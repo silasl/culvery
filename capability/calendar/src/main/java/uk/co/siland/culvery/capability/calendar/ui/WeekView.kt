@@ -63,7 +63,7 @@ internal fun reconnectLabel(labels: List<String>): String =
 fun WeekView(state: WeekViewState, modifier: Modifier = Modifier) {
     val c = Culvery.colors
     val navigator = LocalShellNavigator.current
-    Column(verticalArrangement = Arrangement.spacedBy(18.dp), modifier = modifier.fillMaxSize()) {
+    Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.weekHeaderGap), modifier = modifier.fillMaxSize()) {
         Row(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(CalendarDimens.headerTrailingGap),
@@ -87,7 +87,7 @@ fun WeekView(state: WeekViewState, modifier: Modifier = Modifier) {
             }
             Legend(state.week.people, Modifier.padding(end = CalendarDimens.headerTrailingGap))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().weight(1f)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekColumnGap), modifier = Modifier.fillMaxWidth().weight(1f)) {
             state.week.days.forEach { day ->
                 DayColumn(day, isToday = day.date == state.today, modifier = Modifier.weight(1f).fillMaxHeight())
             }
@@ -98,14 +98,14 @@ fun WeekView(state: WeekViewState, modifier: Modifier = Modifier) {
 @Composable
 private fun DayColumn(day: DayUi, isToday: Boolean, modifier: Modifier) {
     val c = Culvery.colors
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(CalendarDimens.weekColumnRadius)
     val inset = CalendarDimens.columnHeaderInset
     HhCard(
         modifier = modifier
             .testTag("week_day_${day.date}")
-            .then(if (isToday) Modifier.border(2.dp, c.accent, shape) else Modifier),
-        radius = 22.dp,
-        padding = PaddingValues(horizontal = 10.dp, vertical = 14.dp),
+            .then(if (isToday) Modifier.border(CalendarDimens.todayRingWidth, c.accent, shape) else Modifier),
+        radius = CalendarDimens.weekColumnRadius,
+        padding = PaddingValues(horizontal = CalendarDimens.weekColumnPaddingH, vertical = CalendarDimens.weekColumnPaddingV),
     ) {
         Row(Modifier.padding(start = inset, end = inset, bottom = inset)) {
             Text(
@@ -114,7 +114,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, modifier: Modifier) {
                 color = if (isToday) c.accent else c.mute,
                 modifier = Modifier.alignByBaseline(),
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(CalendarDimens.weekDayDateGap))
             Text(day.date.dayOfMonth.toString(), style = HhType.dateNumber, color = c.ink, modifier = Modifier.alignByBaseline())
         }
         Spacer(Modifier.height(CalendarDimens.columnGap))
@@ -135,9 +135,9 @@ private fun EventChip(event: EventUi) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(CalendarDimens.chipRadius))
             .background(colour.copy(alpha = tint))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = CalendarDimens.chipPaddingH, vertical = CalendarDimens.chipPaddingV),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(event.startLabel, style = CalendarType.chipTime, color = colour, maxLines = 1, modifier = Modifier.weight(1f))
@@ -183,7 +183,7 @@ private fun ReconnectChip(label: String, onClick: () -> Unit) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.reconnectIconGap),
         modifier = Modifier
             .height(CalendarDimens.touchTarget)
             .clip(RoundedCornerShape(CalendarDimens.pillRadius))

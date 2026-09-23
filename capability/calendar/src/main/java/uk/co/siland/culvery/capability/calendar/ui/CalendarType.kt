@@ -98,6 +98,20 @@ internal object CalendarDimens {
     val chipTitleTop = 2.dp
     val chipBadge = 15.dp
 
+    // Week view layout: header→columns 18, between columns 10; column radius 22, today ring 2 dp inset;
+    // column padding 10×14; weekday label→date number 6; chip radius 12, chip padding 10×8; reconnect icon→label 8.
+    val weekHeaderGap = 18.dp
+    val weekColumnGap = 10.dp
+    val weekColumnRadius = 22.dp
+    val todayRingWidth = 2.dp
+    val weekColumnPaddingH = 10.dp
+    val weekColumnPaddingV = 14.dp
+    val weekDayDateGap = 6.dp
+    val chipRadius = 12.dp
+    val chipPaddingH = 10.dp
+    val chipPaddingV = 8.dp
+    val reconnectIconGap = 8.dp
+
     /** Chip tint: the person's colour at 0x2E alpha on dark, 0x26 on light. */
     const val CHIP_ALPHA_DARK = 0x2E / 255f
     const val CHIP_ALPHA_LIGHT = 0x26 / 255f
