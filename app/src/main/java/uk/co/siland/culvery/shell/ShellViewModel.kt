@@ -25,13 +25,14 @@ import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomePlacement
+import uk.co.siland.culvery.core.plugin.ShellNavigator
 
 @HiltViewModel
 class ShellViewModel @Inject constructor(
     capabilities: Set<@JvmSuppressWildcards Capability>,
     ticker: MinuteTicker,
     private val access: AccessControl,
-) : ViewModel() {
+) : ViewModel(), ShellNavigator {
     private val ordered = capabilities.sortedBy { it.order }
     private val selected = MutableStateFlow(HOME_TAB_ID)
     private val settingsOpen = MutableStateFlow(false)
@@ -97,7 +98,9 @@ class ShellViewModel @Inject constructor(
         selected.value = id
     }
 
-    fun openSettings() {
+    override fun openTab(id: String) = selectTab(id)
+
+    override fun openSettings() {
         viewModelScope.launch {
             if (access.authorise(CorePermissions.SETTINGS_MANAGE) != null) settingsOpen.value = true
         }

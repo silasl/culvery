@@ -1,6 +1,7 @@
 package uk.co.siland.culvery
 
 import android.app.Application
+import android.util.Log
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -8,15 +9,22 @@ import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.PinManager
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.Startable
 
 @HiltAndroidApp
 class CulveryApp : Application() {
     @Inject lateinit var household: HouseholdRepository
     @Inject lateinit var pins: PinManager
+    @Inject lateinit var startables: Set<@JvmSuppressWildcards Startable>
     @Inject @ApplicationScope lateinit var appScope: CoroutineScope
 
     override fun onCreate() {
         super.onCreate()
+        startAll(startables) { startable, e -> Log.e(TAG, "${startable.javaClass.name} failed to start", e) }
         appScope.launch { seedDebugData(household, pins) }
+    }
+
+    private companion object {
+        const val TAG = "Culvery"
     }
 }

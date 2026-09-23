@@ -16,6 +16,7 @@ import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.ShellNavigator
 
 class ShellViewModelTest {
     @get:Rule val main = MainDispatcherRule()
@@ -226,5 +227,24 @@ class ShellViewModelTest {
     fun initialStateUsesScheduledTheme() = runTest {
         val vm = vm()
         assertThat(vm.uiState.value.dark).isFalse()
+    }
+
+    @Test
+    fun openTabSelectsThatTab() = runTest {
+        val vm = vm(setOf(FakeCapability("calendar", order = 10, shown = true)))
+        val navigator: ShellNavigator = vm
+        vm.uiState.test {
+            navigator.openTab("calendar")
+            assertThat(expectMostRecentItem().selectedTabId).isEqualTo("calendar")
+        }
+    }
+
+    @Test
+    fun openTabForAHiddenTabStaysHome() = runTest {
+        val vm = vm(setOf(FakeCapability("calendar", order = 10, shown = false)))
+        vm.uiState.test {
+            vm.openTab("calendar")
+            assertThat(expectMostRecentItem().selectedTabId).isEqualTo(HOME_TAB_ID)
+        }
     }
 }

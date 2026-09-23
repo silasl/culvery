@@ -8,6 +8,7 @@ import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -19,6 +20,7 @@ import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.access.ui.PinPadHost
 import uk.co.siland.culvery.core.plugin.Capability
+import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.shell.ShellViewModel
 import uk.co.siland.culvery.shell.ui.CulveryShell
@@ -51,19 +53,21 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val state by shell.uiState.collectAsStateWithLifecycle()
-            CulveryTheme(dark = state.dark) {
-                CulveryShell(
-                    state = state,
-                    onSelectTab = shell::selectTab,
-                    onOpenSettings = shell::openSettings,
-                    onLockSession = shell::lockSession,
-                    onToggleThemePreview = shell::toggleThemePreview,
-                    tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
-                )
-                if (state.settingsOpen) {
-                    SettingsPlaceholder(onExitKiosk = shell::exitKiosk, onClose = shell::closeSettings)
+            CompositionLocalProvider(LocalShellNavigator provides shell) {
+                CulveryTheme(dark = state.dark) {
+                    CulveryShell(
+                        state = state,
+                        onSelectTab = shell::selectTab,
+                        onOpenSettings = shell::openSettings,
+                        onLockSession = shell::lockSession,
+                        onToggleThemePreview = shell::toggleThemePreview,
+                        tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
+                    )
+                    if (state.settingsOpen) {
+                        SettingsPlaceholder(onExitKiosk = shell::exitKiosk, onClose = shell::closeSettings)
+                    }
+                    PinPadHost(pinPrompt)
                 }
-                PinPadHost(pinPrompt)
             }
         }
     }

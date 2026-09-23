@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Capability
+import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.shell.MinuteTicker
 import uk.co.siland.culvery.shell.SystemMinuteTicker
@@ -20,6 +21,9 @@ import uk.co.siland.culvery.shell.SystemMinuteTicker
 abstract class AppModule {
     @Multibinds
     abstract fun capabilities(): Set<Capability>
+
+    @Multibinds
+    abstract fun startables(): Set<Startable>
 
     companion object {
         @Provides
