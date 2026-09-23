@@ -11,14 +11,12 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.annotation.Config
 import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
-@Config(qualifiers = "w1280dp-h800dp")
 class PinPadTest {
     @get:Rule val compose = createComposeRule()
     private val controller = PinPromptController()

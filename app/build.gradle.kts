@@ -2,6 +2,7 @@ plugins {
     id("culvery.android.application")
     id("culvery.android.compose")
     id("culvery.hilt")
+    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -23,4 +24,6 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.kotlinx.coroutines.core)
+    testImplementation(libs.roborazzi.core)
+    testImplementation(libs.roborazzi.compose)
 }
