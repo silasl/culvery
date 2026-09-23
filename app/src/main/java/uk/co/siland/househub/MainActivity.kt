@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
                     kioskExited = true
                     unpinFromScreen()
                     showSystemBars()
+                    moveTaskToBack(true)
                 }
             }
         }

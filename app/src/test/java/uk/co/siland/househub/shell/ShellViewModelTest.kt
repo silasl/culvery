@@ -133,6 +133,35 @@ class ShellViewModelTest {
     }
 
     @Test
+    fun exitKioskClosesSettingsAndLocksSession() = runTest {
+        val vm = vm()
+        access.result = admin
+        vm.uiState.test {
+            vm.openSettings()
+            assertThat(expectMostRecentItem().settingsOpen).isTrue()
+            vm.exitKiosk()
+            expectMostRecentItem().let {
+                assertThat(it.settingsOpen).isFalse()
+                assertThat(it.session).isNull()
+            }
+        }
+        assertThat(access.session.value).isNull()
+    }
+
+    @Test
+    fun cancelledExitKioskLeavesSettingsOpen() = runTest {
+        val vm = vm()
+        access.result = admin
+        vm.uiState.test {
+            vm.openSettings()
+            assertThat(expectMostRecentItem().settingsOpen).isTrue()
+            access.result = null
+            vm.exitKiosk()
+            expectNoEvents()
+        }
+    }
+
+    @Test
     fun sessionShowsAsChip() = runTest {
         val vm = vm()
         vm.uiState.test {

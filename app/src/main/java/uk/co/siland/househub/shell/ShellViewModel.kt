@@ -109,7 +109,11 @@ class ShellViewModel @Inject constructor(
 
     fun exitKiosk() {
         viewModelScope.launch {
-            if (access.authorise(CorePermissions.KIOSK_EXIT) != null) kioskExitEvents.send(Unit)
+            if (access.authorise(CorePermissions.KIOSK_EXIT) != null) {
+                settingsOpen.value = false
+                access.lock()
+                kioskExitEvents.send(Unit)
+            }
         }
     }
 
