@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0" rel="stylesheet">
+<style>
+body{margin:0;background:#08090a;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
+a{color:#4CB387}a:hover{color:#7FD1AC}
+button{font-family:'DM Sans',system-ui,sans-serif}
+.ms{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;font-feature-settings:'liga'}
+input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;height:28px;margin:0;width:100%}
+input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:var(--surf3)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--ink);margin-top:-8px;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+</style>
+</helmet>
+<div style="width:{{ wrapW }}px;height:{{ wrapH }}px;flex:none">
+<div style="width:1280px;height:800px;transform:scale({{ scale }});transform-origin:0 0;--bg:{{ t.bg }};--surf:{{ t.surf }};--surf2:{{ t.surf2 }};--surf3:{{ t.surf3 }};--line:{{ t.line }};--ink:{{ t.ink }};--mute:{{ t.mute }};--accent:{{ t.accent }};--accentInk:{{ t.accentInk }};--accentSoft:{{ t.accentSoft }};background:var(--bg);color:var(--ink);display:flex;flex-direction:column;overflow:hidden;position:relative;border-radius:18px;box-shadow:0 0 0 10px #1c1c1e,0 30px 80px rgba(0,0,0,.6);transition:background .4s,color .4s">
+
+  <sc-if value="{{ showStatusBar }}" hint-placeholder-val="{{ true }}">
+    <div style="height:30px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:13px;font-weight:500;color:var(--mute)">
+      <span>{{ clockShort }}</span>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button onClick="{{ cycleTheme }}" title="Preview day / night" style="border:0;background:transparent;color:var(--mute);cursor:pointer;display:flex;align-items:center;gap:4px;font:500 12px 'DM Sans';padding:0"><span class="ms" style="font-size:16px">{{ themeIcon }}</span>{{ themeLabel }}</button>
+        <span class="ms" style="font-size:16px">wifi</span><span class="ms" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hActive }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:none;display:flex;align-items:center;gap:14px;padding:10px 24px;background:var(--accentSoft);color:var(--ink);font-size:15px">
+      <span class="ms" style="font-size:22px;color:var(--accent)">flight_takeoff</span>
+      <span style="font-weight:700">Holiday mode on</span>
+      <span style="color:var(--mute)">Back {{ retLabel }} · {{ activeCount }} routines running</span>
+      <div style="flex:1"></div>
+      <button onClick="{{ endHoliday }}" style="border:0;background:var(--accent);color:var(--accentInk);font-weight:700;font-size:14px;padding:9px 18px;border-radius:20px;cursor:pointer">I'm home</button>
+    </div>
+  </sc-if>
+
+  <div style="flex:1;display:flex;min-height:0">
+    <nav style="width:108px;flex:none;display:flex;flex-direction:column;align-items:center;padding:16px 0 20px;gap:4px;border-right:1px solid var(--line)">
+      <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+        <button onClick="{{ n.onClick }}" style="width:88px;border:0;background:transparent;color:{{ n.color }};display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0;cursor:pointer;font-weight:600;font-size:13px">
+          <span style="width:64px;height:38px;border-radius:19px;background:{{ n.bg }};display:flex;align-items:center;justify-content:center;transition:background .2s"><span class="ms" style="font-size:26px;font-variation-settings:'FILL' {{ n.fill }}">{{ n.icon }}</span></span>
+          <span>{{ n.label }}</span>
+        </button>
+      </sc-for>
+      <div style="flex:1"></div>
+      <button onClick="{{ openHoliday }}" style="width:80px;height:80px;border-radius:26px;border:0;background:{{ hBtnBg }};color:{{ hBtnFg }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;font-weight:700;font-size:12px">
+        <span class="ms" style="font-size:30px">luggage</span><span>{{ hBtnLabel }}</span>
+      </button>
+    </nav>
+
+    <main style="flex:1;min-width:0;padding:24px 28px 22px;display:flex;flex-direction:column;gap:18px;overflow:hidden">
+
+      <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between">
+          <div>
+            <div style="font-size:104px;font-weight:600;letter-spacing:-4px;line-height:.9;font-variant-numeric:tabular-nums">{{ clockBig }}</div>
+            <div style="font-size:21px;color:var(--mute);margin-top:12px">{{ dateLong }}</div>
+          </div>
+          <div style="display:flex;gap:28px;align-items:center;padding-bottom:4px">
+            <div style="display:flex;align-items:center;gap:12px"><span class="ms" style="font-size:44px;color:#E0B85B">partly_cloudy_day</span><div><div style="font-size:34px;font-weight:600">17°</div><div style="font-size:14px;color:var(--mute)">High 19° · Low 11°</div></div></div>
+            <div style="width:1px;height:48px;background:var(--line)"></div>
+            <button onClick="{{ goClimate }}" style="border:0;background:transparent;color:var(--ink);text-align:left;cursor:pointer;padding:0"><div style="font-size:34px;font-weight:600">{{ insideTemp }}°</div><div style="font-size:14px;color:var(--mute)">Inside · {{ heatLabel }}</div></button>
+          </div>
+        </div>
+        <div style="flex:1;min-height:0;display:grid;grid-template-columns:1.15fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:14px">
+          <div style="grid-row:span 2;background:var(--surf);border-radius:26px;padding:22px;display:flex;flex-direction:column;gap:10px;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="font-size:19px;font-weight:700">Today</span><button onClick="{{ goCalendar }}" style="border:0;background:var(--surf2);color:var(--ink);font-weight:600;font-size:13px;padding:7px 14px;border-radius:14px;cursor:pointer">Week</button></div>
+            <sc-for list="{{ todayEvents }}" as="e" hint-placeholder-count="4">
+              <div style="display:flex;gap:14px;padding:12px 14px;background:var(--surf2);border-radius:16px">
+                <div style="width:4px;border-radius:2px;background:{{ e.color }}"></div>
+                <div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">{{ e.t }}</div><div style="font-size:14px;color:var(--mute);margin-top:3px">{{ e.s }}–{{ e.e }} · {{ e.who }}</div></div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="grid-column:span 2;background:var(--surf);border-radius:26px;padding:20px 22px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:19px;font-weight:700">Scenes</span><button onClick="{{ goLights }}" style="border:0;background:transparent;color:var(--mute);font-size:14px;cursor:pointer;padding:0">{{ lightsOnLabel }}</button></div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex:1">
+              <sc-for list="{{ scenes }}" as="s" hint-placeholder-count="4">
+                <button onClick="{{ s.onClick }}" style="border:0;border-radius:18px;background:{{ s.bg }};color:{{ s.fg }};display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;padding:14px 16px;cursor:pointer;font-weight:700;font-size:16px;transition:background .2s">
+                  <span class="ms" style="font-size:30px">{{ s.icon }}</span><span>{{ s.name }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="background:var(--surf);border-radius:26px;padding:18px;display:flex;gap:16px;align-items:center">
+            <div style="width:104px;height:104px;flex:none;border-radius:16px;background:repeating-linear-gradient(135deg,var(--surf2) 0 8px,var(--surf3) 8px 16px);display:flex;align-items:center;justify-content:center;font:10px 'JetBrains Mono';color:var(--mute)">cover art</div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+              <div style="font-size:13px;color:var(--accent);font-weight:700">{{ zoneName }}</div>
+              <div style="font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ track.title }}</div>
+              <div style="font-size:14px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ track.artist }}</div>
+              <button onClick="{{ togglePlay }}" style="margin-top:8px;width:50px;height:50px;border-radius:25px;border:0;background:var(--ink);color:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center"><span class="ms" style="font-size:30px;font-variation-settings:'FILL' 1">{{ playIcon }}</span></button>
+            </div>
+          </div>
+          <button onClick="{{ openHoliday }}" style="border:0;text-align:left;background:{{ homeHBg }};color:var(--ink);border-radius:26px;padding:20px 22px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer">
+            <span class="ms" style="font-size:34px;color:var(--accent)">luggage</span>
+            <div><div style="font-size:19px;font-weight:700">{{ homeHTitle }}</div><div style="font-size:14px;color:var(--mute);margin-top:4px">{{ homeHSub }}</div></div>
+          </button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isCalendar }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between">
+          <div><div style="font-size:34px;font-weight:700;letter-spacing:-.5px">This week</div><div style="font-size:15px;color:var(--mute);margin-top:4px">Family calendar · synced with Google {{ syncAgo }}</div></div>
+          <div style="display:flex;gap:18px;font-size:14px;font-weight:500">
+            <sc-for list="{{ people }}" as="p" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:7px"><span style="width:10px;height:10px;border-radius:5px;background:{{ p.color }}"></span>{{ p.name }}</div></sc-for>
+          </div>
+        </div>
+        <div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px">
+          <sc-for list="{{ week }}" as="d" hint-placeholder-count="7">
+            <div style="background:var(--surf);border-radius:22px;padding:14px 10px;display:flex;flex-direction:column;gap:8px;overflow:hidden;box-shadow:{{ d.ring }}">
+              <div style="display:flex;align-items:baseline;gap:6px;padding:0 4px 4px"><span style="font-size:14px;color:{{ d.dowColor }};font-weight:600">{{ d.dow }}</span><span style="font-size:24px;font-weight:700">{{ d.num }}</span></div>
+              <sc-for list="{{ d.events }}" as="e" hint-placeholder-count="2">
+                <div style="background:{{ e.tint }};border-radius:12px;padding:8px 10px">
+                  <div style="font-size:12px;color:{{ e.color }};font-weight:700">{{ e.s }}</div>
+                  <div style="font-size:14px;font-weight:600;line-height:1.25;margin-top:2px">{{ e.t }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isLights }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between">
+          <div><div style="font-size:34px;font-weight:700;letter-spacing:-.5px">Lights</div><div style="font-size:15px;color:var(--mute);margin-top:4px">{{ lightsSub }}</div></div>
+          <div style="display:flex;gap:10px">
+            <button onClick="{{ allOn }}" style="border:0;background:var(--surf2);color:var(--ink);font-weight:700;font-size:15px;padding:13px 22px;border-radius:24px;cursor:pointer">All on</button>
+            <button onClick="{{ allOff }}" style="border:0;background:var(--surf2);color:var(--ink);font-weight:700;font-size:15px;padding:13px 22px;border-radius:24px;cursor:pointer">All off</button>
+          </div>
+        </div>
+        <div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:1fr 1fr;gap:14px">
+          <sc-for list="{{ rooms }}" as="r" hint-placeholder-count="8">
+            <div style="background:{{ r.bg }};border-radius:24px;padding:18px;display:flex;flex-direction:column;justify-content:space-between;transition:background .25s">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <button onClick="{{ r.onToggle }}" style="width:56px;height:56px;border-radius:28px;border:0;background:{{ r.iconBg }};color:{{ r.iconFg }};cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .25s"><span class="ms" style="font-size:30px;font-variation-settings:'FILL' 1">lightbulb</span></button>
+                <button onClick="{{ r.onCycle }}" title="Change colour" style="width:34px;height:34px;border-radius:17px;border:3px solid var(--surf);background:{{ r.hue }};cursor:pointer;opacity:{{ r.hueOp }}"></button>
+              </div>
+              <div>
+                <div style="font-size:19px;font-weight:700">{{ r.name }}</div>
+                <div style="font-size:14px;color:var(--mute);margin:3px 0 8px">{{ r.status }}</div>
+                <input type="range" min="1" max="100" value="{{ r.bri }}" onChange="{{ r.onBri }}"></input>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isMusic }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;min-height:0;display:grid;grid-template-columns:1.35fr 1fr;gap:18px">
+          <div style="background:var(--surf);border-radius:28px;padding:28px;display:flex;gap:28px;align-items:center">
+            <div style="width:300px;height:300px;flex:none;border-radius:22px;background:repeating-linear-gradient(135deg,var(--surf2) 0 12px,var(--surf3) 12px 24px);display:flex;align-items:center;justify-content:center;font:12px 'JetBrains Mono';color:var(--mute)">album cover</div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:13px;color:var(--accent);font-weight:700;letter-spacing:.6px">{{ playingIn }}</div>
+              <div style="font-size:32px;font-weight:700;line-height:1.1;letter-spacing:-.5px;text-wrap:pretty">{{ track.title }}</div>
+              <div style="font-size:18px;color:var(--mute)">{{ track.artist }}</div>
+              <div style="height:6px;border-radius:3px;background:var(--surf3);margin-top:20px;overflow:hidden"><div style="width:{{ track.pct }}%;height:100%;background:var(--ink)"></div></div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--mute);font-variant-numeric:tabular-nums"><span>{{ track.pos }}</span><span>{{ track.len }}</span></div>
+              <div style="display:flex;gap:14px;align-items:center;margin-top:10px">
+                <button onClick="{{ prevTrack }}" style="width:60px;height:60px;border-radius:30px;border:0;background:var(--surf2);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center"><span class="ms" style="font-size:32px">skip_previous</span></button>
+                <button onClick="{{ togglePlay }}" style="width:80px;height:80px;border-radius:40px;border:0;background:var(--ink);color:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center"><span class="ms" style="font-size:44px;font-variation-settings:'FILL' 1">{{ playIcon }}</span></button>
+                <button onClick="{{ nextTrack }}" style="width:60px;height:60px;border-radius:30px;border:0;background:var(--surf2);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center"><span class="ms" style="font-size:32px">skip_next</span></button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 4px 0"><span style="font-size:22px;font-weight:700">Speakers</span><span style="font-size:14px;color:var(--mute)">Tap name to control · link to group</span></div>
+            <sc-for list="{{ zones }}" as="z" hint-placeholder-count="4">
+              <div style="background:{{ z.bg }};border-radius:20px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;box-shadow:{{ z.ring }}">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <button onClick="{{ z.onSelect }}" style="flex:1;border:0;background:transparent;color:var(--ink);text-align:left;cursor:pointer;padding:0;display:flex;align-items:center;gap:10px"><span class="ms" style="font-size:24px;color:{{ z.iconColor }}">speaker</span><span style="font-size:17px;font-weight:700">{{ z.name }}</span><span style="font-size:13px;color:var(--mute)">{{ z.state }}</span></button>
+                  <button onClick="{{ z.onLink }}" style="border:0;background:{{ z.linkBg }};color:{{ z.linkFg }};font-weight:700;font-size:13px;padding:7px 12px;border-radius:14px;cursor:pointer;display:flex;align-items:center;gap:4px"><span class="ms" style="font-size:16px">link</span>{{ z.linkLabel }}</button>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px"><span class="ms" style="font-size:20px;color:var(--mute)">volume_down</span><input type="range" min="0" max="100" value="{{ z.vol }}" onChange="{{ z.onVol }}"></input><span style="font-size:13px;color:var(--mute);width:28px;text-align:right;font-variant-numeric:tabular-nums">{{ z.vol }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isClimate }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;min-height:0;display:grid;grid-template-columns:1.2fr 1fr;gap:18px">
+          <div style="background:var(--surf);border-radius:28px;padding:30px;display:flex;flex-direction:column;justify-content:space-between">
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:22px;font-weight:700">Heating</span><span style="font-size:15px;color:var(--mute)">Inside now {{ insideTemp }}°</span></div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:40px">
+              <button onClick="{{ tempDown }}" style="width:88px;height:88px;border-radius:44px;border:0;background:var(--surf2);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center"><span class="ms" style="font-size:44px">remove</span></button>
+              <div style="text-align:center"><div style="font-size:160px;font-weight:600;letter-spacing:-6px;line-height:1;font-variant-numeric:tabular-nums;color:{{ targetColor }}">{{ targetLabel }}</div><div style="font-size:16px;color:var(--mute);margin-top:6px">{{ heatLabel }}</div></div>
+              <button onClick="{{ tempUp }}" style="width:88px;height:88px;border-radius:44px;border:0;background:var(--surf2);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center"><span class="ms" style="font-size:44px">add</span></button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--surf2);padding:6px;border-radius:22px">
+              <sc-for list="{{ modes }}" as="m" hint-placeholder-count="3">
+                <button onClick="{{ m.onClick }}" style="border:0;background:{{ m.bg }};color:{{ m.fg }};font-weight:700;font-size:16px;padding:14px;border-radius:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><span class="ms" style="font-size:22px">{{ m.icon }}</span>{{ m.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
+            <div style="font-size:22px;font-weight:700;padding:4px 4px 0">Rooms</div>
+            <sc-for list="{{ climateRooms }}" as="c" hint-placeholder-count="5">
+              <div style="background:var(--surf);border-radius:18px;padding:14px 18px;display:flex;align-items:center;gap:14px">
+                <span style="flex:1;font-size:17px;font-weight:600">{{ c.name }}</span>
+                <span style="font-size:14px;color:var(--mute)">{{ c.hum }}% RH</span>
+                <span style="font-size:24px;font-weight:700;width:64px;text-align:right;font-variant-numeric:tabular-nums">{{ c.temp }}°</span>
+              </div>
+            </sc-for>
+            <button onClick="{{ toggleBoost }}" style="border:0;background:{{ boostBg }};color:{{ boostFg }};border-radius:18px;padding:16px 18px;display:flex;align-items:center;gap:12px;cursor:pointer;font-weight:700;font-size:16px;text-align:left"><span class="ms" style="font-size:26px">water_drop</span><span style="flex:1">{{ boostLabel }}</span><span style="font-size:14px;font-weight:500">{{ boostSub }}</span></button>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+
+  <sc-if value="{{ hOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;display:flex;justify-content:flex-end">
+      <div onClick="{{ closeHoliday }}" style="position:absolute;inset:0;background:rgba(0,0,0,.55)"></div>
+      <div style="position:relative;width:600px;height:100%;background:var(--bg);border-left:1px solid var(--line);padding:28px 30px 26px;box-sizing:border-box;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div><div style="font-size:34px;font-weight:700;letter-spacing:-.5px">{{ sheetTitle }}</div><div style="font-size:15px;color:var(--mute);margin-top:4px">{{ sheetSub }}</div></div>
+          <button onClick="{{ closeHoliday }}" style="width:48px;height:48px;border-radius:24px;border:0;background:var(--surf2);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center"><span class="ms" style="font-size:26px">close</span></button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="background:var(--surf);border-radius:20px;padding:14px 16px;display:flex;align-items:center;gap:10px">
+            <div style="flex:1"><div style="font-size:13px;color:var(--mute);font-weight:600">Leaving</div><div style="font-size:20px;font-weight:700;margin-top:2px">{{ leaveLabel }}</div></div>
+            <button onClick="{{ leaveDown }}" style="width:44px;height:44px;border-radius:22px;border:0;background:var(--surf2);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center"><span class="ms">remove</span></button>
+            <button onClick="{{ leaveUp }}" style="width:44px;height:44px;border-radius:22px;border:0;background:var(--surf2);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center"><span class="ms">add</span></button>
+          </div>
+          <div style="background:var(--surf);border-radius:20px;padding:14px 16px;display:flex;align-items:center;gap:10px">
+            <div style="flex:1"><div style="font-size:13px;color:var(--mute);font-weight:600">Back</div><div style="font-size:20px;font-weight:700;margin-top:2px">{{ retLabel }}</div></div>
+            <button onClick="{{ daysDown }}" style="width:44px;height:44px;border-radius:22px;border:0;background:var(--surf2);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center"><span class="ms">remove</span></button>
+            <button onClick="{{ daysUp }}" style="width:44px;height:44px;border-radius:22px;border:0;background:var(--surf2);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center"><span class="ms">add</span></button>
+          </div>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;overflow-y:auto;overflow-x:hidden">
+          <sc-for list="{{ routines }}" as="r" hint-placeholder-count="7">
+            <button onClick="{{ r.onToggle }}" style="flex:none;border:0;background:var(--surf);color:var(--ink);border-radius:16px;padding:8px 14px;display:flex;align-items:center;gap:14px;cursor:pointer;text-align:left">
+              <span style="width:38px;height:38px;border-radius:19px;background:var(--surf2);display:flex;align-items:center;justify-content:center;flex:none"><span class="ms" style="font-size:22px;color:{{ r.iconColor }}">{{ r.icon }}</span></span>
+              <span style="flex:1;min-width:0"><span style="display:block;font-size:16px;font-weight:700">{{ r.title }}</span><span style="display:block;font-size:13px;color:var(--mute);margin-top:2px">{{ r.sub }}</span></span>
+              <span style="width:52px;height:30px;border-radius:15px;background:{{ r.track }};display:flex;align-items:center;justify-content:{{ r.justify }};padding:3px;box-sizing:border-box;flex:none;transition:background .2s"><span style="width:24px;height:24px;border-radius:12px;background:{{ r.knob }}"></span></span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:10px">
+          <sc-if value="{{ arming }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ cancelArm }}" style="border:0;background:var(--surf2);color:var(--ink);font-weight:700;font-size:17px;padding:18px 24px;border-radius:30px;cursor:pointer">Cancel</button>
+          </sc-if>
+          <button onClick="{{ primaryAction }}" style="flex:1;border:0;background:{{ primaryBg }};color:{{ primaryFg }};font-weight:700;font-size:18px;padding:18px;border-radius:30px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px"><span class="ms" style="font-size:24px">{{ primaryIcon }}</span>{{ primaryLabel }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;auto&quot;,&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;auto&quot;,&quot;tsType&quot;:&quot;'auto'|'dark'|'light'&quot;},&quot;showStatusBar&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;armCountdown&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const THEMES = {
+  dark: { bg:'#0E1011', surf:'#1A1D1E', surf2:'#24282A', surf3:'#303537', line:'#1F2324', ink:'#F1F4F2', mute:'#9AA3A0', accent:'#4CB387', accentInk:'#08170F', accentSoft:'#173427' },
+  light:{ bg:'#EDF0EE', surf:'#FFFFFF', surf2:'#F1F4F2', surf3:'#DDE3E0', line:'#DAE0DD', ink:'#111514', mute:'#5A6461', accent:'#2E8A64', accentInk:'#FFFFFF', accentSoft:'#D3EDE1' }
+};
+const PEOPLE = { alex:{name:'Alex',color:'#4CB387'}, sam:{name:'Sam',color:'#5B9BE0'}, mia:{name:'Mia',color:'#E07BA8'}, fam:{name:'Family',color:'#E0A85B'} };
+const EVENTS = [
+  {d:0,s:'07:45',e:'08:30',t:'School run',p:'sam'},{d:0,s:'10:00',e:'11:00',t:'Boiler service',p:'fam'},{d:0,s:'16:00',e:'17:00',t:'Swimming',p:'mia'},{d:0,s:'19:30',e:'21:00',t:'Dinner with Jo & Priya',p:'alex'},
+  {d:1,s:'09:00',e:'17:00',t:'Office day',p:'alex'},{d:1,s:'18:00',e:'19:00',t:'Football',p:'mia'},
+  {d:2,s:'08:00',e:'09:00',t:'Bin day',p:'fam'},{d:2,s:'12:30',e:'13:30',t:'Dentist',p:'sam'},
+  {d:3,s:'15:30',e:'16:30',t:'Piano',p:'mia'},{d:3,s:'20:00',e:'22:00',t:'Book club',p:'sam'},
+  {d:4,s:'19:00',e:'23:00',t:'Pizza night',p:'fam'},
+  {d:5,s:'09:30',e:'11:00',t:'Parkrun',p:'alex'},{d:5,s:'14:00',e:'17:00',t:'Birthday party',p:'mia'},
+  {d:6,s:'12:00',e:'15:00',t:'Sunday lunch at Gran\'s',p:'fam'}
+];
+const HUES = [['#FFD49A','Warm'],['#FFF3DE','White'],['#A9CBFF','Cool'],['#CDA8FF','Violet'],['#FFA89A','Coral']];
+const TRACKS = [
+  {title:'Slow Morning',artist:'The Lantern Club',len:'4:12',pos:'1:36',pct:38},
+  {title:'Harbour Lights',artist:'Nell & the Tides',len:'3:48',pos:'0:52',pct:23},
+  {title:'Kitchen Radio',artist:'Paper Owls',len:'5:01',pos:'2:40',pct:53}
+];
+const ROUTINES = [
+  {k:'presence',icon:'lightbulb',title:'Simulate presence',sub:'Hue lights on/off at random, 18:00–23:30'},
+  {k:'heat',icon:'thermostat',title:'Frost protection',sub:'Heating held at 12°, hot water off'},
+  {k:'warm',icon:'wb_sunny',title:'Warm up before return',sub:'Back to 20.5° three hours before you arrive'},
+  {k:'sonos',icon:'speaker',title:'Silence Sonos',sub:'Pause all speakers, disable alarms'},
+  {k:'alarm',icon:'shield_lock',title:'Arm alarm & cameras',sub:'Motion alerts to Alex and Sam'},
+  {k:'plugs',icon:'power',title:'Switch off smart plugs',sub:'TV, coffee machine, office — fridge stays on'},
+  {k:'cal',icon:'event',title:'Add “Away” to calendar',sub:'Blocks the dates on the family calendar'}
+];
+const pad = n => String(n).padStart(2,'0');
+const addDays = (d,n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+const dayLabel = d => `${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}`;
+
+class Component extends DCLogic {
+  state = {
+    tab:'home', now:new Date(), themeOverride:null, scale:1,
+    playing:true, trackIdx:0, zone:'lounge', scene:null,
+    rooms:[
+      {id:'kitchen',name:'Kitchen',on:true,bri:80,hue:1},{id:'lounge',name:'Lounge',on:true,bri:55,hue:0},
+      {id:'dining',name:'Dining',on:false,bri:60,hue:0},{id:'hall',name:'Hallway',on:true,bri:30,hue:0},
+      {id:'bed',name:'Main bedroom',on:false,bri:40,hue:0},{id:'kids',name:'Mia\'s room',on:false,bri:25,hue:3},
+      {id:'office',name:'Office',on:false,bri:90,hue:2},{id:'garden',name:'Garden',on:false,bri:70,hue:1}
+    ],
+    zones:[
+      {id:'lounge',name:'Lounge',vol:32,group:false},{id:'kitchen',name:'Kitchen',vol:24,group:true},
+      {id:'bed',name:'Bedroom',vol:15,group:false},{id:'garden',name:'Garden',vol:40,group:false}
+    ],
+    target:20.5, mode:'heat', boost:false,
+    hOpen:false, hActive:false, leave:2, days:9, arming:0,
+    routines:{presence:true,heat:true,warm:true,sonos:true,alarm:true,plugs:true,cal:false}
+  };
+  componentDidMount(){
+    this.tick = setInterval(()=>this.setState({now:new Date()}),10000);
+    this.fit = () => this.setState({scale:Math.max(.3,Math.min(1,(window.innerWidth-40)/1300,(window.innerHeight-40)/820))});
+    this.fit(); window.addEventListener('resize',this.fit);
+  }
+  componentWillUnmount(){ clearInterval(this.tick); clearInterval(this.armT); window.removeEventListener('resize',this.fit); }
+  setRoom(id,patch){ this.setState(s=>({scene:null,rooms:s.rooms.map(r=>r.id===id?{...r,...patch}:r)})); }
+  setZone(id,patch){ this.setState(s=>({zones:s.zones.map(z=>z.id===id?{...z,...patch}:z)})); }
+  applyScene(name){
+    const P = {
+      Morning:{kitchen:[1,90,1],lounge:[1,60,1],hall:[1,50,1],dining:[1,50,1]},
+      Evening:{kitchen:[1,60,0],lounge:[1,45,0],dining:[1,40,0],hall:[1,25,0],garden:[1,50,0]},
+      Film:{lounge:[1,12,3],hall:[1,8,0]},
+      Night:{hall:[1,5,0]}
+    }[name];
+    this.setState(s=>({scene:name,rooms:s.rooms.map(r=>{const v=P[r.id];return v?{...r,on:true,bri:v[1],hue:v[2]}:{...r,on:false};})}));
+  }
+  startHoliday(){
+    clearInterval(this.armT);
+    this.setState(s=>({hActive:true,hOpen:false,arming:0,playing:s.routines.sonos?false:s.playing,
+      rooms:s.routines.presence?s.rooms.map(r=>({...r,on:false})):s.rooms, mode:s.routines.heat?'eco':s.mode}));
+  }
+  beginArm(){
+    if(!(this.props.armCountdown ?? true)) return this.startHoliday();
+    this.setState({arming:10});
+    this.armT = setInterval(()=>{ if(this.state.arming<=1) this.startHoliday(); else this.setState(s=>({arming:s.arming-1})); },1000);
+  }
+  renderVals(){
+    const s = this.state, now = s.now, h = now.getHours();
+    const pref = this.props.theme ?? 'auto';
+    const mode = s.themeOverride || (pref==='auto' ? (h>=7&&h<19?'light':'dark') : pref);
+    const t = THEMES[mode];
+    const tint = c => c + (mode==='dark'?'2E':'26');
+    const onCount = s.rooms.filter(r=>r.on).length;
+    const track = TRACKS[s.trackIdx];
+    const zone = s.zones.find(z=>z.id===s.zone);
+    const leaveD = addDays(now,s.leave), retD = addDays(leaveD,s.days);
+    const activeCount = Object.values(s.routines).filter(Boolean).length;
+    const target = s.mode==='off' ? null : (s.mode==='eco' ? 12 : s.target);
+    const heatLabel = s.mode==='off' ? 'Heating off' : s.mode==='eco' ? 'Frost protection · 12°' : `Heating to ${s.target.toFixed(1)}°`;
+    const tabs = [['home','Home','home'],['calendar','Calendar','calendar_month'],['lights','Lights','lightbulb'],['music','Music','speaker'],['climate','Climate','thermostat']];
+    const go = tab => () => this.setState({tab});
+    const inside = s.mode==='heat' ? '19.8' : '17.2';
+    return {
+      t, wrapW: 1280*s.scale, wrapH: 800*s.scale, scale: s.scale,
+      showStatusBar: this.props.showStatusBar ?? true,
+      themeIcon: mode==='dark'?'dark_mode':'light_mode',
+      themeLabel: s.themeOverride ? (mode==='dark'?'Night':'Day') : (pref==='auto'?'Auto':(mode==='dark'?'Night':'Day')),
+      cycleTheme: () => this.setState({themeOverride: mode==='dark'?'light':'dark'}),
+      clockShort:`${pad(h)}:${pad(now.getMinutes())}`, clockBig:`${pad(h)}:${pad(now.getMinutes())}`,
+      dateLong: now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'}),
+      nav: tabs.map(([id,label,icon])=>{const a=s.tab===id;return {label,icon,onClick:go(id),fill:a?1:0,color:a?'var(--ink)':'var(--mute)',bg:a?'var(--accentSoft)':'transparent'};}),
+      isHome:s.tab==='home', isCalendar:s.tab==='calendar', isLights:s.tab==='lights', isMusic:s.tab==='music', isClimate:s.tab==='climate',
+      goCalendar:go('calendar'), goLights:go('lights'), goClimate:go('climate'),
+      insideTemp: inside, heatLabel,
+      todayEvents: EVENTS.filter(e=>e.d===0).map(e=>({...e,color:PEOPLE[e.p].color,who:PEOPLE[e.p].name})),
+      lightsOnLabel: onCount ? `${onCount} lights on ›` : 'All lights off ›',
+      scenes: [['Morning','wb_twilight'],['Evening','nights_stay'],['Film','movie'],['Night','bedtime']].map(([name,icon])=>{const a=s.scene===name;return {name,icon,onClick:()=>this.applyScene(name),bg:a?'var(--accent)':'var(--surf2)',fg:a?'var(--accentInk)':'var(--ink)'};}),
+      zoneName: zone.name + (s.zones.some(z=>z.group&&z.id!==zone.id)?' + group':''), playingIn:`PLAYING IN ${zone.name.toUpperCase()}`,
+      track, playIcon: s.playing?'pause':'play_arrow',
+      togglePlay:()=>this.setState(x=>({playing:!x.playing})),
+      nextTrack:()=>this.setState(x=>({trackIdx:(x.trackIdx+1)%TRACKS.length,playing:true})),
+      prevTrack:()=>this.setState(x=>({trackIdx:(x.trackIdx+TRACKS.length-1)%TRACKS.length,playing:true})),
+      hActive:s.hActive, activeCount, retLabel: dayLabel(retD), leaveLabel: s.leave===0?'Today':dayLabel(leaveD),
+      homeHBg: s.hActive?'var(--accentSoft)':'var(--surf)',
+      homeHTitle: s.hActive?'Holiday mode on':'Going away?',
+      homeHSub: s.hActive?`Back ${dayLabel(retD)}`:`Set up holiday mode · ${activeCount} routines`,
+      hBtnBg: s.hActive?'var(--accent)':'var(--surf2)', hBtnFg: s.hActive?'var(--accentInk)':'var(--ink)', hBtnLabel: s.hActive?'Away':'Holiday',
+      openHoliday:()=>this.setState({hOpen:true}),
+      closeHoliday:()=>{clearInterval(this.armT);this.setState({hOpen:false,arming:0});},
+      endHoliday:()=>this.setState(x=>({hActive:false,hOpen:false,mode:'heat',routines:x.routines})),
+      syncAgo:'2 min ago',
+      people: Object.values(PEOPLE),
+      week: Array.from({length:7},(_,i)=>{const d=addDays(now,i);return {dow:i===0?'Today':DOW[d.getDay()],num:d.getDate(),dowColor:i===0?'var(--accent)':'var(--mute)',ring:i===0?'inset 0 0 0 2px var(--accent)':'none',
+        events:EVENTS.filter(e=>e.d===i).map(e=>({...e,color:PEOPLE[e.p].color,tint:tint(PEOPLE[e.p].color)}))};}),
+      lightsSub: s.hActive&&s.routines.presence ? 'Presence simulation running — manual control still works' : `${onCount} of ${s.rooms.length} rooms on · Philips Hue bridge connected`,
+      allOn:()=>this.setState(x=>({scene:null,rooms:x.rooms.map(r=>({...r,on:true}))})),
+      allOff:()=>this.setState(x=>({scene:null,rooms:x.rooms.map(r=>({...r,on:false}))})),
+      rooms: s.rooms.map(r=>({...r,
+        bg:r.on?'var(--surf2)':'var(--surf)', iconBg:r.on?HUES[r.hue][0]:'var(--surf3)', iconFg:r.on?'#1A1712':'var(--mute)',
+        hue:HUES[r.hue][0], hueOp:r.on?1:.35, status:r.on?`${r.bri}% · ${HUES[r.hue][1]}`:'Off',
+        onToggle:()=>this.setRoom(r.id,{on:!r.on}), onCycle:()=>this.setRoom(r.id,{hue:(r.hue+1)%HUES.length,on:true}),
+        onBri:e=>this.setRoom(r.id,{bri:+e.target.value,on:true})})),
+      zones: s.zones.map(z=>{const sel=z.id===s.zone, playingHere=s.playing&&(sel||z.group);return {...z,
+        bg:sel?'var(--surf2)':'var(--surf)', ring:sel?'inset 0 0 0 2px var(--accent)':'none', iconColor:playingHere?'var(--accent)':'var(--mute)',
+        state: playingHere?'Playing':(s.playing?'Idle':'Paused'),
+        linkBg:z.group?'var(--accentSoft)':'var(--surf3)', linkFg:z.group?'var(--accent)':'var(--mute)', linkLabel:z.group?'Grouped':'Group',
+        onSelect:()=>this.setState({zone:z.id}), onLink:()=>this.setZone(z.id,{group:!z.group}), onVol:e=>this.setZone(z.id,{vol:+e.target.value})};}),
+      targetLabel: target===null?'Off':target.toFixed(1)+'°', targetColor: s.mode==='heat'?'var(--ink)':'var(--mute)',
+      tempUp:()=>this.setState(x=>({mode:'heat',target:Math.min(25,x.target+.5)})),
+      tempDown:()=>this.setState(x=>({mode:'heat',target:Math.max(10,x.target-.5)})),
+      modes: [['heat','Heat','local_fire_department'],['eco','Eco','eco'],['off','Off','power_settings_new']].map(([id,label,icon])=>{const a=s.mode===id;return {label,icon,onClick:()=>this.setState({mode:id}),bg:a?'var(--accent)':'transparent',fg:a?'var(--accentInk)':'var(--ink)'};}),
+      climateRooms: [['Lounge',inside,48],['Kitchen','20.4',52],['Main bedroom','18.6',46],['Mia\'s room','19.1',47],['Office','18.2',44]].map(([name,temp,hum])=>({name,temp,hum})),
+      boostBg: s.boost?'var(--accent)':'var(--surf)', boostFg: s.boost?'var(--accentInk)':'var(--ink)',
+      boostLabel: s.boost?'Hot water boosting':'Boost hot water', boostSub: s.boost?'Ends in 60 min':'1 hour',
+      toggleBoost:()=>this.setState(x=>({boost:!x.boost})),
+      hOpen:s.hOpen, arming:s.arming>0,
+      sheetTitle: s.hActive?'You\'re away':'Holiday mode',
+      sheetSub: s.hActive?`${activeCount} routines running until ${dayLabel(retD)}`:`${s.days} nights · ${activeCount} of ${ROUTINES.length} routines selected`,
+      leaveDown:()=>this.setState(x=>({leave:Math.max(0,x.leave-1)})), leaveUp:()=>this.setState(x=>({leave:x.leave+1})),
+      daysDown:()=>this.setState(x=>({days:Math.max(1,x.days-1)})), daysUp:()=>this.setState(x=>({days:x.days+1})),
+      routines: ROUTINES.map(r=>{const on=s.routines[r.k];return {...r,
+        sub: r.k==='warm'?`Back to ${s.target.toFixed(1)}° three hours before you arrive`:r.k==='cal'?`Blocks ${dayLabel(leaveD)} – ${dayLabel(retD)}`:r.sub,
+        iconColor:on?'var(--accent)':'var(--mute)', track:on?'var(--accent)':'var(--surf3)', knob:on?'var(--accentInk)':'var(--surf)', justify:on?'flex-end':'flex-start',
+        onToggle:()=>this.setState(x=>({routines:{...x.routines,[r.k]:!x.routines[r.k]}}))};}),
+      cancelArm:()=>{clearInterval(this.armT);this.setState({arming:0});},
+      primaryAction: s.hActive ? ()=>this.setState({hActive:false,hOpen:false,mode:'heat'}) : s.arming ? ()=>this.startHoliday() : ()=>this.beginArm(),
+      primaryIcon: s.hActive?'home':(s.arming?'timer':'flight_takeoff'),
+      primaryLabel: s.hActive?'End holiday mode':(s.arming?`Arming in ${s.arming}s — tap to arm now`:'Start holiday mode'),
+      primaryBg: s.hActive?'var(--surf2)':'var(--accent)', primaryFg: s.hActive?'var(--ink)':'var(--accentInk)'
+    };
+  }
+}
+</script>
+</body>
+</html>
