@@ -1,18 +1,28 @@
 package uk.co.siland.culvery.core.ui
 
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.sp
 
-// One variable font file; Font(resId, weight) sets the wght axis from the weight.
+// One variable font file. Font(resId, weight) leaves the variation settings empty, so Android draws
+// every weight at the file's default wght (400); each Font has to set its wght explicitly.
+@OptIn(ExperimentalTextApi::class)
+private fun dmSans(weight: FontWeight) = Font(
+    R.font.dm_sans,
+    weight,
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
+)
+
 val DmSans = FontFamily(
-    Font(R.font.dm_sans, FontWeight.W400),
-    Font(R.font.dm_sans, FontWeight.W500),
-    Font(R.font.dm_sans, FontWeight.W600),
-    Font(R.font.dm_sans, FontWeight.W700),
+    dmSans(FontWeight.W400),
+    dmSans(FontWeight.W500),
+    dmSans(FontWeight.W600),
+    dmSans(FontWeight.W700),
 )
 
 private const val TABULAR = "tnum"
