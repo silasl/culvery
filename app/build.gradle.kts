@@ -1,13 +1,13 @@
 plugins {
-    id("househub.android.application")
-    id("househub.android.compose")
-    id("househub.hilt")
+    id("culvery.android.application")
+    id("culvery.android.compose")
+    id("culvery.hilt")
 }
 
 android {
-    namespace = "uk.co.siland.househub"
+    namespace = "uk.co.siland.culvery"
     defaultConfig {
-        applicationId = "uk.co.siland.househub"
+        applicationId = "uk.co.siland.culvery"
         versionCode = 1
         versionName = "0.1.0"
     }

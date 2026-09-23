@@ -1,4 +1,4 @@
 plugins {
-    id("househub.android.library")
-    id("househub.android.compose")
+    id("culvery.android.library")
+    id("culvery.android.compose")
 }

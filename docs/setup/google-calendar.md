@@ -1,12 +1,12 @@
 # Setting up Google Calendar access
 
-House Hub signs in to Google on the tablet itself. No client secret or token is ever put in the code. Google only lets the app sign in if a Google Cloud project has an **Android OAuth client** registered for the app's package name and signing certificate. Anyone building House Hub needs to do this once for their own Cloud project.
+Culvery signs in to Google on the tablet itself. No client secret or token is ever put in the code. Google only lets the app sign in if a Google Cloud project has an **Android OAuth client** registered for the app's package name and signing certificate. Anyone building Culvery needs to do this once for their own Cloud project.
 
 Google renames these console screens from time to time. If a label below doesn't match, look for the nearest equivalent.
 
 ## 1. Create the project
 1. Open <https://console.cloud.google.com/> and sign in with the Google account that will own the project.
-2. Create a new project, e.g. `house-hub`.
+2. Create a new project, e.g. `culvery`.
 
 ## 2. Enable the Calendar API
 1. Go to **APIs & Services › Library**.
@@ -14,7 +14,7 @@ Google renames these console screens from time to time. If a label below doesn't
 
 ## 3. Configure the consent screen (Google Auth Platform)
 1. Go to **Google Auth Platform** (or **APIs & Services › OAuth consent screen**) and click **Get started**.
-2. **App information:** name `House Hub`, and your email as the support and developer contact.
+2. **App information:** name `Culvery`, and your email as the support and developer contact.
 3. **Audience:** **External**, which is needed for personal Gmail accounts. Leave publishing status as **Testing** for now; the spike checks whether that's good enough.
 4. **Test users:** add every Google account that will sign in on the tablet, e.g. the household account.
 5. **Data access › Add or remove scopes**, and add both of these:
@@ -26,7 +26,7 @@ Google renames these console screens from time to time. If a label below doesn't
 ## 4. Create the Android OAuth client
 1. Go to **Google Auth Platform › Clients** (or **APIs & Services › Credentials**), then **Create client**, and pick application type **Android**.
 2. Enter:
-   - **Package name:** `uk.co.siland.househub`
+   - **Package name:** `uk.co.siland.culvery`
    - **SHA-1 certificate fingerprint:** the fingerprint of the key that signs your build. For debug builds, get it from the repo root:
      ```bash
      ./gradlew :app:signingReport

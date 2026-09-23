@@ -12,23 +12,23 @@ dependencies {
 gradlePlugin {
     plugins {
         register("androidApplication") {
-            id = "househub.android.application"
+            id = "culvery.android.application"
             implementationClass = "AndroidApplicationConventionPlugin"
         }
         register("androidLibrary") {
-            id = "househub.android.library"
+            id = "culvery.android.library"
             implementationClass = "AndroidLibraryConventionPlugin"
         }
         register("androidCompose") {
-            id = "househub.android.compose"
+            id = "culvery.android.compose"
             implementationClass = "AndroidComposeConventionPlugin"
         }
         register("hilt") {
-            id = "househub.hilt"
+            id = "culvery.hilt"
             implementationClass = "HiltConventionPlugin"
         }
         register("room") {
-            id = "househub.room"
+            id = "culvery.room"
             implementationClass = "RoomConventionPlugin"
         }
     }

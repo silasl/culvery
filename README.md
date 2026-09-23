@@ -1,9 +1,9 @@
-# House Hub
+# Culvery
 
 A wall-mounted Android tablet app for running a family home. Built as a set of modules so new services (calendars, lights, cameras…) plug in without touching the rest of the app, and nothing about a particular household is baked in.
 
 - Design reference: `docs/design/house_hub_handoff/`
-- Spec: `docs/superpowers/specs/2026-09-23-house-hub-v1-design.md`
+- Spec: `docs/superpowers/specs/2026-09-23-culvery-v1-design.md`
 - Plans: `docs/superpowers/plans/`
 
 ## Build and run
@@ -33,7 +33,7 @@ Rules: `:core:*` never depends on `:app`, `:capability:*` or `:provider:*`. Capa
 
 ## Adding a capability
 
-1. Create `capability/<name>/build.gradle.kts` with `id("househub.android.library")`, `id("househub.android.compose")`, `id("househub.hilt")`, and depend on `:core:plugin` (plus `:core:access` if it has actions).
+1. Create `capability/<name>/build.gradle.kts` with `id("culvery.android.library")`, `id("culvery.android.compose")`, `id("culvery.hilt")`, and depend on `:core:plugin` (plus `:core:access` if it has actions).
 2. Implement `Capability` (tab, icon, `order`, `hasTab`, Home `cards()`).
 3. Bind it: `@Binds @IntoSet abstract fun bind(impl: MyCapability): Capability` in a Hilt module.
 4. If it has actions, implement `PermissionSource` and bind it `@IntoSet` too; call `AccessControl.authorise("<name>.<action>")` before acting.
@@ -58,7 +58,7 @@ A stronger device-owner lock is possible later; it is not built yet.
 - 5 wrong PINs lock the pad for 30 seconds, doubling each time up to 16 minutes. Only a PIN that is allowed to do the thing clears the count.
 - This is kid-proofing, not strong security.
 
-**Forgotten PIN:** an Admin can reset anyone's PIN in Settings. If every Admin has forgotten theirs, clear the app's data (Android Settings › Apps › House Hub › Storage › Clear data). That wipes all configuration and starts setup again.
+**Forgotten PIN:** an Admin can reset anyone's PIN in Settings. If every Admin has forgotten theirs, clear the app's data (Android Settings › Apps › Culvery › Storage › Clear data). That wipes all configuration and starts setup again.
 
 ## Licences
 

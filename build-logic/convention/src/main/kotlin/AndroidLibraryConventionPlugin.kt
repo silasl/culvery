@@ -8,7 +8,7 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
         pluginManager.apply("com.android.library")
         pluginManager.apply("org.jetbrains.kotlin.android")
         extensions.configure<LibraryExtension> {
-            namespace = "uk.co.siland.househub." +
+            namespace = "uk.co.siland.culvery." +
                 path.removePrefix(":").replace(':', '.').replace('-', '_')
             configureAndroid(this)
         }

@@ -13,7 +13,7 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "HouseHub"
+rootProject.name = "Culvery"
 include(":app")
 include(":core:ui")
 include(":core:plugin")

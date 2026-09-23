@@ -1,6 +1,6 @@
-# Design brief: House Hub calendar sheets (hand-off addition)
+# Design brief: Culvery calendar sheets (hand-off addition)
 
-This extends the existing **House Hub** hand-off (`docs/design/house_hub_handoff/`). Use the same visual language throughout: the tokens, DM Sans, Material Symbols Rounded, flat surfaces with no shadows, and the same radii. Canvas is 1280×800 dp landscape. Deliver light and dark themes. Both sheets use the right-side sheet pattern from the Holiday mode sheet: 600 dp wide, full height, `bg` background, a 1 dp left border, scrim `rgba(0,0,0,.55)`, and a 48 dp close button.
+This extends the existing **Culvery** hand-off (`docs/design/house_hub_handoff/`). Use the same visual language throughout: the tokens, DM Sans, Material Symbols Rounded, flat surfaces with no shadows, and the same radii. Canvas is 1280×800 dp landscape. Deliver light and dark themes. Both sheets use the right-side sheet pattern from the Holiday mode sheet: 600 dp wide, full height, `bg` background, a 1 dp left border, scrim `rgba(0,0,0,.55)`, and a 48 dp close button.
 
 ## Context
 - A wall-mounted family tablet. Viewing never needs a PIN. Any change asks for a 4-digit personal PIN, and the PIN also records **who** made the change.

@@ -1,7 +1,7 @@
 plugins {
-    id("househub.android.library")
-    id("househub.hilt")
-    id("househub.room")
+    id("culvery.android.library")
+    id("culvery.hilt")
+    id("culvery.room")
 }
 
 dependencies {
