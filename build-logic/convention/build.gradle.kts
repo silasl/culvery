@@ -7,6 +7,8 @@ dependencies {
     compileOnly(libs.kotlin.gradlePlugin)
     compileOnly(libs.compose.gradlePlugin)
     compileOnly(libs.ksp.gradlePlugin)
+    testImplementation(libs.junit)
+    testImplementation(libs.truth)
 }
 
 gradlePlugin {

@@ -12,5 +12,6 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                 path.removePrefix(":").replace(':', '.').replace('-', '_')
             configureAndroid(this)
         }
+        enforceModuleBoundaries()
     }
 }
