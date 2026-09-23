@@ -8,6 +8,8 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - The shell composables (`NavRail`, `StatusBar`, `SettingsPlaceholder`) have no UI tests, although the test tags exist. Cover them with the Roborazzi setup.
 - Set a module-wide Robolectric viewport default (`w1280dp-h800dp`) so each test class doesn't need its own `@Config`.
 - Make the PIN pad scrim colour (`0x8C000000`) a token, and give the repeated `80.dp` key size a name.
+- Home header: the gap between the clock and the date is about 55 dp on the emulator, against about 12 dp in the hand-off, so the grid sits roughly 40 dp too low. The line-height trim on `HhType.clock` isn't taking effect. Found on the emulator; both AVDs show it.
+- The rail session chip cuts "Admin" to "Adm…". The padding, dot and lock icon leave too little width inside the 108 dp rail. Tighten the padding or drop the lock icon.
 
 ## For Plan 4 (weather, setup, settings, release)
 - Guard the lockout against a backwards jump of the wall clock: treat a stored `lockedUntil` more than 16 minutes in the future as expired.
