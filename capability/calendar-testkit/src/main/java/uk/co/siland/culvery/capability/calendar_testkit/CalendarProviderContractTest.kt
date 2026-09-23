@@ -76,7 +76,8 @@ abstract class CalendarProviderContractTest {
             assertWithMessage("'${e.title}' (${e.start} to ${e.end}) is outside $window")
                 .that(window.overlaps(e.start, e.end)).isTrue()
         }
-        val title = outOfRangeEventTitle() ?: return@runTest
+        val title = outOfRangeEventTitle()
+        assumeTrue("provider has no out-of-range fixture", title != null)
         val wide = DateRange(window.start.minusDays(60), window.endExclusive.plusDays(60), window.zone)
         assertWithMessage("fixture: '$title' should exist within 60 days of range()")
             .that(firstSync(range = wide).upserts.map { it.title }).contains(title)
@@ -95,9 +96,11 @@ abstract class CalendarProviderContractTest {
 
     @Test
     fun allDayEventsUseExclusiveEndDates() = runTest {
-        everySourceFirstSync().forEach { e ->
-            val start = e.start as? EventTime.AllDay ?: return@forEach
-            val end = e.end as? EventTime.AllDay ?: return@forEach
+        val allDay = everySourceFirstSync().filter { it.start is EventTime.AllDay && it.end is EventTime.AllDay }
+        assumeTrue("provider has no all-day fixture", allDay.isNotEmpty())
+        allDay.forEach { e ->
+            val start = e.start as EventTime.AllDay
+            val end = e.end as EventTime.AllDay
             assertWithMessage("'${e.title}': an all-day end date is exclusive, so it must be after the start date")
                 .that(end.date).isGreaterThan(start.date)
         }
