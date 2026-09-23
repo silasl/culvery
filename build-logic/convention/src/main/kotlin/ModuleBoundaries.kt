@@ -8,7 +8,9 @@ import org.gradle.api.artifacts.ProjectDependency
  */
 object ModuleBoundaries {
     fun violation(from: String, to: String, configuration: String): String? {
-        val allowed = when (kind(from)) {
+        // AGP wires every Android library's androidTest variant with a ProjectDependency on itself
+        // (e.g. debugAndroidTestCompileClasspath); that's not a real cross-module edge to police.
+        val allowed = if (to == from) true else when (kind(from)) {
             "core" -> kind(to) == "core"
             "capability" -> kind(to) == "core" || (kind(to) == "capability" && family(to) == family(from))
             "provider" -> kind(to) == "core" ||
