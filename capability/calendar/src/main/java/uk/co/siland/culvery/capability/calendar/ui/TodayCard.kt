@@ -22,7 +22,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
@@ -36,7 +35,7 @@ import uk.co.siland.culvery.core.ui.HhType
 fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier) {
     val c = Culvery.colors
     val navigator = LocalShellNavigator.current
-    HhCard(modifier = modifier.fillMaxSize().testTag("calendar_today"), radius = 26.dp) {
+    HhCard(modifier = modifier.fillMaxSize().testTag("calendar_today"), radius = CalendarDimens.cardRadius) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("Today", style = HhType.cardTitle, color = c.ink, modifier = Modifier.weight(1f))
             HeaderChip("Week", onClick = { navigator.openTab(CALENDAR_TAB_ID) })
@@ -62,11 +61,11 @@ private fun TodayRow(event: EventUi) {
         modifier = Modifier
             .fillMaxWidth()
             .height(IntrinsicSize.Min)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(CalendarDimens.todayRowRadius))
             .background(c.surf2)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = CalendarDimens.todayRowPaddingH, vertical = CalendarDimens.todayRowPaddingV),
     ) {
-        ColourBar(Color(event.person.color), width = 4.dp)
+        ColourBar(Color(event.person.color), width = CalendarDimens.todayBarWidth)
         Spacer(Modifier.width(CalendarDimens.todayBarGap))
         Column(Modifier.weight(1f)) {
             Text(event.title, style = HhType.rowTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)

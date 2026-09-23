@@ -49,14 +49,37 @@ internal object CalendarDimens {
     val todayTimeTop = 3.dp
     val todayBadge = 20.dp
 
+    // Shared card radius (Today, Coming up, Connect).
+    val cardRadius = 26.dp
+
+    // Today row: surf2 pill, radius 16, 14×12 padding, 4 dp person-colour bar.
+    val todayRowRadius = 16.dp
+    val todayRowPaddingH = 14.dp
+    val todayRowPaddingV = 12.dp
+    val todayBarWidth = 4.dp
+
     // Coming up card: padding 20 × 22, like the hand-off's WIDE Scenes card.
     val comingUpPaddingV = 20.dp
     val comingUpPaddingH = 22.dp
+
+    // Coming up: header→columns gap, gap between the three day columns, gap within a day column.
+    val comingUpHeaderGap = 6.dp
+    val comingUpColumnGap = 12.dp
+    val comingUpRowGap = 6.dp
+
+    // Coming up compact row: surf2 pill, radius 12, 10×8 padding, 3 dp person-colour bar, bar→text 8.
+    val compactRowRadius = 12.dp
+    val compactRowPaddingH = 10.dp
+    val compactRowPaddingV = 8.dp
+    val compactBarWidth = 3.dp
+    val compactBarGap = 8.dp
 
     // Connect card: padding 20 × 22, 4 dp above the subtitle, like the hand-off's Holiday tile.
     val connectPaddingV = 20.dp
     val connectPaddingH = 22.dp
     val connectSubtitleTop = 4.dp
+    val connectIconSize = 34.dp
+    val connectButtonTop = 18.dp
 
     // Week view header: subtitle 4 below the title; legend 18 between people, 7 dot→name, 24 to the
     // right-hand button slot (2b's Add event); reconnect chip 8 below the subtitle.

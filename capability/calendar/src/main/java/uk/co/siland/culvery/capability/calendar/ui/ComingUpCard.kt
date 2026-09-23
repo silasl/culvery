@@ -23,7 +23,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
@@ -50,16 +49,19 @@ fun ComingUpCard(days: List<DayUi>?, modifier: Modifier = Modifier) {
     val navigator = LocalShellNavigator.current
     HhCard(
         modifier = modifier.fillMaxSize().testTag("calendar_coming_up"),
-        radius = 26.dp,
+        radius = CalendarDimens.cardRadius,
         padding = PaddingValues(horizontal = CalendarDimens.comingUpPaddingH, vertical = CalendarDimens.comingUpPaddingV),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("Coming up", style = HhType.cardTitle, color = c.ink, modifier = Modifier.weight(1f))
             HeaderLink("Week ›", onClick = { navigator.openTab(CALENDAR_TAB_ID) })
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(CalendarDimens.comingUpHeaderGap))
         if (days != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().weight(1f)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(CalendarDimens.comingUpColumnGap),
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            ) {
                 days.forEachIndexed { i, day ->
                     DayColumn(
                         label = if (i == 0) "Tomorrow" else day.date.format(WEEKDAY),
@@ -75,8 +77,11 @@ fun ComingUpCard(days: List<DayUi>?, modifier: Modifier = Modifier) {
 @Composable
 private fun DayColumn(label: String, events: List<EventUi>, modifier: Modifier) {
     val c = Culvery.colors
-    // Scrolls only if a tall font scale makes three rows overflow the card.
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = modifier.verticalScroll(rememberScrollState())) {
+    // Scrolls only if a tall font scale makes MAX_ROWS rows overflow the card.
+    Column(
+        verticalArrangement = Arrangement.spacedBy(CalendarDimens.comingUpRowGap),
+        modifier = modifier.verticalScroll(rememberScrollState()),
+    ) {
         Text(label, style = CalendarType.strong14, color = c.ink)
         if (events.isEmpty()) Text("Free", style = HhType.secondary, color = c.mute)
         events.take(MAX_ROWS).forEach { CompactRow(it) }
@@ -93,12 +98,12 @@ private fun CompactRow(event: EventUi) {
         modifier = Modifier
             .fillMaxWidth()
             .height(IntrinsicSize.Min)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(CalendarDimens.compactRowRadius))
             .background(c.surf2)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = CalendarDimens.compactRowPaddingH, vertical = CalendarDimens.compactRowPaddingV),
     ) {
-        ColourBar(Color(event.person.color), width = 3.dp)
-        Spacer(Modifier.width(8.dp))
+        ColourBar(Color(event.person.color), width = CalendarDimens.compactBarWidth)
+        Spacer(Modifier.width(CalendarDimens.compactBarGap))
         Column {
             Text(event.title, style = CalendarType.strong14, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(event.timeLabel, style = CalendarType.small12, color = c.mute, maxLines = 1)

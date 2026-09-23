@@ -8,7 +8,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
@@ -23,15 +22,15 @@ fun ConnectCalendarCard(modifier: Modifier = Modifier) {
     val navigator = LocalShellNavigator.current
     HhCard(
         modifier = modifier.fillMaxSize().testTag("calendar_connect"),
-        radius = 26.dp,
+        radius = CalendarDimens.cardRadius,
         padding = PaddingValues(horizontal = CalendarDimens.connectPaddingH, vertical = CalendarDimens.connectPaddingV),
     ) {
-        HhIcon("calendar_add_on", size = 34.dp, tint = c.accent)
+        HhIcon("calendar_add_on", size = CalendarDimens.connectIconSize, tint = c.accent)
         Spacer(Modifier.weight(1f))
         Text("Connect a calendar", style = HhType.cardTitle, color = c.ink)
         Spacer(Modifier.height(CalendarDimens.connectSubtitleTop))
         Text("Add your family's calendars in Settings to see them here.", style = HhType.secondary, color = c.mute)
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(CalendarDimens.connectButtonTop))
         HhPillButton("Open settings", onClick = navigator::openSettings, primary = true)
     }
 }
