@@ -58,6 +58,14 @@ class ModuleBoundariesTest {
     fun appMayDependOnAnything() = allowed(":app", ":provider:calendar-fake", "debugImplementation")
 
     @Test
+    fun aModuleMayDependOnItself() {
+        // AGP wires every Android library's androidTest variant with a ProjectDependency on itself.
+        allowed(":provider:calendar-fake", ":provider:calendar-fake", "debugAndroidTestCompileClasspath")
+        allowed(":core:ui", ":core:ui", "debugAndroidTestCompileClasspath")
+        allowed(":capability:calendar", ":capability:calendar", "debugAndroidTestCompileClasspath")
+    }
+
+    @Test
     fun messageNamesBothModulesAndTheConfiguration() {
         assertThat(ModuleBoundaries.violation(":core:ui", ":app", "implementation"))
             .isEqualTo("Module boundary: :core:ui must not depend on :app (in 'implementation'). See README › Modules.")
