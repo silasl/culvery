@@ -1,0 +1,75 @@
+package uk.co.siland.culvery.capability.calendar.ui
+
+import java.time.Instant
+import java.time.LocalDate
+import uk.co.siland.culvery.capability.calendar.ALL_DAY_LABEL
+import uk.co.siland.culvery.capability.calendar.DayUi
+import uk.co.siland.culvery.capability.calendar.EventUi
+import uk.co.siland.culvery.capability.calendar.WeekUi
+import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
+
+/** The hand-off's sample week (Wednesday 23 September 2026, calendar-sheets/02-calendar-week-dark.png) as UI models. */
+object SampleUi {
+    val TODAY: LocalDate = LocalDate.of(2026, 9, 23)
+    val NOW: Long = Instant.parse("2026-09-23T10:54:00Z").toEpochMilli()
+
+    val alex = Person(PersonId("alex"), "Alex", 0xFF4CB387)
+    val sam = Person(PersonId("sam"), "Sam", 0xFF5B9BE0)
+    val mia = Person(PersonId("mia"), "Mia", 0xFFE07BA8)
+    val family = Person.Family
+    val people = listOf(alex, sam, mia, family)
+
+    fun event(title: String, time: String, person: Person, recurring: Boolean = false) =
+        EventUi(title, title, time, time.substringBefore('–'), person, allDay = false, recurring = recurring, startSort = 0)
+
+    fun allDay(title: String, person: Person, recurring: Boolean = false) =
+        EventUi(title, title, ALL_DAY_LABEL, ALL_DAY_LABEL, person, allDay = true, recurring = recurring, startSort = 0)
+
+    private fun day(offset: Long, vararg events: EventUi) = DayUi(TODAY.plusDays(offset), events.toList())
+
+    val today = listOf(
+        event("School run", "07:45–08:30", sam),
+        event("Boiler service", "10:00–11:00", family),
+        event("Plumber quote call", "13:00–13:30", family),
+        event("Swimming", "16:00–17:00", mia, recurring = true),
+        event("Dinner with Jo & Priya", "19:30–21:00", alex),
+    )
+
+    val comingUp = listOf(
+        day(1, event("Office day", "09:00–17:00", alex), event("Football", "18:00–19:00", mia)),
+        day(2, allDay("Bin day", family, recurring = true), event("Dentist", "12:30–13:30", sam)),
+        day(
+            3,
+            allDay("INSET day — no school", family),
+            event("Piano", "15:30–16:30", mia, recurring = true),
+            event("Book club", "20:00–22:00", sam),
+        ),
+    )
+
+    val comingUpBusy = listOf(
+        day(
+            1,
+            event("Office day", "09:00–17:30", alex),
+            event("Swim club", "16:00–17:00", mia),
+            event("Football", "18:00–19:00", mia),
+            event("Parents' evening", "19:00–20:00", sam),
+        ),
+        day(2),
+        day(3, event("Piano", "15:30–16:00", mia)),
+    )
+
+    val week = WeekUi(
+        TODAY,
+        listOf(
+            day(0, *today.toTypedArray()),
+            comingUp[0],
+            comingUp[1],
+            comingUp[2],
+            day(4, event("Pizza night", "19:00–23:00", family)),
+            day(5, event("Parkrun", "09:30–11:00", alex), event("Birthday party", "14:00–17:00", mia)),
+            day(6, event("Sunday lunch at Gran's", "12:00–15:00", family)),
+        ),
+        people,
+    )
+}

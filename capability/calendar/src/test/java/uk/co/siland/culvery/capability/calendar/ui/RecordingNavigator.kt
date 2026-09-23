@@ -1,0 +1,16 @@
+package uk.co.siland.culvery.capability.calendar.ui
+
+import uk.co.siland.culvery.core.plugin.ShellNavigator
+
+class RecordingNavigator : ShellNavigator {
+    val tabs = mutableListOf<String>()
+    var settingsOpened = 0
+
+    override fun openTab(id: String) {
+        tabs += id
+    }
+
+    override fun openSettings() {
+        settingsOpened++
+    }
+}
