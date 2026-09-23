@@ -1,15 +1,88 @@
 package uk.co.siland.househub
 
 import android.os.Bundle
+import android.view.MotionEvent
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
-import androidx.compose.material3.Text
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.launch
+import uk.co.siland.househub.core.access.PinPromptController
+import uk.co.siland.househub.core.access.ui.PinPadHost
+import uk.co.siland.househub.core.plugin.Capability
+import uk.co.siland.househub.core.ui.HouseHubTheme
+import uk.co.siland.househub.shell.ShellViewModel
+import uk.co.siland.househub.shell.ui.HouseHubShell
+import uk.co.siland.househub.shell.ui.SettingsPlaceholder
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val shell: ShellViewModel by viewModels()
+
+    @Inject lateinit var pinPrompt: PinPromptController
+    @Inject lateinit var capabilities: Set<@JvmSuppressWildcards Capability>
+
+    // Set by Settings › Exit kiosk; cleared when the process restarts.
+    private var kioskExited = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        setContent { Text("House Hub") }
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onBackPressedDispatcher.addCallback(this) { }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                shell.kioskExit.collect {
+                    kioskExited = true
+                    unpinFromScreen()
+                    showSystemBars()
+                }
+            }
+        }
+        setContent {
+            val state by shell.uiState.collectAsStateWithLifecycle()
+            HouseHubTheme(dark = state.dark) {
+                HouseHubShell(
+                    state = state,
+                    onSelectTab = shell::selectTab,
+                    onOpenSettings = shell::openSettings,
+                    onLockSession = shell::lockSession,
+                    onToggleThemePreview = shell::toggleThemePreview,
+                    tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
+                )
+                if (state.settingsOpen) {
+                    SettingsPlaceholder(onExitKiosk = shell::exitKiosk, onClose = shell::closeSettings)
+                }
+                PinPadHost(pinPrompt)
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!kioskExited) {
+            hideSystemBars()
+            pinToScreen()
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && !kioskExited) hideSystemBars()
+    }
+
+    // Every touch-down anywhere (shell, Settings, PIN pad) keeps the PIN session alive.
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) shell.onUserActivity()
+        return super.dispatchTouchEvent(ev)
     }
 }
