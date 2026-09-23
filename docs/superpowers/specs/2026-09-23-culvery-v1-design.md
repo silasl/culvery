@@ -195,7 +195,7 @@ Role → permission bundles come from each `PermissionDef.defaultRoles`; they ar
 - Header per hand-off: clock (104 sp), date, weather block. Indoor-temperature block hidden until a Climate capability exists.
 - Grid `1.15fr 1fr 1fr` × 2 rows, filled from `HomeCardContributor`s by size hint and priority:
   - **Today** (Calendar, TALL, col 1) — per hand-off, plus a **+** button in the card header.
-  - **Coming up** (Calendar, WIDE, row 1 cols 2–3) — next 2–3 days grouped by day, same event-row style as Today.
+  - **Coming up** (Calendar, WIDE, row 1 cols 2–3) — next 3 days grouped by day, in compact event rows (a smaller variant of the Today row, two per day, then "+N more") so three days fit in the WIDE card.
   - **Forecast** (Weather, REGULAR/WIDE, row 2) — next 5 days: day, icon, high/low.
 - When later capabilities add cards (e.g. Scenes, WIDE with higher priority), placement is recomputed; no Home code changes.
 - If no calendar connection exists, a "Connect a calendar" card (→ Settings) takes the Today slot.
@@ -204,7 +204,7 @@ Role → permission bundles come from each `PermissionDef.defaultRoles`; they ar
 - Per hand-off §2 (week view, 7 columns, person legend, person-coloured chips, "synced x ago"). Person colours come from Household.
 - **+** button in the header (next to the legend); tapping empty space in a day column opens quick-add with that day preset.
 - Tapping an event opens the **event detail sheet**: title, time, for whom, created by, source calendar. Edit/Delete shown only when the event is editable (§6) — the permission check happens on tap, not on display.
-- Previous/next week navigation (swipe or chevrons); "Today" returns to the current week.
+- Rolling 7 days starting today (matches hand-off §7); no week navigation — the view never leaves the synced window.
 
 ### 9.4 Quick-add / edit sheet (new; hand-off sheet styling, right-side 600 dp)
 Order is chosen so the common case is: tap +, type title, tap a person, tap Save.

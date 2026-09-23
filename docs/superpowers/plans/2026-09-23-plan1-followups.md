@@ -22,3 +22,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - Read `addPerson`'s `sortOrder` inside a transaction. Add tests that `setRole`, `setPinHash` and `clearPin` reject Family.
 - Make the debug seed check for an active Admin rather than an empty household. Remove the debug Admin when the wizard creates the first real one.
 - Before shipping to the wall, run the Task 10 Step 7 checks on the device and do a signed release build (`startLockTask` has only run in release, and never on a device).
+- Calendar sources (deferred from Plan 2a, where a connection's source list is fixed when it is added):
+  - Add source editing with pruning to `CalendarStore`: re-map and hide sources, and drop the events and sync state of sources that are gone.
+  - Add foreign keys with `ON DELETE CASCADE` (event and sync_state → source → connection) in a `calendar.db` migration, and make `applySync` return early if its source row is gone, so a removal racing an in-flight sync leaves no orphan rows or stale cursor.
+  - Refresh each connection's sources from `provider.sources()` (for example daily), keeping the existing mappings.
