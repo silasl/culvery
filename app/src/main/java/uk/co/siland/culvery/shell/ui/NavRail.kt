@@ -118,8 +118,8 @@ private fun SessionChipView(chip: SessionChip, onLock: () -> Unit) {
             .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(c.surf2)
-            .clickable(onClick = onLock)
-            .padding(horizontal = 10.dp),
+            .clickable(onClickLabel = "Lock", onClick = onLock)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(Color(chip.color)))
         Text(
@@ -130,6 +130,5 @@ private fun SessionChipView(chip: SessionChip, onLock: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
-        HhIcon("lock", size = 14.dp, tint = c.mute)
     }
 }

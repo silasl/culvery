@@ -32,6 +32,9 @@ fun CulveryTheme(dark: Boolean, content: @Composable () -> Unit) {
         accent = animated(target.accent),
         accentInk = animated(target.accentInk),
         accentSoft = animated(target.accentSoft),
+        danger = animated(target.danger),
+        dangerSoft = animated(target.dangerSoft),
+        dangerInk = animated(target.dangerInk),
     )
     val base = if (dark) darkColorScheme() else lightColorScheme()
     val scheme = base.copy(

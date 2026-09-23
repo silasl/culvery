@@ -70,4 +70,45 @@ class HomeCardPlacerTest {
         assertThat(result.layout()["a"]).isEqualTo(listOf(1, 0, 2, 1))
         assertThat(result.layout()["b"]).isEqualTo(listOf(1, 1, 2, 1))
     }
+
+    @Test
+    fun mixedSizesFillTallThenWideThenRegularBesideIt() {
+        val result = HomeCardPlacer.place(
+            listOf(card("today", TALL, 100), card("comingUp", WIDE, 50), card("r1", REGULAR, 20), card("r2", REGULAR, 10)),
+        )
+        assertThat(result.layout()).containsExactly(
+            "today", listOf(0, 0, 1, 2),
+            "comingUp", listOf(1, 0, 2, 1),
+            "r1", listOf(1, 1, 1, 1),
+            "r2", listOf(2, 1, 1, 1),
+        )
+    }
+
+    @Test
+    fun lowPriorityTallIsDroppedWhenRegularCardsTookTheLeftColumn() {
+        val result = HomeCardPlacer.place(
+            listOf(
+                card("a", REGULAR, 90), card("b", REGULAR, 80), card("c", REGULAR, 70),
+                card("d", REGULAR, 60), card("e", REGULAR, 50), card("t", TALL, 40), card("f", REGULAR, 30),
+            ),
+        )
+        assertThat(result.map { it.card.id }).doesNotContain("t")
+        assertThat(result.layout()["e"]).isEqualTo(listOf(0, 0, 1, 1))
+        assertThat(result.layout()["f"]).isEqualTo(listOf(0, 1, 1, 1))
+    }
+
+    @Test
+    fun fullGridDropsEverythingElse() {
+        val six = listOf("a", "b", "c", "d", "e", "f").mapIndexed { i, id -> card(id, REGULAR, 60 - i * 10) }
+        val result = HomeCardPlacer.place(six + card("late", REGULAR, 5) + card("tall", TALL, 1) + card("wide", WIDE, 2))
+        assertThat(result.map { it.card.id }).containsExactly("a", "b", "c", "d", "e", "f")
+        assertThat(result.layout()).containsExactly(
+            "a", listOf(1, 0, 1, 1),
+            "b", listOf(2, 0, 1, 1),
+            "c", listOf(1, 1, 1, 1),
+            "d", listOf(2, 1, 1, 1),
+            "e", listOf(0, 0, 1, 1),
+            "f", listOf(0, 1, 1, 1),
+        )
+    }
 }

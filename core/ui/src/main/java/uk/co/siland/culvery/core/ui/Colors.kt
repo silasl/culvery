@@ -15,6 +15,9 @@ data class HhColors(
     val accent: Color,
     val accentInk: Color,
     val accentSoft: Color,
+    val danger: Color,
+    val dangerSoft: Color,
+    val dangerInk: Color,
 )
 
 val DarkColors = HhColors(
@@ -28,6 +31,9 @@ val DarkColors = HhColors(
     accent = Color(0xFF4CB387),
     accentInk = Color(0xFF08170F),
     accentSoft = Color(0xFF173427),
+    danger = Color(0xFFEE7B6A),
+    dangerSoft = Color(0xFF3A211D),
+    dangerInk = Color(0xFF1A0906),
 )
 
 val LightColors = HhColors(
@@ -41,4 +47,7 @@ val LightColors = HhColors(
     accent = Color(0xFF2E8A64),
     accentInk = Color(0xFFFFFFFF),
     accentSoft = Color(0xFFD3EDE1),
+    danger = Color(0xFFB83A28),
+    dangerSoft = Color(0xFFF7DFDA),
+    dangerInk = Color(0xFFFFFFFF),
 )

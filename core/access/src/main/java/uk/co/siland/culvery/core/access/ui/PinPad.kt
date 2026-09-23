@@ -143,7 +143,7 @@ fun PinPadSheet(
                         .clip(CircleShape)
                         .clickable(enabled = digits.isNotEmpty() && !locked) { digits = digits.dropLast(1) },
                 ) {
-                    HhIcon("backspace", size = 30.dp, tint = c.mute)
+                    HhIcon("backspace", size = 30.dp, tint = c.mute, contentDescription = "Delete last digit")
                 }
             }
             Spacer(Modifier.height(16.dp))

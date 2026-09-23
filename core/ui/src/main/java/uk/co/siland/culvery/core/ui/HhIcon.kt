@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -40,6 +41,7 @@ fun HhIcon(
     filled: Boolean = false,
     tint: Color = Culvery.colors.ink,
     modifier: Modifier = Modifier,
+    contentDescription: String? = null,
 ) {
     val sp = with(LocalDensity.current) { size.toSp() }
     Text(
@@ -51,6 +53,9 @@ fun HhIcon(
             color = tint,
         ),
         maxLines = 1,
-        modifier = modifier.clearAndSetSemantics { },
+        // The ligature text means nothing to a screen reader: expose the description or nothing.
+        modifier = modifier.clearAndSetSemantics {
+            if (contentDescription != null) this.contentDescription = contentDescription
+        },
     )
 }

@@ -2,6 +2,7 @@ package uk.co.siland.culvery.core.access.ui
 
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -84,5 +85,12 @@ class PinPadTest {
     fun hiddenWhenNoRequest() {
         show()
         compose.onNodeWithTag("pin_scrim").assertDoesNotExist()
+    }
+
+    @Test
+    fun backspaceIsLabelled() {
+        controller.open("Change settings", null, null)
+        show()
+        compose.onNodeWithContentDescription("Delete last digit").assertExists()
     }
 }
