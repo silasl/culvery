@@ -88,9 +88,10 @@ class DefaultAccessControl @Inject constructor(
 
     private fun restartExpiry() {
         expiry?.cancel()
+        val guarded = _session.value
         expiry = scope.launch {
             delay(SESSION_TIMEOUT_MS)
-            _session.value = null
+            _session.compareAndSet(guarded, null)
         }
     }
 }

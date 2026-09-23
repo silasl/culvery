@@ -222,6 +222,16 @@ class DefaultAccessControlTest {
     }
 
     @Test
+    fun notAllowedPinDoesNotCountTowardLockout() = runTest {
+        person("Alex", Role.ADMIN, "1234")
+        person("Mia", Role.CHILD, "9876")
+        val access = access()
+        answerPins("0000", "0000", "0000", "0000", "9876", null)
+        assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE)).isNull()
+        assertThat(seen.last().lockedUntilMillis).isNull()
+    }
+
+    @Test
     fun authorisedPinResetsLockoutCounter() = runTest {
         person("Alex", Role.ADMIN, "1234")
         val access = access()

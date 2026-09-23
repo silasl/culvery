@@ -99,6 +99,16 @@ class ShellViewModelTest {
     }
 
     @Test
+    fun settingsNeverOpenWithoutSession() = runTest {
+        val noSessionAccess = FakeAccessControl(result = admin, startsSession = false)
+        val vm = ShellViewModel(emptySet(), { ticks }, noSessionAccess)
+        vm.uiState.test {
+            vm.openSettings()
+            assertThat(expectMostRecentItem().settingsOpen).isFalse()
+        }
+    }
+
+    @Test
     fun settingsCloseWhenSessionEnds() = runTest {
         val vm = vm()
         access.result = admin
@@ -157,5 +167,35 @@ class ShellViewModelTest {
     fun userActivityTouchesSession() {
         vm().onUserActivity()
         assertThat(access.touches).isEqualTo(1)
+    }
+
+    @Test
+    fun capabilityThatNeverEmitsDoesNotBlockShell() = runTest {
+        val stuck = NeverEmittingCapability("stuck", order = 5)
+        val normal = FakeCapability("calendar", order = 10, shown = true)
+        val vm = vm(setOf(stuck, normal))
+        access.session.value = Identified(alex, Role.ADMIN)
+        vm.uiState.test {
+            val state = expectMostRecentItem()
+            assertThat(state.tabs.map { it.id }).containsExactly("calendar")
+            assertThat(state.session).isEqualTo(SessionChip("Alex", 0xFF4CB387))
+        }
+    }
+
+    @Test
+    fun capabilityFlowThatThrowsIsIgnored() = runTest {
+        val throwing = ThrowingCardsCapability("bad", order = 5)
+        val today = HomeCard("today", HomeCardSize.TALL, 100) {}
+        val normal = FakeCapability("calendar", order = 10, shown = true, listOf(today))
+        val vm = vm(setOf(throwing, normal))
+        vm.uiState.test {
+            assertThat(expectMostRecentItem().homeCards.map { it.card.id }).containsExactly("today")
+        }
+    }
+
+    @Test
+    fun initialStateUsesScheduledTheme() = runTest {
+        val vm = vm()
+        assertThat(vm.uiState.value.dark).isFalse()
     }
 }

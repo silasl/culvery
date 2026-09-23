@@ -11,10 +11,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -49,7 +51,12 @@ class ShellViewModel @Inject constructor(
         if (ordered.isEmpty()) {
             flowOf(emptyList())
         } else {
-            combine(ordered.map { cap -> cap.hasTab.map { shown -> if (shown) TabItem(cap.id, cap.label, cap.icon) else null } }) {
+            combine(
+                ordered.map { cap ->
+                    cap.hasTab.onStart { emit(false) }.catch { emit(false) }
+                        .map { shown -> if (shown) TabItem(cap.id, cap.label, cap.icon) else null }
+                },
+            ) {
                 it.filterNotNull()
             }
         }
@@ -58,7 +65,9 @@ class ShellViewModel @Inject constructor(
         if (ordered.isEmpty()) {
             flowOf(emptyList())
         } else {
-            combine(ordered.map { it.cards() }) { lists -> HomeCardPlacer.place(lists.toList().flatten()) }
+            combine(
+                ordered.map { it.cards().onStart { emit(emptyList()) }.catch { emit(emptyList()) } },
+            ) { lists -> HomeCardPlacer.place(lists.toList().flatten()) }
         }
 
     val uiState: StateFlow<ShellUiState> =
@@ -69,7 +78,7 @@ class ShellViewModel @Inject constructor(
                     selectedTabId = if (sel == HOME_TAB_ID || tabs.any { it.id == sel }) sel else HOME_TAB_ID,
                     session = session?.let { SessionChip(it.person.name, it.person.color) },
                     homeCards = cards,
-                    settingsOpen = settings,
+                    settingsOpen = settings && session != null,
                 )
             },
             now,
@@ -77,7 +86,7 @@ class ShellViewModel @Inject constructor(
             previewing,
         ) { state, time, scheduled, preview ->
             state.copy(now = time, dark = scheduled != preview, previewing = preview)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ShellUiState())
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ShellUiState(dark = scheduledDark.value))
 
     init {
         viewModelScope.launch { scheduledDark.drop(1).collect { previewing.value = false } }

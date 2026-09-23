@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var pinPrompt: PinPromptController
     @Inject lateinit var capabilities: Set<@JvmSuppressWildcards Capability>
 
-    // Set by Settings › Exit kiosk; cleared when the process restarts.
+    // Set by Settings › Exit kiosk; cleared when the app comes back to the foreground.
     private var kioskExited = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,6 +65,11 @@ class MainActivity : ComponentActivity() {
                 PinPadHost(pinPrompt)
             }
         }
+    }
+
+    override fun onRestart() {
+        super.onRestart()
+        kioskExited = false
     }
 
     override fun onResume() {
