@@ -1,9 +1,6 @@
 package uk.co.siland.culvery.capability.calendar
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -11,7 +8,11 @@ import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.capability.calendar.ui.ComingUpCardHost
 import uk.co.siland.culvery.capability.calendar.ui.ConnectCalendarCard
 import uk.co.siland.culvery.capability.calendar.ui.TodayCardHost
+import uk.co.siland.culvery.capability.calendar.ui.WeekViewHost
+import uk.co.siland.culvery.capability.calendar.ui.rememberNowMillis
 import uk.co.siland.culvery.capability.calendar.ui.rememberToday
+import uk.co.siland.culvery.capability.calendar.ui.rememberZoneId
+import uk.co.siland.culvery.capability.calendar.ui.todayIn
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
@@ -45,9 +46,9 @@ class CalendarCapability @Inject constructor(
         }
     }
 
-    // Task 12 replaces this with the week view.
     @Composable
     override fun TabContent() {
-        Box(Modifier.fillMaxSize())
+        val now = rememberNowMillis(clock)
+        WeekViewHost(repo, today = todayIn(rememberZoneId(zone), now), nowMillis = now)
     }
 }
