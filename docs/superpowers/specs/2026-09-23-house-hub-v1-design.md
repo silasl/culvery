@@ -17,7 +17,7 @@ v1 ships the platform (shell, setup, settings, people & roles, kiosk, plugin con
 ## 2. Target device
 
 - Samsung Galaxy Tab A 10.1 (2019, SM-T510): Android 11 (API 30), 1920×1200 @ 1.5× = **1280×800 dp** (the design canvas), 2 GB RAM.
-- `minSdk 29`, `targetSdk` = latest stable. Landscape only.
+- `minSdk 29`, `compileSdk`/`targetSdk 35`. Landscape only. (Targeting 36 would make Android 16+ ignore the landscape lock on large screens; revisit when leaving the SM-T510.)
 - Performance budget: flat colours, no blur, no layered translucency beyond the design's alpha chips.
 
 ## 3. Core concepts
@@ -26,7 +26,7 @@ v1 ships the platform (shell, setup, settings, people & roles, kiosk, plugin con
 |---|---|---|
 | **Household** | People and location (name, lat/lon, timezone). Rooms are added when a capability needs them. | `:core:household` |
 | **Person** | Name, colour, optional PIN, role. A built-in **Family** pseudo-person exists for shared events; it has no PIN or role. | `:core:household` |
-| **Role** | `ADMIN`, `ADULT`, `CHILD` — a bundle of permissions (§8). | `:core:access` |
+| **Role** | `ADMIN`, `ADULT`, `CHILD` — a bundle of permissions (§8). Stored on the person row. | `:core:household` (enum), `:core:access` (meaning) |
 | **Permission** | A named action declared by a capability (e.g. `calendar.event.create`). | declared by `:capability:*`, enforced by `:core:access` |
 | **Capability** | A kind of thing the home can do (Calendar, Weather; later Lights, Music, Climate, Security). Owns its tab, Home cards, permissions and (later) holiday routines. | `:capability:*` |
 | **Provider** | A service module implementing one capability's contract (Google Calendar, ICS). Declares its features (e.g. `READ`, `WRITE`). | `:provider:*` |
@@ -37,8 +37,8 @@ v1 ships the platform (shell, setup, settings, people & roles, kiosk, plugin con
 ```
 :app                          Activity, kiosk, nav rail, theme, setup & settings shell, DI wiring
 :core:ui                      design tokens (light/dark), DM Sans, Material Symbols Rounded, shared components
-:core:household               Person, Location, household repository
-:core:access                  roles, permission registry, PIN hashing, unlock session, PIN pad UI
+:core:household               Person (incl. role + PIN hash), Location, household repository, last-Admin rule
+:core:access                  permission registry, PIN hashing, lockout, unlock session, PIN pad UI
 :core:plugin                  ProviderDescriptor, Connection, ConnectionHealth, SecretStore, HomeCard contract
 :capability:calendar          CalendarProvider contract, aggregation, cache, outbox, Calendar tab, Home cards, event editor
 :capability:weather           WeatherProvider contract, cache, header widget, Forecast card
@@ -139,7 +139,8 @@ data class EventDraft(
 ## 7. Storage, secrets and sync
 
 **Storage**
-- **Room** database: household, people, roles, PIN hashes, connections, source mappings, master-calendar pointer, cached events, outbox, cached weather, sync cursors, last-sync timestamps.
+- **Room**, one database per module that stores data: `household.db` (people with role + PIN hash, location); each capability its own (e.g. `calendar.db`: connections, source mappings, master-calendar pointer, cached events, outbox, sync cursors; `weather.db`). A capability never edits another module's schema.
+- **Lockout counter:** a small `SharedPreferences` file in `:core:access`.
 - **Secrets** (OAuth tokens; later app passwords): encrypted with Tink AEAD, key held in Android Keystore, in a DataStore file separate from Room.
 - **Not used:** `androidx.security:security-crypto` / `EncryptedSharedPreferences` (deprecated).
 - **PINs:** salted PBKDF2 hash per person, never plaintext.
@@ -170,13 +171,15 @@ data class EventDraft(
 Role → permission bundles come from each `PermissionDef.defaultRoles`; they are not editable in v1. Future capabilities add rows (e.g. `holiday.start`, `security.disarm`) without touching `:core:access`.
 
 **Identification & session**
-- PINs are 4–6 digits and **unique within the household**, so entering a PIN identifies the person. No "who are you?" step.
+- PINs are exactly **4 digits** and **unique within the household**, so entering a PIN identifies the person. No "who are you?" step. The pad submits automatically on the 4th digit.
 - Viewing never requires a PIN. Any mutating action calls `AccessControl.authorise(permission)`:
   - If someone is identified and has the permission → proceed as them.
   - Otherwise → PIN pad. A valid PIN without the permission shows "Sam can't do that".
+  - **Fresh-PIN permissions** (`kiosk.exit`, `people.manage`) always show the PIN pad, even during an active session.
 - Session lasts **60 s after last touch**, then locks. While unlocked, a chip with the person's name and colour sits at the top of the rail; tapping it locks immediately.
 - People without a PIN can be tagged on events but cannot act.
-- **Lockout:** 5 consecutive wrong PINs → 30 s lockout, doubling per further failure, reset on success. Per device.
+- **Lockout:** 5 consecutive wrong PINs → 30 s lockout, doubling per further failure up to 16 min. Reset only by a PIN that is *authorised* for the requested action (a valid PIN that isn't allowed neither resets nor counts). Per device, survives restart.
+- **Settings closes** when the session ends.
 - **Security posture:** this is kid-proofing, not strong authentication. Documented as such.
 - **Recovery:** an Admin can reset anyone's PIN. If every Admin forgets theirs, clear app data (wipes all configuration). At least one Admin with a PIN must always exist — the last Admin cannot be demoted or deleted.
 
@@ -240,7 +243,7 @@ Reuses setup screens: Location, People & roles (add/edit/remove, reset PIN), Con
 
 ## 11. Testing
 
-- **Unit (JUnit5 + Turbine):** event aggregation and person resolution (tagged, untagged, source-mapped), outbox ordering/backoff/rollback, permission resolution per role (incl. `.self` / `.own` rules), PIN hashing/uniqueness/session timeout/lockout, last-Admin protection, theme scheduling with a fake clock, Home card placement.
+- **Unit (JUnit4 + Robolectric + Turbine):** event aggregation and person resolution (tagged, untagged, source-mapped), outbox ordering/backoff/rollback, permission resolution per role (incl. `.self` / `.own` rules), PIN hashing/uniqueness/session timeout/lockout, last-Admin protection, theme scheduling with a fake clock, Home card placement.
 - **Provider contract suite:** abstract `CalendarProviderContractTest` in a shared test-fixtures module; every calendar provider subclasses it. Write-path tests run only for providers declaring `WRITE`.
   - ICS fixtures: weekly RRULE with EXDATE and RECURRENCE-ID override, all-day multi-day event, TZID vs floating vs UTC times, a real UK school-term and council-bin feed.
   - Google fixtures: recorded API JSON for list, incremental, cancelled occurrence, 410 resync, insert/patch/delete with extended properties.

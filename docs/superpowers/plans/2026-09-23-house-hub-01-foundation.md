@@ -2,43 +2,48 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A runnable, kiosk-mode House Hub shell on the tablet: themed nav rail and Home screen driven by a capability registry, household people, per-person PINs with roles, and a PIN-gated Settings placeholder.
+**Goal:** A runnable, kiosk-mode House Hub shell on the tablet: themed nav rail and Home screen driven by a capability registry, household people with roles and 4-digit PINs, and a PIN-gated Settings placeholder.
 
-**Architecture:** Multi-module Gradle project with convention plugins so a new module's build file is a few lines. `:core:*` modules hold shared contracts and services; `:app` only wires. Capabilities (none yet — they arrive in Plan 2) register into a Hilt `Set<Capability>`; the shell renders whatever is registered. Each module that persists data owns its own Room database file, so modules stay independent.
+**Architecture:** Multi-module Gradle project with convention plugins so a new module's build file is a few lines. `:core:*` modules hold shared contracts and services; `:app` only wires. Capabilities (none yet — they arrive in Plan 2) register into a Hilt `Set<Capability>`; the shell renders whatever is registered. Each module that persists data owns its own Room database file, so capability modules never edit a shared schema.
 
-**Tech Stack:** Kotlin 2.2, Jetpack Compose (Material 3, restyled), Hilt (KSP), Room, Coroutines/Flow, JUnit4 + Robolectric + Truth + Turbine, Roborazzi screenshots.
+**Tech Stack:** Kotlin 2.2, Jetpack Compose (Material 3, restyled), Hilt (KSP), Room, SharedPreferences (lockout counter), Coroutines/Flow, JUnit4 + Robolectric + Truth + Turbine.
 
 **Spec:** `docs/superpowers/specs/2026-09-23-house-hub-v1-design.md`
 
 **Plan series** (each its own document, written when the previous one is done):
 1. **Foundation** (this plan)
-2. Calendar capability — contract, cache, outbox, contract test suite, fake provider, Today/Coming up cards, week view, event detail, quick-add
+2. Calendar capability — `Connection` / `ProviderDescriptor` / `ConnectionHealth` contracts and connection storage, calendar contract, cache, outbox, contract test suite, fake provider, Today/Coming up cards, week view, event detail, quick-add, `.self`/`.own` permission checks, shell navigation from cards, module-dependency guard, Roborazzi screenshot tests
 3. Calendar providers — Google OAuth spike (spec §12 risk), Google provider, ICS provider, `SecretStore`
-4. Weather capability + first-run setup wizard + Settings screens + connections health
+4. Weather capability (incl. Home header slot and sunrise/sunset feed) + first-run setup wizard + Settings screens + connections health + release signing
 
 **Deviations from spec (deliberate):**
-- Tests use **JUnit4**, not JUnit5: Robolectric and Roborazzi run on JUnit4 runners, and one test framework across modules is simpler.
-- The Google OAuth spike (spec §12, "first implementation task") moves to the start of Plan 3. Nothing in Plans 1–2 depends on Google, so the risk still gets retired before any code builds on it.
+- Tests use **JUnit4** (spec §11 updated): Robolectric and Roborazzi run on JUnit4 runners.
+- The Google OAuth spike (spec §12) moves to the start of Plan 3. Nothing in Plans 1–2 depends on Google.
+- `AccessControl.authorise(vararg anyOf): Authorised?` replaces spec §5's indicative `authorise(permission): Person?`, so one prompt can accept either `calendar.event.create` or `.create.self`. Plan 2 adds a target check for `.self`/`.own` as an additional parameter.
+- Screen pinning (`startLockTask`) only runs in release builds; in debug it would show a system prompt on every start.
+- Deferred from the plan review (recorded so they are not lost): Home header contributor slot (Plan 4); re-validating a session when a person's role changes (Plan 4, with the people editor); release signing and removing the debug Admin (Plan 4); DM Sans optical-size axis and status-bar wifi/battery icons (unscheduled polish).
 
 ## Global Constraints
 
 - Package root `uk.co.siland.househub`; app name "House Hub".
 - `minSdk 29`, `compileSdk 35`, `targetSdk 35`, JDK 17, landscape only.
+- Stay on AGP 8.x, Gradle 8.13, Hilt 2.57.x. If a version fails to resolve, take the newest **patch** in the same minor line. Never move to a new major/minor (e.g. AGP 9, Hilt 2.59+) without asking the user.
 - Design canvas 1280×800 dp; hand-off `docs/design/house_hub_handoff/README.md` is authoritative for colours, type, spacing, radii.
 - No shadows; flat colours; no blur.
 - No secrets, tokens or household data in source or build config.
-- Do not use `androidx.security:security-crypto` / `EncryptedSharedPreferences` (deprecated). Do not use any other deprecated API without asking the user first.
+- Do not use `androidx.security:security-crypto` / `EncryptedSharedPreferences` (deprecated). Do not use any other deprecated API without asking the user first. `@OptIn` to an *experimental* API is allowed where the plan says so.
+- PINs are exactly 4 ASCII digits.
 - Commit messages contain only the message — no `Co-Authored-By` or any attribution trailer.
 - Module dependency rule: `:core:*` never depends on `:app`, `:capability:*` or `:provider:*`.
-- Tests run with `./gradlew test` from the repo root (Git Bash) or `.\gradlew.bat test` (PowerShell).
+- Run tests with `./gradlew testDebugUnitTest` (Git Bash) or `.\gradlew.bat testDebugUnitTest` (PowerShell). Never plain `test`: release unit tests lack the Compose test activity.
 
 ## Review Focus
 
-1. **Two people choosing the same PIN** — must be rejected, since the PIN is what identifies the person. Test in Task 7 (`duplicatePinIsRejected`).
-2. **Session expiring between opening an action and confirming it** — `authorise` must re-check at the moment of the action and prompt again after 60 s idle. Test in Task 8 (`sessionExpiresAfterSixtySecondsIdle`, `touchExtendsSession`).
-3. **App killed or restarted during a lockout** — the lockout must survive (stored in Room, not memory). Test in Task 7 (`lockoutSurvivesNewRepositoryInstance`).
-4. **Removing, demoting or clearing the PIN of the last Admin** — must be blocked or nobody can reach Settings. Test in Task 7 (`lastAdminCannotBeDemoted`, `...Removed`, `...PinCleared`).
-5. **Missing or nonsense sunrise/sunset** (weather never synced, polar data where sunrise ≥ sunset) — theme falls back to 07:00/19:00 instead of staying dark all day. Test in Task 10 (`invertedSunTimesFallBack`).
+1. **Two people choosing the same PIN** — must be rejected, since the PIN is what identifies the person. Test in Task 6 (`duplicatePinIsRejected`).
+2. **Session expiring between opening an action and confirming it** — `authorise` must prompt again after 60 s idle, and Settings must close. Tests in Task 7 (`sessionExpiresAfterSixtySecondsIdle`, `touchExtendsSessionButItStillExpires`) and Task 9 (`settingsCloseWhenSessionEnds`).
+3. **A child resetting the lockout with their own PIN, or a restart clearing it** — only an authorised PIN resets; state survives a new process. Tests in Task 6 (`lockoutSurvivesNewStoreInstance`) and Task 7 (`notAllowedPinDoesNotResetLockout`, `correctPinIsRefusedDuringLockout`).
+4. **Removing, demoting or clearing the PIN of the last Admin** — must be blocked or nobody can reach Settings. Tests in Task 4 (`lastAdminCannotBeDemoted`, `...Removed`, `...PinCleared`).
+5. **Theme preview left on, or no sunrise data** — the preview must end when the schedule flips (not return tomorrow), and missing/inverted sun times fall back to 07:00/19:00. Tests in Task 9 (`themePreviewEndsWhenScheduleFlips`) and Task 9 `ThemeScheduleTest` (`invertedSunTimesFallBack`).
 
 ---
 
@@ -46,29 +51,21 @@
 
 ```
 settings.gradle.kts, build.gradle.kts, gradle.properties, gradle/libs.versions.toml, .gitignore
-build-logic/
-  settings.gradle.kts
-  convention/build.gradle.kts
-  convention/src/main/kotlin/
-    AndroidConfig.kt                       shared compileSdk/minSdk/JVM config + libs accessor
-    AndroidApplicationConventionPlugin.kt  househub.android.application
-    AndroidLibraryConventionPlugin.kt      househub.android.library
-    AndroidComposeConventionPlugin.kt      househub.android.compose
-    HiltConventionPlugin.kt                househub.hilt
-    RoomConventionPlugin.kt                househub.room
-app/                                       shell: Activity, kiosk, rail, home grid, status bar, settings placeholder
+build-logic/convention/src/main/kotlin/
+  AndroidConfig.kt, AndroidApplicationConventionPlugin.kt, AndroidLibraryConventionPlugin.kt,
+  AndroidComposeConventionPlugin.kt, HiltConventionPlugin.kt, RoomConventionPlugin.kt
+core/ui/          tokens, theme, type, icons, basic components
+core/plugin/      Capability, HomeCard, HomeCardPlacer, SunTimes, WallClock, ApplicationScope
+core/household/   Person (+ role, PIN hash), Credential, Role, HomeLocation, HouseholdRepository (household.db), last-Admin rule
+core/access/      permissions, PinHasher, PinManager, LockoutStore, AccessControl, PinPromptController, PIN pad UI
+app/
   src/main/java/uk/co/siland/househub/
-    HouseHubApp.kt, MainActivity.kt, Kiosk.kt
-    di/AppModule.kt, seed/Seeder.kt
+    HouseHubApp.kt, MainActivity.kt, Kiosk.kt, di/AppModule.kt
     shell/ShellUiState.kt, ShellViewModel.kt, ThemeSchedule.kt, MinuteTicker.kt
-    shell/ui/HouseHubShell.kt, NavRail.kt, StatusBar.kt, HomeScreen.kt, HomeGrid.kt, SettingsPlaceholder.kt, RememberNow.kt
-  src/debug/java/uk/co/siland/househub/seed/DebugSeeder.kt
-  src/release/java/uk/co/siland/househub/seed/ReleaseSeeder.kt
-core/testing/                              MainDispatcherRule
-core/ui/                                   tokens, theme, type, icons, basic components
-core/plugin/                               Capability, HomeCard, HomeCardPlacer, SunTimesSource, WallClock, ApplicationScope
-core/household/                            Person, HomeLocation, HouseholdRepository (Room: household.db)
-core/access/                               roles, permissions, PIN hashing, credentials, lockout, AccessControl, PIN pad (Room: access.db)
+    shell/ui/HouseHubShell.kt, NavRail.kt, StatusBar.kt, HomeScreen.kt, HomeGrid.kt, SettingsPlaceholder.kt
+  src/debug/java/uk/co/siland/househub/DebugSeed.kt
+  src/release/java/uk/co/siland/househub/DebugSeed.kt
+  src/test/java/uk/co/siland/househub/shell/  MainDispatcherRule.kt, Fakes.kt, tests
 README.md
 ```
 
@@ -100,6 +97,8 @@ captures/
 
 - [ ] **Step 2: Write the version catalog `gradle/libs.versions.toml`**
 
+`core-ktx` and `activity-compose` are held at the last releases that compile against SDK 35 (newer ones require compileSdk 36).
+
 ```toml
 [versions]
 agp = "8.13.0"
@@ -107,8 +106,8 @@ kotlin = "2.2.20"
 ksp = "2.2.20-2.0.3"
 hilt = "2.57.1"
 composeBom = "2025.09.00"
-activityCompose = "1.11.0"
-coreKtx = "1.17.0"
+activityCompose = "1.10.1"
+coreKtx = "1.16.0"
 lifecycle = "2.9.4"
 room = "2.8.0"
 coroutines = "1.10.2"
@@ -118,7 +117,6 @@ turbine = "1.2.1"
 robolectric = "4.16"
 androidxTestCore = "1.7.0"
 androidxTestExtJunit = "1.3.0"
-roborazzi = "1.46.1"
 
 [libraries]
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
@@ -157,9 +155,6 @@ robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "
 androidx-test-core = { group = "androidx.test", name = "core-ktx", version.ref = "androidxTestCore" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit-ktx", version.ref = "androidxTestExtJunit" }
 
-roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
-roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
-
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
@@ -167,10 +162,7 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
-roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 ```
-
-> If any version fails to resolve in Step 8, replace it with the newest stable release of that artifact (check its official release page), keeping `kotlin` and `ksp` matched (KSP's version must be built for the same Kotlin). Record changes in the commit message. Never pick a version whose release notes mark the artifact deprecated — ask the user instead.
 
 - [ ] **Step 3: Write root `settings.gradle.kts`, `build.gradle.kts`, `gradle.properties`**
 
@@ -204,7 +196,6 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.hilt) apply false
-    alias(libs.plugins.roborazzi) apply false
 }
 ```
 
@@ -490,7 +481,7 @@ dependencies {
 </resources>
 ```
 
-`app/src/main/res/values/themes.xml` (window background only; everything else is Compose):
+`app/src/main/res/values/themes.xml`:
 ```xml
 <resources>
     <style name="Theme.HouseHub" parent="android:Theme.Material.NoActionBar">
@@ -536,16 +527,16 @@ Run (Git Bash, from repo root):
 GRADLE_BIN=$(ls -d ~/.gradle/wrapper/dists/gradle-8.13-bin/*/gradle-8.13/bin | head -1)
 "$GRADLE_BIN/gradle" wrapper --gradle-version 8.13 --distribution-type bin
 ```
-Expected: `BUILD SUCCESSFUL`; files `gradlew`, `gradlew.bat`, `gradle/wrapper/gradle-wrapper.jar`, `gradle/wrapper/gradle-wrapper.properties` created.
+Expected: `BUILD SUCCESSFUL`; `gradlew`, `gradlew.bat`, `gradle/wrapper/*` created.
 
 - [ ] **Step 8: Build**
 
 Run: `./gradlew :app:assembleDebug`
-Expected: `BUILD SUCCESSFUL`. If a dependency fails to resolve, apply the note under Step 2 and rerun.
+Expected: `BUILD SUCCESSFUL`. If resolution fails, follow the version rule in Global Constraints. If `:app:hiltAggregateDepsDebug` fails with `NoSuchMethodError ... javapoet.ClassName.canonicalName()`, set `hilt = "2.57.2"` and rerun; if that also fails, stop and ask.
 
 - [ ] **Step 9: Install on the tablet and eyeball**
 
-Run: `adb devices` (tablet connected with USB debugging on), then `./gradlew :app:installDebug` and `adb shell am start -n uk.co.siland.househub/.MainActivity`
+Run: `adb devices`, then `./gradlew :app:installDebug` and `adb shell am start -n uk.co.siland.househub/.MainActivity`
 Expected: app opens in landscape showing "House Hub". If no device is connected, say so and continue — Step 8 is the gate.
 
 - [ ] **Step 10: Commit**
@@ -568,10 +559,10 @@ git commit -m "Scaffold multi-module Android project with convention plugins"
 
 **Interfaces:**
 - Produces:
-  - `data class HhColors(bg, surf, surf2, surf3, line, ink, mute, accent, accentInk, accentSoft: Color)`; `val DarkColors: HhColors`, `val LightColors: HhColors`
+  - `data class HhColors(bg, surf, surf2, surf3, line, ink, mute, accent, accentInk, accentSoft: Color)`; `val DarkColors`, `val LightColors`
   - `@Composable fun HouseHubTheme(dark: Boolean, content: @Composable () -> Unit)`
   - `object HouseHub { val colors: HhColors @Composable get }`
-  - `object HhType { clock, date, screenTitle, headerValue, sectionTitle, cardTitle, body, secondary, label, buttonLabel, pinDigit: TextStyle }` — all DM Sans; `clock`, `headerValue`, `pinDigit` use tabular numerals
+  - `object HhType` with, per the hand-off scale: `clock` (104/600, −4 tracking, tabular, line height 0.9), `date` (21/400), `screenTitle` (34/700), `headerValue` (34/600 tabular), `dateNumber` (24/700), `sectionTitle` (22/700), `cardTitle` (19/700), `rowTitle` (17/600), `body` (16/400), `secondary` (14/400), `label` (13/600), `status` (13/500), `labelSmall` (12/700), `buttonLabel` (15/700), `pinDigit` (30/600 tabular)
   - `@Composable fun HhIcon(name: String, size: Dp = 24.dp, filled: Boolean = false, tint: Color = HouseHub.colors.ink, modifier: Modifier = Modifier)` — `name` is a Material Symbols ligature, e.g. `"home"`
   - `@Composable fun HhCard(modifier: Modifier = Modifier, radius: Dp = 24.dp, color: Color = HouseHub.colors.surf, padding: PaddingValues = PaddingValues(22.dp), content: @Composable ColumnScope.() -> Unit)`
   - `@Composable fun HhPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = false)`
@@ -598,7 +589,7 @@ curl -fL -o core/ui/licenses/OFL-DMSans.txt "https://github.com/google/fonts/raw
 curl -fL -o core/ui/licenses/Apache-MaterialSymbols.txt "https://github.com/google/material-design-icons/raw/master/LICENSE"
 ls -la core/ui/src/main/res/font
 ```
-Expected: both `.ttf` files exist and are larger than 100 KB. If a URL 404s, find the current path in that repository's `ofl/dmsans/` or `variablefont/` directory — do not use any other source.
+Expected: `dm_sans.ttf` ≈ 240 KB, `material_symbols_rounded.ttf` ≈ 15 MB. If a URL 404s, find the current path in that repository's `ofl/dmsans/` or `variablefont/` directory — no other source.
 
 - [ ] **Step 3: Write the failing test**
 
@@ -607,7 +598,6 @@ Expected: both `.ttf` files exist and are larger than 100 KB. If a URL 404s, fin
 package uk.co.siland.househub.core.ui
 
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.core.content.res.ResourcesCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -636,10 +626,12 @@ class ThemeTest {
     }
 
     @Test
-    fun bundledFontsLoad() {
-        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
-        assertThat(ResourcesCompat.getFont(ctx, R.font.dm_sans)).isNotNull()
-        assertThat(ResourcesCompat.getFont(ctx, R.font.material_symbols_rounded)).isNotNull()
+    fun bundledFontsAreRealFiles() {
+        val res = ApplicationProvider.getApplicationContext<android.content.Context>().resources
+        val dmSans = res.openRawResource(R.font.dm_sans).use { it.readBytes().size }
+        val symbols = res.openRawResource(R.font.material_symbols_rounded).use { it.readBytes().size }
+        assertThat(dmSans).isGreaterThan(100_000)
+        assertThat(symbols).isGreaterThan(1_000_000)
     }
 }
 ```
@@ -707,6 +699,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.sp
 
 // One variable font file; Font(resId, weight) sets the wght axis from the weight.
@@ -719,18 +712,33 @@ val DmSans = FontFamily(
 
 private const val TABULAR = "tnum"
 
+private fun style(size: Int, weight: FontWeight, tabular: Boolean = false) = TextStyle(
+    fontFamily = DmSans,
+    fontWeight = weight,
+    fontSize = size.sp,
+    fontFeatureSettings = if (tabular) TABULAR else null,
+)
+
 object HhType {
-    val clock = TextStyle(fontFamily = DmSans, fontWeight = FontWeight.W600, fontSize = 104.sp, letterSpacing = (-4).sp, fontFeatureSettings = TABULAR)
-    val date = TextStyle(fontFamily = DmSans, fontWeight = FontWeight.W400, fontSize = 21.sp)
-    val screenTitle = TextStyle(fontFamily = DmSans, fontWeight = FontWeight.W700, fontSize = 34.sp)
-    val headerValue = TextStyle(fontFamily = DmSans, fontWeight = FontWeight.W600, fontSize = 34.sp, fontFeatureSettings = TABULAR)
-    val sectionTitle = TextStyle(fontFamily = DmSans, fontWeight = FontWeight.W700, fontSize = 19.sp)
-    val cardTitle = TextStyle(fontFamily = DmSans, fontWeight = FontWeight.W600, fontSize = 17.sp)
-    val body = TextStyle(fontFamily = DmSans, fontWeight = FontWeight.W400, fontSize = 16.sp)
-    val secondary = TextStyle(fontFamily = DmSans, fontWeight = FontWeight.W400, fontSize = 14.sp)
-    val label = TextStyle(fontFamily = DmSans, fontWeight = FontWeight.W600, fontSize = 13.sp)
-    val buttonLabel = TextStyle(fontFamily = DmSans, fontWeight = FontWeight.W700, fontSize = 15.sp)
-    val pinDigit = TextStyle(fontFamily = DmSans, fontWeight = FontWeight.W600, fontSize = 30.sp, fontFeatureSettings = TABULAR)
+    val clock = style(104, FontWeight.W600, tabular = true).copy(
+        letterSpacing = (-4).sp,
+        lineHeight = 93.6.sp,
+        lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
+    )
+    val date = style(21, FontWeight.W400)
+    val screenTitle = style(34, FontWeight.W700)
+    val headerValue = style(34, FontWeight.W600, tabular = true)
+    val dateNumber = style(24, FontWeight.W700)
+    val sectionTitle = style(22, FontWeight.W700)
+    val cardTitle = style(19, FontWeight.W700)
+    val rowTitle = style(17, FontWeight.W600)
+    val body = style(16, FontWeight.W400)
+    val secondary = style(14, FontWeight.W400)
+    val label = style(13, FontWeight.W600)
+    val status = style(13, FontWeight.W500)
+    val labelSmall = style(12, FontWeight.W700)
+    val buttonLabel = style(15, FontWeight.W700)
+    val pinDigit = style(30, FontWeight.W600, tabular = true)
 }
 ```
 
@@ -802,6 +810,8 @@ private fun animated(target: Color): Color =
 
 - [ ] **Step 8: Write `HhIcon.kt`**
 
+The `Font(..., variationSettings = ...)` overload is `@ExperimentalTextApi` (experimental, not deprecated); opt in locally.
+
 ```kotlin
 package uk.co.siland.househub.core.ui
 
@@ -811,6 +821,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -820,6 +831,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+@OptIn(ExperimentalTextApi::class)
 private fun symbols(fill: Float) = FontFamily(
     Font(
         R.font.material_symbols_rounded,
@@ -944,10 +956,10 @@ git commit -m "Add core:ui design tokens, theme, DM Sans and Material Symbols"
   - `interface Capability : HomeCardContributor { val id: String; val label: String; val icon: String; val order: Int; val hasTab: Flow<Boolean>; @Composable fun TabContent() }`
   - `interface HomeCardContributor { fun cards(): Flow<List<HomeCard>> }`
   - `enum class HomeCardSize { TALL, WIDE, REGULAR }`
-  - `class HomeCard(id: String, size: HomeCardSize, priority: Int, compactSize: HomeCardSize? = null, content: @Composable () -> Unit)`
+  - `class HomeCard(id: String, size: HomeCardSize, priority: Int, content: @Composable () -> Unit)`
   - `data class HomePlacement(card: HomeCard, col: Int, row: Int, colSpan: Int, rowSpan: Int)`
   - `object HomeCardPlacer { const val COLUMNS = 3; const val ROWS = 2; fun place(cards: List<HomeCard>): List<HomePlacement> }`
-  - `data class SunTimes(sunrise: LocalTime, sunset: LocalTime)`; `interface SunTimesSource { val today: Flow<SunTimes?> }`
+  - `data class SunTimes(sunrise: LocalTime, sunset: LocalTime)`
   - `fun interface WallClock { fun nowMillis(): Long }`
   - `@Qualifier annotation class ApplicationScope`
 
@@ -968,7 +980,7 @@ dependencies {
 }
 ```
 
-- [ ] **Step 2: Write the contracts (no logic yet)**
+- [ ] **Step 2: Write the contracts (placer stubbed)**
 
 `HomeCard.kt`:
 ```kotlin
@@ -979,15 +991,11 @@ import kotlinx.coroutines.flow.Flow
 
 enum class HomeCardSize { TALL, WIDE, REGULAR }
 
-/**
- * A card a capability contributes to Home. Higher [priority] is placed first and keeps its
- * preferred [size]; if that no longer fits it tries [compactSize], and is dropped otherwise.
- */
+/** A card a capability contributes to Home. Higher [priority] is placed first; cards that don't fit are dropped. */
 class HomeCard(
     val id: String,
     val size: HomeCardSize,
     val priority: Int,
-    val compactSize: HomeCardSize? = null,
     val content: @Composable () -> Unit,
 )
 
@@ -1023,13 +1031,8 @@ interface Capability : HomeCardContributor {
 package uk.co.siland.househub.core.plugin
 
 import java.time.LocalTime
-import kotlinx.coroutines.flow.Flow
 
 data class SunTimes(val sunrise: LocalTime, val sunset: LocalTime)
-
-interface SunTimesSource {
-    val today: Flow<SunTimes?>
-}
 ```
 
 `Runtime.kt`:
@@ -1047,7 +1050,7 @@ fun interface WallClock {
 annotation class ApplicationScope
 ```
 
-`HomeCardPlacer.kt` (stub so tests compile):
+`HomeCardPlacer.kt`:
 ```kotlin
 package uk.co.siland.househub.core.plugin
 
@@ -1069,7 +1072,7 @@ object HomeCardPlacer {
 
 - [ ] **Step 3: Write the failing tests**
 
-`core/plugin/src/test/java/uk/co/siland/househub/core/plugin/HomeCardPlacerTest.kt`:
+`HomeCardPlacerTest.kt`:
 ```kotlin
 package uk.co.siland.househub.core.plugin
 
@@ -1080,8 +1083,7 @@ import uk.co.siland.househub.core.plugin.HomeCardSize.TALL
 import uk.co.siland.househub.core.plugin.HomeCardSize.WIDE
 
 class HomeCardPlacerTest {
-    private fun card(id: String, size: HomeCardSize, priority: Int, compact: HomeCardSize? = null) =
-        HomeCard(id, size, priority, compact) {}
+    private fun card(id: String, size: HomeCardSize, priority: Int) = HomeCard(id, size, priority) {}
 
     private fun List<HomePlacement>.layout() =
         associate { it.card.id to listOf(it.col, it.row, it.colSpan, it.rowSpan) }
@@ -1094,11 +1096,7 @@ class HomeCardPlacerTest {
     @Test
     fun v1LayoutTodayTallComingUpAndForecastWide() {
         val result = HomeCardPlacer.place(
-            listOf(
-                card("forecast", WIDE, 10, REGULAR),
-                card("today", TALL, 100),
-                card("comingUp", WIDE, 50, REGULAR),
-            ),
+            listOf(card("forecast", WIDE, 10), card("today", TALL, 100), card("comingUp", WIDE, 50)),
         )
         assertThat(result.layout()).containsExactly(
             "today", listOf(0, 0, 1, 2),
@@ -1112,8 +1110,8 @@ class HomeCardPlacerTest {
         val result = HomeCardPlacer.place(
             listOf(
                 card("today", TALL, 100),
-                card("comingUp", WIDE, 50, REGULAR),
-                card("forecast", WIDE, 10, REGULAR),
+                card("comingUp", WIDE, 50),
+                card("forecast", WIDE, 10),
                 card("scenes", WIDE, 200),
             ),
         )
@@ -1125,19 +1123,7 @@ class HomeCardPlacerTest {
     }
 
     @Test
-    fun wideCardFallsBackToCompactSize() {
-        val result = HomeCardPlacer.place(
-            listOf(
-                card("a", WIDE, 30),
-                card("b", WIDE, 20),
-                card("c", WIDE, 10, REGULAR),
-            ),
-        )
-        assertThat(result.layout()["c"]).isEqualTo(listOf(0, 0, 1, 1))
-    }
-
-    @Test
-    fun secondTallCardWithoutCompactSizeIsDropped() {
+    fun secondTallCardIsDropped() {
         val result = HomeCardPlacer.place(listOf(card("a", TALL, 20), card("b", TALL, 10)))
         assertThat(result.map { it.card.id }).containsExactly("a")
     }
@@ -1149,10 +1135,16 @@ class HomeCardPlacerTest {
     }
 
     @Test
+    fun regularCardTakesLeftColumnWhenRightIsFull() {
+        val result = HomeCardPlacer.place(listOf(card("a", WIDE, 30), card("b", WIDE, 20), card("c", REGULAR, 10)))
+        assertThat(result.layout()["c"]).isEqualTo(listOf(0, 0, 1, 1))
+    }
+
+    @Test
     fun equalPriorityIsOrderedById() {
-        val first = HomeCardPlacer.place(listOf(card("b", WIDE, 10), card("a", WIDE, 10)))
-        assertThat(first.layout()["a"]).isEqualTo(listOf(1, 0, 2, 1))
-        assertThat(first.layout()["b"]).isEqualTo(listOf(1, 1, 2, 1))
+        val result = HomeCardPlacer.place(listOf(card("b", WIDE, 10), card("a", WIDE, 10)))
+        assertThat(result.layout()["a"]).isEqualTo(listOf(1, 0, 2, 1))
+        assertThat(result.layout()["b"]).isEqualTo(listOf(1, 1, 2, 1))
     }
 }
 ```
@@ -1160,11 +1152,11 @@ class HomeCardPlacerTest {
 - [ ] **Step 4: Run tests to verify they fail**
 
 Run: `./gradlew :core:plugin:testDebugUnitTest`
-Expected: FAIL — `NotImplementedError` from `TODO()` (the empty-list test also fails).
+Expected: FAIL — `NotImplementedError`.
 
 - [ ] **Step 5: Implement `HomeCardPlacer`**
 
-Replace the `HomeCardPlacer` object in `HomeCardPlacer.kt`:
+Replace the object:
 ```kotlin
 object HomeCardPlacer {
     const val COLUMNS = 3
@@ -1178,9 +1170,7 @@ object HomeCardPlacer {
         val placed = mutableListOf<HomePlacement>()
         val ordered = cards.sortedWith(compareByDescending<HomeCard> { it.priority }.thenBy { it.id })
         for (card in ordered) {
-            val placement = fit(card, card.size, used)
-                ?: card.compactSize?.let { fit(card, it, used) }
-                ?: continue
+            val placement = fit(card, used) ?: continue
             for (r in placement.row until placement.row + placement.rowSpan) {
                 for (c in placement.col until placement.col + placement.colSpan) used[r][c] = true
             }
@@ -1189,8 +1179,8 @@ object HomeCardPlacer {
         return placed
     }
 
-    private fun fit(card: HomeCard, size: HomeCardSize, used: Array<BooleanArray>): HomePlacement? =
-        when (size) {
+    private fun fit(card: HomeCard, used: Array<BooleanArray>): HomePlacement? =
+        when (card.size) {
             HomeCardSize.TALL ->
                 if (!used[0][0] && !used[1][0]) HomePlacement(card, 0, 0, 1, 2) else null
             HomeCardSize.WIDE ->
@@ -1217,83 +1207,26 @@ git commit -m "Add core:plugin capability contract and Home card placement"
 
 ---
 
-### Task 4: `:core:testing` — shared test utilities
+### Task 4: `:core:household` — people, roles, PIN storage, location
 
-**Files:**
-- Modify: `settings.gradle.kts` (add `include(":core:testing")`)
-- Create: `core/testing/build.gradle.kts`
-- Create: `core/testing/src/main/java/uk/co/siland/househub/core/testing/MainDispatcherRule.kt`
-
-**Interfaces:**
-- Produces: `class MainDispatcherRule(val dispatcher: TestDispatcher = UnconfinedTestDispatcher()) : TestWatcher` — use as `@get:Rule val main = MainDispatcherRule()` in any test touching `viewModelScope`.
-
-- [ ] **Step 1: Add module**
-
-Append to `settings.gradle.kts`: `include(":core:testing")`
-
-`core/testing/build.gradle.kts`:
-```kotlin
-plugins {
-    id("househub.android.library")
-}
-
-dependencies {
-    api(libs.junit)
-    api(libs.kotlinx.coroutines.test)
-}
-```
-
-- [ ] **Step 2: Write `MainDispatcherRule.kt`**
-
-```kotlin
-package uk.co.siland.househub.core.testing
-
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.TestDispatcher
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
-import org.junit.rules.TestWatcher
-import org.junit.runner.Description
-
-class MainDispatcherRule(
-    val dispatcher: TestDispatcher = UnconfinedTestDispatcher(),
-) : TestWatcher() {
-    override fun starting(description: Description) = Dispatchers.setMain(dispatcher)
-    override fun finished(description: Description) = Dispatchers.resetMain()
-}
-```
-
-- [ ] **Step 3: Build**
-
-Run: `./gradlew :core:testing:assembleDebug`
-Expected: `BUILD SUCCESSFUL`. (Its behaviour is exercised by the ViewModel tests in Task 10.)
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add settings.gradle.kts core/testing
-git commit -m "Add core:testing with MainDispatcherRule"
-```
-
----
-
-### Task 5: `:core:household` — people and location
+People and their role/PIN hash live on one row, so removing a person can never leave an orphaned credential, and the last-Admin rule is enforced in the same transaction as the change.
 
 **Files:**
 - Modify: `settings.gradle.kts` (add `include(":core:household")`)
 - Create: `core/household/build.gradle.kts`
-- Create: `core/household/src/main/java/uk/co/siland/househub/core/household/Model.kt`, `HouseholdRepository.kt`, `db/HouseholdDatabase.kt`, `RoomHouseholdRepository.kt`, `di/HouseholdModule.kt`
-- Test: `core/household/src/test/java/uk/co/siland/househub/core/household/RoomHouseholdRepositoryTest.kt`
+- Create: `core/household/src/main/java/uk/co/siland/househub/core/household/Model.kt`, `db/HouseholdDatabase.kt`, `HouseholdRepository.kt`, `di/HouseholdModule.kt`
+- Test: `core/household/src/test/java/uk/co/siland/househub/core/household/HouseholdRepositoryTest.kt`
 
 **Interfaces:**
 - Produces:
-  - `@JvmInline value class PersonId(val value: String)` with `PersonId.FAMILY` and `PersonId.new()`
-  - `data class Person(id: PersonId, name: String, color: Long)` with `val isFamily: Boolean`
+  - `@JvmInline value class PersonId(val value: String)` with `PersonId.FAMILY`, `PersonId.new()`
+  - `data class Person(id: PersonId, name: String, color: Long)` with `isFamily`, and `Person.Family`
   - `const val FAMILY_COLOR: Long = 0xFFE0A85B`
+  - `enum class Role { ADMIN, ADULT, CHILD }`
+  - `data class Credential(personId: PersonId, role: Role, pinHash: String?, salt: String?)` with `hasPin`, `isActiveAdmin` — hash/salt are Base64
+  - `class LastAdminException : Exception`
   - `data class HomeLocation(name: String, latitude: Double, longitude: Double, timeZoneId: String)`
-  - `interface HouseholdRepository { val people: Flow<List<Person>>; val peopleWithFamily: Flow<List<Person>>; val location: Flow<HomeLocation?>; suspend fun person(id: PersonId): Person?; suspend fun addPerson(name: String, color: Long): Person; suspend fun updatePerson(person: Person); suspend fun removePerson(id: PersonId); suspend fun setLocation(location: HomeLocation) }`
-  - Hilt binding `HouseholdRepository` → `RoomHouseholdRepository` (singleton, `household.db`)
+  - `@Singleton class HouseholdRepository @Inject constructor(db: HouseholdDatabase)` with: `val people: Flow<List<Person>>`, `val peopleWithFamily: Flow<List<Person>>`, `val location: Flow<HomeLocation?>`, `suspend fun person(id: PersonId): Person?`, `suspend fun addPerson(name: String, color: Long, role: Role): Person`, `suspend fun updatePerson(person: Person)`, `suspend fun removePerson(id: PersonId)`, `suspend fun credential(id: PersonId): Credential?`, `suspend fun credentials(): List<Credential>`, `suspend fun setRole(id: PersonId, role: Role)`, `suspend fun setPinHash(id: PersonId, hash: String, salt: String)`, `suspend fun clearPin(id: PersonId)`, `suspend fun setLocation(location: HomeLocation)`
 
 - [ ] **Step 1: Add module**
 
@@ -1309,10 +1242,12 @@ plugins {
 
 dependencies {
     api(libs.kotlinx.coroutines.core)
+    // HouseholdDatabase is part of this module's public surface (DI and in-memory test databases).
+    api(libs.room.runtime)
 }
 ```
 
-- [ ] **Step 2: Write the model and repository interface**
+- [ ] **Step 2: Write the model**
 
 `Model.kt`:
 ```kotlin
@@ -1338,33 +1273,27 @@ data class Person(val id: PersonId, val name: String, val color: Long) {
     }
 }
 
+enum class Role { ADMIN, ADULT, CHILD }
+
+/** Role and PIN material for one person. [pinHash] and [salt] are Base64. */
+data class Credential(
+    val personId: PersonId,
+    val role: Role,
+    val pinHash: String?,
+    val salt: String?,
+) {
+    val hasPin: Boolean get() = pinHash != null
+    val isActiveAdmin: Boolean get() = role == Role.ADMIN && pinHash != null
+}
+
+class LastAdminException : Exception("At least one Admin with a PIN must remain")
+
 data class HomeLocation(
     val name: String,
     val latitude: Double,
     val longitude: Double,
     val timeZoneId: String,
 )
-```
-
-`HouseholdRepository.kt`:
-```kotlin
-package uk.co.siland.househub.core.household
-
-import kotlinx.coroutines.flow.Flow
-
-interface HouseholdRepository {
-    /** Real people in display order; never includes Family. */
-    val people: Flow<List<Person>>
-    /** Family first, then [people]. */
-    val peopleWithFamily: Flow<List<Person>>
-    val location: Flow<HomeLocation?>
-
-    suspend fun person(id: PersonId): Person?
-    suspend fun addPerson(name: String, color: Long): Person
-    suspend fun updatePerson(person: Person)
-    suspend fun removePerson(id: PersonId)
-    suspend fun setLocation(location: HomeLocation)
-}
 ```
 
 - [ ] **Step 3: Write the Room database**
@@ -1381,6 +1310,7 @@ import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
+import uk.co.siland.househub.core.household.Role
 
 @Entity(tableName = "person")
 data class PersonEntity(
@@ -1388,6 +1318,9 @@ data class PersonEntity(
     val name: String,
     val color: Long,
     val sortOrder: Int,
+    val role: Role,
+    val pinHash: String?,
+    val salt: String?,
 )
 
 @Entity(tableName = "location")
@@ -1403,6 +1336,9 @@ data class LocationEntity(
 interface HouseholdDao {
     @Query("SELECT * FROM person ORDER BY sortOrder")
     fun people(): Flow<List<PersonEntity>>
+
+    @Query("SELECT * FROM person ORDER BY sortOrder")
+    suspend fun all(): List<PersonEntity>
 
     @Query("SELECT * FROM person WHERE id = :id")
     suspend fun person(id: String): PersonEntity?
@@ -1431,7 +1367,7 @@ abstract class HouseholdDatabase : RoomDatabase() {
 
 - [ ] **Step 4: Write the repository stub and Hilt module**
 
-`RoomHouseholdRepository.kt`:
+`HouseholdRepository.kt`:
 ```kotlin
 package uk.co.siland.househub.core.household
 
@@ -1441,16 +1377,20 @@ import kotlinx.coroutines.flow.Flow
 import uk.co.siland.househub.core.household.db.HouseholdDatabase
 
 @Singleton
-class RoomHouseholdRepository @Inject constructor(db: HouseholdDatabase) : HouseholdRepository {
-    private val dao = db.householdDao()
-    override val people: Flow<List<Person>> get() = TODO()
-    override val peopleWithFamily: Flow<List<Person>> get() = TODO()
-    override val location: Flow<HomeLocation?> get() = TODO()
-    override suspend fun person(id: PersonId): Person? = TODO()
-    override suspend fun addPerson(name: String, color: Long): Person = TODO()
-    override suspend fun updatePerson(person: Person): Unit = TODO()
-    override suspend fun removePerson(id: PersonId): Unit = TODO()
-    override suspend fun setLocation(location: HomeLocation): Unit = TODO()
+class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase) {
+    val people: Flow<List<Person>> get() = TODO()
+    val peopleWithFamily: Flow<List<Person>> get() = TODO()
+    val location: Flow<HomeLocation?> get() = TODO()
+    suspend fun person(id: PersonId): Person? = TODO()
+    suspend fun addPerson(name: String, color: Long, role: Role): Person = TODO()
+    suspend fun updatePerson(person: Person): Unit = TODO()
+    suspend fun removePerson(id: PersonId): Unit = TODO()
+    suspend fun credential(id: PersonId): Credential? = TODO()
+    suspend fun credentials(): List<Credential> = TODO()
+    suspend fun setRole(id: PersonId, role: Role): Unit = TODO()
+    suspend fun setPinHash(id: PersonId, hash: String, salt: String): Unit = TODO()
+    suspend fun clearPin(id: PersonId): Unit = TODO()
+    suspend fun setLocation(location: HomeLocation): Unit = TODO()
 }
 ```
 
@@ -1460,35 +1400,27 @@ package uk.co.siland.househub.core.household.di
 
 import android.content.Context
 import androidx.room.Room
-import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
-import uk.co.siland.househub.core.household.HouseholdRepository
-import uk.co.siland.househub.core.household.RoomHouseholdRepository
 import uk.co.siland.househub.core.household.db.HouseholdDatabase
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class HouseholdModule {
-    @Binds
-    abstract fun repository(impl: RoomHouseholdRepository): HouseholdRepository
-
-    companion object {
-        @Provides
-        @Singleton
-        fun database(@ApplicationContext context: Context): HouseholdDatabase =
-            Room.databaseBuilder(context, HouseholdDatabase::class.java, "household.db").build()
-    }
+object HouseholdModule {
+    @Provides
+    @Singleton
+    fun database(@ApplicationContext context: Context): HouseholdDatabase =
+        Room.databaseBuilder(context, HouseholdDatabase::class.java, "household.db").build()
 }
 ```
 
 - [ ] **Step 5: Write the failing tests**
 
-`core/household/src/test/java/uk/co/siland/househub/core/household/RoomHouseholdRepositoryTest.kt`:
+`HouseholdRepositoryTest.kt`:
 ```kotlin
 package uk.co.siland.househub.core.household
 
@@ -1497,6 +1429,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertThrows
@@ -1506,74 +1439,124 @@ import org.junit.runner.RunWith
 import uk.co.siland.househub.core.household.db.HouseholdDatabase
 
 @RunWith(AndroidJUnit4::class)
-class RoomHouseholdRepositoryTest {
+class HouseholdRepositoryTest {
     private lateinit var db: HouseholdDatabase
-    private lateinit var repo: RoomHouseholdRepository
+    private lateinit var repo: HouseholdRepository
 
     @Before
     fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(
-            ApplicationProvider.getApplicationContext(),
-            HouseholdDatabase::class.java,
-        ).allowMainThreadQueries().build()
-        repo = RoomHouseholdRepository(db)
+        db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), HouseholdDatabase::class.java)
+            .allowMainThreadQueries().build()
+        repo = HouseholdRepository(db)
     }
 
     @After
     fun tearDown() = db.close()
 
+    private suspend fun admin(name: String): Person =
+        repo.addPerson(name, 0xFF4CB387, Role.ADMIN).also { repo.setPinHash(it.id, "hash-$name", "salt") }
+
     @Test
     fun addedPeopleAppearInInsertionOrder() = runTest {
-        repo.addPerson("Alex", 0xFF4CB387)
-        repo.addPerson("Sam", 0xFF5B9BE0)
+        repo.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
+        repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
         assertThat(repo.people.first().map { it.name }).containsExactly("Alex", "Sam").inOrder()
     }
 
     @Test
-    fun namesAreTrimmed() = runTest {
-        val p = repo.addPerson("  Mia ", 0xFFE07BA8)
-        assertThat(p.name).isEqualTo("Mia")
-    }
-
-    @Test
-    fun blankNameIsRejected() = runTest {
+    fun namesAreTrimmedAndBlankRejected() = runTest {
+        assertThat(repo.addPerson("  Mia ", 0xFFE07BA8, Role.CHILD).name).isEqualTo("Mia")
         assertThrows(IllegalArgumentException::class.java) {
-            kotlinx.coroutines.runBlocking { repo.addPerson("   ", 0xFF000000) }
+            runBlocking { repo.addPerson("   ", 0xFF000000, Role.CHILD) }
         }
     }
 
     @Test
     fun peopleWithFamilyPutsFamilyFirst() = runTest {
-        repo.addPerson("Alex", 0xFF4CB387)
-        val all = repo.peopleWithFamily.first()
-        assertThat(all.first()).isEqualTo(Person.Family)
-        assertThat(all.map { it.name }).containsExactly("Family", "Alex").inOrder()
+        repo.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
+        assertThat(repo.peopleWithFamily.first().map { it.name }).containsExactly("Family", "Alex").inOrder()
     }
 
     @Test
     fun personLooksUpFamilyAndRealPeople() = runTest {
-        val alex = repo.addPerson("Alex", 0xFF4CB387)
+        val alex = repo.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
         assertThat(repo.person(PersonId.FAMILY)).isEqualTo(Person.Family)
         assertThat(repo.person(alex.id)).isEqualTo(alex)
         assertThat(repo.person(PersonId("missing"))).isNull()
     }
 
     @Test
-    fun updateAndRemove() = runTest {
-        val alex = repo.addPerson("Alex", 0xFF4CB387)
-        repo.updatePerson(alex.copy(name = "Alexandra"))
-        assertThat(repo.person(alex.id)?.name).isEqualTo("Alexandra")
-        repo.removePerson(alex.id)
-        assertThat(repo.people.first()).isEmpty()
+    fun newPersonHasRoleAndNoPin() = runTest {
+        val mia = repo.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
+        assertThat(repo.credential(mia.id)).isEqualTo(Credential(mia.id, Role.CHILD, null, null))
+    }
+
+    @Test
+    fun updateChangesNameAndColourButKeepsCredential() = runTest {
+        val alex = admin("Alex")
+        repo.updatePerson(alex.copy(name = "Alexandra", color = 0xFF000000))
+        assertThat(repo.person(alex.id)).isEqualTo(Person(alex.id, "Alexandra", 0xFF000000))
+        assertThat(repo.credential(alex.id)?.pinHash).isEqualTo("hash-Alex")
     }
 
     @Test
     fun familyCannotBeUpdatedOrRemoved() = runTest {
         assertThrows(IllegalArgumentException::class.java) {
-            kotlinx.coroutines.runBlocking { repo.updatePerson(Person.Family.copy(name = "Us")) }
+            runBlocking { repo.updatePerson(Person.Family.copy(name = "Us")) }
         }
         assertThrows(IllegalArgumentException::class.java) {
-            kotlinx.coroutines.runBlocking { repo.removePerson(PersonId.FAMILY) }
+            runBlocking { repo.removePerson(PersonId.FAMILY) }
+        }
+    }
+
+    @Test
+    fun removingAPersonRemovesTheirCredential() = runTest {
+        admin("Alex")
+        val mia = repo.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
+        repo.setPinHash(mia.id, "h", "s")
+        repo.removePerson(mia.id)
+        assertThat(repo.credentials().map { it.personId }).doesNotContain(mia.id)
+    }
+
+    @Test
+    fun lastAdminCannotBeDemoted() = runTest {
+        val alex = admin("Alex")
+        assertThrows(LastAdminException::class.java) { runBlocking { repo.setRole(alex.id, Role.ADULT) } }
+    }
+
+    @Test
+    fun lastAdminCannotBeRemoved() = runTest {
+        val alex = admin("Alex")
+        assertThrows(LastAdminException::class.java) { runBlocking { repo.removePerson(alex.id) } }
+    }
+
+    @Test
+    fun lastAdminCannotHavePinCleared() = runTest {
+        val alex = admin("Alex")
+        assertThrows(LastAdminException::class.java) { runBlocking { repo.clearPin(alex.id) } }
+    }
+
+    @Test
+    fun oneOfTwoAdminsCanBeDemotedOrRemoved() = runTest {
+        admin("Alex")
+        val sam = admin("Sam")
+        repo.setRole(sam.id, Role.ADULT)
+        assertThat(repo.credential(sam.id)?.role).isEqualTo(Role.ADULT)
+        repo.removePerson(sam.id)
+        assertThat(repo.person(sam.id)).isNull()
+    }
+
+    @Test
+    fun adminWithoutPinDoesNotCountAsLastAdmin() = runTest {
+        val alex = admin("Alex")
+        repo.addPerson("Sam", 0xFF5B9BE0, Role.ADMIN)
+        assertThrows(LastAdminException::class.java) { runBlocking { repo.removePerson(alex.id) } }
+    }
+
+    @Test
+    fun pinHashNeedsAnExistingPerson() = runTest {
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repo.setPinHash(PersonId("nobody"), "h", "s") }
         }
     }
 
@@ -1592,12 +1575,12 @@ class RoomHouseholdRepositoryTest {
 Run: `./gradlew :core:household:testDebugUnitTest`
 Expected: FAIL with `NotImplementedError`.
 
-- [ ] **Step 7: Implement `RoomHouseholdRepository`**
+- [ ] **Step 7: Implement `HouseholdRepository`**
 
-Replace the class body in `RoomHouseholdRepository.kt`:
 ```kotlin
 package uk.co.siland.househub.core.household
 
+import androidx.room.withTransaction
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -1607,43 +1590,53 @@ import uk.co.siland.househub.core.household.db.LocationEntity
 import uk.co.siland.househub.core.household.db.PersonEntity
 
 @Singleton
-class RoomHouseholdRepository @Inject constructor(db: HouseholdDatabase) : HouseholdRepository {
+class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase) {
     private val dao = db.householdDao()
 
-    override val people: Flow<List<Person>> =
-        dao.people().map { rows -> rows.map { it.toPerson() } }
+    /** Real people in display order; never includes Family. */
+    val people: Flow<List<Person>> = dao.people().map { rows -> rows.map { it.toPerson() } }
 
-    override val peopleWithFamily: Flow<List<Person>> =
-        people.map { listOf(Person.Family) + it }
+    val peopleWithFamily: Flow<List<Person>> = people.map { listOf(Person.Family) + it }
 
-    override val location: Flow<HomeLocation?> =
+    val location: Flow<HomeLocation?> =
         dao.location().map { it?.let { l -> HomeLocation(l.name, l.latitude, l.longitude, l.timeZoneId) } }
 
-    override suspend fun person(id: PersonId): Person? =
+    suspend fun person(id: PersonId): Person? =
         if (id == PersonId.FAMILY) Person.Family else dao.person(id.value)?.toPerson()
 
-    override suspend fun addPerson(name: String, color: Long): Person {
-        val clean = name.trim()
-        require(clean.isNotEmpty()) { "Name must not be blank" }
-        val person = Person(PersonId.new(), clean, color)
-        dao.upsertPerson(PersonEntity(person.id.value, clean, color, dao.maxSortOrder() + 1))
-        return person
+    suspend fun addPerson(name: String, color: Long, role: Role): Person {
+        val clean = cleanName(name)
+        val id = PersonId.new()
+        dao.upsertPerson(PersonEntity(id.value, clean, color, dao.maxSortOrder() + 1, role, null, null))
+        return Person(id, clean, color)
     }
 
-    override suspend fun updatePerson(person: Person) {
+    suspend fun updatePerson(person: Person) {
         require(!person.isFamily) { "Family cannot be edited" }
-        val clean = person.name.trim()
-        require(clean.isNotEmpty()) { "Name must not be blank" }
         val existing = requireNotNull(dao.person(person.id.value)) { "Unknown person ${person.id.value}" }
-        dao.upsertPerson(existing.copy(name = clean, color = person.color))
+        dao.upsertPerson(existing.copy(name = cleanName(person.name), color = person.color))
     }
 
-    override suspend fun removePerson(id: PersonId) {
+    suspend fun removePerson(id: PersonId) {
         require(id != PersonId.FAMILY) { "Family cannot be removed" }
-        dao.deletePerson(id.value)
+        db.withTransaction {
+            val current = dao.person(id.value) ?: return@withTransaction
+            guardLastAdmin(current, next = null)
+            dao.deletePerson(id.value)
+        }
     }
 
-    override suspend fun setLocation(location: HomeLocation) {
+    suspend fun credential(id: PersonId): Credential? = dao.person(id.value)?.toCredential()
+
+    suspend fun credentials(): List<Credential> = dao.all().map { it.toCredential() }
+
+    suspend fun setRole(id: PersonId, role: Role) = change(id) { it.copy(role = role) }
+
+    suspend fun setPinHash(id: PersonId, hash: String, salt: String) = change(id) { it.copy(pinHash = hash, salt = salt) }
+
+    suspend fun clearPin(id: PersonId) = change(id) { it.copy(pinHash = null, salt = null) }
+
+    suspend fun setLocation(location: HomeLocation) {
         dao.upsertLocation(
             LocationEntity(
                 name = location.name,
@@ -1654,42 +1647,58 @@ class RoomHouseholdRepository @Inject constructor(db: HouseholdDatabase) : House
         )
     }
 
+    private suspend fun change(id: PersonId, edit: (PersonEntity) -> PersonEntity) = db.withTransaction {
+        val current = requireNotNull(dao.person(id.value)) { "Unknown person ${id.value}" }
+        val next = edit(current)
+        guardLastAdmin(current, next)
+        dao.upsertPerson(next)
+    }
+
+    private suspend fun guardLastAdmin(current: PersonEntity, next: PersonEntity?) {
+        if (!current.isActiveAdmin() || next?.isActiveAdmin() == true) return
+        if (dao.all().count { it.isActiveAdmin() } <= 1) throw LastAdminException()
+    }
+
+    private fun cleanName(name: String): String =
+        name.trim().also { require(it.isNotEmpty()) { "Name must not be blank" } }
+
+    private fun PersonEntity.isActiveAdmin() = role == Role.ADMIN && pinHash != null
     private fun PersonEntity.toPerson() = Person(PersonId(id), name, color)
+    private fun PersonEntity.toCredential() = Credential(PersonId(id), role, pinHash, salt)
 }
 ```
 
 - [ ] **Step 8: Run tests to verify they pass**
 
 Run: `./gradlew :core:household:testDebugUnitTest`
-Expected: PASS (8 tests). A `schemas/` directory is generated under `core/household/`; commit it (it is the migration baseline).
+Expected: PASS (15 tests). Commit the generated `core/household/schemas/` directory (it is the migration baseline).
 
 - [ ] **Step 9: Commit**
 
 ```bash
 git add settings.gradle.kts core/household
-git commit -m "Add core:household with people, Family and home location"
+git commit -m "Add core:household with people, roles, PIN storage and last-admin rule"
 ```
 
 ---
 
-### Task 6: `:core:access` domain — roles, permissions, PIN hashing
+### Task 5: `:core:access` domain — permissions and PIN hashing
 
 **Files:**
 - Modify: `settings.gradle.kts` (add `include(":core:access")`)
 - Create: `core/access/build.gradle.kts`
-- Create: `core/access/src/main/java/uk/co/siland/househub/core/access/Role.kt`, `Permissions.kt`, `PermissionRegistry.kt`, `PinHasher.kt`
+- Create: `core/access/src/main/java/uk/co/siland/househub/core/access/Permissions.kt`, `PermissionRegistry.kt`, `PinHasher.kt`
 - Test: `core/access/src/test/java/uk/co/siland/househub/core/access/PermissionRegistryTest.kt`, `PinHasherTest.kt`
 
 **Interfaces:**
-- Consumes: nothing yet.
+- Consumes: `Role` (Task 4).
 - Produces:
-  - `enum class Role { ADMIN, ADULT, CHILD }`
-  - `data class PermissionDef(id: String, label: String, defaultRoles: Set<Role>)`
+  - `data class PermissionDef(id: String, label: String, defaultRoles: Set<Role>, freshPin: Boolean = false)` — `freshPin` permissions always show the PIN pad, even mid-session
   - `interface PermissionSource { val permissions: List<PermissionDef> }`
-  - `object CorePermissions { const val SETTINGS_MANAGE = "settings.manage"; const val PEOPLE_MANAGE = "people.manage"; const val KIOSK_EXIT = "kiosk.exit" }`
+  - `object CorePermissions { SETTINGS_MANAGE = "settings.manage"; PEOPLE_MANAGE = "people.manage"; KIOSK_EXIT = "kiosk.exit" }`
   - `class CorePermissionSource @Inject constructor() : PermissionSource`
-  - `class PermissionRegistry @Inject constructor(sources: Set<PermissionSource>) { fun require(id: String): PermissionDef; fun isGranted(role: Role, id: String): Boolean; fun all(): Collection<PermissionDef> }`
-  - `class PinHasher @Inject constructor() { fun isWellFormed(pin: String): Boolean; fun validate(pin: String); fun newSalt(): ByteArray; fun hash(pin: String, salt: ByteArray): ByteArray; fun matches(pin: String, salt: ByteArray, hash: ByteArray): Boolean }`
+  - `@Singleton class PermissionRegistry @Inject constructor(sources: Set<PermissionSource>) { fun require(id: String): PermissionDef; fun isGranted(role: Role, id: String): Boolean; fun all(): Collection<PermissionDef> }`
+  - `class PinHasher @Inject constructor() { fun isWellFormed(pin: String): Boolean; fun validate(pin: String); fun newSalt(): String; fun hash(pin: String, salt: String): String; fun matches(pin: String, salt: String, hash: String): Boolean }` with `PIN_LENGTH = 4`
 
 - [ ] **Step 1: Add module**
 
@@ -1701,7 +1710,6 @@ plugins {
     id("househub.android.library")
     id("househub.android.compose")
     id("househub.hilt")
-    id("househub.room")
 }
 
 dependencies {
@@ -1713,20 +1721,19 @@ dependencies {
 
 - [ ] **Step 2: Write the types (logic stubbed)**
 
-`Role.kt`:
-```kotlin
-package uk.co.siland.househub.core.access
-
-enum class Role { ADMIN, ADULT, CHILD }
-```
-
 `Permissions.kt`:
 ```kotlin
 package uk.co.siland.househub.core.access
 
 import javax.inject.Inject
+import uk.co.siland.househub.core.household.Role
 
-data class PermissionDef(val id: String, val label: String, val defaultRoles: Set<Role>)
+data class PermissionDef(
+    val id: String,
+    val label: String,
+    val defaultRoles: Set<Role>,
+    val freshPin: Boolean = false,
+)
 
 /** Each capability contributes one of these via `@IntoSet`. */
 interface PermissionSource {
@@ -1742,8 +1749,8 @@ object CorePermissions {
 class CorePermissionSource @Inject constructor() : PermissionSource {
     override val permissions = listOf(
         PermissionDef(CorePermissions.SETTINGS_MANAGE, "Change settings", setOf(Role.ADMIN)),
-        PermissionDef(CorePermissions.PEOPLE_MANAGE, "Manage people", setOf(Role.ADMIN)),
-        PermissionDef(CorePermissions.KIOSK_EXIT, "Exit kiosk mode", setOf(Role.ADMIN)),
+        PermissionDef(CorePermissions.PEOPLE_MANAGE, "Manage people", setOf(Role.ADMIN), freshPin = true),
+        PermissionDef(CorePermissions.KIOSK_EXIT, "Exit kiosk mode", setOf(Role.ADMIN), freshPin = true),
     )
 }
 ```
@@ -1754,6 +1761,7 @@ package uk.co.siland.househub.core.access
 
 import javax.inject.Inject
 import javax.inject.Singleton
+import uk.co.siland.househub.core.household.Role
 
 @Singleton
 class PermissionRegistry @Inject constructor(
@@ -1774,9 +1782,13 @@ import javax.inject.Inject
 class PinHasher @Inject constructor() {
     fun isWellFormed(pin: String): Boolean = TODO()
     fun validate(pin: String): Unit = TODO()
-    fun newSalt(): ByteArray = TODO()
-    fun hash(pin: String, salt: ByteArray): ByteArray = TODO()
-    fun matches(pin: String, salt: ByteArray, hash: ByteArray): Boolean = TODO()
+    fun newSalt(): String = TODO()
+    fun hash(pin: String, salt: String): String = TODO()
+    fun matches(pin: String, salt: String, hash: String): Boolean = TODO()
+
+    companion object {
+        const val PIN_LENGTH = 4
+    }
 }
 ```
 
@@ -1789,12 +1801,13 @@ package uk.co.siland.househub.core.access
 import com.google.common.truth.Truth.assertThat
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import uk.co.siland.househub.core.household.Role
 
 class PermissionRegistryTest {
     private val calendar = object : PermissionSource {
         override val permissions = listOf(
             PermissionDef("calendar.event.create", "Add events", setOf(Role.ADMIN, Role.ADULT)),
-            PermissionDef("calendar.event.create.self", "Add your own events", setOf(Role.ADMIN, Role.ADULT, Role.CHILD)),
+            PermissionDef("calendar.event.create.self", "Add your own events", Role.entries.toSet()),
         )
     }
     private val registry = PermissionRegistry(setOf(CorePermissionSource(), calendar))
@@ -1806,6 +1819,13 @@ class PermissionRegistryTest {
             assertThat(registry.isGranted(Role.ADULT, id)).isFalse()
             assertThat(registry.isGranted(Role.CHILD, id)).isFalse()
         }
+    }
+
+    @Test
+    fun kioskExitAndPeopleNeedAFreshPin() {
+        assertThat(registry.require(CorePermissions.KIOSK_EXIT).freshPin).isTrue()
+        assertThat(registry.require(CorePermissions.PEOPLE_MANAGE).freshPin).isTrue()
+        assertThat(registry.require(CorePermissions.SETTINGS_MANAGE).freshPin).isFalse()
     }
 
     @Test
@@ -1829,7 +1849,7 @@ class PermissionRegistryTest {
 
     @Test
     fun allListsEveryPermission() {
-        assertThat(registry.all().map { it.id }).hasSize(5)
+        assertThat(registry.all()).hasSize(5)
     }
 }
 ```
@@ -1839,6 +1859,7 @@ class PermissionRegistryTest {
 package uk.co.siland.househub.core.access
 
 import com.google.common.truth.Truth.assertThat
+import java.util.Base64
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -1846,13 +1867,14 @@ class PinHasherTest {
     private val hasher = PinHasher()
 
     @Test
-    fun acceptsFourToSixAsciiDigits() {
-        listOf("1234", "12345", "123456").forEach { assertThat(hasher.isWellFormed(it)).isTrue() }
+    fun acceptsExactlyFourAsciiDigits() {
+        assertThat(hasher.isWellFormed("0000")).isTrue()
+        assertThat(hasher.isWellFormed("2468")).isTrue()
     }
 
     @Test
-    fun rejectsWrongLengthLettersAndNonAsciiDigits() {
-        listOf("", "123", "1234567", "12a4", "12 34", "١٢٣٤").forEach {
+    fun rejectsOtherLengthsLettersAndNonAsciiDigits() {
+        listOf("", "123", "12345", "12a4", "12 4", "١٢٣٤").forEach {
             assertThat(hasher.isWellFormed(it)).isFalse()
             assertThrows(IllegalArgumentException::class.java) { hasher.validate(it) }
         }
@@ -1868,11 +1890,10 @@ class PinHasherTest {
     }
 
     @Test
-    fun saltsAreRandomAndSixteenBytes() {
+    fun saltsAreRandomSixteenBytes() {
         val a = hasher.newSalt()
-        val b = hasher.newSalt()
-        assertThat(a).hasLength(16)
-        assertThat(a).isNotEqualTo(b)
+        assertThat(Base64.getDecoder().decode(a)).hasLength(16)
+        assertThat(a).isNotEqualTo(hasher.newSalt())
     }
 }
 ```
@@ -1911,30 +1932,36 @@ package uk.co.siland.househub.core.access
 
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.Base64
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 import javax.inject.Inject
 
 class PinHasher @Inject constructor() {
     private val random = SecureRandom()
+    private val encoder = Base64.getEncoder()
+    private val decoder = Base64.getDecoder()
 
-    fun isWellFormed(pin: String): Boolean = pin.length in 4..6 && pin.all { it in '0'..'9' }
+    fun isWellFormed(pin: String): Boolean = pin.length == PIN_LENGTH && pin.all { it in '0'..'9' }
 
-    fun validate(pin: String) = require(isWellFormed(pin)) { "PIN must be 4–6 digits" }
+    fun validate(pin: String) = require(isWellFormed(pin)) { "PIN must be $PIN_LENGTH digits" }
 
-    fun newSalt(): ByteArray = ByteArray(16).also(random::nextBytes)
+    fun newSalt(): String = encoder.encodeToString(ByteArray(16).also(random::nextBytes))
 
-    fun hash(pin: String, salt: ByteArray): ByteArray {
+    fun hash(pin: String, salt: String): String = encoder.encodeToString(derive(pin, decoder.decode(salt)))
+
+    fun matches(pin: String, salt: String, hash: String): Boolean =
+        MessageDigest.isEqual(derive(pin, decoder.decode(salt)), decoder.decode(hash))
+
+    private fun derive(pin: String, salt: ByteArray): ByteArray {
         val spec = PBEKeySpec(pin.toCharArray(), salt, ITERATIONS, 256)
         return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
     }
 
-    fun matches(pin: String, salt: ByteArray, hash: ByteArray): Boolean =
-        MessageDigest.isEqual(hash(pin, salt), hash)
-
-    private companion object {
+    companion object {
+        const val PIN_LENGTH = 4
         // Kid-proofing, not strong auth: identify() checks every person, so keep this cheap on a 2 GB tablet.
-        const val ITERATIONS = 10_000
+        private const val ITERATIONS = 10_000
     }
 }
 ```
@@ -1942,145 +1969,84 @@ class PinHasher @Inject constructor() {
 - [ ] **Step 6: Run tests to verify they pass**
 
 Run: `./gradlew :core:access:testDebugUnitTest`
-Expected: PASS (9 tests).
+Expected: PASS (10 tests).
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add settings.gradle.kts core/access
-git commit -m "Add core:access roles, permission registry and PIN hashing"
+git commit -m "Add core:access permission registry and 4-digit PIN hashing"
 ```
 
 ---
 
-### Task 7: `:core:access` persistence — credentials and lockout
+### Task 6: `:core:access` — PIN management and lockout store
 
 **Files:**
-- Create: `core/access/src/main/java/uk/co/siland/househub/core/access/db/AccessDatabase.kt`, `CredentialRepository.kt`, `LockoutRepository.kt`
-- Test: `core/access/src/test/java/uk/co/siland/househub/core/access/CredentialRepositoryTest.kt`, `LockoutRepositoryTest.kt`
+- Create: `core/access/src/main/java/uk/co/siland/househub/core/access/PinManager.kt`, `LockoutStore.kt`
+- Test: `core/access/src/test/java/uk/co/siland/househub/core/access/PinManagerTest.kt`, `LockoutStoreTest.kt`
 
 **Interfaces:**
-- Consumes: `PinHasher`, `Role` (Task 6); `PersonId` (Task 5).
+- Consumes: `HouseholdRepository`, `Person`, `PersonId`, `Role`, `Credential` (Task 4); `PinHasher` (Task 5).
 - Produces:
-  - `class PinInUseException : Exception`, `class LastAdminException : Exception`
-  - `class CredentialRepository @Inject constructor(db: AccessDatabase, hasher: PinHasher) { suspend fun role(id: PersonId): Role?; suspend fun hasPin(id: PersonId): Boolean; suspend fun setRole(id: PersonId, role: Role); suspend fun setPin(id: PersonId, pin: String); suspend fun clearPin(id: PersonId); suspend fun remove(id: PersonId); suspend fun identify(pin: String): PersonId? }`
-  - `class LockoutRepository @Inject constructor(db: AccessDatabase) { suspend fun lockedUntil(nowMillis: Long): Long?; suspend fun recordFailure(nowMillis: Long); suspend fun reset() }` with `FREE_ATTEMPTS = 5`, `BASE_LOCK_MS = 30_000L`
+  - `data class Identified(person: Person, role: Role)`
+  - `class PinInUseException : Exception`
+  - `@Singleton class PinManager @Inject constructor(household: HouseholdRepository, hasher: PinHasher) { suspend fun setPin(id: PersonId, pin: String); suspend fun identify(pin: String): Identified? }`
+  - `@Singleton class LockoutStore @Inject constructor(@ApplicationContext context: Context) { fun lockedUntil(nowMillis: Long): Long?; fun recordFailure(nowMillis: Long); fun reset() }` with `FREE_ATTEMPTS = 5`, `BASE_LOCK_MS = 30_000L`, `MAX_DOUBLINGS = 5`
 
-- [ ] **Step 1: Write the database**
+- [ ] **Step 1: Write stubs**
 
-`db/AccessDatabase.kt`:
-```kotlin
-package uk.co.siland.househub.core.access.db
-
-import androidx.room.Dao
-import androidx.room.Database
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-import androidx.room.Query
-import androidx.room.RoomDatabase
-import androidx.room.Upsert
-import uk.co.siland.househub.core.access.Role
-
-@Entity(tableName = "credential")
-class CredentialEntity(
-    @PrimaryKey val personId: String,
-    val role: Role,
-    val pinHash: ByteArray?,
-    val salt: ByteArray?,
-) {
-    val isActiveAdmin: Boolean get() = role == Role.ADMIN && pinHash != null
-
-    fun copy(role: Role = this.role, pinHash: ByteArray? = this.pinHash, salt: ByteArray? = this.salt) =
-        CredentialEntity(personId, role, pinHash, salt)
-}
-
-@Entity(tableName = "lockout")
-data class LockoutEntity(
-    @PrimaryKey val id: Int = 0,
-    val failures: Int = 0,
-    val lockedUntilMillis: Long = 0,
-)
-
-@Dao
-interface AccessDao {
-    @Query("SELECT * FROM credential")
-    suspend fun all(): List<CredentialEntity>
-
-    @Query("SELECT * FROM credential WHERE personId = :id")
-    suspend fun get(id: String): CredentialEntity?
-
-    @Upsert
-    suspend fun upsert(credential: CredentialEntity)
-
-    @Query("DELETE FROM credential WHERE personId = :id")
-    suspend fun delete(id: String)
-
-    @Query("SELECT * FROM lockout WHERE id = 0")
-    suspend fun lockout(): LockoutEntity?
-
-    @Upsert
-    suspend fun upsertLockout(lockout: LockoutEntity)
-}
-
-@Database(entities = [CredentialEntity::class, LockoutEntity::class], version = 1)
-abstract class AccessDatabase : RoomDatabase() {
-    abstract fun accessDao(): AccessDao
-}
-```
-
-- [ ] **Step 2: Write repository stubs**
-
-`CredentialRepository.kt`:
+`PinManager.kt`:
 ```kotlin
 package uk.co.siland.househub.core.access
 
 import javax.inject.Inject
 import javax.inject.Singleton
-import uk.co.siland.househub.core.access.db.AccessDatabase
+import uk.co.siland.househub.core.household.HouseholdRepository
+import uk.co.siland.househub.core.household.Person
 import uk.co.siland.househub.core.household.PersonId
+import uk.co.siland.househub.core.household.Role
+
+data class Identified(val person: Person, val role: Role)
 
 class PinInUseException : Exception("That PIN is already used by someone else")
-class LastAdminException : Exception("At least one Admin with a PIN must remain")
 
 @Singleton
-class CredentialRepository @Inject constructor(
-    private val db: AccessDatabase,
+class PinManager @Inject constructor(
+    private val household: HouseholdRepository,
     private val hasher: PinHasher,
 ) {
-    suspend fun role(id: PersonId): Role? = TODO()
-    suspend fun hasPin(id: PersonId): Boolean = TODO()
-    suspend fun setRole(id: PersonId, role: Role): Unit = TODO()
     suspend fun setPin(id: PersonId, pin: String): Unit = TODO()
-    suspend fun clearPin(id: PersonId): Unit = TODO()
-    suspend fun remove(id: PersonId): Unit = TODO()
-    suspend fun identify(pin: String): PersonId? = TODO()
+    suspend fun identify(pin: String): Identified? = TODO()
 }
 ```
 
-`LockoutRepository.kt`:
+`LockoutStore.kt`:
 ```kotlin
 package uk.co.siland.househub.core.access
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import uk.co.siland.househub.core.access.db.AccessDatabase
 
 @Singleton
-class LockoutRepository @Inject constructor(db: AccessDatabase) {
-    suspend fun lockedUntil(nowMillis: Long): Long? = TODO()
-    suspend fun recordFailure(nowMillis: Long): Unit = TODO()
-    suspend fun reset(): Unit = TODO()
+class LockoutStore @Inject constructor(@ApplicationContext context: Context) {
+    fun lockedUntil(nowMillis: Long): Long? = TODO()
+    fun recordFailure(nowMillis: Long): Unit = TODO()
+    fun reset(): Unit = TODO()
 
     companion object {
         const val FREE_ATTEMPTS = 5
         const val BASE_LOCK_MS = 30_000L
+        const val MAX_DOUBLINGS = 5
     }
 }
 ```
 
-- [ ] **Step 3: Write the failing tests**
+- [ ] **Step 2: Write the failing tests**
 
-`CredentialRepositoryTest.kt`:
+`PinManagerTest.kt`:
 ```kotlin
 package uk.co.siland.househub.core.access
 
@@ -2095,346 +2061,273 @@ import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import uk.co.siland.househub.core.access.db.AccessDatabase
+import uk.co.siland.househub.core.household.HouseholdRepository
 import uk.co.siland.househub.core.household.PersonId
+import uk.co.siland.househub.core.household.Role
+import uk.co.siland.househub.core.household.db.HouseholdDatabase
 
 @RunWith(AndroidJUnit4::class)
-class CredentialRepositoryTest {
-    private lateinit var db: AccessDatabase
-    private lateinit var repo: CredentialRepository
-    private val alex = PersonId("alex")
-    private val sam = PersonId("sam")
-    private val mia = PersonId("mia")
+class PinManagerTest {
+    private lateinit var db: HouseholdDatabase
+    private lateinit var household: HouseholdRepository
+    private lateinit var pins: PinManager
 
     @Before
     fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AccessDatabase::class.java)
+        db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), HouseholdDatabase::class.java)
             .allowMainThreadQueries().build()
-        repo = CredentialRepository(db, PinHasher())
+        household = HouseholdRepository(db)
+        pins = PinManager(household, PinHasher())
     }
 
     @After
     fun tearDown() = db.close()
 
-    private suspend fun give(id: PersonId, role: Role, pin: String?) {
-        repo.setRole(id, role)
-        if (pin != null) repo.setPin(id, pin)
-    }
-
     @Test
-    fun identifyFindsThePersonByPin() = runTest {
-        give(alex, Role.ADMIN, "1234")
-        give(mia, Role.CHILD, "9876")
-        assertThat(repo.identify("9876")).isEqualTo(mia)
-        assertThat(repo.identify("1234")).isEqualTo(alex)
+    fun identifyReturnsPersonAndRole() = runTest {
+        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
+        val mia = household.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
+        pins.setPin(alex.id, "1234")
+        pins.setPin(mia.id, "9876")
+        assertThat(pins.identify("9876")).isEqualTo(Identified(mia, Role.CHILD))
+        assertThat(pins.identify("1234")).isEqualTo(Identified(alex, Role.ADMIN))
     }
 
     @Test
     fun identifyReturnsNullForWrongOrMalformedPin() = runTest {
-        give(alex, Role.ADMIN, "1234")
-        assertThat(repo.identify("1235")).isNull()
-        assertThat(repo.identify("12")).isNull()
+        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
+        pins.setPin(alex.id, "1234")
+        assertThat(pins.identify("1235")).isNull()
+        assertThat(pins.identify("12")).isNull()
     }
 
     @Test
     fun duplicatePinIsRejected() = runTest {
-        give(alex, Role.ADMIN, "1234")
-        repo.setRole(sam, Role.ADULT)
-        assertThrows(PinInUseException::class.java) { runBlocking { repo.setPin(sam, "1234") } }
+        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
+        val sam = household.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
+        pins.setPin(alex.id, "1234")
+        assertThrows(PinInUseException::class.java) { runBlocking { pins.setPin(sam.id, "1234") } }
     }
 
     @Test
     fun personCanKeepTheirOwnPin() = runTest {
-        give(alex, Role.ADMIN, "1234")
-        repo.setPin(alex, "1234")
-        assertThat(repo.identify("1234")).isEqualTo(alex)
+        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
+        pins.setPin(alex.id, "1234")
+        pins.setPin(alex.id, "1234")
+        assertThat(pins.identify("1234")?.person).isEqualTo(alex)
     }
 
     @Test
     fun malformedPinIsRejected() = runTest {
-        repo.setRole(alex, Role.ADMIN)
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.setPin(alex, "12a4") } }
+        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { pins.setPin(alex.id, "12345") } }
     }
 
     @Test
-    fun pinRequiresARoleFirst() = runTest {
-        assertThrows(IllegalStateException::class.java) { runBlocking { repo.setPin(alex, "1234") } }
+    fun unknownPersonIsRejected() = runTest {
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { pins.setPin(PersonId("nobody"), "1234") } }
     }
 
     @Test
-    fun firstAdminCanBeCreatedOnEmptyDatabase() = runTest {
-        give(alex, Role.ADMIN, "1234")
-        assertThat(repo.role(alex)).isEqualTo(Role.ADMIN)
-        assertThat(repo.hasPin(alex)).isTrue()
-    }
-
-    @Test
-    fun lastAdminCannotBeDemoted() = runTest {
-        give(alex, Role.ADMIN, "1234")
-        assertThrows(LastAdminException::class.java) { runBlocking { repo.setRole(alex, Role.ADULT) } }
-    }
-
-    @Test
-    fun lastAdminCannotBeRemoved() = runTest {
-        give(alex, Role.ADMIN, "1234")
-        assertThrows(LastAdminException::class.java) { runBlocking { repo.remove(alex) } }
-    }
-
-    @Test
-    fun lastAdminCannotHavePinCleared() = runTest {
-        give(alex, Role.ADMIN, "1234")
-        assertThrows(LastAdminException::class.java) { runBlocking { repo.clearPin(alex) } }
-    }
-
-    @Test
-    fun oneOfTwoAdminsCanBeDemoted() = runTest {
-        give(alex, Role.ADMIN, "1234")
-        give(sam, Role.ADMIN, "5678")
-        repo.setRole(sam, Role.ADULT)
-        assertThat(repo.role(sam)).isEqualTo(Role.ADULT)
-    }
-
-    @Test
-    fun clearedPinNoLongerIdentifies() = runTest {
-        give(alex, Role.ADMIN, "1234")
-        give(mia, Role.CHILD, "9876")
-        repo.clearPin(mia)
-        assertThat(repo.identify("9876")).isNull()
-        assertThat(repo.hasPin(mia)).isFalse()
+    fun removedPersonsPinNoLongerIdentifies() = runTest {
+        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
+        val mia = household.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
+        pins.setPin(alex.id, "1234")
+        pins.setPin(mia.id, "9876")
+        household.removePerson(mia.id)
+        assertThat(pins.identify("9876")).isNull()
     }
 }
 ```
 
-`LockoutRepositoryTest.kt`:
+`LockoutStoreTest.kt`:
 ```kotlin
 package uk.co.siland.househub.core.access
 
-import androidx.room.Room
+import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.test.runTest
-import org.junit.After
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import uk.co.siland.househub.core.access.db.AccessDatabase
 
 @RunWith(AndroidJUnit4::class)
-class LockoutRepositoryTest {
-    private lateinit var db: AccessDatabase
-    private lateinit var repo: LockoutRepository
+class LockoutStoreTest {
+    private val context = ApplicationProvider.getApplicationContext<Context>()
+    private val store = LockoutStore(context)
     private val t0 = 1_000_000L
 
-    @Before
-    fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AccessDatabase::class.java)
-            .allowMainThreadQueries().build()
-        repo = LockoutRepository(db)
-    }
-
-    @After
-    fun tearDown() = db.close()
-
     @Test
-    fun fourFailuresDoNotLock() = runTest {
-        repeat(4) { repo.recordFailure(t0) }
-        assertThat(repo.lockedUntil(t0)).isNull()
+    fun fourFailuresDoNotLock() {
+        repeat(4) { store.recordFailure(t0) }
+        assertThat(store.lockedUntil(t0)).isNull()
     }
 
     @Test
-    fun fifthFailureLocksForThirtySecondsThenDoubles() = runTest {
-        repeat(5) { repo.recordFailure(t0) }
-        assertThat(repo.lockedUntil(t0)).isEqualTo(t0 + 30_000)
-        repo.recordFailure(t0 + 31_000)
-        assertThat(repo.lockedUntil(t0 + 31_000)).isEqualTo(t0 + 31_000 + 60_000)
+    fun fifthFailureLocksForThirtySecondsThenDoubles() {
+        repeat(5) { store.recordFailure(t0) }
+        assertThat(store.lockedUntil(t0)).isEqualTo(t0 + 30_000)
+        store.recordFailure(t0 + 31_000)
+        assertThat(store.lockedUntil(t0 + 31_000)).isEqualTo(t0 + 31_000 + 60_000)
     }
 
     @Test
-    fun lockExpires() = runTest {
-        repeat(5) { repo.recordFailure(t0) }
-        assertThat(repo.lockedUntil(t0 + 30_000)).isNull()
+    fun lockExpires() {
+        repeat(5) { store.recordFailure(t0) }
+        assertThat(store.lockedUntil(t0 + 30_000)).isNull()
     }
 
     @Test
-    fun resetClearsFailures() = runTest {
-        repeat(5) { repo.recordFailure(t0) }
-        repo.reset()
-        assertThat(repo.lockedUntil(t0)).isNull()
-        repeat(4) { repo.recordFailure(t0) }
-        assertThat(repo.lockedUntil(t0)).isNull()
+    fun resetClearsFailures() {
+        repeat(5) { store.recordFailure(t0) }
+        store.reset()
+        assertThat(store.lockedUntil(t0)).isNull()
+        repeat(4) { store.recordFailure(t0) }
+        assertThat(store.lockedUntil(t0)).isNull()
     }
 
     @Test
-    fun lockoutSurvivesNewRepositoryInstance() = runTest {
-        repeat(5) { repo.recordFailure(t0) }
-        val afterRestart = LockoutRepository(db)
-        assertThat(afterRestart.lockedUntil(t0 + 1_000)).isEqualTo(t0 + 30_000)
+    fun lockoutSurvivesNewStoreInstance() {
+        repeat(5) { store.recordFailure(t0) }
+        assertThat(LockoutStore(context).lockedUntil(t0 + 1_000)).isEqualTo(t0 + 30_000)
     }
 
     @Test
-    fun lockDurationIsCapped() = runTest {
-        repeat(100) { repo.recordFailure(t0) }
-        assertThat(repo.lockedUntil(t0)).isEqualTo(t0 + (30_000L shl 10))
+    fun lockDurationIsCappedAtSixteenMinutes() {
+        repeat(100) { store.recordFailure(t0) }
+        assertThat(store.lockedUntil(t0)).isEqualTo(t0 + 30_000L * 32)
     }
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they fail**
+- [ ] **Step 3: Run tests to verify they fail**
 
 Run: `./gradlew :core:access:testDebugUnitTest`
 Expected: FAIL with `NotImplementedError` in the new tests.
 
-- [ ] **Step 5: Implement `CredentialRepository`**
+- [ ] **Step 4: Implement `PinManager`**
 
 ```kotlin
 package uk.co.siland.househub.core.access
 
-import androidx.room.withTransaction
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import uk.co.siland.househub.core.access.db.AccessDatabase
-import uk.co.siland.househub.core.access.db.CredentialEntity
+import uk.co.siland.househub.core.household.Credential
+import uk.co.siland.househub.core.household.HouseholdRepository
+import uk.co.siland.househub.core.household.Person
 import uk.co.siland.househub.core.household.PersonId
+import uk.co.siland.househub.core.household.Role
+
+data class Identified(val person: Person, val role: Role)
 
 class PinInUseException : Exception("That PIN is already used by someone else")
-class LastAdminException : Exception("At least one Admin with a PIN must remain")
 
 @Singleton
-class CredentialRepository @Inject constructor(
-    private val db: AccessDatabase,
+class PinManager @Inject constructor(
+    private val household: HouseholdRepository,
     private val hasher: PinHasher,
 ) {
-    private val dao = db.accessDao()
-
-    suspend fun role(id: PersonId): Role? = dao.get(id.value)?.role
-
-    suspend fun hasPin(id: PersonId): Boolean = dao.get(id.value)?.pinHash != null
-
-    suspend fun setRole(id: PersonId, role: Role) = db.withTransaction {
-        val current = dao.get(id.value)
-        val next = current?.copy(role = role) ?: CredentialEntity(id.value, role, null, null)
-        guardLastAdmin(current, next)
-        dao.upsert(next)
-    }
-
     suspend fun setPin(id: PersonId, pin: String) {
         hasher.validate(pin)
-        val (salt, hash) = withContext(Dispatchers.Default) {
-            val others = dao.all().filter { it.personId != id.value }
+        val (hash, salt) = withContext(Dispatchers.Default) {
+            val others = household.credentials().filter { it.personId != id }
             if (others.any { it.matches(pin) }) throw PinInUseException()
             val salt = hasher.newSalt()
-            salt to hasher.hash(pin, salt)
+            hasher.hash(pin, salt) to salt
         }
-        db.withTransaction {
-            val current = dao.get(id.value) ?: throw IllegalStateException("Set a role before a PIN")
-            dao.upsert(current.copy(pinHash = hash, salt = salt))
-        }
+        household.setPinHash(id, hash, salt)
     }
 
-    suspend fun clearPin(id: PersonId) = db.withTransaction {
-        val current = dao.get(id.value) ?: return@withTransaction
-        val next = current.copy(pinHash = null, salt = null)
-        guardLastAdmin(current, next)
-        dao.upsert(next)
-    }
-
-    suspend fun remove(id: PersonId) = db.withTransaction {
-        val current = dao.get(id.value) ?: return@withTransaction
-        guardLastAdmin(current, null)
-        dao.delete(id.value)
-    }
-
-    suspend fun identify(pin: String): PersonId? {
+    suspend fun identify(pin: String): Identified? {
         if (!hasher.isWellFormed(pin)) return null
-        return withContext(Dispatchers.Default) {
-            dao.all().firstOrNull { it.matches(pin) }?.let { PersonId(it.personId) }
-        }
+        val match = withContext(Dispatchers.Default) {
+            household.credentials().firstOrNull { it.matches(pin) }
+        } ?: return null
+        val person = household.person(match.personId) ?: return null
+        return Identified(person, match.role)
     }
 
-    private fun CredentialEntity.matches(pin: String): Boolean {
+    private fun Credential.matches(pin: String): Boolean {
         val h = pinHash ?: return false
         val s = salt ?: return false
         return hasher.matches(pin, s, h)
     }
-
-    private suspend fun guardLastAdmin(current: CredentialEntity?, next: CredentialEntity?) {
-        if (current?.isActiveAdmin != true || next?.isActiveAdmin == true) return
-        if (dao.all().count { it.isActiveAdmin } <= 1) throw LastAdminException()
-    }
 }
 ```
 
-- [ ] **Step 6: Implement `LockoutRepository`**
+- [ ] **Step 5: Implement `LockoutStore`**
 
 ```kotlin
 package uk.co.siland.househub.core.access
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import uk.co.siland.househub.core.access.db.AccessDatabase
-import uk.co.siland.househub.core.access.db.LockoutEntity
 
+/** Consecutive-failure counter. Kept in SharedPreferences so it survives the app being killed. */
 @Singleton
-class LockoutRepository @Inject constructor(db: AccessDatabase) {
-    private val dao = db.accessDao()
+class LockoutStore @Inject constructor(@ApplicationContext context: Context) {
+    private val prefs = context.getSharedPreferences("lockout", Context.MODE_PRIVATE)
 
-    suspend fun lockedUntil(nowMillis: Long): Long? =
-        dao.lockout()?.lockedUntilMillis?.takeIf { it > nowMillis }
+    fun lockedUntil(nowMillis: Long): Long? =
+        prefs.getLong(KEY_UNTIL, 0L).takeIf { it > nowMillis }
 
-    suspend fun recordFailure(nowMillis: Long) {
-        val current = dao.lockout() ?: LockoutEntity()
-        val failures = current.failures + 1
+    fun recordFailure(nowMillis: Long) {
+        val failures = prefs.getInt(KEY_FAILURES, 0) + 1
         val until = if (failures >= FREE_ATTEMPTS) {
             nowMillis + (BASE_LOCK_MS shl minOf(failures - FREE_ATTEMPTS, MAX_DOUBLINGS))
         } else {
-            current.lockedUntilMillis
+            prefs.getLong(KEY_UNTIL, 0L)
         }
-        dao.upsertLockout(current.copy(failures = failures, lockedUntilMillis = until))
+        prefs.edit().putInt(KEY_FAILURES, failures).putLong(KEY_UNTIL, until).commit()
     }
 
-    suspend fun reset() = dao.upsertLockout(LockoutEntity())
+    fun reset() {
+        prefs.edit().clear().commit()
+    }
 
     companion object {
         const val FREE_ATTEMPTS = 5
         const val BASE_LOCK_MS = 30_000L
-        private const val MAX_DOUBLINGS = 10
+        const val MAX_DOUBLINGS = 5
+        private const val KEY_FAILURES = "failures"
+        private const val KEY_UNTIL = "lockedUntil"
     }
 }
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [ ] **Step 6: Run tests to verify they pass**
 
 Run: `./gradlew :core:access:testDebugUnitTest`
-Expected: PASS (all Task 6 and Task 7 tests).
+Expected: PASS (all Task 5 and Task 6 tests).
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add core/access
-git commit -m "Add credential and lockout storage with last-admin protection"
+git commit -m "Add PIN manager and persistent lockout store"
 ```
 
 ---
 
-### Task 8: `:core:access` — `AccessControl`, session and PIN prompt
+### Task 7: `:core:access` — `AccessControl`, session and PIN prompt
 
 **Files:**
 - Create: `core/access/src/main/java/uk/co/siland/househub/core/access/AccessControl.kt`, `PinPromptController.kt`, `DefaultAccessControl.kt`, `di/AccessModule.kt`
-- Test: `core/access/src/test/java/uk/co/siland/househub/core/access/DefaultAccessControlTest.kt`, `FakeHouseholdRepository.kt`
+- Test: `core/access/src/test/java/uk/co/siland/househub/core/access/DefaultAccessControlTest.kt`
 
 **Interfaces:**
-- Consumes: `PermissionRegistry`, `CredentialRepository`, `LockoutRepository` (Tasks 6–7); `HouseholdRepository`, `Person` (Task 5); `WallClock`, `ApplicationScope` (Task 3).
+- Consumes: `PermissionRegistry`, `PermissionSource`, `CorePermissionSource` (Task 5); `PinManager`, `Identified`, `LockoutStore` (Task 6); `WallClock`, `ApplicationScope` (Task 3); `Person`, `Role` (Task 4).
 - Produces:
-  - `data class Identified(person: Person, role: Role)`
   - `data class Authorised(person: Person, role: Role, granted: Set<String>)`
-  - `interface AccessControl { val session: StateFlow<Identified?>; suspend fun authorise(vararg anyOf: String): Authorised?; fun touch(); fun lock() }` — `authorise` returns `null` if cancelled; `granted` is the subset of `anyOf` the person holds (never empty on success)
+  - `interface AccessControl { val session: StateFlow<Identified?>; suspend fun authorise(vararg anyOf: String): Authorised?; fun touch(); fun lock() }` — returns `null` if cancelled; `granted` is the non-empty subset of `anyOf` the person holds
+  - `const val SESSION_TIMEOUT_MS = 60_000L`
   - `sealed interface PinError { data object WrongPin; data class NotAllowed(name: String) }`
   - `class PinRequest(label: String, error: PinError?, lockedUntilMillis: Long?)` (identity equality)
-  - `class PinPromptController @Inject constructor() { val request: StateFlow<PinRequest?>; fun submit(pin: String); fun cancel() }` plus module-internal `open(...)`, `ask(...)`, `dismiss()`
-  - `const val SESSION_TIMEOUT_MS = 60_000L`
+  - `@Singleton class PinPromptController @Inject constructor() { val request: StateFlow<PinRequest?>; fun submit(pin: String); fun cancel() }` plus module-internal `open(...)`, `ask(...)`, `dismiss()`
 
 - [ ] **Step 1: Write the interfaces and prompt controller**
 
@@ -2444,8 +2337,7 @@ package uk.co.siland.househub.core.access
 
 import kotlinx.coroutines.flow.StateFlow
 import uk.co.siland.househub.core.household.Person
-
-data class Identified(val person: Person, val role: Role)
+import uk.co.siland.househub.core.household.Role
 
 data class Authorised(val person: Person, val role: Role, val granted: Set<String>)
 
@@ -2457,11 +2349,11 @@ interface AccessControl {
 
     /**
      * Succeeds if the identified person (or whoever enters a PIN) holds at least one of [anyOf].
-     * Shows the PIN pad when needed. Returns null if the pad is cancelled.
+     * Shows the PIN pad when needed, and always for fresh-PIN permissions. Returns null if cancelled.
      */
     suspend fun authorise(vararg anyOf: String): Authorised?
 
-    /** Call on any user interaction; extends an active session. */
+    /** Call on each touch-down; extends an active session. */
     fun touch()
 
     fun lock()
@@ -2526,16 +2418,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
-import uk.co.siland.househub.core.household.HouseholdRepository
 import uk.co.siland.househub.core.plugin.ApplicationScope
 import uk.co.siland.househub.core.plugin.WallClock
 
 @Singleton
 class DefaultAccessControl @Inject constructor(
     private val registry: PermissionRegistry,
-    private val credentials: CredentialRepository,
-    private val lockout: LockoutRepository,
-    private val household: HouseholdRepository,
+    private val pins: PinManager,
+    private val lockout: LockoutStore,
     private val prompt: PinPromptController,
     private val clock: WallClock,
     @ApplicationScope private val scope: CoroutineScope,
@@ -2551,22 +2441,16 @@ class DefaultAccessControl @Inject constructor(
 ```kotlin
 package uk.co.siland.househub.core.access.di
 
-import android.content.Context
-import androidx.room.Room
 import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
-import javax.inject.Singleton
 import uk.co.siland.househub.core.access.AccessControl
 import uk.co.siland.househub.core.access.CorePermissionSource
 import uk.co.siland.househub.core.access.DefaultAccessControl
 import uk.co.siland.househub.core.access.PermissionSource
-import uk.co.siland.househub.core.access.db.AccessDatabase
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -2580,62 +2464,24 @@ abstract class AccessModule {
     @Binds
     @IntoSet
     abstract fun corePermissions(impl: CorePermissionSource): PermissionSource
-
-    companion object {
-        @Provides
-        @Singleton
-        fun database(@ApplicationContext context: Context): AccessDatabase =
-            Room.databaseBuilder(context, AccessDatabase::class.java, "access.db").build()
-    }
 }
 ```
 
-- [ ] **Step 2: Write the test fake and failing tests**
-
-`FakeHouseholdRepository.kt` (test source set):
-```kotlin
-package uk.co.siland.househub.core.access
-
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
-import uk.co.siland.househub.core.household.HomeLocation
-import uk.co.siland.househub.core.household.HouseholdRepository
-import uk.co.siland.househub.core.household.Person
-import uk.co.siland.househub.core.household.PersonId
-
-class FakeHouseholdRepository : HouseholdRepository {
-    private val state = MutableStateFlow<List<Person>>(emptyList())
-    override val people: Flow<List<Person>> = state
-    override val peopleWithFamily: Flow<List<Person>> = state.map { listOf(Person.Family) + it }
-    override val location = MutableStateFlow<HomeLocation?>(null)
-    override suspend fun person(id: PersonId) =
-        if (id == PersonId.FAMILY) Person.Family else state.value.firstOrNull { it.id == id }
-    override suspend fun addPerson(name: String, color: Long) =
-        Person(PersonId.new(), name, color).also { state.value = state.value + it }
-    override suspend fun updatePerson(person: Person) {
-        state.value = state.value.map { if (it.id == person.id) person else it }
-    }
-    override suspend fun removePerson(id: PersonId) {
-        state.value = state.value.filterNot { it.id == id }
-    }
-    override suspend fun setLocation(location: HomeLocation) {
-        this.location.value = location
-    }
-}
-```
+- [ ] **Step 2: Write the failing tests**
 
 `DefaultAccessControlTest.kt`:
 ```kotlin
 package uk.co.siland.househub.core.access
 
+import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -2646,15 +2492,18 @@ import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import uk.co.siland.househub.core.access.db.AccessDatabase
+import uk.co.siland.househub.core.household.HouseholdRepository
 import uk.co.siland.househub.core.household.Person
+import uk.co.siland.househub.core.household.Role
+import uk.co.siland.househub.core.household.db.HouseholdDatabase
 import uk.co.siland.househub.core.plugin.WallClock
 
 @RunWith(AndroidJUnit4::class)
 class DefaultAccessControlTest {
-    private lateinit var db: AccessDatabase
-    private lateinit var credentials: CredentialRepository
-    private val household = FakeHouseholdRepository()
+    private lateinit var db: HouseholdDatabase
+    private lateinit var household: HouseholdRepository
+    private lateinit var pins: PinManager
+    private val context = ApplicationProvider.getApplicationContext<Context>()
     private val prompt = PinPromptController()
     private val seen = mutableListOf<PinRequest>()
 
@@ -2664,9 +2513,9 @@ class DefaultAccessControlTest {
 
     @Before
     fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AccessDatabase::class.java)
-            .allowMainThreadQueries().build()
-        credentials = CredentialRepository(db, PinHasher())
+        db = Room.inMemoryDatabaseBuilder(context, HouseholdDatabase::class.java).allowMainThreadQueries().build()
+        household = HouseholdRepository(db)
+        pins = PinManager(household, PinHasher())
     }
 
     @After
@@ -2674,24 +2523,19 @@ class DefaultAccessControlTest {
 
     private fun TestScope.access() = DefaultAccessControl(
         registry = PermissionRegistry(setOf(CorePermissionSource(), everyone)),
-        credentials = credentials,
-        lockout = LockoutRepository(db),
-        household = household,
+        pins = pins,
+        lockout = LockoutStore(context),
         prompt = prompt,
         clock = WallClock { testScheduler.currentTime },
         scope = backgroundScope,
     )
 
-    private suspend fun person(name: String, role: Role, pin: String): Person {
-        val p = household.addPerson(name, 0xFF4CB387)
-        credentials.setRole(p.id, role)
-        credentials.setPin(p.id, pin)
-        return p
-    }
+    private suspend fun person(name: String, role: Role, pin: String): Person =
+        household.addPerson(name, 0xFF4CB387, role).also { pins.setPin(it.id, pin) }
 
     /** Answers successive PIN pad requests in order; null = tap Cancel. */
-    private fun TestScope.answerPins(vararg pins: String?) {
-        val queue = ArrayDeque(pins.toList())
+    private fun TestScope.answerPins(vararg answers: String?) {
+        val queue = ArrayDeque(answers.toList())
         backgroundScope.launch {
             prompt.request.filterNotNull().collect { req ->
                 seen += req
@@ -2700,6 +2544,14 @@ class DefaultAccessControlTest {
                 if (pin == null) prompt.cancel() else prompt.submit(pin)
             }
         }
+    }
+
+    /** Starts [permission] and returns the first PIN pad request it shows, then cancels it. */
+    private suspend fun TestScope.firstPromptFor(access: DefaultAccessControl, permission: String): PinRequest {
+        val job = launch { access.authorise(permission) }
+        val request = prompt.request.filterNotNull().first()
+        job.cancel()
+        return request
     }
 
     @Test
@@ -2720,8 +2572,19 @@ class DefaultAccessControlTest {
         val access = access()
         answerPins("1234")
         access.authorise(CorePermissions.SETTINGS_MANAGE)
-        val again = withTimeout(1_000) { access.authorise(CorePermissions.KIOSK_EXIT) }
+        val again = withTimeout(1_000) { access.authorise("test.any") }
         assertThat(again).isNotNull()
+        assertThat(seen).hasSize(1)
+    }
+
+    @Test
+    fun freshPinPermissionPromptsEvenDuringSession() = runTest {
+        person("Alex", Role.ADMIN, "1234")
+        val access = access()
+        answerPins("1234")
+        access.authorise(CorePermissions.SETTINGS_MANAGE)
+        val request = firstPromptFor(access, CorePermissions.KIOSK_EXIT)
+        assertThat(request.label).isEqualTo("Exit kiosk mode")
     }
 
     @Test
@@ -2734,12 +2597,11 @@ class DefaultAccessControlTest {
         assertThat(access.session.value).isNotNull()
         advanceTimeBy(2_000); runCurrent()
         assertThat(access.session.value).isNull()
-        val retry = runCatching { withTimeout(1_000) { access.authorise(CorePermissions.SETTINGS_MANAGE) } }
-        assertThat(retry.exceptionOrNull()).isInstanceOf(TimeoutCancellationException::class.java)
+        assertThat(firstPromptFor(access, CorePermissions.SETTINGS_MANAGE).error).isNull()
     }
 
     @Test
-    fun touchExtendsSession() = runTest {
+    fun touchExtendsSessionButItStillExpires() = runTest {
         person("Alex", Role.ADMIN, "1234")
         val access = access()
         answerPins("1234")
@@ -2748,6 +2610,8 @@ class DefaultAccessControlTest {
         access.touch()
         advanceTimeBy(50_000); runCurrent()
         assertThat(access.session.value).isNotNull()
+        advanceTimeBy(11_000); runCurrent()
+        assertThat(access.session.value).isNull()
     }
 
     @Test
@@ -2765,8 +2629,7 @@ class DefaultAccessControlTest {
         val alex = person("Alex", Role.ADMIN, "1234")
         val access = access()
         answerPins("0000", "1234")
-        val result = access.authorise(CorePermissions.SETTINGS_MANAGE)
-        assertThat(result?.person).isEqualTo(alex)
+        assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE)?.person).isEqualTo(alex)
         assertThat(seen.map { it.error }).containsExactly(null, PinError.WrongPin).inOrder()
     }
 
@@ -2775,8 +2638,7 @@ class DefaultAccessControlTest {
         person("Mia", Role.CHILD, "9876")
         val access = access()
         answerPins("9876", null)
-        val result = access.authorise(CorePermissions.SETTINGS_MANAGE)
-        assertThat(result).isNull()
+        assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE)).isNull()
         assertThat(seen.last().error).isEqualTo(PinError.NotAllowed("Mia"))
         assertThat(access.session.value).isNull()
     }
@@ -2788,8 +2650,7 @@ class DefaultAccessControlTest {
         val access = access()
         answerPins("9876", "1234")
         access.authorise("test.any")
-        val result = access.authorise(CorePermissions.SETTINGS_MANAGE)
-        assertThat(result?.person).isEqualTo(alex)
+        assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE)?.person).isEqualTo(alex)
     }
 
     @Test
@@ -2797,8 +2658,7 @@ class DefaultAccessControlTest {
         person("Mia", Role.CHILD, "9876")
         val access = access()
         answerPins("9876")
-        val result = access.authorise(CorePermissions.SETTINGS_MANAGE, "test.any")
-        assertThat(result?.granted).containsExactly("test.any")
+        assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE, "test.any")?.granted).containsExactly("test.any")
     }
 
     @Test
@@ -2811,20 +2671,45 @@ class DefaultAccessControlTest {
     }
 
     @Test
-    fun fiveWrongPinsLockThePad() = runTest {
+    fun correctPinIsRefusedDuringLockout() = runTest {
         person("Alex", Role.ADMIN, "1234")
         val access = access()
-        answerPins("0000", "0000", "0000", "0000", "0000", null)
+        answerPins("0000", "0000", "0000", "0000", "0000", "1234", null)
+        assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE)).isNull()
+        assertThat(seen[5].lockedUntilMillis).isEqualTo(30_000L)
+        assertThat(access.session.value).isNull()
+
+        advanceTimeBy(30_001)
+        answerPins("1234")
+        assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE)).isNotNull()
+    }
+
+    @Test
+    fun notAllowedPinDoesNotResetLockout() = runTest {
+        person("Alex", Role.ADMIN, "1234")
+        person("Mia", Role.CHILD, "9876")
+        val access = access()
+        answerPins("0000", "0000", "0000", "0000", "9876", "0000", null)
         access.authorise(CorePermissions.SETTINGS_MANAGE)
         assertThat(seen.last().lockedUntilMillis).isNotNull()
     }
 
     @Test
+    fun authorisedPinResetsLockoutCounter() = runTest {
+        person("Alex", Role.ADMIN, "1234")
+        val access = access()
+        answerPins("0000", "0000", "0000", "0000", "1234")
+        access.authorise(CorePermissions.SETTINGS_MANAGE)
+        access.lock()
+        answerPins("0000", null)
+        access.authorise(CorePermissions.SETTINGS_MANAGE)
+        assertThat(seen.last().lockedUntilMillis).isNull()
+    }
+
+    @Test
     fun unknownPermissionThrows() = runTest {
         val access = access()
-        assertThrows(IllegalArgumentException::class.java) {
-            kotlinx.coroutines.runBlocking { access.authorise("nope") }
-        }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { access.authorise("nope") } }
     }
 }
 ```
@@ -2850,16 +2735,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import uk.co.siland.househub.core.household.HouseholdRepository
+import uk.co.siland.househub.core.household.Role
 import uk.co.siland.househub.core.plugin.ApplicationScope
 import uk.co.siland.househub.core.plugin.WallClock
 
 @Singleton
 class DefaultAccessControl @Inject constructor(
     private val registry: PermissionRegistry,
-    private val credentials: CredentialRepository,
-    private val lockout: LockoutRepository,
-    private val household: HouseholdRepository,
+    private val pins: PinManager,
+    private val lockout: LockoutStore,
     private val prompt: PinPromptController,
     private val clock: WallClock,
     @ApplicationScope private val scope: CoroutineScope,
@@ -2868,21 +2752,19 @@ class DefaultAccessControl @Inject constructor(
     override val session: StateFlow<Identified?> = _session.asStateFlow()
 
     private var expiry: Job? = null
-    private val promptLock = Mutex()
+    // Serialises callers so repeated taps can't stack PIN pads, and a queued caller sees the session the first one started.
+    private val authoriseLock = Mutex()
 
     override suspend fun authorise(vararg anyOf: String): Authorised? {
         require(anyOf.isNotEmpty()) { "authorise needs at least one permission" }
         val defs = anyOf.map(registry::require)
-
-        _session.value?.let { current ->
-            val granted = grantedFor(current.role, anyOf)
-            if (granted.isNotEmpty()) {
+        return authoriseLock.withLock {
+            val current = _session.value
+            val sessionGrants = current?.let { grantedFor(it.role, anyOf) }.orEmpty()
+            if (current != null && sessionGrants.isNotEmpty() && defs.none { it.freshPin }) {
                 touch()
-                return Authorised(current.person, current.role, granted)
+                return@withLock Authorised(current.person, current.role, sessionGrants)
             }
-        }
-
-        return promptLock.withLock {
             try {
                 promptUntilResolved(defs.first().label, anyOf)
             } finally {
@@ -2897,24 +2779,22 @@ class DefaultAccessControl @Inject constructor(
             val pin = prompt.ask(label, error, lockout.lockedUntil(clock.nowMillis())) ?: return null
             if (lockout.lockedUntil(clock.nowMillis()) != null) continue
 
-            val personId = credentials.identify(pin)
-            val role = personId?.let { credentials.role(it) }
-            val person = personId?.let { household.person(it) }
-            if (personId == null || role == null || person == null) {
+            val identified = pins.identify(pin)
+            if (identified == null) {
                 lockout.recordFailure(clock.nowMillis())
                 error = PinError.WrongPin
                 continue
             }
-            lockout.reset()
-
-            val granted = grantedFor(role, anyOf)
+            val granted = grantedFor(identified.role, anyOf)
             if (granted.isEmpty()) {
-                error = PinError.NotAllowed(person.name)
+                // A real but unauthorised PIN neither resets nor counts, so a child's own PIN can't clear the counter.
+                error = PinError.NotAllowed(identified.person.name)
                 continue
             }
-            _session.value = Identified(person, role)
+            lockout.reset()
+            _session.value = identified
             restartExpiry()
-            return Authorised(person, role, granted)
+            return Authorised(identified.person, identified.role, granted)
         }
     }
 
@@ -2954,18 +2834,18 @@ git commit -m "Add AccessControl with PIN identification, 60s session and lockou
 
 ---
 
-### Task 9: `:core:access` — PIN pad UI
+### Task 8: `:core:access` — PIN pad UI
 
 **Files:**
 - Create: `core/access/src/main/java/uk/co/siland/househub/core/access/ui/PinPad.kt`
 - Test: `core/access/src/test/java/uk/co/siland/househub/core/access/ui/PinPadTest.kt`
 
 **Interfaces:**
-- Consumes: `PinPromptController`, `PinRequest`, `PinError` (Task 8); `HouseHub`, `HhType`, `HhIcon` (Task 2).
+- Consumes: `PinPromptController`, `PinRequest`, `PinError` (Task 7); `PinHasher.PIN_LENGTH` (Task 5); `HouseHub`, `HhType`, `HhIcon` (Task 2).
 - Produces:
-  - `@Composable fun PinPadHost(controller: PinPromptController)` — place once at the root; shows the pad whenever a request is open
-  - `@Composable fun PinPadSheet(label: String, error: PinError?, lockedUntilMillis: Long?, onSubmit: (String) -> Unit, onCancel: () -> Unit)` — stateless, used by screenshot tests
-  - Test tags: `pin_key_0`…`pin_key_9`, `pin_backspace`, `pin_submit`, `pin_cancel`, `pin_scrim`
+  - `@Composable fun PinPadHost(controller: PinPromptController)` — place once at the root
+  - `@Composable fun PinPadSheet(label: String, error: PinError?, lockedUntilMillis: Long?, onSubmit: (String) -> Unit, onCancel: () -> Unit)` — stateless; submits automatically on the 4th digit
+  - Test tags: `pin_key_0`…`pin_key_9`, `pin_backspace`, `pin_cancel`, `pin_scrim`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2973,7 +2853,6 @@ git commit -m "Add AccessControl with PIN identification, 60s session and lockou
 ```kotlin
 package uk.co.siland.househub.core.access.ui
 
-import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -2997,51 +2876,50 @@ class PinPadTest {
 
     private fun show() = compose.setContent { HouseHubTheme(dark = true) { PinPadHost(controller) } }
 
+    private fun tap(vararg keys: String) = keys.forEach { compose.onNodeWithTag("pin_key_$it").performClick() }
+
     @Test
-    fun typedDigitsAreSubmitted() {
-        show()
+    fun fourthDigitSubmitsAutomatically() {
         val request = controller.open("Change settings", null, null)
+        show()
+        tap("1", "2", "3", "4")
         compose.waitForIdle()
-        listOf("1", "2", "3", "4").forEach { compose.onNodeWithTag("pin_key_$it").performClick() }
-        compose.onNodeWithTag("pin_submit").performClick()
         assertThat(request.answer.getCompleted()).isEqualTo("1234")
     }
 
     @Test
-    fun submitNeedsFourDigits() {
+    fun threeDigitsDoNotSubmit() {
+        val request = controller.open("Change settings", null, null)
         show()
-        controller.open("Change settings", null, null)
+        tap("1", "2", "3")
         compose.waitForIdle()
-        listOf("1", "2", "3").forEach { compose.onNodeWithTag("pin_key_$it").performClick() }
-        compose.onNodeWithTag("pin_submit").assertIsNotEnabled()
-        compose.onNodeWithTag("pin_key_4").performClick()
-        compose.onNodeWithTag("pin_submit").assertIsEnabled()
+        assertThat(request.answer.isCompleted).isFalse()
     }
 
     @Test
     fun backspaceRemovesLastDigit() {
-        show()
         val request = controller.open("Change settings", null, null)
-        compose.waitForIdle()
-        listOf("1", "2", "3", "4", "5").forEach { compose.onNodeWithTag("pin_key_$it").performClick() }
+        show()
+        tap("1", "2", "3")
         compose.onNodeWithTag("pin_backspace").performClick()
-        compose.onNodeWithTag("pin_submit").performClick()
-        assertThat(request.answer.getCompleted()).isEqualTo("1234")
+        tap("4", "5")
+        compose.waitForIdle()
+        assertThat(request.answer.getCompleted()).isEqualTo("1245")
     }
 
     @Test
     fun cancelAnswersNull() {
-        show()
         val request = controller.open("Change settings", null, null)
-        compose.waitForIdle()
+        show()
         compose.onNodeWithTag("pin_cancel").performClick()
+        compose.waitForIdle()
         assertThat(request.answer.getCompleted()).isNull()
     }
 
     @Test
     fun showsWhoIsNotAllowed() {
-        show()
         controller.open("Change settings", PinError.NotAllowed("Mia"), null)
+        show()
         compose.onNodeWithText("Mia can't do that").assertExists()
     }
 
@@ -3049,9 +2927,8 @@ class PinPadTest {
     fun keysAreDisabledWhileLocked() {
         // The countdown loops on delay(); stop the test clock racing through it.
         compose.mainClock.autoAdvance = false
+        controller.open("Change settings", PinError.WrongPin, System.currentTimeMillis() + 60_000)
         show()
-        controller.open("Change settings", PinError.WrongPin, System.currentTimeMillis() + 30_000)
-        compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithTag("pin_key_1").assertIsNotEnabled()
         compose.onNodeWithText("Too many tries", substring = true).assertExists()
     }
@@ -3109,13 +2986,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import uk.co.siland.househub.core.access.PinError
+import uk.co.siland.househub.core.access.PinHasher
 import uk.co.siland.househub.core.access.PinPromptController
 import uk.co.siland.househub.core.ui.HhIcon
 import uk.co.siland.househub.core.ui.HhType
 import uk.co.siland.househub.core.ui.HouseHub
-
-private const val MAX_DIGITS = 6
-private const val MIN_DIGITS = 4
 
 @Composable
 fun PinPadHost(controller: PinPromptController) {
@@ -3153,11 +3028,16 @@ fun PinPadSheet(
         }
     }
     val locked = secondsLeft > 0
+    val canType = !locked && digits.length < PinHasher.PIN_LENGTH
     val message = when {
         locked -> "Too many tries — wait ${secondsLeft}s"
         error is PinError.WrongPin -> "Wrong PIN"
         error is PinError.NotAllowed -> "${error.name} can't do that"
         else -> ""
+    }
+    val type: (String) -> Unit = { d ->
+        digits += d
+        if (digits.length == PinHasher.PIN_LENGTH) onSubmit(digits)
     }
 
     Box(
@@ -3184,11 +3064,11 @@ fun PinPadSheet(
             Text("Enter your PIN", style = HhType.screenTitle, color = c.ink)
             Text(label, style = HhType.secondary, color = c.mute)
             Spacer(Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                repeat(MAX_DIGITS) { i ->
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                repeat(PinHasher.PIN_LENGTH) { i ->
                     Box(
                         Modifier
-                            .size(14.dp)
+                            .size(16.dp)
                             .clip(CircleShape)
                             .background(if (i < digits.length) c.ink else c.surf3),
                     )
@@ -3197,22 +3077,24 @@ fun PinPadSheet(
             Spacer(Modifier.height(12.dp))
             Text(message, style = HhType.label, color = c.ink, modifier = Modifier.height(20.dp))
             Spacer(Modifier.height(12.dp))
-            val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"))
-            rows.forEach { row ->
+            listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9")).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    row.forEach { d ->
-                        DigitKey(d, enabled = !locked && digits.length < MAX_DIGITS) { digits += d }
-                    }
+                    row.forEach { d -> DigitKey(d, enabled = canType) { type(d) } }
                 }
                 Spacer(Modifier.height(12.dp))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                IconKey("backspace", "pin_backspace", enabled = digits.isNotEmpty(), background = c.surf2, tint = c.ink) {
-                    digits = digits.dropLast(1)
-                }
-                DigitKey("0", enabled = !locked && digits.length < MAX_DIGITS) { digits += "0" }
-                IconKey("check", "pin_submit", enabled = !locked && digits.length >= MIN_DIGITS, background = c.accent, tint = c.accentInk) {
-                    onSubmit(digits)
+                Spacer(Modifier.size(80.dp))
+                DigitKey("0", enabled = canType) { type("0") }
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .testTag("pin_backspace")
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .clickable(enabled = digits.isNotEmpty() && !locked) { digits = digits.dropLast(1) },
+                ) {
+                    HhIcon("backspace", size = 30.dp, tint = c.mute)
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -3247,29 +3129,6 @@ private fun DigitKey(digit: String, enabled: Boolean, onClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun IconKey(
-    icon: String,
-    tag: String,
-    enabled: Boolean,
-    background: Color,
-    tint: Color,
-    onClick: () -> Unit,
-) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .testTag(tag)
-            .size(80.dp)
-            .clip(CircleShape)
-            .background(background)
-            .clickable(enabled = enabled, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.4f),
-    ) {
-        HhIcon(icon, size = 30.dp, tint = tint)
-    }
-}
-
 private fun secondsUntil(until: Long?): Int =
     until?.let { ((it - System.currentTimeMillis() + 999) / 1000).toInt().coerceAtLeast(0) } ?: 0
 ```
@@ -3283,24 +3142,24 @@ Expected: PASS (all access tests including 7 PIN pad tests).
 
 ```bash
 git add core/access
-git commit -m "Add PIN pad sheet and host"
+git commit -m "Add 4-digit PIN pad sheet and host"
 ```
 
 ---
 
-### Task 10: Shell logic — theme schedule and `ShellViewModel`
+### Task 9: Shell logic — theme schedule and `ShellViewModel`
 
 **Files:**
 - Modify: `app/build.gradle.kts` (add project dependencies)
 - Create: `app/src/main/java/uk/co/siland/househub/shell/ThemeSchedule.kt`, `MinuteTicker.kt`, `ShellUiState.kt`, `ShellViewModel.kt`, `app/src/main/java/uk/co/siland/househub/di/AppModule.kt`
-- Test: `app/src/test/java/uk/co/siland/househub/shell/ThemeScheduleTest.kt`, `ShellViewModelTest.kt`, `Fakes.kt`
+- Test: `app/src/test/java/uk/co/siland/househub/shell/MainDispatcherRule.kt`, `Fakes.kt`, `ThemeScheduleTest.kt`, `ShellViewModelTest.kt`
 
 **Interfaces:**
-- Consumes: `Capability`, `HomeCard`, `HomeCardPlacer`, `HomePlacement`, `SunTimes`, `SunTimesSource`, `WallClock`, `ApplicationScope` (Task 3); `AccessControl`, `Authorised`, `Identified`, `CorePermissions` (Tasks 6, 8); `MainDispatcherRule` (Task 4).
+- Consumes: `Capability`, `HomeCard`, `HomeCardPlacer`, `HomePlacement`, `SunTimes`, `WallClock`, `ApplicationScope` (Task 3); `AccessControl`, `Authorised`, `Identified`, `CorePermissions` (Tasks 5–7); `Person`, `PersonId`, `Role` (Task 4).
 - Produces:
-  - `object ThemeSchedule { fun isDark(now: LocalTime, sun: SunTimes?): Boolean; fun effectiveDark(scheduled: Boolean, previewAgainst: Boolean?): Boolean }`
-  - `fun interface MinuteTicker { fun ticks(): Flow<LocalTime> }`
-  - `const val HOME_TAB_ID = "home"`; `data class TabItem(id, label, icon)`; `data class SessionChip(name: String, color: Long)`; `data class ShellUiState(tabs, selectedTabId, session, dark, homeCards: List<HomePlacement>, settingsOpen)`
+  - `object ThemeSchedule { fun isDark(now: LocalTime, sun: SunTimes?): Boolean }`
+  - `fun interface MinuteTicker { fun ticks(): Flow<LocalDateTime> }`, `val SystemMinuteTicker`
+  - `const val HOME_TAB_ID = "home"`; `data class TabItem(id, label, icon)`; `data class SessionChip(name: String, color: Long)`; `data class ShellUiState(tabs, selectedTabId, session, now: LocalDateTime, dark, previewing, homeCards, settingsOpen)`
   - `class ShellViewModel { val uiState: StateFlow<ShellUiState>; val kioskExit: Flow<Unit>; fun selectTab(id); fun openSettings(); fun closeSettings(); fun exitKiosk(); fun lockSession(); fun onUserActivity(); fun toggleThemePreview() }`
 
 - [ ] **Step 1: Add dependencies to `app/build.gradle.kts`**
@@ -3316,7 +3175,6 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.kotlinx.coroutines.core)
-    testImplementation(project(":core:testing"))
 }
 ```
 
@@ -3334,12 +3192,6 @@ object ThemeSchedule {
     val DEFAULT_DAY_END: LocalTime = LocalTime.of(19, 0)
 
     fun isDark(now: LocalTime, sun: SunTimes?): Boolean = TODO()
-
-    /**
-     * [previewAgainst] is the scheduled value at the moment the user tapped the preview toggle.
-     * The preview holds until the schedule itself flips, then ends on its own.
-     */
-    fun effectiveDark(scheduled: Boolean, previewAgainst: Boolean?): Boolean = TODO()
 }
 ```
 
@@ -3347,19 +3199,19 @@ object ThemeSchedule {
 ```kotlin
 package uk.co.siland.househub.shell
 
-import java.time.LocalTime
+import java.time.LocalDateTime
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 fun interface MinuteTicker {
-    fun ticks(): Flow<LocalTime>
+    fun ticks(): Flow<LocalDateTime>
 }
 
 val SystemMinuteTicker = MinuteTicker {
     flow {
         while (true) {
-            val now = LocalTime.now()
+            val now = LocalDateTime.now()
             emit(now)
             delay(60_000L - (now.second * 1_000L + now.nano / 1_000_000L))
         }
@@ -3371,6 +3223,7 @@ val SystemMinuteTicker = MinuteTicker {
 ```kotlin
 package uk.co.siland.househub.shell
 
+import java.time.LocalDateTime
 import uk.co.siland.househub.core.plugin.HomePlacement
 
 const val HOME_TAB_ID = "home"
@@ -3383,7 +3236,9 @@ data class ShellUiState(
     val tabs: List<TabItem> = emptyList(),
     val selectedTabId: String = HOME_TAB_ID,
     val session: SessionChip? = null,
+    val now: LocalDateTime = LocalDateTime.now(),
     val dark: Boolean = true,
+    val previewing: Boolean = false,
     val homeCards: List<HomePlacement> = emptyList(),
     val settingsOpen: Boolean = false,
 )
@@ -3395,18 +3250,15 @@ package uk.co.siland.househub.shell
 
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.util.Optional
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import uk.co.siland.househub.core.access.AccessControl
 import uk.co.siland.househub.core.plugin.Capability
-import uk.co.siland.househub.core.plugin.SunTimesSource
 
 @HiltViewModel
 class ShellViewModel @Inject constructor(
     capabilities: Set<@JvmSuppressWildcards Capability>,
-    sunTimes: Optional<SunTimesSource>,
     ticker: MinuteTicker,
     private val access: AccessControl,
 ) : ViewModel() {
@@ -3426,7 +3278,6 @@ class ShellViewModel @Inject constructor(
 ```kotlin
 package uk.co.siland.househub.di
 
-import dagger.BindsOptionalOf
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -3438,7 +3289,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import uk.co.siland.househub.core.plugin.ApplicationScope
 import uk.co.siland.househub.core.plugin.Capability
-import uk.co.siland.househub.core.plugin.SunTimesSource
 import uk.co.siland.househub.core.plugin.WallClock
 import uk.co.siland.househub.shell.MinuteTicker
 import uk.co.siland.househub.shell.SystemMinuteTicker
@@ -3448,9 +3298,6 @@ import uk.co.siland.househub.shell.SystemMinuteTicker
 abstract class AppModule {
     @Multibinds
     abstract fun capabilities(): Set<Capability>
-
-    @BindsOptionalOf
-    abstract fun sunTimes(): SunTimesSource
 
     companion object {
         @Provides
@@ -3467,9 +3314,31 @@ abstract class AppModule {
 }
 ```
 
-- [ ] **Step 3: Write the failing tests**
+- [ ] **Step 3: Write test helpers and failing tests**
 
-`app/src/test/java/uk/co/siland/househub/shell/Fakes.kt`:
+`app/src/test/java/uk/co/siland/househub/shell/MainDispatcherRule.kt`:
+```kotlin
+package uk.co.siland.househub.shell
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class MainDispatcherRule(
+    val dispatcher: TestDispatcher = UnconfinedTestDispatcher(),
+) : TestWatcher() {
+    override fun starting(description: Description) = Dispatchers.setMain(dispatcher)
+    override fun finished(description: Description) = Dispatchers.resetMain()
+}
+```
+
+`Fakes.kt`:
 ```kotlin
 package uk.co.siland.househub.shell
 
@@ -3497,12 +3366,14 @@ class FakeCapability(
     @Composable override fun TabContent() {}
 }
 
+/** Returns [result] for every authorise call and, like the real one, starts a session on success. */
 class FakeAccessControl(var result: Authorised? = null) : AccessControl {
     override val session = MutableStateFlow<Identified?>(null)
     val requested = mutableListOf<List<String>>()
     var touches = 0
     override suspend fun authorise(vararg anyOf: String): Authorised? {
         requested += anyOf.toList()
+        result?.let { session.value = Identified(it.person, it.role) }
         return result
     }
     override fun touch() { touches++ }
@@ -3545,14 +3416,6 @@ class ThemeScheduleTest {
         assertThat(ThemeSchedule.isDark(t(12, 0), nonsense)).isFalse()
         assertThat(ThemeSchedule.isDark(t(22, 0), nonsense)).isTrue()
     }
-
-    @Test
-    fun previewFlipsUntilScheduleChanges() {
-        assertThat(ThemeSchedule.effectiveDark(scheduled = false, previewAgainst = null)).isFalse()
-        assertThat(ThemeSchedule.effectiveDark(scheduled = false, previewAgainst = false)).isTrue()
-        // Schedule flipped to dark since the preview began: preview has ended.
-        assertThat(ThemeSchedule.effectiveDark(scheduled = true, previewAgainst = false)).isTrue()
-    }
 }
 ```
 
@@ -3562,36 +3425,31 @@ package uk.co.siland.househub.shell
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
-import java.time.LocalTime
-import java.util.Optional
-import kotlinx.coroutines.flow.flowOf
+import java.time.LocalDateTime
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import uk.co.siland.househub.core.access.Authorised
 import uk.co.siland.househub.core.access.CorePermissions
 import uk.co.siland.househub.core.access.Identified
-import uk.co.siland.househub.core.access.Role
 import uk.co.siland.househub.core.household.Person
 import uk.co.siland.househub.core.household.PersonId
+import uk.co.siland.househub.core.household.Role
 import uk.co.siland.househub.core.plugin.Capability
 import uk.co.siland.househub.core.plugin.HomeCard
 import uk.co.siland.househub.core.plugin.HomeCardSize
-import uk.co.siland.househub.core.plugin.SunTimesSource
-import uk.co.siland.househub.core.testing.MainDispatcherRule
 
 class ShellViewModelTest {
     @get:Rule val main = MainDispatcherRule()
 
+    private val noon = LocalDateTime.of(2026, 9, 23, 12, 0)
     private val alex = Person(PersonId("alex"), "Alex", 0xFF4CB387)
+    private val admin = Authorised(alex, Role.ADMIN, setOf(CorePermissions.SETTINGS_MANAGE, CorePermissions.KIOSK_EXIT))
     private val access = FakeAccessControl()
+    private val ticks = MutableStateFlow(noon)
 
-    private fun vm(caps: Set<Capability>, noon: Boolean = true) = ShellViewModel(
-        capabilities = caps,
-        sunTimes = Optional.empty<SunTimesSource>(),
-        ticker = MinuteTicker { flowOf(if (noon) LocalTime.NOON else LocalTime.MIDNIGHT) },
-        access = access,
-    )
+    private fun vm(caps: Set<Capability> = emptySet()) = ShellViewModel(caps, { ticks }, access)
 
     @Test
     fun tabsShowOnlyCapabilitiesWithTabsInOrder() = runTest {
@@ -3608,11 +3466,13 @@ class ShellViewModelTest {
     }
 
     @Test
-    fun noCapabilitiesGivesHomeOnly() = runTest {
-        vm(emptySet()).uiState.test {
+    fun noCapabilitiesGivesHomeOnlyAndTracksTheClock() = runTest {
+        vm().uiState.test {
             val s = expectMostRecentItem()
             assertThat(s.tabs).isEmpty()
             assertThat(s.selectedTabId).isEqualTo(HOME_TAB_ID)
+            assertThat(s.now).isEqualTo(noon)
+            assertThat(s.dark).isFalse()
         }
     }
 
@@ -3645,13 +3505,14 @@ class ShellViewModelTest {
 
     @Test
     fun settingsOpenOnlyWhenAuthorised() = runTest {
-        val vm = vm(emptySet())
+        val vm = vm()
         vm.uiState.test {
-            vm.openSettings()
             assertThat(expectMostRecentItem().settingsOpen).isFalse()
+            vm.openSettings()
+            expectNoEvents()
             assertThat(access.requested.last()).containsExactly(CorePermissions.SETTINGS_MANAGE)
 
-            access.result = Authorised(alex, Role.ADMIN, setOf(CorePermissions.SETTINGS_MANAGE))
+            access.result = admin
             vm.openSettings()
             assertThat(expectMostRecentItem().settingsOpen).isTrue()
 
@@ -3661,12 +3522,24 @@ class ShellViewModelTest {
     }
 
     @Test
+    fun settingsCloseWhenSessionEnds() = runTest {
+        val vm = vm()
+        access.result = admin
+        vm.uiState.test {
+            vm.openSettings()
+            assertThat(expectMostRecentItem().settingsOpen).isTrue()
+            access.session.value = null
+            assertThat(expectMostRecentItem().settingsOpen).isFalse()
+        }
+    }
+
+    @Test
     fun exitKioskEmitsOnlyWhenAuthorised() = runTest {
-        val vm = vm(emptySet())
+        val vm = vm()
         vm.kioskExit.test {
             vm.exitKiosk()
             expectNoEvents()
-            access.result = Authorised(alex, Role.ADMIN, setOf(CorePermissions.KIOSK_EXIT))
+            access.result = admin
             vm.exitKiosk()
             awaitItem()
         }
@@ -3674,7 +3547,7 @@ class ShellViewModelTest {
 
     @Test
     fun sessionShowsAsChip() = runTest {
-        val vm = vm(emptySet())
+        val vm = vm()
         vm.uiState.test {
             access.session.value = Identified(alex, Role.ADMIN)
             assertThat(expectMostRecentItem().session).isEqualTo(SessionChip("Alex", 0xFF4CB387))
@@ -3684,21 +3557,28 @@ class ShellViewModelTest {
     }
 
     @Test
-    fun themePreviewTogglesAgainstSchedule() = runTest {
-        val vm = vm(emptySet(), noon = true)
+    fun themePreviewEndsWhenScheduleFlips() = runTest {
+        val vm = vm()
         vm.uiState.test {
             assertThat(expectMostRecentItem().dark).isFalse()
             vm.toggleThemePreview()
-            assertThat(expectMostRecentItem().dark).isTrue()
-            vm.toggleThemePreview()
+            expectMostRecentItem().let {
+                assertThat(it.dark).isTrue()
+                assertThat(it.previewing).isTrue()
+            }
+            ticks.value = noon.withHour(20)
+            expectMostRecentItem().let {
+                assertThat(it.dark).isTrue()
+                assertThat(it.previewing).isFalse()
+            }
+            ticks.value = noon.plusDays(1)
             assertThat(expectMostRecentItem().dark).isFalse()
         }
     }
 
     @Test
     fun userActivityTouchesSession() {
-        val vm = vm(emptySet())
-        vm.onUserActivity()
+        vm().onUserActivity()
         assertThat(access.touches).isEqualTo(1)
     }
 }
@@ -3709,9 +3589,8 @@ class ShellViewModelTest {
 Run: `./gradlew :app:testDebugUnitTest`
 Expected: FAIL with `NotImplementedError`.
 
-- [ ] **Step 5: Implement `ThemeSchedule`**
+- [ ] **Step 5: Implement `ThemeSchedule.isDark`**
 
-Replace the two functions:
 ```kotlin
     fun isDark(now: LocalTime, sun: SunTimes?): Boolean {
         val usable = sun?.takeIf { it.sunrise < it.sunset }
@@ -3719,9 +3598,6 @@ Replace the two functions:
         val end = usable?.sunset ?: DEFAULT_DAY_END
         return now < start || now >= end
     }
-
-    fun effectiveDark(scheduled: Boolean, previewAgainst: Boolean?): Boolean =
-        if (previewAgainst == scheduled) !scheduled else scheduled
 ```
 
 - [ ] **Step 6: Implement `ShellViewModel`**
@@ -3732,7 +3608,8 @@ package uk.co.siland.househub.shell
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.util.Optional
+import java.time.LocalDateTime
+import java.time.LocalTime
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -3740,6 +3617,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -3750,22 +3628,27 @@ import uk.co.siland.househub.core.access.CorePermissions
 import uk.co.siland.househub.core.plugin.Capability
 import uk.co.siland.househub.core.plugin.HomeCardPlacer
 import uk.co.siland.househub.core.plugin.HomePlacement
-import uk.co.siland.househub.core.plugin.SunTimes
-import uk.co.siland.househub.core.plugin.SunTimesSource
 
 @HiltViewModel
 class ShellViewModel @Inject constructor(
     capabilities: Set<@JvmSuppressWildcards Capability>,
-    sunTimes: Optional<SunTimesSource>,
     ticker: MinuteTicker,
     private val access: AccessControl,
 ) : ViewModel() {
     private val ordered = capabilities.sortedBy { it.order }
     private val selected = MutableStateFlow(HOME_TAB_ID)
     private val settingsOpen = MutableStateFlow(false)
-    private val previewAgainst = MutableStateFlow<Boolean?>(null)
+    private val previewing = MutableStateFlow(false)
     private val kioskExitEvents = Channel<Unit>(Channel.BUFFERED)
     val kioskExit: Flow<Unit> = kioskExitEvents.receiveAsFlow()
+
+    private val now: StateFlow<LocalDateTime> =
+        ticker.ticks().stateIn(viewModelScope, SharingStarted.Eagerly, LocalDateTime.now())
+
+    // Sunrise/sunset arrive with the weather capability in Plan 4; until then the 07:00/19:00 fallback applies.
+    private val scheduledDark: StateFlow<Boolean> =
+        now.map { ThemeSchedule.isDark(it.toLocalTime(), null) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeSchedule.isDark(LocalTime.now(), null))
 
     private val tabs: Flow<List<TabItem>> =
         if (ordered.isEmpty()) {
@@ -3783,14 +3666,6 @@ class ShellViewModel @Inject constructor(
             combine(ordered.map { it.cards() }) { lists -> HomeCardPlacer.place(lists.toList().flatten()) }
         }
 
-    private val scheduledDark: StateFlow<Boolean> =
-        combine(ticker.ticks(), sunTimes.map { it.today }.orElse(flowOf<SunTimes?>(null))) { now, sun ->
-            ThemeSchedule.isDark(now, sun)
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    private val dark: Flow<Boolean> =
-        combine(scheduledDark, previewAgainst) { scheduled, preview -> ThemeSchedule.effectiveDark(scheduled, preview) }
-
     val uiState: StateFlow<ShellUiState> =
         combine(
             combine(tabs, selected, access.session, placements, settingsOpen) { tabs, sel, session, cards, settings ->
@@ -3802,9 +3677,17 @@ class ShellViewModel @Inject constructor(
                     settingsOpen = settings,
                 )
             },
-            dark,
-        ) { state, isDark -> state.copy(dark = isDark) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ShellUiState())
+            now,
+            scheduledDark,
+            previewing,
+        ) { state, time, scheduled, preview ->
+            state.copy(now = time, dark = scheduled != preview, previewing = preview)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ShellUiState())
+
+    init {
+        viewModelScope.launch { scheduledDark.drop(1).collect { previewing.value = false } }
+        viewModelScope.launch { access.session.collect { if (it == null) settingsOpen.value = false } }
+    }
 
     fun selectTab(id: String) {
         selected.value = id
@@ -3831,8 +3714,7 @@ class ShellViewModel @Inject constructor(
     fun onUserActivity() = access.touch()
 
     fun toggleThemePreview() {
-        val scheduled = scheduledDark.value
-        previewAgainst.value = if (previewAgainst.value == scheduled) null else scheduled
+        previewing.value = !previewing.value
     }
 }
 ```
@@ -3840,7 +3722,7 @@ class ShellViewModel @Inject constructor(
 - [ ] **Step 7: Run tests to verify they pass**
 
 Run: `./gradlew :app:testDebugUnitTest`
-Expected: PASS (4 theme tests + 9 view-model tests).
+Expected: PASS (3 theme tests + 10 view-model tests).
 
 - [ ] **Step 8: Commit**
 
@@ -3851,43 +3733,23 @@ git commit -m "Add shell view model, theme schedule and app DI"
 
 ---
 
-### Task 11: Shell UI, kiosk mode and debug seed
+### Task 10: Shell UI, kiosk mode and debug seed
 
 **Files:**
-- Create: `app/src/main/java/uk/co/siland/househub/shell/ui/HouseHubShell.kt`, `NavRail.kt`, `StatusBar.kt`, `HomeScreen.kt`, `HomeGrid.kt`, `SettingsPlaceholder.kt`, `RememberNow.kt`
-- Create: `app/src/main/java/uk/co/siland/househub/Kiosk.kt`, `seed/Seeder.kt`
-- Create: `app/src/debug/java/uk/co/siland/househub/seed/DebugSeeder.kt`, `app/src/release/java/uk/co/siland/househub/seed/ReleaseSeeder.kt`
+- Create: `app/src/main/java/uk/co/siland/househub/shell/ui/HouseHubShell.kt`, `NavRail.kt`, `StatusBar.kt`, `HomeScreen.kt`, `HomeGrid.kt`, `SettingsPlaceholder.kt`
+- Create: `app/src/main/java/uk/co/siland/househub/Kiosk.kt`
+- Create: `app/src/debug/java/uk/co/siland/househub/DebugSeed.kt`, `app/src/release/java/uk/co/siland/househub/DebugSeed.kt`
 - Modify: `app/src/main/java/uk/co/siland/househub/MainActivity.kt`, `HouseHubApp.kt`
 
 **Interfaces:**
-- Consumes: `ShellUiState`, `ShellViewModel` (Task 10); `PinPadHost`, `PinPromptController`, `CredentialRepository`, `Role` (Tasks 7–9); `HouseholdRepository` (Task 5); `HhCard`, `HhIcon`, `HhType`, `HouseHub`, `HouseHubTheme`, `HhPillButton` (Task 2); `HomePlacement`, `HomeCardPlacer` (Task 3).
+- Consumes: `ShellUiState`, `ShellViewModel`, `TabItem`, `SessionChip`, `HOME_TAB_ID` (Task 9); `PinPadHost`, `PinPromptController`, `PinManager` (Tasks 6–8); `HouseholdRepository`, `Role` (Task 4); `HhCard`, `HhIcon`, `HhType`, `HouseHub`, `HouseHubTheme`, `HhPillButton` (Task 2); `HomePlacement`, `HomeCardPlacer` (Task 3).
 - Produces:
-  - `@Composable fun HouseHubShell(state: ShellUiState, now: LocalDateTime, onSelectTab: (String) -> Unit, onOpenSettings: () -> Unit, onLockSession: () -> Unit, onToggleThemePreview: () -> Unit, onUserActivity: () -> Unit, tabContent: @Composable (String) -> Unit)` — stateless, used by screenshot tests
+  - `@Composable fun HouseHubShell(state: ShellUiState, onSelectTab: (String) -> Unit, onOpenSettings: () -> Unit, onLockSession: () -> Unit, onToggleThemePreview: () -> Unit, tabContent: @Composable (String) -> Unit)` — stateless
   - `@Composable fun SettingsPlaceholder(onExitKiosk: () -> Unit, onClose: () -> Unit)`
-  - `interface Seeder { suspend fun seed() }`
-  - `fun ComponentActivity.enterKiosk()`, `fun ComponentActivity.exitKiosk()`
+  - `suspend fun seedDebugData(household: HouseholdRepository, pins: PinManager)` (debug: creates Admin/1234; release: no-op)
+  - `fun ComponentActivity.hideSystemBars()`, `showSystemBars()`, `pinToScreen()`, `unpinFromScreen()`
 
-- [ ] **Step 1: Write `RememberNow.kt` and `HomeGrid.kt`**
-
-`shell/ui/RememberNow.kt`:
-```kotlin
-package uk.co.siland.househub.shell.ui
-
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
-import androidx.compose.runtime.produceState
-import java.time.LocalDateTime
-import kotlinx.coroutines.delay
-
-@Composable
-fun rememberNow(): State<LocalDateTime> = produceState(LocalDateTime.now()) {
-    while (true) {
-        val now = LocalDateTime.now()
-        value = now
-        delay(60_000L - (now.second * 1_000L + now.nano / 1_000_000L))
-    }
-}
-```
+- [ ] **Step 1: Write `HomeGrid.kt` and `HomeScreen.kt`**
 
 `shell/ui/HomeGrid.kt`:
 ```kotlin
@@ -3913,7 +3775,8 @@ fun HomeGrid(placements: List<HomePlacement>, modifier: Modifier = Modifier) {
     ) { measurables, constraints ->
         val gap = 14.dp.roundToPx()
         val available = constraints.maxWidth - gap * (HomeCardPlacer.COLUMNS - 1)
-        val colWidths = COLUMN_WEIGHTS.map { (available * it / COLUMN_WEIGHTS.sum()).toInt() }
+        val colWidths = COLUMN_WEIGHTS.map { (available * it / COLUMN_WEIGHTS.sum()).toInt() }.toMutableList()
+        colWidths[colWidths.lastIndex] += available - colWidths.sum()
         val colX = colWidths.runningFold(0) { x, w -> x + w + gap }
         val rowHeight = (constraints.maxHeight - gap * (HomeCardPlacer.ROWS - 1)) / HomeCardPlacer.ROWS
 
@@ -3933,7 +3796,45 @@ fun HomeGrid(placements: List<HomePlacement>, modifier: Modifier = Modifier) {
 }
 ```
 
-- [ ] **Step 2: Write `StatusBar.kt`, `NavRail.kt`, `HomeScreen.kt`**
+`shell/ui/HomeScreen.kt`:
+```kotlin
+package uk.co.siland.househub.shell.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import uk.co.siland.househub.core.plugin.HomePlacement
+import uk.co.siland.househub.core.ui.HhType
+import uk.co.siland.househub.core.ui.HouseHub
+
+private val CLOCK = DateTimeFormatter.ofPattern("HH:mm")
+private val DATE = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.UK)
+
+@Composable
+fun HomeScreen(now: LocalDateTime, placements: List<HomePlacement>) {
+    val c = HouseHub.colors
+    Column(verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxWidth()) {
+            Text(now.format(CLOCK), style = HhType.clock, color = c.ink)
+            Spacer(Modifier.height(12.dp))
+            Text(now.format(DATE), style = HhType.date, color = c.mute)
+        }
+        HomeGrid(placements, Modifier.fillMaxWidth().weight(1f))
+    }
+}
+```
+
+- [ ] **Step 2: Write `StatusBar.kt` and `NavRail.kt`**
 
 `shell/ui/StatusBar.kt`:
 ```kotlin
@@ -3950,7 +3851,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDateTime
@@ -3962,22 +3863,26 @@ import uk.co.siland.househub.core.ui.HouseHub
 private val TIME = DateTimeFormatter.ofPattern("HH:mm")
 
 @Composable
-fun StatusBar(now: LocalDateTime, dark: Boolean, onToggleThemePreview: () -> Unit) {
+fun StatusBar(now: LocalDateTime, dark: Boolean, previewing: Boolean, onToggleThemePreview: () -> Unit) {
     val c = HouseHub.colors
-    val style = HhType.secondary.copy(fontSize = 13.sp, fontWeight = FontWeight.W500)
+    val label = when {
+        !previewing -> "Auto"
+        dark -> "Night"
+        else -> "Day"
+    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().height(30.dp).padding(horizontal = 24.dp),
+        modifier = Modifier.fillMaxWidth().height(30.dp).padding(horizontal = 20.dp),
     ) {
-        Text(now.format(TIME), style = style, color = c.mute)
+        Text(now.format(TIME), style = HhType.status, color = c.mute)
         Spacer(Modifier.weight(1f))
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable(onClick = onToggleThemePreview).padding(4.dp),
+            modifier = Modifier.testTag("status_theme").clickable(onClick = onToggleThemePreview).padding(4.dp),
         ) {
             HhIcon(if (dark) "dark_mode" else "light_mode", size = 16.dp, tint = c.mute)
-            Text(if (dark) "Night" else "Day", style = style, color = c.mute)
+            Text(label, style = HhType.status.copy(fontSize = 12.sp), color = c.mute)
         }
     }
 }
@@ -3996,9 +3901,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -4010,9 +3917,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import uk.co.siland.househub.core.ui.HhIcon
 import uk.co.siland.househub.core.ui.HhType
 import uk.co.siland.househub.core.ui.HouseHub
@@ -4034,7 +3940,7 @@ fun NavRail(
     val c = HouseHub.colors
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .fillMaxHeight()
             .width(108.dp)
@@ -4042,7 +3948,7 @@ fun NavRail(
                 val x = size.width - 0.5.dp.toPx()
                 drawLine(c.line, Offset(x, 0f), Offset(x, size.height), 1.dp.toPx())
             }
-            .padding(vertical = 18.dp),
+            .padding(top = 16.dp, bottom = 20.dp),
     ) {
         session?.let { SessionChipView(it, onLockSession) }
         (listOf(HomeTab) + tabs).forEach { tab ->
@@ -4051,7 +3957,7 @@ fun NavRail(
         Spacer(Modifier.weight(1f))
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically),
             modifier = Modifier
                 .testTag("rail_settings")
                 .size(80.dp)
@@ -4060,7 +3966,7 @@ fun NavRail(
                 .clickable(onClick = onOpenSettings),
         ) {
             HhIcon("settings", size = 30.dp, tint = c.ink)
-            Text("Settings", style = HhType.label.copy(fontSize = 12.sp, fontWeight = FontWeight.W700), color = c.ink)
+            Text("Settings", style = HhType.labelSmall, color = c.ink)
         }
     }
 }
@@ -4084,9 +3990,9 @@ private fun RailItem(tab: TabItem, selected: Boolean, onClick: () -> Unit) {
                 .clip(RoundedCornerShape(19.dp))
                 .background(if (selected) c.accentSoft else Color.Transparent),
         ) {
-            HhIcon(tab.icon, size = 24.dp, filled = selected, tint = c.ink)
+            HhIcon(tab.icon, size = 26.dp, filled = selected, tint = if (selected) c.ink else c.mute)
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
         Text(tab.label, style = HhType.label, color = if (selected) c.ink else c.mute)
     }
 }
@@ -4100,49 +4006,23 @@ private fun SessionChipView(chip: SessionChip, onLock: () -> Unit) {
         modifier = Modifier
             .testTag("rail_session")
             .padding(bottom = 8.dp)
+            .widthIn(max = 92.dp)
+            .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(c.surf2)
             .clickable(onClick = onLock)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp),
     ) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(Color(chip.color)))
-        Text(chip.name, style = HhType.label, color = c.ink, maxLines = 1)
+        Text(
+            chip.name,
+            style = HhType.label,
+            color = c.ink,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
         HhIcon("lock", size = 14.dp, tint = c.mute)
-    }
-}
-```
-
-`shell/ui/HomeScreen.kt`:
-```kotlin
-package uk.co.siland.househub.shell.ui
-
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-import uk.co.siland.househub.core.plugin.HomePlacement
-import uk.co.siland.househub.core.ui.HhType
-import uk.co.siland.househub.core.ui.HouseHub
-
-private val CLOCK = DateTimeFormatter.ofPattern("HH:mm")
-private val DATE = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.UK)
-
-@Composable
-fun HomeScreen(now: LocalDateTime, placements: List<HomePlacement>) {
-    val c = HouseHub.colors
-    Column(verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxWidth()) {
-            Text(now.format(CLOCK), style = HhType.clock, color = c.ink)
-            Text(now.format(DATE), style = HhType.date, color = c.mute)
-        }
-        HomeGrid(placements, Modifier.fillMaxWidth().weight(1f))
     }
 }
 ```
@@ -4161,10 +4041,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import java.time.LocalDateTime
 import uk.co.siland.househub.core.ui.HouseHub
 import uk.co.siland.househub.shell.HOME_TAB_ID
 import uk.co.siland.househub.shell.ShellUiState
@@ -4172,35 +4049,19 @@ import uk.co.siland.househub.shell.ShellUiState
 @Composable
 fun HouseHubShell(
     state: ShellUiState,
-    now: LocalDateTime,
     onSelectTab: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onLockSession: () -> Unit,
     onToggleThemePreview: () -> Unit,
-    onUserActivity: () -> Unit,
     tabContent: @Composable (String) -> Unit,
 ) {
-    val c = HouseHub.colors
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(c.bg)
-            .pointerInput(Unit) {
-                // Observe every touch without consuming it, to keep the PIN session alive.
-                awaitPointerEventScope {
-                    while (true) {
-                        awaitPointerEvent(PointerEventPass.Initial)
-                        onUserActivity()
-                    }
-                }
-            },
-    ) {
-        StatusBar(now, state.dark, onToggleThemePreview)
+    Column(Modifier.fillMaxSize().background(HouseHub.colors.bg)) {
+        StatusBar(state.now, state.dark, state.previewing, onToggleThemePreview)
         Row(Modifier.weight(1f)) {
             NavRail(state.tabs, state.selectedTabId, state.session, onSelectTab, onOpenSettings, onLockSession)
             Box(Modifier.weight(1f).padding(start = 28.dp, end = 28.dp, top = 24.dp, bottom = 22.dp)) {
                 if (state.selectedTabId == HOME_TAB_ID) {
-                    HomeScreen(now, state.homeCards)
+                    HomeScreen(state.now, state.homeCards)
                 } else {
                     tabContent(state.selectedTabId)
                 }
@@ -4215,6 +4076,7 @@ fun HouseHubShell(
 package uk.co.siland.househub.shell.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -4223,6 +4085,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import uk.co.siland.househub.core.ui.HhPillButton
@@ -4235,7 +4098,13 @@ fun SettingsPlaceholder(onExitKiosk: () -> Unit, onClose: () -> Unit) {
     val c = HouseHub.colors
     Column(
         verticalArrangement = Arrangement.spacedBy(18.dp),
-        modifier = Modifier.fillMaxSize().background(c.bg).padding(48.dp).testTag("settings"),
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("settings")
+            .background(c.bg)
+            // Swallow taps on empty space so they don't reach the rail underneath.
+            .pointerInput(Unit) { detectTapGestures { } }
+            .padding(48.dp),
     ) {
         Text("Settings", style = HhType.screenTitle, color = c.ink)
         Text("Household, people and connections arrive in a later update.", style = HhType.body, color = c.mute)
@@ -4247,105 +4116,67 @@ fun SettingsPlaceholder(onExitKiosk: () -> Unit, onClose: () -> Unit) {
 }
 ```
 
-- [ ] **Step 4: Write kiosk helpers and seeders**
+- [ ] **Step 4: Write kiosk helpers and debug seed**
 
 `Kiosk.kt`:
 ```kotlin
 package uk.co.siland.househub
 
 import android.app.ActivityManager
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
-import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
-fun ComponentActivity.enterKiosk() {
-    enableEdgeToEdge()
-    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+fun ComponentActivity.hideSystemBars() {
     WindowCompat.getInsetsController(window, window.decorView).apply {
         hide(WindowInsetsCompat.Type.systemBars())
         systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
-    // Pinning shows a system prompt on every start in debug; only pin release builds.
-    val am = getSystemService(ActivityManager::class.java)
-    if (!BuildConfig.DEBUG && am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) {
-        startLockTask()
-    }
 }
 
-fun ComponentActivity.exitKiosk() {
-    val am = getSystemService(ActivityManager::class.java)
-    if (am.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) stopLockTask()
+fun ComponentActivity.showSystemBars() {
     WindowCompat.getInsetsController(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
 }
-```
 
-`seed/Seeder.kt`:
-```kotlin
-package uk.co.siland.househub.seed
+/** Must be called while resumed. Debug builds skip pinning: it shows a system prompt on every start. */
+fun ComponentActivity.pinToScreen() {
+    val am = getSystemService(ActivityManager::class.java)
+    if (!BuildConfig.DEBUG && am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) startLockTask()
+}
 
-interface Seeder {
-    suspend fun seed()
+fun ComponentActivity.unpinFromScreen() {
+    val am = getSystemService(ActivityManager::class.java)
+    if (am.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) stopLockTask()
 }
 ```
 
-`app/src/debug/java/uk/co/siland/househub/seed/DebugSeeder.kt`:
+`app/src/debug/java/uk/co/siland/househub/DebugSeed.kt`:
 ```kotlin
-package uk.co.siland.househub.seed
+package uk.co.siland.househub
 
-import dagger.Binds
-import dagger.Module
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
-import javax.inject.Inject
 import kotlinx.coroutines.flow.first
-import uk.co.siland.househub.core.access.CredentialRepository
-import uk.co.siland.househub.core.access.Role
+import uk.co.siland.househub.core.access.PinManager
 import uk.co.siland.househub.core.household.HouseholdRepository
+import uk.co.siland.househub.core.household.Role
 
 /** Debug builds only: an Admin with PIN 1234 so Settings is reachable before the setup wizard exists. */
-class DebugSeeder @Inject constructor(
-    private val household: HouseholdRepository,
-    private val credentials: CredentialRepository,
-) : Seeder {
-    override suspend fun seed() {
-        if (household.people.first().isNotEmpty()) return
-        val admin = household.addPerson("Admin", 0xFF4CB387)
-        credentials.setRole(admin.id, Role.ADMIN)
-        credentials.setPin(admin.id, "1234")
-    }
-}
-
-@Module
-@InstallIn(SingletonComponent::class)
-abstract class SeederModule {
-    @Binds
-    abstract fun seeder(impl: DebugSeeder): Seeder
+suspend fun seedDebugData(household: HouseholdRepository, pins: PinManager) {
+    if (household.people.first().isNotEmpty()) return
+    val admin = household.addPerson("Admin", 0xFF4CB387, Role.ADMIN)
+    pins.setPin(admin.id, "1234")
 }
 ```
 
-`app/src/release/java/uk/co/siland/househub/seed/ReleaseSeeder.kt`:
+`app/src/release/java/uk/co/siland/househub/DebugSeed.kt`:
 ```kotlin
-package uk.co.siland.househub.seed
+package uk.co.siland.househub
 
-import dagger.Binds
-import dagger.Module
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
-import javax.inject.Inject
+import uk.co.siland.househub.core.access.PinManager
+import uk.co.siland.househub.core.household.HouseholdRepository
 
-class ReleaseSeeder @Inject constructor() : Seeder {
-    override suspend fun seed() = Unit
-}
-
-@Module
-@InstallIn(SingletonComponent::class)
-abstract class SeederModule {
-    @Binds
-    abstract fun seeder(impl: ReleaseSeeder): Seeder
-}
+@Suppress("UNUSED_PARAMETER")
+suspend fun seedDebugData(household: HouseholdRepository, pins: PinManager) = Unit
 ```
 
 - [ ] **Step 5: Wire `HouseHubApp` and `MainActivity`**
@@ -4359,17 +4190,19 @@ import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import uk.co.siland.househub.core.access.PinManager
+import uk.co.siland.househub.core.household.HouseholdRepository
 import uk.co.siland.househub.core.plugin.ApplicationScope
-import uk.co.siland.househub.seed.Seeder
 
 @HiltAndroidApp
 class HouseHubApp : Application() {
-    @Inject lateinit var seeder: Seeder
+    @Inject lateinit var household: HouseholdRepository
+    @Inject lateinit var pins: PinManager
     @Inject @ApplicationScope lateinit var appScope: CoroutineScope
 
     override fun onCreate() {
         super.onCreate()
-        appScope.launch { seeder.seed() }
+        appScope.launch { seedDebugData(household, pins) }
     }
 }
 ```
@@ -4379,8 +4212,12 @@ class HouseHubApp : Application() {
 package uk.co.siland.househub
 
 import android.os.Bundle
+import android.view.MotionEvent
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.Lifecycle
@@ -4397,7 +4234,6 @@ import uk.co.siland.househub.core.ui.HouseHubTheme
 import uk.co.siland.househub.shell.ShellViewModel
 import uk.co.siland.househub.shell.ui.HouseHubShell
 import uk.co.siland.househub.shell.ui.SettingsPlaceholder
-import uk.co.siland.househub.shell.ui.rememberNow
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -4406,26 +4242,32 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var pinPrompt: PinPromptController
     @Inject lateinit var capabilities: Set<@JvmSuppressWildcards Capability>
 
+    // Set by Settings › Exit kiosk; cleared when the process restarts.
+    private var kioskExited = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        enterKiosk()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onBackPressedDispatcher.addCallback(this) { }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                shell.kioskExit.collect { exitKiosk() }
+                shell.kioskExit.collect {
+                    kioskExited = true
+                    unpinFromScreen()
+                    showSystemBars()
+                }
             }
         }
         setContent {
             val state by shell.uiState.collectAsStateWithLifecycle()
-            val now by rememberNow()
             HouseHubTheme(dark = state.dark) {
                 HouseHubShell(
                     state = state,
-                    now = now,
                     onSelectTab = shell::selectTab,
                     onOpenSettings = shell::openSettings,
                     onLockSession = shell::lockSession,
                     onToggleThemePreview = shell::toggleThemePreview,
-                    onUserActivity = shell::onUserActivity,
                     tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
                 )
                 if (state.settingsOpen) {
@@ -4435,12 +4277,31 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        if (!kioskExited) {
+            hideSystemBars()
+            pinToScreen()
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && !kioskExited) hideSystemBars()
+    }
+
+    // Every touch-down anywhere (shell, Settings, PIN pad) keeps the PIN session alive.
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) shell.onUserActivity()
+        return super.dispatchTouchEvent(ev)
+    }
 }
 ```
 
 - [ ] **Step 6: Build and run the whole test suite**
 
-Run: `./gradlew assembleDebug test`
+Run: `./gradlew assembleDebug testDebugUnitTest`
 Expected: `BUILD SUCCESSFUL`, all tests pass.
 
 - [ ] **Step 7: Verify on the tablet**
@@ -4448,13 +4309,15 @@ Expected: `BUILD SUCCESSFUL`, all tests pass.
 Run: `./gradlew :app:installDebug && adb shell am start -n uk.co.siland.househub/.MainActivity`
 
 Check each, and report any that fail:
-1. Full screen, no system bars; screen stays on.
-2. Status bar shows time and "Day"/"Night"; tapping it flips the theme with a smooth ~400 ms fade.
-3. Rail shows Home (selected, filled icon in green pill) and Settings at the bottom.
+1. Full screen, no system bars; screen stays on. Swipe the edge: bars appear briefly, then hide again. Back does nothing.
+2. Status bar shows time and "Auto"; tapping it flips the theme with a smooth ~400 ms fade and the label becomes "Day"/"Night"; tapping again returns to "Auto".
+3. Rail shows Home (selected: filled icon in green pill) and Settings at the bottom.
 4. Home shows the big clock and date ("Wednesday 23 September" style) with an empty grid below.
-5. Tap Settings → PIN pad. `0000` ✓ → "Wrong PIN". `1234` ✓ → Settings placeholder opens; rail shows an "Admin" session chip.
-6. Close Settings, wait 60 s without touching → chip disappears.
-7. Tap chip → it disappears immediately.
+5. Tap Settings → PIN pad with 4 dots. `0000` → "Wrong PIN" (submits on the 4th digit). `1234` → Settings opens; rail shows an "Admin" chip.
+6. In Settings, tap empty space: nothing happens (no rail tab switch). Tap Exit kiosk → PIN pad appears even though the session is active; Cancel.
+7. Leave the tablet untouched for 60 s with Settings open → Settings closes and the chip disappears.
+8. Tap the chip → it disappears immediately.
+9. Side by side with `docs/design/house_hub_handoff/screenshots/01-home-dark.png`: compare rail width and spacing, clock size/weight and gap to the date, colours. Note any mismatch in your report.
 
 If no device is connected, say so; Step 6 is the gate.
 
@@ -4467,148 +4330,12 @@ git commit -m "Add shell UI, kiosk mode and debug admin seed"
 
 ---
 
-### Task 12: Screenshot tests and README
+### Task 11: README
 
 **Files:**
-- Modify: `app/build.gradle.kts` (Roborazzi plugin + deps)
-- Create: `app/src/test/java/uk/co/siland/househub/shell/ui/ShellScreenshotTest.kt`
-- Create: `app/src/test/screenshots/*.png` (recorded baselines)
 - Create: `README.md`
 
-**Interfaces:**
-- Consumes: `HouseHubShell`, `ShellUiState`, `TabItem`, `SessionChip` (Tasks 10–11); `PinPadSheet`, `PinError` (Tasks 8–9); `HomeCard`, `HomeCardPlacer` (Task 3); `HhCard`, `HouseHubTheme` (Task 2).
-
-- [ ] **Step 1: Add Roborazzi to `app/build.gradle.kts`**
-
-Add to `plugins { }`: `alias(libs.plugins.roborazzi)`
-
-Add to `dependencies { }`:
-```kotlin
-    testImplementation(libs.roborazzi)
-    testImplementation(libs.roborazzi.compose)
-```
-
-- [ ] **Step 2: Write the screenshot tests**
-
-`ShellScreenshotTest.kt`:
-```kotlin
-package uk.co.siland.househub.shell.ui
-
-import android.app.Application
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.test.onRoot
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.takahirom.roborazzi.captureRoboImage
-import java.time.LocalDateTime
-import org.junit.Rule
-import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.annotation.Config
-import org.robolectric.annotation.GraphicsMode
-import uk.co.siland.househub.core.access.PinError
-import uk.co.siland.househub.core.access.ui.PinPadSheet
-import uk.co.siland.househub.core.plugin.HomeCard
-import uk.co.siland.househub.core.plugin.HomeCardPlacer
-import uk.co.siland.househub.core.plugin.HomeCardSize
-import uk.co.siland.househub.core.ui.HhCard
-import uk.co.siland.househub.core.ui.HhType
-import uk.co.siland.househub.core.ui.HouseHub
-import uk.co.siland.househub.core.ui.HouseHubTheme
-import uk.co.siland.househub.shell.SessionChip
-import uk.co.siland.househub.shell.ShellUiState
-import uk.co.siland.househub.shell.TabItem
-
-@RunWith(AndroidJUnit4::class)
-@GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(application = Application::class, qualifiers = "w1280dp-h800dp-land-hdpi")
-class ShellScreenshotTest {
-    @get:Rule val compose = createComposeRule()
-
-    private val now = LocalDateTime.of(2026, 9, 23, 11, 54)
-
-    private fun placeholder(id: String, title: String, size: HomeCardSize, priority: Int) =
-        HomeCard(id, size, priority) {
-            HhCard(Modifier.fillMaxSize(), radius = 26.dp) {
-                Text(title, style = HhType.sectionTitle, color = HouseHub.colors.ink)
-            }
-        }
-
-    private val sampleCards = HomeCardPlacer.place(
-        listOf(
-            placeholder("today", "Today", HomeCardSize.TALL, 100),
-            placeholder("comingUp", "Coming up", HomeCardSize.WIDE, 50),
-            placeholder("forecast", "Forecast", HomeCardSize.WIDE, 10),
-        ),
-    )
-
-    private fun shell(dark: Boolean, state: ShellUiState, name: String) {
-        compose.setContent {
-            HouseHubTheme(dark = dark) {
-                HouseHubShell(state, now, {}, {}, {}, {}, {}, tabContent = {})
-            }
-        }
-        compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
-    }
-
-    @Test
-    fun homeEmptyDark() = shell(true, ShellUiState(dark = true), "home_empty_dark")
-
-    @Test
-    fun homeEmptyLight() = shell(false, ShellUiState(dark = false), "home_empty_light")
-
-    @Test
-    fun homeGridWithTabsAndSessionDark() = shell(
-        dark = true,
-        state = ShellUiState(
-            tabs = listOf(TabItem("calendar", "Calendar", "calendar_month")),
-            session = SessionChip("Alex", 0xFF4CB387),
-            dark = true,
-            homeCards = sampleCards,
-        ),
-        name = "home_grid_dark",
-    )
-
-    @Test
-    fun pinPadWrongPinDark() {
-        compose.setContent {
-            HouseHubTheme(dark = true) {
-                PinPadSheet("Change settings", PinError.WrongPin, null, {}, {})
-            }
-        }
-        compose.onRoot().captureRoboImage("src/test/screenshots/pin_pad_dark.png")
-    }
-
-    @Test
-    fun pinPadNotAllowedLight() {
-        compose.setContent {
-            HouseHubTheme(dark = false) {
-                PinPadSheet("Change settings", PinError.NotAllowed("Mia"), null, {}, {})
-            }
-        }
-        compose.onRoot().captureRoboImage("src/test/screenshots/pin_pad_light.png")
-    }
-}
-```
-
-- [ ] **Step 3: Record baselines**
-
-Run: `./gradlew :app:recordRoborazziDebug`
-Expected: `BUILD SUCCESSFUL`; five PNGs in `app/src/test/screenshots/`.
-
-- [ ] **Step 4: Compare baselines against the hand-off**
-
-Open `home_grid_dark.png` next to `docs/design/house_hub_handoff/screenshots/01-home-dark.png`. Check: rail width and item spacing, clock size and weight, grid proportions (left column visibly wider), card radii, colours. Fix any mismatch in the Task 11 composables, re-record, and note what changed. Report to the user anything that could not be matched.
-
-- [ ] **Step 5: Verify mode passes**
-
-Run: `./gradlew :app:verifyRoborazziDebug`
-Expected: PASS (no diffs).
-
-- [ ] **Step 6: Write `README.md`**
+- [ ] **Step 1: Write `README.md`**
 
 ````markdown
 # House Hub
@@ -4624,13 +4351,13 @@ A wall-mounted Android tablet app for running a family home. Built as a set of m
 Requirements: JDK 17, Android SDK platform 35.
 
 ```bash
-./gradlew assembleDebug test
+./gradlew assembleDebug testDebugUnitTest
 ./gradlew :app:installDebug
 ```
 
-Debug builds create an **Admin** with PIN **1234** on first launch so Settings is reachable. Release builds do not.
+Use `testDebugUnitTest`, not `test` — release unit tests don't include the Compose test activity.
 
-Screenshots: `./gradlew :app:verifyRoborazziDebug` (re-record with `recordRoborazziDebug` after an intended visual change).
+Debug builds create an **Admin** with PIN **1234** on first launch so Settings is reachable. Release builds do not.
 
 ## Modules
 
@@ -4639,9 +4366,8 @@ Screenshots: `./gradlew :app:verifyRoborazziDebug` (re-record with `recordRobora
 | `:app` | Activity, kiosk mode, nav rail, Home grid, wiring only |
 | `:core:ui` | Design tokens, DM Sans, Material Symbols, shared components |
 | `:core:plugin` | `Capability` and `HomeCard` contracts, Home card placement |
-| `:core:household` | People, Family, home location (`household.db`) |
-| `:core:access` | Roles, permissions, per-person PINs, session, PIN pad (`access.db`) |
-| `:core:testing` | Shared test helpers |
+| `:core:household` | People (with role and PIN hash), Family, home location — `household.db` |
+| `:core:access` | Permissions, PIN hashing, lockout, 60 s session, PIN pad |
 
 Rules: `:core:*` never depends on `:app`, `:capability:*` or `:provider:*`. Capabilities never depend on providers. Each module that stores data owns its own database file.
 
@@ -4657,16 +4383,19 @@ No other module changes.
 
 ## Kiosk mode
 
-Release builds pin the app to the screen (`startLockTask`) — Android shows a one-time "App is pinned" prompt. Leave via **Settings › Exit kiosk** (Admin PIN).
+Release builds pin the app to the screen (Android "screen pinning"). Leave properly via **Settings › Exit kiosk** (Admin PIN, always asked).
 
-A stronger lock (device-owner mode, which cannot be escaped with button combinations) is planned but not built yet. It will be optional, needs a tablet with no Google accounts added, and can only be undone with `adb` or a factory reset.
+Screen pinning can also be undone by holding **Back + Overview**. To stop a child doing that, on the tablet: set a screen lock (PIN), then turn on **Settings › Security › Other security settings › Pin windows › Ask for PIN before unpinning**. Unpinning then drops to the lock screen.
+
+A stronger device-owner lock is possible later; it is not built yet.
 
 ## PINs
 
-- Everyone can have their own 4–6 digit PIN; PINs must be unique in the household because the PIN identifies the person.
+- Everyone can have their own 4-digit PIN. PINs must be unique in the household because the PIN identifies the person. The pad submits on the 4th digit.
 - Viewing never needs a PIN. Changing things does.
-- A session lasts 60 seconds after the last touch. Tap your name in the rail to lock early.
-- 5 wrong PINs lock the pad for 30 seconds, doubling each time.
+- A session lasts 60 seconds after the last touch. Tap your name in the rail to lock early. Settings closes when the session ends.
+- Exiting kiosk and managing people always ask for a PIN, even mid-session.
+- 5 wrong PINs lock the pad for 30 seconds, doubling each time up to 16 minutes. Only a PIN that is allowed to do the thing clears the count.
 - This is kid-proofing, not strong security.
 
 **Forgotten PIN:** an Admin can reset anyone's PIN in Settings. If every Admin has forgotten theirs, clear the app's data (Android Settings › Apps › House Hub › Storage › Clear data). That wipes all configuration and starts setup again.
@@ -4676,14 +4405,14 @@ A stronger lock (device-owner mode, which cannot be escaped with button combinat
 DM Sans: SIL Open Font License (`core/ui/licenses/OFL-DMSans.txt`). Material Symbols: Apache 2.0 (`core/ui/licenses/Apache-MaterialSymbols.txt`).
 ````
 
-- [ ] **Step 7: Run everything once more**
+- [ ] **Step 2: Final check**
 
-Run: `./gradlew assembleDebug test :app:verifyRoborazziDebug`
+Run: `./gradlew assembleDebug testDebugUnitTest`
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add app README.md
-git commit -m "Add shell screenshot tests and README"
+git add README.md
+git commit -m "Add README"
 ```
