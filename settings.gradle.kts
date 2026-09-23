@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 rootProject.name = "HouseHub"
 include(":app")
 include(":core:ui")
+include(":core:plugin")
