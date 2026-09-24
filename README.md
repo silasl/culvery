@@ -17,7 +17,7 @@ Requirements: JDK 17, Android SDK platform 35.
 
 Use `testDebugUnitTest`, not `test` — release unit tests don't include the Compose test activity.
 
-Debug builds seed a sample household on first launch so the app is usable before the setup wizard exists: **Alex** (Admin, PIN 1234), **Sam** (Adult, PIN 2468) and **Mia** (Child, PIN 1357), plus a "Sample calendar" connection showing the design hand-off's week. The seed only runs when there is no Admin with a PIN, so after upgrading from an older debug build clear the app's data (`adb shell pm clear uk.co.siland.culvery`). Release builds seed nothing and include no sample calendar.
+Debug builds seed a sample household on first launch so the app is usable before the setup wizard exists: **Alex** (Admin, PIN 1234), **Sam** (Adult, PIN 2468) and **Mia** (Child, PIN 1357), plus a "Sample calendar" connection showing the design hand-off's week. Its "Family calendar" is the household's master calendar, so its events can be deleted and assigned on the tablet. The sample calendar keeps changes in memory and forgets them when the app restarts. People are only seeded when there is no Admin with a PIN; an install carried over from an earlier build (Plan 1 or 2a) also keeps its stored calendar names, so the sample calendar may show "Family" instead of "Family calendar" — clear the app's data (`adb shell pm clear uk.co.siland.culvery`) for a clean sample. Release builds seed nothing and include no sample calendar.
 
 ## Screenshot tests
 
@@ -39,10 +39,10 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 |---|---|
 | `:app` | Activity, kiosk mode, nav rail, Home grid, wiring only |
 | `:core:ui` | Design tokens, DM Sans, Material Symbols, shared components |
-| `:core:plugin` | `Capability`, `HomeCard`, `ProviderDescriptor`, `Connection`, `ConnectionHealth`, `ShellNavigator`, `Startable` |
+| `:core:plugin` | `Capability`, `HomeCard`, `ProviderDescriptor`, `Connection`, `ConnectionHealth`, `ShellNavigator`, `OverlayHost`, `Toaster`, `Startable` |
 | `:core:household` | People (with role and PIN hash), Family, home location — `household.db` |
-| `:core:access` | Permissions, PIN hashing, lockout, 60 s session, PIN pad |
-| `:capability:calendar` | Calendar contract, `calendar.db` cache, 5-minute sync, Home cards, Calendar tab |
+| `:core:access` | Permissions, PIN hashing, lockout, 2-minute session, PIN pad |
+| `:capability:calendar` | Calendar contract (read and write), `calendar.db` cache and outbox, 5-minute sync, event editor, Home cards, Calendar tab, event detail sheet |
 | `:capability:calendar-testkit` | `CalendarProviderContractTest`, the tests every calendar provider must pass |
 | `:provider:calendar-fake` | Debug-only sample calendar (the hand-off's week, relative to today) |
 
@@ -54,12 +54,12 @@ Rules, enforced when Gradle configures the project (`build-logic/convention/src/
 
 Breaking a rule fails the build with `Module boundary: <from> must not depend on <to>`. Each module that stores data owns its own database file.
 
-`calendar.db` stores user configuration (connections, mappings). Every schema version bump ships a Room `Migration` or `AutoMigration`; never use destructive fallback. Room exports each schema version to `<module>/schemas/`, and those files are committed.
+`calendar.db` stores user configuration (connections, mappings, the master calendar) and queued changes (the `outbox` table; the `event` table is only ever a copy of what the provider has). Every schema version bump ships a hand-written Room `Migration` in `db/Migrations.kt` with a `MigrationTestHelper` test in `CalendarMigrationTest`; never use destructive fallback. `CalendarMigrationTest` runs that helper with the driver-based `AndroidSQLiteDriver`, because androidx.sqlite 2.6.x's default driver mis-handles Windows paths. Room exports each schema version to `<module>/schemas/`, and those files are committed.
 
 ## Adding a capability
 
 1. Create `capability/<name>/build.gradle.kts` with `id("culvery.android.library")`, `id("culvery.android.compose")`, `id("culvery.hilt")`, and depend on `:core:plugin` (plus `:core:access` if it has actions).
-2. Implement `Capability` (tab, icon, `order`, `hasTab`, Home `cards()`). Card and tab UI move the shell through `LocalShellNavigator.current.openTab(id)` / `.openSettings()`. Background work (sync loops) is a `Startable` bound `@IntoSet`; the app starts it once at launch.
+2. Implement `Capability` (tab, icon, `order`, `hasTab`, Home `cards()`). Card and tab UI move the shell through `LocalShellNavigator.current.openTab(id)` / `.openSettings()`. Sheets open through `LocalOverlayHost.current.show { … }` (draw them with `HhSheet`). Short messages go through the injected `Toaster`, from the code that knows the outcome (a view model or an `@ApplicationScope` job), so the toast still shows if the sheet has closed. Background work (sync loops) is a `Startable` bound `@IntoSet`; the app starts it once at launch.
 3. Bind it: `@Binds @IntoSet abstract fun bind(impl: MyCapability): Capability` in a Hilt module.
 4. If it has actions, implement `PermissionSource` and bind it `@IntoSet` too; call `AccessControl.authorise("<name>.<action>")` before acting.
 5. `include(":capability:<name>")` in `settings.gradle.kts` and add it to `:app` dependencies.
@@ -88,7 +88,7 @@ A provider connects one kind of calendar service (Google, ICS, CalDAV…) to the
    and `include(":provider:calendar-<name>")` in `settings.gradle.kts`.
 
 2. **Implement `CalendarProvider`:**
-   - `descriptor`: a stable, unique `id` such as `calendar.<name>` (it is stored with each connection, so never change it), a display name, a Material Symbols icon, and `features` (`READ`, plus `WRITE` once 2b adds writing).
+   - `descriptor`: a stable, unique `id` such as `calendar.<name>` (it is stored with each connection, so never change it), a display name, a Material Symbols icon, and `features` (`READ`, plus `WRITE` if it implements `CalendarWriter`).
    - `ConnectScreen(existing, onConnected, onCancel)`: collect whatever the service needs and call `onConnected(Connection(id, providerId = descriptor.id, label, config))`. Use a new UUID for `id` when `existing` is null; when it is non-null the user is reconnecting that connection, so keep `existing.id`. Keep secrets out of `config`.
    - `sources(conn)`: the calendars in this connection, with ids that never change between calls.
    - `sync(conn, source, range, cursor)` must:
@@ -100,7 +100,16 @@ A provider connects one kind of calendar service (Google, ICS, CalDAV…) to the
    - `sources` and `sync` must be main-safe and cancellable: no uninterruptible blocking I/O. The app calls them on `Dispatchers.IO` under a 60-second timeout and treats a timeout as unreachable.
    The app handles storage, the sync schedule (every 5 minutes and on start), the window (yesterday to 14 days ahead) and error display.
 
-3. **Register it** in the module:
+3. **Writing (optional).** If the service can write, declare `Feature.WRITE` and implement `CalendarWriter` (often on the same class):
+   - `providerId` equals `descriptor.id`.
+   - `create`, `update` and `delete` write to one source. `forPerson` and `createdBy` are household person ids to store with the event (Google: `extendedProperties.private`), and the next sync must return them unchanged. Never write names.
+   - `update` changes only the title, the times and the tags, and keeps every other field (Google: PATCH, not PUT).
+   - Throw `WriteRejectedException` for a permanent refusal (including a source that is unknown or read-only), `NeedsSignInException` for auth failures, and `UnreachableException` for network failures and for "try later" answers (Google: 429, 403 rate limits, 5xx). Nothing else.
+   - Deleting an event that is already gone succeeds (Google: treat 404 and 410 on a delete as success).
+
+   Bind it next to the provider: `@Binds @IntoSet abstract fun writer(impl: MyCalendarProvider): CalendarWriter`. The app writes only to the household's master calendar, and only non-recurring events. It tries the writer for 10 seconds, then queues the change and retries with backoff (30 s, 1 min, 2 min, then every 5 min), delivering each event's changes in order. A change still queued after 48 hours is dropped with a toast.
+
+4. **Register it** in the module:
    ```kotlin
    @Module
    @InstallIn(SingletonComponent::class)
@@ -109,7 +118,7 @@ A provider connects one kind of calendar service (Google, ICS, CalDAV…) to the
    }
    ```
 
-4. **Prove it** with the shared contract suite in `src/test`:
+5. **Prove it** with the shared contract suite in `src/test`:
    ```kotlin
    class MyCalendarProviderContractTest : CalendarProviderContractTest() {
        override fun provider() = …            // a provider backed by recorded fixtures, not the network
@@ -121,11 +130,14 @@ A provider connects one kind of calendar service (Google, ICS, CalDAV…) to the
        override fun recurringTitle() = …
        override fun simulateAuthFailure() = { … }
        override fun simulateUnreachable() = { … }
+       // WRITE providers only; the six write checks fail if these are missing.
+       override fun writer() = …
+       override fun writableSource() = …
    }
    ```
    Run `./gradlew :provider:calendar-<name>:testDebugUnitTest`. `:provider:calendar-fake` is a worked example.
 
-5. **Ship it**: add `implementation(project(":provider:calendar-<name>"))` to `app/build.gradle.kts` (or `debugImplementation` for debug-only providers).
+6. **Ship it**: add `implementation(project(":provider:calendar-<name>"))` to `app/build.gradle.kts` (or `debugImplementation` for debug-only providers).
 
 ## Kiosk mode
 
@@ -139,7 +151,8 @@ A stronger device-owner lock is possible later; it is not built yet.
 
 - Everyone can have their own 4-digit PIN. PINs must be unique in the household because the PIN identifies the person. The pad submits on the 4th digit.
 - Viewing never needs a PIN. Changing things does.
-- A session lasts 60 seconds after the last touch. Tap your name in the rail to lock early. Settings closes when the session ends.
+- A session lasts 2 minutes after the last PIN-checked action; touching the screen doesn't extend it. While someone is signed in, the status bar shows their name and role and a **Sign out** link. Settings closes when the session ends.
+- Calendar changes follow the roles: Admins and Adults can delete and assign any event on the master calendar; a Child can delete only events they added, and can't assign. A refused change says why in a toast and signs the person out, so the next tap asks for a PIN. Events from other calendars, and repeating events, can't be changed on the tablet.
 - Exiting kiosk and managing people always ask for a PIN, even mid-session.
 - 5 wrong PINs lock the pad for 30 seconds, doubling each time up to 16 minutes. Only a PIN that is allowed to do the thing clears the count.
 - This is kid-proofing, not strong security.
