@@ -27,9 +27,8 @@ import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ShellToasts
 import uk.co.siland.culvery.shell.ShellViewModel
 import uk.co.siland.culvery.shell.ui.CulveryShell
-import uk.co.siland.culvery.shell.ui.OverlayLayer
 import uk.co.siland.culvery.shell.ui.SettingsPlaceholder
-import uk.co.siland.culvery.shell.ui.ToastLayer
+import uk.co.siland.culvery.shell.ui.ShellLayers
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -66,21 +65,24 @@ class MainActivity : ComponentActivity() {
                 LocalOverlayHost provides overlay,
             ) {
                 CulveryTheme(dark = state.dark) {
-                    CulveryShell(
-                        state = state,
-                        onSelectTab = shell::selectTab,
-                        onOpenSettings = shell::openSettings,
-                        onSignOut = shell::signOut,
-                        onToggleThemePreview = shell::toggleThemePreview,
-                        tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
-                    )
-                    if (state.settingsOpen) {
-                        SettingsPlaceholder(onExitKiosk = shell::exitKiosk, onClose = shell::closeSettings)
+                    ShellLayers(
+                        overlay = overlay,
+                        toast = toast,
+                        onToastHidden = toasts::hide,
+                        pinPad = { PinPadHost(pinPrompt, overSheet = overlay.isShowing) },
+                    ) {
+                        CulveryShell(
+                            state = state,
+                            onSelectTab = shell::selectTab,
+                            onOpenSettings = shell::openSettings,
+                            onSignOut = shell::signOut,
+                            onToggleThemePreview = shell::toggleThemePreview,
+                            tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
+                        )
+                        if (state.settingsOpen) {
+                            SettingsPlaceholder(onExitKiosk = shell::exitKiosk, onClose = shell::closeSettings)
+                        }
                     }
-                    // Layer order: sheet, then the PIN pad over it, then toasts over everything.
-                    OverlayLayer(overlay)
-                    PinPadHost(pinPrompt, overSheet = overlay.isShowing)
-                    ToastLayer(toast, toasts::hide)
                 }
             }
         }

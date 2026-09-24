@@ -11,12 +11,35 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.ui.HhToast
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ToastMessage
+
+/**
+ * The shell with its overlay layers stacked over it: sheet, then [pinPad] over the sheet, then toasts over everything.
+ * The layers need a parent with its own graphics layer: removing a node redraws only its nearest layered ancestor,
+ * and the composition root has none, so a layer closed with no other animation running (a scrim tap, a toast timing
+ * out) would get a layout pass but no new frame and stay on screen.
+ */
+@Composable
+fun ShellLayers(
+    overlay: OverlayState,
+    toast: ToastMessage?,
+    onToastHidden: (Long) -> Unit,
+    pinPad: @Composable () -> Unit,
+    shell: @Composable () -> Unit,
+) {
+    Box(Modifier.fillMaxSize().graphicsLayer {}) {
+        shell()
+        OverlayLayer(overlay)
+        pinPad()
+        ToastLayer(toast, onToastHidden)
+    }
+}
 
 /** The sheet layer: a scrim over the whole shell that dismisses on tap, and the content against the right edge. */
 @Composable
