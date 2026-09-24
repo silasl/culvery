@@ -33,6 +33,7 @@ class DefaultAccessControlTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val prompt = PinPromptController()
     private val seen = mutableListOf<PinRequest>()
+    private val toasts = RecordingToaster()
 
     private val everyone = object : PermissionSource {
         override val permissions = listOf(PermissionDef("test.any", "Do a thing", Role.entries.toSet()))
@@ -54,6 +55,7 @@ class DefaultAccessControlTest {
         lockout = LockoutStore(context),
         prompt = prompt,
         clock = WallClock { testScheduler.currentTime },
+        toaster = toasts,
         scope = backgroundScope,
     )
 
@@ -115,12 +117,12 @@ class DefaultAccessControlTest {
     }
 
     @Test
-    fun sessionExpiresAfterSixtySecondsIdle() = runTest {
+    fun sessionLastsTwoMinutesAfterTheLastAuthorisedAction() = runTest {
         person("Alex", Role.ADMIN, "1234")
         val access = access()
         answerPins("1234")
         access.authorise(CorePermissions.SETTINGS_MANAGE)
-        advanceTimeBy(59_000); runCurrent()
+        advanceTimeBy(119_000); runCurrent()
         assertThat(access.session.value).isNotNull()
         advanceTimeBy(2_000); runCurrent()
         assertThat(access.session.value).isNull()
@@ -128,16 +130,18 @@ class DefaultAccessControlTest {
     }
 
     @Test
-    fun touchExtendsSessionButItStillExpires() = runTest {
+    fun onlyAnAuthorisedActionExtendsTheSession() = runTest {
         person("Alex", Role.ADMIN, "1234")
         val access = access()
         answerPins("1234")
-        access.authorise(CorePermissions.SETTINGS_MANAGE)
-        advanceTimeBy(50_000); runCurrent()
-        access.touch()
-        advanceTimeBy(50_000); runCurrent()
+        access.authorise("test.any")
+        advanceTimeBy(100_000); runCurrent()
+        // Passes on the session shortcut, without a pad, and restarts the two minutes.
+        assertThat(access.authorise("test.any")).isNotNull()
+        assertThat(seen).hasSize(1)
+        advanceTimeBy(119_000); runCurrent()
         assertThat(access.session.value).isNotNull()
-        advanceTimeBy(11_000); runCurrent()
+        advanceTimeBy(2_000); runCurrent()
         assertThat(access.session.value).isNull()
     }
 
@@ -247,5 +251,91 @@ class DefaultAccessControlTest {
     fun unknownPermissionThrows() = runTest {
         val access = access()
         assertThrows(IllegalArgumentException::class.java) { runBlocking { access.authorise("nope") } }
+    }
+
+    @Test
+    fun reasonReachesThePinPad() = runTest {
+        person("Alex", Role.ADMIN, "1234")
+        val access = access()
+        val job = launch { access.authorise("test.any", reason = PinReason.Delete) }
+        assertThat(prompt.request.filterNotNull().first().reason).isEqualTo(PinReason.Delete)
+        job.cancel()
+    }
+
+    @Test
+    fun theReasonIsGenericByDefault() = runTest {
+        val access = access()
+        assertThat(firstPromptFor(access, CorePermissions.SETTINGS_MANAGE).reason).isEqualTo(PinReason.Generic)
+    }
+
+    @Test
+    fun aRefusalOnTheSessionShortcutToastsThenLocks() = runTest {
+        person("Alex", Role.ADMIN, "1234")
+        val access = access()
+        answerPins("1234", "1234")
+        access.authorise("test.any")
+        val refused = access.authorise("test.any", allow = { _, _ -> false }, refusal = Refusal.Toast { "$it may not" })
+        assertThat(refused).isNull()
+        assertThat(seen).hasSize(1)
+        assertThat(toasts.messages).containsExactly("Alex may not")
+        assertThat(access.session.value).isNull()
+        // The next tap brings up the PIN pad, so someone else can take over.
+        assertThat(access.authorise("test.any")).isNotNull()
+        assertThat(seen).hasSize(2)
+    }
+
+    @Test
+    fun allowIsAppliedAfterAPinAndARefusalToastClosesThePad() = runTest {
+        person("Mia", Role.CHILD, "9876")
+        val access = access()
+        answerPins("9876")
+        val result = access.authorise(
+            "test.any",
+            allow = { who, _ -> who.person.name != "Mia" },
+            refusal = Refusal.Toast { "$it can only change events they created." },
+        )
+        assertThat(result).isNull()
+        assertThat(toasts.messages).containsExactly("Mia can only change events they created.")
+        assertThat(prompt.request.value).isNull()
+        assertThat(access.session.value).isNull()
+    }
+
+    @Test
+    fun aRefusalInThePadCarriesItsMessageAndAsksAgain() = runTest {
+        person("Mia", Role.CHILD, "9876")
+        val access = access()
+        answerPins("9876", null)
+        assertThat(access.authorise("test.any", allow = { _, _ -> false })).isNull()
+        assertThat(seen.last().error).isEqualTo(PinError.NotAllowed("Mia", "Mia can't do that"))
+        assertThat(toasts.messages).isEmpty()
+    }
+
+    @Test
+    fun allowSeesOnlyTheGrantedPermissions() = runTest {
+        person("Mia", Role.CHILD, "9876")
+        val access = access()
+        answerPins("9876")
+        var seenGrants: Set<String>? = null
+        access.authorise(CorePermissions.SETTINGS_MANAGE, "test.any", allow = { _, g -> seenGrants = g; true })
+        assertThat(seenGrants).containsExactly("test.any")
+    }
+
+    @Test
+    fun aRefusedPinDoesNotResetTheLockoutCounter() = runTest {
+        person("Alex", Role.ADMIN, "1234")
+        person("Mia", Role.CHILD, "9876")
+        val access = access()
+        answerPins("0000", "0000", "0000", "0000", "9876", "0000", null)
+        access.authorise("test.any", allow = { who, _ -> who.person.name != "Mia" })
+        assertThat(seen.last().lockedUntilMillis).isNotNull()
+    }
+
+    @Test
+    fun pinReasonTextNamesTheActionOrThePermission() {
+        assertThat(pinReasonText(PinReason.Delete, "Change any event"))
+            .isEqualTo("Enter your PIN to delete this event. It also records who made the change.")
+        assertThat(pinReasonText(PinReason.Assign, "Assign events"))
+            .isEqualTo("Enter your PIN to assign this event. It also records who made the change.")
+        assertThat(pinReasonText(PinReason.Generic, "Change settings")).isEqualTo("Enter your PIN to change settings.")
     }
 }

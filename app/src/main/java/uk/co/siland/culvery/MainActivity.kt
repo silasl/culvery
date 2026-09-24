@@ -1,7 +1,6 @@
 package uk.co.siland.culvery
 
 import android.os.Bundle
-import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
@@ -103,11 +102,5 @@ class MainActivity : ComponentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus && !kioskExited) hideSystemBars()
-    }
-
-    // Every touch-down anywhere (shell, sheet, PIN pad) keeps the PIN session alive.
-    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (ev.actionMasked == MotionEvent.ACTION_DOWN) shell.onUserActivity()
-        return super.dispatchTouchEvent(ev)
     }
 }

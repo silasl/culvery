@@ -123,8 +123,6 @@ class ShellViewModel @Inject constructor(
 
     fun signOut() = access.lock()
 
-    fun onUserActivity() = access.touch()
-
     fun toggleThemePreview() {
         previewing.value = !previewing.value
     }

@@ -9,12 +9,13 @@ import kotlinx.coroutines.flow.asStateFlow
 
 sealed interface PinError {
     data object WrongPin : PinError
-    data class NotAllowed(val name: String) : PinError
+    data class NotAllowed(val name: String, val message: String = "$name can't do that") : PinError
 }
 
 /** One showing of the PIN pad. Identity equality: every retry is a new request. */
 class PinRequest internal constructor(
     val label: String,
+    val reason: PinReason,
     val error: PinError?,
     val lockedUntilMillis: Long?,
 ) {
@@ -34,11 +35,11 @@ class PinPromptController @Inject constructor() {
         _request.value?.answer?.complete(null)
     }
 
-    internal fun open(label: String, error: PinError?, lockedUntilMillis: Long?): PinRequest =
-        PinRequest(label, error, lockedUntilMillis).also { _request.value = it }
+    internal fun open(label: String, error: PinError?, lockedUntilMillis: Long?, reason: PinReason = PinReason.Generic): PinRequest =
+        PinRequest(label, reason, error, lockedUntilMillis).also { _request.value = it }
 
-    internal suspend fun ask(label: String, error: PinError?, lockedUntilMillis: Long?): String? =
-        open(label, error, lockedUntilMillis).answer.await()
+    internal suspend fun ask(label: String, reason: PinReason, error: PinError?, lockedUntilMillis: Long?): String? =
+        open(label, error, lockedUntilMillis, reason).answer.await()
 
     internal fun dismiss() {
         _request.value = null

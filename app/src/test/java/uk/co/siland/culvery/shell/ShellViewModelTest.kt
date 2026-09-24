@@ -199,12 +199,6 @@ class ShellViewModelTest {
     }
 
     @Test
-    fun userActivityTouchesSession() {
-        vm().onUserActivity()
-        assertThat(access.touches).isEqualTo(1)
-    }
-
-    @Test
     fun capabilityThatNeverEmitsDoesNotBlockShell() = runTest {
         val stuck = NeverEmittingCapability("stuck", order = 5)
         val normal = FakeCapability("calendar", order = 10, shown = true)

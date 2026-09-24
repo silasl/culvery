@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.flowOf
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.access.Identified
+import uk.co.siland.culvery.core.access.PinReason
+import uk.co.siland.culvery.core.access.Refusal
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 
@@ -48,12 +50,15 @@ class ThrowingCardsCapability(override val id: String, override val order: Int) 
 class FakeAccessControl(var result: Authorised? = null, private val startsSession: Boolean = true) : AccessControl {
     override val session = MutableStateFlow<Identified?>(null)
     val requested = mutableListOf<List<String>>()
-    var touches = 0
-    override suspend fun authorise(vararg anyOf: String): Authorised? {
+    override suspend fun authorise(
+        vararg anyOf: String,
+        reason: PinReason,
+        allow: (Identified, Set<String>) -> Boolean,
+        refusal: Refusal,
+    ): Authorised? {
         requested += anyOf.toList()
         if (startsSession) result?.let { session.value = Identified(it.person, it.role) }
         return result
     }
-    override fun touch() { touches++ }
     override fun lock() { session.value = null }
 }
