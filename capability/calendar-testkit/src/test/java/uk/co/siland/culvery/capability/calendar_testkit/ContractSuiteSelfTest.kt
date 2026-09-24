@@ -4,13 +4,16 @@ import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 import org.junit.runner.JUnitCore
+import uk.co.siland.culvery.capability.calendar_testkit.fixtures.DroppingTagsContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.GoodContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.InclusiveAllDayEndContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.LeakingContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.PartialFirstSyncContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.RawAuthErrorContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.RawErrorContract
+import uk.co.siland.culvery.capability.calendar_testkit.fixtures.ReadOnlyContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.RepeatingContract
+import uk.co.siland.culvery.capability.calendar_testkit.fixtures.StrictDeleteContract
 
 /** Proves the suite passes a correct provider and catches each kind of broken one. */
 class ContractSuiteSelfTest {
@@ -28,7 +31,7 @@ class ContractSuiteSelfTest {
     fun wellBehavedProviderPassesEveryCheck() {
         val result = JUnitCore.runClasses(GoodContract::class.java)
         assertThat(result.failures.map { "${it.description.methodName}: ${it.message}" }).isEmpty()
-        assertThat(result.runCount).isEqualTo(10)
+        assertThat(result.runCount).isEqualTo(16)
         // A skipped check would otherwise count as a pass.
         assertThat(result.assumptionFailureCount).isEqualTo(0)
     }
@@ -62,5 +65,23 @@ class ContractSuiteSelfTest {
     @Test
     fun rawAuthExceptionIsCaught() {
         assertThat(failuresOf(RawAuthErrorContract::class.java)).containsExactly("authFailureThrowsNeedsSignIn")
+    }
+
+    @Test
+    fun droppedTagsAreCaught() {
+        assertThat(failuresOf(DroppingTagsContract::class.java)).containsExactly("createdEventComesBackOnTheNextSyncWithItsTags")
+    }
+
+    @Test
+    fun refusingToDeleteAMissingEventIsCaught() {
+        assertThat(failuresOf(StrictDeleteContract::class.java)).containsExactly("deletingAnEventThatIsAlreadyGoneSucceeds")
+    }
+
+    @Test
+    fun aReadOnlyProviderSkipsOnlyTheWriteChecks() {
+        val result = JUnitCore.runClasses(ReadOnlyContract::class.java)
+        assertThat(result.failures.map { "${it.description.methodName}: ${it.message}" }).isEmpty()
+        assertThat(result.runCount).isEqualTo(16)
+        assertThat(result.assumptionFailureCount).isEqualTo(6)
     }
 }

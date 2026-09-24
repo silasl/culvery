@@ -14,6 +14,7 @@ import javax.inject.Singleton
 import uk.co.siland.culvery.capability.calendar.CalendarCapability
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSyncLoop
+import uk.co.siland.culvery.capability.calendar.CalendarWriter
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_1_2
 import uk.co.siland.culvery.core.plugin.Capability
@@ -24,6 +25,9 @@ import uk.co.siland.culvery.core.plugin.Startable
 abstract class CalendarModule {
     @Multibinds
     abstract fun providers(): Set<CalendarProvider>
+
+    @Multibinds
+    abstract fun writers(): Set<CalendarWriter>
 
     @Binds
     @IntoSet

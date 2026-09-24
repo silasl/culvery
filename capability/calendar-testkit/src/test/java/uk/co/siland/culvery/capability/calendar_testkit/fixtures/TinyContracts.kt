@@ -17,6 +17,8 @@ abstract class TinyContract(private val tiny: TinyProvider) : CalendarProviderCo
     override fun recurringTitle() = "Yoga"
     override fun simulateAuthFailure() = { tiny.failNextWith(NeedsSignInException("expired")) }
     override fun simulateUnreachable() = { tiny.failNextWith(UnreachableException("offline")) }
+    override fun writer() = tiny
+    override fun writableSource() = TinyProvider.WRITABLE
 }
 
 class GoodContract : TinyContract(TinyProvider())
@@ -26,3 +28,6 @@ class RepeatingContract : TinyContract(TinyProvider(repeatOnCursor = true))
 class RawErrorContract : TinyContract(TinyProvider(rawNetworkErrors = true))
 class InclusiveAllDayEndContract : TinyContract(TinyProvider(inclusiveAllDayEnd = true))
 class RawAuthErrorContract : TinyContract(TinyProvider(rawAuthErrors = true))
+class DroppingTagsContract : TinyContract(TinyProvider(dropTagsOnCreate = true))
+class StrictDeleteContract : TinyContract(TinyProvider(rejectMissingDelete = true))
+class ReadOnlyContract : TinyContract(TinyProvider(canWrite = false))

@@ -86,9 +86,20 @@ data class EventDraft(
     val createdBy: String?,
 )
 
+/** The connection's sign-in has expired or been revoked (Google: 401, or a refused token refresh). */
 class NeedsSignInException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
 
+/**
+ * The provider couldn't be reached, or asked to be tried later: network errors, and for Google 429, 403
+ * rate-limit reasons (rateLimitExceeded, userRateLimitExceeded) and every 5xx. The engine retries with backoff.
+ */
 class UnreachableException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+
+/**
+ * A permanent refusal: retrying would not help (Google: a 4xx other than 401, 429 and the 403 rate limits).
+ * A delete that finds the event already gone (404 or 410) is a success, not a refusal.
+ */
+class WriteRejectedException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
  * A calendar service. Implementations live in :provider:calendar-* and bind themselves with
@@ -111,4 +122,30 @@ interface CalendarProvider {
     suspend fun sources(conn: Connection): List<CalendarSource>
 
     suspend fun sync(conn: Connection, source: CalendarSource, range: DateRange, cursor: SyncCursor?): SyncResult
+}
+
+/**
+ * Writes for a provider that declares Feature.WRITE. Bound `@IntoSet` beside its CalendarProvider; the engine
+ * matches them by [providerId] == descriptor.id. Behaviour is pinned by the write checks in
+ * CalendarProviderContractTest.
+ *
+ * - Throws only [WriteRejectedException] (permanent), [NeedsSignInException] or [UnreachableException].
+ * - Main-safe and cancellable. Called on Dispatchers.IO under a timeout: 10 s from the editor, 60 s from the
+ *   outbox drain. A timeout counts as unreachable and the change is queued or retried.
+ * - Stores [EventDraft.forPerson] and [EventDraft.createdBy] so that the next sync returns them unchanged.
+ * - A write to a source the connection doesn't have, or can't write, throws [WriteRejectedException].
+ * - [delete] of an event that no longer exists succeeds: a retried delete must not be reported as a failure.
+ */
+interface CalendarWriter {
+    val providerId: String
+
+    suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft): RemoteEvent
+
+    /**
+     * Changes only the title, the times and the two tags. Everything else the service holds (description,
+     * location, attendees, reminders) is kept (Google: PATCH, never PUT).
+     */
+    suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft): RemoteEvent
+
+    suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String)
 }

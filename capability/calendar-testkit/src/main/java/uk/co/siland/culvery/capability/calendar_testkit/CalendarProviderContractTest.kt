@@ -7,14 +7,19 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSource
+import uk.co.siland.culvery.capability.calendar.CalendarWriter
 import uk.co.siland.culvery.capability.calendar.DateRange
+import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
+import uk.co.siland.culvery.capability.calendar.SyncCursor
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.UnreachableException
+import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.instantIn
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.Feature
 
 /**
  * Every calendar provider subclasses this in its own tests (spec §11). Invariants are checked on every
@@ -40,10 +45,15 @@ abstract class CalendarProviderContractTest {
     protected open fun simulateAuthFailure(): (() -> Unit)? = null
     /** Makes the next call fail as a network outage would; null if the provider can't simulate it. */
     protected open fun simulateUnreachable(): (() -> Unit)? = null
+    /** The writer, for a provider that declares Feature.WRITE; the write checks fail if it is missing. */
+    protected open fun writer(): CalendarWriter? = null
+    /** A writable source the write checks may create, change and delete events in. */
+    protected open fun writableSource(): CalendarSource? = null
 
     private val subject by lazy { provider() }
     private val conn by lazy { connection() }
     private val window by lazy { range() }
+    private val writes by lazy { writer() }
 
     private suspend fun firstSync(source: CalendarSource = sourceWithEvents(), range: DateRange = window): SyncResult =
         subject.sync(conn, source, range, null)
@@ -155,5 +165,123 @@ abstract class CalendarProviderContractTest {
         assumeTrue("provider cannot simulate a network failure", simulate != null)
         simulate!!.invoke()
         assertThat(failureOfFirstSync()).isInstanceOf(UnreachableException::class.java)
+    }
+
+    /** Skips a provider without WRITE; fails one that declares WRITE but can't be exercised. */
+    private fun requireWriting(): Pair<CalendarWriter, CalendarSource> {
+        assumeTrue("provider does not declare WRITE", Feature.WRITE in subject.descriptor.features)
+        val w = writes
+        assertWithMessage("the provider declares WRITE, so writer() must return its writer").that(w).isNotNull()
+        assertWithMessage("writer.providerId must equal the provider's descriptor.id")
+            .that(w!!.providerId).isEqualTo(subject.descriptor.id)
+        val source = writableSource()
+        assertWithMessage("the provider declares WRITE, so writableSource() must name a writable source").that(source).isNotNull()
+        return w to source!!
+    }
+
+    /** A one-hour event on day [dayOffset] after the window's second day, at 10:00 in the window's zone. */
+    private fun draftIn(title: String, dayOffset: Long, forPerson: String? = "contract-for", createdBy: String? = "contract-by"): EventDraft {
+        val start = window.start.plusDays(1 + dayOffset).atTime(10, 0).atZone(window.zone).toInstant()
+        return EventDraft(title, EventTime.Timed(start), EventTime.Timed(start.plusSeconds(3_600)), forPerson, createdBy)
+    }
+
+    private suspend fun nextSyncReturns(source: CalendarSource, cursor: SyncCursor?, remoteId: String): RemoteEvent? =
+        subject.sync(conn, source, window, cursor).upserts.firstOrNull { it.remoteId == remoteId }
+
+    /** Dates and title always; the two tags only when [checkTags] (an all-day round trip is about dates, not tags). */
+    private fun assertMatches(what: String, event: RemoteEvent, draft: EventDraft, checkTags: Boolean = true) {
+        assertWithMessage("$what: title").that(event.title).isEqualTo(draft.title)
+        assertWithMessage("$what: start").that(event.start).isEqualTo(draft.start)
+        assertWithMessage("$what: end").that(event.end).isEqualTo(draft.end)
+        if (checkTags) {
+            assertWithMessage("$what: the forPerson tag").that(event.forPerson).isEqualTo(draft.forPerson)
+            assertWithMessage("$what: the createdBy tag").that(event.createdBy).isEqualTo(draft.createdBy)
+        }
+        assertWithMessage("$what: a written event is never recurring").that(event.recurring).isFalse()
+    }
+
+    @Test
+    fun createdEventComesBackOnTheNextSyncWithItsTags() = runTest {
+        val (w, source) = requireWriting()
+        val before = subject.sync(conn, source, window, null)
+        val draft = draftIn("Contract check", 1)
+        val created = w.create(conn, source, draft)
+        assertMatches("create's result", created, draft)
+        val synced = nextSyncReturns(source, before.cursor, created.remoteId)
+        assertWithMessage("the next sync must return the created event").that(synced).isNotNull()
+        assertMatches("the next sync", synced!!, draft)
+    }
+
+    @Test
+    fun anAllDayEventRoundTrips() = runTest {
+        val (w, source) = requireWriting()
+        val before = subject.sync(conn, source, window, null)
+        val first = window.start.plusDays(2)
+        // Two days: the end date is exclusive, as in RemoteEvent.
+        val draft = EventDraft("All-day check", EventTime.AllDay(first), EventTime.AllDay(first.plusDays(2)), "contract-for", "contract-by")
+        val created = w.create(conn, source, draft)
+        assertMatches("create's result", created, draft, checkTags = false)
+        val synced = nextSyncReturns(source, before.cursor, created.remoteId)
+        assertWithMessage("the next sync must return the all-day event").that(synced).isNotNull()
+        assertMatches("the next sync", synced!!, draft, checkTags = false)
+    }
+
+    @Test
+    fun updatedFieldsRoundTrip() = runTest {
+        val (w, source) = requireWriting()
+        val created = w.create(conn, source, draftIn("Before", 1))
+        val cursor = subject.sync(conn, source, window, null).cursor
+        val changed = draftIn("After", 2, forPerson = "contract-other")
+        val updated = w.update(conn, source, created.remoteId, changed)
+        assertWithMessage("an update keeps the remoteId").that(updated.remoteId).isEqualTo(created.remoteId)
+        assertMatches("update's result", updated, changed)
+        val synced = nextSyncReturns(source, cursor, created.remoteId)
+        assertWithMessage("the next sync must return the updated event").that(synced).isNotNull()
+        assertMatches("the next sync", synced!!, changed)
+    }
+
+    @Test
+    fun deletedEventIsRemovedOnTheNextSync() = runTest {
+        val (w, source) = requireWriting()
+        val created = w.create(conn, source, draftIn("Doomed", 1))
+        val cursor = subject.sync(conn, source, window, null).cursor
+        w.delete(conn, source, created.remoteId)
+        val next = subject.sync(conn, source, window, cursor)
+        val reported = if (next.fullReplace) {
+            next.upserts.none { it.remoteId == created.remoteId }
+        } else {
+            created.remoteId in next.removedIds
+        }
+        assertWithMessage("the next sync must report the delete: a removal, or absence from a full replace")
+            .that(reported).isTrue()
+        assertThat(subject.sync(conn, source, window, null).upserts.map { it.remoteId }).doesNotContain(created.remoteId)
+    }
+
+    @Test
+    fun deletingAnEventThatIsAlreadyGoneSucceeds() = runTest {
+        val (w, source) = requireWriting()
+        val created = w.create(conn, source, draftIn("Twice", 1))
+        w.delete(conn, source, created.remoteId)
+        val error = try {
+            w.delete(conn, source, created.remoteId)
+            null
+        } catch (e: Exception) {
+            e
+        }
+        assertWithMessage("a second delete of the same event must succeed: a retried delete may already have landed")
+            .that(error).isNull()
+    }
+
+    @Test
+    fun aWriteToAnUnknownSourceIsRejected() = runTest {
+        val (w, _) = requireWriting()
+        val unknown = CalendarSource("contract-no-such-source", "Nowhere", writable = true)
+        val error = try {
+            w.create(conn, unknown, draftIn("Lost", 1))
+            null
+        } catch (e: Throwable) {
+            e
+        }
+        assertThat(error).isInstanceOf(WriteRejectedException::class.java)
     }
 }
