@@ -3,16 +3,20 @@ package uk.co.siland.culvery.capability.calendar
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 
 const val ALL_DAY_LABEL = "All day"
 const val STALE_AFTER_MS = 30 * 60_000L
+const val ADDED_FROM_PHONE = "Added from phone"
+const val CALENDAR_FEED = "Calendar feed"
 
 data class EventUi(
-    /** Stable across days and syncs: connectionId/sourceId/remoteId. */
-    val key: String,
+    /** Which mirrored event this is; the same on every day a multi-day event covers. */
+    val ref: EventRef,
     val title: String,
     /** This day's slice: "07:45–08:30", "22:00–" (first day of several), "until 01:00" (last day), or "All day". */
     val timeLabel: String,
@@ -23,7 +27,24 @@ data class EventUi(
     val allDay: Boolean,
     val recurring: Boolean,
     val startSort: Long,
-)
+    /** The source calendar's name, e.g. "Family calendar" or "School terms". */
+    val sourceName: String = "",
+    /** The connection's label ("Google", "Sample calendar"): where changes are sent. */
+    val connectionLabel: String = "",
+    /** Null when the tablet may change this event: a non-recurring event on the master calendar. */
+    val readOnlyReason: ReadOnlyReason? = null,
+    /** On the master calendar with no person tags at all: added from a phone (hand-off "untagged"). */
+    val untagged: Boolean = false,
+    /** A change to it is waiting in the outbox. */
+    val syncing: Boolean = false,
+    /** A person's name, [ADDED_FROM_PHONE] or [CALENDAR_FEED]. */
+    val createdBy: String = "",
+) {
+    val editable: Boolean get() = readOnlyReason == null
+}
+
+/** The detail sheet's model: the event plus its "When" row. */
+data class EventDetailUi(val event: EventUi, val whenLabel: String)
 
 data class DayUi(val date: LocalDate, val events: List<EventUi>)
 
@@ -40,6 +61,23 @@ data class SyncStatusUi(
     val needsSignIn: List<String>,
     val connectionLabels: List<String>,
     val failingBeforeFirstSync: Boolean,
+)
+
+/** Hand-off §7 chip and row badges, in the order they show. */
+enum class Badge(val icon: String, val description: String) {
+    Syncing("cloud_upload", "Syncing"),
+    OtherCalendar("lock", "Read-only calendar"),
+    Repeats("repeat", "Repeats"),
+}
+
+/** `cloud_upload` first, then `lock` (another calendar) or `repeat` (recurring). */
+fun EventUi.badges(): List<Badge> = listOfNotNull(
+    Badge.Syncing.takeIf { syncing },
+    when {
+        readOnlyReason == ReadOnlyReason.OtherCalendar -> Badge.OtherCalendar
+        recurring -> Badge.Repeats
+        else -> null
+    },
 )
 
 fun syncedLabel(lastSyncMillis: Long?, nowMillis: Long, connectionLabel: String? = null): String {
@@ -71,6 +109,40 @@ fun resolvePerson(forPerson: String?, sourcePerson: PersonId, people: Map<Person
     forPerson?.let { people[PersonId(it)] } ?: people[sourcePerson] ?: Person.Family
 
 private val HOURS_MINUTES = DateTimeFormatter.ofPattern("HH:mm")
+// ENGLISH, not UK: JDK 17's CLDR data gives "Sept" for Locale.UK, and Android versions differ.
+private val SHORT_DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
+
+/** An event ending at exactly midnight ends on the day before. */
+private fun lastDayOf(from: ZonedDateTime, to: ZonedDateTime): LocalDate {
+    val endsAtMidnight = to.toLocalTime() == LocalTime.MIDNIGHT
+    return if (endsAtMidnight && to.toLocalDate().isAfter(from.toLocalDate())) to.toLocalDate().minusDays(1) else to.toLocalDate()
+}
+
+internal fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
+    today -> "Today"
+    today.plusDays(1) -> "Tomorrow"
+    today.minusDays(1) -> "Yesterday"
+    else -> date.format(SHORT_DAY)
+}
+
+/** The detail sheet's "When": "Today · 19:30–21:00", "Sat 26 Sep · All day", or the span of a longer event. */
+fun whenLabel(start: EventTime, end: EventTime, zone: ZoneId, today: LocalDate): String {
+    if (start is EventTime.AllDay && end is EventTime.AllDay) {
+        val last = maxOf(start.date, end.date.minusDays(1))
+        return if (last == start.date) {
+            "${dayLabel(start.date, today)} · $ALL_DAY_LABEL"
+        } else {
+            "${dayLabel(start.date, today)} – ${dayLabel(last, today)} · $ALL_DAY_LABEL"
+        }
+    }
+    val from = start.instantIn(zone).atZone(zone)
+    val to = end.instantIn(zone).atZone(zone)
+    return if (lastDayOf(from, to) == from.toLocalDate()) {
+        "${dayLabel(from.toLocalDate(), today)} · ${from.format(HOURS_MINUTES)}–${to.format(HOURS_MINUTES)}"
+    } else {
+        "${dayLabel(from.toLocalDate(), today)} ${from.format(HOURS_MINUTES)} – ${dayLabel(to.toLocalDate(), today)} ${to.format(HOURS_MINUTES)}"
+    }
+}
 
 private class Slice(val timeLabel: String, val startLabel: String, val allDay: Boolean)
 
@@ -80,8 +152,7 @@ private fun StoredEvent.sliceOn(date: LocalDate, zone: ZoneId): Slice {
     val from = start.instantIn(zone).atZone(zone)
     val to = end.instantIn(zone).atZone(zone)
     val endsAtMidnight = to.toLocalTime() == LocalTime.MIDNIGHT
-    // An event ending at exactly midnight ends on the day before.
-    val lastDay = if (endsAtMidnight && to.toLocalDate().isAfter(from.toLocalDate())) to.toLocalDate().minusDays(1) else to.toLocalDate()
+    val lastDay = lastDayOf(from, to)
     val startClock = from.format(HOURS_MINUTES)
     val endClock = to.format(HOURS_MINUTES)
     return when {
@@ -92,10 +163,36 @@ private fun StoredEvent.sliceOn(date: LocalDate, zone: ZoneId): Slice {
     }
 }
 
-internal fun StoredEvent.toUi(date: LocalDate, zone: ZoneId, people: Map<PersonId, Person>): EventUi {
+/** Sources, connection labels and which providers can write: what the UI needs beyond the event row. */
+internal class SourceCatalog(sources: List<StoredSource>, connections: List<StoredConnection>, private val writerIds: Set<String>) {
+    private val sources = sources.associateBy { it.connectionId to it.source.id }
+    private val connections = connections.associate { it.connection.id to it.connection }
+
+    fun source(connectionId: String, sourceId: String): StoredSource? = sources[connectionId to sourceId]
+
+    fun label(connectionId: String): String = connections[connectionId]?.label.orEmpty()
+
+    fun hasWriter(connectionId: String): Boolean = connections[connectionId]?.providerId in writerIds
+}
+
+/** Only the master calendar carries the tablet's tags; any other calendar's events come from its feed. */
+internal fun createdByLabel(createdBy: String?, source: StoredSource?, people: Map<PersonId, Person>): String = when {
+    source == null || !source.isMaster -> CALENDAR_FEED
+    createdBy == null -> ADDED_FROM_PHONE
+    else -> people[PersonId(createdBy)]?.name ?: ADDED_FROM_PHONE
+}
+
+internal fun StoredEvent.toUi(
+    date: LocalDate,
+    zone: ZoneId,
+    people: Map<PersonId, Person>,
+    catalog: SourceCatalog,
+    syncing: Boolean = false,
+): EventUi {
     val slice = sliceOn(date, zone)
+    val source = catalog.source(connectionId, sourceId)
     return EventUi(
-        key = "$connectionId/$sourceId/$remoteId",
+        ref = ref,
         title = title,
         timeLabel = slice.timeLabel,
         startLabel = slice.startLabel,
@@ -103,5 +200,11 @@ internal fun StoredEvent.toUi(date: LocalDate, zone: ZoneId, people: Map<PersonI
         allDay = slice.allDay,
         recurring = recurring,
         startSort = startSort,
+        sourceName = source?.source?.name.orEmpty(),
+        connectionLabel = catalog.label(connectionId),
+        readOnlyReason = readOnlyReason(this, source, catalog.hasWriter(connectionId)),
+        untagged = source?.isMaster == true && source.source.writable && forPerson == null && createdBy == null,
+        syncing = syncing,
+        createdBy = createdByLabel(createdBy, source, people),
     )
 }

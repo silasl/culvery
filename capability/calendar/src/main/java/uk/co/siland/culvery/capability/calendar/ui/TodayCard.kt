@@ -48,7 +48,7 @@ fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier) {
                 verticalArrangement = Arrangement.spacedBy(CalendarDimens.todayRowGap),
                 modifier = Modifier.fillMaxWidth().weight(1f),
             ) {
-                items(events, key = { it.key }) { TodayRow(it) }
+                items(events, key = { it.ref.listKey }) { TodayRow(it) }
             }
         }
     }

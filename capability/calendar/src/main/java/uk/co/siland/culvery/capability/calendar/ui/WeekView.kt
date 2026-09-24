@@ -126,7 +126,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, modifier: Modifier) {
             verticalArrangement = Arrangement.spacedBy(CalendarDimens.columnGap),
             modifier = Modifier.fillMaxWidth().weight(1f),
         ) {
-            items(day.events, key = { it.key }) { EventChip(it) }
+            items(day.events, key = { it.ref.listKey }) { EventChip(it) }
         }
     }
 }

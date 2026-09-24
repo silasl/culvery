@@ -29,7 +29,7 @@ class CalendarCapabilityTest {
         store = CalendarStore(calendar)
         val household = HouseholdRepository(householdDb)
         val zone = HouseholdZone(household)
-        capability = CalendarCapability(CalendarRepository(store, household, zone), zone, WallClock { 0L })
+        capability = CalendarCapability(CalendarRepository(store, household, zone, emptySet(), emptySet()), zone, WallClock { 0L })
     }
 
     @After

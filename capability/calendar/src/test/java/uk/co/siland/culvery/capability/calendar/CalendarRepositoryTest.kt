@@ -41,7 +41,7 @@ class CalendarRepositoryTest {
         householdDb = householdDb()
         store = CalendarStore(calendar)
         household = HouseholdRepository(householdDb)
-        repo = CalendarRepository(store, household, HouseholdZone(household))
+        repo = CalendarRepository(store, household, HouseholdZone(household), emptySet(), setOf(ScriptedWriter("calendar.test")))
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
         sam = household.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
@@ -50,6 +50,7 @@ class CalendarRepositoryTest {
             listOf(CalendarSource("s-alex", "Alex", writable = false), CalendarSource("s-family", "Family", writable = false)),
             mapOf("s-alex" to SourceMapping(alex.id, visible = true)),
         )
+        store.setMaster("c1", "s-family")
     }
 
     @After
@@ -211,7 +212,7 @@ class CalendarRepositoryTest {
     fun hasConnectionsFollowsTheStore() = runTest {
         val emptyDb = calendarDb()
         val emptyStore = CalendarStore(emptyDb)
-        val emptyRepo = CalendarRepository(emptyStore, household, HouseholdZone(household))
+        val emptyRepo = CalendarRepository(emptyStore, household, HouseholdZone(household), emptySet(), emptySet())
         assertThat(emptyRepo.hasConnections.first()).isFalse()
         emptyStore.addConnection(Connection("c9", "calendar.test", "Other", emptyMap()), emptyList(), emptyMap())
         assertThat(emptyRepo.hasConnections.first()).isTrue()
@@ -240,5 +241,169 @@ class CalendarRepositoryTest {
         assertThat(status.lastSyncMillis).isEqualTo(5_000L)
         assertThat(status.failingBeforeFirstSync).isTrue()
         assertThat(status.isStaleAt(5_000L)).isTrue()
+    }
+
+    private fun ref(id: String, source: String = "s-family") = EventRef("c1", source, id)
+
+    private suspend fun queue(kind: ChangeKind, remoteId: String?, draft: EventDraft? = null, source: String = "s-family"): Long =
+        store.enqueue(PendingChange(0, "c1", source, remoteId, kind, draft, attempts = 1, nextAttemptMillis = 0, createdMillis = 0))
+
+    private suspend fun today() = repo.day(sept(23)).first()
+
+    @Test
+    fun eventsCarryTheirRefSourceAndConnection() = runTest {
+        put("s-family", timed("Boiler service", 23, 10, 0, 60))
+        val e = today().single()
+        assertThat(e.ref).isEqualTo(ref("Boiler service"))
+        assertThat(e.sourceName).isEqualTo("Family")
+        assertThat(e.connectionLabel).isEqualTo("Google")
+    }
+
+    @Test
+    fun masterEventsAreEditableAndOthersSayWhy() = runTest {
+        put("s-family", timed("Boiler service", 23, 10, 0, 60), timed("Swimming", 23, 16, 0, 60).copy(recurring = true))
+        put("s-alex", timed("Dinner", 23, 19, 0, 60), timed("Gym", 23, 7, 0, 60).copy(recurring = true))
+        val byTitle = today().associateBy { it.title }
+        assertThat(byTitle.getValue("Boiler service").readOnlyReason).isNull()
+        assertThat(byTitle.getValue("Boiler service").editable).isTrue()
+        assertThat(byTitle.getValue("Swimming").readOnlyReason).isEqualTo(ReadOnlyReason.Recurring)
+        assertThat(byTitle.getValue("Dinner").readOnlyReason).isEqualTo(ReadOnlyReason.OtherCalendar)
+        assertThat(byTitle.getValue("Gym").readOnlyReason).isEqualTo(ReadOnlyReason.OtherCalendar)
+    }
+
+    @Test
+    fun aMasterWhoseProviderHasNoWriterIsReadOnly() = runTest {
+        val noWriter = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet())
+        put("s-family", timed("Boiler service", 23, 10, 0, 60))
+        assertThat(noWriter.day(sept(23)).first().single().readOnlyReason).isEqualTo(ReadOnlyReason.OtherCalendar)
+    }
+
+    @Test
+    fun createdByNamesThePersonThePhoneOrTheFeed() = runTest {
+        put(
+            "s-family",
+            timed("Dinner with Jo & Priya", 23, 19, 30, 90).copy(createdBy = alex.id.value),
+            timed("Plumber quote call", 23, 13, 0, 30),
+        )
+        put("s-alex", timed("Gym", 23, 7, 0, 60))
+        val byTitle = today().associateBy { it.title }
+        assertThat(byTitle.getValue("Dinner with Jo & Priya").createdBy).isEqualTo("Alex")
+        assertThat(byTitle.getValue("Plumber quote call").createdBy).isEqualTo(ADDED_FROM_PHONE)
+        assertThat(byTitle.getValue("Gym").createdBy).isEqualTo(CALENDAR_FEED)
+    }
+
+    @Test
+    fun untaggedMeansAMasterEventWithNoTagsAtAll() = runTest {
+        put(
+            "s-family",
+            timed("Plumber quote call", 23, 13, 0, 30),
+            timed("Assigned", 23, 14, 0, 30, forPerson = sam.id.value),
+        )
+        put("s-alex", timed("Gym", 23, 7, 0, 60))
+        val byTitle = today().associateBy { it.title }
+        assertThat(byTitle.getValue("Plumber quote call").untagged).isTrue()
+        assertThat(byTitle.getValue("Assigned").untagged).isFalse()
+        assertThat(byTitle.getValue("Gym").untagged).isFalse()
+    }
+
+    @Test
+    fun aQueuedDeleteIsHidden() = runTest {
+        put("s-family", timed("Boiler service", 23, 10, 0, 60))
+        queue(ChangeKind.DELETE, "Boiler service")
+        assertThat(today()).isEmpty()
+        assertThat(store.eventNow(ref("Boiler service"))).isNotNull()
+    }
+
+    @Test
+    fun aRejectedQueuedDeleteBringsTheEventBack() = runTest {
+        put("s-family", timed("Boiler service", 23, 10, 0, 60))
+        val id = queue(ChangeKind.DELETE, "Boiler service")
+        assertThat(today()).isEmpty()
+        // What the drain does when the provider refuses the delete.
+        store.dropChange(id)
+        assertThat(today().map { it.title to it.syncing }).containsExactly("Boiler service" to false)
+    }
+
+    @Test
+    fun pendingDeleteStaysHiddenAfterAFullReplaceSync() = runTest {
+        put("s-family", timed("Boiler service", 23, 10, 0, 60))
+        queue(ChangeKind.DELETE, "Boiler service")
+        put("s-family", timed("Boiler service", 23, 10, 0, 60), timed("Walk", 23, 12, 0, 30))
+        assertThat(today().map { it.title }).containsExactly("Walk")
+    }
+
+    @Test
+    fun pendingAssignShowsTheNewPersonAsSyncingAfterAFullReplaceSync() = runTest {
+        val original = timed("Plumber quote call", 23, 13, 0, 30)
+        put("s-family", original)
+        queue(
+            ChangeKind.ASSIGN,
+            "Plumber quote call",
+            EventDraft(original.title, original.start, original.end, forPerson = sam.id.value, createdBy = null),
+        )
+        assertThat(today().single().let { it.person.name to it.syncing }).isEqualTo("Sam" to true)
+        put("s-family", original)
+        assertThat(today().single().let { it.person.name to it.syncing }).isEqualTo("Sam" to true)
+        assertThat(today().single().untagged).isFalse()
+    }
+
+    @Test
+    fun aQueuedCreateShowsAsSyncing() = runTest {
+        val slot = timed("Sleepover", 23, 18, 0, 60)
+        val id = queue(ChangeKind.CREATE, null, EventDraft("Sleepover", slot.start, slot.end, forPerson = sam.id.value, createdBy = sam.id.value))
+        val e = today().single()
+        assertThat(listOf(e.title, e.person.name)).containsExactly("Sleepover", "Sam").inOrder()
+        assertThat(e.syncing).isTrue()
+        assertThat(e.ref).isEqualTo(ref("pending-$id"))
+    }
+
+    @Test
+    fun detailHasTheWhenLabelAndFollowsTheOutbox() = runTest {
+        put("s-family", timed("Dinner with Jo & Priya", 23, 19, 30, 90).copy(createdBy = alex.id.value))
+        val detail = repo.event(ref("Dinner with Jo & Priya"), today = sept(23)).first()!!
+        assertThat(detail.whenLabel).isEqualTo("Today · 19:30–21:00")
+        assertThat(detail.event.createdBy).isEqualTo("Alex")
+        assertThat(detail.event.editable).isTrue()
+        queue(ChangeKind.DELETE, "Dinner with Jo & Priya")
+        assertThat(repo.event(ref("Dinner with Jo & Priya"), today = sept(23)).first()).isNull()
+    }
+
+    @Test
+    fun detailShowsAQueuedAssignAsSyncing() = runTest {
+        val original = timed("Plumber quote call", 23, 13, 0, 30)
+        put("s-family", original)
+        queue(ChangeKind.ASSIGN, original.remoteId, EventDraft(original.title, original.start, original.end, sam.id.value, null))
+        val detail = repo.event(ref(original.remoteId), today = sept(23)).first()!!
+        assertThat(detail.event.syncing).isTrue()
+        assertThat(detail.event.person.name).isEqualTo("Sam")
+    }
+
+    @Test
+    fun detailOfAMissingEventIsNull() = runTest {
+        assertThat(repo.event(ref("nope"), today = sept(23)).first()).isNull()
+    }
+
+    @Test
+    fun anEventEndingAtMidnightStaysOnItsOwnDay() = runTest {
+        put("s-alex", timed("Late film", 23, 22, 0, 120))
+        assertThat(titlesAndLabels(sept(23), 2)).containsExactly(
+            listOf("Late film 22:00–00:00"),
+            emptyList<String>(),
+        ).inOrder()
+    }
+
+    @Test
+    fun anEventEndingAtMidnightTwoDaysOnReadsFromThenAllDay() = runTest {
+        put("s-alex", timed("Festival", 23, 22, 0, 26 * 60L))
+        assertThat(titlesAndLabels(sept(23), 3)).containsExactly(
+            listOf("Festival 22:00–"),
+            listOf("Festival All day"),
+            emptyList<String>(),
+        ).inOrder()
+    }
+
+    @Test
+    fun peopleListsTheHousehold() = runTest {
+        assertThat(repo.people.first().map { it.name }).containsExactly("Alex", "Sam").inOrder()
     }
 }

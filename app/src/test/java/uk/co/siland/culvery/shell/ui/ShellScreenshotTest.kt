@@ -16,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.DayUi
+import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ui.ComingUpCard
 import uk.co.siland.culvery.capability.calendar.ui.TodayCard
@@ -51,11 +52,13 @@ class ShellScreenshotTest {
     private val sam = Person(PersonId("sam"), "Sam", 0xFF5B9BE0)
     private val mia = Person(PersonId("mia"), "Mia", 0xFFE07BA8)
 
-    private fun event(title: String, time: String, person: Person, recurring: Boolean = false) =
-        EventUi(title, title, time, time.substringBefore('–'), person, allDay = false, recurring = recurring, startSort = 0)
+    private fun event(title: String, time: String, person: Person, recurring: Boolean = false) = EventUi(
+        EventRef("sample", "family", title), title, time, time.substringBefore('–'), person,
+        allDay = false, recurring = recurring, startSort = 0,
+    )
 
     private fun allDay(title: String, person: Person, recurring: Boolean = false) =
-        EventUi(title, title, "All day", "All day", person, allDay = true, recurring = recurring, startSort = 0)
+        EventUi(EventRef("sample", "family", title), title, "All day", "All day", person, allDay = true, recurring = recurring, startSort = 0)
 
     private val today = listOf(
         event("School run", "07:45–08:30", sam),

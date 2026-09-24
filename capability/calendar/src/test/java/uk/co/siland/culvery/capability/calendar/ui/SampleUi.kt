@@ -4,7 +4,9 @@ import java.time.Instant
 import java.time.LocalDate
 import uk.co.siland.culvery.capability.calendar.ALL_DAY_LABEL
 import uk.co.siland.culvery.capability.calendar.DayUi
+import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
+import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
 import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -20,11 +22,17 @@ object SampleUi {
     val family = Person.Family
     val people = listOf(alex, sam, mia, family)
 
-    fun event(title: String, time: String, person: Person, recurring: Boolean = false) =
-        EventUi(title, title, time, time.substringBefore('–'), person, allDay = false, recurring = recurring, startSort = 0)
+    fun event(title: String, time: String, person: Person, recurring: Boolean = false) = EventUi(
+        EventRef("sample", "family", title), title, time, time.substringBefore('–'), person,
+        allDay = false, recurring = recurring, startSort = 0,
+        readOnlyReason = if (recurring) ReadOnlyReason.Recurring else null,
+    )
 
-    fun allDay(title: String, person: Person, recurring: Boolean = false) =
-        EventUi(title, title, ALL_DAY_LABEL, ALL_DAY_LABEL, person, allDay = true, recurring = recurring, startSort = 0)
+    fun allDay(title: String, person: Person, recurring: Boolean = false) = EventUi(
+        EventRef("sample", "family", title), title, ALL_DAY_LABEL, ALL_DAY_LABEL, person,
+        allDay = true, recurring = recurring, startSort = 0,
+        readOnlyReason = if (recurring) ReadOnlyReason.Recurring else null,
+    )
 
     private fun day(offset: Long, vararg events: EventUi) = DayUi(TODAY.plusDays(offset), events.toList())
 

@@ -59,7 +59,7 @@ class CardHostsMidnightRolloverTest {
         val store = CalendarStore(calendar)
         val household = HouseholdRepository(householdDb)
         zone = HouseholdZone(household)
-        repo = CalendarRepository(store, household, zone)
+        repo = CalendarRepository(store, household, zone, emptySet(), emptySet())
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         store.addConnection(
             Connection("c1", "calendar.test", "Google", emptyMap()),
