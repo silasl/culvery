@@ -5,8 +5,16 @@ import com.google.common.truth.Truth.assertThat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -14,6 +22,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
+import uk.co.siland.culvery.capability.calendar.db.OutboxEntity
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.PersonId
@@ -23,6 +32,7 @@ import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.WallClock
 
 // Robolectric for Room and for android.util.Log (the engine logs timeouts).
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class CalendarSyncTest {
     private lateinit var calendar: CalendarDatabase
@@ -229,5 +239,272 @@ class CalendarSyncTest {
         a.failWith = CancellationException("provider cancelled its own job")
         engine().syncAll()
         assertThat(health("c1")).isEqualTo(ConnectionHealth.Unreachable)
+    }
+
+    private val w = ScriptedWriter("calendar.a")
+    private val toaster = RecordingToaster()
+
+    private suspend fun writingEngine(io: CoroutineContext = EmptyCoroutineContext, timeoutMillis: Long = 1_000): CalendarSync {
+        household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
+        return CalendarSync(
+            store, setOf(a, b), HouseholdZone(household), clock, io, timeoutMillis,
+            writers = setOf(w), toaster = toaster,
+        )
+    }
+
+    private fun swimDraft(forPerson: String?) = EventDraft("Swim", swim().start, swim().end, forPerson, "alex-id")
+
+    private suspend fun queue(
+        kind: ChangeKind,
+        remoteId: String? = "swim",
+        draft: EventDraft? = swimDraft("sam-id"),
+        attempts: Int = 1,
+        sourceId: String = "s1",
+        next: Instant = now,
+        created: Instant = now,
+    ): Long = store.enqueue(PendingChange(0, "c1", sourceId, remoteId, kind, draft, attempts, next.toEpochMilli(), created.toEpochMilli()))
+
+    @Test
+    fun drainDeliversADueDeleteAndCompletesIt() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = writingEngine()
+        sync.syncAll()
+        queue(ChangeKind.DELETE, draft = null)
+        a.events = { emptyList() }
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("delete:swim")
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(cachedTitles()).isEmpty()
+    }
+
+    @Test
+    fun drainAppliesAnAcceptedUpdateEvenWhenTheReadFails() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = writingEngine()
+        sync.syncAll()
+        queue(ChangeKind.UPDATE)
+        a.failWith = UnreachableException("reads are down")
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("update:swim")
+        assertThat(store.eventNow(EventRef("c1", "s1", "swim"))!!.forPerson).isEqualTo("sam-id")
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
+    @Test
+    fun drainDeliversACreateAndMirrorsIt() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"))
+        a.failWith = UnreachableException("reads are down")
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("create:Swim")
+        assertThat(store.eventNow(EventRef("c1", "s1", "new-1"))!!.forPerson).isEqualTo("mia-id")
+    }
+
+    @Test
+    fun queuedChangesDrainInTheOrderTheyWereMade() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.UPDATE)
+        queue(ChangeKind.DELETE, draft = null)
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("update:swim", "delete:swim").inOrder()
+    }
+
+    @Test
+    fun aLaterChangeWaitsForAnEarlierOneInBackoff() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.UPDATE, next = now.plusSeconds(30))
+        queue(ChangeKind.DELETE, draft = null)
+        sync.syncAll()
+        assertThat(w.calls).isEmpty()
+        assertThat(store.pendingNow()).hasSize(2)
+        now = now.plusSeconds(30)
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("update:swim", "delete:swim").inOrder()
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
+    @Test
+    fun aQueuedAssignIsAppliedToTheEventAsItIsNow() = runTest {
+        connect("c1", "calendar.a", s1)
+        // Renamed on a phone after the assign was queued with the old title.
+        a.events = { listOf(swim().copy(title = "Swim club")) }
+        val sync = writingEngine()
+        sync.syncAll()
+        queue(ChangeKind.ASSIGN, draft = swimDraft("sam-id"))
+        a.failWith = UnreachableException("reads are down")
+        sync.syncAll()
+        val sent = w.drafts.single()
+        assertThat(listOf(sent.title, sent.forPerson)).containsExactly("Swim club", "sam-id").inOrder()
+        assertThat(store.eventNow(EventRef("c1", "s1", "swim"))!!.let { it.title to it.forPerson }).isEqualTo("Swim club" to "sam-id")
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
+    @Test
+    fun aQueuedAssignForAnEventThatIsGoneIsDroppedWithAToast() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.ASSIGN)
+        sync.syncAll()
+        assertThat(w.calls).isEmpty()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't save to C1 — The event no longer exists")
+    }
+
+    @Test
+    fun drainRejectionDropsTheChangeAndToastsWhy() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = writingEngine()
+        sync.syncAll()
+        queue(ChangeKind.DELETE, draft = null)
+        w.failWith = WriteRejectedException("Event is locked")
+        sync.syncAll()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(cachedTitles()).containsExactly("Swim")
+        assertThat(toaster.messages).containsExactly("Couldn't save to C1 — Event is locked")
+    }
+
+    @Test
+    fun severalRejectionsInOnePassMakeOneToast() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, remoteId = "swim", draft = null)
+        queue(ChangeKind.DELETE, remoteId = "walk", draft = null)
+        w.failWith = WriteRejectedException("Event is locked")
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("delete:swim", "delete:walk").inOrder()
+        assertThat(toaster.messages).containsExactly("Couldn't save 2 changes to C1")
+    }
+
+    @Test
+    fun anUnreachableDrainRetriesWithBackoff() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, draft = null, attempts = 1)
+        w.failWith = UnreachableException("offline")
+        sync.syncAll()
+        assertThat(store.pendingNow().single().let { it.attempts to it.nextAttemptMillis })
+            .isEqualTo(2 to now.toEpochMilli() + 60_000)
+        sync.syncAll()
+        assertThat(w.calls).hasSize(1)
+        now = now.plusSeconds(60)
+        sync.syncAll()
+        assertThat(w.calls).hasSize(2)
+        assertThat(store.pendingNow().single().let { it.attempts to it.nextAttemptMillis })
+            .isEqualTo(3 to now.toEpochMilli() + 120_000)
+    }
+
+    @Test
+    fun anUnreachableConnectionIsNotTriedAgainInThePass() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, remoteId = "swim", draft = null, attempts = 1)
+        queue(ChangeKind.DELETE, remoteId = "walk", draft = null, attempts = 1)
+        w.failWith = UnreachableException("offline")
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("delete:swim")
+        assertThat(store.pendingNow().map { it.attempts to it.nextAttemptMillis })
+            .containsExactly(2 to now.toEpochMilli() + 60_000, 2 to now.toEpochMilli() + 60_000)
+    }
+
+    @Test
+    fun backoffIsThirtySecondsOneMinuteTwoMinutesThenFive() {
+        assertThat((1..6).map(::backoffMillis))
+            .containsExactly(30_000L, 60_000L, 120_000L, 300_000L, 300_000L, 300_000L).inOrder()
+    }
+
+    @Test
+    fun needsSignInRetriesWithTheNormalBackoff() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, draft = null, attempts = 1)
+        w.failWith = NeedsSignInException("expired")
+        a.failWith = NeedsSignInException("expired")
+        sync.syncAll()
+        // The pass's own read flags the connection; the failed write only reschedules.
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.NeedsSignIn)
+        assertThat(store.pendingNow().single().let { it.attempts to it.nextAttemptMillis })
+            .isEqualTo(2 to now.toEpochMilli() + 60_000)
+        now = now.plusSeconds(60)
+        sync.syncAll()
+        assertThat(w.calls).hasSize(2)
+    }
+
+    @Test
+    fun aChangeUnsentForTwoDaysIsDroppedWithAToast() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, draft = null, created = now.minusMillis(OUTBOX_MAX_AGE_MS + 1))
+        sync.syncAll()
+        assertThat(w.calls).isEmpty()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't save to C1")
+    }
+
+    @Test
+    fun aChangeWithNowhereToGoIsDroppedWithAToast() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, draft = null, sourceId = "gone")
+        sync.syncAll()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(w.calls).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't save to C1")
+    }
+
+    @Test
+    fun anUnreadableQueuedRowIsDroppedAndTheSyncStillRuns() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = writingEngine()
+        calendar.calendarDao().insertOutbox(
+            OutboxEntity(
+                connectionId = "c1", sourceId = "s1", remoteId = "swim", kind = "BOGUS", draftJson = null,
+                attempts = 0, nextAttemptMillis = 0, createdMillis = 0,
+            ),
+        )
+        sync.syncAll()
+        assertThat(cachedTitles()).containsExactly("Swim")
+        assertThat(calendar.calendarDao().outboxNow()).isEmpty()
+    }
+
+    @Test
+    fun aPassWaitsForTheOneBeforeIt() = runTest {
+        connect("c1", "calendar.a", s1)
+        // Real threads and a real timeout: runTest must not skip virtual time past the held-up pass.
+        val sync = writingEngine(io = Dispatchers.Default, timeoutMillis = PROVIDER_TIMEOUT_MS)
+        a.gate = CompletableDeferred()
+        val first = launch { sync.syncAll() }
+        a.entered.await()
+        val second = launch { sync.syncAll() }
+        // Real time for the second pass to reach the provider, if nothing held it back.
+        withContext(Dispatchers.Default) { delay(200) }
+        assertThat(a.calls).hasSize(1)
+        a.gate?.complete(Unit)
+        first.join()
+        second.join()
+        assertThat(a.calls).hasSize(2)
+        assertThat(a.maxInFlight).isEqualTo(1)
+    }
+
+    @Test
+    fun realCancellationPropagatesAndLeavesTheConnectionAlone() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.hang = true
+        val sync = engine()
+        val job = launch { sync.syncAll() }
+        a.entered.await()
+        job.cancelAndJoin()
+        assertThat(job.isCancelled).isTrue()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
+        assertThat(store.connectionsNow().single().lastSyncMillis).isNull()
+        a.hang = false
+        sync.syncAll()
+        assertThat(store.connectionsNow().single().lastSyncMillis).isEqualTo(now.toEpochMilli())
     }
 }

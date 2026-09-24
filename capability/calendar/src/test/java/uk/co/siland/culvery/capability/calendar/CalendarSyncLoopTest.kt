@@ -3,8 +3,12 @@ package uk.co.siland.culvery.capability.calendar
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -80,5 +84,108 @@ class CalendarSyncLoopTest {
         advanceTimeBy(SYNC_INTERVAL_MS)
         runCurrent()
         assertThat(count).isEqualTo(2)
+    }
+
+    @Test
+    fun requestSyncRunsAPassNow() = runTest {
+        var count = 0
+        val loop = CalendarSyncLoop({ count++ }, MutableStateFlow(listOf("c1")), backgroundScope)
+        loop.start()
+        runCurrent()
+        loop.requestSync()
+        runCurrent()
+        assertThat(count).isEqualTo(2)
+    }
+
+    @Test
+    fun requestsDuringAPassCoalesceIntoOneMorePass() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        var count = 0
+        val loop = CalendarSyncLoop({ count++; if (count == 1) gate.await() }, MutableStateFlow(listOf("c1")), backgroundScope)
+        loop.start()
+        runCurrent()
+        repeat(3) { loop.requestSync() }
+        runCurrent()
+        assertThat(count).isEqualTo(1)
+        gate.complete(Unit)
+        runCurrent()
+        assertThat(count).isEqualTo(2)
+        advanceTimeBy(SYNC_INTERVAL_MS - 1)
+        runCurrent()
+        assertThat(count).isEqualTo(2)
+    }
+
+    @Test
+    fun aConnectionAddedMidPassGetsAPassOfItsOwnWithoutCancellingTheRunningOne() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        var started = 0
+        var finished = 0
+        val ids = MutableStateFlow(listOf("c1"))
+        val syncAll: suspend () -> Unit = {
+            started++
+            if (started == 1) gate.await()
+            finished++
+        }
+        CalendarSyncLoop(syncAll, ids, backgroundScope).start()
+        runCurrent()
+        ids.value = listOf("c1", "c2")
+        runCurrent()
+        assertThat(started).isEqualTo(1)
+        gate.complete(Unit)
+        runCurrent()
+        assertThat(started).isEqualTo(2)
+        assertThat(finished).isEqualTo(2)
+    }
+
+    @Test
+    fun aDueRetryWakesTheLoopBeforeTheFiveMinuteTick() = runTest {
+        var count = 0
+        CalendarSyncLoop({ count++ }, MutableStateFlow(listOf("c1")), backgroundScope, untilNextRetry = { 30_000L }).start()
+        runCurrent()
+        advanceTimeBy(30_000)
+        runCurrent()
+        assertThat(count).isEqualTo(2)
+    }
+
+    @Test
+    fun anOverdueRetryStillWaitsASecond() = runTest {
+        var count = 0
+        CalendarSyncLoop({ count++ }, MutableStateFlow(listOf("c1")), backgroundScope, untilNextRetry = { -5_000L }).start()
+        runCurrent()
+        advanceTimeBy(999)
+        runCurrent()
+        assertThat(count).isEqualTo(1)
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(count).isEqualTo(2)
+    }
+
+    @Test
+    fun cancellingTheScopeStopsTheLoopMidPass() = runTest {
+        val loopScope = CoroutineScope(backgroundScope.coroutineContext + Job(backgroundScope.coroutineContext[Job]))
+        val entered = CompletableDeferred<Unit>()
+        var started = 0
+        var retryReads = 0
+        var sawCancellation = false
+        val syncAll: suspend () -> Unit = {
+            started++
+            entered.complete(Unit)
+            try {
+                awaitCancellation()
+            } catch (e: CancellationException) {
+                sawCancellation = true
+                throw e
+            }
+        }
+        CalendarSyncLoop(syncAll, MutableStateFlow(listOf("c1")), loopScope, untilNextRetry = { retryReads++; null }).start()
+        entered.await()
+        loopScope.cancel()
+        runCurrent()
+        assertThat(sawCancellation).isTrue()
+        advanceTimeBy(SYNC_INTERVAL_MS * 2)
+        runCurrent()
+        assertThat(started).isEqualTo(1)
+        // A cancelled loop never goes on to read the outbox for its next wait.
+        assertThat(retryReads).isEqualTo(0)
     }
 }

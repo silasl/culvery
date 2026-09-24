@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.withTimeout
@@ -14,15 +15,26 @@ internal data class SyncCall(val connectionId: String, val sourceId: String, val
 internal class ScriptedProvider(
     id: String,
     var sourceList: List<CalendarSource> = emptyList(),
+    features: Set<Feature> = setOf(Feature.READ),
 ) : CalendarProvider {
-    override val descriptor = ProviderDescriptor(id, id, "event", setOf(Feature.READ))
+    override val descriptor = ProviderDescriptor(id, id, "event", features)
     val calls = mutableListOf<SyncCall>()
     var failWith: Throwable? = null
     /** Per-source failures, by source id; they win over [failWith]. */
     var failFor: Map<String, Throwable> = emptyMap()
     /** Never returns, like a stalled socket. */
     var hang = false
+    /** When set, sync waits for it: a slow network the test releases. */
+    var gate: CompletableDeferred<Unit>? = null
+    /** Completes when the first sync call starts. */
+    val entered = CompletableDeferred<Unit>()
     var events: (CalendarSource) -> List<RemoteEvent> = { emptyList() }
+
+    private var inFlight = 0
+
+    /** The most sync calls that were running at once. */
+    var maxInFlight = 0
+        private set
 
     @Composable
     override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
@@ -31,10 +43,21 @@ internal class ScriptedProvider(
     override suspend fun sources(conn: Connection): List<CalendarSource> = sourceList
 
     override suspend fun sync(conn: Connection, source: CalendarSource, range: DateRange, cursor: SyncCursor?): SyncResult {
-        calls += SyncCall(conn.id, source.id, range, cursor)
-        if (hang) awaitCancellation()
-        (failFor[source.id] ?: failWith)?.let { throw it }
-        return SyncResult(events(source), emptyList(), SyncCursor("k${calls.size}"), fullReplace = cursor == null)
+        // Some tests run the engine on Dispatchers.Default, so the bookkeeping is locked.
+        synchronized(this) {
+            calls += SyncCall(conn.id, source.id, range, cursor)
+            inFlight++
+            maxInFlight = maxOf(maxInFlight, inFlight)
+        }
+        entered.complete(Unit)
+        try {
+            if (hang) awaitCancellation()
+            gate?.await()
+            (failFor[source.id] ?: failWith)?.let { throw it }
+            return SyncResult(events(source), emptyList(), SyncCursor("k${calls.size}"), fullReplace = cursor == null)
+        } finally {
+            synchronized(this) { inFlight-- }
+        }
     }
 }
 
