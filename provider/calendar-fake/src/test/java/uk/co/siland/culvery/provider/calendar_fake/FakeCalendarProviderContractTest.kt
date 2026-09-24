@@ -18,7 +18,11 @@ class FakeCalendarProviderContractTest : CalendarProviderContractTest() {
     override fun provider() = fake
     override fun connection() = Connection("c1", FakeCalendarProvider.ID, "Sample calendar", emptyMap())
     override fun range() = DateRange(today.minusDays(1), today.plusDays(15), zone)
-    override fun sourceWithEvents() = CalendarSource(FakeCalendarProvider.SOURCE_MIA, "Mia", writable = false)
+    private val familyCalendar = CalendarSource(FakeCalendarProvider.SOURCE_FAMILY, "Family calendar", writable = true)
+
+    override fun sourceWithEvents() = familyCalendar
+    override fun writer() = fake
+    override fun writableSource() = familyCalendar
     override fun outOfRangeEventTitle() = "School trip"
     override fun recurringTitle() = "Piano"
     override fun simulateAuthFailure() = { fake.failNextWith(NeedsSignInException("expired")) }

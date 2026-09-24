@@ -5,13 +5,19 @@ import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import uk.co.siland.culvery.capability.calendar.DateRange
+import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.UnreachableException
+import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.instantIn
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.Feature
 
 class FakeCalendarProviderTest {
     private val zone = ZoneId.of("Europe/London")
@@ -29,10 +35,11 @@ class FakeCalendarProviderTest {
     private fun source(id: String) = FakeCalendarProvider.SOURCES.first { it.id == id }
 
     @Test
-    fun sourcesAreThePeopleFamilyAndSchoolTermsAllReadOnly() = runTest {
+    fun onlyTheFamilyCalendarIsWritable() = runTest {
         val sources = providerOn(today).sources(conn)
-        assertThat(sources.map { it.name }).containsExactly("Alex", "Sam", "Mia", "Family", "School terms").inOrder()
-        assertThat(sources.none { it.writable }).isTrue()
+        assertThat(sources.map { it.name }).containsExactly("Alex", "Sam", "Mia", "Family calendar", "School terms").inOrder()
+        assertThat(sources.filter { it.writable }.map { it.id }).containsExactly(FakeCalendarProvider.SOURCE_FAMILY)
+        assertThat(providerOn(today).descriptor.features).containsExactly(Feature.READ, Feature.WRITE)
     }
 
     @Test
@@ -44,18 +51,18 @@ class FakeCalendarProviderTest {
             .sortedBy { (_, e) -> e.start.instantIn(zone) }
             .map { (source, e) -> "${time(e.start).format(hm)}–${time(e.end).format(hm)} ${e.title} ($source)" }
         assertThat(todays).containsExactly(
-            "07:45–08:30 School run (fake-sam)",
+            "07:45–08:30 School run (fake-family)",
             "10:00–11:00 Boiler service (fake-family)",
             "13:00–13:30 Plumber quote call (fake-family)",
-            "16:00–17:00 Swimming (fake-mia)",
-            "19:30–21:00 Dinner with Jo & Priya (fake-alex)",
+            "16:00–17:00 Swimming (fake-family)",
+            "19:30–21:00 Dinner with Jo & Priya (fake-family)",
         ).inOrder()
     }
 
     @Test
-    fun pianoRepeatsWeeklyOnMiasCalendar() = runTest {
+    fun pianoRepeatsWeeklyOnTheFamilyCalendar() = runTest {
         val fake = providerOn(today)
-        val piano = fake.sync(conn, source(FakeCalendarProvider.SOURCE_MIA), windowFrom(today), null).upserts
+        val piano = fake.sync(conn, source(FakeCalendarProvider.SOURCE_FAMILY), windowFrom(today), null).upserts
             .filter { it.title == "Piano" }
         assertThat(piano.map { time(it.start).toLocalDateTime().toString() })
             .containsExactly("2026-09-26T15:30", "2026-10-03T15:30").inOrder()
@@ -65,7 +72,7 @@ class FakeCalendarProviderTest {
     @Test
     fun swimmingAndBinDayRepeatWeekly() = runTest {
         val fake = providerOn(today)
-        val swimming = fake.sync(conn, source(FakeCalendarProvider.SOURCE_MIA), windowFrom(today), null).upserts
+        val swimming = fake.sync(conn, source(FakeCalendarProvider.SOURCE_FAMILY), windowFrom(today), null).upserts
             .filter { it.title == "Swimming" }
         assertThat(swimming.map { time(it.start).toLocalDate().toString() })
             .containsExactly("2026-09-23", "2026-09-30", "2026-10-07").inOrder()
@@ -106,7 +113,7 @@ class FakeCalendarProviderTest {
 
     @Test
     fun cursorFromYesterdayGivesAFullReplace() = runTest {
-        val source = FakeCalendarProvider.SOURCES.first()
+        val source = source(FakeCalendarProvider.SOURCE_FAMILY)
         val yesterday = providerOn(today).sync(conn, source, windowFrom(today), null)
         val tomorrow = today.plusDays(1)
         val next = providerOn(tomorrow).sync(conn, source, windowFrom(tomorrow), yesterday.cursor)
@@ -122,5 +129,102 @@ class FakeCalendarProviderTest {
         val first = runCatching { fake.sources(conn) }
         assertThat(first.exceptionOrNull()).isInstanceOf(UnreachableException::class.java)
         assertThat(fake.sources(conn)).hasSize(5)
+    }
+
+    private val family get() = source(FakeCalendarProvider.SOURCE_FAMILY)
+
+    private suspend fun FakeCalendarProvider.familyEvents(): List<RemoteEvent> =
+        sync(conn, family, windowFrom(today), null).upserts
+
+    private fun draft(title: String) = EventDraft(
+        title,
+        EventTime.Timed(today.plusDays(1).atTime(18, 0).atZone(zone).toInstant()),
+        EventTime.Timed(today.plusDays(1).atTime(19, 0).atZone(zone).toInstant()),
+        forPerson = "mia-id",
+        createdBy = "sam-id",
+    )
+
+    @Test
+    fun samplesAreUntaggedExceptFamilyUntilTheSeedGivesIds() = runTest {
+        val byTitle = providerOn(today).familyEvents().associateBy { it.title }
+        assertThat(byTitle.getValue("Dinner with Jo & Priya").let { it.forPerson to it.createdBy }).isEqualTo(null to null)
+        assertThat(byTitle.getValue("Boiler service").forPerson).isEqualTo("family")
+    }
+
+    @Test
+    fun tagSamplesTagsTheWeekWithTheHouseholdsIds() = runTest {
+        val fake = providerOn(today)
+        fake.tagSamples(mapOf("Alex" to "alex-id", "Sam" to "sam-id", "Mia" to "mia-id"))
+        val byTitle = fake.familyEvents().associateBy { it.title }
+        assertThat(byTitle.getValue("Dinner with Jo & Priya").let { it.forPerson to it.createdBy }).isEqualTo("alex-id" to "alex-id")
+        assertThat(byTitle.getValue("Football").let { it.forPerson to it.createdBy }).isEqualTo("mia-id" to "mia-id")
+        assertThat(byTitle.getValue("Boiler service").let { it.forPerson to it.createdBy }).isEqualTo("family" to "alex-id")
+        assertThat(byTitle.getValue("Plumber quote call").let { it.forPerson to it.createdBy }).isEqualTo(null to null)
+    }
+
+    @Test
+    fun tagSamplesForcesAFullReplaceOnlyWhenTheIdsChange() = runTest {
+        val fake = providerOn(today)
+        val first = fake.sync(conn, family, windowFrom(today), null)
+        fake.tagSamples(mapOf("Alex" to "alex-id"))
+        val second = fake.sync(conn, family, windowFrom(today), first.cursor)
+        assertThat(second.fullReplace).isTrue()
+        fake.tagSamples(mapOf("Alex" to "alex-id"))
+        assertThat(fake.sync(conn, family, windowFrom(today), second.cursor).fullReplace).isFalse()
+    }
+
+    @Test
+    fun deletingASampleHidesItAndDeletingItAgainSucceeds() = runTest {
+        val fake = providerOn(today)
+        val boiler = fake.familyEvents().single { it.title == "Boiler service" }
+        fake.delete(conn, family, boiler.remoteId)
+        fake.delete(conn, family, boiler.remoteId)
+        assertThat(fake.familyEvents().map { it.title }).doesNotContain("Boiler service")
+    }
+
+    @Test
+    fun updatingASampleReplacesItOnTheNextSync() = runTest {
+        val fake = providerOn(today)
+        val plumber = fake.familyEvents().single { it.title == "Plumber quote call" }
+        fake.update(conn, family, plumber.remoteId, EventDraft(plumber.title, plumber.start, plumber.end, "sam-id", null))
+        assertThat(fake.familyEvents().single { it.remoteId == plumber.remoteId }.forPerson).isEqualTo("sam-id")
+    }
+
+    @Test
+    fun repeatingSamplesCannotBeChanged() = runTest {
+        val fake = providerOn(today)
+        val swim = fake.familyEvents().first { it.title == "Swimming" }
+        assertThrows(WriteRejectedException::class.java) {
+            runBlocking { fake.update(conn, family, swim.remoteId, EventDraft(swim.title, swim.start, swim.end, null, null)) }
+        }
+    }
+
+    @Test
+    fun readOnlySourcesCannotBeWritten() = runTest {
+        val fake = providerOn(today)
+        assertThrows(WriteRejectedException::class.java) {
+            runBlocking { fake.create(conn, source(FakeCalendarProvider.SOURCE_SCHOOL), draft("Sports day")) }
+        }
+    }
+
+    @Test
+    fun rejectNextWriteRejectsOnlyTheNextWrite() = runTest {
+        val fake = providerOn(today)
+        fake.rejectNextWrite("Event is locked")
+        val error = runCatching { fake.create(conn, family, draft("Sleepover")) }.exceptionOrNull()
+        assertThat(error).isInstanceOf(WriteRejectedException::class.java)
+        assertThat(error?.message).isEqualTo("Event is locked")
+        assertThat(fake.create(conn, family, draft("Sleepover")).title).isEqualTo("Sleepover")
+    }
+
+    @Test
+    fun unreachableNextWriteFailsOnlyTheNextWrite() = runTest {
+        val fake = providerOn(today)
+        fake.unreachableNextWrite()
+        assertThat(runCatching { fake.create(conn, family, draft("Sleepover")) }.exceptionOrNull())
+            .isInstanceOf(UnreachableException::class.java)
+        assertThat(fake.familyEvents().map { it.title }).doesNotContain("Sleepover")
+        fake.create(conn, family, draft("Sleepover"))
+        assertThat(fake.familyEvents().map { it.title }).contains("Sleepover")
     }
 }
