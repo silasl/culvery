@@ -17,6 +17,7 @@ dependencies {
     // PersonId and Person appear in this module's public API (SourceMapping, EventUi).
     api(project(":core:household"))
     implementation(project(":core:ui"))
+    implementation(project(":core:access"))
     testImplementation(libs.roborazzi.core)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.room.testing)

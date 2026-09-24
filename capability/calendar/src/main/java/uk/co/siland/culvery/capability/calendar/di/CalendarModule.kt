@@ -12,11 +12,13 @@ import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
 import javax.inject.Singleton
 import uk.co.siland.culvery.capability.calendar.CalendarCapability
+import uk.co.siland.culvery.capability.calendar.CalendarPermissionSource
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSyncLoop
 import uk.co.siland.culvery.capability.calendar.CalendarWriter
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_1_2
+import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
 
@@ -36,6 +38,10 @@ abstract class CalendarModule {
     @Binds
     @IntoSet
     abstract fun syncLoop(impl: CalendarSyncLoop): Startable
+
+    @Binds
+    @IntoSet
+    abstract fun permissions(impl: CalendarPermissionSource): PermissionSource
 
     companion object {
         @Provides
