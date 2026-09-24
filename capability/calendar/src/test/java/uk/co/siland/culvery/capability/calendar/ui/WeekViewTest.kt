@@ -2,6 +2,8 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -99,5 +101,21 @@ class WeekViewTest {
         show { WeekView(state()) }
         compose.onNodeWithText("needs reconnecting", substring = true).assertDoesNotExist()
         compose.onNodeWithText("need reconnecting", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun legendStaysLevelWithTheSubtitleWhetherOrNotTheReconnectChipShows() {
+        val currentSync = mutableStateOf(sync())
+        show {
+            val s by currentSync
+            WeekView(state(s))
+        }
+        val withoutChip = compose.onNodeWithTag("week_legend").fetchSemanticsNode().boundsInRoot.top
+
+        currentSync.value = sync(agoMinutes = 0, needsSignIn = listOf("Google"))
+        compose.waitForIdle()
+        val withChip = compose.onNodeWithTag("week_legend").fetchSemanticsNode().boundsInRoot.top
+
+        assertThat(withChip).isEqualTo(withoutChip)
     }
 }

@@ -64,28 +64,32 @@ fun WeekView(state: WeekViewState, modifier: Modifier = Modifier) {
     val c = Culvery.colors
     val navigator = LocalShellNavigator.current
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.weekHeaderGap), modifier = modifier.fillMaxSize()) {
-        Row(
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(CalendarDimens.headerTrailingGap),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("This week", style = CalendarType.weekTitle, color = c.ink)
-                Spacer(Modifier.height(CalendarDimens.subtitleTop))
-                Text(
-                    weekSubtitle(state.sync, state.nowMillis),
-                    style = CalendarType.subtitle,
-                    color = if (state.sync.isStaleAt(state.nowMillis)) c.danger else c.mute,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.testTag("week_subtitle"),
-                )
-                if (state.sync.needsSignIn.isNotEmpty()) {
-                    Spacer(Modifier.height(CalendarDimens.reconnectTop))
-                    ReconnectChip(reconnectLabel(state.sync.needsSignIn), onClick = navigator::openSettings)
+        Column {
+            // The title+subtitle column and the legend share one bottom-aligned row, so the legend stays level
+            // with the subtitle whether or not the reconnect chip below adds height to the title column.
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(CalendarDimens.headerTrailingGap),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("This week", style = CalendarType.weekTitle, color = c.ink)
+                    Spacer(Modifier.height(CalendarDimens.subtitleTop))
+                    Text(
+                        weekSubtitle(state.sync, state.nowMillis),
+                        style = CalendarType.subtitle,
+                        color = if (state.sync.isStaleAt(state.nowMillis)) c.danger else c.mute,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("week_subtitle"),
+                    )
                 }
+                Legend(state.week.people, Modifier.testTag("week_legend").padding(end = CalendarDimens.headerTrailingGap))
             }
-            Legend(state.week.people, Modifier.padding(end = CalendarDimens.headerTrailingGap))
+            if (state.sync.needsSignIn.isNotEmpty()) {
+                Spacer(Modifier.height(CalendarDimens.reconnectTop))
+                ReconnectChip(reconnectLabel(state.sync.needsSignIn), onClick = navigator::openSettings)
+            }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekColumnGap), modifier = Modifier.fillMaxWidth().weight(1f)) {
             state.week.days.forEach { day ->
