@@ -17,11 +17,19 @@ data class StoredConnection(
     val lastSyncMillis: Long?,
 )
 
+/** [isMaster]: the household's master calendar, the only source the tablet writes to (spec §6). */
 data class StoredSource(
     val connectionId: String,
     val source: CalendarSource,
     val mapping: SourceMapping,
+    val isMaster: Boolean = false,
 )
+
+/** One mirrored event. Ids from providers may contain any character, including "/". */
+data class EventRef(val connectionId: String, val sourceId: String, val remoteId: String) {
+    /** A Bundle-safe lazy-list key. NUL never appears in a provider id, so it can't be mistaken for part of one. */
+    val listKey: String get() = "$connectionId\u0000$sourceId\u0000$remoteId"
+}
 
 data class StoredEvent(
     val connectionId: String,
@@ -36,4 +44,27 @@ data class StoredEvent(
     val sourcePerson: PersonId,
     val startSort: Long,
     val endSort: Long,
-)
+) {
+    val ref: EventRef get() = EventRef(connectionId, sourceId, remoteId)
+}
+
+/** ASSIGN changes only who an event is for: it is sent as the event is when it is sent, with the new person. */
+enum class ChangeKind { CREATE, UPDATE, DELETE, ASSIGN }
+
+/**
+ * One queued write, kept until the provider accepts or refuses it. [remoteId] is null only for CREATE;
+ * [draft] is null only for DELETE, and for ASSIGN only its forPerson counts. [id] is 0 until the store assigns one.
+ */
+data class PendingChange(
+    val id: Long,
+    val connectionId: String,
+    val sourceId: String,
+    val remoteId: String?,
+    val kind: ChangeKind,
+    val draft: EventDraft?,
+    val attempts: Int,
+    val nextAttemptMillis: Long,
+    val createdMillis: Long,
+) {
+    val ref: EventRef? get() = remoteId?.let { EventRef(connectionId, sourceId, it) }
+}

@@ -15,6 +15,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarCapability
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSyncLoop
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
+import uk.co.siland.culvery.capability.calendar.db.MIGRATION_1_2
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
 
@@ -36,6 +37,8 @@ abstract class CalendarModule {
         @Provides
         @Singleton
         fun database(@ApplicationContext context: Context): CalendarDatabase =
-            Room.databaseBuilder(context, CalendarDatabase::class.java, "calendar.db").build()
+            Room.databaseBuilder(context, CalendarDatabase::class.java, "calendar.db")
+                .addMigrations(MIGRATION_1_2)
+                .build()
     }
 }

@@ -73,6 +73,19 @@ data class SyncResult(
     val fullReplace: Boolean,
 )
 
+/**
+ * What the tablet asks a provider to write. [end] is exclusive, as in [RemoteEvent]. [forPerson] and [createdBy]
+ * are household PersonId values ("family" allowed) that the provider stores with the event (Google:
+ * extendedProperties.private). Names are never written.
+ */
+data class EventDraft(
+    val title: String,
+    val start: EventTime,
+    val end: EventTime,
+    val forPerson: String?,
+    val createdBy: String?,
+)
+
 class NeedsSignInException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
 
 class UnreachableException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)

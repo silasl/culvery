@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Embedded
@@ -34,6 +35,8 @@ data class SourceEntity(
     val visible: Boolean,
     /** A household PersonId value, or "family". */
     val personId: String,
+    /** At most one row is 1 (CalendarStore.setMaster clears the others in the same transaction). */
+    @ColumnInfo(defaultValue = "0") val isMaster: Boolean = false,
 )
 
 /** Timed events set the *Instant columns; all-day events set the *Date columns (ISO dates, end exclusive). */
@@ -68,6 +71,23 @@ data class SyncStateEntity(
     val rangeStart: String,
 )
 
+/** Writes waiting for the provider. The event table stays a pure mirror of the provider. */
+@Entity(tableName = "outbox")
+data class OutboxEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val connectionId: String,
+    val sourceId: String,
+    /** Null for CREATE. */
+    val remoteId: String?,
+    /** CREATE, UPDATE, DELETE or ASSIGN. */
+    val kind: String,
+    /** The EventDraft as JSON; null for DELETE. */
+    val draftJson: String?,
+    val attempts: Int,
+    val nextAttemptMillis: Long,
+    val createdMillis: Long,
+)
+
 data class EventRow(
     @Embedded val event: EventEntity,
     val sourcePersonId: String,
@@ -96,6 +116,21 @@ interface CalendarDao {
     @Query("SELECT * FROM source WHERE connectionId = :connectionId ORDER BY name")
     suspend fun sources(connectionId: String): List<SourceEntity>
 
+    @Query("SELECT * FROM source ORDER BY connectionId, name")
+    fun allSources(): Flow<List<SourceEntity>>
+
+    @Query("SELECT * FROM source WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun source(connectionId: String, sourceId: String): SourceEntity?
+
+    @Query("SELECT * FROM source WHERE isMaster = 1 LIMIT 1")
+    fun master(): Flow<SourceEntity?>
+
+    @Query("UPDATE source SET isMaster = 0 WHERE isMaster = 1")
+    suspend fun clearMaster()
+
+    @Query("UPDATE source SET isMaster = 1, writable = 1 WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun markMaster(connectionId: String, sourceId: String): Int
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertSources(sources: List<SourceEntity>)
 
@@ -118,20 +153,57 @@ interface CalendarDao {
     )
     fun eventsBetween(start: Long, end: Long): Flow<List<EventRow>>
 
+    @Query(
+        """
+        SELECT e.*, s.personId AS sourcePersonId FROM event e
+        JOIN source s ON s.connectionId = e.connectionId AND s.sourceId = e.sourceId
+        WHERE e.connectionId = :connectionId AND e.sourceId = :sourceId AND e.remoteId = :remoteId
+        """,
+    )
+    fun event(connectionId: String, sourceId: String, remoteId: String): Flow<EventRow?>
+
+    @Query(
+        """
+        SELECT e.*, s.personId AS sourcePersonId FROM event e
+        JOIN source s ON s.connectionId = e.connectionId AND s.sourceId = e.sourceId
+        WHERE e.connectionId = :connectionId AND e.sourceId = :sourceId AND e.remoteId = :remoteId
+        """,
+    )
+    suspend fun eventNow(connectionId: String, sourceId: String, remoteId: String): EventRow?
+
     @Query("SELECT * FROM sync_state WHERE connectionId = :connectionId AND sourceId = :sourceId")
     suspend fun syncState(connectionId: String, sourceId: String): SyncStateEntity?
 
     @Upsert
     suspend fun upsertSyncState(state: SyncStateEntity)
+
+    @Insert
+    suspend fun insertOutbox(change: OutboxEntity): Long
+
+    @Query("SELECT * FROM outbox ORDER BY id")
+    fun outbox(): Flow<List<OutboxEntity>>
+
+    @Query("SELECT * FROM outbox ORDER BY id")
+    suspend fun outboxNow(): List<OutboxEntity>
+
+    @Query("SELECT MIN(nextAttemptMillis) FROM outbox")
+    suspend fun nextAttemptMillis(): Long?
+
+    @Query("UPDATE outbox SET attempts = :attempts, nextAttemptMillis = :next WHERE id = :id")
+    suspend fun rescheduleOutbox(id: Long, attempts: Int, next: Long)
+
+    @Query("DELETE FROM outbox WHERE id = :id")
+    suspend fun deleteOutbox(id: Long)
 }
 
 /**
- * Holds user configuration (connections, source mappings), not just a cache: every version bump ships a
- * Migration or AutoMigration, never a destructive fallback. The schema JSON under schemas/ is committed.
+ * Holds user configuration (connections, source mappings, the master flag, queued writes), not just a cache:
+ * every version bump ships a Migration (see Migrations.kt) with a MigrationTestHelper test, never a destructive
+ * fallback. The schema JSON under schemas/ is committed.
  */
 @Database(
-    entities = [ConnectionEntity::class, SourceEntity::class, EventEntity::class, SyncStateEntity::class],
-    version = 1,
+    entities = [ConnectionEntity::class, SourceEntity::class, EventEntity::class, SyncStateEntity::class, OutboxEntity::class],
+    version = 2,
     exportSchema = true,
 )
 abstract class CalendarDatabase : RoomDatabase() {
