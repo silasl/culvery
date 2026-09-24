@@ -1,5 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
+import androidx.room.execSQL
+import androidx.room.useWriterConnection
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
@@ -201,6 +203,35 @@ class CalendarEditorTest {
         assertThat(store.eventNow(ref("dinner"))).isNotNull()
         assertThat(store.pendingNow()).isEmpty()
         assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — Event is locked")
+    }
+
+    /** Makes every [op] on [table] fail inside SQLite, as a full disk or a corrupt page would. */
+    private suspend fun failEvery(op: String, table: String) = calendar.useWriterConnection {
+        it.execSQL("CREATE TRIGGER fail_$table BEFORE $op ON $table BEGIN SELECT RAISE(ABORT, 'disk full'); END")
+    }
+
+    @Test
+    fun aDatabaseFailureAfterTheProviderAcceptsIsToldNotThrown() = runTest {
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value))
+        failEvery("DELETE", "event")
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access).delete(ref("dinner"))).isEqualTo(EditResult.Rejected(TRY_AGAIN))
+        assertThat(writer.calls).containsExactly("delete:dinner")
+        assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — try again")
+        assertThat(syncRequests).isEqualTo(1)
+    }
+
+    @Test
+    fun aDatabaseFailureWhileQueueingIsToldNotThrown() = runTest {
+        val access = testAccess(household)
+        put(event("plumber", createdBy = null))
+        failEvery("INSERT", "outbox")
+        writer.failWith = UnreachableException("offline")
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access).assign(ref("plumber"), access.sam.id)).isEqualTo(EditResult.Rejected(TRY_AGAIN))
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — try again")
     }
 
     @Test

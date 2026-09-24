@@ -1,8 +1,10 @@
 package uk.co.siland.culvery.capability.calendar
 
+import android.util.Log
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -21,6 +23,9 @@ import uk.co.siland.culvery.core.plugin.WallClock
 /** How long the editor tries the provider before queueing the change instead (2b-1 design D3). */
 const val WRITE_ATTEMPT_MS = 10_000L
 
+/** The reason shown when the tablet itself fails to save a change: nothing the provider said. */
+internal const val TRY_AGAIN = "try again"
+
 /** Hand-off §7: the toast after a delete. */
 const val EVENT_DELETED = "Event deleted"
 
@@ -31,7 +36,7 @@ sealed interface EditResult {
     /** The provider couldn't be reached in time: the change is queued and shows as syncing. */
     data object Queued : EditResult
 
-    /** The provider refused the change for good; nothing changed, and the editor has toasted why. */
+    /** The provider refused the change for good, or the tablet couldn't store it; the editor has toasted why. */
     data class Rejected(val message: String) : EditResult
 
     /** The PIN pad was cancelled, or the person was refused and told so by a toast. */
@@ -144,17 +149,25 @@ class CalendarEditor internal constructor(
     private suspend fun write(target: Target, kind: ChangeKind, forPerson: String?): EditResult {
         require(kind == ChangeKind.DELETE || kind == ChangeKind.ASSIGN) { "Creating and editing arrive with the quick-add sheet (2b-2)" }
         return scope.async {
-            val result = writeLock.withLock {
-                val ref = target.event.ref
-                val pending = store.pendingNow().filter { it.ref == ref }
-                val event = store.eventNow(ref)
-                when {
-                    pending.any { it.kind == ChangeKind.DELETE } ->
-                        if (kind == ChangeKind.DELETE) EditResult.Queued else EditResult.NotEditable
-                    event == null -> if (kind == ChangeKind.DELETE) EditResult.Done else EditResult.NotEditable
-                    pending.isNotEmpty() -> queue(target, kind, draftFor(kind, event, forPerson), attempted = false)
-                    else -> attempt(target, kind, event, forPerson)
+            val result = try {
+                writeLock.withLock {
+                    val ref = target.event.ref
+                    val pending = store.pendingNow().filter { it.ref == ref }
+                    val event = store.eventNow(ref)
+                    when {
+                        pending.any { it.kind == ChangeKind.DELETE } ->
+                            if (kind == ChangeKind.DELETE) EditResult.Queued else EditResult.NotEditable
+                        event == null -> if (kind == ChangeKind.DELETE) EditResult.Done else EditResult.NotEditable
+                        pending.isNotEmpty() -> queue(target, kind, draftFor(kind, event, forPerson), attempted = false)
+                        else -> attempt(target, kind, event, forPerson)
+                    }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A store failure (disk full, corruption) would otherwise reach the sheet's scope and kill the app.
+                Log.w(TAG, "Couldn't save a $kind for ${target.event.ref}", e)
+                EditResult.Rejected(TRY_AGAIN)
             }
             report(target, kind, result)
             // A sync pass already in flight may briefly put back the old mirror; the pass this asks for corrects it.
@@ -213,5 +226,9 @@ class CalendarEditor internal constructor(
             result is EditResult.Rejected -> toaster.show(couldNotSave(target.connection.label, result.message))
             kind == ChangeKind.DELETE && (result == EditResult.Done || result == EditResult.Queued) -> toaster.show(EVENT_DELETED)
         }
+    }
+
+    private companion object {
+        const val TAG = "CalendarEditor"
     }
 }
