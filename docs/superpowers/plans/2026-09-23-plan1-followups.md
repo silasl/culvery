@@ -62,6 +62,8 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - m2: a drain that keeps throwing makes the loop run a full sync every second (`nextWait()` sees the change overdue). Back off after a failed drain; fold into R3.
 - m3: a queued ASSIGN for an event that left the mirror's window is dropped as "The event no longer exists". Fetch the event from the provider, or send a tags-only patch.
 - m4: a reconnect keeps the connection id, so queued changes wait out their backoff (up to 5 minutes). Reconnect should reset that connection's `nextAttemptMillis` and call `requestSync()`.
+- The editor's reads in `resolve()` (for `mayDelete`, `delete` and `assign`) are outside the write path's catch, so a failing read still crashes the open sheet. Fold into R3.
+- When the provider accepts a change but saving it to the mirror fails, the editor toasts "Couldn't save… — try again" although the change reached the provider. The next sync corrects the screen; consider distinct wording.
 
 **For Plan 4**
 - `CalendarSetup.setMaster` calls `provider.sources()` without the IO + timeout wrapper. Fix with `CalendarSetup.connect`.
