@@ -26,3 +26,33 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
   - Add source editing with pruning to `CalendarStore`: re-map and hide sources, and drop the events and sync state of sources that are gone.
   - Add foreign keys with `ON DELETE CASCADE` (event and sync_state → source → connection) in a `calendar.db` migration, and make `applySync` return early if its source row is gone, so a removal racing an in-flight sync leaves no orphan rows or stale cursor.
   - Refresh each connection's sources from `provider.sources()` (for example daily), keeping the existing mappings.
+
+## From Plan 2a review (deferred)
+
+**For Plan 2b**
+- Map an unknown stored health code to `Error`, not `Ok` (`CalendarStore.healthOf`).
+- Test that real cancellation propagates through `CalendarSync` and the loop.
+- Test that an id change mid-sync behaves correctly.
+- Test the midnight-end label rule.
+- `EventRef` must replace the `/`-joined `EventUi.key` (ICS UIDs can contain `/`).
+- Check DM Sans weights and bold-text truncation on an API 30 AVD (Google Play image) at the checkpoint.
+- The overlay host, "sync now" (`requestSync` + `Mutex`), `CalendarWriter`, the outbox as a separate table, and the v2 migration with a `MigrationTestHelper` test.
+
+**For Plan 3**
+- Widen R3:
+  - add a logging `CoroutineExceptionHandler` on `@ApplicationScope`;
+  - add `retryWhen` with backoff on `connectionIds()` and on the capability flows in `ShellViewModel`, where `catch` currently completes the flow;
+  - catch `Throwable` minus `CancellationException` per source, because an `Error` from a provider currently crashes the process.
+- Log NeedsSignIn, Unreachable and Error with their cause.
+- Put the store calls outside the per-source try.
+- Replace the chunking test with a counting DAO fake: API 30 SQLite has the 999-variable limit.
+- More contract-suite self-test fixtures.
+- Cover the ICS empty feed with `fullReplace` and zero-duration events.
+- Extend the module guard to JVM-only modules.
+
+**For Plan 4**
+- `CalendarSetup.connect` must go through the IO + timeout wrapper.
+- Test that `addConnection` is atomic.
+- All-day events straddle two days after a household zone change until the next sync: filter all-day events by date.
+- `opsz` axis for large text.
+- An on-device SM-T510 pass of the calendar UI.

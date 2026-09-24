@@ -40,5 +40,5 @@ internal fun rememberZoneId(zone: HouseholdZone): ZoneId {
 internal fun todayIn(zone: ZoneId, nowMillis: Long): LocalDate = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
 
 @Composable
-internal fun rememberToday(zone: HouseholdZone, clock: WallClock): LocalDate =
-    todayIn(rememberZoneId(zone), rememberNowMillis(clock))
+internal fun rememberToday(zone: HouseholdZone, clock: WallClock, ticks: Flow<Unit> = everyTick): LocalDate =
+    todayIn(rememberZoneId(zone), rememberNowMillis(clock, ticks))

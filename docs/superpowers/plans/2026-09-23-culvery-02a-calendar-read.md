@@ -51,6 +51,7 @@
 - The sync loop is started from `CulveryApp.onCreate` through `Startable`, not "with the Activity" (spec §7). The app is a single-activity foreground kiosk, so the effect is the same.
 - `:app`'s `robolectric.properties` sets `application=android.app.Application`. Otherwise every Robolectric test in `:app` would boot the real Hilt app, with its databases, the sync loop and the seed.
 - The text-metric tests in Task 2 and `CardsTest` in Task 11 (which checks rows fit the real card sizes) use `@GraphicsMode(NATIVE)` as well as the screenshot classes. Robolectric's legacy graphics fakes glyph widths, so an ellipsis or baseline test would pass or fail for the wrong reason.
+- An inserted Task 11b fixed a Plan 1 bug: every DM Sans weight rendered at 400 on device. Root cause: `Font(resId, weight)` resolves to an overload whose variation settings are empty, so the variable font's `wght` axis was never set. Fix: each `Font` sets `FontVariation.weight(n)` explicitly, which needs `@OptIn(ExperimentalTextApi::class)`. The same opt-in `HhIcon` already uses since Plan 1; experimental, not deprecated. It has been verified on API 35 only. API 30 is checked at the 2b checkpoint.
 
 **Review outcome (settled; do not reintroduce):**
 - Rejected: T4, a real-thread Room test of the sync loop's connection flow.
