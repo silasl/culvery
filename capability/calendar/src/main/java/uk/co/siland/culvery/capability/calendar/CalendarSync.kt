@@ -74,59 +74,77 @@ class CalendarSync internal constructor(
 
     /**
      * Delivers queued changes in the order they were made. An event's later changes wait while an earlier one is
-     * waiting or has just failed, so they can't land first and be undone. Once a connection fails to answer, its
+     * waiting or has just failed, so they can't land first and be undone; they are rescheduled to its next attempt,
+     * so the loop doesn't wake for them before it. Once a connection fails to answer, its
      * other changes wait for their next attempt instead of each costing a timeout. Changes nothing can deliver,
      * changes the provider refuses, and changes older than [OUTBOX_MAX_AGE_MS] are dropped, with one toast per
-     * connection.
+     * connection, shown even if the pass then fails.
      */
     private suspend fun drainOutbox(connections: List<StoredConnection>, zone: ZoneId) {
         val now = clock.nowMillis()
         val byId = connections.associateBy { it.connection.id }
-        val blockedRefs = mutableSetOf<EventRef>()
+        // Each blocked event, with the time its earliest waiting change is next tried.
+        val blockedRefs = mutableMapOf<EventRef, Long>()
         val blockedConnections = mutableSetOf<String>()
         val dropped = linkedMapOf<String, MutableList<String?>>()
-        for (change in store.pendingNow()) {
-            val ref = change.ref
-            if (ref != null && ref in blockedRefs) continue
-            val stored = byId[change.connectionId]
-            val label = stored?.connection?.label ?: REMOVED_CALENDAR
-            if (now - change.createdMillis > OUTBOX_MAX_AGE_MS) {
-                Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}: unsent for 48 hours")
-                store.dropChange(change.id)
-                dropped.getOrPut(label) { mutableListOf() }.add(null)
-                continue
-            }
-            if (change.nextAttemptMillis > now) {
-                ref?.let(blockedRefs::add)
-                continue
-            }
-            if (change.connectionId in blockedConnections) {
-                retryLater(change, now)
-                ref?.let(blockedRefs::add)
-                continue
-            }
-            val source = store.source(change.connectionId, change.sourceId)
-            val writer = stored?.let { s -> writers.firstOrNull { it.providerId == s.connection.providerId } }
-            if (stored == null || source == null || writer == null) {
-                Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}/${change.sourceId}: nothing can deliver it")
-                store.dropChange(change.id)
-                dropped.getOrPut(label) { mutableListOf() }.add(null)
-                continue
-            }
-            when (val outcome = deliver(change, stored.connection, source.source, writer, zone)) {
-                is WriteOutcome.Accepted -> Unit
-                is WriteOutcome.Rejected -> {
+        try {
+            for (change in store.pendingNow()) {
+                val ref = change.ref
+                val blockedUntil = ref?.let(blockedRefs::get)
+                if (blockedUntil != null) {
+                    // Not an attempt, so it costs no backoff step.
+                    if (change.nextAttemptMillis < blockedUntil) store.reschedule(change.id, change.attempts, blockedUntil)
+                    continue
+                }
+                val stored = byId[change.connectionId]
+                val label = stored?.connection?.label ?: REMOVED_CALENDAR
+                if (now - change.createdMillis > OUTBOX_MAX_AGE_MS) {
+                    Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}: unsent for 48 hours")
                     store.dropChange(change.id)
-                    dropped.getOrPut(label) { mutableListOf() }.add(outcome.message)
+                    dropped.getOrPut(label) { mutableListOf() }.add(null)
+                    continue
                 }
-                is WriteOutcome.Retry -> {
-                    retryLater(change, now)
-                    ref?.let(blockedRefs::add)
-                    if (outcome.blocksConnection) blockedConnections += change.connectionId
+                if (change.nextAttemptMillis > now) {
+                    ref?.let { blockedRefs[it] = change.nextAttemptMillis }
+                    continue
+                }
+                if (change.connectionId in blockedConnections) {
+                    val next = retryLater(change, now)
+                    ref?.let { blockedRefs[it] = next }
+                    continue
+                }
+                val source = store.source(change.connectionId, change.sourceId)
+                val writer = stored?.let { s -> writers.firstOrNull { it.providerId == s.connection.providerId } }
+                if (stored == null || source == null || writer == null || !change.isComplete()) {
+                    Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}/${change.sourceId}: nothing can deliver it")
+                    store.dropChange(change.id)
+                    dropped.getOrPut(label) { mutableListOf() }.add(null)
+                    continue
+                }
+                when (val outcome = deliver(change, stored.connection, source.source, writer, zone)) {
+                    is WriteOutcome.Accepted -> Unit
+                    is WriteOutcome.Rejected -> {
+                        store.dropChange(change.id)
+                        dropped.getOrPut(label) { mutableListOf() }.add(outcome.message)
+                    }
+                    is WriteOutcome.Retry -> {
+                        val next = retryLater(change, now)
+                        ref?.let { blockedRefs[it] = next }
+                        if (outcome.blocksConnection) blockedConnections += change.connectionId
+                    }
                 }
             }
+        } finally {
+            // Those changes are already gone, so they are told even when a later change fails the pass.
+            dropped.forEach { (label, reasons) -> toaster.show(couldNotSaveAll(label, reasons)) }
         }
-        dropped.forEach { (label, reasons) -> toaster.show(couldNotSaveAll(label, reasons)) }
+    }
+
+    /** Whether the change carries what its kind needs; one that doesn't can never be sent. */
+    private fun PendingChange.isComplete(): Boolean = when (kind) {
+        ChangeKind.CREATE -> draft != null
+        ChangeKind.UPDATE -> remoteId != null && draft != null
+        ChangeKind.ASSIGN, ChangeKind.DELETE -> remoteId != null
     }
 
     /** Sends one change and, when the provider accepts it, applies the result to the mirror and completes it. */
@@ -137,11 +155,17 @@ class CalendarSync internal constructor(
         writer: CalendarWriter,
         zone: ZoneId,
     ): WriteOutcome {
+        // Checked outside callWriter, so a malformed change fails the drain instead of being retried as a write.
         val ref = change.ref
         val outcome = when (change.kind) {
-            ChangeKind.CREATE -> callWriter(io, timeoutMillis) { writer.create(conn, source, requireNotNull(change.draft)) }
-            ChangeKind.UPDATE -> callWriter(io, timeoutMillis) {
-                writer.update(conn, source, requireNotNull(ref).remoteId, requireNotNull(change.draft))
+            ChangeKind.CREATE -> {
+                val draft = checkNotNull(change.draft)
+                callWriter(io, timeoutMillis) { writer.create(conn, source, draft) }
+            }
+            ChangeKind.UPDATE -> {
+                val remoteId = checkNotNull(change.remoteId)
+                val draft = checkNotNull(change.draft)
+                callWriter(io, timeoutMillis) { writer.update(conn, source, remoteId, draft) }
             }
             ChangeKind.ASSIGN -> {
                 // Sent as the event is now, so a title or time changed elsewhere since it was queued is kept.
@@ -149,9 +173,12 @@ class CalendarSync internal constructor(
                 val draft = assignDraft(current, change.draft?.forPerson)
                 callWriter(io, timeoutMillis) { writer.update(conn, source, current.remoteId, draft) }
             }
-            ChangeKind.DELETE -> callWriter(io, timeoutMillis) {
-                writer.delete(conn, source, requireNotNull(ref).remoteId)
-                null
+            ChangeKind.DELETE -> {
+                val remoteId = checkNotNull(change.remoteId)
+                callWriter(io, timeoutMillis) {
+                    writer.delete(conn, source, remoteId)
+                    null
+                }
             }
         }
         if (outcome is WriteOutcome.Accepted) {
@@ -160,9 +187,12 @@ class CalendarSync internal constructor(
         return outcome
     }
 
-    private suspend fun retryLater(change: PendingChange, now: Long) {
+    /** Counts a failed attempt and returns when the change will next be tried. */
+    private suspend fun retryLater(change: PendingChange, now: Long): Long {
         val attempts = change.attempts + 1
-        store.reschedule(change.id, attempts, now + backoffMillis(attempts))
+        val next = now + backoffMillis(attempts)
+        store.reschedule(change.id, attempts, next)
+        return next
     }
 
     private suspend fun sync(conn: Connection, window: DateRange) {

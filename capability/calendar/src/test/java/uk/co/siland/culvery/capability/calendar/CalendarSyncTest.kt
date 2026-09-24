@@ -29,6 +29,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 
 // Robolectric for Room and for android.util.Log (the engine logs timeouts).
@@ -506,5 +507,57 @@ class CalendarSyncTest {
         a.hang = false
         sync.syncAll()
         assertThat(store.connectionsNow().single().lastSyncMillis).isEqualTo(now.toEpochMilli())
+    }
+
+    @Test
+    fun aChangeWaitingBehindAnEarlierOneIsRescheduledToItsTimeWithoutAnAttempt() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        val blockerAt = now.plusSeconds(30).toEpochMilli()
+        queue(ChangeKind.UPDATE, next = now.plusSeconds(30))
+        val later = queue(ChangeKind.DELETE, draft = null)
+        sync.syncAll()
+        // Otherwise the loop would wake every second for the later change until the blocker is due.
+        assertThat(store.nextAttemptMillis()).isEqualTo(blockerAt)
+        assertThat(store.pendingNow().single { it.id == later }.let { it.attempts to it.nextAttemptMillis })
+            .isEqualTo(1 to blockerAt)
+    }
+
+    @Test
+    fun aFailedDrainIsLoggedAndTheSyncStillRuns() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
+        val broken = object : Toaster {
+            override fun show(message: String, icon: String) = error("toasts are down")
+        }
+        val sync = CalendarSync(store, setOf(a, b), HouseholdZone(household), clock, EmptyCoroutineContext, 1_000, setOf(w), broken)
+        queue(ChangeKind.DELETE, draft = null, sourceId = "gone")
+        sync.syncAll()
+        assertThat(cachedTitles()).containsExactly("Swim")
+    }
+
+    @Test
+    fun toastsForDroppedChangesAreShownWhenTheRestOfThePassIsCancelled() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, draft = null, sourceId = "gone")
+        queue(ChangeKind.DELETE, draft = null)
+        w.gate = CompletableDeferred()
+        val job = launch { sync.syncAll() }
+        w.entered.await()
+        job.cancelAndJoin()
+        assertThat(toaster.messages).containsExactly("Couldn't save to C1")
+    }
+
+    @Test
+    fun anIncompleteChangeIsDroppedWithAToastNotRetried() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.UPDATE, draft = null)
+        sync.syncAll()
+        assertThat(w.calls).isEmpty()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't save to C1")
     }
 }
