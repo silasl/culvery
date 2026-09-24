@@ -2,8 +2,11 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import java.time.Instant
 import java.time.LocalDate
+import uk.co.siland.culvery.capability.calendar.ADDED_FROM_PHONE
 import uk.co.siland.culvery.capability.calendar.ALL_DAY_LABEL
+import uk.co.siland.culvery.capability.calendar.CALENDAR_FEED
 import uk.co.siland.culvery.capability.calendar.DayUi
+import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
@@ -80,4 +83,36 @@ object SampleUi {
         ),
         people,
     )
+
+    /** The people who can be assigned (hand-off 06: Alex, Sam, Mia). */
+    val household = listOf(alex, sam, mia)
+
+    private fun EventUi.onFamilyCalendar(createdBy: String) =
+        copy(sourceName = "Family calendar", connectionLabel = "Sample calendar", createdBy = createdBy)
+
+    /** Hand-off 03. */
+    val detailEditable = EventDetailUi(event("Dinner with Jo & Priya", "19:30–21:00", alex).onFamilyCalendar("Alex"), "Today · 19:30–21:00")
+
+    /** Hand-off 04. */
+    val detailReadOnlyFeed = EventDetailUi(
+        allDay("INSET day — no school", family).copy(
+            sourceName = "School terms",
+            connectionLabel = "Sample calendar",
+            readOnlyReason = ReadOnlyReason.OtherCalendar,
+            createdBy = CALENDAR_FEED,
+        ),
+        "Sat 26 Sep · All day",
+    )
+
+    /** Hand-off 05. */
+    val detailRecurring = EventDetailUi(event("Swimming", "16:00–17:00", mia, recurring = true).onFamilyCalendar("Sam"), "Today · 16:00–17:00")
+
+    /** Hand-off 06. */
+    val detailUntagged = EventDetailUi(
+        event("Plumber quote call", "13:00–13:30", family).onFamilyCalendar(ADDED_FROM_PHONE).copy(untagged = true),
+        "Today · 13:00–13:30",
+    )
+
+    /** Hand-off 07. */
+    val detailSyncing = detailEditable.copy(event = detailEditable.event.copy(syncing = true))
 }
