@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -20,11 +21,16 @@ import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.access.ui.PinPadHost
 import uk.co.siland.culvery.core.plugin.Capability
+import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.shell.OverlayState
+import uk.co.siland.culvery.shell.ShellToasts
 import uk.co.siland.culvery.shell.ShellViewModel
 import uk.co.siland.culvery.shell.ui.CulveryShell
+import uk.co.siland.culvery.shell.ui.OverlayLayer
 import uk.co.siland.culvery.shell.ui.SettingsPlaceholder
+import uk.co.siland.culvery.shell.ui.ToastLayer
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -32,6 +38,7 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var pinPrompt: PinPromptController
     @Inject lateinit var capabilities: Set<@JvmSuppressWildcards Capability>
+    @Inject lateinit var toasts: ShellToasts
 
     // Set by Settings › Exit kiosk; cleared when the app comes back to the foreground.
     private var kioskExited = false
@@ -53,20 +60,28 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val state by shell.uiState.collectAsStateWithLifecycle()
-            CompositionLocalProvider(LocalShellNavigator provides shell) {
+            val toast by toasts.current.collectAsStateWithLifecycle()
+            val overlay = remember { OverlayState() }
+            CompositionLocalProvider(
+                LocalShellNavigator provides shell,
+                LocalOverlayHost provides overlay,
+            ) {
                 CulveryTheme(dark = state.dark) {
                     CulveryShell(
                         state = state,
                         onSelectTab = shell::selectTab,
                         onOpenSettings = shell::openSettings,
-                        onLockSession = shell::lockSession,
+                        onSignOut = shell::signOut,
                         onToggleThemePreview = shell::toggleThemePreview,
                         tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
                     )
                     if (state.settingsOpen) {
                         SettingsPlaceholder(onExitKiosk = shell::exitKiosk, onClose = shell::closeSettings)
                     }
+                    // Layer order: sheet, then the PIN pad over it, then toasts over everything.
+                    OverlayLayer(overlay)
                     PinPadHost(pinPrompt)
+                    ToastLayer(toast, toasts::hide)
                 }
             }
         }
@@ -90,7 +105,7 @@ class MainActivity : ComponentActivity() {
         if (hasFocus && !kioskExited) hideSystemBars()
     }
 
-    // Every touch-down anywhere (shell, Settings, PIN pad) keeps the PIN session alive.
+    // Every touch-down anywhere (shell, sheet, PIN pad) keeps the PIN session alive.
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) shell.onUserActivity()
         return super.dispatchTouchEvent(ev)

@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
+import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomePlacement
@@ -77,7 +78,7 @@ class ShellViewModel @Inject constructor(
                 ShellUiState(
                     tabs = tabs,
                     selectedTabId = if (sel == HOME_TAB_ID || tabs.any { it.id == sel }) sel else HOME_TAB_ID,
-                    session = session?.let { SessionChip(it.person.name, it.person.color) },
+                    session = session?.let { SessionUi(it.person.name, roleLabel(it.role)) },
                     homeCards = cards,
                     settingsOpen = settings && session != null,
                 )
@@ -120,11 +121,17 @@ class ShellViewModel @Inject constructor(
         }
     }
 
-    fun lockSession() = access.lock()
+    fun signOut() = access.lock()
 
     fun onUserActivity() = access.touch()
 
     fun toggleThemePreview() {
         previewing.value = !previewing.value
     }
+}
+
+internal fun roleLabel(role: Role): String = when (role) {
+    Role.ADMIN -> "Admin"
+    Role.ADULT -> "Adult"
+    Role.CHILD -> "Child"
 }

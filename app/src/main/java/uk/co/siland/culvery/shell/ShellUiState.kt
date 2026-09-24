@@ -7,12 +7,13 @@ const val HOME_TAB_ID = "home"
 
 data class TabItem(val id: String, val label: String, val icon: String)
 
-data class SessionChip(val name: String, val color: Long)
+/** The status bar's "{name} · {role}". */
+data class SessionUi(val name: String, val role: String)
 
 data class ShellUiState(
     val tabs: List<TabItem> = emptyList(),
     val selectedTabId: String = HOME_TAB_ID,
-    val session: SessionChip? = null,
+    val session: SessionUi? = null,
     val now: LocalDateTime = LocalDateTime.now(),
     val dark: Boolean = true,
     val previewing: Boolean = false,

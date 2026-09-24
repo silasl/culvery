@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.di
 
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -12,8 +13,10 @@ import kotlinx.coroutines.SupervisorJob
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
+import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.shell.MinuteTicker
+import uk.co.siland.culvery.shell.ShellToasts
 import uk.co.siland.culvery.shell.SystemMinuteTicker
 
 @Module
@@ -24,6 +27,9 @@ abstract class AppModule {
 
     @Multibinds
     abstract fun startables(): Set<Startable>
+
+    @Binds
+    abstract fun toaster(impl: ShellToasts): Toaster
 
     companion object {
         @Provides

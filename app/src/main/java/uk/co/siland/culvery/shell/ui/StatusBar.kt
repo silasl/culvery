@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,14 +17,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
-import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.ShellTokens
+import uk.co.siland.culvery.core.ui.ShellType
+import uk.co.siland.culvery.shell.SessionUi
 
 private val TIME = DateTimeFormatter.ofPattern("HH:mm")
 
+/** Hand-off status bar, plus §7's signed-in indicator: `account_circle` · "{name} · {role}" · "Sign out". */
 @Composable
-fun StatusBar(now: LocalDateTime, dark: Boolean, previewing: Boolean, onToggleThemePreview: () -> Unit) {
+fun StatusBar(
+    now: LocalDateTime,
+    dark: Boolean,
+    previewing: Boolean,
+    session: SessionUi?,
+    onSignOut: () -> Unit,
+    onToggleThemePreview: () -> Unit,
+) {
     val c = Culvery.colors
     val label = when {
         !previewing -> "Auto"
@@ -36,6 +48,26 @@ fun StatusBar(now: LocalDateTime, dark: Boolean, previewing: Boolean, onToggleTh
     ) {
         Text(now.format(TIME), style = HhType.status, color = c.mute)
         Spacer(Modifier.weight(1f))
+        if (session != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(ShellTokens.statusGap),
+                modifier = Modifier.testTag("status_session"),
+            ) {
+                HhIcon("account_circle", size = ShellTokens.statusIcon, tint = c.mute)
+                Text("${session.name} · ${session.role}", style = HhType.status, color = c.mute, maxLines = 1)
+                Text(
+                    "Sign out",
+                    style = ShellType.signOut,
+                    color = c.accent,
+                    modifier = Modifier
+                        .testTag("status_sign_out")
+                        .clickable(onClickLabel = "Sign out", onClick = onSignOut)
+                        .padding(horizontal = ShellTokens.statusSignOutPaddingH, vertical = ShellTokens.statusSignOutPaddingV),
+                )
+            }
+            Spacer(Modifier.width(ShellTokens.statusGroupGap))
+        }
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,

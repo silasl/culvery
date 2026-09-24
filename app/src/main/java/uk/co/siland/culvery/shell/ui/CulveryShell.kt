@@ -18,14 +18,14 @@ fun CulveryShell(
     state: ShellUiState,
     onSelectTab: (String) -> Unit,
     onOpenSettings: () -> Unit,
-    onLockSession: () -> Unit,
+    onSignOut: () -> Unit,
     onToggleThemePreview: () -> Unit,
     tabContent: @Composable (String) -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
-        StatusBar(state.now, state.dark, state.previewing, onToggleThemePreview)
+        StatusBar(state.now, state.dark, state.previewing, state.session, onSignOut, onToggleThemePreview)
         Row(Modifier.weight(1f)) {
-            NavRail(state.tabs, state.selectedTabId, state.session, onSelectTab, onOpenSettings, onLockSession)
+            NavRail(state.tabs, state.selectedTabId, onSelectTab, onOpenSettings)
             Box(Modifier.weight(1f).padding(start = 28.dp, end = 28.dp, top = 24.dp, bottom = 22.dp)) {
                 if (state.selectedTabId == HOME_TAB_ID) {
                     HomeScreen(state.now, state.homeCards)

@@ -28,9 +28,10 @@ import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.shell.SessionChip
+import uk.co.siland.culvery.shell.SessionUi
 import uk.co.siland.culvery.shell.ShellUiState
 import uk.co.siland.culvery.shell.TabItem
+import uk.co.siland.culvery.shell.ToastMessage
 
 private object NoNavigation : ShellNavigator {
     override fun openTab(id: String) = Unit
@@ -104,7 +105,7 @@ class ShellScreenshotTest {
                             state = state,
                             onSelectTab = {},
                             onOpenSettings = {},
-                            onLockSession = {},
+                            onSignOut = {},
                             onToggleThemePreview = {},
                             tabContent = {},
                         )
@@ -126,8 +127,17 @@ class ShellScreenshotTest {
     fun homeWithSessionDark() = snap(
         "home_session_dark",
         dark = true,
-        state = ShellUiState(now = at, dark = true, session = SessionChip("Admin", 0xFF4CB387)),
+        state = ShellUiState(now = at, dark = true, session = SessionUi("Alex", "Admin")),
     )
+
+    @Test
+    fun toastDark() {
+        // The toast hides itself after 3.5 s; hold the clock so it is still there for the capture.
+        compose.mainClock.autoAdvance = false
+        snap("home_toast_dark", dark = true) {
+            ToastLayer(ToastMessage(1, "Mia can only change events they created.", "info")) {}
+        }
+    }
 
     @Test
     fun homeWithCalendarDark() = snap("home_calendar_dark", dark = true, state = calendarHome(dark = true))

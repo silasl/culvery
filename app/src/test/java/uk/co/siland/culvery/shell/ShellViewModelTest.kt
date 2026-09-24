@@ -163,14 +163,19 @@ class ShellViewModelTest {
     }
 
     @Test
-    fun sessionShowsAsChip() = runTest {
+    fun sessionShowsNameAndRoleForTheStatusBar() = runTest {
         val vm = vm()
         vm.uiState.test {
             access.session.value = Identified(alex, Role.ADMIN)
-            assertThat(expectMostRecentItem().session).isEqualTo(SessionChip("Alex", 0xFF4CB387))
-            vm.lockSession()
+            assertThat(expectMostRecentItem().session).isEqualTo(SessionUi("Alex", "Admin"))
+            vm.signOut()
             assertThat(expectMostRecentItem().session).isNull()
         }
+    }
+
+    @Test
+    fun roleLabelsReadAsWords() {
+        assertThat(Role.entries.map(::roleLabel)).containsExactly("Admin", "Adult", "Child").inOrder()
     }
 
     @Test
@@ -208,7 +213,7 @@ class ShellViewModelTest {
         vm.uiState.test {
             val state = expectMostRecentItem()
             assertThat(state.tabs.map { it.id }).containsExactly("calendar")
-            assertThat(state.session).isEqualTo(SessionChip("Alex", 0xFF4CB387))
+            assertThat(state.session).isEqualTo(SessionUi("Alex", "Admin"))
         }
     }
 
