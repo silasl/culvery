@@ -18,7 +18,7 @@ Writes are exercised against the debug fake provider only. Google writes arrive 
 
 | # | Decision |
 |---|---|
-| D1 | **Session:** 2 minutes after the last action (was 60 s). Shown in the status bar as `account_circle · {name} · {role}` with a **Sign out** link. The Plan 1 rail chip is removed. Fresh-PIN permissions (`kiosk.exit`, `people.manage`) are unchanged. |
+| D1 | **Session:** 2 minutes after the last authorised action, i.e. a PIN-gated action that succeeded (was 60 s after the last touch). Touching the screen does not extend it, so a child tapping around can't keep an adult's session alive (amended after the plan review, U1). Shown in the status bar as `account_circle · {name} · {role}` with a **Sign out** link. The Plan 1 rail chip is removed. Fresh-PIN permissions (`kiosk.exit`, `people.manage`) are unchanged. |
 | D2 | **PIN pad:** adopt the hand-off §7 design: lock badge, "Who's this?", reason text, 76 dp keys, a Cancel key, a `danger` error line, digits that clear on a wrong PIN, and a 400 dp `surf` card. When a sheet is open it is placed over the sheet area, otherwise it is centred. |
 | D3 | **Save flow:** try the provider directly for up to 10 s. Accepted → done. Rejected → the sheet stays open with the error and the input kept. Offline or timed out → queue in the outbox and show the syncing badge. A later rejection is rolled back with a toast. |
 | D4 | **Split:** 2b-1 then 2b-2, each ending at a screenshot checkpoint. |
@@ -47,6 +47,7 @@ Writes are exercised against the debug fake provider only. Google writes arrive 
   - `reason` feeds the PIN pad's reason text: Generic, Save, Edit, Delete, Assign.
   - `allow` runs on the session shortcut and after each PIN. If it returns false, the result is the existing `NotAllowed` path. `NotAllowed` now carries a message so the calendar can supply the design's wording.
 - **Refusal toast:** a refusal while a sheet is open shows as a **toast**, not only as the PIN pad error. The PIN pad dismisses, and the calendar shows the toast from the `NotAllowed` reason.
+- **Refusal on the session shortcut:** when a signed-in person is refused with a toast, the session is not extended; it is **locked** after the toast, so the next tap brings up the PIN pad and someone else can take over (amended after the plan review, U2).
 
 ### 3.3 Calendar contract
 ```kotlin
@@ -184,7 +185,8 @@ When more than one applies, show `cloud_upload` first, then `lock` or `repeat`.
 
 ## 6. Testing
 - **Access:**
-  - the session lasts 2 minutes and a touch extends it
+  - the session lasts 2 minutes after the last authorised action; touches alone don't keep it alive
+  - a refusal on the session shortcut toasts, then locks
   - `reason` reaches the PIN pad
   - `allow` is applied on both the session shortcut and after a PIN
   - `NotAllowed` carries the message

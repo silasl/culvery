@@ -176,7 +176,7 @@ Role → permission bundles come from each `PermissionDef.defaultRoles`; they ar
   - If someone is identified and has the permission → proceed as them.
   - Otherwise → PIN pad. A valid PIN without the permission shows "Sam can't do that".
   - **Fresh-PIN permissions** (`kiosk.exit`, `people.manage`) always show the PIN pad, even during an active session.
-- Session lasts **2 min after the last action**, then locks (amended by the 2b-1 design, per hand-off §7). While signed in, the status bar shows `account_circle · {name} · {role}` and a "Sign out" link that locks immediately.
+- Session lasts **2 min after the last authorised action** (a PIN-gated action that succeeded; touching the screen does not extend it), then locks (amended by the 2b-1 design, per hand-off §7). While signed in, the status bar shows `account_circle · {name} · {role}` and a "Sign out" link that locks immediately.
 - People without a PIN can be tagged on events but cannot act.
 - **Lockout:** 5 consecutive wrong PINs → 30 s lockout, doubling per further failure up to 16 min. Reset only by a PIN that is *authorised* for the requested action (a valid PIN that isn't allowed neither resets nor counts). Per device, survives restart.
 - **Settings closes** when the session ends.

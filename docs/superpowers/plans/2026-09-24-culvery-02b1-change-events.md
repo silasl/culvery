@@ -21,32 +21,37 @@
 4. PIN pad redesign, placed over the sheet when one is open.
 5. `CalendarWriter` contract, the write checks in the contract suite, and the broken-writer self-test fixture.
 6. Fake provider writes. The hand-off's week moves onto the writable Family source, tagged by person.
-7. Sync loop and outbox drain: `requestSync`, `Mutex`, backoff, `WriteFailed` toasts, and the deferred cancellation and mid-sync tests.
+7. Sync loop and outbox drain: `requestSync`, `Mutex`, the shared `callWriter`, in-order delivery, backoff, the 48-hour cap, rejection toasts, and the deferred cancellation and mid-sync tests.
 8. `CalendarEditor` and `CalendarPermissionSource`.
 9. Repository: `EventRef`, the outbox overlay, the new `EventUi` fields, the "When" label, and the midnight-end test.
 10. Event detail sheet, in every state, with screenshots.
 11. Opening the sheet from Today rows and week chips, the badges, and removing the Coming up link, with screenshots.
-12. Debug seed (master flag and tags), the emulator walkthrough, and the **USER CHECKPOINT**.
-13. README.
+12. Debug seed (master flag and tags), the rollback demo test, the emulator walkthrough, the **USER CHECKPOINT**, then the README.
 
 **Deviations from the design and extensions (deliberate):**
 - `authorise` gains a fourth parameter, `refusal: Refusal = Refusal.InPad`, as well as the design's `reason` and `allow`.
   - `Refusal.InPad` keeps today's behaviour: the pad shows "{name} can't do that" and asks again.
   - `Refusal.Toast { name -> "…" }` closes the pad, shows the caller's wording as a toast, and returns null. This also applies on the session shortcut, so a signed-in child gets the toast without seeing a pad (hand-off: "If a check fails → toast").
+  - On the session shortcut, a `Refusal.Toast` refusal also **locks the session** (and doesn't extend it), so the next tap brings up the PIN pad and an adult can take over from a signed-in child. **Approved by the user (U2).**
   - `AccessControl` shows the toast itself through the injected `Toaster`. The calendar supplies the wording. With `Authorised?` as the return type, the caller can't tell a refusal from a cancel, so the toast has to come from `AccessControl`.
-- `Toaster` is an injectable singleton (`ShellToasts`, bound in `:app`) **and** `LocalToaster`. The outbox drain has to toast a rejection from the background, where there is no composable.
-- `WriteFailed` events reach the toaster through a small calendar `Startable` (`WriteFailureToasts`).
+- **The session extends only on a successful `authorise`** (a PIN-gated action), never on a touch. `AccessControl.touch()`, `ShellViewModel.onUserActivity()` and `MainActivity`'s touch hook are removed, so a child tapping around can't keep an adult's session alive. **Approved by the user (U1)**; the design's D1 and §6 and the parent spec's §8 are amended to "2 minutes after the last authorised action".
+- `Toaster` is an injectable singleton (`ShellToasts`, bound in `:app`). There is no `LocalToaster`: every toast comes from code that has the injected `Toaster` (access control, the editor, the outbox drain).
+- The design's `WriteFailed` event is not built. The drain shows what it had to drop through the injected `Toaster`, one toast per connection per pass: "Couldn't save to {label} — {reason}" for one change, "Couldn't save {n} changes to {label}" for several, and "Couldn't save to {label}" when there is no reason (nothing can deliver it, or it waited too long).
+- The editor shows its own outcome toasts ("Event deleted", "Couldn't save to {label} — {reason}") from the application scope, so closing the sheet mid-write can't lose them. The sheet only decides whether it stays open.
+- **Assign is its own change kind, `ASSIGN`** (stored as TEXT in `outbox.kind`, so no schema change; the design lists CREATE, UPDATE and DELETE). Only its draft's `forPerson` counts: the editor and the drain send the event **as the mirror has it at send time** with the new person, so an assign never overwrites a title or time changed on a phone meanwhile. `CalendarWriter.update` changes only the title, the times and the tags and keeps everything else (Google: PATCH).
+- The editor and the drain call writers through one classifier, `callWriter`, which sorts every outcome into `Accepted`, `Rejected` or `Retry`. Writes never set a connection's health: the pass that `requestSync()` starts straight after reports `NeedsSignIn` from the reads (design §5).
+- The drain delivers the changes to one event **in the order they were made**: once an event's first change is waiting or has failed, its later changes wait too. Once a connection fails to answer (unreachable, timed out or needs sign-in), its other changes wait for their next attempt in that pass instead of each costing a timeout. A change still queued **48 hours** after it was made is dropped with a toast. One unreadable outbox row is logged and dropped rather than stopping the queue.
 - The scrims (`rgba(0,0,0,.55)` behind sheets and `rgba(0,0,0,.5)` behind the PIN pad) are theme-independent constants in `:core:ui`'s `ShellTokens`, not `HhColors` tokens. This settles the Plan 1 follow-up "make the PIN pad scrim colour a token".
-- Wording that names Google in the hand-off uses the **connection label** instead. So the fake reads "Syncing to Sample calendar…", "…will be removed from Sample calendar for everyone" and "Couldn't save to Sample calendar — {reason}", and a Google connection reads as the hand-off does. The 2a subtitle already does this ("synced with {label}").
+- Wording that names Google in the hand-off uses the **connection label** instead. So the fake reads "Syncing to Sample calendar…", "…will be removed from Sample calendar for everyone" and "Couldn't save to Sample calendar — {reason}", and a Google connection reads as the hand-off does. The 2a subtitle already does this ("synced with {label}"). **Approved by the user (U3).** Plan 3 moves the failure, repeating-event and delete wording to the service name ("Google Calendar") once a second label exists (in the follow-ups).
 - `EventUi.createdBy` is a display `String` (a name, "Added from phone", or "Calendar feed"), not `Person?`. The editor checks ownership against the stored person id, never against the label.
 - The detail sheet reads `EventDetailUi(event: EventUi, whenLabel: String)` from `CalendarRepository.event(ref, today)`. Rows don't need the "When" label ("Today · 19:30–21:00"), so it isn't in `EventUi`.
-- A lazy-list key can't be a data class on Android. `EventRef.listKey` is a length-prefixed string, which stays unambiguous when ids contain `/`.
+- A lazy-list key can't be a data class on Android. `EventRef.listKey` joins the three ids with NUL (`\u0000`), which no provider id contains, so it stays unambiguous when ids contain `/`.
 - Delete asks for the PIN twice at most. `mayDelete(ref)` guards before the confirmation. `delete(ref)` authorises again, which normally passes silently on the session. If the session expired while the confirmation was showing, the pad appears again.
-- The editor never writes directly behind a pending change for the same event: it queues the new change after the pending one, so the drain applies both in order. A second delete of an event already queued for delete is not queued again.
-- The provider call and the mirror update run on `@ApplicationScope`, so closing the sheet mid-write can't lose a change.
-- The loop no longer uses `collectLatest`. A trigger (a connection change or `requestSync`) that arrives mid-pass runs one more pass after it, rather than cancelling it. The loop also wakes early when an outbox entry falls due, so a 30 s backoff isn't stuck behind the 5-minute tick.
-- A queued change for a connection flagged `NeedsSignIn` is paused: its next attempt moves 5 minutes on and its attempt count stays the same. It resumes once a sync marks the connection Ok (spec §7: "Auth failure pauses the queue").
-- The contract adds one rule: **deleting an event that no longer exists succeeds.** Without it, a retried delete that had already reached the provider would be toasted as a failure.
+- The editor never writes directly behind a pending change for the same event: it queues the new change after the pending one, so the drain applies both in order. The editor's writes run one at a time under a `Mutex`, which re-reads the queue inside it, so two sheets can't race; the lock is held only around the write, never while the PIN pad is up. A second delete of an event already queued for delete is not queued again (checked under the same lock).
+- The provider call and the mirror update run on `@ApplicationScope`, so closing the sheet mid-write can't lose a change. They don't take the sync's `passLock` (that could hold the 10 s attempt behind a 60 s pass), so a pass already in flight may briefly put back the old mirror; the `requestSync()` after every write corrects it.
+- The loop no longer uses `collectLatest`. A trigger (a connection change or `requestSync`) that arrives mid-pass runs one more pass after it, rather than cancelling it. The loop also wakes early when an outbox entry falls due, so a 30 s backoff isn't stuck behind the 5-minute tick. The first pass starts when the first connection list arrives, so a connection added before the loop listened is never missed.
+- A queued change for a connection flagged `NeedsSignIn` is **not** paused: it retries with the normal backoff, and the connection is skipped for the rest of the pass once it fails. This meets design §5 ("the queue resumes after reconnect") without a separate pause state.
+- The contract adds one rule: **deleting an event that no longer exists succeeds.** Without it, a retried delete that had already reached the provider would be toasted as a failure. **Approved by the user (U3)**; the contract suite checks it.
 - The fake provider now puts the hand-off's week on the writable **"Family calendar"** source. Events are tagged by person *name*, and the debug seed turns the names into household ids (`tagSamples`). INSET day stays on the read-only "School terms" source. Plumber quote call stays untagged ("Added from phone"). The fake forgets its writes when the app restarts, which is acceptable for debug.
 - `CalendarStore.setMaster` also records the source as writable. `CalendarSetup.setMaster` checks the provider first, so a 2a install upgraded in place gets a writable master without clearing data.
 - The spec lists the unknown-health fix under the repository, but it is done in Task 1 because the code lives in `CalendarStore.healthOf`.
@@ -59,6 +64,49 @@
 - C6 (`requestSync`) and R12 (the `Mutex`): Task 7.
 - C8, the outbox table: Tasks 1 and 9.
 - The `MigrationTestHelper` test: Task 1.
+
+**Review outcome (settled; do not reintroduce):**
+- Accepted: B1, `Locale.ENGLISH` for the short day label (JDK 17's CLDR prints "Sept" for `Locale.UK`).
+- Accepted: B2, the drain delivers each event's changes in order (`blockedRefs`); no collapsing.
+- Modified: B3, an `ASSIGN` change kind applied to the mirror's event at send time; KDoc on `CalendarWriter.update` (title, times and tags only).
+- Deferred to 2b-2: S1, a `clientKey` on the outbox for idempotent creates.
+- Rejected: S2, a `baseJson` column (B3 covers it).
+- Accepted: R1, each outbox row decodes on its own (a bad row is logged and dropped), and a failing drain doesn't stop the sync.
+- Modified: R2, a change still queued 48 hours after it was made is dropped with a toast; no attempts cap.
+- Accepted: R3, a connection that fails to answer is skipped for the rest of the pass.
+- Accepted: R4, a change nothing can deliver is toasted before it is dropped.
+- Modified: R5, a `Mutex` inside the editor's write, re-reading the queue; never held across `authorise`.
+- Accepted via Simp3: R6, no stale health snapshot, because there is no pause.
+- Accepted: R7, documented only (a comment on the editor's write).
+- Modified: R8, one rejection toast per connection per pass through the injected `Toaster`.
+- Deferred to Plan 3: R8's mapping of raw provider text to fixed wording.
+- Deferred to Plan 3: R9, `runInterruptible` in the Google writer and its contract check.
+- Modified: R10, the editor toasts outcomes on the application scope through `Toaster`.
+- Accepted: R11, KDoc on the exception classes (429, 403 rate limits and 5xx are Unreachable; a delete's 404/410 is success).
+- Accepted: R12, `createdByLabel` keys on `isMaster`, with a test.
+- Accepted: R13, no `drop(1)`; the first connection list starts the first pass.
+- Accepted: T1, T2, T3, T4, T5, T7, T8, T11 (test fixes as listed in the tasks).
+- Modified: T6 and T9, the host test checks that a rejection keeps the sheet open; the toast checks move to `CalendarEditorTest`.
+- Modified: T10, an assign-rejected test, `detail_pin_light`, and a rollback demo test on the fake's existing switches (no debug trigger).
+- Accepted: BM1, the schema assets are a `debug` source set (they ship in the debug APK).
+- Moot: BM2, `WriteFailureToastsTest` no longer exists.
+- Rejected: BM3 (the stop-and-ask covers it).
+- Accepted: BM4, a note on the badge-count tests.
+- Deferred to Plan 3: DL1, a recurrence label from Google's RRULE.
+- Accepted: DL2, the note icons' colour is a checkpoint question.
+- Accepted: Simp1, one `callWriter` returning `WriteOutcome`, shared by the editor and the drain (not always-enqueue).
+- Accepted: Simp2, no `CalendarWriteEvents`, `WriteFailed` or `WriteFailureToasts`; `CalendarSync` takes the `Toaster`.
+- Accepted: Simp3, no NeedsSignIn pause.
+- Rejected: Simp4, keep `Refusal`.
+- Accepted after R10: Simp5, no `LocalToaster`.
+- Rejected: Simp6, `NotEditable` closes the sheet and `Cancelled` doesn't.
+- Accepted: Simp7, the editor takes no `providers`.
+- Rejected: Simp8, the queued-delete check stays, moved under R5's lock.
+- Accepted: Simp9, `listKey` joins with NUL.
+- Rejected: Simp10, Simp11.
+- Modified: Simp12, the README is part of Task 12; Tasks 5 and 6 stay separate.
+- Modified: Simp13, `detail_untagged_collapsed_dark` is dropped; the light variants stay.
+- Approved by the user: U1 (the session extends only on an authorised action), U2 (a shortcut refusal toasts, then locks), U3 (delete-missing succeeds; the connection label in 2b-1).
 
 ## Global Constraints
 
@@ -104,8 +152,9 @@
    - Tests:
      - Task 8 `offlineDeleteIsQueued`
      - Task 9 `aQueuedDeleteIsHidden`
-     - Task 7 `drainRejectionDropsTheChangeAndEmitsWriteFailed`
+     - Task 7 `drainRejectionDropsTheChangeAndToastsWhy`
      - Task 9 `aRejectedQueuedDeleteBringsTheEventBack`
+     - Task 12 `aRefusedOfflineDeleteComesBackWithAToast` (the sample calendar end to end)
 2. **The 5-minute sync does a full replace while changes are queued.**
    - Queued changes live only in `outbox`, so a full replace of `event` must not lose them or undo the overlay.
    - Tests:
@@ -119,11 +168,14 @@
      - `childCanDeleteTheirOwnEvent`
      - `adultCanDeleteAnyMasterEvent`
      - `childCannotAssignAndIsToldToAskAnAdult`
-     - `signedInChildIsRefusedWithoutAPinPad`
-4. **The session runs out while the sheet is open**, between the guard and the confirmation.
+     - `signedInChildIsRefusedWithoutAPinPad` (the refusal also signs Mia out)
+4. **The session runs out while the sheet is open**, between the guard and the confirmation, **or a child keeps an adult's session alive.**
    - The delete must ask for the PIN again rather than go through as nobody, or as a stale person.
+   - Only an authorised action extends the session; touches don't. A refusal on the session shortcut signs the person out.
    - Tests:
-     - Task 3 `sessionLastsTwoMinutesAfterTheLastAction`
+     - Task 3 `sessionLastsTwoMinutesAfterTheLastAuthorisedAction`
+     - Task 3 `onlyAnAuthorisedActionExtendsTheSession`
+     - Task 3 `aRefusalOnTheSessionShortcutToastsThenLocks`
      - Task 8 `sessionExpiryBetweenGuardAndConfirmAsksForThePinAgain`
 5. **The tablet already has 2a data when 2b-1 is installed.**
    - The v1 → v2 migration must keep connections, sources (mappings), events and cursors.
@@ -139,6 +191,15 @@
      - Task 10 `deleteEventIgnoresASecondTapWhileBusy`
      - Task 8 `deletingAnEventAlreadyQueuedForDeleteDoesNotQueueItTwice`
      - Task 8 `closingTheSheetMidWriteStillFinishesTheWrite`
+     - Task 8 `concurrentWritesToOneEventRunOneAtATime`
+7. **Changes to one event arrive out of order, or an assign undoes an edit made on a phone.**
+   - A change queued behind one in backoff must wait for it, and a connection that doesn't answer must not cost a timeout per change.
+   - An assign must send the event as the mirror has it when it is sent, not as it was when it was queued.
+   - Tests:
+     - Task 7 `aLaterChangeWaitsForAnEarlierOneInBackoff`
+     - Task 7 `anUnreachableConnectionIsNotTriedAgainInThePass`
+     - Task 7 `aQueuedAssignIsAppliedToTheEventAsItIsNow`
+     - Task 9 `aQueuedAssignChangesOnlyThePerson`
 
 ---
 
@@ -147,33 +208,33 @@
 ```
 gradle/libs.versions.toml                                        (modify: room-testing)
 
-core/plugin/src/main/java/.../core/plugin/Overlays.kt            (create: OverlayHost, LocalOverlayHost, Toaster, LocalToaster)
+core/plugin/src/main/java/.../core/plugin/Overlays.kt            (create: OverlayHost, LocalOverlayHost, Toaster)
 core/ui/src/main/java/.../core/ui/Shell.kt                       (create: ShellTokens, ShellType, HhSheet, HhCloseButton, HhToast)
 core/access/src/main/java/.../core/access/
-  AccessControl.kt           (modify: 2-min session, PinReason, pinReasonText, Refusal, new authorise)
-  DefaultAccessControl.kt    (modify: reason/allow/refusal, Toaster)
+  AccessControl.kt           (modify: 2-min session, no touch(), PinReason, pinReasonText, Refusal, new authorise)
+  DefaultAccessControl.kt    (modify: reason/allow/refusal, Toaster, lock on a shortcut refusal)
   PinPromptController.kt     (modify: PinRequest.reason, NotAllowed.message)
   ui/PinPad.kt               (rewrite: hand-off §7 pad, over-sheet placement)
   ui/PinPadDimens.kt         (create: PinPadDimens, PinPadType)
 core/access/src/test/java/.../core/access/RecordingToaster.kt    (create)
 
 app/src/main/java/uk/co/siland/culvery/
-  MainActivity.kt, di/AppModule.kt                               (modify: overlay/toast layers, Toaster binding)
+  MainActivity.kt, di/AppModule.kt                               (modify: overlay/toast layers, Toaster binding, no touch hook)
   CulveryApp.kt                                                  (modify: providers into the seed)
   shell/ShellOverlays.kt                                         (create: OverlayState, ShellToasts, ToastMessage)
-  shell/ShellUiState.kt, shell/ShellViewModel.kt                 (modify: SessionUi)
+  shell/ShellUiState.kt, shell/ShellViewModel.kt                 (modify: SessionUi, no onUserActivity)
   shell/ui/OverlayLayers.kt                                      (create: OverlayLayer, ToastLayer)
   shell/ui/CulveryShell.kt, NavRail.kt, StatusBar.kt             (modify: status-bar sign-in, no rail chip)
 app/src/debug|release/java/uk/co/siland/culvery/DebugSeed.kt     (modify: master + tags)
 app/src/test/java/uk/co/siland/culvery/  shell/ShellToastsTest, shell/ui/OverlayLayersTest (create);
                                           shell/Fakes, shell/ShellViewModelTest, shell/ui/ShellLayoutTest,
                                           shell/ui/ShellScreenshotTest (modify)
-app/src/testDebug/java/uk/co/siland/culvery/DebugSeedTest.kt     (modify)
+app/src/testDebug/java/uk/co/siland/culvery/DebugSeedTest.kt     (modify); SampleRollbackTest.kt (create)
 app/src/test/screenshots/  home_session_dark, pin_pad_{dark,light}, home_calendar_{dark,light} (re-recorded);
                            home_toast_dark, pin_pad_wrong_dark (new)
 
 capability/calendar/
-  build.gradle.kts                   (modify: :core:access, room-testing, schema assets for tests)
+  build.gradle.kts                   (modify: :core:access, room-testing, schemas as debug assets)
   schemas/…CalendarDatabase/2.json   (generated, committed)
   src/main/java/uk/co/siland/culvery/capability/calendar/
     CalendarContract.kt      (modify: EventDraft, CalendarWriter, WriteRejectedException)
@@ -181,25 +242,25 @@ capability/calendar/
     db/CalendarDatabase.kt   (modify: v2 — source.isMaster, outbox, DAO)
     db/Migrations.kt         (create: MIGRATION_1_2)
     CalendarStore.kt         (modify: master, outbox, single-event reads/writes, healthOf)
-    CalendarWriteEvents.kt   (create: WriteFailed, CalendarWriteEvents, writeFailedMessage, WriteFailureToasts)
-    CalendarSync.kt          (modify: Mutex, outbox drain, writers)
+    Writes.kt                (create: backoff, OUTBOX_MAX_AGE_MS, WriteOutcome, callWriter, couldNotSave, assignDraft)
+    CalendarSync.kt          (modify: Mutex, in-order outbox drain, writers, Toaster)
     CalendarSyncLoop.kt      (modify: @Singleton, requestSync, early wake)
     CalendarPermissions.kt   (create: CalendarPermissions, CalendarPermissionSource)
     Editability.kt           (create: ReadOnlyReason, readOnlyReason())
-    CalendarEditor.kt        (create)
+    CalendarEditor.kt        (create: EditResult, EVENT_DELETED, write Mutex, outcome toasts)
     PendingOverlay.kt        (create: ShownEvent, overlayPending())
     CalendarUi.kt            (modify: EventUi fields, EventDetailUi, whenLabel, createdByLabel, badges)
     CalendarRepository.kt    (modify: overlay, event(ref, today), people)
     CalendarSetup.kt         (modify: setMaster, requestSync)
     CalendarCapability.kt    (modify: editor → hosts)
-    di/CalendarModule.kt     (modify: migration, writers, permissions, WriteFailureToasts)
+    di/CalendarModule.kt     (modify: migration, writers, permissions)
     ui/CalendarType.kt       (modify: sheet styles and dimens)
     ui/EventDetailSheet.kt   (create: stateless sheet)
     ui/EventDetailHost.kt    (create: host + rememberEventOpener)
     ui/Badges.kt             (create: EventBadges)
     ui/TodayCard.kt, ui/WeekView.kt, ui/ComingUpCard.kt, ui/Components.kt, ui/CardHosts.kt (modify)
   src/test/java/uk/co/siland/culvery/capability/calendar/
-    CalendarMigrationTest, CalendarStoreTest, CalendarSyncTest, CalendarSyncLoopTest, WriteFailureToastsTest,
+    CalendarMigrationTest, CalendarStoreTest, CalendarSyncTest, CalendarSyncLoopTest,
     ScriptedProvider, ScriptedWriter, TestAccess, RecordingToaster, StubEditor, CalendarEditorTest,
     CalendarPermissionsTest, PendingOverlayTest, WhenLabelTest, CalendarRepositoryTest, CalendarSetupTest,
     CalendarCapabilityTest, ui/RecordingOverlay, ui/EventDetailSheetTest, ui/EventDetailHostTest,
@@ -209,7 +270,7 @@ capability/calendar/
 
 capability/calendar-testkit/   CalendarProviderContractTest (write checks), fixtures TinyProvider/TinyContracts, ContractSuiteSelfTest
 provider/calendar-fake/        FakeCalendarProvider (writer, switches, tagSamples), SampleEvents (Family calendar), module, tests
-README.md
+README.md                      (modify, Task 12 after the checkpoint)
 ```
 
 `...` stands for `uk/co/siland/culvery`; every step below spells out the full path.
@@ -241,7 +302,7 @@ README.md
   - `data class EventRef(connectionId: String, sourceId: String, remoteId: String)` with `val listKey: String`
   - `StoredEvent.ref: EventRef`
   - `StoredSource(connectionId, source, mapping, isMaster: Boolean = false)`
-  - `enum class ChangeKind { CREATE, UPDATE, DELETE }`
+  - `enum class ChangeKind { CREATE, UPDATE, DELETE, ASSIGN }` (an ASSIGN's draft counts only for its `forPerson`)
   - `data class PendingChange(id: Long, connectionId: String, sourceId: String, remoteId: String?, kind: ChangeKind, draft: EventDraft?, attempts: Int, nextAttemptMillis: Long, createdMillis: Long)` with `val ref: EventRef?`
   - `CalendarStore`:
     - Sources and the master:
@@ -256,9 +317,8 @@ README.md
       - `suspend fun applyDeleted(ref: EventRef, completing: Long? = null)`
     - The outbox:
       - `suspend fun enqueue(change: PendingChange): Long`
-      - `fun pending(): Flow<List<PendingChange>>`
-      - `suspend fun pendingNow(): List<PendingChange>`
-      - `suspend fun dueChanges(nowMillis: Long): List<PendingChange>`
+      - `fun pending(): Flow<List<PendingChange>>`: skips a row it can't read
+      - `suspend fun pendingNow(): List<PendingChange>`: in queue order; logs and deletes a row it can't read
       - `suspend fun nextAttemptMillis(): Long?`
       - `suspend fun reschedule(id: Long, attempts: Int, nextAttemptMillis: Long)`
       - `suspend fun dropChange(id: Long)`
@@ -283,8 +343,9 @@ plugins {
 }
 
 android {
-    // MigrationTestHelper reads the exported schema JSON as test assets.
-    sourceSets.getByName("test").assets.srcDir("$projectDir/schemas")
+    // MigrationTestHelper reads the exported schema JSON as assets. Robolectric reads the variant's assets, not
+    // test assets, so the schemas are debug assets: a few KB in the debug APK, nothing in release.
+    sourceSets.getByName("debug").assets.srcDir("$projectDir/schemas")
 }
 
 dependencies {
@@ -308,6 +369,7 @@ import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertThrows
 import kotlinx.coroutines.runBlocking
 import uk.co.siland.culvery.capability.calendar.db.ConnectionEntity
+import uk.co.siland.culvery.capability.calendar.db.OutboxEntity
 ```
 (`first` is already imported; keep one copy.) Then add these members at the end of the class:
 ```kotlin
@@ -359,27 +421,40 @@ import uk.co.siland.culvery.capability.calendar.db.ConnectionEntity
         val create = change(ChangeKind.CREATE, remoteId = null, draft = allDay)
         val update = change(ChangeKind.UPDATE, draft = eventDraft("Swim", 23, 9, forPerson = "family"))
         val delete = change(ChangeKind.DELETE, draft = null)
-        val ids = listOf(store.enqueue(create), store.enqueue(update), store.enqueue(delete))
+        val assign = change(ChangeKind.ASSIGN, draft = eventDraft("Swim", 23, 9, forPerson = "sam-id"))
+        val ids = listOf(store.enqueue(create), store.enqueue(update), store.enqueue(delete), store.enqueue(assign))
         assertThat(store.pendingNow()).containsExactly(
             create.copy(id = ids[0]),
             update.copy(id = ids[1]),
             delete.copy(id = ids[2]),
+            assign.copy(id = ids[3]),
         ).inOrder()
         assertThat(store.pending().first().map { it.ref }).containsExactly(
             null,
+            EventRef("c1", "s1", "e1"),
             EventRef("c1", "s1", "e1"),
             EventRef("c1", "s1", "e1"),
         ).inOrder()
     }
 
     @Test
-    fun dueChangesAreThoseWhoseTimeHasComeInQueueOrder() = runTest {
+    fun nextAttemptIsTheEarliestQueuedTime() = runTest {
         connect("s1")
-        val later = store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null, next = 5_000))
-        val now = store.enqueue(change(ChangeKind.DELETE, remoteId = "b", draft = null, next = 1_000))
-        assertThat(store.dueChanges(1_000).map { it.id }).containsExactly(now)
-        assertThat(store.dueChanges(5_000).map { it.id }).containsExactly(later, now).inOrder()
+        store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null, next = 5_000))
+        store.enqueue(change(ChangeKind.DELETE, remoteId = "b", draft = null, next = 1_000))
         assertThat(store.nextAttemptMillis()).isEqualTo(1_000L)
+    }
+
+    @Test
+    fun anUnreadableQueuedRowIsDroppedAndTheOthersStillRead() = runTest {
+        connect("s1")
+        val dao = db.calendarDao()
+        dao.insertOutbox(OutboxEntity(connectionId = "c1", sourceId = "s1", remoteId = "x", kind = "BOGUS", draftJson = null, attempts = 0, nextAttemptMillis = 0, createdMillis = 0))
+        dao.insertOutbox(OutboxEntity(connectionId = "c1", sourceId = "s1", remoteId = "y", kind = "UPDATE", draftJson = "{", attempts = 0, nextAttemptMillis = 0, createdMillis = 0))
+        val good = store.enqueue(change(ChangeKind.DELETE, draft = null))
+        assertThat(store.pending().first().map { it.id }).containsExactly(good)
+        assertThat(store.pendingNow().map { it.id }).containsExactly(good)
+        assertThat(dao.outboxNow().map { it.id }).containsExactly(good)
     }
 
     @Test
@@ -457,6 +532,7 @@ import uk.co.siland.culvery.capability.calendar.db.ConnectionEntity
     fun listKeysDifferWhenSlashesMoveBetweenIds() {
         assertThat(EventRef("a/b", "c", "d").listKey).isNotEqualTo(EventRef("a", "b/c", "d").listKey)
         assertThat(EventRef("a", "b", "c/d").listKey).isNotEqualTo(EventRef("a", "b/c", "d").listKey)
+        assertThat(EventRef("ab", "c", "d").listKey).isNotEqualTo(EventRef("a", "bc", "d").listKey)
     }
 ```
 
@@ -609,8 +685,8 @@ data class StoredSource(
 
 /** One mirrored event. Ids from providers may contain any character, including "/". */
 data class EventRef(val connectionId: String, val sourceId: String, val remoteId: String) {
-    /** A Bundle-safe lazy-list key; the length prefixes keep it unambiguous whatever the ids contain. */
-    val listKey: String get() = "${connectionId.length}:$connectionId${sourceId.length}:$sourceId$remoteId"
+    /** A Bundle-safe lazy-list key. NUL never appears in a provider id, so it can't be mistaken for part of one. */
+    val listKey: String get() = "$connectionId\u0000$sourceId\u0000$remoteId"
 }
 
 data class StoredEvent(
@@ -630,11 +706,12 @@ data class StoredEvent(
     val ref: EventRef get() = EventRef(connectionId, sourceId, remoteId)
 }
 
-enum class ChangeKind { CREATE, UPDATE, DELETE }
+/** ASSIGN changes only who an event is for: it is sent as the event is when it is sent, with the new person. */
+enum class ChangeKind { CREATE, UPDATE, DELETE, ASSIGN }
 
 /**
  * One queued write, kept until the provider accepts or refuses it. [remoteId] is null only for CREATE;
- * [draft] is null only for DELETE. [id] is 0 until the store assigns one.
+ * [draft] is null only for DELETE, and for ASSIGN only its forPerson counts. [id] is 0 until the store assigns one.
  */
 data class PendingChange(
     val id: Long,
@@ -736,7 +813,7 @@ data class OutboxEntity(
     val sourceId: String,
     /** Null for CREATE. */
     val remoteId: String?,
-    /** CREATE, UPDATE or DELETE. */
+    /** CREATE, UPDATE, DELETE or ASSIGN. */
     val kind: String,
     /** The EventDraft as JSON; null for DELETE. */
     val draftJson: String?,
@@ -843,9 +920,6 @@ interface CalendarDao {
     @Query("SELECT * FROM outbox ORDER BY id")
     suspend fun outboxNow(): List<OutboxEntity>
 
-    @Query("SELECT * FROM outbox WHERE nextAttemptMillis <= :now ORDER BY id")
-    suspend fun dueOutbox(now: Long): List<OutboxEntity>
-
     @Query("SELECT MIN(nextAttemptMillis) FROM outbox")
     suspend fun nextAttemptMillis(): Long?
 
@@ -902,6 +976,7 @@ Replace `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calen
 ```kotlin
 package uk.co.siland.culvery.capability.calendar
 
+import android.util.Log
 import androidx.room.withTransaction
 import java.time.Instant
 import java.time.LocalDate
@@ -1029,11 +1104,15 @@ class CalendarStore @Inject constructor(private val db: CalendarDatabase) {
 
     suspend fun enqueue(change: PendingChange): Long = dao.insertOutbox(change.toEntity())
 
-    fun pending(): Flow<List<PendingChange>> = dao.outbox().map { rows -> rows.map { it.toPending() } }
+    /** Skips a row this version can't read; [pendingNow] deletes it. */
+    fun pending(): Flow<List<PendingChange>> = dao.outbox().map { rows -> rows.mapNotNull { it.readOrNull() } }
 
-    suspend fun pendingNow(): List<PendingChange> = dao.outboxNow().map { it.toPending() }
-
-    suspend fun dueChanges(nowMillis: Long): List<PendingChange> = dao.dueOutbox(nowMillis).map { it.toPending() }
+    /** In queue order. A row this version can't read is logged and deleted, so one bad row can't stall the queue. */
+    suspend fun pendingNow(): List<PendingChange> = dao.outboxNow().mapNotNull { row ->
+        val change = row.readOrNull()
+        if (change == null) dao.deleteOutbox(row.id)
+        change
+    }
 
     suspend fun nextAttemptMillis(): Long? = dao.nextAttemptMillis()
 
@@ -1041,7 +1120,14 @@ class CalendarStore @Inject constructor(private val db: CalendarDatabase) {
 
     suspend fun dropChange(id: Long) = dao.deleteOutbox(id)
 
+    private fun OutboxEntity.readOrNull(): PendingChange? =
+        runCatching { toPending() }
+            .onFailure { Log.w(TAG, "Dropping unreadable outbox row $id (kind $kind)", it) }
+            .getOrNull()
+
     private companion object {
+        const val TAG = "CalendarStore"
+
         // SQLite allows 999 bound variables per statement on older Android versions.
         const val REMOVE_CHUNK = 500
     }
@@ -1190,14 +1276,7 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/d
 Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarStoreTest*" --tests "*CalendarMigrationTest*"`
 Expected: PASS. The build writes `capability/calendar/schemas/uk.co.siland.culvery.capability.calendar.db.CalendarDatabase/2.json`.
 
-**If `CalendarMigrationTest` fails with `FileNotFoundException` for `…CalendarDatabase/1.json`,** Robolectric isn't seeing the test assets. Change the `android { }` block in `capability/calendar/build.gradle.kts` to:
-```kotlin
-android {
-    // MigrationTestHelper reads the exported schema JSON as assets. Debug-only: nothing ships in release.
-    sourceSets.getByName("debug").assets.srcDir("$projectDir/schemas")
-}
-```
-Then run the tests again. If the test still can't find the schema, stop and ask.
+**If `CalendarMigrationTest` fails with `FileNotFoundException` for `…CalendarDatabase/1.json`,** Robolectric isn't seeing the debug assets. Stop and ask; don't move the schemas into `src/main`.
 
 **If `runMigrationsAndValidate` reports a schema mismatch,** open `2.json`. Copy the `createSql` for `outbox` (with `${TABLE_NAME}` replaced by `outbox`) and the `isMaster` field (`"defaultValue": "0"`) into `MIGRATION_1_2` exactly, then run again.
 
@@ -1252,7 +1331,7 @@ git commit -m "Add calendar.db v2 with the master flag and outbox, and its migra
 - Produces:
   - `:core:plugin`:
     - `interface OverlayHost { fun show(content: @Composable () -> Unit); fun dismiss() }` and `val LocalOverlayHost`
-    - `interface Toaster { fun show(message: String, icon: String = TOAST_ICON_INFO) }`, `val LocalToaster`, `const val TOAST_ICON_INFO = "info"`
+    - `interface Toaster { fun show(message: String, icon: String = TOAST_ICON_INFO) }` (injected only; no composition local), `const val TOAST_ICON_INFO = "info"`
   - `:core:ui`:
     - `object ShellTokens`: `sheetScrim`, `pinScrim`, `sheetWidth`, `sheetBorder`, `sheetGap`, `closeButton`, `closeIcon`, the toast and status values, `TOAST_MILLIS = 3_500L`
     - `object ShellType` (`toast`, `signOut`)
@@ -1387,6 +1466,7 @@ class OverlayLayersTest {
             CulveryTheme(dark = true) { ToastLayer(toast) { id -> if (toast?.id == id) toast = null } }
         }
         toast = ToastMessage(1, "Event deleted", "info")
+        compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("Event deleted").assertExists()
         compose.mainClock.advanceTimeBy(3_000)
@@ -1405,10 +1485,17 @@ class OverlayLayersTest {
         }
         compose.mainClock.advanceTimeBy(3_000)
         toast = ToastMessage(2, "Second", "info")
+        compose.waitForIdle()
         compose.mainClock.advanceTimeBy(1_000)
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("Second").assertExists()
         compose.onNodeWithText("First").assertDoesNotExist()
+        // The second toast's own 3.5 s runs from about 3.0 s: still showing at 6.3 s, gone by 6.6 s.
+        compose.mainClock.advanceTimeBy(2_300)
+        compose.onNodeWithText("Second").assertExists()
+        compose.mainClock.advanceTimeBy(300)
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("Second").assertDoesNotExist()
     }
 }
 ```
@@ -1556,15 +1643,12 @@ val LocalOverlayHost = staticCompositionLocalOf<OverlayHost> {
 const val TOAST_ICON_INFO = "info"
 
 /**
- * A short bottom-centre message (hand-off §7). Injectable, so background work can use it, and also provided as
- * [LocalToaster]. Safe from any thread. A new toast replaces the current one.
+ * A short bottom-centre message (hand-off §7). Injected wherever a toast is shown (access control, the calendar
+ * editor, the outbox drain), so a toast never depends on a composable still being on screen. Safe from any
+ * thread. A new toast replaces the current one.
  */
 interface Toaster {
     fun show(message: String, icon: String = TOAST_ICON_INFO)
-}
-
-val LocalToaster = staticCompositionLocalOf<Toaster> {
-    error("LocalToaster not provided: wrap the content in CompositionLocalProvider(LocalToaster provides …)")
 }
 ```
 
@@ -2124,7 +2208,6 @@ import uk.co.siland.culvery.core.access.ui.PinPadHost
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
-import uk.co.siland.culvery.core.plugin.LocalToaster
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ShellToasts
@@ -2167,7 +2250,6 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(
                 LocalShellNavigator provides shell,
                 LocalOverlayHost provides overlay,
-                LocalToaster provides toasts,
             ) {
                 CulveryTheme(dark = state.dark) {
                     CulveryShell(
@@ -2275,14 +2357,19 @@ git commit -m "Add the sheet overlay and toasts to the shell and show the sessio
 - Modify: `core/access/src/main/java/uk/co/siland/culvery/core/access/PinPromptController.kt`
 - Create: `core/access/src/test/java/uk/co/siland/culvery/core/access/RecordingToaster.kt`
 - Test: `core/access/src/test/java/uk/co/siland/culvery/core/access/DefaultAccessControlTest.kt` (modify)
-- Modify: `app/src/test/java/uk/co/siland/culvery/shell/Fakes.kt` (`FakeAccessControl` signature)
+- Modify: `app/src/main/java/uk/co/siland/culvery/MainActivity.kt` (remove the touch hook)
+- Modify: `app/src/main/java/uk/co/siland/culvery/shell/ShellViewModel.kt` (remove `onUserActivity`)
+- Modify: `app/src/test/java/uk/co/siland/culvery/shell/Fakes.kt` (`FakeAccessControl` signature, no `touch`)
+- Test: `app/src/test/java/uk/co/siland/culvery/shell/ShellViewModelTest.kt` (remove `userActivityTouchesSession`)
 
 **Interfaces:**
 - Consumes:
   - `Toaster` (Task 2)
   - existing `PermissionRegistry`, `PinManager`, `LockoutStore`, `PinPromptController`, `WallClock`, `@ApplicationScope`
 - Produces:
-  - `const val SESSION_TIMEOUT_MS = 120_000L`
+  - `const val SESSION_TIMEOUT_MS = 120_000L`, counted from the last successful `authorise` (a PIN-gated action), never from a touch
+  - `AccessControl.touch()` is **removed**, with `ShellViewModel.onUserActivity()` and `MainActivity.dispatchTouchEvent`
+  - A `Refusal.Toast` refusal on the session shortcut shows the toast, then `lock()`s
   - `enum class PinReason { Generic, Save, Edit, Delete, Assign }`
   - `fun pinReasonText(reason: PinReason, label: String): String`
   - `sealed interface Refusal { data object InPad; class Toast(val message: (name: String) -> String) }`
@@ -2318,10 +2405,10 @@ In `core/access/src/test/java/uk/co/siland/culvery/core/access/DefaultAccessCont
     private val toasts = RecordingToaster()
 ```
 2. In `access()`, add `toaster = toasts,` after `clock = WallClock { testScheduler.currentTime },`.
-3. Replace `sessionExpiresAfterSixtySecondsIdle` and `touchExtendsSessionButItStillExpires` with:
+3. Replace `sessionExpiresAfterSixtySecondsIdle` and `touchExtendsSessionButItStillExpires` with the tests below. `AccessControl` no longer has `touch()`, so touching the screen can't extend a session: the first test is the "touches alone don't keep it alive" case, because nothing but an authorised action restarts the timer.
 ```kotlin
     @Test
-    fun sessionLastsTwoMinutesAfterTheLastAction() = runTest {
+    fun sessionLastsTwoMinutesAfterTheLastAuthorisedAction() = runTest {
         person("Alex", Role.ADMIN, "1234")
         val access = access()
         answerPins("1234")
@@ -2334,16 +2421,18 @@ In `core/access/src/test/java/uk/co/siland/culvery/core/access/DefaultAccessCont
     }
 
     @Test
-    fun touchExtendsTheTwoMinuteSessionButItStillExpires() = runTest {
+    fun onlyAnAuthorisedActionExtendsTheSession() = runTest {
         person("Alex", Role.ADMIN, "1234")
         val access = access()
         answerPins("1234")
-        access.authorise(CorePermissions.SETTINGS_MANAGE)
+        access.authorise("test.any")
         advanceTimeBy(100_000); runCurrent()
-        access.touch()
-        advanceTimeBy(100_000); runCurrent()
+        // Passes on the session shortcut, without a pad, and restarts the two minutes.
+        assertThat(access.authorise("test.any")).isNotNull()
+        assertThat(seen).hasSize(1)
+        advanceTimeBy(119_000); runCurrent()
         assertThat(access.session.value).isNotNull()
-        advanceTimeBy(21_000); runCurrent()
+        advanceTimeBy(2_000); runCurrent()
         assertThat(access.session.value).isNull()
     }
 ```
@@ -2365,16 +2454,19 @@ In `core/access/src/test/java/uk/co/siland/culvery/core/access/DefaultAccessCont
     }
 
     @Test
-    fun allowIsAppliedOnTheSessionShortcut() = runTest {
+    fun aRefusalOnTheSessionShortcutToastsThenLocks() = runTest {
         person("Alex", Role.ADMIN, "1234")
         val access = access()
-        answerPins("1234")
+        answerPins("1234", "1234")
         access.authorise("test.any")
         val refused = access.authorise("test.any", allow = { _, _ -> false }, refusal = Refusal.Toast { "$it may not" })
         assertThat(refused).isNull()
         assertThat(seen).hasSize(1)
         assertThat(toasts.messages).containsExactly("Alex may not")
-        assertThat(access.session.value?.person?.name).isEqualTo("Alex")
+        assertThat(access.session.value).isNull()
+        // The next tap brings up the PIN pad, so someone else can take over.
+        assertThat(access.authorise("test.any")).isNotNull()
+        assertThat(seen).hasSize(2)
     }
 
     @Test
@@ -2450,7 +2542,7 @@ import uk.co.siland.culvery.core.household.Role
 
 data class Authorised(val person: Person, val role: Role, val granted: Set<String>)
 
-/** Hand-off §7: signed in for 2 minutes after the last action. */
+/** Hand-off §7: signed in for 2 minutes after the last authorised action. Touching the screen doesn't extend it. */
 const val SESSION_TIMEOUT_MS = 120_000L
 
 /** Why the PIN pad is asking; it picks the pad's reason line. */
@@ -2482,7 +2574,8 @@ interface AccessControl {
      *
      * [allow] runs on the session shortcut and after each PIN, with the permissions the person holds.
      * [refusal] decides whether a "no" asks for another PIN in the pad, or closes the pad with a toast. With
-     * [Refusal.Toast], a signed-in person who is refused gets the toast without a PIN pad.
+     * [Refusal.Toast], a signed-in person who is refused gets the toast without a PIN pad and is signed out, so
+     * the next tap asks for a PIN. Each success restarts the session's two minutes.
      */
     suspend fun authorise(
         vararg anyOf: String,
@@ -2490,9 +2583,6 @@ interface AccessControl {
         allow: (Identified, granted: Set<String>) -> Boolean = { _, granted -> granted.isNotEmpty() },
         refusal: Refusal = Refusal.InPad,
     ): Authorised?
-
-    /** Call on each touch-down; extends an active session. */
-    fun touch()
 
     fun lock()
 }
@@ -2578,12 +2668,13 @@ class DefaultAccessControl @Inject constructor(
             if (current != null && defs.none { it.freshPin }) {
                 val grants = grantedFor(current.role, anyOf)
                 if (grants.isNotEmpty() && allow(current, grants)) {
-                    touch()
+                    restartExpiry()
                     return@withLock Authorised(current.person, current.role, grants)
                 }
                 if (refusal is Refusal.Toast) {
-                    touch()
                     toaster.show(refusal.message(current.person.name))
+                    // Signed out, so the next tap brings up the PIN pad: an adult can take over from a child.
+                    lock()
                     return@withLock null
                 }
             }
@@ -2630,10 +2721,6 @@ class DefaultAccessControl @Inject constructor(
         }
     }
 
-    override fun touch() {
-        if (_session.value != null) restartExpiry()
-    }
-
     override fun lock() {
         expiry?.cancel()
         _session.value = null
@@ -2653,7 +2740,7 @@ class DefaultAccessControl @Inject constructor(
 }
 ```
 
-- [ ] **Step 7: Update the app's fake**
+- [ ] **Step 7: Update the app: its fake, and no touch hook**
 
 In `app/src/test/java/uk/co/siland/culvery/shell/Fakes.kt`:
 - add imports `uk.co.siland.culvery.core.access.PinReason` and `uk.co.siland.culvery.core.access.Refusal`;
@@ -2666,6 +2753,27 @@ In `app/src/test/java/uk/co/siland/culvery/shell/Fakes.kt`:
         refusal: Refusal,
     ): Authorised? {
 ```
+- in `FakeAccessControl`, delete the line `var touches = 0` and the line `override fun touch() { touches++ }`.
+
+In `app/src/test/java/uk/co/siland/culvery/shell/ShellViewModelTest.kt`, delete the test `userActivityTouchesSession`.
+
+In `app/src/main/java/uk/co/siland/culvery/shell/ShellViewModel.kt`, delete the line `fun onUserActivity() = access.touch()` and the blank line before it.
+
+In `app/src/main/java/uk/co/siland/culvery/MainActivity.kt`, delete `import android.view.MotionEvent` and the whole `dispatchTouchEvent` override with its comment:
+```kotlin
+    // Every touch-down anywhere (shell, sheet, PIN pad) keeps the PIN session alive.
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) shell.onUserActivity()
+        return super.dispatchTouchEvent(ev)
+    }
+```
+so the class ends after `onWindowFocusChanged`.
+
+Then check nothing else still calls the removed API:
+```bash
+grep -rn "touch()\|onUserActivity\|dispatchTouchEvent" --include=*.kt app core
+```
+Expected: no output.
 
 - [ ] **Step 8: Run the tests to see them pass**
 
@@ -2680,8 +2788,8 @@ Expected: `BUILD SUCCESSFUL`. Hilt compiles `DefaultAccessControl` with the `Toa
 - [ ] **Step 10: Commit**
 
 ```bash
-git add core/access app/src/test
-git commit -m "Give access a 2-minute session, PIN reasons, allow rules and refusal toasts"
+git add core/access app
+git commit -m "Give access a 2-minute session that only authorised actions extend, PIN reasons, allow rules and refusal toasts"
 ```
 
 ---
@@ -3257,26 +3365,28 @@ git commit -m "Redesign the PIN pad and place it over an open sheet"
   - `EventDraft` (Task 1)
   - existing `CalendarProvider`, `RemoteEvent`, `CalendarSource`, `SyncCursor`, `Feature`
 - Produces:
-  - `class WriteRejectedException(message: String, cause: Throwable? = null) : Exception`
+  - `class WriteRejectedException(message: String, cause: Throwable? = null) : Exception`, with KDoc on it, `NeedsSignInException` and `UnreachableException` saying which provider errors each covers (429, 403 rate limits and 5xx are `UnreachableException`; a delete's 404/410 is success)
   - `interface CalendarWriter`:
     - `val providerId: String`
     - `suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft): RemoteEvent`
-    - `suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft): RemoteEvent`
+    - `suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft): RemoteEvent`: changes only the title, the times and the tags, and keeps every other field (Google: PATCH)
     - `suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String)`
   - `@Multibinds Set<CalendarWriter>` in `CalendarModule`
   - `CalendarProviderContractTest` hooks: `protected open fun writer(): CalendarWriter? = null` and `protected open fun writableSource(): CalendarSource? = null`
-  - Four new checks, which run only when the provider declares `Feature.WRITE`:
+  - Six new checks, which run only when the provider declares `Feature.WRITE`:
     - `createdEventComesBackOnTheNextSyncWithItsTags`
+    - `anAllDayEventRoundTrips`
     - `updatedFieldsRoundTrip`
     - `deletedEventIsRemovedOnTheNextSync`
+    - `deletingAnEventThatIsAlreadyGoneSucceeds`
     - `aWriteToAnUnknownSourceIsRejected`
-  - `TinyProvider.WRITABLE`; fixture contracts `DroppingTagsContract` and `ReadOnlyContract`
+  - `TinyProvider.WRITABLE`; fixture contracts `DroppingTagsContract`, `StrictDeleteContract` and `ReadOnlyContract`
 
 - [ ] **Step 1: Write the failing self-tests**
 
 In `capability/calendar-testkit/src/test/java/uk/co/siland/culvery/capability/calendar_testkit/ContractSuiteSelfTest.kt`:
-- add imports `uk.co.siland.culvery.capability.calendar_testkit.fixtures.DroppingTagsContract` and `uk.co.siland.culvery.capability.calendar_testkit.fixtures.ReadOnlyContract`;
-- in `wellBehavedProviderPassesEveryCheck`, change `isEqualTo(10)` to `isEqualTo(14)`;
+- add imports `uk.co.siland.culvery.capability.calendar_testkit.fixtures.DroppingTagsContract`, `uk.co.siland.culvery.capability.calendar_testkit.fixtures.ReadOnlyContract` and `uk.co.siland.culvery.capability.calendar_testkit.fixtures.StrictDeleteContract`;
+- in `wellBehavedProviderPassesEveryCheck`, change `isEqualTo(10)` to `isEqualTo(16)`;
 - add at the end of the class:
 ```kotlin
     @Test
@@ -3285,11 +3395,16 @@ In `capability/calendar-testkit/src/test/java/uk/co/siland/culvery/capability/ca
     }
 
     @Test
+    fun refusingToDeleteAMissingEventIsCaught() {
+        assertThat(failuresOf(StrictDeleteContract::class.java)).containsExactly("deletingAnEventThatIsAlreadyGoneSucceeds")
+    }
+
+    @Test
     fun aReadOnlyProviderSkipsOnlyTheWriteChecks() {
         val result = JUnitCore.runClasses(ReadOnlyContract::class.java)
         assertThat(result.failures.map { "${it.description.methodName}: ${it.message}" }).isEmpty()
-        assertThat(result.runCount).isEqualTo(14)
-        assertThat(result.assumptionFailureCount).isEqualTo(4)
+        assertThat(result.runCount).isEqualTo(16)
+        assertThat(result.assumptionFailureCount).isEqualTo(6)
     }
 ```
 
@@ -3301,19 +3416,38 @@ In `capability/calendar-testkit/src/test/java/uk/co/siland/culvery/capability/ca
 and add at the end of the file:
 ```kotlin
 class DroppingTagsContract : TinyContract(TinyProvider(dropTagsOnCreate = true))
+class StrictDeleteContract : TinyContract(TinyProvider(rejectMissingDelete = true))
 class ReadOnlyContract : TinyContract(TinyProvider(canWrite = false))
 ```
 
 - [ ] **Step 2: Run the self-test to see it fail**
 
 Run: `./gradlew :capability:calendar-testkit:testDebugUnitTest`
-Expected: compilation FAILS: `writer`, `writableSource`, `TinyProvider.WRITABLE`, and the `dropTagsOnCreate` and `canWrite` parameters are unresolved.
+Expected: compilation FAILS: `writer`, `writableSource`, `TinyProvider.WRITABLE`, and the `dropTagsOnCreate`, `rejectMissingDelete` and `canWrite` parameters are unresolved.
 
 - [ ] **Step 3: Add the write contract**
 
-In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarContract.kt`, insert after `class UnreachableException …`:
+In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarContract.kt`, replace the two lines
 ```kotlin
-/** A permanent refusal from the provider (Google: a 4xx other than auth). Retrying would not help. */
+class NeedsSignInException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+
+class UnreachableException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+```
+with:
+```kotlin
+/** The connection's sign-in has expired or been revoked (Google: 401, or a refused token refresh). */
+class NeedsSignInException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+
+/**
+ * The provider couldn't be reached, or asked to be tried later: network errors, and for Google 429, 403
+ * rate-limit reasons (rateLimitExceeded, userRateLimitExceeded) and every 5xx. The engine retries with backoff.
+ */
+class UnreachableException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+
+/**
+ * A permanent refusal: retrying would not help (Google: a 4xx other than 401, 429 and the 403 rate limits).
+ * A delete that finds the event already gone (404 or 410) is a success, not a refusal.
+ */
 class WriteRejectedException(message: String, cause: Throwable? = null) : Exception(message, cause)
 ```
 and append at the end of the file:
@@ -3335,6 +3469,10 @@ interface CalendarWriter {
 
     suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft): RemoteEvent
 
+    /**
+     * Changes only the title, the times and the two tags. Everything else the service holds (description,
+     * location, attendees, reminders) is kept (Google: PATCH, never PUT).
+     */
     suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft): RemoteEvent
 
     suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String)
@@ -3415,6 +3553,20 @@ import uk.co.siland.culvery.core.plugin.Feature
     }
 
     @Test
+    fun anAllDayEventRoundTrips() = runTest {
+        val (w, source) = requireWriting()
+        val before = subject.sync(conn, source, window, null)
+        val first = window.start.plusDays(2)
+        // Two days: the end date is exclusive, as in RemoteEvent.
+        val draft = EventDraft("All-day check", EventTime.AllDay(first), EventTime.AllDay(first.plusDays(2)), "contract-for", "contract-by")
+        val created = w.create(conn, source, draft)
+        assertMatches("create's result", created, draft)
+        val synced = nextSyncReturns(source, before.cursor, created.remoteId)
+        assertWithMessage("the next sync must return the all-day event").that(synced).isNotNull()
+        assertMatches("the next sync", synced!!, draft)
+    }
+
+    @Test
     fun updatedFieldsRoundTrip() = runTest {
         val (w, source) = requireWriting()
         val created = w.create(conn, source, draftIn("Before", 1))
@@ -3443,6 +3595,21 @@ import uk.co.siland.culvery.core.plugin.Feature
         assertWithMessage("the next sync must report the delete: a removal, or absence from a full replace")
             .that(reported).isTrue()
         assertThat(subject.sync(conn, source, window, null).upserts.map { it.remoteId }).doesNotContain(created.remoteId)
+    }
+
+    @Test
+    fun deletingAnEventThatIsAlreadyGoneSucceeds() = runTest {
+        val (w, source) = requireWriting()
+        val created = w.create(conn, source, draftIn("Twice", 1))
+        w.delete(conn, source, created.remoteId)
+        val error = try {
+            w.delete(conn, source, created.remoteId)
+            null
+        } catch (e: Exception) {
+            e
+        }
+        assertWithMessage("a second delete of the same event must succeed: a retried delete may already have landed")
+            .that(error).isNull()
     }
 
     @Test
@@ -3495,6 +3662,7 @@ class TinyProvider(
     private val rawAuthErrors: Boolean = false,
     private val canWrite: Boolean = true,
     private val dropTagsOnCreate: Boolean = false,
+    private val rejectMissingDelete: Boolean = false,
 ) : CalendarProvider, CalendarWriter {
     override val descriptor = ProviderDescriptor(
         "calendar.tiny",
@@ -3566,7 +3734,10 @@ class TinyProvider(
 
     override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) {
         checkWritable(source)
-        if (written.remove(remoteId) != null) version++
+        when {
+            written.remove(remoteId) != null -> version++
+            rejectMissingDelete -> throw WriteRejectedException("No event $remoteId")
+        }
     }
 
     private fun checkWritable(source: CalendarSource) {
@@ -3598,16 +3769,17 @@ class TinyProvider(
 - [ ] **Step 6: Run the self-test to see it pass**
 
 Run: `./gradlew :capability:calendar-testkit:testDebugUnitTest`
-Expected: PASS (9 tests in `ContractSuiteSelfTest`).
-- The good fixture runs 14 checks and skips none.
-- The read-only fixture skips exactly the four write checks.
+Expected: PASS (10 tests in `ContractSuiteSelfTest`).
+- The good fixture runs 16 checks and skips none.
+- The read-only fixture skips exactly the six write checks.
 - Dropping tags fails only `createdEventComesBackOnTheNextSyncWithItsTags`.
+- Refusing to delete a missing event fails only `deletingAnEventThatIsAlreadyGoneSucceeds`.
 - Every older broken fixture still fails only its own check.
 
 - [ ] **Step 7: Run the gate**
 
 Run: `./gradlew testDebugUnitTest verifyRoborazziDebug`
-Expected: `BUILD SUCCESSFUL`. `FakeCalendarProviderContractTest` still passes. Its provider does not declare WRITE yet, so the four write checks are skipped there until Task 6.
+Expected: `BUILD SUCCESSFUL`. `FakeCalendarProviderContractTest` still passes. Its provider does not declare WRITE yet, so the six write checks are skipped there until Task 6.
 
 - [ ] **Step 8: Commit**
 
@@ -4123,7 +4295,7 @@ abstract class FakeCalendarModule {
 - [ ] **Step 6: Run the fake's tests to see them pass**
 
 Run: `./gradlew :provider:calendar-fake:testDebugUnitTest`
-Expected: PASS. `FakeCalendarProviderContractTest` now runs all 14 checks. None is skipped, because the fake declares WRITE and gives a writer and a writable source.
+Expected: PASS. `FakeCalendarProviderContractTest` now runs all 16 checks. None is skipped, because the fake declares WRITE and gives a writer and a writable source.
 
 - [ ] **Step 7: Run the gate**
 
@@ -4139,62 +4311,117 @@ git commit -m "Let the sample calendar write, with reject and offline switches a
 
 ---
 
-### Task 7: Sync loop and outbox drain — `requestSync`, one pass at a time, backoff, `WriteFailed` toasts
+### Task 7: Sync loop and outbox drain — `requestSync`, one pass at a time, in-order delivery, backoff, rejection toasts
 
 **Files:**
-- Create: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarWriteEvents.kt`
+- Create: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/Writes.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSync.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSyncLoop.kt`
-- Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/di/CalendarModule.kt`
-- Modify: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ScriptedProvider.kt`
+- Modify (replace): `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ScriptedProvider.kt`
 - Create: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ScriptedWriter.kt`
 - Create: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/RecordingToaster.kt`
 - Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSyncTest.kt` (modify)
 - Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSyncLoopTest.kt` (modify)
-- Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/WriteFailureToastsTest.kt` (create)
 
 **Interfaces:**
 - Consumes:
-  - the store's outbox API and `applyAccepted`/`applyDeleted`/`source` (Task 1)
+  - the store's outbox API, `eventNow`, `applyAccepted`/`applyDeleted` and `source` (Task 1)
   - `CalendarWriter`, `WriteRejectedException` (Task 5)
   - `Toaster` (Task 2)
-- Produces:
+- Produces (in `Writes.kt`, shared with the editor in Task 8):
   - `val OUTBOX_BACKOFF_MS: List<Long>` = 30 s, 1 min, 2 min, 5 min; `internal fun backoffMillis(attempts: Int): Long`
-  - `data class WriteFailed(calendar: String, reason: String)` and `fun writeFailedMessage(failure: WriteFailed): String` ("Couldn't save to {calendar} — {reason}")
-  - `@Singleton class CalendarWriteEvents @Inject constructor()`, with `val failures: SharedFlow<WriteFailed>` and `fun emit(failure: WriteFailed)`
-  - `class WriteFailureToasts @Inject constructor(events, toaster, @ApplicationScope scope) : Startable`, bound `@IntoSet`
+  - `const val OUTBOX_MAX_AGE_MS = 48 * 60 * 60_000L`
+  - `internal const val EVENT_GONE = "The event no longer exists"`
+  - `internal sealed interface WriteOutcome { Accepted(event: RemoteEvent?); Rejected(message: String); Retry(blocksConnection: Boolean) }`
+  - `internal suspend fun callWriter(io: CoroutineContext, timeoutMillis: Long, call: suspend () -> RemoteEvent?): WriteOutcome`
+  - `fun couldNotSave(label: String, reason: String?): String` ("Couldn't save to {label} — {reason}", or "Couldn't save to {label}") and `internal fun couldNotSaveAll(label: String, reasons: List<String?>): String` ("Couldn't save {n} changes to {label}" for more than one)
+  - `internal fun assignDraft(event: StoredEvent, forPerson: String?): EventDraft`
+  - `internal object SilentToaster : Toaster`
+- Produces (the engine):
   - `CalendarSync`:
-    - `@Inject constructor(store, providers, writers: Set<CalendarWriter>, writeEvents: CalendarWriteEvents, zone, clock)`
-    - internal constructor `(store, providers, zone, clock, io, timeoutMillis, writers = emptySet(), writeEvents = CalendarWriteEvents())`
-    - `syncAll()` now drains due outbox entries first, and runs one pass at a time
+    - `@Inject constructor(store, providers, writers: Set<CalendarWriter>, toaster: Toaster, zone, clock)`
+    - internal constructor `(store, providers, zone, clock, io, timeoutMillis, writers = emptySet(), toaster: Toaster = SilentToaster)`
+    - `syncAll()` drains the outbox first (a drain failure is logged and the sync still runs), and runs one pass at a time
   - `@Singleton CalendarSyncLoop`:
     - `fun requestSync()`
     - internal constructor `(syncAll, connectionIds, scope, intervalMillis = SYNC_INTERVAL_MS, untilNextRetry: suspend () -> Long? = { null })`
     - `@Inject constructor(sync, store, clock: WallClock, @ApplicationScope scope)`
   - Test helpers:
-    - `ScriptedProvider(id, sourceList, features: Set<Feature> = setOf(Feature.READ))`, with `var gate: CompletableDeferred<Unit>?`
-    - `ScriptedWriter(providerId)`, with `calls: MutableList<String>`, `failWith` and `gate`
+    - `ScriptedProvider(id, sourceList, features: Set<Feature> = setOf(Feature.READ))`, with `var gate: CompletableDeferred<Unit>?`, `val entered: CompletableDeferred<Unit>` and `val maxInFlight: Int`
+    - `ScriptedWriter(providerId)`, with `calls: MutableList<String>`, `drafts: MutableList<EventDraft>`, `failWith`, `gate` and `entered`
     - `RecordingToaster`
 
 - [ ] **Step 1: Add the test helpers**
 
-In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ScriptedProvider.kt`:
-- add `import kotlinx.coroutines.CompletableDeferred`;
-- change the class header and descriptor to:
+Replace `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ScriptedProvider.kt` with:
 ```kotlin
+package uk.co.siland.culvery.capability.calendar
+
+import androidx.compose.runtime.Composable
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.withTimeout
+import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.Feature
+import uk.co.siland.culvery.core.plugin.ProviderDescriptor
+
+internal data class SyncCall(val connectionId: String, val sourceId: String, val range: DateRange, val cursor: SyncCursor?)
+
+/** An in-test provider (the capability may not depend on :provider:calendar-fake, even in tests). */
 internal class ScriptedProvider(
     id: String,
     var sourceList: List<CalendarSource> = emptyList(),
     features: Set<Feature> = setOf(Feature.READ),
 ) : CalendarProvider {
     override val descriptor = ProviderDescriptor(id, id, "event", features)
-```
-- add a field after `var hang = false`:
-```kotlin
+    val calls = mutableListOf<SyncCall>()
+    var failWith: Throwable? = null
+    /** Per-source failures, by source id; they win over [failWith]. */
+    var failFor: Map<String, Throwable> = emptyMap()
+    /** Never returns, like a stalled socket. */
+    var hang = false
     /** When set, sync waits for it: a slow network the test releases. */
     var gate: CompletableDeferred<Unit>? = null
+    /** Completes when the first sync call starts. */
+    val entered = CompletableDeferred<Unit>()
+    var events: (CalendarSource) -> List<RemoteEvent> = { emptyList() }
+
+    private var inFlight = 0
+
+    /** The most sync calls that were running at once. */
+    var maxInFlight = 0
+        private set
+
+    @Composable
+    override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
+    }
+
+    override suspend fun sources(conn: Connection): List<CalendarSource> = sourceList
+
+    override suspend fun sync(conn: Connection, source: CalendarSource, range: DateRange, cursor: SyncCursor?): SyncResult {
+        // Some tests run the engine on Dispatchers.Default, so the bookkeeping is locked.
+        synchronized(this) {
+            calls += SyncCall(conn.id, source.id, range, cursor)
+            inFlight++
+            maxInFlight = maxOf(maxInFlight, inFlight)
+        }
+        entered.complete(Unit)
+        try {
+            if (hang) awaitCancellation()
+            gate?.await()
+            (failFor[source.id] ?: failWith)?.let { throw it }
+            return SyncResult(events(source), emptyList(), SyncCursor("k${calls.size}"), fullReplace = cursor == null)
+        } finally {
+            synchronized(this) { inFlight-- }
+        }
+    }
+}
+
+/** A real TimeoutCancellationException, as a provider's own internal withTimeout would throw. */
+internal suspend fun timeoutCancellation(): TimeoutCancellationException =
+    runCatching { withTimeout(1) { awaitCancellation() } }.exceptionOrNull() as TimeoutCancellationException
 ```
-- in `sync`, after `if (hang) awaitCancellation()`, add `gate?.await()`.
 
 `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ScriptedWriter.kt`:
 ```kotlin
@@ -4206,29 +4433,42 @@ import uk.co.siland.culvery.core.plugin.Connection
 /** An in-test writer. [calls] reads "create:<title>", "update:<remoteId>" or "delete:<remoteId>". */
 internal class ScriptedWriter(override val providerId: String) : CalendarWriter {
     val calls = mutableListOf<String>()
+    /** The drafts sent to create and update, in order. */
+    val drafts = mutableListOf<EventDraft>()
     var failWith: Throwable? = null
     /** When set, each write waits for it: a slow network the test releases. */
     var gate: CompletableDeferred<Unit>? = null
+    /** Completes when the first write starts. */
+    val entered = CompletableDeferred<Unit>()
     private var next = 0
 
     override suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft): RemoteEvent {
-        calls += "create:${draft.title}"
+        record("create:${draft.title}", draft)
         gate?.await()
         failWith?.let { throw it }
         return RemoteEvent("new-${++next}", draft.title, draft.start, draft.end, recurring = false, draft.forPerson, draft.createdBy)
     }
 
     override suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft): RemoteEvent {
-        calls += "update:$remoteId"
+        record("update:$remoteId", draft)
         gate?.await()
         failWith?.let { throw it }
         return RemoteEvent(remoteId, draft.title, draft.start, draft.end, recurring = false, draft.forPerson, draft.createdBy)
     }
 
     override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) {
-        calls += "delete:$remoteId"
+        record("delete:$remoteId", null)
         gate?.await()
         failWith?.let { throw it }
+    }
+
+    // Some tests run writes on Dispatchers.Default, so the lists are locked.
+    private fun record(call: String, draft: EventDraft?) {
+        synchronized(this) {
+            calls += call
+            if (draft != null) drafts += draft
+        }
+        entered.complete(Unit)
     }
 }
 ```
@@ -4254,25 +4494,28 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
 
 1. Add imports:
 ```kotlin
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.withContext
+import uk.co.siland.culvery.capability.calendar.db.OutboxEntity
 ```
-and put `@OptIn(ExperimentalCoroutinesApi::class)` on the class.
+and put `@OptIn(ExperimentalCoroutinesApi::class)` on the class if it isn't there already.
 
 2. Add these members at the end of the class:
 ```kotlin
     private val w = ScriptedWriter("calendar.a")
-    private val writeEvents = CalendarWriteEvents()
+    private val toaster = RecordingToaster()
 
-    private suspend fun writingEngine(): CalendarSync {
+    private suspend fun writingEngine(io: CoroutineContext = EmptyCoroutineContext, timeoutMillis: Long = 1_000): CalendarSync {
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         return CalendarSync(
-            store, setOf(a, b), HouseholdZone(household), clock, EmptyCoroutineContext, timeoutMillis = 1_000,
-            writers = setOf(w), writeEvents = writeEvents,
+            store, setOf(a, b), HouseholdZone(household), clock, io, timeoutMillis,
+            writers = setOf(w), toaster = toaster,
         )
     }
 
@@ -4284,7 +4527,9 @@ and put `@OptIn(ExperimentalCoroutinesApi::class)` on the class.
         draft: EventDraft? = swimDraft("sam-id"),
         attempts: Int = 1,
         sourceId: String = "s1",
-    ): Long = store.enqueue(PendingChange(0, "c1", sourceId, remoteId, kind, draft, attempts, now.toEpochMilli(), now.toEpochMilli()))
+        next: Instant = now,
+        created: Instant = now,
+    ): Long = store.enqueue(PendingChange(0, "c1", sourceId, remoteId, kind, draft, attempts, next.toEpochMilli(), created.toEpochMilli()))
 
     @Test
     fun drainDeliversADueDeleteAndCompletesIt() = runTest {
@@ -4336,17 +4581,71 @@ and put `@OptIn(ExperimentalCoroutinesApi::class)` on the class.
     }
 
     @Test
-    fun drainRejectionDropsTheChangeAndEmitsWriteFailed() = runTest {
+    fun aLaterChangeWaitsForAnEarlierOneInBackoff() = runTest {
         connect("c1", "calendar.a", s1)
         val sync = writingEngine()
-        val failures = mutableListOf<WriteFailed>()
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { writeEvents.failures.collect { failures += it } }
+        queue(ChangeKind.UPDATE, next = now.plusSeconds(30))
+        queue(ChangeKind.DELETE, draft = null)
+        sync.syncAll()
+        assertThat(w.calls).isEmpty()
+        assertThat(store.pendingNow()).hasSize(2)
+        now = now.plusSeconds(30)
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("update:swim", "delete:swim").inOrder()
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
+    @Test
+    fun aQueuedAssignIsAppliedToTheEventAsItIsNow() = runTest {
+        connect("c1", "calendar.a", s1)
+        // Renamed on a phone after the assign was queued with the old title.
+        a.events = { listOf(swim().copy(title = "Swim club")) }
+        val sync = writingEngine()
+        sync.syncAll()
+        queue(ChangeKind.ASSIGN, draft = swimDraft("sam-id"))
+        a.failWith = UnreachableException("reads are down")
+        sync.syncAll()
+        val sent = w.drafts.single()
+        assertThat(listOf(sent.title, sent.forPerson)).containsExactly("Swim club", "sam-id").inOrder()
+        assertThat(store.eventNow(EventRef("c1", "s1", "swim"))!!.let { it.title to it.forPerson }).isEqualTo("Swim club" to "sam-id")
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
+    @Test
+    fun aQueuedAssignForAnEventThatIsGoneIsDroppedWithAToast() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.ASSIGN)
+        sync.syncAll()
+        assertThat(w.calls).isEmpty()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't save to C1 — The event no longer exists")
+    }
+
+    @Test
+    fun drainRejectionDropsTheChangeAndToastsWhy() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = writingEngine()
+        sync.syncAll()
         queue(ChangeKind.DELETE, draft = null)
         w.failWith = WriteRejectedException("Event is locked")
         sync.syncAll()
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(failures).containsExactly(WriteFailed("C1", "Event is locked"))
-        assertThat(writeFailedMessage(failures.single())).isEqualTo("Couldn't save to C1 — Event is locked")
+        assertThat(cachedTitles()).containsExactly("Swim")
+        assertThat(toaster.messages).containsExactly("Couldn't save to C1 — Event is locked")
+    }
+
+    @Test
+    fun severalRejectionsInOnePassMakeOneToast() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, remoteId = "swim", draft = null)
+        queue(ChangeKind.DELETE, remoteId = "walk", draft = null)
+        w.failWith = WriteRejectedException("Event is locked")
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("delete:swim", "delete:walk").inOrder()
+        assertThat(toaster.messages).containsExactly("Couldn't save 2 changes to C1")
     }
 
     @Test
@@ -4368,52 +4667,96 @@ and put `@OptIn(ExperimentalCoroutinesApi::class)` on the class.
     }
 
     @Test
+    fun anUnreachableConnectionIsNotTriedAgainInThePass() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, remoteId = "swim", draft = null, attempts = 1)
+        queue(ChangeKind.DELETE, remoteId = "walk", draft = null, attempts = 1)
+        w.failWith = UnreachableException("offline")
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("delete:swim")
+        assertThat(store.pendingNow().map { it.attempts to it.nextAttemptMillis })
+            .containsExactly(2 to now.toEpochMilli() + 60_000, 2 to now.toEpochMilli() + 60_000)
+    }
+
+    @Test
     fun backoffIsThirtySecondsOneMinuteTwoMinutesThenFive() {
         assertThat((1..6).map(::backoffMillis))
             .containsExactly(30_000L, 60_000L, 120_000L, 300_000L, 300_000L, 300_000L).inOrder()
     }
 
     @Test
-    fun needsSignInFlagsTheConnectionAndPausesTheChange() = runTest {
+    fun needsSignInRetriesWithTheNormalBackoff() = runTest {
         connect("c1", "calendar.a", s1)
         val sync = writingEngine()
         queue(ChangeKind.DELETE, draft = null, attempts = 1)
         w.failWith = NeedsSignInException("expired")
         a.failWith = NeedsSignInException("expired")
         sync.syncAll()
+        // The pass's own read flags the connection; the failed write only reschedules.
         assertThat(health("c1")).isEqualTo(ConnectionHealth.NeedsSignIn)
-        assertThat(store.pendingNow().single().attempts).isEqualTo(2)
-
-        now = now.plusSeconds(600)
-        w.calls.clear()
-        sync.syncAll()
-        assertThat(w.calls).isEmpty()
         assertThat(store.pendingNow().single().let { it.attempts to it.nextAttemptMillis })
-            .isEqualTo(2 to now.toEpochMilli() + SYNC_INTERVAL_MS)
+            .isEqualTo(2 to now.toEpochMilli() + 60_000)
+        now = now.plusSeconds(60)
+        sync.syncAll()
+        assertThat(w.calls).hasSize(2)
     }
 
     @Test
-    fun aChangeWithNowhereToGoIsDropped() = runTest {
+    fun aChangeUnsentForTwoDaysIsDroppedWithAToast() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, draft = null, created = now.minusMillis(OUTBOX_MAX_AGE_MS + 1))
+        sync.syncAll()
+        assertThat(w.calls).isEmpty()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't save to C1")
+    }
+
+    @Test
+    fun aChangeWithNowhereToGoIsDroppedWithAToast() = runTest {
         connect("c1", "calendar.a", s1)
         val sync = writingEngine()
         queue(ChangeKind.DELETE, draft = null, sourceId = "gone")
         sync.syncAll()
         assertThat(store.pendingNow()).isEmpty()
         assertThat(w.calls).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't save to C1")
+    }
+
+    @Test
+    fun anUnreadableQueuedRowIsDroppedAndTheSyncStillRuns() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = writingEngine()
+        calendar.calendarDao().insertOutbox(
+            OutboxEntity(
+                connectionId = "c1", sourceId = "s1", remoteId = "swim", kind = "BOGUS", draftJson = null,
+                attempts = 0, nextAttemptMillis = 0, createdMillis = 0,
+            ),
+        )
+        sync.syncAll()
+        assertThat(cachedTitles()).containsExactly("Swim")
+        assertThat(calendar.calendarDao().outboxNow()).isEmpty()
     }
 
     @Test
     fun aPassWaitsForTheOneBeforeIt() = runTest {
         connect("c1", "calendar.a", s1)
-        val sync = writingEngine()
-        // Stand in for a pass in progress. The lock is taken before any database work, so this is deterministic.
-        sync.passLock.lock()
-        val waiting = launch { sync.syncAll() }
-        runCurrent()
-        assertThat(a.calls).isEmpty()
-        sync.passLock.unlock()
-        waiting.join()
+        // Real threads and a real timeout: runTest must not skip virtual time past the held-up pass.
+        val sync = writingEngine(io = Dispatchers.Default, timeoutMillis = PROVIDER_TIMEOUT_MS)
+        a.gate = CompletableDeferred()
+        val first = launch { sync.syncAll() }
+        a.entered.await()
+        val second = launch { sync.syncAll() }
+        // Real time for the second pass to reach the provider, if nothing held it back.
+        withContext(Dispatchers.Default) { delay(200) }
         assertThat(a.calls).hasSize(1)
+        a.gate?.complete(Unit)
+        first.join()
+        second.join()
+        assertThat(a.calls).hasSize(2)
+        assertThat(a.maxInFlight).isEqualTo(1)
     }
 
     @Test
@@ -4422,8 +4765,7 @@ and put `@OptIn(ExperimentalCoroutinesApi::class)` on the class.
         a.hang = true
         val sync = engine()
         val job = launch { sync.syncAll() }
-        advanceTimeBy(500)
-        runCurrent()
+        a.entered.await()
         job.cancelAndJoin()
         assertThat(job.isCancelled).isTrue()
         assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
@@ -4522,10 +4864,13 @@ and add at the end of the class:
     @Test
     fun cancellingTheScopeStopsTheLoopMidPass() = runTest {
         val loopScope = CoroutineScope(backgroundScope.coroutineContext + Job(backgroundScope.coroutineContext[Job]))
+        val entered = CompletableDeferred<Unit>()
         var started = 0
+        var retryReads = 0
         var sawCancellation = false
         val syncAll: suspend () -> Unit = {
             started++
+            entered.complete(Unit)
             try {
                 awaitCancellation()
             } catch (e: CancellationException) {
@@ -4533,62 +4878,38 @@ and add at the end of the class:
                 throw e
             }
         }
-        CalendarSyncLoop(syncAll, MutableStateFlow(listOf("c1")), loopScope).start()
-        runCurrent()
+        CalendarSyncLoop(syncAll, MutableStateFlow(listOf("c1")), loopScope, untilNextRetry = { retryReads++; null }).start()
+        entered.await()
         loopScope.cancel()
         runCurrent()
         assertThat(sawCancellation).isTrue()
         advanceTimeBy(SYNC_INTERVAL_MS * 2)
         runCurrent()
         assertThat(started).isEqualTo(1)
+        // A cancelled loop never goes on to read the outbox for its next wait.
+        assertThat(retryReads).isEqualTo(0)
     }
 ```
 
-- [ ] **Step 4: Write the failing toast test**
+- [ ] **Step 4: Run the tests to see them fail**
 
-`capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/WriteFailureToastsTest.kt`:
+Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarSyncTest*" --tests "*CalendarSyncLoopTest*"`
+Expected: compilation FAILS: `backoffMillis`, `OUTBOX_MAX_AGE_MS`, `ChangeKind.ASSIGN` in use, `requestSync`, and the `writers`, `toaster` and `untilNextRetry` parameters are unresolved.
+
+- [ ] **Step 5: Add the shared write helpers**
+
+`capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/Writes.kt`:
 ```kotlin
 package uk.co.siland.culvery.capability.calendar
 
-import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
-import org.junit.Test
-
-class WriteFailureToastsTest {
-    @Test
-    fun everyDrainRejectionIsToasted() = runTest {
-        val events = CalendarWriteEvents()
-        val toaster = RecordingToaster()
-        WriteFailureToasts(events, toaster, backgroundScope).start()
-        runCurrent()
-        events.emit(WriteFailed("Sample calendar", "Event is locked"))
-        runCurrent()
-        assertThat(toaster.messages).containsExactly("Couldn't save to Sample calendar — Event is locked")
-    }
-}
-```
-
-- [ ] **Step 5: Run the tests to see them fail**
-
-Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarSyncTest*" --tests "*CalendarSyncLoopTest*" --tests "*WriteFailureToastsTest*"`
-Expected: compilation FAILS: `CalendarWriteEvents`, `WriteFailed`, `writeFailedMessage`, `backoffMillis`, `WriteFailureToasts`, `requestSync`, and the `writers` and `untilNextRetry` parameters are unresolved.
-
-- [ ] **Step 6: Add the write events and their toasts**
-
-`capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarWriteEvents.kt`:
-```kotlin
-package uk.co.siland.culvery.capability.calendar
-
-import javax.inject.Inject
-import javax.inject.Singleton
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.launch
-import uk.co.siland.culvery.core.plugin.ApplicationScope
-import uk.co.siland.culvery.core.plugin.Startable
+import android.util.Log
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import uk.co.siland.culvery.core.plugin.Toaster
 
 /** Waits after the nth failed attempt: 30 s, 1 min, 2 min, then 5 min. */
@@ -4596,34 +4917,69 @@ val OUTBOX_BACKOFF_MS: List<Long> = listOf(30_000L, 60_000L, 120_000L, 300_000L)
 
 internal fun backoffMillis(attempts: Int): Long = OUTBOX_BACKOFF_MS[(attempts - 1).coerceIn(0, OUTBOX_BACKOFF_MS.lastIndex)]
 
-/** A queued change the provider later refused; the change has been dropped. [calendar] is the connection label. */
-data class WriteFailed(val calendar: String, val reason: String)
+/** A queued change still unsent this long after it was made is dropped, with a toast. */
+const val OUTBOX_MAX_AGE_MS = 48 * 60 * 60_000L
 
-fun writeFailedMessage(failure: WriteFailed): String = "Couldn't save to ${failure.calendar} — ${failure.reason}"
+internal const val EVENT_GONE = "The event no longer exists"
 
-@Singleton
-class CalendarWriteEvents @Inject constructor() {
-    private val _failures = MutableSharedFlow<WriteFailed>(extraBufferCapacity = 16)
-    val failures: SharedFlow<WriteFailed> = _failures.asSharedFlow()
+/** What one writer call came to. */
+internal sealed interface WriteOutcome {
+    /** The provider took the change. [event] is what it now holds; null for a delete. */
+    data class Accepted(val event: RemoteEvent?) : WriteOutcome
 
-    fun emit(failure: WriteFailed) {
-        _failures.tryEmit(failure)
-    }
+    /** The provider refused the change for good. */
+    data class Rejected(val message: String) : WriteOutcome
+
+    /** Try again later. [blocksConnection]: the provider didn't answer, so its other changes should wait too. */
+    data class Retry(val blocksConnection: Boolean) : WriteOutcome
 }
 
-/** Shows every drain rejection as a toast, whichever screen is open. */
-class WriteFailureToasts @Inject constructor(
-    private val events: CalendarWriteEvents,
-    private val toaster: Toaster,
-    @ApplicationScope private val scope: CoroutineScope,
-) : Startable {
-    override fun start() {
-        scope.launch { events.failures.collect { toaster.show(writeFailedMessage(it)) } }
+/**
+ * The one way the engine calls a writer, for the editor and the outbox drain alike: on [io], under
+ * [timeoutMillis], with every failure sorted into a [WriteOutcome]. A real cancellation of the caller still
+ * propagates.
+ */
+internal suspend fun callWriter(io: CoroutineContext, timeoutMillis: Long, call: suspend () -> RemoteEvent?): WriteOutcome =
+    try {
+        WriteOutcome.Accepted(withContext(io) { withTimeout(timeoutMillis) { call() } })
+    } catch (e: WriteRejectedException) {
+        WriteOutcome.Rejected(e.message ?: "the calendar refused the change")
+    } catch (e: TimeoutCancellationException) {
+        WriteOutcome.Retry(blocksConnection = true)
+    } catch (e: CancellationException) {
+        // Rethrows if the caller was really cancelled; otherwise the writer leaked a stray cancellation.
+        currentCoroutineContext().ensureActive()
+        WriteOutcome.Retry(blocksConnection = true)
+    } catch (e: NeedsSignInException) {
+        WriteOutcome.Retry(blocksConnection = true)
+    } catch (e: UnreachableException) {
+        WriteOutcome.Retry(blocksConnection = true)
+    } catch (e: Exception) {
+        Log.w(TAG, "A calendar write failed unexpectedly; it will be retried", e)
+        WriteOutcome.Retry(blocksConnection = false)
     }
+
+/** "Couldn't save to {label} — {reason}", or just "Couldn't save to {label}" when there is no reason. */
+fun couldNotSave(label: String, reason: String?): String =
+    if (reason == null) "Couldn't save to $label" else "Couldn't save to $label — $reason"
+
+/** One toast for everything a drain pass dropped for [label]; [reasons] has one entry per change. */
+internal fun couldNotSaveAll(label: String, reasons: List<String?>): String =
+    if (reasons.size == 1) couldNotSave(label, reasons.single()) else "Couldn't save ${reasons.size} changes to $label"
+
+/** An assign as it is sent: the event's current title, times and creator, with the new person. */
+internal fun assignDraft(event: StoredEvent, forPerson: String?): EventDraft =
+    EventDraft(event.title, event.start, event.end, forPerson, event.createdBy)
+
+/** For an engine built without a toaster, in tests that don't look at toasts. */
+internal object SilentToaster : Toaster {
+    override fun show(message: String, icon: String) = Unit
 }
+
+private const val TAG = "CalendarWrites"
 ```
 
-- [ ] **Step 7: Drain the outbox at the start of each pass, one pass at a time**
+- [ ] **Step 6: Drain the outbox at the start of each pass, one pass at a time**
 
 Replace `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSync.kt` with:
 ```kotlin
@@ -4646,6 +5002,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 
 const val SYNC_PAST_DAYS = 1L
@@ -4661,29 +5018,36 @@ class CalendarSync internal constructor(
     private val io: CoroutineContext,
     private val timeoutMillis: Long,
     private val writers: Set<@JvmSuppressWildcards CalendarWriter> = emptySet(),
-    private val writeEvents: CalendarWriteEvents = CalendarWriteEvents(),
+    private val toaster: Toaster = SilentToaster,
 ) {
     @Inject
     constructor(
         store: CalendarStore,
         providers: Set<@JvmSuppressWildcards CalendarProvider>,
         writers: Set<@JvmSuppressWildcards CalendarWriter>,
-        writeEvents: CalendarWriteEvents,
+        toaster: Toaster,
         zone: HouseholdZone,
         clock: WallClock,
-    ) : this(store, providers, zone, clock, Dispatchers.IO, PROVIDER_TIMEOUT_MS, writers, writeEvents)
+    ) : this(store, providers, zone, clock, Dispatchers.IO, PROVIDER_TIMEOUT_MS, writers, toaster)
 
     // The loop's timer, a connection change and requestSync may all ask at once: one pass writes at a time.
-    internal val passLock = Mutex()
+    private val passLock = Mutex()
 
     /**
-     * Delivers due queued changes, then syncs each connection, and each source within it, independently. A
+     * Delivers queued changes, then syncs each connection, and each source within it, independently. A
      * failure only flags that connection (with its worst source's health) and never clears its cache.
      */
     suspend fun syncAll() = passLock.withLock {
         val window = currentWindow()
         val connections = store.connectionsNow()
-        drainOutbox(connections, window.zone)
+        try {
+            drainOutbox(connections, window.zone)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // The changes stay queued for the next pass; the sync must still run.
+            Log.w(TAG, "The outbox drain failed; syncing anyway", e)
+        }
         connections.forEach { sync(it.connection, window) }
     }
 
@@ -4693,69 +5057,97 @@ class CalendarSync internal constructor(
         return DateRange(today.minusDays(SYNC_PAST_DAYS), today.plusDays(SYNC_FUTURE_DAYS + 1), z)
     }
 
+    /**
+     * Delivers queued changes in the order they were made. An event's later changes wait while an earlier one is
+     * waiting or has just failed, so they can't land first and be undone. Once a connection fails to answer, its
+     * other changes wait for their next attempt instead of each costing a timeout. Changes nothing can deliver,
+     * changes the provider refuses, and changes older than [OUTBOX_MAX_AGE_MS] are dropped, with one toast per
+     * connection.
+     */
     private suspend fun drainOutbox(connections: List<StoredConnection>, zone: ZoneId) {
         val now = clock.nowMillis()
         val byId = connections.associateBy { it.connection.id }
-        for (change in store.dueChanges(now)) {
+        val blockedRefs = mutableSetOf<EventRef>()
+        val blockedConnections = mutableSetOf<String>()
+        val dropped = linkedMapOf<String, MutableList<String?>>()
+        for (change in store.pendingNow()) {
+            val ref = change.ref
+            if (ref != null && ref in blockedRefs) continue
             val stored = byId[change.connectionId]
+            val label = stored?.connection?.label ?: REMOVED_CALENDAR
+            if (now - change.createdMillis > OUTBOX_MAX_AGE_MS) {
+                Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}: unsent for 48 hours")
+                store.dropChange(change.id)
+                dropped.getOrPut(label) { mutableListOf() }.add(null)
+                continue
+            }
+            if (change.nextAttemptMillis > now) {
+                ref?.let(blockedRefs::add)
+                continue
+            }
+            if (change.connectionId in blockedConnections) {
+                retryLater(change, now)
+                ref?.let(blockedRefs::add)
+                continue
+            }
             val source = store.source(change.connectionId, change.sourceId)
             val writer = stored?.let { s -> writers.firstOrNull { it.providerId == s.connection.providerId } }
             if (stored == null || source == null || writer == null) {
                 Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}/${change.sourceId}: nothing can deliver it")
                 store.dropChange(change.id)
+                dropped.getOrPut(label) { mutableListOf() }.add(null)
                 continue
             }
-            if (stored.health == ConnectionHealth.NeedsSignIn) {
-                // Paused until a sync marks the connection Ok again; not counted as an attempt.
-                store.reschedule(change.id, change.attempts, now + SYNC_INTERVAL_MS)
-                continue
+            when (val outcome = deliver(change, stored.connection, source.source, writer, zone)) {
+                is WriteOutcome.Accepted -> Unit
+                is WriteOutcome.Rejected -> {
+                    store.dropChange(change.id)
+                    dropped.getOrPut(label) { mutableListOf() }.add(outcome.message)
+                }
+                is WriteOutcome.Retry -> {
+                    retryLater(change, now)
+                    ref?.let(blockedRefs::add)
+                    if (outcome.blocksConnection) blockedConnections += change.connectionId
+                }
             }
-            deliver(change, stored.connection, source.source, writer, zone, now)
         }
+        dropped.forEach { (label, reasons) -> toaster.show(couldNotSaveAll(label, reasons)) }
     }
 
+    /** Sends one change and, when the provider accepts it, applies the result to the mirror and completes it. */
     private suspend fun deliver(
         change: PendingChange,
         conn: Connection,
         source: CalendarSource,
         writer: CalendarWriter,
         zone: ZoneId,
-        now: Long,
-    ) {
-        try {
-            when (change.kind) {
-                ChangeKind.CREATE -> {
-                    val created = callProvider { writer.create(conn, source, requireNotNull(change.draft)) }
-                    store.applyAccepted(conn.id, source.id, created, zone, completing = change.id)
-                }
-                ChangeKind.UPDATE -> {
-                    val remoteId = requireNotNull(change.remoteId)
-                    val updated = callProvider { writer.update(conn, source, remoteId, requireNotNull(change.draft)) }
-                    store.applyAccepted(conn.id, source.id, updated, zone, completing = change.id)
-                }
-                ChangeKind.DELETE -> {
-                    val remoteId = requireNotNull(change.remoteId)
-                    callProvider { writer.delete(conn, source, remoteId) }
-                    store.applyDeleted(EventRef(conn.id, source.id, remoteId), completing = change.id)
-                }
+    ): WriteOutcome {
+        val ref = change.ref
+        val outcome = when (change.kind) {
+            ChangeKind.CREATE -> callWriter(io, timeoutMillis) { writer.create(conn, source, requireNotNull(change.draft)) }
+            ChangeKind.UPDATE -> callWriter(io, timeoutMillis) {
+                writer.update(conn, source, requireNotNull(ref).remoteId, requireNotNull(change.draft))
             }
-        } catch (e: WriteRejectedException) {
-            store.dropChange(change.id)
-            writeEvents.emit(WriteFailed(conn.label, e.message ?: "the calendar refused the change"))
-        } catch (e: TimeoutCancellationException) {
-            retryLater(change, now)
-        } catch (e: CancellationException) {
-            currentCoroutineContext().ensureActive()
-            retryLater(change, now)
-        } catch (e: NeedsSignInException) {
-            store.setHealth(conn.id, ConnectionHealth.NeedsSignIn)
-            retryLater(change, now)
-        } catch (e: UnreachableException) {
-            retryLater(change, now)
-        } catch (e: Exception) {
-            Log.w(TAG, "A queued ${change.kind} failed unexpectedly; retrying later", e)
-            retryLater(change, now)
+            ChangeKind.ASSIGN -> {
+                // Sent as the event is now, so a title or time changed elsewhere since it was queued is kept.
+                val current = ref?.let { store.eventNow(it) } ?: return WriteOutcome.Rejected(EVENT_GONE)
+                val draft = assignDraft(current, change.draft?.forPerson)
+                callWriter(io, timeoutMillis) { writer.update(conn, source, current.remoteId, draft) }
+            }
+            ChangeKind.DELETE -> callWriter(io, timeoutMillis) {
+                writer.delete(conn, source, requireNotNull(ref).remoteId)
+                null
+            }
         }
+        if (outcome is WriteOutcome.Accepted) {
+            val event = outcome.event
+            if (event == null) {
+                store.applyDeleted(requireNotNull(ref), completing = change.id)
+            } else {
+                store.applyAccepted(conn.id, source.id, event, zone, completing = change.id)
+            }
+        }
+        return outcome
     }
 
     private suspend fun retryLater(change: PendingChange, now: Long) {
@@ -4807,7 +5199,7 @@ class CalendarSync internal constructor(
             ConnectionHealth.Error(e.message ?: e.javaClass.simpleName)
         }
 
-    /** Every provider and writer call from the engine goes through here. */
+    /** Every provider read goes through here; writes go through callWriter. */
     private suspend fun <T> callProvider(block: suspend () -> T): T =
         withContext(io) { withTimeout(timeoutMillis) { block() } }
 
@@ -4820,11 +5212,14 @@ class CalendarSync internal constructor(
 
     private companion object {
         const val TAG = "CalendarSync"
+
+        /** The toast's label for a change whose connection has been removed. */
+        const val REMOVED_CALENDAR = "a removed calendar"
     }
 }
 ```
 
-- [ ] **Step 8: Give the loop `requestSync` and an early wake for due retries**
+- [ ] **Step 7: Give the loop `requestSync` and an early wake for due retries**
 
 Replace `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSyncLoop.kt` with:
 ```kotlin
@@ -4840,7 +5235,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.plugin.ApplicationScope
@@ -4853,10 +5247,10 @@ const val SYNC_INTERVAL_MS = 5 * 60_000L
 const val MIN_PASS_GAP_MS = 1_000L
 
 /**
- * Runs a pass (the outbox drain, then a sync) on start, whenever a connection is added or removed, on
- * [requestSync], when a queued change falls due, and otherwise every [intervalMillis]. A trigger that arrives
- * mid-pass runs one more pass afterwards; it never cancels the running one. [untilNextRetry] is the time until
- * the earliest queued change is due, or null when nothing is queued.
+ * Runs a pass (the outbox drain, then a sync) as soon as the first connection list arrives, whenever a
+ * connection is added or removed, on [requestSync], when a queued change falls due, and otherwise every
+ * [intervalMillis]. A trigger that arrives mid-pass runs one more pass afterwards; it never cancels the running
+ * one. [untilNextRetry] is the time until the earliest queued change is due, or null when nothing is queued.
  */
 @Singleton
 class CalendarSyncLoop internal constructor(
@@ -4885,11 +5279,15 @@ class CalendarSyncLoop internal constructor(
 
     override fun start() {
         scope.launch {
-            // The first list is the one the start-up pass already covers.
-            launch { connectionIds.distinctUntilChanged().drop(1).collect { wake.trySend(Unit) } }
+            // Every list, the first included, asks for a pass, so a connection added before this collector
+            // started is never missed.
+            launch { connectionIds.distinctUntilChanged().collect { wake.trySend(Unit) } }
+            // The first pass waits only for the first connection list.
+            var wait = intervalMillis
             while (true) {
+                withTimeoutOrNull(wait) { wake.receive() }
                 runPass()
-                withTimeoutOrNull(nextWait()) { wake.receive() }
+                wait = nextWait()
             }
         }
     }
@@ -4924,28 +5322,23 @@ class CalendarSyncLoop internal constructor(
 }
 ```
 
-In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/di/CalendarModule.kt`, add `import uk.co.siland.culvery.capability.calendar.WriteFailureToasts` and, after the `syncLoop` binding:
-```kotlin
-    @Binds
-    @IntoSet
-    abstract fun writeFailureToasts(impl: WriteFailureToasts): Startable
-```
+`CalendarModule` needs no change: `CalendarSync` gets `Set<CalendarWriter>` from Task 5's `@Multibinds` and `Toaster` from `:app`.
 
-- [ ] **Step 9: Run the tests to see them pass**
+- [ ] **Step 8: Run the tests to see them pass**
 
 Run: `./gradlew :capability:calendar:testDebugUnitTest`
-Expected: PASS. The five existing loop tests pass unchanged: the start-up pass is still immediate, and a new connection still triggers a pass.
+Expected: PASS. The five existing loop tests pass unchanged: the first connection list starts the first pass at once, and a new connection still triggers a pass. The existing sync tests pass unchanged too: `engine()` builds `CalendarSync` with no writers and the silent toaster.
 
-- [ ] **Step 10: Run the gate**
+- [ ] **Step 9: Run the gate**
 
 Run: `./gradlew testDebugUnitTest verifyRoborazziDebug`
-Expected: `BUILD SUCCESSFUL`. Hilt now builds `CalendarSync` with `Set<CalendarWriter>`: empty in release, the fake in debug. It also injects `WallClock` into the singleton loop.
+Expected: `BUILD SUCCESSFUL`. Hilt now builds `CalendarSync` with `Set<CalendarWriter>` (empty in release, the fake in debug) and the app's `Toaster`. It also injects `WallClock` into the singleton loop.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add capability/calendar
-git commit -m "Drain the calendar outbox before each sync, one pass at a time, with requestSync and backoff"
+git commit -m "Drain the calendar outbox before each sync, in order and one pass at a time, with requestSync, backoff and rejection toasts"
 ```
 
 ---
@@ -4966,7 +5359,8 @@ git commit -m "Drain the calendar outbox before each sync, one pass at a time, w
 - Consumes:
   - `AccessControl.authorise(…, reason, allow, refusal)`, `PinReason`, `Refusal`, `Identified` (Task 3)
   - `DefaultAccessControl`, `PermissionRegistry`, `PinManager`, `PinHasher`, `LockoutStore`, `PinPromptController`, `CorePermissionSource` (tests)
-  - the store API (Task 1), `CalendarWriter` (Task 5), `backoffMillis`, `CalendarSyncLoop.requestSync` (Task 7)
+  - the store API and `ChangeKind.ASSIGN` (Task 1), `CalendarWriter` (Task 5), `Toaster` (Task 2)
+  - `callWriter`, `WriteOutcome`, `backoffMillis`, `couldNotSave`, `assignDraft`, `CalendarSyncLoop.requestSync` (Task 7)
 - Produces:
   - `object CalendarPermissions`, with the constants:
     - `CREATE = "calendar.event.create"`
@@ -4980,15 +5374,18 @@ git commit -m "Drain the calendar outbox before each sync, one pass at a time, w
   - `const val ASK_AN_ADULT = "Ask an adult to assign this event."`
   - `enum class ReadOnlyReason { OtherCalendar, Recurring }` and `internal fun readOnlyReason(event: StoredEvent, source: StoredSource?, hasWriter: Boolean): ReadOnlyReason?`
   - `const val WRITE_ATTEMPT_MS = 10_000L`
+  - `const val EVENT_DELETED = "Event deleted"`
   - `sealed interface EditResult`, with the cases:
     - `Done`, `Queued` and `Cancelled` (objects)
     - `Rejected(message: String)`
     - `NotEditable` (object)
   - `@Singleton class CalendarEditor`:
     - `suspend fun mayDelete(ref: EventRef): Boolean`
-    - `suspend fun delete(ref: EventRef): EditResult`
-    - `suspend fun assign(ref: EventRef, person: PersonId): EditResult`
-    - internal constructor `(store, providers, writers, access, zone, clock, scope, requestSync: () -> Unit, io: CoroutineContext, attemptMillis: Long)`
+    - `suspend fun delete(ref: EventRef): EditResult`: toasts `EVENT_DELETED` when Done or Queued
+    - `suspend fun assign(ref: EventRef, person: PersonId): EditResult`: queues or sends an `ASSIGN`
+    - both toast `couldNotSave(label, message)` when Rejected; the toasts come from the application scope
+    - internal constructor `(store, writers, access, toaster: Toaster, zone, clock, scope, requestSync: () -> Unit, io: CoroutineContext, attemptMillis: Long)`
+    - `@Inject constructor(store, writers, access, toaster, zone, clock, @ApplicationScope scope, loop: CalendarSyncLoop)`
   - Test helpers:
     - `internal suspend fun testAccess(household, listenIn: CoroutineScope, clock: WallClock, sessionScope: CoroutineScope): TestAccess`
     - `internal suspend fun TestScope.testAccess(household: HouseholdRepository): TestAccess`
@@ -5175,14 +5572,19 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -5193,8 +5595,6 @@ import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
-import uk.co.siland.culvery.core.plugin.ConnectionHealth
-import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.WallClock
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -5209,7 +5609,6 @@ class CalendarEditorTest {
     private val window = DateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 10, 8), london)
     private val family = CalendarSource("s-family", "Family calendar", writable = true)
     private val school = CalendarSource("s-school", "School terms", writable = false)
-    private val provider = ScriptedProvider("calendar.a", features = setOf(Feature.READ, Feature.WRITE))
     private val writer = ScriptedWriter("calendar.a")
     private var syncRequests = 0
 
@@ -5240,16 +5639,21 @@ class CalendarEditorTest {
 
     private fun ref(id: String, source: String = "s-family") = EventRef("c1", source, id)
 
-    private fun TestScope.editor(access: TestAccess) = CalendarEditor(
+    /**
+     * The editor shares access's toaster, as the app shares one. [io] is the writer's context: tests that hold a
+     * write open use Dispatchers.Default, so its 10 s timeout runs on real time and runTest can't skip past it
+     * while the test waits for Room.
+     */
+    private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext) = CalendarEditor(
         store = store,
-        providers = setOf(provider),
         writers = setOf(writer),
         access = access.control,
+        toaster = access.toasts,
         zone = HouseholdZone(household),
         clock = WallClock { testScheduler.currentTime },
         scope = backgroundScope,
         requestSync = { syncRequests++ },
-        io = EmptyCoroutineContext,
+        io = io,
         attemptMillis = WRITE_ATTEMPT_MS,
     )
 
@@ -5263,6 +5667,7 @@ class CalendarEditorTest {
         assertThat(store.eventNow(ref("dinner"))).isNull()
         assertThat(access.requests.single().reason).isEqualTo(PinReason.Delete)
         assertThat(syncRequests).isEqualTo(1)
+        assertThat(access.toasts.messages).containsExactly(EVENT_DELETED)
     }
 
     @Test
@@ -5304,6 +5709,8 @@ class CalendarEditorTest {
         assertThat(editor.delete(ref("dinner"))).isEqualTo(EditResult.Cancelled)
         assertThat(access.requests).hasSize(1)
         assertThat(access.toasts.messages).containsExactly("Mia can only change events they created.")
+        // Signed out by the refusal, so the next tap asks for a PIN.
+        assertThat(access.control.session.value).isNull()
     }
 
     @Test
@@ -5317,6 +5724,19 @@ class CalendarEditorTest {
         assertThat(stored.forPerson).isEqualTo(access.sam.id.value)
         assertThat(stored.createdBy).isNull()
         assertThat(access.requests.single().reason).isEqualTo(PinReason.Assign)
+        assertThat(access.toasts.messages).isEmpty()
+    }
+
+    @Test
+    fun aRejectedAssignChangesNothingAndSaysWhy() = runTest {
+        val access = testAccess(household)
+        put(event("plumber", createdBy = null))
+        writer.failWith = WriteRejectedException("Event is locked")
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access).assign(ref("plumber"), access.sam.id)).isEqualTo(EditResult.Rejected("Event is locked"))
+        assertThat(store.eventNow(ref("plumber"))!!.forPerson).isNull()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — Event is locked")
     }
 
     @Test
@@ -5348,6 +5768,7 @@ class CalendarEditorTest {
         assertThat(editor(access).delete(ref("dinner"))).isEqualTo(EditResult.Rejected("Event is locked"))
         assertThat(store.eventNow(ref("dinner"))).isNotNull()
         assertThat(store.pendingNow()).isEmpty()
+        assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — Event is locked")
     }
 
     @Test
@@ -5362,6 +5783,8 @@ class CalendarEditorTest {
         assertThat(queued.nextAttemptMillis).isEqualTo(testScheduler.currentTime + 30_000)
         assertThat(store.eventNow(ref("dinner"))).isNotNull()
         assertThat(syncRequests).isEqualTo(1)
+        // The event hides at once (the repository's overlay), so the delete reads as done.
+        assertThat(access.toasts.messages).containsExactly(EVENT_DELETED)
     }
 
     @Test
@@ -5375,14 +5798,15 @@ class CalendarEditorTest {
     }
 
     @Test
-    fun needsSignInQueuesAndFlagsTheConnection() = runTest {
+    fun needsSignInQueuesTheAssignAndAsksForASync() = runTest {
         val access = testAccess(household)
         put(event("plumber", createdBy = null))
         writer.failWith = NeedsSignInException("expired")
         access.answer(TestAccess.ALEX)
         assertThat(editor(access).assign(ref("plumber"), access.sam.id)).isEqualTo(EditResult.Queued)
-        assertThat(store.connectionsNow().single().health).isEqualTo(ConnectionHealth.NeedsSignIn)
-        assertThat(store.pendingNow().single().draft?.forPerson).isEqualTo(access.sam.id.value)
+        assertThat(store.pendingNow().single().let { it.kind to it.draft?.forPerson }).isEqualTo(ChangeKind.ASSIGN to access.sam.id.value)
+        // The pass this asks for flags the connection from its own read.
+        assertThat(syncRequests).isEqualTo(1)
     }
 
     @Test
@@ -5434,6 +5858,7 @@ class CalendarEditorTest {
         assertThat(editor.assign(ref("plumber"), access.mia.id)).isEqualTo(EditResult.Queued)
         assertThat(writer.calls).containsExactly("update:plumber")
         val second = store.pendingNow()[1]
+        assertThat(second.kind).isEqualTo(ChangeKind.ASSIGN)
         assertThat(second.draft?.forPerson).isEqualTo(access.mia.id.value)
         assertThat(second.attempts).isEqualTo(0)
         assertThat(second.nextAttemptMillis).isEqualTo(testScheduler.currentTime)
@@ -5446,16 +5871,37 @@ class CalendarEditorTest {
         val gate = CompletableDeferred<Unit>()
         writer.gate = gate
         access.answer(TestAccess.ALEX)
-        val editor = editor(access)
+        val editor = editor(access, io = Dispatchers.Default)
         val sheet = launch { editor.delete(ref("dinner")) }
-        runCurrent()
+        writer.entered.await()
         assertThat(writer.calls).containsExactly("delete:dinner")
         sheet.cancel()
         gate.complete(Unit)
-        // Room applies the delete on its own thread; wait for the mirror to show it.
-        store.event(ref("dinner")).first { it == null }
+        // Room applies the delete on its own thread; wait (in real time, bounded) for the mirror to show it.
+        withContext(Dispatchers.Default) { withTimeout(5_000) { store.event(ref("dinner")).first { it == null } } }
         assertThat(store.pendingNow()).isEmpty()
         assertThat(writer.calls).containsExactly("delete:dinner")
+    }
+
+    @Test
+    fun concurrentWritesToOneEventRunOneAtATime() = runTest {
+        val access = testAccess(household)
+        put(event("plumber", createdBy = null))
+        writer.gate = CompletableDeferred()
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access, io = Dispatchers.Default)
+        val first = async { editor.assign(ref("plumber"), access.sam.id) }
+        writer.entered.await()
+        // A second sheet on the same event, on the session the first one started.
+        val second = async { editor.assign(ref("plumber"), access.mia.id) }
+        // Real time for the second write to reach the writer, if the lock didn't hold it back.
+        withContext(Dispatchers.Default) { delay(200) }
+        assertThat(writer.calls).containsExactly("update:plumber")
+        writer.gate?.complete(Unit)
+        assertThat(first.await()).isEqualTo(EditResult.Done)
+        assertThat(second.await()).isEqualTo(EditResult.Done)
+        assertThat(writer.calls).containsExactly("update:plumber", "update:plumber")
+        assertThat(store.eventNow(ref("plumber"))!!.forPerson).isEqualTo(access.mia.id.value)
     }
 
     @Test
@@ -5482,7 +5928,7 @@ class CalendarEditorTest {
         val access = testAccess(household)
         put(event("dinner", createdBy = access.alex.id.value))
         val noWriter = CalendarEditor(
-            store, setOf(provider), emptySet(), access.control, HouseholdZone(household),
+            store, emptySet(), access.control, access.toasts, HouseholdZone(household),
             WallClock { testScheduler.currentTime }, backgroundScope, {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS,
         )
         assertThat(noWriter.delete(ref("dinner"))).isEqualTo(EditResult.NotEditable)
@@ -5563,19 +6009,14 @@ internal fun readOnlyReason(event: StoredEvent, source: StoredSource?, hasWriter
 ```kotlin
 package uk.co.siland.culvery.capability.calendar
 
-import android.util.Log
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.CoroutineContext
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.access.PinReason
@@ -5583,12 +6024,14 @@ import uk.co.siland.culvery.core.access.Refusal
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Connection
-import uk.co.siland.culvery.core.plugin.ConnectionHealth
-import uk.co.siland.culvery.core.plugin.Feature
+import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 
 /** How long the editor tries the provider before queueing the change instead (2b-1 design D3). */
 const val WRITE_ATTEMPT_MS = 10_000L
+
+/** Hand-off §7: the toast after a delete. */
+const val EVENT_DELETED = "Event deleted"
 
 sealed interface EditResult {
     /** The provider accepted the change, and the mirror has it. */
@@ -5597,7 +6040,7 @@ sealed interface EditResult {
     /** The provider couldn't be reached in time: the change is queued and shows as syncing. */
     data object Queued : EditResult
 
-    /** The provider refused the change for good; nothing changed. */
+    /** The provider refused the change for good; nothing changed, and the editor has toasted why. */
     data class Rejected(val message: String) : EditResult
 
     /** The PIN pad was cancelled, or the person was refused and told so by a toast. */
@@ -5609,14 +6052,15 @@ sealed interface EditResult {
 
 /**
  * Changes master-calendar events on the tablet: authorises, tries the provider for up to [attemptMillis], and
- * queues the change in the outbox when the provider can't be reached. Every outcome nudges the sync loop.
+ * queues the change in the outbox when the provider can't be reached. It reports the outcome as a toast itself,
+ * and every write nudges the sync loop.
  */
 @Singleton
 class CalendarEditor internal constructor(
     private val store: CalendarStore,
-    private val providers: Set<@JvmSuppressWildcards CalendarProvider>,
     private val writers: Set<@JvmSuppressWildcards CalendarWriter>,
     private val access: AccessControl,
+    private val toaster: Toaster,
     private val zone: HouseholdZone,
     private val clock: WallClock,
     private val scope: CoroutineScope,
@@ -5627,14 +6071,18 @@ class CalendarEditor internal constructor(
     @Inject
     constructor(
         store: CalendarStore,
-        providers: Set<@JvmSuppressWildcards CalendarProvider>,
         writers: Set<@JvmSuppressWildcards CalendarWriter>,
         access: AccessControl,
+        toaster: Toaster,
         zone: HouseholdZone,
         clock: WallClock,
         @ApplicationScope scope: CoroutineScope,
         loop: CalendarSyncLoop,
-    ) : this(store, providers, writers, access, zone, clock, scope, loop::requestSync, Dispatchers.IO, WRITE_ATTEMPT_MS)
+    ) : this(store, writers, access, toaster, zone, clock, scope, loop::requestSync, Dispatchers.IO, WRITE_ATTEMPT_MS)
+
+    // One write at a time, so two sheets on one event can't send their changes out of order. Held only around the
+    // write itself, never while the PIN pad is up.
+    private val writeLock = Mutex()
 
     /** The delete guard, run before the confirmation appears: true when this person may delete [ref]. */
     suspend fun mayDelete(ref: EventRef): Boolean {
@@ -5646,8 +6094,7 @@ class CalendarEditor internal constructor(
     suspend fun delete(ref: EventRef): EditResult {
         val target = resolve(ref) ?: return EditResult.NotEditable
         authoriseChange(target) ?: return EditResult.Cancelled
-        if (target.pending.any { it.kind == ChangeKind.DELETE }) return EditResult.Queued
-        return write(target, ChangeKind.DELETE, draft = null)
+        return write(target, ChangeKind.DELETE, forPerson = null)
     }
 
     /** Tags [ref] as being for [person] (hand-off: "Assign to…"). Adults only. */
@@ -5659,7 +6106,7 @@ class CalendarEditor internal constructor(
             reason = PinReason.Assign,
             refusal = Refusal.Toast { ASK_AN_ADULT },
         ) ?: return EditResult.Cancelled
-        return write(target, ChangeKind.UPDATE, target.current.copy(forPerson = person.value))
+        return write(target, ChangeKind.ASSIGN, forPerson = person.value)
     }
 
     private class Target(
@@ -5669,26 +6116,26 @@ class CalendarEditor internal constructor(
         val writer: CalendarWriter,
         val pending: List<PendingChange>,
     ) {
-        /** The event as it will be once its queued changes land: the latest queued draft, else the mirror. */
-        val current: EventDraft
-            get() = pending.lastOrNull { it.draft != null }?.draft
-                ?: EventDraft(event.title, event.start, event.end, event.forPerson, event.createdBy)
+        /** Who made the event once its queued edits land; an assign never changes it. */
+        val createdBy: String?
+            get() {
+                val edit = pending.lastOrNull { it.kind == ChangeKind.UPDATE }?.draft
+                return if (edit != null) edit.createdBy else event.createdBy
+            }
     }
 
     private suspend fun resolve(ref: EventRef): Target? {
         val event = store.eventNow(ref) ?: return null
         val source = store.source(ref.connectionId, ref.sourceId) ?: return null
         val connection = store.connectionsNow().firstOrNull { it.connection.id == ref.connectionId }?.connection ?: return null
-        val writer = writers.firstOrNull { it.providerId == connection.providerId }
-        if (writer == null && providers.any { it.descriptor.id == connection.providerId && Feature.WRITE in it.descriptor.features }) {
-            Log.w(TAG, "${connection.providerId} declares WRITE but binds no CalendarWriter; its events are read-only")
-        }
-        if (writer == null || readOnlyReason(event, source, hasWriter = true) != null) return null
+        // A provider that declares WRITE without binding a writer fails the contract suite, and the repository logs it.
+        val writer = writers.firstOrNull { it.providerId == connection.providerId } ?: return null
+        if (readOnlyReason(event, source, hasWriter = true) != null) return null
         return Target(event, connection, source.source, writer, store.pendingNow().filter { it.ref == ref })
     }
 
     private suspend fun authoriseChange(target: Target): Authorised? {
-        val createdBy = target.current.createdBy
+        val createdBy = target.createdBy
         return access.authorise(
             CalendarPermissions.EDIT,
             CalendarPermissions.EDIT_OWN,
@@ -5698,55 +6145,60 @@ class CalendarEditor internal constructor(
         )
     }
 
-    /** Runs on the application scope, so closing the sheet mid-write can't lose the change. */
-    private suspend fun write(target: Target, kind: ChangeKind, draft: EventDraft?): EditResult =
-        scope.async {
-            val result = if (target.pending.isNotEmpty()) {
-                // Going direct would let the older queued change land last and undo this one.
-                queue(target, kind, draft, attempted = false)
-            } else {
-                attempt(target, kind, draft)
+    /**
+     * Runs on the application scope, so closing the sheet mid-write can't lose the change or its toast. Under
+     * [writeLock] it reads the queue and the mirror afresh: a change behind a pending one for the same event is
+     * queued after it rather than sent directly, where it could land first and be undone.
+     */
+    private suspend fun write(target: Target, kind: ChangeKind, forPerson: String?): EditResult {
+        require(kind == ChangeKind.DELETE || kind == ChangeKind.ASSIGN) { "Creating and editing arrive with the quick-add sheet (2b-2)" }
+        return scope.async {
+            val result = writeLock.withLock {
+                val ref = target.event.ref
+                val pending = store.pendingNow().filter { it.ref == ref }
+                val event = store.eventNow(ref)
+                when {
+                    pending.any { it.kind == ChangeKind.DELETE } ->
+                        if (kind == ChangeKind.DELETE) EditResult.Queued else EditResult.NotEditable
+                    event == null -> if (kind == ChangeKind.DELETE) EditResult.Done else EditResult.NotEditable
+                    pending.isNotEmpty() -> queue(target, kind, draftFor(kind, event, forPerson), attempted = false)
+                    else -> attempt(target, kind, event, forPerson)
+                }
             }
+            report(target, kind, result)
+            // A sync pass already in flight may briefly put back the old mirror; the pass this asks for corrects it.
             requestSync()
             result
         }.await()
+    }
 
-    private suspend fun attempt(target: Target, kind: ChangeKind, draft: EventDraft?): EditResult {
-        require(kind != ChangeKind.CREATE) { "Creating events arrives with the quick-add sheet (2b-2)" }
-        val conn = target.connection
-        val ref = target.event.ref
-        return try {
-            val accepted = withContext(io) {
-                withTimeout(attemptMillis) {
-                    if (kind == ChangeKind.DELETE) {
-                        target.writer.delete(conn, target.source, ref.remoteId)
-                        null
-                    } else {
-                        target.writer.update(conn, target.source, ref.remoteId, requireNotNull(draft))
-                    }
-                }
-            }
-            if (accepted == null) {
-                store.applyDeleted(ref)
+    /** No draft for a delete; for an assign, the event as the mirror has it now, with the new person. */
+    private fun draftFor(kind: ChangeKind, event: StoredEvent, forPerson: String?): EventDraft? =
+        if (kind == ChangeKind.DELETE) null else assignDraft(event, forPerson)
+
+    private suspend fun attempt(target: Target, kind: ChangeKind, event: StoredEvent, forPerson: String?): EditResult {
+        val ref = event.ref
+        val draft = draftFor(kind, event, forPerson)
+        val outcome = callWriter(io, attemptMillis) {
+            if (draft == null) {
+                target.writer.delete(target.connection, target.source, ref.remoteId)
+                null
             } else {
-                store.applyAccepted(ref.connectionId, ref.sourceId, accepted, zone.current())
+                target.writer.update(target.connection, target.source, ref.remoteId, draft)
             }
-            EditResult.Done
-        } catch (e: WriteRejectedException) {
-            EditResult.Rejected(e.message ?: "The calendar refused the change")
-        } catch (e: TimeoutCancellationException) {
-            queue(target, kind, draft, attempted = true)
-        } catch (e: CancellationException) {
-            currentCoroutineContext().ensureActive()
-            queue(target, kind, draft, attempted = true)
-        } catch (e: NeedsSignInException) {
-            store.setHealth(conn.id, ConnectionHealth.NeedsSignIn)
-            queue(target, kind, draft, attempted = true)
-        } catch (e: UnreachableException) {
-            queue(target, kind, draft, attempted = true)
-        } catch (e: Exception) {
-            Log.w(TAG, "A $kind failed unexpectedly; queueing it", e)
-            queue(target, kind, draft, attempted = true)
+        }
+        return when (outcome) {
+            is WriteOutcome.Accepted -> {
+                val accepted = outcome.event
+                if (accepted == null) {
+                    store.applyDeleted(ref)
+                } else {
+                    store.applyAccepted(ref.connectionId, ref.sourceId, accepted, zone.current())
+                }
+                EditResult.Done
+            }
+            is WriteOutcome.Rejected -> EditResult.Rejected(outcome.message)
+            is WriteOutcome.Retry -> queue(target, kind, draft, attempted = true)
         }
     }
 
@@ -5769,8 +6221,12 @@ class CalendarEditor internal constructor(
         return EditResult.Queued
     }
 
-    private companion object {
-        const val TAG = "CalendarEditor"
+    /** A queued delete already hides the event, so it reads as deleted too. */
+    private fun report(target: Target, kind: ChangeKind, result: EditResult) {
+        when {
+            result is EditResult.Rejected -> toaster.show(couldNotSave(target.connection.label, result.message))
+            kind == ChangeKind.DELETE && (result == EditResult.Done || result == EditResult.Queued) -> toaster.show(EVENT_DELETED)
+        }
     }
 }
 ```
@@ -5842,7 +6298,8 @@ git commit -m "Add the calendar editor for delete and assign, with the calendar 
     - `@Inject constructor(store, household, zone, providers: Set<CalendarProvider>, writers: Set<CalendarWriter>)`
     - `val people: Flow<List<Person>>`
     - `fun event(ref: EventRef, today: LocalDate): Flow<EventDetailUi?>`
-    - `days`, `day` and `week` now lay the outbox over the mirror
+    - `days`, `day` and `week` now lay the outbox over the mirror (a queued ASSIGN changes only the person shown)
+  - `createdByLabel` reads "Calendar feed" for any source that isn't the master, writable or not
 
 - [ ] **Step 1: Write the failing label and badge tests**
 
@@ -5856,6 +6313,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import org.junit.Test
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
 
 class WhenLabelTest {
     private val london = ZoneId.of("Europe/London")
@@ -5924,6 +6382,18 @@ class WhenLabelTest {
         assertThat(ui().editable).isTrue()
         assertThat(ui(readOnly = ReadOnlyReason.Recurring).editable).isFalse()
     }
+
+    @Test
+    fun onlyTheMasterCalendarNamesWhoAddedAnEvent() {
+        val master = StoredSource("c", CalendarSource("s1", "Family calendar", writable = true), SourceMapping.Default, isMaster = true)
+        val writableOther = StoredSource("c", CalendarSource("s2", "Work", writable = true), SourceMapping.Default, isMaster = false)
+        val alex = Person(PersonId("alex-id"), "Alex", 0xFF4CB387)
+        val people = mapOf(alex.id to alex)
+        assertThat(createdByLabel("alex-id", master, people)).isEqualTo("Alex")
+        assertThat(createdByLabel(null, master, people)).isEqualTo(ADDED_FROM_PHONE)
+        assertThat(createdByLabel("alex-id", writableOther, people)).isEqualTo(CALENDAR_FEED)
+        assertThat(createdByLabel(null, null, people)).isEqualTo(CALENDAR_FEED)
+    }
 }
 ```
 
@@ -5976,6 +6446,16 @@ class PendingOverlayTest {
         assertThat(shown.syncing).isTrue()
         assertThat(listOf(shown.event.title, shown.event.forPerson)).containsExactly("Moved", "sam").inOrder()
         assertThat(shown.event.startSort).isEqualTo(at(14).instant.toEpochMilli())
+    }
+
+    @Test
+    fun aQueuedAssignChangesOnlyThePerson() {
+        // Queued before the event was renamed and moved on a phone; the mirror has the new title and time.
+        val stale = EventDraft("Old title", at(7), at(8), forPerson = "sam", createdBy = null)
+        val shown = overlay(listOf(stored("a", 9)), listOf(change(1, ChangeKind.ASSIGN, "a", stale))).single()
+        assertThat(shown.syncing).isTrue()
+        assertThat(listOf(shown.event.title, shown.event.forPerson)).containsExactly("a", "sam").inOrder()
+        assertThat(shown.event.startSort).isEqualTo(at(9).instant.toEpochMilli())
     }
 
     @Test
@@ -6124,7 +6604,7 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
         val original = timed("Plumber quote call", 23, 13, 0, 30)
         put("s-family", original)
         queue(
-            ChangeKind.UPDATE,
+            ChangeKind.ASSIGN,
             "Plumber quote call",
             EventDraft(original.title, original.start, original.end, forPerson = sam.id.value, createdBy = null),
         )
@@ -6159,7 +6639,7 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
     fun detailShowsAQueuedAssignAsSyncing() = runTest {
         val original = timed("Plumber quote call", 23, 13, 0, 30)
         put("s-family", original)
-        queue(ChangeKind.UPDATE, original.remoteId, EventDraft(original.title, original.start, original.end, sam.id.value, null))
+        queue(ChangeKind.ASSIGN, original.remoteId, EventDraft(original.title, original.start, original.end, sam.id.value, null))
         val detail = repo.event(ref(original.remoteId), today = sept(23)).first()!!
         assertThat(detail.event.syncing).isTrue()
         assertThat(detail.event.person.name).isEqualTo("Sam")
@@ -6317,7 +6797,8 @@ fun resolvePerson(forPerson: String?, sourcePerson: PersonId, people: Map<Person
     forPerson?.let { people[PersonId(it)] } ?: people[sourcePerson] ?: Person.Family
 
 private val HOURS_MINUTES = DateTimeFormatter.ofPattern("HH:mm")
-private val SHORT_DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.UK)
+// ENGLISH, not UK: JDK 17's CLDR data gives "Sept" for Locale.UK, and Android versions differ.
+private val SHORT_DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
 
 /** An event ending at exactly midnight ends on the day before. */
 private fun lastDayOf(from: ZonedDateTime, to: ZonedDateTime): LocalDate {
@@ -6382,8 +6863,9 @@ internal class SourceCatalog(sources: List<StoredSource>, connections: List<Stor
     fun hasWriter(connectionId: String): Boolean = connections[connectionId]?.providerId in writerIds
 }
 
+/** Only the master calendar carries the tablet's tags; any other calendar's events come from its feed. */
 internal fun createdByLabel(createdBy: String?, source: StoredSource?, people: Map<PersonId, Person>): String = when {
-    source == null || !source.source.writable -> CALENDAR_FEED
+    source == null || !source.isMaster -> CALENDAR_FEED
     createdBy == null -> ADDED_FROM_PHONE
     else -> people[PersonId(createdBy)]?.name ?: ADDED_FROM_PHONE
 }
@@ -6431,8 +6913,9 @@ internal data class ShownEvent(val event: StoredEvent, val syncing: Boolean)
 
 /**
  * Lays [pending] changes over [events] in queue order. A delete hides the event. An update shows the draft's
- * values. A create adds the draft as a new event on a visible source; it has no remoteId yet, so its ref uses
- * "pending-{id}". Only events overlapping [windowStart, windowEnd) are returned, in start order.
+ * values; an assign shows only its person. A create adds the draft as a new event on a visible source; it has no
+ * remoteId yet, so its ref uses "pending-{id}". Only events overlapping [windowStart, windowEnd) are returned, in
+ * start order.
  */
 internal fun overlayPending(
     events: List<StoredEvent>,
@@ -6452,6 +6935,11 @@ internal fun overlayPending(
                 val ref = change.ref ?: continue
                 val current = shown[ref] ?: continue
                 if (draft != null) shown[ref] = ShownEvent(current.event.withDraft(draft, zone), syncing = true)
+            }
+            ChangeKind.ASSIGN -> {
+                val ref = change.ref ?: continue
+                val current = shown[ref] ?: continue
+                if (draft != null) shown[ref] = ShownEvent(current.event.copy(forPerson = draft.forPerson), syncing = true)
             }
             ChangeKind.CREATE -> {
                 val source = sources(change.connectionId, change.sourceId)?.takeIf { it.mapping.visible } ?: continue
@@ -6671,14 +7159,12 @@ git commit -m "Key calendar events by EventRef and show queued changes over the 
 **Interfaces:**
 - Consumes:
   - `EventDetailUi`, `EventUi` fields, `ReadOnlyReason`, `CalendarRepository.event(ref, today)`, `CalendarRepository.people` (Task 9)
-  - `CalendarEditor.mayDelete/delete/assign`, `EditResult` (Task 8)
-  - `writeFailedMessage`, `WriteFailed` (Task 7)
-  - `HhSheet`, `HhCloseButton`, `ShellTokens`, `LocalOverlayHost`, `LocalToaster` (Task 2)
+  - `CalendarEditor.mayDelete/delete/assign`, `EditResult` (Task 8); the editor shows the outcome toasts itself
+  - `HhSheet`, `HhCloseButton`, `ShellTokens`, `LocalOverlayHost` (Task 2)
   - `PinPadSheet(…, overSheet = true)` (Task 4)
   - `testAccess(household, listenIn, clock, sessionScope)` (Task 8)
 - Produces:
   - `enum class DetailMode { Idle, ChoosingPerson, ConfirmingDelete }`
-  - `const val EVENT_DELETED = "Event deleted"`
   - `@Composable fun EventDetailSheet(detail: EventDetailUi, people: List<Person>, mode: DetailMode, busy: Boolean, onClose: () -> Unit, onDelete: () -> Unit, onKeep: () -> Unit, onConfirmDelete: () -> Unit, onChoosePerson: () -> Unit, onAssign: (Person) -> Unit, modifier: Modifier = Modifier)`
   - Sheet test tags: `detail_sheet`, `detail_info`, `detail_note`, `detail_syncing`, `detail_assign`, `assign_<name>`, `detail_delete`, `detail_confirm`, `detail_keep`, `detail_confirm_delete`, and `sheet_close` from `HhCloseButton`
   - `@Composable internal fun EventDetailHost(ref: EventRef, today: LocalDate, repo: CalendarRepository, editor: CalendarEditor, onClose: () -> Unit)`
@@ -7059,8 +7545,6 @@ import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhSheet
 
-const val EVENT_DELETED = "Event deleted"
-
 enum class DetailMode { Idle, ChoosingPerson, ConfirmingDelete }
 
 /** The Calendar row's value: the source's name, marked read-only when it isn't the master calendar. */
@@ -7384,7 +7868,6 @@ Expected: PASS (10 tests).
 ```kotlin
 package uk.co.siland.culvery.capability.calendar.ui
 
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -7413,12 +7896,12 @@ import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.HouseholdZone
-import uk.co.siland.culvery.capability.calendar.RecordingToaster
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.ScriptedWriter
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.TestAccess
 import uk.co.siland.culvery.capability.calendar.WRITE_ATTEMPT_MS
+import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.calendarDb
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
@@ -7427,11 +7910,13 @@ import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
-import uk.co.siland.culvery.core.plugin.LocalToaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
-/** The sheet wired to a real repository, editor and access rules; PIN pads are answered from a queue. */
+/**
+ * The sheet wired to a real repository, editor and access rules; PIN pads are answered from a queue. Access and
+ * the editor share one recording toaster, `access.toasts`, as the app shares one.
+ */
 @RunWith(AndroidJUnit4::class)
 class EventDetailHostTest {
     @get:Rule val compose = createComposeRule()
@@ -7448,7 +7933,6 @@ class EventDetailHostTest {
     private val london = ZoneId.of("Europe/London")
     private val today = LocalDate.of(2026, 9, 23)
     private val writer = ScriptedWriter("calendar.a")
-    private val toaster = RecordingToaster()
     private var closed = 0
 
     @Before
@@ -7475,7 +7959,7 @@ class EventDetailHostTest {
         )
         repo = CalendarRepository(store, household, zone, emptySet(), setOf(writer))
         editor = CalendarEditor(
-            store, emptySet(), setOf(writer), access.control, zone, WallClock { System.currentTimeMillis() },
+            store, setOf(writer), access.control, access.toasts, zone, WallClock { System.currentTimeMillis() },
             scope, {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS,
         )
     }
@@ -7493,10 +7977,8 @@ class EventDetailHostTest {
     }
 
     private fun show(id: String) = compose.setContent {
-        CompositionLocalProvider(LocalToaster provides toaster) {
-            CulveryTheme(dark = true) {
-                EventDetailHost(EventRef("c1", "s-family", id), today, repo, editor, onClose = { closed++ })
-            }
+        CulveryTheme(dark = true) {
+            EventDetailHost(EventRef("c1", "s-family", id), today, repo, editor, onClose = { closed++ })
         }
     }
 
@@ -7515,7 +7997,23 @@ class EventDetailHostTest {
         compose.waitUntil(5_000) { closed > 0 }
         assertThat(access.requests).hasSize(1)
         assertThat(writer.calls).containsExactly("delete:dinner")
-        assertThat(toaster.messages).contains(EVENT_DELETED)
+    }
+
+    @Test
+    fun aRejectedDeleteKeepsTheSheetOpen() {
+        writer.failWith = WriteRejectedException("Event is locked")
+        access.answer(TestAccess.ALEX)
+        show("dinner")
+        waitForText("Dinner with Jo & Priya")
+        compose.onNodeWithTag("detail_delete").performClick()
+        waitForText("Delete this event?")
+        compose.onNodeWithTag("detail_confirm_delete").performClick()
+        // The editor toasts the refusal; the sheet goes back to its footer and stays open.
+        compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Delete this event?").fetchSemanticsNodes().isEmpty() }
+        assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — Event is locked")
+        compose.onNodeWithTag("detail_delete").assertExists()
+        assertThat(closed).isEqualTo(0)
     }
 
     @Test
@@ -7541,7 +8039,7 @@ class EventDetailHostTest {
         show("dinner")
         waitForText("Dinner with Jo & Priya")
         compose.onNodeWithTag("detail_delete").performClick()
-        // Access control shows refusals itself, through its own toaster.
+        // Access control shows refusals itself, through the toaster.
         compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
         assertThat(access.toasts.messages).containsExactly("Mia can only change events they created.")
         compose.onNodeWithTag("detail_confirm").assertDoesNotExist()
@@ -7595,18 +8093,16 @@ import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.EditResult
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventRef
-import uk.co.siland.culvery.capability.calendar.WriteFailed
-import uk.co.siland.culvery.capability.calendar.writeFailedMessage
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
-import uk.co.siland.culvery.core.plugin.LocalToaster
 
 /** Wraps a loaded detail so "still loading" (null) differs from "gone" (Loaded(null)). */
 private class Loaded(val detail: EventDetailUi?)
 
 /**
  * The detail sheet for [ref], kept live from the repository: it closes itself when the event disappears.
- * Only one action runs at a time; while one runs, further taps are ignored.
+ * Only one action runs at a time; while one runs, further taps are ignored. The editor toasts each outcome;
+ * the host only decides whether the sheet stays open.
  */
 @Composable
 internal fun EventDetailHost(
@@ -7621,7 +8117,6 @@ internal fun EventDetailHost(
     var mode by remember(ref) { mutableStateOf(DetailMode.Idle) }
     var busy by remember(ref) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val toaster = LocalToaster.current
 
     val state = loaded ?: return
     val detail = state.detail
@@ -7642,9 +8137,6 @@ internal fun EventDetailHost(
         }
     }
 
-    fun failed(result: EditResult.Rejected) =
-        toaster.show(writeFailedMessage(WriteFailed(detail.event.connectionLabel, result.message)))
-
     EventDetailSheet(
         detail = detail,
         people = people,
@@ -7655,15 +8147,9 @@ internal fun EventDetailHost(
         onKeep = { mode = DetailMode.Idle },
         onConfirmDelete = {
             run {
-                when (val result = editor.delete(ref)) {
-                    EditResult.Done, EditResult.Queued -> {
-                        onClose()
-                        toaster.show(EVENT_DELETED)
-                    }
-                    is EditResult.Rejected -> {
-                        mode = DetailMode.Idle
-                        failed(result)
-                    }
+                when (editor.delete(ref)) {
+                    EditResult.Done, EditResult.Queued -> onClose()
+                    is EditResult.Rejected -> mode = DetailMode.Idle
                     EditResult.Cancelled -> Unit
                     EditResult.NotEditable -> onClose()
                 }
@@ -7672,10 +8158,9 @@ internal fun EventDetailHost(
         onChoosePerson = { mode = DetailMode.ChoosingPerson },
         onAssign = { person ->
             run {
-                when (val result = editor.assign(ref, person.id)) {
+                when (editor.assign(ref, person.id)) {
                     EditResult.Done, EditResult.Queued -> mode = DetailMode.Idle
-                    is EditResult.Rejected -> failed(result)
-                    EditResult.Cancelled -> Unit
+                    is EditResult.Rejected, EditResult.Cancelled -> Unit
                     EditResult.NotEditable -> onClose()
                 }
             }
@@ -7696,7 +8181,7 @@ internal fun rememberEventOpener(repo: CalendarRepository, editor: CalendarEdito
 - [ ] **Step 8: Run the host tests to see them pass**
 
 Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*EventDetailHostTest*"`
-Expected: PASS (5 tests).
+Expected: PASS (6 tests).
 
 - [ ] **Step 9: Write the screenshot test**
 
@@ -7760,7 +8245,6 @@ class DetailScreenshotTest {
     @Test fun recurringLight() = snap("detail_recurring_light", false, SampleUi.detailRecurring)
     @Test fun untaggedDark() = snap("detail_untagged_dark", true, SampleUi.detailUntagged, DetailMode.ChoosingPerson)
     @Test fun untaggedLight() = snap("detail_untagged_light", false, SampleUi.detailUntagged, DetailMode.ChoosingPerson)
-    @Test fun untaggedCollapsedDark() = snap("detail_untagged_collapsed_dark", true, SampleUi.detailUntagged)
     @Test fun syncingDark() = snap("detail_syncing_dark", true, SampleUi.detailSyncing)
     @Test fun syncingLight() = snap("detail_syncing_light", false, SampleUi.detailSyncing)
     @Test fun deleteConfirmDark() = snap("detail_delete_confirm_dark", true, SampleUi.detailEditable, DetailMode.ConfirmingDelete)
@@ -7768,6 +8252,11 @@ class DetailScreenshotTest {
 
     @Test
     fun pinOverTheSheetDark() = snap("detail_pin_dark", true, SampleUi.detailEditable) {
+        PinPadSheet("Change any event", PinReason.Delete, error = null, lockedUntilMillis = null, onSubmit = {}, onCancel = {}, overSheet = true)
+    }
+
+    @Test
+    fun pinOverTheSheetLight() = snap("detail_pin_light", false, SampleUi.detailEditable) {
         PinPadSheet("Change any event", PinReason.Delete, error = null, lockedUntilMillis = null, onSubmit = {}, onCancel = {}, overSheet = true)
     }
 }
@@ -7805,12 +8294,12 @@ State by state:
   - A green-tinted `accentSoft` card with a green phone icon: "Added from a phone" / "Showing as Family until someone assigns it."
   - Below the text, three 48 dp `surf` chips: ● Alex, ● Sam, ● Mia.
   - Delete at the bottom.
-  - `detail_untagged_collapsed_dark` shows a 44 dp green "Assign to…" button in place of the chips.
+  - The collapsed state (a 44 dp green "Assign to…" button in place of the chips) has no image; `anUntaggedEventOffersAssignAndKeepsDelete` covers it, and the walkthrough shows it.
 - `detail_syncing_*` (07): a 30 dp `surf2` pill above the title, reading "Syncing to Sample calendar…" with a `cloud_upload` icon. The colour bar spans both the pill and the title.
 - `detail_delete_confirm_*` (08):
   - The Delete pill is replaced by a coral-tinted `dangerSoft` panel with radius 24. It holds a trash icon and "Delete this event?" at 18 sp bold, then "“Dinner with Jo & Priya” will be removed from Sample calendar for everyone."
   - Two 60 dp buttons: "Keep event" (`surf`) on the left and "Delete event" (coral with dark ink and `delete_forever`) on the right.
-- `detail_pin_dark` (09):
+- `detail_pin_*` (09):
   - The PIN pad's half-dark scrim covers only the 600 dp sheet area.
   - Its 400 dp card is centred in that area, asking "Who's this?" / "Enter your PIN to delete this event. It also records who made the change."
 
@@ -7919,14 +8408,12 @@ private object NobodyMay : AccessControl {
         refusal: Refusal,
     ): Authorised? = null
 
-    override fun touch() = Unit
-
     override fun lock() = Unit
 }
 
 /** An editor that can't change anything, for tests that only need the hosts to compose and open sheets. */
 internal fun stubEditor(store: CalendarStore, zone: HouseholdZone): CalendarEditor = CalendarEditor(
-    store, emptySet(), emptySet(), NobodyMay, zone, WallClock { 0L },
+    store, emptySet(), NobodyMay, RecordingToaster(), zone, WallClock { 0L },
     CoroutineScope(Dispatchers.Unconfined), {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS,
 )
 ```
@@ -7953,8 +8440,10 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/u
         assertThat(opened).containsExactly(EventRef("sample", "family", "School run"))
     }
 
+    // Counted on the merged tree, as a person hears them: each row merges its badges' descriptions, so a row
+    // counts once per badge kind. Don't switch these to useUnmergedTree.
     @Test
-    fun todayRowsShowSyncingFirstThenLockOrRepeat() {
+    fun todayRowsShowEachOfTheirBadges() {
         show { TodayCard(SampleUi.todayWithBadges) }
         compose.onAllNodesWithContentDescription("Syncing").assertCountEquals(2)
         compose.onAllNodesWithContentDescription("Read-only calendar").assertCountEquals(1)
@@ -8016,7 +8505,6 @@ import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.HouseholdZone
-import uk.co.siland.culvery.capability.calendar.RecordingToaster
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.calendarDb
@@ -8029,7 +8517,6 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
-import uk.co.siland.culvery.core.plugin.LocalToaster
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
 @RunWith(AndroidJUnit4::class)
@@ -8079,7 +8566,6 @@ class OpenEventTest {
         CompositionLocalProvider(
             LocalShellNavigator provides RecordingNavigator(),
             LocalOverlayHost provides overlay,
-            LocalToaster provides RecordingToaster(),
         ) {
             CulveryTheme(dark = true) {
                 Box {
@@ -8478,7 +8964,7 @@ git commit -m "Open the event detail sheet from Today rows and week chips, with 
 
 ---
 
-### Task 12: Debug seed (master and tags), emulator walkthrough, and the user checkpoint
+### Task 12: Debug seed (master and tags), rollback demo, emulator walkthrough, the user checkpoint, and the README
 
 **Files:**
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSetup.kt`
@@ -8487,12 +8973,16 @@ git commit -m "Open the event detail sheet from Today rows and week chips, with 
 - Modify: `app/src/release/java/uk/co/siland/culvery/DebugSeed.kt`
 - Modify: `app/src/main/java/uk/co/siland/culvery/CulveryApp.kt`
 - Test: `app/src/testDebug/java/uk/co/siland/culvery/DebugSeedTest.kt` (modify)
+- Test: `app/src/testDebug/java/uk/co/siland/culvery/SampleRollbackTest.kt` (create)
+- Modify (after the checkpoint): `README.md`
 
 **Interfaces:**
 - Consumes:
-  - `CalendarStore.setMaster`, `CalendarStore.master()` (Task 1)
-  - `CalendarSyncLoop.requestSync` (Task 7)
-  - `FakeCalendarProvider.tagSamples`, `SOURCE_FAMILY` (Task 6)
+  - `CalendarStore.setMaster`, `CalendarStore.master()`, `CalendarStore.enqueue`, `PendingChange` (Task 1)
+  - `CalendarSync`'s `@Inject` constructor, `CalendarSyncLoop.requestSync` (Task 7)
+  - `FakeCalendarProvider.tagSamples`, `rejectNextWrite`, `SOURCE_FAMILY` (Task 6)
+  - `CalendarRepository.day` (Task 9)
+  - for the README: `CalendarWriter`, `WriteRejectedException`, `EventDraft`, `CalendarProviderContractTest.writer()` and `writableSource()`, `OverlayHost`, `Toaster`, `CalendarPermissions`, `MIGRATION_1_2`
 - Produces:
   - `CalendarSetup(store, providers, requestSync: () -> Unit = {})` (public), plus `@Inject constructor(store, providers, loop: CalendarSyncLoop)`
   - `suspend fun CalendarSetup.master(): StoredSource?`
@@ -8693,9 +9183,106 @@ class DebugSeedTest {
 }
 ```
 
+`app/src/testDebug/java/uk/co/siland/culvery/SampleRollbackTest.kt`, the checkpoint's rollback demo on the sample calendar and its existing `rejectNextWrite` switch (no debug trigger in the app):
+```kotlin
+package uk.co.siland.culvery
+
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
+import java.time.LocalDate
+import java.time.ZoneId
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.calendar.CalendarRepository
+import uk.co.siland.culvery.capability.calendar.CalendarSetup
+import uk.co.siland.culvery.capability.calendar.CalendarStore
+import uk.co.siland.culvery.capability.calendar.CalendarSync
+import uk.co.siland.culvery.capability.calendar.ChangeKind
+import uk.co.siland.culvery.capability.calendar.HouseholdZone
+import uk.co.siland.culvery.capability.calendar.PendingChange
+import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
+import uk.co.siland.culvery.core.access.PinHasher
+import uk.co.siland.culvery.core.access.PinManager
+import uk.co.siland.culvery.core.household.HomeLocation
+import uk.co.siland.culvery.core.household.HouseholdRepository
+import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider
+
+/**
+ * A delete queued while offline hides the event; when the sample calendar later refuses it, the event comes back
+ * and a toast says why. The real store, sync engine, repository and fake provider, end to end.
+ */
+@RunWith(AndroidJUnit4::class)
+class SampleRollbackTest {
+    private class Toasts : Toaster {
+        val messages = mutableListOf<String>()
+
+        override fun show(message: String, icon: String) {
+            messages += message
+        }
+    }
+
+    private lateinit var householdDb: HouseholdDatabase
+    private lateinit var calendarDb: CalendarDatabase
+    private val fake = FakeCalendarProvider()
+    private val toasts = Toasts()
+    private val london = ZoneId.of("Europe/London")
+
+    @Before
+    fun setUp() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        householdDb = Room.inMemoryDatabaseBuilder(context, HouseholdDatabase::class.java).allowMainThreadQueries().build()
+        calendarDb = Room.inMemoryDatabaseBuilder(context, CalendarDatabase::class.java).allowMainThreadQueries().build()
+    }
+
+    @After
+    fun tearDown() {
+        householdDb.close()
+        calendarDb.close()
+    }
+
+    @Test
+    fun aRefusedOfflineDeleteComesBackWithAToast() = runTest {
+        val household = HouseholdRepository(householdDb)
+        household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
+        val store = CalendarStore(calendarDb)
+        val zone = HouseholdZone(household)
+        seedDebugData(household, PinManager(household, PinHasher()), CalendarSetup(store, setOf(fake)), setOf(fake))
+        val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, WallClock { System.currentTimeMillis() })
+        val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake))
+        sync.syncAll()
+        val today = LocalDate.now(london)
+        val boiler = repo.day(today).first().single { it.title == "Boiler service" }
+
+        // What the editor queues when the provider can't be reached (CalendarEditorTest covers that step).
+        val now = System.currentTimeMillis()
+        store.enqueue(
+            PendingChange(
+                0, boiler.ref.connectionId, boiler.ref.sourceId, boiler.ref.remoteId, ChangeKind.DELETE,
+                draft = null, attempts = 1, nextAttemptMillis = now, createdMillis = now,
+            ),
+        )
+        assertThat(repo.day(today).first().map { it.title }).doesNotContain("Boiler service")
+
+        fake.rejectNextWrite("Boiler service is locked")
+        sync.syncAll()
+        assertThat(repo.day(today).first().map { it.title }).contains("Boiler service")
+        assertThat(toasts.messages).containsExactly("Couldn't save to Sample calendar — Boiler service is locked")
+    }
+}
+```
+
 - [ ] **Step 3: Run the tests to see them fail**
 
-Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarSetupTest*" :app:testDebugUnitTest --tests "*DebugSeedTest*"`
+Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarSetupTest*" :app:testDebugUnitTest --tests "*DebugSeedTest*" --tests "*SampleRollbackTest*"`
 Expected: compilation FAILS: `master`, `setMaster` and the trailing `requestSync` lambda don't exist, and `seedDebugData` takes no providers.
 
 - [ ] **Step 4: Let setup choose the master calendar**
@@ -8860,7 +9447,7 @@ In `app/src/main/java/uk/co/siland/culvery/CulveryApp.kt`:
 
 - [ ] **Step 6: Run the tests to see them pass**
 
-Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarSetupTest*" :app:testDebugUnitTest --tests "*DebugSeedTest*"`
+Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarSetupTest*" :app:testDebugUnitTest --tests "*DebugSeedTest*" --tests "*SampleRollbackTest*"`
 Expected: PASS.
 
 - [ ] **Step 7: Build both variants and run the gate**
@@ -8870,8 +9457,8 @@ Expected: `BUILD SUCCESSFUL`.
 - The release build has empty `Set<CalendarProvider>` and `Set<CalendarWriter>` (both `@Multibinds`).
 - The debug build binds the fake as both a provider and a writer.
 - If Hilt reports a missing binding, the message names it. The new bindings are:
-  - `Toaster` (`AppModule`);
-  - `Set<CalendarWriter>`, the `PermissionSource` and `WriteFailureToasts` (`CalendarModule`);
+  - `Toaster` (`AppModule`), injected into `DefaultAccessControl`, `CalendarSync` and `CalendarEditor`;
+  - `Set<CalendarWriter>` and the `PermissionSource` (`CalendarModule`);
   - the writer (`FakeCalendarModule`).
 
 - [ ] **Step 8: Commit**
@@ -8933,11 +9520,11 @@ Check each item below and report any that fail. Take `adb exec-out screencap -p 
    2. Tap **Keep event**: the Delete pill returns.
    3. Tap **Delete** again. No PIN is asked, because Mia is signed in.
    4. Tap **Delete event**. The sheet closes, "Event deleted" shows as a toast, and Football is gone from the week.
-8. **A child is refused someone else's event.** Still within 2 minutes, tap *Dinner with Jo & Priya*, then **Delete**. No PIN pad appears, and a toast reads "Mia can only change events they created."
+8. **A child is refused someone else's event.** Still within 2 minutes, tap *Dinner with Jo & Priya*, then **Delete**. No PIN pad appears, a toast reads "Mia can only change events they created.", and the status-bar indicator disappears: the refusal signed Mia out. Tap **Delete** again: the PIN pad appears. Cancel it.
 9. **Read-only states.**
    - Tap *INSET day — no school*, which shows a `lock` badge: "From School terms (read-only)", Calendar "School terms · read-only", and no footer.
    - Tap *Swimming*: "Repeating event", a Repeats row reading "Yes", and no footer.
-10. **The session ends by itself.** Leave the tablet untouched for 2 minutes 10 seconds. The status-bar indicator disappears.
+10. **The session ends by itself, and touches don't extend it.** Tap *Dinner with Jo & Priya*, tap **Delete**, enter `1234` (Alex), then tap **Keep event** and close the sheet. For the next 2 minutes 10 seconds keep tapping around (open and close week chips): the status-bar indicator still disappears 2 minutes after the PIN.
 11. **PIN pad without a sheet.** On Home, tap **Settings** in the rail. The pad is centred over the whole screen and reads "Enter your PIN to change settings." Enter `0000`: the dots turn coral and "Wrong PIN — try again" shows. Cancel.
 12. **DM Sans on this API level** (the 2a follow-up):
     - Bold titles ("This week", the sheet title, "Who's this?") must look clearly heavier than body text.
@@ -8946,23 +9533,23 @@ Check each item below and report any that fail. Take `adb exec-out screencap -p 
 
     Say which API level you checked. If it isn't API 30 with the Google Play image, list this check as still to do on that image.
 
-The outbox's offline and rejection paths can't be triggered on the device in 2b-1: the fake's switches are only reachable from tests. `CalendarEditorTest`, `CalendarSyncTest` and `CalendarRepositoryTest` cover them. Say so in the report.
+The outbox's offline and rejection paths can't be triggered on the device in 2b-1: the fake's switches are only reachable from tests, and the app has no debug trigger for them. `SampleRollbackTest` runs the rollback end to end on the sample calendar with its `rejectNextWrite` switch; `CalendarEditorTest`, `CalendarSyncTest` and `CalendarRepositoryTest` cover the rest. Say so in the report.
 
 If the emulator can't start, say so and report Step 7 as the gate.
 
 - [ ] **Step 10: STOP — the controller runs the USER CHECKPOINT**
 
-The implementer stops here and reports Steps 7 and 9. **The controller**, not the implementer, then does the following, and does not start Task 13 until the user replies.
+The implementer stops here and reports Steps 7 and 9. **The controller**, not the implementer, then does the following, and does not start Step 11 until the user replies.
 
 Send the user these images:
 - The sheet (`capability/calendar/src/test/screenshots/`):
   - `detail_editable_dark.png`, `detail_editable_light.png`
   - `detail_readonly_feed_dark.png`, `detail_readonly_feed_light.png`
   - `detail_recurring_dark.png`, `detail_recurring_light.png`
-  - `detail_untagged_dark.png`, `detail_untagged_light.png`, `detail_untagged_collapsed_dark.png`
+  - `detail_untagged_dark.png`, `detail_untagged_light.png`
   - `detail_syncing_dark.png`, `detail_syncing_light.png`
   - `detail_delete_confirm_dark.png`, `detail_delete_confirm_light.png`
-  - `detail_pin_dark.png`
+  - `detail_pin_dark.png`, `detail_pin_light.png`
 - Badges and the Coming up change:
   - `today_badges_dark.png`, `week_dark.png`, `week_syncing_dark.png`, `coming_up_dark.png`
 - The shell (`app/src/test/screenshots/`):
@@ -8974,9 +9561,9 @@ Send the hand-off references with them: `docs/design/house_hub_handoff/screensho
 
 Name the parts that are the controller's own design, which the hand-off does not specify:
 - where the status-bar sign-in sits (right side, before the theme indicator);
-- the collapsed "Assign to…" button (the hand-off only shows the chips);
+- the collapsed "Assign to…" button (the hand-off only shows the chips; seen in the walkthrough, step 5);
 - "Repeats · Yes";
-- the connection label in place of "Google" ("Syncing to Sample calendar…", "…removed from Sample calendar…", "Edit repeating events in Sample calendar on your phone.");
+- the connection label in place of "Google" ("Syncing to Sample calendar…", "…removed from Sample calendar…", "Edit repeating events in Sample calendar on your phone."), already approved (U3);
 - the `delete` icon in the confirmation panel;
 - the 22 dp toast icon;
 - the full-screen PIN pad when no sheet is open.
@@ -8986,25 +9573,18 @@ List the known differences that are **2b-2 work, not defects**:
 - the **+** on Today, **Add event** in the Calendar header, and the column add hints;
 - the quick-add sheet, the pickers and keyboard handling.
 
+Show the rollback: run `./gradlew :app:testDebugUnitTest --tests "*SampleRollbackTest*"` and tell the user what it proves (an offline delete hides Boiler service; when the sample calendar refuses it, the event comes back and the toast reads "Couldn't save to Sample calendar — Boiler service is locked"), alongside `home_toast_dark.png` for how a toast looks.
+
+Ask one design question: the lock and `event_repeat` icons in the read-only and repeating cards are drawn `mute`, as the other card icons are. Should they be `ink`?
+
 Also list anything you noted in Task 10 Step 10, Task 11 Step 11 or Step 9 above.
 
 Ask: "Do these match what you want? Any changes before I update the README?"
 
 - **If the user asks for changes:** make them, and re-record only the affected images with `--tests`. Look at them, run `./gradlew testDebugUnitTest verifyRoborazziDebug`, re-send the changed images, and commit with a message describing the change. Repeat until the user approves.
-- **When approved:** continue to Task 13.
+- **When approved:** continue to Step 11.
 
----
-
-### Task 13: README — change events, sessions, the writer contract
-
-**Files:**
-- Modify: `README.md`
-
-**Interfaces:**
-- Consumes the names above: `CalendarWriter`, `WriteRejectedException`, `EventDraft`, `CalendarProviderContractTest.writer()` and `writableSource()`, `OverlayHost`, `Toaster`, `CalendarPermissions`, `MIGRATION_1_2`.
-- Produces: documentation only.
-
-- [ ] **Step 1: Update the README**
+- [ ] **Step 11: Update the README**
 
 Make these edits to `README.md`:
 
@@ -9023,7 +9603,7 @@ Debug builds seed a sample household on first launch so the app is usable before
 `calendar.db` stores user configuration (connections, mappings, the master calendar) and queued changes (the `outbox` table; the `event` table is only ever a copy of what the provider has). Every schema version bump ships a hand-written Room `Migration` in `db/Migrations.kt` with a `MigrationTestHelper` test in `CalendarMigrationTest`; never use destructive fallback. Room exports each schema version to `<module>/schemas/`, and those files are committed.
 ```
 
-3. **Adding a capability.** In step 2, after "Card and tab UI move the shell through `LocalShellNavigator.current.openTab(id)` / `.openSettings()`.", add: "Sheets open through `LocalOverlayHost.current.show { … }` (draw them with `HhSheet`), and short messages go through `Toaster` (injectable, or `LocalToaster.current`)."
+3. **Adding a capability.** In step 2, after "Card and tab UI move the shell through `LocalShellNavigator.current.openTab(id)` / `.openSettings()`.", add: "Sheets open through `LocalOverlayHost.current.show { … }` (draw them with `HhSheet`). Short messages go through the injected `Toaster`, from the code that knows the outcome (a view model or an `@ApplicationScope` job), so the toast still shows if the sheet has closed."
 
 4. **Adding a calendar provider.**
    - In step 2, replace "and `features` (`READ`, plus `WRITE` once 2b adds writing)." with "and `features` (`READ`, plus `WRITE` if it implements `CalendarWriter`)."
@@ -9032,37 +9612,38 @@ Debug builds seed a sample household on first launch so the app is usable before
 3. **Writing (optional).** If the service can write, declare `Feature.WRITE` and implement `CalendarWriter` (often on the same class):
    - `providerId` equals `descriptor.id`.
    - `create`, `update` and `delete` write to one source. `forPerson` and `createdBy` are household person ids to store with the event (Google: `extendedProperties.private`), and the next sync must return them unchanged. Never write names.
-   - Throw `WriteRejectedException` for a permanent refusal (including a source that is unknown or read-only), `NeedsSignInException` for auth failures, and `UnreachableException` for network failures. Nothing else.
-   - Deleting an event that is already gone succeeds.
+   - `update` changes only the title, the times and the tags, and keeps every other field (Google: PATCH, not PUT).
+   - Throw `WriteRejectedException` for a permanent refusal (including a source that is unknown or read-only), `NeedsSignInException` for auth failures, and `UnreachableException` for network failures and for "try later" answers (Google: 429, 403 rate limits, 5xx). Nothing else.
+   - Deleting an event that is already gone succeeds (Google: treat 404 and 410 on a delete as success).
 
-   Bind it next to the provider: `@Binds @IntoSet abstract fun writer(impl: MyCalendarProvider): CalendarWriter`. The app writes only to the household's master calendar, and only non-recurring events. It tries the writer for 10 seconds, then queues the change and retries with backoff (30 s, 1 min, 2 min, then every 5 min).
+   Bind it next to the provider: `@Binds @IntoSet abstract fun writer(impl: MyCalendarProvider): CalendarWriter`. The app writes only to the household's master calendar, and only non-recurring events. It tries the writer for 10 seconds, then queues the change and retries with backoff (30 s, 1 min, 2 min, then every 5 min), delivering each event's changes in order. A change still queued after 48 hours is dropped with a toast.
 ````
    - Renumber the old steps 3, 4 and 5 to 4, 5 and 6.
    - In the contract-test example, after `override fun simulateUnreachable() = { … }`, add:
 ```kotlin
-       // WRITE providers only; the four write checks fail if these are missing.
+       // WRITE providers only; the six write checks fail if these are missing.
        override fun writer() = …
        override fun writableSource() = …
 ```
 
 5. **PINs.** Replace the bullet "A session lasts 60 seconds after the last touch. Tap your name in the rail to lock early. Settings closes when the session ends." with:
 ```markdown
-- A session lasts 2 minutes after the last touch. While someone is signed in, the status bar shows their name and role and a **Sign out** link. Settings closes when the session ends.
-- Calendar changes follow the roles: Admins and Adults can delete and assign any event on the master calendar; a Child can delete only events they added, and can't assign. A refused change says why in a toast. Events from other calendars, and repeating events, can't be changed on the tablet.
+- A session lasts 2 minutes after the last PIN-checked action; touching the screen doesn't extend it. While someone is signed in, the status bar shows their name and role and a **Sign out** link. Settings closes when the session ends.
+- Calendar changes follow the roles: Admins and Adults can delete and assign any event on the master calendar; a Child can delete only events they added, and can't assign. A refused change says why in a toast and signs the person out, so the next tap asks for a PIN. Events from other calendars, and repeating events, can't be changed on the tablet.
 ```
 
-- [ ] **Step 2: Check the README renders sensibly**
+- [ ] **Step 12: Check the README renders sensibly**
 
 Read `README.md` through once. Check that:
 - the provider steps number 1 to 6;
 - the code blocks are balanced;
-- nothing still mentions "60 seconds", "rail chip" or "once 2b adds writing":
+- nothing still mentions "60 seconds", "rail chip", "once 2b adds writing", `LocalToaster` or a touch extending the session:
   ```bash
-  grep -nE "60 s|60 seconds|rail chip|once 2b" README.md
+  grep -nE "60 s|60 seconds|rail chip|once 2b|LocalToaster|last touch" README.md
   ```
   Expected: no output.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 13: Commit**
 
 ```bash
 git add README.md
@@ -9075,16 +9656,16 @@ git commit -m "Document calendar changes, the writer contract and the 2-minute s
 
 | Design | Where |
 |---|---|
-| §2 D1 two-minute session, status-bar sign-in, no rail chip | Tasks 2, 3 |
+| §2 D1 two-minute session (extended only by an authorised action), status-bar sign-in, no rail chip | Tasks 2, 3 |
 | §2 D2 PIN pad redesign, over-sheet placement | Task 4 |
-| §2 D3 save flow (10 s attempt, rejected, queued, later rollback) | Tasks 7, 8, 9, 10 (delete and assign; save in 2b-2) |
+| §2 D3 save flow (10 s attempt, rejected, queued, later rollback) | Tasks 7, 8, 9, 10, 12 (delete and assign; save in 2b-2) |
 | §2 D5 debug master calendar | Tasks 6, 12 |
 | §2 D6 no Coming up week link | Task 11 |
 | §3.1 overlay host, toaster, status bar | Task 2 |
-| §3.2 `authorise` reason/allow, `NotAllowed` message, refusal toast | Task 3 |
-| §3.3 `EventDraft`, `CalendarWriter`, `WriteRejectedException`, write checks, broken-writer fixture | Tasks 1, 5 |
+| §3.2 `authorise` reason/allow, `NotAllowed` message, refusal toast (a shortcut refusal locks) | Task 3 |
+| §3.3 `EventDraft`, `CalendarWriter`, `WriteRejectedException`, write checks (plus delete-missing and all-day), broken-writer fixtures | Tasks 1, 5 |
 | §3.4 v2 migration, master flag, outbox, `MigrationTestHelper` | Task 1 |
-| §3.5 editor, outbox drain, backoff, `WriteFailed`, overlay, `requestSync` + `Mutex` | Tasks 7, 8, 9 |
+| §3.5 editor, outbox drain (in order, 48-hour cap), backoff, rejection toasts in place of `WriteFailed`, overlay, `requestSync` + `Mutex` | Tasks 7, 8, 9 |
 | §3.6 permissions table, allow rules, refusal wording | Task 8 |
 | §3.7 `EventRef`, new `EventUi` fields | Tasks 1, 9 |
 | §4.1–4.2 opening the sheet, every sheet state | Tasks 10, 11 |

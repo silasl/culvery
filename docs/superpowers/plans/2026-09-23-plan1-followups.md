@@ -57,3 +57,14 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - All-day events straddle two days after a household zone change until the next sync: filter all-day events by date.
 - `opsz` axis for large text.
 - An on-device SM-T510 pass of the calendar UI.
+
+## From Plan 2b-1 review (deferred)
+
+**For Plan 2b-2**
+- S1, idempotent creates: add a nullable `clientKey TEXT` (a UUID) to `outbox` (a one-line Room AutoMigration, v2 → v3) and an optional client id on `CalendarWriter.create`. The contract says a repeated create with the same key returns the existing event. A queued create's `EventRef` uses the client id, so it can be opened, edited and deleted before it syncs. Needed before quick-add ships: nothing in 2b-1 creates events.
+
+**For Plan 3**
+- R8: map raw provider error text to fixed, friendly wording in the Google writer before it reaches a toast ("Couldn't save to … — {reason}").
+- R9: the Google writer must wrap its blocking HTTP calls in `runInterruptible` (or an equivalent cancellable call), so the editor's 10 s and the drain's 60 s timeouts hold. Add the contract check (a gated write returns when its caller is cancelled) with it; on the cooperative fake it proves nothing.
+- DL1: describe the recurrence from Google's RRULE (e.g. "Every week") in the detail sheet's Repeats row, in place of "Yes".
+- U3 follow-up: once a second connection label exists, use the service name ("Google Calendar") in the failure, repeating-event and delete-confirmation wording, and keep the short connection label for the syncing pill.
