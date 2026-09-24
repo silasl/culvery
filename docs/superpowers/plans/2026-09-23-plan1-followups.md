@@ -30,6 +30,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 ## From Plan 2a review (deferred)
 
 **For Plan 2b**
+- Remove the "Week ›" link from the Coming up card header. The user decided that Today's Week pill and the rail's Calendar tab are enough, so there is one way from Home to the week view. Re-record the Coming up screenshots.
 - Map an unknown stored health code to `Error`, not `Ok` (`CalendarStore.healthOf`).
 - Test that real cancellation propagates through `CalendarSync` and the loop.
 - Test that an id change mid-sync behaves correctly.
