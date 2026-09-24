@@ -7,9 +7,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - `HomeCardPlacer` has no tests with mixed sizes or a full grid. Add them once real cards exist.
 - The shell composables (`NavRail`, `StatusBar`, `SettingsPlaceholder`) have no UI tests, although the test tags exist. Cover them with the Roborazzi setup.
 - Set a module-wide Robolectric viewport default (`w1280dp-h800dp`) so each test class doesn't need its own `@Config`.
-- Make the PIN pad scrim colour (`0x8C000000`) a token, and give the repeated `80.dp` key size a name.
 - Home header: the gap between the clock and the date is about 55 dp on the emulator, against about 12 dp in the hand-off, so the grid sits roughly 40 dp too low. The line-height trim on `HhType.clock` isn't taking effect. Found on the emulator; both AVDs show it.
-- The rail session chip cuts "Admin" to "Adm…". The padding, dot and lock icon leave too little width inside the 108 dp rail. Tighten the padding or drop the lock icon.
 
 ## For Plan 4 (weather, setup, settings, release)
 - Guard the lockout against a backwards jump of the wall clock: treat a stored `lockedUntil` more than 16 minutes in the future as expired.
@@ -18,7 +16,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - After Exit kiosk, the system bars overlap the content (edge-to-edge, no insets). Pad the root with `WindowInsets.systemBars` when not in kiosk mode.
 - `LockoutStore` uses `commit()`, which is synchronous disk I/O and may be on Main. Switch to `apply()` with an in-memory mirror if StrictMode complains.
 - `kioskExited` is lost when the Activity is recreated by a config change that isn't in the manifest list.
-- The session keeps a snapshot of the person, so a role change or deletion takes up to 60 s to apply. The people editor should call `AccessControl.lock()`.
+- The session keeps a snapshot of the person, so a role change or deletion lasts until the session ends, 2 minutes after the last authorised action. The people editor should call `AccessControl.lock()`.
 - Read `addPerson`'s `sortOrder` inside a transaction. Add tests that `setRole`, `setPinHash` and `clearPin` reject Family.
 - Make the debug seed check for an active Admin rather than an empty household. Remove the debug Admin when the wizard creates the first real one.
 - Before shipping to the wall, run the Task 10 Step 7 checks on the device and do a signed release build (`startLockTask` has only run in release, and never on a device).
@@ -28,16 +26,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
   - Refresh each connection's sources from `provider.sources()` (for example daily), keeping the existing mappings.
 
 ## From Plan 2a review (deferred)
-
-**For Plan 2b**
-- Remove the "Week ›" link from the Coming up card header. The user decided that Today's Week pill and the rail's Calendar tab are enough, so there is one way from Home to the week view. Re-record the Coming up screenshots.
-- Map an unknown stored health code to `Error`, not `Ok` (`CalendarStore.healthOf`).
-- Test that real cancellation propagates through `CalendarSync` and the loop.
-- Test that an id change mid-sync behaves correctly.
-- Test the midnight-end label rule.
-- `EventRef` must replace the `/`-joined `EventUi.key` (ICS UIDs can contain `/`).
-- Check DM Sans weights and bold-text truncation on an API 30 AVD (Google Play image) at the checkpoint.
-- The overlay host, "sync now" (`requestSync` + `Mutex`), `CalendarWriter`, the outbox as a separate table, and the v2 migration with a `MigrationTestHelper` test.
 
 **For Plan 3**
 - Widen R3:
@@ -58,13 +46,32 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - `opsz` axis for large text.
 - An on-device SM-T510 pass of the calendar UI.
 
-## From Plan 2b-1 review (deferred)
+## From Plan 2b-1 (deferred)
 
 **For Plan 2b-2**
 - S1, idempotent creates: add a nullable `clientKey TEXT` (a UUID) to `outbox` (a one-line Room AutoMigration, v2 → v3) and an optional client id on `CalendarWriter.create`. The contract says a repeated create with the same key returns the existing event. A queued create's `EventRef` uses the client id, so it can be opened, edited and deleted before it syncs. Needed before quick-add ships: nothing in 2b-1 creates events.
+- Duplicate CREATE: if `applyAcceptedWrite` throws after the provider accepted, the queued create is sent again. Fix with S1, before quick-add ships.
+- `CalendarEditor` judges `createdBy` from the snapshot taken before the PIN pad. Re-read it after authorising once UPDATE can change it.
+- m7: move `SilentToaster` to test sources and drop the `writers = emptySet()` and `toaster = SilentToaster` defaults on `CalendarSync`'s internal constructor.
 
 **For Plan 3**
 - R8: map raw provider error text to fixed, friendly wording in the Google writer before it reaches a toast ("Couldn't save to … — {reason}").
 - R9: the Google writer must wrap its blocking HTTP calls in `runInterruptible` (or an equivalent cancellable call), so the editor's 10 s and the drain's 60 s timeouts hold. Add the contract check (a gated write returns when its caller is cancelled) with it; on the cooperative fake it proves nothing.
 - DL1: describe the recurrence from Google's RRULE (e.g. "Every week") in the detail sheet's Repeats row, in place of "Yes".
 - U3 follow-up: once a second connection label exists, use the service name ("Google Calendar") in the failure, repeating-event and delete-confirmation wording, and keep the short connection label for the syncing pill.
+- m2: a drain that keeps throwing makes the loop run a full sync every second (`nextWait()` sees the change overdue). Back off after a failed drain; fold into R3.
+- m3: a queued ASSIGN for an event that left the mirror's window is dropped as "The event no longer exists". Fetch the event from the provider, or send a tags-only patch.
+- m4: a reconnect keeps the connection id, so queued changes wait out their backoff (up to 5 minutes). Reconnect should reset that connection's `nextAttemptMillis` and call `requestSync()`.
+
+**For Plan 4**
+- `CalendarSetup.setMaster` calls `provider.sources()` without the IO + timeout wrapper. Fix with `CalendarSetup.connect`.
+- m5: Settings closes when the session ends, 2 minutes after the PIN, however busy the adult is. Extend the session on each saved settings action, or give Settings its own session while open.
+- Check DM Sans weights and bold-text truncation on an API 30 AVD (Google Play image); the 2b-1 walkthrough ran on API 35.
+
+**Accessibility pass (with the `HhIcon` item)**
+- Clickable event rows and week chips have no `Role.Button`.
+- The event detail sheet doesn't scroll. It fits today; longer titles and 2b-2's fields won't.
+
+**Next migration or Room upgrade**
+- The driver-based `MigrationTestHelper` may not catch a dropped table. At v2 → v3, check it does, or assert the table list in the test.
+- `androidxSqlite` 2.6.0 is pinned apart from Room's transitive version. Re-check it on each Room bump.
