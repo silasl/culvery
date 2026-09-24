@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
                     }
                     // Layer order: sheet, then the PIN pad over it, then toasts over everything.
                     OverlayLayer(overlay)
-                    PinPadHost(pinPrompt)
+                    PinPadHost(pinPrompt, overSheet = overlay.isShowing)
                     ToastLayer(toast, toasts::hide)
                 }
             }

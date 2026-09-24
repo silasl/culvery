@@ -19,6 +19,8 @@ import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ui.ComingUpCard
 import uk.co.siland.culvery.capability.calendar.ui.TodayCard
+import uk.co.siland.culvery.core.access.PinError
+import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.ui.PinPadSheet
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -152,11 +154,16 @@ class ShellScreenshotTest {
 
     @Test
     fun pinPadDark() = snap("pin_pad_dark", dark = true) {
-        PinPadSheet("Change settings", error = null, lockedUntilMillis = null, onSubmit = {}, onCancel = {})
+        PinPadSheet("Change settings", PinReason.Generic, error = null, lockedUntilMillis = null, onSubmit = {}, onCancel = {})
     }
 
     @Test
     fun pinPadLight() = snap("pin_pad_light", dark = false) {
-        PinPadSheet("Change settings", error = null, lockedUntilMillis = null, onSubmit = {}, onCancel = {})
+        PinPadSheet("Change settings", PinReason.Generic, error = null, lockedUntilMillis = null, onSubmit = {}, onCancel = {})
+    }
+
+    @Test
+    fun pinPadWrongDark() = snap("pin_pad_wrong_dark", dark = true) {
+        PinPadSheet("Change settings", PinReason.Generic, error = PinError.WrongPin, lockedUntilMillis = null, onSubmit = {}, onCancel = {})
     }
 }

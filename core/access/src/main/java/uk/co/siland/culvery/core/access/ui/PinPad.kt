@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.core.access.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -8,7 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -29,42 +30,53 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.access.PinHasher
 import uk.co.siland.culvery.core.access.PinPromptController
-import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.access.PinReason
+import uk.co.siland.culvery.core.access.pinReasonText
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.ShellTokens
 
+/** [overSheet]: a sheet is open, so the pad covers the sheet's area rather than the whole screen. */
 @Composable
-fun PinPadHost(controller: PinPromptController) {
+fun PinPadHost(controller: PinPromptController, overSheet: Boolean = false) {
     val request by controller.request.collectAsState()
     request?.let { r ->
-        // Keyed on the request so each retry starts with an empty field.
+        // Keyed on the request so each retry (e.g. after a wrong PIN) starts with empty digits.
         key(r) {
             PinPadSheet(
                 label = r.label,
+                reason = r.reason,
                 error = r.error,
                 lockedUntilMillis = r.lockedUntilMillis,
                 onSubmit = controller::submit,
                 onCancel = controller::cancel,
+                overSheet = overSheet,
             )
         }
     }
 }
 
+/**
+ * Hand-off §7 PIN pad. It catches every tap on the screen: a tap outside the card cancels. The `rgba(0,0,0,.5)`
+ * scrim covers the sheet's 600 dp when [overSheet], otherwise the whole screen; the card is centred in it.
+ */
 @Composable
 fun PinPadSheet(
     label: String,
+    reason: PinReason,
     error: PinError?,
     lockedUntilMillis: Long?,
     onSubmit: (String) -> Unit,
     onCancel: () -> Unit,
+    overSheet: Boolean = false,
 ) {
     val c = Culvery.colors
     var digits by remember { mutableStateOf("") }
@@ -80,8 +92,8 @@ fun PinPadSheet(
     val canType = !locked && digits.length < PinHasher.PIN_LENGTH
     val message = when {
         locked -> "Too many tries — wait ${secondsLeft}s"
-        error is PinError.WrongPin -> "Wrong PIN"
-        error is PinError.NotAllowed -> "${error.name} can't do that"
+        error is PinError.WrongPin -> "Wrong PIN — try again"
+        error is PinError.NotAllowed -> error.message
         else -> ""
     }
     val type: (String) -> Unit = { d ->
@@ -93,69 +105,105 @@ fun PinPadSheet(
         modifier = Modifier
             .fillMaxSize()
             .testTag("pin_scrim")
-            .background(Color(0x8C000000))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
+                onClickLabel = "Cancel",
                 onClick = onCancel,
             ),
-        contentAlignment = Alignment.Center,
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .width(420.dp)
-                .clip(RoundedCornerShape(28.dp))
-                .background(c.bg)
-                .pointerInput(Unit) { detectTapGestures { } }
-                .padding(28.dp),
+                .align(if (overSheet) Alignment.CenterEnd else Alignment.Center)
+                .then(if (overSheet) Modifier.fillMaxHeight().width(ShellTokens.sheetWidth) else Modifier.fillMaxSize())
+                .testTag("pin_area")
+                // A boundary of its own, so the scrim's clickable() (which merges descendants for a11y)
+                // doesn't swallow this tag and pin_card's into the scrim's single merged semantics node.
+                .semantics(mergeDescendants = true) {}
+                .background(ShellTokens.pinScrim),
         ) {
-            Text("Enter your PIN", style = HhType.screenTitle, color = c.ink)
-            Text(label, style = HhType.secondary, color = c.mute)
-            Spacer(Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                repeat(PinHasher.PIN_LENGTH) { i ->
-                    Box(
-                        Modifier
-                            .size(16.dp)
-                            .clip(CircleShape)
-                            .background(if (i < digits.length) c.ink else c.surf3),
-                    )
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(message, style = HhType.label, color = c.ink, modifier = Modifier.height(20.dp))
-            Spacer(Modifier.height(12.dp))
-            listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9")).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    row.forEach { d -> DigitKey(d, enabled = canType) { type(d) } }
-                }
-                Spacer(Modifier.height(12.dp))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Spacer(Modifier.size(80.dp))
-                DigitKey("0", enabled = canType) { type("0") }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(PinPadDimens.gap),
+                modifier = Modifier
+                    .testTag("pin_card")
+                    .semantics(mergeDescendants = true) {}
+                    .width(PinPadDimens.cardWidth)
+                    .clip(RoundedCornerShape(PinPadDimens.cardRadius))
+                    .background(c.surf)
+                    .pointerInput(Unit) { detectTapGestures { } }
+                    .padding(horizontal = PinPadDimens.cardPaddingH, vertical = PinPadDimens.cardPaddingV),
+            ) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .testTag("pin_backspace")
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .clickable(enabled = digits.isNotEmpty() && !locked) { digits = digits.dropLast(1) },
+                    modifier = Modifier.size(PinPadDimens.badge).clip(CircleShape).background(c.accentSoft),
                 ) {
-                    HhIcon("backspace", size = 30.dp, tint = c.mute, contentDescription = "Delete last digit")
+                    HhIcon("lock", size = PinPadDimens.badgeIcon, tint = c.accent)
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(PinPadDimens.titleReasonGap),
+                ) {
+                    Text("Who's this?", style = PinPadType.title, color = c.ink)
+                    Text(pinReasonText(reason, label), style = PinPadType.reason, color = c.mute, textAlign = TextAlign.Center)
+                }
+                Dots(filled = digits.length, error = error is PinError.WrongPin && digits.isEmpty())
+                Text(
+                    message,
+                    style = PinPadType.error,
+                    color = c.danger,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.testTag("pin_error").height(PinPadDimens.errorLine),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(PinPadDimens.keyRowGap)) {
+                    listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9")).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(PinPadDimens.keyColumnGap)) {
+                            row.forEach { d -> DigitKey(d, enabled = canType) { type(d) } }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(PinPadDimens.keyColumnGap)) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .testTag("pin_cancel")
+                                .size(PinPadDimens.key)
+                                .clip(CircleShape)
+                                .clickable(onClick = onCancel),
+                        ) {
+                            Text("Cancel", style = PinPadType.cancel, color = c.ink)
+                        }
+                        DigitKey("0", enabled = canType) { type("0") }
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .testTag("pin_backspace")
+                                .size(PinPadDimens.key)
+                                .clip(CircleShape)
+                                .clickable(enabled = digits.isNotEmpty() && !locked) { digits = digits.dropLast(1) },
+                        ) {
+                            HhIcon("backspace", size = PinPadDimens.backspaceIcon, tint = c.ink, contentDescription = "Delete last digit")
+                        }
+                    }
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "Cancel",
-                style = HhType.buttonLabel,
-                color = c.mute,
-                modifier = Modifier
-                    .testTag("pin_cancel")
-                    .clip(RoundedCornerShape(24.dp))
-                    .clickable(onClick = onCancel)
-                    .padding(horizontal = 22.dp, vertical = 13.dp),
+        }
+    }
+}
+
+@Composable
+private fun Dots(filled: Int, error: Boolean) {
+    val c = Culvery.colors
+    Row(horizontalArrangement = Arrangement.spacedBy(PinPadDimens.dotGap), modifier = Modifier.testTag("pin_dots")) {
+        repeat(PinHasher.PIN_LENGTH) { i ->
+            val dot = Modifier.size(PinPadDimens.dot).clip(CircleShape)
+            Box(
+                if (i < filled) {
+                    dot.background(c.ink)
+                } else {
+                    dot.border(PinPadDimens.dotBorder, if (error) c.danger else c.mute, CircleShape)
+                },
             )
         }
     }
@@ -168,13 +216,13 @@ private fun DigitKey(digit: String, enabled: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .testTag("pin_key_$digit")
-            .size(80.dp)
+            .size(PinPadDimens.key)
             .clip(CircleShape)
             .background(c.surf2)
             .clickable(enabled = enabled, onClick = onClick)
             .alpha(if (enabled) 1f else 0.4f),
     ) {
-        Text(digit, style = HhType.pinDigit, color = c.ink)
+        Text(digit, style = PinPadType.digit, color = c.ink)
     }
 }
 
