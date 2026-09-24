@@ -148,14 +148,14 @@ class PinPadTest {
         controller.open("Change settings", null, null)
         show()
         compose.onNodeWithTag("pin_key_5").assertWidthIsEqualTo(76.dp).assertHeightIsEqualTo(76.dp)
-        compose.onNodeWithTag("pin_card").assertWidthIsEqualTo(400.dp)
+        compose.onNodeWithTag("pin_card", useUnmergedTree = true).assertWidthIsEqualTo(400.dp)
     }
 
     @Test
     fun withoutASheetTheCardIsCentredOnTheScreen() {
         controller.open("Change settings", null, null)
         show()
-        val card = compose.onNodeWithTag("pin_card").getUnclippedBoundsInRoot()
+        val card = compose.onNodeWithTag("pin_card", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertThat(((card.left + card.right) / 2).value).isWithin(1f).of(640f)
     }
 
@@ -163,10 +163,10 @@ class PinPadTest {
     fun overASheetTheScrimCoversOnlyTheSheetAndTheCardIsCentredInIt() {
         controller.open("Change settings", null, null)
         show(overSheet = true)
-        val area = compose.onNodeWithTag("pin_area").getUnclippedBoundsInRoot()
+        val area = compose.onNodeWithTag("pin_area", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertThat(area.left.value).isWithin(1f).of(680f)
         assertThat((area.right - area.left).value).isWithin(1f).of(600f)
-        val card = compose.onNodeWithTag("pin_card").getUnclippedBoundsInRoot()
+        val card = compose.onNodeWithTag("pin_card", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertThat(((card.left + card.right) / 2).value).isWithin(1f).of(980f)
     }
 }

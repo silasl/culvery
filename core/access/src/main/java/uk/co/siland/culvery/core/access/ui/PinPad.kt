@@ -32,7 +32,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.access.PinError
@@ -118,9 +117,6 @@ fun PinPadSheet(
                 .align(if (overSheet) Alignment.CenterEnd else Alignment.Center)
                 .then(if (overSheet) Modifier.fillMaxHeight().width(ShellTokens.sheetWidth) else Modifier.fillMaxSize())
                 .testTag("pin_area")
-                // A boundary of its own, so the scrim's clickable() (which merges descendants for a11y)
-                // doesn't swallow this tag and pin_card's into the scrim's single merged semantics node.
-                .semantics(mergeDescendants = true) {}
                 .background(ShellTokens.pinScrim),
         ) {
             Column(
@@ -128,7 +124,6 @@ fun PinPadSheet(
                 verticalArrangement = Arrangement.spacedBy(PinPadDimens.gap),
                 modifier = Modifier
                     .testTag("pin_card")
-                    .semantics(mergeDescendants = true) {}
                     .width(PinPadDimens.cardWidth)
                     .clip(RoundedCornerShape(PinPadDimens.cardRadius))
                     .background(c.surf)
