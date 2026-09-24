@@ -52,7 +52,7 @@ object SampleUi {
         day(2, allDay("Bin day", family, recurring = true), event("Dentist", "12:30–13:30", sam)),
         day(
             3,
-            allDay("INSET day — no school", family),
+            allDay("INSET day — no school", family).copy(readOnlyReason = ReadOnlyReason.OtherCalendar),
             event("Piano", "15:30–16:30", mia, recurring = true),
             event("Book club", "20:00–22:00", sam),
         ),
@@ -115,4 +115,18 @@ object SampleUi {
 
     /** Hand-off 07. */
     val detailSyncing = detailEditable.copy(event = detailEditable.event.copy(syncing = true))
+
+    /** Today rows with every badge: syncing, another calendar, repeating. */
+    val todayWithBadges = listOf(
+        event("Dinner with Jo & Priya", "19:30–21:00", alex).copy(syncing = true),
+        allDay("INSET day — no school", family).copy(readOnlyReason = ReadOnlyReason.OtherCalendar),
+        event("Swimming", "16:00–17:00", mia, recurring = true).copy(syncing = true),
+    )
+
+    /** Hand-off 07's week: Dinner with Jo & Priya is waiting to sync. */
+    val weekWithSyncing = week.copy(
+        days = week.days.mapIndexed { i, d ->
+            if (i != 0) d else d.copy(events = d.events.map { if (it.title == "Dinner with Jo & Priya") it.copy(syncing = true) else it })
+        },
+    )
 }

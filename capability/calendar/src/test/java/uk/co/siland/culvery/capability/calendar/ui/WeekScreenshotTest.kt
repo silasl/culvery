@@ -16,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
+import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -30,12 +31,12 @@ class WeekScreenshotTest {
     @get:Rule val compose = createComposeRule()
     private val now = SampleUi.NOW
 
-    private fun snap(name: String, dark: Boolean, sync: SyncStatusUi) {
+    private fun snap(name: String, dark: Boolean, sync: SyncStatusUi, week: WeekUi = SampleUi.week) {
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
                 CulveryTheme(dark = dark) {
                     Box(Modifier.testTag("shot").background(Culvery.colors.bg).size(CONTENT_W, CONTENT_H)) {
-                        WeekView(WeekViewState(SampleUi.week, SampleUi.TODAY, sync, now))
+                        WeekView(WeekViewState(week, SampleUi.TODAY, sync, now))
                     }
                 }
             }
@@ -51,4 +52,5 @@ class WeekScreenshotTest {
     @Test fun weekLight() = snap("week_light", false, fresh)
     @Test fun weekStaleDark() = snap("week_stale_dark", true, stale)
     @Test fun weekNeedsSignInDark() = snap("week_needs_sign_in_dark", true, needsSignIn)
+    @Test fun weekSyncingDark() = snap("week_syncing_dark", true, fresh, SampleUi.weekWithSyncing)
 }

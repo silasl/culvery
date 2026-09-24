@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,18 +31,6 @@ internal fun HeaderChip(text: String, onClick: () -> Unit, modifier: Modifier = 
             .padding(horizontal = CalendarDimens.pillPaddingH),
     ) {
         Text(text, style = CalendarType.pill, color = c.ink, maxLines = 1)
-    }
-}
-
-/** Card-header text link ("Week ›"): muted text, as the hand-off's "3 lights on ›", with a 44 dp touch target. */
-@Composable
-internal fun HeaderLink(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val c = Culvery.colors
-    Box(
-        contentAlignment = Alignment.CenterEnd,
-        modifier = modifier.heightIn(min = CalendarDimens.touchTarget).clickable(onClick = onClick),
-    ) {
-        Text(text, style = CalendarType.link, color = c.mute, maxLines = 1)
     }
 }
 

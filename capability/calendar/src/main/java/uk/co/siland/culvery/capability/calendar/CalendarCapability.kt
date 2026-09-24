@@ -28,6 +28,7 @@ class CalendarCapability @Inject constructor(
     private val repo: CalendarRepository,
     private val zone: HouseholdZone,
     private val clock: WallClock,
+    private val editor: CalendarEditor,
 ) : Capability {
     override val id = CALENDAR_TAB_ID
     override val label = "Calendar"
@@ -40,7 +41,7 @@ class CalendarCapability @Inject constructor(
             listOf(HomeCard(CONNECT_CARD_ID, HomeCardSize.TALL, 100) { ConnectCalendarCard() })
         } else {
             listOf(
-                HomeCard(TODAY_CARD_ID, HomeCardSize.TALL, 100) { TodayCardHost(repo, rememberToday(zone, clock)) },
+                HomeCard(TODAY_CARD_ID, HomeCardSize.TALL, 100) { TodayCardHost(repo, editor, rememberToday(zone, clock)) },
                 HomeCard(COMING_UP_CARD_ID, HomeCardSize.WIDE, 50) { ComingUpCardHost(repo, rememberToday(zone, clock)) },
             )
         }
@@ -49,6 +50,6 @@ class CalendarCapability @Inject constructor(
     @Composable
     override fun TabContent() {
         val now = rememberNowMillis(clock)
-        WeekViewHost(repo, today = todayIn(rememberZoneId(zone), now), nowMillis = now)
+        WeekViewHost(repo, editor, today = todayIn(rememberZoneId(zone), now), nowMillis = now)
     }
 }

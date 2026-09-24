@@ -18,6 +18,7 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -117,5 +118,25 @@ class WeekViewTest {
         val withChip = compose.onNodeWithTag("week_legend").fetchSemanticsNode().boundsInRoot.top
 
         assertThat(withChip).isEqualTo(withoutChip)
+    }
+
+    @Test
+    fun insetDayFromTheSchoolFeedShowsTheLockBadge() {
+        show { WeekView(state()) }
+        compose.onAllNodesWithContentDescription("Read-only calendar").assertCountEquals(1)
+    }
+
+    @Test
+    fun aSyncingChipShowsCloudUpload() {
+        show { WeekView(WeekViewState(SampleUi.weekWithSyncing, SampleUi.TODAY, sync(), now)) }
+        compose.onAllNodesWithContentDescription("Syncing").assertCountEquals(1)
+    }
+
+    @Test
+    fun tappingAChipOpensItsEvent() {
+        val opened = mutableListOf<EventRef>()
+        show { WeekView(state(), onOpen = { opened += it }) }
+        compose.onNodeWithText("Parkrun").performClick()
+        assertThat(opened).containsExactly(EventRef("sample", "family", "Parkrun"))
     }
 }

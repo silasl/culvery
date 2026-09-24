@@ -17,6 +17,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.CalendarSource
 import uk.co.siland.culvery.capability.calendar.CalendarStore
@@ -28,10 +29,12 @@ import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.calendarDb
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
+import uk.co.siland.culvery.capability.calendar.stubEditor
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -51,6 +54,7 @@ class CardHostsMidnightRolloverTest {
     private lateinit var householdDb: HouseholdDatabase
     private lateinit var repo: CalendarRepository
     private lateinit var zone: HouseholdZone
+    private lateinit var editor: CalendarEditor
 
     @Before
     fun setUp() = runTest {
@@ -60,6 +64,7 @@ class CardHostsMidnightRolloverTest {
         val household = HouseholdRepository(householdDb)
         zone = HouseholdZone(household)
         repo = CalendarRepository(store, household, zone, emptySet(), emptySet())
+        editor = stubEditor(store, zone)
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         store.addConnection(
             Connection("c1", "calendar.test", "Google", emptyMap()),
@@ -91,8 +96,8 @@ class CardHostsMidnightRolloverTest {
         val clock = WallClock { now }
         val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
         compose.setContent {
-            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
-                CulveryTheme(dark = true) { TodayCardHost(repo, rememberToday(zone, clock, ticks)) }
+            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides RecordingOverlay()) {
+                CulveryTheme(dark = true) { TodayCardHost(repo, editor, rememberToday(zone, clock, ticks)) }
             }
         }
         compose.waitUntil(timeoutMillis = 5_000) {
@@ -117,10 +122,10 @@ class CardHostsMidnightRolloverTest {
         val clock = WallClock { now }
         val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
         compose.setContent {
-            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
+            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides RecordingOverlay()) {
                 CulveryTheme(dark = true) {
                     val today = rememberToday(zone, clock, ticks)
-                    WeekViewHost(repo, today, rememberNowMillis(clock, ticks))
+                    WeekViewHost(repo, editor, today, rememberNowMillis(clock, ticks))
                 }
             }
         }

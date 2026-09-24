@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -25,10 +26,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventUi
-import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhType
@@ -46,15 +45,18 @@ private val WEEKDAY = DateTimeFormatter.ofPattern("EEEE", Locale.UK)
 @Composable
 fun ComingUpCard(days: List<DayUi>?, modifier: Modifier = Modifier) {
     val c = Culvery.colors
-    val navigator = LocalShellNavigator.current
     HhCard(
         modifier = modifier.fillMaxSize().testTag("calendar_coming_up"),
         radius = CalendarDimens.cardRadius,
         padding = PaddingValues(horizontal = CalendarDimens.comingUpPaddingH, vertical = CalendarDimens.comingUpPaddingV),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("Coming up", style = HhType.cardTitle, color = c.ink, modifier = Modifier.weight(1f))
-            HeaderLink("Week ›", onClick = { navigator.openTab(CALENDAR_TAB_ID) })
+        // One way from Home to the week (2b-1 D6): Today's Week pill. The row keeps the old link's 44 dp height,
+        // so the day columns stay where MAX_ROWS was measured.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().heightIn(min = CalendarDimens.touchTarget),
+        ) {
+            Text("Coming up", style = HhType.cardTitle, color = c.ink)
         }
         Spacer(Modifier.height(CalendarDimens.comingUpHeaderGap))
         if (days != null) {

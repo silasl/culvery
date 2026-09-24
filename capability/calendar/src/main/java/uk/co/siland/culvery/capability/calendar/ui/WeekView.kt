@@ -35,6 +35,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.DayUi
+import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WeekUi
@@ -60,7 +61,7 @@ internal fun reconnectLabel(labels: List<String>): String =
  * 2b's Add event button goes.
  */
 @Composable
-fun WeekView(state: WeekViewState, modifier: Modifier = Modifier) {
+fun WeekView(state: WeekViewState, modifier: Modifier = Modifier, onOpen: (EventRef) -> Unit = {}) {
     val c = Culvery.colors
     val navigator = LocalShellNavigator.current
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.weekHeaderGap), modifier = modifier.fillMaxSize()) {
@@ -93,14 +94,14 @@ fun WeekView(state: WeekViewState, modifier: Modifier = Modifier) {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekColumnGap), modifier = Modifier.fillMaxWidth().weight(1f)) {
             state.week.days.forEach { day ->
-                DayColumn(day, isToday = day.date == state.today, modifier = Modifier.weight(1f).fillMaxHeight())
+                DayColumn(day, isToday = day.date == state.today, onOpen = onOpen, modifier = Modifier.weight(1f).fillMaxHeight())
             }
         }
     }
 }
 
 @Composable
-private fun DayColumn(day: DayUi, isToday: Boolean, modifier: Modifier) {
+private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, modifier: Modifier) {
     val c = Culvery.colors
     val shape = RoundedCornerShape(CalendarDimens.weekColumnRadius)
     val inset = CalendarDimens.columnHeaderInset
@@ -126,13 +127,13 @@ private fun DayColumn(day: DayUi, isToday: Boolean, modifier: Modifier) {
             verticalArrangement = Arrangement.spacedBy(CalendarDimens.columnGap),
             modifier = Modifier.fillMaxWidth().weight(1f),
         ) {
-            items(day.events, key = { it.ref.listKey }) { EventChip(it) }
+            items(day.events, key = { it.ref.listKey }) { EventChip(it, onOpen) }
         }
     }
 }
 
 @Composable
-private fun EventChip(event: EventUi) {
+private fun EventChip(event: EventUi, onOpen: (EventRef) -> Unit) {
     val c = Culvery.colors
     val colour = Color(event.person.color)
     val tint = if (c.bg.luminance() < 0.5f) CalendarDimens.CHIP_ALPHA_DARK else CalendarDimens.CHIP_ALPHA_LIGHT
@@ -141,13 +142,12 @@ private fun EventChip(event: EventUi) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(CalendarDimens.chipRadius))
             .background(colour.copy(alpha = tint))
+            .clickable(onClickLabel = "Open") { onOpen(event.ref) }
             .padding(horizontal = CalendarDimens.chipPaddingH, vertical = CalendarDimens.chipPaddingV),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(event.startLabel, style = CalendarType.chipTime, color = colour, maxLines = 1, modifier = Modifier.weight(1f))
-            if (event.recurring) {
-                HhIcon("repeat", size = CalendarDimens.chipBadge, tint = c.mute, contentDescription = "Repeats")
-            }
+            EventBadges(event, CalendarDimens.chipBadge)
         }
         Spacer(Modifier.height(CalendarDimens.chipTitleTop))
         Text(event.title, style = CalendarType.chipTitle, color = c.ink, maxLines = 3, overflow = TextOverflow.Ellipsis)

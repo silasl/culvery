@@ -31,9 +31,6 @@ internal object CalendarType {
     /** 14 sp / 600: the "Week" pill and the reconnect chip. */
     val pill = strong14
 
-    /** 14 sp / 400: header text links ("Week ›"). */
-    val link = HhType.secondary
-
     /** 34 sp / 700, −0.5 tracking: the detail sheet's title. */
     val sheetTitle = weekTitle
 
@@ -127,6 +124,7 @@ internal object CalendarDimens {
     val columnGap = 8.dp
     val chipTitleTop = 2.dp
     val chipBadge = 15.dp
+    val badgeGap = 4.dp
 
     // Week view layout: header→columns 18, between columns 10; column radius 22, today ring 2 dp inset;
     // column padding 10×14; weekday label→date number 6; chip radius 12, chip padding 10×8; reconnect icon→label 8.

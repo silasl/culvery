@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -23,16 +24,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
+import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
-import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
 
-/** Hand-off Home "Today" card. [events] null while loading: shows nothing rather than a false "Nothing on today". */
+/**
+ * Hand-off Home "Today" card. [events] null while loading: shows nothing rather than a false "Nothing on today".
+ * Each row is a button (hand-off §7) that opens its event through [onOpen].
+ */
 @Composable
-fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier) {
+fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier, onOpen: (EventRef) -> Unit = {}) {
     val c = Culvery.colors
     val navigator = LocalShellNavigator.current
     HhCard(modifier = modifier.fillMaxSize().testTag("calendar_today"), radius = CalendarDimens.cardRadius) {
@@ -48,14 +52,14 @@ fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier) {
                 verticalArrangement = Arrangement.spacedBy(CalendarDimens.todayRowGap),
                 modifier = Modifier.fillMaxWidth().weight(1f),
             ) {
-                items(events, key = { it.ref.listKey }) { TodayRow(it) }
+                items(events, key = { it.ref.listKey }) { TodayRow(it, onOpen) }
             }
         }
     }
 }
 
 @Composable
-private fun TodayRow(event: EventUi) {
+private fun TodayRow(event: EventUi, onOpen: (EventRef) -> Unit) {
     val c = Culvery.colors
     Row(
         modifier = Modifier
@@ -63,6 +67,7 @@ private fun TodayRow(event: EventUi) {
             .height(IntrinsicSize.Min)
             .clip(RoundedCornerShape(CalendarDimens.todayRowRadius))
             .background(c.surf2)
+            .clickable(onClickLabel = "Open") { onOpen(event.ref) }
             .padding(horizontal = CalendarDimens.todayRowPaddingH, vertical = CalendarDimens.todayRowPaddingV),
     ) {
         ColourBar(Color(event.person.color), width = CalendarDimens.todayBarWidth)
@@ -78,14 +83,6 @@ private fun TodayRow(event: EventUi) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (event.recurring) {
-            HhIcon(
-                "repeat",
-                size = CalendarDimens.todayBadge,
-                tint = c.mute,
-                modifier = Modifier.align(Alignment.CenterVertically),
-                contentDescription = "Repeats",
-            )
-        }
+        EventBadges(event, CalendarDimens.todayBadge, Modifier.align(Alignment.CenterVertically))
     }
 }

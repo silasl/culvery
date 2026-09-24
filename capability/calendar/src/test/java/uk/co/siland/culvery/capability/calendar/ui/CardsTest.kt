@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -20,6 +22,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
+import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
@@ -108,18 +111,35 @@ class CardsTest {
     }
 
     @Test
-    fun weekLinkOnComingUpOpensTheCalendarTab() {
-        show { ComingUpCard(SampleUi.comingUp) }
-        compose.onNodeWithText("Week ›").assertHeightIsAtLeast(44.dp)
-        compose.onNodeWithText("Week ›").performClick()
-        assertThat(navigator.tabs).containsExactly(CALENDAR_TAB_ID)
-    }
-
-    @Test
     fun connectCardOpensSettings() {
         show { ConnectCalendarCard() }
         compose.onNodeWithText("Connect a calendar").assertExists()
         compose.onNodeWithText("Open settings").performClick()
         assertThat(navigator.settingsOpened).isEqualTo(1)
+    }
+
+    @Test
+    fun comingUpHasNoWeekLink() {
+        show { ComingUpCard(SampleUi.comingUp) }
+        compose.onNodeWithText("Week ›").assertDoesNotExist()
+    }
+
+    @Test
+    fun todayRowsAreButtonsThatOpenTheirEvent() {
+        val opened = mutableListOf<EventRef>()
+        show { TodayCard(SampleUi.today, onOpen = { opened += it }) }
+        compose.onNodeWithText("School run").assert(hasClickAction())
+        compose.onNodeWithText("School run").performClick()
+        assertThat(opened).containsExactly(EventRef("sample", "family", "School run"))
+    }
+
+    // Counted on the merged tree, as a person hears them: each row merges its badges' descriptions, so a row
+    // counts once per badge kind. Don't switch these to useUnmergedTree.
+    @Test
+    fun todayRowsShowEachOfTheirBadges() {
+        show { TodayCard(SampleUi.todayWithBadges) }
+        compose.onAllNodesWithContentDescription("Syncing").assertCountEquals(2)
+        compose.onAllNodesWithContentDescription("Read-only calendar").assertCountEquals(1)
+        compose.onAllNodesWithContentDescription("Repeats").assertCountEquals(1)
     }
 }
