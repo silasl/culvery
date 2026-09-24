@@ -1,6 +1,8 @@
 package uk.co.siland.culvery
 
+import android.util.Log
 import kotlinx.coroutines.flow.first
+import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
 import uk.co.siland.culvery.capability.calendar.SourceMapping
 import uk.co.siland.culvery.core.access.PinManager
@@ -22,17 +24,26 @@ private const val DEBUG_CONNECTION_ID = "debug-sample"
 
 /**
  * Debug builds only: the hand-off's family and a sample calendar, so the app is usable before the setup wizard
- * exists. Guarded on an active Admin (not an empty household) so it never adds a second set of people.
+ * exists. People are added only when there is no active Admin, so a second set is never added. Every start
+ * re-tags the sample week with the people's ids (the fake keeps them in memory) and, once, makes the sample
+ * "Family calendar" the writable master (2b-1 design D5).
  */
-suspend fun seedDebugData(household: HouseholdRepository, pins: PinManager, calendar: CalendarSetup) {
+suspend fun seedDebugData(
+    household: HouseholdRepository,
+    pins: PinManager,
+    calendar: CalendarSetup,
+    providers: Set<CalendarProvider>,
+) {
     if (household.credentials().none { it.isActiveAdmin }) {
         SEED_PEOPLE.forEach { p ->
             val person = household.addPerson(p.name, p.color, p.role)
             pins.setPin(person.id, p.pin)
         }
     }
+    val byName = household.people.first().associate { it.name to it.id }
+    val fake = providers.filterIsInstance<FakeCalendarProvider>().singleOrNull()
+    fake?.tagSamples(byName.mapValues { it.value.value })
     if (!calendar.hasConnections()) {
-        val byName = household.people.first().associate { it.name to it.id }
         val mapping = SEED_PEOPLE.associate { p ->
             p.source to SourceMapping(byName[p.name] ?: PersonId.FAMILY, visible = true)
         } + mapOf(
@@ -41,4 +52,13 @@ suspend fun seedDebugData(household: HouseholdRepository, pins: PinManager, cale
         )
         calendar.connect(Connection(DEBUG_CONNECTION_ID, FakeCalendarProvider.ID, "Sample calendar", emptyMap()), mapping)
     }
+    if (fake != null && calendar.master() == null) {
+        try {
+            calendar.setMaster(DEBUG_CONNECTION_ID, FakeCalendarProvider.SOURCE_FAMILY)
+        } catch (e: IllegalArgumentException) {
+            Log.w("Culvery", "Couldn't make the sample Family calendar the master", e)
+        }
+    }
+    // The tags may have changed after the start-up sync ran.
+    calendar.syncSoon()
 }
