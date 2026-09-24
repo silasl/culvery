@@ -150,7 +150,7 @@ data class EventDraft(
 - **Calendar read:** each connection syncs independently every 5 min and on app start. Window: today −1 day to +14 days.
   - Google: incremental via `syncToken`; full resync on HTTP 410.
   - ICS: conditional GET (`ETag` / `If-Modified-Since`); parse and expand with ical4j.
-- **Calendar write — outbox:** create/update/delete is applied to the local cache immediately (event shows a small "syncing" mark) and appended to an outbox. The outbox drains in order with exponential backoff. On permanent failure (4xx other than auth) the local change is rolled back and a snackbar explains why. Auth failure pauses the outbox and flags the connection `NeedsSignIn`.
+- **Calendar write — save flow and outbox** (refined by the 2b-1 design): a save first tries the provider directly (≤10 s) while the sheet shows "Saving…". Accepted → local copy updated. Rejected → the sheet stays open with the error and the input kept. Offline or timed out → queued in a separate `outbox` table and shown with a syncing mark; the queue drains before each sync with backoff. A later rejection drops the change and a toast explains why. Auth failure pauses the queue and flags the connection `NeedsSignIn`.
 - **Weather:** every 30 min. Supplies current conditions, daily high/low, 5-day forecast, and **sunrise/sunset**.
 - UI reads only from Room via `Flow`. Network never blocks rendering.
 
@@ -176,7 +176,7 @@ Role → permission bundles come from each `PermissionDef.defaultRoles`; they ar
   - If someone is identified and has the permission → proceed as them.
   - Otherwise → PIN pad. A valid PIN without the permission shows "Sam can't do that".
   - **Fresh-PIN permissions** (`kiosk.exit`, `people.manage`) always show the PIN pad, even during an active session.
-- Session lasts **60 s after last touch**, then locks. While unlocked, a chip with the person's name and colour sits at the top of the rail; tapping it locks immediately.
+- Session lasts **2 min after the last action**, then locks (amended by the 2b-1 design, per hand-off §7). While signed in, the status bar shows `account_circle · {name} · {role}` and a "Sign out" link that locks immediately.
 - People without a PIN can be tagged on events but cannot act.
 - **Lockout:** 5 consecutive wrong PINs → 30 s lockout, doubling per further failure up to 16 min. Reset only by a PIN that is *authorised* for the requested action (a valid PIN that isn't allowed neither resets nor counts). Per device, survives restart.
 - **Settings closes** when the session ends.
@@ -187,7 +187,7 @@ Role → permission bundles come from each `PermissionDef.defaultRoles`; they ar
 
 ### 9.1 Shell
 - **Nav rail** (per hand-off): Home first, then each capability with ≥1 connection, in fixed order Calendar → Lights → Music → Climate → Security. v1 shows Home + Calendar.
-- **Session chip** at the top of the rail when someone is identified.
+- **Signed-in indicator** in the status bar (hand-off §7), not the rail. The Plan 1 rail chip is removed in 2b-1.
 - **Rail footer:** gear button (Settings, `settings.manage`) occupying the hand-off's Holiday button slot. Holiday button is out of v1.
 - **Theme:** auto switches to dark at local sunset and light at sunrise (from weather data); falls back to 07:00/19:00 if weather has never synced. 400 ms colour transition. Status-bar theme preview from the hand-off is kept.
 
