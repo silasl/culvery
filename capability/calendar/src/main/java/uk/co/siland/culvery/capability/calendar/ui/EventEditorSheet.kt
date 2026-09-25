@@ -79,7 +79,8 @@ private val PersonChipInk: Color = DarkColors.bg
  * decides [busy], [failure] and which [picker] shows. [childOnly] is a signed-in Child's own id, in a new event or an
  * edit (§6): every other Who chip is drawn disabled and a tap on one calls [onRefusedWho]. The pickers draw inside
  * the sheet's box. Save, ✕, Done and opening a picker close the keyboard; tapping a chip doesn't. Everything but the
- * background sits above [keyboard].
+ * background sits above [keyboard]. While [busy], the form can't change: a save in flight would close the sheet on
+ * edits it never sent.
  */
 @Composable
 fun EventEditorSheet(
@@ -131,7 +132,7 @@ fun EventEditorSheet(
                     closeKeyboard()
                     onClose()
                 }
-                TitleField(form, titleFocus, onDone = closeKeyboard)
+                TitleField(form, titleFocus, readOnly = busy, onDone = closeKeyboard)
                 Column(
                     verticalArrangement = Arrangement.spacedBy(CalendarDimens.editorBodyGap),
                     modifier = Modifier
@@ -140,19 +141,19 @@ fun EventEditorSheet(
                         .verticalScroll(rememberScrollState())
                         .padding(top = CalendarDimens.editorBodyTop),
                 ) {
-                    WhoSection(form, everyone, childOnly, onRefusedWho)
+                    WhoSection(form, everyone, childOnly, busy, onRefusedWho)
                     if (form.datesLocked) {
                         LockedDates(form.lockedDatesLabel.orEmpty())
                     } else {
-                        DaySection(form) {
+                        DaySection(form, busy) {
                             closeKeyboard()
                             onPicker(EditorPicker.Date)
                         }
-                        TimeSection(form) {
+                        TimeSection(form, busy) {
                             closeKeyboard()
                             onPicker(EditorPicker.Time)
                         }
-                        if (form.time != TimeChoice.AllDay) LengthSection(form)
+                        if (form.time != TimeChoice.AllDay) LengthSection(form, busy)
                     }
                 }
                 if (failure != null) FailureCard(failure)
@@ -225,7 +226,7 @@ private fun Header(form: EventForm, everyone: List<Person>, onClose: () -> Unit)
 
 /** 64 dp, `surf`, 22 sp / 600, "What's happening?", one line; Done closes the keyboard and never saves. */
 @Composable
-private fun TitleField(form: EventForm, focus: FocusRequester, onDone: () -> Unit) {
+private fun TitleField(form: EventForm, focus: FocusRequester, readOnly: Boolean, onDone: () -> Unit) {
     val c = Culvery.colors
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(CalendarDimens.titleRadius)
@@ -233,6 +234,7 @@ private fun TitleField(form: EventForm, focus: FocusRequester, onDone: () -> Uni
         value = form.title,
         onValueChange = { form.updateTitle(it) },
         singleLine = true,
+        readOnly = readOnly,
         textStyle = CalendarType.titleField.copy(color = c.ink),
         cursorBrush = SolidColor(c.accent),
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
@@ -274,7 +276,7 @@ private fun Section(label: String, chips: @Composable () -> Unit) {
 }
 
 @Composable
-private fun WhoSection(form: EventForm, everyone: List<Person>, childOnly: PersonId?, onRefusedWho: () -> Unit) {
+private fun WhoSection(form: EventForm, everyone: List<Person>, childOnly: PersonId?, busy: Boolean, onRefusedWho: () -> Unit) {
     Section("WHO") {
         everyone.forEach { person ->
             val selected = form.who == person.id
@@ -295,14 +297,20 @@ private fun WhoSection(form: EventForm, everyone: List<Person>, childOnly: Perso
                     }
                 },
                 // The chosen chip may be a disabled one (an adult tagged the child's event); a tap on it does nothing.
-                onClick = { if (enabled || selected) form.chooseWho(person.id) else onRefusedWho() },
+                onClick = {
+                    when {
+                        busy -> Unit
+                        enabled || selected -> form.chooseWho(person.id)
+                        else -> onRefusedWho()
+                    }
+                },
             )
         }
     }
 }
 
 @Composable
-private fun DaySection(form: EventForm, onPickDate: () -> Unit) {
+private fun DaySection(form: EventForm, busy: Boolean, onPickDate: () -> Unit) {
     Section("DAY") {
         form.dayChoices.forEachIndexed { i, date ->
             ChoiceChip(
@@ -313,7 +321,7 @@ private fun DaySection(form: EventForm, onPickDate: () -> Unit) {
                 },
                 selected = form.day == date,
                 tag = "day_$date",
-                onClick = { form.chooseDay(date) },
+                onClick = { if (!busy) form.chooseDay(date) },
             )
         }
         val picked = form.pickedDateLabel
@@ -322,22 +330,22 @@ private fun DaySection(form: EventForm, onPickDate: () -> Unit) {
             selected = picked != null,
             tag = "day_pick",
             leading = { ink -> HhIcon("calendar_month", size = CalendarDimens.choiceChipIcon, tint = ink) },
-            onClick = onPickDate,
+            onClick = { if (!busy) onPickDate() },
         )
     }
 }
 
 @Composable
-private fun TimeSection(form: EventForm, onPickTime: () -> Unit) {
+private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit) {
     Section("TIME") {
-        ChoiceChip("All day", form.time == TimeChoice.AllDay, "time_all_day", onClick = { form.chooseTime(TimeChoice.AllDay) })
+        ChoiceChip("All day", form.time == TimeChoice.AllDay, "time_all_day", onClick = { if (!busy) form.chooseTime(TimeChoice.AllDay) })
         TimeSlot.entries.forEach { slot ->
             ChoiceChip(
                 label = slot.label,
                 selected = form.time == TimeChoice.Slot(slot),
                 tag = "time_${slot.name}",
                 secondary = slot.time.format(HOURS_MINUTES),
-                onClick = { form.chooseTime(TimeChoice.Slot(slot)) },
+                onClick = { if (!busy) form.chooseTime(TimeChoice.Slot(slot)) },
             )
         }
         val custom = form.time as? TimeChoice.Custom
@@ -346,16 +354,16 @@ private fun TimeSection(form: EventForm, onPickTime: () -> Unit) {
             selected = custom != null,
             tag = "time_pick",
             leading = { ink -> HhIcon("schedule", size = CalendarDimens.choiceChipIcon, tint = ink) },
-            onClick = onPickTime,
+            onClick = { if (!busy) onPickTime() },
         )
     }
 }
 
 @Composable
-private fun LengthSection(form: EventForm) {
+private fun LengthSection(form: EventForm, busy: Boolean) {
     Section("LENGTH") {
         form.lengths.forEach { length ->
-            ChoiceChip(lengthLabel(length), form.length == length, "length_${length.toMinutes()}", onClick = { form.chooseLength(length) })
+            ChoiceChip(lengthLabel(length), form.length == length, "length_${length.toMinutes()}", onClick = { if (!busy) form.chooseLength(length) })
         }
     }
 }

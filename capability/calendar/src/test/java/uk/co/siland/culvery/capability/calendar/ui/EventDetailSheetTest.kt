@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -11,6 +12,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -41,6 +43,7 @@ class EventDetailSheetTest {
                 onConfirmDelete = { calls += "confirm" },
                 onChoosePerson = { calls += "choose" },
                 onAssign = { p: Person -> calls += "assign:${p.name}" },
+                onEdit = { calls += "edit" },
             )
         }
     }
@@ -66,6 +69,7 @@ class EventDetailSheetTest {
         compose.onNodeWithText("School terms · read-only").assertExists()
         compose.onNodeWithText("Calendar feed").assertExists()
         compose.onNodeWithTag("detail_delete").assertDoesNotExist()
+        compose.onNodeWithTag("detail_edit").assertDoesNotExist()
     }
 
     @Test
@@ -75,6 +79,7 @@ class EventDetailSheetTest {
         compose.onNodeWithText("Edit repeating events in Sample calendar on your phone.").assertExists()
         compose.onNodeWithText("Repeats").assertExists()
         compose.onNodeWithTag("detail_delete").assertDoesNotExist()
+        compose.onNodeWithTag("detail_edit").assertDoesNotExist()
     }
 
     @Test
@@ -122,6 +127,7 @@ class EventDetailSheetTest {
         compose.onNodeWithText("Delete this event?").assertExists()
         compose.onNodeWithText("“Dinner with Jo & Priya” will be removed from Sample calendar for everyone.").assertExists()
         compose.onNodeWithTag("detail_delete").assertDoesNotExist()
+        compose.onNodeWithTag("detail_edit").assertDoesNotExist()
         val keep = compose.onNodeWithTag("detail_keep").getUnclippedBoundsInRoot()
         val confirm = compose.onNodeWithTag("detail_confirm_delete").getUnclippedBoundsInRoot()
         // A second tap where Delete was lands on Keep event, so a double tap is harmless.
@@ -151,5 +157,21 @@ class EventDetailSheetTest {
         show(SampleUi.detailEditable)
         compose.onNodeWithTag("sheet_close").performClick()
         assertThat(calls).containsExactly("close")
+    }
+
+    @Test
+    fun editSitsRightOfDeleteAndOpensTheEditor() {
+        show(SampleUi.detailEditable)
+        val delete = compose.onNodeWithTag("detail_delete").getUnclippedBoundsInRoot()
+        val edit = compose.onNodeWithTag("detail_edit").assertHeightIsEqualTo(60.dp).getUnclippedBoundsInRoot()
+        assertThat(edit.left).isGreaterThan(delete.right)
+        compose.onNodeWithTag("detail_edit").performClick()
+        assertThat(calls).containsExactly("edit")
+    }
+
+    @Test
+    fun anUntaggedEventCanBeEdited() {
+        show(SampleUi.detailUntagged)
+        compose.onNodeWithTag("detail_edit").assertExists()
     }
 }

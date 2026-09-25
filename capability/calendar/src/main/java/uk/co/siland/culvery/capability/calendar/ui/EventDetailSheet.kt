@@ -47,7 +47,8 @@ internal fun calendarLabel(event: EventUi): String =
 /**
  * Hand-off §7 "Sheet 1 — Event detail". Stateless: the host decides [mode] and [busy]. Buttons are never hidden
  * for permission reasons; the checks happen when they are tapped. Delete runs the guard ([onDelete]); only the
- * confirmation's "Delete event" deletes ([onConfirmDelete]).
+ * confirmation's "Delete event" deletes ([onConfirmDelete]). Edit ([onEdit]) shows exactly where Delete does and
+ * opens the add/edit sheet without a PIN (2b-2 design D12).
  */
 @Composable
 fun EventDetailSheet(
@@ -61,6 +62,7 @@ fun EventDetailSheet(
     onConfirmDelete: () -> Unit,
     onChoosePerson: () -> Unit,
     onAssign: (Person) -> Unit,
+    onEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = Culvery.colors
@@ -112,7 +114,10 @@ fun EventDetailSheet(
             if (mode == DetailMode.ConfirmingDelete) {
                 DeleteConfirmation(e, busy, onKeep, onConfirmDelete)
             } else {
-                DeleteButton(enabled = !busy, tag = "detail_delete", onClick = onDelete)
+                Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
+                    DeleteButton(enabled = !busy, tag = "detail_delete", onClick = onDelete)
+                    PrimaryButton("Edit", "edit", enabled = !busy, tag = "detail_edit", onClick = onEdit, modifier = Modifier.weight(1f))
+                }
             }
         }
     }

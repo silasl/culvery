@@ -39,7 +39,7 @@ class DetailScreenshotTest {
                 Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
                     Box(Modifier.fillMaxSize().background(ShellTokens.sheetScrim))
                     Box(Modifier.align(Alignment.CenterEnd)) {
-                        EventDetailSheet(detail, SampleUi.household, mode, busy = false, {}, {}, {}, {}, {}, {})
+                        EventDetailSheet(detail, SampleUi.household, mode, busy = false, {}, {}, {}, {}, {}, {}, {})
                     }
                     over()
                 }
