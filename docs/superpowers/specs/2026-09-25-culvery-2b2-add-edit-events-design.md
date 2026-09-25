@@ -2,6 +2,7 @@
 
 **Date:** 2026-09-25
 **Status:** Approved
+**Amended:** 2026-09-25, after the plan review, with the user's approval: an edit that changes Who follows the add rule (§6, with D2, D7, §3.3, §3.7, §4.2); a write the provider accepted counts as done even if storing it fails (§3.4, with D5, §3.3, §5).
 **Parent spec:** `docs/superpowers/specs/2026-09-23-culvery-v1-design.md` (§8, §9.3, §9.4)
 **Previous plan:** `docs/superpowers/specs/2026-09-24-culvery-2b1-change-events-design.md` (2b-1, change events)
 **Design:** `docs/design/house_hub_handoff/README.md` §7 ("Sheet 2 — Quick-add / edit", "Entry points") and `screenshots/calendar-sheets/10`–`16`, dark and light; `docs/design/brief-calendar-sheets.md`
@@ -23,12 +24,12 @@ Writes are still exercised against the debug fake provider only. Google writes a
 | # | Decision |
 |---|---|
 | D1 | **Save flow = 2b-1's.** Authorise on Save, then try the writer directly for up to 10 s with the sheet open. **Rejected** → the sheet stays open with the input kept, the hand-off's `dangerSoft` card "Couldn't save to {connection label}" shows above the footer, and Save becomes **Try again**. **Offline or timed out** → the change is queued, the sheet closes and the event shows as syncing. A later rejection from the queue is a toast, and the change rolls back. The hand-off's "close at once, reopen on a later rejection" is **not** built. Success toasts: "Event added" / "Changes saved". |
-| D2 | **Who defaults.** If someone is signed in, Who starts on them. A signed-in Child sees the other chips disabled, not hidden. If nobody is signed in, Who starts on Family and every chip can be picked. The PIN on Save decides: a Child with only `create.self` saving an event that isn't for themselves gets the toast "{Name} can only add events for themselves.", and the sheet stays open with its input intact. Opening a sheet never asks for a PIN. |
+| D2 | **Who defaults.** If someone is signed in, Who starts on them. A signed-in Child sees the other chips disabled, not hidden. If nobody is signed in, Who starts on Family and every chip can be picked. The PIN on Save decides: a Child with only `create.self` saving an event that isn't for themselves gets the toast "{Name} can only add events for themselves.", and the sheet stays open with its input intact. An edit that changes Who follows the same rule (§6). Opening a sheet never asks for a PIN. |
 | D3 | **Editing values that aren't chips.** An existing event's own start time shows on the **Pick time…** chip, selected (e.g. "19:30"). Its own length adds a 4th Length chip, selected (e.g. "1 h 30"). Nothing changes unless the user changes it. **Multi-day events** get Edit, but only Title and Who can be changed: Day, Time and Length become one read-only line, "Mon 22 – Wed 24 · change dates on your phone". New events can't span days. |
 | D4 | **Architecture: a separate add/edit sheet.** `EventForm` is a plain Kotlin state holder (title, who, day, time, length; `canSave`; the summary line; builds the `EventDraft` in the household zone, all-day as whole dates; `unchanged`, so an unchanged edit just closes with no PIN). `EventEditorSheet` is stateless. `EventEditorHost` is shown through the existing overlay host. The detail sheet's Edit swaps the overlay to the editor. The editor's Delete authorises, then swaps to the detail sheet in its delete-confirm state. ✕ or the scrim closes entirely. The pickers draw inside the sheet's 600 dp box, with no second overlay. No ViewModels. |
-| D5 | **Idempotent creates** (follow-up S1). `calendar.db` v3 adds a nullable `clientKey TEXT` to `outbox`, with a hand-written `MIGRATION_2_3` and a `MigrationTestHelper` test. `CalendarWriter.create` takes a `clientKey: String`, chosen on Save. Contract rule: a repeated create with the same key returns the existing event, never a duplicate. Providers that can choose ids (Google, the fake) use the key as the remote id, so a queued create's `EventRef`, built from the key, stays the same after it syncs. A new contract check proves idempotency. This also fixes the deferred "duplicate CREATE if `applyAcceptedWrite` throws". |
+| D5 | **Idempotent creates** (follow-up S1). `calendar.db` v3 adds a nullable `clientKey TEXT` to `outbox`, with a hand-written `MIGRATION_2_3` and a `MigrationTestHelper` test. `CalendarWriter.create` takes a `clientKey: String`, chosen on Save. Contract rule: a repeated create with the same key returns the existing event, never a duplicate. Providers that can choose ids (Google, the fake) use the key as the remote id, so a queued create's `EventRef`, built from the key, stays the same after it syncs. A new contract check proves idempotency. This also fixes the deferred "duplicate CREATE if `applyAcceptedWrite` throws". A write the provider accepted counts as done even if storing it on the tablet fails; the next sync stores it (§3.4). |
 | D6 | **Pending creates behave like any event.** They can be opened, edited and deleted before they sync. Edits and deletes of a queued create queue behind it. In-order delivery plus idempotent creates make that correct; there is no collapsing of queued changes. |
-| D7 | **Editor.** `create(draft)` authorises `create`, or `create.self` with `allow` = the draft is for the authorised person. `update(ref, draft)` uses `edit` / `edit.own` like delete, and re-reads `createdBy` **after** authorising (follow-up). `createdBy` on a create is the authorised person. An update sends the title, times and who only; the existing contract keeps every other field (Google: PATCH). |
+| D7 | **Editor.** `create(draft)` authorises `create`, or `create.self` with `allow` = the draft is for the authorised person. `update(ref, draft)` uses `edit` / `edit.own` like delete, and re-reads `createdBy` **after** authorising (follow-up); an update that changes who also follows the add rule (§6). `createdBy` on a create is the authorised person. An update sends the title, times and who only; the existing contract keeps every other field (Google: PATCH). |
 | D8 | **Sheet UI** per hand-off §7 Sheet 2 and screenshots 10–16 (§4.2). Header "New event" / "Edit event" + live summary ("Tomorrow · 14:00–15:00 · Mia") + ✕. Title 64 dp, "What's happening?", at most 100 characters; Save disabled until the trimmed title isn't empty. Who: Family and the household's people. Day: Today, Tomorrow, the next 5 days, Pick date… (a week-column tap preselects that day; an edit selects the event's date chip, or shows its date on Pick date…). Time: All day, Morning 09:00, Afternoon 14:00, Evening 18:00, Pick time… (a new event defaults to the next slot still to come today, All day late in the evening, Morning on a later day). Length: 30 min / 1 h / 2 h, default 1 h, hidden for All day. Footer: "Save event" / "Save changes", with Delete on the left in edit mode. One save at a time (Save disabled while busy); closing mid-save still completes it (application scope, as 2b-1). |
 | D9 | **Keyboard.** New event → Title focused, keyboard up. Edit → no focus. With the keyboard up the sheet shrinks as in the hand-off: the header and Save stay pinned and the chips scroll. Toasts sit above the keyboard. The keyboard's Done closes the keyboard; it doesn't save. Kiosk mode and the Samsung keyboard are the riskiest part (§4.4, §8). |
 | D10 | **Pickers.** Date: a 7×5 grid, today ringed, past days dimmed but selectable, arrows to move between pages, Cancel. Time: hour and minute steppers (1 h / 15 min), Cancel and **Set time**. Hand-off sizes. |
@@ -107,11 +108,11 @@ suspend fun update(ref: EventRef, draft: EventDraft): EditResult
 1. Resolves the master source, its connection and writer. No master, or no writer for it → `NotEditable` (the entry points are hidden in that case, §4.1).
 2. `authorise(CREATE, CREATE_SELF, reason = Save, allow = { who, granted -> CREATE in granted || (CREATE_SELF in granted && draft.forPerson == who.person.id.value) }, refusal = Toast(::cannotAddForOthers))`.
 3. Sets `createdBy` to the authorised person, and chooses `clientKey` (§3.4).
-4. Writes as 2b-1 does: under the write lock, on the application scope, with a 10 s attempt. Accepted → the mirror gets the returned event → `Done`. Rejected → `Rejected(message)`. Retry → a `CREATE` row with the key, → `Queued`.
+4. Writes as 2b-1 does: under the write lock, on the application scope, with a 10 s attempt. Accepted → the mirror gets the returned event → `Done` (still `Done` if storing it fails, §3.4). Rejected → `Rejected(message)`. Retry → a `CREATE` row with the key, → `Queued`.
 
 **`update`**
 1. Resolves the target. A pending create counts as a target (D6): its draft stands in for the mirror row.
-2. `authorise(EDIT, EDIT_OWN, reason = Edit, allow = mayChange(granted, who, createdBy), refusal = Toast(::cannotChangeOthers))`.
+2. `authorise(EDIT, EDIT_OWN, reason = Edit, allow = mayChange(granted, who, createdBy), refusal = Toast(::cannotChangeOthers))`. An edit that changes who also needs `assign`, or the create rule for the new person (§6); refused, it toasts `cannotAddForOthers`.
 3. **After authorising**, under the write lock, re-reads the event and its queue and checks `mayChange` again with the fresh `createdBy`. If it now fails → the same toast, `Cancelled`. (Closes the follow-up "`CalendarEditor` judges `createdBy` from the snapshot taken before the PIN pad"; `delete` gets the same re-check.)
 4. The draft sent keeps the event's current `createdBy`; only title, times and who change (D7).
 5. Writes as `write` does today: queued behind any pending change for the same ref (including a pending create), otherwise tried directly.
@@ -128,6 +129,7 @@ interface CalendarWriter {
 }
 ```
 - **`clientKey`**: a random UUID written as 32 lowercase hex digits with no dashes. That is a valid Google event id (base32hex, 5–1024 characters). The editor chooses a new key on each Save tap; a queued create keeps its key for every retry.
+- **Accepted means done:** a write the provider accepted counts as done even if storing it on the tablet fails; the next sync stores it. The editor returns `Done` and toasts success, so a Try again can't send a second create.
 - **Rule:** a create with a key already used on that source returns the event that key created and never makes a second one. The writer uses the key as the event's remote id, so the returned `remoteId == clientKey`. Google (Plan 3): `events.insert` with `id = clientKey`; a 409 means it exists, so the writer fetches and returns it. The fake: keeps created events by key.
 - Every v1 writer can choose its ids. A future writer that can't would need a key → id map in the engine; that is out of scope, and the contract check requires `remoteId == clientKey`.
 - **Contract suite:** a new write check, gated on `Feature.WRITE`: create twice with one key → the same `remoteId`, equal to the key, and a full sync returns exactly one event with that title. The self-test gains a broken writer fixture that ignores the key (a new id per create), which the check must catch.
@@ -153,6 +155,7 @@ The permission table is unchanged from 2b-1 §3.6.
 |---|---|---|---|
 | Create | `create`, `create.self` | `create`, or `create.self` and `forPerson` is the person | "{Name} can only add events for themselves." |
 | Update | `edit`, `edit.own` | `mayChange` (as delete) | "{Name} can only change events they created." |
+| Update that changes who | also `assign`, `create`, `create.self` | as Update, and `assign`, or the Create rule for the new person (§6) | "{Name} can only add events for themselves." |
 | Delete, Assign | unchanged | unchanged | unchanged |
 
 - New in `CalendarPermissions.kt`: `fun cannotAddForOthers(name: String) = "$name can only add events for themselves."`
@@ -174,7 +177,7 @@ Right-side sheet, 600 dp, full height, `bg`, 1 dp `line` left border, scrim `rgb
 - **Title:** 64 dp, radius 18, `surf`, 22 sp/600, padding 0 20, a 2 dp border that is `accent` when focused. Placeholder "What's happening?". One line, at most 100 characters. Keyboard action Done.
 - **Body** scrolls, gap 20. Section labels WHO / DAY / TIME / LENGTH: 13 sp/700 `mute`, 0.5 tracking, uppercase, 10 dp above the chips. Chips wrap with 8 dp gaps.
 - **Chip:** 48 dp, padding 0 18, radius 24, 16 sp/600, icon–text gap 8. Unselected `surf`/`ink`; selected `accent`/`accentInk`. Secondary text in time chips ("09:00"): weight 500, 72% opacity. Disabled: 38% opacity, still tappable, and a tap explains by toast.
-- **Who:** Family, then each household person in their order. Each chip shows a 12 dp colour dot; selected, its background is the person's colour, its ink `#0E1011`, and a `check` icon replaces the dot. For a signed-in Child, in a **new** event, every chip but their own is disabled; a tap toasts "{Name} can only add events for themselves." The disabled state follows the live session; the selection doesn't move after opening.
+- **Who:** Family, then each household person in their order. Each chip shows a 12 dp colour dot; selected, its background is the person's colour, its ink `#0E1011`, and a `check` icon replaces the dot. For a signed-in Child, in a new event or an edit, every chip but their own is disabled; a tap toasts "{Name} can only add events for themselves." The disabled state follows the live session; the selection doesn't move after opening.
 - **Day:** Today, Tomorrow, the next 5 days by weekday name ("Fri", "Sat"…), and **Pick date…** (`calendar_month`). A date outside those seven shows on Pick date… as "Mon 5 Oct", selected.
 - **Time:** All day, Morning 09:00, Afternoon 14:00, Evening 18:00, and **Pick time…** (`schedule`), which shows a custom time ("16:15"), selected.
 - **Length:** 30 min, 1 h, 2 h, plus the edited event's own length as a 4th chip when it matches none (D3). Hidden for All day.
@@ -207,7 +210,7 @@ Drawn inside the sheet's box, over a scrim `rgba(0,0,0,.5)` on the sheet only; a
 - **Timeout after the provider actually created the event** → the create is queued with its key; the retry returns the existing event, so there is no duplicate (D5).
 - **Child saving for someone else** → the toast, the sheet stays open, the child is signed out (§3.7).
 - **The event disappears while its editor is open** (deleted on a phone, then synced) → Save returns `NotEditable`; the sheet closes with no toast, as the detail sheet does.
-- **Store failure** (disk full) → `Rejected(TRY_AGAIN)`: the failure card reads "Couldn't save to {label} — try again".
+- **Store failure** (disk full) before the provider accepted, or while queueing → `Rejected(TRY_AGAIN)`: the failure card reads "Couldn't save to {label} — try again". After the provider accepted → `Done` (§3.4).
 
 ## 6. Where the hand-off is ambiguous, and what was chosen
 - **Which calendar new events go to:** the master calendar. There is no calendar picker.
@@ -215,7 +218,7 @@ Drawn inside the sheet's box, over a scrim `rgba(0,0,0,.5)` on the sheet only; a
 - **Save flow:** the hand-off closes at once and reopens on a later rejection; D1 tries directly first and never reopens.
 - **Date picker:** the hand-off shows 5 weeks from this Monday with past days inactive and no arrows. D10 keeps the 7×5 grid and adds paging arrows; past days are dimmed but selectable.
 - **"Late evening":** the hand-off's default is Evening from 14:00 on. D8 adds All day from 18:00, when Evening has already started.
-- **Who in edit mode:** starts on the event's person. The disabled-chip rule for a signed-in Child applies to new events; an edit is checked by `edit` / `edit.own` only (D7).
+- **Who in edit mode:** starts on the event's person. An edit that changes Who follows the add rule: a person without `create` or `assign` (a Child) may tag only themselves, so a signed-in Child's other chips are disabled in an edit too, and the editor refuses such a change with "{Name} can only add events for themselves." An edit that leaves Who alone is checked by `edit` / `edit.own` only (D7).
 - **Keyboard stand-in:** the prototype draws its own keyboard; the app uses the system keyboard.
 
 ## 7. Testing
@@ -228,7 +231,7 @@ Drawn inside the sheet's box, over a scrim `rgba(0,0,0,.5)` on the sheet only; a
   - `canSave` (blank, spaces, 100-character cap) and `unchanged` (including a title that differs only by surrounding spaces).
 - **Editor:**
   - create and update, Done / Rejected / Queued for each;
-  - the role matrix: Admin and Adult create for anyone; Child creates for self, is refused for Family and for others with the toast; Child updates own events only; the `createdBy` re-read after authorising, for update and delete;
+  - the role matrix: Admin and Adult create for anyone; Child creates for self, is refused for Family and for others with the toast; Child updates own events only, and can't move one to someone else; the `createdBy` re-read after authorising, for update and delete;
   - `createdBy` on a create is the authorised person; an update keeps the event's;
   - success and failure toasts, and the toast when the sheet has gone before a rejection.
 - **Idempotency:** a create accepted by the provider whose `applyAcceptedWrite` throws is retried and makes one event; an editor attempt that times out after the fake created the event makes one event after the drain.

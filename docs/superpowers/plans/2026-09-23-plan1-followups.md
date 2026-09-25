@@ -77,3 +77,14 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **Next migration or Room upgrade**
 - The driver-based `MigrationTestHelper` may not catch a dropped table. At v2 → v3, check it does, or assert the table list in the test.
 - `androidxSqlite` 2.6.0 is pinned apart from Room's transitive version. Re-check it on each Room bump.
+
+## From Plan 2b-2 (deferred)
+
+**For Plan 3**
+- C2: when the drain's accepted create can't be stored, the row stays due and the loop resends it every second (2b-1 m2). Fold into R3's drain backoff, and update `CalendarSyncTest.aCreateWhoseMirrorWriteFailsIsRetriedAndMakesOneEvent`, which relies on the row staying due.
+- C3: an edit sends every field from the sheet's snapshot, so a phone change made meanwhile to a field the user didn't touch is undone. With the Google writer's PATCH, send only the touched fields, applied to the event as re-read under the write lock.
+- C9: a create whose reply was lost, then unsent for 48 hours, is dropped with the DELETE queued behind it, so the event it did make comes back. Decide what an aged create means for Google (fetch by key first, or send the delete).
+- C10: the fake recreates a deleted event when a create repeats its key; Google returns 409 for a cancelled event's id. Pin the rule in the contract suite with the Google writer.
+
+**For Plan 4**
+- I1, T2, T7: in the on-device pass, check the add/edit sheet with Samsung's floating and split keyboards, that the real IME inset reaches the sheet and the toast through `ShellLayers`, and that a tap on the scrim hides the keyboard.
