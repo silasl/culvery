@@ -46,6 +46,15 @@ data class EventUi(
 /** The detail sheet's model: the event plus its "When" row. */
 data class EventDetailUi(val event: EventUi, val whenLabel: String)
 
+/** Where the add/edit sheet starts: an event as shown, with its queued changes laid over it (2b-2 design §3.1). */
+data class EditableEvent(
+    val ref: EventRef,
+    val title: String,
+    val start: EventTime,
+    val end: EventTime,
+    val forPerson: String?,
+)
+
 data class DayUi(val date: LocalDate, val events: List<EventUi>)
 
 /** [people] is the legend: household members in order, then Family. */

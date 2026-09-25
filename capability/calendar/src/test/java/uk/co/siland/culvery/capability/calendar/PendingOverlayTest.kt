@@ -19,8 +19,8 @@ class PendingOverlayTest {
         sourcePerson = PersonId.FAMILY, startSort = at(hour).instant.toEpochMilli(), endSort = at(hour + 1).instant.toEpochMilli(),
     )
 
-    private fun change(id: Long, kind: ChangeKind, remoteId: String?, draft: EventDraft?, sourceId: String = "s1") =
-        PendingChange(id, "c1", sourceId, remoteId, kind, draft, attempts = 0, nextAttemptMillis = 0, createdMillis = 0)
+    private fun change(id: Long, kind: ChangeKind, remoteId: String?, draft: EventDraft?, sourceId: String = "s1", clientKey: String? = null) =
+        PendingChange(id, "c1", sourceId, remoteId, kind, draft, attempts = 0, nextAttemptMillis = 0, createdMillis = 0, clientKey = clientKey)
 
     private fun overlay(events: List<StoredEvent>, pending: List<PendingChange>) =
         overlayPending(events, pending, { _, s -> sources[s] }, london, Long.MIN_VALUE, Long.MAX_VALUE)
@@ -69,10 +69,41 @@ class PendingOverlayTest {
     }
 
     @Test
-    fun aQueuedCreateAppearsAsSyncingUnlessItsSourceIsHidden() {
+    fun aQueuedCreateAppearsUnderItsClientKeyUnlessItsSourceIsHidden() {
         val draft = EventDraft("Sleepover", at(18), at(19), forPerson = "mia", createdBy = "mia")
-        val shown = overlay(emptyList(), listOf(change(7, ChangeKind.CREATE, null, draft), change(8, ChangeKind.CREATE, null, draft, sourceId = "s2")))
-        assertThat(shown.map { it.event.remoteId to it.syncing }).containsExactly("pending-7" to true)
+        val shown = overlay(
+            emptyList(),
+            listOf(
+                change(7, ChangeKind.CREATE, null, draft, clientKey = "k7"),
+                change(8, ChangeKind.CREATE, null, draft, sourceId = "s2", clientKey = "k8"),
+            ),
+        )
+        assertThat(shown.map { it.event.ref to it.syncing }).containsExactly(EventRef("c1", "s1", "k7") to true)
+    }
+
+    @Test
+    fun aQueuedCreateWithoutAKeyIsNotShown() {
+        val draft = EventDraft("Sleepover", at(18), at(19), forPerson = "mia", createdBy = "mia")
+        assertThat(overlay(emptyList(), listOf(change(7, ChangeKind.CREATE, null, draft)))).isEmpty()
+    }
+
+    @Test
+    fun changesQueuedBehindACreateApplyToItUnderItsKey() {
+        val draft = EventDraft("Sleepover", at(18), at(19), forPerson = "mia", createdBy = "mia")
+        val renamed = draft.copy(title = "Sleepover at Ava's")
+        val create = change(1, ChangeKind.CREATE, null, draft, clientKey = "k1")
+        val update = change(2, ChangeKind.UPDATE, "k1", renamed)
+        assertThat(overlay(emptyList(), listOf(create, update)).single().event.title).isEqualTo("Sleepover at Ava's")
+        assertThat(overlay(emptyList(), listOf(create, update, change(3, ChangeKind.DELETE, "k1", null)))).isEmpty()
+    }
+
+    @Test
+    fun aCreateTheMirrorAlreadyHoldsShowsTheMirrorsCopyAsSyncing() {
+        // The provider made it and a sync fetched it, but the reply was lost, so the create is still queued.
+        val mirrored = stored("k1", 18).copy(title = "From the provider")
+        val draft = EventDraft("From the sheet", at(18), at(19), forPerson = null, createdBy = null)
+        val shown = overlay(listOf(mirrored), listOf(change(1, ChangeKind.CREATE, null, draft, clientKey = "k1"))).single()
+        assertThat(shown.event.title to shown.syncing).isEqualTo("From the provider" to true)
     }
 
     @Test

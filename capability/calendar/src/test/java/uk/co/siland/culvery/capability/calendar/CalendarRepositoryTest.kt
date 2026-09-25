@@ -245,8 +245,17 @@ class CalendarRepositoryTest {
 
     private fun ref(id: String, source: String = "s-family") = EventRef("c1", source, id)
 
-    private suspend fun queue(kind: ChangeKind, remoteId: String?, draft: EventDraft? = null, source: String = "s-family"): Long =
-        store.enqueue(PendingChange(0, "c1", source, remoteId, kind, draft, attempts = 1, nextAttemptMillis = 0, createdMillis = 0))
+    private val key = "0123456789abcdef0123456789abcdef"
+
+    private suspend fun queue(
+        kind: ChangeKind,
+        remoteId: String?,
+        draft: EventDraft? = null,
+        source: String = "s-family",
+        clientKey: String? = null,
+    ): Long = store.enqueue(
+        PendingChange(0, "c1", source, remoteId, kind, draft, attempts = 1, nextAttemptMillis = 0, createdMillis = 0, clientKey = clientKey),
+    )
 
     private suspend fun today() = repo.day(sept(23)).first()
 
@@ -348,13 +357,62 @@ class CalendarRepositoryTest {
     }
 
     @Test
-    fun aQueuedCreateShowsAsSyncing() = runTest {
+    fun aQueuedCreateShowsAsSyncingUnderItsKey() = runTest {
         val slot = timed("Sleepover", 23, 18, 0, 60)
-        val id = queue(ChangeKind.CREATE, null, EventDraft("Sleepover", slot.start, slot.end, forPerson = sam.id.value, createdBy = sam.id.value))
+        queue(ChangeKind.CREATE, null, EventDraft("Sleepover", slot.start, slot.end, forPerson = sam.id.value, createdBy = sam.id.value), clientKey = key)
         val e = today().single()
         assertThat(listOf(e.title, e.person.name)).containsExactly("Sleepover", "Sam").inOrder()
         assertThat(e.syncing).isTrue()
-        assertThat(e.ref).isEqualTo(ref("pending-$id"))
+        assertThat(e.ref).isEqualTo(ref(key))
+    }
+
+    @Test
+    fun aQueuedCreateOpensInTheDetailSheetAsSyncingAndEditable() = runTest {
+        val slot = timed("Sleepover", 23, 18, 0, 60)
+        queue(ChangeKind.CREATE, null, EventDraft("Sleepover", slot.start, slot.end, sam.id.value, sam.id.value), clientKey = key)
+        val detail = repo.event(ref(key), today = sept(23)).first()!!
+        assertThat(detail.whenLabel).isEqualTo("Today · 18:00–19:00")
+        assertThat(detail.event.syncing).isTrue()
+        assertThat(detail.event.editable).isTrue()
+        assertThat(detail.event.createdBy).isEqualTo("Sam")
+    }
+
+    @Test
+    fun aChangeAndADeleteQueuedBehindACreateShowUnderItsRef() = runTest {
+        val slot = timed("Sleepover", 23, 18, 0, 60)
+        val draft = EventDraft("Sleepover", slot.start, slot.end, sam.id.value, sam.id.value)
+        queue(ChangeKind.CREATE, null, draft, clientKey = key)
+        queue(ChangeKind.UPDATE, key, draft.copy(title = "Sleepover at Ava's"))
+        assertThat(today().single().let { it.ref to it.title }).isEqualTo(ref(key) to "Sleepover at Ava's")
+        assertThat(repo.event(ref(key), today = sept(23)).first()!!.event.title).isEqualTo("Sleepover at Ava's")
+        queue(ChangeKind.DELETE, key)
+        assertThat(today()).isEmpty()
+        assertThat(repo.event(ref(key), today = sept(23)).first()).isNull()
+    }
+
+    @Test
+    fun editableIsTheEventAsShownWithItsQueuedChanges() = runTest {
+        val original = timed("Dinner with Jo & Priya", 23, 19, 30, 90, forPerson = alex.id.value)
+        put("s-family", original)
+        assertThat(repo.editable(ref(original.remoteId)).first())
+            .isEqualTo(EditableEvent(ref(original.remoteId), original.title, original.start, original.end, alex.id.value))
+        val moved = timed("Dinner at Gran's", 24, 18, 0, 60)
+        queue(ChangeKind.UPDATE, original.remoteId, EventDraft(moved.title, moved.start, moved.end, sam.id.value, alex.id.value))
+        assertThat(repo.editable(ref(original.remoteId)).first())
+            .isEqualTo(EditableEvent(ref(original.remoteId), "Dinner at Gran's", moved.start, moved.end, sam.id.value))
+        queue(ChangeKind.DELETE, original.remoteId)
+        assertThat(repo.editable(ref(original.remoteId)).first()).isNull()
+    }
+
+    @Test
+    fun theMasterLabelNamesWhereNewEventsGo() = runTest {
+        assertThat(repo.masterLabel.first()).isEqualTo("Google")
+    }
+
+    @Test
+    fun thereIsNowhereToAddWithoutAWriterForTheMaster() = runTest {
+        val readOnly = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet())
+        assertThat(readOnly.masterLabel.first()).isNull()
     }
 
     @Test

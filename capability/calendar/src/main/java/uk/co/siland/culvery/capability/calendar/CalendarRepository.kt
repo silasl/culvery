@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.Feature
 
@@ -35,7 +36,7 @@ class CalendarRepository @Inject constructor(
 
     val hasConnections: Flow<Boolean> = store.connectionIds().map { it.isNotEmpty() }.distinctUntilChanged()
 
-    /** The household's people, for the detail sheet's Assign chips. */
+    /** The household's people, for the detail sheet's Assign chips and the add/edit sheet's Who chips. */
     val people: Flow<List<Person>> = household.people
 
     val syncStatus: Flow<SyncStatusUi> = store.connections().map { connections ->
@@ -45,6 +46,14 @@ class CalendarRepository @Inject constructor(
             connectionLabels = connections.map { it.connection.label },
             failingBeforeFirstSync = connections.any { it.lastSyncMillis == null && it.health != ConnectionHealth.Ok },
         )
+    }.distinctUntilChanged()
+
+    /**
+     * The connection label of the writable master calendar, where new events go; null when there is nowhere to add
+     * (no master, or its provider binds no writer), which hides the add entry points (2b-2 design §4.1).
+     */
+    val masterLabel: Flow<String?> = combine(store.master(), store.connections()) { master, connections ->
+        writableMaster(master, connections, writerIds)?.connection?.label
     }.distinctUntilChanged()
 
     private val catalog: Flow<SourceCatalog> =
@@ -76,16 +85,31 @@ class CalendarRepository @Inject constructor(
     fun week(start: LocalDate): Flow<WeekUi> =
         combine(days(start, 7), household.people) { days, people -> WeekUi(start, days, people + Person.Family) }
 
-    /** One event for the detail sheet; null once it is gone or queued for deletion. [today] makes "Today · …". */
+    /**
+     * One event for the detail sheet, a queued create not yet synced included; null once it is gone or queued for
+     * deletion. [today] makes "Today · …".
+     */
+    fun event(ref: EventRef, today: LocalDate): Flow<EventDetailUi?> = shownEvent(ref).map { s ->
+        if (s == null) return@map null
+        val e = s.shown.event
+        val day = e.start.instantIn(s.zone).atZone(s.zone).toLocalDate()
+        EventDetailUi(e.toUi(day, s.zone, s.people, s.catalog, s.shown.syncing), whenLabel(e.start, e.end, s.zone, today))
+    }
+
+    /** What the add/edit sheet starts from: [ref] as shown; null once it is gone or queued for deletion. */
+    fun editable(ref: EventRef): Flow<EditableEvent?> = shownEvent(ref).map { s ->
+        s?.shown?.event?.let { EditableEvent(ref, it.title, it.start, it.end, it.forPerson) }
+    }
+
+    private class Shown(val shown: ShownEvent, val catalog: SourceCatalog, val people: Map<PersonId, Person>, val zone: ZoneId)
+
+    /** [ref] with its queued changes laid over it; a queued create not yet in the mirror counts (2b-2 design D6). */
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun event(ref: EventRef, today: LocalDate): Flow<EventDetailUi?> = zone.zone.flatMapLatest { z ->
+    private fun shownEvent(ref: EventRef): Flow<Shown?> = zone.zone.flatMapLatest { z ->
         combine(store.event(ref), store.pending(), catalog, household.peopleWithFamily) { stored, pending, cat, people ->
-            val mirrored = stored ?: return@combine null
-            val shown = overlayPending(listOf(mirrored), pending.filter { it.ref == ref }, cat::source, z, Long.MIN_VALUE, Long.MAX_VALUE)
-                .singleOrNull() ?: return@combine null
-            val e = shown.event
-            val day = e.start.instantIn(z).atZone(z).toLocalDate()
-            EventDetailUi(e.toUi(day, z, people.associateBy { it.id }, cat, shown.syncing), whenLabel(e.start, e.end, z, today))
+            overlayPending(listOfNotNull(stored), pending.filter { it.ref == ref }, cat::source, z, Long.MIN_VALUE, Long.MAX_VALUE)
+                .singleOrNull()
+                ?.let { Shown(it, cat, people.associateBy { p -> p.id }, z) }
         }
     }
 

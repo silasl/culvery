@@ -1,15 +1,40 @@
 package uk.co.siland.culvery.capability.calendar
 
 import java.time.ZoneId
+import uk.co.siland.culvery.core.household.PersonId
 
 /** A mirrored event as the UI shows it, with any queued change laid over it. */
 internal data class ShownEvent(val event: StoredEvent, val syncing: Boolean)
 
 /**
+ * A queued create as the event it will become, under its client key: the ref it keeps once it syncs (2b-2 design
+ * D5). Null for any other kind, or for a create without a key or a draft.
+ */
+internal fun PendingChange.asCreatedEvent(sourcePerson: PersonId, zone: ZoneId): StoredEvent? {
+    if (kind != ChangeKind.CREATE) return null
+    val key = clientKey ?: return null
+    val d = draft ?: return null
+    return StoredEvent(
+        connectionId = connectionId,
+        sourceId = sourceId,
+        remoteId = key,
+        title = d.title,
+        start = d.start,
+        end = d.end,
+        recurring = false,
+        forPerson = d.forPerson,
+        createdBy = d.createdBy,
+        sourcePerson = sourcePerson,
+        startSort = d.start.instantIn(zone).toEpochMilli(),
+        endSort = d.end.instantIn(zone).toEpochMilli(),
+    )
+}
+
+/**
  * Lays [pending] changes over [events] in queue order. A delete hides the event. An update shows the draft's
- * values; an assign shows only its person. A create adds the draft as a new event on a visible source; it has no
- * remoteId yet, so its ref uses "pending-{id}". Only events overlapping [windowStart, windowEnd) are returned, in
- * start order.
+ * values; an assign shows only its person. A create adds its draft, on a visible source, under its client key, so
+ * the changes queued behind it apply to it and it keeps its ref once it syncs. Only events overlapping
+ * [windowStart, windowEnd) are returned, in start order.
  */
 internal fun overlayPending(
     events: List<StoredEvent>,
@@ -37,22 +62,9 @@ internal fun overlayPending(
             }
             ChangeKind.CREATE -> {
                 val source = sources(change.connectionId, change.sourceId)?.takeIf { it.mapping.visible } ?: continue
-                if (draft == null) continue
-                val event = StoredEvent(
-                    connectionId = change.connectionId,
-                    sourceId = change.sourceId,
-                    remoteId = "pending-${change.id}",
-                    title = draft.title,
-                    start = draft.start,
-                    end = draft.end,
-                    recurring = false,
-                    forPerson = draft.forPerson,
-                    createdBy = draft.createdBy,
-                    sourcePerson = source.mapping.person,
-                    startSort = draft.start.instantIn(zone).toEpochMilli(),
-                    endSort = draft.end.instantIn(zone).toEpochMilli(),
-                )
-                shown[event.ref] = ShownEvent(event, syncing = true)
+                val event = change.asCreatedEvent(source.mapping.person, zone) ?: continue
+                // A sync may already have fetched it (the provider made it, but its reply was lost): keep that copy.
+                shown[event.ref] = ShownEvent(shown[event.ref]?.event ?: event, syncing = true)
             }
         }
     }
