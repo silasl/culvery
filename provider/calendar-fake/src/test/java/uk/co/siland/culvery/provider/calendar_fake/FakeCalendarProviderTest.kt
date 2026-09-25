@@ -239,4 +239,21 @@ class FakeCalendarProviderTest {
         assertThat(fake.create(conn, family, draft("Sleepover"), key).remoteId).isEqualTo(key)
         assertThat(fake.familyEvents().count { it.title == "Sleepover" }).isEqualTo(1)
     }
+
+    @Test
+    fun offlineFailsEveryReadAndWriteUntilItIsBackOnline() = runTest {
+        val fake = providerOn(today)
+        fake.setOffline(true)
+        assertThat(runCatching { fake.sources(conn) }.exceptionOrNull()).isInstanceOf(UnreachableException::class.java)
+        assertThat(runCatching { fake.familyEvents() }.exceptionOrNull()).isInstanceOf(UnreachableException::class.java)
+        // Every write, not only the next one.
+        repeat(2) {
+            assertThat(runCatching { fake.create(conn, family, draft("Sleepover"), newClientKey()) }.exceptionOrNull())
+                .isInstanceOf(UnreachableException::class.java)
+        }
+        fake.setOffline(false)
+        assertThat(fake.familyEvents().map { it.title }).doesNotContain("Sleepover")
+        fake.create(conn, family, draft("Sleepover"), newClientKey())
+        assertThat(fake.familyEvents().map { it.title }).contains("Sleepover")
+    }
 }

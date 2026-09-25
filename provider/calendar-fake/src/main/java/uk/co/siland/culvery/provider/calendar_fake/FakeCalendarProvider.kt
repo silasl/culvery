@@ -41,6 +41,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     override val providerId = ID
 
     @Volatile private var failNext: Throwable? = null
+    @Volatile private var offline = false
 
     private val lock = Any()
     // Everything below is guarded by lock. Every change bumps version, so the next sync is a full replace.
@@ -55,6 +56,11 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     /** For contract tests: the next sources() or sync() call throws [error]. */
     fun failNextWith(error: Throwable) {
         failNext = error
+    }
+
+    /** While offline, every read and write throws UnreachableException (the walkthrough's DebugOfflineReceiver). */
+    fun setOffline(value: Boolean) {
+        offline = value
     }
 
     /** The next create, update or delete throws WriteRejectedException([message]). */
@@ -136,6 +142,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     }
 
     private inline fun <T> write(source: CalendarSource, block: () -> T): T = synchronized(lock) {
+        if (offline) throw UnreachableException(OFFLINE_MESSAGE)
         if (unreachableNext) {
             unreachableNext = false
             throw UnreachableException(OFFLINE_MESSAGE)
@@ -149,6 +156,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     }
 
     private fun throwIfFailing() {
+        if (offline) throw UnreachableException(OFFLINE_MESSAGE)
         failNext?.let {
             failNext = null
             throw it
