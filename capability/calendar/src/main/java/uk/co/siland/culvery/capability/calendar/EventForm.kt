@@ -125,24 +125,30 @@ class EventForm(
         whoTouched = true
     }
 
+    /** Choosing the day already chosen changes nothing (as [chooseWho]), so re-tapping it can't nudge a timed event. */
     fun chooseDay(date: LocalDate) {
+        if (date == day) return
         day = date
         whenTouched = true
         if (!timeTouched) time = defaultTime(date, today, now)
     }
 
-    /** A picked time that is a slot's time selects that slot's chip. */
+    /** A picked time that is a slot's time selects that slot's chip. Re-choosing the time already chosen changes nothing. */
     fun chooseTime(choice: TimeChoice) {
-        time = if (choice is TimeChoice.Custom) {
+        val normalized = if (choice is TimeChoice.Custom) {
             TimeSlot.entries.firstOrNull { it.time == choice.time }?.let { TimeChoice.Slot(it) } ?: choice
         } else {
             choice
         }
+        if (normalized == time) return
+        time = normalized
         timeTouched = true
         whenTouched = true
     }
 
+    /** Choosing the length already chosen changes nothing. */
     fun chooseLength(value: Duration) {
+        if (value == length) return
         length = value
         whenTouched = true
     }
@@ -155,7 +161,7 @@ class EventForm(
             is TimeChoice.Custom -> t.time
         }
 
-    /** Where the time picker opens: the chosen start, or the default slot's time (Evening's) when All day is chosen. */
+    /** Where the time picker opens: the chosen start; otherwise today's default slot, or Evening's time if that default is itself All day. */
     val pickerTime: LocalTime
         get() = startTime ?: (defaultTime(day, today, now) as? TimeChoice.Slot)?.slot?.time ?: TimeSlot.Evening.time
 
@@ -174,14 +180,17 @@ class EventForm(
      * What Save sends. All day is one whole date. A timed event starts at the chosen local time in the household zone
      * (in a spring-forward gap it moves forward; an ambiguous autumn time takes the earlier offset) and lasts
      * [length] of real time, but ends at the next midnight at the latest, since new events can't span days (D3). A
-     * locked edit, or one whose Day, Time and Length weren't touched, keeps its own start and end: rebuilt from the
-     * chips, an event in the autumn's repeated hour would move. An edit whose Who wasn't touched keeps its tag
-     * exactly (an untagged event stays untagged).
+     * locked edit, or one whose Day, Time and Length weren't touched and whose own span was valid (all-day, or a
+     * positive length), keeps its own start and end: rebuilt from the chips, an event in the autumn's repeated hour
+     * would move. A zero- or negative-length original (bad provider data) is always rebuilt from the chips, so Save
+     * can't send an end at or before its start. An edit whose Who wasn't touched keeps its tag exactly (an untagged
+     * event stays untagged).
      */
     fun draft(createdBy: String?): EventDraft {
         val o = original
         val forPerson = if (o != null && !whoTouched) o.forPerson else who.value
-        if (o != null && (datesLocked || !whenTouched)) return EventDraft(title.trim(), o.start, o.end, forPerson, createdBy)
+        val keepsOwnSpan = o != null && (datesLocked || (!whenTouched && (o.start is EventTime.AllDay || lengthOf(o) != null)))
+        if (o != null && keepsOwnSpan) return EventDraft(title.trim(), o.start, o.end, forPerson, createdBy)
         val start = startTime
         return if (start == null) {
             EventDraft(title.trim(), EventTime.AllDay(day), EventTime.AllDay(day.plusDays(1)), forPerson, createdBy)

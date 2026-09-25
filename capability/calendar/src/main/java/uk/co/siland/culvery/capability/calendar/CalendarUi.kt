@@ -117,7 +117,7 @@ fun weekSubtitle(sync: SyncStatusUi, nowMillis: Long): String =
 fun resolvePerson(forPerson: String?, sourcePerson: PersonId, people: Map<PersonId, Person>): Person =
     forPerson?.let { people[PersonId(it)] } ?: people[sourcePerson] ?: Person.Family
 
-internal val HOURS_MINUTES = DateTimeFormatter.ofPattern("HH:mm")
+internal val HOURS_MINUTES: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 // ENGLISH, not UK: JDK 17's CLDR data gives "Sept" for Locale.UK, and Android versions differ.
 internal val SHORT_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
 

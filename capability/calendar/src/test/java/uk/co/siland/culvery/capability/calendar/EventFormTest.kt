@@ -346,4 +346,76 @@ class EventFormTest {
     fun aNewEventIsNeverUnchanged() {
         assertThat(new().unchanged).isFalse()
     }
+
+    @Test
+    fun anUntouchedEditWithNoValidLengthRebuildsFromTheFormsChips() {
+        val expectedStart = today.atTime(19, 30).atZone(london).toInstant()
+        val expectedEnd = today.atTime(20, 30).atZone(london).toInstant()
+
+        val zero = editTimed(today.atTime(19, 30), 0)
+        val zeroDraft = zero.draft(createdBy = null)
+        assertThat(zeroDraft.start).isEqualTo(EventTime.Timed(expectedStart))
+        assertThat(zeroDraft.end).isEqualTo(EventTime.Timed(expectedEnd))
+
+        val negative = editTimed(today.atTime(19, 30), -30)
+        val negativeDraft = negative.draft(createdBy = null)
+        assertThat(negativeDraft.start).isEqualTo(EventTime.Timed(expectedStart))
+        assertThat(negativeDraft.end).isEqualTo(EventTime.Timed(expectedEnd))
+    }
+
+    @Test
+    fun tappingTheAlreadySelectedDayTimeOrLengthChangesNothing() {
+        // 01:30 GMT on 25 October is the second 01:30 that night; re-choosing it must not silently rebuild it as the first.
+        val secondHalfPast = Instant.parse("2026-10-25T01:30:00Z")
+        val start = EventTime.Timed(secondHalfPast)
+        val end = EventTime.Timed(secondHalfPast.plusSeconds(3_600))
+        val form = edit(start, end)
+        form.chooseDay(form.day)
+        form.chooseTime(form.time)
+        form.chooseLength(form.length)
+        val draft = form.draft(createdBy = null)
+        assertThat(listOf(draft.start, draft.end)).containsExactly(start, end).inOrder()
+        assertThat(form.unchanged).isTrue()
+    }
+
+    @Test
+    fun chooseDayOnALockedEditDoesNotChangeItsDates() {
+        val start = EventTime.AllDay(LocalDate.of(2026, 9, 22))
+        val end = EventTime.AllDay(LocalDate.of(2026, 9, 25))
+        val form = edit(start, end, title = "Half term", forPerson = "family")
+        form.chooseDay(today)
+        val draft = form.draft(createdBy = null)
+        assertThat(listOf(draft.start, draft.end)).containsExactly(start, end).inOrder()
+    }
+
+    @Test
+    fun anEditsTimeSurvivesChooseDay() {
+        val form = editTimed(today.atTime(19, 30), 90)
+        form.chooseDay(today.plusDays(2))
+        assertThat(form.time).isEqualTo(TimeChoice.Custom(LocalTime.of(19, 30)))
+    }
+
+    @Test
+    fun theFormUsesTheHouseholdZoneNotTheJvmDefault() {
+        // Pacific/Auckland is far from Europe/London, the gate machine's JVM default; NZ's DST hasn't started yet.
+        val auckland = ZoneId.of("Pacific/Auckland")
+        val form = EventForm(EventForm.Mode.New, today, LocalTime.of(10, 54), auckland, signedIn = null, preselectedDay = null)
+        val draft = form.draft(createdBy = null)
+        // 14:00 NZST (UTC+12) is 02:00Z, not 13:00Z as it would be in London.
+        assertThat(draft.start).isEqualTo(EventTime.Timed(Instant.parse("2026-09-23T02:00:00Z")))
+        assertThat(draft.end).isEqualTo(EventTime.Timed(Instant.parse("2026-09-23T03:00:00Z")))
+        assertThat(form.summary { names.getValue(it) }).isEqualTo("Today · 14:00–15:00 · Family")
+
+        // 22:00 Auckland + 3 h crosses midnight there (13:00Z start), but the same instants read as 23:00-02:00 BST
+        // in London, a single day: a household-zone regression to the JVM default would flip this to unlocked.
+        val lateStart = LocalDate.of(2026, 9, 23).atTime(22, 0).atZone(auckland).toInstant()
+        val lateEnd = lateStart.plusSeconds(3 * 3_600)
+        val lateForm = EventForm(
+            EventForm.Mode.Edit(
+                EditableEvent(EventRef("c1", "s1", "e1"), "Late one", EventTime.Timed(lateStart), EventTime.Timed(lateEnd), "alex"),
+            ),
+            today, LocalTime.of(10, 54), auckland, signedIn = null, preselectedDay = null,
+        )
+        assertThat(lateForm.datesLocked).isTrue()
+    }
 }
