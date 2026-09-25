@@ -117,9 +117,9 @@ fun weekSubtitle(sync: SyncStatusUi, nowMillis: Long): String =
 fun resolvePerson(forPerson: String?, sourcePerson: PersonId, people: Map<PersonId, Person>): Person =
     forPerson?.let { people[PersonId(it)] } ?: people[sourcePerson] ?: Person.Family
 
-private val HOURS_MINUTES = DateTimeFormatter.ofPattern("HH:mm")
+internal val HOURS_MINUTES = DateTimeFormatter.ofPattern("HH:mm")
 // ENGLISH, not UK: JDK 17's CLDR data gives "Sept" for Locale.UK, and Android versions differ.
-private val SHORT_DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
+internal val SHORT_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
 
 /** An event ending at exactly midnight ends on the day before. */
 private fun lastDayOf(from: ZonedDateTime, to: ZonedDateTime): LocalDate {
@@ -134,22 +134,31 @@ internal fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
     else -> date.format(SHORT_DAY)
 }
 
+/** An event's first and last day in [zone]. An all-day end is exclusive; a timed end at exactly midnight belongs to the day before. */
+internal fun daySpan(start: EventTime, end: EventTime, zone: ZoneId): Pair<LocalDate, LocalDate> =
+    if (start is EventTime.AllDay && end is EventTime.AllDay) {
+        start.date to maxOf(start.date, end.date.minusDays(1))
+    } else {
+        val from = start.instantIn(zone).atZone(zone)
+        from.toLocalDate() to lastDayOf(from, end.instantIn(zone).atZone(zone))
+    }
+
 /** The detail sheet's "When": "Today · 19:30–21:00", "Sat 26 Sep · All day", or the span of a longer event. */
 fun whenLabel(start: EventTime, end: EventTime, zone: ZoneId, today: LocalDate): String {
+    val (first, last) = daySpan(start, end, zone)
     if (start is EventTime.AllDay && end is EventTime.AllDay) {
-        val last = maxOf(start.date, end.date.minusDays(1))
-        return if (last == start.date) {
-            "${dayLabel(start.date, today)} · $ALL_DAY_LABEL"
+        return if (last == first) {
+            "${dayLabel(first, today)} · $ALL_DAY_LABEL"
         } else {
-            "${dayLabel(start.date, today)} – ${dayLabel(last, today)} · $ALL_DAY_LABEL"
+            "${dayLabel(first, today)} – ${dayLabel(last, today)} · $ALL_DAY_LABEL"
         }
     }
     val from = start.instantIn(zone).atZone(zone)
     val to = end.instantIn(zone).atZone(zone)
-    return if (lastDayOf(from, to) == from.toLocalDate()) {
-        "${dayLabel(from.toLocalDate(), today)} · ${from.format(HOURS_MINUTES)}–${to.format(HOURS_MINUTES)}"
+    return if (last == first) {
+        "${dayLabel(first, today)} · ${from.format(HOURS_MINUTES)}–${to.format(HOURS_MINUTES)}"
     } else {
-        "${dayLabel(from.toLocalDate(), today)} ${from.format(HOURS_MINUTES)} – ${dayLabel(to.toLocalDate(), today)} ${to.format(HOURS_MINUTES)}"
+        "${dayLabel(first, today)} ${from.format(HOURS_MINUTES)} – ${dayLabel(to.toLocalDate(), today)} ${to.format(HOURS_MINUTES)}"
     }
 }
 
