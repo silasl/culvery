@@ -32,8 +32,8 @@ class CalendarSync internal constructor(
     private val clock: WallClock,
     private val io: CoroutineContext,
     private val timeoutMillis: Long,
-    private val writers: Set<@JvmSuppressWildcards CalendarWriter> = emptySet(),
-    private val toaster: Toaster = SilentToaster,
+    private val writers: Set<@JvmSuppressWildcards CalendarWriter>,
+    private val toaster: Toaster,
 ) {
     @Inject
     constructor(
@@ -78,7 +78,8 @@ class CalendarSync internal constructor(
      * so the loop doesn't wake for them before it. Once a connection fails to answer, its
      * other changes wait for their next attempt instead of each costing a timeout. Changes nothing can deliver,
      * changes the provider refuses, and changes older than [OUTBOX_MAX_AGE_MS] are dropped, with one toast per
-     * connection, shown even if the pass then fails.
+     * connection, shown even if the pass then fails. A dropped create takes the changes queued behind it with it:
+     * there is no event for them to change (2b-2 design §5).
      */
     private suspend fun drainOutbox(connections: List<StoredConnection>, zone: ZoneId) {
         val now = clock.nowMillis()
@@ -87,21 +88,39 @@ class CalendarSync internal constructor(
         val blockedRefs = mutableMapOf<EventRef, Long>()
         val blockedConnections = mutableSetOf<String>()
         val dropped = linkedMapOf<String, MutableList<String?>>()
+        val droppedCreates = mutableSetOf<EventRef>()
+
+        suspend fun drop(change: PendingChange, label: String, reason: String?) {
+            val ref = change.ref
+            val count = if (change.kind == ChangeKind.CREATE && ref != null) {
+                droppedCreates += ref
+                store.dropCreate(ref)
+            } else {
+                store.dropChange(change.id)
+                1
+            }
+            val reasons = dropped.getOrPut(label) { mutableListOf() }
+            reasons += reason
+            // The changes that went with a create have no reason of their own.
+            repeat(count - 1) { reasons += null }
+        }
+
         try {
             for (change in store.pendingNow()) {
                 val ref = change.ref
+                val stored = byId[change.connectionId]
+                val label = stored?.connection?.label ?: REMOVED_CALENDAR
+                // Already deleted, and counted, with its create.
+                if (ref != null && ref in droppedCreates) continue
                 val blockedUntil = ref?.let(blockedRefs::get)
                 if (blockedUntil != null) {
                     // Not an attempt, so it costs no backoff step.
                     if (change.nextAttemptMillis < blockedUntil) store.reschedule(change.id, change.attempts, blockedUntil)
                     continue
                 }
-                val stored = byId[change.connectionId]
-                val label = stored?.connection?.label ?: REMOVED_CALENDAR
                 if (now - change.createdMillis > OUTBOX_MAX_AGE_MS) {
                     Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}: unsent for 48 hours")
-                    store.dropChange(change.id)
-                    dropped.getOrPut(label) { mutableListOf() }.add(null)
+                    drop(change, label, null)
                     continue
                 }
                 if (change.nextAttemptMillis > now) {
@@ -117,16 +136,12 @@ class CalendarSync internal constructor(
                 val writer = stored?.let { s -> writers.firstOrNull { it.providerId == s.connection.providerId } }
                 if (stored == null || source == null || writer == null || !change.isComplete()) {
                     Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}/${change.sourceId}: nothing can deliver it")
-                    store.dropChange(change.id)
-                    dropped.getOrPut(label) { mutableListOf() }.add(null)
+                    drop(change, label, null)
                     continue
                 }
                 when (val outcome = deliver(change, stored.connection, source.source, writer, zone)) {
                     is WriteOutcome.Accepted -> Unit
-                    is WriteOutcome.Rejected -> {
-                        store.dropChange(change.id)
-                        dropped.getOrPut(label) { mutableListOf() }.add(outcome.message)
-                    }
+                    is WriteOutcome.Rejected -> drop(change, label, outcome.message)
                     is WriteOutcome.Retry -> {
                         val next = retryLater(change, now)
                         ref?.let { blockedRefs[it] = next }

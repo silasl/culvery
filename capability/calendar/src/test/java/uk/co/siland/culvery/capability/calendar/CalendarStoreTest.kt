@@ -289,6 +289,18 @@ class CalendarStoreTest {
     }
 
     @Test
+    fun droppingACreateTakesEveryChangeQueuedForItsEvent() = runTest {
+        connect("s1")
+        val key = "0123456789abcdef0123456789abcdef"
+        store.enqueue(change(ChangeKind.CREATE, remoteId = null).copy(clientKey = key))
+        store.enqueue(change(ChangeKind.UPDATE, remoteId = key))
+        store.enqueue(change(ChangeKind.DELETE, remoteId = key, draft = null))
+        val other = store.enqueue(change(ChangeKind.UPDATE, remoteId = "e1"))
+        assertThat(store.dropCreate(EventRef("c1", "s1", key))).isEqualTo(3)
+        assertThat(store.pendingNow().map { it.id }).containsExactly(other)
+    }
+
+    @Test
     fun nextAttemptIsTheEarliestQueuedTime() = runTest {
         connect("s1")
         store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null, next = 5_000))

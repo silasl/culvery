@@ -144,6 +144,12 @@ class CalendarStore @Inject constructor(private val db: CalendarDatabase) {
 
     suspend fun dropChange(id: Long) = dao.deleteOutbox(id)
 
+    /**
+     * Drops the create for [ref] and every change queued for that event, in one statement, so a change queued after
+     * the caller read the queue goes too. Returns how many changes went.
+     */
+    suspend fun dropCreate(ref: EventRef): Int = dao.deleteOutboxFor(ref.connectionId, ref.sourceId, ref.remoteId)
+
     private fun OutboxEntity.readOrNull(): PendingChange? =
         runCatching { toPending() }
             .onFailure { Log.w(TAG, "Dropping unreadable outbox row $id (kind $kind)", it) }

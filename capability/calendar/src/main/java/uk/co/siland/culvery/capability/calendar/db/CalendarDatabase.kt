@@ -196,6 +196,13 @@ interface CalendarDao {
 
     @Query("DELETE FROM outbox WHERE id = :id")
     suspend fun deleteOutbox(id: Long)
+
+    /** A create and every change queued for its event: the create carries the key, the others target it as remoteId. */
+    @Query(
+        "DELETE FROM outbox WHERE connectionId = :connectionId AND sourceId = :sourceId " +
+            "AND (clientKey = :key OR remoteId = :key)",
+    )
+    suspend fun deleteOutboxFor(connectionId: String, sourceId: String, key: String): Int
 }
 
 /**

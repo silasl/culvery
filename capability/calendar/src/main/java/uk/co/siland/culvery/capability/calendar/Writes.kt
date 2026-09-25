@@ -9,7 +9,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import uk.co.siland.culvery.core.plugin.Toaster
 
 /** Waits after the nth failed attempt: 30 s, 1 min, 2 min, then 5 min. */
 val OUTBOX_BACKOFF_MS: List<Long> = listOf(30_000L, 60_000L, 120_000L, 300_000L)
@@ -90,10 +89,5 @@ internal fun couldNotSaveAll(label: String, reasons: List<String?>): String =
 /** An assign as it is sent: the event's current title, times and creator, with the new person. */
 internal fun assignDraft(event: StoredEvent, forPerson: String?): EventDraft =
     EventDraft(event.title, event.start, event.end, forPerson, event.createdBy)
-
-/** For an engine built without a toaster, in tests that don't look at toasts. */
-internal object SilentToaster : Toaster {
-    override fun show(message: String, icon: String) = Unit
-}
 
 private const val TAG = "CalendarWrites"

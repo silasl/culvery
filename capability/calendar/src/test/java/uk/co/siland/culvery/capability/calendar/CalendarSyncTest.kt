@@ -1,5 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
+import androidx.room.execSQL
+import androidx.room.useWriterConnection
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.Instant
@@ -66,7 +68,10 @@ class CalendarSyncTest {
     /** Provider calls stay on the test dispatcher, so the 1 s timeout runs on virtual time. */
     private suspend fun engine(): CalendarSync {
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
-        return CalendarSync(store, setOf(a, b), HouseholdZone(household), clock, EmptyCoroutineContext, timeoutMillis = 1_000)
+        return CalendarSync(
+            store, setOf(a, b), HouseholdZone(household), clock, EmptyCoroutineContext, timeoutMillis = 1_000,
+            writers = emptySet(), toaster = SilentToaster,
+        )
     }
 
     private suspend fun connect(id: String, providerId: String, vararg sources: CalendarSource, mapping: Map<String, SourceMapping> = emptyMap()) =
@@ -565,5 +570,82 @@ class CalendarSyncTest {
         assertThat(w.calls).isEmpty()
         assertThat(store.pendingNow()).isEmpty()
         assertThat(toaster.messages).containsExactly("Couldn't save to C1")
+    }
+
+    @Test
+    fun aRefusedCreateDropsTheChangesQueuedBehindItWithOneToast() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
+        queue(ChangeKind.UPDATE, remoteId = key, draft = swimDraft("sam-id"))
+        queue(ChangeKind.DELETE, remoteId = key, draft = null)
+        w.failWith = WriteRejectedException("Calendar is full")
+        sync.syncAll()
+        // Nothing is sent for an event that was never made.
+        assertThat(w.calls).containsExactly("create:Swim")
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't save 3 changes to C1")
+    }
+
+    @Test
+    fun aCreateDroppedAfterTwoDaysTakesItsQueuedChangesWithIt() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        val longAgo = now.minusMillis(OUTBOX_MAX_AGE_MS + 1)
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key, created = longAgo)
+        queue(ChangeKind.UPDATE, remoteId = key, draft = swimDraft("sam-id"))
+        sync.syncAll()
+        assertThat(w.calls).isEmpty()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't save 2 changes to C1")
+    }
+
+    @Test
+    fun aChangeForAnotherEventIsNotDroppedWithARefusedCreate() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
+        queue(ChangeKind.DELETE, remoteId = "swim", draft = null)
+        w.failWith = WriteRejectedException("Calendar is full")
+        sync.syncAll()
+        // The delete was tried (and refused too) on its own account.
+        assertThat(w.calls).containsExactly("create:Swim", "delete:swim").inOrder()
+    }
+
+    @Test
+    fun aQueuedCreateEditAndDeleteAreDeliveredInOrder() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
+        queue(ChangeKind.UPDATE, remoteId = key, draft = swimDraft("sam-id"))
+        queue(ChangeKind.DELETE, remoteId = key, draft = null)
+        a.failWith = UnreachableException("reads are down")
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("create:Swim", "update:$key", "delete:$key").inOrder()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(store.eventNow(EventRef("c1", "s1", key))).isNull()
+    }
+
+    // The row stays due and is sent again on the next pass. Plan 3's drain backoff (2b-1 m2, R3) changes that wait
+    // and must update this test with it.
+    @Test
+    fun aCreateWhoseMirrorWriteFailsIsRetriedAndMakesOneEvent() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
+        a.failWith = UnreachableException("reads are down")
+        // The provider accepts the create, then the tablet can't store it (a full disk).
+        calendar.useWriterConnection {
+            it.execSQL("CREATE TRIGGER fail_event BEFORE INSERT ON event BEGIN SELECT RAISE(ABORT, 'disk full'); END")
+        }
+        sync.syncAll()
+        assertThat(store.pendingNow()).hasSize(1)
+        calendar.useWriterConnection { it.execSQL("DROP TRIGGER fail_event") }
+        sync.syncAll()
+        // Sent twice with one key: the provider returned the event it had already made.
+        assertThat(w.calls).containsExactly("create:Swim", "create:Swim")
+        assertThat(w.created.keys).containsExactly(key)
+        assertThat(store.eventNow(EventRef("c1", "s1", key))).isNotNull()
+        assertThat(store.pendingNow()).isEmpty()
     }
 }
