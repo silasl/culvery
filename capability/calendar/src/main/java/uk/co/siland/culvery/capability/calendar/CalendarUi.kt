@@ -120,6 +120,7 @@ fun resolvePerson(forPerson: String?, sourcePerson: PersonId, people: Map<Person
 internal val HOURS_MINUTES: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 // ENGLISH, not UK: JDK 17's CLDR data gives "Sept" for Locale.UK, and Android versions differ.
 internal val SHORT_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
+internal val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
 
 /** An event ending at exactly midnight ends on the day before. */
 private fun lastDayOf(from: ZonedDateTime, to: ZonedDateTime): LocalDate {

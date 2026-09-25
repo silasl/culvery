@@ -32,12 +32,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
+import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.capability.calendar.isStaleAt
 import uk.co.siland.culvery.capability.calendar.weekSubtitle
@@ -47,8 +46,6 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
-
-private val SHORT_WEEKDAY = DateTimeFormatter.ofPattern("EEE", Locale.UK)
 
 data class WeekViewState(val week: WeekUi, val today: LocalDate, val sync: SyncStatusUi, val nowMillis: Long)
 
@@ -114,7 +111,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
     ) {
         Row(Modifier.padding(start = inset, end = inset, bottom = inset)) {
             Text(
-                if (isToday) "Today" else day.date.format(SHORT_WEEKDAY),
+                if (isToday) "Today" else day.date.format(WEEKDAY),
                 style = CalendarType.strong14,
                 color = if (isToday) c.accent else c.mute,
                 modifier = Modifier.alignByBaseline(),

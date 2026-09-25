@@ -40,6 +40,7 @@ import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.SHORT_DAY
+import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.ShellTokens
@@ -57,9 +58,8 @@ private const val MINUTES_PER_HOUR = 60
 /** The time picker's minute step (hand-off §7). */
 internal const val MINUTE_STEP = 15
 
-// ENGLISH, as elsewhere in the calendar: the hand-off's "Mon", "1 Oct".
+// ENGLISH, as elsewhere in the calendar: the hand-off's "1 Oct".
 private val DAY_MONTH = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
-private val WEEKDAY = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
 
 /** The first page starts on this week's Monday. */
 internal fun firstPageStart(today: LocalDate): LocalDate = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
