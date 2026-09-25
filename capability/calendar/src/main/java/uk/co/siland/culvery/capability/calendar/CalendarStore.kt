@@ -268,6 +268,7 @@ private fun PendingChange.toEntity() = OutboxEntity(
     attempts = attempts,
     nextAttemptMillis = nextAttemptMillis,
     createdMillis = createdMillis,
+    clientKey = clientKey,
 )
 
 private fun OutboxEntity.toPending() = PendingChange(
@@ -280,4 +281,5 @@ private fun OutboxEntity.toPending() = PendingChange(
     attempts = attempts,
     nextAttemptMillis = nextAttemptMillis,
     createdMillis = createdMillis,
+    clientKey = clientKey,
 )

@@ -272,6 +272,23 @@ class CalendarStoreTest {
     }
 
     @Test
+    fun aQueuedCreateKeepsItsClientKeyAndItsRefUsesIt() = runTest {
+        connect("s1")
+        val key = "0123456789abcdef0123456789abcdef"
+        val create = change(ChangeKind.CREATE, remoteId = null).copy(clientKey = key)
+        val id = store.enqueue(create)
+        val read = store.pendingNow().single()
+        assertThat(read).isEqualTo(create.copy(id = id))
+        assertThat(read.ref).isEqualTo(EventRef("c1", "s1", key))
+    }
+
+    @Test
+    fun onlyACreateTakesItsRefFromItsClientKey() {
+        assertThat(change(ChangeKind.UPDATE).copy(clientKey = "stray").ref).isEqualTo(EventRef("c1", "s1", "e1"))
+        assertThat(change(ChangeKind.CREATE, remoteId = null).ref).isNull()
+    }
+
+    @Test
     fun nextAttemptIsTheEarliestQueuedTime() = runTest {
         connect("s1")
         store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null, next = 5_000))

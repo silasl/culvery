@@ -52,8 +52,10 @@ data class StoredEvent(
 enum class ChangeKind { CREATE, UPDATE, DELETE, ASSIGN }
 
 /**
- * One queued write, kept until the provider accepts or refuses it. [remoteId] is null only for CREATE;
- * [draft] is null only for DELETE, and for ASSIGN only its forPerson counts. [id] is 0 until the store assigns one.
+ * One queued write, kept until the provider accepts or refuses it. [remoteId] is null only for CREATE, which
+ * carries its [clientKey] instead: the id the provider gives the event (CalendarWriter.create), so a retried create
+ * can't make a second one. [draft] is null only for DELETE, and for ASSIGN only its forPerson counts. [id] is 0
+ * until the store assigns one.
  */
 data class PendingChange(
     val id: Long,
@@ -65,6 +67,12 @@ data class PendingChange(
     val attempts: Int,
     val nextAttemptMillis: Long,
     val createdMillis: Long,
+    val clientKey: String? = null,
 ) {
-    val ref: EventRef? get() = remoteId?.let { EventRef(connectionId, sourceId, it) }
+    /**
+     * The event this change is for. A create's ref is built from its client key, the id the event keeps once it
+     * syncs, so the changes queued behind it and the sheets showing it use one ref throughout.
+     */
+    val ref: EventRef?
+        get() = (if (kind == ChangeKind.CREATE) clientKey else remoteId)?.let { EventRef(connectionId, sourceId, it) }
 }

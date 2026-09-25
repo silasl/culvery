@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.calendar
 import android.content.Context
 import androidx.room.Room
 import androidx.room.testing.MigrationTestHelper
+import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.sqlite.execSQL
 import androidx.test.core.app.ApplicationProvider
@@ -19,6 +20,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_1_2
+import uk.co.siland.culvery.capability.calendar.db.MIGRATION_2_3
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -30,6 +32,10 @@ import uk.co.siland.culvery.core.plugin.ConnectionHealth
  * SupportSQLiteDriver.open), which always mismatches on Windows because Robolectric's absolute path is
  * backslash-separated there. AndroidSQLiteDriver opens the file directly with no such comparison.
  */
+/** A draft as a v2 outbox row stores it. */
+private const val DRAFT_JSON =
+    """{"title":"Swim","start":{"instant":1000},"end":{"instant":2000},"forPerson":"alex-id","createdBy":"alex-id"}"""
+
 @RunWith(AndroidJUnit4::class)
 class CalendarMigrationTest {
     private val context get() = ApplicationProvider.getApplicationContext<Context>()
@@ -66,7 +72,7 @@ class CalendarMigrationTest {
         helper.runMigrationsAndValidate(2, listOf(MIGRATION_1_2)).close()
 
         val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .setDriver(AndroidSQLiteDriver())
             .allowMainThreadQueries()
             .build()
@@ -94,6 +100,87 @@ class CalendarMigrationTest {
             assertThat(store.master().first()).isNull()
         } finally {
             db.close()
+        }
+    }
+
+    @Test
+    fun migrationFromV2AddsAnEmptyClientKeyAndKeepsEverything() = runTest {
+        file.parentFile?.mkdirs()
+        file.delete()
+
+        val v2 = helper.createDatabase(2)
+        v2.execSQL(
+            "INSERT INTO connection (id, providerId, label, configJson, health, healthMessage, lastSyncMillis) " +
+                "VALUES ('c1', 'calendar.test', 'Google', '{}', 'OK', NULL, 1234)",
+        )
+        v2.execSQL(
+            "INSERT INTO source (connectionId, sourceId, name, writable, visible, personId, isMaster) " +
+                "VALUES ('c1', 's1', 'Family', 1, 1, 'family', 1), ('c1', 's2', 'Alex', 0, 1, 'alex-id', 0)",
+        )
+        v2.execSQL(
+            "INSERT INTO event (connectionId, sourceId, remoteId, title, startInstant, startDate, endInstant, endDate, " +
+                "recurring, forPerson, createdBy, startSort, endSort) " +
+                "VALUES ('c1', 's1', 'e1', 'Swim', 1000, NULL, 2000, NULL, 0, 'alex-id', 'sam-id', 1000, 2000)",
+        )
+        v2.execSQL(
+            "INSERT INTO sync_state (connectionId, sourceId, cursor, rangeStart) " +
+                "VALUES ('c1', 's1', 'k7', '2026-09-22|Europe/London')",
+        )
+        v2.execSQL(
+            "INSERT INTO outbox (connectionId, sourceId, remoteId, kind, draftJson, attempts, nextAttemptMillis, createdMillis) VALUES " +
+                "('c1', 's1', NULL, 'CREATE', '$DRAFT_JSON', 0, 10, 100), " +
+                "('c1', 's1', 'e1', 'UPDATE', '$DRAFT_JSON', 1, 20, 200), " +
+                "('c1', 's1', 'e1', 'ASSIGN', '$DRAFT_JSON', 0, 30, 300), " +
+                "('c1', 's1', 'e1', 'DELETE', NULL, 2, 40, 400)",
+        )
+        v2.close()
+
+        val v3 = helper.runMigrationsAndValidate(3, listOf(MIGRATION_2_3))
+        try {
+            // The driver-based helper may not notice a dropped table, so the list is checked here.
+            assertThat(tableNames(v3)).containsExactly("connection", "event", "outbox", "source", "sync_state").inOrder()
+        } finally {
+            v3.close()
+        }
+
+        val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .setDriver(AndroidSQLiteDriver())
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val store = CalendarStore(db)
+            assertThat(store.connectionsNow().single().connection.label).isEqualTo("Google")
+            assertThat(store.master().first()?.source?.id).isEqualTo("s1")
+            assertThat(store.eventNow(EventRef("c1", "s1", "e1"))?.title).isEqualTo("Swim")
+            val range = DateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 10, 8), ZoneId.of("Europe/London"))
+            assertThat(store.cursor("c1", "s1", range)).isEqualTo(SyncCursor("k7"))
+
+            val pending = store.pendingNow()
+            assertThat(pending.map { it.kind })
+                .containsExactly(ChangeKind.CREATE, ChangeKind.UPDATE, ChangeKind.ASSIGN, ChangeKind.DELETE).inOrder()
+            assertThat(pending.map { it.clientKey }).containsExactly(null, null, null, null)
+            assertThat(pending.map { it.attempts }).containsExactly(0, 1, 0, 2).inOrder()
+            assertThat(pending.first().draft?.title).isEqualTo("Swim")
+            // A v2 create has no key, so no ref: the drain drops it as undeliverable (Task 2's isComplete).
+            assertThat(pending.first().ref).isNull()
+        } finally {
+            db.close()
+        }
+    }
+
+    /** The app's own tables, without SQLite's, Android's and Room's bookkeeping. */
+    private fun tableNames(connection: SQLiteConnection): List<String> {
+        val statement = connection.prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' " +
+                "AND name NOT IN ('android_metadata', 'room_master_table') ORDER BY name",
+        )
+        try {
+            val names = mutableListOf<String>()
+            while (statement.step()) names += statement.getText(0)
+            return names
+        } finally {
+            statement.close()
         }
     }
 }

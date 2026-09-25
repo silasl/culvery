@@ -86,6 +86,8 @@ data class OutboxEntity(
     val attempts: Int,
     val nextAttemptMillis: Long,
     val createdMillis: Long,
+    /** CREATE only (v3): the key the provider uses as the event's id, so a retried create can't duplicate it. */
+    val clientKey: String? = null,
 )
 
 data class EventRow(
@@ -203,7 +205,7 @@ interface CalendarDao {
  */
 @Database(
     entities = [ConnectionEntity::class, SourceEntity::class, EventEntity::class, SyncStateEntity::class, OutboxEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class CalendarDatabase : RoomDatabase() {
