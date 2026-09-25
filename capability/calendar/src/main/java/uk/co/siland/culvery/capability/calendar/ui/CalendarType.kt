@@ -81,6 +81,30 @@ internal object CalendarType {
 
     /** 64 sp / 600: the ":" between them. */
     val timeColon = HhType.headerValue.copy(fontSize = 64.sp)
+
+    /** 30 sp / 700, −0.5 tracking: "New event", "Edit event". */
+    val editorTitle = HhType.screenTitle.copy(fontSize = 30.sp, letterSpacing = (-0.5).sp)
+
+    /** 15 sp / 400: the add/edit sheet's live summary. */
+    val editorSummary = subtitle
+
+    /** 22 sp / 600: the Title field. */
+    val titleField = HhType.sectionTitle.copy(fontWeight = FontWeight.W600)
+
+    /** 13 sp / 700, 0.5 tracking: WHO, DAY, TIME, LENGTH. */
+    val sectionLabel = HhType.label.copy(fontWeight = FontWeight.W700, letterSpacing = 0.5.sp)
+
+    /** 16 sp / 600: choice chips. */
+    val chip = personChip
+
+    /** 16 sp / 500: a time chip's "09:00". */
+    val chipSecondary = HhType.body.copy(fontWeight = FontWeight.W500)
+
+    /** 18 sp / 700: Save, Save changes, Try again, Edit. */
+    val primaryButton = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W700)
+
+    /** 16 sp / 600: a locked multi-day edit's dates line. */
+    val lockedDates = personChip
 }
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */
@@ -258,6 +282,49 @@ internal object CalendarDimens {
 
     /** Hand-off §7: past days in the date picker at 30%. */
     const val PAST_DAY_ALPHA = 0.3f
+
+    // Add/edit sheet (hand-off §7 Sheet 2 and Culvery.dc.html): padding 24×30×20; the summary 4 below the title and
+    // ✕ 16 away; the body 4 below the Title field, 20 between sections, each label 10 above its chips.
+    val editorPaddingTop = 24.dp
+    val editorPaddingBottom = 20.dp
+    val editorHeaderGap = 16.dp
+    val editorSummaryTop = 4.dp
+    val editorBodyTop = 4.dp
+    val editorBodyGap = 20.dp
+    val sectionGap = 10.dp
+
+    // Title field: 64 dp, radius 18, `surf`, padding 0 20, a 2 dp `accent` border while focused.
+    val titleHeight = 64.dp
+    val titleRadius = 18.dp
+    val titlePaddingH = 20.dp
+    val titleBorder = 2.dp
+
+    // Choice chips: 48 dp, padding 0 18, radius 24, 8 apart; a 12 dp dot or 20 dp icon 8 from the label.
+    val choiceChipHeight = 48.dp
+    val choiceChipPaddingH = 18.dp
+    val choiceChipRadius = 24.dp
+    val choiceChipGap = 8.dp
+    val choiceChipIconGap = 8.dp
+    val choiceChipDot = 12.dp
+    val choiceChipIcon = 20.dp
+
+    // The locked dates line and the failure card: radius 18, padding 14×16, the icon 12 from the text;
+    // `date_range` 22 dp, `cloud_off` 24 dp, the failure body 2 below its title.
+    val editorCardRadius = 18.dp
+    val editorCardPaddingV = 14.dp
+    val editorCardPaddingH = 16.dp
+    val editorCardIconGap = 12.dp
+    val lockedIcon = 22.dp
+    val failureIcon = 24.dp
+    val failureBodyTop = 2.dp
+
+    // Footers: 10 between Delete and the main button; the main button's icon 10 from its label.
+    val footerGap = 10.dp
+    val primaryIconGap = 10.dp
+
+    /** Hand-off §7: a disabled chip is drawn at 38% and stays tappable; a time chip's "09:00" is at 72%. */
+    const val DISABLED_CHIP_ALPHA = 0.38f
+    const val CHIP_SECONDARY_ALPHA = 0.72f
 
     /** Chip tint: the person's colour at 0x2E alpha on dark, 0x26 on light. */
     const val CHIP_ALPHA_DARK = 0x2E / 255f

@@ -112,7 +112,7 @@ fun EventDetailSheet(
             if (mode == DetailMode.ConfirmingDelete) {
                 DeleteConfirmation(e, busy, onKeep, onConfirmDelete)
             } else {
-                DeleteButton(enabled = !busy, onClick = onDelete)
+                DeleteButton(enabled = !busy, tag = "detail_delete", onClick = onDelete)
             }
         }
     }
@@ -270,25 +270,6 @@ private fun PersonChip(person: Person, enabled: Boolean, onClick: () -> Unit) {
     ) {
         Box(Modifier.size(CalendarDimens.personChipDot).clip(CircleShape).background(Color(person.color)))
         Text(person.name, style = CalendarType.personChip, color = c.ink, maxLines = 1)
-    }
-}
-
-@Composable
-private fun DeleteButton(enabled: Boolean, onClick: () -> Unit) {
-    val c = Culvery.colors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerIconGap),
-        modifier = Modifier
-            .testTag("detail_delete")
-            .height(CalendarDimens.footerButtonHeight)
-            .clip(RoundedCornerShape(CalendarDimens.footerButtonRadius))
-            .background(c.surf2)
-            .clickable(enabled = enabled, onClickLabel = "Delete", onClick = onClick)
-            .padding(horizontal = CalendarDimens.deleteButtonPaddingH),
-    ) {
-        HhIcon("delete", size = CalendarDimens.footerIcon, tint = c.danger)
-        Text("Delete", style = CalendarType.footerButton, color = c.danger)
     }
 }
 
