@@ -177,6 +177,16 @@ class WeekViewTest {
     }
 
     @Test
+    fun aTapAnywhereInAnEmptyColumnAddsOnThatDay() {
+        val added = mutableListOf<LocalDate>()
+        // Today's column with no chips at all: there's no last chip to compare against (the `last == null` branch).
+        val emptyToday = SampleUi.week.copy(days = SampleUi.week.days.map { if (it.date == SampleUi.TODAY) it.copy(events = emptyList()) else it })
+        show { WeekView(WeekViewState(emptyToday, SampleUi.TODAY, sync(), now), onAdd = { added += it }) }
+        compose.onNodeWithTag("week_day_${SampleUi.TODAY}").performTouchInput { click(Offset(centerX, centerY)) }
+        assertThat(added).containsExactly(SampleUi.TODAY)
+    }
+
+    @Test
     fun aTapInTheGapBetweenTwoChipsAddsNothing() {
         val added = mutableListOf<LocalDate>()
         show { WeekView(state(), onAdd = { added += it }) }

@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -129,6 +130,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
     val shape = RoundedCornerShape(CalendarDimens.weekColumnRadius)
     val inset = CalendarDimens.columnHeaderInset
     val chips = rememberLazyListState()
+    val currentOnAdd = rememberUpdatedState(onAdd)
     HhCard(
         modifier = modifier
             .testTag("week_day_${day.date}")
@@ -156,11 +158,14 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
                         Modifier
                     } else {
                         // The chips take their own taps. Only the space below the last one adds: a tap in the header or
-                        // between two chips is a missed chip, not a new event (2b-2 design §4.1).
-                        Modifier.pointerInput(onAdd) {
+                        // between two chips is a missed chip, not a new event (2b-2 design §4.1). Keyed on the day
+                        // (not the onAdd lambda, rebuilt every recomposition as the header's clock ticks), so the
+                        // gesture coroutine doesn't restart and drop a tap mid-gesture; it reads onAdd fresh via
+                        // rememberUpdatedState.
+                        Modifier.pointerInput(day.date) {
                             detectTapGestures { tap ->
                                 val last = chips.layoutInfo.visibleItemsInfo.lastOrNull()
-                                if (last == null || tap.y > last.offset + last.size) onAdd()
+                                if (last == null || tap.y > last.offset + last.size) currentOnAdd.value?.invoke()
                             }
                         }
                     },
