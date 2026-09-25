@@ -4,8 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -37,7 +42,7 @@ fun ShellLayers(
         shell()
         OverlayLayer(overlay)
         pinPad()
-        ToastLayer(toast, onToastHidden)
+        ToastLayer(toast, onHidden = onToastHidden)
     }
 }
 
@@ -62,15 +67,24 @@ fun OverlayLayer(state: OverlayState) {
     }
 }
 
-/** Draws [toast] bottom-centre and reports it hidden after 3.5 s; a new toast restarts the timer. */
+/**
+ * Draws [toast] bottom-centre, 28 dp above the bottom or above the on-screen keyboard while it shows (hand-off §7),
+ * and reports it hidden after 3.5 s; a new toast restarts the timer.
+ */
 @Composable
-fun ToastLayer(toast: ToastMessage?, onHidden: (Long) -> Unit) {
+fun ToastLayer(toast: ToastMessage?, keyboard: WindowInsets = WindowInsets.ime, onHidden: (Long) -> Unit) {
     val t = toast ?: return
     LaunchedEffect(t.id) {
         delay(ShellTokens.TOAST_MILLIS)
         onHidden(t.id)
     }
-    Box(Modifier.fillMaxSize().padding(bottom = ShellTokens.toastBottom), contentAlignment = Alignment.BottomCenter) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(keyboard.only(WindowInsetsSides.Bottom))
+            .padding(bottom = ShellTokens.toastBottom),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
         HhToast(t.message, t.icon)
     }
 }
