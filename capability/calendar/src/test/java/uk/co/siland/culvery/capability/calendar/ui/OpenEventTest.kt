@@ -1,9 +1,14 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -26,6 +31,7 @@ import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.HouseholdZone
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
+import uk.co.siland.culvery.capability.calendar.ScriptedWriter
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.calendarDb
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
@@ -37,6 +43,7 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
 @RunWith(AndroidJUnit4::class)
@@ -48,6 +55,9 @@ class OpenEventTest {
     private val overlay = RecordingOverlay()
     private lateinit var calendar: CalendarDatabase
     private lateinit var householdDb: HouseholdDatabase
+    private lateinit var store: CalendarStore
+    private lateinit var household: HouseholdRepository
+    private lateinit var zone: HouseholdZone
     private lateinit var repo: CalendarRepository
     private lateinit var editor: CalendarEditor
 
@@ -55,10 +65,10 @@ class OpenEventTest {
     fun setUp() = runBlocking {
         calendar = calendarDb()
         householdDb = householdDb()
-        val store = CalendarStore(calendar)
-        val household = HouseholdRepository(householdDb)
+        store = CalendarStore(calendar)
+        household = HouseholdRepository(householdDb)
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
-        val zone = HouseholdZone(household)
+        zone = HouseholdZone(household)
         store.addConnection(
             Connection("c1", "calendar.test", "Google", emptyMap()),
             listOf(CalendarSource("s-family", "Family calendar", writable = true)),
@@ -82,6 +92,13 @@ class OpenEventTest {
         householdDb.close()
     }
 
+    /** The Family calendar as a writable master whose provider has a writer, so the add entry points show. */
+    private fun makeFamilyTheWritableMaster() {
+        runBlocking { store.setMaster("c1", "s-family") }
+        repo = CalendarRepository(store, household, zone, emptySet(), setOf(ScriptedWriter("calendar.test")))
+        editor = stubEditor(store, zone, WallClock { SampleUi.NOW })
+    }
+
     private fun show(host: @Composable () -> Unit) = compose.setContent {
         CompositionLocalProvider(
             LocalShellNavigator provides RecordingNavigator(),
@@ -98,6 +115,9 @@ class OpenEventTest {
 
     private fun waitForText(text: String) =
         compose.waitUntil(5_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+
+    private fun waitForTag(tag: String) =
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
 
     @Test
     fun tappingATodayRowOpensItsDetailSheetAndCloseDismissesIt() {
@@ -118,5 +138,76 @@ class OpenEventTest {
         compose.onNodeWithText("Dinner with Jo & Priya").performClick()
         waitForText("Created by")
         compose.onNodeWithTag("detail_sheet").assertExists()
+    }
+
+    /** Both hosts at once, for the tests where neither may offer to add. */
+    private fun showBothHosts() = show {
+        Row(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f)) { TodayCardHost(repo, editor, today) }
+            Box(Modifier.weight(1f)) { WeekViewHost(repo, editor, today, nowMillis = 0L) }
+        }
+    }
+
+    private fun assertNowhereToAdd() {
+        waitForText("Dinner with Jo & Priya")
+        compose.onNodeWithTag("today_add").assertDoesNotExist()
+        compose.onNodeWithTag("week_add_event").assertDoesNotExist()
+        compose.onNodeWithTag("week_add_$today", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun withNoMasterThereIsNowhereToAdd() {
+        repo = CalendarRepository(store, household, zone, emptySet(), setOf(ScriptedWriter("calendar.test")))
+        showBothHosts()
+        assertNowhereToAdd()
+    }
+
+    @Test
+    fun withAMasterWhoseProviderHasNoWriterThereIsNowhereToAdd() {
+        runBlocking { store.setMaster("c1", "s-family") }
+        showBothHosts()
+        assertNowhereToAdd()
+    }
+
+    @Test
+    fun thePlusOnTodayOpensANewEventForToday() {
+        makeFamilyTheWritableMaster()
+        show { TodayCardHost(repo, editor, today) }
+        waitForTag("today_add")
+        compose.onNodeWithTag("today_add").performClick()
+        waitForText("New event")
+        compose.onNodeWithTag("editor_summary").assertTextEquals("Today · 14:00–15:00 · Family")
+    }
+
+    @Test
+    fun addEventInTheWeekOpensANewEventForToday() {
+        makeFamilyTheWritableMaster()
+        show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW) }
+        waitForTag("week_add_event")
+        compose.onNodeWithTag("week_add_event").performClick()
+        waitForText("New event")
+        compose.onNodeWithTag("editor_summary").assertTextEquals("Today · 14:00–15:00 · Family")
+    }
+
+    @Test
+    fun aColumnTapPresetsItsDay() {
+        makeFamilyTheWritableMaster()
+        show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW) }
+        val friday = today.plusDays(2)
+        waitForTag("week_add_$friday")
+        compose.onNodeWithTag("week_add_$friday", useUnmergedTree = true).performClick()
+        waitForText("New event")
+        // A later day starts on Morning.
+        compose.onNodeWithTag("editor_summary").assertTextEquals("Fri 25 Sep · 09:00–10:00 · Family")
+    }
+
+    @Test
+    fun aChipTapStillOpensTheEventNotTheEditor() {
+        makeFamilyTheWritableMaster()
+        show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW) }
+        waitForText("Dinner with Jo & Priya")
+        compose.onNodeWithText("Dinner with Jo & Priya").performClick()
+        waitForText("Created by")
+        compose.onNodeWithText("New event").assertDoesNotExist()
     }
 }

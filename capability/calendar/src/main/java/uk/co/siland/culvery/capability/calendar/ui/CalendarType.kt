@@ -105,6 +105,9 @@ internal object CalendarType {
 
     /** 16 sp / 600: a locked multi-day edit's dates line. */
     val lockedDates = personChip
+
+    /** 15 sp / 700: "Add event" in the Calendar header. */
+    val addEventButton = HhType.buttonLabel
 }
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */
@@ -325,6 +328,23 @@ internal object CalendarDimens {
     /** Hand-off §7: a disabled chip is drawn at 38% and stays tappable; a time chip's "09:00" is at 72%. */
     const val DISABLED_CHIP_ALPHA = 0.38f
     const val CHIP_SECONDARY_ALPHA = 0.72f
+
+    // Entry points (hand-off §7): Today's + is a 44 dp `accent` circle (touchTarget) with a 26 dp `add`, 8 from Week.
+    // Add event is 48 dp, radius 24, padding 0 20 0 14, a 24 dp `add` 6 from its label. Each week column ends with a
+    // 24 dp `add` hint at 50% in at least 40 dp.
+    val todayAddIcon = 26.dp
+    val todayHeaderButtonGap = 8.dp
+    val addEventHeight = 48.dp
+    val addEventRadius = 24.dp
+    val addEventPaddingStart = 14.dp
+    val addEventPaddingEnd = 20.dp
+    val addEventIcon = 24.dp
+    val addEventIconGap = 6.dp
+    val addHintIcon = 24.dp
+    val addHintMinHeight = 40.dp
+
+    /** Hand-off §7: the week column's add hint at 50%. */
+    const val ADD_HINT_ALPHA = 0.5f
 
     /** Chip tint: the person's colour at 0x2E alpha on dark, 0x26 on light. */
     const val CHIP_ALPHA_DARK = 0x2E / 255f

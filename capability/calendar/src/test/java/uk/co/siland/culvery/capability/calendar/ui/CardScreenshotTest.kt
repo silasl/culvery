@@ -46,8 +46,8 @@ class CardScreenshotTest {
         compose.onNodeWithTag("shot").captureRoboImage("src/test/screenshots/$name.png")
     }
 
-    @Test fun todayDark() = snap("today_dark", true, TALL_W, TALL_H) { TodayCard(SampleUi.today) }
-    @Test fun todayLight() = snap("today_light", false, TALL_W, TALL_H) { TodayCard(SampleUi.today) }
+    @Test fun todayDark() = snap("today_dark", true, TALL_W, TALL_H) { TodayCard(SampleUi.today, onAdd = {}) }
+    @Test fun todayLight() = snap("today_light", false, TALL_W, TALL_H) { TodayCard(SampleUi.today, onAdd = {}) }
     @Test fun todayEmptyDark() = snap("today_empty_dark", true, TALL_W, TALL_H) { TodayCard(emptyList()) }
     @Test fun comingUpDark() = snap("coming_up_dark", true, WIDE_W, WIDE_H) { ComingUpCard(SampleUi.comingUp) }
     @Test fun comingUpLight() = snap("coming_up_light", false, WIDE_W, WIDE_H) { ComingUpCard(SampleUi.comingUp) }

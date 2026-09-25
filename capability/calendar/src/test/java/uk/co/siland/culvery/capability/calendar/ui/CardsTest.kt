@@ -8,10 +8,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -141,5 +144,14 @@ class CardsTest {
         compose.onAllNodesWithContentDescription("Syncing").assertCountEquals(2)
         compose.onAllNodesWithContentDescription("Read-only calendar").assertCountEquals(1)
         compose.onAllNodesWithContentDescription("Repeats").assertCountEquals(1)
+    }
+
+    @Test
+    fun thePlusOnTodayIsA44DpCircleThatAdds() {
+        var added = 0
+        show { TodayCard(SampleUi.today, onAdd = { added++ }) }
+        compose.onNodeWithTag("today_add").assertHeightIsEqualTo(44.dp).assertWidthIsEqualTo(44.dp).performClick()
+        assertThat(added).isEqualTo(1)
+        compose.onNodeWithText("Week").assertExists()
     }
 }

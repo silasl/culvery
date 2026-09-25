@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.calendar.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,12 +14,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -28,9 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
@@ -54,11 +57,17 @@ internal fun reconnectLabel(labels: List<String>): String =
 
 /**
  * Hand-off §2 and §7: a rolling seven days from today, person-coloured chips and the sync state. There is no week
- * navigation, so the view never leaves the synced window. The legend keeps a 24 dp gap to the right edge, where
- * 2b's Add event button goes.
+ * navigation, so the view never leaves the synced window. With [onAdd] (there is a writable master calendar), Add event
+ * sits right of the legend and adds on today, and a tap on the space below a column's chips, or on its hint, adds on
+ * that column's day; chip taps still open their event. Without it, the legend keeps a 24 dp gap to the right edge.
  */
 @Composable
-fun WeekView(state: WeekViewState, modifier: Modifier = Modifier, onOpen: (EventRef) -> Unit = {}) {
+fun WeekView(
+    state: WeekViewState,
+    modifier: Modifier = Modifier,
+    onOpen: (EventRef) -> Unit = {},
+    onAdd: ((LocalDate) -> Unit)? = null,
+) {
     val c = Culvery.colors
     val navigator = LocalShellNavigator.current
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.weekHeaderGap), modifier = modifier.fillMaxSize()) {
@@ -82,7 +91,18 @@ fun WeekView(state: WeekViewState, modifier: Modifier = Modifier, onOpen: (Event
                         modifier = Modifier.testTag("week_subtitle"),
                     )
                 }
-                Legend(state.week.people, Modifier.testTag("week_legend").padding(end = CalendarDimens.headerTrailingGap))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(CalendarDimens.headerTrailingGap),
+                ) {
+                    Legend(
+                        state.week.people,
+                        Modifier
+                            .testTag("week_legend")
+                            .then(if (onAdd == null) Modifier.padding(end = CalendarDimens.headerTrailingGap) else Modifier),
+                    )
+                    if (onAdd != null) AddEventButton { onAdd(state.today) }
+                }
             }
             if (state.sync.needsSignIn.isNotEmpty()) {
                 Spacer(Modifier.height(CalendarDimens.reconnectTop))
@@ -91,17 +111,24 @@ fun WeekView(state: WeekViewState, modifier: Modifier = Modifier, onOpen: (Event
         }
         Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekColumnGap), modifier = Modifier.fillMaxWidth().weight(1f)) {
             state.week.days.forEach { day ->
-                DayColumn(day, isToday = day.date == state.today, onOpen = onOpen, modifier = Modifier.weight(1f).fillMaxHeight())
+                DayColumn(
+                    day,
+                    isToday = day.date == state.today,
+                    onOpen = onOpen,
+                    onAdd = onAdd?.let { add -> { add(day.date) } },
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
             }
         }
     }
 }
 
 @Composable
-private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, modifier: Modifier) {
+private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, onAdd: (() -> Unit)?, modifier: Modifier) {
     val c = Culvery.colors
     val shape = RoundedCornerShape(CalendarDimens.weekColumnRadius)
     val inset = CalendarDimens.columnHeaderInset
+    val chips = rememberLazyListState()
     HhCard(
         modifier = modifier
             .testTag("week_day_${day.date}")
@@ -120,12 +147,69 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
             Text(day.date.dayOfMonth.toString(), style = HhType.dateNumber, color = c.ink, modifier = Modifier.alignByBaseline())
         }
         Spacer(Modifier.height(CalendarDimens.columnGap))
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(CalendarDimens.columnGap),
-            modifier = Modifier.fillMaxWidth().weight(1f),
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .then(
+                    if (onAdd == null) {
+                        Modifier
+                    } else {
+                        // The chips take their own taps. Only the space below the last one adds: a tap in the header or
+                        // between two chips is a missed chip, not a new event (2b-2 design §4.1).
+                        Modifier.pointerInput(onAdd) {
+                            detectTapGestures { tap ->
+                                val last = chips.layoutInfo.visibleItemsInfo.lastOrNull()
+                                if (last == null || tap.y > last.offset + last.size) onAdd()
+                            }
+                        }
+                    },
+                ),
         ) {
-            items(day.events, key = { it.ref.listKey }) { EventChip(it, onOpen) }
+            LazyColumn(
+                state = chips,
+                verticalArrangement = Arrangement.spacedBy(CalendarDimens.columnGap),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                items(day.events, key = { it.ref.listKey }) { EventChip(it, onOpen) }
+            }
         }
+        if (onAdd != null) AddHint(day.date, onAdd)
+    }
+}
+
+/** Hand-off §7: a faint `add` at the foot of each column, in a tap area at least 40 dp tall. */
+@Composable
+private fun AddHint(date: LocalDate, onAdd: () -> Unit) {
+    Box(
+        contentAlignment = Alignment.BottomCenter,
+        modifier = Modifier
+            .testTag("week_add_$date")
+            .fillMaxWidth()
+            .heightIn(min = CalendarDimens.addHintMinHeight)
+            .clickable(onClickLabel = "Add event", onClick = onAdd),
+    ) {
+        HhIcon("add", size = CalendarDimens.addHintIcon, tint = Culvery.colors.mute.copy(alpha = CalendarDimens.ADD_HINT_ALPHA))
+    }
+}
+
+/** Hand-off §7: 48 dp, radius 24, `accent`, a 24 dp `add` and 15 sp / 700 in `accentInk`. */
+@Composable
+private fun AddEventButton(onClick: () -> Unit) {
+    val c = Culvery.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.addEventIconGap),
+        modifier = Modifier
+            .testTag("week_add_event")
+            .height(CalendarDimens.addEventHeight)
+            .clip(RoundedCornerShape(CalendarDimens.addEventRadius))
+            .background(c.accent)
+            .clickable(onClick = onClick)
+            .padding(start = CalendarDimens.addEventPaddingStart, end = CalendarDimens.addEventPaddingEnd),
+    ) {
+        HhIcon("add", size = CalendarDimens.addEventIcon, tint = c.accentInk)
+        Text("Add event", style = CalendarType.addEventButton, color = c.accentInk, maxLines = 1)
     }
 }
 

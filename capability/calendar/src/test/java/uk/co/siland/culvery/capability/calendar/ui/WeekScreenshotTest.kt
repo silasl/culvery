@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
+import java.time.LocalDate
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,13 +31,14 @@ private val CONTENT_H = 724.dp
 class WeekScreenshotTest {
     @get:Rule val compose = createComposeRule()
     private val now = SampleUi.NOW
+    private val addNothing: (LocalDate) -> Unit = {}
 
-    private fun snap(name: String, dark: Boolean, sync: SyncStatusUi, week: WeekUi = SampleUi.week) {
+    private fun snap(name: String, dark: Boolean, sync: SyncStatusUi, week: WeekUi = SampleUi.week, canAdd: Boolean = false) {
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
                 CulveryTheme(dark = dark) {
                     Box(Modifier.testTag("shot").background(Culvery.colors.bg).size(CONTENT_W, CONTENT_H)) {
-                        WeekView(WeekViewState(week, SampleUi.TODAY, sync, now))
+                        WeekView(WeekViewState(week, SampleUi.TODAY, sync, now), onAdd = addNothing.takeIf { canAdd })
                     }
                 }
             }
@@ -48,8 +50,8 @@ class WeekScreenshotTest {
     private val stale = fresh.copy(lastSyncMillis = now - 45 * 60_000)
     private val needsSignIn = fresh.copy(needsSignIn = listOf("Google"))
 
-    @Test fun weekDark() = snap("week_dark", true, fresh)
-    @Test fun weekLight() = snap("week_light", false, fresh)
+    @Test fun weekDark() = snap("week_dark", true, fresh, canAdd = true)
+    @Test fun weekLight() = snap("week_light", false, fresh, canAdd = true)
     @Test fun weekStaleDark() = snap("week_stale_dark", true, stale)
     @Test fun weekNeedsSignInDark() = snap("week_needs_sign_in_dark", true, needsSignIn)
     @Test fun weekSyncingDark() = snap("week_syncing_dark", true, fresh, SampleUi.weekWithSyncing)

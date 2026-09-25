@@ -12,11 +12,13 @@ import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WeekUi
 
+/** Today's rows open their event; its + adds one today, when there is a writable master calendar to add to. */
 @Composable
 internal fun TodayCardHost(repo: CalendarRepository, editor: CalendarEditor, today: LocalDate) {
     val open = rememberEventOpener(repo, editor, today)
+    val add = rememberEventAdder(repo, editor, today)
     val events: List<EventUi>? by remember(today) { repo.day(today) }.collectAsState(initial = null)
-    TodayCard(events, onOpen = open)
+    TodayCard(events, onOpen = open, onAdd = add?.let { a -> { a(null) } })
 }
 
 @Composable
@@ -25,13 +27,17 @@ internal fun ComingUpCardHost(repo: CalendarRepository, today: LocalDate) {
     ComingUpCard(days)
 }
 
-/** Today plus six days; [today] moves at midnight, so the week rolls with it. Shows nothing until both flows load. */
+/**
+ * Today plus six days; [today] moves at midnight, so the week rolls with it. Shows nothing until both flows load.
+ * Add event and the column taps show only when there is a writable master calendar to add to.
+ */
 @Composable
 internal fun WeekViewHost(repo: CalendarRepository, editor: CalendarEditor, today: LocalDate, nowMillis: Long) {
     val open = rememberEventOpener(repo, editor, today)
+    val add = rememberEventAdder(repo, editor, today)
     val week: WeekUi? by remember(today) { repo.week(today) }.collectAsState(initial = null)
     val sync: SyncStatusUi? by repo.syncStatus.collectAsState(initial = null)
     val w = week ?: return
     val s = sync ?: return
-    WeekView(WeekViewState(w, today, s, nowMillis), onOpen = open)
+    WeekView(WeekViewState(w, today, s, nowMillis), onOpen = open, onAdd = add)
 }
