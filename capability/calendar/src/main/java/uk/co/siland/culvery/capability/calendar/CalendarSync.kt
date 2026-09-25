@@ -142,7 +142,7 @@ class CalendarSync internal constructor(
 
     /** Whether the change carries what its kind needs; one that doesn't can never be sent. */
     private fun PendingChange.isComplete(): Boolean = when (kind) {
-        ChangeKind.CREATE -> draft != null
+        ChangeKind.CREATE -> draft != null && clientKey != null
         ChangeKind.UPDATE -> remoteId != null && draft != null
         ChangeKind.ASSIGN, ChangeKind.DELETE -> remoteId != null
     }
@@ -160,7 +160,9 @@ class CalendarSync internal constructor(
         val outcome = when (change.kind) {
             ChangeKind.CREATE -> {
                 val draft = checkNotNull(change.draft)
-                callWriter(io, timeoutMillis) { writer.create(conn, source, draft) }
+                val key = checkNotNull(change.clientKey)
+                // The key makes a retry safe: if an earlier attempt did create the event, the provider returns it.
+                callWriter(io, timeoutMillis) { writer.create(conn, source, draft, key) }
             }
             ChangeKind.UPDATE -> {
                 val remoteId = checkNotNull(change.remoteId)

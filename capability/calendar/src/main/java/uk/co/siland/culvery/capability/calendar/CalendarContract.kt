@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.UUID
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 
@@ -125,6 +126,12 @@ interface CalendarProvider {
 }
 
 /**
+ * A new client key: a random UUID as 32 lowercase hex digits, which is also a valid Google event id (base32hex,
+ * 5–1024 characters). The editor chooses one on each Save tap; a queued create keeps its key for every retry.
+ */
+fun newClientKey(): String = UUID.randomUUID().toString().replace("-", "")
+
+/**
  * Writes for a provider that declares Feature.WRITE. Bound `@IntoSet` beside its CalendarProvider; the engine
  * matches them by [providerId] == descriptor.id. Behaviour is pinned by the write checks in
  * CalendarProviderContractTest.
@@ -135,11 +142,14 @@ interface CalendarProvider {
  * - Stores [EventDraft.forPerson] and [EventDraft.createdBy] so that the next sync returns them unchanged.
  * - A write to a source the connection doesn't have, or can't write, throws [WriteRejectedException].
  * - [delete] of an event that no longer exists succeeds: a retried delete must not be reported as a failure.
+ * - [create] is idempotent by its client key: the writer uses the key as the event's id, so the returned remoteId
+ *   equals it, and a create with a key already used on that source returns the event that key made, never a second
+ *   one (Google: events.insert with id = clientKey; a 409 means it exists, so fetch and return it).
  */
 interface CalendarWriter {
     val providerId: String
 
-    suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft): RemoteEvent
+    suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft, clientKey: String): RemoteEvent
 
     /**
      * Changes only the title, the times and the two tags. Everything else the service holds (description,

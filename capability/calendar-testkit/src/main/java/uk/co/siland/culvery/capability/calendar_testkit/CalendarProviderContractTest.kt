@@ -13,6 +13,7 @@ import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
+import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.capability.calendar.SyncCursor
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.UnreachableException
@@ -205,7 +206,7 @@ abstract class CalendarProviderContractTest {
         val (w, source) = requireWriting()
         val before = subject.sync(conn, source, window, null)
         val draft = draftIn("Contract check", 1)
-        val created = w.create(conn, source, draft)
+        val created = w.create(conn, source, draft, newClientKey())
         assertMatches("create's result", created, draft)
         val synced = nextSyncReturns(source, before.cursor, created.remoteId)
         assertWithMessage("the next sync must return the created event").that(synced).isNotNull()
@@ -219,7 +220,7 @@ abstract class CalendarProviderContractTest {
         val first = window.start.plusDays(2)
         // Two days: the end date is exclusive, as in RemoteEvent.
         val draft = EventDraft("All-day check", EventTime.AllDay(first), EventTime.AllDay(first.plusDays(2)), "contract-for", "contract-by")
-        val created = w.create(conn, source, draft)
+        val created = w.create(conn, source, draft, newClientKey())
         assertMatches("create's result", created, draft, checkTags = false)
         val synced = nextSyncReturns(source, before.cursor, created.remoteId)
         assertWithMessage("the next sync must return the all-day event").that(synced).isNotNull()
@@ -229,7 +230,7 @@ abstract class CalendarProviderContractTest {
     @Test
     fun updatedFieldsRoundTrip() = runTest {
         val (w, source) = requireWriting()
-        val created = w.create(conn, source, draftIn("Before", 1))
+        val created = w.create(conn, source, draftIn("Before", 1), newClientKey())
         val cursor = subject.sync(conn, source, window, null).cursor
         val changed = draftIn("After", 2, forPerson = "contract-other")
         val updated = w.update(conn, source, created.remoteId, changed)
@@ -243,7 +244,7 @@ abstract class CalendarProviderContractTest {
     @Test
     fun deletedEventIsRemovedOnTheNextSync() = runTest {
         val (w, source) = requireWriting()
-        val created = w.create(conn, source, draftIn("Doomed", 1))
+        val created = w.create(conn, source, draftIn("Doomed", 1), newClientKey())
         val cursor = subject.sync(conn, source, window, null).cursor
         w.delete(conn, source, created.remoteId)
         val next = subject.sync(conn, source, window, cursor)
@@ -260,7 +261,7 @@ abstract class CalendarProviderContractTest {
     @Test
     fun deletingAnEventThatIsAlreadyGoneSucceeds() = runTest {
         val (w, source) = requireWriting()
-        val created = w.create(conn, source, draftIn("Twice", 1))
+        val created = w.create(conn, source, draftIn("Twice", 1), newClientKey())
         w.delete(conn, source, created.remoteId)
         val error = try {
             w.delete(conn, source, created.remoteId)
@@ -277,11 +278,28 @@ abstract class CalendarProviderContractTest {
         val (w, _) = requireWriting()
         val unknown = CalendarSource("contract-no-such-source", "Nowhere", writable = true)
         val error = try {
-            w.create(conn, unknown, draftIn("Lost", 1))
+            w.create(conn, unknown, draftIn("Lost", 1), newClientKey())
             null
         } catch (e: Throwable) {
             e
         }
         assertThat(error).isInstanceOf(WriteRejectedException::class.java)
+    }
+
+    /**
+     * A retried create must not make a second event: the app queues a create whose reply was lost and sends it
+     * again with the same key. The writer uses the key as the event's id (2b-2 design D5).
+     */
+    @Test
+    fun aRepeatedCreateWithTheSameKeyReturnsTheSameEvent() = runTest {
+        val (w, source) = requireWriting()
+        val key = newClientKey()
+        val draft = draftIn("Once only", 3)
+        val first = w.create(conn, source, draft, key)
+        assertWithMessage("the writer must use the client key as the event's id").that(first.remoteId).isEqualTo(key)
+        val second = w.create(conn, source, draft, key)
+        assertWithMessage("a repeated create must return the event its key made").that(second.remoteId).isEqualTo(first.remoteId)
+        val synced = subject.sync(conn, source, window, null).upserts.filter { it.title == "Once only" }
+        assertWithMessage("a repeated create must not make a second event").that(synced).hasSize(1)
     }
 }

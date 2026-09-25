@@ -244,6 +244,7 @@ class CalendarSyncTest {
 
     private val w = ScriptedWriter("calendar.a")
     private val toaster = RecordingToaster()
+    private val key = "0123456789abcdef0123456789abcdef"
 
     private suspend fun writingEngine(io: CoroutineContext = EmptyCoroutineContext, timeoutMillis: Long = 1_000): CalendarSync {
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
@@ -263,7 +264,10 @@ class CalendarSyncTest {
         sourceId: String = "s1",
         next: Instant = now,
         created: Instant = now,
-    ): Long = store.enqueue(PendingChange(0, "c1", sourceId, remoteId, kind, draft, attempts, next.toEpochMilli(), created.toEpochMilli()))
+        clientKey: String? = null,
+    ): Long = store.enqueue(
+        PendingChange(0, "c1", sourceId, remoteId, kind, draft, attempts, next.toEpochMilli(), created.toEpochMilli(), clientKey),
+    )
 
     @Test
     fun drainDeliversADueDeleteAndCompletesIt() = runTest {
@@ -294,14 +298,16 @@ class CalendarSyncTest {
     }
 
     @Test
-    fun drainDeliversACreateAndMirrorsIt() = runTest {
+    fun drainDeliversACreateWithItsKeyAndMirrorsItUnderThatKey() = runTest {
         connect("c1", "calendar.a", s1)
         val sync = writingEngine()
-        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"))
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
         a.failWith = UnreachableException("reads are down")
         sync.syncAll()
         assertThat(w.calls).containsExactly("create:Swim")
-        assertThat(store.eventNow(EventRef("c1", "s1", "new-1"))!!.forPerson).isEqualTo("mia-id")
+        assertThat(w.created.keys).containsExactly(key)
+        assertThat(store.eventNow(EventRef("c1", "s1", key))!!.forPerson).isEqualTo("mia-id")
+        assertThat(store.pendingNow()).isEmpty()
     }
 
     @Test

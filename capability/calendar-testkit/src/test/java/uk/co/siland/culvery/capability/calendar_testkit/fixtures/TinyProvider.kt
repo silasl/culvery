@@ -31,6 +31,8 @@ class TinyProvider(
     private val canWrite: Boolean = true,
     private val dropTagsOnCreate: Boolean = false,
     private val rejectMissingDelete: Boolean = false,
+    private val ignoreClientKey: Boolean = false,
+    private val duplicateOnRepeat: Boolean = false,
 ) : CalendarProvider, CalendarWriter {
     override val descriptor = ProviderDescriptor(
         "calendar.tiny",
@@ -75,10 +77,21 @@ class TinyProvider(
         return SyncResult(events, emptyList(), SyncCursor("c1"), fullReplace = !partialFirstSync)
     }
 
-    override suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft): RemoteEvent {
+    override suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft, clientKey: String): RemoteEvent {
         checkWritable(source)
+        if (!ignoreClientKey) {
+            written[clientKey]?.let { existing ->
+                if (duplicateOnRepeat) {
+                    // Broken on purpose: it answers with the event the key made, but writes a second one too.
+                    val copy = "w${++nextId}"
+                    written[copy] = existing.copy(remoteId = copy)
+                    version++
+                }
+                return existing
+            }
+        }
         val event = RemoteEvent(
-            "w${++nextId}",
+            if (ignoreClientKey) "w${++nextId}" else clientKey,
             draft.title,
             draft.start,
             draft.end,

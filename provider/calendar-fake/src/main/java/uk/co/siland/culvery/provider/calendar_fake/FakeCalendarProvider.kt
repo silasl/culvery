@@ -27,6 +27,8 @@ import uk.co.siland.culvery.core.ui.HhPillButton
 /** Gap between the ConnectScreen's buttons. */
 private val ConnectScreenButtonGap = 12.dp
 
+private const val OFFLINE_MESSAGE = "Sample calendar is offline"
+
 /**
  * Debug-only sample data matching the design hand-off, generated relative to today so it never goes stale.
  * Writes to the "Family calendar" are kept in memory, so the fake forgets them when the app restarts.
@@ -43,7 +45,6 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     private val lock = Any()
     // Everything below is guarded by lock. Every change bumps version, so the next sync is a full replace.
     private var version = 0
-    private var nextId = 0
     private var idsByName: Map<String, String> = emptyMap()
     private val created = linkedMapOf<String, RemoteEvent>()
     private val changed = mutableMapOf<String, RemoteEvent>()
@@ -106,11 +107,13 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
         return SyncResult(events.filter { range.overlaps(it.start, it.end) }, emptyList(), current, fullReplace = true)
     }
 
-    override suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft): RemoteEvent = write(source) {
-        val event = RemoteEvent("written-${++nextId}", draft.title, draft.start, draft.end, recurring = false, draft.forPerson, draft.createdBy)
-        created[event.remoteId] = event
-        event
-    }
+    override suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft, clientKey: String): RemoteEvent =
+        write(source) {
+            // The key is the event's id, so a retried create returns the event it made (CalendarWriter contract).
+            created.getOrPut(clientKey) {
+                RemoteEvent(clientKey, draft.title, draft.start, draft.end, recurring = false, draft.forPerson, draft.createdBy)
+            }
+        }
 
     override suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft): RemoteEvent =
         write(source) {
@@ -135,7 +138,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     private inline fun <T> write(source: CalendarSource, block: () -> T): T = synchronized(lock) {
         if (unreachableNext) {
             unreachableNext = false
-            throw UnreachableException("Sample calendar is offline")
+            throw UnreachableException(OFFLINE_MESSAGE)
         }
         rejectNext?.let {
             rejectNext = null

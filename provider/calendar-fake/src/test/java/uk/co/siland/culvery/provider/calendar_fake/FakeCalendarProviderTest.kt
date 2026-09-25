@@ -16,6 +16,7 @@ import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.instantIn
+import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 
@@ -203,7 +204,7 @@ class FakeCalendarProviderTest {
     fun readOnlySourcesCannotBeWritten() = runTest {
         val fake = providerOn(today)
         assertThrows(WriteRejectedException::class.java) {
-            runBlocking { fake.create(conn, source(FakeCalendarProvider.SOURCE_SCHOOL), draft("Sports day")) }
+            runBlocking { fake.create(conn, source(FakeCalendarProvider.SOURCE_SCHOOL), draft("Sports day"), newClientKey()) }
         }
     }
 
@@ -211,20 +212,31 @@ class FakeCalendarProviderTest {
     fun rejectNextWriteRejectsOnlyTheNextWrite() = runTest {
         val fake = providerOn(today)
         fake.rejectNextWrite("Event is locked")
-        val error = runCatching { fake.create(conn, family, draft("Sleepover")) }.exceptionOrNull()
+        val error = runCatching { fake.create(conn, family, draft("Sleepover"), newClientKey()) }.exceptionOrNull()
         assertThat(error).isInstanceOf(WriteRejectedException::class.java)
         assertThat(error?.message).isEqualTo("Event is locked")
-        assertThat(fake.create(conn, family, draft("Sleepover")).title).isEqualTo("Sleepover")
+        assertThat(fake.create(conn, family, draft("Sleepover"), newClientKey()).title).isEqualTo("Sleepover")
     }
 
     @Test
     fun unreachableNextWriteFailsOnlyTheNextWrite() = runTest {
         val fake = providerOn(today)
         fake.unreachableNextWrite()
-        assertThat(runCatching { fake.create(conn, family, draft("Sleepover")) }.exceptionOrNull())
+        assertThat(runCatching { fake.create(conn, family, draft("Sleepover"), newClientKey()) }.exceptionOrNull())
             .isInstanceOf(UnreachableException::class.java)
         assertThat(fake.familyEvents().map { it.title }).doesNotContain("Sleepover")
-        fake.create(conn, family, draft("Sleepover"))
+        fake.create(conn, family, draft("Sleepover"), newClientKey())
         assertThat(fake.familyEvents().map { it.title }).contains("Sleepover")
+    }
+
+    @Test
+    fun aCreateUsesItsClientKeyAsTheEventsId() = runTest {
+        val fake = providerOn(today)
+        val key = newClientKey()
+        assertThat(fake.create(conn, family, draft("Sleepover"), key).remoteId).isEqualTo(key)
+        assertThat(fake.familyEvents().single { it.title == "Sleepover" }.remoteId).isEqualTo(key)
+        // A repeated key returns the event it made.
+        assertThat(fake.create(conn, family, draft("Sleepover"), key).remoteId).isEqualTo(key)
+        assertThat(fake.familyEvents().count { it.title == "Sleepover" }).isEqualTo(1)
     }
 }
