@@ -60,6 +60,27 @@ internal object CalendarType {
 
     /** 18 sp / 700: "Delete this event?". */
     val confirmTitle = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W700)
+
+    /** 24 sp / 700: "Pick a date", "Pick a time". */
+    val pickerTitle = HhType.dateNumber
+
+    /** 15 sp / 400: the date picker's range, "Mon 21 Sep – Sun 25 Oct". */
+    val pickerRange = subtitle
+
+    /** 13 sp / 700: the date picker's weekday header. */
+    val pickerWeekday = HhType.label.copy(fontWeight = FontWeight.W700)
+
+    /** 16 sp / 600: date cells. */
+    val pickerCell = personChip
+
+    /** 16 sp / 700: Cancel and Set time. */
+    val pickerButton = noteTitle
+
+    /** 72 sp / 600, tabular, −2 tracking, line height 1: the time picker's hour and minute. */
+    val timeValue = HhType.headerValue.copy(fontSize = 72.sp, letterSpacing = (-2).sp, lineHeight = 72.sp)
+
+    /** 64 sp / 600: the ":" between them. */
+    val timeColon = HhType.headerValue.copy(fontSize = 64.sp)
 }
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */
@@ -201,6 +222,42 @@ internal object CalendarDimens {
     val confirmPadding = 20.dp
     val confirmGap = 16.dp
     val confirmButtonGap = 12.dp
+
+    // Pickers (hand-off §7 and Culvery.dc.html): card `surf`, radius 30, padding 26. Date: 520 wide, 14 between blocks,
+    // the range 4 below "Pick a date", ‹ › 48 dp circles 8 apart; weekday header padding 4; cells 56 dp, radius 16,
+    // 6 apart, today's ring 2 dp; Cancel 52 dp, radius 26. Time: 440 wide, 18 between blocks; the columns 14 apart;
+    // steppers 88×52, radius 18, a 32 dp icon, 8 from the value; ":" 10 above the baseline; Cancel and Set time
+    // 56 dp, radius 28, 10 apart.
+    val pickerRadius = 30.dp
+    val pickerPadding = 26.dp
+    val datePickerWidth = 520.dp
+    val datePickerGap = 14.dp
+    val pickerRangeTop = 4.dp
+    val pageButton = 48.dp
+    val pageButtonIcon = 24.dp
+    val pageButtonGap = 8.dp
+    val weekdayPaddingV = 4.dp
+    val dateCellHeight = 56.dp
+    val dateCellRadius = 16.dp
+    val dateCellGap = 6.dp
+    val dateRing = 2.dp
+    val pickerCancelHeight = 52.dp
+    val pickerCancelRadius = 26.dp
+    val timePickerWidth = 440.dp
+    val timePickerGap = 18.dp
+    val timeColumnGap = 14.dp
+    val stepperWidth = 88.dp
+    val stepperHeight = 52.dp
+    val stepperRadius = 18.dp
+    val stepperIcon = 32.dp
+    val stepperGap = 8.dp
+    val colonBottom = 10.dp
+    val timeButtonHeight = 56.dp
+    val timeButtonRadius = 28.dp
+    val timeButtonGap = 10.dp
+
+    /** Hand-off §7: past days in the date picker at 30%. */
+    const val PAST_DAY_ALPHA = 0.3f
 
     /** Chip tint: the person's colour at 0x2E alpha on dark, 0x26 on light. */
     const val CHIP_ALPHA_DARK = 0x2E / 255f
