@@ -47,4 +47,24 @@ class CalendarPermissionsTest {
         assertThat(cannotChangeOthers("Mia")).isEqualTo("Mia can only change events they created.")
         assertThat(ASK_AN_ADULT).isEqualTo("Ask an adult to assign this event.")
     }
+
+    @Test
+    fun createAddsForAnyoneAndCreateSelfOnlyForYourself() {
+        assertThat(mayCreateFor(setOf(CalendarPermissions.CREATE), mia, PersonId.FAMILY.value)).isTrue()
+        assertThat(mayCreateFor(setOf(CalendarPermissions.CREATE_SELF), mia, "mia")).isTrue()
+        assertThat(mayCreateFor(setOf(CalendarPermissions.CREATE_SELF), mia, PersonId.FAMILY.value)).isFalse()
+        assertThat(mayCreateFor(setOf(CalendarPermissions.CREATE_SELF), mia, null)).isFalse()
+    }
+
+    @Test
+    fun changingWhoNeedsAssignOrTheAddRule() {
+        assertThat(mayRetag(setOf(CalendarPermissions.ASSIGN), mia, PersonId.FAMILY.value)).isTrue()
+        assertThat(mayRetag(setOf(CalendarPermissions.EDIT_OWN, CalendarPermissions.CREATE_SELF), mia, "mia")).isTrue()
+        assertThat(mayRetag(setOf(CalendarPermissions.EDIT_OWN, CalendarPermissions.CREATE_SELF), mia, PersonId.FAMILY.value)).isFalse()
+    }
+
+    @Test
+    fun theAddRefusalNamesThePerson() {
+        assertThat(cannotAddForOthers("Mia")).isEqualTo("Mia can only add events for themselves.")
+    }
 }

@@ -30,7 +30,19 @@ internal fun mayChange(granted: Set<String>, who: Identified, createdBy: String?
     CalendarPermissions.EDIT in granted ||
         (CalendarPermissions.EDIT_OWN in granted && createdBy == who.person.id.value)
 
+/** Adding needs create, or create.self for an event that is for this person (2b-2 design D7). */
+internal fun mayCreateFor(granted: Set<String>, who: Identified, forPerson: String?): Boolean =
+    CalendarPermissions.CREATE in granted ||
+        (CalendarPermissions.CREATE_SELF in granted && forPerson == who.person.id.value)
+
+/** An edit that changes who follows the add rule (2b-2 design §6): assign or create may tag anyone. */
+internal fun mayRetag(granted: Set<String>, who: Identified, forPerson: String?): Boolean =
+    CalendarPermissions.ASSIGN in granted || mayCreateFor(granted, who, forPerson)
+
 /** Hand-off §7 refusal wording. */
 fun cannotChangeOthers(name: String): String = "$name can only change events they created."
+
+/** Hand-off §7 refusal wording for a child adding an event for someone else, or moving one to someone else. */
+fun cannotAddForOthers(name: String): String = "$name can only add events for themselves."
 
 const val ASK_AN_ADULT = "Ask an adult to assign this event."
