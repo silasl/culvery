@@ -236,12 +236,14 @@ class CalendarSetupTest {
     }
 
     @Test
-    fun anUnknownProviderIsAFailedConnectNotACrash() = runTest {
+    fun anUnknownProviderIsNamedByItsConnectionLabelNotACrash() = runTest {
+        // calendar.google isn't installed (only calendar.a is): the toast falls back to the connection's own label
+        // ("Google"), never the raw provider id, and the setup itself doesn't crash.
         assertThat(setup(setOf(provider)).connectWithDefaults(googleConnection)).isFalse()
         assertThat(setup(setOf(provider)).reconnect(googleConnection)).isFalse()
         assertThat(store.connectionsNow()).isEmpty()
         assertThat(toaster.messages).containsExactly(
-            "Couldn't connect to calendar.google — try again", "Couldn't connect to calendar.google — try again",
+            "Couldn't connect to Google — try again", "Couldn't connect to Google — try again",
         )
     }
 

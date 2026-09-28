@@ -98,9 +98,9 @@ class CalendarSetup(
         }
         if (stored) {
             requestSync()
-            toaster.show(connected(serviceName(connection)))
+            toaster.show(connected(serviceNameOf(connection, providers::displayNameOf)))
         } else {
-            toaster.show(couldNotConnect(serviceName(connection)))
+            toaster.show(couldNotConnect(serviceNameOf(connection, providers::displayNameOf)))
         }
         stored
     }
@@ -122,9 +122,9 @@ class CalendarSetup(
         }
         if (recorded) {
             requestSync()
-            toaster.show(reconnected(serviceName(connection)))
+            toaster.show(reconnected(serviceNameOf(connection, providers::displayNameOf)))
         } else {
-            toaster.show(couldNotConnect(serviceName(connection)))
+            toaster.show(couldNotConnect(serviceNameOf(connection, providers::displayNameOf)))
         }
         return recorded
     }
@@ -159,10 +159,6 @@ class CalendarSetup(
 
     /** Asks the sync loop for a pass now. */
     fun syncSoon() = requestSync()
-
-    /** The provider's display name for the toasts; its id if it isn't installed. */
-    private fun serviceName(connection: Connection): String =
-        providers.firstOrNull { it.descriptor.id == connection.providerId }?.descriptor?.displayName ?: connection.providerId
 
     private fun providerFor(providerId: String): CalendarProvider =
         providers.firstOrNull { it.descriptor.id == providerId } ?: throw IllegalArgumentException("No calendar provider $providerId")
