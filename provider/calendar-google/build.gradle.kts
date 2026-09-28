@@ -13,6 +13,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.play.services.auth)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.androidx.activity.compose)
     testImplementation(project(":capability:calendar-testkit"))
     testImplementation(libs.okhttp.mockwebserver)
 }
