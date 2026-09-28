@@ -452,6 +452,21 @@ class CalendarStoreTest {
     }
 
     @Test
+    fun aRefreshForARemovedConnectionWritesNothing() = runTest {
+        connect("s1")
+        store.removeConnection("c1")
+        assertThat(store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 5_000L, mapping("mia"))).isFalse()
+        assertThat(store.sources().first()).isEmpty()
+    }
+
+    @Test
+    fun aDuplicatedSourceIdInTheProviderListIsAddedOnce() = runTest {
+        connect("s1")
+        store.refreshSources("c1", listOf(listed("s1"), listed("s2"), listed("s2")), 5_000L, mapping("mia"))
+        assertThat(store.sources().first().map { it.source.id }).containsExactly("s1", "s2")
+    }
+
+    @Test
     fun makeDueBringsAConnectionsQueueDueWithoutCountingAnAttempt() = runTest {
         connect("s1")
         store.enqueue(change(ChangeKind.DELETE, draft = null, next = 90_000L, attempts = 3))
@@ -517,6 +532,22 @@ class CalendarStoreTest {
         store.enqueue(change(ChangeKind.DELETE, draft = null).copy(createdMillis = 1_000L))
         store.markSynced("c1", 10_000L)
         assertThat(store.pendingNow().single().createdMillis).isEqualTo(1_000L)
+    }
+
+    @Test
+    fun aPauseEndingBeforeItBeganMovesNoRow() = runTest {
+        connect("s1")
+        store.enqueue(change(ChangeKind.DELETE, draft = null).copy(createdMillis = 1_000L))
+        store.setHealth("c1", ConnectionHealth.NeedsSignIn, 10_000L)
+        // The wall clock stepped back.
+        store.setHealth("c1", ConnectionHealth.Ok, 5_000L)
+        assertThat(store.pendingNow().single().createdMillis).isEqualTo(1_000L)
+    }
+
+    @Test
+    fun ageMillisIsNeverNegative() {
+        val change = change(ChangeKind.DELETE, draft = null).copy(createdMillis = 5_000L)
+        assertThat(ageMillis(change, pausedSince = null, nowMillis = 1_000L)).isEqualTo(0L)
     }
 
     @Test

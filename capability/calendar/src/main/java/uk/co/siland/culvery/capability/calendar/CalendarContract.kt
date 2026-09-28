@@ -35,6 +35,9 @@ data class CalendarSource(
     val primary: Boolean = false,
 )
 
+/** Whether the tablet shows this source: the primary always, any other as it is ticked in the service. */
+internal val CalendarSource.visibleOnTablet: Boolean get() = shown || primary
+
 /** The [Connection.config] key a provider stores the signed-in account under; Settings shows it ("Google Calendar · {account}"). */
 const val CONFIG_ACCOUNT = "account"
 

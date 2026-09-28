@@ -79,7 +79,7 @@ class CalendarStore @Inject constructor(private val db: CalendarDatabase) {
      * Follows the provider's list of [sources] (3a design §3.4), in one transaction: a new source is added with
      * [mappingForNew]; an existing one keeps its person and takes the listed name, writability and visibility (the
      * primary stays visible); one no longer listed goes with its events, cursor and queued changes. Returns true when
-     * the master went, or became read-only, and was cleared.
+     * the master went, or became read-only, and was cleared. Writes nothing once the connection is gone.
      */
     suspend fun refreshSources(
         connectionId: String,
@@ -87,20 +87,23 @@ class CalendarStore @Inject constructor(private val db: CalendarDatabase) {
         nowMillis: Long,
         mappingForNew: (CalendarSource) -> SourceMapping,
     ): Boolean = db.withTransaction {
+        // Removed while the provider was being read: no orphan sources.
+        dao.connection(connectionId) ?: return@withTransaction false
         val stored = dao.sources(connectionId).associateBy { it.sourceId }
-        val listed = sources.associateBy { it.id }
+        // A repeated id would break the insert's primary key on every pass.
+        val listed = sources.distinctBy { it.id }.associateBy { it.id }
         var masterCleared = false
         stored.values.filter { it.sourceId !in listed }.forEach { gone ->
             if (gone.isMaster) masterCleared = true
             removeSourceRows(connectionId, gone.sourceId)
         }
-        sources.forEach { s ->
+        listed.values.forEach { s ->
             val existing = stored[s.id]
             if (existing == null) {
                 val m = mappingForNew(s)
                 dao.insertSources(listOf(SourceEntity(connectionId, s.id, s.name, s.writable, m.visible, m.person.value)))
             } else {
-                dao.updateSource(connectionId, s.id, s.name, s.writable, visible = s.shown || s.primary)
+                dao.updateSource(connectionId, s.id, s.name, s.writable, visible = s.visibleOnTablet)
                 if (existing.isMaster && !s.writable) {
                     dao.clearMaster()
                     masterCleared = true

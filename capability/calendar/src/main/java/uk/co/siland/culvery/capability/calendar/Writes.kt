@@ -25,7 +25,7 @@ const val OUTBOX_MAX_AGE_MS = 48 * 60 * 60_000L
  */
 internal fun ageMillis(change: PendingChange, pausedSince: Long?, nowMillis: Long): Long {
     val running = pausedSince?.let { (nowMillis - maxOf(it, change.createdMillis)).coerceAtLeast(0) } ?: 0L
-    return nowMillis - change.createdMillis - running
+    return (nowMillis - change.createdMillis - running).coerceAtLeast(0)
 }
 
 /** Why a change to an event that is gone is refused; public so providers refuse with the same words. */
