@@ -106,7 +106,7 @@ class SampleAddTest {
         )
         val lock = CalendarWriteLock()
         val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, clock, lock, SourceRefresher(store, household, clock, toasts))
-        val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, backgroundScope), lock, household)
+        val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, backgroundScope), lock, household, setOf(fake))
         val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake))
         sync.syncAll()
 

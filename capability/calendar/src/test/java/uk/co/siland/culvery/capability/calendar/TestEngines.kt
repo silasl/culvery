@@ -24,7 +24,9 @@ internal fun testEditor(
     io: CoroutineContext = EmptyCoroutineContext,
     writeLock: CalendarWriteLock = CalendarWriteLock(),
     personOf: suspend (PersonId) -> Person? = { null },
-): CalendarEditor = CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, personOf)
+    serviceOf: (providerId: String) -> String? = { null },
+): CalendarEditor =
+    CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, personOf, serviceOf)
 
 internal fun testSync(
     store: CalendarStore,

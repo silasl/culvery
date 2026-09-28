@@ -9,6 +9,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import uk.co.siland.culvery.core.plugin.Connection
 
 /** Waits after the nth failed attempt: 30 s, 1 min, 2 min, then 5 min. */
 val OUTBOX_BACKOFF_MS: List<Long> = listOf(30_000L, 60_000L, 120_000L, 300_000L)
@@ -129,6 +130,17 @@ fun couldNotSave(label: String, reason: String?): String =
 /** One toast for everything a drain pass dropped for [label]; [reasons] has one entry per change. */
 internal fun couldNotSaveAll(label: String, reasons: List<String?>): String =
     if (reasons.size == 1) couldNotSave(label, reasons.single()) else "Couldn't save ${reasons.size} changes to $label"
+
+/**
+ * The name failure, repeating-event and delete copy use for [connection] (3a design D11): its provider's display name
+ * ("Google Calendar"), or its label when the provider isn't installed.
+ */
+internal fun serviceNameOf(connection: Connection, displayNameOf: (providerId: String) -> String?): String =
+    displayNameOf(connection.providerId) ?: connection.label
+
+/** [providerId]'s display name among these providers; null when it isn't installed. */
+internal fun Set<CalendarProvider>.displayNameOf(providerId: String): String? =
+    firstOrNull { it.descriptor.id == providerId }?.descriptor?.displayName
 
 /** An assign as it is sent: the event's current title, times and creator, with the new person and their colour. */
 internal fun assignDraft(event: StoredEvent, forPerson: String?, forPersonColor: Long?): EventDraft =

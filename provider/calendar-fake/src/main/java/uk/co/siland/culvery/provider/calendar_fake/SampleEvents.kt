@@ -15,6 +15,9 @@ import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider.Companio
  * "family". Plumber quote call has no tags, as if added from a phone. INSET day comes from the read-only school feed.
  */
 internal object SampleEvents {
+    // So the debug build's Repeats row reads "Every week", as Google's would.
+    private const val WEEKLY_RULE = "RRULE:FREQ=WEEKLY"
+
     private class Timed(
         val id: String,
         val source: String,
@@ -92,6 +95,7 @@ internal object SampleEvents {
                             recurring = e.weekly,
                             forPerson = tag(e.forName, idsByName),
                             createdBy = tag(e.byName, idsByName),
+                            recurrenceRule = if (e.weekly) WEEKLY_RULE else null,
                         ),
                     )
                 }
@@ -108,6 +112,7 @@ internal object SampleEvents {
                             recurring = e.weekly,
                             forPerson = tag(e.forName, idsByName),
                             createdBy = tag(e.byName, idsByName),
+                            recurrenceRule = if (e.weekly) WEEKLY_RULE else null,
                         ),
                     )
                 }

@@ -85,6 +85,7 @@ class CalendarEditor internal constructor(
     private val attemptMillis: Long,
     private val writeLock: CalendarWriteLock,
     private val personOf: suspend (PersonId) -> Person?,
+    private val serviceOf: (providerId: String) -> String?,
 ) {
     @Inject
     constructor(
@@ -98,9 +99,10 @@ class CalendarEditor internal constructor(
         loop: CalendarSyncLoop,
         writeLock: CalendarWriteLock,
         household: HouseholdRepository,
+        providers: Set<@JvmSuppressWildcards CalendarProvider>,
     ) : this(
         store, writers, access, toaster, zone, clock, scope, loop::requestSync, Dispatchers.IO, WRITE_ATTEMPT_MS, writeLock,
-        household::person,
+        household::person, providers::displayNameOf,
     )
 
     /** Who is signed in now: the add/edit sheet's Who default and its disabled chips (2b-2 design D2). */
@@ -160,7 +162,7 @@ class CalendarEditor internal constructor(
             refusal = Refusal.Toast(::cannotAddForOthers),
         ) ?: return EditResult.Cancelled
         val toSend = draft.copy(createdBy = who.person.id.value, forPersonColor = colorOf(draft.forPerson))
-        return onAppScope(ChangeKind.CREATE, to.connection.label) {
+        return onAppScope(ChangeKind.CREATE, serviceNameOf(to.connection, serviceOf)) {
             writeLock.withLock { attempt(to, ChangeKind.CREATE, remoteId = null, toSend, clientKey = clientKey) }
         }
     }
@@ -278,7 +280,7 @@ class CalendarEditor internal constructor(
         forPerson: String? = null,
         edit: EventDraft? = null,
         fields: Set<EventField>? = null,
-    ): EditResult = onAppScope(kind, target.to.connection.label) {
+    ): EditResult = onAppScope(kind, serviceNameOf(target.to.connection, serviceOf)) {
         writeLock.withLock {
             val ref = target.event.ref
             val pending = store.pendingNow().filter { it.ref == ref }

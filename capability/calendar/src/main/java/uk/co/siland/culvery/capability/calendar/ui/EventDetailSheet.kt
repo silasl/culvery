@@ -87,7 +87,7 @@ fun EventDetailSheet(
             e.readOnlyReason == ReadOnlyReason.Recurring -> Note(
                 icon = "event_repeat",
                 title = "Repeating event",
-                body = "Edit repeating events in ${e.connectionLabel} on your phone.",
+                body = "Edit repeating events in ${e.serviceName} on your phone.",
             )
             e.untagged -> Note(
                 icon = "smartphone",
@@ -186,7 +186,7 @@ private fun InfoCard(detail: EventDetailUi) {
         InfoRow("calendar_month", "Calendar") { Value(calendarLabel(e)) }
         if (e.recurring) {
             Divider()
-            InfoRow("repeat", "Repeats") { Value("Yes") }
+            InfoRow("repeat", "Repeats") { Value(e.repeats) }
         }
     }
 }
@@ -295,7 +295,7 @@ private fun DeleteConfirmation(e: EventUi, busy: Boolean, onKeep: () -> Unit, on
             Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.noteTextGap)) {
                 Text("Delete this event?", style = CalendarType.confirmTitle, color = c.ink)
                 Text(
-                    "“${e.title}” will be removed from ${e.connectionLabel} for everyone.",
+                    "“${e.title}” will be removed from ${e.serviceName} for everyone.",
                     style = CalendarType.noteBody,
                     color = c.mute,
                 )

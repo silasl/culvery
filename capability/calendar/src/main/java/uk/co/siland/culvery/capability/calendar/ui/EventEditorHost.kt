@@ -39,7 +39,7 @@ sealed interface EditorRequest {
 private class Opened(val request: EditorRequest, val form: EventForm?, val label: String)
 
 private suspend fun open(request: EditorRequest, repo: CalendarRepository, editor: CalendarEditor): Opened {
-    val label = repo.masterLabel.first() ?: return Opened(request, null, "")
+    val label = repo.masterService.first() ?: return Opened(request, null, "")
     val at = editor.openedAt()
     val mode = when (request) {
         is EditorRequest.New -> EventForm.Mode.New
@@ -165,7 +165,7 @@ internal fun EventEditorHost(
 @Composable
 internal fun rememberEventAdder(repo: CalendarRepository, editor: CalendarEditor, today: LocalDate): ((LocalDate?) -> Unit)? {
     val overlay = LocalOverlayHost.current
-    val addTo: String? by repo.masterLabel.collectAsState(initial = null)
+    val addTo: String? by repo.masterService.collectAsState(initial = null)
     val add: (LocalDate?) -> Unit = remember(overlay, repo, editor, today) {
         { day -> overlay.showEditor(EditorRequest.New(day), today, repo, editor) }
     }

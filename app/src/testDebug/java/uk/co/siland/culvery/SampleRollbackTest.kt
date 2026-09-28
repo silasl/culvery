@@ -93,6 +93,6 @@ class SampleRollbackTest {
         fake.rejectNextWrite("Boiler service is locked")
         sync.syncAll()
         assertThat(repo.day(today).first().map { it.title }).contains("Boiler service")
-        assertThat(toasts.messages).containsExactly("Couldn't save to Sample calendar — Boiler service is locked")
+        assertThat(toasts.messages).containsExactly("Couldn't save to Sample calendar (debug) — Boiler service is locked")
     }
 }

@@ -405,14 +405,14 @@ class CalendarRepositoryTest {
     }
 
     @Test
-    fun theMasterLabelNamesWhereNewEventsGo() = runTest {
-        assertThat(repo.masterLabel.first()).isEqualTo("Google")
+    fun theMasterServiceNamesWhereNewEventsGo() = runTest {
+        assertThat(repo.masterService.first()).isEqualTo("Google")
     }
 
     @Test
     fun thereIsNowhereToAddWithoutAWriterForTheMaster() = runTest {
         val readOnly = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet())
-        assertThat(readOnly.masterLabel.first()).isNull()
+        assertThat(readOnly.masterService.first()).isNull()
     }
 
     @Test
@@ -463,5 +463,17 @@ class CalendarRepositoryTest {
     @Test
     fun peopleListsTheHousehold() = runTest {
         assertThat(repo.people.first().map { it.name }).containsExactly("Alex", "Sam").inOrder()
+    }
+
+    @Test
+    fun eventsNameTheirServiceAndSayHowTheyRepeat() = runTest {
+        val google = ScriptedProvider("calendar.test", displayName = "Google Calendar")
+        val named = CalendarRepository(store, household, HouseholdZone(household), setOf(google), setOf(ScriptedWriter("calendar.test")))
+        put("s-family", timed("Piano", 23, 15, 30, 60).copy(recurring = true, recurrenceRule = "RRULE:FREQ=WEEKLY"))
+        val piano = named.day(LocalDate.of(2026, 9, 23)).first().single { it.title == "Piano" }
+        assertThat(piano.serviceName).isEqualTo("Google Calendar")
+        assertThat(piano.connectionLabel).isEqualTo("Google")
+        assertThat(piano.repeats).isEqualTo("Every week")
+        assertThat(named.masterService.first()).isEqualTo("Google Calendar")
     }
 }

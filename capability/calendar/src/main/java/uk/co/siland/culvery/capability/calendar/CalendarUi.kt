@@ -31,6 +31,8 @@ data class EventUi(
     val sourceName: String = "",
     /** The connection's label ("Google", "Sample calendar"): where changes are sent. */
     val connectionLabel: String = "",
+    /** The service's name ("Google Calendar"): failure, repeating-event and delete copy (3a design D11). */
+    val serviceName: String = "",
     /** Null when the tablet may change this event: a non-recurring event on the master calendar. */
     val readOnlyReason: ReadOnlyReason? = null,
     /** On the master calendar with no person tags at all: added from a phone (hand-off "untagged"). */
@@ -39,6 +41,8 @@ data class EventUi(
     val syncing: Boolean = false,
     /** A person's name, [ADDED_FROM_PHONE] or [CALENDAR_FEED]. */
     val createdBy: String = "",
+    /** The Repeats row: "Every week"… or "Yes" (3a design D12). */
+    val repeats: String = REPEATS_YES,
 ) {
     val editable: Boolean get() = readOnlyReason == null
 }
@@ -182,14 +186,22 @@ private fun StoredEvent.sliceOn(date: LocalDate, zone: ZoneId): Slice {
     }
 }
 
-/** Sources, connection labels and which providers can write: what the UI needs beyond the event row. */
-internal class SourceCatalog(sources: List<StoredSource>, connections: List<StoredConnection>, private val writerIds: Set<String>) {
+/** Sources, connection labels, service names and which providers can write: what the UI needs beyond the event row. */
+internal class SourceCatalog(
+    sources: List<StoredSource>,
+    connections: List<StoredConnection>,
+    private val writerIds: Set<String>,
+    private val serviceNames: Map<String, String> = emptyMap(),
+) {
     private val sources = sources.associateBy { it.connectionId to it.source.id }
     private val connections = connections.associate { it.connection.id to it.connection }
 
     fun source(connectionId: String, sourceId: String): StoredSource? = sources[connectionId to sourceId]
 
     fun label(connectionId: String): String = connections[connectionId]?.label.orEmpty()
+
+    /** The provider's display name; the connection label when the provider isn't installed. */
+    fun serviceName(connectionId: String): String = connections[connectionId]?.let { serviceNameOf(it, serviceNames::get) }.orEmpty()
 
     fun hasWriter(connectionId: String): Boolean = connections[connectionId]?.providerId in writerIds
 }
@@ -221,9 +233,11 @@ internal fun StoredEvent.toUi(
         startSort = startSort,
         sourceName = source?.source?.name.orEmpty(),
         connectionLabel = catalog.label(connectionId),
+        serviceName = catalog.serviceName(connectionId),
         readOnlyReason = readOnlyReason(this, source, catalog.hasWriter(connectionId)),
         untagged = source?.isMaster == true && source.source.writable && forPerson == null && createdBy == null,
         syncing = syncing,
         createdBy = createdByLabel(createdBy, source, people),
+        repeats = repeatsLabel(recurrenceRule, start, zone),
     )
 }

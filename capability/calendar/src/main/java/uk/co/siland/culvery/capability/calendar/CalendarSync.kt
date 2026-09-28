@@ -122,7 +122,8 @@ class CalendarSync internal constructor(
             for (change in store.pendingNow()) {
                 val ref = change.ref
                 val stored = byId[change.connectionId]
-                val label = stored?.connection?.label ?: REMOVED_CALENDAR
+                // The service's name ("Google Calendar", 3a design D11); the label if its provider isn't installed.
+                val label = stored?.connection?.let { serviceNameOf(it, providers::displayNameOf) } ?: REMOVED_CALENDAR
                 // Already deleted, and counted, with its create.
                 if (ref != null && ref in droppedCreates) continue
                 val blockedUntil = ref?.let(blockedRefs::get)

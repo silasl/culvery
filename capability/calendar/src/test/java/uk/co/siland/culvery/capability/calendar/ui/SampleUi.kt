@@ -88,7 +88,7 @@ object SampleUi {
     val household = listOf(alex, sam, mia)
 
     private fun EventUi.onFamilyCalendar(createdBy: String) =
-        copy(sourceName = "Family calendar", connectionLabel = "Sample calendar", createdBy = createdBy)
+        copy(sourceName = "Family calendar", connectionLabel = "Sample calendar", serviceName = "Google Calendar", createdBy = createdBy)
 
     /** Hand-off 03. */
     val detailEditable = EventDetailUi(event("Dinner with Jo & Priya", "19:30–21:00", alex).onFamilyCalendar("Alex"), "Today · 19:30–21:00")
@@ -105,7 +105,10 @@ object SampleUi {
     )
 
     /** Hand-off 05. */
-    val detailRecurring = EventDetailUi(event("Swimming", "16:00–17:00", mia, recurring = true).onFamilyCalendar("Sam"), "Today · 16:00–17:00")
+    val detailRecurring = EventDetailUi(
+        event("Swimming", "16:00–17:00", mia, recurring = true).onFamilyCalendar("Sam").copy(repeats = "Every week"),
+        "Today · 16:00–17:00",
+    )
 
     /** Hand-off 06. */
     val detailUntagged = EventDetailUi(

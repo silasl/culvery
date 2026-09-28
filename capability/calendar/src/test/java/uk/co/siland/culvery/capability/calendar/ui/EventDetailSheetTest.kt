@@ -76,7 +76,8 @@ class EventDetailSheetTest {
     fun aRepeatingEventPointsToThePhoneAndShowsRepeats() {
         show(SampleUi.detailRecurring)
         compose.onNodeWithText("Repeating event").assertExists()
-        compose.onNodeWithText("Edit repeating events in Sample calendar on your phone.").assertExists()
+        compose.onNodeWithText("Edit repeating events in Google Calendar on your phone.").assertExists()
+        compose.onNodeWithText("Every week").assertExists()
         compose.onNodeWithText("Repeats").assertExists()
         compose.onNodeWithTag("detail_delete").assertDoesNotExist()
         compose.onNodeWithTag("detail_edit").assertDoesNotExist()
@@ -125,7 +126,7 @@ class EventDetailSheetTest {
         val delete = compose.onNodeWithTag("detail_delete").getUnclippedBoundsInRoot()
         mode = DetailMode.ConfirmingDelete
         compose.onNodeWithText("Delete this event?").assertExists()
-        compose.onNodeWithText("“Dinner with Jo & Priya” will be removed from Sample calendar for everyone.").assertExists()
+        compose.onNodeWithText("“Dinner with Jo & Priya” will be removed from Google Calendar for everyone.").assertExists()
         compose.onNodeWithTag("detail_delete").assertDoesNotExist()
         compose.onNodeWithTag("detail_edit").assertDoesNotExist()
         val keep = compose.onNodeWithTag("detail_keep").getUnclippedBoundsInRoot()

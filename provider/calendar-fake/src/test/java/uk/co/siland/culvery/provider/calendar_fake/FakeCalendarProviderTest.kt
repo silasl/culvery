@@ -286,6 +286,13 @@ class FakeCalendarProviderTest {
     }
 
     @Test
+    fun weeklySamplesCarryTheirRule() = runTest {
+        val events = providerOn(today).familyEvents()
+        assertThat(events.first { it.title == "Piano" }.recurrenceRule).isEqualTo("RRULE:FREQ=WEEKLY")
+        assertThat(events.first { it.title == "Boiler service" }.recurrenceRule).isNull()
+    }
+
+    @Test
     fun aKeyWhoseEventWasDeletedIsRefused() = runTest {
         val fake = providerOn(today)
         val key = newClientKey()

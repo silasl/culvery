@@ -27,6 +27,7 @@ class CalendarRepository @Inject constructor(
     writers: Set<@JvmSuppressWildcards CalendarWriter>,
 ) {
     private val writerIds = writers.map { it.providerId }.toSet()
+    private val serviceNames = providers.associate { it.descriptor.id to it.descriptor.displayName }
 
     init {
         providers
@@ -49,15 +50,15 @@ class CalendarRepository @Inject constructor(
     }.distinctUntilChanged()
 
     /**
-     * The connection label of the writable master calendar, where new events go; null when there is nowhere to add
-     * (no master, or its provider binds no writer), which hides the add entry points (2b-2 design §4.1).
+     * The service name of the writable master calendar, where new events go (the connection label if its provider isn't
+     * installed); null when there is nowhere to add, which hides the add entry points (2b-2 design §4.1).
      */
-    val masterLabel: Flow<String?> = combine(store.master(), store.connections()) { master, connections ->
-        writableMaster(master, connections, writerIds)?.connection?.label
+    val masterService: Flow<String?> = combine(store.master(), store.connections()) { master, connections ->
+        writableMaster(master, connections, writerIds)?.connection?.let { serviceNameOf(it, serviceNames::get) }
     }.distinctUntilChanged()
 
     private val catalog: Flow<SourceCatalog> =
-        combine(store.sources(), store.connections()) { sources, connections -> SourceCatalog(sources, connections, writerIds) }
+        combine(store.sources(), store.connections()) { sources, connections -> SourceCatalog(sources, connections, writerIds, serviceNames) }
 
     fun day(date: LocalDate): Flow<List<EventUi>> = days(date, 1).map { it.single().events }
 
