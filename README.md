@@ -17,7 +17,9 @@ Requirements: JDK 17, Android SDK platform 35.
 
 Use `testDebugUnitTest`, not `test` — release unit tests don't include the Compose test activity.
 
-Debug builds seed a sample household on first launch so the app is usable before the setup wizard exists: **Alex** (Admin, PIN 1234), **Sam** (Adult, PIN 2468) and **Mia** (Child, PIN 1357), plus a "Sample calendar" connection showing the design hand-off's week. Its "Family calendar" is the household's master calendar, so its events can be deleted and assigned on the tablet. The sample calendar keeps changes in memory and forgets them when the app restarts. People are only seeded when there is no Admin with a PIN; an install carried over from an earlier build (Plan 1 or 2a) also keeps its stored calendar names, so the sample calendar may show "Family" instead of "Family calendar" — clear the app's data (`adb shell pm clear uk.co.siland.culvery`) for a clean sample. Release builds seed nothing and include no sample calendar.
+Debug builds seed a sample household on first launch so the app is usable before the setup wizard exists: **Alex** (Admin, PIN 1234), **Sam** (Adult, PIN 2468) and **Mia** (Child, PIN 1357), plus a "Sample calendar" connection showing the design hand-off's week. Its "Family calendar" is the household's master calendar, so events can be added there, and its events edited, deleted and assigned, on the tablet. The sample calendar keeps changes in memory and forgets them when the app restarts. People are only seeded when there is no Admin with a PIN; an install carried over from an earlier build (Plan 1 or 2a) also keeps its stored calendar names, so the sample calendar may show "Family" instead of "Family calendar" — clear the app's data (`adb shell pm clear uk.co.siland.culvery`) for a clean sample. Release builds seed nothing and include no sample calendar.
+
+To see what the tablet does while a calendar can't be reached, a debug build can take the sample calendar offline and bring it back: `adb shell am broadcast -n uk.co.siland.culvery/.DebugOfflineReceiver --ez offline true` (or `false`). Changes made meanwhile show as syncing and are sent once it is back. This switch is debug-only and reached only over adb; it has no counterpart in the app's UI.
 
 ## Screenshot tests
 
@@ -42,7 +44,7 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 | `:core:plugin` | `Capability`, `HomeCard`, `ProviderDescriptor`, `Connection`, `ConnectionHealth`, `ShellNavigator`, `OverlayHost`, `Toaster`, `Startable` |
 | `:core:household` | People (with role and PIN hash), Family, home location — `household.db` |
 | `:core:access` | Permissions, PIN hashing, lockout, 2-minute session, PIN pad |
-| `:capability:calendar` | Calendar contract (read and write), `calendar.db` cache and outbox, 5-minute sync, event editor, Home cards, Calendar tab, event detail sheet |
+| `:capability:calendar` | Calendar contract (read and write), `calendar.db` cache and outbox, 5-minute sync, event editor, Home cards, Calendar tab, event detail and add/edit sheets |
 | `:capability:calendar-testkit` | `CalendarProviderContractTest`, the tests every calendar provider must pass |
 | `:provider:calendar-fake` | Debug-only sample calendar (the hand-off's week, relative to today) |
 
@@ -106,6 +108,7 @@ A provider connects one kind of calendar service (Google, ICS, CalDAV…) to the
    - `update` changes only the title, the times and the tags, and keeps every other field (Google: PATCH, not PUT).
    - Throw `WriteRejectedException` for a permanent refusal (including a source that is unknown or read-only), `NeedsSignInException` for auth failures, and `UnreachableException` for network failures and for "try later" answers (Google: 429, 403 rate limits, 5xx). Nothing else.
    - Deleting an event that is already gone succeeds (Google: treat 404 and 410 on a delete as success).
+   - `create` takes a client key: use it as the event's id, so the returned `remoteId` equals it, and when a create repeats a key already used on that source, return the event that key made instead of making a second (Google: `events.insert` with `id = clientKey`; a 409 means it exists, so fetch and return it). The app sends a create again with the same key when it never heard back, so this is what stops duplicates.
 
    Bind it next to the provider: `@Binds @IntoSet abstract fun writer(impl: MyCalendarProvider): CalendarWriter`. The app writes only to the household's master calendar, and only non-recurring events. It tries the writer for 10 seconds, then queues the change and retries with backoff (30 s, 1 min, 2 min, then every 5 min), delivering each event's changes in order. A change still queued after 48 hours is dropped with a toast.
 
@@ -130,7 +133,7 @@ A provider connects one kind of calendar service (Google, ICS, CalDAV…) to the
        override fun recurringTitle() = …
        override fun simulateAuthFailure() = { … }
        override fun simulateUnreachable() = { … }
-       // WRITE providers only; the six write checks fail if these are missing.
+       // WRITE providers only; the seven write checks fail if these are missing.
        override fun writer() = …
        override fun writableSource() = …
    }
@@ -152,7 +155,7 @@ A stronger device-owner lock is possible later; it is not built yet.
 - Everyone can have their own 4-digit PIN. PINs must be unique in the household because the PIN identifies the person. The pad submits on the 4th digit.
 - Viewing never needs a PIN. Changing things does.
 - A session lasts 2 minutes after the last PIN-checked action; touching the screen doesn't extend it. While someone is signed in, the status bar shows their name and role and a **Sign out** link. Settings closes when the session ends.
-- Calendar changes follow the roles: Admins and Adults can delete and assign any event on the master calendar; a Child can delete only events they added, and can't assign. A refused change says why in a toast and signs the person out, so the next tap asks for a PIN. Events from other calendars, and repeating events, can't be changed on the tablet.
+- Calendar changes follow the roles: Admins and Adults can add events for anyone, and edit, delete and assign any event on the master calendar; a Child can add events only for themselves, edit or delete only events they added (and can't move one to someone else), and can't assign. A refused change says why in a toast and signs the person out, so the next tap asks for a PIN. Events from other calendars, and repeating events, can't be changed on the tablet, and an event over several days can have only its title and who changed.
 - Exiting kiosk and managing people always ask for a PIN, even mid-session.
 - 5 wrong PINs lock the pad for 30 seconds, doubling each time up to 16 minutes. Only a PIN that is allowed to do the thing clears the count.
 - This is kid-proofing, not strong security.

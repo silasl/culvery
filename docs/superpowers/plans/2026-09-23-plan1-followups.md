@@ -48,12 +48,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 ## From Plan 2b-1 (deferred)
 
-**For Plan 2b-2**
-- S1, idempotent creates: add a nullable `clientKey TEXT` (a UUID) to `outbox` (a one-line Room AutoMigration, v2 → v3) and an optional client id on `CalendarWriter.create`. The contract says a repeated create with the same key returns the existing event. A queued create's `EventRef` uses the client id, so it can be opened, edited and deleted before it syncs. Needed before quick-add ships: nothing in 2b-1 creates events.
-- Duplicate CREATE: if `applyAcceptedWrite` throws after the provider accepted, the queued create is sent again. Fix with S1, before quick-add ships.
-- `CalendarEditor` judges `createdBy` from the snapshot taken before the PIN pad. Re-read it after authorising once UPDATE can change it.
-- m7: move `SilentToaster` to test sources and drop the `writers = emptySet()` and `toaster = SilentToaster` defaults on `CalendarSync`'s internal constructor.
-
 **For Plan 3**
 - R8: map raw provider error text to fixed, friendly wording in the Google writer before it reaches a toast ("Couldn't save to … — {reason}").
 - R9: the Google writer must wrap its blocking HTTP calls in `runInterruptible` (or an equivalent cancellable call), so the editor's 10 s and the drain's 60 s timeouts hold. Add the contract check (a gated write returns when its caller is cancelled) with it; on the cooperative fake it proves nothing.
@@ -62,8 +56,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - m2: a drain that keeps throwing makes the loop run a full sync every second (`nextWait()` sees the change overdue). Back off after a failed drain; fold into R3.
 - m3: a queued ASSIGN for an event that left the mirror's window is dropped as "The event no longer exists". Fetch the event from the provider, or send a tags-only patch.
 - m4: a reconnect keeps the connection id, so queued changes wait out their backoff (up to 5 minutes). Reconnect should reset that connection's `nextAttemptMillis` and call `requestSync()`.
-- The editor's reads in `resolve()` (for `mayDelete`, `delete` and `assign`) are outside the write path's catch, so a failing read still crashes the open sheet. Fold into R3.
-- When the provider accepts a change but saving it to the mirror fails, the editor toasts "Couldn't save… — try again" although the change reached the provider. The next sync corrects the screen; consider distinct wording.
 
 **For Plan 4**
 - `CalendarSetup.setMaster` calls `provider.sources()` without the IO + timeout wrapper. Fix with `CalendarSetup.connect`.
@@ -75,7 +67,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - The event detail sheet doesn't scroll. It fits today; longer titles and 2b-2's fields won't.
 
 **Next migration or Room upgrade**
-- The driver-based `MigrationTestHelper` may not catch a dropped table. At v2 → v3, check it does, or assert the table list in the test.
 - `androidxSqlite` 2.6.0 is pinned apart from Room's transitive version. Re-check it on each Room bump.
 
 ## From Plan 2b-2 (deferred)
@@ -85,6 +76,16 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - C3: an edit sends every field from the sheet's snapshot, so a phone change made meanwhile to a field the user didn't touch is undone. With the Google writer's PATCH, send only the touched fields, applied to the event as re-read under the write lock.
 - C9: a create whose reply was lost, then unsent for 48 hours, is dropped with the DELETE queued behind it, so the event it did make comes back. Decide what an aged create means for Google (fetch by key first, or send the delete).
 - C10: the fake recreates a deleted event when a create repeats its key; Google returns 409 for a cancelled event's id. Pin the rule in the contract suite with the Google writer.
+- The editor's Retry path queues a create with its key; if that queue insert then fails (`TRY_AGAIN`), the sheet's Try again chooses a new key, and a provider that did make the event ends up with two. Fold into R3 with the other store failures.
+- The Google writer: `events.insert` with `id = clientKey`, and on 409 fetch and return the existing event.
+- The add/edit sheet crashes if the store fails while loading: `produceState` has no `catch`. Fold into R3 with the other store failures.
 
 **For Plan 4**
 - I1, T2, T7: in the on-device pass, check the add/edit sheet with Samsung's floating and split keyboards, that the real IME inset reaches the sheet and the toast through `ShellLayers`, and that a tap on the scrim hides the keyboard.
+- The on-device pass: the add/edit sheet with the Samsung keyboard on the SM-T510, and with a signed release in lock-task mode (debug builds never call `startLockTask`, so the 2b-2 walkthrough checked the immersive window only).
+- With the full keyboard up, the add/edit sheet's first Day row is half-hidden and the chips scroll to reach it; check whether that is acceptable on the SM-T510's keyboard.
+- A toast covers the sheet's footer for about 3.5 s while it is up; check whether that is acceptable on-device.
+
+**Accessibility pass (with the `HhIcon` item)**
+- Disabled Who chips lack disabled semantics.
+- `AddEventButton` lacks an `onClickLabel`.
