@@ -30,6 +30,7 @@ class CalendarSync internal constructor(
     private val writers: Set<@JvmSuppressWildcards CalendarWriter>,
     private val toaster: Toaster,
     private val writeLock: CalendarWriteLock,
+    private val refresher: SourceRefresher,
 ) {
     @Inject
     constructor(
@@ -40,7 +41,8 @@ class CalendarSync internal constructor(
         zone: HouseholdZone,
         clock: WallClock,
         writeLock: CalendarWriteLock,
-    ) : this(store, providers, zone, clock, Dispatchers.IO, PROVIDER_TIMEOUT_MS, writers, toaster, writeLock)
+        refresher: SourceRefresher,
+    ) : this(store, providers, zone, clock, Dispatchers.IO, PROVIDER_TIMEOUT_MS, writers, toaster, writeLock, refresher)
 
     // The loop's timer, a connection change and requestSync may all ask at once: one pass writes at a time.
     private val passLock = Mutex()
@@ -70,7 +72,7 @@ class CalendarSync internal constructor(
             failedDrains++
             Log.w(TAG, "The outbox drain failed ($failedDrains in a row); syncing anyway", e)
         }
-        connections.forEach { sync(it.connection, window) }
+        connections.forEach { sync(it, window) }
     }
 
     private suspend fun currentWindow(): DateRange {
@@ -266,15 +268,17 @@ class CalendarSync internal constructor(
         return next
     }
 
-    private suspend fun sync(conn: Connection, window: DateRange) {
+    private suspend fun sync(stored: StoredConnection, window: DateRange) {
+        val conn = stored.connection
         val provider = providers.firstOrNull { it.descriptor.id == conn.providerId }
         if (provider == null) {
             store.setHealth(conn.id, ConnectionHealth.Error("Provider not installed"), clock.nowMillis())
             return
         }
+        refresher.refreshIfDue(provider, stored)
         var worst: ConnectionHealth = ConnectionHealth.Ok
-        for (stored in store.visibleSourcesFor(conn.id)) {
-            val health = syncSource(provider, conn, stored.source, window)
+        for (source in store.visibleSourcesFor(conn.id)) {
+            val health = syncSource(provider, conn, source.source, window)
             if (health.severity() > worst.severity()) worst = health
         }
         if (worst == ConnectionHealth.Ok) {
@@ -309,6 +313,11 @@ class CalendarSync internal constructor(
         is NeedsSignInException -> {
             Log.w(TAG, "${conn.id}: a source needs signing in again", e)
             ConnectionHealth.NeedsSignIn
+        }
+        is SourceGoneException -> {
+            Log.w(TAG, "${conn.id}: a source is gone from the service; refreshing its calendars at the next pass", e)
+            refresher.flag(conn.id)
+            ConnectionHealth.Unreachable
         }
         is UnreachableException -> {
             Log.w(TAG, "${conn.id}: a source is unreachable", e)

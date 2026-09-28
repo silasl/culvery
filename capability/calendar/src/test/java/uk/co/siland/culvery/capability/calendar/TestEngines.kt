@@ -36,4 +36,5 @@ internal fun testSync(
     io: CoroutineContext = EmptyCoroutineContext,
     timeoutMillis: Long = PROVIDER_TIMEOUT_MS,
     writeLock: CalendarWriteLock = CalendarWriteLock(),
-): CalendarSync = CalendarSync(store, providers, zone, clock, io, timeoutMillis, writers, toaster, writeLock)
+    refresher: SourceRefresher = SourceRefresher(store, { emptyList() }, clock, toaster, io, timeoutMillis),
+): CalendarSync = CalendarSync(store, providers, zone, clock, io, timeoutMillis, writers, toaster, writeLock, refresher)

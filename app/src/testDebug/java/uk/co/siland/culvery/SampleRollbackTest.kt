@@ -20,6 +20,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarWriteLock
 import uk.co.siland.culvery.capability.calendar.ChangeKind
 import uk.co.siland.culvery.capability.calendar.HouseholdZone
 import uk.co.siland.culvery.capability.calendar.PendingChange
+import uk.co.siland.culvery.capability.calendar.SourceRefresher
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.core.access.PinHasher
 import uk.co.siland.culvery.core.access.PinManager
@@ -69,8 +70,11 @@ class SampleRollbackTest {
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         val store = CalendarStore(calendarDb)
         val zone = HouseholdZone(household)
-        seedDebugData(household, PinManager(household, PinHasher()), CalendarSetup(store, setOf(fake)), setOf(fake))
-        val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, WallClock { System.currentTimeMillis() }, CalendarWriteLock())
+        seedDebugData(household, PinManager(household, PinHasher()), CalendarSetup(store, setOf(fake), { household.people.first() }, toasts, WallClock { System.currentTimeMillis() }), setOf(fake))
+        val sync = CalendarSync(
+            store, setOf(fake), setOf(fake), toasts, zone, WallClock { System.currentTimeMillis() }, CalendarWriteLock(),
+            SourceRefresher(store, household, WallClock { System.currentTimeMillis() }, toasts),
+        )
         val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake))
         sync.syncAll()
         val today = LocalDate.now(london)

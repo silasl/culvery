@@ -83,8 +83,11 @@ class CalendarSyncTest {
 
     private suspend fun engine(): CalendarSync = engineWith(emptySet(), SilentToaster)
 
-    private suspend fun connect(id: String, providerId: String, vararg sources: CalendarSource, mapping: Map<String, SourceMapping> = emptyMap()) =
+    private suspend fun connect(id: String, providerId: String, vararg sources: CalendarSource, mapping: Map<String, SourceMapping> = emptyMap()) {
+        // The provider lists the same calendars, so the first pass's source refresh keeps them.
+        listOf(a, b).firstOrNull { it.descriptor.id == providerId }?.sourceList = sources.toList()
         store.addConnection(Connection(id, providerId, id.uppercase(), emptyMap()), sources.toList(), mapping)
+    }
 
     private fun swim() = RemoteEvent(
         "swim", "Swim",
@@ -196,7 +199,7 @@ class CalendarSyncTest {
 
     @Test
     fun hiddenSourcesAreNotSynced() = runTest {
-        connect("c1", "calendar.a", s1, s2, mapping = mapOf("s2" to SourceMapping(PersonId.FAMILY, visible = false)))
+        connect("c1", "calendar.a", s1, s2.copy(shown = false), mapping = mapOf("s2" to SourceMapping(PersonId.FAMILY, visible = false)))
         engine().syncAll()
         assertThat(a.calls.map { it.sourceId }).containsExactly("s1")
     }
@@ -868,6 +871,41 @@ class CalendarSyncTest {
         queue(ChangeKind.ASSIGN, draft = swimDraft("sam-id").copy(forPersonColor = SAM_COLOR))
         sync.syncAll()
         assertThat(w.drafts.single().forPersonColor).isEqualTo(SAM_COLOR)
+    }
+
+    @Test
+    fun aSourceGoneFlagsARefreshThatRemovesIt() = runTest {
+        // A list without its primary is a failed read, so this connection has one.
+        val family = s1.copy(primary = true)
+        connect("c1", "calendar.a", family, s2)
+        val sync = engine()
+        sync.syncAll()
+        // Deleted in the service: its list call says so before a refresh would.
+        a.failFor = mapOf("s2" to SourceGoneException("calendar deleted"))
+        a.sourceList = listOf(family)
+        now = now.plusSeconds(300)
+        sync.syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Unreachable)
+        assertThat(store.sources().first().map { it.source.id }).containsExactly("s1", "s2")
+        now = now.plusSeconds(300)
+        sync.syncAll()
+        assertThat(store.sources().first().map { it.source.id }).containsExactly("s1")
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
+    }
+
+    @Test
+    fun aSourceGoneThatIsStillListedIsKept() = runTest {
+        val family = s1.copy(primary = true)
+        connect("c1", "calendar.a", family, s2)
+        val sync = engine()
+        sync.syncAll()
+        a.failFor = mapOf("s2" to SourceGoneException("a passing 404"))
+        now = now.plusSeconds(300)
+        sync.syncAll()
+        now = now.plusSeconds(300)
+        sync.syncAll()
+        assertThat(store.sources().first().map { it.source.id }).containsExactly("s1", "s2")
+        assertThat(store.connectionsNow().single().sourcesCheckedMillis).isEqualTo(now.toEpochMilli())
     }
 
     private companion object {

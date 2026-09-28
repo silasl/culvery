@@ -31,6 +31,7 @@ import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.HouseholdZone
 import uk.co.siland.culvery.capability.calendar.OUTBOX_BACKOFF_MS
+import uk.co.siland.culvery.capability.calendar.SourceRefresher
 import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.core.access.CorePermissionSource
@@ -89,7 +90,7 @@ class SampleAddTest {
         val pins = PinManager(household, PinHasher())
         val store = CalendarStore(calendarDb)
         val zone = HouseholdZone(household)
-        seedDebugData(household, pins, CalendarSetup(store, setOf(fake)), setOf(fake))
+        seedDebugData(household, pins, CalendarSetup(store, setOf(fake), { household.people.first() }, toasts, WallClock { System.currentTimeMillis() }), setOf(fake))
         var now = System.currentTimeMillis()
         val clock = WallClock { now }
         val prompt = PinPromptController()
@@ -104,7 +105,7 @@ class SampleAddTest {
             backgroundScope,
         )
         val lock = CalendarWriteLock()
-        val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, clock, lock)
+        val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, clock, lock, SourceRefresher(store, household, clock, toasts))
         val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, backgroundScope), lock, household)
         val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake))
         sync.syncAll()

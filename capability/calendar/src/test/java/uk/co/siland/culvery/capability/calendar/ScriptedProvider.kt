@@ -16,12 +16,17 @@ internal class ScriptedProvider(
     id: String,
     var sourceList: List<CalendarSource> = emptyList(),
     features: Set<Feature> = setOf(Feature.READ),
+    displayName: String = id,
 ) : CalendarProvider {
-    override val descriptor = ProviderDescriptor(id, id, "event", features)
+    override val descriptor = ProviderDescriptor(id, displayName, "event", features)
     val calls = mutableListOf<SyncCall>()
     var failWith: Throwable? = null
     /** Per-source failures, by source id; they win over [failWith]. */
     var failFor: Map<String, Throwable> = emptyMap()
+    /** When set, sources() throws it. */
+    var sourcesFailWith: Throwable? = null
+    /** sources() never returns, like a stalled socket. */
+    var sourcesHang = false
     /** Never returns, like a stalled socket. */
     var hang = false
     /** When set, sync waits for it: a slow network the test releases. */
@@ -40,7 +45,11 @@ internal class ScriptedProvider(
     override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
     }
 
-    override suspend fun sources(conn: Connection): List<CalendarSource> = sourceList
+    override suspend fun sources(conn: Connection): List<CalendarSource> {
+        if (sourcesHang) awaitCancellation()
+        sourcesFailWith?.let { throw it }
+        return sourceList
+    }
 
     override suspend fun sync(conn: Connection, source: CalendarSource, range: DateRange, cursor: SyncCursor?): SyncResult {
         // Some tests run the engine on Dispatchers.Default, so the bookkeeping is locked.
