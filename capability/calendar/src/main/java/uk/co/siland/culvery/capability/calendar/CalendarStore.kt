@@ -35,28 +35,88 @@ class CalendarStore @Inject constructor(private val db: CalendarDatabase) {
 
     /**
      * One transaction, so the sync loop never sees a connection without its sources. A source missing from
-     * [mapping] shows as Family. Source editing and pruning come with Plan 4's Connections settings.
+     * [mapping] shows as Family. [masterSourceId] makes that source the master, clearing any other (3a design D4).
      */
-    suspend fun addConnection(connection: Connection, sources: List<CalendarSource>, mapping: Map<String, SourceMapping>) =
-        db.withTransaction {
-            dao.insertConnection(
-                ConnectionEntity(
-                    id = connection.id,
-                    providerId = connection.providerId,
-                    label = connection.label,
-                    configJson = encodeConfig(connection.config),
-                    health = ConnectionHealth.Ok.code(),
-                    healthMessage = null,
-                    lastSyncMillis = null,
-                ),
-            )
-            dao.insertSources(
-                sources.map { s ->
-                    val m = mapping[s.id] ?: SourceMapping.Default
-                    SourceEntity(connection.id, s.id, s.name, s.writable, m.visible, m.person.value)
-                },
-            )
+    suspend fun addConnection(
+        connection: Connection,
+        sources: List<CalendarSource>,
+        mapping: Map<String, SourceMapping>,
+        masterSourceId: String? = null,
+    ) = db.withTransaction {
+        dao.insertConnection(
+            ConnectionEntity(
+                id = connection.id,
+                providerId = connection.providerId,
+                label = connection.label,
+                configJson = encodeConfig(connection.config),
+                health = ConnectionHealth.Ok.code(),
+                healthMessage = null,
+                lastSyncMillis = null,
+            ),
+        )
+        dao.insertSources(
+            sources.map { s ->
+                val m = mapping[s.id] ?: SourceMapping.Default
+                SourceEntity(connection.id, s.id, s.name, s.writable, m.visible, m.person.value)
+            },
+        )
+        if (masterSourceId != null) {
+            dao.clearMaster()
+            require(dao.markMaster(connection.id, masterSourceId) == 1) { "No source $masterSourceId in ${connection.id}" }
         }
+    }
+
+    /** The connection with its sources, events, cursors and queued changes, in one transaction (3a design D5). */
+    suspend fun removeConnection(connectionId: String) = db.withTransaction {
+        dao.deleteOutboxOf(connectionId)
+        dao.deleteSyncStatesOf(connectionId)
+        dao.deleteEventsOf(connectionId)
+        dao.deleteSourcesOf(connectionId)
+        dao.deleteConnection(connectionId)
+    }
+
+    /**
+     * Follows the provider's list of [sources] (3a design §3.4), in one transaction: a new source is added with
+     * [mappingForNew]; an existing one keeps its person and takes the listed name, writability and visibility (the
+     * primary stays visible); one no longer listed goes with its events, cursor and queued changes. Returns true when
+     * the master went, or became read-only, and was cleared.
+     */
+    suspend fun refreshSources(
+        connectionId: String,
+        sources: List<CalendarSource>,
+        nowMillis: Long,
+        mappingForNew: (CalendarSource) -> SourceMapping,
+    ): Boolean = db.withTransaction {
+        val stored = dao.sources(connectionId).associateBy { it.sourceId }
+        val listed = sources.associateBy { it.id }
+        var masterCleared = false
+        stored.values.filter { it.sourceId !in listed }.forEach { gone ->
+            if (gone.isMaster) masterCleared = true
+            removeSourceRows(connectionId, gone.sourceId)
+        }
+        sources.forEach { s ->
+            val existing = stored[s.id]
+            if (existing == null) {
+                val m = mappingForNew(s)
+                dao.insertSources(listOf(SourceEntity(connectionId, s.id, s.name, s.writable, m.visible, m.person.value)))
+            } else {
+                dao.updateSource(connectionId, s.id, s.name, s.writable, visible = s.shown || s.primary)
+                if (existing.isMaster && !s.writable) {
+                    dao.clearMaster()
+                    masterCleared = true
+                }
+            }
+        }
+        dao.markSourcesChecked(connectionId, nowMillis)
+        masterCleared
+    }
+
+    private suspend fun removeSourceRows(connectionId: String, sourceId: String) {
+        dao.deleteOutboxOfSource(connectionId, sourceId)
+        dao.deleteSyncState(connectionId, sourceId)
+        dao.deleteEventsForSource(connectionId, sourceId)
+        dao.deleteSource(connectionId, sourceId)
+    }
 
     suspend fun visibleSourcesFor(connectionId: String): List<StoredSource> =
         dao.sources(connectionId).filter { it.visible }.map { it.toStored() }
@@ -77,10 +137,33 @@ class CalendarStore @Inject constructor(private val db: CalendarDatabase) {
         require(dao.markMaster(connectionId, sourceId) == 1) { "No source $sourceId in connection $connectionId" }
     }
 
-    suspend fun setHealth(connectionId: String, health: ConnectionHealth) =
+    /**
+     * Also keeps the outbox's sign-in pause (3a design D16): the first NeedsSignIn starts it; Ok folds it into each of
+     * the connection's rows (moving its creation forward) and ends it; Unreachable and Error leave it running, since
+     * neither says access is back.
+     */
+    suspend fun setHealth(connectionId: String, health: ConnectionHealth, nowMillis: Long) = db.withTransaction {
+        val row = dao.connection(connectionId) ?: return@withTransaction
+        when {
+            health == ConnectionHealth.NeedsSignIn && row.needsSignInSinceMillis == null -> dao.setNeedsSignInSince(connectionId, nowMillis)
+            health == ConnectionHealth.Ok -> endPause(row, nowMillis)
+        }
         dao.setHealth(connectionId, health.code(), (health as? ConnectionHealth.Error)?.message)
+    }
 
-    suspend fun markSynced(connectionId: String, atMillis: Long) = dao.markSynced(connectionId, atMillis)
+    suspend fun markSynced(connectionId: String, atMillis: Long) = db.withTransaction {
+        dao.connection(connectionId)?.let { endPause(it, atMillis) }
+        dao.markSynced(connectionId, atMillis)
+    }
+
+    private suspend fun endPause(row: ConnectionEntity, nowMillis: Long) {
+        val since = row.needsSignInSinceMillis ?: return
+        dao.foldPause(row.id, since, nowMillis)
+        dao.setNeedsSignInSince(row.id, null)
+    }
+
+    /** Reconnect (3a design D6, follow-up m4): the connection's queued changes are tried at the next pass. */
+    suspend fun makeDue(connectionId: String, nowMillis: Long) = dao.makeDue(connectionId, nowMillis)
 
     /**
      * Null when nothing is stored or the cursor belongs to a different window or zone, forcing a full resync.
@@ -92,9 +175,14 @@ class CalendarStore @Inject constructor(private val db: CalendarDatabase) {
             ?.cursor
             ?.let(::SyncCursor)
 
-    /** Touches only the event mirror and the cursor; queued changes in the outbox are never affected. */
+    /**
+     * Touches only the event mirror and the cursor; queued changes in the outbox are never affected. Writes nothing
+     * once the source is gone.
+     */
     suspend fun applySync(connectionId: String, sourceId: String, range: DateRange, result: SyncResult) =
         db.withTransaction {
+            // A source removed while this sync was in flight: no orphan events or stale cursor.
+            if (dao.source(connectionId, sourceId) == null) return@withTransaction
             if (result.fullReplace) {
                 dao.deleteEventsForSource(connectionId, sourceId)
             } else {
@@ -113,9 +201,13 @@ class CalendarStore @Inject constructor(private val db: CalendarDatabase) {
     suspend fun eventNow(ref: EventRef): StoredEvent? =
         dao.eventNow(ref.connectionId, ref.sourceId, ref.remoteId)?.toStored()
 
-    /** Puts a write the provider accepted into the mirror and, if it came from the outbox, completes it. */
+    /**
+     * Puts a write the provider accepted into the mirror and, if it came from the outbox, completes it. Writes nothing
+     * once the source is gone: its queued changes went with it.
+     */
     suspend fun applyAccepted(connectionId: String, sourceId: String, event: RemoteEvent, zone: ZoneId, completing: Long? = null) =
         db.withTransaction {
+            if (dao.source(connectionId, sourceId) == null) return@withTransaction
             dao.upsertEvents(listOf(event.toEntity(connectionId, sourceId, zone)))
             completing?.let { dao.deleteOutbox(it) }
         }
@@ -204,6 +296,7 @@ private fun encodeDraft(d: EventDraft): String = JSONObject()
     .put("end", encodeTime(d.end))
     .put("forPerson", d.forPerson ?: JSONObject.NULL)
     .put("createdBy", d.createdBy ?: JSONObject.NULL)
+    .put("forPersonColor", d.forPersonColor ?: JSONObject.NULL)
     .toString()
 
 private fun decodeDraft(json: String): EventDraft {
@@ -214,13 +307,22 @@ private fun decodeDraft(json: String): EventDraft {
         end = decodeTime(o.getJSONObject("end")),
         forPerson = o.stringOrNull("forPerson"),
         createdBy = o.stringOrNull("createdBy"),
+        // A row from before v4 has no colour.
+        forPersonColor = if (o.has("forPersonColor") && !o.isNull("forPersonColor")) o.getLong("forPersonColor") else null,
     )
 }
+
+private fun encodeFields(fields: Set<EventField>?): String? = fields?.joinToString(",") { it.name }
+
+private fun decodeFields(text: String?): Set<EventField>? =
+    text?.split(",")?.filter { it.isNotEmpty() }?.map(EventField::valueOf)?.toSet()
 
 private fun ConnectionEntity.toStored() = StoredConnection(
     Connection(id, providerId, label, decodeConfig(configJson)),
     healthOf(health, healthMessage),
     lastSyncMillis,
+    sourcesCheckedMillis,
+    needsSignInSinceMillis,
 )
 
 private fun SourceEntity.toStored() = StoredSource(
@@ -244,6 +346,7 @@ private fun RemoteEvent.toEntity(connectionId: String, sourceId: String, zone: Z
     createdBy = createdBy,
     startSort = start.instantIn(zone).toEpochMilli(),
     endSort = end.instantIn(zone).toEpochMilli(),
+    recurrenceRule = recurrenceRule,
 )
 
 private fun timeOf(instant: Long?, date: String?): EventTime =
@@ -262,6 +365,7 @@ private fun EventRow.toStored() = StoredEvent(
     sourcePerson = PersonId(sourcePersonId),
     startSort = event.startSort,
     endSort = event.endSort,
+    recurrenceRule = event.recurrenceRule,
 )
 
 private fun PendingChange.toEntity() = OutboxEntity(
@@ -275,6 +379,7 @@ private fun PendingChange.toEntity() = OutboxEntity(
     nextAttemptMillis = nextAttemptMillis,
     createdMillis = createdMillis,
     clientKey = clientKey,
+    fields = encodeFields(fields),
 )
 
 private fun OutboxEntity.toPending() = PendingChange(
@@ -288,4 +393,5 @@ private fun OutboxEntity.toPending() = PendingChange(
     nextAttemptMillis = nextAttemptMillis,
     createdMillis = createdMillis,
     clientKey = clientKey,
+    fields = decodeFields(fields),
 )

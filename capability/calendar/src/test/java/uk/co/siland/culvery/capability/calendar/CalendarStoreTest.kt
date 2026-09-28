@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.calendar
 
+import androidx.room.useReaderConnection
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.Instant
@@ -73,18 +74,18 @@ class CalendarStoreTest {
     @Test
     fun healthRoundTripsIncludingTheErrorMessage() = runTest {
         connect("s1")
-        store.setHealth("c1", ConnectionHealth.Error("quota exceeded"))
+        store.setHealth("c1", ConnectionHealth.Error("quota exceeded"), 0L)
         assertThat(store.connectionsNow().single().health).isEqualTo(ConnectionHealth.Error("quota exceeded"))
-        store.setHealth("c1", ConnectionHealth.NeedsSignIn)
+        store.setHealth("c1", ConnectionHealth.NeedsSignIn, 0L)
         assertThat(store.connectionsNow().single().health).isEqualTo(ConnectionHealth.NeedsSignIn)
-        store.setHealth("c1", ConnectionHealth.Unreachable)
+        store.setHealth("c1", ConnectionHealth.Unreachable, 0L)
         assertThat(store.connectionsNow().single().health).isEqualTo(ConnectionHealth.Unreachable)
     }
 
     @Test
     fun markSyncedSetsOkAndTheTime() = runTest {
         connect("s1")
-        store.setHealth("c1", ConnectionHealth.NeedsSignIn)
+        store.setHealth("c1", ConnectionHealth.NeedsSignIn, 0L)
         store.markSynced("c1", 1234L)
         val stored = store.connectionsNow().single()
         assertThat(stored.health).isEqualTo(ConnectionHealth.Ok)
@@ -329,6 +330,220 @@ class CalendarStoreTest {
         store.dropChange(id)
         assertThat(store.pendingNow()).isEmpty()
         assertThat(store.nextAttemptMillis()).isNull()
+    }
+
+    /** Event rows for [sourceId], counted directly: eventsBetween joins the source table, so it can't see an orphan. */
+    private suspend fun eventRows(sourceId: String): Long = db.useReaderConnection { connection ->
+        connection.usePrepared("SELECT COUNT(*) FROM event WHERE connectionId = 'c1' AND sourceId = ?") { statement ->
+            statement.bindText(1, sourceId)
+            statement.step()
+            statement.getLong(0)
+        }
+    }
+
+    private suspend fun rowsFor(sourceId: String): Triple<Long, SyncCursor?, Int> = Triple(
+        eventRows(sourceId),
+        store.cursor("c1", sourceId, window),
+        store.pendingNow().count { it.sourceId == sourceId },
+    )
+
+    private fun listed(id: String, writable: Boolean = false, shown: Boolean = true, primary: Boolean = false) =
+        CalendarSource(id, id.uppercase(), writable, shown, primary)
+
+    private fun mapping(person: String) = { _: CalendarSource -> SourceMapping(PersonId(person), visible = true) }
+
+    @Test
+    fun aConnectionAndEverythingItHoldsIsRemovedTogether() = runTest {
+        connect("s1", "s2")
+        store.setMaster("c1", "s1")
+        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)))
+        store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null))
+        store.removeConnection("c1")
+        assertThat(store.connectionsNow()).isEmpty()
+        assertThat(store.sources().first()).isEmpty()
+        assertThat(eventRows("s1")).isEqualTo(0L)
+        assertThat(store.cursor("c1", "s1", window)).isNull()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(store.master().first()).isNull()
+    }
+
+    @Test
+    fun refreshingAddsNewSourcesWithTheirMappingAndKeepsExistingMappings() = runTest {
+        connect("s1", mapping = mapOf("s1" to SourceMapping(PersonId("alex"), visible = true)))
+        store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 5_000L, mapping("mia"))
+        assertThat(store.sources().first().associate { it.source.id to it.mapping.person })
+            .containsExactly("s1", PersonId("alex"), "s2", PersonId("mia"))
+    }
+
+    @Test
+    fun refreshingFollowsTheTicksButKeepsThePrimaryVisible() = runTest {
+        connect("s1", "s2")
+        store.refreshSources("c1", listOf(listed("s1", shown = false), listed("s2", shown = false, primary = true)), 5_000L, mapping("mia"))
+        assertThat(store.sources().first().associate { it.source.id to it.mapping.visible }).containsExactly("s1", false, "s2", true)
+        store.refreshSources("c1", listOf(listed("s1", shown = true), listed("s2", primary = true)), 6_000L, mapping("mia"))
+        assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
+    }
+
+    @Test
+    fun refreshingUpdatesNamesAndWritability() = runTest {
+        connect("s1")
+        store.refreshSources("c1", listOf(CalendarSource("s1", "Swimming club", writable = true)), 5_000L, mapping("mia"))
+        assertThat(store.source("c1", "s1")!!.source.let { it.name to it.writable }).isEqualTo("Swimming club" to true)
+    }
+
+    @Test
+    fun refreshingRemovesAGoneSourceWithItsEventsCursorAndQueue() = runTest {
+        connect("s1", "s2")
+        store.applySync("c1", "s2", window, full(timed("a", "Walk", 23, 9)))
+        store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null).copy(sourceId = "s2"))
+        val cleared = store.refreshSources("c1", listOf(listed("s1")), 5_000L, mapping("mia"))
+        assertThat(cleared).isFalse()
+        assertThat(store.sources().first().map { it.source.id }).containsExactly("s1")
+        assertThat(rowsFor("s2")).isEqualTo(Triple(0L, null, 0))
+    }
+
+    @Test
+    fun refreshingWithoutTheMasterClearsItAndRemovesItsRows() = runTest {
+        connect("s1", "s2")
+        store.setMaster("c1", "s1")
+        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)))
+        store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null))
+        val cleared = store.refreshSources("c1", listOf(listed("s2")), 5_000L, mapping("mia"))
+        assertThat(cleared).isTrue()
+        assertThat(store.master().first()).isNull()
+        assertThat(rowsFor("s1")).isEqualTo(Triple(0L, null, 0))
+    }
+
+    @Test
+    fun aMasterThatBecomesReadOnlyIsClearedButStays() = runTest {
+        connect("s1")
+        store.setMaster("c1", "s1")
+        val cleared = store.refreshSources("c1", listOf(listed("s1", writable = false)), 5_000L, mapping("mia"))
+        assertThat(cleared).isTrue()
+        assertThat(store.master().first()).isNull()
+        assertThat(store.source("c1", "s1")!!.source.writable).isFalse()
+    }
+
+    @Test
+    fun aWritableMasterStaysTheMasterThroughARefresh() = runTest {
+        connect("s1")
+        store.setMaster("c1", "s1")
+        assertThat(store.refreshSources("c1", listOf(listed("s1", writable = true)), 5_000L, mapping("mia"))).isFalse()
+        assertThat(store.master().first()?.source?.id).isEqualTo("s1")
+    }
+
+    @Test
+    fun refreshingRecordsWhenItChecked() = runTest {
+        connect("s1")
+        assertThat(store.connectionsNow().single().sourcesCheckedMillis).isNull()
+        store.refreshSources("c1", listOf(listed("s1")), 5_000L, mapping("mia"))
+        assertThat(store.connectionsNow().single().sourcesCheckedMillis).isEqualTo(5_000L)
+    }
+
+    @Test
+    fun aSyncOrAcceptedWriteForARemovedSourceWritesNothing() = runTest {
+        connect("s1")
+        val queued = store.enqueue(change(ChangeKind.UPDATE, remoteId = "a"))
+        store.removeConnection("c1")
+        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)))
+        store.applyAccepted("c1", "s1", timed("a", "Walk", 23, 9), zone, completing = queued)
+        assertThat(eventRows("s1")).isEqualTo(0L)
+        assertThat(store.cursor("c1", "s1", window)).isNull()
+    }
+
+    @Test
+    fun makeDueBringsAConnectionsQueueDueWithoutCountingAnAttempt() = runTest {
+        connect("s1")
+        store.enqueue(change(ChangeKind.DELETE, draft = null, next = 90_000L, attempts = 3))
+        store.makeDue("c1", 1_000L)
+        assertThat(store.pendingNow().single().let { it.attempts to it.nextAttemptMillis }).isEqualTo(3 to 1_000L)
+    }
+
+    @Test
+    fun addingAConnectionCanMakeOneOfItsSourcesTheMaster() = runTest {
+        store.addConnection(conn, listOf(listed("s1", writable = true, primary = true)), emptyMap(), masterSourceId = "s1")
+        assertThat(store.master().first()?.source?.id).isEqualTo("s1")
+    }
+
+    @Test
+    fun aNeedsSignInLapseIsFoldedIntoEachRowWhenTheConnectionIsOk() = runTest {
+        connect("s1")
+        store.enqueue(change(ChangeKind.DELETE, draft = null).copy(createdMillis = 1_000L))
+        store.setHealth("c1", ConnectionHealth.NeedsSignIn, 2_000L)
+        assertThat(store.connectionsNow().single().needsSignInSinceMillis).isEqualTo(2_000L)
+        store.setHealth("c1", ConnectionHealth.Ok, 10_000L)
+        // The 8 s lapse no longer counts: the row reads as made 8 s later.
+        assertThat(store.pendingNow().single().createdMillis).isEqualTo(9_000L)
+        assertThat(store.connectionsNow().single().needsSignInSinceMillis).isNull()
+    }
+
+    @Test
+    fun aRowQueuedDuringTheLapseIsPausedOnlyFromItsCreation() = runTest {
+        connect("s1")
+        store.setHealth("c1", ConnectionHealth.NeedsSignIn, 2_000L)
+        store.enqueue(change(ChangeKind.DELETE, draft = null).copy(createdMillis = 5_000L))
+        store.markSynced("c1", 10_000L)
+        assertThat(store.pendingNow().single().createdMillis).isEqualTo(10_000L)
+        assertThat(store.connectionsNow().single().needsSignInSinceMillis).isNull()
+    }
+
+    @Test
+    fun foldingAPauseKeepsTheQueueInTheOrderItWasMade() = runTest {
+        connect("s1")
+        store.enqueue(change(ChangeKind.DELETE, remoteId = "first", draft = null).copy(createdMillis = 1_000L))
+        store.setHealth("c1", ConnectionHealth.NeedsSignIn, 2_000L)
+        store.enqueue(change(ChangeKind.DELETE, remoteId = "second", draft = null).copy(createdMillis = 5_000L))
+        store.markSynced("c1", 10_000L)
+        // Both now read as made at 9 000 and 10 000; the queue is ordered by id, never by createdMillis.
+        assertThat(store.pendingNow().map { it.remoteId to it.createdMillis })
+            .containsExactly("first" to 9_000L, "second" to 10_000L).inOrder()
+    }
+
+    @Test
+    fun aRepeatedNeedsSignInKeepsWhenThePauseBeganAndOnlyOkEndsIt() = runTest {
+        connect("s1")
+        store.setHealth("c1", ConnectionHealth.NeedsSignIn, 2_000L)
+        store.setHealth("c1", ConnectionHealth.NeedsSignIn, 4_000L)
+        store.setHealth("c1", ConnectionHealth.Unreachable, 6_000L)
+        store.setHealth("c1", ConnectionHealth.Error("quota exceeded"), 7_000L)
+        val stored = store.connectionsNow().single()
+        assertThat(stored.health).isEqualTo(ConnectionHealth.Error("quota exceeded"))
+        assertThat(stored.needsSignInSinceMillis).isEqualTo(2_000L)
+    }
+
+    @Test
+    fun anOkWithNoPauseRunningChangesNoRow() = runTest {
+        connect("s1")
+        store.enqueue(change(ChangeKind.DELETE, draft = null).copy(createdMillis = 1_000L))
+        store.markSynced("c1", 10_000L)
+        assertThat(store.pendingNow().single().createdMillis).isEqualTo(1_000L)
+    }
+
+    @Test
+    fun ageMillisCountsOnlyTimeTheConnectionWasNotWaitingForSignIn() {
+        val change = change(ChangeKind.DELETE, draft = null).copy(createdMillis = 1_000L)
+        assertThat(ageMillis(change, pausedSince = null, nowMillis = 5_000L)).isEqualTo(4_000L)
+        assertThat(ageMillis(change, pausedSince = 3_000L, nowMillis = 5_000L)).isEqualTo(2_000L)
+        // Made during the running pause: no age yet.
+        assertThat(ageMillis(change.copy(createdMillis = 4_000L), pausedSince = 3_000L, nowMillis = 5_000L)).isEqualTo(0L)
+    }
+
+    @Test
+    fun outboxKeepsItsFieldsAndTheColour() = runTest {
+        connect("s1")
+        val update = change(ChangeKind.UPDATE).copy(
+            draft = eventDraft("Swim", 23, 9).copy(forPersonColor = 0xFF4CB387),
+            fields = setOf(EventField.TITLE, EventField.TIMES),
+        )
+        val id = store.enqueue(update)
+        assertThat(store.pendingNow().single()).isEqualTo(update.copy(id = id))
+    }
+
+    @Test
+    fun eventsKeepTheirRecurrenceRule() = runTest {
+        connect("s1")
+        store.applySync("c1", "s1", window, full(timed("a", "Swim", 23, 9).copy(recurring = true, recurrenceRule = "RRULE:FREQ=WEEKLY")))
+        assertThat(store.eventNow(EventRef("c1", "s1", "a"))!!.recurrenceRule).isEqualTo("RRULE:FREQ=WEEKLY")
     }
 
     @Test

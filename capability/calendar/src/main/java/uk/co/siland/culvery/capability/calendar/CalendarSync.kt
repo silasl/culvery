@@ -215,7 +215,7 @@ class CalendarSync internal constructor(
     private suspend fun sync(conn: Connection, window: DateRange) {
         val provider = providers.firstOrNull { it.descriptor.id == conn.providerId }
         if (provider == null) {
-            store.setHealth(conn.id, ConnectionHealth.Error("Provider not installed"))
+            store.setHealth(conn.id, ConnectionHealth.Error("Provider not installed"), clock.nowMillis())
             return
         }
         var worst: ConnectionHealth = ConnectionHealth.Ok
@@ -226,7 +226,7 @@ class CalendarSync internal constructor(
         if (worst == ConnectionHealth.Ok) {
             store.markSynced(conn.id, clock.nowMillis())
         } else {
-            store.setHealth(conn.id, worst)
+            store.setHealth(conn.id, worst, clock.nowMillis())
         }
     }
 

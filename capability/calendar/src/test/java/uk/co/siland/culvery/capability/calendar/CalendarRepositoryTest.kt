@@ -224,7 +224,7 @@ class CalendarRepositoryTest {
         store.addConnection(Connection("c2", "calendar.test", "School", emptyMap()), emptyList(), emptyMap())
         store.markSynced("c1", 5_000L)
         store.markSynced("c2", 2_000L)
-        store.setHealth("c1", ConnectionHealth.NeedsSignIn)
+        store.setHealth("c1", ConnectionHealth.NeedsSignIn, 0L)
         val status = repo.syncStatus.first()
         assertThat(status.lastSyncMillis).isEqualTo(2_000L)
         assertThat(status.needsSignIn).containsExactly("Google")
@@ -236,7 +236,7 @@ class CalendarRepositoryTest {
     fun aConnectionFailingBeforeItsFirstSyncMakesTheStatusStale() = runTest {
         store.addConnection(Connection("c2", "calendar.test", "School", emptyMap()), emptyList(), emptyMap())
         store.markSynced("c1", 5_000L)
-        store.setHealth("c2", ConnectionHealth.Unreachable)
+        store.setHealth("c2", ConnectionHealth.Unreachable, 0L)
         val status = repo.syncStatus.first()
         assertThat(status.lastSyncMillis).isEqualTo(5_000L)
         assertThat(status.failingBeforeFirstSync).isTrue()

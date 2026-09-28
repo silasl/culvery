@@ -22,3 +22,16 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         db.execSQL("ALTER TABLE `outbox` ADD COLUMN `clientKey` TEXT")
     }
 }
+
+/**
+ * v4 (Plan 3a): the series' RRULE on each event; an update's touched fields on the outbox; when a connection's
+ * sources were last refreshed and when its sign-in pause began (D16). The SQL must match schemas/…/4.json exactly.
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `event` ADD COLUMN `recurrenceRule` TEXT")
+        db.execSQL("ALTER TABLE `outbox` ADD COLUMN `fields` TEXT")
+        db.execSQL("ALTER TABLE `connection` ADD COLUMN `sourcesCheckedMillis` INTEGER")
+        db.execSQL("ALTER TABLE `connection` ADD COLUMN `needsSignInSinceMillis` INTEGER")
+    }
+}

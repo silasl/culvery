@@ -11,10 +11,17 @@ data class SourceMapping(val person: PersonId, val visible: Boolean) {
     }
 }
 
+/**
+ * [sourcesCheckedMillis]: when the sources were last refreshed from the provider; null before the first refresh
+ * (3a design §3.4). [needsSignInSinceMillis]: when the running sign-in pause of the outbox age clock began; null
+ * when none runs (3a design D16).
+ */
 data class StoredConnection(
     val connection: Connection,
     val health: ConnectionHealth,
     val lastSyncMillis: Long?,
+    val sourcesCheckedMillis: Long? = null,
+    val needsSignInSinceMillis: Long? = null,
 )
 
 /** [isMaster]: the household's master calendar, the only source the tablet writes to (spec §6). */
@@ -44,6 +51,8 @@ data class StoredEvent(
     val sourcePerson: PersonId,
     val startSort: Long,
     val endSort: Long,
+    /** The series' RRULE line, for the Repeats row (3a design D12); null when unknown. */
+    val recurrenceRule: String? = null,
 ) {
     val ref: EventRef get() = EventRef(connectionId, sourceId, remoteId)
 }
@@ -54,8 +63,10 @@ enum class ChangeKind { CREATE, UPDATE, DELETE, ASSIGN }
 /**
  * One queued write, kept until the provider accepts or refuses it. [remoteId] is null only for CREATE, which
  * carries its [clientKey] instead: the id the provider gives the event (CalendarWriter.create), so a retried create
- * can't make a second one. [draft] is null only for DELETE, and for ASSIGN only its forPerson counts. [id] is 0
- * until the store assigns one.
+ * can't make a second one. [draft] is null only for DELETE, and for ASSIGN only its forPerson counts. [fields] are
+ * what an UPDATE changes (3a design C3); null on a row queued before v4, which sent every field. [createdMillis] is
+ * moved forward by each finished sign-in pause (D16), so it is read only for the change's age. [id] is 0 until the
+ * store assigns one.
  */
 data class PendingChange(
     val id: Long,
@@ -68,6 +79,7 @@ data class PendingChange(
     val nextAttemptMillis: Long,
     val createdMillis: Long,
     val clientKey: String? = null,
+    val fields: Set<EventField>? = null,
 ) {
     /**
      * The event this change is for. A create's ref is built from its client key, the id the event keeps once it

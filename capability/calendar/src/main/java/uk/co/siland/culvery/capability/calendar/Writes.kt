@@ -18,6 +18,16 @@ internal fun backoffMillis(attempts: Int): Long = OUTBOX_BACKOFF_MS[(attempts - 
 /** A queued change still unsent this long after it was made is dropped, with a toast. */
 const val OUTBOX_MAX_AGE_MS = 48 * 60 * 60_000L
 
+/**
+ * How long [change] has waited, not counting time its connection spent waiting for sign-in (3a design D16): a
+ * finished pause has already moved [PendingChange.createdMillis] forward, and [pausedSince] starts the pause still
+ * running (null when none runs); a change made during that pause has aged only from when it was made.
+ */
+internal fun ageMillis(change: PendingChange, pausedSince: Long?, nowMillis: Long): Long {
+    val running = pausedSince?.let { (nowMillis - maxOf(it, change.createdMillis)).coerceAtLeast(0) } ?: 0L
+    return nowMillis - change.createdMillis - running
+}
+
 /** Why a change to an event that is gone is refused; public so providers refuse with the same words. */
 const val EVENT_GONE = "The event no longer exists"
 

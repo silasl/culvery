@@ -24,6 +24,10 @@ data class ConnectionEntity(
     val health: String,
     val healthMessage: String?,
     val lastSyncMillis: Long?,
+    /** v4: when the sources were last refreshed from the provider. */
+    val sourcesCheckedMillis: Long? = null,
+    /** v4 (D16): when the running sign-in pause of the outbox age clock began; null when none runs. */
+    val needsSignInSinceMillis: Long? = null,
 )
 
 @Entity(tableName = "source", primaryKeys = ["connectionId", "sourceId"])
@@ -60,6 +64,8 @@ data class EventEntity(
     /** Epoch millis; for all-day events, midnight of the date in the household zone at sync time. */
     val startSort: Long,
     val endSort: Long,
+    /** v4: the series' RRULE line; null when unknown. */
+    val recurrenceRule: String? = null,
 )
 
 @Entity(tableName = "sync_state", primaryKeys = ["connectionId", "sourceId"])
@@ -88,6 +94,8 @@ data class OutboxEntity(
     val createdMillis: Long,
     /** CREATE only (v3): the key the provider uses as the event's id, so a retried create can't duplicate it. */
     val clientKey: String? = null,
+    /** v4, UPDATE only: the EventField names it changes, comma-separated; null on an older row (every field). */
+    val fields: String? = null,
 )
 
 data class EventRow(
@@ -114,6 +122,58 @@ interface CalendarDao {
 
     @Query("UPDATE connection SET health = 'OK', healthMessage = NULL, lastSyncMillis = :at WHERE id = :id")
     suspend fun markSynced(id: String, at: Long)
+
+    @Query("SELECT * FROM connection WHERE id = :id")
+    suspend fun connection(id: String): ConnectionEntity?
+
+    @Query("DELETE FROM connection WHERE id = :id")
+    suspend fun deleteConnection(id: String)
+
+    @Query("UPDATE connection SET sourcesCheckedMillis = :at WHERE id = :id")
+    suspend fun markSourcesChecked(id: String, at: Long)
+
+    @Query("UPDATE connection SET needsSignInSinceMillis = :since WHERE id = :id")
+    suspend fun setNeedsSignInSince(id: String, since: Long?)
+
+    /**
+     * D16: moves each of the connection's rows' creation forward by the pause since [since], counted from when each
+     * was made, so the pause never counts towards its age. The outbox is read in id order, so order is kept.
+     */
+    @Query(
+        "UPDATE outbox SET createdMillis = createdMillis + MAX(0, :now - MAX(:since, createdMillis)) " +
+            "WHERE connectionId = :connectionId",
+    )
+    suspend fun foldPause(connectionId: String, since: Long, now: Long)
+
+    @Query("UPDATE outbox SET nextAttemptMillis = :now WHERE connectionId = :connectionId")
+    suspend fun makeDue(connectionId: String, now: Long)
+
+    @Query("DELETE FROM source WHERE connectionId = :connectionId")
+    suspend fun deleteSourcesOf(connectionId: String)
+
+    @Query("DELETE FROM event WHERE connectionId = :connectionId")
+    suspend fun deleteEventsOf(connectionId: String)
+
+    @Query("DELETE FROM sync_state WHERE connectionId = :connectionId")
+    suspend fun deleteSyncStatesOf(connectionId: String)
+
+    @Query("DELETE FROM outbox WHERE connectionId = :connectionId")
+    suspend fun deleteOutboxOf(connectionId: String)
+
+    @Query("DELETE FROM source WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun deleteSource(connectionId: String, sourceId: String)
+
+    @Query("DELETE FROM sync_state WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun deleteSyncState(connectionId: String, sourceId: String)
+
+    @Query("DELETE FROM outbox WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun deleteOutboxOfSource(connectionId: String, sourceId: String)
+
+    @Query(
+        "UPDATE source SET name = :name, writable = :writable, visible = :visible " +
+            "WHERE connectionId = :connectionId AND sourceId = :sourceId",
+    )
+    suspend fun updateSource(connectionId: String, sourceId: String, name: String, writable: Boolean, visible: Boolean)
 
     @Query("SELECT * FROM source WHERE connectionId = :connectionId ORDER BY name")
     suspend fun sources(connectionId: String): List<SourceEntity>
@@ -212,7 +272,7 @@ interface CalendarDao {
  */
 @Database(
     entities = [ConnectionEntity::class, SourceEntity::class, EventEntity::class, SyncStateEntity::class, OutboxEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class CalendarDatabase : RoomDatabase() {

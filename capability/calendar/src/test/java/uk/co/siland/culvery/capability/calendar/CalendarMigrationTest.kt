@@ -21,6 +21,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_1_2
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_2_3
+import uk.co.siland.culvery.capability.calendar.db.MIGRATION_3_4
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -72,7 +73,7 @@ class CalendarMigrationTest {
         helper.runMigrationsAndValidate(2, listOf(MIGRATION_1_2)).close()
 
         val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .setDriver(AndroidSQLiteDriver())
             .allowMainThreadQueries()
             .build()
@@ -144,7 +145,7 @@ class CalendarMigrationTest {
         }
 
         val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .setDriver(AndroidSQLiteDriver())
             .allowMainThreadQueries()
             .build()
@@ -164,6 +165,80 @@ class CalendarMigrationTest {
             assertThat(pending.first().draft?.title).isEqualTo("Swim")
             // A v2 create has no key, so no ref: the drain drops it as undeliverable (Task 2's isComplete).
             assertThat(pending.first().ref).isNull()
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun migrationFromV3AddsTheNewColumnsEmptyAndKeepsEverything() = runTest {
+        file.parentFile?.mkdirs()
+        file.delete()
+
+        val v3 = helper.createDatabase(3)
+        v3.execSQL(
+            "INSERT INTO connection (id, providerId, label, configJson, health, healthMessage, lastSyncMillis) " +
+                "VALUES ('c1', 'calendar.test', 'Google', '{\"account\":\"family@example.com\"}', 'NEEDS_SIGN_IN', NULL, 1234)",
+        )
+        v3.execSQL(
+            "INSERT INTO source (connectionId, sourceId, name, writable, visible, personId, isMaster) " +
+                "VALUES ('c1', 's1', 'Family', 1, 1, 'family', 1), ('c1', 's2', 'Alex', 0, 0, 'alex-id', 0)",
+        )
+        v3.execSQL(
+            "INSERT INTO event (connectionId, sourceId, remoteId, title, startInstant, startDate, endInstant, endDate, " +
+                "recurring, forPerson, createdBy, startSort, endSort) " +
+                "VALUES ('c1', 's1', 'e1', 'Swim', 1000, NULL, 2000, NULL, 1, 'alex-id', 'sam-id', 1000, 2000)",
+        )
+        v3.execSQL(
+            "INSERT INTO sync_state (connectionId, sourceId, cursor, rangeStart) " +
+                "VALUES ('c1', 's1', 'k7', '2026-09-22|Europe/London')",
+        )
+        v3.execSQL(
+            "INSERT INTO outbox (connectionId, sourceId, remoteId, kind, draftJson, attempts, nextAttemptMillis, createdMillis, clientKey) VALUES " +
+                "('c1', 's1', NULL, 'CREATE', '$DRAFT_JSON', 0, 10, 100, 'k-1'), " +
+                "('c1', 's1', 'e1', 'UPDATE', '$DRAFT_JSON', 1, 20, 200, NULL), " +
+                "('c1', 's1', 'e1', 'ASSIGN', '$DRAFT_JSON', 0, 30, 300, NULL), " +
+                "('c1', 's1', 'e1', 'DELETE', NULL, 2, 40, 400, NULL)",
+        )
+        v3.close()
+
+        val v4 = helper.runMigrationsAndValidate(4, listOf(MIGRATION_3_4))
+        try {
+            assertThat(tableNames(v4)).containsExactly("connection", "event", "outbox", "source", "sync_state").inOrder()
+        } finally {
+            v4.close()
+        }
+
+        val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .setDriver(AndroidSQLiteDriver())
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val store = CalendarStore(db)
+            val stored = store.connectionsNow().single()
+            assertThat(stored.connection.config).containsExactly("account", "family@example.com")
+            assertThat(stored.health).isEqualTo(ConnectionHealth.NeedsSignIn)
+            // D16: an existing NEEDS_SIGN_IN connection's pause starts at the next NeedsSignIn a sync reports.
+            assertThat(listOf(stored.sourcesCheckedMillis, stored.needsSignInSinceMillis)).containsExactly(null, null)
+            assertThat(store.master().first()?.source?.id).isEqualTo("s1")
+            assertThat(store.source("c1", "s2")!!.mapping).isEqualTo(SourceMapping(PersonId("alex-id"), visible = false))
+
+            val event = store.eventNow(EventRef("c1", "s1", "e1"))!!
+            assertThat(listOf(event.title, event.recurring, event.recurrenceRule)).containsExactly("Swim", true, null).inOrder()
+            val range = DateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 10, 8), ZoneId.of("Europe/London"))
+            assertThat(store.cursor("c1", "s1", range)).isEqualTo(SyncCursor("k7"))
+
+            val pending = store.pendingNow()
+            assertThat(pending.map { it.kind })
+                .containsExactly(ChangeKind.CREATE, ChangeKind.UPDATE, ChangeKind.ASSIGN, ChangeKind.DELETE).inOrder()
+            assertThat(pending.map { it.clientKey }).containsExactly("k-1", null, null, null).inOrder()
+            assertThat(pending.map { it.fields }).containsExactly(null, null, null, null)
+            assertThat(pending.map { it.createdMillis }).containsExactly(100L, 200L, 300L, 400L).inOrder()
+            assertThat(pending.first().draft?.forPersonColor).isNull()
+            // A v3 row's fields are what it sent then: every field for an update, who for an assign.
+            assertThat(fieldsFor(ChangeKind.UPDATE, pending[1].fields)).containsExactlyElementsIn(EventField.entries)
+            assertThat(fieldsFor(ChangeKind.ASSIGN, pending[2].fields)).containsExactly(EventField.FOR_PERSON)
         } finally {
             db.close()
         }
