@@ -500,7 +500,7 @@ class CalendarEditorTest {
 
         // Once the disk has room, the sync the editor asked for mirrors the event the provider holds.
         calendar.useWriterConnection { it.execSQL("DROP TRIGGER fail_event") }
-        val reads = ScriptedProvider("calendar.a", sourceList = listOf(family, school)).apply {
+        val reads = ScriptedProvider("calendar.a", sourceList = listOf(family.copy(primary = true), school)).apply {
             events = { source -> if (source.id == family.id) writer.created.values.toList() else emptyList() }
         }
         testSync(

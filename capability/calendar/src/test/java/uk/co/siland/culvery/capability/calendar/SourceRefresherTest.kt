@@ -76,7 +76,7 @@ class SourceRefresherTest {
         connect()
         refresh()
         provider.sourceList = listOf(primary, swimming)
-        refresher.flag("g1")
+        refresher.flag("g1", primary.id)
         now += 60_000
         refresh()
         assertThat(sourceIds()).containsExactly(primary.id, swimming.id)
@@ -91,7 +91,7 @@ class SourceRefresherTest {
         refresh()
         assertThat(store.master().first()).isNull()
         assertThat(sourceIds()).containsExactly(primary.id, swimming.id)
-        refresher.flag("g1")
+        refresher.flag("g1", swimming.id)
         refresh()
         assertThat(toaster.messages).containsExactly("Google Calendar: can't find the master calendar, so new events can't be added")
     }
@@ -113,7 +113,7 @@ class SourceRefresherTest {
         provider.sourceList = emptyList()
         refresh()
         provider.sourceList = listOf(swimming)
-        refresher.flag("g1")
+        refresher.flag("g1", swimming.id)
         refresh()
         assertThat(sourceIds()).containsExactly(primary.id, swimming.id)
         assertThat(store.master().first()?.source?.id).isEqualTo(primary.id)
@@ -132,6 +132,36 @@ class SourceRefresherTest {
         provider.sourcesFailWith = null
         refresh()
         assertThat(sourceIds()).containsExactly(primary.id, swimming.id)
+    }
+
+    @Test
+    fun aCheckInTheFutureAfterTheClockWasSetBackIsDue() = runTest {
+        connect()
+        refresh()
+        provider.sourceList = listOf(primary, swimming)
+        now -= 60_000
+        refresh()
+        assertThat(sourceIds()).containsExactly(primary.id, swimming.id)
+    }
+
+    @Test
+    fun aGoneSourceStillListedIsNotFlaggedAgainUntilTheDailyRefresh() = runTest {
+        connect(listOf(primary, swimming))
+        refresh()
+        provider.sourceList = listOf(primary, swimming)
+        refresher.flag("g1", swimming.id)
+        refresh()
+        val calls = provider.sourcesCalls
+        refresher.flag("g1", swimming.id)
+        now += 60_000
+        refresh()
+        assertThat(provider.sourcesCalls).isEqualTo(calls)
+        now += SOURCE_REFRESH_MS
+        refresh()
+        refresher.flag("g1", swimming.id)
+        now += 60_000
+        refresh()
+        assertThat(provider.sourcesCalls).isEqualTo(calls + 2)
     }
 
     @Test

@@ -49,7 +49,7 @@ class CalendarSyncTest {
     private val london = ZoneId.of("Europe/London")
     private var now = Instant.parse("2026-09-23T11:00:00Z")
     private val clock = WallClock { now.toEpochMilli() }
-    private val s1 = CalendarSource("s1", "One", writable = false)
+    private val s1 = CalendarSource("s1", "One", writable = false, primary = true)
     private val s2 = CalendarSource("s2", "Two", writable = false)
     private val a = ScriptedProvider("calendar.a")
     private val b = ScriptedProvider("calendar.b")
@@ -84,7 +84,7 @@ class CalendarSyncTest {
     private suspend fun engine(): CalendarSync = engineWith(emptySet(), SilentToaster)
 
     private suspend fun connect(id: String, providerId: String, vararg sources: CalendarSource, mapping: Map<String, SourceMapping> = emptyMap()) {
-        // The provider lists the same calendars, so the first pass's source refresh keeps them.
+        // The provider lists the same calendars, so the first pass's source refresh keeps them (s1 is the primary).
         listOf(a, b).firstOrNull { it.descriptor.id == providerId }?.sourceList = sources.toList()
         store.addConnection(Connection(id, providerId, id.uppercase(), emptyMap()), sources.toList(), mapping)
     }
@@ -875,14 +875,12 @@ class CalendarSyncTest {
 
     @Test
     fun aSourceGoneFlagsARefreshThatRemovesIt() = runTest {
-        // A list without its primary is a failed read, so this connection has one.
-        val family = s1.copy(primary = true)
-        connect("c1", "calendar.a", family, s2)
+        connect("c1", "calendar.a", s1, s2)
         val sync = engine()
         sync.syncAll()
         // Deleted in the service: its list call says so before a refresh would.
         a.failFor = mapOf("s2" to SourceGoneException("calendar deleted"))
-        a.sourceList = listOf(family)
+        a.sourceList = listOf(s1)
         now = now.plusSeconds(300)
         sync.syncAll()
         assertThat(health("c1")).isEqualTo(ConnectionHealth.Unreachable)
@@ -894,9 +892,8 @@ class CalendarSyncTest {
     }
 
     @Test
-    fun aSourceGoneThatIsStillListedIsKept() = runTest {
-        val family = s1.copy(primary = true)
-        connect("c1", "calendar.a", family, s2)
+    fun aSourceGoneThatIsStillListedIsKeptAndNotReadAgainEachPass() = runTest {
+        connect("c1", "calendar.a", s1, s2)
         val sync = engine()
         sync.syncAll()
         a.failFor = mapOf("s2" to SourceGoneException("a passing 404"))
@@ -906,6 +903,12 @@ class CalendarSyncTest {
         sync.syncAll()
         assertThat(store.sources().first().map { it.source.id }).containsExactly("s1", "s2")
         assertThat(store.connectionsNow().single().sourcesCheckedMillis).isEqualTo(now.toEpochMilli())
+        // Still gone to sync, still listed: no calendar list read every pass until the daily refresh.
+        val reads = a.sourcesCalls
+        now = now.plusSeconds(300)
+        sync.syncAll()
+        assertThat(a.sourcesCalls).isEqualTo(reads)
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Unreachable)
     }
 
     private companion object {

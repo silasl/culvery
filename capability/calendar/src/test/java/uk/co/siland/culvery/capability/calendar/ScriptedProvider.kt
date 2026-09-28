@@ -27,6 +27,12 @@ internal class ScriptedProvider(
     var sourcesFailWith: Throwable? = null
     /** sources() never returns, like a stalled socket. */
     var sourcesHang = false
+    /** When set, sources() waits for it. */
+    var sourcesGate: CompletableDeferred<Unit>? = null
+
+    /** How many times sources() was called. */
+    @Volatile var sourcesCalls = 0
+        private set
     /** Never returns, like a stalled socket. */
     var hang = false
     /** When set, sync waits for it: a slow network the test releases. */
@@ -46,7 +52,9 @@ internal class ScriptedProvider(
     }
 
     override suspend fun sources(conn: Connection): List<CalendarSource> {
+        synchronized(this) { sourcesCalls++ }
         if (sourcesHang) awaitCancellation()
+        sourcesGate?.await()
         sourcesFailWith?.let { throw it }
         return sourceList
     }

@@ -36,11 +36,18 @@ class SourceRefresher internal constructor(
         this(store, { household.people.first() }, clock, toaster, Dispatchers.IO, PROVIDER_TIMEOUT_MS)
 
     private val refreshed = ConcurrentHashMap.newKeySet<String>()
-    private val flagged = ConcurrentHashMap.newKeySet<String>()
 
-    /** A sync found one of [connectionId]'s sources gone (SourceGoneException): refresh at the next pass. */
-    fun flag(connectionId: String) {
-        flagged += connectionId
+    // Per connection: the sources a sync found gone, waiting for a refresh.
+    private val flagged = ConcurrentHashMap<String, MutableSet<String>>()
+
+    // Per connection: sources found gone that a flagged refresh saw still listed. Their SourceGone is ignored until
+    // the next scheduled refresh, or every pass would read the calendar list again.
+    private val stillListed = ConcurrentHashMap<String, MutableSet<String>>()
+
+    /** A sync found [sourceId] gone (SourceGoneException): refresh [connectionId] at the next pass. */
+    fun flag(connectionId: String, sourceId: String) {
+        if (stillListed[connectionId]?.contains(sourceId) == true) return
+        flagged.getOrPut(connectionId) { ConcurrentHashMap.newKeySet() } += sourceId
     }
 
     /**
@@ -53,8 +60,10 @@ class SourceRefresher internal constructor(
         val id = stored.connection.id
         val now = clock.nowMillis()
         val checked = stored.sourcesCheckedMillis
-        val due = id !in refreshed || id in flagged || checked == null || now - checked >= SOURCE_REFRESH_MS
-        if (!due) return
+        // A check in the future means the clock was set back.
+        val scheduled = id !in refreshed || checked == null || checked > now || now - checked >= SOURCE_REFRESH_MS
+        val gone = flagged[id].orEmpty().toSet()
+        if (!scheduled && gone.isEmpty()) return
         // Logged by connection id only: a calendar's name or id can be the account's email.
         val sources = callReader(io, timeoutMillis) { provider.sources(stored.connection) }.getOrElse {
             Log.w(TAG, "$id: couldn't read its calendars; trying again next pass", it)
@@ -67,7 +76,11 @@ class SourceRefresher internal constructor(
         val household = people()
         val masterCleared = store.refreshSources(id, sources, now) { defaultMapping(it, household) }
         refreshed += id
-        flagged -= id
+        flagged[id]?.removeAll(gone)
+        val listed = sources.mapTo(HashSet()) { it.id }
+        val kept = stillListed.getOrPut(id) { ConcurrentHashMap.newKeySet() }
+        if (scheduled) kept.clear()
+        kept += gone.filter { it in listed }
         if (masterCleared) toaster.show(masterGone(provider.descriptor.displayName))
     }
 

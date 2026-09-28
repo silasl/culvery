@@ -170,6 +170,17 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     suspend fun makeDue(connectionId: String, nowMillis: Long) = dao.makeDue(connectionId, nowMillis)
 
     /**
+     * Reconnect (3a design D6) in one transaction: health Ok, which ends the sign-in pause, and the queued changes due
+     * now. False, writing nothing, when the connection is gone.
+     */
+    suspend fun reconnect(connectionId: String, nowMillis: Long): Boolean = db.withTransaction {
+        dao.connection(connectionId) ?: return@withTransaction false
+        setHealth(connectionId, ConnectionHealth.Ok, nowMillis)
+        makeDue(connectionId, nowMillis)
+        true
+    }
+
+    /**
      * Null when nothing is stored or the cursor belongs to a different window or zone, forcing a full resync.
      * A zone change must resync: all-day events are stored at midnight in the zone they were synced in.
      */

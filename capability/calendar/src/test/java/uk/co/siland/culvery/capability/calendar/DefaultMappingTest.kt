@@ -39,6 +39,14 @@ class DefaultMappingTest {
     }
 
     @Test
+    fun aPersonWithABlankNameNamesNoCalendar() {
+        // An empty name would match between any two non-letters, here around the "&".
+        val blank = Person(PersonId("blank"), "", 0xFF000000)
+        assertThat(defaultMapping(CalendarSource("m", "Mia & friends", writable = false), listOf(mia, blank)).person).isEqualTo(mia.id)
+        assertThat(defaultMapping(CalendarSource("b", "Bins & recycling", writable = false), listOf(blank)).person).isEqualTo(PersonId.FAMILY)
+    }
+
+    @Test
     fun visibilityFollowsTheTick() {
         assertThat(mapped("Mia", shown = false)).isEqualTo(SourceMapping(mia.id, visible = false))
         assertThat(mapped("Mia", shown = true)).isEqualTo(SourceMapping(mia.id, visible = true))

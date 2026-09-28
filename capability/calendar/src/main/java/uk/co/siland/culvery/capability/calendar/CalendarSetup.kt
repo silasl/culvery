@@ -8,10 +8,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.Connection
-import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -49,6 +50,9 @@ class CalendarSetup(
         loop: CalendarSyncLoop,
     ) : this(store, providers, { household.people.first() }, toaster, clock, Dispatchers.IO, PROVIDER_TIMEOUT_MS, loop::requestSync)
 
+    // Makes connectWithDefaults' same-account check and its add one step.
+    private val connecting = Mutex()
+
     suspend fun hasConnections(): Boolean = store.connectionsNow().isNotEmpty()
 
     /** Every connection's id, as it changes. */
@@ -65,20 +69,25 @@ class CalendarSetup(
 
     /**
      * Connects with automatic setup (3a design D4): every source, mapped by [defaultMapping] from the household's
-     * people, and the primary as the master; then a sync. Toasts the outcome. A failure stores nothing. Returns whether
-     * the connection was stored. The same provider and account already connected (a second tap on Connect, while the
-     * first was still setting up) is reconnected instead, never added twice (review M2); CalendarConnections runs one
-     * connect at a time, so the second sees the first.
+     * people, and the primary as the master; then a sync. Toasts the outcome. A failure, a list without the primary
+     * calendar included (§3.4), stores nothing. Returns whether the connection was stored. The same provider and
+     * account already connected (a second tap on Connect, while the first was still setting up) is reconnected
+     * instead, never added twice (review M2): the check and the add run under one lock, whoever calls.
      */
-    suspend fun connectWithDefaults(connection: Connection): Boolean {
-        alreadyConnected(connection)?.let { return reconnect(it) }
-        val provider = providerFor(connection.providerId)
-        val service = provider.descriptor.displayName
+    suspend fun connectWithDefaults(connection: Connection): Boolean = connecting.withLock {
+        alreadyConnected(connection)?.let { return@withLock reconnect(it) }
         val stored = try {
+            val provider = providerFor(connection.providerId)
             val sources = callProvider { provider.sources(connection) }
+            val master = sources.firstOrNull { it.primary }
+                ?: throw UnreachableException("The calendar list has no primary calendar")
             val household = people()
-            val master = sources.firstOrNull { it.primary && it.writable }?.id
-            store.addConnection(connection, sources, sources.associate { it.id to defaultMapping(it, household) }, master)
+            store.addConnection(
+                connection,
+                sources,
+                sources.associate { it.id to defaultMapping(it, household) },
+                master.id.takeIf { master.writable },
+            )
             true
         } catch (e: CancellationException) {
             throw e
@@ -88,33 +97,35 @@ class CalendarSetup(
         }
         if (stored) {
             requestSync()
-            toaster.show(connected(service))
+            toaster.show(connected(serviceName(connection)))
         } else {
-            toaster.show(couldNotConnect(service))
+            toaster.show(couldNotConnect(serviceName(connection)))
         }
-        return stored
+        stored
     }
 
     /**
      * Reconnect (3a design D6): the same connection, healthy again, so its sign-in pause ends (D16); its queued
-     * changes are due now (m4) and a sync is asked for. Returns whether it was recorded.
+     * changes are due now (m4) and a sync is asked for. Returns whether it was recorded: not when the connection has
+     * been removed meanwhile.
      */
     suspend fun reconnect(connection: Connection): Boolean {
-        val service = providerFor(connection.providerId).descriptor.displayName
-        return try {
-            val now = clock.nowMillis()
-            store.setHealth(connection.id, ConnectionHealth.Ok, now)
-            store.makeDue(connection.id, now)
-            requestSync()
-            toaster.show(reconnected(service))
-            true
+        val recorded = try {
+            providerFor(connection.providerId)
+            store.reconnect(connection.id, clock.nowMillis())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "Couldn't record ${connection.id} as reconnected", e)
-            toaster.show(couldNotConnect(service))
             false
         }
+        if (recorded) {
+            requestSync()
+            toaster.show(reconnected(serviceName(connection)))
+        } else {
+            toaster.show(couldNotConnect(serviceName(connection)))
+        }
+        return recorded
     }
 
     /** The stored connection for [connection]'s provider and account, if there is one. */
@@ -147,6 +158,10 @@ class CalendarSetup(
 
     /** Asks the sync loop for a pass now. */
     fun syncSoon() = requestSync()
+
+    /** The provider's display name for the toasts; its id if it isn't installed. */
+    private fun serviceName(connection: Connection): String =
+        providers.firstOrNull { it.descriptor.id == connection.providerId }?.descriptor?.displayName ?: connection.providerId
 
     private fun providerFor(providerId: String): CalendarProvider =
         providers.firstOrNull { it.descriptor.id == providerId } ?: throw IllegalArgumentException("No calendar provider $providerId")

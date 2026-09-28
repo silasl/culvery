@@ -12,7 +12,7 @@ fun defaultMapping(source: CalendarSource, people: List<Person>): SourceMapping 
     val person = if (source.primary) {
         PersonId.FAMILY
     } else {
-        people.filter { !it.isFamily && namesPerson(source.name, it.name) }.singleOrNull()?.id ?: PersonId.FAMILY
+        people.filter { !it.isFamily && it.name.isNotBlank() && namesPerson(source.name, it.name) }.singleOrNull()?.id ?: PersonId.FAMILY
     }
     return SourceMapping(person, visible = source.visibleOnTablet)
 }

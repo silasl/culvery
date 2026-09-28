@@ -300,7 +300,7 @@ class CalendarSync internal constructor(
     ): ConnectionHealth {
         val cursor = store.cursor(conn.id, source.id, window)
         val result = callReader(io, timeoutMillis) { provider.sync(conn, source, window, cursor) }
-            .getOrElse { return healthAfter(it, conn) }
+            .getOrElse { return healthAfter(it, conn, source.id) }
         store.applySync(conn.id, source.id, window, result)
         return ConnectionHealth.Ok
     }
@@ -309,14 +309,14 @@ class CalendarSync internal constructor(
      * A failed read's health, logged with its cause and the connection's id: never a name or a calendar id, either of
      * which can be the account's email, and never a token.
      */
-    private fun healthAfter(e: Throwable, conn: Connection): ConnectionHealth = when (e) {
+    private fun healthAfter(e: Throwable, conn: Connection, sourceId: String): ConnectionHealth = when (e) {
         is NeedsSignInException -> {
             Log.w(TAG, "${conn.id}: a source needs signing in again", e)
             ConnectionHealth.NeedsSignIn
         }
         is SourceGoneException -> {
-            Log.w(TAG, "${conn.id}: a source is gone from the service; refreshing its calendars at the next pass", e)
-            refresher.flag(conn.id)
+            Log.w(TAG, "${conn.id}: a source is gone from the service; flagging a refresh of its calendars", e)
+            refresher.flag(conn.id, sourceId)
             ConnectionHealth.Unreachable
         }
         is UnreachableException -> {

@@ -3,7 +3,14 @@ package uk.co.siland.culvery.capability.calendar
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -199,5 +206,52 @@ class CalendarSetupTest {
         setup.removeConnection("g1")
         assertThat(setup.connectionIds().first()).isEmpty()
         assertThat(store.sources().first()).isEmpty()
+    }
+
+    @Test
+    fun twoConnectsOfTheSameAccountAtOnceMakeOneConnection() = runTest {
+        // The reads run on a real thread under a real timeout: virtual time would time the held read out.
+        val setup = CalendarSetup(store, setOf(google), { listOf(mia) }, toaster, WallClock { now }, Dispatchers.Default, 5_000)
+        val gate = CompletableDeferred<Unit>()
+        google.sourcesGate = gate
+        val first = async { setup.connectWithDefaults(googleConnection) }
+        withContext(Dispatchers.Default) { withTimeout(5_000) { while (google.sourcesCalls < 1) delay(10) } }
+        val second = async { setup.connectWithDefaults(googleConnection.copy(id = "g2")) }
+        // Without the lock the second would get past the check and read the list too; give it the chance.
+        withContext(Dispatchers.Default) { withTimeoutOrNull(500) { while (google.sourcesCalls < 2) delay(10) } }
+        gate.complete(Unit)
+        assertThat(first.await() to second.await()).isEqualTo(true to true)
+        assertThat(store.connectionsNow().map { it.connection.id }).containsExactly("g1")
+        assertThat(toaster.messages).containsExactly("Google Calendar connected", "Google Calendar reconnected").inOrder()
+    }
+
+    @Test
+    fun aListWithoutThePrimaryIsAFailedConnect() = runTest {
+        google.sourceList = google.sourceList.filterNot { it.primary }
+        assertThat(setup(setOf(google)).connectWithDefaults(googleConnection)).isFalse()
+        assertThat(store.connectionsNow()).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't connect to Google Calendar — try again")
+    }
+
+    @Test
+    fun anUnknownProviderIsAFailedConnectNotACrash() = runTest {
+        assertThat(setup(setOf(provider)).connectWithDefaults(googleConnection)).isFalse()
+        assertThat(setup(setOf(provider)).reconnect(googleConnection)).isFalse()
+        assertThat(store.connectionsNow()).isEmpty()
+        assertThat(toaster.messages).containsExactly(
+            "Couldn't connect to calendar.google — try again", "Couldn't connect to calendar.google — try again",
+        )
+    }
+
+    @Test
+    fun reconnectingAConnectionRemovedMeanwhileRecordsNothing() = runTest {
+        var syncs = 0
+        val setup = setup(setOf(google)) { syncs++ }
+        setup.connectWithDefaults(googleConnection)
+        setup.removeConnection("g1")
+        assertThat(setup.reconnect(googleConnection)).isFalse()
+        assertThat(store.connectionsNow()).isEmpty()
+        assertThat(syncs).isEqualTo(1)
+        assertThat(toaster.messages).containsExactly("Google Calendar connected", "Couldn't connect to Google Calendar — try again").inOrder()
     }
 }
