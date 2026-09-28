@@ -50,6 +50,7 @@ import uk.co.siland.culvery.capability.calendar.ChangeKind
 import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EVENT_ADDED
 import uk.co.siland.culvery.capability.calendar.EventDraft
+import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.HouseholdZone
@@ -277,6 +278,8 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { closed > 0 }
         assertThat(writer.calls).containsExactly("update:dinner")
+        // Only Length was changed, so only the times are sent (3a design C3).
+        assertThat(writer.fieldSets.single()).containsExactly(EventField.TIMES)
         assertThat(access.requests.single().reason).isEqualTo(PinReason.Edit)
         assertThat(access.toasts.messages).containsExactly(CHANGES_SAVED)
     }

@@ -84,11 +84,14 @@ class CalendarEditorTest {
      */
     private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext) = testEditor(
         store, setOf(writer), access.control, access.toasts, HouseholdZone(household), WallClock { testScheduler.currentTime },
-        backgroundScope, requestSync = { syncRequests++ }, io = io, writeLock = lock,
+        backgroundScope, requestSync = { syncRequests++ }, io = io, writeLock = lock, personOf = household::person,
     )
 
     /** As the sheet chooses them: "key-1", "key-2"… in the order Save is tapped. */
     private suspend fun CalendarEditor.create(draft: EventDraft): EditResult = create(draft, "key-${++keys}")
+
+    /** A change to everything the sheet shows, as 2b-2's sheet sent it. */
+    private suspend fun CalendarEditor.update(ref: EventRef, draft: EventDraft): EditResult = update(ref, draft, EventField.entries.toSet())
 
     /** The outbox drain as the sync loop runs it, [aheadMillis] after the test's clock, with this test's writer. */
     private fun TestScope.drain(access: TestAccess, aheadMillis: Long) = testSync(
@@ -739,5 +742,65 @@ class CalendarEditorTest {
         assertThat(editor.update(ref("dinner"), edited("Pizza"))).isEqualTo(EditResult.NotEditable)
         assertThat(editor.update(ref("nope"), edited("Pizza"))).isEqualTo(EditResult.NotEditable)
         assertThat(access.requests).hasSize(1)
+    }
+
+    /** The dinner as a phone left it: an hour later than [event] puts it. */
+    private fun movedOnAPhone(createdBy: String?): RemoteEvent {
+        val later = LocalDate.of(2026, 9, 23).atTime(20, 30).atZone(london).toInstant()
+        return RemoteEvent("dinner", "dinner", EventTime.Timed(later), EventTime.Timed(later.plusSeconds(5_400)), false, null, createdBy)
+    }
+
+    @Test
+    fun anEditSendsOnlyItsFieldsLaidOverTheEventAsItIsNow() = runTest {
+        val access = testAccess(household)
+        // The sheet opened on the event at 19:30; a phone moved it while the sheet was open.
+        put(movedOnAPhone(createdBy = access.alex.id.value))
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access).update(ref("dinner"), edited("Dinner at Gran's"), setOf(EventField.TITLE))).isEqualTo(EditResult.Done)
+        assertThat(writer.fieldSets.single()).containsExactly(EventField.TITLE)
+        val sent = writer.drafts.single()
+        assertThat(listOf(sent.title, sent.start, sent.forPerson, sent.createdBy))
+            .containsExactly("Dinner at Gran's", movedOnAPhone(null).start, null, access.alex.id.value).inOrder()
+    }
+
+    @Test
+    fun anOfflineTitleEditIsSentAsATitleOnlyUpdateAfterAPhoneMovedTheEvent() = runTest {
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value))
+        writer.failWith = UnreachableException("offline")
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access).update(ref("dinner"), edited("Dinner at Gran's"), setOf(EventField.TITLE))).isEqualTo(EditResult.Queued)
+        assertThat(store.pendingNow().single().fields).containsExactly(EventField.TITLE)
+        // Before the tablet is back online, a phone moves the event an hour later.
+        put(movedOnAPhone(createdBy = access.alex.id.value))
+        writer.failWith = null
+        drain(access, aheadMillis = OUTBOX_BACKOFF_MS.first()).syncAll()
+        // Only the title goes: the provider keeps the phone's new time.
+        assertThat(writer.fieldSets.last()).containsExactly(EventField.TITLE)
+        assertThat(writer.drafts.last().title).isEqualTo("Dinner at Gran's")
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
+    @Test
+    fun aChangeOfWhoIsARetagOnlyWhenWhoIsTouched() = runTest {
+        val access = testAccess(household)
+        put(event("football", createdBy = access.mia.id.value, forPerson = access.mia.id.value))
+        access.answer(TestAccess.MIA)
+        // The sheet's draft names Family, but Who isn't among the touched fields: Mia may change her own title.
+        assertThat(editor(access).update(ref("football"), edited("Football at the park", PersonId.FAMILY.value), setOf(EventField.TITLE)))
+            .isEqualTo(EditResult.Done)
+        assertThat(writer.drafts.single().forPerson).isEqualTo(access.mia.id.value)
+    }
+
+    @Test
+    fun newEventsAndAssignsCarryThePersonsColourAndFamilyCarriesNone() = runTest {
+        val access = testAccess(household)
+        put(event("plumber", createdBy = null))
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        editor.create(draft("Sleepover", access.mia.id.value))
+        editor.create(draft("Pizza night", PersonId.FAMILY.value))
+        editor.assign(ref("plumber"), access.sam.id)
+        assertThat(writer.drafts.map { it.forPersonColor }).containsExactly(access.mia.color, null, access.sam.color).inOrder()
     }
 }

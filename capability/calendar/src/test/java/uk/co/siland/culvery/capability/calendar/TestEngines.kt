@@ -4,6 +4,8 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import uk.co.siland.culvery.core.access.AccessControl
+import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 
@@ -21,7 +23,8 @@ internal fun testEditor(
     requestSync: () -> Unit = {},
     io: CoroutineContext = EmptyCoroutineContext,
     writeLock: CalendarWriteLock = CalendarWriteLock(),
-): CalendarEditor = CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock)
+    personOf: suspend (PersonId) -> Person? = { null },
+): CalendarEditor = CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, personOf)
 
 internal fun testSync(
     store: CalendarStore,

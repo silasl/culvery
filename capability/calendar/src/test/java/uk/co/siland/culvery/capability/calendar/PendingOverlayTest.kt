@@ -120,4 +120,15 @@ class PendingOverlayTest {
         )
         assertThat(shown.map { it.event.remoteId }).containsExactly("a")
     }
+
+    @Test
+    fun aQueuedTitleEditShowsOverThePhonesNewTime() {
+        // Queued with the times the sheet opened on; a phone has since moved the event to 11:00.
+        val titleOnly = EventDraft("Renamed", at(9), at(10), forPerson = null, createdBy = null)
+        val queued = change(1, ChangeKind.UPDATE, "a", titleOnly).copy(fields = setOf(EventField.TITLE))
+        val shown = overlay(listOf(stored("a", 11)), listOf(queued)).single()
+        assertThat(shown.event.title).isEqualTo("Renamed")
+        assertThat(shown.event.start).isEqualTo(at(11))
+        assertThat(shown.event.startSort).isEqualTo(at(11).instant.toEpochMilli())
+    }
 }

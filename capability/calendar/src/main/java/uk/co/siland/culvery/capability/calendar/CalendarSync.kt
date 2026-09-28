@@ -190,12 +190,13 @@ class CalendarSync internal constructor(
             ChangeKind.UPDATE -> {
                 val remoteId = checkNotNull(change.remoteId)
                 val draft = checkNotNull(change.draft)
-                callWriter(io, timeoutMillis) { writer.update(conn, source, remoteId, draft, fieldsFor(ChangeKind.UPDATE, null)) }
+                // Only the fields the sheet touched (3a design C3): a phone's change to the others is kept.
+                callWriter(io, timeoutMillis) { writer.update(conn, source, remoteId, draft, fieldsFor(ChangeKind.UPDATE, change.fields)) }
             }
             ChangeKind.ASSIGN -> {
                 // Sent as the event is now, so a title or time changed elsewhere since it was queued is kept.
                 val current = ref?.let { store.eventNow(it) } ?: return WriteOutcome.Rejected(EVENT_GONE)
-                val draft = assignDraft(current, change.draft?.forPerson)
+                val draft = assignDraft(current, change.draft?.forPerson, change.draft?.forPersonColor)
                 callWriter(io, timeoutMillis) { writer.update(conn, source, current.remoteId, draft, fieldsFor(ChangeKind.ASSIGN, null)) }
             }
             ChangeKind.DELETE -> {

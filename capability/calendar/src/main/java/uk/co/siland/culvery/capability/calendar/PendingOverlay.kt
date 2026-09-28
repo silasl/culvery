@@ -32,7 +32,7 @@ internal fun PendingChange.asCreatedEvent(sourcePerson: PersonId, zone: ZoneId):
 
 /**
  * Lays [pending] changes over [events] in queue order. A delete hides the event. An update shows the draft's
- * values; an assign shows only its person. A create adds its draft, on a visible source, under its client key, so
+ * values for its fields; an assign shows only its person. A create adds its draft, on a visible source, under its client key, so
  * the changes queued behind it apply to it and it keeps its ref once it syncs. Only events overlapping
  * [windowStart, windowEnd) are returned, in start order.
  */
@@ -50,15 +50,12 @@ internal fun overlayPending(
         val draft = change.draft
         when (change.kind) {
             ChangeKind.DELETE -> change.ref?.let { shown.remove(it) }
-            ChangeKind.UPDATE -> {
+            ChangeKind.UPDATE, ChangeKind.ASSIGN -> {
                 val ref = change.ref ?: continue
                 val current = shown[ref] ?: continue
-                if (draft != null) shown[ref] = ShownEvent(current.event.withDraft(draft, zone), syncing = true)
-            }
-            ChangeKind.ASSIGN -> {
-                val ref = change.ref ?: continue
-                val current = shown[ref] ?: continue
-                if (draft != null) shown[ref] = ShownEvent(current.event.copy(forPerson = draft.forPerson), syncing = true)
+                if (draft != null) {
+                    shown[ref] = ShownEvent(current.event.withFields(draft, fieldsFor(change.kind, change.fields), zone), syncing = true)
+                }
             }
             ChangeKind.CREATE -> {
                 val source = sources(change.connectionId, change.sourceId)?.takeIf { it.mapping.visible } ?: continue
@@ -73,12 +70,20 @@ internal fun overlayPending(
         .sortedWith(compareBy<ShownEvent> { it.event.startSort }.thenBy { it.event.title })
 }
 
-private fun StoredEvent.withDraft(d: EventDraft, zone: ZoneId) = copy(
-    title = d.title,
-    start = d.start,
-    end = d.end,
-    forPerson = d.forPerson,
-    createdBy = d.createdBy,
-    startSort = d.start.instantIn(zone).toEpochMilli(),
-    endSort = d.end.instantIn(zone).toEpochMilli(),
-)
+/**
+ * [d]'s values for [fields] only (3a design C3): a phone's change to a field the tablet didn't touch still shows. The
+ * creator never changes here.
+ */
+internal fun StoredEvent.withFields(d: EventDraft, fields: Set<EventField>, zone: ZoneId): StoredEvent {
+    val times = EventField.TIMES in fields
+    val newStart = if (times) d.start else start
+    val newEnd = if (times) d.end else end
+    return copy(
+        title = if (EventField.TITLE in fields) d.title else title,
+        start = newStart,
+        end = newEnd,
+        forPerson = if (EventField.FOR_PERSON in fields) d.forPerson else forPerson,
+        startSort = newStart.instantIn(zone).toEpochMilli(),
+        endSort = newEnd.instantIn(zone).toEpochMilli(),
+    )
+}

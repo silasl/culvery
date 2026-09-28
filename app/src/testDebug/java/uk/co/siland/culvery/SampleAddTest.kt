@@ -27,6 +27,7 @@ import uk.co.siland.culvery.capability.calendar.EVENT_ADDED
 import uk.co.siland.culvery.capability.calendar.EVENT_DELETED
 import uk.co.siland.culvery.capability.calendar.EditResult
 import uk.co.siland.culvery.capability.calendar.EventDraft
+import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.HouseholdZone
 import uk.co.siland.culvery.capability.calendar.OUTBOX_BACKOFF_MS
@@ -104,7 +105,7 @@ class SampleAddTest {
         )
         val lock = CalendarWriteLock()
         val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, clock, lock)
-        val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, backgroundScope), lock)
+        val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, backgroundScope), lock, household)
         val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake))
         sync.syncAll()
 
@@ -118,7 +119,7 @@ class SampleAddTest {
         val added = repo.day(today).first().single { it.title == "Parents evening" }
         assertThat(added.syncing).isTrue()
 
-        assertThat(editor.update(added.ref, draft("Parents' evening at school"))).isEqualTo(EditResult.Queued)
+        assertThat(editor.update(added.ref, draft("Parents' evening at school"), setOf(EventField.TITLE))).isEqualTo(EditResult.Queued)
         assertThat(repo.event(added.ref, today).first()?.event?.title).isEqualTo("Parents' evening at school")
 
         assertThat(editor.delete(added.ref)).isEqualTo(EditResult.Queued)

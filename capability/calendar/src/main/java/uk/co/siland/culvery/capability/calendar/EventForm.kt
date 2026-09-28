@@ -205,13 +205,24 @@ class EventForm(
         }
     }
 
-    /** An edit that changes nothing: the sheet just closes, with no PIN (2b-2 design §3.3). A new event never is. */
-    val unchanged: Boolean
+    /**
+     * What an edit changed from the event as it opened (3a design C3): the fields its update sends, so a change made
+     * on a phone meanwhile to any other field is kept. A field changed and changed back isn't touched. A new event is
+     * every field.
+     */
+    val touched: Set<EventField>
         get() {
-            val o = original ?: return false
+            val o = original ?: return EventField.entries.toSet()
             val d = draft(createdBy = null)
-            return d.title == o.title.trim() && d.start == o.start && d.end == o.end && d.forPerson == o.forPerson
+            return buildSet {
+                if (d.title != o.title.trim()) add(EventField.TITLE)
+                if (d.start != o.start || d.end != o.end) add(EventField.TIMES)
+                if (d.forPerson != o.forPerson) add(EventField.FOR_PERSON)
+            }
         }
+
+    /** An edit that changes nothing: the sheet just closes, with no PIN (2b-2 design §3.3). A new event never is. */
+    val unchanged: Boolean get() = original != null && touched.isEmpty()
 
     /**
      * The header's live line, e.g. "Tomorrow · 14:00–15:00 · Mia": the When row's wording and the person's name. A tag

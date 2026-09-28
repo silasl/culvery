@@ -435,4 +435,30 @@ class EventFormTest {
         )
         assertThat(lateForm.datesLocked).isTrue()
     }
+
+    @Test
+    fun anEditTouchesOnlyWhatChanged() {
+        val form = editTimed(LocalDateTime.of(2026, 9, 23, 19, 30), 90)
+        assertThat(form.touched).isEmpty()
+        form.updateTitle("Dinner at Gran's")
+        assertThat(form.touched).containsExactly(EventField.TITLE)
+        form.chooseLength(Duration.ofHours(2))
+        assertThat(form.touched).containsExactly(EventField.TITLE, EventField.TIMES)
+        form.chooseWho(mia)
+        assertThat(form.touched).containsExactly(EventField.TITLE, EventField.TIMES, EventField.FOR_PERSON)
+    }
+
+    @Test
+    fun aTitleChangedAndChangedBackIsNotTouched() {
+        val form = editTimed(LocalDateTime.of(2026, 9, 23, 19, 30), 90)
+        form.updateTitle("Dinner")
+        form.updateTitle("Dinner with Jo & Priya")
+        assertThat(form.touched).isEmpty()
+        assertThat(form.unchanged).isTrue()
+    }
+
+    @Test
+    fun aNewEventTouchesEveryField() {
+        assertThat(new().touched).containsExactlyElementsIn(EventField.entries)
+    }
 }

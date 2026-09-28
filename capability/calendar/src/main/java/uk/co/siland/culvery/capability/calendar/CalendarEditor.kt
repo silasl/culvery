@@ -19,6 +19,8 @@ import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.Refusal
+import uk.co.siland.culvery.core.household.HouseholdRepository
+import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Connection
@@ -81,6 +83,7 @@ class CalendarEditor internal constructor(
     private val io: CoroutineContext,
     private val attemptMillis: Long,
     private val writeLock: CalendarWriteLock,
+    private val personOf: suspend (PersonId) -> Person?,
 ) {
     @Inject
     constructor(
@@ -93,7 +96,11 @@ class CalendarEditor internal constructor(
         @ApplicationScope scope: CoroutineScope,
         loop: CalendarSyncLoop,
         writeLock: CalendarWriteLock,
-    ) : this(store, writers, access, toaster, zone, clock, scope, loop::requestSync, Dispatchers.IO, WRITE_ATTEMPT_MS, writeLock)
+        household: HouseholdRepository,
+    ) : this(
+        store, writers, access, toaster, zone, clock, scope, loop::requestSync, Dispatchers.IO, WRITE_ATTEMPT_MS, writeLock,
+        household::person,
+    )
 
     /** Who is signed in now: the add/edit sheet's Who default and its disabled chips (2b-2 design D2). */
     internal val session: StateFlow<Identified?> get() = access.session
@@ -151,23 +158,26 @@ class CalendarEditor internal constructor(
             allow = { person, granted -> mayCreateFor(granted, person, draft.forPerson) },
             refusal = Refusal.Toast(::cannotAddForOthers),
         ) ?: return EditResult.Cancelled
-        val toSend = draft.copy(createdBy = who.person.id.value)
+        val toSend = draft.copy(createdBy = who.person.id.value, forPersonColor = colorOf(draft.forPerson))
         return onAppScope(ChangeKind.CREATE, to.connection.label) {
             writeLock.withLock { attempt(to, ChangeKind.CREATE, remoteId = null, toSend, clientKey = clientKey) }
         }
     }
 
     /**
-     * Changes [ref]'s title, times and who to [draft]'s (2b-2 design D7); everything else the provider holds is kept.
-     * The event's creator is kept too: [EventDraft.createdBy] is ignored. Needs edit, or edit.own on an event this
-     * person created, checked again once the PIN pad has closed. A change of who follows the add rule (§6).
+     * Changes [fields] of [ref] to [draft]'s values (3a design C3): the sheet's touched fields, laid over the event as
+     * re-read under the write lock, so a phone's change to the others is kept, in the mirror and the queue alike.
+     * Everything else the provider holds, and the event's creator, is kept: [EventDraft.createdBy] is ignored. Needs
+     * edit, or edit.own on an event this person created, checked again once the PIN pad has closed. A touched Who
+     * that differs follows the add rule (2b-2 design §6).
      */
-    suspend fun update(ref: EventRef, draft: EventDraft): EditResult {
+    suspend fun update(ref: EventRef, draft: EventDraft, fields: Set<EventField>): EditResult {
         val target = resolve(ref) ?: return EditResult.NotEditable
         if (target.pending.any { it.kind == ChangeKind.DELETE }) return EditResult.NotEditable
-        val retags = draft.forPerson != forPersonOf(target.event, target.pending)
+        val shownPerson = asShown(target.event, target.pending, zone.current()).forPerson
+        val retags = EventField.FOR_PERSON in fields && draft.forPerson != shownPerson
         val who = authoriseChange(target, PinReason.Edit, retags, draft.forPerson) ?: return EditResult.Cancelled
-        return write(target, ChangeKind.UPDATE, who, edit = draft)
+        return write(target, ChangeKind.UPDATE, who, edit = draft, fields = fields)
     }
 
     /** Where a change goes: a connection, one of its sources, and the writer for its provider. */
@@ -266,6 +276,7 @@ class CalendarEditor internal constructor(
         who: Authorised?,
         forPerson: String? = null,
         edit: EventDraft? = null,
+        fields: Set<EventField>? = null,
     ): EditResult = onAppScope(kind, target.to.connection.label) {
         writeLock.withLock {
             val ref = target.event.ref
@@ -282,11 +293,11 @@ class CalendarEditor internal constructor(
                     EditResult.Cancelled
                 }
                 else -> {
-                    val draft = draftFor(kind, event, pending, forPerson, edit)
+                    val draft = draftFor(kind, event, pending, forPerson, edit, fields)
                     if (pending.isNotEmpty()) {
-                        queue(target.to, kind, ref.remoteId, draft, attempted = false)
+                        queue(target.to, kind, ref.remoteId, draft, attempted = false, fields = fields)
                     } else {
-                        attempt(target.to, kind, ref.remoteId, draft)
+                        attempt(target.to, kind, ref.remoteId, draft, fields = fields)
                     }
                 }
             }
@@ -294,21 +305,31 @@ class CalendarEditor internal constructor(
     }
 
     /**
-     * No draft for a delete. An assign sends the event as it is now, with the new person. An update sends the
-     * sheet's title, times and who, with the event's own creator.
+     * No draft for a delete. An assign sends the event as it is now, with the new person and their colour. An update
+     * lays the sheet's [fields] over the event as shown now (its queued changes included) and keeps its creator.
      */
-    private fun draftFor(
+    private suspend fun draftFor(
         kind: ChangeKind,
         event: StoredEvent,
         pending: List<PendingChange>,
         forPerson: String?,
         edit: EventDraft?,
+        fields: Set<EventField>?,
     ): EventDraft? = when (kind) {
         ChangeKind.DELETE -> null
-        ChangeKind.ASSIGN -> assignDraft(event, forPerson)
-        ChangeKind.UPDATE -> checkNotNull(edit) { "An update needs its draft" }.copy(createdBy = createdByOf(event, pending))
+        ChangeKind.ASSIGN -> assignDraft(event, forPerson, colorOf(forPerson))
+        ChangeKind.UPDATE -> {
+            val sheet = checkNotNull(edit) { "An update needs its draft" }
+            val touched = checkNotNull(fields) { "An update needs its fields" }
+            val shown = asShown(event, pending, zone.current()).withFields(sheet, touched, zone.current())
+            EventDraft(shown.title, shown.start, shown.end, shown.forPerson, createdByOf(event, pending), colorOf(shown.forPerson))
+        }
         ChangeKind.CREATE -> error("A create has no event to change")
     }
+
+    /** The colour of the person [forPerson] names, for the provider's event colour; null for Family, untagged or someone gone. */
+    private suspend fun colorOf(forPerson: String?): Long? =
+        forPerson?.takeIf { it != PersonId.FAMILY.value }?.let { personOf(PersonId(it))?.color }
 
     /**
      * Tries the provider once. A create sends its [clientKey], and a queued create keeps it: if the provider did make
@@ -321,6 +342,7 @@ class CalendarEditor internal constructor(
         remoteId: String?,
         draft: EventDraft?,
         clientKey: String? = null,
+        fields: Set<EventField>? = null,
     ): EditResult {
         val outcome = callWriter(io, attemptMillis) {
             when (kind) {
@@ -330,7 +352,7 @@ class CalendarEditor internal constructor(
                     null
                 }
                 ChangeKind.UPDATE, ChangeKind.ASSIGN ->
-                    to.writer.update(to.connection, to.source, checkNotNull(remoteId), checkNotNull(draft), fieldsFor(kind, null))
+                    to.writer.update(to.connection, to.source, checkNotNull(remoteId), checkNotNull(draft), fieldsFor(kind, fields))
             }
         }
         return when (outcome) {
@@ -345,7 +367,7 @@ class CalendarEditor internal constructor(
                 EditResult.Done
             }
             is WriteOutcome.Rejected -> EditResult.Rejected(outcome.message)
-            is WriteOutcome.Retry -> queue(to, kind, remoteId, draft, attempted = true, clientKey = clientKey)
+            is WriteOutcome.Retry -> queue(to, kind, remoteId, draft, attempted = true, clientKey = clientKey, fields = fields)
         }
     }
 
@@ -357,6 +379,7 @@ class CalendarEditor internal constructor(
         draft: EventDraft?,
         attempted: Boolean,
         clientKey: String? = null,
+        fields: Set<EventField>? = null,
     ): EditResult {
         val now = clock.nowMillis()
         store.enqueue(
@@ -371,6 +394,8 @@ class CalendarEditor internal constructor(
                 nextAttemptMillis = if (attempted) now + backoffMillis(1) else now,
                 createdMillis = now,
                 clientKey = clientKey,
+                // An UPDATE's touched fields, which the drain sends (3a design C3); nothing else stores fields.
+                fields = fields.takeIf { kind == ChangeKind.UPDATE },
             ),
         )
         return EditResult.Queued
@@ -407,8 +432,13 @@ private fun createdByOf(event: StoredEvent, pending: List<PendingChange>): Strin
     return if (edit != null) edit.createdBy else event.createdBy
 }
 
-/** Who the event is for once its queued edits and assigns land: what the edit sheet showed. */
-private fun forPersonOf(event: StoredEvent, pending: List<PendingChange>): String? {
-    val last = pending.lastOrNull { it.kind == ChangeKind.UPDATE || it.kind == ChangeKind.ASSIGN }?.draft
-    return if (last != null) last.forPerson else event.forPerson
-}
+/** The event as the sheets show it: its queued updates and assigns laid over it in order, each with only its fields. */
+private fun asShown(event: StoredEvent, pending: List<PendingChange>, zone: ZoneId): StoredEvent =
+    pending.fold(event) { shown, change ->
+        val d = change.draft
+        if (d != null && (change.kind == ChangeKind.UPDATE || change.kind == ChangeKind.ASSIGN)) {
+            shown.withFields(d, fieldsFor(change.kind, change.fields), zone)
+        } else {
+            shown
+        }
+    }

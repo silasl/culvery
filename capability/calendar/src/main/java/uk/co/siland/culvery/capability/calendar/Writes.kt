@@ -127,8 +127,8 @@ fun couldNotSave(label: String, reason: String?): String =
 internal fun couldNotSaveAll(label: String, reasons: List<String?>): String =
     if (reasons.size == 1) couldNotSave(label, reasons.single()) else "Couldn't save ${reasons.size} changes to $label"
 
-/** An assign as it is sent: the event's current title, times and creator, with the new person. */
-internal fun assignDraft(event: StoredEvent, forPerson: String?): EventDraft =
-    EventDraft(event.title, event.start, event.end, forPerson, event.createdBy)
+/** An assign as it is sent: the event's current title, times and creator, with the new person and their colour. */
+internal fun assignDraft(event: StoredEvent, forPerson: String?, forPersonColor: Long?): EventDraft =
+    EventDraft(event.title, event.start, event.end, forPerson, event.createdBy, forPersonColor)
 
 private const val TAG = "CalendarWrites"

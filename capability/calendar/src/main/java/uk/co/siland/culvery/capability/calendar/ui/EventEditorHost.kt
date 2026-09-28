@@ -114,7 +114,7 @@ internal fun EventEditorHost(
         action.run {
             val result = when (val mode = form.mode) {
                 EventForm.Mode.New -> editor.create(form.draft(createdBy = null), createKey)
-                is EventForm.Mode.Edit -> editor.update(mode.original.ref, form.draft(createdBy = null))
+                is EventForm.Mode.Edit -> editor.update(mode.original.ref, form.draft(createdBy = null), form.touched)
             }
             if (result != EditResult.Rejected(TRY_AGAIN)) createKey = newClientKey()
             when (result) {
