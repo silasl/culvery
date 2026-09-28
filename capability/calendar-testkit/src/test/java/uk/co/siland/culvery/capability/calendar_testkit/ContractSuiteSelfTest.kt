@@ -75,10 +75,7 @@ class ContractSuiteSelfTest {
 
     @Test
     fun droppedTagsAreCaught() {
-        // update() has no field for createdBy (3a design C3: no update ever changes it), so a provider that drops the
-        // creator tag at create time never gets it back, and updatedFieldsRoundTrip's tag check fails too.
-        assertThat(failuresOf(DroppingTagsContract::class.java))
-            .containsExactly("createdEventComesBackOnTheNextSyncWithItsTags", "updatedFieldsRoundTrip")
+        assertThat(failuresOf(DroppingTagsContract::class.java)).containsExactly("createdEventComesBackOnTheNextSyncWithItsTags")
     }
 
     @Test

@@ -15,6 +15,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSource
 import uk.co.siland.culvery.capability.calendar.CalendarWriter
 import uk.co.siland.culvery.capability.calendar.DateRange
+import uk.co.siland.culvery.capability.calendar.EVENT_GONE
 import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
@@ -31,7 +32,6 @@ import uk.co.siland.culvery.core.ui.HhPillButton
 private val ConnectScreenButtonGap = 12.dp
 
 private const val OFFLINE_MESSAGE = "Sample calendar is offline"
-private const val GONE_MESSAGE = "That event no longer exists"
 
 /**
  * Debug-only sample data matching the design hand-off, generated relative to today so it never goes stale.
@@ -124,7 +124,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     override suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft, clientKey: String): RemoteEvent =
         write(source) {
             // A key whose event was deleted is refused, never made again (CalendarWriter contract).
-            if (clientKey in deleted) throw WriteRejectedException(GONE_MESSAGE)
+            if (clientKey in deleted) throw WriteRejectedException(EVENT_GONE)
             // The key is the event's id, so a retried create returns the event it made (CalendarWriter contract).
             created.getOrPut(clientKey) {
                 RemoteEvent(clientKey, draft.title, draft.start, draft.end, recurring = false, draft.forPerson, draft.createdBy)
@@ -138,7 +138,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
         draft: EventDraft,
         fields: Set<EventField>,
     ): RemoteEvent = write(source) {
-        val current = current(remoteId) ?: throw WriteRejectedException(GONE_MESSAGE)
+        val current = current(remoteId) ?: throw WriteRejectedException(EVENT_GONE)
         if (current.recurring) throw WriteRejectedException("Repeating events can't be changed here")
         val event = current.copy(
             title = if (EventField.TITLE in fields) draft.title else current.title,
@@ -158,9 +158,13 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
         Unit
     }
 
-    override suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent? {
+    override suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent? = synchronized(lock) {
         if (offline) throw UnreachableException(OFFLINE_MESSAGE)
-        return synchronized(lock) { if (source.id == SOURCE_FAMILY) current(remoteId) else null }
+        if (unreachableNext) {
+            unreachableNext = false
+            throw UnreachableException(OFFLINE_MESSAGE)
+        }
+        if (source.id == SOURCE_FAMILY) current(remoteId) else null
     }
 
     /** The Family calendar's event as it is now; null once deleted. Called under [lock]. */

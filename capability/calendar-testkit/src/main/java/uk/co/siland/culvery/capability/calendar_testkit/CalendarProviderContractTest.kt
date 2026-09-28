@@ -236,10 +236,13 @@ abstract class CalendarProviderContractTest {
         val changed = draftIn("After", 2, forPerson = "contract-other")
         val updated = w.update(conn, source, created.remoteId, changed, EventField.entries.toSet())
         assertWithMessage("an update keeps the remoteId").that(updated.remoteId).isEqualTo(created.remoteId)
-        assertMatches("update's result", updated, changed)
         val synced = nextSyncReturns(source, cursor, created.remoteId)
         assertWithMessage("the next sync must return the updated event").that(synced).isNotNull()
-        assertMatches("the next sync", synced!!, changed)
+        listOf("update's result" to updated, "the next sync" to synced!!).forEach { (what, e) ->
+            assertMatches(what, e, changed, checkTags = false)
+            assertWithMessage("$what: the forPerson tag").that(e.forPerson).isEqualTo(changed.forPerson)
+            assertWithMessage("$what: no update changes who created the event").that(e.createdBy).isEqualTo(created.createdBy)
+        }
     }
 
     @Test
