@@ -75,8 +75,9 @@ class CalendarSetup(
      * instead, never added twice (review M2): the check and the add run under one lock, whoever calls.
      */
     suspend fun connectWithDefaults(connection: Connection): Boolean = connecting.withLock {
-        alreadyConnected(connection)?.let { return@withLock reconnect(it) }
         val stored = try {
+            // Inside the try: a store failure here is a failed connect with its toast, like any other.
+            alreadyConnected(connection)?.let { return@withLock reconnect(it) }
             val provider = providerFor(connection.providerId)
             val sources = callProvider { provider.sources(connection) }
             val master = sources.firstOrNull { it.primary }

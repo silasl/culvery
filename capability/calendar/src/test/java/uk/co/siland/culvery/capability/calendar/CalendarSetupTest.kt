@@ -18,7 +18,9 @@ import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.calendar.db.CalendarDao
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
+import uk.co.siland.culvery.capability.calendar.db.ConnectionEntity
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
@@ -253,5 +255,16 @@ class CalendarSetupTest {
         assertThat(store.connectionsNow()).isEmpty()
         assertThat(syncs).isEqualTo(1)
         assertThat(toaster.messages).containsExactly("Google Calendar connected", "Couldn't connect to Google Calendar — try again").inOrder()
+    }
+
+    @Test
+    fun aStoreFailureCheckingForTheAccountIsAFailedConnect() = runTest {
+        val failing = object : CalendarDao by db.calendarDao() {
+            override suspend fun allConnections(): List<ConnectionEntity> = throw IllegalStateException("disk I/O error")
+        }
+        val setup = CalendarSetup(CalendarStore(db, failing), setOf(google), { listOf(mia) }, toaster, WallClock { now }, EmptyCoroutineContext, 1_000)
+        assertThat(setup.connectWithDefaults(googleConnection)).isFalse()
+        assertThat(store.sources().first()).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't connect to Google Calendar — try again")
     }
 }
