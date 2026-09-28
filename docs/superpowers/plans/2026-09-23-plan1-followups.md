@@ -79,12 +79,22 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - The editor's Retry path queues a create with its key; if that queue insert then fails (`TRY_AGAIN`), the sheet's Try again chooses a new key, and a provider that did make the event ends up with two. Fold into R3 with the other store failures.
 - The Google writer: `events.insert` with `id = clientKey`, and on 409 fetch and return the existing event.
 - The add/edit sheet crashes if the store fails while loading: `produceState` has no `catch`. Fold into R3 with the other store failures.
+- The drain doesn't take the editor's write lock, so an edit queued just as the drain drops its refused create is orphaned (an extra "no longer exists" toast). Fold into R3.
+- The editor host's error handler shows the Save failure card when the editor's Delete hits a store failure.
+- Drop `EventDetailHost`'s `onEdit = {}` default so a new caller can't get a dead Edit button.
 
 **For Plan 4**
 - I1, T2, T7: in the on-device pass, check the add/edit sheet with Samsung's floating and split keyboards, that the real IME inset reaches the sheet and the toast through `ShellLayers`, and that a tap on the scrim hides the keyboard.
 - The on-device pass: the add/edit sheet with the Samsung keyboard on the SM-T510, and with a signed release in lock-task mode (debug builds never call `startLockTask`, so the 2b-2 walkthrough checked the immersive window only).
 - With the full keyboard up, the add/edit sheet's first Day row is half-hidden and the chips scroll to reach it; check whether that is acceptable on the SM-T510's keyboard.
 - A toast covers the sheet's footer for about 3.5 s while it is up; check whether that is acceptable on-device.
+- For up to 30 s after midnight a week-column tap adds on the old "today" until the tick moves it; check on-device.
+- "No explicit keyboard insets in the hosts" is a manual grep in the plan, not a test.
+
+**Adding events, later (the user chose to leave these for now)**
+- Lengths beyond 2 h: a 3 h chip and **Pick end…** (an end time on the same day).
+- 5-minute steps on the time picker's minutes (15-minute steps today).
+- Multi-day all-day events: an **Until…** chip when All day is chosen, picking the end date. Multi-day timed events stay on the phone.
 
 **Accessibility pass (with the `HhIcon` item)**
 - Disabled Who chips lack disabled semantics.
