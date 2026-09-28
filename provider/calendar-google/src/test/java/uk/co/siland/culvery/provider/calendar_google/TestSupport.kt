@@ -40,10 +40,13 @@ internal fun screens(): PendingIntent =
 /**
  * P8/P11, for a test class's tearDown: nothing this module logged (its tags start "Google"), with its whole chain of
  * causes, holds an email, a token, or Google's own error text (the fake server's is "Google's own words for …"), nor
- * any of [also]. Other tags are the framework's, whose object ids hold "@".
+ * any of [also]. Other tags are the framework's, whose object ids hold "@". A failure-path test passes [minLines], so
+ * a check that saw no log at all can't pass by default.
  */
-internal fun assertLogsHoldNoPersonalData(vararg also: String) {
-    ShadowLog.getLogs().filter { it.tag.startsWith("Google") }.forEach { log ->
+internal fun assertLogsHoldNoPersonalData(vararg also: String, minLines: Int = 0) {
+    val logs = ShadowLog.getLogs().filter { it.tag.startsWith("Google") }
+    assertWithMessage("lines this module logged").that(logs.size).isAtLeast(minLines)
+    logs.forEach { log ->
         val causes = generateSequence(log.throwable) { it.cause }.joinToString(" ")
         val text = "${log.msg} $causes"
         assertWithMessage(text).that(text).doesNotContain("@")

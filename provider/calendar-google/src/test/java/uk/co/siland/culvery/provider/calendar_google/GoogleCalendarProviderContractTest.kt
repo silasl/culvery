@@ -54,4 +54,6 @@ class GoogleCalendarProviderContractTest : CalendarProviderContractTest() {
         google.failNext(401, "authError")
     }
     override fun simulateUnreachable() = { google.failNext(503) }
+    override fun writer() = subject
+    override fun writableSource() = family
 }

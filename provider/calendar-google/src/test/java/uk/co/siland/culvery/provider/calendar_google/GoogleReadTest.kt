@@ -127,10 +127,17 @@ class GoogleReadTest {
     fun anExpiredSyncTokenGivesAFullReplace() = runTest {
         google.putEvent(family.id, google.timed("a", "Walk", at(23, 9), at(23, 10)))
         val first = provider.sync(conn, family, range, null)
+        google.putEvent(family.id, google.timed("b", "Swim", at(23, 16), at(23, 17)))
         google.oldestValidToken = Long.MAX_VALUE
         val next = provider.sync(conn, family, range, first.cursor)
         assertThat(next.fullReplace).isTrue()
-        assertThat(next.upserts.map { it.remoteId }).containsExactly("a")
+        assertThat(next.upserts.map { it.remoteId }).containsExactly("a", "b")
+        val (expired, retry) = google.requests.takeLast(2).map { it.requestUrl!! }
+        assertThat(expired.queryParameter("syncToken")).isEqualTo(first.cursor!!.value)
+        assertThat(retry.queryParameter("syncToken")).isNull()
+        assertThat(retry.queryParameter("timeMin")).isNotNull()
+        assertThat(next.cursor).isEqualTo(SyncCursor(google.currentSyncToken()))
+        assertThat(next.cursor).isNotEqualTo(first.cursor)
     }
 
     @Test
@@ -146,6 +153,16 @@ class GoogleReadTest {
         assertThat(event.start).isEqualTo(EventTime.Timed(at(23, 19, 30)))
         assertThat(event.forPerson to event.createdBy).isEqualTo("mia-id" to "sam-id")
         assertThat(event.recurring).isFalse()
+    }
+
+    @Test
+    fun anEventWhoseTimeDoesntParseIsLeftOutAndSaidSo() = runTest {
+        google.putEvent(family.id, google.timed("a", "Walk", at(23, 9), at(23, 10)))
+        val first = provider.sync(conn, family, range, null)
+        // Handed over by an incremental sync: the fake's window check can't place an end it can't parse either.
+        google.putEvent(family.id, google.timed("b", "Swim", at(23, 16), at(23, 17)) { putJsonObject("end") { put("dateTime", "half past four") } })
+        assertThat(provider.sync(conn, family, range, first.cursor).upserts).isEmpty()
+        assertLogsHoldNoPersonalData("half past four", "Swim", minLines = 1)
     }
 
     @Test

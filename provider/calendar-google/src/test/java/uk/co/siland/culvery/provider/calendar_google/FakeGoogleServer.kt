@@ -69,6 +69,9 @@ internal class FakeGoogleServer(private val zone: ZoneId = ZoneId.of("Europe/Lon
     /** Counted down when a write reaches the server, so a test cancels a call that is really in flight. */
     val writeReached = CountDownLatch(1)
 
+    /** The sync token a list would end with now. */
+    fun currentSyncToken(): String = "t${version.get()}"
+
     /** Starts the server and returns the base URL a GoogleApi uses. */
     fun start(): HttpUrl {
         server.dispatcher = this
@@ -224,7 +227,7 @@ internal class FakeGoogleServer(private val zone: ZoneId = ZoneId.of("Europe/Lon
         return ok(
             buildJsonObject {
                 put("items", JsonArray(all.drop(from).take(pageSize).map { it.json }))
-                if (next < all.size) put("nextPageToken", next.toString()) else put("nextSyncToken", "t${version.get()}")
+                if (next < all.size) put("nextPageToken", next.toString()) else put("nextSyncToken", currentSyncToken())
             },
         )
     }

@@ -19,13 +19,18 @@ import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSource
+import uk.co.siland.culvery.capability.calendar.CalendarWriter
 import uk.co.siland.culvery.capability.calendar.DateRange
+import uk.co.siland.culvery.capability.calendar.EVENT_GONE
+import uk.co.siland.culvery.capability.calendar.EventDraft
+import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.SourceGoneException
 import uk.co.siland.culvery.capability.calendar.SyncCursor
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.UnreachableException
+import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
@@ -51,8 +56,9 @@ class GoogleCalendarProvider @Inject constructor(
     private val api: GoogleApi,
     private val authorizer: Authorizer,
     private val toaster: Toaster,
-) : CalendarProvider {
-    override val descriptor = ProviderDescriptor(GOOGLE_PROVIDER_ID, GOOGLE_DISPLAY_NAME, "calendar_month", setOf(Feature.READ))
+) : CalendarProvider, CalendarWriter {
+    override val descriptor = ProviderDescriptor(GOOGLE_PROVIDER_ID, GOOGLE_DISPLAY_NAME, "calendar_month", setOf(Feature.READ, Feature.WRITE))
+    override val providerId = GOOGLE_PROVIDER_ID
 
     // By connection and calendar: each series' RRULE, "" for a series with none.
     private val rules = ConcurrentHashMap<String, ConcurrentHashMap<String, String>>()
@@ -212,6 +218,72 @@ class GoogleCalendarProvider @Inject constructor(
         }
         cache[series] = rule.orEmpty()
         return rule
+    }
+
+    /** events.insert with id = the client key (3a design §3.6); a 409 means it exists, so it is looked up (the lost-reply retry). */
+    override suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft, clientKey: String): RemoteEvent {
+        val account = accountOf(conn)
+        val answer = api.send(account, "POST", api.url("calendars", source.id, "events"), insertBody(draft, clientKey))
+        return when {
+            answer.isSuccessful -> answer.decode(GoogleEvent.serializer(), "events.insert").written()
+            // A create never recreates a deleted event (C10): a key whose event is gone is refused.
+            answer.code == 409 -> lookUp(account, source, clientKey) ?: throw WriteRejectedException(EVENT_GONE)
+            else -> throw answer.refusal("Adding an event")
+        }
+    }
+
+    /**
+     * Looks first (3a design §3.6): Google answers a PATCH on an event deleted on a phone with 200 and leaves it deleted,
+     * and a PATCH on an event since made a series changes every instance. Gone → EVENT_GONE; a series → refused.
+     */
+    override suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft, fields: Set<EventField>): RemoteEvent {
+        val account = accountOf(conn)
+        oneOffToChange(account, source, remoteId, "Changing an event") ?: throw WriteRejectedException(EVENT_GONE)
+        val answer = api.send(account, "PATCH", api.url("calendars", source.id, "events", remoteId), patchBody(draft, fields))
+        return when {
+            answer.isSuccessful -> answer.decode(GoogleEvent.serializer(), "events.patch").written()
+            answer.code == 404 || answer.code == 410 -> throw WriteRejectedException(EVENT_GONE)
+            else -> throw answer.refusal("Changing an event")
+        }
+    }
+
+    /** Gone already (looked up first, or 404 or 410) is success; an event since made a series is refused, not deleted whole. */
+    override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) {
+        val account = accountOf(conn)
+        oneOffToChange(account, source, remoteId, "Deleting an event") ?: return
+        val answer = api.send(account, "DELETE", api.url("calendars", source.id, "events", remoteId))
+        if (answer.isSuccessful || answer.code == 404 || answer.code == 410) return
+        throw answer.refusal("Deleting an event")
+    }
+
+    override suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent? =
+        lookUp(accountOf(conn), source, remoteId)
+
+    /** The event; null for 404, 410 or a gone one. */
+    private suspend fun lookUp(account: String, source: CalendarSource, remoteId: String): RemoteEvent? =
+        fetch(account, source, remoteId)?.takeUnless { it.isGone }?.written()
+
+    /** The event as Google holds it, whatever its status; null for 404 or 410. */
+    private suspend fun fetch(account: String, source: CalendarSource, remoteId: String): GoogleEvent? {
+        val answer = api.send(account, "GET", api.url("calendars", source.id, "events", remoteId))
+        if (answer.code == 404 || answer.code == 410) return null
+        return answer.readOrUnreachable("events.get").decode(GoogleEvent.serializer(), "events.get")
+    }
+
+    /** The event about to be changed or deleted; null when it's gone. One since made a series is refused (no If-Match: writes are rare). */
+    private suspend fun oneOffToChange(account: String, source: CalendarSource, remoteId: String, what: String): GoogleEvent? {
+        val event = fetch(account, source, remoteId)?.takeUnless { it.isGone } ?: return null
+        if (event.recurrence != null) {
+            Log.w(TAG, "$what: it has become a repeating event in Google Calendar, so the tablet leaves it alone")
+            throw WriteRejectedException(REFUSED)
+        }
+        return event
+    }
+
+    /** A written event, as Google holds it now: never an instance of a series, so no rule. Gone (a PATCH on a deleted event answers 200) → EVENT_GONE. */
+    private fun GoogleEvent.written(): RemoteEvent {
+        if (isGone) throw WriteRejectedException(EVENT_GONE)
+        return toRemoteEvent(rule = null) ?: throw UnreachableException("Google Calendar returned an event with no times the tablet can read")
     }
 
     private fun rulesFor(conn: Connection, source: CalendarSource) = rules.getOrPut("${conn.id}\u0000${source.id}") { ConcurrentHashMap() }
