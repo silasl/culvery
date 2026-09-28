@@ -68,8 +68,9 @@ internal suspend fun Call.await(): GoogleResponse = suspendCancellableCoroutine 
             override fun onResponse(call: Call, response: Response) {
                 val answer = try {
                     response.use { GoogleResponse(it.code, it.body?.string().orEmpty()) }
-                } catch (e: IOException) {
-                    // After a cancel, this is the closed socket; the continuation has already been cancelled.
+                } catch (e: Throwable) {
+                    // After a cancel, this is the closed socket; the continuation has already been cancelled. Anything
+                    // else goes to the caller too: OkHttp would rethrow it on its own thread and the caller would hang.
                     cont.resumeWithException(e)
                     return
                 }

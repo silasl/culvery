@@ -261,6 +261,19 @@ class GoogleApiTest {
         assertThat(readOn).isNotEmpty()
         assertThat(readOn).doesNotContain(caller)
     }
+
+    /** Task 8 review: anything the body read throws reaches the caller; OkHttp would rethrow it on its own thread and the caller would hang. */
+    @Test
+    fun aBodyReadThatThrowsAnythingFailsTheCaller() = runTest {
+        val broken = OkHttpClient.Builder().addInterceptor { chain ->
+            val response = chain.proceed(chain.request())
+            response.newBuilder().body(response.body!!.onEachRead { throw IllegalStateException("broken body") }).build()
+        }.build()
+        val failure = withContext(Dispatchers.Default) {
+            withTimeoutOrNull(5_000) { failureOf { GoogleApi(baseUrl, tokens, broken).send(ACCOUNT, "GET", calendarList) } }
+        }
+        assertThat(failure).isInstanceOf(IllegalStateException::class.java)
+    }
 }
 
 private fun errorBody(status: Int, reason: String) =
