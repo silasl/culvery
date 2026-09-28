@@ -25,6 +25,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
+import uk.co.siland.culvery.capability.calendar.db.CalendarDao
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.OutboxEntity
 import uk.co.siland.culvery.core.household.HomeLocation
@@ -74,6 +75,7 @@ class CalendarSyncTest {
         io: CoroutineContext = EmptyCoroutineContext,
         timeoutMillis: Long = 1_000,
         lock: CalendarWriteLock = CalendarWriteLock(),
+        store: CalendarStore = this.store,
     ): CalendarSync {
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         return testSync(store, setOf(a, b), HouseholdZone(household), clock, writers, toaster, io, timeoutMillis, lock)
@@ -740,5 +742,21 @@ class CalendarSyncTest {
         // Queued with one attempt behind it, so this is the second: the next backoff step.
         assertThat(store.pendingNow().single().let { it.attempts to it.nextAttemptMillis }).isEqualTo(2 to now.toEpochMilli() + 60_000)
         assertThat(ShadowLog.getLogsForTag("CalendarWrites").map { it.throwable?.message }).contains("writer recursed")
+    }
+
+    @Test
+    fun anErrorStoringAnAcceptedWriteBacksTheLoopOffAndTheSyncStillRuns() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val recursing = object : CalendarDao by calendar.calendarDao() {
+            override suspend fun deleteEvents(connectionId: String, sourceId: String, ids: List<String>) =
+                throw StackOverflowError("store recursed")
+        }
+        val sync = engineWith(setOf(w), toaster, store = CalendarStore(calendar, recursing))
+        queue(ChangeKind.DELETE, draft = null)
+        sync.syncAll()
+        // Counted as a failed drain, so the loop waits at least 30 s rather than re-sending the write every second.
+        assertThat(sync.drainBackoffMillis()).isEqualTo(30_000L)
+        assertThat(cachedTitles()).containsExactly("Swim")
     }
 }

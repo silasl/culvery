@@ -5,6 +5,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -37,5 +39,29 @@ class FlowRetryTest {
         runCurrent()
         assertThat(result.await()).isEqualTo("ok")
         assertThat(failures).containsExactly("store hiccup 1", "store hiccup 2").inOrder()
+    }
+
+    @Test
+    fun aValueGettingThroughStartsTheWaitsAgainFromOneSecond() = runTest {
+        var starts = 0
+        val flaky = flow {
+            starts++
+            if (starts == 1) throw IllegalStateException("store hiccup 1")
+            if (starts == 2) {
+                emit("a")
+                throw IllegalStateException("store hiccup 2")
+            }
+            emit("b")
+        }
+        val result = async { flaky.retryWithBackoff {}.take(2).toList() }
+        runCurrent()
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertThat(starts).isEqualTo(2)
+        // One second again, not two: "a" got through, so the second failure is a fresh hiccup.
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertThat(starts).isEqualTo(3)
+        assertThat(result.await()).containsExactly("a", "b").inOrder()
     }
 }

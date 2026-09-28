@@ -64,8 +64,9 @@ class CalendarSync internal constructor(
             failedDrains = 0
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
-            // The changes stay queued for a later pass; the sync must still run.
+        } catch (e: Throwable) {
+            // An Error too (review M1), or its row stays due and the loop re-sends it every second. The changes stay
+            // queued for a later pass; the sync must still run.
             failedDrains++
             Log.w(TAG, "The outbox drain failed ($failedDrains in a row); syncing anyway", e)
         }

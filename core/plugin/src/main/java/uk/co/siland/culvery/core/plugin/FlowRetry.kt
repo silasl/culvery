@@ -2,6 +2,9 @@ package uk.co.siland.culvery.core.plugin
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.retryWhen
 
 private const val FIRST_RETRY_MS = 1_000L
@@ -15,9 +18,16 @@ fun retryDelayMillis(attempt: Long): Long =
 /**
  * Starts the flow again after a failure, waiting [retryDelayMillis], instead of ending it: a store hiccup must not
  * leave a tab, a card or the sync loop's trigger gone until the app restarts (3a design §3.12). [onFailure] logs it.
+ * A value getting through starts the waits again from 1 s, so a rare hiccup never waits a minute.
  */
-fun <T> Flow<T>.retryWithBackoff(onFailure: (Throwable) -> Unit): Flow<T> = retryWhen { cause, attempt ->
-    onFailure(cause)
-    delay(retryDelayMillis(attempt))
-    true
+fun <T> Flow<T>.retryWithBackoff(onFailure: (Throwable) -> Unit): Flow<T> = flow {
+    // Per collection; onEach sits upstream of retryWhen, so a downstream failure is never caught or retried.
+    var failures = 0L
+    emitAll(
+        onEach { failures = 0 }.retryWhen { cause, _ ->
+            onFailure(cause)
+            delay(retryDelayMillis(failures++))
+            true
+        },
+    )
 }

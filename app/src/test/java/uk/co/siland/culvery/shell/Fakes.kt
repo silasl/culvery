@@ -75,3 +75,16 @@ class FlakyTabCapability(override val id: String, override val order: Int) : Cap
     override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList())
     @Composable override fun TabContent() {}
 }
+
+/** A capability whose cards() flow fails once, as a store hiccup would, then shows [cardList]. */
+class FlakyCardsCapability(override val id: String, override val order: Int, private val cardList: List<HomeCard>) : Capability {
+    private var failures = 1
+    override val label = id.replaceFirstChar { it.uppercase() }
+    override val icon = "star"
+    override val hasTab: Flow<Boolean> = flowOf(false)
+    override fun cards(): Flow<List<HomeCard>> = flow {
+        if (failures-- > 0) throw IllegalStateException("store hiccup")
+        emit(cardList)
+    }
+    @Composable override fun TabContent() {}
+}

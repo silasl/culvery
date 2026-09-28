@@ -240,4 +240,17 @@ class CalendarSyncLoopTest {
         runCurrent()
         assertThat(count).isEqualTo(1)
     }
+
+    @Test
+    fun anErrorReadingTheQueueWaitsTheFullIntervalAndTheLoopGoesOn() = runTest {
+        var count = 0
+        CalendarSyncLoop(
+            { count++ }, MutableStateFlow(listOf("c1")), backgroundScope,
+            untilNextRetry = { throw StackOverflowError("outbox recursed") },
+        ).start()
+        runCurrent()
+        advanceTimeBy(SYNC_INTERVAL_MS)
+        runCurrent()
+        assertThat(count).isEqualTo(2)
+    }
 }

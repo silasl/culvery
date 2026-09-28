@@ -61,6 +61,8 @@ internal suspend fun callWriter(io: CoroutineContext, timeoutMillis: Long, call:
     } catch (e: WriteRejectedException) {
         WriteOutcome.Rejected(e.message ?: "the calendar refused the change")
     } catch (e: TimeoutCancellationException) {
+        // Rethrows if it was the caller's own timeout, not this call's.
+        currentCoroutineContext().ensureActive()
         WriteOutcome.Retry(blocksConnection = true)
     } catch (e: CancellationException) {
         // Rethrows if the caller was really cancelled; otherwise the writer leaked a stray cancellation.
@@ -85,6 +87,8 @@ internal suspend fun <T> callReader(io: CoroutineContext, timeoutMillis: Long, r
     try {
         Result.success(withContext(io) { withTimeout(timeoutMillis) { read() } })
     } catch (e: TimeoutCancellationException) {
+        // Rethrows if it was the caller's own timeout, not this call's.
+        currentCoroutineContext().ensureActive()
         Result.failure(UnreachableException("Timed out after $timeoutMillis ms", e))
     } catch (e: CancellationException) {
         // Rethrows if the caller was really cancelled; otherwise the provider leaked a stray cancellation.

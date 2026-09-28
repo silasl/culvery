@@ -92,7 +92,8 @@ class CalendarSyncLoop internal constructor(
             untilNextRetry()
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // An Error too (review M1): escaping here would end the loop.
             Log.w(TAG, "Couldn't read the outbox; waiting the full interval", e)
             null
         }

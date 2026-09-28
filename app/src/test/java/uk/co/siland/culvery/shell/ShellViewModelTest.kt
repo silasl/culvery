@@ -263,4 +263,15 @@ class ShellViewModelTest {
             assertThat(expectMostRecentItem().tabs.map { it.id }).containsExactly("calendar")
         }
     }
+
+    @Test
+    fun cardsWhoseFlowFailsComeBackAfterTheRetry() = runTest {
+        val today = HomeCard("today", HomeCardSize.TALL, 100) {}
+        val vm = vm(setOf(FlakyCardsCapability("calendar", order = 10, listOf(today))))
+        vm.uiState.test {
+            assertThat(expectMostRecentItem().homeCards).isEmpty()
+            advanceTimeBy(1_001)
+            assertThat(expectMostRecentItem().homeCards.map { it.card.id }).containsExactly("today")
+        }
+    }
 }
