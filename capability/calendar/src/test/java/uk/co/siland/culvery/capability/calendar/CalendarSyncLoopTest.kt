@@ -10,12 +10,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 
 // Robolectric only because the loop logs through android.util.Log when a sync throws.
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -187,5 +189,55 @@ class CalendarSyncLoopTest {
         assertThat(started).isEqualTo(1)
         // A cancelled loop never goes on to read the outbox for its next wait.
         assertThat(retryReads).isEqualTo(0)
+    }
+
+    /** Review focus #5 at loop level: an Error (a writer that recursed) is logged, and the next pass still runs. */
+    @Test
+    fun anErrorInAPassIsLoggedAndTheNextPassStillRuns() = runTest {
+        var count = 0
+        CalendarSyncLoop(
+            { count++; if (count == 1) throw StackOverflowError("a writer recursed") },
+            MutableStateFlow(listOf("c1")),
+            backgroundScope,
+        ).start()
+        runCurrent()
+        advanceTimeBy(SYNC_INTERVAL_MS)
+        runCurrent()
+        assertThat(count).isEqualTo(2)
+        assertThat(ShadowLog.getLogsForTag("CalendarSync").map { it.throwable?.message }).contains("a writer recursed")
+    }
+
+    @Test
+    fun aFailedDrainHoldsTheNextPassBackWhateverTheQueueSays() = runTest {
+        var count = 0
+        CalendarSyncLoop(
+            { count++ }, MutableStateFlow(listOf("c1")), backgroundScope,
+            untilNextRetry = { -5_000L }, drainBackoff = { 30_000L },
+        ).start()
+        runCurrent()
+        assertThat(count).isEqualTo(1)
+        advanceTimeBy(29_999)
+        runCurrent()
+        assertThat(count).isEqualTo(1)
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(count).isEqualTo(2)
+    }
+
+    @Test
+    fun aFailingConnectionListIsReadAgainAndStillStartsAPass() = runTest {
+        var reads = 0
+        var count = 0
+        val ids = flow {
+            reads++
+            if (reads == 1) throw IllegalStateException("database locked")
+            emit(listOf("c1"))
+        }
+        CalendarSyncLoop({ count++ }, ids, backgroundScope).start()
+        runCurrent()
+        assertThat(count).isEqualTo(0)
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertThat(count).isEqualTo(1)
     }
 }

@@ -159,15 +159,18 @@ class CalendarStoreTest {
     }
 
     @Test
-    fun removalsBeyondSqlitesVariableLimitAreApplied() = runTest {
-        connect("s1")
+    fun removalsBeyondSqlitesVariableLimitAreAppliedWithNoStatementOverIt() = runTest {
+        val counting = CountingDao(db.calendarDao())
+        val store = CalendarStore(db, counting)
+        store.addConnection(conn, listOf(CalendarSource("s1", "S1", writable = false)), emptyMap())
         val many = (1..1_200).map { timed("e$it", "Event $it", 23, 9) }
         store.applySync("c1", "s1", window, full(*many.toTypedArray(), timed("keep", "Keep", 23, 10)))
         store.applySync(
             "c1", "s1", window,
             SyncResult(emptyList(), many.map { it.remoteId }, SyncCursor("k2"), fullReplace = false),
         )
-        assertThat(titlesBetween(23, 24)).containsExactly("Keep")
+        assertThat(store.eventsBetween(millis(23), millis(24)).first().map { it.title }).containsExactly("Keep")
+        assertThat(counting.mostBound).isAtMost(999)
     }
 
     @Test

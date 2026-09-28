@@ -17,12 +17,14 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.OutboxEntity
 import uk.co.siland.culvery.core.household.HomeLocation
@@ -65,14 +67,19 @@ class CalendarSyncTest {
         householdDb.close()
     }
 
-    /** Provider calls stay on the test dispatcher, so the 1 s timeout runs on virtual time. */
-    private suspend fun engine(): CalendarSync {
+    /** Every engine this class builds. Provider calls stay on the test dispatcher, so the 1 s timeout runs on virtual time. */
+    private suspend fun engineWith(
+        writers: Set<CalendarWriter>,
+        toaster: Toaster,
+        io: CoroutineContext = EmptyCoroutineContext,
+        timeoutMillis: Long = 1_000,
+        lock: CalendarWriteLock = CalendarWriteLock(),
+    ): CalendarSync {
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
-        return CalendarSync(
-            store, setOf(a, b), HouseholdZone(household), clock, EmptyCoroutineContext, timeoutMillis = 1_000,
-            writers = emptySet(), toaster = SilentToaster,
-        )
+        return testSync(store, setOf(a, b), HouseholdZone(household), clock, writers, toaster, io, timeoutMillis, lock)
     }
+
+    private suspend fun engine(): CalendarSync = engineWith(emptySet(), SilentToaster)
 
     private suspend fun connect(id: String, providerId: String, vararg sources: CalendarSource, mapping: Map<String, SourceMapping> = emptyMap()) =
         store.addConnection(Connection(id, providerId, id.uppercase(), emptyMap()), sources.toList(), mapping)
@@ -251,13 +258,8 @@ class CalendarSyncTest {
     private val toaster = RecordingToaster()
     private val key = "0123456789abcdef0123456789abcdef"
 
-    private suspend fun writingEngine(io: CoroutineContext = EmptyCoroutineContext, timeoutMillis: Long = 1_000): CalendarSync {
-        household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
-        return CalendarSync(
-            store, setOf(a, b), HouseholdZone(household), clock, io, timeoutMillis,
-            writers = setOf(w), toaster = toaster,
-        )
-    }
+    private suspend fun writingEngine(io: CoroutineContext = EmptyCoroutineContext, timeoutMillis: Long = 1_000): CalendarSync =
+        engineWith(setOf(w), toaster, io, timeoutMillis)
 
     private fun swimDraft(forPerson: String?) = EventDraft("Swim", swim().start, swim().end, forPerson, "alex-id")
 
@@ -538,11 +540,10 @@ class CalendarSyncTest {
     fun aFailedDrainIsLoggedAndTheSyncStillRuns() = runTest {
         connect("c1", "calendar.a", s1)
         a.events = { listOf(swim()) }
-        household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         val broken = object : Toaster {
             override fun show(message: String, icon: String) = error("toasts are down")
         }
-        val sync = CalendarSync(store, setOf(a, b), HouseholdZone(household), clock, EmptyCoroutineContext, 1_000, setOf(w), broken)
+        val sync = engineWith(setOf(w), broken)
         queue(ChangeKind.DELETE, draft = null, sourceId = "gone")
         sync.syncAll()
         assertThat(cachedTitles()).containsExactly("Swim")
@@ -626,10 +627,8 @@ class CalendarSyncTest {
         assertThat(store.eventNow(EventRef("c1", "s1", key))).isNull()
     }
 
-    // The row stays due and is sent again on the next pass. Plan 3's drain backoff (2b-1 m2, R3) changes that wait
-    // and must update this test with it.
     @Test
-    fun aCreateWhoseMirrorWriteFailsIsRetriedAndMakesOneEvent() = runTest {
+    fun aCreateWhoseMirrorWriteFailsIsRetriedLaterAndMakesOneEvent() = runTest {
         connect("c1", "calendar.a", s1)
         val sync = writingEngine()
         queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
@@ -639,13 +638,107 @@ class CalendarSyncTest {
             it.execSQL("CREATE TRIGGER fail_event BEFORE INSERT ON event BEGIN SELECT RAISE(ABORT, 'disk full'); END")
         }
         sync.syncAll()
-        assertThat(store.pendingNow()).hasSize(1)
+        // Rescheduled with the next backoff step, not left due: the loop would run a pass every second.
+        assertThat(store.pendingNow().single().let { it.attempts to it.nextAttemptMillis }).isEqualTo(2 to now.toEpochMilli() + 60_000)
         calendar.useWriterConnection { it.execSQL("DROP TRIGGER fail_event") }
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("create:Swim")
+        now = now.plusSeconds(60)
         sync.syncAll()
         // Sent twice with one key: the provider returned the event it had already made.
         assertThat(w.calls).containsExactly("create:Swim", "create:Swim")
         assertThat(w.created.keys).containsExactly(key)
         assertThat(store.eventNow(EventRef("c1", "s1", key))).isNotNull()
         assertThat(store.pendingNow()).isEmpty()
+    }
+
+    @Test
+    fun aProviderThrowingAnErrorFlagsOnlyItsConnection() = runTest {
+        connect("c1", "calendar.a", s1)
+        connect("c2", "calendar.b", s1)
+        a.failWith = StackOverflowError("provider recursed")
+        b.events = { listOf(swim()) }
+        engine().syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Error("provider recursed"))
+        assertThat(health("c2")).isEqualTo(ConnectionHealth.Ok)
+        assertThat(cachedTitles()).containsExactly("Swim")
+    }
+
+    @Test
+    fun aStoreFailureFailsThePassNotTheProvidersHealth() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = engine()
+        calendar.useWriterConnection {
+            it.execSQL("CREATE TRIGGER fail_event BEFORE INSERT ON event BEGIN SELECT RAISE(ABORT, 'disk full'); END")
+        }
+        assertThat(runCatching { sync.syncAll() }.exceptionOrNull()).isNotNull()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
+        calendar.useWriterConnection { it.execSQL("DROP TRIGGER fail_event") }
+        sync.syncAll()
+        assertThat(cachedTitles()).containsExactly("Swim")
+    }
+
+    @Test
+    fun aFailingDrainBacksTheLoopOffUntilADrainCompletes() = runTest {
+        connect("c1", "calendar.a", s1)
+        var toastsWork = false
+        val flaky = object : Toaster {
+            override fun show(message: String, icon: String) {
+                if (!toastsWork) error("toasts are down")
+            }
+        }
+        val sync = engineWith(setOf(w), flaky)
+        assertThat(sync.drainBackoffMillis()).isNull()
+        queue(ChangeKind.DELETE, draft = null, sourceId = "gone")
+        sync.syncAll()
+        assertThat(sync.drainBackoffMillis()).isEqualTo(30_000L)
+        queue(ChangeKind.DELETE, draft = null, sourceId = "gone")
+        sync.syncAll()
+        assertThat(sync.drainBackoffMillis()).isEqualTo(60_000L)
+        toastsWork = true
+        sync.syncAll()
+        assertThat(sync.drainBackoffMillis()).isNull()
+    }
+
+    @Test
+    fun anEditQueuedWhileARefusedCreateIsDroppedGoesWithIt() = runTest {
+        connect("c1", "calendar.a", s1)
+        val lock = CalendarWriteLock()
+        // Real threads for the write, so runTest can't skip virtual time while the test holds the lock.
+        val sync = engineWith(setOf(w), toaster, io = Dispatchers.Default, timeoutMillis = PROVIDER_TIMEOUT_MS, lock = lock)
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
+        w.failWith = WriteRejectedException("Calendar is full")
+        a.failWith = UnreachableException("reads are down")
+        // The editor holds the lock while it queues a change behind the create.
+        val holding = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val editor = launch(Dispatchers.Default) { lock.withLock { holding.complete(Unit); release.await() } }
+        withContext(Dispatchers.Default) { withTimeout(5_000) { holding.await() } }
+        val pass = launch { sync.syncAll() }
+        withContext(Dispatchers.Default) {
+            withTimeout(5_000) { w.entered.await() }
+            // Real time for a drop outside the lock to go ahead, so such a drop fails this test every time.
+            delay(200)
+        }
+        queue(ChangeKind.UPDATE, remoteId = key, draft = swimDraft("sam-id"))
+        release.complete(Unit)
+        editor.join()
+        pass.join()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't save 2 changes to C1")
+    }
+
+    @Test
+    fun aWriterThrowingAnErrorIsLoggedAndTheChangeIsTriedAgainLater() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, draft = null)
+        w.failWith = StackOverflowError("writer recursed")
+        a.failWith = UnreachableException("reads are down")
+        sync.syncAll()
+        // Queued with one attempt behind it, so this is the second: the next backoff step.
+        assertThat(store.pendingNow().single().let { it.attempts to it.nextAttemptMillis }).isEqualTo(2 to now.toEpochMilli() + 60_000)
+        assertThat(ShadowLog.getLogsForTag("CalendarWrites").map { it.throwable?.message }).contains("writer recursed")
     }
 }

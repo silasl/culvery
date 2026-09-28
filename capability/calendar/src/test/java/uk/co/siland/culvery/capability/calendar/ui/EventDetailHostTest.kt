@@ -8,7 +8,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
 import java.time.ZoneId
-import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,12 +31,12 @@ import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.ScriptedWriter
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.TestAccess
-import uk.co.siland.culvery.capability.calendar.WRITE_ATTEMPT_MS
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.calendarDb
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
 import uk.co.siland.culvery.capability.calendar.testAccess
+import uk.co.siland.culvery.capability.calendar.testEditor
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
@@ -90,10 +89,7 @@ class EventDetailHostTest {
             ),
         )
         repo = CalendarRepository(store, household, zone, emptySet(), setOf(writer))
-        editor = CalendarEditor(
-            store, setOf(writer), access.control, access.toasts, zone, WallClock { System.currentTimeMillis() },
-            scope, {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS,
-        )
+        editor = testEditor(store, setOf(writer), access.control, access.toasts, zone, WallClock { System.currentTimeMillis() }, scope)
     }
 
     @After

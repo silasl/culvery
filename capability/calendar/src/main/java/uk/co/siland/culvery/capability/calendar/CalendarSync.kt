@@ -8,13 +8,8 @@ import javax.inject.Singleton
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.Toaster
@@ -34,6 +29,7 @@ class CalendarSync internal constructor(
     private val timeoutMillis: Long,
     private val writers: Set<@JvmSuppressWildcards CalendarWriter>,
     private val toaster: Toaster,
+    private val writeLock: CalendarWriteLock,
 ) {
     @Inject
     constructor(
@@ -43,25 +39,35 @@ class CalendarSync internal constructor(
         toaster: Toaster,
         zone: HouseholdZone,
         clock: WallClock,
-    ) : this(store, providers, zone, clock, Dispatchers.IO, PROVIDER_TIMEOUT_MS, writers, toaster)
+        writeLock: CalendarWriteLock,
+    ) : this(store, providers, zone, clock, Dispatchers.IO, PROVIDER_TIMEOUT_MS, writers, toaster, writeLock)
 
     // The loop's timer, a connection change and requestSync may all ask at once: one pass writes at a time.
     private val passLock = Mutex()
 
+    // Passes in a row whose drain failed (m2); a completed drain resets it.
+    @Volatile private var failedDrains = 0
+
+    /** How long the loop waits at least after a failed drain (30 s, 1 min, 2 min, then 5 min); null after one completes. */
+    internal fun drainBackoffMillis(): Long? = failedDrains.takeIf { it > 0 }?.let(::backoffMillis)
+
     /**
-     * Delivers queued changes, then syncs each connection, and each source within it, independently. A
-     * failure only flags that connection (with its worst source's health) and never clears its cache.
+     * Delivers queued changes, then syncs each connection, and each source within it, independently. A provider
+     * failure only flags that connection (with its worst source's health) and never clears its cache; a store failure
+     * fails the pass, and the loop logs it and tries again.
      */
     suspend fun syncAll() = passLock.withLock {
         val window = currentWindow()
         val connections = store.connectionsNow()
         try {
             drainOutbox(connections, window.zone)
+            failedDrains = 0
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // The changes stay queued for the next pass; the sync must still run.
-            Log.w(TAG, "The outbox drain failed; syncing anyway", e)
+            // The changes stay queued for a later pass; the sync must still run.
+            failedDrains++
+            Log.w(TAG, "The outbox drain failed ($failedDrains in a row); syncing anyway", e)
         }
         connections.forEach { sync(it.connection, window) }
     }
@@ -94,7 +100,8 @@ class CalendarSync internal constructor(
             val ref = change.ref
             val count = if (change.kind == ChangeKind.CREATE && ref != null) {
                 droppedCreates += ref
-                store.dropCreate(ref)
+                // Under the editor's lock: an edit being queued behind this create goes with it, or finds it gone.
+                writeLock.withLock { store.dropCreate(ref) }
             } else {
                 store.dropChange(change.id)
                 1
@@ -198,11 +205,27 @@ class CalendarSync internal constructor(
                 }
             }
         }
-        if (outcome is WriteOutcome.Accepted) {
-            store.applyAcceptedWrite(conn.id, source.id, change.remoteId, outcome, zone, completing = change.id)
-        }
-        return outcome
+        return if (outcome is WriteOutcome.Accepted) complete(change, conn, source, outcome, zone) else outcome
     }
+
+    /** Stores a write the provider accepted and completes its row; a store failure is retried later (C2). */
+    private suspend fun complete(
+        change: PendingChange,
+        conn: Connection,
+        source: CalendarSource,
+        accepted: WriteOutcome.Accepted,
+        zone: ZoneId,
+    ): WriteOutcome =
+        try {
+            store.applyAcceptedWrite(conn.id, source.id, change.remoteId, accepted, zone, completing = change.id)
+            accepted
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Sent again later, which is safe: creates are idempotent by key, updates and deletes by nature.
+            Log.w(TAG, "The provider accepted a queued ${change.kind} but the tablet couldn't store it; retrying later", e)
+            WriteOutcome.Retry(blocksConnection = false)
+        }
 
     /** Counts a failed attempt and returns when the change will next be tried. */
     private suspend fun retryLater(change: PendingChange, now: Long): Long {
@@ -230,35 +253,41 @@ class CalendarSync internal constructor(
         }
     }
 
+    /**
+     * The store calls sit outside the provider's call: a store failure fails the pass rather than reading as the
+     * provider's health. Any Throwable from the provider (an Error included) flags only this source.
+     */
     private suspend fun syncSource(
         provider: CalendarProvider,
         conn: Connection,
         source: CalendarSource,
         window: DateRange,
-    ): ConnectionHealth =
-        try {
-            val cursor = store.cursor(conn.id, source.id, window)
-            val result = callProvider { provider.sync(conn, source, window, cursor) }
-            store.applySync(conn.id, source.id, window, result)
-            ConnectionHealth.Ok
-        } catch (e: TimeoutCancellationException) {
-            Log.w(TAG, "${conn.label} / ${source.name}: timed out", e)
-            ConnectionHealth.Unreachable
-        } catch (e: CancellationException) {
-            // Rethrows if this sync was really cancelled; otherwise the provider leaked a stray cancellation.
-            currentCoroutineContext().ensureActive()
-            ConnectionHealth.Unreachable
-        } catch (e: NeedsSignInException) {
+    ): ConnectionHealth {
+        val cursor = store.cursor(conn.id, source.id, window)
+        val result = callReader(io, timeoutMillis) { provider.sync(conn, source, window, cursor) }
+            .getOrElse { return healthAfter(it, conn) }
+        store.applySync(conn.id, source.id, window, result)
+        return ConnectionHealth.Ok
+    }
+
+    /**
+     * A failed read's health, logged with its cause and the connection's id: never a name or a calendar id, either of
+     * which can be the account's email, and never a token.
+     */
+    private fun healthAfter(e: Throwable, conn: Connection): ConnectionHealth = when (e) {
+        is NeedsSignInException -> {
+            Log.w(TAG, "${conn.id}: a source needs signing in again", e)
             ConnectionHealth.NeedsSignIn
-        } catch (e: UnreachableException) {
+        }
+        is UnreachableException -> {
+            Log.w(TAG, "${conn.id}: a source is unreachable", e)
             ConnectionHealth.Unreachable
-        } catch (e: Exception) {
+        }
+        else -> {
+            Log.e(TAG, "${conn.id}: a source failed", e)
             ConnectionHealth.Error(e.message ?: e.javaClass.simpleName)
         }
-
-    /** Every provider read goes through here; writes go through callWriter. */
-    private suspend fun <T> callProvider(block: suspend () -> T): T =
-        withContext(io) { withTimeout(timeoutMillis) { block() } }
+    }
 
     private fun ConnectionHealth.severity(): Int = when (this) {
         ConnectionHealth.NeedsSignIn -> 3

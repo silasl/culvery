@@ -15,6 +15,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
 const val SYNC_INTERVAL_MS = 5 * 60_000L
 
@@ -34,6 +35,7 @@ class CalendarSyncLoop internal constructor(
     private val scope: CoroutineScope,
     private val intervalMillis: Long = SYNC_INTERVAL_MS,
     private val untilNextRetry: suspend () -> Long? = { null },
+    private val drainBackoff: () -> Long? = { null },
 ) : Startable {
     @Inject
     constructor(sync: CalendarSync, store: CalendarStore, clock: WallClock, @ApplicationScope scope: CoroutineScope) :
@@ -43,6 +45,7 @@ class CalendarSyncLoop internal constructor(
             scope,
             SYNC_INTERVAL_MS,
             { store.nextAttemptMillis()?.let { it - clock.nowMillis() } },
+            sync::drainBackoffMillis,
         )
 
     private val wake = Channel<Unit>(Channel.CONFLATED)
@@ -56,7 +59,11 @@ class CalendarSyncLoop internal constructor(
         scope.launch {
             // Every list, the first included, asks for a pass, so a connection added before this collector
             // started is never missed.
-            launch { connectionIds.distinctUntilChanged().collect { wake.trySend(Unit) } }
+            launch {
+                connectionIds.distinctUntilChanged()
+                    .retryWithBackoff { Log.w(TAG, "Couldn't read the connections; retrying", it) }
+                    .collect { wake.trySend(Unit) }
+            }
             // The first pass waits only for the first connection list.
             var wait = intervalMillis
             while (true) {
@@ -74,7 +81,8 @@ class CalendarSyncLoop internal constructor(
             // Stops the loop only if it was really cancelled; a stray one (an internal timeout) must not.
             currentCoroutineContext().ensureActive()
             Log.w(TAG, "Calendar sync was cancelled internally", e)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // An Error too (review M1): the loop must outlive it, and the application scope's handler never sees it.
             Log.w(TAG, "Calendar sync failed", e)
         }
     }
@@ -88,7 +96,9 @@ class CalendarSyncLoop internal constructor(
             Log.w(TAG, "Couldn't read the outbox; waiting the full interval", e)
             null
         }
-        return (retry ?: intervalMillis).coerceIn(MIN_PASS_GAP_MS, intervalMillis)
+        // After a failed drain, the queue's own times don't count: waiting a second would retry the failure (m2).
+        val floor = maxOf(MIN_PASS_GAP_MS, drainBackoff() ?: 0L).coerceAtMost(intervalMillis)
+        return (retry ?: intervalMillis).coerceIn(floor, intervalMillis)
     }
 
     private companion object {

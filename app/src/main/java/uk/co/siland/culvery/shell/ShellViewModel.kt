@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.shell
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,7 +12,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOf
@@ -27,6 +27,7 @@ import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomePlacement
 import uk.co.siland.culvery.core.plugin.ShellNavigator
+import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
 @HiltViewModel
 class ShellViewModel @Inject constructor(
@@ -55,7 +56,9 @@ class ShellViewModel @Inject constructor(
         } else {
             combine(
                 ordered.map { cap ->
-                    cap.hasTab.onStart { emit(false) }.catch { emit(false) }
+                    // onStart after the retry: a retry must not hide a tab that was showing.
+                    cap.hasTab.retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read whether it has a tab; retrying", it) }
+                        .onStart { emit(false) }
                         .map { shown -> if (shown) TabItem(cap.id, cap.label, cap.icon) else null }
                 },
             ) {
@@ -68,7 +71,10 @@ class ShellViewModel @Inject constructor(
             flowOf(emptyList())
         } else {
             combine(
-                ordered.map { it.cards().onStart { emit(emptyList()) }.catch { emit(emptyList()) } },
+                ordered.map { cap ->
+                    cap.cards().retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its Home cards; retrying", it) }
+                        .onStart { emit(emptyList()) }
+                },
             ) { lists -> HomeCardPlacer.place(lists.toList().flatten()) }
         }
 
@@ -133,3 +139,5 @@ internal fun roleLabel(role: Role): String = when (role) {
     Role.ADULT -> "Adult"
     Role.CHILD -> "Child"
 }
+
+private const val TAG = "ShellViewModel"

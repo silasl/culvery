@@ -46,6 +46,7 @@ class CalendarEditorTest {
     private val school = CalendarSource("s-school", "School terms", writable = false)
     private val writer = ScriptedWriter("calendar.a")
     private var syncRequests = 0
+    private val lock = CalendarWriteLock()
 
     @Before
     fun setUp() = runTest {
@@ -81,24 +82,15 @@ class CalendarEditorTest {
      * write open use Dispatchers.Default, so its 10 s timeout runs on real time and runTest can't skip past it
      * while the test waits for Room. Client keys are "key-1", "key-2"… in the order Save is tapped.
      */
-    private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext) = CalendarEditor(
-        store = store,
-        writers = setOf(writer),
-        access = access.control,
-        toaster = access.toasts,
-        zone = HouseholdZone(household),
-        clock = WallClock { testScheduler.currentTime },
-        scope = backgroundScope,
-        requestSync = { syncRequests++ },
-        io = io,
-        attemptMillis = WRITE_ATTEMPT_MS,
-        newKey = { "key-${++keys}" },
+    private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext) = testEditor(
+        store, setOf(writer), access.control, access.toasts, HouseholdZone(household), WallClock { testScheduler.currentTime },
+        backgroundScope, requestSync = { syncRequests++ }, io = io, writeLock = lock, newKey = { "key-${++keys}" },
     )
 
     /** The outbox drain as the sync loop runs it, [aheadMillis] after the test's clock, with this test's writer. */
-    private fun TestScope.drain(access: TestAccess, aheadMillis: Long) = CalendarSync(
-        store, emptySet(), HouseholdZone(household), WallClock { testScheduler.currentTime + aheadMillis },
-        EmptyCoroutineContext, PROVIDER_TIMEOUT_MS, setOf(writer), access.toasts,
+    private fun TestScope.drain(access: TestAccess, aheadMillis: Long) = testSync(
+        store, emptySet(), HouseholdZone(household), WallClock { testScheduler.currentTime + aheadMillis }, setOf(writer), access.toasts,
+        writeLock = lock,
     )
 
     /** A one-hour event on Sunday 27 September at 18:00, as the add sheet builds it. */
@@ -417,9 +409,8 @@ class CalendarEditorTest {
     fun aMasterWithoutAWriterIsNotEditable() = runTest {
         val access = testAccess(household)
         put(event("dinner", createdBy = access.alex.id.value))
-        val noWriter = CalendarEditor(
-            store, emptySet(), access.control, access.toasts, HouseholdZone(household),
-            WallClock { testScheduler.currentTime }, backgroundScope, {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS,
+        val noWriter = testEditor(
+            store, emptySet(), access.control, access.toasts, HouseholdZone(household), WallClock { testScheduler.currentTime }, backgroundScope,
         )
         assertThat(noWriter.delete(ref("dinner"))).isEqualTo(EditResult.NotEditable)
     }
@@ -505,9 +496,9 @@ class CalendarEditorTest {
         val reads = ScriptedProvider("calendar.a").apply {
             events = { source -> if (source.id == family.id) writer.created.values.toList() else emptyList() }
         }
-        CalendarSync(
+        testSync(
             store, setOf(reads), HouseholdZone(household), WallClock { LocalDate.of(2026, 9, 23).atStartOfDay(london).toInstant().toEpochMilli() },
-            EmptyCoroutineContext, PROVIDER_TIMEOUT_MS, setOf(writer), access.toasts,
+            setOf(writer), access.toasts, writeLock = lock,
         ).syncAll()
         assertThat(store.eventNow(ref("key-1"))!!.title).isEqualTo("Sleepover")
         assertThat(writer.calls).containsExactly("create:Sleepover")
@@ -574,9 +565,8 @@ class CalendarEditorTest {
     @Test
     fun aMasterWithoutAWriterCanNotBeAddedToAndAsksForNoPin() = runTest {
         val access = testAccess(household)
-        val noWriter = CalendarEditor(
-            store, emptySet(), access.control, access.toasts, HouseholdZone(household),
-            WallClock { testScheduler.currentTime }, backgroundScope, {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS,
+        val noWriter = testEditor(
+            store, emptySet(), access.control, access.toasts, HouseholdZone(household), WallClock { testScheduler.currentTime }, backgroundScope,
         )
         assertThat(noWriter.create(draft("Sleepover", PersonId.FAMILY.value))).isEqualTo(EditResult.NotEditable)
         assertThat(access.requests).isEmpty()

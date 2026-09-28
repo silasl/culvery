@@ -29,7 +29,5 @@ private object NobodyMay : AccessControl {
  * An editor that can't change anything, for tests that only need the hosts to compose and open sheets. [clock] is
  * "now" for an add sheet the test opens.
  */
-internal fun stubEditor(store: CalendarStore, zone: HouseholdZone, clock: WallClock = WallClock { 0L }): CalendarEditor = CalendarEditor(
-    store, emptySet(), NobodyMay, RecordingToaster(), zone, clock,
-    CoroutineScope(Dispatchers.Unconfined), {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS,
-)
+internal fun stubEditor(store: CalendarStore, zone: HouseholdZone, clock: WallClock = WallClock { 0L }): CalendarEditor =
+    testEditor(store, emptySet(), NobodyMay, RecordingToaster(), zone, clock, CoroutineScope(Dispatchers.Unconfined))

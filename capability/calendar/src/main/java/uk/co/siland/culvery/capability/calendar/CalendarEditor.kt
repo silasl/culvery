@@ -14,8 +14,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.access.Identified
@@ -79,6 +77,7 @@ class CalendarEditor internal constructor(
     private val requestSync: () -> Unit,
     private val io: CoroutineContext,
     private val attemptMillis: Long,
+    private val writeLock: CalendarWriteLock,
     private val newKey: () -> String = ::newClientKey,
 ) {
     @Inject
@@ -91,11 +90,8 @@ class CalendarEditor internal constructor(
         clock: WallClock,
         @ApplicationScope scope: CoroutineScope,
         loop: CalendarSyncLoop,
-    ) : this(store, writers, access, toaster, zone, clock, scope, loop::requestSync, Dispatchers.IO, WRITE_ATTEMPT_MS)
-
-    // One write at a time, so two sheets on one event can't send their changes out of order. Held only around the
-    // write itself, never while the PIN pad is up.
-    private val writeLock = Mutex()
+        writeLock: CalendarWriteLock,
+    ) : this(store, writers, access, toaster, zone, clock, scope, loop::requestSync, Dispatchers.IO, WRITE_ATTEMPT_MS, writeLock)
 
     /** Who is signed in now: the add/edit sheet's Who default and its disabled chips (2b-2 design D2). */
     internal val session: StateFlow<Identified?> get() = access.session

@@ -70,9 +70,28 @@ internal suspend fun callWriter(io: CoroutineContext, timeoutMillis: Long, call:
         WriteOutcome.Retry(blocksConnection = true)
     } catch (e: UnreachableException) {
         WriteOutcome.Retry(blocksConnection = true)
-    } catch (e: Exception) {
+    } catch (e: Throwable) {
+        // An Error too (review M1): logged and retried, never out of the drain.
         Log.w(TAG, "A calendar write failed unexpectedly; it will be retried", e)
         WriteOutcome.Retry(blocksConnection = false)
+    }
+
+/**
+ * The one way the engine reads a provider (a sync, or its sources for the refresh and for connecting): on [io], under
+ * [timeoutMillis]. A failure comes back as the Throwable to report, an Error included; a timeout, or a cancellation
+ * the provider leaked, as [UnreachableException]. A real cancellation of the caller still propagates.
+ */
+internal suspend fun <T> callReader(io: CoroutineContext, timeoutMillis: Long, read: suspend () -> T): Result<T> =
+    try {
+        Result.success(withContext(io) { withTimeout(timeoutMillis) { read() } })
+    } catch (e: TimeoutCancellationException) {
+        Result.failure(UnreachableException("Timed out after $timeoutMillis ms", e))
+    } catch (e: CancellationException) {
+        // Rethrows if the caller was really cancelled; otherwise the provider leaked a stray cancellation.
+        currentCoroutineContext().ensureActive()
+        Result.failure(UnreachableException("Cancelled inside the provider", e))
+    } catch (e: Throwable) {
+        Result.failure(e)
     }
 
 /**

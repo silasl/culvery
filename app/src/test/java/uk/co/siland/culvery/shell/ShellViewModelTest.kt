@@ -1,12 +1,16 @@
 package uk.co.siland.culvery.shell
 
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDateTime
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.Identified
@@ -18,6 +22,9 @@ import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 
+// Robolectric for android.util.Log: a failing capability flow is logged before it is retried.
+@OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(AndroidJUnit4::class)
 class ShellViewModelTest {
     @get:Rule val main = MainDispatcherRule()
 
@@ -244,6 +251,16 @@ class ShellViewModelTest {
         vm.uiState.test {
             vm.openTab("calendar")
             assertThat(expectMostRecentItem().selectedTabId).isEqualTo(HOME_TAB_ID)
+        }
+    }
+
+    @Test
+    fun aTabWhoseFlowFailsComesBackAfterTheRetry() = runTest {
+        val vm = vm(setOf(FlakyTabCapability("calendar", order = 10)))
+        vm.uiState.test {
+            assertThat(expectMostRecentItem().tabs).isEmpty()
+            advanceTimeBy(1_001)
+            assertThat(expectMostRecentItem().tabs.map { it.id }).containsExactly("calendar")
         }
     }
 }

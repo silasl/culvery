@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import org.json.JSONObject
+import uk.co.siland.culvery.capability.calendar.db.CalendarDao
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.ConnectionEntity
 import uk.co.siland.culvery.capability.calendar.db.EventEntity
@@ -24,8 +25,8 @@ import uk.co.siland.culvery.core.plugin.ConnectionHealth
 
 /** The only writer of calendar.db. UI reads go through CalendarRepository. */
 @Singleton
-class CalendarStore @Inject constructor(private val db: CalendarDatabase) {
-    private val dao = db.calendarDao()
+class CalendarStore internal constructor(private val db: CalendarDatabase, private val dao: CalendarDao) {
+    @Inject constructor(db: CalendarDatabase) : this(db, db.calendarDao())
 
     fun connections(): Flow<List<StoredConnection>> = dao.connections().map { rows -> rows.map { it.toStored() } }
 

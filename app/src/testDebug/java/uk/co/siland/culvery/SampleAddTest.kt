@@ -22,6 +22,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarSetup
 import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.CalendarSync
 import uk.co.siland.culvery.capability.calendar.CalendarSyncLoop
+import uk.co.siland.culvery.capability.calendar.CalendarWriteLock
 import uk.co.siland.culvery.capability.calendar.EVENT_ADDED
 import uk.co.siland.culvery.capability.calendar.EVENT_DELETED
 import uk.co.siland.culvery.capability.calendar.EditResult
@@ -100,8 +101,9 @@ class SampleAddTest {
             toasts,
             backgroundScope,
         )
-        val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, clock)
-        val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, backgroundScope))
+        val lock = CalendarWriteLock()
+        val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, clock, lock)
+        val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, backgroundScope), lock)
         val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake))
         sync.syncAll()
 

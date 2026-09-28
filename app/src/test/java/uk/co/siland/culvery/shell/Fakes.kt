@@ -62,3 +62,16 @@ class FakeAccessControl(var result: Authorised? = null, private val startsSessio
     }
     override fun lock() { session.value = null }
 }
+
+/** A capability whose hasTab flow fails once, as a store hiccup would, then says it has a tab. */
+class FlakyTabCapability(override val id: String, override val order: Int) : Capability {
+    private var failures = 1
+    override val label = id.replaceFirstChar { it.uppercase() }
+    override val icon = "star"
+    override val hasTab: Flow<Boolean> = flow {
+        if (failures-- > 0) throw IllegalStateException("store hiccup")
+        emit(true)
+    }
+    override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList())
+    @Composable override fun TabContent() {}
+}
