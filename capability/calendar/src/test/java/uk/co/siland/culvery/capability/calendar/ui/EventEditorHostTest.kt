@@ -40,6 +40,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CHANGES_SAVED
+import uk.co.siland.culvery.capability.calendar.COULD_NOT_OPEN
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarPermissions
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
@@ -475,5 +476,66 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_title").assertIsFocused()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
         compose.onNodeWithTag("length_60").assertIsSelected()
+    }
+
+    @Test
+    fun tryAgainAfterATabletFailureReusesTheKeyAndMakesOneEvent() {
+        // The provider makes the event, the connection drops before its reply, and queueing it fails on the tablet.
+        writer.dropNextReply = true
+        runBlocking {
+            calendar.useWriterConnection {
+                it.execSQL("CREATE TRIGGER fail_outbox BEFORE INSERT ON outbox BEGIN SELECT RAISE(ABORT, 'disk full'); END")
+            }
+        }
+        access.answer(TestAccess.ALEX)
+        showEditor(EditorRequest.New(day = null))
+        waitForText("New event")
+        compose.onNodeWithTag("editor_title").performTextInput("Parents evening")
+        compose.onNodeWithTag("editor_save").performClick()
+        waitForText(couldNotSave("Sample calendar", TRY_AGAIN))
+        runBlocking { calendar.useWriterConnection { it.execSQL("DROP TRIGGER fail_outbox") } }
+        compose.onNodeWithTag("editor_save").performClick()
+        compose.waitUntil(5_000) { closed > 0 }
+        // The same key both times: the provider returned the event it had made.
+        assertThat(writer.calls).containsExactly("create:Parents evening", "create:Parents evening")
+        assertThat(writer.created).hasSize(1)
+    }
+
+    @Test
+    fun aSheetThatCannotLoadClosesAndSaysSo() {
+        // A row with neither a start time nor a start date can't be read, so loading the event throws.
+        runBlocking {
+            calendar.useWriterConnection {
+                it.execSQL(
+                    "INSERT INTO event (connectionId, sourceId, remoteId, title, startInstant, startDate, endInstant, endDate, " +
+                        "recurring, forPerson, createdBy, startSort, endSort) " +
+                        "VALUES ('c1', 's-family', 'broken', 'Broken', NULL, NULL, NULL, NULL, 0, NULL, NULL, 0, 0)",
+                )
+            }
+        }
+        showEditor(EditorRequest.Edit(EventRef("c1", "s-family", "broken")))
+        compose.waitUntil(5_000) { closed > 0 }
+        assertThat(access.toasts.messages).containsExactly(COULD_NOT_OPEN)
+    }
+
+    @Test
+    fun aStoreFailureInTheEditorsDeleteToastsLikeTheDetailSheet() {
+        showEditor(EditorRequest.Edit(dinner))
+        waitForText("Edit event")
+        // An unreadable queued row, which reading the queue deletes, and a disk that refuses the delete.
+        runBlocking {
+            calendar.useWriterConnection {
+                it.execSQL(
+                    "INSERT INTO outbox (connectionId, sourceId, remoteId, kind, draftJson, attempts, nextAttemptMillis, createdMillis) " +
+                        "VALUES ('c1', 's-family', 'dinner', 'MOVE', NULL, 0, 0, 0)",
+                )
+                it.execSQL("CREATE TRIGGER fail_outbox BEFORE DELETE ON outbox BEGIN SELECT RAISE(ABORT, 'disk full'); END")
+            }
+        }
+        compose.onNodeWithTag("editor_delete").performClick()
+        compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
+        assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", TRY_AGAIN))
+        compose.onNodeWithTag("editor_failure").assertDoesNotExist()
+        assertThat(deleting).isEmpty()
     }
 }

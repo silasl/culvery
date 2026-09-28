@@ -23,6 +23,8 @@ internal class ScriptedWriter(override val providerId: String) : CalendarWriter 
     var gate: CompletableDeferred<Unit>? = null
     /** The next create makes its event, then never replies: a reply lost after the provider acted. */
     var loseNextReply = false
+    /** The next create makes its event, then the connection drops before the reply (UnreachableException). */
+    var dropNextReply = false
     /** Completes when the first write starts. */
     val entered = CompletableDeferred<Unit>()
 
@@ -38,6 +40,10 @@ internal class ScriptedWriter(override val providerId: String) : CalendarWriter 
         if (loseNextReply) {
             loseNextReply = false
             awaitCancellation()
+        }
+        if (dropNextReply) {
+            dropNextReply = false
+            throw UnreachableException("connection reset")
         }
         return event
     }

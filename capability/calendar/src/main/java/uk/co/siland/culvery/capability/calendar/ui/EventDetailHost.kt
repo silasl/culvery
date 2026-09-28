@@ -38,7 +38,7 @@ internal fun EventDetailHost(
     editor: CalendarEditor,
     onClose: () -> Unit,
     initialMode: DetailMode = DetailMode.Idle,
-    onEdit: () -> Unit = {},
+    onEdit: () -> Unit,
 ) {
     val loaded: Loaded? by remember(ref, today) { repo.event(ref, today).map { Loaded(it) } }.collectAsState(initial = null)
     val people: List<Person> by repo.people.collectAsState(initial = emptyList())

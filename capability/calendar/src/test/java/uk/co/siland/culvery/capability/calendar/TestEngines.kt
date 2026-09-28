@@ -21,8 +21,7 @@ internal fun testEditor(
     requestSync: () -> Unit = {},
     io: CoroutineContext = EmptyCoroutineContext,
     writeLock: CalendarWriteLock = CalendarWriteLock(),
-    newKey: () -> String = ::newClientKey,
-): CalendarEditor = CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, newKey)
+): CalendarEditor = CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock)
 
 internal fun testSync(
     store: CalendarStore,

@@ -30,6 +30,7 @@ import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.HouseholdZone
 import uk.co.siland.culvery.capability.calendar.OUTBOX_BACKOFF_MS
+import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.core.access.CorePermissionSource
 import uk.co.siland.culvery.core.access.DefaultAccessControl
@@ -113,7 +114,7 @@ class SampleAddTest {
         val titles = listOf("Parents evening", "Parents' evening at school")
 
         fake.setOffline(true)
-        assertThat(editor.create(draft("Parents evening"))).isEqualTo(EditResult.Queued)
+        assertThat(editor.create(draft("Parents evening"), newClientKey())).isEqualTo(EditResult.Queued)
         val added = repo.day(today).first().single { it.title == "Parents evening" }
         assertThat(added.syncing).isTrue()
 

@@ -80,12 +80,15 @@ class CalendarEditorTest {
     /**
      * The editor shares access's toaster, as the app shares one. [io] is the writer's context: tests that hold a
      * write open use Dispatchers.Default, so its 10 s timeout runs on real time and runTest can't skip past it
-     * while the test waits for Room. Client keys are "key-1", "key-2"… in the order Save is tapped.
+     * while the test waits for Room.
      */
     private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext) = testEditor(
         store, setOf(writer), access.control, access.toasts, HouseholdZone(household), WallClock { testScheduler.currentTime },
-        backgroundScope, requestSync = { syncRequests++ }, io = io, writeLock = lock, newKey = { "key-${++keys}" },
+        backgroundScope, requestSync = { syncRequests++ }, io = io, writeLock = lock,
     )
+
+    /** As the sheet chooses them: "key-1", "key-2"… in the order Save is tapped. */
+    private suspend fun CalendarEditor.create(draft: EventDraft): EditResult = create(draft, "key-${++keys}")
 
     /** The outbox drain as the sync loop runs it, [aheadMillis] after the test's clock, with this test's writer. */
     private fun TestScope.drain(access: TestAccess, aheadMillis: Long) = testSync(
@@ -537,13 +540,11 @@ class CalendarEditorTest {
     }
 
     @Test
-    fun eachSaveUsesANewKey() = runTest {
+    fun aCreateUsesTheKeyTheSheetGivesIt() = runTest {
         val access = testAccess(household)
         access.answer(TestAccess.ALEX)
-        val editor = editor(access)
-        editor.create(draft("Sleepover", PersonId.FAMILY.value))
-        editor.create(draft("Sleepover", PersonId.FAMILY.value))
-        assertThat(writer.created.keys).containsExactly("key-1", "key-2").inOrder()
+        assertThat(editor(access).create(draft("Sleepover", PersonId.FAMILY.value), "chosen-by-the-sheet")).isEqualTo(EditResult.Done)
+        assertThat(writer.created.keys).containsExactly("chosen-by-the-sheet")
     }
 
     @Test

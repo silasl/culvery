@@ -11,6 +11,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import java.time.LocalDate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
@@ -19,6 +20,7 @@ import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.TRY_AGAIN
 import uk.co.siland.culvery.capability.calendar.couldNotSave
+import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
@@ -59,7 +61,8 @@ private suspend fun open(request: EditorRequest, repo: CalendarRepository, edito
  * is disabled while one runs), and closes itself when there is nothing to edit. An unchanged edit closes with no PIN.
  * A refusal keeps the sheet open with the failure card, and so does the tablet failing before the write; a queued or
  * saved change closes it. Delete authorises, then [onDeleteAuthorised] swaps to the detail sheet asking to confirm.
- * A signed-in Child's other Who chips are disabled in a new event and in an edit alike (§6).
+ * A signed-in Child's other Who chips are disabled in a new event and in an edit alike (§6). Try again after a
+ * tablet failure reuses the create's key. A sheet that can't load closes with a toast.
  */
 @Composable
 internal fun EventEditorHost(
@@ -69,11 +72,24 @@ internal fun EventEditorHost(
     onClose: () -> Unit,
     onDeleteAuthorised: (EventRef) -> Unit,
 ) {
-    val opened: Opened? by produceState<Opened?>(null, request) { value = open(request, repo, editor) }
+    val opened: Opened? by produceState<Opened?>(null, request) {
+        value = try {
+            open(request, repo, editor)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // The sheet closes (no form) and says so, instead of the store failure killing the app.
+            Log.w(TAG, "Couldn't open the add/edit sheet", e)
+            editor.couldNotOpen()
+            Opened(request, null, "")
+        }
+    }
     val people: List<Person>? by repo.people.collectAsState(initial = null)
     val session by editor.session.collectAsState()
     var failure by remember(request) { mutableStateOf<String?>(null) }
     var picker by remember(request) { mutableStateOf(EditorPicker.None) }
+    // Kept only after the tablet failed (TRY_AGAIN), so Try again can't make a second event (3a design §3.12).
+    var createKey by remember(request) { mutableStateOf(newClientKey()) }
     val action = rememberSingleAction(request) { e ->
         Log.w(TAG, "Couldn't save", e)
         failure = couldNotSave(opened?.label.orEmpty(), TRY_AGAIN)
@@ -97,9 +113,10 @@ internal fun EventEditorHost(
         failure = null
         action.run {
             val result = when (val mode = form.mode) {
-                EventForm.Mode.New -> editor.create(form.draft(createdBy = null))
+                EventForm.Mode.New -> editor.create(form.draft(createdBy = null), createKey)
                 is EventForm.Mode.Edit -> editor.update(mode.original.ref, form.draft(createdBy = null))
             }
+            if (result != EditResult.Rejected(TRY_AGAIN)) createKey = newClientKey()
             when (result) {
                 EditResult.Done, EditResult.Queued, EditResult.NotEditable -> onClose()
                 is EditResult.Rejected -> failure = couldNotSave(loaded.label, result.message)
@@ -110,7 +127,17 @@ internal fun EventEditorHost(
 
     fun delete() {
         val mode = form.mode as? EventForm.Mode.Edit ?: return
-        action.run { if (editor.mayDelete(mode.original.ref)) onDeleteAuthorised(mode.original.ref) }
+        action.run {
+            try {
+                if (editor.mayDelete(mode.original.ref)) onDeleteAuthorised(mode.original.ref)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A delete, so the detail sheet's wording rather than the Save failure card.
+                Log.w(TAG, "Couldn't start a delete", e)
+                editor.couldNotDelete(loaded.label)
+            }
+        }
     }
 
     // A new request is a new sheet: its focus, scroll and title state don't carry over from the last one.

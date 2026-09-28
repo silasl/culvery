@@ -38,6 +38,9 @@ const val EVENT_DELETED = "Event deleted"
 const val EVENT_ADDED = "Event added"
 const val CHANGES_SAVED = "Changes saved"
 
+/** 3a design §3.12: the add/edit sheet couldn't load what it needs, so it closed. */
+const val COULD_NOT_OPEN = "Couldn't open the event — try again"
+
 sealed interface EditResult {
     /** The provider accepted the change. The mirror has it, or the next sync brings it (2b-2 design §3.4). */
     data object Done : EditResult
@@ -78,7 +81,6 @@ class CalendarEditor internal constructor(
     private val io: CoroutineContext,
     private val attemptMillis: Long,
     private val writeLock: CalendarWriteLock,
-    private val newKey: () -> String = ::newClientKey,
 ) {
     @Inject
     constructor(
@@ -101,6 +103,12 @@ class CalendarEditor internal constructor(
 
     /** A signed-in child tapped someone else's Who chip: say why it is disabled (2b-2 design §4.2). */
     internal fun refuseOtherWho(name: String) = toaster.show(cannotAddForOthers(name))
+
+    /** The add/edit sheet couldn't load (a store failure): it closes and says so. */
+    internal fun couldNotOpen() = toaster.show(COULD_NOT_OPEN)
+
+    /** The editor's Delete failed before it could ask to confirm (a store failure): the detail sheet's delete wording. */
+    internal fun couldNotDelete(label: String) = toaster.show(couldNotSave(label, TRY_AGAIN))
 
     /** The delete guard, run before the confirmation appears: true when this person may delete [ref]. */
     suspend fun mayDelete(ref: EventRef): Boolean {
@@ -128,11 +136,13 @@ class CalendarEditor internal constructor(
     }
 
     /**
-     * Adds [draft] to the master calendar (2b-2 design §3.3). Adults may add for anyone; a child only for themselves.
-     * [EventDraft.createdBy] is ignored: the person who authorises is recorded. Each call chooses a new client key,
-     * which a queued create keeps for every retry.
+     * Adds [draft] to the master calendar (2b-2 design §3.3) as [clientKey], the id the event keeps. The sheet chooses
+     * the key, and keeps it for a Try again after the tablet failed (3a design §3.12): if the provider did make the event,
+     * the retry gets it back rather than making a second. Adults may add for anyone; a child only for themselves.
+     * [EventDraft.createdBy] is ignored: the person who authorises is recorded. A queued create keeps its key for every
+     * retry.
      */
-    suspend fun create(draft: EventDraft): EditResult {
+    suspend fun create(draft: EventDraft, clientKey: String): EditResult {
         val to = master() ?: return EditResult.NotEditable
         val who = access.authorise(
             CalendarPermissions.CREATE,
@@ -141,10 +151,9 @@ class CalendarEditor internal constructor(
             allow = { person, granted -> mayCreateFor(granted, person, draft.forPerson) },
             refusal = Refusal.Toast(::cannotAddForOthers),
         ) ?: return EditResult.Cancelled
-        val key = newKey()
         val toSend = draft.copy(createdBy = who.person.id.value)
         return onAppScope(ChangeKind.CREATE, to.connection.label) {
-            writeLock.withLock { attempt(to, ChangeKind.CREATE, remoteId = null, toSend, clientKey = key) }
+            writeLock.withLock { attempt(to, ChangeKind.CREATE, remoteId = null, toSend, clientKey = clientKey) }
         }
     }
 
