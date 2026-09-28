@@ -6,7 +6,12 @@ import com.google.common.truth.Truth.assertWithMessage
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
@@ -18,6 +23,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
+import okhttp3.Response
 import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.asResponseBody
 import okhttp3.mockwebserver.MockResponse
@@ -29,8 +35,10 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.UnreachableException
+import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 
 private const val ACCOUNT = "family@example.com"
 
@@ -51,7 +59,16 @@ class GoogleApiTest {
     }
 
     @After
-    fun tearDown() = google.shutdown()
+    fun tearDown() {
+        google.shutdown()
+        // P8, for every test: nothing logged names the account, any email, or a token.
+        ShadowLog.getLogs().forEach { log ->
+            val text = "${log.msg} ${log.throwable}"
+            assertWithMessage(text).that(text).doesNotContain(ACCOUNT)
+            assertWithMessage(text).that(text).doesNotContain("@")
+            assertWithMessage(text).that(text).doesNotContain("token-")
+        }
+    }
 
     private val calendarList get() = api.url("users", "me", "calendarList")
 
@@ -131,7 +148,7 @@ class GoogleApiTest {
     @Test
     fun aBodyThatDoesNotParseIsUnreachable() = runTest {
         google.failNextWith(MockResponse().setBody("<html>Service Unavailable</html>"))
-        assertThat(failureOf { api.send(ACCOUNT, "GET", calendarList).decode(CalendarListPage.serializer()) })
+        assertThat(failureOf { api.send(ACCOUNT, "GET", calendarList).decode(CalendarListPage.serializer(), "list calendars") })
             .isInstanceOf(UnreachableException::class.java)
     }
 
@@ -155,6 +172,82 @@ class GoogleApiTest {
         withContext(Dispatchers.Default) { withTimeout(1_000) { while (patient.dispatcher.runningCallsCount() > 0) delay(10) } }
     }
 
+    /** Review fix: headers in, body stalled. Cancelling must end the call at once, as a cancellation, not a failure. */
+    @Test
+    fun cancellingDuringTheBodyReadCancelsTheCallPromptly() = runTest {
+        val reading = CountDownLatch(1)
+        val patient = OkHttpClient.Builder()
+            .readTimeout(Duration.ofSeconds(30))
+            .addInterceptor { chain ->
+                val response = chain.proceed(chain.request())
+                response.newBuilder().body(response.body!!.onFirstRead { reading.countDown() }).build()
+            }.build()
+        // One byte every 3 s: only cancelling the call can end the read inside a second.
+        google.failNextWith(MockResponse().setBody("{\"items\":[]}").throttleBody(1, 3, TimeUnit.SECONDS))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val call = scope.async { GoogleApi(baseUrl, tokens, patient).send(ACCOUNT, "GET", calendarList) }
+            check(runInterruptible(Dispatchers.IO) { reading.await(5, TimeUnit.SECONDS) }) { "the body was never read" }
+            call.cancel()
+            val finished = withContext(Dispatchers.Default) { withTimeoutOrNull(1_000) { call.join() } } != null
+            assertThat(finished).isTrue()
+            assertThat(runCatching { call.await() }.exceptionOrNull()).isInstanceOf(CancellationException::class.java)
+            withContext(Dispatchers.Default) { withTimeout(1_000) { while (patient.dispatcher.runningCallsCount() > 0) delay(10) } }
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun aNewTokenRefusedMeansSigningInAgain() = runTest {
+        google.failNext(401, "authError")
+        assertThat(failureOf { api.sendWithToken("fresh-token", "GET", calendarList) }).isInstanceOf(NeedsSignInException::class.java)
+    }
+
+    @Test
+    fun aRefusalIsInTheTabletsOwnWords() {
+        val forbidden = GoogleResponse(403, errorBody(403, "forbidden"))
+        val invalid = GoogleResponse(400, errorBody(400, "invalid"))
+        assertThat(forbidden.refusal("add an event")).isInstanceOf(WriteRejectedException::class.java)
+        assertThat(forbidden.refusal("add an event").message).isEqualTo(READ_ONLY_HERE)
+        assertThat(invalid.refusal("add an event").message).isEqualTo(REFUSED)
+    }
+
+    @Test
+    fun aReadThatFailsIsUnreachableAndOneThatWorksIsReturned() = runTest {
+        val ok = GoogleResponse(200, "{}")
+        assertThat(ok.readOrUnreachable("list calendars")).isSameInstanceAs(ok)
+        assertThat(failureOf { GoogleResponse(404, errorBody(404, "notFound")).readOrUnreachable("list calendars") })
+            .isInstanceOf(UnreachableException::class.java)
+    }
+
+    /** Review H2: an answer without items is a bad read, never an account with no calendars. */
+    @Test
+    fun aCalendarListWithoutItemsIsUnreachable() = runTest {
+        assertThat(failureOf { GoogleResponse(200, "{}").decode(CalendarListPage.serializer(), "list calendars") })
+            .isInstanceOf(UnreachableException::class.java)
+    }
+
+    /** P8: Google's message and the path both hold the account's email; neither reaches the log. */
+    @Test
+    fun errorsOnTheAccountsCalendarLogNoEmail() = runTest {
+        val events = api.url("calendars", ACCOUNT, "events")
+        listOf(403 to "insufficientPermissions", 503 to "backendError", 403 to "forbidden").forEach { (status, reason) ->
+            google.failNextWith(
+                MockResponse().setResponseCode(status).setBody(
+                    """{"error":{"code":$status,"message":"Not allowed for $ACCOUNT","errors":[{"reason":"$reason","message":"$ACCOUNT"}]}}""",
+                ),
+            )
+            val answer = runCatching { api.send(ACCOUNT, "GET", events) }.getOrNull()
+            answer?.refusal("change an event")
+            answer?.let { runCatching { it.readOrUnreachable("list events") } }
+        }
+        google.failNextWith(MockResponse().setBody("""{"items":"$ACCOUNT"}"""))
+        runCatching { api.send(ACCOUNT, "GET", events).decode(CalendarListPage.serializer(), "list calendars") }
+        assertThat(ShadowLog.getLogsForTag("GoogleCalendar").size).isAtLeast(4)
+        // The assertions are tearDown's.
+    }
+
     /** Review M3: the connect screen calls from the main thread, so the body must be read elsewhere. */
     @Test
     fun theBodyIsReadOffTheCallersThread() = runTest {
@@ -170,10 +263,21 @@ class GoogleApiTest {
     }
 }
 
-private fun ResponseBody.recordingReads(threads: MutableList<Thread>): ResponseBody {
+private fun errorBody(status: Int, reason: String) =
+    """{"error":{"code":$status,"message":"Google's own words","errors":[{"reason":"$reason"}]}}"""
+
+private fun ResponseBody.recordingReads(threads: MutableList<Thread>): ResponseBody =
+    onEachRead { synchronized(threads) { threads += Thread.currentThread() } }
+
+private fun ResponseBody.onFirstRead(action: () -> Unit): ResponseBody {
+    var first = true
+    return onEachRead { if (first) action().also { first = false } }
+}
+
+private fun ResponseBody.onEachRead(action: () -> Unit): ResponseBody {
     val source = object : ForwardingSource(source()) {
         override fun read(sink: Buffer, byteCount: Long): Long {
-            synchronized(threads) { threads += Thread.currentThread() }
+            action()
             return super.read(sink, byteCount)
         }
     }

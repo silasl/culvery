@@ -2,9 +2,10 @@ package uk.co.siland.culvery.provider.calendar_google
 
 import android.util.Log
 import java.io.IOException
+import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.JsonElement
@@ -51,8 +52,12 @@ internal fun pathTemplate(url: HttpUrl): String {
     return out.joinToString("/").removePrefix("calendar/v3/")
 }
 
-/** Enqueues the call and suspends until it answers; cancelling the coroutine cancels the call (follow-up R9). */
-internal suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
+/**
+ * Enqueues the call and suspends until its whole body is in (follow-up R9). The body is read on OkHttp's own thread,
+ * never the caller's, and inside the cancellable region: cancelling the coroutine cancels the call, which ends a
+ * stalled body read at once, and the caller sees the cancellation straight away.
+ */
+internal suspend fun Call.await(): GoogleResponse = suspendCancellableCoroutine { cont ->
     cont.invokeOnCancellation { cancel() }
     enqueue(
         object : Callback {
@@ -61,7 +66,14 @@ internal suspend fun Call.await(): Response = suspendCancellableCoroutine { cont
             }
 
             override fun onResponse(call: Call, response: Response) {
-                cont.resume(response) { _, value, _ -> value.close() }
+                val answer = try {
+                    response.use { GoogleResponse(it.code, it.body?.string().orEmpty()) }
+                } catch (e: IOException) {
+                    // After a cancel, this is the closed socket; the continuation has already been cancelled.
+                    cont.resumeWithException(e)
+                    return
+                }
+                cont.resume(answer)
             }
         },
     )
@@ -71,32 +83,37 @@ internal suspend fun Call.await(): Response = suspendCancellableCoroutine { cont
 internal class GoogleResponse(val code: Int, val body: String) {
     val isSuccessful: Boolean get() = code in 200..299
 
-    /** Every reason Google gave: its classic errors[].reason, then its newer details[].reason. */
-    val reasons: List<String> get() = error()?.let { e -> (e.errors + e.details).mapNotNull { it.reason } }.orEmpty()
-    val reason: String? get() = reasons.firstOrNull()
-    val message: String? get() = error()?.message
+    private val error: ErrorDetail? by lazy {
+        runCatching { GoogleJson.decodeFromString(ErrorBody.serializer(), body).error }.getOrNull()
+    }
 
-    private fun error(): ErrorDetail? = runCatching { GoogleJson.decodeFromString(ErrorBody.serializer(), body).error }.getOrNull()
+    /** Every reason Google gave: its classic errors[].reason, then its newer details[].reason. */
+    val reasons: List<String> by lazy { error?.let { e -> (e.errors + e.details).mapNotNull { it.reason } }.orEmpty() }
+    val reason: String? get() = reasons.firstOrNull()
+    val message: String? get() = error?.message
 }
 
-/** A successful answer as [deserializer] reads it; a body that doesn't parse means try later (3a design §3.7). */
-internal fun <T> GoogleResponse.decode(deserializer: DeserializationStrategy<T>): T =
+/**
+ * A successful answer as [deserializer] reads it; a body that doesn't parse means try later (3a design §3.7).
+ * [what] is logged, so it names the request and never a calendar, an email or an id.
+ */
+internal fun <T> GoogleResponse.decode(deserializer: DeserializationStrategy<T>, what: String): T =
     try {
         GoogleJson.decodeFromString(deserializer, body)
     } catch (e: IllegalArgumentException) {
         // Not the exception itself: kotlinx.serialization quotes the body, which can hold emails (P8).
-        Log.w(TAG, "Google Calendar sent a body the tablet can't read (${e::class.simpleName})")
+        Log.w(TAG, "$what: Google Calendar sent a body the tablet can't read (${e::class.simpleName})")
         throw UnreachableException("Google Calendar sent an answer the tablet can't read")
     }
 
-/** A read's answer: success, or "try later" for any status the caller didn't handle, logged with Google's reason. */
+/** A read's answer: success, or "try later" for any status the caller didn't handle, logged with Google's reason ([what] as for [decode]). */
 internal fun GoogleResponse.readOrUnreachable(what: String): GoogleResponse {
     if (isSuccessful) return this
     Log.w(TAG, "$what: Google Calendar answered $code ($reason)")
     throw UnreachableException("Google Calendar answered $code")
 }
 
-/** A write's refusal in the tablet's own words (3a design §3.7, R8); Google's reason is logged. */
+/** A write's refusal in the tablet's own words (3a design §3.7, R8); Google's reason is logged ([what] as for [decode]). */
 internal fun GoogleResponse.refusal(what: String): WriteRejectedException {
     Log.w(TAG, "$what: Google Calendar refused it with $code ($reason)")
     return WriteRejectedException(if (code == 403) READ_ONLY_HERE else REFUSED)
@@ -142,12 +159,10 @@ class GoogleApi(private val baseUrl: HttpUrl, private val tokens: TokenSource, p
             .method(method, body?.toString()?.toRequestBody(JSON_TYPE))
             .build()
         val answer = try {
-            client.newCall(request).await().use { response ->
-                // On IO, so a caller on the main thread never reads the body there; interruptible, so a slow body
-                // can't outlast a cancelled caller either.
-                GoogleResponse(response.code, runInterruptible(Dispatchers.IO) { response.body?.string().orEmpty() })
-            }
+            client.newCall(request).await()
         } catch (e: IOException) {
+            // A cancelled caller gets its cancellation, never "unreachable".
+            currentCoroutineContext().ensureActive()
             throw UnreachableException("Couldn't reach Google Calendar", e)
         }
         if (answer.code == 403 && answer.reasons.any { it in SCOPE_MISSING }) {
