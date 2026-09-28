@@ -1,0 +1,181 @@
+package uk.co.siland.culvery.provider.calendar_google
+
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
+import java.time.Duration
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import okhttp3.HttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.ResponseBody
+import okhttp3.ResponseBody.Companion.asResponseBody
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.SocketPolicy
+import okio.Buffer
+import okio.ForwardingSource
+import okio.buffer
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.calendar.NeedsSignInException
+import uk.co.siland.culvery.capability.calendar.UnreachableException
+
+private const val ACCOUNT = "family@example.com"
+
+// Robolectric for android.util.Log; the server is a real MockWebServer on localhost.
+@RunWith(AndroidJUnit4::class)
+class GoogleApiTest {
+    private val google = FakeGoogleServer()
+    private val tokens = FakeTokenSource()
+    private val client = OkHttpClient.Builder().readTimeout(Duration.ofSeconds(1)).build()
+    private lateinit var baseUrl: HttpUrl
+    private lateinit var api: GoogleApi
+
+    @Before
+    fun setUp() {
+        baseUrl = google.start()
+        api = GoogleApi(baseUrl, tokens, client)
+        google.addCalendar(ACCOUNT, "Family", primary = true)
+    }
+
+    @After
+    fun tearDown() = google.shutdown()
+
+    private val calendarList get() = api.url("users", "me", "calendarList")
+
+    @Test
+    fun everyRequestCarriesTheAccountsToken() = runTest {
+        assertThat(api.send(ACCOUNT, "GET", calendarList).code).isEqualTo(200)
+        assertThat(tokens.asked).containsExactly(ACCOUNT)
+        assertThat(google.requests.single().getHeader("Authorization")).isEqualTo("Bearer token-1")
+    }
+
+    @Test
+    fun a401ClearsTheTokenAndTriesOnceMoreWithAFreshOne() = runTest {
+        google.failNext(401, "authError")
+        assertThat(api.send(ACCOUNT, "GET", calendarList).code).isEqualTo(200)
+        assertThat(tokens.invalidated).containsExactly("token-1")
+        assertThat(google.requests.map { it.getHeader("Authorization") }).containsExactly("Bearer token-1", "Bearer token-2").inOrder()
+    }
+
+    @Test
+    fun a401TwiceMeansTheAccountNeedsSigningIn() = runTest {
+        google.failNext(401, "authError")
+        google.failNext(401, "authError")
+        assertThat(failureOf { api.send(ACCOUNT, "GET", calendarList) }).isInstanceOf(NeedsSignInException::class.java)
+    }
+
+    @Test
+    fun tryLaterAnswersAreUnreachable() = runTest {
+        listOf(
+            429 to "rateLimitExceeded", 403 to "rateLimitExceeded", 403 to "userRateLimitExceeded",
+            // Google's quotas: try later, never a refusal that drops the change or a calendar that has gone.
+            403 to "quotaExceeded", 403 to "dailyLimitExceeded", 403 to "calendarUsageLimitsExceeded",
+            500 to "backendError", 503 to "backendError",
+        ).forEach { (status, reason) ->
+            google.failNext(status, reason)
+            assertWithMessage("$status $reason").that(failureOf { api.send(ACCOUNT, "GET", calendarList) })
+                .isInstanceOf(UnreachableException::class.java)
+        }
+    }
+
+    @Test
+    fun a403ForAMissingScopeMeansTheAccountNeedsSigningIn() = runTest {
+        google.failNext(403, "insufficientPermissions")
+        assertThat(failureOf { api.send(ACCOUNT, "GET", calendarList) }).isInstanceOf(NeedsSignInException::class.java)
+        // Google's newer error form names it in details[] only.
+        google.failNextWith(
+            MockResponse().setResponseCode(403).setBody(
+                """{"error":{"code":403,"message":"Request had insufficient authentication scopes.","errors":[{"reason":"forbidden"}],""" +
+                    """"details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"ACCESS_TOKEN_SCOPE_INSUFFICIENT"}]}}""",
+            ),
+        )
+        assertThat(failureOf { api.send(ACCOUNT, "GET", calendarList) }).isInstanceOf(NeedsSignInException::class.java)
+    }
+
+    @Test
+    fun anotherForbiddenIsLeftToTheCallerWithGooglesReason() = runTest {
+        google.failNext(403, "forbidden")
+        val answer = api.send(ACCOUNT, "GET", calendarList)
+        assertThat(answer.code to answer.reason).isEqualTo(403 to "forbidden")
+    }
+
+    @Test
+    fun aDroppedConnectionIsUnreachable() = runTest {
+        // The server reads the request, then drops the connection unanswered (a Dispatcher can't drop it at the
+        // start: MockWebServer honours that only through peek()). Its own client, so OkHttp doesn't quietly retry on a
+        // fresh connection and get the next, healthy answer.
+        val noRetry = GoogleApi(baseUrl, tokens, OkHttpClient.Builder().retryOnConnectionFailure(false).build())
+        google.failNextWith(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        assertThat(failureOf { noRetry.send(ACCOUNT, "GET", calendarList) }).isInstanceOf(UnreachableException::class.java)
+    }
+
+    @Test
+    fun aSlowReplyIsUnreachable() = runTest {
+        google.failNextWith(MockResponse().setBody("{}").setHeadersDelay(3, TimeUnit.SECONDS))
+        assertThat(failureOf { api.send(ACCOUNT, "GET", calendarList) }).isInstanceOf(UnreachableException::class.java)
+    }
+
+    @Test
+    fun aBodyThatDoesNotParseIsUnreachable() = runTest {
+        google.failNextWith(MockResponse().setBody("<html>Service Unavailable</html>"))
+        assertThat(failureOf { api.send(ACCOUNT, "GET", calendarList).decode(CalendarListPage.serializer()) })
+            .isInstanceOf(UnreachableException::class.java)
+    }
+
+    /** Follow-up R9, proved here rather than in the contract suite (review Simp8). */
+    @Test
+    fun cancellingTheCallerCancelsTheHttpCall() = runTest {
+        // Its own client with a long read timeout, so nothing but cancelling the call can end it inside the second.
+        val patient = OkHttpClient.Builder().readTimeout(Duration.ofSeconds(30)).build()
+        val held = GoogleApi(baseUrl, tokens, patient)
+        google.writeHold = CountDownLatch(1)
+        val body = buildJsonObject { put("id", "held0123") }
+        val returned = withContext(Dispatchers.Default) {
+            val call = launch { held.send(ACCOUNT, "POST", held.url("calendars", ACCOUNT, "events"), body) }
+            // Cancelled only once the request is really at the server.
+            check(runInterruptible(Dispatchers.IO) { google.writeReached.await(5, TimeUnit.SECONDS) }) { "the write never reached the server" }
+            call.cancel()
+            withTimeoutOrNull(1_000) { call.join() } != null
+        }
+        assertThat(returned).isTrue()
+        // Nothing left running in OkHttp: the call itself was cancelled, not just abandoned.
+        withContext(Dispatchers.Default) { withTimeout(1_000) { while (patient.dispatcher.runningCallsCount() > 0) delay(10) } }
+    }
+
+    /** Review M3: the connect screen calls from the main thread, so the body must be read elsewhere. */
+    @Test
+    fun theBodyIsReadOffTheCallersThread() = runTest {
+        val readOn = mutableListOf<Thread>()
+        val recording = OkHttpClient.Builder().addInterceptor { chain ->
+            val response = chain.proceed(chain.request())
+            response.newBuilder().body(response.body!!.recordingReads(readOn)).build()
+        }.build()
+        val caller = Thread.currentThread()
+        assertThat(GoogleApi(baseUrl, tokens, recording).send(ACCOUNT, "GET", calendarList).code).isEqualTo(200)
+        assertThat(readOn).isNotEmpty()
+        assertThat(readOn).doesNotContain(caller)
+    }
+}
+
+private fun ResponseBody.recordingReads(threads: MutableList<Thread>): ResponseBody {
+    val source = object : ForwardingSource(source()) {
+        override fun read(sink: Buffer, byteCount: Long): Long {
+            synchronized(threads) { threads += Thread.currentThread() }
+            return super.read(sink, byteCount)
+        }
+    }
+    return source.buffer().asResponseBody(contentType(), contentLength())
+}
