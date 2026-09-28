@@ -4,7 +4,7 @@
 
 **Goal:** The household connects its Google account from Settings or the Connect-a-calendar card and the tablet shows, adds, edits, deletes and assigns events on the real family calendar, follows the calendars ticked in Google, survives Google access lapsing (reconnect from the chip, nothing queued lost), and no provider or store failure can crash the app.
 
-**Architecture:** A new `:provider:calendar-google` implements `CalendarProvider` and `CalendarWriter` over Google Calendar API v3 with OkHttp (every call cancellable) and kotlinx.serialization; tokens come from Play services' `AuthorizationClient` behind an `Authorizer` seam, so no Play services are needed in tests, and a `MockWebServer` with a `Dispatcher`-based fake Google server stands in for Google. The contract grows (`update(fields)`, `find`, `SourceGoneException`, `shown`/`primary` sources, `recurrenceRule`, `forPersonColor`, `userConnectable`) with a contract check per rule. `calendar.db` v4 stores the touched fields, the recurrence rule, the source-refresh time and the paused outbox age clock (D16). The engine gains source refresh and default mapping, touched-field edits, the aged-create and out-of-window lookups, and the crash-proofing of R3 and the store-failure follow-ups; the UI gains the connecting card, the Settings Calendars block, the reconnect chip's flow, the Repeats wording and the service name in copy.
+**Architecture:** A new `:provider:calendar-google` implements `CalendarProvider` and `CalendarWriter` over Google Calendar API v3 with OkHttp (every call cancellable) and kotlinx.serialization; tokens come from Play services' `AuthorizationClient` behind an `Authorizer` seam, so no Play services are needed in tests, and a `MockWebServer` with a `Dispatcher`-based fake Google server stands in for Google. The contract grows (`update(fields)`, `find`, `SourceGoneException`, `shown`/`primary` sources, `recurrenceRule`, `forPersonColor`, `userConnectable`) with a contract check per rule. `calendar.db` v4 stores the touched fields, the recurrence rule, the source-refresh time and when a sign-in pause of the outbox age clock began (D16; a finished pause moves each queued change's `createdMillis` forward). The engine gains source refresh and default mapping, touched-field edits, the aged-create and out-of-window lookups, and the crash-proofing of R3 and the store-failure follow-ups; the UI gains the connecting card, the Settings Calendars block, the reconnect chip's flow, the Repeats wording and the service name in copy.
 
 **Tech Stack:** Kotlin 2.2.20, Jetpack Compose (BOM 2025.09.00), Hilt 2.57.1 (KSP), Room 2.8.0 + room-testing, Coroutines 1.10.2 (+ `kotlinx-coroutines-play-services` 1.10.2), OkHttp 4.12.0 + MockWebServer 4.12.0, kotlinx.serialization 1.9.0 (plugin `org.jetbrains.kotlin.plugin.serialization` 2.2.20), Play services `play-services-auth` 21.4.0, JUnit4 + Robolectric 4.16 + Truth + Turbine, Roborazzi 1.46.1.
 
@@ -14,33 +14,85 @@
 **Plan series:** 1 Foundation (done) · 2a Calendar read path (done) · 2b-1 Change events (done) · 2b-2 Add and edit (done) · **3a Google Calendar and crash-proofing (this plan)** · 4 Weather, setup, settings, release. The direct ICS provider is deferred (spec D1).
 
 **Task order and why:** contract and data first, then the engine that uses them, then the Google provider, then the UI and the app wiring, so every task ends green and each layer is tested before anything depends on it.
-1. **The contract, and every writer in one task.** `update(…, fields)` and `find` stop `:provider:calendar-fake`, the testkit's `TinyProvider` and the calendar tests' `ScriptedWriter` compiling until each implements them, and the fake must pass the five new contract checks at the same gate.
-2. `calendar.db` v4 and the store: `MIGRATION_3_4` (the spec's three columns and D16's two), removing connections and sources, the source refresh, `makeDue`, the early returns, and the paused age clock.
-3. Crash-proofing the engine (D13): the application scope's handler, `Throwable` per source with logging, store calls outside the provider's try, `retryWhen` on the flows, the drain backoff (m2), C2, the shared write lock (orphan race) and the counting-DAO test.
+1. **The contract, and every writer in one task.** `update(…, fields)` and `find` stop `:provider:calendar-fake`, the testkit's `TinyProvider` and the calendar tests' `ScriptedWriter` compiling until each implements them, and the fake must pass the four new contract checks at the same gate.
+2. `calendar.db` v4 and the store: `MIGRATION_3_4` (the spec's three columns and D16's one), removing connections and sources, the source refresh, `makeDue`, the early returns, and the paused age clock.
+3. Crash-proofing the engine (D13): the application scope's handler, `Throwable` per source with logging through one `callReader`, an `Error` in a write or a pass caught, store calls outside the provider's call, `retryWhen` on the flows, the drain backoff (m2), C2 (`complete`), the shared write lock (orphan race), the counting-DAO test, and the tests' `testEditor`/`testSync` factories.
 4. Crash-proofing the sheets (D13): Try again reuses the key, the sheet's load failure, the editor's Delete wording, and `EventDetailHost`'s `onEdit` default.
 5. Touched fields (C3) and the person's colour, sheet → editor → outbox → drain.
 6. The drain's Google follow-ups: the paused age clock in the drain (D16), `NeedsSignIn` from a write, the aged create (C9) and the assign outside the window (m3).
-7. Sources: `defaultMapping`, `SourceRefresher` (start, daily, after `SourceGoneException`), the master-gone toast, and `CalendarSetup.connectWithDefaults`/`reconnect` behind the IO + timeout wrapper.
-8. `:provider:calendar-google`, the fake Google server fixture, and `GoogleApi` (cancellable HTTP, JSON, error mapping, the 401 refresh).
-9. Sign-in: `TokenSource`, the `Authorizer` seam over `AuthorizationClient`, and the connect flow's logic.
-10. `GoogleCalendarProvider` reading (sources, sync, paging, 410, recurrence) and the contract suite's read checks through the fake server.
-11. `GoogleCalendarProvider` writing (insert/409, PATCH of touched fields, delete, `find`, `colorId`, R8 wording) and the whole contract suite through the fake server, R9 included.
+7. Sources: `defaultMapping`, `SourceRefresher` (start, daily, after `SourceGoneException`), the master-gone toast, and `CalendarSetup.connectWithDefaults` (a second connect of the same account reconnects it)/`reconnect` through `callReader`.
+8. `:provider:calendar-google`, the fake Google server fixture, and `GoogleApi` (cancellable, main-safe HTTP proved against the fake server (R9), JSON, error mapping with Google's quota and missing-scope reasons, the 401 refresh).
+9. Sign-in: `TokenSource`, the `Authorizer` seam over `AuthorizationClient` (NeedsSignIn only for a status that needs the user), and the connect flow's logic (both scopes, a silent grant for the email, only a user cancel silent).
+10. `GoogleCalendarProvider` reading (sources with hidden calendars and no free/busy ones, a list without the primary refused, sync, paging, 410, declined invitations, recurrence) and the contract suite's read checks through the fake server.
+11. `GoogleCalendarProvider` writing (insert/409, update and delete that look first, PATCH of touched fields, `find`, `colorId`, R8 wording) and the whole contract suite through the fake server.
 12. Wording and Repeats (D11, D12).
 13. Connecting: `CalendarConnectHost`, Google's `ConnectScreen`, the Connect card, the Settings Calendars block, the reconnect chip, `:app` wiring, and the debug sample's removal (D5); the release APK check.
 14. The emulator walkthrough with the user's Google account, the **USER CHECKPOINT**, then the README, `docs/setup/google-calendar.md` and the follow-ups.
 
 **Deviations from the design and extensions (deliberate):**
-- **D16 as the spec now states it:** the pause starts at the first `NeedsSignIn` (`connection.needsSignInSinceMillis`) and is folded into each outbox row's `pausedMillis` only when the connection becomes `Ok` (`markSynced` or the reconnect's `setHealth(Ok)`); `Unreachable` and `Error` leave it running. `setHealth` gains `nowMillis`.
+- **D16 as the spec now states it:** the pause starts at the first `NeedsSignIn` (`connection.needsSignInSinceMillis`) and is folded in only when the connection becomes `Ok` (`markSynced` or the reconnect's `setHealth(Ok)`), by one UPDATE that moves each of its outbox rows' `createdMillis` forward by the time paused since it was made (no `pausedMillis` column; review Simp2, spec §3.8, §3.11 amended); `Unreachable` and `Error` leave it running. `setHealth` gains `nowMillis`.
 - **The connecting card is drawn by `CalendarConnectHost`**, with the provider's `ConnectScreen` inside it running the flow (Google's draws nothing). The spec's "draws the provider's ConnectScreen (a centred surf card …)" reads either way; this keeps every layout number in `CalendarDimens` and the provider free of UI.
 - **`Capability.SettingsSection()`** (a `@Composable` with an empty default, in `:core:plugin`): the Settings placeholder draws each capability's section, so `:app` never learns calendar UI. The Calendars block is the calendar's section.
 - **`CONFIG_ACCOUNT = "account"`** in the contract: the `Connection.config` key a provider stores the signed-in account under, which Settings shows ("Google Calendar · {account}").
-- **`CalendarConnections`** (`:capability:calendar`) serves the three entry points (card, Settings, chip): which providers can be connected, the Admin check, and finishing a connect or reconnect on the application scope, so closing the card can't cancel it.
+- **`CalendarConnections`** (`:capability:calendar`) serves the three entry points (card, Settings, chip): which providers can be connected, the Admin check, and finishing a connect or reconnect on the application scope, so closing the card can't cancel it, one at a time (review M2).
 - **One `retryWithBackoff` helper** in `:core:plugin` for `CalendarSyncLoop` and `ShellViewModel` (1 s doubling to 60 s, each failure logged).
 - **A queued change's overlay applies only its stored fields**, so a phone change to a field the tablet didn't touch shows at once, not only after the drain. `EVENT_GONE` becomes public so providers refuse with the app's own wording. The debug fake's weekly samples carry `RRULE:FREQ=WEEKLY`, so the debug build shows "Every week".
 - **The walkthrough connects from Settings, not the Connect card** (spec §7 says "sign in from the card"): a debug build always has the sample calendar, so the card never shows on the emulator. The card's button is covered by `CardsTest` and `CalendarConnectHostTest`, and the follow-ups note it for the on-device pass.
-- **Small API changes:** `CalendarRepository.masterLabel` becomes `masterService` (it names the service for the failure card); `CalendarSetup`, `SourceRefresher` and `CalendarEditor` take the household's people and the providers' names as functions, so their tests need no provider module. **Small test hooks:** `ScriptedWriter.dropNextReply` (the provider makes the event, then the connection drops) and `ScriptedWriter.findable`; the fake's `writeGate` (the R9 check). `CalendarStore` gets an internal `(db, dao)` constructor for the counting DAO.
+- **Small API changes:** `CalendarRepository.masterLabel` becomes `masterService` (it names the service for the failure card); `CalendarSetup`, `SourceRefresher` and `CalendarEditor` take the household's people and the providers' names as functions, so their tests need no provider module, and one `serviceNameOf` names a connection's service everywhere. **Small test hooks:** `ScriptedWriter.dropNextReply` (the provider makes the event, then the connection drops) and `ScriptedWriter.findable`; `ScriptedProvider.sourcesHang`; the fake Google server's `writeHold` and `writeReached` (the R9 test). `CalendarStore` gets an internal `(db, dao)` constructor for the counting DAO. The calendar tests build every editor and engine through `testEditor`/`testSync`.
+- **M5 (approved by the user):** only a resolution, `SIGN_IN_REQUIRED`, `INVALID_ACCOUNT` or `RESOLUTION_REQUIRED` (and a grant missing a calendar scope, or Google's 403 `insufficientPermissions` / `ACCESS_TOKEN_SCOPE_INSUFFICIENT`) is `NeedsSignIn`; every other Play services status is `Unreachable` during a sync, logged with its status, and "Couldn't connect to Google Calendar — try again" when connecting; a user cancel stays silent. Spec D2, §3.2 and §3.7 are amended to say so.
+- **M9 (approved by the user):** an invitation the account itself declined (an attendee with `self: true` and `responseStatus: "declined"`) counts as gone: skipped in a full sync, removed in an incremental one (spec §3.5 amended).
+- **L3 (deferred by the user to Plan 4):** whether connecting and reconnecting need a fresh PIN is decided in the on-device kiosk pass; 3a keeps `settings.manage` on the 2-minute Admin session (follow-ups, "From Plan 3a review").
+- **The contract suite has no cancellation check** (review Simp8, spec §3.10 amended): R9 is an OkHttp property, proved against the fake Google server in Task 8; the in-memory fake has no I/O to cancel.
 
-**Carried forward (still settled; do not reintroduce):** every 2b-2 review outcome stands, except where this plan's spec says otherwise: C2, C3, C9, C10, m2, m3, m4, R8, R9, DL1 and U3 are done here. One `callWriter` shared by the editor and the drain (2b-1 Simp1); every accepted write reaches the mirror through `CalendarStore.applyAcceptedWrite`; no `LocalToaster` (2b-1 Simp5); `rememberSingleAction` for the sheets; `SilentToaster` in test sources and no `CalendarSync` defaults (2b-2 m7). The follow-ups marked **For Plan 3** are in scope except the two the spec defers (ICS fixtures, the JVM-only module guard, §8).
+**Carried forward (still settled; do not reintroduce):** every 2b-2 review outcome stands, except where this plan's spec says otherwise: C2, C3, C9, C10, m2, m3, m4, R8, R9, DL1 and U3 are done here. One `callWriter` shared by the editor and the drain (2b-1 Simp1), and now one `callReader` for every provider read; every accepted write reaches the mirror through `CalendarStore.applyAcceptedWrite`; no `LocalToaster` (2b-1 Simp5); `rememberSingleAction` for the sheets; `SilentToaster` in test sources and no `CalendarSync` defaults (2b-2 m7). The follow-ups marked **For Plan 3** are in scope except the two the spec defers (ICS fixtures, the JVM-only module guard, §8).
+
+**Review outcome (settled; do not reintroduce).** The adversarial review of this plan, as applied:
+- **B1** (accepted): the dropped-connection test uses `DISCONNECT_AFTER_REQUEST` on its own client with `retryOnConnectionFailure(false)` (Task 8).
+- **B2** (accepted): the full sync's `timeMax` is `2026-10-07T23:00:00Z`, midnight BST on 8 October (Task 10).
+- **B3** (accepted): the R9 test's own client reads for 30 s, so only cancelling the call can end it within the 1 s bound; the running-calls poll stays (Task 8).
+- **H1** (modified): `update` and `delete` GET first: gone → `EVENT_GONE` (update) or success (delete); a series → refused; a PATCH answered with a gone event → `EVENT_GONE`; no If-Match (Task 11; walkthrough 8).
+- **H2** (modified): `CalendarListPage.items` is required; a list without the primary and an events page with neither token are `UnreachableException` (Tasks 8, 10). The master's self-heal and counting removed outbox rows in the toast are Plan 4's.
+- **H3** (modified): Google's quota 403s are "try later"; a 403 for a missing scope is `NeedsSignIn`; a connect whose grant lacks a scope stores nothing (Tasks 8, 9). `forbiddenForNonOrganizer` keeps the existing wording.
+- **M1** (modified): `runPass` and `callWriter` catch `Throwable`, rethrowing cancellation; the application scope's handler is unchanged (Task 3).
+- **M2** (modified): `CalendarConnections` finishes one connect at a time, and `connectWithDefaults` turns a connect of an account already connected into a reconnect; no deterministic ids (Tasks 7, 13).
+- **M3** (accepted): `execute` reads the body under `runInterruptible(Dispatchers.IO)`, so `GoogleApi` is main-safe (Task 8).
+- **M4** (modified): at connect time only a user cancel is silent; any other failure is logged and toasted "Couldn't connect…" (Tasks 9, 10). The Play services availability check and the kiosk hint are Plan 4's.
+- **M5** (approved by the user): `NeedsSignIn` only for a status that needs the user; every other status is `Unreachable`, logged with it (Task 9).
+- **M6** (accepted): before `Done`, a silent `authorize(email)` must be `Granted`, else "Couldn't connect" and nothing stored (Task 9).
+- **M7** (modified): calendarList asks for `minAccessRole=reader` and the fake honours it (Task 10). Not re-flagging a kept source and per-source health are Plan 4's.
+- **M8** (accepted): calendarList asks for `showHidden=true`, and the fake leaves hidden calendars out without it (Tasks 8, 10).
+- **M9** (approved by the user): an invitation the account declined is gone (Task 10).
+- **M10** (accepted): the walkthrough checks on a real account that a Who PATCH leaves `createdBy` alone (walkthrough 5).
+- **M11** (rejected): no `fields=`, stream decoding or page cap; pages are bounded by the window, and `decodeFromStream` is experimental.
+- **T1** (accepted): the removal tests count event rows directly, not through the source join (Task 2).
+- **T2** (accepted): a Who-only PATCH is tested with a different `createdBy` in the draft and sends only `culvery.person`; the contract check has a `FOR_PERSON` step (Tasks 1, 11).
+- **T3** (accepted): the orphan-race test waits 200 ms of real time after `entered` (Task 3).
+- **T4** (accepted): the connect timeout test hangs (`sourcesHang`) and meets the setup's virtual timeout (Task 7).
+- **T5** (accepted): the failed rule-fetch test stores the series, so the fetch meets the 500 (Task 10).
+- **T6** (accepted): the no-sample test fails without its change (no warning logged); the app-start refresh is tested on a recent check (Tasks 7, 13).
+- **T7** (accepted): a loop test: a pass throwing an `Error` is logged and the next pass runs (Task 3).
+- **T8** (accepted): constructor edits live in the factories; the one order-sensitive replacement (`to C1`) says to run before the test that keeps it (Task 12).
+- **T9** (accepted): the fake's `primaryId` is `@Volatile`, it checks event ids as Google does, and the R9 test cancels after `writeReached` (Task 8).
+- **L1** (accepted): `CalendarWriteLock` wraps a private `Mutex` with its own `withLock` (Task 3).
+- **L2** (accepted): a failed rule fetch is remembered for the rest of that sync (Task 10).
+- **L3** (deferred by the user to Plan 4): a fresh PIN for connect and reconnect.
+- **L4** (modified): `Authorization.Granted` is a plain class (Task 9). Redacting paths and names in logs is Plan 4's.
+- **L5** (rejected): no timeout on reading the household's people; it is local DataStore.
+- **L6** (deferred to Plan 4): an on-device check of deleting a series on a phone.
+- **L7** (accepted): the docs say to add the family account first and to clear app data to undo a connection; walkthrough 1 is softened (Task 14).
+- **L8** (accepted): the README and the follow-ups say a release Connect fails until Plan 4's release client (Task 14).
+- **L9** (deferred, later): no in-memory token cache.
+- **L10** (accepted): the README and the setup doc note that common-word names can mis-map a calendar (Task 14).
+- **Simp1** (rejected): `Authorizer` and `TokenSource` stay apart; the token mapping is tested through the seam.
+- **Simp2** (accepted): no `pausedMillis`; a finished pause moves `createdMillis` forward in one UPDATE (Task 2).
+- **Simp3** (accepted): one `callReader` for the sync, the refresh and connecting (Tasks 3, 7).
+- **Simp4** (accepted): `complete` is written once, in Task 3.
+- **Simp5** (modified): one `serviceNameOf`; the editor keeps its name-function injection (Task 12).
+- **Simp6** (accepted): `testEditor`/`testSync` in Task 3.
+- **Simp7** (rejected): `CalendarSetup` and `CalendarConnections` stay apart.
+- **Simp8** (accepted): no `gateWrites`/`writeGate`; R9 is proved against the fake Google server (Tasks 1, 8).
+- **Simp9** (accepted): Reconnect is `AddButton` without its icon; no duplicate tokens or type names (Task 13).
+- **Simp10** (modified): `removeCalendar` and its test are cut; the fake's weekly RRULE and `GoogleConnectScreenTest` stay.
 
 ## Global Constraints
 
@@ -49,7 +101,8 @@
 - Pinned versions: AGP 8.13.0, Gradle 8.13, Kotlin 2.2.20, KSP 2.2.20-2.0.3, Compose BOM 2025.09.00, Hilt 2.57.1, Room 2.8.0 (with `room-testing` 2.8.0), Robolectric 4.16, Roborazzi 1.46.1. **New in this plan:** OkHttp 4.12.0 and MockWebServer 4.12.0, kotlinx-serialization-json 1.9.0 with the `org.jetbrains.kotlin.plugin.serialization` plugin at the Kotlin version, `play-services-auth` 21.4.0 (the first with `AuthorizationClient.clearToken`), `kotlinx-coroutines-play-services` 1.10.2. All in `gradle/libs.versions.toml`. If a version fails to resolve, take the newest **patch** in the same minor line. Never move to a new major or minor version without asking.
 - **Deprecated APIs:** use none without asking the user first. If any API this plan uses shows a deprecation warning in these versions, **stop and ask**. The APIs worth checking are:
   - `GoogleSignIn`, `GoogleSignInAccount`, `GoogleSignInOptions` and `AuthorizationResult.toGoogleSignInAccount()`: deprecated sign-in; **never use them** (spec §3.1);
-  - `Identity.getAuthorizationClient`, `AuthorizationRequest.builder().setRequestedScopes(…).setAccount(…)`, `AuthorizationClient.authorize`, `getAuthorizationResultFromIntent`, `clearToken(ClearTokenRequest)` (Task 9);
+  - `Identity.getAuthorizationClient`, `AuthorizationRequest.builder().setRequestedScopes(…).setAccount(…)`, `AuthorizationClient.authorize`, `getAuthorizationResultFromIntent`, `AuthorizationResult.getGrantedScopes()`, `clearToken(ClearTokenRequest)` and the `CommonStatusCodes` constants (Task 9);
+  - Room 2.8's `useReaderConnection` and `usePrepared` (Task 2's row count);
   - `CancellableContinuation.resume(value, onCancellation)`: the one-argument `onCancellation: (Throwable) -> Unit` overload **is deprecated** in coroutines 1.10; use the three-argument `{ _, value, _ -> … }` form (Task 8);
   - OkHttp 4's Java-style accessors (`response.body()`, `response.code()`, `request.url()`, `RecordedRequest.getPath()` as a call) are deprecated in Kotlin: use the properties (`response.body`, `response.code`, `request.url`, `recorded.path`, `recorded.requestUrl`) and the extension functions (`toMediaType()`, `toRequestBody()`, `toHttpUrl()`) (Tasks 8–11);
   - `rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult())` and `IntentSenderRequest.Builder(IntentSender)` (Task 13);
@@ -84,7 +137,7 @@
   - sync, drain, source refresh, `connect`, `connectWithDefaults` and `setMaster` calls under 60 s (`PROVIDER_TIMEOUT_MS`);
   - the editor's direct attempt under `WRITE_ATTEMPT_MS = 10_000`.
 
-  **Cancelling the coroutine must cancel the HTTP call** (R9): the Google provider enqueues every OkHttp `Call` inside `suspendCancellableCoroutine` and cancels it from `invokeOnCancellation`; nothing calls the blocking `execute()`. Every writer call goes through the shared `callWriter`, and every accepted write reaches the mirror through `CalendarStore.applyAcceptedWrite` (both in `Writes.kt`). Reuse them, `couldNotSave`, `SingleAction`/`rememberSingleAction`; never write a second path.
+  **Cancelling the coroutine must cancel the HTTP call** (R9): the Google provider enqueues every OkHttp `Call` inside `suspendCancellableCoroutine` and cancels it from `invokeOnCancellation`; nothing calls the blocking `execute()`. Every writer call goes through the shared `callWriter`, every provider read (a sync, or sources for the refresh or connecting) through `callReader`, and every accepted write reaches the mirror through `CalendarStore.applyAcceptedWrite` (all in `Writes.kt`). Reuse them, `couldNotSave`, `serviceNameOf`, `SingleAction`/`rememberSingleAction`; never write a second path.
 - Writers throw only `WriteRejectedException` (a permanent refusal), `NeedsSignInException` or `UnreachableException` (`SourceGoneException` is one). `create` is idempotent by its client key, returns `remoteId == clientKey`, and never recreates a deleted event. `update` changes only its `fields`. `find` throws only `NeedsSignInException` or `UnreachableException`.
 - **The outbox never spins:** nothing may leave an outbox row due now at the end of a pass (the loop would run a pass every second). Every "try again later" path reschedules with `retryLater` (backoff), and a failed drain backs the loop off (m2).
 - Viewing never needs a PIN. Every change calls `AccessControl.authorise` **when tapped**. Buttons are never hidden for permission reasons. (The three add entry points hide only when there is no writable master calendar; Connect Google Calendar hides once Google is connected.) Connecting and reconnecting need `settings.manage` (Admin; not a fresh-PIN permission, spec §6).
@@ -106,16 +159,18 @@ The spec's review-focus inputs (§9), each pinned by named tests in the task tha
 1. **Google access lapses mid-save, over a weekend.**
    - The change is queued, the chip shows `NeedsSignIn` at once, nothing is dropped for age while the connection needs sign-in (D16), and the reconnect makes the queue due and drains it.
    - Tests:
-     - Task 2 `aNeedsSignInLapseIsFoldedIntoEachRowWhenTheConnectionIsOk`, `aRowQueuedDuringTheLapseIsPausedOnlyFromItsCreation`
+     - Task 2 `aNeedsSignInLapseIsFoldedIntoEachRowWhenTheConnectionIsOk`, `aRowQueuedDuringTheLapseIsPausedOnlyFromItsCreation`, `foldingAPauseKeepsTheQueueInTheOrderItWasMade`
+     - Task 8 `a403ForAMissingScopeMeansTheAccountNeedsSigningIn`; Task 9 `onlyAStatusThatNeedsTheUserMeansSignInAndAnyOtherIsTryLaterNamingIt` (a Play services hiccup doesn't start the pause)
      - Task 6 `aWriteThatNeedsSignInFlagsTheConnectionAndStartsThePause`, `aChangeQueuedBeforeAThreeDayLapseSurvivesItAndAgesAgainAfterTheReconnect`
      - Task 6 `aSaveThatNeedsSignInIsQueuedAndFlagsTheConnectionAtOnce` (editor)
      - Task 7 `reconnectSetsHealthOkMakesTheQueueDueAndAsksForASync`
      - Task 14 Step 3, walkthrough item 9 (revoke at myaccount.google.com, reconnect)
 2. **A 409 on a create after a lost reply.**
-   - No duplicate, and never a deleted event brought back.
+   - No duplicate, and never a deleted event brought back, by a create or by an edit.
    - Tests:
      - Task 1 contract checks `aRepeatedCreateWithTheSameKeyReturnsTheSameEvent` and `aCreateNeverRecreatesADeletedEvent`, with the fixture `RecreatingContract`
-     - Task 11 `aRepeatedInsertReturnsTheEventItsKeyMade`, `anInsertWhoseEventWasDeletedOnAPhoneIsRefused`
+     - Task 11 `aRepeatedInsertReturnsTheEventItsKeyMade`, `anInsertWhoseEventWasDeletedOnAPhoneIsRefused`, `anEditOfAnEventCancelledOnThePhoneIsGoneAndNeverBringsItBack`, `anEditOfAnEventMadeASeriesOnThePhoneIsRefused`, `aDeleteOfAnEventMadeASeriesOnThePhoneIsRefused`
+     - Task 14 Step 3, walkthrough item 8 (deleted on the phone, edited on the offline tablet)
      - Task 6 `anAgedCreateThatGoogleHasIsCompletedAndItsFollowersAreSent` (C9)
 3. **A phone edit made while an offline tablet edit waits.**
    - Only the touched fields are sent, so the phone's other change is kept.
@@ -123,19 +178,22 @@ The spec's review-focus inputs (§9), each pinned by named tests in the task tha
      - Task 5 `anOfflineTitleEditIsSentAsATitleOnlyUpdateAfterAPhoneMovedTheEvent`
      - Task 5 `aQueuedTitleEditShowsOverThePhonesNewTime` (overlay)
      - Task 11 `aTitlePatchKeepsAPhoneChangeToTheTime` and `aPersonPatchKeepsCreatedBy` (fake Google server)
-     - Task 1 contract check `anUpdateChangesOnlyItsFields`, with the fixture `OverwritingContract`
+     - Task 1 contract check `anUpdateChangesOnlyItsFields` (its `FOR_PERSON` step keeps `createdBy`), with the fixture `OverwritingContract`
+     - Task 14 Step 3, walkthrough item 5 (`createdBy` kept by a Who PATCH on a real account)
 4. **A calendar deleted in Google while it is the master.**
    - The master is cleared, one toast, the add buttons hide, nothing crashes; its events, cursor and queued changes go.
    - Tests:
      - Task 2 `refreshingWithoutTheMasterClearsItAndRemovesItsRows`
      - Task 7 `aMasterDeletedInGoogleIsClearedWithOneToast`, `aSourceGoneFlagsARefreshThatRemovesIt`
-     - Task 10 `aListOnADeletedCalendarIsSourceGone`
+     - Task 10 `aDeletedOrForbiddenCalendarIsSourceGone`
+     - Task 10 `aCalendarListWithNoItemsOrNoPrimaryIsUnreachableNotEveryCalendarGone` (a bad answer never reads as every calendar deleted)
 5. **A provider throws an `Error`.**
    - No crash; that source's health is Error, logged; the other sources and connections keep syncing, and the loop keeps running.
    - Tests:
      - Task 3 `aProviderThrowingAnErrorFlagsOnlyItsConnection`
      - Task 3 `anUncaughtFailureInAnApplicationJobIsLoggedAndItsSiblingsRun`
      - Task 3 `aStoreFailureFailsThePassNotTheProvidersHealth`
+     - Task 3 `anErrorInAPassIsLoggedAndTheNextPassStillRuns` (loop) and `aWriterThrowingAnErrorIsLoggedAndTheChangeIsTriedAgainLater` (drain)
 
 The spec's sixth note (release kiosk mode may block Play services' account chooser) is untested until the Plan 4 on-device pass; Task 14 adds it to the follow-ups.
 
@@ -157,50 +215,50 @@ capability/calendar/
   schemas/…CalendarDatabase/4.json                 (generated, committed)
   src/main/java/uk/co/siland/culvery/capability/calendar/
     CalendarContract.kt   (modify: shown, primary, recurrenceRule, forPersonColor, EventField, update(fields), find, SourceGoneException, CONFIG_ACCOUNT)
-    Writes.kt             (modify: EVENT_GONE public, fieldsFor, ageMillis, Retry.needsSignIn, assignDraft with colour)
-    Stored.kt             (modify: StoredConnection's refresh and pause times, StoredEvent.recurrenceRule, PendingChange.fields/pausedMillis)
+    Writes.kt             (modify: EVENT_GONE public, fieldsFor, ageMillis, callReader, callWriter catching Throwable, Retry.needsSignIn, assignDraft with colour, serviceNameOf)
+    Stored.kt             (modify: StoredConnection's refresh and pause times, StoredEvent.recurrenceRule, PendingChange.fields)
     db/CalendarDatabase.kt, db/Migrations.kt, di/CalendarModule.kt   (modify: v4, MIGRATION_3_4)
-    CalendarStore.kt      (modify: removeConnection, refreshSources, makeDue, early returns, D16, internal (db, dao) constructor)
+    CalendarStore.kt      (modify: removeConnection, refreshSources, makeDue, early returns, D16 (folding moves createdMillis), internal (db, dao) constructor)
     CalendarWriteLock.kt  (create)
-    CalendarSync.kt       (modify: Throwable per source, logging, store calls outside the try, drain backoff, C2, lock, fields, D16, C9, m3, NeedsSignIn, refresher)
-    CalendarSyncLoop.kt   (modify: retryWithBackoff, drain backoff floor)
+    CalendarSync.kt       (modify: callReader per source, logging, store calls outside the provider's call, drain backoff, C2 (complete), lock, fields, D16, C9, m3, NeedsSignIn, refresher)
+    CalendarSyncLoop.kt   (modify: retryWithBackoff, drain backoff floor, runPass catching Throwable)
     CalendarEditor.kt     (modify: shared lock, create(draft, key), update(ref, draft, fields), colour, NeedsSignIn, service name, couldNotOpen)
     EventForm.kt          (modify: touched)
     PendingOverlay.kt     (modify: an update applies only its fields)
     DefaultMapping.kt     (create: defaultMapping, namesPerson)
     SourceRefresher.kt    (create)
-    CalendarSetup.kt      (modify: connectWithDefaults, reconnect, IO + timeout, connectionIds, removeConnection)
-    CalendarConnections.kt (create)
+    CalendarSetup.kt      (modify: connectWithDefaults (an account already connected is reconnected), reconnect, callReader, connectionIds, removeConnection)
+    CalendarConnections.kt (create: one connect at a time)
     Repeats.kt            (create: repeatsLabel)
     CalendarUi.kt, CalendarRepository.kt   (modify: serviceName, repeats, masterService, reconnectId)
     CalendarCapability.kt (modify: connect card host, SettingsSection)
     ui/EventEditorHost.kt, ui/EventDetailHost.kt, ui/EventDetailSheet.kt, ui/WeekView.kt, ui/CardHosts.kt, ui/ConnectCalendarCard.kt,
-    ui/Components.kt (AddButton), ui/Pickers.kt (PickerCard, PickerButton internal), ui/CalendarType.kt   (modify)
+    ui/Components.kt (AddButton, its icon optional), ui/Pickers.kt (PickerCard, PickerButton internal), ui/CalendarType.kt   (modify)
     ui/CalendarConnectHost.kt, ui/CalendarSettings.kt   (create)
   src/test/java/uk/co/siland/culvery/capability/calendar/
-    ScriptedWriter.kt, CountingDao.kt (create), CalendarMigrationTest, CalendarStoreTest, CalendarSyncTest, CalendarSyncLoopTest, CalendarEditorTest,
+    ScriptedWriter.kt, ScriptedProvider.kt, CountingDao.kt (create), TestEngines.kt (create: testEditor, testSync), CalendarMigrationTest, CalendarStoreTest, CalendarSyncTest, CalendarSyncLoopTest, CalendarEditorTest,
     EventFormTest, PendingOverlayTest, DefaultMappingTest (create), SourceRefresherTest (create), CalendarSetupTest, RepeatsTest (create),
     CalendarRepositoryTest, CalendarCapabilityTest, StubEditor, ui/EventEditorHostTest, ui/EventDetailHostTest, ui/EventDetailSheetTest,
     ui/CardsTest, ui/WeekViewTest, ui/CalendarConnectHostTest (create), ui/CalendarSettingsTest (create), ui/ConnectScreenshotTest (create), ui/CardScreenshotTest
   src/test/screenshots/connect_{dark,light}.png (re-recorded), connecting_*.png, settings_calendars_*.png (new), detail_recurring_*, detail_delete_confirm_* (re-recorded)
 
 capability/calendar-testkit/
-  src/main/…/CalendarProviderContractTest.kt       (modify: five checks, gateWrites)
-  src/test/…/fixtures/TinyProvider.kt, TinyContracts.kt; ContractSuiteSelfTest.kt   (modify: five broken fixtures)
+  src/main/…/CalendarProviderContractTest.kt       (modify: four checks)
+  src/test/…/fixtures/TinyProvider.kt, TinyContracts.kt; ContractSuiteSelfTest.kt   (modify: four broken fixtures)
 
 provider/calendar-fake/
-  src/main/…/FakeCalendarProvider.kt, SampleEvents.kt   (modify: fields, find, no recreate, userConnectable, primary, writeGate, RRULE)
+  src/main/…/FakeCalendarProvider.kt, SampleEvents.kt   (modify: fields, find, no recreate, userConnectable, primary, RRULE)
   src/test/…/FakeCalendarProviderTest.kt, FakeCalendarProviderContractTest.kt   (modify)
 
 provider/calendar-google/                          (create)
   build.gradle.kts
   src/main/AndroidManifest.xml
   src/main/java/uk/co/siland/culvery/provider/calendar_google/
-    GoogleJson.kt          (the JSON models and the one Json)
-    GoogleHttp.kt          (Call.await, GoogleApi: requests, the 401 refresh, error mapping)
+    GoogleJson.kt          (the JSON models, attendees included, and the one Json)
+    GoogleHttp.kt          (Call.await, GoogleApi: main-safe requests, the 401 refresh, error mapping)
     GoogleColors.kt        (the 11 event colours, nearestColorId)
     GoogleEvents.kt        (mapping one event; PATCH and insert bodies)
-    TokenSource.kt         (TokenSource, Authorizer, Authorization, PlayServicesAuthorizer, PlayServicesTokenSource, authorizationFailure)
+    TokenSource.kt         (TokenSource, Authorizer, Authorization, PlayServicesAuthorizer, PlayServicesTokenSource, PlayServicesStatusException, authorizationFailure, isUserCancel)
     GoogleConnectFlow.kt   (the connect flow's logic)
     GoogleCalendarProvider.kt
     di/GoogleCalendarModule.kt
@@ -254,9 +312,9 @@ README.md, docs/setup/google-calendar.md, docs/superpowers/plans/2026-09-23-plan
   - `open class UnreachableException`; `class SourceGoneException(message: String? = null, cause: Throwable? = null) : UnreachableException`
   - `const val CONFIG_ACCOUNT = "account"`
   - `const val EVENT_GONE = "The event no longer exists"` (now public); `internal fun fieldsFor(kind: ChangeKind, fields: Set<EventField>?): Set<EventField>`
-  - `CalendarProviderContractTest.gateWrites(): (() -> Unit)?` (optional hook: hold every write's reply; the returned function releases them)
   - `ScriptedWriter.fieldSets: List<Set<EventField>>`, `ScriptedWriter.findable: MutableMap<String, RemoteEvent>`
-  - `FakeCalendarProvider.writeGate: CompletableDeferred<Unit>?` (internal); `SOURCE_FAMILY` is the fake's `primary`
+  - `SOURCE_FAMILY` is the fake's `primary`
+  - No cancellation hook in the contract suite (review Simp8): R9 is an OkHttp property, proved in Task 8's `cancellingTheCallerCancelsTheHttpCall` with the fake server's `writeHold`.
 
 - [ ] **Step 1: Write the failing contract checks**
 
@@ -266,12 +324,7 @@ In `capability/calendar-testkit/src/main/java/uk/co/siland/culvery/capability/ca
 ```kotlin
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
@@ -291,25 +344,9 @@ import uk.co.siland.culvery.capability.calendar.instantIn
 import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
-
-/** Real time for a held write to reach the service before the check cancels its caller. */
-private const val HOLD_SETTLE_MS = 200L
-
-/** How soon a cancelled write must return (3a design §3.10, follow-up R9). */
-private const val CANCEL_WITHIN_MS = 1_000L
 ```
 
-2. After `protected open fun writableSource(): CalendarSource? = null`, add:
-```kotlin
-    /**
-     * Makes the service hold its reply to every write from now on and returns the function that releases them; null
-     * skips the cancellation check. On a cooperative in-memory provider it proves little; on a real service's test
-     * double (Google through the fake server) it proves the HTTP call is cancelled with its caller.
-     */
-    protected open fun gateWrites(): (() -> Unit)? = null
-```
-
-3. In `updatedFieldsRoundTrip`, replace
+2. In `updatedFieldsRoundTrip`, replace
 ```kotlin
         val updated = w.update(conn, source, created.remoteId, changed)
 ```
@@ -318,7 +355,7 @@ with
         val updated = w.update(conn, source, created.remoteId, changed, EventField.entries.toSet())
 ```
 
-4. Add these members at the end of the class:
+3. Add these members at the end of the class:
 ```kotlin
     /** 3a design C10: a create whose key belonged to a deleted event is refused; it never makes the event again. */
     @Test
@@ -339,7 +376,10 @@ with
         assertThat(subject.sync(conn, source, window, null).upserts.map { it.remoteId }).doesNotContain(made.remoteId)
     }
 
-    /** 3a design C3: an update changes only its fields, so a change made elsewhere to the others is kept. */
+    /**
+     * 3a design C3: an update changes only its fields, so a change made elsewhere to the others is kept, and no
+     * update changes who created the event, a Who-only one included.
+     */
     @Test
     fun anUpdateChangesOnlyItsFields() = runTest {
         val (w, source) = requireWriting()
@@ -347,13 +387,15 @@ with
         val moved = draftIn("Not this title", 5, forPerson = "not-this-person", createdBy = "not-this-creator")
         w.update(conn, source, created.remoteId, moved, setOf(EventField.TIMES))
         val renamed = draftIn("Renamed", 9, forPerson = "not-this-person", createdBy = "not-this-creator")
-        val updated = w.update(conn, source, created.remoteId, renamed, setOf(EventField.TITLE))
+        w.update(conn, source, created.remoteId, renamed, setOf(EventField.TITLE))
+        val retagged = draftIn("Not this title either", 11, forPerson = "contract-new-for", createdBy = "not-this-creator")
+        val updated = w.update(conn, source, created.remoteId, retagged, setOf(EventField.FOR_PERSON))
         val synced = subject.sync(conn, source, window, null).upserts.firstOrNull { it.remoteId == created.remoteId }
         assertWithMessage("the next sync must return the updated event").that(synced).isNotNull()
         listOf("update's result" to updated, "the next sync" to synced!!).forEach { (what, e) ->
-            assertWithMessage("$what: the title").that(e.title).isEqualTo("Renamed")
-            assertWithMessage("$what: the times the earlier TIMES update set").that(e.start to e.end).isEqualTo(moved.start to moved.end)
-            assertWithMessage("$what: who it is for, which neither update changed").that(e.forPerson).isEqualTo(created.forPerson)
+            assertWithMessage("$what: the title the TITLE update set").that(e.title).isEqualTo("Renamed")
+            assertWithMessage("$what: the times the TIMES update set").that(e.start to e.end).isEqualTo(moved.start to moved.end)
+            assertWithMessage("$what: who it is for, as the FOR_PERSON update set").that(e.forPerson).isEqualTo("contract-new-for")
             assertWithMessage("$what: who created it, which no update changes").that(e.createdBy).isEqualTo(created.createdBy)
         }
     }
@@ -370,37 +412,13 @@ with
         assertWithMessage("find must return null for a deleted event").that(w.find(conn, source, created.remoteId)).isNull()
     }
 
-    /** Follow-up R9: cancelling the caller must cancel the service call, or the engine's timeouts can't hold. */
-    @Test
-    fun aWriteReturnsPromptlyWhenItsCallerIsCancelled() = runTest {
-        val (w, source) = requireWriting()
-        val release = gateWrites()
-        assumeTrue("provider cannot hold a write's reply", release != null)
-        val returnedInTime = withContext(Dispatchers.Default) {
-            val call = launch {
-                try {
-                    w.create(conn, source, draftIn("Held", 4), newClientKey())
-                } catch (e: Exception) {
-                    // Cancelled, as this check intends.
-                }
-            }
-            delay(HOLD_SETTLE_MS)
-            call.cancel()
-            val joined = withTimeoutOrNull(CANCEL_WITHIN_MS) { call.join() } != null
-            release!!.invoke()
-            joined
-        }
-        assertWithMessage("a write whose caller is cancelled must return within 1 s: cancel the service call with it")
-            .that(returnedInTime).isTrue()
-    }
-
     @Test
     fun sourcesReportAtMostOnePrimary() = runTest {
         assertWithMessage("at most one source may be the account's primary calendar")
             .that(subject.sources(conn).count { it.primary }).isAtMost(1)
     }
 ```
-The release runs inside the `withContext` block, before it returns: `withContext` waits for its child, and a child stuck in a non-cancellable wait would otherwise never finish.
+The suite has no cancellation check (review Simp8): cancelling a write is an HTTP property, proved against the fake Google server in Task 8, and the in-memory fake has no I/O to cancel.
 
 - [ ] **Step 2: Write the failing self-tests**
 
@@ -410,10 +428,9 @@ In `capability/calendar-testkit/src/test/java/uk/co/siland/culvery/capability/ca
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.BlindContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.OverwritingContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.RecreatingContract
-import uk.co.siland.culvery.capability.calendar_testkit.fixtures.StubbornContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.TwoPrimariesContract
 ```
-2. In `wellBehavedProviderPassesEveryCheck` and `aReadOnlyProviderSkipsOnlyTheWriteChecks`, replace `isEqualTo(17)` with `isEqualTo(22)`. In `aReadOnlyProviderSkipsOnlyTheWriteChecks`, replace `assertThat(result.assumptionFailureCount).isEqualTo(7)` with `assertThat(result.assumptionFailureCount).isEqualTo(11)`.
+2. In `wellBehavedProviderPassesEveryCheck` and `aReadOnlyProviderSkipsOnlyTheWriteChecks`, replace `isEqualTo(17)` with `isEqualTo(21)`. In `aReadOnlyProviderSkipsOnlyTheWriteChecks`, replace `assertThat(result.assumptionFailureCount).isEqualTo(7)` with `assertThat(result.assumptionFailureCount).isEqualTo(10)` (the three new write checks are skipped; the primary check runs).
 3. Add at the end of the class:
 ```kotlin
     @Test
@@ -432,11 +449,6 @@ import uk.co.siland.culvery.capability.calendar_testkit.fixtures.TwoPrimariesCon
     }
 
     @Test
-    fun aWriteThatIgnoresCancellationIsCaught() {
-        assertThat(failuresOf(StubbornContract::class.java)).containsExactly("aWriteReturnsPromptlyWhenItsCallerIsCancelled")
-    }
-
-    @Test
     fun twoPrimaryCalendarsAreCaught() {
         assertThat(failuresOf(TwoPrimariesContract::class.java)).containsExactly("sourcesReportAtMostOnePrimary")
     }
@@ -445,7 +457,7 @@ import uk.co.siland.culvery.capability.calendar_testkit.fixtures.TwoPrimariesCon
 - [ ] **Step 3: Run them to see them fail**
 
 Run: `./gradlew :capability:calendar-testkit:testDebugUnitTest`
-Expected: compilation FAILS: `EventField`, `find` and the five fixtures are unresolved.
+Expected: compilation FAILS: `EventField`, `find` and the four fixtures are unresolved.
 
 - [ ] **Step 4: Change the contract**
 
@@ -661,7 +673,7 @@ internal class ScriptedWriter(override val providerId: String) : CalendarWriter 
 }
 ```
 
-- [ ] **Step 6: The testkit's tiny provider, with the five broken fixtures**
+- [ ] **Step 6: The testkit's tiny provider, with the four broken fixtures**
 
 In `capability/calendar-testkit/src/test/java/uk/co/siland/culvery/capability/calendar_testkit/fixtures/TinyProvider.kt`:
 
@@ -671,9 +683,6 @@ import androidx.compose.runtime.Composable
 import java.io.IOException
 import java.time.LocalDate
 import java.time.ZoneId
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSource
 import uk.co.siland.culvery.capability.calendar.CalendarWriter
@@ -697,45 +706,26 @@ import uk.co.siland.culvery.core.plugin.ProviderDescriptor
     private val recreateDeleted: Boolean = false,
     private val updateEverything: Boolean = false,
     private val findNothing: Boolean = false,
-    private val uncancellableWrites: Boolean = false,
     private val twoPrimaries: Boolean = false,
 ```
 
 3. After `private var nextId = 0` add:
 ```kotlin
-    private var writeGate: CompletableDeferred<Unit>? = null
     // The key each written event was made with, and the keys of events since deleted.
     private val keyOf = mutableMapOf<String, String>()
     private val deletedKeys = mutableSetOf<String>()
 ```
 
-4. After `fun failNextWith(error: Throwable) { … }` add:
-```kotlin
-    /** Holds every write until the returned function is called (the R9 check). */
-    fun gateWrites(): () -> Unit {
-        val gate = CompletableDeferred<Unit>()
-        writeGate = gate
-        return { gate.complete(Unit) }
-    }
-
-    private suspend fun awaitGate() {
-        val gate = writeGate ?: return
-        // Broken on purpose when uncancellable: the caller's cancellation can't reach the wait.
-        if (uncancellableWrites) withContext(NonCancellable) { gate.await() } else gate.await()
-    }
-```
-
-5. Replace `override suspend fun sources(conn: Connection) = …` with:
+4. Replace `override suspend fun sources(conn: Connection) = …` with:
 ```kotlin
     override suspend fun sources(conn: Connection) =
         if (canWrite) listOf(SOURCE.copy(primary = twoPrimaries), WRITABLE) else listOf(SOURCE.copy(primary = twoPrimaries))
 ```
 
-6. Replace `create`, `update` and `delete` with:
+5. Replace `create`, `update` and `delete` with:
 ```kotlin
     override suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft, clientKey: String): RemoteEvent {
         checkWritable(source)
-        awaitGate()
         if (!recreateDeleted && clientKey in deletedKeys) throw WriteRejectedException("Tiny's event for $clientKey was deleted")
         if (!ignoreClientKey) {
             written[clientKey]?.let { existing ->
@@ -771,7 +761,6 @@ import uk.co.siland.culvery.core.plugin.ProviderDescriptor
         fields: Set<EventField>,
     ): RemoteEvent {
         checkWritable(source)
-        awaitGate()
         val current = written[remoteId] ?: throw WriteRejectedException("No event $remoteId")
         // Broken on purpose when updating everything: it writes the whole draft, creator included.
         val applied = if (updateEverything) EventField.entries.toSet() else fields
@@ -789,7 +778,6 @@ import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 
     override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) {
         checkWritable(source)
-        awaitGate()
         when {
             written.remove(remoteId) != null -> {
                 deletedKeys += keyOf[remoteId] ?: remoteId
@@ -803,22 +791,16 @@ import uk.co.siland.culvery.core.plugin.ProviderDescriptor
         if (findNothing || source.id != WRITABLE.id) null else written[remoteId]
 ```
 
-7. In the companion, replace `val WRITABLE = CalendarSource("tiny-w", "Tiny writable", writable = true)` with:
+6. In the companion, replace `val WRITABLE = CalendarSource("tiny-w", "Tiny writable", writable = true)` with:
 ```kotlin
         val WRITABLE = CalendarSource("tiny-w", "Tiny writable", writable = true, primary = true)
 ```
 
-In `capability/calendar-testkit/src/test/java/uk/co/siland/culvery/capability/calendar_testkit/fixtures/TinyContracts.kt`:
-1. After `override fun writableSource() = TinyProvider.WRITABLE` add:
-```kotlin
-    override fun gateWrites(): (() -> Unit)? = tiny.gateWrites()
-```
-2. Add at the end of the file:
+In `capability/calendar-testkit/src/test/java/uk/co/siland/culvery/capability/calendar_testkit/fixtures/TinyContracts.kt`, add at the end of the file:
 ```kotlin
 class RecreatingContract : TinyContract(TinyProvider(recreateDeleted = true))
 class OverwritingContract : TinyContract(TinyProvider(updateEverything = true))
 class BlindContract : TinyContract(TinyProvider(findNothing = true))
-class StubbornContract : TinyContract(TinyProvider(uncancellableWrites = true))
 class TwoPrimariesContract : TinyContract(TinyProvider(twoPrimaries = true))
 ```
 
@@ -881,25 +863,15 @@ In `provider/calendar-fake/src/test/java/uk/co/siland/culvery/provider/calendar_
     }
 ```
 
-In `provider/calendar-fake/src/test/java/uk/co/siland/culvery/provider/calendar_fake/FakeCalendarProviderContractTest.kt`:
-1. Add `import kotlinx.coroutines.CompletableDeferred`, and remove the `CalendarSource` import.
-2. Replace `private val familyCalendar = CalendarSource(FakeCalendarProvider.SOURCE_FAMILY, "Family calendar", writable = true)` with:
+In `provider/calendar-fake/src/test/java/uk/co/siland/culvery/provider/calendar_fake/FakeCalendarProviderContractTest.kt`, remove the `CalendarSource` import and replace `private val familyCalendar = CalendarSource(FakeCalendarProvider.SOURCE_FAMILY, "Family calendar", writable = true)` with:
 ```kotlin
     private val familyCalendar = FakeCalendarProvider.SOURCES.single { it.id == FakeCalendarProvider.SOURCE_FAMILY }
-```
-3. After `override fun simulateUnreachable() = …` add:
-```kotlin
-    override fun gateWrites(): (() -> Unit)? {
-        val gate = CompletableDeferred<Unit>()
-        fake.writeGate = gate
-        return { gate.complete(Unit) }
-    }
 ```
 
 - [ ] **Step 9: Run them to see them fail**
 
 Run: `./gradlew :provider:calendar-fake:testDebugUnitTest`
-Expected: compilation FAILS: the fake doesn't implement `find` or the new `update`, and `writeGate` is unresolved.
+Expected: compilation FAILS: the fake doesn't implement `find` or the new `update`.
 
 - [ ] **Step 10: Bring the fake in line**
 
@@ -918,7 +890,6 @@ import java.time.ZoneOffset
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CompletableDeferred
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSource
 import uk.co.siland.culvery.capability.calendar.CalendarWriter
@@ -951,9 +922,6 @@ private const val GONE_MESSAGE = "That event no longer exists"
 ```kotlin
     // The last sync's zone, so an update can rebuild the sample it changes.
     @Volatile private var zone: ZoneId = ZoneOffset.UTC
-
-    /** For the contract's R9 check: while set, every write waits for it. */
-    @Volatile internal var writeGate: CompletableDeferred<Unit>? = null
 ```
 
 5. In `sync`, make the first line after `throwIfFailing()`:
@@ -1015,27 +983,7 @@ private const val GONE_MESSAGE = "That event no longer exists"
     }
 ```
 
-7. Replace `private inline fun <T> write(…)` with:
-```kotlin
-    private suspend inline fun <T> write(source: CalendarSource, block: () -> T): T {
-        writeGate?.await()
-        return synchronized(lock) {
-            if (offline) throw UnreachableException(OFFLINE_MESSAGE)
-            if (unreachableNext) {
-                unreachableNext = false
-                throw UnreachableException(OFFLINE_MESSAGE)
-            }
-            rejectNext?.let {
-                rejectNext = null
-                throw WriteRejectedException(it)
-            }
-            if (source.id != SOURCE_FAMILY) throw WriteRejectedException("${source.name} can't be changed here")
-            block().also { version++ }
-        }
-    }
-```
-
-8. In the companion's `SOURCES`, replace the Family line with:
+7. In the companion's `SOURCES`, replace the Family line with:
 ```kotlin
             CalendarSource(SOURCE_FAMILY, "Family calendar", writable = true, primary = true),
 ```
@@ -1045,7 +993,7 @@ In `provider/calendar-fake/src/main/java/uk/co/siland/culvery/provider/calendar_
 - [ ] **Step 11: Run the fake's tests**
 
 Run: `./gradlew :provider:calendar-fake:testDebugUnitTest`
-Expected: PASS, the contract suite's five new checks included.
+Expected: PASS, the contract suite's four new checks included.
 
 - [ ] **Step 12: Run the gate**
 
@@ -1081,9 +1029,9 @@ git commit -m "Add touched-field updates, find, gone sources and the primary cal
 - Produces:
   - `StoredConnection(connection, health, lastSyncMillis, sourcesCheckedMillis: Long? = null, needsSignInSinceMillis: Long? = null)`
   - `StoredEvent(…, endSort, recurrenceRule: String? = null)`
-  - `PendingChange(…, clientKey: String? = null, fields: Set<EventField>? = null, pausedMillis: Long = 0)`
+  - `PendingChange(…, clientKey: String? = null, fields: Set<EventField>? = null)`
   - `val MIGRATION_3_4: Migration`; `CalendarDatabase` version 4
-  - `CalendarStore.setHealth(connectionId: String, health: ConnectionHealth, nowMillis: Long)` (gains `nowMillis`); `markSynced(connectionId, atMillis)` also ends a pause
+  - `CalendarStore.setHealth(connectionId: String, health: ConnectionHealth, nowMillis: Long)` (gains `nowMillis`); `markSynced(connectionId, atMillis)` also ends a pause. Ending a pause moves each of the connection's outbox rows' `createdMillis` forward by the paused time (review Simp2: no `pausedMillis` column; the outbox is ordered by id and `createdMillis` is read only for age)
   - `CalendarStore.removeConnection(connectionId: String)`
   - `CalendarStore.refreshSources(connectionId: String, sources: List<CalendarSource>, nowMillis: Long, mappingForNew: (CalendarSource) -> SourceMapping): Boolean` — true when it cleared the master
   - `CalendarStore.makeDue(connectionId: String, nowMillis: Long)`
@@ -1170,7 +1118,7 @@ with
                 .containsExactly(ChangeKind.CREATE, ChangeKind.UPDATE, ChangeKind.ASSIGN, ChangeKind.DELETE).inOrder()
             assertThat(pending.map { it.clientKey }).containsExactly("k-1", null, null, null).inOrder()
             assertThat(pending.map { it.fields }).containsExactly(null, null, null, null)
-            assertThat(pending.map { it.pausedMillis }).containsExactly(0L, 0L, 0L, 0L)
+            assertThat(pending.map { it.createdMillis }).containsExactly(100L, 200L, 300L, 400L).inOrder()
             assertThat(pending.first().draft?.forPersonColor).isNull()
             // A v3 row's fields are what it sent then: every field for an update, who for an assign.
             assertThat(fieldsFor(ChangeKind.UPDATE, pending[1].fields)).containsExactlyElementsIn(EventField.entries)
@@ -1187,10 +1135,19 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
 
 1. The health calls gain a time. In `healthRoundTripsIncludingTheErrorMessage`, replace the three `store.setHealth("c1", X)` calls with `store.setHealth("c1", X, 0L)` (for `ConnectionHealth.Error("quota exceeded")`, `ConnectionHealth.NeedsSignIn` and `ConnectionHealth.Unreachable`). In `markSyncedSetsOkAndTheTime`, replace `store.setHealth("c1", ConnectionHealth.NeedsSignIn)` with `store.setHealth("c1", ConnectionHealth.NeedsSignIn, 0L)`.
 
-2. Add these members after `rescheduleAndDropChange`:
+2. Add the import `import androidx.room.useReaderConnection`, and these members after `rescheduleAndDropChange`:
 ```kotlin
-    private suspend fun rowsFor(sourceId: String): Triple<Int, SyncCursor?, Int> = Triple(
-        titlesBetween(22, 30).size,
+    /** Event rows for [sourceId], counted directly: eventsBetween joins the source table, so it can't see an orphan. */
+    private suspend fun eventRows(sourceId: String): Long = db.useReaderConnection { connection ->
+        connection.usePrepared("SELECT COUNT(*) FROM event WHERE connectionId = 'c1' AND sourceId = ?") { statement ->
+            statement.bindText(1, sourceId)
+            statement.step()
+            statement.getLong(0)
+        }
+    }
+
+    private suspend fun rowsFor(sourceId: String): Triple<Long, SyncCursor?, Int> = Triple(
+        eventRows(sourceId),
         store.cursor("c1", sourceId, window),
         store.pendingNow().count { it.sourceId == sourceId },
     )
@@ -1209,7 +1166,7 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
         store.removeConnection("c1")
         assertThat(store.connectionsNow()).isEmpty()
         assertThat(store.sources().first()).isEmpty()
-        assertThat(titlesBetween(22, 30)).isEmpty()
+        assertThat(eventRows("s1")).isEqualTo(0L)
         assertThat(store.cursor("c1", "s1", window)).isNull()
         assertThat(store.pendingNow()).isEmpty()
         assertThat(store.master().first()).isNull()
@@ -1247,7 +1204,7 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
         val cleared = store.refreshSources("c1", listOf(listed("s1")), 5_000L, mapping("mia"))
         assertThat(cleared).isFalse()
         assertThat(store.sources().first().map { it.source.id }).containsExactly("s1")
-        assertThat(rowsFor("s2")).isEqualTo(Triple(0, null, 0))
+        assertThat(rowsFor("s2")).isEqualTo(Triple(0L, null, 0))
     }
 
     @Test
@@ -1259,7 +1216,7 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
         val cleared = store.refreshSources("c1", listOf(listed("s2")), 5_000L, mapping("mia"))
         assertThat(cleared).isTrue()
         assertThat(store.master().first()).isNull()
-        assertThat(rowsFor("s1")).isEqualTo(Triple(0, null, 0))
+        assertThat(rowsFor("s1")).isEqualTo(Triple(0L, null, 0))
     }
 
     @Test
@@ -1295,7 +1252,7 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
         store.removeConnection("c1")
         store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)))
         store.applyAccepted("c1", "s1", timed("a", "Walk", 23, 9), zone, completing = queued)
-        assertThat(titlesBetween(22, 30)).isEmpty()
+        assertThat(eventRows("s1")).isEqualTo(0L)
         assertThat(store.cursor("c1", "s1", window)).isNull()
     }
 
@@ -1320,7 +1277,8 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
         store.setHealth("c1", ConnectionHealth.NeedsSignIn, 2_000L)
         assertThat(store.connectionsNow().single().needsSignInSinceMillis).isEqualTo(2_000L)
         store.setHealth("c1", ConnectionHealth.Ok, 10_000L)
-        assertThat(store.pendingNow().single().pausedMillis).isEqualTo(8_000L)
+        // The 8 s lapse no longer counts: the row reads as made 8 s later.
+        assertThat(store.pendingNow().single().createdMillis).isEqualTo(9_000L)
         assertThat(store.connectionsNow().single().needsSignInSinceMillis).isNull()
     }
 
@@ -1330,8 +1288,20 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
         store.setHealth("c1", ConnectionHealth.NeedsSignIn, 2_000L)
         store.enqueue(change(ChangeKind.DELETE, draft = null).copy(createdMillis = 5_000L))
         store.markSynced("c1", 10_000L)
-        assertThat(store.pendingNow().single().pausedMillis).isEqualTo(5_000L)
+        assertThat(store.pendingNow().single().createdMillis).isEqualTo(10_000L)
         assertThat(store.connectionsNow().single().needsSignInSinceMillis).isNull()
+    }
+
+    @Test
+    fun foldingAPauseKeepsTheQueueInTheOrderItWasMade() = runTest {
+        connect("s1")
+        store.enqueue(change(ChangeKind.DELETE, remoteId = "first", draft = null).copy(createdMillis = 1_000L))
+        store.setHealth("c1", ConnectionHealth.NeedsSignIn, 2_000L)
+        store.enqueue(change(ChangeKind.DELETE, remoteId = "second", draft = null).copy(createdMillis = 5_000L))
+        store.markSynced("c1", 10_000L)
+        // Both now read as made at 9 000 and 10 000; the queue is ordered by id, never by createdMillis.
+        assertThat(store.pendingNow().map { it.remoteId to it.createdMillis })
+            .containsExactly("first" to 9_000L, "second" to 10_000L).inOrder()
     }
 
     @Test
@@ -1351,25 +1321,24 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
         connect("s1")
         store.enqueue(change(ChangeKind.DELETE, draft = null).copy(createdMillis = 1_000L))
         store.markSynced("c1", 10_000L)
-        assertThat(store.pendingNow().single().pausedMillis).isEqualTo(0L)
+        assertThat(store.pendingNow().single().createdMillis).isEqualTo(1_000L)
     }
 
     @Test
     fun ageMillisCountsOnlyTimeTheConnectionWasNotWaitingForSignIn() {
-        val change = change(ChangeKind.DELETE, draft = null).copy(createdMillis = 1_000L, pausedMillis = 100L)
-        assertThat(ageMillis(change, pausedSince = null, nowMillis = 5_000L)).isEqualTo(3_900L)
-        assertThat(ageMillis(change, pausedSince = 3_000L, nowMillis = 5_000L)).isEqualTo(1_900L)
+        val change = change(ChangeKind.DELETE, draft = null).copy(createdMillis = 1_000L)
+        assertThat(ageMillis(change, pausedSince = null, nowMillis = 5_000L)).isEqualTo(4_000L)
+        assertThat(ageMillis(change, pausedSince = 3_000L, nowMillis = 5_000L)).isEqualTo(2_000L)
         // Made during the running pause: no age yet.
-        assertThat(ageMillis(change.copy(createdMillis = 4_000L, pausedMillis = 0L), pausedSince = 3_000L, nowMillis = 5_000L)).isEqualTo(0L)
+        assertThat(ageMillis(change.copy(createdMillis = 4_000L), pausedSince = 3_000L, nowMillis = 5_000L)).isEqualTo(0L)
     }
 
     @Test
-    fun outboxKeepsItsFieldsPausedTimeAndTheColour() = runTest {
+    fun outboxKeepsItsFieldsAndTheColour() = runTest {
         connect("s1")
         val update = change(ChangeKind.UPDATE).copy(
             draft = eventDraft("Swim", 23, 9).copy(forPersonColor = 0xFF4CB387),
             fields = setOf(EventField.TITLE, EventField.TIMES),
-            pausedMillis = 42L,
         )
         val id = store.enqueue(update)
         assertThat(store.pendingNow().single()).isEqualTo(update.copy(id = id))
@@ -1388,7 +1357,7 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
 - [ ] **Step 3: Run the tests to see them fail**
 
 Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarMigrationTest*" --tests "*CalendarStoreTest*" --tests "*CalendarRepositoryTest*"`
-Expected: compilation FAILS: `MIGRATION_3_4`, `removeConnection`, `refreshSources`, `makeDue`, `ageMillis` and the new fields are unresolved.
+Expected: compilation FAILS: `MIGRATION_3_4`, `removeConnection`, `refreshSources`, `makeDue`, `ageMillis` and the new fields are unresolved. (`useReaderConnection` and `usePrepared` are Room 2.8's own; the `CalendarDao` has no count query for a test to lean on.)
 
 - [ ] **Step 4: The stored types**
 
@@ -1419,9 +1388,8 @@ data class StoredConnection(
 3. In `PendingChange`, after `val clientKey: String? = null,` add:
 ```kotlin
     val fields: Set<EventField>? = null,
-    val pausedMillis: Long = 0,
 ```
-and add to its KDoc, before "[id] is 0 until the store assigns one.": `[fields] are what an UPDATE changes (3a design C3); null on a row queued before v4, which sent every field. [pausedMillis] is the sign-in pause already folded into its age (D16).`
+and add to its KDoc, before "[id] is 0 until the store assigns one.": `[fields] are what an UPDATE changes (3a design C3); null on a row queued before v4, which sent every field. [createdMillis] is moved forward by each finished sign-in pause (D16), so it is read only for the change's age.`
 
 - [ ] **Step 5: The entities, v4 and `MIGRATION_3_4`**
 
@@ -1443,8 +1411,6 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/d
 ```kotlin
     /** v4, UPDATE only: the EventField names it changes, comma-separated; null on an older row (every field). */
     val fields: String? = null,
-    /** v4 (D16): the sign-in pause already folded into this row's age. */
-    @ColumnInfo(defaultValue = "0") val pausedMillis: Long = 0,
 ```
 4. In `CalendarDao`, after `suspend fun markSynced(id: String, at: Long)` add:
 ```kotlin
@@ -1460,12 +1426,15 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/d
     @Query("UPDATE connection SET needsSignInSinceMillis = :since WHERE id = :id")
     suspend fun setNeedsSignInSince(id: String, since: Long?)
 
-    /** D16: adds the pause since [since] to each of the connection's rows, from when each was made. */
+    /**
+     * D16: moves each of the connection's rows' creation forward by the pause since [since], counted from when each
+     * was made, so the pause never counts towards its age. The outbox is read in id order, so order is kept.
+     */
     @Query(
-        "UPDATE outbox SET pausedMillis = pausedMillis + MAX(0, :now - MAX(:since, createdMillis)) " +
+        "UPDATE outbox SET createdMillis = createdMillis + MAX(0, :now - MAX(:since, createdMillis)) " +
             "WHERE connectionId = :connectionId",
     )
-    suspend fun addPause(connectionId: String, since: Long, now: Long)
+    suspend fun foldPause(connectionId: String, since: Long, now: Long)
 
     @Query("UPDATE outbox SET nextAttemptMillis = :now WHERE connectionId = :connectionId")
     suspend fun makeDue(connectionId: String, now: Long)
@@ -1503,15 +1472,13 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/d
 ```kotlin
 
 /**
- * v4 (Plan 3a): the series' RRULE on each event; an update's touched fields and the paused age (D16) on the outbox;
- * when a connection's sources were last refreshed and when its sign-in pause began (D16). The SQL must match
- * schemas/…/4.json exactly.
+ * v4 (Plan 3a): the series' RRULE on each event; an update's touched fields on the outbox; when a connection's
+ * sources were last refreshed and when its sign-in pause began (D16). The SQL must match schemas/…/4.json exactly.
  */
 val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE `event` ADD COLUMN `recurrenceRule` TEXT")
         db.execSQL("ALTER TABLE `outbox` ADD COLUMN `fields` TEXT")
-        db.execSQL("ALTER TABLE `outbox` ADD COLUMN `pausedMillis` INTEGER NOT NULL DEFAULT 0")
         db.execSQL("ALTER TABLE `connection` ADD COLUMN `sourcesCheckedMillis` INTEGER")
         db.execSQL("ALTER TABLE `connection` ADD COLUMN `needsSignInSinceMillis` INTEGER")
     }
@@ -1616,7 +1583,8 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/C
 ```kotlin
     /**
      * Also keeps the outbox's sign-in pause (3a design D16): the first NeedsSignIn starts it; Ok folds it into each of
-     * the connection's rows and ends it; Unreachable and Error leave it running, since neither says access is back.
+     * the connection's rows (moving its creation forward) and ends it; Unreachable and Error leave it running, since
+     * neither says access is back.
      */
     suspend fun setHealth(connectionId: String, health: ConnectionHealth, nowMillis: Long) = db.withTransaction {
         val row = dao.connection(connectionId) ?: return@withTransaction
@@ -1634,7 +1602,7 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/C
 
     private suspend fun endPause(row: ConnectionEntity, nowMillis: Long) {
         val since = row.needsSignInSinceMillis ?: return
-        dao.addPause(row.id, since, nowMillis)
+        dao.foldPause(row.id, since, nowMillis)
         dao.setNeedsSignInSince(row.id, null)
     }
 
@@ -1709,25 +1677,23 @@ private fun ConnectionEntity.toStored() = StoredConnection(
 8. In `PendingChange.toEntity()`, after `clientKey = clientKey,` add:
 ```kotlin
     fields = encodeFields(fields),
-    pausedMillis = pausedMillis,
 ```
 In `OutboxEntity.toPending()`, after `clientKey = clientKey,` add:
 ```kotlin
     fields = decodeFields(fields),
-    pausedMillis = pausedMillis,
 ```
 
 In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/Writes.kt`, after `const val OUTBOX_MAX_AGE_MS = …` add:
 ```kotlin
 
 /**
- * How long [change] has waited, not counting time its connection spent waiting for sign-in (3a design D16):
- * [PendingChange.pausedMillis] is the pause already folded in, and [pausedSince] starts the pause still running (null
- * when none runs); a change made during that pause has aged only from when it was made.
+ * How long [change] has waited, not counting time its connection spent waiting for sign-in (3a design D16): a
+ * finished pause has already moved [PendingChange.createdMillis] forward, and [pausedSince] starts the pause still
+ * running (null when none runs); a change made during that pause has aged only from when it was made.
  */
 internal fun ageMillis(change: PendingChange, pausedSince: Long?, nowMillis: Long): Long {
     val running = pausedSince?.let { (nowMillis - maxOf(it, change.createdMillis)).coerceAtLeast(0) } ?: 0L
-    return nowMillis - change.createdMillis - change.pausedMillis - running
+    return nowMillis - change.createdMillis - running
 }
 ```
 
@@ -1740,7 +1706,7 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/C
 Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarMigrationTest*" --tests "*CalendarStoreTest*" --tests "*CalendarRepositoryTest*"`
 Expected: PASS. The build writes `capability/calendar/schemas/uk.co.siland.culvery.capability.calendar.db.CalendarDatabase/4.json`.
 - If the migration test can't find `4.json` in the assets, run the same command again: KSP writes the schema while compiling, which can come after the debug assets were merged on the first run.
-- Open `4.json` and check: `outbox` has `fields` (TEXT, not `notNull`) and `pausedMillis` (INTEGER, `notNull`, `defaultValue` `'0'`); `event` has `recurrenceRule`; `connection` has `sourcesCheckedMillis` and `needsSignInSinceMillis`. If Room reports a schema mismatch, the migration's SQL differs from `4.json`: make the migration match it; never edit the JSON.
+- Open `4.json` and check: `outbox` has `fields` (TEXT, not `notNull`) and no `pausedMillis`; `event` has `recurrenceRule`; `connection` has `sourcesCheckedMillis` and `needsSignInSinceMillis`. If Room reports a schema mismatch, the migration's SQL differs from `4.json`: make the migration match it; never edit the JSON.
 
 - [ ] **Step 8: Run the gate**
 
@@ -1766,11 +1732,13 @@ git commit -m "Store touched fields, recurrence rules, source refreshes and the 
 - Modify: `app/src/main/java/uk/co/siland/culvery/shell/ShellViewModel.kt`
 - Test: `app/src/test/java/uk/co/siland/culvery/shell/ShellViewModelTest.kt`, `app/src/test/java/uk/co/siland/culvery/shell/Fakes.kt` (modify)
 - Create: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarWriteLock.kt`
+- Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/Writes.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSync.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSyncLoop.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarEditor.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarStore.kt`
 - Create: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CountingDao.kt`
+- Create: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/TestEngines.kt`
 - Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSyncTest.kt`, `CalendarSyncLoopTest.kt`, `CalendarStoreTest.kt`, `CalendarEditorTest.kt`, `StubEditor.kt`, `ui/EventDetailHostTest.kt`, `ui/EventEditorHostTest.kt` (modify)
 - Test: `app/src/testDebug/java/uk/co/siland/culvery/SampleAddTest.kt`, `SampleRollbackTest.kt` (modify)
 
@@ -1779,12 +1747,14 @@ git commit -m "Store touched fields, recurrence rules, source refreshes and the 
 - Produces:
   - `fun retryDelayMillis(attempt: Long): Long` and `fun <T> Flow<T>.retryWithBackoff(onFailure: (Throwable) -> Unit): Flow<T>` in `uk.co.siland.culvery.core.plugin`
   - `internal val LoggingExceptionHandler: CoroutineExceptionHandler` in `:app`'s `AppModule.kt`
-  - `@Singleton class CalendarWriteLock @Inject constructor() : Mutex`
-  - `CalendarSync` internal constructor `(store, providers, zone, clock, io, timeoutMillis, writers, toaster, writeLock: CalendarWriteLock)`; `@Inject` constructor `(store, providers, writers, toaster, zone, clock, writeLock)`; `internal fun drainBackoffMillis(): Long?`
+  - `@Singleton class CalendarWriteLock @Inject constructor()` with `suspend fun <T> withLock(block: suspend () -> T): T` (it wraps a private `Mutex`, so nothing delegates the deprecated `onLock`; review L1)
+  - `internal suspend fun <T> callReader(io: CoroutineContext, timeoutMillis: Long, read: suspend () -> T): Result<T>` (in `Writes.kt`, beside `callWriter`): the one catch ladder for provider reads (review Simp3); a timeout or a stray cancellation comes back as `UnreachableException`, any other `Throwable` as itself
+  - `callWriter` and `CalendarSyncLoop.runPass` catch `Throwable` (rethrowing cancellation), so an `Error` in a write or a pass is logged and retried, never kills the loop (review M1)
+  - `CalendarSync` internal constructor `(store, providers, zone, clock, io, timeoutMillis, writers, toaster, writeLock: CalendarWriteLock)`; `@Inject` constructor `(store, providers, writers, toaster, zone, clock, writeLock)`; `internal fun drainBackoffMillis(): Long?`; the private `complete(change, conn, source, accepted, zone): WriteOutcome` in its final form (C2; review Simp4)
   - `CalendarSyncLoop` internal constructor gains `drainBackoff: () -> Long? = { null }` (last)
   - `CalendarEditor` internal constructor `(store, writers, access, toaster, zone, clock, scope, requestSync, io, attemptMillis, writeLock: CalendarWriteLock, newKey = ::newClientKey)`; `@Inject` constructor gains `writeLock: CalendarWriteLock` (last)
   - `CalendarStore` internal constructor `(db: CalendarDatabase, dao: CalendarDao)`; the `@Inject` one is unchanged
-  - Test sources: `CountingDao(real: CalendarDao) : CalendarDao` with `mostBound: Int`
+  - Test sources: `CountingDao(real: CalendarDao) : CalendarDao` with `mostBound: Int`; `testEditor(…)` and `testSync(…)` in `TestEngines.kt`, the one place the calendar tests build an editor or an engine, so a constructor that grows in a later task touches one line (review Simp6)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1949,8 +1919,49 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
     }
 ```
 
+Create `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/TestEngines.kt`:
+```kotlin
+package uk.co.siland.culvery.capability.calendar
+
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlinx.coroutines.CoroutineScope
+import uk.co.siland.culvery.core.access.AccessControl
+import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.plugin.WallClock
+
+// Every calendar test builds its editor and its engine here, so a constructor that grows touches one place. Calls
+// stay on the test's dispatcher unless a test passes io; each gets its own write lock unless it shares one.
+
+internal fun testEditor(
+    store: CalendarStore,
+    writers: Set<CalendarWriter>,
+    access: AccessControl,
+    toaster: Toaster,
+    zone: HouseholdZone,
+    clock: WallClock,
+    scope: CoroutineScope,
+    requestSync: () -> Unit = {},
+    io: CoroutineContext = EmptyCoroutineContext,
+    writeLock: CalendarWriteLock = CalendarWriteLock(),
+    newKey: () -> String = ::newClientKey,
+): CalendarEditor = CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, newKey)
+
+internal fun testSync(
+    store: CalendarStore,
+    providers: Set<CalendarProvider>,
+    zone: HouseholdZone,
+    clock: WallClock,
+    writers: Set<CalendarWriter>,
+    toaster: Toaster,
+    io: CoroutineContext = EmptyCoroutineContext,
+    timeoutMillis: Long = PROVIDER_TIMEOUT_MS,
+    writeLock: CalendarWriteLock = CalendarWriteLock(),
+): CalendarSync = CalendarSync(store, providers, zone, clock, io, timeoutMillis, writers, toaster, writeLock)
+```
+
 In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSyncTest.kt`:
-1. Add the imports `import kotlinx.coroutines.withTimeout` and `import uk.co.siland.culvery.core.plugin.WallClock` (if not present) — `WallClock` already is; add `withTimeout` only.
+1. Add the imports `import kotlinx.coroutines.delay`, `import kotlinx.coroutines.withTimeout` and `import org.robolectric.shadows.ShadowLog` (each only if not already there).
 2. Replace `engine()` (with its KDoc), `writingEngine(…)` and the construction in `aFailedDrainIsLoggedAndTheSyncStillRuns` so every engine is built in one place. Replace
 ```kotlin
     /** Provider calls stay on the test dispatcher, so the 1 s timeout runs on virtual time. */
@@ -1973,7 +1984,7 @@ with
         lock: CalendarWriteLock = CalendarWriteLock(),
     ): CalendarSync {
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
-        return CalendarSync(store, setOf(a, b), HouseholdZone(household), clock, io, timeoutMillis, writers, toaster, lock)
+        return testSync(store, setOf(a, b), HouseholdZone(household), clock, writers, toaster, io, timeoutMillis, lock)
     }
 
     private suspend fun engine(): CalendarSync = engineWith(emptySet(), SilentToaster)
@@ -2074,22 +2085,59 @@ In `aFailedDrainIsLoggedAndTheSyncStillRuns`, delete its `household.setLocation(
         queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
         w.failWith = WriteRejectedException("Calendar is full")
         a.failWith = UnreachableException("reads are down")
-        // As the editor does while it queues a change behind the create.
-        lock.lock()
+        // The editor holds the lock while it queues a change behind the create.
+        val holding = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val editor = launch(Dispatchers.Default) { lock.withLock { holding.complete(Unit); release.await() } }
+        withContext(Dispatchers.Default) { withTimeout(5_000) { holding.await() } }
         val pass = launch { sync.syncAll() }
-        withContext(Dispatchers.Default) { withTimeout(5_000) { w.entered.await() } }
+        withContext(Dispatchers.Default) {
+            withTimeout(5_000) { w.entered.await() }
+            // Real time for a drop outside the lock to go ahead, so such a drop fails this test every time.
+            delay(200)
+        }
         queue(ChangeKind.UPDATE, remoteId = key, draft = swimDraft("sam-id"))
-        lock.unlock()
+        release.complete(Unit)
+        editor.join()
         pass.join()
         assertThat(store.pendingNow()).isEmpty()
         assertThat(toaster.messages).containsExactly("Couldn't save 2 changes to C1")
     }
+
+    @Test
+    fun aWriterThrowingAnErrorIsLoggedAndTheChangeIsTriedAgainLater() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, draft = null)
+        w.failWith = StackOverflowError("writer recursed")
+        a.failWith = UnreachableException("reads are down")
+        sync.syncAll()
+        // Queued with one attempt behind it, so this is the second: the next backoff step.
+        assertThat(store.pendingNow().single().let { it.attempts to it.nextAttemptMillis }).isEqualTo(2 to now.toEpochMilli() + 60_000)
+        assertThat(ShadowLog.getLogsForTag("CalendarWrites").map { it.throwable?.message }).contains("writer recursed")
+    }
 ```
 
 In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSyncLoopTest.kt`:
-1. Add `import kotlinx.coroutines.flow.flow`.
+1. Add `import kotlinx.coroutines.flow.flow` and `import org.robolectric.shadows.ShadowLog`.
 2. Add at the end of the class:
 ```kotlin
+    /** Review focus #5 at loop level: an Error (a writer that recursed) is logged, and the next pass still runs. */
+    @Test
+    fun anErrorInAPassIsLoggedAndTheNextPassStillRuns() = runTest {
+        var count = 0
+        CalendarSyncLoop(
+            { count++; if (count == 1) throw StackOverflowError("a writer recursed") },
+            MutableStateFlow(listOf("c1")),
+            backgroundScope,
+        ).start()
+        runCurrent()
+        advanceTimeBy(SYNC_INTERVAL_MS)
+        runCurrent()
+        assertThat(count).isEqualTo(2)
+        assertThat(ShadowLog.getLogsForTag("CalendarSync").map { it.throwable?.message }).contains("a writer recursed")
+    }
+
     @Test
     fun aFailedDrainHoldsTheNextPassBackWhateverTheQueueSays() = runTest {
         var count = 0
@@ -2128,7 +2176,7 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `./gradlew :core:plugin:testDebugUnitTest :capability:calendar:testDebugUnitTest :app:testDebugUnitTest`
-Expected: compilation FAILS: `retryWithBackoff`, `retryDelayMillis`, `CalendarWriteLock`, `drainBackoffMillis`, the `drainBackoff` parameter and `CalendarStore(db, dao)` are unresolved.
+Expected: compilation FAILS: `retryWithBackoff`, `retryDelayMillis`, `CalendarWriteLock`, `drainBackoffMillis`, the `drainBackoff` parameter, the engine's and the editor's `writeLock` parameters and `CalendarStore(db, dao)` are unresolved.
 
 - [ ] **Step 3: The shared retry and the application scope**
 
@@ -2216,14 +2264,58 @@ package uk.co.siland.culvery.capability.calendar
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * The one lock around calendar writes (3a design §3.12): the editor holds it while it reads the queue and writes or
  * queues a change, and the drain while it drops a create with the changes behind it, so an edit being queued behind
- * that create either lands first (and goes with it) or finds no create.
+ * that create either lands first (and goes with it) or finds no create. It wraps a Mutex rather than being one, so
+ * nothing delegates Mutex's deprecated onLock.
  */
 @Singleton
-class CalendarWriteLock @Inject constructor() : Mutex by Mutex()
+class CalendarWriteLock @Inject constructor() {
+    private val mutex = Mutex()
+
+    suspend fun <T> withLock(block: suspend () -> T): T = mutex.withLock { block() }
+}
+```
+
+In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/Writes.kt`:
+1. In `callWriter`, replace
+```kotlin
+    } catch (e: Exception) {
+        Log.w(TAG, "A calendar write failed unexpectedly; it will be retried", e)
+        WriteOutcome.Retry(blocksConnection = false)
+    }
+```
+with
+```kotlin
+    } catch (e: Throwable) {
+        // An Error too (review M1): logged and retried, never out of the drain.
+        Log.w(TAG, "A calendar write failed unexpectedly; it will be retried", e)
+        WriteOutcome.Retry(blocksConnection = false)
+    }
+```
+2. After `callWriter`, add:
+```kotlin
+
+/**
+ * The one way the engine reads a provider (a sync, or its sources for the refresh and for connecting): on [io], under
+ * [timeoutMillis]. A failure comes back as the Throwable to report, an Error included; a timeout, or a cancellation
+ * the provider leaked, as [UnreachableException]. A real cancellation of the caller still propagates.
+ */
+internal suspend fun <T> callReader(io: CoroutineContext, timeoutMillis: Long, read: suspend () -> T): Result<T> =
+    try {
+        Result.success(withContext(io) { withTimeout(timeoutMillis) { read() } })
+    } catch (e: TimeoutCancellationException) {
+        Result.failure(UnreachableException("Timed out after $timeoutMillis ms", e))
+    } catch (e: CancellationException) {
+        // Rethrows if the caller was really cancelled; otherwise the provider leaked a stray cancellation.
+        currentCoroutineContext().ensureActive()
+        Result.failure(UnreachableException("Cancelled inside the provider", e))
+    } catch (e: Throwable) {
+        Result.failure(e)
+    }
 ```
 
 In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSync.kt`:
@@ -2300,24 +2392,35 @@ with
 ```
 with
 ```kotlin
-        if (outcome is WriteOutcome.Accepted) {
-            try {
-                store.applyAcceptedWrite(conn.id, source.id, change.remoteId, outcome, zone, completing = change.id)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // C2: sent again later, which is safe: creates are idempotent by key, updates and deletes by nature.
-                Log.w(TAG, "The provider accepted a queued ${change.kind} but the tablet couldn't store it; retrying later", e)
-                return WriteOutcome.Retry(blocksConnection = false)
-            }
+        return if (outcome is WriteOutcome.Accepted) complete(change, conn, source, outcome, zone) else outcome
+```
+and after `deliver` add `complete`, written here in its final form (Task 6 calls it for an aged create too):
+```kotlin
+
+    /** Stores a write the provider accepted and completes its row; a store failure is retried later (C2). */
+    private suspend fun complete(
+        change: PendingChange,
+        conn: Connection,
+        source: CalendarSource,
+        accepted: WriteOutcome.Accepted,
+        zone: ZoneId,
+    ): WriteOutcome =
+        try {
+            store.applyAcceptedWrite(conn.id, source.id, change.remoteId, accepted, zone, completing = change.id)
+            accepted
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Sent again later, which is safe: creates are idempotent by key, updates and deletes by nature.
+            Log.w(TAG, "The provider accepted a queued ${change.kind} but the tablet couldn't store it; retrying later", e)
+            WriteOutcome.Retry(blocksConnection = false)
         }
-        return outcome
 ```
 
-6. Replace `syncSource` with:
+6. Replace `syncSource` and `callProvider` (with its KDoc) with:
 ```kotlin
     /**
-     * The store calls sit outside the provider's try: a store failure fails the pass rather than reading as the
+     * The store calls sit outside the provider's call: a store failure fails the pass rather than reading as the
      * provider's health. Any Throwable from the provider (an Error included) flags only this source.
      */
     private suspend fun syncSource(
@@ -2327,30 +2430,29 @@ with
         window: DateRange,
     ): ConnectionHealth {
         val cursor = store.cursor(conn.id, source.id, window)
-        val result = try {
-            callProvider { provider.sync(conn, source, window, cursor) }
-        } catch (e: TimeoutCancellationException) {
-            Log.w(TAG, "${conn.label} / ${source.name}: timed out", e)
-            return ConnectionHealth.Unreachable
-        } catch (e: CancellationException) {
-            // Rethrows if this sync was really cancelled; otherwise the provider leaked a stray cancellation.
-            currentCoroutineContext().ensureActive()
-            Log.w(TAG, "${conn.label} / ${source.name}: cancelled inside the provider", e)
-            return ConnectionHealth.Unreachable
-        } catch (e: NeedsSignInException) {
-            Log.w(TAG, "${conn.label} / ${source.name}: needs signing in again", e)
-            return ConnectionHealth.NeedsSignIn
-        } catch (e: UnreachableException) {
-            Log.w(TAG, "${conn.label} / ${source.name}: unreachable", e)
-            return ConnectionHealth.Unreachable
-        } catch (e: Throwable) {
-            Log.e(TAG, "${conn.label} / ${source.name}: failed", e)
-            return ConnectionHealth.Error(e.message ?: e.javaClass.simpleName)
-        }
+        val result = callReader(io, timeoutMillis) { provider.sync(conn, source, window, cursor) }
+            .getOrElse { return healthAfter(it, conn, source) }
         store.applySync(conn.id, source.id, window, result)
         return ConnectionHealth.Ok
     }
+
+    /** A failed read's health, logged with its cause and the connection's and source's names (never a token). */
+    private fun healthAfter(e: Throwable, conn: Connection, source: CalendarSource): ConnectionHealth = when (e) {
+        is NeedsSignInException -> {
+            Log.w(TAG, "${conn.label} / ${source.name}: needs signing in again", e)
+            ConnectionHealth.NeedsSignIn
+        }
+        is UnreachableException -> {
+            Log.w(TAG, "${conn.label} / ${source.name}: unreachable", e)
+            ConnectionHealth.Unreachable
+        }
+        else -> {
+            Log.e(TAG, "${conn.label} / ${source.name}: failed", e)
+            ConnectionHealth.Error(e.message ?: e.javaClass.simpleName)
+        }
+    }
 ```
+Remove the imports that are now unused: `kotlinx.coroutines.TimeoutCancellationException`, `kotlinx.coroutines.currentCoroutineContext`, `kotlinx.coroutines.ensureActive`, `kotlinx.coroutines.withContext` and `kotlinx.coroutines.withTimeout`.
 
 In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSyncLoop.kt`:
 1. Add `import uk.co.siland.culvery.core.plugin.retryWithBackoff`.
@@ -2394,11 +2496,24 @@ with
         val floor = maxOf(MIN_PASS_GAP_MS, drainBackoff() ?: 0L).coerceAtMost(intervalMillis)
         return (retry ?: intervalMillis).coerceIn(floor, intervalMillis)
 ```
+5. In `runPass`, replace
+```kotlin
+        } catch (e: Exception) {
+            Log.w(TAG, "Calendar sync failed", e)
+        }
+```
+with
+```kotlin
+        } catch (e: Throwable) {
+            // An Error too (review M1): the loop must outlive it, and the application scope's handler never sees it.
+            Log.w(TAG, "Calendar sync failed", e)
+        }
+```
 
 - [ ] **Step 5: The editor takes the shared lock**
 
 In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarEditor.kt`:
-1. Remove the imports `kotlinx.coroutines.sync.Mutex` (keep `kotlinx.coroutines.sync.withLock`).
+1. Remove the imports `kotlinx.coroutines.sync.Mutex` and `kotlinx.coroutines.sync.withLock`: `writeLock.withLock { … }` now calls `CalendarWriteLock`'s own member, so its call sites don't change.
 2. In the internal constructor, after `private val attemptMillis: Long,` add `private val writeLock: CalendarWriteLock,`.
 3. Replace the `@Inject` constructor with:
 ```kotlin
@@ -2438,16 +2553,52 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     @Inject constructor(db: CalendarDatabase) : this(db, db.calendarDao())
 ```
 
-- [ ] **Step 7: Pass the lock at every construction**
+- [ ] **Step 7: Build every test editor and engine through the factories**
 
+Each replacement below is a whole construction, so the order doesn't matter. Afterwards remove imports that are no longer used in each file (`EmptyCoroutineContext`, `WRITE_ATTEMPT_MS`, `PROVIDER_TIMEOUT_MS`, `CalendarSync`), leaving any the file still uses.
 - `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarEditorTest.kt`:
   - add `private val lock = CalendarWriteLock()` after `private var syncRequests = 0`;
-  - in `editor(…)`, after `attemptMillis = WRITE_ATTEMPT_MS,` add `writeLock = lock,`;
-  - in `drain(…)` and in `aCreateAcceptedButNotStoredIsDoneAndMakesOneEvent`, replace `EmptyCoroutineContext, PROVIDER_TIMEOUT_MS, setOf(writer), access.toasts,` with `EmptyCoroutineContext, PROVIDER_TIMEOUT_MS, setOf(writer), access.toasts, lock,`;
-  - in both `noWriter` constructions, replace `WallClock { testScheduler.currentTime }, backgroundScope, {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS,` with `WallClock { testScheduler.currentTime }, backgroundScope, {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS, lock,`.
-- `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/StubEditor.kt`: replace `CoroutineScope(Dispatchers.Unconfined), {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS,` with `CoroutineScope(Dispatchers.Unconfined), {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS, CalendarWriteLock(),`.
-- `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/EventDetailHostTest.kt` and `ui/EventEditorHostTest.kt`: add `import uk.co.siland.culvery.capability.calendar.CalendarWriteLock`, and replace `scope, {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS,` with `scope, {}, EmptyCoroutineContext, WRITE_ATTEMPT_MS, CalendarWriteLock(),`.
-- `app/src/testDebug/java/uk/co/siland/culvery/SampleAddTest.kt`: add `import uk.co.siland.culvery.capability.calendar.CalendarWriteLock`, and replace the two lines
+  - replace the `editor(…)` function (keep its KDoc) with:
+```kotlin
+    private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext) = testEditor(
+        store, setOf(writer), access.control, access.toasts, HouseholdZone(household), WallClock { testScheduler.currentTime },
+        backgroundScope, requestSync = { syncRequests++ }, io = io, writeLock = lock, newKey = { "key-${++keys}" },
+    )
+```
+  - replace the `drain(…)` function (keep its KDoc) with:
+```kotlin
+    private fun TestScope.drain(access: TestAccess, aheadMillis: Long) = testSync(
+        store, emptySet(), HouseholdZone(household), WallClock { testScheduler.currentTime + aheadMillis }, setOf(writer), access.toasts,
+        writeLock = lock,
+    )
+```
+  - in `aCreateAcceptedButNotStoredIsDoneAndMakesOneEvent`, replace the `CalendarSync(…).syncAll()` construction with:
+```kotlin
+        testSync(
+            store, setOf(reads), HouseholdZone(household), WallClock { LocalDate.of(2026, 9, 23).atStartOfDay(london).toInstant().toEpochMilli() },
+            setOf(writer), access.toasts, writeLock = lock,
+        ).syncAll()
+```
+  - replace both `val noWriter = CalendarEditor(…)` constructions with:
+```kotlin
+        val noWriter = testEditor(
+            store, emptySet(), access.control, access.toasts, HouseholdZone(household), WallClock { testScheduler.currentTime }, backgroundScope,
+        )
+```
+- `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/StubEditor.kt`: replace the body of `stubEditor` with:
+```kotlin
+internal fun stubEditor(store: CalendarStore, zone: HouseholdZone, clock: WallClock = WallClock { 0L }): CalendarEditor =
+    testEditor(store, emptySet(), NobodyMay, RecordingToaster(), zone, clock, CoroutineScope(Dispatchers.Unconfined))
+```
+- `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/EventDetailHostTest.kt`: add `import uk.co.siland.culvery.capability.calendar.testEditor`, and replace `editor = CalendarEditor(…)` in `setUp` with:
+```kotlin
+        editor = testEditor(store, setOf(writer), access.control, access.toasts, zone, WallClock { System.currentTimeMillis() }, scope)
+```
+- `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/EventEditorHostTest.kt`: add `import uk.co.siland.culvery.capability.calendar.testEditor`, and replace `editor = CalendarEditor(…)` in `setUp` with:
+```kotlin
+        editor = testEditor(store, setOf(writer), access.control, access.toasts, zone, WallClock { now ?: System.currentTimeMillis() }, scope)
+```
+- `app/src/testDebug/java/uk/co/siland/culvery/SampleAddTest.kt` (`:app` can't see the calendar's test sources, so it keeps its own constructions): add `import uk.co.siland.culvery.capability.calendar.CalendarWriteLock`, and replace the two lines
 ```kotlin
         val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, clock)
         val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, backgroundScope))
@@ -2465,7 +2616,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
 Run: `./gradlew :core:plugin:testDebugUnitTest :capability:calendar:testDebugUnitTest :app:testDebugUnitTest`
 Expected: PASS.
 - `capabilityFlowThatThrowsIsIgnored` keeps its always-failing capability: it now retries on virtual time (1 s, 2 s, … 60 s) in `viewModelScope`, and the test ends before those waits; the other capability's card shows from the start.
-- If `anEditQueuedWhileARefusedCreateIsDroppedGoesWithIt` fails with the update still queued, the drop isn't under the lock: check Step 4.4.
+- If `anEditQueuedWhileARefusedCreateIsDroppedGoesWithIt` fails with the update still queued, the drop isn't under the lock: check Step 4.4. The 200 ms real wait after `entered` gives an unlocked drop time to run first, so the test fails every time without the lock, not just sometimes.
 
 - [ ] **Step 9: Run the gate**
 
@@ -2476,7 +2627,7 @@ Expected: `BUILD SUCCESSFUL`.
 
 ```bash
 git add core/plugin capability/calendar app
-git commit -m "Keep the app alive through provider errors and store failures, back the loop off after a failed drain, and share the write lock with the drain"
+git commit -m "Keep the app alive through provider and writer errors and store failures, back the loop off after a failed drain, and share the write lock with the drain"
 ```
 
 ---
@@ -2487,7 +2638,7 @@ git commit -m "Keep the app alive through provider errors and store failures, ba
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarEditor.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/EventEditorHost.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/EventDetailHost.kt`
-- Modify: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ScriptedWriter.kt`
+- Modify: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ScriptedWriter.kt`, `TestEngines.kt`
 - Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/EventEditorHostTest.kt` (modify)
 - Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/EventDetailHostTest.kt` (modify)
 - Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarEditorTest.kt` (modify)
@@ -2576,8 +2727,10 @@ with
             EventDetailHost(EventRef("c1", "s-family", id), today, repo, editor, onClose = { closed++ }, onEdit = {})
 ```
 
+In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/TestEngines.kt`, in `testEditor`, delete the parameter `newKey: () -> String = ::newClientKey,` and replace `WRITE_ATTEMPT_MS, writeLock, newKey)` with `WRITE_ATTEMPT_MS, writeLock)`.
+
 In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarEditorTest.kt`:
-1. In `editor(…)`, delete the line `newKey = { "key-${++keys}" },`, and replace the last sentence of its KDoc (`Client keys are "key-1", "key-2"… in the order Save is tapped.`) with nothing.
+1. In `editor(…)`, replace `writeLock = lock, newKey = { "key-${++keys}" },` with `writeLock = lock,`, and replace the last sentence of its KDoc (`Client keys are "key-1", "key-2"… in the order Save is tapped.`) with nothing.
 2. After `private fun TestScope.editor(…)`, add:
 ```kotlin
     /** As the sheet chooses them: "key-1", "key-2"… in the order Save is tapped. */
@@ -2757,7 +2910,7 @@ git commit -m "Reuse the create's key on Try again, close the sheet with a toast
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarEditor.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSync.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/EventEditorHost.kt`
-- Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/EventFormTest.kt`, `PendingOverlayTest.kt`, `CalendarEditorTest.kt`, `StubEditor.kt`, `ui/EventEditorHostTest.kt`, `ui/EventDetailHostTest.kt` (modify)
+- Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/EventFormTest.kt`, `PendingOverlayTest.kt`, `CalendarEditorTest.kt`, `TestEngines.kt`, `ui/EventEditorHostTest.kt` (modify)
 - Test: `app/src/testDebug/java/uk/co/siland/culvery/SampleAddTest.kt` (modify)
 
 **Interfaces:**
@@ -2815,15 +2968,18 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/P
     }
 ```
 
+In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/TestEngines.kt`:
+1. Add the imports `import uk.co.siland.culvery.core.household.Person` and `import uk.co.siland.culvery.core.household.PersonId`.
+2. In `testEditor`, add the parameter `personOf: suspend (PersonId) -> Person? = { null },` after `writeLock: CalendarWriteLock = CalendarWriteLock(),`, and replace `WRITE_ATTEMPT_MS, writeLock)` with `WRITE_ATTEMPT_MS, writeLock, personOf)`. Tests that don't look at colours keep the default.
+
 In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarEditorTest.kt`:
-1. In `editor(…)`, after `writeLock = lock,` add `personOf = household::person,`.
-2. In both `noWriter` constructions, replace `WRITE_ATTEMPT_MS, lock,` with `WRITE_ATTEMPT_MS, lock, household::person,`.
-3. After the `CalendarEditor.create(draft)` extension (Task 4), add:
+1. In `editor(…)`, replace `writeLock = lock,` with `writeLock = lock, personOf = household::person,`.
+2. After the `CalendarEditor.create(draft)` extension (Task 4), add:
 ```kotlin
     /** A change to everything the sheet shows, as 2b-2's sheet sent it. */
     private suspend fun CalendarEditor.update(ref: EventRef, draft: EventDraft): EditResult = update(ref, draft, EventField.entries.toSet())
 ```
-4. Add at the end of the class:
+3. Add at the end of the class:
 ```kotlin
     /** The dinner as a phone left it: an hour later than [event] puts it. */
     private fun movedOnAPhone(createdBy: String?): RemoteEvent {
@@ -2888,16 +3044,11 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
 
 In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/EventEditorHostTest.kt`:
 1. Add `import uk.co.siland.culvery.capability.calendar.EventField`.
-2. In `setUp`, replace `WRITE_ATTEMPT_MS, CalendarWriteLock(),` with `WRITE_ATTEMPT_MS, CalendarWriteLock(), household::person,`.
-3. In `savingAnEditSendsTheChange`, after `assertThat(writer.calls).containsExactly("update:dinner")` add:
+2. In `savingAnEditSendsTheChange`, after `assertThat(writer.calls).containsExactly("update:dinner")` add:
 ```kotlin
         // Only Length was changed, so only the times are sent (3a design C3).
         assertThat(writer.fieldSets.single()).containsExactly(EventField.TIMES)
 ```
-
-In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/EventDetailHostTest.kt`, replace `WRITE_ATTEMPT_MS, CalendarWriteLock(),` with `WRITE_ATTEMPT_MS, CalendarWriteLock(), household::person,`.
-
-In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/StubEditor.kt`, replace `WRITE_ATTEMPT_MS, CalendarWriteLock(),` with `WRITE_ATTEMPT_MS, CalendarWriteLock(), { null },` (it never writes, so it needs no colours).
 
 In `app/src/testDebug/java/uk/co/siland/culvery/SampleAddTest.kt`:
 1. Add `import uk.co.siland.culvery.capability.calendar.EventField`.
@@ -3487,26 +3638,8 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/C
         }
         return if (outcome is WriteOutcome.Accepted) complete(change, conn, source, outcome, zone) else outcome
     }
-
-    /** Stores a write the provider accepted and completes its row; a store failure is retried later (C2). */
-    private suspend fun complete(
-        change: PendingChange,
-        conn: Connection,
-        source: CalendarSource,
-        accepted: WriteOutcome.Accepted,
-        zone: ZoneId,
-    ): WriteOutcome =
-        try {
-            store.applyAcceptedWrite(conn.id, source.id, change.remoteId, accepted, zone, completing = change.id)
-            accepted
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // Sent again later, which is safe: creates are idempotent by key, updates and deletes by nature.
-            Log.w(TAG, "The provider accepted a queued ${change.kind} but the tablet couldn't store it; retrying later", e)
-            WriteOutcome.Retry(blocksConnection = false)
-        }
 ```
+(`complete` stays as Task 3 wrote it.)
 
 - [ ] **Step 5: Run the tests to see them pass**
 
@@ -3534,7 +3667,7 @@ git commit -m "Pause the queue's age while sign-in is needed, flag it from a wri
 - Create: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/SourceRefresher.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSync.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSetup.kt`
-- Modify: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ScriptedProvider.kt`
+- Modify: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ScriptedProvider.kt`, `TestEngines.kt`
 - Create: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/DefaultMappingTest.kt`
 - Create: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/SourceRefresherTest.kt`
 - Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSyncTest.kt`, `CalendarSetupTest.kt`, `CalendarEditorTest.kt` (modify)
@@ -3548,9 +3681,11 @@ git commit -m "Pause the queue's age while sign-in is needed, flag it from a wri
   - `@Singleton class SourceRefresher` — internal constructor `(store, people: suspend () -> List<Person>, clock, toaster, io, timeoutMillis)`; `@Inject` constructor `(store, household: HouseholdRepository, clock, toaster)`; `fun flag(connectionId: String)`; `suspend fun refreshIfDue(provider: CalendarProvider, stored: StoredConnection)`
   - `CalendarSync` constructors gain `refresher: SourceRefresher` (last)
   - `CalendarSetup(store, providers, people: suspend () -> List<Person>, toaster: Toaster, clock: WallClock, io: CoroutineContext = Dispatchers.IO, timeoutMillis: Long = PROVIDER_TIMEOUT_MS, requestSync: () -> Unit = {})`; `@Inject` constructor `(store, providers, household, toaster, clock, loop)`
-  - `CalendarSetup.connectWithDefaults(connection: Connection): Boolean`, `reconnect(connection: Connection): Boolean`, `connectionIds(): Flow<List<String>>`, `removeConnection(connectionId: String)`; `connect` and `setMaster` read sources on `io` under the timeout
+  - `CalendarSetup.connectWithDefaults(connection: Connection): Boolean` (a connection for a provider and account already connected is a reconnect of that one, never a second: review M2), `reconnect(connection: Connection): Boolean`, `connectionIds(): Flow<List<String>>`, `removeConnection(connectionId: String)`; `connect` and `setMaster` read sources through `callReader`
+  - `SourceRefresher` and `connectWithDefaults` read through `callReader` (Task 3), so the sync, the refresh and connecting share one catch ladder
   - `fun connected(service: String)`, `fun reconnected(service: String)`, `fun couldNotConnect(service: String)`: "{service} connected", "{service} reconnected", "Couldn't connect to {service} — try again"
-  - `ScriptedProvider(id, sourceList, features, displayName: String = id)` with `sourcesFailWith: Throwable?`
+  - `ScriptedProvider(id, sourceList, features, displayName: String = id)` with `sourcesFailWith: Throwable?` and `sourcesHang: Boolean`
+  - `testSync(…)` gains `refresher: SourceRefresher` (last, defaulting to one over no people and the engine's own clock, toaster, `io` and timeout)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3569,10 +3704,13 @@ internal class ScriptedProvider(
 ```kotlin
     /** When set, sources() throws it. */
     var sourcesFailWith: Throwable? = null
+    /** sources() never returns, like a stalled socket. */
+    var sourcesHang = false
 ```
 3. Replace `override suspend fun sources(conn: Connection): List<CalendarSource> = sourceList` with:
 ```kotlin
     override suspend fun sources(conn: Connection): List<CalendarSource> {
+        if (sourcesHang) awaitCancellation()
         sourcesFailWith?.let { throw it }
         return sourceList
     }
@@ -3680,8 +3818,10 @@ class SourceRefresherTest {
     private suspend fun sourceIds() = store.sources().first().map { it.source.id }
 
     @Test
-    fun theFirstPassAfterTheAppStartsAddsNewCalendarsMappedByName() = runTest {
+    fun theFirstPassAfterTheAppStartsRefreshesEvenARecentCheckAndMapsNewCalendarsByName() = runTest {
         connect()
+        // The process before this one checked a minute ago: only the app start makes this refresh due.
+        store.refreshSources("g1", listOf(primary), now - 60_000) { SourceMapping.Default }
         provider.sourceList = listOf(primary, swimming)
         refresh()
         assertThat(store.source("g1", "mia-swim")!!.mapping).isEqualTo(SourceMapping(mia.id, visible = true))
@@ -3748,15 +3888,8 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
         store.addConnection(Connection(id, providerId, id.uppercase(), emptyMap()), sources.toList(), mapping)
     }
 ```
-2. In `engineWith`, replace `return CalendarSync(store, setOf(a, b), HouseholdZone(household), clock, io, timeoutMillis, writers, toaster, lock)` with:
-```kotlin
-        return CalendarSync(
-            store, setOf(a, b), HouseholdZone(household), clock, io, timeoutMillis, writers, toaster, lock,
-            SourceRefresher(store, { household.people.first() }, clock, toaster, io, timeoutMillis),
-        )
-```
-3. In `hiddenSourcesAreNotSynced`, replace `connect("c1", "calendar.a", s1, s2, mapping = …)` with `connect("c1", "calendar.a", s1, s2.copy(shown = false), mapping = mapOf("s2" to SourceMapping(PersonId.FAMILY, visible = false)))`: an unticked calendar stays hidden through the refresh.
-4. Add at the end of the class:
+2. In `hiddenSourcesAreNotSynced`, replace `connect("c1", "calendar.a", s1, s2, mapping = …)` with `connect("c1", "calendar.a", s1, s2.copy(shown = false), mapping = mapOf("s2" to SourceMapping(PersonId.FAMILY, visible = false)))`: an unticked calendar stays hidden through the refresh.
+3. Add at the end of the class:
 ```kotlin
     @Test
     fun aSourceGoneFlagsARefreshThatRemovesIt() = runTest {
@@ -3776,29 +3909,13 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
     }
 ```
 
-In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarEditorTest.kt`:
-1. Replace `drain(…)` with:
+In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/TestEngines.kt`, in `testSync`, add the parameter
 ```kotlin
-    /** The outbox drain as the sync loop runs it, [aheadMillis] after the test's clock, with this test's writer. */
-    private fun TestScope.drain(access: TestAccess, aheadMillis: Long): CalendarSync {
-        val clock = WallClock { testScheduler.currentTime + aheadMillis }
-        return CalendarSync(
-            store, emptySet(), HouseholdZone(household), clock, EmptyCoroutineContext, PROVIDER_TIMEOUT_MS, setOf(writer), access.toasts, lock,
-            SourceRefresher(store, { household.people.first() }, clock, access.toasts, EmptyCoroutineContext, PROVIDER_TIMEOUT_MS),
-        )
-    }
+    refresher: SourceRefresher = SourceRefresher(store, { emptyList() }, clock, toaster, io, timeoutMillis),
 ```
-2. In `aCreateAcceptedButNotStoredIsDoneAndMakesOneEvent`, replace from `val reads = ScriptedProvider("calendar.a").apply {` to `).syncAll()` with:
-```kotlin
-        val reads = ScriptedProvider("calendar.a", sourceList = listOf(family, school)).apply {
-            events = { source -> if (source.id == family.id) writer.created.values.toList() else emptyList() }
-        }
-        val clock = WallClock { LocalDate.of(2026, 9, 23).atStartOfDay(london).toInstant().toEpochMilli() }
-        CalendarSync(
-            store, setOf(reads), HouseholdZone(household), clock, EmptyCoroutineContext, PROVIDER_TIMEOUT_MS, setOf(writer), access.toasts, lock,
-            SourceRefresher(store, { household.people.first() }, clock, access.toasts, EmptyCoroutineContext, PROVIDER_TIMEOUT_MS),
-        ).syncAll()
-```
+after `writeLock: CalendarWriteLock = CalendarWriteLock(),`, and replace `writers, toaster, writeLock)` with `writers, toaster, writeLock, refresher)`. (No test's engine maps a new calendar by name; `SourceRefresherTest` builds its own refresher with people.)
+
+In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarEditorTest.kt`, in `aCreateAcceptedButNotStoredIsDoneAndMakesOneEvent`, replace `val reads = ScriptedProvider("calendar.a").apply {` with `val reads = ScriptedProvider("calendar.a", sourceList = listOf(family, school)).apply {`: the pass's source refresh then keeps both calendars.
 
 In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSetupTest.kt`:
 1. Replace the imports block with:
@@ -3870,10 +3987,22 @@ import uk.co.siland.culvery.core.plugin.WallClock
 
     @Test
     fun aConnectThatTimesOutStoresNothingAndSaysSo() = runTest {
-        google.sourcesFailWith = timeoutCancellation()
+        // Never answers: only the setup's own (virtual) 1 s timeout ends the read.
+        google.sourcesHang = true
         assertThat(setup(setOf(google)).connectWithDefaults(googleConnection)).isFalse()
         assertThat(store.connectionsNow()).isEmpty()
         assertThat(toaster.messages).containsExactly("Couldn't connect to Google Calendar — try again")
+    }
+
+    @Test
+    fun connectingAnAccountAlreadyConnectedReconnectsItInsteadOfAddingASecond() = runTest {
+        val setup = setup(setOf(google))
+        setup.connectWithDefaults(googleConnection)
+        store.setHealth("g1", ConnectionHealth.NeedsSignIn, 500L)
+        // A second tap on Connect: the provider's screen made a new connection, with a new id, for the same account.
+        assertThat(setup.connectWithDefaults(googleConnection.copy(id = "g2"))).isTrue()
+        assertThat(store.connectionsNow().map { it.connection.id to it.health }).containsExactly("g1" to ConnectionHealth.Ok)
+        assertThat(toaster.messages).containsExactly("Google Calendar connected", "Google Calendar reconnected").inOrder()
     }
 
     @Test
@@ -3888,9 +4017,10 @@ import uk.co.siland.culvery.core.plugin.WallClock
         now = 5_000L
         assertThat(setup.reconnect(googleConnection)).isTrue()
         assertThat(store.connectionsNow().single().health).isEqualTo(ConnectionHealth.Ok)
-        // Due now without an extra attempt, and the lapse (from 500) no longer counts towards its age (D16).
-        assertThat(store.pendingNow().single().let { Triple(it.attempts, it.nextAttemptMillis, it.pausedMillis) })
-            .isEqualTo(Triple(3, 5_000L, 4_500L))
+        // Due now without an extra attempt, and the lapse (from 500) no longer counts towards its age (D16): its
+        // creation moved forward by the 4.5 s paused since then.
+        assertThat(store.pendingNow().single().let { Triple(it.attempts, it.nextAttemptMillis, it.createdMillis) })
+            .isEqualTo(Triple(3, 5_000L, 4_600L))
         assertThat(syncs).isEqualTo(2)
         assertThat(toaster.messages).containsExactly("Google Calendar connected", "Google Calendar reconnected").inOrder()
     }
@@ -3972,14 +4102,8 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.CoroutineContext
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.Toaster
@@ -4018,7 +4142,8 @@ class SourceRefresher internal constructor(
 
     /**
      * A failure to read the sources is logged and tried again at the next pass; the sync still runs on the sources
-     * already stored. A store failure fails the pass, as any other.
+     * already stored. (A provider reports a list it can't trust as a failure: Google's without the primary calendar,
+     * 3a design §3.4.) A store failure fails the pass, as any other.
      */
     suspend fun refreshIfDue(provider: CalendarProvider, stored: StoredConnection) {
         val id = stored.connection.id
@@ -4026,18 +4151,8 @@ class SourceRefresher internal constructor(
         val checked = stored.sourcesCheckedMillis
         val due = id !in refreshed || id in flagged || checked == null || now - checked >= SOURCE_REFRESH_MS
         if (!due) return
-        val sources = try {
-            withContext(io) { withTimeout(timeoutMillis) { provider.sources(stored.connection) } }
-        } catch (e: TimeoutCancellationException) {
-            Log.w(TAG, "${stored.connection.label}: timed out reading its calendars", e)
-            return
-        } catch (e: CancellationException) {
-            // Rethrows if this pass was really cancelled; otherwise the provider leaked a stray cancellation.
-            currentCoroutineContext().ensureActive()
-            Log.w(TAG, "${stored.connection.label}: reading its calendars was cancelled inside the provider", e)
-            return
-        } catch (e: Throwable) {
-            Log.w(TAG, "${stored.connection.label}: couldn't read its calendars; trying again next pass", e)
+        val sources = callReader(io, timeoutMillis) { provider.sources(stored.connection) }.getOrElse {
+            Log.w(TAG, "${stored.connection.label}: couldn't read its calendars; trying again next pass", it)
             return
         }
         val household = people()
@@ -4072,12 +4187,13 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/C
         for (source in store.visibleSourcesFor(conn.id)) {
 ```
 (the loop body `val health = syncSource(provider, conn, source.source, window)` replaces `stored.source`: rename the loop variable's uses from `stored.source` to `source.source`.)
-4. In `syncSource`, before `} catch (e: UnreachableException) {` add:
+4. In `healthAfter`, before `is UnreachableException -> {` add:
 ```kotlin
-        } catch (e: SourceGoneException) {
+        is SourceGoneException -> {
             Log.w(TAG, "${conn.label} / ${source.name}: gone from the service; refreshing its calendars at the next pass", e)
             refresher.flag(conn.id)
-            return ConnectionHealth.Unreachable
+            ConnectionHealth.Unreachable
+        }
 ```
 
 - [ ] **Step 6: Connecting with defaults, and reconnecting**
@@ -4092,13 +4208,8 @@ import javax.inject.Singleton
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.Connection
@@ -4116,7 +4227,8 @@ fun couldNotConnect(service: String): String = "Couldn't connect to $service —
 
 /**
  * Adds and reconnects provider connections and chooses the master calendar: Settings, the Connect card and the
- * reconnect chip (3a design §3.3), and the debug seed. Every read of a provider runs on [io] under [timeoutMillis].
+ * reconnect chip (3a design §3.3), and the debug seed. Every read of a provider goes through [callReader], on [io]
+ * under [timeoutMillis].
  */
 @Singleton
 class CalendarSetup(
@@ -4156,26 +4268,23 @@ class CalendarSetup(
     /**
      * Connects with automatic setup (3a design D4): every source, mapped by [defaultMapping] from the household's
      * people, and the primary as the master; then a sync. Toasts the outcome. A failure stores nothing. Returns whether
-     * the connection was stored.
+     * the connection was stored. The same provider and account already connected (a second tap on Connect, while the
+     * first was still setting up) is reconnected instead, never added twice (review M2); CalendarConnections runs one
+     * connect at a time, so the second sees the first.
      */
     suspend fun connectWithDefaults(connection: Connection): Boolean {
+        alreadyConnected(connection)?.let { return reconnect(it) }
         val provider = providerFor(connection.providerId)
         val service = provider.descriptor.displayName
         val stored = try {
-            val sources = callProvider { provider.sources(connection) }
+            val sources = callReader(io, timeoutMillis) { provider.sources(connection) }.getOrThrow()
             val household = people()
             val master = sources.firstOrNull { it.primary && it.writable }?.id
             store.addConnection(connection, sources, sources.associate { it.id to defaultMapping(it, household) }, master)
             true
-        } catch (e: TimeoutCancellationException) {
-            Log.w(TAG, "Connecting ${connection.providerId} timed out", e)
-            false
         } catch (e: CancellationException) {
-            // Rethrows if the caller was really cancelled; otherwise the provider leaked a stray cancellation.
-            currentCoroutineContext().ensureActive()
-            Log.w(TAG, "Connecting ${connection.providerId} was cancelled inside the provider", e)
-            false
-        } catch (e: Exception) {
+            throw e
+        } catch (e: Throwable) {
             Log.w(TAG, "Couldn't connect ${connection.providerId}", e)
             false
         }
@@ -4210,6 +4319,14 @@ class CalendarSetup(
         }
     }
 
+    /** The stored connection for [connection]'s provider and account, if there is one. */
+    private suspend fun alreadyConnected(connection: Connection): Connection? {
+        val account = connection.config[CONFIG_ACCOUNT] ?: return null
+        return store.connectionsNow().map { it.connection }.firstOrNull {
+            it.providerId == connection.providerId && it.config[CONFIG_ACCOUNT].equals(account, ignoreCase = true)
+        }
+    }
+
     /** The household's master calendar; null until one is chosen. */
     suspend fun master(): StoredSource? = store.master().first()
 
@@ -4236,7 +4353,7 @@ class CalendarSetup(
     private fun providerFor(providerId: String): CalendarProvider =
         providers.firstOrNull { it.descriptor.id == providerId } ?: throw IllegalArgumentException("No calendar provider $providerId")
 
-    private suspend fun <T> callProvider(block: suspend () -> T): T = withContext(io) { withTimeout(timeoutMillis) { block() } }
+    private suspend fun <T> callProvider(block: suspend () -> T): T = callReader(io, timeoutMillis, block).getOrThrow()
 
     private companion object {
         const val TAG = "CalendarSetup"
@@ -4281,12 +4398,12 @@ git commit -m "Follow the calendars ticked in the service, map new ones by name,
 - Consumes: `NeedsSignInException`, `UnreachableException`, `WriteRejectedException` (the contract).
 - Produces:
   - Catalog entries `libs.okhttp`, `libs.okhttp.mockwebserver`, `libs.kotlinx.serialization.json`, `libs.play.services.auth`, `libs.kotlinx.coroutines.play.services`, `libs.androidx.activity.compose` (exists), plugin `libs.plugins.kotlin.serialization`
-  - `internal val GoogleJson: Json`; the `@Serializable` models `CalendarListPage`, `CalendarListEntry`, `EventsPage`, `GoogleEvent`, `GoogleTime`, `ExtendedProperties(privateProperties)`, `CalendarResource`, `ErrorBody`, `ErrorDetail`, `ErrorItem`
+  - `internal val GoogleJson: Json`; the `@Serializable` models `CalendarListPage` (its `items` required: a `{}` answer is a bad read, not an empty account; review H2), `CalendarListEntry`, `EventsPage`, `GoogleEvent` (with `attendees`), `GoogleAttendee`, `GoogleTime`, `ExtendedProperties(privateProperties)`, `CalendarResource`, `ErrorBody`, `ErrorDetail` (with `details`), `ErrorItem`
   - `interface TokenSource { suspend fun token(account: String): String; suspend fun invalidate(token: String) }`
   - `internal suspend fun Call.await(): Response`
-  - `internal class GoogleResponse(code: Int, body: String)` with `isSuccessful`, `reason`, `message`; `internal fun <T> GoogleResponse.decode(deserializer: DeserializationStrategy<T>): T`; `internal fun GoogleResponse.readOrUnreachable(what: String): GoogleResponse`; `internal fun GoogleResponse.refusal(what: String): WriteRejectedException`; `internal const val REFUSED = "the change was refused"`, `internal const val READ_ONLY_HERE = "this calendar can't be changed from the tablet"`
-  - `class GoogleApi(baseUrl: HttpUrl, tokens: TokenSource, client: OkHttpClient)` with `fun url(vararg segments: String, query: Map<String, String?> = emptyMap()): HttpUrl`, `internal suspend fun send(account: String, method: String, url: HttpUrl, body: JsonElement? = null): GoogleResponse`, `internal suspend fun sendWithToken(token: String, method: String, url: HttpUrl): GoogleResponse`; `const val GOOGLE_CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3/"`
-  - Test sources: `FakeGoogleServer` (calendars, events, sync tokens, pages, PATCH merge, failures, a write hold, recorded requests) and `FakeTokenSource`
+  - `internal class GoogleResponse(code: Int, body: String)` with `isSuccessful`, `reasons` (every `errors[].reason` and `details[].reason`), `reason` (the first), `message`; `internal fun <T> GoogleResponse.decode(deserializer: DeserializationStrategy<T>): T`; `internal fun GoogleResponse.readOrUnreachable(what: String): GoogleResponse`; `internal fun GoogleResponse.refusal(what: String): WriteRejectedException`; `internal const val REFUSED = "the change was refused"`, `internal const val READ_ONLY_HERE = "this calendar can't be changed from the tablet"`
+  - `class GoogleApi(baseUrl: HttpUrl, tokens: TokenSource, client: OkHttpClient)` with `fun url(vararg segments: String, query: Map<String, String?> = emptyMap()): HttpUrl`, `internal suspend fun send(account: String, method: String, url: HttpUrl, body: JsonElement? = null): GoogleResponse`, `internal suspend fun sendWithToken(token: String, method: String, url: HttpUrl): GoogleResponse`; `const val GOOGLE_CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3/"`. Main-safe: the body is read under `runInterruptible(Dispatchers.IO)` (review M3). A 403 for a missing scope (`insufficientPermissions`, `ACCESS_TOKEN_SCOPE_INSUFFICIENT`) is `NeedsSignInException`; Google's quota reasons are "try later" like its rate limits (review H3)
+  - Test sources: `FakeGoogleServer` (calendars honouring `minAccessRole` and `showHidden`, events, sync tokens, pages, PATCH merge, event ids checked as Google checks them, failures, a write hold with `writeReached`, recorded requests) and `FakeTokenSource`
 
 - [ ] **Step 1: Pin the libraries and add the module**
 
@@ -4407,6 +4524,12 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 
+/** calendarList's access roles, weakest first, for minAccessRole. */
+private val ACCESS_ROLES = listOf("freeBusyReader", "reader", "writer", "owner")
+
+/** Google's rule for an event id the client chooses: base32hex (a–v, 0–9), 5 to 1024 characters. */
+private val EVENT_ID = Regex("[a-v0-9]{5,1024}")
+
 /**
  * Google Calendar API v3 on a MockWebServer (3a design §7): calendars and their events in memory, sync tokens, pages,
  * cancelled (deleted) events, extended properties and PATCH's merge. All-day dates are read in [zone], the calendar's
@@ -4422,7 +4545,7 @@ internal class FakeGoogleServer(private val zone: ZoneId = ZoneId.of("Europe/Lon
     private val events = ConcurrentHashMap<String, LinkedHashMap<String, Stored>>()
     private val version = AtomicLong(0)
     private val failures = ConcurrentLinkedQueue<Failure>()
-    private var primaryId: String? = null
+    @Volatile private var primaryId: String? = null
 
     /** Every request, in order. */
     val requests = CopyOnWriteArrayList<RecordedRequest>()
@@ -4438,6 +4561,9 @@ internal class FakeGoogleServer(private val zone: ZoneId = ZoneId.of("Europe/Lon
 
     /** While set, every write waits for it before answering (the R9 check). */
     @Volatile var writeHold: CountDownLatch? = null
+
+    /** Counted down when a write reaches the server, so a test cancels a call that is really in flight. */
+    val writeReached = CountDownLatch(1)
 
     /** Starts the server and returns the base URL a GoogleApi uses. */
     fun start(): HttpUrl {
@@ -4471,11 +4597,6 @@ internal class FakeGoogleServer(private val zone: ZoneId = ZoneId.of("Europe/Lon
         }
         events[id] = LinkedHashMap()
         if (primary) primaryId = id
-    }
-
-    fun removeCalendar(id: String) {
-        calendars.removeIf { it.id == id }
-        events.remove(id)
     }
 
     /** Adds or replaces [event] in [calendarId], as a phone would. */
@@ -4553,18 +4674,25 @@ internal class FakeGoogleServer(private val zone: ZoneId = ZoneId.of("Europe/Lon
     }
 
     private fun held(answer: () -> MockResponse): MockResponse {
+        writeReached.countDown()
         writeHold?.await()
         return answer()
     }
 
+    /** As Google: hidden calendars only with showHidden=true, and none weaker than minAccessRole. */
     private fun calendarList(url: HttpUrl): MockResponse {
+        val showHidden = url.queryParameter("showHidden") == "true"
+        val weakest = url.queryParameter("minAccessRole")?.let(ACCESS_ROLES::indexOf) ?: 0
+        val listed = calendars.filter { c ->
+            (showHidden || c["hidden"] == null) && ACCESS_ROLES.indexOf(c.string("accessRole")) >= weakest
+        }
         val from = url.queryParameter("pageToken")?.toInt() ?: 0
-        val page = calendars.drop(from).take(pageSize)
+        val page = listed.drop(from).take(pageSize)
         val next = from + pageSize
         return ok(
             buildJsonObject {
                 put("items", JsonArray(page))
-                if (next < calendars.size) put("nextPageToken", next.toString())
+                if (next < listed.size) put("nextPageToken", next.toString())
             },
         )
     }
@@ -4605,7 +4733,9 @@ internal class FakeGoogleServer(private val zone: ZoneId = ZoneId.of("Europe/Lon
     private fun insert(calendarId: String, body: JsonObject): MockResponse {
         val stored = events[calendarId] ?: return error(404, "notFound")
         if (!writable(calendarId)) return error(403, "forbidden")
-        val id = body["id"]?.jsonPrimitive?.content ?: "g${version.incrementAndGet()}"
+        val given = body["id"]?.jsonPrimitive?.content
+        if (given != null && !EVENT_ID.matches(given)) return error(400, "invalid")
+        val id = given ?: "g${version.incrementAndGet()}"
         synchronized(stored) {
             if (id in stored) return error(409, "duplicate")
             val event = JsonObject(body + ("id" to JsonPrimitive(id)) + ("status" to JsonPrimitive("confirmed")))
@@ -4619,7 +4749,7 @@ internal class FakeGoogleServer(private val zone: ZoneId = ZoneId.of("Europe/Lon
         if (!writable(calendarId)) return error(403, "forbidden")
         synchronized(stored) {
             val e = stored[eventId] ?: return error(404, "notFound")
-            if (e.json.status == "cancelled") return error(410, "deleted")
+            // As Google: a PATCH on a deleted event answers 200, and the event stays deleted (the body never sets status).
             e.json = merge(e.json, body)
             e.version = version.incrementAndGet()
             return ok(e.json)
@@ -4710,12 +4840,14 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.SocketPolicy
@@ -4734,11 +4866,13 @@ class GoogleApiTest {
     private val google = FakeGoogleServer()
     private val tokens = FakeTokenSource()
     private val client = OkHttpClient.Builder().readTimeout(Duration.ofSeconds(1)).build()
+    private lateinit var baseUrl: HttpUrl
     private lateinit var api: GoogleApi
 
     @Before
     fun setUp() {
-        api = GoogleApi(google.start(), tokens, client)
+        baseUrl = google.start()
+        api = GoogleApi(baseUrl, tokens, client)
         google.addCalendar(ACCOUNT, "Family", primary = true)
     }
 
@@ -4779,12 +4913,30 @@ class GoogleApiTest {
 
     @Test
     fun tryLaterAnswersAreUnreachable() = runTest {
-        listOf(429 to "rateLimitExceeded", 403 to "rateLimitExceeded", 403 to "userRateLimitExceeded", 500 to "backendError", 503 to "backendError")
-            .forEach { (status, reason) ->
-                google.failNext(status, reason)
-                assertWithMessage("$status $reason").that(failureOf { api.send(ACCOUNT, "GET", calendarList) })
-                    .isInstanceOf(UnreachableException::class.java)
-            }
+        listOf(
+            429 to "rateLimitExceeded", 403 to "rateLimitExceeded", 403 to "userRateLimitExceeded",
+            // Google's quotas: try later, never a refusal that drops the change or a calendar that has gone.
+            403 to "quotaExceeded", 403 to "dailyLimitExceeded", 403 to "calendarUsageLimitsExceeded",
+            500 to "backendError", 503 to "backendError",
+        ).forEach { (status, reason) ->
+            google.failNext(status, reason)
+            assertWithMessage("$status $reason").that(failureOf { api.send(ACCOUNT, "GET", calendarList) })
+                .isInstanceOf(UnreachableException::class.java)
+        }
+    }
+
+    @Test
+    fun a403ForAMissingScopeMeansTheAccountNeedsSigningIn() = runTest {
+        google.failNext(403, "insufficientPermissions")
+        assertThat(failureOf { api.send(ACCOUNT, "GET", calendarList) }).isInstanceOf(NeedsSignInException::class.java)
+        // Google's newer error form names it in details[] only.
+        google.failNextWith(
+            MockResponse().setResponseCode(403).setBody(
+                """{"error":{"code":403,"message":"Request had insufficient authentication scopes.","errors":[{"reason":"forbidden"}],""" +
+                    """"details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"ACCESS_TOKEN_SCOPE_INSUFFICIENT"}]}}""",
+            ),
+        )
+        assertThat(failureOf { api.send(ACCOUNT, "GET", calendarList) }).isInstanceOf(NeedsSignInException::class.java)
     }
 
     @Test
@@ -4796,8 +4948,12 @@ class GoogleApiTest {
 
     @Test
     fun aDroppedConnectionIsUnreachable() = runTest {
-        google.failNextWith(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
-        assertThat(failureOf { api.send(ACCOUNT, "GET", calendarList) }).isInstanceOf(UnreachableException::class.java)
+        // The server reads the request, then drops the connection unanswered (a Dispatcher can't drop it at the
+        // start: MockWebServer honours that only through peek()). Its own client, so OkHttp doesn't quietly retry on a
+        // fresh connection and get the next, healthy answer.
+        val noRetry = GoogleApi(baseUrl, tokens, OkHttpClient.Builder().retryOnConnectionFailure(false).build())
+        google.failNextWith(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        assertThat(failureOf { noRetry.send(ACCOUNT, "GET", calendarList) }).isInstanceOf(UnreachableException::class.java)
     }
 
     @Test
@@ -4813,19 +4969,24 @@ class GoogleApiTest {
             .isInstanceOf(UnreachableException::class.java)
     }
 
+    /** Follow-up R9, proved here rather than in the contract suite (review Simp8). */
     @Test
     fun cancellingTheCallerCancelsTheHttpCall() = runTest {
+        // Its own client with a long read timeout, so nothing but cancelling the call can end it inside the second.
+        val patient = OkHttpClient.Builder().readTimeout(Duration.ofSeconds(30)).build()
+        val held = GoogleApi(baseUrl, tokens, patient)
         google.writeHold = CountDownLatch(1)
         val body = buildJsonObject { put("id", "held0123") }
         val returned = withContext(Dispatchers.Default) {
-            val call = launch { api.send(ACCOUNT, "POST", api.url("calendars", ACCOUNT, "events"), body) }
-            delay(200)
+            val call = launch { held.send(ACCOUNT, "POST", held.url("calendars", ACCOUNT, "events"), body) }
+            // Cancelled only once the request is really at the server.
+            check(runInterruptible(Dispatchers.IO) { google.writeReached.await(5, TimeUnit.SECONDS) }) { "the write never reached the server" }
             call.cancel()
             withTimeoutOrNull(1_000) { call.join() } != null
         }
         assertThat(returned).isTrue()
         // Nothing left running in OkHttp: the call itself was cancelled, not just abandoned.
-        withContext(Dispatchers.Default) { withTimeout(1_000) { while (client.dispatcher.runningCallsCount() > 0) delay(10) } }
+        withContext(Dispatchers.Default) { withTimeout(1_000) { while (patient.dispatcher.runningCallsCount() > 0) delay(10) } }
     }
 }
 ```
@@ -4851,8 +5012,9 @@ internal val GoogleJson = Json {
     explicitNulls = false
 }
 
+/** [items] has no default: an answer without it is a bad read, never "the account has no calendars" (review H2). */
 @Serializable
-internal data class CalendarListPage(val items: List<CalendarListEntry> = emptyList(), val nextPageToken: String? = null)
+internal data class CalendarListPage(val items: List<CalendarListEntry>, val nextPageToken: String? = null)
 
 @Serializable
 internal data class CalendarListEntry(
@@ -4865,6 +5027,7 @@ internal data class CalendarListEntry(
     val primary: Boolean? = null,
 )
 
+/** An empty page may leave out [items]; one with neither token is refused by the provider as a bad read (review H2). */
 @Serializable
 internal data class EventsPage(
     val items: List<GoogleEvent> = emptyList(),
@@ -4884,7 +5047,12 @@ internal data class GoogleEvent(
     val eventType: String? = null,
     val extendedProperties: ExtendedProperties? = null,
     val colorId: String? = null,
+    val attendees: List<GoogleAttendee>? = null,
 )
+
+/** [self]: this attendee is the account itself, whose answer ([responseStatus]) decides a declined invitation. */
+@Serializable
+internal data class GoogleAttendee(val self: Boolean? = null, val responseStatus: String? = null)
 
 @Serializable
 internal data class GoogleTime(val dateTime: String? = null, val date: String? = null, val timeZone: String? = null)
@@ -4898,8 +5066,14 @@ internal data class CalendarResource(val id: String)
 @Serializable
 internal data class ErrorBody(val error: ErrorDetail? = null)
 
+/** [errors] is Google's classic list of reasons; [details] its newer one (e.g. ACCESS_TOKEN_SCOPE_INSUFFICIENT). */
 @Serializable
-internal data class ErrorDetail(val code: Int? = null, val message: String? = null, val errors: List<ErrorItem> = emptyList())
+internal data class ErrorDetail(
+    val code: Int? = null,
+    val message: String? = null,
+    val errors: List<ErrorItem> = emptyList(),
+    val details: List<ErrorItem> = emptyList(),
+)
 
 @Serializable
 internal data class ErrorItem(val reason: String? = null, val message: String? = null)
@@ -4928,6 +5102,7 @@ package uk.co.siland.culvery.provider.calendar_google
 import android.util.Log
 import java.io.IOException
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.DeserializationStrategy
@@ -4952,7 +5127,12 @@ internal const val READ_ONLY_HERE = "this calendar can't be changed from the tab
 
 private const val TAG = "GoogleCalendar"
 private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
-private val RATE_LIMITS = setOf("rateLimitExceeded", "userRateLimitExceeded")
+
+/** 403 reasons that mean "try later": Google's rate limits and its quotas (3a design §3.7). */
+private val RATE_LIMITS = setOf("rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded", "dailyLimitExceeded", "calendarUsageLimitsExceeded")
+
+/** 403 reasons that mean the grant lacks a calendar scope: the account must approve it again (3a design §3.7). */
+private val SCOPE_MISSING = setOf("insufficientPermissions", "ACCESS_TOKEN_SCOPE_INSUFFICIENT")
 
 /** Enqueues the call and suspends until it answers; cancelling the coroutine cancels the call (follow-up R9). */
 internal suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
@@ -4970,10 +5150,13 @@ internal suspend fun Call.await(): Response = suspendCancellableCoroutine { cont
     )
 }
 
-/** What Google answered: the status, the body, and Google's first error reason and message (for the log). */
+/** What Google answered: the status, the body, and Google's error reasons and message (for the log). */
 internal class GoogleResponse(val code: Int, val body: String) {
     val isSuccessful: Boolean get() = code in 200..299
-    val reason: String? get() = error()?.errors?.firstOrNull()?.reason
+
+    /** Every reason Google gave: its classic errors[].reason, then its newer details[].reason. */
+    val reasons: List<String> get() = error()?.let { e -> (e.errors + e.details).mapNotNull { it.reason } }.orEmpty()
+    val reason: String? get() = reasons.firstOrNull()
     val message: String? get() = error()?.message
 
     private fun error(): ErrorDetail? = runCatching { GoogleJson.decodeFromString(ErrorBody.serializer(), body).error }.getOrNull()
@@ -5003,9 +5186,10 @@ internal fun GoogleResponse.refusal(what: String): WriteRejectedException {
 
 /**
  * Google Calendar API v3 over OkHttp (3a design §3.1, §3.7). Each request asks [tokens] for the account's token; a
- * 401 clears it and tries once more with a fresh one, and a second 401 means the account needs signing in again.
- * The answers every call treats alike are "try later" (UnreachableException): 429, a rate-limit 403, 5xx, and a
- * connection that fails or times out. Everything else is returned for the caller to map.
+ * 401 clears it and tries once more with a fresh one, and a second 401 means the account needs signing in again, as
+ * does a 403 for a missing scope. The answers every call treats alike are "try later" (UnreachableException): 429, a
+ * rate-limit or quota 403, 5xx, and a connection that fails or times out. Everything else is returned for the caller
+ * to map. Main-safe: the connect screen calls it from the main thread.
  */
 class GoogleApi(private val baseUrl: HttpUrl, private val tokens: TokenSource, private val client: OkHttpClient) {
     /** [segments] below the base URL, each encoded (calendar ids hold '@' and '#'), with the non-null [query] values. */
@@ -5041,13 +5225,18 @@ class GoogleApi(private val baseUrl: HttpUrl, private val tokens: TokenSource, p
             .build()
         val answer = try {
             client.newCall(request).await().use { response ->
-                // Interruptible, so a slow body can't outlast a cancelled caller either.
-                GoogleResponse(response.code, runInterruptible { response.body?.string().orEmpty() })
+                // On IO, so a caller on the main thread never reads the body there; interruptible, so a slow body
+                // can't outlast a cancelled caller either.
+                GoogleResponse(response.code, runInterruptible(Dispatchers.IO) { response.body?.string().orEmpty() })
             }
         } catch (e: IOException) {
             throw UnreachableException("Couldn't reach Google Calendar", e)
         }
-        if (answer.code == 429 || answer.code >= 500 || (answer.code == 403 && answer.reason in RATE_LIMITS)) {
+        if (answer.code == 403 && answer.reasons.any { it in SCOPE_MISSING }) {
+            Log.w(TAG, "$method ${url.encodedPath}: Google Calendar says the grant lacks a calendar scope: ${answer.message}")
+            throw NeedsSignInException("Google Calendar needs the calendar scopes approved again")
+        }
+        if (answer.code == 429 || answer.code >= 500 || (answer.code == 403 && answer.reasons.any { it in RATE_LIMITS })) {
             Log.w(TAG, "$method ${url.encodedPath}: Google Calendar said try later: ${answer.code} (${answer.reason}): ${answer.message}")
             throw UnreachableException("Google Calendar asked to try later (${answer.code})")
         }
@@ -5090,16 +5279,17 @@ git commit -m "Add the Google Calendar provider module with cancellable HTTP, it
 **Interfaces:**
 - Consumes: `GoogleApi.sendWithToken`, `readOrUnreachable`, `decode`, `CalendarResource`, `FakeGoogleServer` (Task 8); `CONFIG_ACCOUNT` (Task 1); `couldNotConnect` (Task 7).
 - Produces:
-  - `sealed interface Authorization { data class Granted(val token: String); class NeedsUser(val intent: PendingIntent) }`
+  - `sealed interface Authorization { class Granted(val token: String, val scopes: List<String>); class NeedsUser(val intent: PendingIntent) }` — `Granted` is a plain class, so its `toString` can't print the token (review L4)
   - `interface Authorizer { suspend fun authorize(account: String?): Authorization; fun authorizationFrom(data: Intent?): Authorization; suspend fun clearToken(token: String) }`
   - `@Singleton class PlayServicesAuthorizer @Inject constructor(@ApplicationContext context: Context) : Authorizer`
   - `class PlayServicesTokenSource @Inject constructor(authorizer: Authorizer) : TokenSource`
-  - `internal fun authorizationFailure(statusCode: Int, cause: Throwable? = null): Exception`
+  - `internal val CALENDAR_SCOPES: List<String>`
+  - `internal class PlayServicesStatusException(statusCode: Int, cause: Throwable?) : UnreachableException`; `internal fun authorizationFailure(statusCode: Int, cause: Throwable? = null): Exception` — `NeedsSignInException` only for `SIGN_IN_REQUIRED`, `INVALID_ACCOUNT` and `RESOLUTION_REQUIRED`, any other status a `PlayServicesStatusException` naming it (review M5, approved); `internal fun Throwable.isUserCancel(): Boolean` (status `CANCELED`)
   - `const val GOOGLE_PROVIDER_ID = "calendar.google"`, `internal const val GOOGLE_DISPLAY_NAME = "Google Calendar"`, `internal const val GOOGLE_LABEL = "Google"`
   - `sealed interface ConnectStep { data class Done(connection); class ShowScreens(intent: PendingIntent); data object Stopped }`
-  - `internal class GoogleConnectFlow(authorizer, api, toaster)` with `suspend fun start(existing: Connection?): ConnectStep` and `suspend fun afterScreens(existing: Connection?, data: Intent?): ConnectStep`
+  - `internal class GoogleConnectFlow(authorizer, api, toaster)` with `suspend fun start(existing: Connection?): ConnectStep` and `suspend fun afterScreens(existing: Connection?, data: Intent?): ConnectStep`. Only a user cancel stops silently; any other failure is logged and toasts "Couldn't connect to Google Calendar — try again" (review M4). Before `Done`: the grant holds both scopes (review H3), and a silent `authorize(email)` for the account the primary calendar names is `Granted` (review M6); otherwise the same toast, nothing stored
   - `fun differentAccount(email: String): String` — "That's a different Google account. Reconnect with {email}."
-  - Test sources: `FakeAuthorizer`
+  - Test sources: `FakeAuthorizer` (its `next` answers once; after it, authorize grants every scope), `granted(token)`
 
 - [ ] **Step 1: Add Play services**
 
@@ -5119,20 +5309,23 @@ package uk.co.siland.culvery.provider.calendar_google
 
 import android.content.Intent
 
+/** A grant of both calendar scopes. */
+internal fun granted(token: String): Authorization = Authorization.Granted(token, CALENDAR_SCOPES)
+
 /** Play services' answers, scripted: no Play services in tests. */
 internal class FakeAuthorizer : Authorizer {
-    /** What the next authorize answers, unless [failWith] is set. */
-    var next: Authorization = Authorization.Granted("token-granted")
+    /** What the next authorize answers, once; after it, authorize grants both scopes. Ignored while [failWith] is set. */
+    var next: Authorization? = null
     var failWith: Exception? = null
     /** What the account chooser and consent screens answer. */
-    var fromScreens: Authorization = Authorization.Granted("token-after-screens")
+    var fromScreens: Authorization = granted("token-after-screens")
     val accounts = mutableListOf<String?>()
     val cleared = mutableListOf<String>()
 
     override suspend fun authorize(account: String?): Authorization {
         accounts += account
         failWith?.let { throw it }
-        return next
+        return next?.also { next = null } ?: granted("token-granted")
     }
 
     override fun authorizationFrom(data: Intent?): Authorization = fromScreens
@@ -5153,6 +5346,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -5178,9 +5372,14 @@ class TokenSourceTest {
 
     @Test
     fun aGrantIsTheTokenForThatAccount() = runTest {
-        authorizer.next = Authorization.Granted("t1")
+        authorizer.next = granted("t1")
         assertThat(tokens.token("family@example.com")).isEqualTo("t1")
         assertThat(authorizer.accounts).containsExactly("family@example.com")
+    }
+
+    @Test
+    fun aGrantNeverPrintsItsToken() {
+        assertThat(granted("secret-token").toString()).doesNotContain("secret-token")
     }
 
     @Test
@@ -5196,11 +5395,21 @@ class TokenSourceTest {
     }
 
     @Test
-    fun aNetworkStatusIsTryLaterAndAnyOtherNeedsTheUser() {
-        assertThat(authorizationFailure(CommonStatusCodes.NETWORK_ERROR)).isInstanceOf(UnreachableException::class.java)
-        assertThat(authorizationFailure(CommonStatusCodes.TIMEOUT)).isInstanceOf(UnreachableException::class.java)
-        assertThat(authorizationFailure(CommonStatusCodes.SIGN_IN_REQUIRED)).isInstanceOf(NeedsSignInException::class.java)
-        assertThat(authorizationFailure(CommonStatusCodes.CANCELED)).isInstanceOf(NeedsSignInException::class.java)
+    fun onlyAStatusThatNeedsTheUserMeansSignInAndAnyOtherIsTryLaterNamingIt() {
+        listOf(CommonStatusCodes.SIGN_IN_REQUIRED, CommonStatusCodes.INVALID_ACCOUNT, CommonStatusCodes.RESOLUTION_REQUIRED).forEach {
+            assertWithMessage("status $it").that(authorizationFailure(it)).isInstanceOf(NeedsSignInException::class.java)
+        }
+        listOf(
+            CommonStatusCodes.NETWORK_ERROR, CommonStatusCodes.TIMEOUT, CommonStatusCodes.INTERNAL_ERROR,
+            CommonStatusCodes.API_NOT_CONNECTED, CommonStatusCodes.DEVELOPER_ERROR, CommonStatusCodes.CANCELED,
+        ).forEach { status ->
+            val failure = authorizationFailure(status)
+            assertWithMessage("status $status").that(failure).isInstanceOf(UnreachableException::class.java)
+            // The sync logs it with its cause, so the status is in the log.
+            assertWithMessage("status $status").that(failure.message).contains("status $status")
+        }
+        assertThat(authorizationFailure(CommonStatusCodes.CANCELED).isUserCancel()).isTrue()
+        assertThat(authorizationFailure(CommonStatusCodes.INTERNAL_ERROR).isUserCancel()).isFalse()
     }
 
     @Test
@@ -5219,7 +5428,9 @@ import android.app.PendingIntent
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import org.junit.After
@@ -5227,10 +5438,11 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
-import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Toaster
+
+private const val COULD_NOT_CONNECT = "Couldn't connect to Google Calendar — try again"
 
 @RunWith(AndroidJUnit4::class)
 class GoogleConnectFlowTest {
@@ -5263,7 +5475,8 @@ class GoogleConnectFlowTest {
     fun aGrantBecomesANewConnectionForTheAccountItsPrimaryCalendarNames() = runTest {
         google.addCalendar("family@example.com", "Family", primary = true)
         val step = flow.start(existing = null) as ConnectStep.Done
-        assertThat(authorizer.accounts).containsExactly(null)
+        // The chooser's grant, then the silent grant every later call will ask for, for the email Google named.
+        assertThat(authorizer.accounts).containsExactly(null, "family@example.com").inOrder()
         assertThat(step.connection.providerId).isEqualTo(GOOGLE_PROVIDER_ID)
         assertThat(step.connection.label).isEqualTo(GOOGLE_LABEL)
         assertThat(step.connection.config).containsExactly(CONFIG_ACCOUNT, "family@example.com")
@@ -5284,7 +5497,7 @@ class GoogleConnectFlowTest {
     fun aReconnectAsksForTheStoredAccountAndKeepsTheConnectionsId() = runTest {
         google.addCalendar("family@example.com", "Family", primary = true)
         val done = flow.start(existing = stored) as ConnectStep.Done
-        assertThat(authorizer.accounts).containsExactly("family@example.com")
+        assertThat(authorizer.accounts).containsExactly("family@example.com", "family@example.com")
         assertThat(done.connection.id).isEqualTo("g1")
     }
 
@@ -5297,9 +5510,41 @@ class GoogleConnectFlowTest {
 
     @Test
     fun backingOutOfTheChooserStopsQuietly() = runTest {
-        authorizer.failWith = NeedsSignInException("the user cancelled")
+        authorizer.failWith = authorizationFailure(CommonStatusCodes.CANCELED)
         assertThat(flow.start(existing = null)).isEqualTo(ConnectStep.Stopped)
         assertThat(toasts.messages).isEmpty()
+    }
+
+    @Test
+    fun anyOtherPlayServicesFailureStopsAndSaysSo() = runTest {
+        listOf(CommonStatusCodes.DEVELOPER_ERROR, CommonStatusCodes.INTERNAL_ERROR, CommonStatusCodes.SIGN_IN_REQUIRED).forEach { status ->
+            toasts.messages.clear()
+            authorizer.failWith = authorizationFailure(status)
+            assertWithMessage("status $status").that(flow.start(existing = null)).isEqualTo(ConnectStep.Stopped)
+            assertWithMessage("status $status").that(toasts.messages).containsExactly(COULD_NOT_CONNECT)
+        }
+    }
+
+    @Test
+    fun aGrantWithoutBothScopesStoresNothingAndSaysSo() = runTest {
+        google.addCalendar("family@example.com", "Family", primary = true)
+        // The person unticked "see and edit events" on the consent screen.
+        authorizer.next = Authorization.Granted("t1", listOf(CALENDAR_SCOPES.first()))
+        assertThat(flow.start(existing = null)).isEqualTo(ConnectStep.Stopped)
+        assertThat(toasts.messages).containsExactly(COULD_NOT_CONNECT)
+        assertThat(google.requests).isEmpty()
+    }
+
+    @Test
+    fun anAccountPlayServicesWontGrantSilentlyStoresNothingAndSaysSo() = runTest {
+        // E.g. the primary calendar says googlemail.com and the device's account is gmail.com.
+        google.addCalendar("family@example.com", "Family", primary = true)
+        authorizer.next = Authorization.NeedsUser(screens())
+        assertThat(flow.start(existing = null)).isInstanceOf(ConnectStep.ShowScreens::class.java)
+        authorizer.next = Authorization.NeedsUser(screens())
+        assertThat(flow.afterScreens(existing = null, data = Intent())).isEqualTo(ConnectStep.Stopped)
+        assertThat(authorizer.accounts).containsExactly(null, "family@example.com").inOrder()
+        assertThat(toasts.messages).containsExactly(COULD_NOT_CONNECT)
     }
 
     @Test
@@ -5310,10 +5555,7 @@ class GoogleConnectFlowTest {
         authorizer.failWith = null
         google.failNext(503)
         assertThat(flow.start(existing = null)).isEqualTo(ConnectStep.Stopped)
-        assertThat(toasts.messages).containsExactly(
-            "Couldn't connect to Google Calendar — try again",
-            "Couldn't connect to Google Calendar — try again",
-        )
+        assertThat(toasts.messages).containsExactly(COULD_NOT_CONNECT, COULD_NOT_CONNECT)
     }
 }
 ```
@@ -5321,7 +5563,7 @@ class GoogleConnectFlowTest {
 - [ ] **Step 3: Run them to see them fail**
 
 Run: `./gradlew :provider:calendar-google:testDebugUnitTest`
-Expected: compilation FAILS: `Authorization`, `Authorizer`, `PlayServicesTokenSource`, `authorizationFailure` and `GoogleConnectFlow` are unresolved.
+Expected: compilation FAILS: `Authorization`, `Authorizer`, `CALENDAR_SCOPES`, `PlayServicesTokenSource`, `authorizationFailure`, `isUserCancel` and `GoogleConnectFlow` are unresolved.
 
 - [ ] **Step 4: Play services behind the seam**
 
@@ -5363,11 +5605,15 @@ internal val CALENDAR_SCOPES = listOf(
 )
 
 private const val GOOGLE_ACCOUNT_TYPE = "com.google"
-private val NETWORK_STATUSES = setOf(CommonStatusCodes.NETWORK_ERROR, CommonStatusCodes.TIMEOUT)
 
-/** Play services' answer: a token, or screens (the account chooser, Google's consent) the user must see first. */
+/** The statuses that say the user must act (3a design D2); any other says nothing about the grant. */
+private val NEEDS_USER_STATUSES =
+    setOf(CommonStatusCodes.SIGN_IN_REQUIRED, CommonStatusCodes.INVALID_ACCOUNT, CommonStatusCodes.RESOLUTION_REQUIRED)
+
+/** Play services' answer: a token with the scopes it grants, or screens (the account chooser, Google's consent) the user must see first. */
 sealed interface Authorization {
-    data class Granted(val token: String) : Authorization
+    /** A plain class, not a data class: its toString must never print the token. */
+    class Granted(val token: String, val scopes: List<String>) : Authorization
 
     class NeedsUser(val intent: PendingIntent) : Authorization
 }
@@ -5383,13 +5629,26 @@ interface Authorizer {
     suspend fun clearToken(token: String)
 }
 
-/** A Play services failure (3a design §3.2): a network status means try later; any other needs the user. */
+/**
+ * Play services answered [statusCode], which doesn't say the user must act (Play services updating, an internal error,
+ * a developer error, a cancel): try later. The status is in the message, so whoever logs it logs the status.
+ */
+internal class PlayServicesStatusException(val statusCode: Int, cause: Throwable?) :
+    UnreachableException("Play services answered status $statusCode", cause)
+
+/**
+ * A Play services failure (3a design §3.2, D2): NeedsSignIn only for a status that says the user must act; any other
+ * is Unreachable during a sync, and "Couldn't connect" when connecting.
+ */
 internal fun authorizationFailure(statusCode: Int, cause: Throwable? = null): Exception =
-    if (statusCode in NETWORK_STATUSES) {
-        UnreachableException("Play services couldn't reach Google", cause)
+    if (statusCode in NEEDS_USER_STATUSES) {
+        NeedsSignInException("Play services needs the user to sign in (status $statusCode)", cause)
     } else {
-        NeedsSignInException("Play services didn't grant the calendar scopes ($statusCode)", cause)
+        PlayServicesStatusException(statusCode, cause)
     }
+
+/** The person backed out of Play services' screens: the connect flow stops without a word. */
+internal fun Throwable.isUserCancel(): Boolean = this is PlayServicesStatusException && statusCode == CommonStatusCodes.CANCELED
 
 @Singleton
 class PlayServicesAuthorizer @Inject constructor(@ApplicationContext private val context: Context) : Authorizer {
@@ -5426,7 +5685,7 @@ class PlayServicesAuthorizer @Inject constructor(@ApplicationContext private val
     private fun AuthorizationResult.toAuthorization(): Authorization {
         val screens = pendingIntent
         if (hasResolution() && screens != null) return Authorization.NeedsUser(screens)
-        return Authorization.Granted(accessToken ?: throw NeedsSignInException("Play services granted no token"))
+        return Authorization.Granted(accessToken ?: throw NeedsSignInException("Play services granted no token"), grantedScopes)
     }
 }
 
@@ -5456,7 +5715,6 @@ import android.util.Log
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
-import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.couldNotConnect
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Toaster
@@ -5485,8 +5743,10 @@ sealed interface ConnectStep {
 
 /**
  * The connect and reconnect flow's logic, apart from the screens it launches (3a design §3.2): ask Play services for
- * the calendar scopes (for the stored account on a reconnect); once granted, ask Google whose primary calendar this
- * is, which is the account's email. A reconnect to a different account is refused. Backing out says nothing.
+ * the calendar scopes (for the stored account on a reconnect); once both are granted, ask Google whose primary
+ * calendar this is, which is the account's email, and check Play services grants that account silently, as every
+ * later call will ask. A reconnect to a different account is refused. Backing out says nothing; any other failure
+ * says "Couldn't connect", and nothing is stored.
  */
 internal class GoogleConnectFlow(private val authorizer: Authorizer, private val api: GoogleApi, private val toaster: Toaster) {
     suspend fun start(existing: Connection?): ConnectStep = step(existing) { authorizer.authorize(existing?.config?.get(CONFIG_ACCOUNT)) }
@@ -5497,21 +5757,27 @@ internal class GoogleConnectFlow(private val authorizer: Authorizer, private val
         try {
             when (val answer = ask()) {
                 is Authorization.NeedsUser -> ConnectStep.ShowScreens(answer.intent)
-                is Authorization.Granted -> finish(existing, answer.token)
+                is Authorization.Granted -> finish(existing, answer)
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: NeedsSignInException) {
-            Log.i(TAG, "Google sign-in stopped", e)
-            ConnectStep.Stopped
         } catch (e: Exception) {
-            Log.w(TAG, "Couldn't connect to Google", e)
-            toaster.show(couldNotConnect(GOOGLE_DISPLAY_NAME))
+            if (e.isUserCancel()) {
+                Log.i(TAG, "Google sign-in was cancelled", e)
+            } else {
+                Log.w(TAG, "Couldn't connect to Google", e)
+                stopWithToast()
+            }
             ConnectStep.Stopped
         }
 
-    private suspend fun finish(existing: Connection?, token: String): ConnectStep {
-        val email = api.sendWithToken(token, "GET", api.url("calendars", "primary"))
+    private suspend fun finish(existing: Connection?, grant: Authorization.Granted): ConnectStep {
+        if (!grant.scopes.containsAll(CALENDAR_SCOPES)) {
+            // An unticked box on the consent screen: the tablet could read but not write, or the reverse.
+            Log.w(TAG, "Google granted ${grant.scopes.size} of the ${CALENDAR_SCOPES.size} calendar scopes; nothing stored")
+            return stopWithToast()
+        }
+        val email = api.sendWithToken(grant.token, "GET", api.url("calendars", "primary"))
             .readOrUnreachable("Finding the account's primary calendar")
             .decode(CalendarResource.serializer())
             .id
@@ -5520,8 +5786,18 @@ internal class GoogleConnectFlow(private val authorizer: Authorizer, private val
             toaster.show(differentAccount(stored))
             return ConnectStep.Stopped
         }
+        // Every later call asks for this email silently; an alias Play services doesn't know would need the user forever.
+        if (authorizer.authorize(email) !is Authorization.Granted) {
+            Log.w(TAG, "Play services won't grant the primary calendar's account silently; nothing stored")
+            return stopWithToast()
+        }
         val id = existing?.id ?: UUID.randomUUID().toString()
         return ConnectStep.Done(Connection(id, GOOGLE_PROVIDER_ID, GOOGLE_LABEL, mapOf(CONFIG_ACCOUNT to email)))
+    }
+
+    private fun stopWithToast(): ConnectStep {
+        toaster.show(couldNotConnect(GOOGLE_DISPLAY_NAME))
+        return ConnectStep.Stopped
     }
 }
 ```
@@ -5529,7 +5805,7 @@ internal class GoogleConnectFlow(private val authorizer: Authorizer, private val
 - [ ] **Step 6: Run the tests to see them pass**
 
 Run: `./gradlew :provider:calendar-google:testDebugUnitTest`
-Expected: PASS. If the build warns that any `AuthorizationClient`, `AuthorizationRequest.Builder` or `ClearTokenRequest` member is deprecated, stop and ask (Global Constraints). Nothing here may touch `GoogleSignIn` or `GoogleSignInAccount`.
+Expected: PASS. If the build warns that any `AuthorizationClient`, `AuthorizationRequest.Builder`, `AuthorizationResult` (`getGrantedScopes`), `ClearTokenRequest` or `CommonStatusCodes` member is deprecated, stop and ask (Global Constraints). Nothing here may touch `GoogleSignIn` or `GoogleSignInAccount`.
 
 - [ ] **Step 7: Run the gate**
 
@@ -5559,7 +5835,9 @@ git commit -m "Get Google tokens from Play services behind a seam, and work out 
 - Consumes: `GoogleApi`, `GoogleResponse` helpers, the JSON models, `FakeGoogleServer`, `FakeTokenSource` (Task 8); `Authorizer`, `GoogleConnectFlow`, `GOOGLE_PROVIDER_ID`, `GOOGLE_DISPLAY_NAME`, `FakeAuthorizer` (Task 9); `SourceGoneException`, `CONFIG_ACCOUNT` (Task 1).
 - Produces:
   - `internal const val PERSON_KEY = "culvery.person"`, `internal const val CREATED_BY_KEY = "culvery.createdBy"`, `internal const val NO_TITLE = "(No title)"`
-  - `internal val GoogleEvent.isGone: Boolean` (cancelled, or a working location); `internal fun GoogleEvent.toRemoteEvent(rule: String?): RemoteEvent?`; `internal fun GoogleTime.toEventTime(): EventTime?`
+  - `internal val GoogleEvent.isGone: Boolean` (cancelled, a working location, or an invitation the account itself declined: review M9, approved); `internal fun GoogleEvent.toRemoteEvent(rule: String?): RemoteEvent?`; `internal fun GoogleTime.toEventTime(): EventTime?`
+  - `sources` asks calendarList for `minAccessRole=reader` and `showHidden=true` (review M7, M8), and a list without the primary calendar is `UnreachableException` (review H2); an events page with neither `nextPageToken` nor `nextSyncToken` is too
+  - A series rule that can't be fetched is remembered as none for the rest of that sync (review L2)
   - `@Singleton class GoogleCalendarProvider @Inject constructor(api: GoogleApi, authorizer: Authorizer, toaster: Toaster) : CalendarProvider` — descriptor id `calendar.google`, "Google Calendar", `calendar_month`, `READ` (Task 11 adds `WRITE` and `CalendarWriter`)
 
 - [ ] **Step 1: The connect screen needs activity-compose**
@@ -5581,11 +5859,13 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
-import kotlinx.serialization.json.add
 import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.MockResponse
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -5639,13 +5919,36 @@ class GoogleReadTest {
         google.pageSize = 1
         google.addCalendar("mia@group", "Mia", accessRole = "writer", summaryOverride = "Mia's swimming")
         google.addCalendar("holidays@group", "UK holidays", accessRole = "reader", selected = false)
-        google.addCalendar("busy@group", "Busy", accessRole = "freeBusyReader", hidden = true)
+        // Hidden in Google: still a source (hidden on the tablet), so its mapping survives being unhidden.
+        google.addCalendar("club@group", "Old club", accessRole = "reader", hidden = true)
         assertThat(provider.sources(conn)).containsExactly(
             CalendarSource(family.id, "Family", writable = true, shown = true, primary = true),
             CalendarSource("mia@group", "Mia's swimming", writable = true, shown = true, primary = false),
             CalendarSource("holidays@group", "UK holidays", writable = false, shown = false, primary = false),
-            CalendarSource("busy@group", "Busy", writable = false, shown = false, primary = false),
+            CalendarSource("club@group", "Old club", writable = false, shown = false, primary = false),
         ).inOrder()
+        val asked = google.requests.first().requestUrl!!
+        assertThat(asked.queryParameter("showHidden") to asked.queryParameter("minAccessRole")).isEqualTo("true" to "reader")
+    }
+
+    @Test
+    fun aCalendarThatShowsOnlyFreeBusyIsNotASource() = runTest {
+        google.addCalendar("busy@group", "Busy", accessRole = "freeBusyReader")
+        assertThat(provider.sources(conn).map { it.id }).containsExactly(family.id)
+    }
+
+    @Test
+    fun aCalendarListWithNoItemsOrNoPrimaryIsUnreachableNotEveryCalendarGone() = runTest {
+        google.failNextWith(MockResponse().setBody("{}"))
+        assertThat(failureOf { provider.sources(conn) }).isInstanceOf(UnreachableException::class.java)
+        google.failNextWith(MockResponse().setBody("""{"items":[{"id":"mia@group","summary":"Mia","accessRole":"owner"}]}"""))
+        assertThat(failureOf { provider.sources(conn) }).isInstanceOf(UnreachableException::class.java)
+    }
+
+    @Test
+    fun anEventsPageWithNeitherTokenIsUnreachable() = runTest {
+        google.failNextWith(MockResponse().setBody("{}"))
+        assertThat(failureOf { provider.sync(conn, family, range, null) }).isInstanceOf(UnreachableException::class.java)
     }
 
     @Test
@@ -5660,7 +5963,8 @@ class GoogleReadTest {
         assertThat(result.cursor).isNotNull()
         val first = google.requests.first().requestUrl!!
         assertThat(first.queryParameter("timeMin")).isEqualTo("2026-09-21T23:00:00Z")
-        assertThat(first.queryParameter("timeMax")).isEqualTo("2026-10-08T23:00:00Z")
+        // The window's exclusive end, 8 October, starts at midnight BST: 23:00 UTC on the 7th.
+        assertThat(first.queryParameter("timeMax")).isEqualTo("2026-10-07T23:00:00Z")
         assertThat(first.queryParameter("singleEvents")).isEqualTo("true")
         assertThat(google.requests).hasSize(2)
     }
@@ -5737,11 +6041,32 @@ class GoogleReadTest {
     }
 
     @Test
-    fun aSeriesWhoseRuleCantBeReadStillSyncsWithNoRule() = runTest {
+    fun aSeriesWhoseRuleCantBeReadStillSyncsWithNoRuleAndIsAskedForOncePerSync() = runTest {
+        // The series is there, so the fetch really meets the 500 rather than a 404.
+        google.putEvent(family.id, google.timed("piano", "Piano", at(22, 15), at(22, 16)) { putJsonArray("recurrence") { add("RRULE:FREQ=WEEKLY") } })
         google.putEvent(family.id, google.timed("piano_1", "Piano", at(22, 15), at(22, 16)) { put("recurringEventId", "piano") })
+        google.putEvent(family.id, google.timed("piano_2", "Piano", at(29, 15), at(29, 16)) { put("recurringEventId", "piano") })
         google.failNext(500) { it.requestUrl!!.pathSegments.last() == "piano" }
-        val event = provider.sync(conn, family, range, null).upserts.single()
-        assertThat(event.recurring to event.recurrenceRule).isEqualTo(true to null)
+        val upserts = provider.sync(conn, family, range, null).upserts
+        assertThat(upserts.map { it.recurring to it.recurrenceRule }).containsExactly(true to null, true to null)
+        // The failure is remembered for the rest of this sync: the second instance doesn't ask again.
+        assertThat(google.requests.count { it.requestUrl!!.pathSegments.last() == "piano" }).isEqualTo(1)
+    }
+
+    @Test
+    fun anInvitationTheAccountDeclinedIsSkippedInAFullSyncAndRemovedInAnIncrementalOne() = runTest {
+        fun invitation(answer: String) = google.timed("party", "Party", at(24, 19), at(24, 22)) {
+            putJsonArray("attendees") {
+                add(buildJsonObject { put("email", "family@example.com"); put("self", true); put("responseStatus", answer) })
+                add(buildJsonObject { put("email", "host@example.com"); put("responseStatus", "accepted") })
+            }
+        }
+        google.putEvent(family.id, invitation("needsAction"))
+        val first = provider.sync(conn, family, range, null)
+        assertThat(first.upserts.map { it.remoteId }).containsExactly("party")
+        google.putEvent(family.id, invitation("declined"))
+        assertThat(provider.sync(conn, family, range, first.cursor).removedIds).containsExactly("party")
+        assertThat(provider.sync(conn, family, range, null).upserts).isEmpty()
     }
 
     @Test
@@ -5753,18 +6078,10 @@ class GoogleReadTest {
     }
 
     @Test
-    fun aListOnADeletedCalendarIsSourceGone() = runTest {
-        google.addCalendar("gone@group", "Gone")
-        google.removeCalendar("gone@group")
-        val gone = CalendarSource("gone@group", "Gone", writable = false)
-        assertThat(failureOf { provider.sync(conn, gone, range, null) }).isInstanceOf(SourceGoneException::class.java)
-    }
-
-    @Test
     fun anyOtherRefusalOrAnUnreadableBodyIsUnreachable() = runTest {
         google.failNext(400, "invalid")
         assertThat(failureOf { provider.sync(conn, family, range, null) }).isInstanceOf(UnreachableException::class.java)
-        google.failNextWith(okhttp3.mockwebserver.MockResponse().setBody("not json"))
+        google.failNextWith(MockResponse().setBody("not json"))
         assertThat(failureOf { provider.sync(conn, family, range, SyncCursor("t0")) }).isInstanceOf(UnreachableException::class.java)
     }
 
@@ -5781,6 +6098,7 @@ package uk.co.siland.culvery.provider.calendar_google
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.common.truth.Truth.assertThat
 import okhttp3.OkHttpClient
 import org.junit.After
@@ -5789,25 +6107,29 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
-import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Toaster
 
 @RunWith(AndroidJUnit4::class)
 class GoogleConnectScreenTest {
-    private object NoToasts : Toaster {
-        override fun show(message: String, icon: String) = Unit
+    private class Toasts : Toaster {
+        val messages = mutableListOf<String>()
+
+        override fun show(message: String, icon: String) {
+            messages += message
+        }
     }
 
     @get:Rule val compose = createComposeRule()
 
     private val google = FakeGoogleServer()
     private val authorizer = FakeAuthorizer()
+    private val toasts = Toasts()
     private lateinit var provider: GoogleCalendarProvider
 
     @Before
     fun setUp() {
-        provider = GoogleCalendarProvider(GoogleApi(google.start(), FakeTokenSource(), OkHttpClient()), authorizer, NoToasts)
+        provider = GoogleCalendarProvider(GoogleApi(google.start(), FakeTokenSource(), OkHttpClient()), authorizer, toasts)
         google.addCalendar("family@example.com", "Family", primary = true)
     }
 
@@ -5823,11 +6145,21 @@ class GoogleConnectScreenTest {
     }
 
     @Test
-    fun backingOutCancels() {
-        authorizer.failWith = NeedsSignInException("the user cancelled")
+    fun backingOutCancelsWithNothingSaid() {
+        authorizer.failWith = authorizationFailure(CommonStatusCodes.CANCELED)
         var cancelled = 0
         compose.setContent { provider.ConnectScreen(existing = null, onConnected = {}, onCancel = { cancelled++ }) }
         compose.waitUntil(5_000) { cancelled == 1 }
+        assertThat(toasts.messages).isEmpty()
+    }
+
+    @Test
+    fun aPlayServicesFailureSaysSoAndCancels() {
+        authorizer.failWith = authorizationFailure(CommonStatusCodes.DEVELOPER_ERROR)
+        var cancelled = 0
+        compose.setContent { provider.ConnectScreen(existing = null, onConnected = {}, onCancel = { cancelled++ }) }
+        compose.waitUntil(5_000) { cancelled == 1 }
+        assertThat(toasts.messages).containsExactly("Couldn't connect to Google Calendar — try again")
     }
 }
 ```
@@ -5921,9 +6253,15 @@ internal const val NO_TITLE = "(No title)"
 
 private const val CANCELLED = "cancelled"
 private const val WORKING_LOCATION = "workingLocation"
+private const val DECLINED = "declined"
 
-/** Deleted, or a working location, which isn't an event people plan around (3a design §3.5). */
-internal val GoogleEvent.isGone: Boolean get() = status == CANCELLED || eventType == WORKING_LOCATION
+/**
+ * Deleted; a working location, which isn't an event people plan around; or an invitation the account itself declined
+ * (3a design §3.5).
+ */
+internal val GoogleEvent.isGone: Boolean
+    get() = status == CANCELLED || eventType == WORKING_LOCATION ||
+        attendees.orEmpty().any { it.self == true && it.responseStatus == DECLINED }
 
 /** A start or end: a dateTime with Google's offset, or an all-day date (Google's end date is already exclusive). */
 internal fun GoogleTime.toEventTime(): EventTime? = runCatching {
@@ -5958,6 +6296,7 @@ Create `provider/calendar-google/src/main/java/uk/co/siland/culvery/provider/cal
 ```kotlin
 package uk.co.siland.culvery.provider.calendar_google
 
+import android.app.Activity
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -5993,6 +6332,12 @@ private const val PAGE_SIZE = "250"
 private val WRITE_ROLES = setOf("owner", "writer")
 
 /**
+ * calendarList's query (3a design §3.5): hidden calendars too, so hiding one in Google hides it rather than deleting it
+ * and its mapping; none the account can see only as free/busy, whose events it can't read.
+ */
+private val CALENDAR_LIST_QUERY = mapOf("showHidden" to "true", "minAccessRole" to "reader")
+
+/**
  * Google Calendar API v3 (3a design §3.1–§3.7). The connection's config holds only the account's email; every call
  * takes a fresh token from Play services. Each series' RRULE is fetched once and kept in memory per calendar until
  * that calendar's next full sync.
@@ -6021,6 +6366,11 @@ class GoogleCalendarProvider @Inject constructor(
         val connected by rememberUpdatedState(onConnected)
         val cancelled by rememberUpdatedState(onCancel)
         val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            // Backed out of the chooser or the consent screen: the card closes with nothing said (3a design §3.2).
+            if (result.resultCode != Activity.RESULT_OK) {
+                cancelled()
+                return@rememberLauncherForActivityResult
+            }
             scope.launch {
                 // Play services has its answer now; screens asked for a second time read as a stop.
                 when (val step = flow.afterScreens(existing, result.data)) {
@@ -6043,7 +6393,8 @@ class GoogleCalendarProvider @Inject constructor(
         val sources = mutableListOf<CalendarSource>()
         var pageToken: String? = null
         do {
-            val page = api.send(account, "GET", api.url("users", "me", "calendarList", query = mapOf("pageToken" to pageToken)))
+            val url = api.url("users", "me", "calendarList", query = CALENDAR_LIST_QUERY + ("pageToken" to pageToken))
+            val page = api.send(account, "GET", url)
                 .readOrUnreachable("The calendar list")
                 .decode(CalendarListPage.serializer())
             page.items.forEach { e ->
@@ -6057,6 +6408,12 @@ class GoogleCalendarProvider @Inject constructor(
             }
             pageToken = page.nextPageToken
         } while (pageToken != null)
+        // Google always lists the account's own calendar: a list without it is a bad answer, never "every calendar was
+        // deleted", which would remove them all with their events and queued changes (3a design §3.4).
+        if (sources.none { it.primary }) {
+            Log.w(TAG, "The calendar list came back without the primary calendar; treating it as a failed read")
+            throw UnreachableException("Google Calendar listed no primary calendar")
+        }
         return sources
     }
 
@@ -6071,7 +6428,8 @@ class GoogleCalendarProvider @Inject constructor(
         rulesFor(conn, source).clear()
         val window = mapOf("timeMin" to range.startInstant.toString(), "timeMax" to range.endInstant.toString())
         val listed = list(account, source, window) ?: throw UnreachableException("Google Calendar refused a full sync of ${source.name}")
-        val upserts = listed.items.filterNot { it.isGone }.mapNotNull { it.toRemoteEvent(ruleOf(conn, account, source, it)) }
+        val failed = mutableSetOf<String>()
+        val upserts = listed.items.filterNot { it.isGone }.mapNotNull { it.toRemoteEvent(ruleOf(conn, account, source, it, failed)) }
         return SyncResult(upserts, emptyList(), listed.syncToken?.let(::SyncCursor), fullReplace = true)
     }
 
@@ -6079,11 +6437,12 @@ class GoogleCalendarProvider @Inject constructor(
         val listed = list(account, source, mapOf("syncToken" to cursor.value)) ?: return null
         val upserts = mutableListOf<RemoteEvent>()
         val removed = mutableListOf<String>()
+        val failed = mutableSetOf<String>()
         listed.items.forEach { event ->
             if (event.isGone) {
                 removed += event.id
             } else {
-                event.toRemoteEvent(ruleOf(conn, account, source, event))?.let { upserts += it }
+                event.toRemoteEvent(ruleOf(conn, account, source, event, failed))?.let { upserts += it }
             }
         }
         return SyncResult(upserts, removed, listed.syncToken?.let(::SyncCursor) ?: cursor, fullReplace = false)
@@ -6105,14 +6464,29 @@ class GoogleCalendarProvider @Inject constructor(
                 throw SourceGoneException("${source.name} isn't in Google Calendar any more")
             }
             val page = answer.readOrUnreachable("The events of ${source.name}").decode(EventsPage.serializer())
+            // Every real page carries one or the other; one with neither (a bare {}) is a bad answer (3a design §3.7).
+            if (page.nextPageToken == null && page.nextSyncToken == null) {
+                Log.w(TAG, "${source.name}: Google Calendar sent an events page with no page or sync token")
+                throw UnreachableException("Google Calendar sent an events page the tablet can't follow")
+            }
             items += page.items
             pageToken = page.nextPageToken ?: return Listed(items, page.nextSyncToken)
         }
     }
 
-    /** An instance's series rule (3a design D12): fetched once per series; a failed fetch is null and doesn't fail the sync. */
-    private suspend fun ruleOf(conn: Connection, account: String, source: CalendarSource, event: GoogleEvent): String? {
+    /**
+     * An instance's series rule (3a design D12): fetched once per series. A failed fetch is null, doesn't fail the
+     * sync, and is remembered in [failed] for the rest of this sync, so the series' other instances don't ask again.
+     */
+    private suspend fun ruleOf(
+        conn: Connection,
+        account: String,
+        source: CalendarSource,
+        event: GoogleEvent,
+        failed: MutableSet<String>,
+    ): String? {
         val series = event.recurringEventId ?: return null
+        if (series in failed) return null
         val cache = rulesFor(conn, source)
         cache[series]?.let { return it.ifEmpty { null } }
         val rule = try {
@@ -6125,6 +6499,7 @@ class GoogleCalendarProvider @Inject constructor(
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "Couldn't read a series' rule; its Repeats row says Yes", e)
+            failed += series
             return null
         }
         cache[series] = rule.orEmpty()
@@ -6173,7 +6548,7 @@ git commit -m "Read Google calendars and events: full and incremental syncs, exp
 - Produces:
   - `internal val EVENT_COLORS: Map<String, Int>`; `internal fun nearestColorId(argb: Long): String`
   - `internal fun insertBody(draft: EventDraft, clientKey: String): JsonObject`; `internal fun patchBody(draft: EventDraft, fields: Set<EventField>): JsonObject`
-  - `GoogleCalendarProvider : CalendarProvider, CalendarWriter` with `READ` + `WRITE`; `providerId = "calendar.google"`
+  - `GoogleCalendarProvider : CalendarProvider, CalendarWriter` with `READ` + `WRITE`; `providerId = "calendar.google"`. `update` and `delete` GET the event first (review H1): gone (404, 410, cancelled) → `EVENT_GONE` for an update, success for a delete; a series (`recurrence` set, e.g. made one on a phone) → `WriteRejectedException(REFUSED)`; no If-Match. A PATCH whose answer is gone → `EVENT_GONE`
   - `GoogleCalendarModule`: binds the provider `@IntoSet` as `CalendarProvider` and `CalendarWriter`, `TokenSource` → `PlayServicesTokenSource`, `Authorizer` → `PlayServicesAuthorizer`; provides the `OkHttpClient` (connect 15 s, read 30 s) and the `GoogleApi` on `GOOGLE_CALENDAR_BASE_URL`
 
 - [ ] **Step 1: Write the failing tests**
@@ -6213,8 +6588,11 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.putJsonArray
 import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.MockResponse
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -6343,10 +6721,14 @@ class GoogleWriteTest {
     @Test
     fun aPersonPatchKeepsCreatedBy() = runTest {
         provider.create(conn, family, draft(), key)
-        val updated = provider.update(conn, family, key, draft(forPerson = "sam-id"), setOf(EventField.FOR_PERSON))
-        assertThat(updated.forPerson to updated.createdBy).isEqualTo("sam-id" to "sam-id")
+        // The draft names someone else as its creator: a Who change must never send it.
+        val retag = draft(forPerson = "alex-id").copy(createdBy = "someone-else")
+        val updated = provider.update(conn, family, key, retag, setOf(EventField.FOR_PERSON))
+        assertThat(google.bodies.last().obj("extendedProperties").obj("private").keys).containsExactly(PERSON_KEY)
+        assertThat(updated.forPerson to updated.createdBy).isEqualTo("alex-id" to "sam-id")
         val stored = google.event(family.id, key)!!.obj("extendedProperties").obj("private")
         assertThat(stored.keys).containsExactly(PERSON_KEY, CREATED_BY_KEY)
+        assertThat(stored.text(CREATED_BY_KEY)).isEqualTo("sam-id")
     }
 
     @Test
@@ -6369,9 +6751,51 @@ class GoogleWriteTest {
     @Test
     fun updatingAnEventThatIsGoneIsRefusedAsGone() = runTest {
         assertThat(failureOf { provider.update(conn, family, "nope0", draft(), setOf(EventField.TITLE)) }?.message).isEqualTo(EVENT_GONE)
+    }
+
+    @Test
+    fun anEditOfAnEventCancelledOnThePhoneIsGoneAndNeverBringsItBack() = runTest {
         provider.create(conn, family, draft(), key)
         google.cancel(family.id, key)
-        assertThat(failureOf { provider.update(conn, family, key, draft(), setOf(EventField.TITLE)) }?.message).isEqualTo(EVENT_GONE)
+        // Google would answer a PATCH here with 200, so the edit must look first and send nothing.
+        assertThat(failureOf { provider.update(conn, family, key, draft(title = "Swim club"), setOf(EventField.TITLE)) }?.message)
+            .isEqualTo(EVENT_GONE)
+        assertThat(google.requests.map { it.method }).doesNotContain("PATCH")
+        assertThat(google.event(family.id, key)!!.text("status")).isEqualTo("cancelled")
+        // Cancelled between the look and the PATCH: the answer says so, and it is still gone.
+        provider.create(conn, family, draft(), "abcdefabcdef")
+        val cancelledMeanwhile = JsonObject(google.event(family.id, "abcdefabcdef")!! + ("status" to JsonPrimitive("cancelled")))
+        google.failNextWith(MockResponse().setBody(cancelledMeanwhile.toString())) { it.method == "PATCH" }
+        assertThat(failureOf { provider.update(conn, family, "abcdefabcdef", draft(), setOf(EventField.TITLE)) }?.message)
+            .isEqualTo(EVENT_GONE)
+    }
+
+    @Test
+    fun anEditOfAnEventMadeASeriesOnThePhoneIsRefused() = runTest {
+        provider.create(conn, family, draft(), key)
+        google.putEvent(family.id, google.timed(key, "Swim", at(23, 16), at(23, 17)) { putJsonArray("recurrence") { add("RRULE:FREQ=WEEKLY") } })
+        // A PATCH would change every instance of the series.
+        assertThat(failureOf { provider.update(conn, family, key, draft(title = "Swim club"), setOf(EventField.TITLE)) }?.message)
+            .isEqualTo("the change was refused")
+        assertThat(google.requests.map { it.method }).doesNotContain("PATCH")
+    }
+
+    @Test
+    fun aDeleteOfAnEventCancelledOnThePhoneSucceedsAndSendsNoDelete() = runTest {
+        provider.create(conn, family, draft(), key)
+        google.cancel(family.id, key)
+        provider.delete(conn, family, key)
+        assertThat(google.requests.map { it.method }).doesNotContain("DELETE")
+    }
+
+    @Test
+    fun aDeleteOfAnEventMadeASeriesOnThePhoneIsRefused() = runTest {
+        provider.create(conn, family, draft(), key)
+        google.putEvent(family.id, google.timed(key, "Swim", at(23, 16), at(23, 17)) { putJsonArray("recurrence") { add("RRULE:FREQ=WEEKLY") } })
+        // A DELETE would remove the whole series.
+        assertThat(failureOf { provider.delete(conn, family, key) }?.message).isEqualTo("the change was refused")
+        assertThat(google.requests.map { it.method }).doesNotContain("DELETE")
+        assertThat(google.event(family.id, key)!!.text("status")).isEqualTo("confirmed")
     }
 
     @Test
@@ -6407,17 +6831,10 @@ class GoogleWriteTest {
 }
 ```
 
-In `provider/calendar-google/src/test/java/uk/co/siland/culvery/provider/calendar_google/GoogleCalendarProviderContractTest.kt`:
-1. Add `import java.util.concurrent.CountDownLatch`.
-2. After `override fun simulateUnreachable() = …` add:
+In `provider/calendar-google/src/test/java/uk/co/siland/culvery/provider/calendar_google/GoogleCalendarProviderContractTest.kt`, after `override fun simulateUnreachable() = …` add:
 ```kotlin
     override fun writer() = subject
     override fun writableSource() = family
-    override fun gateWrites(): (() -> Unit)? {
-        val hold = CountDownLatch(1)
-        google.writeHold = hold
-        return { hold.countDown() }
-    }
 ```
 
 - [ ] **Step 2: Run them to see them fail**
@@ -6559,8 +6976,14 @@ import uk.co.siland.culvery.capability.calendar.WriteRejectedException
         }
     }
 
+    /**
+     * Looks first (3a design §3.6): Google answers a PATCH on an event deleted on a phone with 200 and leaves it deleted,
+     * and a PATCH on an event since made a series changes every instance. Gone → EVENT_GONE; a series → refused.
+     */
     override suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft, fields: Set<EventField>): RemoteEvent {
-        val answer = api.send(accountOf(conn), "PATCH", api.url("calendars", source.id, "events", remoteId), patchBody(draft, fields))
+        val account = accountOf(conn)
+        oneOffToChange(account, source, remoteId, "Changing an event") ?: throw WriteRejectedException(EVENT_GONE)
+        val answer = api.send(account, "PATCH", api.url("calendars", source.id, "events", remoteId), patchBody(draft, fields))
         return when {
             answer.isSuccessful -> answer.decode(GoogleEvent.serializer()).written()
             answer.code == 404 || answer.code == 410 -> throw WriteRejectedException(EVENT_GONE)
@@ -6568,9 +6991,11 @@ import uk.co.siland.culvery.capability.calendar.WriteRejectedException
         }
     }
 
-    /** 404 and 410 are success: the event is already gone. */
+    /** Gone already (looked up first, or 404 or 410) is success; an event since made a series is refused, not deleted whole. */
     override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) {
-        val answer = api.send(accountOf(conn), "DELETE", api.url("calendars", source.id, "events", remoteId))
+        val account = accountOf(conn)
+        oneOffToChange(account, source, remoteId, "Deleting an event") ?: return
+        val answer = api.send(account, "DELETE", api.url("calendars", source.id, "events", remoteId))
         if (answer.isSuccessful || answer.code == 404 || answer.code == 410) return
         throw answer.refusal("Deleting an event")
     }
@@ -6578,17 +7003,32 @@ import uk.co.siland.culvery.capability.calendar.WriteRejectedException
     override suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent? =
         lookUp(accountOf(conn), source, remoteId)
 
-    /** The event; null for 404, 410 or a cancelled one. */
-    private suspend fun lookUp(account: String, source: CalendarSource, remoteId: String): RemoteEvent? {
+    /** The event; null for 404, 410 or a gone one. */
+    private suspend fun lookUp(account: String, source: CalendarSource, remoteId: String): RemoteEvent? =
+        fetch(account, source, remoteId)?.takeUnless { it.isGone }?.written()
+
+    /** The event as Google holds it, whatever its status; null for 404 or 410. */
+    private suspend fun fetch(account: String, source: CalendarSource, remoteId: String): GoogleEvent? {
         val answer = api.send(account, "GET", api.url("calendars", source.id, "events", remoteId))
         if (answer.code == 404 || answer.code == 410) return null
-        val event = answer.readOrUnreachable("Looking an event up").decode(GoogleEvent.serializer())
-        return if (event.isGone) null else event.written()
+        return answer.readOrUnreachable("Looking an event up").decode(GoogleEvent.serializer())
     }
 
-    /** A written event, as Google holds it now: never an instance of a series, so no rule. */
-    private fun GoogleEvent.written(): RemoteEvent =
-        toRemoteEvent(rule = null) ?: throw UnreachableException("Google Calendar returned an event with no times the tablet can read")
+    /** The event about to be changed or deleted; null when it's gone. One since made a series is refused (no If-Match: writes are rare). */
+    private suspend fun oneOffToChange(account: String, source: CalendarSource, remoteId: String, what: String): GoogleEvent? {
+        val event = fetch(account, source, remoteId)?.takeUnless { it.isGone } ?: return null
+        if (event.recurrence != null) {
+            Log.w(TAG, "$what: it has become a repeating event in Google Calendar, so the tablet leaves it alone")
+            throw WriteRejectedException(REFUSED)
+        }
+        return event
+    }
+
+    /** A written event, as Google holds it now: never an instance of a series, so no rule. Gone (a PATCH on a deleted event answers 200) → EVENT_GONE. */
+    private fun GoogleEvent.written(): RemoteEvent {
+        if (isGone) throw WriteRejectedException(EVENT_GONE)
+        return toRemoteEvent(rule = null) ?: throw UnreachableException("Google Calendar returned an event with no times the tablet can read")
+    }
 ```
 
 - [ ] **Step 6: Bind it**
@@ -6653,7 +7093,7 @@ abstract class GoogleCalendarModule {
 - [ ] **Step 7: Run the tests to see them pass**
 
 Run: `./gradlew :provider:calendar-google:testDebugUnitTest`
-Expected: PASS: the whole contract suite runs against Google through the fake server, the write checks included, and `aWriteReturnsPromptlyWhenItsCallerIsCancelled` proves the OkHttp call is cancelled with its caller (R9).
+Expected: PASS: the whole contract suite runs against Google through the fake server, the write checks included. (R9, the OkHttp call cancelled with its caller, is proved by Task 8's `cancellingTheCallerCancelsTheHttpCall`, not by the suite.)
 
 - [ ] **Step 8: Run the gate**
 
@@ -6664,7 +7104,7 @@ Expected: `BUILD SUCCESSFUL`. (`:app` doesn't depend on the module yet; Task 13 
 
 ```bash
 git add provider/calendar-google
-git commit -m "Write to Google Calendar: keyed inserts, touched-field patches, deletes, lookups and person colours, passing the whole contract suite"
+git commit -m "Write to Google Calendar: keyed inserts, touched-field patches and deletes that look first, lookups and person colours, passing the whole contract suite"
 ```
 
 ---
@@ -6673,6 +7113,7 @@ git commit -m "Write to Google Calendar: keyed inserts, touched-field patches, d
 
 **Files:**
 - Create: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/Repeats.kt`
+- Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/Writes.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarUi.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarRepository.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarEditor.kt`
@@ -6681,7 +7122,7 @@ git commit -m "Write to Google Calendar: keyed inserts, touched-field patches, d
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/EventEditorHost.kt`
 - Modify: `provider/calendar-fake/src/main/java/uk/co/siland/culvery/provider/calendar_fake/SampleEvents.kt`
 - Create: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/RepeatsTest.kt`
-- Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarRepositoryTest.kt`, `CalendarSyncTest.kt`, `CalendarEditorTest.kt`, `StubEditor.kt`, `ui/SampleUi.kt`, `ui/EventDetailSheetTest.kt`, `ui/EventDetailHostTest.kt`, `ui/EventEditorHostTest.kt` (modify)
+- Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarRepositoryTest.kt`, `CalendarSyncTest.kt`, `TestEngines.kt`, `ui/SampleUi.kt`, `ui/EventDetailSheetTest.kt` (modify)
 - Test: `provider/calendar-fake/src/test/java/uk/co/siland/culvery/provider/calendar_fake/FakeCalendarProviderTest.kt` (modify)
 - Test: `app/src/testDebug/java/uk/co/siland/culvery/SampleAddTest.kt`, `SampleRollbackTest.kt` (modify)
 - Screenshots: `capability/calendar/src/test/screenshots/detail_recurring_{dark,light}.png`, `detail_delete_confirm_{dark,light}.png` (re-recorded)
@@ -6692,7 +7133,8 @@ git commit -m "Write to Google Calendar: keyed inserts, touched-field patches, d
   - `const val REPEATS_YES = "Yes"`; `fun repeatsLabel(rule: String?, start: EventTime, zone: ZoneId): String`
   - `EventUi(…, serviceName: String = "", repeats: String = REPEATS_YES)`
   - `CalendarRepository.masterService: Flow<String?>` (replaces `masterLabel`): the master's service name ("Google Calendar"), falling back to its connection label when its provider isn't installed; null when there is nowhere to add
-  - `CalendarEditor` internal constructor gains `serviceOf: (providerId: String) -> String?` (last); `@Inject` constructor gains `providers: Set<@JvmSuppressWildcards CalendarProvider>` (last). The editor's and the drain's failure toasts name the service, falling back to the connection label.
+  - `internal fun serviceNameOf(connection: Connection, displayNameOf: (providerId: String) -> String?): String` and `internal fun Set<CalendarProvider>.displayNameOf(providerId: String): String?` (in `Writes.kt`): the one rule for naming a connection's service, the provider's display name or else the connection label (review Simp5), used by the catalog, `masterService`, the editor, the drain and (Task 13) Settings' rows
+  - `CalendarEditor` internal constructor gains `serviceOf: (providerId: String) -> String?` (last; still a function, so its tests need no provider module); `@Inject` constructor gains `providers: Set<@JvmSuppressWildcards CalendarProvider>` (last). The editor's and the drain's failure toasts name the service, falling back to the connection label.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -6796,7 +7238,7 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
     private val a = ScriptedProvider("calendar.a", displayName = "Service A")
     private val b = ScriptedProvider("calendar.b", displayName = "Service B")
 ```
-2. The drain's toasts now name the service: replace every occurrence of the text `to C1` with `to Service A` (each is a toast expectation, e.g. `"Couldn't save to C1 — Event is locked"` → `"Couldn't save to Service A — Event is locked"`, `"Couldn't save 2 changes to C1"` → `"Couldn't save 2 changes to Service A"`).
+2. The drain's toasts now name the service: replace every occurrence of the text `to C1` with `to Service A` (each is a toast expectation, e.g. `"Couldn't save to C1 — Event is locked"` → `"Couldn't save to Service A — Event is locked"`, `"Couldn't save 2 changes to C1"` → `"Couldn't save 2 changes to Service A"`). Do this before adding the test below, whose "to C1" must stay.
 3. Add at the end of the class:
 ```kotlin
     @Test
@@ -6869,6 +7311,21 @@ fun repeatsLabel(rule: String?, start: EventTime, zone: ZoneId): String {
 
 - [ ] **Step 4: The service name and the repeats in the UI model**
 
+In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/Writes.kt`, add `import uk.co.siland.culvery.core.plugin.Connection` and, after `couldNotSaveAll`, the one rule every screen and toast names a service by:
+```kotlin
+
+/**
+ * The name failure, repeating-event and delete copy use for [connection] (3a design D11): its provider's display name
+ * ("Google Calendar"), or its label when the provider isn't installed.
+ */
+internal fun serviceNameOf(connection: Connection, displayNameOf: (providerId: String) -> String?): String =
+    displayNameOf(connection.providerId) ?: connection.label
+
+/** [providerId]'s display name among these providers; null when it isn't installed. */
+internal fun Set<CalendarProvider>.displayNameOf(providerId: String): String? =
+    firstOrNull { it.descriptor.id == providerId }?.descriptor?.displayName
+```
+
 In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarUi.kt`:
 1. In `EventUi`, after `val connectionLabel: String = "",` add:
 ```kotlin
@@ -6897,8 +7354,7 @@ internal class SourceCatalog(
     fun label(connectionId: String): String = connections[connectionId]?.label.orEmpty()
 
     /** The provider's display name; the connection label when the provider isn't installed. */
-    fun serviceName(connectionId: String): String =
-        connections[connectionId]?.providerId?.let(serviceNames::get) ?: label(connectionId)
+    fun serviceName(connectionId: String): String = connections[connectionId]?.let { serviceNameOf(it, serviceNames::get) }.orEmpty()
 
     fun hasWriter(connectionId: String): Boolean = connections[connectionId]?.providerId in writerIds
 }
@@ -6924,7 +7380,7 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/C
      * installed); null when there is nowhere to add, which hides the add entry points (2b-2 design §4.1).
      */
     val masterService: Flow<String?> = combine(store.master(), store.connections()) { master, connections ->
-        writableMaster(master, connections, writerIds)?.connection?.let { serviceNames[it.providerId] ?: it.label }
+        writableMaster(master, connections, writerIds)?.connection?.let { serviceNameOf(it, serviceNames::get) }
     }.distinctUntilChanged()
 ```
 3. Replace `SourceCatalog(sources, connections, writerIds)` with `SourceCatalog(sources, connections, writerIds, serviceNames)`.
@@ -6941,13 +7397,8 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/u
 
 In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarEditor.kt`:
 1. In the internal constructor, after `private val personOf: suspend (PersonId) -> Person?,` add `private val serviceOf: (providerId: String) -> String?,`.
-2. In the `@Inject` constructor, add the parameter `providers: Set<@JvmSuppressWildcards CalendarProvider>,` after `household: HouseholdRepository,`, and pass `{ id -> providers.firstOrNull { it.descriptor.id == id }?.descriptor?.displayName }` after `household::person,`.
-3. After the `colorOf` function add:
-```kotlin
-    /** Failure copy names the service ("Google Calendar", 3a design D11); the connection label if it isn't installed. */
-    private fun serviceName(connection: Connection): String = serviceOf(connection.providerId) ?: connection.label
-```
-4. Replace `onAppScope(ChangeKind.CREATE, to.connection.label)` with `onAppScope(ChangeKind.CREATE, serviceName(to.connection))`, and `onAppScope(kind, target.to.connection.label)` with `onAppScope(kind, serviceName(target.to.connection))`.
+2. In the `@Inject` constructor, add the parameter `providers: Set<@JvmSuppressWildcards CalendarProvider>,` after `household: HouseholdRepository,`, and pass `providers::displayNameOf` after `household::person,`.
+3. Replace `onAppScope(ChangeKind.CREATE, to.connection.label)` with `onAppScope(ChangeKind.CREATE, serviceNameOf(to.connection, serviceOf))`, and `onAppScope(kind, target.to.connection.label)` with `onAppScope(kind, serviceNameOf(target.to.connection, serviceOf))`.
 
 In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSync.kt`, in `drainOutbox`, replace
 ```kotlin
@@ -6956,15 +7407,11 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/C
 with
 ```kotlin
                 // The service's name ("Google Calendar", 3a design D11); the label if its provider isn't installed.
-                val label = stored?.connection?.let { c ->
-                    providers.firstOrNull { it.descriptor.id == c.providerId }?.descriptor?.displayName ?: c.label
-                } ?: REMOVED_CALENDAR
+                val label = stored?.connection?.let { serviceNameOf(it, providers::displayNameOf) } ?: REMOVED_CALENDAR
 ```
 
-Pass the new editor argument at every construction:
-- `CalendarEditorTest.kt`: in `editor(…)` add `serviceOf = { null },` after `personOf = household::person,`; in both `noWriter` constructions replace `lock, household::person,` with `lock, household::person, { null },` (no provider in these tests, so the connection label stays: their expected toasts are unchanged).
-- `StubEditor.kt`: replace `CalendarWriteLock(), { null },` with `CalendarWriteLock(), { null }, { null },`.
-- `ui/EventDetailHostTest.kt` and `ui/EventEditorHostTest.kt`: replace `CalendarWriteLock(), household::person,` with `CalendarWriteLock(), household::person, { null },`.
+Pass the new editor argument where editors are built:
+- `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/TestEngines.kt`: in `testEditor`, add the parameter `serviceOf: (providerId: String) -> String? = { null },` after `personOf`, and replace `WRITE_ATTEMPT_MS, writeLock, personOf)` with `WRITE_ATTEMPT_MS, writeLock, personOf, serviceOf)`. No calendar test installs a provider for its editor, so the connection label stays and their expected toasts are unchanged.
 - `app/src/testDebug/java/uk/co/siland/culvery/SampleAddTest.kt`: replace `lock, household)` with `lock, household, setOf(fake))`.
 
 In `provider/calendar-fake/src/main/java/uk/co/siland/culvery/provider/calendar_fake/SampleEvents.kt`, in both `RemoteEvent(…)` constructions in `forSource`, after `createdBy = tag(e.byName, idsByName),` add:
@@ -7026,7 +7473,7 @@ git commit -m "Name the service in failure, repeating-event and delete copy, and
 - Produces:
   - `Capability.SettingsSection()` — `@Composable`, empty by default
   - `data class CalendarRow(connection: Connection, service: String, icon: String, health: ConnectionHealth, lastSyncMillis: Long?)`
-  - `@Singleton class CalendarConnections @Inject constructor(store, setup, access: AccessControl, providers, @ApplicationScope scope)` with `connectable: Flow<List<CalendarProvider>>`, `rows: Flow<List<CalendarRow>>`, `provider(providerId): CalendarProvider?`, `suspend fun mayConnect(): Boolean`, `fun finish(connection: Connection, reconnecting: Boolean)`
+  - `@Singleton class CalendarConnections @Inject constructor(store, setup, access: AccessControl, providers, @ApplicationScope scope)` with `connectable: Flow<List<CalendarProvider>>`, `rows: Flow<List<CalendarRow>>`, `provider(providerId): CalendarProvider?`, `suspend fun mayConnect(): Boolean`, `fun finish(connection: Connection, reconnecting: Boolean)` — one finish at a time under a `Mutex`, so a double Connect becomes a reconnect in `connectWithDefaults` (review M2)
   - `internal data class ConnectRequest(val provider: CalendarProvider, val existing: Connection?)`; `internal fun OverlayHost.showConnect(request: ConnectRequest, connections: CalendarConnections)`; `CalendarConnectHost`; `ConnectingCard(service, onCancel, content)`
   - `internal class Connector` / `rememberConnector(connections)` with `connect(providerId)` and `reconnect(connection)`
   - `CalendarSettings(rows, connectable, nowMillis, onReconnect, onConnect)`; `internal fun healthWords(row: CalendarRow, nowMillis: Long): String`
@@ -7411,6 +7858,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.robolectric.shadows.ShadowLog
 ```
 2. Add at the end of the class:
 ```kotlin
@@ -7428,10 +7876,12 @@ import kotlinx.coroutines.withTimeout
     }
 
     @Test
-    fun aStartAfterGoogleIsConnectedAddsNoSample() = runTest {
+    fun aStartAfterGoogleIsConnectedAddsNoSampleAndLeavesTheMasterAlone() = runTest {
         store.addConnection(Connection("g1", "calendar.google", "Google", emptyMap()), emptyList(), emptyMap())
         seed()
         assertThat(store.connectionsNow().map { it.connection.id }).containsExactly("g1")
+        // Before the change, the seed still tried to make the missing sample's calendar the master, and warned.
+        assertThat(ShadowLog.getLogsForTag("Culvery")).isEmpty()
     }
 ```
 
@@ -7464,6 +7914,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.plugin.ApplicationScope
@@ -7500,10 +7952,14 @@ class CalendarConnections @Inject constructor(
 
     val rows: Flow<List<CalendarRow>> = store.connections().map { stored ->
         stored.map { s ->
-            val descriptor = provider(s.connection.providerId)?.descriptor
-            CalendarRow(s.connection, descriptor?.displayName ?: s.connection.label, descriptor?.icon ?: DEFAULT_ICON, s.health, s.lastSyncMillis)
+            val icon = provider(s.connection.providerId)?.descriptor?.icon ?: DEFAULT_ICON
+            CalendarRow(s.connection, serviceNameOf(s.connection, providers::displayNameOf), icon, s.health, s.lastSyncMillis)
         }
     }
+
+    // One connect or reconnect at a time: a second tap on Connect (the card closes before setup ends) waits, then finds
+    // the first connection and reconnects it rather than adding a second (review M2).
+    private val finishing = Mutex()
 
     fun provider(providerId: String): CalendarProvider? = providers.firstOrNull { it.descriptor.id == providerId }
 
@@ -7512,7 +7968,9 @@ class CalendarConnections @Inject constructor(
 
     /** Stores what the provider's screen connected, on the application scope, so closing the card can't cancel it. */
     fun finish(connection: Connection, reconnecting: Boolean) {
-        scope.launch { if (reconnecting) setup.reconnect(connection) else setup.connectWithDefaults(connection) }
+        scope.launch {
+            finishing.withLock { if (reconnecting) setup.reconnect(connection) else setup.connectWithDefaults(connection) }
+        }
     }
 
     private companion object {
@@ -7524,16 +7982,11 @@ class CalendarConnections @Inject constructor(
 In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/Pickers.kt`, make `PickerCard` and `PickerButton` `internal` (replace `private fun PickerCard(` with `internal fun PickerCard(` and `private fun PickerButton(` with `internal fun PickerButton(`): the connecting card is the same card.
 
 In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/CalendarType.kt`:
-1. In `CalendarType`, after `val addEventButton = HhType.buttonLabel` add:
+1. In `CalendarType`, after `val addEventButton = HhType.buttonLabel` add (the connecting card's line and a Settings row's health use the existing `subtitle`, 15 sp / 400):
 ```kotlin
 
     /** 22 sp / 700: "Connecting to Google Calendar…" and Settings' "Calendars" (3a design §4). */
-    val connectingTitle = HhType.sectionTitle
-    val settingsTitle = HhType.sectionTitle
-
-    /** 15 sp / 400: the connecting card's line and a Settings row's health. */
-    val connectingBody = subtitle
-    val settingsStatus = subtitle
+    val blockTitle = HhType.sectionTitle
 
     /** 18 sp / 600: a Settings row's "Google Calendar · {account}". */
     val settingsRowTitle = HhType.rowTitle.copy(fontSize = 18.sp)
@@ -7547,9 +8000,9 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/u
     val connectingTextGap = 4.dp
     val connectingIcon = 32.dp
 
-    // Settings' Calendars block (3a design §4.1): a row `surf`, radius 18, padding 16×20; pills 48 dp, radius 24,
-    // padding 0 20. Not in the spec: 12 below the title, rows 10 apart, a 26 dp icon 16 from the text, the health 2
-    // below the name, and rows 600 wide (the sheets' width) so a row reads as one line.
+    // Settings' Calendars block (3a design §4.1): a row `surf`, radius 18, padding 16×20; its pills are AddButton's.
+    // Not in the spec: 12 below the title, rows 10 apart, a 26 dp icon 16 from the text, the health 2 below the name,
+    // and rows 600 wide (the sheets' width) so a row reads as one line.
     val settingsTitleGap = 12.dp
     val settingsRowGap = 10.dp
     val settingsRowWidth = 600.dp
@@ -7559,20 +8012,17 @@ In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/u
     val settingsIcon = 26.dp
     val settingsIconGap = 16.dp
     val settingsStatusTop = 2.dp
-    val settingsPillHeight = 48.dp
-    val settingsPillRadius = 24.dp
-    val settingsPillPaddingH = 20.dp
 ```
 
 In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/Components.kt`, add the imports `androidx.compose.foundation.layout.padding` (if missing) and add at the end:
 ```kotlin
 
 /**
- * An `accent` pill with an `add` icon: hand-off §7's Add event, and Settings' Connect (3a design §4.1). 48 dp,
- * radius 24, padding 0 20 0 14, a 24 dp icon 6 from its 15 sp / 700 label.
+ * An `accent` pill: hand-off §7's Add event, and Settings' Connect and Reconnect (3a design §4.1). 48 dp, radius 24,
+ * a 15 sp / 700 label; with an [icon], a 24 dp one 6 from the label and padding 0 20 0 14, without one padding 0 20.
  */
 @Composable
-internal fun AddButton(text: String, tag: String, onClick: () -> Unit) {
+internal fun AddButton(text: String, tag: String, icon: String? = "add", onClick: () -> Unit) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -7583,9 +8033,12 @@ internal fun AddButton(text: String, tag: String, onClick: () -> Unit) {
             .clip(RoundedCornerShape(CalendarDimens.addEventRadius))
             .background(c.accent)
             .clickable(onClick = onClick)
-            .padding(start = CalendarDimens.addEventPaddingStart, end = CalendarDimens.addEventPaddingEnd),
+            .padding(
+                start = if (icon != null) CalendarDimens.addEventPaddingStart else CalendarDimens.addEventPaddingEnd,
+                end = CalendarDimens.addEventPaddingEnd,
+            ),
     ) {
-        HhIcon("add", size = CalendarDimens.addEventIcon, tint = c.accentInk)
+        if (icon != null) HhIcon(icon, size = CalendarDimens.addEventIcon, tint = c.accentInk)
         Text(text, style = CalendarType.addEventButton, color = c.accentInk, maxLines = 1)
     }
 }
@@ -7679,8 +8132,8 @@ internal fun ConnectingCard(service: String, onCancel: () -> Unit, content: @Com
         PickerCard(CalendarDimens.connectingWidth, CalendarDimens.connectingGap, "connecting_card") {
             HhIcon("calendar_month", size = CalendarDimens.connectingIcon, tint = c.accent)
             Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.connectingTextGap)) {
-                Text(connectingTitle(service), style = CalendarType.connectingTitle, color = c.ink)
-                Text(CONNECTING_LINE, style = CalendarType.connectingBody, color = c.mute)
+                Text(connectingTitle(service), style = CalendarType.blockTitle, color = c.ink)
+                Text(CONNECTING_LINE, style = CalendarType.subtitle, color = c.mute)
             }
             content()
             PickerButton(
@@ -7698,9 +8151,7 @@ Create `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calend
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -7769,7 +8220,7 @@ internal fun CalendarSettings(
 ) {
     val c = Culvery.colors
     Column(modifier.testTag("settings_calendars")) {
-        Text("Calendars", style = CalendarType.settingsTitle, color = c.ink)
+        Text("Calendars", style = CalendarType.blockTitle, color = c.ink)
         Spacer(Modifier.height(CalendarDimens.settingsTitleGap))
         Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.settingsRowGap)) {
             rows.forEach { row -> ConnectionRow(row, nowMillis, onReconnect) }
@@ -7802,27 +8253,10 @@ private fun ConnectionRow(row: CalendarRow, nowMillis: Long, onReconnect: (Conne
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(healthWords(row, nowMillis), style = CalendarType.settingsStatus, color = if (needsReconnect) c.danger else c.mute, maxLines = 1)
+            Text(healthWords(row, nowMillis), style = CalendarType.subtitle, color = if (needsReconnect) c.danger else c.mute, maxLines = 1)
         }
-        if (needsReconnect) ReconnectButton { onReconnect(row.connection) }
-    }
-}
-
-/** 3a design §4.1: 48 dp, `accent`. */
-@Composable
-private fun ReconnectButton(onClick: () -> Unit) {
-    val c = Culvery.colors
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .testTag("settings_reconnect")
-            .height(CalendarDimens.settingsPillHeight)
-            .clip(RoundedCornerShape(CalendarDimens.settingsPillRadius))
-            .background(c.accent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = CalendarDimens.settingsPillPaddingH),
-    ) {
-        Text("Reconnect", style = CalendarType.addEventButton, color = c.accentInk, maxLines = 1)
+        // 3a design §4.1: 48 dp, `accent`: the Add event pill without its icon.
+        if (needsReconnect) AddButton("Reconnect", "settings_reconnect", icon = null) { onReconnect(row.connection) }
     }
 }
 ```
@@ -8112,8 +8546,9 @@ Before starting, ask the user:
 A debug build has the sample calendar, so the Connect card never shows there: connecting from Settings is the path to walk (the card's button is covered by `CardsTest` and `CalendarConnectHostTest`).
 
 1. **Connect from Settings.** Tap the rail's Settings, enter `1234` (Alex). Below the text, "Calendars" lists "Sample calendar (debug)" with "Synced … ago", and a **Connect Google Calendar** pill. Tap it: the connecting card ("Connecting to Google Calendar…") shows over the scrim.
-   - **USER:** choose the account in the system chooser, continue past the "unverified app" screen if the project is in Testing, and allow calendar access.
-   - Then: the card closes, the toast reads "Google Calendar connected", the sample row is gone (D5), and the row reads "Google Calendar · {email}" with "Synced just now" within a minute.
+   - **USER:** choose the family's account if the system chooser appears (with one account on the device, Play services may skip it), continue past the "unverified app" screen if the project is in Testing, and allow calendar access with both boxes ticked.
+   - Then: the card closes and the toast reads "Google Calendar connected"; the sample row goes (D5), and the row reads "Google Calendar · {email}", "Synced just now" once the first sync has run (usually within a minute; a large account can take longer).
+   - If the wrong account was connected, there is no disconnect until Plan 4: clear the app's data (Settings › Apps › Culvery › Storage) and start again from Step 2.
 2. **The real calendars.** Home and the Calendar tab show the account's events, the person-named calendar's events in that person's colour, and no sample event. In the logcat, nothing from `CalendarSync` but normal passes:
    ```bash
    adb -s emulator-5554 logcat -d | grep -iE "CalendarSync|GoogleCalendar|SourceRefresher|FATAL" | tail -30
@@ -8127,13 +8562,17 @@ A debug build has the sample calendar, so the Connect card never shows there: co
    3. **USER:** on the phone, move "Culvery test" to 19:00.
    4. Back online: `adb -s emulator-5554 shell cmd connectivity airplane-mode disable`. Within 5 minutes (the queue's backoff), the tablet shows "Culvery test 2" at 19:00.
    5. **USER:** check the phone shows "Culvery test 2" at **19:00** (the phone's time kept, 3a design C3), once.
-5. **Assign.** **USER:** on the phone, add "Plumber" today with no other details. On the tablet it shows "Added from a phone". Tap it, **Assign to…**, **Sam**, PIN `1234`.
+5. **Assign, and the creator kept.** **USER:** on the phone, add "Plumber" today with no other details. On the tablet it shows "Added from a phone". Tap it, **Assign to…**, **Sam**, PIN `1234`.
    - **USER:** check "Plumber" turns Blueberry (blue) on the phone.
+   - **USER:** in the API Explorer (developers.google.com › Calendar API › events.get, calendar `primary`, the event's id from the event's details or events.list), check "Plumber"'s `extendedProperties.private` holds only `culvery.person` (Sam's id): the Who PATCH added no `culvery.createdBy` and changed nothing else, and its `creator` is still the phone's account (3a design §3.6).
+   - Then assign "Culvery test 2" (made on the tablet, so it carries `culvery.createdBy`) to **Sam** too, and check in the API Explorer that its `culvery.createdBy` is unchanged (Alex's id, as before the assign): Google merged the PATCH's `extendedProperties.private` rather than replacing it.
 6. **A repeating event.** Open the weekly event: the detail sheet says "Edit repeating events in Google Calendar on your phone." and Repeats reads "Every week" (or "Every 2 weeks"…, as the phone set it).
 7. **Offline add, delivered once.** Airplane mode on (as in 4.1), add "Offline test" for tomorrow, airplane mode off, wait up to 5 minutes.
    - **USER:** check the phone has exactly one "Offline test".
 8. **Delete.** Open "Culvery test 2", **Delete**, **Delete event**: "Event deleted".
    - **USER:** check it's gone from the phone.
+   - **Deleted on the phone, edited on the offline tablet.** Add "Gone test" for tomorrow on the tablet and wait for it on the phone. Airplane mode on (as in 4.1). **USER:** delete "Gone test" on the phone. On the tablet, open "Gone test", **Edit**, change the title to "Gone test 2", **Save changes** (queued). Airplane mode off and wait up to 5 minutes: the toast says the change couldn't be saved because the event no longer exists ("Couldn't save to Google Calendar — The event no longer exists"), and the tablet's copy goes at the next sync.
+   - **USER:** check "Gone test" (or "Gone test 2") has not come back on the phone (3a design §3.6: the edit looks first and never PATCHes a deleted event).
 9. **Access lapses, and the reconnect.**
    1. **USER:** at myaccount.google.com › Security › Third-party access (or "Your connections to third-party apps"), remove Culvery's access.
    2. On the tablet, force a pass: `adb -s emulator-5554 shell am force-stop uk.co.siland.culvery && adb -s emulator-5554 shell am start -n uk.co.siland.culvery/.MainActivity`. Within a minute the Calendar tab shows "Google needs reconnecting", and Settings' row reads "Needs reconnecting" with **Reconnect**.
@@ -8146,7 +8585,7 @@ A debug build has the sample calendar, so the Connect card never shows there: co
 Send the user these images (from `capability/calendar/src/test/screenshots/`), dark and light: `connecting_*`, `settings_calendars_*` (Ok, reconnect, connect), `connect_*`, `detail_recurring_*`, `detail_delete_confirm_*`, and the walkthrough screenshots. Name the parts that are the controller's own design, which the spec doesn't specify:
 - the connecting card borrows the date picker's card and Cancel (radius 30, padding 26, 14 between blocks);
 - Settings' rows are 600 dp wide with a 26 dp provider icon, 12 below "Calendars" and 10 apart;
-- a Settings Connect pill looks exactly like the week's **Add event**;
+- a Settings Connect pill looks exactly like the week's **Add event**, and **Reconnect** is the same pill without the icon;
 - the debug build's sample events read "Every week" in Repeats (the fake now carries a weekly rule).
 
 Ask: "Do these match what you want? Any changes before I update the README and the setup doc?" Also ask for the outcome of the 2026-10-01 seven-day check on the spike (did the Testing-status grant still work silently after 7 days?) and which publishing status they have chosen.
@@ -8160,7 +8599,7 @@ In `README.md`:
 
 1. **Build and run.** After the paragraph starting "To see what the tablet does while a calendar can't be reached", add:
 ```markdown
-To connect a real Google account, first set up a Google Cloud project with an Android client for your debug key (`docs/setup/google-calendar.md`), then Settings › Connect Google Calendar (Admin PIN). Connecting removes the sample calendar, with its events and queued changes, for good; to get it back, clear the app's data. Release builds offer Google Calendar only.
+To connect a real Google account, first set up a Google Cloud project with an Android client for your debug key (`docs/setup/google-calendar.md`), add the family's Google account to the device (Settings › Accounts), then Settings › Connect Google Calendar (Admin PIN). Connecting removes the sample calendar, with its events and queued changes, for good. There is no disconnect yet: to undo a connection (the wrong account, or to get the sample back), clear the app's data. Release builds offer Google Calendar only, and its Connect fails until the release key's SHA-1 has its own Android client (Plan 4). A calendar is mapped to a person when its name contains theirs as a whole word, so a name that is also a common word ("May", "Will") can map a calendar like "May half term" to that person; Plan 4's Settings will let you change it.
 ```
 2. **Modules.** After the `:provider:calendar-fake` row add:
 ```markdown
@@ -8182,11 +8621,11 @@ To connect a real Google account, first set up a Google Cloud project with an An
 ```
    - In step 3, after the bullet starting "`create` takes a client key:", add:
 ```markdown
-   - A create never recreates a deleted event: when the key belonged to an event since deleted, throw `WriteRejectedException` (Google: the 409's event is cancelled).
-   - Every call must return promptly when its caller is cancelled: cancel the network call with it (OkHttp: enqueue inside `suspendCancellableCoroutine` and cancel from `invokeOnCancellation`).
+   - A create never recreates a deleted event: when the key belonged to an event since deleted, throw `WriteRejectedException` (Google: the 409's event is cancelled). Nor does an update: if the service would accept a change to a deleted event (Google answers a PATCH on one with 200), look the event up first and refuse with `EVENT_GONE`.
+   - Every call must return promptly when its caller is cancelled: cancel the network call with it (OkHttp: enqueue inside `suspendCancellableCoroutine` and cancel from `invokeOnCancellation`), and keep the calls main-safe (read bodies off the main thread).
 ```
    - In step 3's last paragraph, replace "A change still queued after 48 hours is dropped with a toast." with "A change still queued after 48 hours (not counting time the connection waited for sign-in) is dropped with a toast."
-   - In step 5's contract example, replace `// WRITE providers only; the seven write checks fail if these are missing.` with `// WRITE providers only; the eleven write checks fail if these are missing.` and after `override fun writableSource() = …` add the line `       override fun gateWrites() = …           // optional: hold the service's replies, for the cancellation check`.
+   - In step 5's contract example, replace `// WRITE providers only; the seven write checks fail if these are missing.` with `// WRITE providers only; the ten write checks fail if these are missing.` (The suite has no cancellation check: prove it in the provider's own tests against its HTTP double, as `GoogleApiTest.cancellingTheCallerCancelsTheHttpCall` does.)
    - In step 5's last line, replace "`:provider:calendar-fake` is a worked example." with "`:provider:calendar-fake` and `:provider:calendar-google` (through a fake Google server on `MockWebServer`) are worked examples."
 
 - [ ] **Step 5: Update the setup doc**
@@ -8205,7 +8644,7 @@ In `docs/setup/google-calendar.md`:
 2. Replace §5 ("Emulator note") with:
 ```markdown
 ## 5. Connect on the tablet
-The emulator (or tablet) needs Google Play services: an image with **Google Play**. Add the Google account under **Settings › Accounts** if it isn't there. Then, in Culvery, **Settings › Connect Google Calendar** (Admin PIN): pick the account, allow calendar access, and the household's calendars appear. Every calendar in the account is added; the account's own calendar becomes the one the tablet adds events to, and a calendar named after one person (e.g. "Mia's swimming") shows in their colour. If access lapses, the Calendar tab shows "Google needs reconnecting": tap it and approve again.
+The emulator (or tablet) needs Google Play services: an image with **Google Play**. Add the family's Google account under **Settings › Accounts** first, so the chooser offers it. Then, in Culvery, **Settings › Connect Google Calendar** (Admin PIN): pick the account, allow calendar access (both boxes), and the household's calendars appear. Every calendar in the account is added; the account's own calendar becomes the one the tablet adds events to, and a calendar named after one person (e.g. "Mia's swimming") shows in their colour. A person whose name is also a common word ("May", "Will") can catch a calendar like "May half term"; Plan 4's Settings will let you change a mapping. If access lapses, the Calendar tab shows "Google needs reconnecting": tap it and approve again. There is no disconnect yet: if the wrong account was connected, clear Culvery's data (**Settings › Apps › Culvery › Storage**) and connect again.
 
 Release builds need a second Android client with the release key's SHA-1 (Plan 4). In release kiosk mode the account chooser may not appear; if so, exit kiosk (Settings › Exit kiosk), connect, and return.
 ```
@@ -8232,11 +8671,11 @@ In `docs/superpowers/plans/2026-09-23-plan1-followups.md`:
 
 **For Plan 4**
 - The on-device pass: in a signed release in lock-task mode, check Play services' account chooser and consent screens appear when connecting and reconnecting (3a design §9); if not, exit kiosk around them.
-- The release OAuth client (the release key's SHA-1) with release signing.
+- The release OAuth client (the release key's SHA-1) with release signing. Until then a release build offers Connect Google Calendar, and it fails with "Couldn't connect" (the README says so).
 - The Connect-a-calendar card's Google button was checked by tests only: a debug build always has the sample calendar, so the card never shows on the emulator.
 - Settings: disconnecting a connection, and editing mappings, visibility and the master (3a design §10).
 ```
-   and add under it any item you or the user noted during this plan that was deferred rather than fixed.
+   and add under it any item you or the user noted during this plan that was deferred rather than fixed. Leave "## From Plan 3a review (deferred)", added with this plan, as it is; don't repeat its items.
 
 - [ ] **Step 8: Commit**
 
@@ -8252,13 +8691,13 @@ git commit -m "Document the Google Calendar provider, connecting it, and the con
 | Design | Where |
 |---|---|
 | §1 scope; D1 ICS deferred; Google in release, the fake debug-only | Tasks 8–13; Task 13 Step 8 (`:app` wiring), Step 10 (release APK) |
-| D2 sign-in through `AuthorizationClient`; only the email stored; `NeedsSignIn` from a resolution; §3.2 401 refresh, `clearToken`, the account from `calendars/primary`, a different account refused | Tasks 8 (401), 9 (token source, connect flow), 10 (connect screen) |
+| D2 sign-in through `AuthorizationClient`; only the email stored; `NeedsSignIn` from a resolution or a status that needs the user, any other status Unreachable (M5); §3.2 401 refresh, `clearToken`, the account from `calendars/primary`, a different account refused, both scopes and a silent grant for the email before storing, a user cancel silent and any other failure toasted | Tasks 8 (401, missing scope), 9 (token source, connect flow), 10 (connect screen) |
 | D3 Connect in Settings and on the card, Admin PIN, one Google connection, `userConnectable` | Tasks 1, 13 |
-| D4 automatic setup: every calendar, visible = ticked, writable = owner/writer, primary → master and Family, others by name | Tasks 2 (`addConnection(…, master)`), 7 (`defaultMapping`, `connectWithDefaults`), 10 (`sources`) |
+| D4 automatic setup: every calendar the account can read (hidden ones too), visible = ticked, writable = owner/writer, primary → master and Family, others by name; a list without the primary is a failed read | Tasks 2 (`addConnection(…, master)`), 7 (`defaultMapping`, `connectWithDefaults`), 10 (`sources`) |
 | D5 connecting removes the sample; `removeConnection`; removing a source or connection removes its rows | Tasks 2, 7, 13 |
 | D6 reconnect from the chip, Admin PIN, health Ok, queue due (m4), sync | Tasks 7, 13 |
 | D7 daily source refresh and on start; hide unticked, remove deleted, keep mappings; the master gone or read-only → cleared, one toast | Tasks 2, 7 |
-| D8 OkHttp + kotlinx.serialization, MockWebServer fake server, cancellable calls (R9), pinned versions | Tasks 8, 11 |
+| D8 OkHttp + kotlinx.serialization, MockWebServer fake server, cancellable and main-safe calls (R9), pinned versions | Task 8 (`cancellingTheCallerCancelsTheHttpCall`), 11 |
 | D9 Google API behaviour (list, syncToken, 410, paging, insert with the key, 409, PATCH, delete 404/410, tags, `colorId`, cancelled, recurring) | Tasks 10, 11 |
 | D10 error mapping (§3.7 table), R8 wording | Tasks 8, 10, 11 |
 | D11 the service name in failure, repeating and delete copy; the label on the pill and chip | Task 12 |
@@ -8268,15 +8707,15 @@ git commit -m "Document the Google Calendar provider, connecting it, and the con
 | D15 testing | every task; the fake server Tasks 8–11; the walkthrough Task 14 |
 | D16 the outbox age clock pauses while sign-in is needed | Tasks 2 (columns, `setHealth`/`markSynced`, `ageMillis`), 6 (the drain; `NeedsSignIn` from a write), 7 (reconnect folds the pause) |
 | §3.1 module, `GoogleApi`, `TokenSource`, `:app` in every build type | Tasks 8, 9, 11, 13 |
-| §3.3 `CalendarConnectHost`, `connectWithDefaults`, `reconnect`, entry points | Tasks 7, 13 |
+| §3.3 `CalendarConnectHost`, `connectWithDefaults` (a second connect of the same account reconnects it), `reconnect`, entry points, one connect at a time | Tasks 7, 13 |
 | §3.4 `shown`/`primary`, `defaultMapping`, `SourceRefresher`, `SourceGoneException` → refresh | Tasks 1, 7 |
-| §3.5 reading, the RRULE cache, "simple" rules | Tasks 10, 12 |
-| §3.6 writing: create, 409, update (C3), ASSIGN as `{FOR_PERSON}` and m3, `colorId`, delete, `find`, C9 | Tasks 5, 6, 11 |
-| §3.7 `Retry.needsSignIn` sets health at once | Task 6 |
-| §3.8 store: `removeConnection`, `refreshSources`, master clearing, `makeDue`, early returns, no foreign keys | Task 2 |
+| §3.5 reading, declined invitations gone (M9), the RRULE cache and a failed fetch remembered per sync, "simple" rules | Tasks 10, 12 |
+| §3.6 writing: create, 409, update (C3) and delete after a look (gone, or made a series), ASSIGN as `{FOR_PERSON}` and m3, `colorId`, `find`, C9 | Tasks 5, 6, 11 |
+| §3.7 the error table (quotas try later, a missing scope needs sign-in, a page without tokens unreachable); `Retry.needsSignIn` sets health at once | Tasks 6, 8, 10, 11 |
+| §3.8 store: `removeConnection`, `refreshSources`, master clearing, `makeDue`, early returns, no foreign keys, the pause folded by moving `createdMillis` | Task 2 |
 | §3.9 debug builds: the sample removed once another connection exists, never re-seeded | Task 13 |
-| §3.10 contract changes, five checks and their fixtures, the fake in line, README | Tasks 1, 14 |
-| §3.11 `calendar.db` v4 (the spec's three columns and D16's two), migration test with the table list, `fields`, `forPersonColor` in the draft JSON | Task 2 |
+| §3.10 contract changes, four checks and their fixtures (R9 proved against the fake server instead), the fake in line, README | Tasks 1, 8, 14 |
+| §3.11 `calendar.db` v4 (the spec's three columns and D16's one), migration test with the table list, `fields`, `forPersonColor` in the draft JSON | Task 2 |
 | §3.12 crash-proofing details | Tasks 3, 4 |
 | §3.13 publishing status in the setup doc | Task 14 Steps 3, 5 |
 | §4.1–§4.4 Settings block, Connect card, reconnect chip, connecting card; §4.5 copy | Tasks 12, 13 |

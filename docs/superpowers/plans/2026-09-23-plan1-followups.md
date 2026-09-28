@@ -99,3 +99,16 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **Accessibility pass (with the `HhIcon` item)**
 - Disabled Who chips lack disabled semantics.
 - `AddEventButton` lacks an `onClickLabel`.
+
+## From Plan 3a review (deferred)
+
+**For Plan 4**
+- L3: decide in the on-device kiosk pass whether connecting and reconnecting Google need a fresh PIN; 3a rides the 2-minute Admin session, and the account chooser's "Add another account" can lead a child out of the app.
+- M4: before connecting, check Play services is available (`isGooglePlayServicesAvailable`), and when the chooser comes back cancelled with no data in lock-task mode, hint to exit kiosk; part of the on-device lock-task pass.
+- H2: when a connection has no master (cleared by D7), make its writable primary the master again, with Settings' master editing; and count the queued changes a source removal dropped in the D7 toast.
+- M7: a source still listed after a refresh but always 403/404 on events.list is flagged for a refresh every pass and keeps its connection "Can't reach": stop re-flagging a kept source, and show per-source health in Settings.
+- L4: release logging policy: keep the account email (in request paths) and calendar names out of release logs.
+- L6: on the device, delete a whole series on a phone and check its instances leave the tablet; the next daily full sync bounds it today (a full sync when a cancelled id is a known series would close it).
+
+**Later**
+- L9: keep a Google access token in memory until a 401 instead of asking Play services for one on every call (it caches them itself; each ask costs an IPC).
