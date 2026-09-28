@@ -93,7 +93,8 @@ class CalendarSetup(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            Log.w(TAG, "Couldn't connect ${connection.providerId}", e)
+            // Only the type (P8): a message can hold a calendar id, which is often the account's email.
+            Log.w(TAG, "Couldn't connect ${connection.providerId} (${e::class.simpleName})")
             false
         }
         if (stored) {
@@ -151,8 +152,8 @@ class CalendarSetup(
         val provider = providerFor(connection.providerId)
         require(Feature.WRITE in provider.descriptor.features) { "${provider.descriptor.displayName} can't write" }
         val source = callProvider { provider.sources(connection) }.firstOrNull { it.id == sourceId }
-            ?: throw IllegalArgumentException("No source $sourceId in ${connection.label}")
-        require(source.writable) { "${source.name} is read-only" }
+            ?: throw IllegalArgumentException("The master calendar isn't among the connection's calendars")
+        require(source.writable) { "The master calendar is read-only" }
         store.setMaster(connectionId, sourceId)
         requestSync()
     }

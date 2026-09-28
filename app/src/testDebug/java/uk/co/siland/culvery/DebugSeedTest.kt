@@ -1,6 +1,7 @@
 package uk.co.siland.culvery
 
 import androidx.room.Room
+import androidx.room.useReaderConnection
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -20,7 +21,9 @@ import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
 import uk.co.siland.culvery.capability.calendar.CalendarStore
+import uk.co.siland.culvery.capability.calendar.ChangeKind
 import uk.co.siland.culvery.capability.calendar.DateRange
+import uk.co.siland.culvery.capability.calendar.PendingChange
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.core.access.PinHasher
 import uk.co.siland.culvery.core.access.PinManager
@@ -32,6 +35,8 @@ import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider
+
+private const val DEBUG_SAMPLE = "debug-sample"
 
 private object NoToasts : Toaster {
     override fun show(message: String, icon: String) = Unit
@@ -151,14 +156,35 @@ class DebugSeedTest {
     @Test
     fun aRealConnectionRemovesTheSampleWithEverythingItHeld() = runTest {
         seed()
+        // The sample holds events, a cursor and a queued change, as it would after a sync and an offline add.
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
+        val range = DateRange(today.minusDays(1), today.plusDays(15), zone)
+        val sample = store.connectionsNow().single().connection
+        val family = FakeCalendarProvider.SOURCES.single { it.id == FakeCalendarProvider.SOURCE_FAMILY }
+        store.applySync(DEBUG_SAMPLE, family.id, range, fake.sync(sample, family, range, null))
+        store.enqueue(PendingChange(0, DEBUG_SAMPLE, family.id, "e1", ChangeKind.DELETE, null, 0, 0L, 0L))
+        assertThat(sampleRows()).containsExactly("event", true, "outbox", true, "sync_state", true)
         store.addConnection(Connection("g1", "calendar.google", "Google", emptyMap()), emptyList(), emptyMap())
         val watcher = launch { removeSampleWhenReplaced(setup) }
         withContext(Dispatchers.Default) {
-            withTimeout(5_000) { while (store.connectionsNow().any { it.connection.id == "debug-sample" }) delay(10) }
+            withTimeout(5_000) { while (store.connectionsNow().any { it.connection.id == DEBUG_SAMPLE }) delay(10) }
         }
         watcher.cancel()
         assertThat(store.connectionsNow().map { it.connection.id }).containsExactly("g1")
         assertThat(store.sources().first()).isEmpty()
+        assertThat(sampleRows()).containsExactly("event", false, "outbox", false, "sync_state", false)
+    }
+
+    /** Whether each table still holds a row of the sample's, counted directly. */
+    private suspend fun sampleRows(): Map<String, Boolean> = listOf("event", "outbox", "sync_state").associateWith { table ->
+        calendarDb.useReaderConnection { connection ->
+            connection.usePrepared("SELECT COUNT(*) FROM $table WHERE connectionId = ?") { statement ->
+                statement.bindText(1, DEBUG_SAMPLE)
+                statement.step()
+                statement.getLong(0) > 0
+            }
+        }
     }
 
     @Test

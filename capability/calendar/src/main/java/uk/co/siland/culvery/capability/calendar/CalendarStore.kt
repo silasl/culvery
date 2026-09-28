@@ -63,7 +63,8 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         )
         if (masterSourceId != null) {
             dao.clearMaster()
-            require(dao.markMaster(connection.id, masterSourceId) == 1) { "No source $masterSourceId in ${connection.id}" }
+            // Fixed words (P8): a Google calendar id is often the account's email, and the message gets logged.
+            require(dao.markMaster(connection.id, masterSourceId) == 1) { "The master calendar isn't among the connection's calendars" }
         }
     }
 
@@ -138,7 +139,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
      */
     suspend fun setMaster(connectionId: String, sourceId: String) = db.withTransaction {
         dao.clearMaster()
-        require(dao.markMaster(connectionId, sourceId) == 1) { "No source $sourceId in connection $connectionId" }
+        require(dao.markMaster(connectionId, sourceId) == 1) { "The master calendar isn't among the connection's calendars" }
     }
 
     /**

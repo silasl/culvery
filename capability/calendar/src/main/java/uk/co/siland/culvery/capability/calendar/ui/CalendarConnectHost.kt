@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,11 +37,20 @@ internal fun OverlayHost.showConnect(request: ConnectRequest, connections: Calen
 /** Opens the connecting card for a new connection or a reconnect (3a design §3.3). */
 internal class Connector(private val overlay: OverlayHost, private val connections: CalendarConnections) {
     fun connect(providerId: String) {
-        connections.provider(providerId)?.let { overlay.showConnect(ConnectRequest(it, existing = null), connections) }
+        val provider = installed(providerId) ?: return
+        overlay.showConnect(ConnectRequest(provider, existing = null), connections)
     }
 
     fun reconnect(connection: Connection) {
-        connections.provider(connection.providerId)?.let { overlay.showConnect(ConnectRequest(it, existing = connection), connections) }
+        val provider = installed(connection.providerId) ?: return
+        overlay.showConnect(ConnectRequest(provider, existing = connection), connections)
+    }
+
+    private fun installed(providerId: String): CalendarProvider? =
+        connections.provider(providerId).also { if (it == null) Log.w(TAG, "No calendar provider $providerId in this build; nothing to connect") }
+
+    private companion object {
+        const val TAG = "CalendarConnect"
     }
 }
 

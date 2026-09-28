@@ -45,6 +45,10 @@ internal class ScriptedProvider(
     /** When set, the connect screen reports this at once; otherwise it waits, like a person still choosing. */
     var connectsAs: Connection? = null
 
+    /** How many times the connect screen entered the composition. */
+    @Volatile var connectScreenShown = 0
+        private set
+
     private var inFlight = 0
 
     /** The most sync calls that were running at once. */
@@ -53,6 +57,7 @@ internal class ScriptedProvider(
 
     @Composable
     override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
+        LaunchedEffect(Unit) { connectScreenShown++ }
         val answer = connectsAs
         LaunchedEffect(answer) { answer?.let(onConnected) }
     }
