@@ -105,8 +105,11 @@ class EventEditorHostTest {
     private var closed = 0
     private val deleting = mutableListOf<EventRef>()
 
-    /** The editor's "now", when a test moves it; otherwise the real time. */
-    private var now: Long? = null
+    /**
+     * The editor's "now": a fixed morning, so a new event's default time (and with it the Length row) doesn't depend on
+     * when the tests run; a test may move it.
+     */
+    private var now: Long = millisAt(day, 9, 0)
 
     @Before
     fun setUp() = runBlocking {
@@ -132,7 +135,7 @@ class EventEditorHostTest {
             ),
         )
         repo = CalendarRepository(store, household, zone, emptySet(), setOf(writer))
-        editor = testEditor(store, setOf(writer), access.control, access.toasts, zone, WallClock { now ?: System.currentTimeMillis() }, scope)
+        editor = testEditor(store, setOf(writer), access.control, access.toasts, zone, WallClock { now }, scope)
     }
 
     @After
