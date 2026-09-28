@@ -40,14 +40,22 @@ sealed interface ConnectStep {
  * says "Couldn't connect", and nothing is stored.
  */
 internal class GoogleConnectFlow(private val authorizer: Authorizer, private val api: GoogleApi, private val toaster: Toaster) {
-    suspend fun start(existing: Connection?): ConnectStep = step(existing) { authorizer.authorize(existing?.config?.get(CONFIG_ACCOUNT)) }
+    suspend fun start(existing: Connection?): ConnectStep =
+        step(existing, screensAllowed = true) { authorizer.authorize(existing?.config?.get(CONFIG_ACCOUNT)) }
 
-    suspend fun afterScreens(existing: Connection?, data: Intent?): ConnectStep = step(existing) { authorizer.authorizationFrom(data) }
+    suspend fun afterScreens(existing: Connection?, data: Intent?): ConnectStep =
+        step(existing, screensAllowed = false) { authorizer.authorizationFrom(data) }
 
-    private suspend fun step(existing: Connection?, ask: suspend () -> Authorization): ConnectStep =
+    private suspend fun step(existing: Connection?, screensAllowed: Boolean, ask: suspend () -> Authorization): ConnectStep =
         try {
             when (val answer = ask()) {
-                is Authorization.NeedsUser -> ConnectStep.ShowScreens(answer.intent)
+                is Authorization.NeedsUser -> if (screensAllowed) {
+                    ConnectStep.ShowScreens(answer.intent)
+                } else {
+                    // The screens were shown and still didn't grant: only a cancel is silent (§3.2).
+                    Log.w(TAG, "Play services wants its screens again after they were shown; nothing stored")
+                    stopWithToast()
+                }
                 is Authorization.Granted -> finish(existing, answer)
             }
         } catch (e: CancellationException) {

@@ -36,7 +36,8 @@ class GoogleConnectFlowTest {
         google.shutdown()
         // P8, for every test: nothing logged names an account or a token.
         ShadowLog.getLogs().forEach { log ->
-            val text = "${log.msg} ${log.throwable}"
+            val causes = generateSequence(log.throwable) { it.cause }.joinToString(" ")
+            val text = "${log.msg} $causes"
             assertWithMessage(text).that(text).doesNotContain("@")
             assertWithMessage(text).that(text).doesNotContain("token")
             assertWithMessage(text).that(text).doesNotContain("t1")
@@ -78,6 +79,23 @@ class GoogleConnectFlowTest {
         google.addCalendar("someone.else@example.com", "Theirs", primary = true)
         assertThat(flow.start(existing = stored)).isEqualTo(ConnectStep.Stopped)
         assertThat(toasts.messages).containsExactly("That's a different Google account. Reconnect with family@example.com.")
+        // Refused before the silent grant for the other account was asked for.
+        assertThat(authorizer.accounts).containsExactly("family@example.com")
+    }
+
+    @Test
+    fun aReconnectMatchesTheStoredAccountWhateverItsCase() = runTest {
+        google.addCalendar("Family@Example.com", "Family", primary = true)
+        val done = flow.start(existing = stored) as ConnectStep.Done
+        assertThat(done.connection.id).isEqualTo("g1")
+        assertThat(toasts.messages).isEmpty()
+    }
+
+    @Test
+    fun screensThatStillDoNotGrantStopAndSaySo() = runTest {
+        authorizer.fromScreens = Authorization.NeedsUser(screens())
+        assertThat(flow.afterScreens(existing = null, data = Intent())).isEqualTo(ConnectStep.Stopped)
+        assertThat(toasts.messages).containsExactly(COULD_NOT_CONNECT)
     }
 
     @Test

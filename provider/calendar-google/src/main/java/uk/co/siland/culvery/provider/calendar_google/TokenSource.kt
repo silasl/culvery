@@ -14,6 +14,7 @@ import com.google.android.gms.common.api.Scope
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.UnreachableException
@@ -80,43 +81,43 @@ internal fun authorizationFailure(statusCode: Int, cause: Throwable? = null): Ex
 internal fun Throwable.isUserCancel(): Boolean = this is PlayServicesStatusException && statusCode == CommonStatusCodes.CANCELED
 
 @Singleton
-class PlayServicesAuthorizer @Inject constructor(@ApplicationContext private val context: Context) : Authorizer {
-    private val client get() = Identity.getAuthorizationClient(context)
+class PlayServicesAuthorizer @Inject constructor(@ApplicationContext context: Context) : Authorizer {
+    private val client = Identity.getAuthorizationClient(context)
 
     override suspend fun authorize(account: String?): Authorization {
         val request = AuthorizationRequest.builder()
             .setRequestedScopes(CALENDAR_SCOPES.map(::Scope))
             .apply { if (account != null) setAccount(Account(account, GOOGLE_ACCOUNT_TYPE)) }
             .build()
-        val result = try {
-            client.authorize(request).await()
-        } catch (e: ApiException) {
-            throw authorizationFailure(e.statusCode, e)
-        }
-        return result.toAuthorization()
+        return playServices { client.authorize(request).await() }.toAuthorization()
     }
 
     override fun authorizationFrom(data: Intent?): Authorization =
-        try {
-            client.getAuthorizationResultFromIntent(data).toAuthorization()
-        } catch (e: ApiException) {
-            throw authorizationFailure(e.statusCode, e)
-        }
+        playServices { client.getAuthorizationResultFromIntent(data) }.toAuthorization()
 
     override suspend fun clearToken(token: String) {
-        try {
-            client.clearToken(ClearTokenRequest.builder().setToken(token).build()).await()
-        } catch (e: ApiException) {
-            throw authorizationFailure(e.statusCode, e)
-        }
+        playServices { client.clearToken(ClearTokenRequest.builder().setToken(token).build()).await() }
     }
 
     private fun AuthorizationResult.toAuthorization(): Authorization {
         val screens = pendingIntent
         if (hasResolution() && screens != null) return Authorization.NeedsUser(screens)
-        return Authorization.Granted(accessToken ?: throw NeedsSignInException("Play services granted no token"), grantedScopes)
+        // Neither screens nor a token says nothing about the grant (D2): try later.
+        return Authorization.Granted(accessToken ?: throw UnreachableException("Play services granted no token"), grantedScopes)
     }
 }
+
+/** [call]'s failures in the tablet's terms: a Play services status as [authorizationFailure] maps it, anything else try later. */
+private inline fun <T> playServices(call: () -> T): T =
+    try {
+        call()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: ApiException) {
+        throw authorizationFailure(e.statusCode, e)
+    } catch (e: Exception) {
+        throw UnreachableException("Play services failed (${e::class.simpleName})", e)
+    }
 
 /**
  * Asks Play services for a token on every call (3a design §3.2): it caches and refreshes them itself. Screens the user
