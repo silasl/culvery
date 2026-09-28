@@ -192,6 +192,23 @@ class EventFormTest {
     }
 
     @Test
+    fun aLockedSpanCrossingAMonthOrYearNamesTheMonthOnBothEnds() {
+        val crossMonth = edit(
+            EventTime.AllDay(LocalDate.of(2026, 9, 30)),
+            EventTime.AllDay(LocalDate.of(2026, 10, 3)),
+            "Half term", "family",
+        )
+        assertThat(crossMonth.lockedDatesLabel).isEqualTo("Wed 30 Sep – Fri 2 Oct · change dates on your phone")
+
+        val crossYear = edit(
+            EventTime.AllDay(LocalDate.of(2026, 12, 31)),
+            EventTime.AllDay(LocalDate.of(2027, 1, 3)),
+            "New Year trip", "family",
+        )
+        assertThat(crossYear.lockedDatesLabel).isEqualTo("Thu 31 Dec – Sat 2 Jan · change dates on your phone")
+    }
+
+    @Test
     fun aLockedEditKeepsItsDatesAndChangesOnlyTitleAndWho() {
         val start = EventTime.AllDay(LocalDate.of(2026, 9, 22))
         val end = EventTime.AllDay(LocalDate.of(2026, 9, 25))

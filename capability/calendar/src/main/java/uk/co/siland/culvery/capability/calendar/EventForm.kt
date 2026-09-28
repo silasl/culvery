@@ -169,11 +169,15 @@ class EventForm(
     val pickedDateLabel: String?
         get() = day.takeIf { it !in dayChoices }?.format(SHORT_DAY)
 
-    /** A locked multi-day edit's one line: "Mon 22 – Wed 24 · change dates on your phone". */
+    /**
+     * A locked multi-day edit's one line: "Mon 22 – Wed 24 · change dates on your phone", or, when the span crosses
+     * a month, "Wed 30 Sep – Fri 2 Oct · change dates on your phone" on both ends.
+     */
     val lockedDatesLabel: String?
         get() = original?.takeIf { datesLocked }?.let { o ->
             val (first, last) = daySpan(o.start, o.end, zone)
-            "${first.format(DAY_AND_DATE)} – ${last.format(DAY_AND_DATE)} · change dates on your phone"
+            val formatter = if (first.month == last.month && first.year == last.year) DAY_AND_DATE else SHORT_DAY
+            "${first.format(formatter)} – ${last.format(formatter)} · change dates on your phone"
         }
 
     /**
