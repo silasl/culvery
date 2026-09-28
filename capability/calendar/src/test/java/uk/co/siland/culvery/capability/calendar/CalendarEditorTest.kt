@@ -30,6 +30,7 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.WallClock
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -802,5 +803,28 @@ class CalendarEditorTest {
         editor.create(draft("Pizza night", PersonId.FAMILY.value))
         editor.assign(ref("plumber"), access.sam.id)
         assertThat(writer.drafts.map { it.forPersonColor }).containsExactly(access.mia.color, null, access.sam.color).inOrder()
+    }
+
+    @Test
+    fun anEditThatTouchesWhoCarriesThePersonsColour() = runTest {
+        val access = testAccess(household)
+        put(event("dinner", createdBy = access.alex.id.value))
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access).update(ref("dinner"), edited("dinner", access.sam.id.value), setOf(EventField.FOR_PERSON)))
+            .isEqualTo(EditResult.Done)
+        assertThat(writer.drafts.single().forPersonColor).isEqualTo(access.sam.color)
+    }
+
+    @Test
+    fun aSaveThatNeedsSignInIsQueuedAndFlagsTheConnectionAtOnce() = runTest {
+        val access = testAccess(household)
+        writer.failWith = NeedsSignInException("expired")
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access).create(draft("Sleepover", PersonId.FAMILY.value))).isEqualTo(EditResult.Queued)
+        val stored = store.connectionsNow().single()
+        // The reconnect chip shows now, not at the next sync (3a design §3.7), and the queue stops ageing (D16).
+        assertThat(stored.health).isEqualTo(ConnectionHealth.NeedsSignIn)
+        assertThat(stored.needsSignInSinceMillis).isEqualTo(testScheduler.currentTime)
+        assertThat(store.pendingNow()).hasSize(1)
     }
 }

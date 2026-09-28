@@ -46,8 +46,11 @@ internal sealed interface WriteOutcome {
     /** The provider refused the change for good. */
     data class Rejected(val message: String) : WriteOutcome
 
-    /** Try again later. [blocksConnection]: the provider didn't answer, so its other changes should wait too. */
-    data class Retry(val blocksConnection: Boolean) : WriteOutcome
+    /**
+     * Try again later. [blocksConnection]: the provider didn't answer, so its other changes should wait too.
+     * [needsSignIn]: the connection needs signing in again, so its health says so at once (3a design §3.7).
+     */
+    data class Retry(val blocksConnection: Boolean, val needsSignIn: Boolean = false) : WriteOutcome
 }
 
 /**
@@ -69,7 +72,7 @@ internal suspend fun callWriter(io: CoroutineContext, timeoutMillis: Long, call:
         currentCoroutineContext().ensureActive()
         WriteOutcome.Retry(blocksConnection = true)
     } catch (e: NeedsSignInException) {
-        WriteOutcome.Retry(blocksConnection = true)
+        WriteOutcome.Retry(blocksConnection = true, needsSignIn = true)
     } catch (e: UnreachableException) {
         WriteOutcome.Retry(blocksConnection = true)
     } catch (e: Throwable) {
@@ -129,6 +132,19 @@ internal fun couldNotSaveAll(label: String, reasons: List<String?>): String =
 
 /** An assign as it is sent: the event's current title, times and creator, with the new person and their colour. */
 internal fun assignDraft(event: StoredEvent, forPerson: String?, forPersonColor: Long?): EventDraft =
-    EventDraft(event.title, event.start, event.end, forPerson, event.createdBy, forPersonColor)
+    assignDraft(event.title, event.start, event.end, event.createdBy, forPerson, forPersonColor)
+
+/** As [assignDraft] for the mirror's event, for one only the provider holds (3a design m3). */
+internal fun assignDraft(event: RemoteEvent, forPerson: String?, forPersonColor: Long?): EventDraft =
+    assignDraft(event.title, event.start, event.end, event.createdBy, forPerson, forPersonColor)
+
+private fun assignDraft(
+    title: String,
+    start: EventTime,
+    end: EventTime,
+    createdBy: String?,
+    forPerson: String?,
+    forPersonColor: Long?,
+): EventDraft = EventDraft(title, start, end, forPerson, createdBy, forPersonColor)
 
 private const val TAG = "CalendarWrites"

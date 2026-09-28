@@ -366,7 +366,8 @@ class CalendarSyncTest {
         val sync = writingEngine()
         queue(ChangeKind.ASSIGN)
         sync.syncAll()
-        assertThat(w.calls).isEmpty()
+        // Not in the mirror, so the provider is asked first (m3); it has no such event.
+        assertThat(w.calls).containsExactly("find:swim")
         assertThat(store.pendingNow()).isEmpty()
         assertThat(toaster.messages).containsExactly("Couldn't save to C1 — The event no longer exists")
     }
@@ -442,7 +443,7 @@ class CalendarSyncTest {
         w.failWith = NeedsSignInException("expired")
         a.failWith = NeedsSignInException("expired")
         sync.syncAll()
-        // The pass's own read flags the connection; the failed write only reschedules.
+        // The failed write flags the connection at once (3a design §3.7); the pass's own read agrees.
         assertThat(health("c1")).isEqualTo(ConnectionHealth.NeedsSignIn)
         assertThat(store.pendingNow().single().let { it.attempts to it.nextAttemptMillis })
             .isEqualTo(2 to now.toEpochMilli() + 60_000)
@@ -591,14 +592,15 @@ class CalendarSyncTest {
     }
 
     @Test
-    fun aCreateDroppedAfterTwoDaysTakesItsQueuedChangesWithIt() = runTest {
+    fun anAgedCreateTheProviderNeverMadeIsDroppedWithItsFollowers() = runTest {
         connect("c1", "calendar.a", s1)
         val sync = writingEngine()
         val longAgo = now.minusMillis(OUTBOX_MAX_AGE_MS + 1)
         queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key, created = longAgo)
         queue(ChangeKind.UPDATE, remoteId = key, draft = swimDraft("sam-id"))
         sync.syncAll()
-        assertThat(w.calls).isEmpty()
+        // C9: asked for by its key before it is dropped.
+        assertThat(w.calls).containsExactly("find:$key")
         assertThat(store.pendingNow()).isEmpty()
         assertThat(toaster.messages).containsExactly("Couldn't save 2 changes to C1")
     }
@@ -758,5 +760,117 @@ class CalendarSyncTest {
         // Counted as a failed drain, so the loop waits at least 30 s rather than re-sending the write every second.
         assertThat(sync.drainBackoffMillis()).isEqualTo(30_000L)
         assertThat(cachedTitles()).containsExactly("Swim")
+    }
+
+    @Test
+    fun anAgedCreateThatGoogleHasIsCompletedAndItsFollowersAreSent() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        val longAgo = now.minusMillis(OUTBOX_MAX_AGE_MS + 1)
+        // The provider made the event, but its reply was lost; the delete queued behind it has waited as long.
+        w.findable[key] = RemoteEvent(key, "Swim", swim().start, swim().end, recurring = false, "mia-id", "alex-id")
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key, created = longAgo)
+        queue(ChangeKind.DELETE, remoteId = key, draft = null, created = longAgo)
+        a.failWith = UnreachableException("reads are down")
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("find:$key", "delete:$key").inOrder()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(store.eventNow(EventRef("c1", "s1", key))).isNull()
+        assertThat(toaster.messages).isEmpty()
+    }
+
+    @Test
+    fun anAgedCreateWhoseLookupFailsWaitsForALaterPass() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key, created = now.minusMillis(OUTBOX_MAX_AGE_MS + 1))
+        w.failWith = UnreachableException("offline")
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("find:$key")
+        // Rescheduled, not left due: the loop would spin.
+        assertThat(store.pendingNow().single().let { it.attempts to it.nextAttemptMillis }).isEqualTo(2 to now.toEpochMilli() + 60_000)
+        assertThat(toaster.messages).isEmpty()
+    }
+
+    @Test
+    fun anAssignForAnEventOutsideTheWindowIsSentOnceTheProviderFindsIt() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        w.findable["swim"] = swim()
+        queue(ChangeKind.ASSIGN, draft = swimDraft("sam-id"))
+        a.failWith = UnreachableException("reads are down")
+        sync.syncAll()
+        assertThat(w.calls).containsExactly("find:swim", "update:swim").inOrder()
+        assertThat(w.fieldSets.single()).containsExactly(EventField.FOR_PERSON)
+        assertThat(w.drafts.single().forPerson).isEqualTo("sam-id")
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
+    @Test
+    fun aWriteThatNeedsSignInFlagsTheConnectionAndStartsThePause() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, draft = null)
+        w.failWith = NeedsSignInException("expired")
+        a.failWith = UnreachableException("offline")
+        sync.syncAll()
+        val stored = store.connectionsNow().single()
+        // The read then found the network down, which doesn't end the pause (D16).
+        assertThat(stored.health).isEqualTo(ConnectionHealth.Unreachable)
+        assertThat(stored.needsSignInSinceMillis).isEqualTo(now.toEpochMilli())
+        assertThat(store.pendingNow()).hasSize(1)
+    }
+
+    @Test
+    fun aChangeQueuedBeforeAThreeDayLapseSurvivesItAndAgesAgainAfterTheReconnect() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        val hour = 3_600_000L
+        queue(ChangeKind.DELETE, draft = null, created = now.minusMillis(47 * hour))
+        w.failWith = NeedsSignInException("expired")
+        a.failWith = NeedsSignInException("expired")
+        sync.syncAll()
+        // A long weekend with Google's access lapsed: nothing ages.
+        now = now.plusMillis(72 * hour)
+        sync.syncAll()
+        assertThat(store.pendingNow()).hasSize(1)
+        assertThat(toaster.messages).isEmpty()
+        // Reconnected (health Ok folds the lapse in), but Google is now unreachable, so the change waits on.
+        store.setHealth("c1", ConnectionHealth.Ok, now.toEpochMilli())
+        w.failWith = UnreachableException("offline")
+        a.failWith = UnreachableException("offline")
+        now = now.plusMillis(hour - 60_000)
+        sync.syncAll()
+        assertThat(store.pendingNow()).hasSize(1)
+        // 48 hours of healthy time: dropped as before.
+        now = now.plusMillis(60_001)
+        sync.syncAll()
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(toaster.messages).containsExactly("Couldn't save to C1")
+    }
+
+    @Test
+    fun aQueuedAssignCarriesItsPersonsColourToTheProvider() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = writingEngine()
+        sync.syncAll()
+        queue(ChangeKind.ASSIGN, draft = swimDraft("sam-id").copy(forPersonColor = SAM_COLOR))
+        sync.syncAll()
+        assertThat(w.drafts.single().forPersonColor).isEqualTo(SAM_COLOR)
+    }
+
+    @Test
+    fun aQueuedAssignForAnEventOutsideTheWindowCarriesItsPersonsColour() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        w.findable["swim"] = swim()
+        queue(ChangeKind.ASSIGN, draft = swimDraft("sam-id").copy(forPersonColor = SAM_COLOR))
+        sync.syncAll()
+        assertThat(w.drafts.single().forPersonColor).isEqualTo(SAM_COLOR)
+    }
+
+    private companion object {
+        const val SAM_COLOR = 0xFF3A7BD5
     }
 }

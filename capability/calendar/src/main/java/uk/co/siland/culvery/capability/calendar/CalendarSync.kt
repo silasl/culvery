@@ -82,11 +82,12 @@ class CalendarSync internal constructor(
     /**
      * Delivers queued changes in the order they were made. An event's later changes wait while an earlier one is
      * waiting or has just failed, so they can't land first and be undone; they are rescheduled to its next attempt,
-     * so the loop doesn't wake for them before it. Once a connection fails to answer, its
-     * other changes wait for their next attempt instead of each costing a timeout. Changes nothing can deliver,
-     * changes the provider refuses, and changes older than [OUTBOX_MAX_AGE_MS] are dropped, with one toast per
-     * connection, shown even if the pass then fails. A dropped create takes the changes queued behind it with it:
-     * there is no event for them to change (2b-2 design §5).
+     * so the loop doesn't wake for them before it. Once a connection fails to answer, its other changes wait for
+     * their next attempt instead of each costing a timeout. Changes nothing can deliver, changes the provider refuses,
+     * and changes older than [OUTBOX_MAX_AGE_MS] are dropped, with one toast per connection, shown even if the pass
+     * then fails. Age leaves out time the connection spent waiting for sign-in (3a design D16). An aged create is
+     * first looked up by its key (C9): if the provider made it, it is completed and the changes behind it are sent
+     * whatever their age. A dropped create takes the changes queued behind it with it (2b-2 design §5).
      */
     private suspend fun drainOutbox(connections: List<StoredConnection>, zone: ZoneId) {
         val now = clock.nowMillis()
@@ -96,6 +97,8 @@ class CalendarSync internal constructor(
         val blockedConnections = mutableSetOf<String>()
         val dropped = linkedMapOf<String, MutableList<String?>>()
         val droppedCreates = mutableSetOf<EventRef>()
+        // Aged creates the provider turned out to have: the changes behind them are sent whatever their age.
+        val foundCreates = mutableSetOf<EventRef>()
 
         suspend fun drop(change: PendingChange, label: String, reason: String?) {
             val ref = change.ref
@@ -126,7 +129,9 @@ class CalendarSync internal constructor(
                     if (change.nextAttemptMillis < blockedUntil) store.reschedule(change.id, change.attempts, blockedUntil)
                     continue
                 }
-                if (now - change.createdMillis > OUTBOX_MAX_AGE_MS) {
+                val aged = (ref == null || ref !in foundCreates) &&
+                    ageMillis(change, stored?.needsSignInSinceMillis, now) > OUTBOX_MAX_AGE_MS
+                if (aged && change.kind != ChangeKind.CREATE) {
                     Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}: unsent for 48 hours")
                     drop(change, label, null)
                     continue
@@ -147,13 +152,27 @@ class CalendarSync internal constructor(
                     drop(change, label, null)
                     continue
                 }
-                when (val outcome = deliver(change, stored.connection, source.source, writer, zone)) {
-                    is WriteOutcome.Accepted -> Unit
+                val outcome = if (aged) {
+                    // C9: its reply may have been lost after the provider made it; ask before dropping it.
+                    val found = callWriter(io, timeoutMillis) { writer.find(stored.connection, source.source, checkNotNull(change.clientKey)) }
+                    if (found is WriteOutcome.Accepted && found.event == null) {
+                        Log.w(TAG, "Dropping a queued CREATE for ${change.connectionId}: unsent for 48 hours, and never made")
+                        drop(change, label, null)
+                        continue
+                    }
+                    if (found is WriteOutcome.Accepted) complete(change, stored.connection, source.source, found, zone) else found
+                } else {
+                    deliver(change, stored.connection, source.source, writer, zone)
+                }
+                when (outcome) {
+                    is WriteOutcome.Accepted -> if (aged && ref != null) foundCreates += ref
                     is WriteOutcome.Rejected -> drop(change, label, outcome.message)
                     is WriteOutcome.Retry -> {
                         val next = retryLater(change, now)
                         ref?.let { blockedRefs[it] = next }
                         if (outcome.blocksConnection) blockedConnections += change.connectionId
+                        // The reconnect chip shows at once, and the queue stops ageing (3a design §3.7, D16).
+                        if (outcome.needsSignIn) store.setHealth(change.connectionId, ConnectionHealth.NeedsSignIn, now)
                     }
                 }
             }
@@ -194,10 +213,20 @@ class CalendarSync internal constructor(
                 callWriter(io, timeoutMillis) { writer.update(conn, source, remoteId, draft, fieldsFor(ChangeKind.UPDATE, change.fields)) }
             }
             ChangeKind.ASSIGN -> {
-                // Sent as the event is now, so a title or time changed elsewhere since it was queued is kept.
-                val current = ref?.let { store.eventNow(it) } ?: return WriteOutcome.Rejected(EVENT_GONE)
-                val draft = assignDraft(current, change.draft?.forPerson, change.draft?.forPersonColor)
-                callWriter(io, timeoutMillis) { writer.update(conn, source, current.remoteId, draft, fieldsFor(ChangeKind.ASSIGN, null)) }
+                val remoteId = checkNotNull(change.remoteId)
+                val forPerson = change.draft?.forPerson
+                val color = change.draft?.forPersonColor
+                val current = ref?.let { store.eventNow(it) }
+                val draft = if (current != null) {
+                    assignDraft(current, forPerson, color)
+                } else {
+                    // m3: out of the mirror's window, not necessarily gone. Never PATCH blind: it could bring a deleted event back.
+                    val found = callWriter(io, timeoutMillis) { writer.find(conn, source, remoteId) }
+                    if (found !is WriteOutcome.Accepted) return found
+                    val event = found.event ?: return WriteOutcome.Rejected(EVENT_GONE)
+                    assignDraft(event, forPerson, color)
+                }
+                callWriter(io, timeoutMillis) { writer.update(conn, source, remoteId, draft, fieldsFor(ChangeKind.ASSIGN, null)) }
             }
             ChangeKind.DELETE -> {
                 val remoteId = checkNotNull(change.remoteId)

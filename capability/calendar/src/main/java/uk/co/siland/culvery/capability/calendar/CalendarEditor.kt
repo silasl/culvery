@@ -24,6 +24,7 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 
@@ -367,7 +368,11 @@ class CalendarEditor internal constructor(
                 EditResult.Done
             }
             is WriteOutcome.Rejected -> EditResult.Rejected(outcome.message)
-            is WriteOutcome.Retry -> queue(to, kind, remoteId, draft, attempted = true, clientKey = clientKey, fields = fields)
+            is WriteOutcome.Retry -> {
+                // The reconnect chip shows at once rather than at the next sync (3a design §3.7).
+                if (outcome.needsSignIn) store.setHealth(to.connection.id, ConnectionHealth.NeedsSignIn, clock.nowMillis())
+                queue(to, kind, remoteId, draft, attempted = true, clientKey = clientKey, fields = fields)
+            }
         }
     }
 
