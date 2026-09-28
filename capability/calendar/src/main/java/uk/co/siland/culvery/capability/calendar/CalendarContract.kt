@@ -23,7 +23,20 @@ fun EventTime.instantIn(zone: ZoneId): Instant = when (this) {
 fun spanOverlaps(start: Long, end: Long, windowStart: Long, windowEnd: Long): Boolean =
     start < windowEnd && (end > windowStart || start >= windowStart)
 
-data class CalendarSource(val id: String, val name: String, val writable: Boolean)
+/**
+ * One calendar in a connection. [shown]: ticked and not hidden in the service (Google: `selected` and not `hidden`).
+ * [primary]: the account's own calendar, at most one per connection; connecting makes it the master (3a design D4).
+ */
+data class CalendarSource(
+    val id: String,
+    val name: String,
+    val writable: Boolean,
+    val shown: Boolean = true,
+    val primary: Boolean = false,
+)
+
+/** The [Connection.config] key a provider stores the signed-in account under; Settings shows it ("Google Calendar · {account}"). */
+const val CONFIG_ACCOUNT = "account"
 
 /**
  * One concrete occurrence from a provider.
@@ -32,6 +45,7 @@ data class CalendarSource(val id: String, val name: String, val writable: Boolea
  * as in Google Calendar and iCalendar. [start] and [end] are both Timed or both AllDay.
  * Recurring events arrive already expanded, one RemoteEvent per occurrence, each with its own [remoteId],
  * and [recurring] set. [forPerson] and [createdBy] are household PersonId values when the provider stores them.
+ * [recurrenceRule] is the series' RRULE line (e.g. "RRULE:FREQ=WEEKLY") when the provider knows it.
  */
 data class RemoteEvent(
     val remoteId: String,
@@ -41,6 +55,7 @@ data class RemoteEvent(
     val recurring: Boolean,
     val forPerson: String? = null,
     val createdBy: String? = null,
+    val recurrenceRule: String? = null,
 )
 
 /** Local dates in the household's [zone]; [endExclusive] is the first day not included. */
@@ -77,7 +92,8 @@ data class SyncResult(
 /**
  * What the tablet asks a provider to write. [end] is exclusive, as in [RemoteEvent]. [forPerson] and [createdBy]
  * are household PersonId values ("family" allowed) that the provider stores with the event (Google:
- * extendedProperties.private). Names are never written.
+ * extendedProperties.private). Names are never written. [forPersonColor] is that person's colour (ARGB), so the
+ * provider can colour the event (Google: the nearest colorId); null for Family or untagged.
  */
 data class EventDraft(
     val title: String,
@@ -85,7 +101,11 @@ data class EventDraft(
     val end: EventTime,
     val forPerson: String?,
     val createdBy: String?,
+    val forPersonColor: Long? = null,
 )
+
+/** What an update changes (3a design C3): the title, the start and end together, or who the event is for. */
+enum class EventField { TITLE, TIMES, FOR_PERSON }
 
 /** The connection's sign-in has expired or been revoked (Google: 401, or a refused token refresh). */
 class NeedsSignInException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
@@ -94,7 +114,13 @@ class NeedsSignInException(message: String? = null, cause: Throwable? = null) : 
  * The provider couldn't be reached, or asked to be tried later: network errors, and for Google 429, 403
  * rate-limit reasons (rateLimitExceeded, userRateLimitExceeded) and every 5xx. The engine retries with backoff.
  */
-class UnreachableException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+open class UnreachableException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+
+/**
+ * The source isn't there any more (Google: 404, or a 403 that isn't a rate limit, on events.list). The engine
+ * records it as unreachable and refreshes the connection's sources on the next pass, which removes it if it has gone.
+ */
+class SourceGoneException(message: String? = null, cause: Throwable? = null) : UnreachableException(message, cause)
 
 /**
  * A permanent refusal: retrying would not help (Google: a 4xx other than 401, 429 and the 403 rate limits).
@@ -145,6 +171,9 @@ fun newClientKey(): String = UUID.randomUUID().toString().replace("-", "")
  * - [create] is idempotent by its client key: the writer uses the key as the event's id, so the returned remoteId
  *   equals it, and a create with a key already used on that source returns the event that key made, never a second
  *   one (Google: events.insert with id = clientKey; a 409 means it exists, so fetch and return it).
+ * - [create] never recreates a deleted event: a create whose key belonged to an event since deleted throws
+ *   [WriteRejectedException] (Google: the 409's event is cancelled).
+ * - [find] throws only [NeedsSignInException] or [UnreachableException].
  */
 interface CalendarWriter {
     val providerId: String
@@ -152,10 +181,14 @@ interface CalendarWriter {
     suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft, clientKey: String): RemoteEvent
 
     /**
-     * Changes only the title, the times and the two tags. Everything else the service holds (description,
-     * location, attendees, reminders) is kept (Google: PATCH, never PUT).
+     * Changes only [fields] of the event to [draft]'s values; the draft's other fields are ignored. Everything else the
+     * service holds (description, location, attendees, reminders, the createdBy tag) is kept (Google: PATCH, never
+     * PUT). Returns the event as the service now holds it.
      */
-    suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft): RemoteEvent
+    suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft, fields: Set<EventField>): RemoteEvent
+
+    /** The event as the service holds it; null when it doesn't exist or was deleted. */
+    suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent?
 
     suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String)
 }

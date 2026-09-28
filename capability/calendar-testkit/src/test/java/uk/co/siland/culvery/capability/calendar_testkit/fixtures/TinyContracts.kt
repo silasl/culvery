@@ -33,3 +33,7 @@ class StrictDeleteContract : TinyContract(TinyProvider(rejectMissingDelete = tru
 class ReadOnlyContract : TinyContract(TinyProvider(canWrite = false))
 class KeylessContract : TinyContract(TinyProvider(ignoreClientKey = true))
 class DuplicatingContract : TinyContract(TinyProvider(duplicateOnRepeat = true))
+class RecreatingContract : TinyContract(TinyProvider(recreateDeleted = true))
+class OverwritingContract : TinyContract(TinyProvider(updateEverything = true))
+class BlindContract : TinyContract(TinyProvider(findNothing = true))
+class TwoPrimariesContract : TinyContract(TinyProvider(twoPrimaries = true))

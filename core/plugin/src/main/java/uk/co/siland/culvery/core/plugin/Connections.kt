@@ -9,9 +9,14 @@ data class ProviderDescriptor(
     /** Material Symbols ligature name. */
     val icon: String,
     val features: Set<Feature>,
+    /** Offered as "Connect {displayName}" in Settings and on the Connect-a-calendar card; false for the debug sample. */
+    val userConnectable: Boolean = true,
 )
 
-/** One user-configured instance of a provider. [config] holds non-secret settings; secrets go in SecretStore (Plan 3). */
+/**
+ * One user-configured instance of a provider. [config] holds non-secret settings (Google: only the account email).
+ * A SecretStore arrives with the first provider that has a secret; Google needs none (3a design D2).
+ */
 data class Connection(
     val id: String,
     val providerId: String,

@@ -18,7 +18,15 @@ internal fun backoffMillis(attempts: Int): Long = OUTBOX_BACKOFF_MS[(attempts - 
 /** A queued change still unsent this long after it was made is dropped, with a toast. */
 const val OUTBOX_MAX_AGE_MS = 48 * 60 * 60_000L
 
-internal const val EVENT_GONE = "The event no longer exists"
+/** Why a change to an event that is gone is refused; public so providers refuse with the same words. */
+const val EVENT_GONE = "The event no longer exists"
+
+/**
+ * What an update of [kind] changes: an assign only who the event is for; an update its stored [fields], or every
+ * field for a row queued before v4 stored them.
+ */
+internal fun fieldsFor(kind: ChangeKind, fields: Set<EventField>?): Set<EventField> =
+    if (kind == ChangeKind.ASSIGN) setOf(EventField.FOR_PERSON) else fields ?: EventField.entries.toSet()
 
 /** What one writer call came to. */
 internal sealed interface WriteOutcome {

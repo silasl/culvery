@@ -3,7 +3,6 @@ package uk.co.siland.culvery.provider.calendar_fake
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
-import uk.co.siland.culvery.capability.calendar.CalendarSource
 import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.UnreachableException
@@ -18,7 +17,7 @@ class FakeCalendarProviderContractTest : CalendarProviderContractTest() {
     override fun provider() = fake
     override fun connection() = Connection("c1", FakeCalendarProvider.ID, "Sample calendar", emptyMap())
     override fun range() = DateRange(today.minusDays(1), today.plusDays(15), zone)
-    private val familyCalendar = CalendarSource(FakeCalendarProvider.SOURCE_FAMILY, "Family calendar", writable = true)
+    private val familyCalendar = FakeCalendarProvider.SOURCES.single { it.id == FakeCalendarProvider.SOURCE_FAMILY }
 
     override fun sourceWithEvents() = familyCalendar
     override fun writer() = fake

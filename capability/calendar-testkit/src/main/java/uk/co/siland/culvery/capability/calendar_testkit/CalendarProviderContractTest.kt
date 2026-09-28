@@ -10,15 +10,16 @@ import uk.co.siland.culvery.capability.calendar.CalendarSource
 import uk.co.siland.culvery.capability.calendar.CalendarWriter
 import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventDraft
+import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
-import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.capability.calendar.SyncCursor
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.instantIn
+import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 
@@ -233,7 +234,7 @@ abstract class CalendarProviderContractTest {
         val created = w.create(conn, source, draftIn("Before", 1), newClientKey())
         val cursor = subject.sync(conn, source, window, null).cursor
         val changed = draftIn("After", 2, forPerson = "contract-other")
-        val updated = w.update(conn, source, created.remoteId, changed)
+        val updated = w.update(conn, source, created.remoteId, changed, EventField.entries.toSet())
         assertWithMessage("an update keeps the remoteId").that(updated.remoteId).isEqualTo(created.remoteId)
         assertMatches("update's result", updated, changed)
         val synced = nextSyncReturns(source, cursor, created.remoteId)
@@ -301,5 +302,66 @@ abstract class CalendarProviderContractTest {
         assertWithMessage("a repeated create must return the event its key made").that(second.remoteId).isEqualTo(first.remoteId)
         val synced = subject.sync(conn, source, window, null).upserts.filter { it.title == "Once only" }
         assertWithMessage("a repeated create must not make a second event").that(synced).hasSize(1)
+    }
+
+    /** 3a design C10: a create whose key belonged to a deleted event is refused; it never makes the event again. */
+    @Test
+    fun aCreateNeverRecreatesADeletedEvent() = runTest {
+        val (w, source) = requireWriting()
+        val key = newClientKey()
+        val draft = draftIn("Gone for good", 3)
+        val made = w.create(conn, source, draft, key)
+        w.delete(conn, source, made.remoteId)
+        val error = try {
+            w.create(conn, source, draft, key)
+            null
+        } catch (e: Exception) {
+            e
+        }
+        assertWithMessage("a create repeating a deleted event's key must be refused, never make the event again")
+            .that(error).isInstanceOf(WriteRejectedException::class.java)
+        assertThat(subject.sync(conn, source, window, null).upserts.map { it.remoteId }).doesNotContain(made.remoteId)
+    }
+
+    /**
+     * 3a design C3: an update changes only its fields, so a change made elsewhere to the others is kept, and no
+     * update changes who created the event, a Who-only one included.
+     */
+    @Test
+    fun anUpdateChangesOnlyItsFields() = runTest {
+        val (w, source) = requireWriting()
+        val created = w.create(conn, source, draftIn("Only fields", 1), newClientKey())
+        val moved = draftIn("Not this title", 5, forPerson = "not-this-person", createdBy = "not-this-creator")
+        w.update(conn, source, created.remoteId, moved, setOf(EventField.TIMES))
+        val renamed = draftIn("Renamed", 9, forPerson = "not-this-person", createdBy = "not-this-creator")
+        w.update(conn, source, created.remoteId, renamed, setOf(EventField.TITLE))
+        val retagged = draftIn("Not this title either", 11, forPerson = "contract-new-for", createdBy = "not-this-creator")
+        val updated = w.update(conn, source, created.remoteId, retagged, setOf(EventField.FOR_PERSON))
+        val synced = subject.sync(conn, source, window, null).upserts.firstOrNull { it.remoteId == created.remoteId }
+        assertWithMessage("the next sync must return the updated event").that(synced).isNotNull()
+        listOf("update's result" to updated, "the next sync" to synced!!).forEach { (what, e) ->
+            assertWithMessage("$what: the title the TITLE update set").that(e.title).isEqualTo("Renamed")
+            assertWithMessage("$what: the times the TIMES update set").that(e.start to e.end).isEqualTo(moved.start to moved.end)
+            assertWithMessage("$what: who it is for, as the FOR_PERSON update set").that(e.forPerson).isEqualTo("contract-new-for")
+            assertWithMessage("$what: who created it, which no update changes").that(e.createdBy).isEqualTo(created.createdBy)
+        }
+    }
+
+    @Test
+    fun findReturnsACreatedEventAndNullOnceItIsDeleted() = runTest {
+        val (w, source) = requireWriting()
+        val draft = draftIn("Findable", 2)
+        val created = w.create(conn, source, draft, newClientKey())
+        val found = w.find(conn, source, created.remoteId)
+        assertWithMessage("find must return an event that exists").that(found).isNotNull()
+        assertMatches("find's result", found!!, draft, checkTags = false)
+        w.delete(conn, source, created.remoteId)
+        assertWithMessage("find must return null for a deleted event").that(w.find(conn, source, created.remoteId)).isNull()
+    }
+
+    @Test
+    fun sourcesReportAtMostOnePrimary() = runTest {
+        assertWithMessage("at most one source may be the account's primary calendar")
+            .that(subject.sources(conn).count { it.primary }).isAtMost(1)
     }
 }

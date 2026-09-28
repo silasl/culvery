@@ -4,18 +4,22 @@ import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 import org.junit.runner.JUnitCore
+import uk.co.siland.culvery.capability.calendar_testkit.fixtures.BlindContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.DroppingTagsContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.DuplicatingContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.GoodContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.InclusiveAllDayEndContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.KeylessContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.LeakingContract
+import uk.co.siland.culvery.capability.calendar_testkit.fixtures.OverwritingContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.PartialFirstSyncContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.RawAuthErrorContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.RawErrorContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.ReadOnlyContract
+import uk.co.siland.culvery.capability.calendar_testkit.fixtures.RecreatingContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.RepeatingContract
 import uk.co.siland.culvery.capability.calendar_testkit.fixtures.StrictDeleteContract
+import uk.co.siland.culvery.capability.calendar_testkit.fixtures.TwoPrimariesContract
 
 /** Proves the suite passes a correct provider and catches each kind of broken one. */
 class ContractSuiteSelfTest {
@@ -33,7 +37,7 @@ class ContractSuiteSelfTest {
     fun wellBehavedProviderPassesEveryCheck() {
         val result = JUnitCore.runClasses(GoodContract::class.java)
         assertThat(result.failures.map { "${it.description.methodName}: ${it.message}" }).isEmpty()
-        assertThat(result.runCount).isEqualTo(17)
+        assertThat(result.runCount).isEqualTo(21)
         // A skipped check would otherwise count as a pass.
         assertThat(result.assumptionFailureCount).isEqualTo(0)
     }
@@ -71,7 +75,10 @@ class ContractSuiteSelfTest {
 
     @Test
     fun droppedTagsAreCaught() {
-        assertThat(failuresOf(DroppingTagsContract::class.java)).containsExactly("createdEventComesBackOnTheNextSyncWithItsTags")
+        // update() has no field for createdBy (3a design C3: no update ever changes it), so a provider that drops the
+        // creator tag at create time never gets it back, and updatedFieldsRoundTrip's tag check fails too.
+        assertThat(failuresOf(DroppingTagsContract::class.java))
+            .containsExactly("createdEventComesBackOnTheNextSyncWithItsTags", "updatedFieldsRoundTrip")
     }
 
     @Test
@@ -83,8 +90,8 @@ class ContractSuiteSelfTest {
     fun aReadOnlyProviderSkipsOnlyTheWriteChecks() {
         val result = JUnitCore.runClasses(ReadOnlyContract::class.java)
         assertThat(result.failures.map { "${it.description.methodName}: ${it.message}" }).isEmpty()
-        assertThat(result.runCount).isEqualTo(17)
-        assertThat(result.assumptionFailureCount).isEqualTo(7)
+        assertThat(result.runCount).isEqualTo(21)
+        assertThat(result.assumptionFailureCount).isEqualTo(10)
     }
 
     @Test
@@ -95,5 +102,25 @@ class ContractSuiteSelfTest {
     @Test
     fun aWriterThatMakesASecondEventForARepeatedKeyIsCaught() {
         assertThat(failuresOf(DuplicatingContract::class.java)).containsExactly("aRepeatedCreateWithTheSameKeyReturnsTheSameEvent")
+    }
+
+    @Test
+    fun aWriterThatRecreatesADeletedEventIsCaught() {
+        assertThat(failuresOf(RecreatingContract::class.java)).containsExactly("aCreateNeverRecreatesADeletedEvent")
+    }
+
+    @Test
+    fun anUpdateThatChangesEveryFieldIsCaught() {
+        assertThat(failuresOf(OverwritingContract::class.java)).containsExactly("anUpdateChangesOnlyItsFields")
+    }
+
+    @Test
+    fun aWriterThatCannotFindItsEventsIsCaught() {
+        assertThat(failuresOf(BlindContract::class.java)).containsExactly("findReturnsACreatedEventAndNullOnceItIsDeleted")
+    }
+
+    @Test
+    fun twoPrimaryCalendarsAreCaught() {
+        assertThat(failuresOf(TwoPrimariesContract::class.java)).containsExactly("sourcesReportAtMostOnePrimary")
     }
 }

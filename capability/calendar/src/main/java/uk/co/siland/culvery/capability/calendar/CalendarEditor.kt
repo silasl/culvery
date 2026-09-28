@@ -324,7 +324,8 @@ class CalendarEditor internal constructor(
                     to.writer.delete(to.connection, to.source, checkNotNull(remoteId))
                     null
                 }
-                ChangeKind.UPDATE, ChangeKind.ASSIGN -> to.writer.update(to.connection, to.source, checkNotNull(remoteId), checkNotNull(draft))
+                ChangeKind.UPDATE, ChangeKind.ASSIGN ->
+                    to.writer.update(to.connection, to.source, checkNotNull(remoteId), checkNotNull(draft), fieldsFor(kind, null))
             }
         }
         return when (outcome) {

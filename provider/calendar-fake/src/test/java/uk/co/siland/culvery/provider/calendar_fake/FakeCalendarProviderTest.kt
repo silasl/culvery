@@ -11,6 +11,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventDraft
+import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.UnreachableException
@@ -187,7 +188,7 @@ class FakeCalendarProviderTest {
     fun updatingASampleReplacesItOnTheNextSync() = runTest {
         val fake = providerOn(today)
         val plumber = fake.familyEvents().single { it.title == "Plumber quote call" }
-        fake.update(conn, family, plumber.remoteId, EventDraft(plumber.title, plumber.start, plumber.end, "sam-id", null))
+        fake.update(conn, family, plumber.remoteId, EventDraft(plumber.title, plumber.start, plumber.end, "sam-id", null), setOf(EventField.FOR_PERSON))
         assertThat(fake.familyEvents().single { it.remoteId == plumber.remoteId }.forPerson).isEqualTo("sam-id")
     }
 
@@ -196,7 +197,7 @@ class FakeCalendarProviderTest {
         val fake = providerOn(today)
         val swim = fake.familyEvents().first { it.title == "Swimming" }
         assertThrows(WriteRejectedException::class.java) {
-            runBlocking { fake.update(conn, family, swim.remoteId, EventDraft(swim.title, swim.start, swim.end, null, null)) }
+            runBlocking { fake.update(conn, family, swim.remoteId, EventDraft(swim.title, swim.start, swim.end, null, null), setOf(EventField.TITLE)) }
         }
     }
 
@@ -255,5 +256,44 @@ class FakeCalendarProviderTest {
         assertThat(fake.familyEvents().map { it.title }).doesNotContain("Sleepover")
         fake.create(conn, family, draft("Sleepover"), newClientKey())
         assertThat(fake.familyEvents().map { it.title }).contains("Sleepover")
+    }
+
+    @Test
+    fun theSampleIsNeverOfferedToConnectAndItsFamilyCalendarIsThePrimary() = runTest {
+        val fake = providerOn(today)
+        assertThat(fake.descriptor.userConnectable).isFalse()
+        assertThat(fake.sources(conn).filter { it.primary }.map { it.id }).containsExactly(FakeCalendarProvider.SOURCE_FAMILY)
+    }
+
+    @Test
+    fun anUpdateOfASampleChangesOnlyItsFieldsAndKeepsItsCreator() = runTest {
+        val fake = providerOn(today)
+        fake.tagSamples(mapOf("Alex" to "alex-id"))
+        val dinner = fake.familyEvents().single { it.title == "Dinner with Jo & Priya" }
+        val updated = fake.update(conn, family, dinner.remoteId, draft("Dinner at Gran's"), setOf(EventField.TITLE))
+        assertThat(listOf(updated.title, updated.start, updated.forPerson, updated.createdBy))
+            .containsExactly("Dinner at Gran's", dinner.start, "alex-id", "alex-id").inOrder()
+        assertThat(fake.familyEvents().single { it.remoteId == dinner.remoteId }.title).isEqualTo("Dinner at Gran's")
+    }
+
+    @Test
+    fun findReturnsWhatTheCalendarHoldsAndNullOnceDeleted() = runTest {
+        val fake = providerOn(today)
+        val boiler = fake.familyEvents().single { it.title == "Boiler service" }
+        assertThat(fake.find(conn, family, boiler.remoteId)?.title).isEqualTo("Boiler service")
+        fake.delete(conn, family, boiler.remoteId)
+        assertThat(fake.find(conn, family, boiler.remoteId)).isNull()
+    }
+
+    @Test
+    fun aKeyWhoseEventWasDeletedIsRefused() = runTest {
+        val fake = providerOn(today)
+        val key = newClientKey()
+        fake.create(conn, family, draft("Sleepover"), key)
+        fake.delete(conn, family, key)
+        assertThrows(WriteRejectedException::class.java) {
+            runBlocking { fake.create(conn, family, draft("Sleepover"), key) }
+        }
+        assertThat(fake.familyEvents().map { it.title }).doesNotContain("Sleepover")
     }
 }

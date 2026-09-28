@@ -9,6 +9,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarSource
 import uk.co.siland.culvery.capability.calendar.CalendarWriter
 import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventDraft
+import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
@@ -33,6 +34,10 @@ class TinyProvider(
     private val rejectMissingDelete: Boolean = false,
     private val ignoreClientKey: Boolean = false,
     private val duplicateOnRepeat: Boolean = false,
+    private val recreateDeleted: Boolean = false,
+    private val updateEverything: Boolean = false,
+    private val findNothing: Boolean = false,
+    private val twoPrimaries: Boolean = false,
 ) : CalendarProvider, CalendarWriter {
     override val descriptor = ProviderDescriptor(
         "calendar.tiny",
@@ -46,6 +51,9 @@ class TinyProvider(
     private val written = linkedMapOf<String, RemoteEvent>()
     private var version = 0
     private var nextId = 0
+    // The key each written event was made with, and the keys of events since deleted.
+    private val keyOf = mutableMapOf<String, String>()
+    private val deletedKeys = mutableSetOf<String>()
 
     fun failNextWith(error: Throwable) {
         failNext = error
@@ -55,7 +63,8 @@ class TinyProvider(
     override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
     }
 
-    override suspend fun sources(conn: Connection) = if (canWrite) listOf(SOURCE, WRITABLE) else listOf(SOURCE)
+    override suspend fun sources(conn: Connection) =
+        if (canWrite) listOf(SOURCE.copy(primary = twoPrimaries), WRITABLE) else listOf(SOURCE.copy(primary = twoPrimaries))
 
     override suspend fun sync(conn: Connection, source: CalendarSource, range: DateRange, cursor: SyncCursor?): SyncResult {
         failNext?.let { error ->
@@ -79,6 +88,7 @@ class TinyProvider(
 
     override suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft, clientKey: String): RemoteEvent {
         checkWritable(source)
+        if (!recreateDeleted && clientKey in deletedKeys) throw WriteRejectedException("Tiny's event for $clientKey was deleted")
         if (!ignoreClientKey) {
             written[clientKey]?.let { existing ->
                 if (duplicateOnRepeat) {
@@ -100,14 +110,29 @@ class TinyProvider(
             createdBy = if (dropTagsOnCreate) null else draft.createdBy,
         )
         written[event.remoteId] = event
+        keyOf[event.remoteId] = clientKey
         version++
         return event
     }
 
-    override suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft): RemoteEvent {
+    override suspend fun update(
+        conn: Connection,
+        source: CalendarSource,
+        remoteId: String,
+        draft: EventDraft,
+        fields: Set<EventField>,
+    ): RemoteEvent {
         checkWritable(source)
-        if (remoteId !in written) throw WriteRejectedException("No event $remoteId")
-        val event = RemoteEvent(remoteId, draft.title, draft.start, draft.end, recurring = false, draft.forPerson, draft.createdBy)
+        val current = written[remoteId] ?: throw WriteRejectedException("No event $remoteId")
+        // Broken on purpose when updating everything: it writes the whole draft, creator included.
+        val applied = if (updateEverything) EventField.entries.toSet() else fields
+        val event = current.copy(
+            title = if (EventField.TITLE in applied) draft.title else current.title,
+            start = if (EventField.TIMES in applied) draft.start else current.start,
+            end = if (EventField.TIMES in applied) draft.end else current.end,
+            forPerson = if (EventField.FOR_PERSON in applied) draft.forPerson else current.forPerson,
+            createdBy = if (updateEverything) draft.createdBy else current.createdBy,
+        )
         written[remoteId] = event
         version++
         return event
@@ -116,10 +141,16 @@ class TinyProvider(
     override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) {
         checkWritable(source)
         when {
-            written.remove(remoteId) != null -> version++
+            written.remove(remoteId) != null -> {
+                deletedKeys += keyOf[remoteId] ?: remoteId
+                version++
+            }
             rejectMissingDelete -> throw WriteRejectedException("No event $remoteId")
         }
     }
+
+    override suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent? =
+        if (findNothing || source.id != WRITABLE.id) null else written[remoteId]
 
     private fun checkWritable(source: CalendarSource) {
         if (!canWrite || source.id != WRITABLE.id) throw WriteRejectedException("Tiny can't write to ${source.id}")
@@ -142,6 +173,6 @@ class TinyProvider(
 
     companion object {
         val SOURCE = CalendarSource("tiny", "Tiny", writable = false)
-        val WRITABLE = CalendarSource("tiny-w", "Tiny writable", writable = true)
+        val WRITABLE = CalendarSource("tiny-w", "Tiny writable", writable = true, primary = true)
     }
 }

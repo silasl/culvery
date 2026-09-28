@@ -113,11 +113,4 @@ internal object SampleEvents {
                 }
             }
         }
-
-    /** Whether the Family calendar sample with [remoteId] repeats; null when it isn't a sample. */
-    fun familySampleRepeats(remoteId: String): Boolean? =
-        (timed.filter { it.source == SOURCE_FAMILY }.map { it.id to it.weekly } +
-            allDay.filter { it.source == SOURCE_FAMILY }.map { it.id to it.weekly })
-            .firstOrNull { (id, _) -> remoteId.startsWith("$id-") }
-            ?.second
 }

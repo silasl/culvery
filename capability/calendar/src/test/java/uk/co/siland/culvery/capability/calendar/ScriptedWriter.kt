@@ -5,15 +5,19 @@ import kotlinx.coroutines.awaitCancellation
 import uk.co.siland.culvery.core.plugin.Connection
 
 /**
- * An in-test writer. [calls] reads "create:<title>", "update:<remoteId>" or "delete:<remoteId>". Creates keep the
- * contract: the client key is the event's id, and a repeated key returns the event it made.
+ * An in-test writer. [calls] reads "create:<title>", "update:<remoteId>", "delete:<remoteId>" or "find:<remoteId>".
+ * Creates keep the contract: the client key is the event's id, and a repeated key returns the event it made.
  */
 internal class ScriptedWriter(override val providerId: String) : CalendarWriter {
     val calls = mutableListOf<String>()
     /** The drafts sent to create and update, in order. */
     val drafts = mutableListOf<EventDraft>()
+    /** The fields sent with each update, in order. */
+    val fieldSets = mutableListOf<Set<EventField>>()
     /** The events create made, by client key. */
     val created = linkedMapOf<String, RemoteEvent>()
+    /** Events find returns besides those create made: an event the mirror doesn't hold (3a design m3). */
+    val findable = linkedMapOf<String, RemoteEvent>()
     var failWith: Throwable? = null
     /** When set, each write waits for it: a slow network the test releases. */
     var gate: CompletableDeferred<Unit>? = null
@@ -38,8 +42,15 @@ internal class ScriptedWriter(override val providerId: String) : CalendarWriter 
         return event
     }
 
-    override suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft): RemoteEvent {
+    override suspend fun update(
+        conn: Connection,
+        source: CalendarSource,
+        remoteId: String,
+        draft: EventDraft,
+        fields: Set<EventField>,
+    ): RemoteEvent {
         record("update:$remoteId", draft)
+        synchronized(this) { fieldSets += fields }
         gate?.await()
         failWith?.let { throw it }
         return RemoteEvent(remoteId, draft.title, draft.start, draft.end, recurring = false, draft.forPerson, draft.createdBy)
@@ -49,6 +60,13 @@ internal class ScriptedWriter(override val providerId: String) : CalendarWriter 
         record("delete:$remoteId", null)
         gate?.await()
         failWith?.let { throw it }
+    }
+
+    override suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent? {
+        record("find:$remoteId", null)
+        gate?.await()
+        failWith?.let { throw it }
+        return synchronized(this) { findable[remoteId] ?: created[remoteId] }
     }
 
     // Some tests run writes on Dispatchers.Default, so the lists are locked.
