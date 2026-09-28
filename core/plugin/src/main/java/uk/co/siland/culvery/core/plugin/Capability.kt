@@ -15,4 +15,9 @@ interface Capability : HomeCardContributor {
 
     @Composable
     fun TabContent()
+
+    /** This capability's block in Settings, if it has one (3a design §4.1: the calendar's connections). */
+    @Composable
+    fun SettingsSection() {
+    }
 }

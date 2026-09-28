@@ -30,7 +30,7 @@ class CalendarCapabilityTest {
         val household = HouseholdRepository(householdDb)
         val zone = HouseholdZone(household)
         capability = CalendarCapability(
-            CalendarRepository(store, household, zone, emptySet(), emptySet()), zone, WallClock { 0L }, stubEditor(store, zone),
+            CalendarRepository(store, household, zone, emptySet(), emptySet()), zone, WallClock { 0L }, stubEditor(store, zone), stubConnections(store),
         )
     }
 

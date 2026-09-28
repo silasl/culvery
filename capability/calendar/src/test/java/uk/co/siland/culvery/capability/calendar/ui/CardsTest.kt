@@ -114,11 +114,21 @@ class CardsTest {
     }
 
     @Test
-    fun connectCardOpensSettings() {
-        show { ConnectCalendarCard() }
+    fun connectCardOpensSettingsWhenNothingCanBeConnected() {
+        show { ConnectCalendarCard(connectService = null, onConnect = {}) }
         compose.onNodeWithText("Connect a calendar").assertExists()
+        compose.onNodeWithText("Connect your family's calendar to see it here.").assertExists()
         compose.onNodeWithText("Open settings").performClick()
         assertThat(navigator.settingsOpened).isEqualTo(1)
+    }
+
+    @Test
+    fun connectCardOffersGoogle() {
+        var connects = 0
+        show { ConnectCalendarCard(connectService = "Google Calendar", onConnect = { connects++ }) }
+        compose.onNodeWithText("Connect Google Calendar").performClick()
+        assertThat(connects).isEqualTo(1)
+        assertThat(navigator.settingsOpened).isEqualTo(0)
     }
 
     @Test

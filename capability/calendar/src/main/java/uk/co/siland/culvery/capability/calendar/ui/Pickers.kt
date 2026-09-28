@@ -192,7 +192,7 @@ internal fun TimePickerCard(initial: LocalTime, onSet: (LocalTime) -> Unit, onCa
 }
 
 @Composable
-private fun PickerCard(width: Dp, gap: Dp, tag: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun PickerCard(width: Dp, gap: Dp, tag: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
         verticalArrangement = Arrangement.spacedBy(gap),
         modifier = Modifier
@@ -270,7 +270,7 @@ private fun StepButton(icon: String, tag: String, label: String, onClick: () -> 
 }
 
 @Composable
-private fun PickerButton(
+internal fun PickerButton(
     text: String,
     primary: Boolean,
     tag: String,

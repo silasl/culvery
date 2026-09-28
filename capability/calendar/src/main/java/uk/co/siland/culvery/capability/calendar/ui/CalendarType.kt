@@ -108,6 +108,12 @@ internal object CalendarType {
 
     /** 15 sp / 700: "Add event" in the Calendar header. */
     val addEventButton = HhType.buttonLabel
+
+    /** 22 sp / 700: "Connecting to Google Calendar…" and Settings' "Calendars" (3a design §4). */
+    val blockTitle = HhType.sectionTitle
+
+    /** 18 sp / 600: a Settings row's "Google Calendar · {account}". */
+    val settingsRowTitle = HhType.rowTitle.copy(fontSize = 18.sp)
 }
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */
@@ -345,6 +351,26 @@ internal object CalendarDimens {
 
     /** Hand-off §7: the week column's add hint at 50%. */
     const val ADD_HINT_ALPHA = 0.5f
+
+    // Connecting card (3a design §4.4): the pickers' card (radius 30, padding 26) 440 wide, a 32 dp icon; 14 between
+    // blocks and 4 between its two lines (not in the spec: the date picker's spacing); Cancel as the date picker's.
+    val connectingWidth = 440.dp
+    val connectingGap = 14.dp
+    val connectingTextGap = 4.dp
+    val connectingIcon = 32.dp
+
+    // Settings' Calendars block (3a design §4.1): a row `surf`, radius 18, padding 16×20; its pills are AddButton's.
+    // Not in the spec: 12 below the title, rows 10 apart, a 26 dp icon 16 from the text, the health 2 below the name,
+    // and rows 600 wide (the sheets' width) so a row reads as one line.
+    val settingsTitleGap = 12.dp
+    val settingsRowGap = 10.dp
+    val settingsRowWidth = 600.dp
+    val settingsRowRadius = 18.dp
+    val settingsRowPaddingV = 16.dp
+    val settingsRowPaddingH = 20.dp
+    val settingsIcon = 26.dp
+    val settingsIconGap = 16.dp
+    val settingsStatusTop = 2.dp
 
     /** Chip tint: the person's colour at 0x2E alpha on dark, 0x26 on light. */
     const val CHIP_ALPHA_DARK = 0x2E / 255f

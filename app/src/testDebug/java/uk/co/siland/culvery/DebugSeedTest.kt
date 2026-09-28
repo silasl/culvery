@@ -6,12 +6,18 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
 import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.DateRange
@@ -140,5 +146,27 @@ class DebugSeedTest {
         seed()
         assertThat(household.people.first().map { it.name }).containsExactly("Admin")
         assertThat(seededSources().map { it.mapping.person }.toSet()).containsExactly(PersonId.FAMILY)
+    }
+
+    @Test
+    fun aRealConnectionRemovesTheSampleWithEverythingItHeld() = runTest {
+        seed()
+        store.addConnection(Connection("g1", "calendar.google", "Google", emptyMap()), emptyList(), emptyMap())
+        val watcher = launch { removeSampleWhenReplaced(setup) }
+        withContext(Dispatchers.Default) {
+            withTimeout(5_000) { while (store.connectionsNow().any { it.connection.id == "debug-sample" }) delay(10) }
+        }
+        watcher.cancel()
+        assertThat(store.connectionsNow().map { it.connection.id }).containsExactly("g1")
+        assertThat(store.sources().first()).isEmpty()
+    }
+
+    @Test
+    fun aStartAfterGoogleIsConnectedAddsNoSampleAndLeavesTheMasterAlone() = runTest {
+        store.addConnection(Connection("g1", "calendar.google", "Google", emptyMap()), emptyList(), emptyMap())
+        seed()
+        assertThat(store.connectionsNow().map { it.connection.id }).containsExactly("g1")
+        // Before the change, the seed still tried to make the missing sample's calendar the master, and warned.
+        assertThat(ShadowLog.getLogsForTag("Culvery")).isEmpty()
     }
 }

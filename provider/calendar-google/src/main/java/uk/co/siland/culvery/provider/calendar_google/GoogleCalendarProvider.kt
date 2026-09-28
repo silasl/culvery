@@ -36,7 +36,6 @@ import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.Toaster
 
-private const val TAG = "GoogleCalendar"
 private const val PAGE_SIZE = "250"
 private val WRITE_ROLES = setOf("owner", "writer")
 
@@ -242,7 +241,7 @@ class GoogleCalendarProvider @Inject constructor(
         val answer = api.send(account, "PATCH", api.url("calendars", source.id, "events", remoteId), patchBody(draft, fields))
         return when {
             answer.isSuccessful -> answer.decode(GoogleEvent.serializer(), "events.patch").written()
-            answer.code == 404 || answer.code == 410 -> throw WriteRejectedException(EVENT_GONE)
+            answer.isGoneStatus -> throw WriteRejectedException(EVENT_GONE)
             else -> throw answer.refusal("Changing an event")
         }
     }
@@ -252,7 +251,7 @@ class GoogleCalendarProvider @Inject constructor(
         val account = accountOf(conn)
         oneOffToChange(account, source, remoteId, "Deleting an event") ?: return
         val answer = api.send(account, "DELETE", api.url("calendars", source.id, "events", remoteId))
-        if (answer.isSuccessful || answer.code == 404 || answer.code == 410) return
+        if (answer.isSuccessful || answer.isGoneStatus) return
         throw answer.refusal("Deleting an event")
     }
 
@@ -264,15 +263,21 @@ class GoogleCalendarProvider @Inject constructor(
         fetch(account, source, remoteId)?.takeUnless { it.isGone }?.written()
 
     /** The event as Google holds it, whatever its status; null for 404 or 410. */
-    private suspend fun fetch(account: String, source: CalendarSource, remoteId: String): GoogleEvent? {
-        val answer = api.send(account, "GET", api.url("calendars", source.id, "events", remoteId))
-        if (answer.code == 404 || answer.code == 410) return null
-        return answer.readOrUnreachable("events.get").decode(GoogleEvent.serializer(), "events.get")
-    }
+    private suspend fun fetch(account: String, source: CalendarSource, remoteId: String): GoogleEvent? =
+        get(account, source, remoteId)?.readOrUnreachable("events.get")?.decode(GoogleEvent.serializer(), "events.get")
 
-    /** The event about to be changed or deleted; null when it's gone. One since made a series is refused (no If-Match: writes are rare). */
+    /** events.get's answer; null for 404 or 410. */
+    private suspend fun get(account: String, source: CalendarSource, remoteId: String): GoogleResponse? =
+        api.send(account, "GET", api.url("calendars", source.id, "events", remoteId)).takeUnless { it.isGoneStatus }
+
+    /**
+     * The event about to be changed or deleted; null when it's gone. Any other refusal of the look is the write's
+     * refusal (3a design §3.7). One since made a series is refused (no If-Match: writes are rare).
+     */
     private suspend fun oneOffToChange(account: String, source: CalendarSource, remoteId: String, what: String): GoogleEvent? {
-        val event = fetch(account, source, remoteId)?.takeUnless { it.isGone } ?: return null
+        val answer = get(account, source, remoteId) ?: return null
+        if (!answer.isSuccessful) throw answer.refusal(what)
+        val event = answer.decode(GoogleEvent.serializer(), "events.get").takeUnless { it.isGone } ?: return null
         if (event.recurrence != null) {
             Log.w(TAG, "$what: it has become a repeating event in Google Calendar, so the tablet leaves it alone")
             throw WriteRejectedException(REFUSED)

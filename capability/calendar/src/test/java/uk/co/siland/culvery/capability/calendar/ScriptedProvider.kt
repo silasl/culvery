@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.awaitCancellation
@@ -41,6 +42,9 @@ internal class ScriptedProvider(
     val entered = CompletableDeferred<Unit>()
     var events: (CalendarSource) -> List<RemoteEvent> = { emptyList() }
 
+    /** When set, the connect screen reports this at once; otherwise it waits, like a person still choosing. */
+    var connectsAs: Connection? = null
+
     private var inFlight = 0
 
     /** The most sync calls that were running at once. */
@@ -49,6 +53,8 @@ internal class ScriptedProvider(
 
     @Composable
     override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
+        val answer = connectsAs
+        LaunchedEffect(answer) { answer?.let(onConnected) }
     }
 
     override suspend fun sources(conn: Connection): List<CalendarSource> {

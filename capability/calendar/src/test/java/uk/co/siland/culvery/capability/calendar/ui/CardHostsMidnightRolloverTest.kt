@@ -125,7 +125,7 @@ class CardHostsMidnightRolloverTest {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides RecordingOverlay()) {
                 CulveryTheme(dark = true) {
                     val today = rememberToday(zone, clock, ticks)
-                    WeekViewHost(repo, editor, today, rememberNowMillis(clock, ticks))
+                    WeekViewHost(repo, editor, today, rememberNowMillis(clock, ticks), onReconnect = {})
                 }
             }
         }

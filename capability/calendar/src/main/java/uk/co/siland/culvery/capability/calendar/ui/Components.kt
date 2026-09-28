@@ -99,3 +99,29 @@ internal fun PrimaryButton(
         Text(text, style = CalendarType.primaryButton, color = content, maxLines = 1)
     }
 }
+
+/**
+ * An `accent` pill: hand-off §7's Add event, and Settings' Connect and Reconnect (3a design §4.1). 48 dp, radius 24,
+ * a 15 sp / 700 label; with an [icon], a 24 dp one 6 from the label and padding 0 20 0 14, without one padding 0 20.
+ */
+@Composable
+internal fun AddButton(text: String, tag: String, icon: String? = "add", onClick: () -> Unit) {
+    val c = Culvery.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.addEventIconGap),
+        modifier = Modifier
+            .testTag(tag)
+            .height(CalendarDimens.addEventHeight)
+            .clip(RoundedCornerShape(CalendarDimens.addEventRadius))
+            .background(c.accent)
+            .clickable(onClick = onClick)
+            .padding(
+                start = if (icon != null) CalendarDimens.addEventPaddingStart else CalendarDimens.addEventPaddingEnd,
+                end = CalendarDimens.addEventPaddingEnd,
+            ),
+    ) {
+        if (icon != null) HhIcon(icon, size = CalendarDimens.addEventIcon, tint = c.accentInk)
+        Text(text, style = CalendarType.addEventButton, color = c.accentInk, maxLines = 1)
+    }
+}

@@ -21,7 +21,6 @@ internal const val CREATED_BY_KEY = "culvery.createdBy"
 /** As Google shows an event with no title. */
 internal const val NO_TITLE = "(No title)"
 
-private const val TAG = "GoogleCalendar"
 private const val CANCELLED = "cancelled"
 private const val WORKING_LOCATION = "workingLocation"
 private const val DECLINED = "declined"

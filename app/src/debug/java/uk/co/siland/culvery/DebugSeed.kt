@@ -52,7 +52,7 @@ suspend fun seedDebugData(
         )
         calendar.connect(Connection(DEBUG_CONNECTION_ID, FakeCalendarProvider.ID, "Sample calendar", emptyMap()), mapping)
     }
-    if (fake != null && calendar.master() == null) {
+    if (fake != null && calendar.master() == null && DEBUG_CONNECTION_ID in calendar.connectionIds().first()) {
         try {
             calendar.setMaster(DEBUG_CONNECTION_ID, FakeCalendarProvider.SOURCE_FAMILY)
         } catch (e: IllegalArgumentException) {
@@ -61,4 +61,14 @@ suspend fun seedDebugData(
     }
     // The tags may have changed after the start-up sync ran.
     calendar.syncSoon()
+}
+
+/**
+ * Debug builds only (3a design D5, §3.9): once any other connection exists, the sample connection goes, with its events,
+ * sync state and queue, so sample and real events never mix; with a connection, no later start seeds it again.
+ */
+suspend fun removeSampleWhenReplaced(calendar: CalendarSetup) {
+    calendar.connectionIds().collect { ids ->
+        if (DEBUG_CONNECTION_ID in ids && ids.any { it != DEBUG_CONNECTION_ID }) calendar.removeConnection(DEBUG_CONNECTION_ID)
+    }
 }

@@ -45,7 +45,6 @@ import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.capability.calendar.isStaleAt
 import uk.co.siland.culvery.capability.calendar.weekSubtitle
 import uk.co.siland.culvery.core.household.Person
-import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
@@ -61,6 +60,7 @@ internal fun reconnectLabel(labels: List<String>): String =
  * navigation, so the view never leaves the synced window. With [onAdd] (there is a writable master calendar), Add event
  * sits right of the legend and adds on today, and a tap on the space below a column's chips, or on its hint, adds on
  * that column's day; chip taps still open their event. Without it, the legend keeps a 24 dp gap to the right edge.
+ * The reconnect chip runs [onReconnect] (3a design §4.3).
  */
 @Composable
 fun WeekView(
@@ -68,9 +68,9 @@ fun WeekView(
     modifier: Modifier = Modifier,
     onOpen: (EventRef) -> Unit = {},
     onAdd: ((LocalDate) -> Unit)? = null,
+    onReconnect: () -> Unit = {},
 ) {
     val c = Culvery.colors
-    val navigator = LocalShellNavigator.current
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.weekHeaderGap), modifier = modifier.fillMaxSize()) {
         Column {
             // The title+subtitle column and the legend share one bottom-aligned row, so the legend stays level
@@ -102,12 +102,12 @@ fun WeekView(
                             .testTag("week_legend")
                             .then(if (onAdd == null) Modifier.padding(end = CalendarDimens.headerTrailingGap) else Modifier),
                     )
-                    if (onAdd != null) AddEventButton { onAdd(state.today) }
+                    if (onAdd != null) AddButton("Add event", "week_add_event") { onAdd(state.today) }
                 }
             }
             if (state.sync.needsSignIn.isNotEmpty()) {
                 Spacer(Modifier.height(CalendarDimens.reconnectTop))
-                ReconnectChip(reconnectLabel(state.sync.needsSignIn), onClick = navigator::openSettings)
+                ReconnectChip(reconnectLabel(state.sync.needsSignIn), onClick = onReconnect)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekColumnGap), modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -195,26 +195,6 @@ private fun AddHint(date: LocalDate, onAdd: () -> Unit) {
             .clickable(onClickLabel = "Add event", onClick = onAdd),
     ) {
         HhIcon("add", size = CalendarDimens.addHintIcon, tint = Culvery.colors.mute.copy(alpha = CalendarDimens.ADD_HINT_ALPHA))
-    }
-}
-
-/** Hand-off §7: 48 dp, radius 24, `accent`, a 24 dp `add` and 15 sp / 700 in `accentInk`. */
-@Composable
-private fun AddEventButton(onClick: () -> Unit) {
-    val c = Culvery.colors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.addEventIconGap),
-        modifier = Modifier
-            .testTag("week_add_event")
-            .height(CalendarDimens.addEventHeight)
-            .clip(RoundedCornerShape(CalendarDimens.addEventRadius))
-            .background(c.accent)
-            .clickable(onClick = onClick)
-            .padding(start = CalendarDimens.addEventPaddingStart, end = CalendarDimens.addEventPaddingEnd),
-    ) {
-        HhIcon("add", size = CalendarDimens.addEventIcon, tint = c.accentInk)
-        Text("Add event", style = CalendarType.addEventButton, color = c.accentInk, maxLines = 1)
     }
 }
 

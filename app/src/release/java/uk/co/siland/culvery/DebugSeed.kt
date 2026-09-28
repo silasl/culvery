@@ -12,3 +12,6 @@ suspend fun seedDebugData(
     calendar: CalendarSetup,
     providers: Set<CalendarProvider>,
 ) = Unit
+
+@Suppress("UNUSED_PARAMETER")
+suspend fun removeSampleWhenReplaced(calendar: CalendarSetup) = Unit

@@ -228,6 +228,8 @@ class CalendarRepositoryTest {
         val status = repo.syncStatus.first()
         assertThat(status.lastSyncMillis).isEqualTo(2_000L)
         assertThat(status.needsSignIn).containsExactly("Google")
+        // The chip reconnects the first connection that needs it.
+        assertThat(status.reconnect?.id).isEqualTo("c1")
         assertThat(status.connectionLabels).containsExactly("Google", "School").inOrder()
         assertThat(status.failingBeforeFirstSync).isFalse()
     }

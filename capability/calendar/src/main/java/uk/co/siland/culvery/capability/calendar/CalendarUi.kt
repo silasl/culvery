@@ -8,6 +8,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.plugin.Connection
 
 const val ALL_DAY_LABEL = "All day"
 const val STALE_AFTER_MS = 30 * 60_000L
@@ -74,6 +75,8 @@ data class SyncStatusUi(
     val needsSignIn: List<String>,
     val connectionLabels: List<String>,
     val failingBeforeFirstSync: Boolean,
+    /** The first connection that needs signing in again: what the reconnect chip reconnects (3a design §4.3). */
+    val reconnect: Connection? = null,
 )
 
 /** Hand-off §7 chip and row badges, in the order they show. */

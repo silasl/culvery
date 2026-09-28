@@ -87,11 +87,13 @@ class WeekViewTest {
     }
 
     @Test
-    fun reconnectChipOpensSettings() {
-        show { WeekView(state(sync(agoMinutes = 0, needsSignIn = listOf("Google")))) }
+    fun theReconnectChipRunsTheReconnect() {
+        var reconnects = 0
+        show { WeekView(state(sync(agoMinutes = 0, needsSignIn = listOf("Google"))), onReconnect = { reconnects++ }) }
         compose.onNodeWithText("Google needs reconnecting").assertHeightIsAtLeast(44.dp)
         compose.onNodeWithText("Google needs reconnecting").performClick()
-        assertThat(navigator.settingsOpened).isEqualTo(1)
+        assertThat(reconnects).isEqualTo(1)
+        assertThat(navigator.settingsOpened).isEqualTo(0)
     }
 
     @Test

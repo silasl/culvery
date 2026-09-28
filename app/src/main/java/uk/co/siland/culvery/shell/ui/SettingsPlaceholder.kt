@@ -17,9 +17,9 @@ import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Culvery
 
-/** Replaced by real Settings screens in Plan 4. */
+/** Replaced by real Settings screens in Plan 4. [sections] are the capabilities' blocks (3a: the calendar's connections). */
 @Composable
-fun SettingsPlaceholder(onExitKiosk: () -> Unit, onClose: () -> Unit) {
+fun SettingsPlaceholder(onExitKiosk: () -> Unit, onClose: () -> Unit, sections: @Composable () -> Unit = {}) {
     val c = Culvery.colors
     Column(
         verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -33,6 +33,7 @@ fun SettingsPlaceholder(onExitKiosk: () -> Unit, onClose: () -> Unit) {
     ) {
         Text("Settings", style = HhType.screenTitle, color = c.ink)
         Text("Household, people and connections arrive in a later update.", style = HhType.body, color = c.mute)
+        sections()
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             HhPillButton("Exit kiosk", onExitKiosk)
             HhPillButton("Close", onClose, primary = true)

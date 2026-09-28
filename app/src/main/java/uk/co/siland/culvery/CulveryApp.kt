@@ -26,6 +26,7 @@ class CulveryApp : Application() {
         super.onCreate()
         startAll(startables) { startable, e -> Log.e(TAG, "${startable.javaClass.name} failed to start", e) }
         appScope.launch { seedDebugData(household, pins, calendarSetup, calendarProviders) }
+        appScope.launch { removeSampleWhenReplaced(calendarSetup) }
     }
 
     private companion object {

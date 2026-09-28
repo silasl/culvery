@@ -80,7 +80,9 @@ class MainActivity : ComponentActivity() {
                             tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
                         )
                         if (state.settingsOpen) {
-                            SettingsPlaceholder(onExitKiosk = shell::exitKiosk, onClose = shell::closeSettings)
+                            SettingsPlaceholder(onExitKiosk = shell::exitKiosk, onClose = shell::closeSettings) {
+                                capabilities.sortedBy { it.order }.forEach { it.SettingsSection() }
+                            }
                         }
                     }
                 }

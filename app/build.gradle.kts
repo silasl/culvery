@@ -21,7 +21,8 @@ dependencies {
     implementation(project(":core:household"))
     implementation(project(":core:access"))
     implementation(project(":capability:calendar"))
-    // Sample data only; release builds have no calendar provider until Plan 3.
+    implementation(project(":provider:calendar-google"))
+    // Sample data only, in debug builds.
     debugImplementation(project(":provider:calendar-fake"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

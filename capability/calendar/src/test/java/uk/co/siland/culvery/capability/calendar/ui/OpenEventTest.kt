@@ -133,7 +133,7 @@ class OpenEventTest {
 
     @Test
     fun tappingAWeekChipOpensItsDetailSheet() {
-        show { WeekViewHost(repo, editor, today, nowMillis = 0L) }
+        show { WeekViewHost(repo, editor, today, nowMillis = 0L, onReconnect = {}) }
         waitForText("Dinner with Jo & Priya")
         compose.onNodeWithText("Dinner with Jo & Priya").performClick()
         waitForText("Created by")
@@ -144,7 +144,7 @@ class OpenEventTest {
     private fun showBothHosts() = show {
         Row(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) { TodayCardHost(repo, editor, today) }
-            Box(Modifier.weight(1f)) { WeekViewHost(repo, editor, today, nowMillis = 0L) }
+            Box(Modifier.weight(1f)) { WeekViewHost(repo, editor, today, nowMillis = 0L, onReconnect = {}) }
         }
     }
 
@@ -182,7 +182,7 @@ class OpenEventTest {
     @Test
     fun addEventInTheWeekOpensANewEventForToday() {
         makeFamilyTheWritableMaster()
-        show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW) }
+        show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW, onReconnect = {}) }
         waitForTag("week_add_event")
         compose.onNodeWithTag("week_add_event").performClick()
         waitForText("New event")
@@ -192,7 +192,7 @@ class OpenEventTest {
     @Test
     fun aColumnTapPresetsItsDay() {
         makeFamilyTheWritableMaster()
-        show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW) }
+        show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW, onReconnect = {}) }
         val friday = today.plusDays(2)
         waitForTag("week_add_$friday")
         compose.onNodeWithTag("week_add_$friday", useUnmergedTree = true).performClick()
@@ -204,7 +204,7 @@ class OpenEventTest {
     @Test
     fun aChipTapStillOpensTheEventNotTheEditor() {
         makeFamilyTheWritableMaster()
-        show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW) }
+        show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW, onReconnect = {}) }
         waitForText("Dinner with Jo & Priya")
         compose.onNodeWithText("Dinner with Jo & Priya").performClick()
         waitForText("Created by")

@@ -224,6 +224,18 @@ class GoogleWriteTest {
     }
 
     @Test
+    fun aLookBeforeAWriteThatGoogleRefusesIsARefusalNotTryLater() = runTest {
+        provider.create(conn, family, draft(), key)
+        google.failNext(400, "invalid") { it.method == "GET" }
+        assertThat(failureOf { provider.update(conn, family, key, draft(title = "Swim club"), setOf(EventField.TITLE)) })
+            .isInstanceOf(WriteRejectedException::class.java)
+        google.failNext(403, "forbidden") { it.method == "GET" }
+        assertThat(failureOf { provider.delete(conn, family, key) }?.message).isEqualTo("this calendar can't be changed from the tablet")
+        assertThat(google.requests.map { it.method }).containsNoneOf("PATCH", "DELETE")
+        assertLogsHoldNoPersonalData(minLines = 2)
+    }
+
+    @Test
     fun deletingSucceedsWhateverIsLeft() = runTest {
         provider.create(conn, family, draft(), key)
         provider.delete(conn, family, key)

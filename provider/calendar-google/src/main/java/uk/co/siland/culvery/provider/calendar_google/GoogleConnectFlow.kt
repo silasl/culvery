@@ -18,8 +18,6 @@ internal const val GOOGLE_DISPLAY_NAME = "Google Calendar"
 /** The short connection label: the syncing pill and the reconnect chip (3a design D11). */
 internal const val GOOGLE_LABEL = "Google"
 
-private const val TAG = "GoogleConnect"
-
 /** 3a design §3.2: a reconnect must be the same account. */
 fun differentAccount(email: String): String = "That's a different Google account. Reconnect with $email."
 

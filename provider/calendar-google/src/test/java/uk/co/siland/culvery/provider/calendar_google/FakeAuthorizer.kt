@@ -14,6 +14,7 @@ internal class FakeAuthorizer : Authorizer {
     var fromScreens: Authorization = granted("token-after-screens")
     val accounts = mutableListOf<String?>()
     val cleared = mutableListOf<String>()
+    var readFromScreens = 0
 
     override suspend fun authorize(account: String?): Authorization {
         accounts += account
@@ -21,7 +22,10 @@ internal class FakeAuthorizer : Authorizer {
         return next?.also { next = null } ?: granted("token-granted")
     }
 
-    override fun authorizationFrom(data: Intent?): Authorization = fromScreens
+    override fun authorizationFrom(data: Intent?): Authorization {
+        readFromScreens++
+        return fromScreens
+    }
 
     override suspend fun clearToken(token: String) {
         cleared += token

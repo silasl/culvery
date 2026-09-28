@@ -46,6 +46,7 @@ class CalendarRepository @Inject constructor(
             needsSignIn = connections.filter { it.health == ConnectionHealth.NeedsSignIn }.map { it.connection.label },
             connectionLabels = connections.map { it.connection.label },
             failingBeforeFirstSync = connections.any { it.lastSyncMillis == null && it.health != ConnectionHealth.Ok },
+            reconnect = connections.firstOrNull { it.health == ConnectionHealth.NeedsSignIn }?.connection,
         )
     }.distinctUntilChanged()
 

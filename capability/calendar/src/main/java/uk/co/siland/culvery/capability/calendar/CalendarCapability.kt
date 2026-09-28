@@ -5,10 +5,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import uk.co.siland.culvery.capability.calendar.ui.CalendarSettingsHost
 import uk.co.siland.culvery.capability.calendar.ui.ComingUpCardHost
-import uk.co.siland.culvery.capability.calendar.ui.ConnectCalendarCard
+import uk.co.siland.culvery.capability.calendar.ui.ConnectCardHost
 import uk.co.siland.culvery.capability.calendar.ui.TodayCardHost
 import uk.co.siland.culvery.capability.calendar.ui.WeekViewHost
+import uk.co.siland.culvery.capability.calendar.ui.rememberConnector
 import uk.co.siland.culvery.capability.calendar.ui.rememberNowMillis
 import uk.co.siland.culvery.capability.calendar.ui.rememberToday
 import uk.co.siland.culvery.capability.calendar.ui.rememberZoneId
@@ -29,6 +31,7 @@ class CalendarCapability @Inject constructor(
     private val zone: HouseholdZone,
     private val clock: WallClock,
     private val editor: CalendarEditor,
+    private val connections: CalendarConnections,
 ) : Capability {
     override val id = CALENDAR_TAB_ID
     override val label = "Calendar"
@@ -38,7 +41,7 @@ class CalendarCapability @Inject constructor(
 
     override fun cards(): Flow<List<HomeCard>> = repo.hasConnections.map { connected ->
         if (!connected) {
-            listOf(HomeCard(CONNECT_CARD_ID, HomeCardSize.TALL, 100) { ConnectCalendarCard() })
+            listOf(HomeCard(CONNECT_CARD_ID, HomeCardSize.TALL, 100) { ConnectCardHost(connections) })
         } else {
             listOf(
                 HomeCard(TODAY_CARD_ID, HomeCardSize.TALL, 100) { TodayCardHost(repo, editor, rememberToday(zone, clock)) },
@@ -50,6 +53,12 @@ class CalendarCapability @Inject constructor(
     @Composable
     override fun TabContent() {
         val now = rememberNowMillis(clock)
-        WeekViewHost(repo, editor, today = todayIn(rememberZoneId(zone), now), nowMillis = now)
+        val connector = rememberConnector(connections)
+        WeekViewHost(repo, editor, today = todayIn(rememberZoneId(zone), now), nowMillis = now, onReconnect = connector::reconnect)
+    }
+
+    @Composable
+    override fun SettingsSection() {
+        CalendarSettingsHost(connections, clock)
     }
 }

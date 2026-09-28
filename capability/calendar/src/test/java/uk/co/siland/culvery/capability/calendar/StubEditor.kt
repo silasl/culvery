@@ -31,3 +31,12 @@ private object NobodyMay : AccessControl {
  */
 internal fun stubEditor(store: CalendarStore, zone: HouseholdZone, clock: WallClock = WallClock { 0L }): CalendarEditor =
     testEditor(store, emptySet(), NobodyMay, RecordingToaster(), zone, clock, CoroutineScope(Dispatchers.Unconfined))
+
+/** Connections that nobody may make, for tests that only need the capability's screens to compose. */
+internal fun stubConnections(store: CalendarStore): CalendarConnections = CalendarConnections(
+    store,
+    CalendarSetup(store, emptySet(), { emptyList() }, RecordingToaster(), WallClock { 0L }, EmptyCoroutineContext),
+    NobodyMay,
+    emptySet(),
+    CoroutineScope(Dispatchers.Unconfined),
+)

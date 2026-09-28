@@ -27,7 +27,9 @@ const val GOOGLE_CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3/"
 internal const val REFUSED = "the change was refused"
 internal const val READ_ONLY_HERE = "this calendar can't be changed from the tablet"
 
-private const val TAG = "GoogleCalendar"
+/** The module's one log tag. */
+internal const val TAG = "GoogleCalendar"
+
 private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
 
 /** 403 reasons that mean "try later": Google's rate limits and its quotas (3a design §3.7). */
@@ -83,6 +85,9 @@ internal suspend fun Call.await(): GoogleResponse = suspendCancellableCoroutine 
 /** What Google answered: the status, the body, and Google's error reasons (for the log) and message (never logged). */
 internal class GoogleResponse(val code: Int, val body: String) {
     val isSuccessful: Boolean get() = code in 200..299
+
+    /** 404 or 410: the event (or calendar) isn't there. */
+    val isGoneStatus: Boolean get() = code == 404 || code == 410
 
     private val error: ErrorDetail? by lazy {
         runCatching { GoogleJson.decodeFromString(ErrorBody.serializer(), body).error }.getOrNull()
