@@ -41,6 +41,7 @@ The direct ICS provider is deferred, not a "3b" (D1). Google becomes the first p
 | D13 | **Crash-proofing** (R3 and the folded follow-ups): a logging `CoroutineExceptionHandler` on `@ApplicationScope`; per source, catch `Throwable` minus `CancellationException` → health Error, logged with its cause; store calls outside the per-source try; `ShellViewModel`'s capability flows and `connectionIds()` use `retryWhen` with backoff instead of a terminal `catch`; the drain backs off after a failed drain (m2); a drain write the provider accepted but the tablet couldn't store is retried later, not left due (C2); the drain/editor orphan race is closed; Try again after a failed queue write reuses the key; the add/edit sheet closes with a toast when it can't load; the editor's Delete failure uses delete wording; `NeedsSignIn`, `Unreachable` and `Error` are logged with their cause; a counting-DAO test for SQLite's 999-variable limit. |
 | D14 | **Google-specific follow-ups.** C3: an edit PATCHes only the fields the user touched (the form tracks them; they are applied to the event as re-read under the write lock; queued offline edits too). m3: a queued ASSIGN for an event outside the window fetches it from Google. C9: an aged (48 h) create is looked up by its key before it is dropped. C10: contract rule "a create never recreates a deleted event", with its check. |
 | D15 | **Testing.** Fake-Google-server tests for every mapping and error; the contract suite against the Google provider (through the fake server); crash-proofing tests; an emulator walkthrough with the user's real Google account on the API 35 Play image; the user's screenshot checkpoint (§7). |
+| D16 | **The outbox age clock pauses while Google needs sign-in.** A queued change's 48-hour age counts only the time its connection was not waiting for sign-in, so changes queued during a Google access lapse (a weekend, a Testing-status grant expiring) are never dropped for age; the clock resumes when the connection is healthy again (§3.8, §3.11). Changes stuck for other reasons (offline, refused, undeliverable) age as before. |
 
 ## 3. Architecture
 
@@ -68,7 +69,7 @@ Set up as README "Adding a calendar provider" step 1, plus:
 - **Connectable providers:** `ProviderDescriptor` gains `userConnectable: Boolean = true`; the fake sets it false. "Connect {displayName}" is offered for each connectable provider with no connection yet, so in 3a just "Connect Google Calendar", and it goes once Google is connected.
 - **`CalendarConnectHost`** (`:capability:calendar`, shown through `LocalOverlayHost`): authorises, then draws the provider's `ConnectScreen` (a centred `surf` card, "Connecting to Google Calendar…", with Cancel, over the scrim, while the system screens run). `onConnected` → `CalendarSetup.connectWithDefaults(connection)` for a new connection, or `CalendarSetup.reconnect(connection)`; `onCancel` → dismiss, no toast.
 - **`connectWithDefaults`** (D4): reads `provider.sources()` through the IO + 60 s timeout wrapper (the Plan 4 follow-up for `connect`, pulled forward; `setMaster` gets the same wrapper), builds the mapping with `defaultMapping` (§3.4) from the household's people, adds the connection and sources in one transaction, makes the primary the master (`setMaster` clears any other), requests a sync, and toasts "Google Calendar connected". A failure → "Couldn't connect to Google Calendar — try again", and nothing is stored.
-- **`reconnect`** (D6): keeps the connection id and config; sets health Ok; `store.makeDue(connectionId, now)` sets `nextAttemptMillis = now` on that connection's outbox rows without touching `attempts`; requests a sync; toasts "Google Calendar reconnected".
+- **`reconnect`** (D6): keeps the connection id and config; sets health Ok (which ends the D16 pause, §3.8); `store.makeDue(connectionId, now)` sets `nextAttemptMillis = now` on that connection's outbox rows without touching `attempts`; requests a sync; toasts "Google Calendar reconnected".
 - **Where:** the Settings placeholder gains a Calendars row per connection ("Google Calendar · {email}", its health in words, and **Reconnect** when it needs signing in) and the Connect button (§4.1). The Connect-a-calendar card's button becomes the Connect button (§4.2). The reconnect chip opens `CalendarConnectHost` for its connection (§4.3).
 
 ### 3.4 Sources, default mapping and the daily refresh (D4, D7)
@@ -107,7 +108,7 @@ Set up as README "Adding a calendar provider" step 1, plus:
 - **`colorId`:** the nearest of Google's 11 fixed event colours (`colors.get` ids 1–11, a table in the provider) to the person's colour by RGB distance. `EventDraft` gains `forPersonColor: Long?`, set by the editor from the household; null for Family or untagged, which sends no `colorId` on a create and clears it (`null`) on a Who change.
 - **Delete:** `DELETE calendars/{id}/events/{eventId}`; 404 and 410 → success.
 - **`find`:** `GET calendars/{id}/events/{eventId}` → the event, or null for 404, 410 or `status == "cancelled"`.
-- **Aged create (C9):** at 48 h, before dropping a create, the drain calls `writer.find(clientKey)`. Found → the create is completed (the mirror gets the event, the row goes), and the changes queued behind it are sent in this pass whatever their age, since they describe an event that exists. Not found → dropped with its followers, as today. `find` unreachable → the row stays and the check repeats next pass.
+- **Aged create (C9):** at 48 h of age (as D16 measures it), before dropping a create, the drain calls `writer.find(clientKey)`. Found → the create is completed (the mirror gets the event, the row goes), and the changes queued behind it are sent in this pass whatever their age, since they describe an event that exists. Not found → dropped with its followers, as today. `find` unreachable → the row stays and the check repeats next pass.
 
 ### 3.7 Error mapping (D10)
 | Response | Reads (`sources`, `sync`, `find`) | Writes |
@@ -125,13 +126,18 @@ Set up as README "Adding a calendar provider" step 1, plus:
 
 Google's own message text is logged, never shown. The toast reads, for example, "Couldn't save to Google Calendar — the change was refused".
 
-**`NeedsSignIn` from a write.** `WriteOutcome.Retry` gains `needsSignIn`; when set, the editor or the drain also sets the connection's health to `NeedsSignIn`, so the reconnect chip shows at once rather than at the next sync. The change is queued and backs off as any retry; the reconnect makes it due (D6). A change still unsent after 48 h is dropped as today.
+**`NeedsSignIn` from a write.** `WriteOutcome.Retry` gains `needsSignIn`; when set, the editor or the drain also sets the connection's health to `NeedsSignIn`, so the reconnect chip shows at once rather than at the next sync. The change is queued and backs off as any retry; the reconnect makes it due (D6). Its age clock is paused while the connection needs sign-in (D16, §3.8), so a lapse of any length drops nothing; a change still unsent after 48 h of unpaused age is dropped as today.
 
 ### 3.8 Store (D5, D7)
 - `removeConnection(id)`: one transaction deleting the connection and its sources, events, sync state and outbox rows.
 - `refreshSources(connectionId, sources, mappingForNew)`: §3.4; returns whether the master was cleared.
 - `clearMaster()`, used by `refreshSources` when the master goes; `setMaster` already clears any other master when `connectWithDefaults` sets the primary.
 - `makeDue(connectionId, nowMillis)`: D6.
+- **The paused age clock (D16).** `setHealth(connectionId, health, nowMillis)` (it gains `nowMillis`) and `markSynced` are the only ways health changes, and each runs in one transaction that also keeps the pause:
+  - entering `NeedsSignIn` with no pause running sets `connection.needsSignInSinceMillis = now`; a repeated `NeedsSignIn` keeps the original time;
+  - becoming `Ok` (`markSynced`, the reconnect's `setHealth(Ok)`) with a pause running adds the paused time to each of that connection's outbox rows, `pausedMillis += now − max(needsSignInSinceMillis, createdMillis)` (a row queued during the lapse is paused only from when it was made), and clears `needsSignInSinceMillis`;
+  - `Unreachable` or `Error` while paused leave the pause running: they don't say the access came back, and a lapsed tablet that is also offline must not start ageing its queue.
+  - A change's age is `ageMillis(change, pausedSince, now) = now − createdMillis − pausedMillis − (now − max(pausedSince, createdMillis) while a pause runs)`, a pure function in `Writes.kt`; the drain (the 48 h drop and C9's check) uses it instead of `now − createdMillis`. `StoredConnection` gains `needsSignInSinceMillis: Long?` so the drain reads it from the connections it already has.
 - `applySync` and `applyAccepted` return early, writing nothing, when the source row is gone, so a removal racing an in-flight sync or write leaves no orphan rows or stale cursor.
 - The Plan 4 follow-up's foreign keys are not added: the store is the only writer of `calendar.db` and deletes the dependent rows itself in the same transaction, and the early returns cover the race. That follow-up closes.
 
@@ -159,9 +165,11 @@ Google's own message text is logged, never shown. The toast reads, for example, 
 - **`MIGRATION_3_4`**, hand-written:
   - `ALTER TABLE event ADD COLUMN recurrenceRule TEXT`;
   - `ALTER TABLE outbox ADD COLUMN fields TEXT` (a comma-separated `EventField` list; null on an older row means every field for an UPDATE, which is what it sent, and `FOR_PERSON` for an ASSIGN);
-  - `ALTER TABLE connection ADD COLUMN sourcesCheckedMillis INTEGER`.
+  - `ALTER TABLE connection ADD COLUMN sourcesCheckedMillis INTEGER`;
+  - `ALTER TABLE connection ADD COLUMN needsSignInSinceMillis INTEGER` (D16: when the running sign-in pause began; null when none runs; an existing `NEEDS_SIGN_IN` row migrates with null, so its pause starts at the next `NeedsSignIn` a sync reports);
+  - `ALTER TABLE outbox ADD COLUMN pausedMillis INTEGER NOT NULL DEFAULT 0` (D16: the paused time already folded into this row's age).
 - The v4 schema JSON is committed. `CalendarMigrationTest` gets a v3 → v4 test with rows of every kind and the table list.
-- `PendingChange` gains `fields: Set<EventField>?` (UPDATE and ASSIGN only). `EventDraft`'s `forPersonColor` goes in the outbox's draft JSON; an older row without it reads null.
+- `PendingChange` gains `fields: Set<EventField>?` (UPDATE and ASSIGN only) and `pausedMillis: Long = 0` (D16). `EventDraft`'s `forPersonColor` goes in the outbox's draft JSON; an older row without it reads null.
 
 ### 3.12 Crash-proofing (D13)
 - **Application scope:** `AppModule.applicationScope()` adds a `CoroutineExceptionHandler` that logs with `Log.e` and keeps the process alive; with the existing `SupervisorJob`, one failed child no longer brings down the others.
@@ -206,7 +214,7 @@ The label is unchanged ("Google needs reconnecting"). A tap runs D6 for the firs
 
 ## 5. Errors and offline
 - **Offline** → sync health Unreachable, cached events shown; saves queue as in 2b-2.
-- **Google access lapses** (revoked, password change, a Testing-status grant expiring) → the next call gets a resolution or a second 401 → `NeedsSignIn`; the chip shows. Saves meanwhile are queued (§3.7). Reconnect → health Ok, the queue is due now and drains, a sync runs.
+- **Google access lapses** (revoked, password change, a Testing-status grant expiring) → the next call gets a resolution or a second 401 → `NeedsSignIn`; the chip shows. Saves meanwhile are queued (§3.7) and their age clock is paused (D16), so a lapse over a weekend drops nothing. Reconnect → health Ok, the pause is folded into each queued change's age, the queue is due now and drains, a sync runs.
 - **Lost reply on a create** → queued with its key; the retry's 409 returns the existing event; one event.
 - **A phone edit while an offline tablet edit waits** → only the touched fields are sent; the phone's other changes stay.
 - **An event deleted on a phone while a tablet create for it was queued** (the create's reply was lost, then the event deleted) → the retry's 409 finds it cancelled → rejected with `EVENT_GONE`, dropped with its followers, one toast.
@@ -223,7 +231,7 @@ The label is unchanged ("Google needs reconnecting"). A tap runs D6 for the firs
 - **Visibility after a refresh** follows Google's ticks each time (§3.4); person mappings are kept.
 - **"Simple" RRULE** also allows the one-day `BYDAY` / `BYMONTHDAY` that Google writes for every weekly and monthly event; otherwise almost no real series would get a label. Intervals other than 1 and 2 weeks read "Every {n} {unit}s".
 - **Reconnect in Settings:** the Settings row also offers Reconnect, since an Admin looking there for the problem should be able to fix it; it runs the same flow as the chip.
-- **Access lapsing for over 48 h** drops queued changes by the existing age rule (with the toast); 3a doesn't extend it.
+- **Access lapsing for over 48 h** drops nothing (D16): the age clock pauses from the first `NeedsSignIn` until the connection is `Ok` again. An `Unreachable` or `Error` in between keeps the pause running, since neither says the access came back. An existing `NEEDS_SIGN_IN` connection at upgrade starts its pause at the next sync that reports it.
 
 ## 7. Testing
 - **Fake Google server** (`MockWebServer` + a `Dispatcher` holding calendars and events in memory, with sync tokens, pages, cancelled instances and extended properties): tests for every row of §3.5–§3.7:
@@ -238,8 +246,8 @@ The label is unchanged ("Google needs reconnecting"). A tap runs D6 for the firs
 - **Token source:** resolution → NeedsSignIn; network `ApiException` → Unreachable; `invalidate` then retry.
 - **Contract suite** runs against `GoogleCalendarProvider` through the fake server, and against the fake; both pass every check, and every new check has a self-test fixture that fails it.
 - **Mapping and refresh:** `defaultMapping` (primary, one name, a possessive, two names, a name inside another word such as "Samantha" for "Sam", case); the refresh (add, hide, unhide, remove with events and outbox, keep mappings, master removed, master read-only → cleared and one toast); `repeatsLabel` for each label and "Yes" cases.
-- **Store:** v3 → v4 migration with the table list; `removeConnection` and source removal leave no events, cursors or outbox rows; `applySync`/`applyAccepted` after a removal write nothing; `makeDue`.
-- **Editor and drain:** touched fields (sheet → editor → queue → writer), including an offline edit overlaid on a later phone change; ASSIGN outside the window found and not found; an aged create found (followers sent) and not found (dropped, one toast); `NeedsSignIn` from a write sets health; reconnect makes the queue due.
+- **Store:** v3 → v4 migration with the table list; `removeConnection` and source removal leave no events, cursors or outbox rows; `applySync`/`applyAccepted` after a removal write nothing; `makeDue`; the paused clock (D16): `NeedsSignIn` starts a pause once, `Unreachable` keeps it, `markSynced` and `setHealth(Ok)` fold it into each row (a row queued mid-lapse only from its creation) and clear it; `ageMillis` for no pause, a running pause and a folded one.
+- **Editor and drain:** touched fields (sheet → editor → queue → writer), including an offline edit overlaid on a later phone change; ASSIGN outside the window found and not found; a change queued 47 h before a 3-day `NeedsSignIn` lapse is not dropped during it, and is dropped once 1 h of healthy time passes after the reconnect (if still unsent); an aged create found (followers sent) and not found (dropped, one toast); `NeedsSignIn` from a write sets health; reconnect makes the queue due.
 - **Crash-proofing:** a provider throwing `Error` → Error health, others sync, the loop keeps running; a store failure in a pass → logged, next pass runs; the drain backoff sequence and reset; C2 (the updated test); the orphan race with the shared lock; Try again reuses the key after `TRY_AGAIN`; the sheet's load failure closes with the toast; the editor's Delete failure toast; `retryWhen` restores a tab after a failing flow recovers; an uncaught exception in an application-scope child is logged and siblings keep running; the counting-DAO test that no statement binds more than 999 variables.
 - **Connect flow (Robolectric):** `CalendarConnectHost` with a fake provider: authorise, connect → setup, cancel, failure toast; the card's and Settings' buttons; the chip opening reconnect; debug: a Google connection removes the sample.
 - **Roborazzi**, dark and light: the Settings placeholder with a Google row (Ok and NeedsSignIn), the connect card with Connect Google Calendar, the Connecting card.
@@ -248,7 +256,7 @@ The label is unchanged ("Google needs reconnecting"). A tap runs D6 for the firs
   - add, edit, delete and assign on the tablet, each checked in Google Calendar on the phone (title, time, colour); an edit's untouched fields kept after a phone change;
   - a repeating event's Repeats row;
   - offline (airplane mode): add and edit, then back online: delivered once;
-  - revoke access at myaccount.google.com › Security › Third-party access: the chip appears; reconnect with the PIN: queued changes go through;
+  - revoke access at myaccount.google.com › Security › Third-party access: the chip appears; reconnect with the PIN: queued changes go through (the D16 pause itself is checked by unit tests, not by waiting 48 h);
   - tick a new calendar in Google, restart the app: it appears, mapped.
 
 ## 8. Plan 3 follow-ups: what 3a does
@@ -268,6 +276,7 @@ The label is unchanged ("Google needs reconnecting"). A tap runs D6 for the firs
 | m2 drain backoff | Yes, §3.12 |
 | m3 ASSIGN outside the window | Yes, §3.6 |
 | m4 reconnect makes the queue due | Yes, §3.3 |
+| (new, D16) queued changes survive a sign-in lapse of any length | Yes, §3.8, §3.11 |
 | C2 accepted but unstored | Yes, §3.12 |
 | C3 touched-field PATCH | Yes, §3.6 |
 | C9 aged create | Yes, §3.6 |
@@ -282,7 +291,7 @@ The label is unchanged ("Google needs reconnecting"). A tap runs D6 for the firs
 
 ## 9. Review focus
 Inputs a person will hit, for the plan's reviewers:
-- Google access lapsing mid-save: the change is queued, the chip shows `NeedsSignIn`, and the reconnect drains it.
+- Google access lapsing mid-save: the change is queued, the chip shows `NeedsSignIn`, and the reconnect drains it; a lapse longer than 48 h (a weekend) drops nothing, because the age clock pauses while the connection needs sign-in (D16).
 - A 409 on a create after a lost reply: no duplicate, and never a deleted event brought back.
 - A phone edit made while an offline tablet edit waits: the touched-field PATCH keeps it.
 - A calendar deleted in Google while it is the master: cleared, one toast, add buttons hide, nothing crashes.
