@@ -300,7 +300,6 @@ class GoogleCalendarProvider @Inject constructor(
 
     private fun keyOf(conn: Connection, source: CalendarSource) = "${conn.id}\u0000${source.id}"
 
-
     private fun accountOf(conn: Connection): String =
         conn.config[CONFIG_ACCOUNT] ?: throw NeedsSignInException("The Google connection ${conn.id} has no account")
 }
