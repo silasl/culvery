@@ -88,3 +88,4 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - Bound recurring series in the mirror: Google's sync (`singleEvents`, no `timeMax`) stores every instance, e.g. 730 rows up to 2040 for one weekly event. Measure on the SM-T510 and cap stored instances (for example, drop rows past the sync window after each pass).
 - `TodayCardHost` recomposes every 30 s on the clock tick with nothing changed; key the day on the date alone.
 - Emulator Play services 26.34 crash-loops on API 35 after a network change (see the setup doc's §5 note); recheck on the SM-T510 before shipping.
+- A write refused for a missing scope (403, NeedsSignIn) while reads still work: the same pass's `markSynced` sets health back to Ok, so the reconnect chip vanishes and the change retries until its 48 hours run out. Only a later partial revocation leads here (connect refuses partial grants); keep NeedsSignIn from a write until a reconnect.

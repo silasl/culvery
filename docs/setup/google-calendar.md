@@ -16,12 +16,12 @@ Google renames these console screens from time to time. If a label below doesn't
 1. Go to **Google Auth Platform** (or **APIs & Services › OAuth consent screen**) and click **Get started**.
 2. **App information:** name `Culvery`, and your email as the support and developer contact.
 3. **Audience:** **External**, which is needed for personal Gmail accounts. Set the publishing status to **In production**. The app stays unverified, which is fine for a household: the first sign-in shows a "Google hasn't verified this app" screen (choose **Advanced**, then **Go to Culvery (unsafe)**), up to 100 users can sign in, and access doesn't expire. In **Testing**, Google ends access every 7 days, so the tablet would show "Google needs reconnecting" weekly.
-4. **Test users:** add every Google account that will sign in on the tablet, e.g. the household account.
+4. **Test users** (only if you left it in **Testing**): add every Google account that will sign in on the tablet, e.g. the household account.
 5. **Data access › Add or remove scopes**, and add both of these:
    - `https://www.googleapis.com/auth/calendar.readonly`
    - `https://www.googleapis.com/auth/calendar.events`
 
-   These are "sensitive" scopes. That's expected: while the app is unverified, Google shows an "unverified app" warning at sign-in, which you can safely continue past for your own app.
+   These are "sensitive" scopes, which is expected; they are why Google shows the unverified-app screen from step 3.
 
 ## 4. Create the Android OAuth client
 1. Go to **Google Auth Platform › Clients** (or **APIs & Services › Credentials**), then **Create client**, and pick application type **Android**.
