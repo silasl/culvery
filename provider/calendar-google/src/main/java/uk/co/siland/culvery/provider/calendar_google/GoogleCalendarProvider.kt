@@ -143,9 +143,10 @@ class GoogleCalendarProvider @Inject constructor(
         val listed = list(account, source, window) ?: throw UnreachableException("Google Calendar expired a full sync of a calendar")
         val failed = mutableSetOf<String>()
         val upserts = listed.items.filterNot { it.isGone }.mapNotNull { it.toRemoteEvent(ruleOf(account, source, it, fresh, failed)) }
+        // A resumed map can hold series deleted since the unfinished attempt.
         fresh.keys.retainAll(listed.items.mapNotNull { it.recurringEventId }.toSet())
         rules[key] = fresh
-        fullSyncRules.remove(key, fresh)
+        fullSyncRules.remove(key)
         return SyncResult(upserts, emptyList(), listed.syncToken?.let(::SyncCursor), fullReplace = true)
     }
 
@@ -158,7 +159,7 @@ class GoogleCalendarProvider @Inject constructor(
             if (event.isGone) {
                 removed += event.id
             } else {
-                event.toRemoteEvent(ruleOf(account, source, event, rulesFor(conn, source), failed))?.let { upserts += it }
+                event.toRemoteEvent(ruleOf(account, source, event, rules.getOrPut(keyOf(conn, source)) { ConcurrentHashMap() }, failed))?.let { upserts += it }
             }
         }
         return SyncResult(upserts, removed, listed.syncToken?.let(::SyncCursor) ?: cursor, fullReplace = false)
@@ -299,7 +300,6 @@ class GoogleCalendarProvider @Inject constructor(
 
     private fun keyOf(conn: Connection, source: CalendarSource) = "${conn.id}\u0000${source.id}"
 
-    private fun rulesFor(conn: Connection, source: CalendarSource) = rules.getOrPut(keyOf(conn, source)) { ConcurrentHashMap() }
 
     private fun accountOf(conn: Connection): String =
         conn.config[CONFIG_ACCOUNT] ?: throw NeedsSignInException("The Google connection ${conn.id} has no account")

@@ -4,7 +4,6 @@ import androidx.room.execSQL
 import androidx.room.useWriterConnection
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import com.google.common.truth.Truth.assertWithMessage
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -487,7 +486,7 @@ class CalendarSyncTest {
         sync.syncAll()
         val lines = ShadowLog.getLogsForTag("CalendarSync").map { "${it.msg} ${it.throwable?.message}" }
         assertThat(lines.filter { "nothing can deliver" in it }).hasSize(1)
-        lines.forEach { assertWithMessage(it).that(it).doesNotContain("@") }
+        assertThat(lines.joinToString()).doesNotContain("@")
     }
 
     @Test
