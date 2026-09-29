@@ -32,7 +32,7 @@ fun SettingsPlaceholder(onExitKiosk: () -> Unit, onClose: () -> Unit, sections: 
             .padding(48.dp),
     ) {
         Text("Settings", style = HhType.screenTitle, color = c.ink)
-        Text("Household, people and connections arrive in a later update.", style = HhType.body, color = c.mute)
+        Text("Household and people arrive in a later update.", style = HhType.body, color = c.mute)
         sections()
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             HhPillButton("Exit kiosk", onExitKiosk)
