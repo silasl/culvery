@@ -21,6 +21,8 @@ Debug builds seed a sample household on first launch so the app is usable before
 
 To see what the tablet does while a calendar can't be reached, a debug build can take the sample calendar offline and bring it back: `adb shell am broadcast -n uk.co.siland.culvery/.DebugOfflineReceiver --ez offline true` (or `false`). Changes made meanwhile show as syncing and are sent once it is back. This switch is debug-only and reached only over adb; it has no counterpart in the app's UI.
 
+To connect a real Google account, first set up a Google Cloud project with an Android client for your debug key (`docs/setup/google-calendar.md`), add the family's Google account to the device (Settings › Accounts), then Settings › Connect Google Calendar (Admin PIN). Connecting removes the sample calendar, with its events and queued changes, for good. There is no disconnect yet: to undo a connection (the wrong account, or to get the sample back), clear the app's data. Release builds offer Google Calendar only, and its Connect fails until the release key's SHA-1 has its own Android client (Plan 4). A calendar is mapped to a person when its name contains theirs as a whole word, so a name that is also a common word ("May", "Will") can map a calendar like "May half term" to that person; Plan 4's Settings will let you change it.
+
 ## Screenshot tests
 
 Compose screens are checked against PNG baselines with [Roborazzi](https://github.com/takahirom/roborazzi) under Robolectric at the tablet's 1280×800 dp.
@@ -47,6 +49,7 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 | `:capability:calendar` | Calendar contract (read and write), `calendar.db` cache and outbox, 5-minute sync, event editor, Home cards, Calendar tab, event detail and add/edit sheets |
 | `:capability:calendar-testkit` | `CalendarProviderContractTest`, the tests every calendar provider must pass |
 | `:provider:calendar-fake` | Debug-only sample calendar (the hand-off's week, relative to today) |
+| `:provider:calendar-google` | Google Calendar API v3 over OkHttp; sign-in and tokens through Play services, nothing stored |
 
 Rules, enforced when Gradle configures the project (`build-logic/convention/src/main/kotlin/ModuleBoundaries.kt`):
 - `:core:*` depends only on `:core:*`.
@@ -56,7 +59,7 @@ Rules, enforced when Gradle configures the project (`build-logic/convention/src/
 
 Breaking a rule fails the build with `Module boundary: <from> must not depend on <to>`. Each module that stores data owns its own database file.
 
-`calendar.db` stores user configuration (connections, mappings, the master calendar) and queued changes (the `outbox` table; the `event` table is only ever a copy of what the provider has). Every schema version bump ships a hand-written Room `Migration` in `db/Migrations.kt` with a `MigrationTestHelper` test in `CalendarMigrationTest`; never use destructive fallback. `CalendarMigrationTest` runs that helper with the driver-based `AndroidSQLiteDriver`, because androidx.sqlite 2.6.x's default driver mis-handles Windows paths. Room exports each schema version to `<module>/schemas/`, and those files are committed.
+`calendar.db` stores user configuration (connections, mappings, the master calendar) and queued changes (the `outbox` table; the `event` table is only ever a copy of what the provider has). A queued change's 48-hour age doesn't count time its connection spent waiting for sign-in, so a lapse over a weekend drops nothing. Every schema version bump ships a hand-written Room `Migration` in `db/Migrations.kt` with a `MigrationTestHelper` test in `CalendarMigrationTest`; never use destructive fallback. `CalendarMigrationTest` runs that helper with the driver-based `AndroidSQLiteDriver`, because androidx.sqlite 2.6.x's default driver mis-handles Windows paths. Room exports each schema version to `<module>/schemas/`, and those files are committed.
 
 ## Adding a capability
 
@@ -91,26 +94,30 @@ A provider connects one kind of calendar service (Google, ICS, CalDAV…) to the
 
 2. **Implement `CalendarProvider`:**
    - `descriptor`: a stable, unique `id` such as `calendar.<name>` (it is stored with each connection, so never change it), a display name, a Material Symbols icon, and `features` (`READ`, plus `WRITE` if it implements `CalendarWriter`).
-   - `ConnectScreen(existing, onConnected, onCancel)`: collect whatever the service needs and call `onConnected(Connection(id, providerId = descriptor.id, label, config))`. Use a new UUID for `id` when `existing` is null; when it is non-null the user is reconnecting that connection, so keep `existing.id`. Keep secrets out of `config`.
-   - `sources(conn)`: the calendars in this connection, with ids that never change between calls.
+   - `ConnectScreen(existing, onConnected, onCancel)`: collect whatever the service needs and call `onConnected(Connection(id, providerId = descriptor.id, label, config))`. Use a new UUID for `id` when `existing` is null; when it is non-null the user is reconnecting that connection, so keep `existing.id`. Keep secrets out of `config`. Put the signed-in account in `config[CONFIG_ACCOUNT]` for Settings to show. Set `ProviderDescriptor.userConnectable = false` for a provider nobody should connect from Settings (the debug sample).
+   - `sources(conn)`: the calendars in this connection, with ids that never change between calls. Set `shown` (ticked in the service) and `primary` (the account's own calendar, at most one): connecting maps every source by name to a person or Family, shows the ticked ones, and makes the primary the master. A daily refresh follows later ticks, additions and removals.
    - `sync(conn, source, range, cursor)` must:
      - with `cursor == null`, return every event that overlaps `range` (local dates in `range.zone`, end exclusive), and only those, with `fullReplace = true` and, if the service supports it, a cursor for next time;
      - with a cursor, return only changes (`upserts`, `removedIds`) with `fullReplace = false`, or `fullReplace = true` only if the service forces a full resync (e.g. Google's HTTP 410). These incremental upserts MAY lie outside `range` (Google's `syncToken` can't carry `timeMin`/`timeMax`); the app keeps them and filters by range when it reads;
      - give timed events as `EventTime.Timed(instant)` and all-day events as `EventTime.AllDay(date)` with an **exclusive** end date (a one-day event on the 23rd ends on the 24th);
      - expand recurring events into occurrences with distinct `remoteId`s and `recurring = true`;
-     - throw `NeedsSignInException` for auth failures and `UnreachableException` for network failures, and nothing else.
+     - throw `NeedsSignInException` for auth failures and `UnreachableException` for network failures, or `SourceGoneException` (an `UnreachableException`) when the source itself has gone (the app then refreshes the sources), and nothing else. Set `recurrenceRule` to the series' RRULE line when you know it: the detail sheet describes it ("Every week").
    - `sources` and `sync` must be main-safe and cancellable: no uninterruptible blocking I/O. The app calls them on `Dispatchers.IO` under a 60-second timeout and treats a timeout as unreachable.
    The app handles storage, the sync schedule (every 5 minutes and on start), the window (yesterday to 14 days ahead) and error display.
 
 3. **Writing (optional).** If the service can write, declare `Feature.WRITE` and implement `CalendarWriter` (often on the same class):
    - `providerId` equals `descriptor.id`.
    - `create`, `update` and `delete` write to one source. `forPerson` and `createdBy` are household person ids to store with the event (Google: `extendedProperties.private`), and the next sync must return them unchanged. Never write names.
-   - `update` changes only the title, the times and the tags, and keeps every other field (Google: PATCH, not PUT).
+   - `update(…, fields)` changes only the given `EventField`s (`TITLE`, `TIMES`, `FOR_PERSON`) and keeps everything else, the `createdBy` tag included (Google: a PATCH of just those keys). The tablet sends only what the person touched, so a change made on a phone to anything else is kept.
+   - `find` returns the event as the service holds it, or null when it doesn't exist or was deleted.
+   - `EventDraft.forPersonColor` is the person's colour; use it if the service can colour events (Google: the nearest `colorId`).
    - Throw `WriteRejectedException` for a permanent refusal (including a source that is unknown or read-only), `NeedsSignInException` for auth failures, and `UnreachableException` for network failures and for "try later" answers (Google: 429, 403 rate limits, 5xx). Nothing else.
    - Deleting an event that is already gone succeeds (Google: treat 404 and 410 on a delete as success).
    - `create` takes a client key: use it as the event's id, so the returned `remoteId` equals it, and when a create repeats a key already used on that source, return the event that key made instead of making a second (Google: `events.insert` with `id = clientKey`; a 409 means it exists, so fetch and return it). The app sends a create again with the same key when it never heard back, so this is what stops duplicates.
+   - A create never recreates a deleted event: when the key belonged to an event since deleted, throw `WriteRejectedException` (Google: the 409's event is cancelled). Nor does an update: if the service would accept a change to a deleted event (Google answers a PATCH on one with 200), look the event up first and refuse with `EVENT_GONE`.
+   - Every call must return promptly when its caller is cancelled: cancel the network call with it (OkHttp: enqueue inside `suspendCancellableCoroutine` and cancel from `invokeOnCancellation`), and keep the calls main-safe (read bodies off the main thread).
 
-   Bind it next to the provider: `@Binds @IntoSet abstract fun writer(impl: MyCalendarProvider): CalendarWriter`. The app writes only to the household's master calendar, and only non-recurring events. It tries the writer for 10 seconds, then queues the change and retries with backoff (30 s, 1 min, 2 min, then every 5 min), delivering each event's changes in order. A change still queued after 48 hours is dropped with a toast.
+   Bind it next to the provider: `@Binds @IntoSet abstract fun writer(impl: MyCalendarProvider): CalendarWriter`. The app writes only to the household's master calendar, and only non-recurring events. It tries the writer for 10 seconds, then queues the change and retries with backoff (30 s, 1 min, 2 min, then every 5 min), delivering each event's changes in order. A change still queued after 48 hours (not counting time the connection waited for sign-in) is dropped with a toast.
 
 4. **Register it** in the module:
    ```kotlin
@@ -133,12 +140,12 @@ A provider connects one kind of calendar service (Google, ICS, CalDAV…) to the
        override fun recurringTitle() = …
        override fun simulateAuthFailure() = { … }
        override fun simulateUnreachable() = { … }
-       // WRITE providers only; the seven write checks fail if these are missing.
+       // WRITE providers only; the ten write checks fail if these are missing.
        override fun writer() = …
        override fun writableSource() = …
    }
    ```
-   Run `./gradlew :provider:calendar-<name>:testDebugUnitTest`. `:provider:calendar-fake` is a worked example.
+   Run `./gradlew :provider:calendar-<name>:testDebugUnitTest`. `:provider:calendar-fake` and `:provider:calendar-google` (through a fake Google server on `MockWebServer`) are worked examples. The suite has no cancellation check: prove it in the provider's own tests against its HTTP double, as `GoogleApiTest.cancellingTheCallerCancelsTheHttpCall` does.
 
 6. **Ship it**: add `implementation(project(":provider:calendar-<name>"))` to `app/build.gradle.kts` (or `debugImplementation` for debug-only providers).
 

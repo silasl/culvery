@@ -20,27 +20,14 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - Read `addPerson`'s `sortOrder` inside a transaction. Add tests that `setRole`, `setPinHash` and `clearPin` reject Family.
 - Make the debug seed check for an active Admin rather than an empty household. Remove the debug Admin when the wizard creates the first real one.
 - Before shipping to the wall, run the Task 10 Step 7 checks on the device and do a signed release build (`startLockTask` has only run in release, and never on a device).
-- Calendar sources (deferred from Plan 2a, where a connection's source list is fixed when it is added):
-  - Add source editing with pruning to `CalendarStore`: re-map and hide sources, and drop the events and sync state of sources that are gone.
-  - Add foreign keys with `ON DELETE CASCADE` (event and sync_state → source → connection) in a `calendar.db` migration, and make `applySync` return early if its source row is gone, so a removal racing an in-flight sync leaves no orphan rows or stale cursor.
-  - Refresh each connection's sources from `provider.sources()` (for example daily), keeping the existing mappings.
 
 ## From Plan 2a review (deferred)
 
-**For Plan 3**
-- Widen R3:
-  - add a logging `CoroutineExceptionHandler` on `@ApplicationScope`;
-  - add `retryWhen` with backoff on `connectionIds()` and on the capability flows in `ShellViewModel`, where `catch` currently completes the flow;
-  - catch `Throwable` minus `CancellationException` per source, because an `Error` from a provider currently crashes the process.
-- Log NeedsSignIn, Unreachable and Error with their cause.
-- Put the store calls outside the per-source try.
-- Replace the chunking test with a counting DAO fake: API 30 SQLite has the 999-variable limit.
-- More contract-suite self-test fixtures.
+**For the ICS provider, or the first JVM-only module** (3a design §8)
 - Cover the ICS empty feed with `fullReplace` and zero-duration events.
 - Extend the module guard to JVM-only modules.
 
 **For Plan 4**
-- `CalendarSetup.connect` must go through the IO + timeout wrapper.
 - Test that `addConnection` is atomic.
 - All-day events straddle two days after a household zone change until the next sync: filter all-day events by date.
 - `opsz` axis for large text.
@@ -48,17 +35,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 ## From Plan 2b-1 (deferred)
 
-**For Plan 3**
-- R8: map raw provider error text to fixed, friendly wording in the Google writer before it reaches a toast ("Couldn't save to … — {reason}").
-- R9: the Google writer must wrap its blocking HTTP calls in `runInterruptible` (or an equivalent cancellable call), so the editor's 10 s and the drain's 60 s timeouts hold. Add the contract check (a gated write returns when its caller is cancelled) with it; on the cooperative fake it proves nothing.
-- DL1: describe the recurrence from Google's RRULE (e.g. "Every week") in the detail sheet's Repeats row, in place of "Yes".
-- U3 follow-up: once a second connection label exists, use the service name ("Google Calendar") in the failure, repeating-event and delete-confirmation wording, and keep the short connection label for the syncing pill.
-- m2: a drain that keeps throwing makes the loop run a full sync every second (`nextWait()` sees the change overdue). Back off after a failed drain; fold into R3.
-- m3: a queued ASSIGN for an event that left the mirror's window is dropped as "The event no longer exists". Fetch the event from the provider, or send a tags-only patch.
-- m4: a reconnect keeps the connection id, so queued changes wait out their backoff (up to 5 minutes). Reconnect should reset that connection's `nextAttemptMillis` and call `requestSync()`.
-
 **For Plan 4**
-- `CalendarSetup.setMaster` calls `provider.sources()` without the IO + timeout wrapper. Fix with `CalendarSetup.connect`.
 - m5: Settings closes when the session ends, 2 minutes after the PIN, however busy the adult is. Extend the session on each saved settings action, or give Settings its own session while open.
 - Check DM Sans weights and bold-text truncation on an API 30 AVD (Google Play image); the 2b-1 walkthrough ran on API 35.
 
@@ -67,21 +44,9 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - The event detail sheet doesn't scroll. It fits today; longer titles and 2b-2's fields won't.
 
 **Next migration or Room upgrade**
-- `androidxSqlite` 2.6.0 is pinned apart from Room's transitive version. Re-check it on each Room bump.
+- `androidxSqlite` 2.6.2 is pinned apart from Room's transitive version. Re-check it on each Room bump.
 
 ## From Plan 2b-2 (deferred)
-
-**For Plan 3**
-- C2: when the drain's accepted create can't be stored, the row stays due and the loop resends it every second (2b-1 m2). Fold into R3's drain backoff, and update `CalendarSyncTest.aCreateWhoseMirrorWriteFailsIsRetriedAndMakesOneEvent`, which relies on the row staying due.
-- C3: an edit sends every field from the sheet's snapshot, so a phone change made meanwhile to a field the user didn't touch is undone. With the Google writer's PATCH, send only the touched fields, applied to the event as re-read under the write lock.
-- C9: a create whose reply was lost, then unsent for 48 hours, is dropped with the DELETE queued behind it, so the event it did make comes back. Decide what an aged create means for Google (fetch by key first, or send the delete).
-- C10: the fake recreates a deleted event when a create repeats its key; Google returns 409 for a cancelled event's id. Pin the rule in the contract suite with the Google writer.
-- The editor's Retry path queues a create with its key; if that queue insert then fails (`TRY_AGAIN`), the sheet's Try again chooses a new key, and a provider that did make the event ends up with two. Fold into R3 with the other store failures.
-- The Google writer: `events.insert` with `id = clientKey`, and on 409 fetch and return the existing event.
-- The add/edit sheet crashes if the store fails while loading: `produceState` has no `catch`. Fold into R3 with the other store failures.
-- The drain doesn't take the editor's write lock, so an edit queued just as the drain drops its refused create is orphaned (an extra "no longer exists" toast). Fold into R3.
-- The editor host's error handler shows the Save failure card when the editor's Delete hits a store failure.
-- Drop `EventDetailHost`'s `onEdit = {}` default so a new caller can't get a dead Edit button.
 
 **For Plan 4**
 - I1, T2, T7: in the on-device pass, check the add/edit sheet with Samsung's floating and split keyboards, that the real IME inset reaches the sheet and the toast through `ShellLayers`, and that a tap on the scrim hides the keyboard.
@@ -112,3 +77,14 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 **Later**
 - L9: keep a Google access token in memory until a 401 instead of asking Play services for one on every call (it caches them itself; each ask costs an IPC).
+
+## From Plan 3a (deferred)
+
+**For Plan 4**
+- The on-device pass: in a signed release in lock-task mode, check Play services' account chooser and consent screens appear when connecting and reconnecting (3a design §9); if not, exit kiosk around them.
+- The release OAuth client (the release key's SHA-1) with release signing. Until then a release build offers Connect Google Calendar, and it fails with "Couldn't connect" (the README says so).
+- The Connect-a-calendar card's Google button was checked by tests only: a debug build always has the sample calendar, so the card never shows on the emulator.
+- Settings: disconnecting a connection, and editing mappings, visibility and the master (3a design §10).
+- Bound recurring series in the mirror: Google's sync (`singleEvents`, no `timeMax`) stores every instance, e.g. 730 rows up to 2040 for one weekly event. Measure on the SM-T510 and cap stored instances (for example, drop rows past the sync window after each pass).
+- `TodayCardHost` recomposes every 30 s on the clock tick with nothing changed; key the day on the date alone.
+- Emulator Play services 26.34 crash-loops on API 35 after a network change (see the setup doc's §5 note); recheck on the SM-T510 before shipping.
