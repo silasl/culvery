@@ -40,7 +40,7 @@ import uk.co.siland.culvery.core.ui.HhSheet
 
 enum class DetailMode { Idle, ChoosingPerson, ConfirmingDelete }
 
-/** The Calendar row's value: the source's name, marked read-only when it isn't the master calendar. */
+/** The Calendar row's value: the source's name, marked read-only when nobody can change it. */
 internal fun calendarLabel(event: EventUi): String =
     if (event.readOnlyReason == ReadOnlyReason.OtherCalendar) "${event.sourceName} · read-only" else event.sourceName
 
@@ -79,11 +79,18 @@ fun EventDetailSheet(
         Header(e, onClose)
         InfoCard(detail)
         when {
-            e.readOnlyReason == ReadOnlyReason.OtherCalendar -> Note(
-                icon = "lock",
-                title = "From ${e.sourceName} (read-only)",
-                body = "This is a subscribed calendar, so it can't be changed here.",
-            )
+            e.readOnlyReason == ReadOnlyReason.OtherCalendar || e.readOnlyReason == ReadOnlyReason.NotMaster -> {
+                val subscribed = e.readOnlyReason == ReadOnlyReason.OtherCalendar
+                Note(
+                    icon = "lock",
+                    title = if (subscribed) "From ${e.sourceName} (read-only)" else "From ${e.sourceName}",
+                    body = if (subscribed) {
+                        "This is a subscribed calendar, so it can't be changed here."
+                    } else {
+                        "Change events on this calendar in ${e.serviceName} on your phone."
+                    },
+                )
+            }
             e.readOnlyReason == ReadOnlyReason.Recurring -> Note(
                 icon = "event_repeat",
                 title = "Repeating event",

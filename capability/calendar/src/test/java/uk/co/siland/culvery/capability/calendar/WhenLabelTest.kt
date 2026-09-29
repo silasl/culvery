@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import com.google.common.truth.Truth.assertThat
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -61,6 +62,7 @@ class WhenLabelTest {
         assertThat(ui(recurring = true, readOnly = ReadOnlyReason.Recurring).badges()).containsExactly(Badge.Repeats)
         assertThat(ui(readOnly = ReadOnlyReason.OtherCalendar).badges()).containsExactly(Badge.OtherCalendar)
         assertThat(ui(recurring = true, readOnly = ReadOnlyReason.OtherCalendar).badges()).containsExactly(Badge.OtherCalendar)
+        assertThat(ui(recurring = true, readOnly = ReadOnlyReason.NotMaster).badges()).containsExactly(Badge.OtherCalendar)
         assertThat(ui(syncing = true, recurring = true, readOnly = ReadOnlyReason.Recurring).badges())
             .containsExactly(Badge.Syncing, Badge.Repeats).inOrder()
     }
@@ -78,13 +80,27 @@ class WhenLabelTest {
 
     @Test
     fun onlyTheMasterCalendarNamesWhoAddedAnEvent() {
-        val master = StoredSource("c", CalendarSource("s1", "Family calendar", writable = true), SourceMapping.Default, isMaster = true)
-        val writableOther = StoredSource("c", CalendarSource("s2", "Work", writable = true), SourceMapping.Default, isMaster = false)
         val alex = Person(PersonId("alex-id"), "Alex", 0xFF4CB387)
         val people = mapOf(alex.id to alex)
-        assertThat(createdByLabel("alex-id", master, people)).isEqualTo("Alex")
-        assertThat(createdByLabel(null, master, people)).isEqualTo(ADDED_FROM_PHONE)
-        assertThat(createdByLabel("alex-id", writableOther, people)).isEqualTo(CALENDAR_FEED)
-        assertThat(createdByLabel(null, null, people)).isEqualTo(CALENDAR_FEED)
+        assertThat(createdByLabel("alex-id", null, people, "Google Calendar")).isEqualTo("Alex")
+        assertThat(createdByLabel("alex-id", ReadOnlyReason.Recurring, people, "Google Calendar")).isEqualTo("Alex")
+        assertThat(createdByLabel(null, null, people, "Google Calendar")).isEqualTo(ADDED_FROM_PHONE)
+        assertThat(createdByLabel("alex-id", ReadOnlyReason.NotMaster, people, "Google Calendar")).isEqualTo("Google Calendar")
+        assertThat(createdByLabel("alex-id", ReadOnlyReason.OtherCalendar, people, "Google Calendar")).isEqualTo(CALENDAR_FEED)
+    }
+
+    @Test
+    fun onlyAWritableCalendarWithAWriterIsNotMaster() {
+        val at = EventTime.Timed(Instant.EPOCH)
+        val event = StoredEvent(
+            "c", "s2", "e1", "Gym", at, at, recurring = true, forPerson = null, createdBy = null,
+            sourcePerson = PersonId.FAMILY, startSort = 0, endSort = 0,
+        )
+        val writableOther = StoredSource("c", CalendarSource("s2", "Work", writable = true), SourceMapping.Default, isMaster = false)
+        val subscribed = StoredSource("c", CalendarSource("s2", "School terms", writable = false), SourceMapping.Default, isMaster = false)
+        assertThat(readOnlyReason(event, writableOther, hasWriter = true)).isEqualTo(ReadOnlyReason.NotMaster)
+        assertThat(readOnlyReason(event, writableOther, hasWriter = false)).isEqualTo(ReadOnlyReason.OtherCalendar)
+        assertThat(readOnlyReason(event, subscribed, hasWriter = true)).isEqualTo(ReadOnlyReason.OtherCalendar)
+        assertThat(readOnlyReason(event, null, hasWriter = true)).isEqualTo(ReadOnlyReason.OtherCalendar)
     }
 }

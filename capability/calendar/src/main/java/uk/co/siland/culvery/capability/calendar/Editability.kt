@@ -2,15 +2,17 @@ package uk.co.siland.culvery.capability.calendar
 
 import uk.co.siland.culvery.core.plugin.Connection
 
-enum class ReadOnlyReason { OtherCalendar, Recurring }
+/** [OtherCalendar]: a subscription or a provider with no writer. [NotMaster]: a writable calendar changed on a phone. */
+enum class ReadOnlyReason { OtherCalendar, NotMaster, Recurring }
 
 /**
  * Null when the tablet may change [event] (spec §6): a non-recurring event on the writable master calendar whose
  * provider has a writer. A master with no writer (a misconfiguration) reads as another calendar. A recurring
- * event on another calendar is OtherCalendar.
+ * event on another calendar takes that calendar's reason.
  */
 internal fun readOnlyReason(event: StoredEvent, source: StoredSource?, hasWriter: Boolean): ReadOnlyReason? = when {
-    source == null || !source.isMaster || !source.source.writable || !hasWriter -> ReadOnlyReason.OtherCalendar
+    source == null || !source.source.writable || !hasWriter -> ReadOnlyReason.OtherCalendar
+    !source.isMaster -> ReadOnlyReason.NotMaster
     event.recurring -> ReadOnlyReason.Recurring
     else -> null
 }

@@ -104,6 +104,19 @@ object SampleUi {
         "Sat 26 Sep · All day",
     )
 
+    /** One of the household's own calendars in the service, not the master: changed there, not here. */
+    val detailNotMaster = EventDetailUi(
+        event("Gym", "07:00–08:00", alex, recurring = true).copy(
+            sourceName = "Alex",
+            connectionLabel = "Google",
+            serviceName = "Google Calendar",
+            readOnlyReason = ReadOnlyReason.NotMaster,
+            createdBy = "Google Calendar",
+            repeats = "Every week",
+        ),
+        "Today · 07:00–08:00",
+    )
+
     /** Hand-off 05. */
     val detailRecurring = EventDetailUi(
         event("Swimming", "16:00–17:00", mia, recurring = true).onFamilyCalendar("Sam").copy(repeats = "Every week"),

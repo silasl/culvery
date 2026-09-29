@@ -40,7 +40,7 @@ data class EventUi(
     val untagged: Boolean = false,
     /** A change to it is waiting in the outbox. */
     val syncing: Boolean = false,
-    /** A person's name, [ADDED_FROM_PHONE] or [CALENDAR_FEED]. */
+    /** A person's name, [ADDED_FROM_PHONE], the service's name or [CALENDAR_FEED]. */
     val createdBy: String = "",
     /** The Repeats row: "Every week"… or "Yes" (3a design D12). */
     val repeats: String = REPEATS_YES,
@@ -90,7 +90,7 @@ enum class Badge(val icon: String, val description: String) {
 fun EventUi.badges(): List<Badge> = listOfNotNull(
     Badge.Syncing.takeIf { syncing },
     when {
-        readOnlyReason == ReadOnlyReason.OtherCalendar -> Badge.OtherCalendar
+        readOnlyReason == ReadOnlyReason.OtherCalendar || readOnlyReason == ReadOnlyReason.NotMaster -> Badge.OtherCalendar
         recurring -> Badge.Repeats
         else -> null
     },
@@ -209,12 +209,13 @@ internal class SourceCatalog(
     fun hasWriter(connectionId: String): Boolean = connections[connectionId]?.providerId in writerIds
 }
 
-/** Only the master calendar carries the tablet's tags; any other calendar's events come from its feed. */
-internal fun createdByLabel(createdBy: String?, source: StoredSource?, people: Map<PersonId, Person>): String = when {
-    source == null || !source.isMaster -> CALENDAR_FEED
-    createdBy == null -> ADDED_FROM_PHONE
-    else -> people[PersonId(createdBy)]?.name ?: ADDED_FROM_PHONE
-}
+/** Only the master calendar carries the tablet's tags; another writable calendar was filled in [serviceName]. */
+internal fun createdByLabel(createdBy: String?, reason: ReadOnlyReason?, people: Map<PersonId, Person>, serviceName: String): String =
+    when (reason) {
+        ReadOnlyReason.OtherCalendar -> CALENDAR_FEED
+        ReadOnlyReason.NotMaster -> serviceName
+        else -> createdBy?.let { people[PersonId(it)]?.name } ?: ADDED_FROM_PHONE
+    }
 
 internal fun StoredEvent.toUi(
     date: LocalDate,
@@ -225,6 +226,8 @@ internal fun StoredEvent.toUi(
 ): EventUi {
     val slice = sliceOn(date, zone)
     val source = catalog.source(connectionId, sourceId)
+    val serviceName = catalog.serviceName(connectionId)
+    val reason = readOnlyReason(this, source, catalog.hasWriter(connectionId))
     return EventUi(
         ref = ref,
         title = title,
@@ -236,11 +239,11 @@ internal fun StoredEvent.toUi(
         startSort = startSort,
         sourceName = source?.source?.name.orEmpty(),
         connectionLabel = catalog.label(connectionId),
-        serviceName = catalog.serviceName(connectionId),
-        readOnlyReason = readOnlyReason(this, source, catalog.hasWriter(connectionId)),
+        serviceName = serviceName,
+        readOnlyReason = reason,
         untagged = source?.isMaster == true && source.source.writable && forPerson == null && createdBy == null,
         syncing = syncing,
-        createdBy = createdByLabel(createdBy, source, people),
+        createdBy = createdByLabel(createdBy, reason, people, serviceName),
         repeats = repeatsLabel(recurrenceRule, start, zone),
     )
 }

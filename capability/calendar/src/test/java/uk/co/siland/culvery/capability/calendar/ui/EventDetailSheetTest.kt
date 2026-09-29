@@ -62,6 +62,19 @@ class EventDetailSheetTest {
     }
 
     @Test
+    fun theHouseholdsOwnCalendarPointsToThePhone() {
+        show(SampleUi.detailNotMaster)
+        compose.onNodeWithText("From Alex").assertExists()
+        compose.onNodeWithText("Change events on this calendar in Google Calendar on your phone.").assertExists()
+        compose.onNodeWithText("This is a subscribed calendar, so it can't be changed here.").assertDoesNotExist()
+        compose.onNodeWithText("Alex · read-only").assertDoesNotExist()
+        compose.onNodeWithText("Google Calendar").assertExists()
+        compose.onNodeWithText("Every week").assertExists()
+        compose.onNodeWithTag("detail_delete").assertDoesNotExist()
+        compose.onNodeWithTag("detail_edit").assertDoesNotExist()
+    }
+
+    @Test
     fun anotherCalendarIsReadOnlyWithNoFooter() {
         show(SampleUi.detailReadOnlyFeed)
         compose.onNodeWithText("From School terms (read-only)").assertExists()
