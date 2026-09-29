@@ -5,7 +5,13 @@ import com.google.common.truth.Truth.assertThat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -13,6 +19,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -193,6 +200,24 @@ class GoogleReadTest {
         // A full sync starts the cache again.
         provider.sync(conn, family, range, null)
         assertThat(google.requests.count { it.requestUrl!!.pathSegments.last() == "piano" }).isEqualTo(2)
+    }
+
+    @Test
+    fun aFullSyncCancelledPartWayKeepsTheRulesItFetchedForTheNextAttempt() = runTest {
+        google.putEvent(family.id, google.timed("piano", "Piano", at(22, 15), at(22, 16)) { putJsonArray("recurrence") { add("RRULE:FREQ=WEEKLY") } })
+        google.putEvent(family.id, google.timed("piano_1", "Piano", at(22, 15), at(22, 16)) { put("recurringEventId", "piano") })
+        google.putEvent(family.id, google.timed("swim", "Swim", at(23, 17), at(23, 18)) { putJsonArray("recurrence") { add("RRULE:FREQ=DAILY") } })
+        google.putEvent(family.id, google.timed("swim_1", "Swim", at(23, 17), at(23, 18)) { put("recurringEventId", "swim") })
+        fun asksFor(series: String) = google.requests.count { it.requestUrl!!.pathSegments.last() == series }
+        // Swim's rule never comes back, so the pass is cancelled after piano's was fetched, as a timeout would.
+        google.failNextWith(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)) { it.requestUrl!!.pathSegments.last() == "swim" }
+        val first = launch(Dispatchers.Default) { provider.sync(conn, family, range, null) }
+        withContext(Dispatchers.Default) { withTimeout(5_000) { while (asksFor("swim") == 0) delay(10) } }
+        first.cancelAndJoin()
+        val upserts = provider.sync(conn, family, range, null).upserts
+        assertThat(upserts.map { it.recurrenceRule }).containsExactly("RRULE:FREQ=WEEKLY", "RRULE:FREQ=DAILY")
+        assertThat(asksFor("piano")).isEqualTo(1)
+        assertThat(asksFor("swim")).isEqualTo(2)
     }
 
     @Test

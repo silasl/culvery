@@ -48,7 +48,7 @@ private val CALENDAR_LIST_QUERY = mapOf("showHidden" to "true", "minAccessRole" 
 /**
  * Google Calendar API v3 (3a design §3.1–§3.7). The connection's config holds only the account's email; every call
  * takes a fresh token from Play services. Each series' RRULE is fetched once and kept in memory per calendar until
- * that calendar's next full sync.
+ * that calendar's next full sync completes.
  */
 @Singleton
 class GoogleCalendarProvider @Inject constructor(
@@ -61,6 +61,9 @@ class GoogleCalendarProvider @Inject constructor(
 
     // By connection and calendar: each series' RRULE, "" for a series with none.
     private val rules = ConcurrentHashMap<String, ConcurrentHashMap<String, String>>()
+
+    // The rules an unfinished full sync has fetched, kept so a retry after a timeout resumes rather than starts again.
+    private val fullSyncRules = ConcurrentHashMap<String, ConcurrentHashMap<String, String>>()
 
     private class Listed(val items: List<GoogleEvent>, val syncToken: String?)
 
@@ -134,11 +137,15 @@ class GoogleCalendarProvider @Inject constructor(
     }
 
     private suspend fun full(conn: Connection, account: String, source: CalendarSource, range: DateRange): SyncResult {
-        rulesFor(conn, source).clear()
+        val key = keyOf(conn, source)
+        val fresh = fullSyncRules.getOrPut(key) { ConcurrentHashMap() }
         val window = mapOf("timeMin" to range.startInstant.toString(), "timeMax" to range.endInstant.toString())
         val listed = list(account, source, window) ?: throw UnreachableException("Google Calendar expired a full sync of a calendar")
         val failed = mutableSetOf<String>()
-        val upserts = listed.items.filterNot { it.isGone }.mapNotNull { it.toRemoteEvent(ruleOf(conn, account, source, it, failed)) }
+        val upserts = listed.items.filterNot { it.isGone }.mapNotNull { it.toRemoteEvent(ruleOf(account, source, it, fresh, failed)) }
+        fresh.keys.retainAll(listed.items.mapNotNull { it.recurringEventId }.toSet())
+        rules[key] = fresh
+        fullSyncRules.remove(key, fresh)
         return SyncResult(upserts, emptyList(), listed.syncToken?.let(::SyncCursor), fullReplace = true)
     }
 
@@ -151,7 +158,7 @@ class GoogleCalendarProvider @Inject constructor(
             if (event.isGone) {
                 removed += event.id
             } else {
-                event.toRemoteEvent(ruleOf(conn, account, source, event, failed))?.let { upserts += it }
+                event.toRemoteEvent(ruleOf(account, source, event, rulesFor(conn, source), failed))?.let { upserts += it }
             }
         }
         return SyncResult(upserts, removed, listed.syncToken?.let(::SyncCursor) ?: cursor, fullReplace = false)
@@ -187,19 +194,18 @@ class GoogleCalendarProvider @Inject constructor(
     }
 
     /**
-     * An instance's series rule (3a design D12): fetched once per series. A failed fetch is null, doesn't fail the
-     * sync, and is remembered in [failed] for the rest of this sync, so the series' other instances don't ask again.
+     * An instance's series rule (3a design D12): fetched once per series into [cache]. A failed fetch is null, doesn't
+     * fail the sync, and is remembered in [failed] for the rest of this sync, so the series' other instances don't ask again.
      */
     private suspend fun ruleOf(
-        conn: Connection,
         account: String,
         source: CalendarSource,
         event: GoogleEvent,
+        cache: ConcurrentHashMap<String, String>,
         failed: MutableSet<String>,
     ): String? {
         val series = event.recurringEventId ?: return null
         if (series in failed) return null
-        val cache = rulesFor(conn, source)
         cache[series]?.let { return it.ifEmpty { null } }
         val rule = try {
             api.send(account, "GET", api.url("calendars", source.id, "events", series))
@@ -291,7 +297,9 @@ class GoogleCalendarProvider @Inject constructor(
         return toRemoteEvent(rule = null) ?: throw UnreachableException("Google Calendar returned an event with no times the tablet can read")
     }
 
-    private fun rulesFor(conn: Connection, source: CalendarSource) = rules.getOrPut("${conn.id}\u0000${source.id}") { ConcurrentHashMap() }
+    private fun keyOf(conn: Connection, source: CalendarSource) = "${conn.id}\u0000${source.id}"
+
+    private fun rulesFor(conn: Connection, source: CalendarSource) = rules.getOrPut(keyOf(conn, source)) { ConcurrentHashMap() }
 
     private fun accountOf(conn: Connection): String =
         conn.config[CONFIG_ACCOUNT] ?: throw NeedsSignInException("The Google connection ${conn.id} has no account")
