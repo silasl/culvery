@@ -4,6 +4,7 @@ import androidx.room.execSQL
 import androidx.room.useWriterConnection
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -475,6 +476,18 @@ class CalendarSyncTest {
         assertThat(store.pendingNow()).isEmpty()
         assertThat(w.calls).isEmpty()
         assertThat(toaster.messages).containsExactly("Couldn't save to Service A")
+    }
+
+    @Test
+    fun aDroppedChangeIsLoggedWithoutItsCalendarId() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        // Google names a primary calendar by its account's email.
+        queue(ChangeKind.DELETE, draft = null, sourceId = "family@example.com")
+        sync.syncAll()
+        val lines = ShadowLog.getLogsForTag("CalendarSync").map { "${it.msg} ${it.throwable?.message}" }
+        assertThat(lines.filter { "nothing can deliver" in it }).hasSize(1)
+        lines.forEach { assertWithMessage(it).that(it).doesNotContain("@") }
     }
 
     @Test

@@ -151,7 +151,7 @@ class CalendarSync internal constructor(
                 val source = store.source(change.connectionId, change.sourceId)
                 val writer = stored?.let { s -> writers.firstOrNull { it.providerId == s.connection.providerId } }
                 if (stored == null || source == null || writer == null || !change.isComplete()) {
-                    Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}/${change.sourceId}: nothing can deliver it")
+                    Log.w(TAG, "Dropping a queued ${change.kind} for ${change.connectionId}: nothing can deliver it")
                     drop(change, label, null)
                     continue
                 }
