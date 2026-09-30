@@ -173,4 +173,44 @@ class PeopleUiTest {
         compose.awaitTag("person_P7")
         compose.onNodeWithTag("people_add").assertDoesNotExist()
     }
+
+    @Test
+    fun aWriteThatFailsKeepsTheSheetAndWhatWasTyped() {
+        addSam()
+        show()
+        compose.awaitTag("person_Sam")
+        compose.onNodeWithTag("person_Sam").performClick()
+        compose.onNodeWithTag("person_name").performTextInput("my")
+        db.openHelper.writableDatabase.execSQL("CREATE TRIGGER no_updates BEFORE UPDATE ON person BEGIN SELECT RAISE(ABORT, 'x'); END")
+        compose.onNodeWithTag("person_save").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("person_message").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("person_message").assert(hasText("Couldn't save — try again."))
+        compose.onNodeWithTag("person_name").assert(hasText("mySam"))
+        assertNoSecretsLogged("People", listOf("Sam"))
+    }
+
+    @Test
+    fun anErrorThatEscapesTheEditorShowsCouldNotSaveAndLogsOnlyItsClass() {
+        addSam()
+        val failing = PeopleEditor(household, access.pins, access.control, object : uk.co.siland.culvery.core.plugin.Toaster {
+            override fun show(message: String, icon: String) = throw IllegalStateException("Sam removed")
+        })
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalOverlayHost provides overlay) {
+                    Box {
+                        PeoplePane(failing)
+                        overlay.content?.invoke()
+                    }
+                }
+            }
+        }
+        compose.awaitTag("person_Sam")
+        compose.onNodeWithTag("person_Sam").performClick()
+        compose.onNodeWithTag("person_remove").performClick()
+        compose.onNodeWithTag("person_confirm_remove").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("person_message").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("person_message").assert(hasText("Couldn't save — try again."))
+        assertNoSecretsLogged("PersonSheet", listOf("Sam"))
+    }
 }

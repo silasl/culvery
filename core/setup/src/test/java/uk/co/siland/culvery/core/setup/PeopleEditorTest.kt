@@ -188,4 +188,60 @@ class PeopleEditorTest {
         assertThat(editor.save(sam.id, draft("Samantha", 1))).isEqualTo(PeopleOutcome.Refused(COULD_NOT_SAVE))
         assertNoSecretsLogged("People", listOf("Sam", "2468", "1234"))
     }
+
+    @Test
+    fun demotingYourselfSignsYouOut() = runTest {
+        start()
+        sam(pin = "2468", role = Role.ADMIN)
+        access.answer("1234")
+        assertThat(editor.save(alex.id, draft("Alex", 0, Role.ADULT))).isEqualTo(PeopleOutcome.Done)
+        assertThat(access.control.session.value).isNull()
+    }
+
+    @Test
+    fun aRenameWithNobodySignedInAsksForAPinAndACancelChangesNothing() = runTest {
+        start()
+        val sam = sam()
+        access.control.lock()
+        access.answer("1234")
+        assertThat(editor.save(sam.id, draft("Samuel", 1))).isEqualTo(PeopleOutcome.Done)
+        assertThat(access.requests.map { it.label }).containsExactly("Change settings")
+        access.control.lock()
+        access.answer(null)
+        assertThat(editor.save(sam.id, draft("Sammy", 1))).isEqualTo(PeopleOutcome.Cancelled)
+        assertThat(household.person(sam.id)?.name).isEqualTo("Samuel")
+    }
+
+    @Test
+    fun aWriteThatFailsAfterTheReadSaysCouldNotSaveAndLogsNoNameOrPin() = runTest {
+        start()
+        val sam = sam(pin = "2468")
+        db.openHelper.writableDatabase.execSQL(
+            "CREATE TRIGGER no_updates BEFORE UPDATE ON person BEGIN SELECT RAISE(ABORT, 'Samantha 2468'); END",
+        )
+        assertThat(editor.save(sam.id, draft("Samantha", 1))).isEqualTo(PeopleOutcome.Refused(COULD_NOT_SAVE))
+        assertThat(household.person(sam.id)?.name).isEqualTo("Sam")
+        assertNoSecretsLogged("People", listOf("Sam", "2468", "1234"))
+    }
+
+    @Test
+    fun aPinInUseWhenEditingSomeoneIsRefusedAndNothingChanges() = runTest {
+        start()
+        val sam = sam()
+        access.answer("1234")
+        assertThat(editor.save(sam.id, draft("Sam", 1, pin = "1234"))).isEqualTo(PeopleOutcome.Refused("That PIN is taken — choose another."))
+        assertThat(household.member(sam.id)?.hasPin).isFalse()
+    }
+
+    @Test
+    fun aCancelledFreshPinOnARoleChangeOrARemoveChangesNothing() = runTest {
+        start()
+        val sam = sam()
+        access.answer(null, null)
+        assertThat(editor.save(sam.id, draft("Sam", 1, Role.CHILD))).isEqualTo(PeopleOutcome.Cancelled)
+        assertThat(household.member(sam.id)?.role).isEqualTo(Role.ADULT)
+        assertThat(editor.remove(sam.id)).isEqualTo(PeopleOutcome.Cancelled)
+        assertThat(household.member(sam.id)).isNotNull()
+        assertThat(access.toasts.messages).isEmpty()
+    }
 }
