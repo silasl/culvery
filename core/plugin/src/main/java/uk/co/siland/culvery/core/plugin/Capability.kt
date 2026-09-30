@@ -20,4 +20,10 @@ interface Capability : HomeCardContributor {
     @Composable
     fun SettingsSection() {
     }
+
+    /** This capability's wizard steps (4a design D7), placed by [SetupStep.order] among the core ones. */
+    fun setupSteps(): List<SetupStep> = emptyList()
+
+    /** This capability's Settings pages (4a design D7), placed by [SettingsPage.order]. */
+    fun settingsPages(): List<SettingsPage> = emptyList()
 }
