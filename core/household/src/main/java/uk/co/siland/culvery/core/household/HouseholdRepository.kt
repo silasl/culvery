@@ -37,14 +37,19 @@ class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase)
      * at most [MAX_PEOPLE]. [pinHash] and [salt] set the PIN in the same transaction (PinManager.addPerson), so a person
      * is never left half made.
      */
-    suspend fun addPerson(name: String, color: Long, role: Role, pinHash: String? = null, salt: String? = null): Person {
+    suspend fun addPerson(name: String, color: Long, role: Role,
+        pinHash: String? = null,
+        salt: String? = null,
+        pinGuard: PinGuard? = null,
+    ): Person {
         require((pinHash == null) == (salt == null)) { "A PIN needs both its hash and its salt" }
         val clean = cleanName(name)
         val id = PersonId.new()
         db.withTransaction {
             val all = dao.all()
-            require(all.size < MAX_PEOPLE) { "At most $MAX_PEOPLE people" }
+            if (all.size >= MAX_PEOPLE) throw HouseholdFullException()
             checkUnique(all, id, clean, color)
+            pinGuard?.check(all.map { it.toCredential() })
             dao.upsertPerson(PersonEntity(id.value, clean, color, dao.maxSortOrder() + 1, role, pinHash, salt))
         }
         return Person(id, clean, color)
@@ -69,12 +74,16 @@ class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase)
         val clean = cleanName(name)
         db.withTransaction {
             val current = requireNotNull(dao.person(id.value)) { "Unknown person ${id.value}" }
-            checkUnique(dao.all(), id, clean, color)
+            val all = dao.all()
+            checkUnique(all, id, clean, color)
             val renamed = current.copy(name = clean, color = color, role = role)
             val next = when (pin) {
                 PinChange.Keep -> renamed
                 PinChange.Remove -> renamed.copy(pinHash = null, salt = null)
-                is PinChange.Set -> renamed.copy(pinHash = pin.hash, salt = pin.salt)
+                is PinChange.Set -> {
+                    pin.guard?.check(all.filter { it.id != id.value }.map { it.toCredential() })
+                    renamed.copy(pinHash = pin.hash, salt = pin.salt)
+                }
             }
             guardLastAdmin(current, next)
             dao.upsertPerson(next)
@@ -96,7 +105,8 @@ class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase)
 
     suspend fun setRole(id: PersonId, role: Role) = change(id) { it.copy(role = role) }
 
-    suspend fun setPinHash(id: PersonId, hash: String, salt: String) = change(id) { it.copy(pinHash = hash, salt = salt) }
+    suspend fun setPinHash(id: PersonId, hash: String, salt: String, guard: PinGuard? = null) =
+        change(id, guard) { it.copy(pinHash = hash, salt = salt) }
 
     suspend fun clearPin(id: PersonId) = change(id) { it.copy(pinHash = null, salt = null) }
 
@@ -111,11 +121,12 @@ class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase)
         )
     }
 
-    private suspend fun change(id: PersonId, edit: (PersonEntity) -> PersonEntity) {
+    private suspend fun change(id: PersonId, guard: PinGuard? = null, edit: (PersonEntity) -> PersonEntity) {
         require(id != PersonId.FAMILY) { "Family has no role or PIN" }
         db.withTransaction {
             val current = requireNotNull(dao.person(id.value)) { "Unknown person ${id.value}" }
             val next = edit(current)
+            guard?.check(dao.all().filter { it.id != id.value }.map { it.toCredential() })
             guardLastAdmin(current, next)
             dao.upsertPerson(next)
         }

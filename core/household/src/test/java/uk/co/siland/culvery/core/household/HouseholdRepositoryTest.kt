@@ -181,7 +181,7 @@ class HouseholdRepositoryTest {
     @Test
     fun aNinthPersonIsRefused() = runTest {
         repeat(MAX_PEOPLE) { repo.addPerson("P$it", 0xFF100000L + it, Role.ADULT) }
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.addPerson("P8", 0xFF200000L, Role.ADULT) } }
+        assertThrows(HouseholdFullException::class.java) { runBlocking { repo.addPerson("P8", 0xFF200000L, Role.ADULT) } }
         assertThat(repo.people.first()).hasSize(MAX_PEOPLE)
     }
 
@@ -235,5 +235,59 @@ class HouseholdRepositoryTest {
             runBlocking { repo.updateMember(alex.id, "Alex", alex.color, Role.ADMIN, PinChange.Remove) }
         }
         assertThat(repo.member(alex.id)?.isActiveAdmin).isTrue()
+    }
+
+    private val refuseEveryPin = PinGuard { throw IllegalStateException("guard ran") }
+
+    @Test
+    fun aMemberEditRefusesADuplicateNameAColourInUseAndFamily() = runTest {
+        repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
+        val mia = repo.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
+        assertThrows(DuplicateNameException::class.java) {
+            runBlocking { repo.updateMember(mia.id, " sam", mia.color, Role.CHILD, PinChange.Keep) }
+        }
+        assertThrows(DuplicateNameException::class.java) {
+            runBlocking { repo.updateMember(mia.id, "FAMILY", mia.color, Role.CHILD, PinChange.Keep) }
+        }
+        assertThrows(ColourInUseException::class.java) {
+            runBlocking { repo.updateMember(mia.id, "Mia", 0xFF5B9BE0, Role.CHILD, PinChange.Keep) }
+        }
+        assertThat(repo.member(mia.id)).isEqualTo(Member(mia, Role.CHILD, hasPin = false))
+    }
+
+    @Test
+    fun familyCannotBeEditedAsAMember() = runTest {
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repo.updateMember(PersonId.FAMILY, "Family", 0xFF5B9BE0, Role.ADULT, PinChange.Keep) }
+        }
+    }
+
+    @Test
+    fun aPinNeedsBothItsHashAndItsSalt() = runTest {
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT, pinHash = "h") } }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT, salt = "s") } }
+        assertThat(repo.people.first()).isEmpty()
+    }
+
+    @Test
+    fun aPinGuardSeesOnlyOthersAndItsRefusalChangesNothing() = runTest {
+        val alex = admin("Alex")
+        val mia = repo.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
+        var seen: List<PersonId> = emptyList()
+        val spy = PinGuard { others -> seen = others.map { it.personId } }
+        repo.updateMember(mia.id, "Mia", mia.color, Role.CHILD, PinChange.Set("h", "s", spy))
+        assertThat(seen).containsExactly(alex.id)
+
+        assertThrows(IllegalStateException::class.java) {
+            runBlocking { repo.updateMember(mia.id, "Mia", mia.color, Role.CHILD, PinChange.Set("h2", "s2", refuseEveryPin)) }
+        }
+        assertThrows(IllegalStateException::class.java) {
+            runBlocking { repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT, "h", "s", refuseEveryPin) }
+        }
+        assertThrows(IllegalStateException::class.java) {
+            runBlocking { repo.setPinHash(mia.id, "h3", "s3", refuseEveryPin) }
+        }
+        assertThat(repo.credential(mia.id)?.pinHash).isEqualTo("h")
+        assertThat(repo.people.first().map { it.name }).containsExactly("Alex", "Mia")
     }
 }

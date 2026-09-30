@@ -50,16 +50,27 @@ data class Member(val person: Person, val role: Role, val hasPin: Boolean) {
     val isActiveAdmin: Boolean get() = role == Role.ADMIN && hasPin
 }
 
+/**
+ * Decides, inside the write's own transaction, whether a new PIN clashes with anyone else's; it throws to refuse.
+ * [others] are everyone's credentials but the person being written.
+ */
+fun interface PinGuard {
+    fun check(others: List<Credential>)
+}
+
 /** What a member edit does to the PIN. [Set] carries PinManager's hash and salt, both Base64. */
 sealed interface PinChange {
     data object Keep : PinChange
 
     data object Remove : PinChange
 
-    class Set(val hash: String, val salt: String) : PinChange
+    class Set(val hash: String, val salt: String, val guard: PinGuard? = null) : PinChange
 }
 
 /** [name] is for the editor's message; the exception's own text holds no name, as it may be logged. */
 class DuplicateNameException(val name: String) : Exception("Someone already has that name")
 
 class ColourInUseException : Exception("That colour is already someone's")
+
+/** A ninth person. Still an IllegalArgumentException, but distinct from a blank name. */
+class HouseholdFullException : IllegalArgumentException("At most $MAX_PEOPLE people")

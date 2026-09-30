@@ -108,4 +108,24 @@ class PinManagerTest {
         assertThat(pins.hashNew("1234", owner = alex.id).second).isNotEmpty()
         assertThrows(PinInUseException::class.java) { runBlocking { pins.hashNew("1234", owner = null) } }
     }
+
+    @Test
+    fun aPinTakenAfterHashingIsStillRefusedInsideTheWrite() = runTest {
+        val alex = pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, "1234")
+        val mia = pins.addPerson("Mia", 0xFFE07BA8, Role.CHILD, null)
+        val change = pins.changeTo("4321", owner = mia.id)
+        pins.setPin(alex.id, "4321")
+        assertThrows(PinInUseException::class.java) {
+            runBlocking { household.updateMember(mia.id, "Mia", mia.color, Role.CHILD, change) }
+        }
+        assertThat(household.member(mia.id)?.hasPin).isFalse()
+    }
+
+    @Test
+    fun aPinInUseIsRefusedThroughAMemberEditAndSetPin() = runTest {
+        pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, "1234")
+        val mia = pins.addPerson("Mia", 0xFFE07BA8, Role.CHILD, null)
+        assertThrows(PinInUseException::class.java) { runBlocking { pins.changeTo("1234", owner = mia.id) } }
+        assertThrows(PinInUseException::class.java) { runBlocking { pins.setPin(mia.id, "1234") } }
+    }
 }

@@ -7,6 +7,8 @@ import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.core.household.Credential
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PinChange
+import uk.co.siland.culvery.core.household.PinGuard
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 
@@ -23,22 +25,27 @@ class PinManager @Inject constructor(
     suspend fun hashNew(pin: String, owner: PersonId?): Pair<String, String> {
         hasher.validate(pin)
         return withContext(Dispatchers.Default) {
-            val others = household.credentials().filter { it.personId != owner }
-            if (others.any { it.matches(pin) }) throw PinInUseException()
+            guardFor(pin).check(household.credentials().filter { it.personId != owner })
             val salt = hasher.newSalt()
             hasher.hash(pin, salt) to salt
         }
     }
 
+    /** A [PinChange.Set] for [pin] whose clash check runs again inside the write's transaction. */
+    suspend fun changeTo(pin: String, owner: PersonId?): PinChange.Set {
+        val (hash, salt) = hashNew(pin, owner)
+        return PinChange.Set(hash, salt, guardFor(pin))
+    }
+
     suspend fun setPin(id: PersonId, pin: String) {
         val (hash, salt) = hashNew(pin, id)
-        household.setPinHash(id, hash, salt)
+        household.setPinHash(id, hash, salt, guardFor(pin))
     }
 
     /** Adds a person with [pin] (or none) in one step, so a PIN in use leaves nobody added. */
     suspend fun addPerson(name: String, color: Long, role: Role, pin: String?): Person {
         val hashed = pin?.let { hashNew(it, owner = null) }
-        return household.addPerson(name, color, role, hashed?.first, hashed?.second)
+        return household.addPerson(name, color, role, hashed?.first, hashed?.second, pin?.let(::guardFor))
     }
 
     suspend fun identify(pin: String): Identified? {
@@ -48,6 +55,10 @@ class PinManager @Inject constructor(
         } ?: return null
         val person = household.person(match.personId) ?: return null
         return Identified(person, match.role)
+    }
+
+    private fun guardFor(pin: String) = PinGuard { others ->
+        if (others.any { it.matches(pin) }) throw PinInUseException()
     }
 
     private fun Credential.matches(pin: String): Boolean {
