@@ -43,13 +43,6 @@ internal object SetupDimens {
     val roleGap = 10.dp
     val footerGap = 10.dp
 
-    // A confirmation, as the calendar's delete confirmation: `dangerSoft`, radius 24, padding 20, 16 between blocks,
-    // buttons 12 apart.
-    val confirmRadius = 24.dp
-    val confirmPadding = 20.dp
-    val confirmGap = 16.dp
-    val confirmButtonGap = 12.dp
-
     // Settings (§4.6): the left column 320 wide. Not in the spec: `surf`, padding 32×28; the title 24 above the list;
     // items 56 dp, radius 16, padding 0 18, 4 apart; the page padded 40×48, at most the wizard's 720 wide.
     val settingsList = 320.dp
@@ -86,7 +79,4 @@ internal object SetupType {
 
     /** 14 sp / 700: a refusal in `danger`. */
     val message = HhType.secondary.copy(fontWeight = FontWeight.W700)
-
-    /** 18 sp / 700: a confirmation's question. */
-    val confirm = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W700)
 }

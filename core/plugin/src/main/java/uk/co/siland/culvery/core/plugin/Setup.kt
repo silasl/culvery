@@ -10,6 +10,9 @@ const val NEXT_LABEL = "Next"
 /** 4a design §5: a setting that didn't save; nothing changed. */
 const val COULD_NOT_SAVE = "Couldn't save — try again."
 
+/** The button that closes a confirmation and changes nothing. */
+const val KEEP = "Keep"
+
 /**
  * One page of the first-run wizard (4a design §3.2, §3.3). Core steps use orders 0–399, capabilities 400 and up in
  * rail order, Done 1000.

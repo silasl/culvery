@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.core.setup
 
 import android.util.Log
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,10 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,7 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -34,12 +30,15 @@ import uk.co.siland.culvery.core.access.ui.ChoosePinPad
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
+import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
+import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
+import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhSheetButton
@@ -221,7 +220,14 @@ internal fun PersonEditorSheet(
             }
             form.message?.let { Text(it, style = SetupType.message, color = c.danger, modifier = Modifier.testTag("person_message")) }
             if (confirmingRemove && existing != null) {
-                RemoveConfirmation(existing.person.name, busy, onKeep, onConfirmRemove)
+                HhConfirmCard(
+                    tag = "person_confirm",
+                    keep = KEEP, keepTone = ButtonTone.Plain, keepTag = "person_keep",
+                    confirm = REMOVE_PERSON, confirmTag = "person_confirm_remove",
+                    busy = busy, onKeep = onKeep, onConfirm = onConfirmRemove,
+                ) {
+                    Text(removeQuestion(existing.person.name), style = ControlType.confirmTitle, color = c.ink)
+                }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(SetupDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
                     if (canRemove) HhSheetButton(REMOVE_PERSON, ButtonTone.Danger, enabled = !busy, tag = "person_remove", onClick = onRemove)
@@ -245,26 +251,5 @@ private fun Section(label: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.labelGap)) {
         Text(label, style = SetupType.label, color = Culvery.colors.mute)
         content()
-    }
-}
-
-@Composable
-private fun RemoveConfirmation(name: String, busy: Boolean, onKeep: () -> Unit, onConfirm: () -> Unit) {
-    val c = Culvery.colors
-    Column(
-        verticalArrangement = Arrangement.spacedBy(SetupDimens.confirmGap),
-        modifier = Modifier
-            .testTag("person_confirm")
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(SetupDimens.confirmRadius))
-            .background(c.dangerSoft)
-            .padding(SetupDimens.confirmPadding),
-    ) {
-        Text(removeQuestion(name), style = SetupType.confirm, color = c.ink)
-        // Keep sits where Remove person was, so a double tap on Remove is harmless.
-        Row(horizontalArrangement = Arrangement.spacedBy(SetupDimens.confirmButtonGap), modifier = Modifier.fillMaxWidth()) {
-            HhSheetButton(KEEP, ButtonTone.Plain, enabled = !busy, tag = "person_keep", onClick = onKeep, modifier = Modifier.weight(1f))
-            HhSheetButton(REMOVE_PERSON, ButtonTone.Destroy, enabled = !busy, tag = "person_confirm_remove", onClick = onConfirm, modifier = Modifier.weight(1f))
-        }
     }
 }

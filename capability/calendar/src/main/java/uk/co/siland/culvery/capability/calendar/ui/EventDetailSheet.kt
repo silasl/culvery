@@ -33,13 +33,14 @@ import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.ButtonTone
+import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhCloseButton
+import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPersonChip
 import uk.co.siland.culvery.core.ui.HhSheet
-import uk.co.siland.culvery.core.ui.HhSheetButton
 
 enum class DetailMode { Idle, ChoosingPerson, ConfirmingDelete }
 
@@ -122,7 +123,24 @@ fun EventDetailSheet(
         if (e.editable) {
             Spacer(Modifier.weight(1f))
             if (mode == DetailMode.ConfirmingDelete) {
-                DeleteConfirmation(e, busy, onKeep, onConfirmDelete)
+                HhConfirmCard(
+                    tag = "detail_confirm",
+                    keep = "Keep event", keepTone = ButtonTone.Quiet, keepTag = "detail_keep",
+                    confirm = "Delete event", confirmTag = "detail_confirm_delete", confirmIcon = "delete_forever",
+                    busy = busy, onKeep = onKeep, onConfirm = onConfirmDelete,
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.noteIconGap)) {
+                        HhIcon("delete", size = CalendarDimens.footerIcon, tint = c.danger)
+                        Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.noteTextGap)) {
+                            Text("Delete this event?", style = ControlType.confirmTitle, color = c.ink)
+                            Text(
+                                "“${e.title}” will be removed from ${e.serviceName} for everyone.",
+                                style = CalendarType.noteBody,
+                                color = c.mute,
+                            )
+                        }
+                    }
+                }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
                     DeleteButton(enabled = !busy, tag = "detail_delete", onClick = onDelete)
@@ -266,39 +284,5 @@ private fun AssignButton(enabled: Boolean, onClick: () -> Unit) {
             .padding(horizontal = CalendarDimens.assignButtonPaddingH),
     ) {
         Text("Assign to…", style = CalendarType.assignButton, color = c.accentInk, maxLines = 1)
-    }
-}
-
-@Composable
-private fun DeleteConfirmation(e: EventUi, busy: Boolean, onKeep: () -> Unit, onConfirmDelete: () -> Unit) {
-    val c = Culvery.colors
-    Column(
-        verticalArrangement = Arrangement.spacedBy(CalendarDimens.confirmGap),
-        modifier = Modifier
-            .testTag("detail_confirm")
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(CalendarDimens.confirmRadius))
-            .background(c.dangerSoft)
-            .padding(CalendarDimens.confirmPadding),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.noteIconGap)) {
-            HhIcon("delete", size = CalendarDimens.footerIcon, tint = c.danger)
-            Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.noteTextGap)) {
-                Text("Delete this event?", style = CalendarType.confirmTitle, color = c.ink)
-                Text(
-                    "“${e.title}” will be removed from ${e.serviceName} for everyone.",
-                    style = CalendarType.noteBody,
-                    color = c.mute,
-                )
-            }
-        }
-        // Keep event sits on the left, where Delete was, so a double tap on Delete is harmless.
-        Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.confirmButtonGap), modifier = Modifier.fillMaxWidth()) {
-            HhSheetButton("Keep event", ButtonTone.Quiet, enabled = !busy, tag = "detail_keep", onClick = onKeep, modifier = Modifier.weight(1f))
-            HhSheetButton(
-                "Delete event", ButtonTone.Destroy, enabled = !busy, tag = "detail_confirm_delete", onClick = onConfirmDelete,
-                modifier = Modifier.weight(1f), icon = "delete_forever",
-            )
-        }
     }
 }

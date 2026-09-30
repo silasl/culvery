@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /** Control values from the hand-off (§7 chips, the title field, person chips) and 4a's colour swatches. */
 object ControlTokens {
@@ -69,6 +71,13 @@ object ControlTokens {
     val buttonIcon = 24.dp
     val buttonIconGap = 8.dp
 
+    // A confirmation, as the calendar's delete confirmation: `dangerSoft`, radius 24, padding 20, 16 between blocks,
+    // buttons 12 apart.
+    val confirmRadius = 24.dp
+    val confirmPadding = 20.dp
+    val confirmGap = 16.dp
+    val confirmButtonGap = 12.dp
+
     // Colour swatch (4a; not in the spec): a 44 dp circle, 12 apart; chosen, a 3 dp `ink` ring 3 dp outside it; taken,
     // at 38% with a 2 dp `ink` line across it.
     val swatch = 44.dp
@@ -94,6 +103,9 @@ object ControlType {
 
     /** 17 sp / 700: a sheet's footer button. */
     val button = HhType.rowTitle.copy(fontWeight = FontWeight.W700)
+
+    /** 18 sp / 700: a confirmation's question. */
+    val confirmTitle = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W700)
 }
 
 /**
@@ -243,6 +255,44 @@ fun HhSheetButton(
     ) {
         if (icon != null) HhIcon(icon, size = ControlTokens.buttonIcon, tint = ink)
         Text(text, style = ControlType.button, color = ink, maxLines = 1)
+    }
+}
+
+/**
+ * A confirmation card on `dangerSoft`: [question] above two buttons. Keep, in [keepTone], sits on the left where the
+ * action that opened the card was, so a double tap on it is harmless; the confirming button is [ButtonTone.Destroy].
+ */
+@Composable
+fun HhConfirmCard(
+    tag: String,
+    keep: String,
+    keepTone: ButtonTone,
+    keepTag: String,
+    confirm: String,
+    confirmTag: String,
+    busy: Boolean,
+    onKeep: () -> Unit,
+    onConfirm: () -> Unit,
+    confirmIcon: String? = null,
+    question: @Composable () -> Unit,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(ControlTokens.confirmGap),
+        modifier = Modifier
+            .testTag(tag)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(ControlTokens.confirmRadius))
+            .background(Culvery.colors.dangerSoft)
+            .padding(ControlTokens.confirmPadding),
+    ) {
+        question()
+        Row(horizontalArrangement = Arrangement.spacedBy(ControlTokens.confirmButtonGap), modifier = Modifier.fillMaxWidth()) {
+            HhSheetButton(keep, keepTone, enabled = !busy, tag = keepTag, onClick = onKeep, modifier = Modifier.weight(1f))
+            HhSheetButton(
+                confirm, ButtonTone.Destroy, enabled = !busy, tag = confirmTag, onClick = onConfirm,
+                modifier = Modifier.weight(1f), icon = confirmIcon,
+            )
+        }
     }
 }
 

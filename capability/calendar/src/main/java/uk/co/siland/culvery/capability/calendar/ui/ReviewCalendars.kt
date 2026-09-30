@@ -36,15 +36,17 @@ import uk.co.siland.culvery.capability.calendar.syncedLabel
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
+import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhChoiceChip
+import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPillButton
-import uk.co.siland.culvery.core.ui.HhSheetButton
 import uk.co.siland.culvery.core.ui.HhSwitch
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
@@ -58,7 +60,6 @@ internal const val SHOW = "Show"
 internal const val MASTER = "Master"
 internal const val NEW_EVENTS_GO_HERE = "New events go here"
 internal const val MAKE_MASTER = "Make master"
-internal const val KEEP = "Keep"
 
 private const val TAG = "ReviewCalendars"
 
@@ -159,7 +160,14 @@ internal fun ReviewCalendars(
         connections.forEach { connection ->
             ConnectionHeader(connection.row, nowMillis, busy, actions.onReconnect, actions.onDisconnect)
             if (confirming != null && confirming.row.connection.id == connection.row.connection.id) {
-                DisconnectConfirmation(confirming, busy, actions.onKeep, actions.onConfirmDisconnect)
+                HhConfirmCard(
+                    tag = "review_confirm",
+                    keep = KEEP, keepTone = ButtonTone.Quiet, keepTag = "review_keep",
+                    confirm = DISCONNECT, confirmTag = "review_confirm_disconnect",
+                    busy = busy, onKeep = actions.onKeep, onConfirm = { actions.onConfirmDisconnect(confirming.row) },
+                ) {
+                    Text(disconnectQuestion(confirming.row.service, confirming.queued), style = ControlType.confirmTitle, color = Culvery.colors.ink)
+                }
             }
             connection.sources.forEach { source ->
                 SourceRow(source, people, busy, picking == sourceKey(source), actions.onPick, actions.onPerson, actions.onShown, actions.onMakeMaster)
@@ -272,27 +280,4 @@ private fun SourceRow(
 @Composable
 private fun Dot(person: Person) {
     Box(Modifier.size(ControlTokens.chipDot).clip(CircleShape).background(Color(person.color)))
-}
-
-@Composable
-private fun DisconnectConfirmation(confirming: Confirming, busy: Boolean, onKeep: () -> Unit, onConfirm: (CalendarRow) -> Unit) {
-    val c = Culvery.colors
-    Column(
-        verticalArrangement = Arrangement.spacedBy(CalendarDimens.confirmGap),
-        modifier = Modifier
-            .testTag("review_confirm")
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(CalendarDimens.confirmRadius))
-            .background(c.dangerSoft)
-            .padding(CalendarDimens.confirmPadding),
-    ) {
-        Text(disconnectQuestion(confirming.row.service, confirming.queued), style = CalendarType.confirmTitle, color = c.ink)
-        Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.confirmButtonGap), modifier = Modifier.fillMaxWidth()) {
-            HhSheetButton(KEEP, ButtonTone.Quiet, enabled = !busy, tag = "review_keep", onClick = onKeep, modifier = Modifier.weight(1f))
-            HhSheetButton(
-                DISCONNECT, ButtonTone.Destroy, enabled = !busy, tag = "review_confirm_disconnect",
-                onClick = { onConfirm(confirming.row) }, modifier = Modifier.weight(1f),
-            )
-        }
-    }
 }

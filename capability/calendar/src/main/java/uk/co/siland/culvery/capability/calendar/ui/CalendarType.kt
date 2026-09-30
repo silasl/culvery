@@ -58,9 +58,6 @@ internal object CalendarType {
     /** 17 sp / 700: Delete, Keep event, Delete event. */
     val footerButton = HhType.rowTitle.copy(fontWeight = FontWeight.W700)
 
-    /** 18 sp / 700: "Delete this event?". */
-    val confirmTitle = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W700)
-
     /** 24 sp / 700: "Pick a date", "Pick a time". */
     val pickerTitle = HhType.dateNumber
 
@@ -241,12 +238,6 @@ internal object CalendarDimens {
     val deleteButtonPaddingH = 26.dp
     val footerIcon = 24.dp
     val footerIconGap = 8.dp
-
-    // Delete confirmation: `dangerSoft`, radius 24, padding 20, 16 between blocks; buttons 12 apart.
-    val confirmRadius = 24.dp
-    val confirmPadding = 20.dp
-    val confirmGap = 16.dp
-    val confirmButtonGap = 12.dp
 
     // Pickers (hand-off §7 and Culvery.dc.html): card `surf`, radius 30, padding 26. Date: 520 wide, 14 between blocks,
     // the range 4 below "Pick a date", ‹ › 48 dp circles 8 apart; weekday header padding 4; cells 56 dp, radius 16,
