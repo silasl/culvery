@@ -60,7 +60,7 @@ import uk.co.siland.culvery.core.ui.ShellTokens
 const val SAVE_FAILED_BODY = "Nothing was changed. Your details are still here — check the connection and try again."
 
 /** A selected Who chip's ink on the person's colour: #0E1011 in both themes (hand-off §7), the dark theme's `bg`. */
-private val PersonChipInk: Color = DarkColors.bg
+internal val PersonChipInk: Color = DarkColors.bg
 
 /**
  * Hand-off §7 "Sheet 2 — Quick-add / edit" (2b-2 design §4.2). Stateless apart from the [form] it edits: the host

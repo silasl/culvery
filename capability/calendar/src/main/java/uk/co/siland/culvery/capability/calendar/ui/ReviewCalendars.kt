@@ -41,7 +41,6 @@ import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPillButton
@@ -253,15 +252,16 @@ private fun SourceRow(
         if (picking) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap), verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
                 people.forEach { p ->
+                    val selected = p.id == source.mapping.person
                     HhChoiceChip(
                         p.name,
-                        selected = p.id == source.mapping.person,
+                        selected = selected,
                         tag = "review_pick_${p.name}",
                         onClick = { onPerson(source, p) },
                         enabled = !busy,
                         selectedColor = Color(p.color),
-                        selectedInk = DarkColors.bg,
-                        leading = { _ -> Dot(p) },
+                        selectedInk = PersonChipInk,
+                        leading = { ink -> if (selected) HhIcon("check", size = ControlTokens.chipIcon, tint = ink) else Dot(p) },
                     )
                 }
             }

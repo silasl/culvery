@@ -106,7 +106,7 @@ internal object CalendarType {
     /** 18 sp / 600: a Settings row's "Google Calendar Â· {account}". */
     val settingsRowTitle = HhType.rowTitle.copy(fontSize = 18.sp)
 
-    /** 34 sp / 700: "Your calendars" and "Calendars", as the wizard's and Settings' titles (4a design §4.5). */
+    /** 34 sp / 700: "Your calendars" and "Calendars", as the wizard's and Settings' titles (4a design Â§4.5). */
     val reviewTitle = HhType.screenTitle
 
     /** 13 sp / 700: the "Master" badge. */
@@ -335,9 +335,6 @@ internal object CalendarDimens {
     // Settings' Calendars block (3a design Â§4.1): a row `surf`, radius 18, padding 16Ã—20; its pills are AddButton's.
     // Not in the spec: 12 below the title, rows 10 apart, a 26 dp icon 16 from the text, the health 2 below the name,
     // and rows 600 wide (the sheets' width) so a row reads as one line.
-    val settingsTitleGap = 12.dp
-    val settingsRowGap = 10.dp
-    val settingsRowWidth = 600.dp
     val settingsRowRadius = 18.dp
     val settingsRowPaddingV = 16.dp
     val settingsRowPaddingH = 20.dp
@@ -345,9 +342,9 @@ internal object CalendarDimens {
     val settingsIconGap = 16.dp
     val settingsStatusTop = 2.dp
 
-    // Review calendars (4a design §4.5; not in the spec): blocks 12 apart; a calendar's row `surf`, radius 18, padding
-    // 14×20, its parts 12 apart; the Master badge `accentSoft`, radius 12, padding 4×10. The wizard's Connect card
-    // 380×460, about a Home card's size.
+    // Review calendars (4a design Â§4.5; not in the spec): blocks 12 apart; a calendar's row `surf`, radius 18, padding
+    // 14Ã—20, its parts 12 apart; the Master badge `accentSoft`, radius 12, padding 4Ã—10. The wizard's Connect card
+    // 380Ã—460, about a Home card's size.
     val reviewBlockGap = 12.dp
     val reviewRowRadius = 18.dp
     val reviewRowPaddingV = 14.dp

@@ -2,6 +2,8 @@ package uk.co.siland.culvery.capability.calendar
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.time.Instant
+import java.time.ZoneId
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -118,12 +120,20 @@ class CalendarReviewTest {
     fun disconnectingCountsTheQueueThenRemovesEverything() = runTest {
         val (review, access) = review()
         repeat(3) { i -> store.enqueue(PendingChange(0, "g1", family.id, "e$i", ChangeKind.DELETE, null, 0, 0L, 0L)) }
+        store.applyAccepted(
+            "g1", family.id,
+            RemoteEvent("e", "Walk", EventTime.Timed(Instant.ofEpochSecond(3_600)), EventTime.Timed(Instant.ofEpochSecond(7_200)), recurring = false),
+            ZoneId.of("UTC"),
+        )
+        assertThat(store.eventsBetween(0, Long.MAX_VALUE).first()).hasSize(1)
         assertThat(review.queuedChanges("g1")).isEqualTo(3)
         val row = review.connections.first().single().row
         access.answer(TestAccess.ALEX)
         assertThat(review.disconnect(row)).isTrue()
         assertThat(store.connectionsNow()).isEmpty()
         assertThat(store.pendingNow()).isEmpty()
+        assertThat(store.sources().first()).isEmpty()
+        assertThat(store.eventsBetween(0, Long.MAX_VALUE).first()).isEmpty()
         assertThat(toaster.messages).containsExactly("Google Calendar disconnected")
     }
 

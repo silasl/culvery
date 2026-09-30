@@ -46,7 +46,6 @@ class ReviewCalendarsTest {
     private var shown: Pair<String, Boolean>? = null
     private var mastered: String? = null
     private var reconnected: Connection? = null
-    private var disconnecting: CalendarRow? = null
     private var kept = 0
     private var confirmed: CalendarRow? = null
 
@@ -67,7 +66,6 @@ class ReviewCalendarsTest {
                     onPerson = { source, person -> chosen = source.source.id to person.name },
                     onShown = { source, visible -> shown = source.source.id to visible },
                     onMakeMaster = { mastered = it.source.id },
-                    onDisconnect = { disconnecting = it },
                     onKeep = { kept++ },
                     onConfirmDisconnect = { confirmed = it },
                 ),
