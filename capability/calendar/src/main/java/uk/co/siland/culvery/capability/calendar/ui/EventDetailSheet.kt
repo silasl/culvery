@@ -32,11 +32,14 @@ import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhPersonChip
 import uk.co.siland.culvery.core.ui.HhSheet
+import uk.co.siland.culvery.core.ui.HhSheetButton
 
 enum class DetailMode { Idle, ChoosingPerson, ConfirmingDelete }
 
@@ -109,7 +112,7 @@ fun EventDetailSheet(
                         horizontalArrangement = Arrangement.spacedBy(CalendarDimens.personChipGap),
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                     ) {
-                        people.forEach { person -> PersonChip(person, enabled = !busy) { onAssign(person) } }
+                        people.forEach { person -> HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy) { onAssign(person) } }
                     }
                 } else {
                     AssignButton(enabled = !busy, onClick = onChoosePerson)
@@ -267,25 +270,6 @@ private fun AssignButton(enabled: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun PersonChip(person: Person, enabled: Boolean, onClick: () -> Unit) {
-    val c = Culvery.colors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.personChipDotGap),
-        modifier = Modifier
-            .testTag("assign_${person.name}")
-            .height(CalendarDimens.personChipHeight)
-            .clip(RoundedCornerShape(CalendarDimens.personChipRadius))
-            .background(c.surf)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = CalendarDimens.personChipPaddingH),
-    ) {
-        Box(Modifier.size(CalendarDimens.personChipDot).clip(CircleShape).background(Color(person.color)))
-        Text(person.name, style = CalendarType.personChip, color = c.ink, maxLines = 1)
-    }
-}
-
-@Composable
 private fun DeleteConfirmation(e: EventUi, busy: Boolean, onKeep: () -> Unit, onConfirmDelete: () -> Unit) {
     val c = Culvery.colors
     Column(
@@ -310,34 +294,11 @@ private fun DeleteConfirmation(e: EventUi, busy: Boolean, onKeep: () -> Unit, on
         }
         // Keep event sits on the left, where Delete was, so a double tap on Delete is harmless.
         Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.confirmButtonGap), modifier = Modifier.fillMaxWidth()) {
-            ConfirmButton("Keep event", null, c.surf, c.ink, "detail_keep", !busy, onKeep, Modifier.weight(1f))
-            ConfirmButton("Delete event", "delete_forever", c.danger, c.dangerInk, "detail_confirm_delete", !busy, onConfirmDelete, Modifier.weight(1f))
+            HhSheetButton("Keep event", ButtonTone.Quiet, enabled = !busy, tag = "detail_keep", onClick = onKeep, modifier = Modifier.weight(1f))
+            HhSheetButton(
+                "Delete event", ButtonTone.Destroy, enabled = !busy, tag = "detail_confirm_delete", onClick = onConfirmDelete,
+                modifier = Modifier.weight(1f), icon = "delete_forever",
+            )
         }
-    }
-}
-
-@Composable
-private fun ConfirmButton(
-    text: String,
-    icon: String?,
-    background: Color,
-    content: Color,
-    tag: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerIconGap, Alignment.CenterHorizontally),
-        modifier = modifier
-            .testTag(tag)
-            .height(CalendarDimens.footerButtonHeight)
-            .clip(RoundedCornerShape(CalendarDimens.footerButtonRadius))
-            .background(background)
-            .clickable(enabled = enabled, onClick = onClick),
-    ) {
-        if (icon != null) HhIcon(icon, size = CalendarDimens.footerIcon, tint = content)
-        Text(text, style = CalendarType.footerButton, color = content, maxLines = 1)
     }
 }

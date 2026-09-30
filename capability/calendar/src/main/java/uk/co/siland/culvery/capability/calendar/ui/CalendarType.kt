@@ -88,17 +88,8 @@ internal object CalendarType {
     /** 15 sp / 400: the add/edit sheet's live summary. */
     val editorSummary = subtitle
 
-    /** 22 sp / 600: the Title field. */
-    val titleField = HhType.sectionTitle.copy(fontWeight = FontWeight.W600)
-
     /** 13 sp / 700, 0.5 tracking: WHO, DAY, TIME, LENGTH. */
     val sectionLabel = HhType.label.copy(fontWeight = FontWeight.W700, letterSpacing = 0.5.sp)
-
-    /** 16 sp / 600: choice chips. */
-    val chip = personChip
-
-    /** 16 sp / 500: a time chip's "09:00". */
-    val chipSecondary = HhType.body.copy(fontWeight = FontWeight.W500)
 
     /** 18 sp / 700: Save, Save changes, Try again, Edit. */
     val primaryButton = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W700)
@@ -231,17 +222,12 @@ internal object CalendarDimens {
     val noteIconGap = 14.dp
     val noteTextGap = 2.dp
 
-    // Assign: "Assign to…" 44 dp, radius 22; person chips 48 dp, `surf`, radius 24, 12 dp dot, 8 apart.
+    // Assign: "Assign to…" 44 dp, radius 22; person chips 8 apart (ControlTokens has the chip).
     val assignTop = 12.dp
     val assignButtonHeight = 44.dp
     val assignButtonRadius = 22.dp
     val assignButtonPaddingH = 18.dp
-    val personChipHeight = 48.dp
-    val personChipRadius = 24.dp
-    val personChipPaddingH = 18.dp
     val personChipGap = 8.dp
-    val personChipDot = 12.dp
-    val personChipDotGap = 8.dp
 
     // Footer: Delete 60 dp, padding 0 26, radius 30, `surf2`, `danger` text.
     val footerButtonHeight = 60.dp
@@ -302,21 +288,6 @@ internal object CalendarDimens {
     val editorBodyGap = 20.dp
     val sectionGap = 10.dp
 
-    // Title field: 64 dp, radius 18, `surf`, padding 0 20, a 2 dp `accent` border while focused.
-    val titleHeight = 64.dp
-    val titleRadius = 18.dp
-    val titlePaddingH = 20.dp
-    val titleBorder = 2.dp
-
-    // Choice chips: 48 dp, padding 0 18, radius 24, 8 apart; a 12 dp dot or 20 dp icon 8 from the label.
-    val choiceChipHeight = 48.dp
-    val choiceChipPaddingH = 18.dp
-    val choiceChipRadius = 24.dp
-    val choiceChipGap = 8.dp
-    val choiceChipIconGap = 8.dp
-    val choiceChipDot = 12.dp
-    val choiceChipIcon = 20.dp
-
     // The locked dates line and the failure card: radius 18, padding 14×16, the icon 12 from the text;
     // `date_range` 22 dp, `cloud_off` 24 dp, the failure body 2 below its title.
     val editorCardRadius = 18.dp
@@ -330,10 +301,6 @@ internal object CalendarDimens {
     // Footers: 10 between Delete and the main button; the main button's icon 10 from its label.
     val footerGap = 10.dp
     val primaryIconGap = 10.dp
-
-    /** Hand-off §7: a disabled chip is drawn at 38% and stays tappable; a time chip's "09:00" is at 72%. */
-    const val DISABLED_CHIP_ALPHA = 0.38f
-    const val CHIP_SECONDARY_ALPHA = 0.72f
 
     // Entry points (hand-off §7): Today's + is a 44 dp `accent` circle (touchTarget) with a 26 dp `add`, 8 from Week.
     // Add event is 48 dp, radius 24, padding 0 20 0 14, a 24 dp `add` 6 from its label. Each week column ends with a

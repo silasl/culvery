@@ -1,8 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,33 +23,20 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.HOURS_MINUTES
@@ -62,10 +47,13 @@ import uk.co.siland.culvery.capability.calendar.lengthLabel
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.HhCloseButton
+import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhSheet
+import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.ShellTokens
 
 /** Hand-off §7: the failure card's body. */
@@ -227,38 +215,14 @@ private fun Header(form: EventForm, everyone: List<Person>, onClose: () -> Unit)
 /** 64 dp, `surf`, 22 sp / 600, "What's happening?", one line; Done closes the keyboard and never saves. */
 @Composable
 private fun TitleField(form: EventForm, focus: FocusRequester, readOnly: Boolean, onDone: () -> Unit) {
-    val c = Culvery.colors
-    var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(CalendarDimens.titleRadius)
-    BasicTextField(
+    HhTextField(
         value = form.title,
         onValueChange = { form.updateTitle(it) },
-        singleLine = true,
+        placeholder = "What's happening?",
+        tag = "editor_title",
+        modifier = Modifier.focusRequester(focus),
         readOnly = readOnly,
-        textStyle = CalendarType.titleField.copy(color = c.ink),
-        cursorBrush = SolidColor(c.accent),
-        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { onDone() }),
-        modifier = Modifier
-            .testTag("editor_title")
-            .fillMaxWidth()
-            .height(CalendarDimens.titleHeight)
-            .focusRequester(focus)
-            .onFocusChanged { focused = it.isFocused },
-        decorationBox = { inner ->
-            Box(
-                contentAlignment = Alignment.CenterStart,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(shape)
-                    .background(c.surf)
-                    .then(if (focused) Modifier.border(CalendarDimens.titleBorder, c.accent, shape) else Modifier)
-                    .padding(horizontal = CalendarDimens.titlePaddingH),
-            ) {
-                if (form.title.isEmpty()) Text("What's happening?", style = CalendarType.titleField, color = c.mute, maxLines = 1)
-                inner()
-            }
-        },
+        onDone = onDone,
     )
 }
 
@@ -267,8 +231,8 @@ private fun Section(label: String, chips: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
         Text(label, style = CalendarType.sectionLabel, color = Culvery.colors.mute)
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(CalendarDimens.choiceChipGap),
-            verticalArrangement = Arrangement.spacedBy(CalendarDimens.choiceChipGap),
+            horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
+            verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
         ) {
             chips()
         }
@@ -282,7 +246,7 @@ private fun WhoSection(form: EventForm, everyone: List<Person>, childOnly: Perso
             val selected = form.who == person.id
             val enabled = childOnly == null || person.id == childOnly
             val colour = Color(person.color)
-            ChoiceChip(
+            HhChoiceChip(
                 label = person.name,
                 selected = selected,
                 tag = "who_${person.name}",
@@ -291,9 +255,9 @@ private fun WhoSection(form: EventForm, everyone: List<Person>, childOnly: Perso
                 selectedInk = PersonChipInk,
                 leading = { ink ->
                     if (selected) {
-                        HhIcon("check", size = CalendarDimens.choiceChipIcon, tint = ink)
+                        HhIcon("check", size = ControlTokens.chipIcon, tint = ink)
                     } else {
-                        Box(Modifier.size(CalendarDimens.choiceChipDot).clip(CircleShape).background(colour))
+                        Box(Modifier.size(ControlTokens.chipDot).clip(CircleShape).background(colour))
                     }
                 },
                 // The chosen chip may be a disabled one (an adult tagged the child's event); a tap on it does nothing.
@@ -313,7 +277,7 @@ private fun WhoSection(form: EventForm, everyone: List<Person>, childOnly: Perso
 private fun DaySection(form: EventForm, busy: Boolean, onPickDate: () -> Unit) {
     Section("DAY") {
         form.dayChoices.forEachIndexed { i, date ->
-            ChoiceChip(
+            HhChoiceChip(
                 label = when (i) {
                     0 -> "Today"
                     1 -> "Tomorrow"
@@ -325,11 +289,11 @@ private fun DaySection(form: EventForm, busy: Boolean, onPickDate: () -> Unit) {
             )
         }
         val picked = form.pickedDateLabel
-        ChoiceChip(
+        HhChoiceChip(
             label = picked ?: "Pick date…",
             selected = picked != null,
             tag = "day_pick",
-            leading = { ink -> HhIcon("calendar_month", size = CalendarDimens.choiceChipIcon, tint = ink) },
+            leading = { ink -> HhIcon("calendar_month", size = ControlTokens.chipIcon, tint = ink) },
             onClick = { if (!busy) onPickDate() },
         )
     }
@@ -338,9 +302,9 @@ private fun DaySection(form: EventForm, busy: Boolean, onPickDate: () -> Unit) {
 @Composable
 private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit) {
     Section("TIME") {
-        ChoiceChip("All day", form.time == TimeChoice.AllDay, "time_all_day", onClick = { if (!busy) form.chooseTime(TimeChoice.AllDay) })
+        HhChoiceChip("All day", form.time == TimeChoice.AllDay, "time_all_day", onClick = { if (!busy) form.chooseTime(TimeChoice.AllDay) })
         TimeSlot.entries.forEach { slot ->
-            ChoiceChip(
+            HhChoiceChip(
                 label = slot.label,
                 selected = form.time == TimeChoice.Slot(slot),
                 tag = "time_${slot.name}",
@@ -349,11 +313,11 @@ private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit) 
             )
         }
         val custom = form.time as? TimeChoice.Custom
-        ChoiceChip(
+        HhChoiceChip(
             label = custom?.time?.format(HOURS_MINUTES) ?: "Pick time…",
             selected = custom != null,
             tag = "time_pick",
-            leading = { ink -> HhIcon("schedule", size = CalendarDimens.choiceChipIcon, tint = ink) },
+            leading = { ink -> HhIcon("schedule", size = ControlTokens.chipIcon, tint = ink) },
             onClick = { if (!busy) onPickTime() },
         )
     }
@@ -363,46 +327,7 @@ private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit) 
 private fun LengthSection(form: EventForm, busy: Boolean) {
     Section("LENGTH") {
         form.lengths.forEach { length ->
-            ChoiceChip(lengthLabel(length), form.length == length, "length_${length.toMinutes()}", onClick = { if (!busy) form.chooseLength(length) })
-        }
-    }
-}
-
-/**
- * Hand-off §7 chip: 48 dp, padding 0 18, radius 24, 16 sp / 600; `surf`/`ink`, or [selectedColor]/[selectedInk] when
- * selected. A disabled chip is drawn at 38% but stays tappable, so a tap can explain why.
- */
-@Composable
-private fun ChoiceChip(
-    label: String,
-    selected: Boolean,
-    tag: String,
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-    selectedColor: Color = Culvery.colors.accent,
-    selectedInk: Color = Culvery.colors.accentInk,
-    secondary: String? = null,
-    leading: (@Composable (ink: Color) -> Unit)? = null,
-) {
-    val c = Culvery.colors
-    val ink = if (selected) selectedInk else c.ink
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.choiceChipIconGap),
-        modifier = Modifier
-            .testTag(tag)
-            .semantics { this.selected = selected }
-            .alpha(if (enabled) 1f else CalendarDimens.DISABLED_CHIP_ALPHA)
-            .height(CalendarDimens.choiceChipHeight)
-            .clip(RoundedCornerShape(CalendarDimens.choiceChipRadius))
-            .background(if (selected) selectedColor else c.surf)
-            .clickable(onClick = onClick)
-            .padding(horizontal = CalendarDimens.choiceChipPaddingH),
-    ) {
-        leading?.invoke(ink)
-        Text(label, style = CalendarType.chip, color = ink, maxLines = 1)
-        if (secondary != null) {
-            Text(secondary, style = CalendarType.chipSecondary, color = ink.copy(alpha = CalendarDimens.CHIP_SECONDARY_ALPHA), maxLines = 1)
+            HhChoiceChip(lengthLabel(length), form.length == length, "length_${length.toMinutes()}", onClick = { if (!busy) form.chooseLength(length) })
         }
     }
 }

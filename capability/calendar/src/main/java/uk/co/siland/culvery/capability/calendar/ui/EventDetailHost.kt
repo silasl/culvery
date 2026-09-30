@@ -17,6 +17,7 @@ import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "EventDetailHost"
 

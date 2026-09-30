@@ -32,22 +32,28 @@ fun HhCard(
     )
 }
 
+/** A pill button; a disabled one is `surf2` with `mute` text and ignores taps. */
 @Composable
 fun HhPillButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     primary: Boolean = false,
+    enabled: Boolean = true,
 ) {
     val c = Culvery.colors
     Text(
         text = text,
         style = HhType.buttonLabel,
-        color = if (primary) c.accentInk else c.ink,
+        color = when {
+            !enabled -> c.mute
+            primary -> c.accentInk
+            else -> c.ink
+        },
         modifier = modifier
             .clip(RoundedCornerShape(24.dp))
-            .background(if (primary) c.accent else c.surf2)
-            .clickable(onClick = onClick)
+            .background(if (primary && enabled) c.accent else c.surf2)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 22.dp, vertical = 13.dp),
     )
 }
