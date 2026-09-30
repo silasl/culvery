@@ -30,7 +30,7 @@ internal fun shouldPin(setupComplete: Boolean, kioskExited: Boolean): Boolean = 
  * the activity is in front, so Open Culvery locks the tablet straight away.
  */
 internal fun pinOnSetupRead(previous: Boolean?, now: Boolean, resumed: Boolean, kioskExited: Boolean): Boolean =
-    now && previous != true && resumed && !kioskExited
+    previous != true && resumed && shouldPin(now, kioskExited)
 
 /** 4a design D5, D9: touches restart the session while Settings is open or the wizard shows (the setup session's ten minutes). */
 internal fun touchTarget(complete: Boolean?, settingsOpen: Boolean, access: AccessControl): (() -> Unit)? =
