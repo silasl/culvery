@@ -22,7 +22,7 @@ class PinManager @Inject constructor(
     private val hasher: PinHasher,
 ) {
     /** A hash and salt for [pin]; PinInUseException when anyone but [owner] has it (PINs identify people). */
-    suspend fun hashNew(pin: String, owner: PersonId?): Pair<String, String> {
+    private suspend fun hashNew(pin: String, owner: PersonId?): Pair<String, String> {
         hasher.validate(pin)
         return withContext(Dispatchers.Default) {
             guardFor(pin).check(household.credentials().filter { it.personId != owner })
@@ -35,11 +35,6 @@ class PinManager @Inject constructor(
     suspend fun changeTo(pin: String, owner: PersonId?): PinChange.Set {
         val (hash, salt) = hashNew(pin, owner)
         return PinChange.Set(hash, salt, guardFor(pin))
-    }
-
-    suspend fun setPin(id: PersonId, pin: String) {
-        val (hash, salt) = hashNew(pin, id)
-        household.setPinHash(id, hash, salt, guardFor(pin))
     }
 
     /** Adds a person with [pin] (or none) in one step, so a PIN in use leaves nobody added. */

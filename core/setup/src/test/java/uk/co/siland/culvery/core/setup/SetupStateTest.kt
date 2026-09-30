@@ -66,8 +66,7 @@ class SetupStateTest {
     private val file get() = File(folder.root, "setup.preferences_pb")
 
     private suspend fun addAdmin(withPin: Boolean = true) {
-        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
-        if (withPin) household.setPinHash(alex.id, "hash", "salt")
+        household.addPerson("Alex", 0xFF4CB387, Role.ADMIN, pinHash = "hash".takeIf { withPin }, salt = "salt".takeIf { withPin })
     }
 
     @Test

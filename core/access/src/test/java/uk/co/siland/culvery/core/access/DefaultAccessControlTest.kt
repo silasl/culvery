@@ -63,7 +63,7 @@ class DefaultAccessControlTest {
     private var nextColour = 0xFF101010L
 
     private suspend fun person(name: String, role: Role, pin: String): Person =
-        household.addPerson(name, nextColour++, role).also { pins.setPin(it.id, pin) }
+        pins.addPerson(name, nextColour++, role, pin)
 
     /** Answers successive PIN pad requests in order; null = tap Cancel. */
     private fun TestScope.answerPins(vararg answers: String?) {

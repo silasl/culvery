@@ -73,7 +73,7 @@ internal suspend fun testAccess(
 ): TestAccess {
     val pins = PinManager(household, PinHasher())
     suspend fun person(name: String, color: Long, role: Role, pin: String) =
-        household.addPerson(name, color, role).also { pins.setPin(it.id, pin) }
+        pins.addPerson(name, color, role, pin)
     val alex = person("Alex", 0xFF4CB387, Role.ADMIN, TestAccess.ALEX)
     val sam = person("Sam", 0xFF5B9BE0, Role.ADULT, TestAccess.SAM)
     val mia = person("Mia", 0xFFE07BA8, Role.CHILD, TestAccess.MIA)

@@ -36,55 +36,55 @@ class PinManagerTest {
 
     @Test
     fun identifyReturnsPersonAndRole() = runTest {
-        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
-        val mia = household.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
-        pins.setPin(alex.id, "1234")
-        pins.setPin(mia.id, "9876")
+        val alex = pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, "1234")
+        val mia = pins.addPerson("Mia", 0xFFE07BA8, Role.CHILD, "9876")
         assertThat(pins.identify("9876")).isEqualTo(Identified(mia, Role.CHILD))
         assertThat(pins.identify("1234")).isEqualTo(Identified(alex, Role.ADMIN))
     }
 
     @Test
     fun identifyReturnsNullForWrongOrMalformedPin() = runTest {
-        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
-        pins.setPin(alex.id, "1234")
+        pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, "1234")
         assertThat(pins.identify("1235")).isNull()
         assertThat(pins.identify("12")).isNull()
     }
 
     @Test
     fun duplicatePinIsRejected() = runTest {
-        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
-        val sam = household.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
-        pins.setPin(alex.id, "1234")
-        assertThrows(PinInUseException::class.java) { runBlocking { pins.setPin(sam.id, "1234") } }
+        pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, "1234")
+        val sam = pins.addPerson("Sam", 0xFF5B9BE0, Role.ADULT, null)
+        assertThrows(PinInUseException::class.java) {
+            runBlocking { household.updateMember(sam.id, "Sam", sam.color, Role.ADULT, pins.changeTo("1234", owner = sam.id)) }
+        }
+        assertThat(household.member(sam.id)?.hasPin).isFalse()
     }
 
     @Test
     fun personCanKeepTheirOwnPin() = runTest {
-        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
-        pins.setPin(alex.id, "1234")
-        pins.setPin(alex.id, "1234")
+        val alex = pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, "1234")
+        household.updateMember(alex.id, "Alex", alex.color, Role.ADMIN, pins.changeTo("1234", owner = alex.id))
         assertThat(pins.identify("1234")?.person).isEqualTo(alex)
     }
 
     @Test
     fun malformedPinIsRejected() = runTest {
-        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { pins.setPin(alex.id, "12345") } }
+        val alex = pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, null)
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { pins.changeTo("12345", owner = alex.id) } }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { pins.addPerson("Mia", 0xFFE07BA8, Role.CHILD, "12345") } }
     }
 
     @Test
     fun unknownPersonIsRejected() = runTest {
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { pins.setPin(PersonId("nobody"), "1234") } }
+        val nobody = PersonId("nobody")
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { household.updateMember(nobody, "Nobody", 0xFF4CB387, Role.ADULT, pins.changeTo("1234", owner = nobody)) }
+        }
     }
 
     @Test
     fun removedPersonsPinNoLongerIdentifies() = runTest {
-        val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
-        val mia = household.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
-        pins.setPin(alex.id, "1234")
-        pins.setPin(mia.id, "9876")
+        pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, "1234")
+        val mia = pins.addPerson("Mia", 0xFFE07BA8, Role.CHILD, "9876")
         household.removePerson(mia.id)
         assertThat(pins.identify("9876")).isNull()
     }
@@ -103,10 +103,10 @@ class PinManagerTest {
     }
 
     @Test
-    fun aNewHashAllowsTheOwnersOwnPinAndNobodyElses() = runTest {
+    fun aPinChangeAllowsTheOwnersOwnPinAndNobodyElses() = runTest {
         val alex = pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, "1234")
-        assertThat(pins.hashNew("1234", owner = alex.id).second).isNotEmpty()
-        assertThrows(PinInUseException::class.java) { runBlocking { pins.hashNew("1234", owner = null) } }
+        assertThat(pins.changeTo("1234", owner = alex.id).salt).isNotEmpty()
+        assertThrows(PinInUseException::class.java) { runBlocking { pins.changeTo("1234", owner = null) } }
     }
 
     @Test
@@ -114,7 +114,7 @@ class PinManagerTest {
         val alex = pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, "1234")
         val mia = pins.addPerson("Mia", 0xFFE07BA8, Role.CHILD, null)
         val change = pins.changeTo("4321", owner = mia.id)
-        pins.setPin(alex.id, "4321")
+        household.updateMember(alex.id, "Alex", alex.color, Role.ADMIN, pins.changeTo("4321", owner = alex.id))
         assertThrows(PinInUseException::class.java) {
             runBlocking { household.updateMember(mia.id, "Mia", mia.color, Role.CHILD, change) }
         }
@@ -122,10 +122,9 @@ class PinManagerTest {
     }
 
     @Test
-    fun aPinInUseIsRefusedThroughAMemberEditAndSetPin() = runTest {
+    fun aPinInUseIsRefusedBeforeHashing() = runTest {
         pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, "1234")
         val mia = pins.addPerson("Mia", 0xFFE07BA8, Role.CHILD, null)
         assertThrows(PinInUseException::class.java) { runBlocking { pins.changeTo("1234", owner = mia.id) } }
-        assertThrows(PinInUseException::class.java) { runBlocking { pins.setPin(mia.id, "1234") } }
     }
 }

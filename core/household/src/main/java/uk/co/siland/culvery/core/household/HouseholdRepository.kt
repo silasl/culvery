@@ -55,16 +55,6 @@ class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase)
         return Person(id, clean, color)
     }
 
-    suspend fun updatePerson(person: Person) {
-        require(!person.isFamily) { "Family cannot be edited" }
-        val clean = cleanName(person.name)
-        db.withTransaction {
-            val existing = requireNotNull(dao.person(person.id.value)) { "Unknown person ${person.id.value}" }
-            checkUnique(dao.all(), person.id, clean, person.color)
-            dao.upsertPerson(existing.copy(name = clean, color = person.color))
-        }
-    }
-
     /**
      * Name, colour, role and PIN in one transaction (4a design §5: a refused edit changes nothing), under [addPerson]'s
      * rules and the last-Admin rule.
@@ -103,13 +93,6 @@ class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase)
 
     suspend fun credentials(): List<Credential> = dao.all().map { it.toCredential() }
 
-    suspend fun setRole(id: PersonId, role: Role) = change(id) { it.copy(role = role) }
-
-    suspend fun setPinHash(id: PersonId, hash: String, salt: String, guard: PinGuard? = null) =
-        change(id, guard) { it.copy(pinHash = hash, salt = salt) }
-
-    suspend fun clearPin(id: PersonId) = change(id) { it.copy(pinHash = null, salt = null) }
-
     suspend fun setLocation(location: HomeLocation) {
         dao.upsertLocation(
             LocationEntity(
@@ -119,17 +102,6 @@ class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase)
                 timeZoneId = location.timeZoneId,
             ),
         )
-    }
-
-    private suspend fun change(id: PersonId, guard: PinGuard? = null, edit: (PersonEntity) -> PersonEntity) {
-        require(id != PersonId.FAMILY) { "Family has no role or PIN" }
-        db.withTransaction {
-            val current = requireNotNull(dao.person(id.value)) { "Unknown person ${id.value}" }
-            val next = edit(current)
-            guard?.check(dao.all().filter { it.id != id.value }.map { it.toCredential() })
-            guardLastAdmin(current, next)
-            dao.upsertPerson(next)
-        }
     }
 
     private suspend fun guardLastAdmin(current: PersonEntity, next: PersonEntity?) {

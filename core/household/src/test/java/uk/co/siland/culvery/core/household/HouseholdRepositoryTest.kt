@@ -32,7 +32,7 @@ class HouseholdRepositoryTest {
     private var nextColour = 0xFF101010L
 
     private suspend fun admin(name: String): Person =
-        repo.addPerson(name, nextColour++, Role.ADMIN).also { repo.setPinHash(it.id, "hash-$name", "salt") }
+        repo.addPerson(name, nextColour++, Role.ADMIN, pinHash = "hash-$name", salt = "salt")
 
     @Test
     fun addedPeopleAppearInInsertionOrder() = runTest {
@@ -72,34 +72,30 @@ class HouseholdRepositoryTest {
     @Test
     fun updateChangesNameAndColourButKeepsCredential() = runTest {
         val alex = admin("Alex")
-        repo.updatePerson(alex.copy(name = "Alexandra", color = 0xFF000000))
+        repo.updateMember(alex.id, "Alexandra", 0xFF000000, Role.ADMIN, PinChange.Keep)
         assertThat(repo.person(alex.id)).isEqualTo(Person(alex.id, "Alexandra", 0xFF000000))
         assertThat(repo.credential(alex.id)?.pinHash).isEqualTo("hash-Alex")
     }
 
     @Test
     fun familyCannotBeUpdatedOrRemoved() = runTest {
-        assertThrows(IllegalArgumentException::class.java) {
-            runBlocking { repo.updatePerson(Person.Family.copy(name = "Us")) }
+        // Without the Family check these would fail only as an unknown person; the refusal must name Family.
+        val edit = assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repo.updateMember(PersonId.FAMILY, "Us", 0xFF5B9BE0, Role.ADULT, PinChange.Set("h", "s")) }
         }
-        assertThrows(IllegalArgumentException::class.java) {
+        val remove = assertThrows(IllegalArgumentException::class.java) {
             runBlocking { repo.removePerson(PersonId.FAMILY) }
         }
+        assertThat(edit.message).isEqualTo("Family cannot be edited")
+        assertThat(remove.message).isEqualTo("Family cannot be removed")
     }
 
     @Test
     fun removingAPersonRemovesTheirCredential() = runTest {
         admin("Alex")
-        val mia = repo.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
-        repo.setPinHash(mia.id, "h", "s")
+        val mia = repo.addPerson("Mia", 0xFFE07BA8, Role.CHILD, pinHash = "h", salt = "s")
         repo.removePerson(mia.id)
         assertThat(repo.credentials().map { it.personId }).doesNotContain(mia.id)
-    }
-
-    @Test
-    fun lastAdminCannotBeDemoted() = runTest {
-        val alex = admin("Alex")
-        assertThrows(LastAdminException::class.java) { runBlocking { repo.setRole(alex.id, Role.ADULT) } }
     }
 
     @Test
@@ -109,16 +105,10 @@ class HouseholdRepositoryTest {
     }
 
     @Test
-    fun lastAdminCannotHavePinCleared() = runTest {
-        val alex = admin("Alex")
-        assertThrows(LastAdminException::class.java) { runBlocking { repo.clearPin(alex.id) } }
-    }
-
-    @Test
     fun oneOfTwoAdminsCanBeDemotedOrRemoved() = runTest {
         admin("Alex")
         val sam = admin("Sam")
-        repo.setRole(sam.id, Role.ADULT)
+        repo.updateMember(sam.id, "Sam", sam.color, Role.ADULT, PinChange.Keep)
         assertThat(repo.credential(sam.id)?.role).isEqualTo(Role.ADULT)
         repo.removePerson(sam.id)
         assertThat(repo.person(sam.id)).isNull()
@@ -132,9 +122,9 @@ class HouseholdRepositoryTest {
     }
 
     @Test
-    fun pinHashNeedsAnExistingPerson() = runTest {
+    fun aMemberEditNeedsAnExistingPerson() = runTest {
         assertThrows(IllegalArgumentException::class.java) {
-            runBlocking { repo.setPinHash(PersonId("nobody"), "h", "s") }
+            runBlocking { repo.updateMember(PersonId("nobody"), "Nobody", 0xFF5B9BE0, Role.ADULT, PinChange.Set("h", "s")) }
         }
     }
 
@@ -172,9 +162,13 @@ class HouseholdRepositoryTest {
     fun renamingAndRecolouringFollowTheSameRules() = runTest {
         repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
         val mia = repo.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
-        assertThrows(DuplicateNameException::class.java) { runBlocking { repo.updatePerson(mia.copy(name = "SAM")) } }
-        assertThrows(ColourInUseException::class.java) { runBlocking { repo.updatePerson(mia.copy(color = 0xFF5B9BE0)) } }
-        repo.updatePerson(mia.copy(name = "MIA"))
+        assertThrows(DuplicateNameException::class.java) {
+            runBlocking { repo.updateMember(mia.id, "SAM", mia.color, Role.CHILD, PinChange.Keep) }
+        }
+        assertThrows(ColourInUseException::class.java) {
+            runBlocking { repo.updateMember(mia.id, "Mia", 0xFF5B9BE0, Role.CHILD, PinChange.Keep) }
+        }
+        repo.updateMember(mia.id, "MIA", mia.color, Role.CHILD, PinChange.Keep)
         assertThat(repo.person(mia.id)?.name).isEqualTo("MIA")
     }
 
@@ -192,17 +186,6 @@ class HouseholdRepositoryTest {
         assertThat(repo.credential(alex.id)).isEqualTo(Credential(alex.id, Role.ADMIN, "h", "s"))
         assertThat(repo.hasActiveAdmin.first()).isTrue()
         assertThat(repo.members.first()).containsExactly(Member(alex, Role.ADMIN, hasPin = true))
-    }
-
-    @Test
-    fun familyHasNoRoleOrPin() = runTest {
-        // Today these fail only as an unknown person; the refusal must name Family.
-        val refusals = listOf(
-            assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.setRole(PersonId.FAMILY, Role.ADULT) } },
-            assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.setPinHash(PersonId.FAMILY, "h", "s") } },
-            assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.clearPin(PersonId.FAMILY) } },
-        )
-        assertThat(refusals.map { it.message }.toSet()).containsExactly("Family has no role or PIN")
     }
 
     @Test
@@ -256,13 +239,6 @@ class HouseholdRepositoryTest {
     }
 
     @Test
-    fun familyCannotBeEditedAsAMember() = runTest {
-        assertThrows(IllegalArgumentException::class.java) {
-            runBlocking { repo.updateMember(PersonId.FAMILY, "Family", 0xFF5B9BE0, Role.ADULT, PinChange.Keep) }
-        }
-    }
-
-    @Test
     fun aPinNeedsBothItsHashAndItsSalt() = runTest {
         assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT, pinHash = "h") } }
         assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT, salt = "s") } }
@@ -283,9 +259,6 @@ class HouseholdRepositoryTest {
         }
         assertThrows(IllegalStateException::class.java) {
             runBlocking { repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT, "h", "s", refuseEveryPin) }
-        }
-        assertThrows(IllegalStateException::class.java) {
-            runBlocking { repo.setPinHash(mia.id, "h3", "s3", refuseEveryPin) }
         }
         assertThat(repo.credential(mia.id)?.pinHash).isEqualTo("h")
         assertThat(repo.people.first().map { it.name }).containsExactly("Alex", "Mia")
