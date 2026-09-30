@@ -1,5 +1,7 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,13 +12,18 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
+import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.HhType
+
+/** The wizard's Connect step once a calendar is connected. */
+internal const val CONNECTED = "Connected"
 
 /**
  * Takes the Today slot until a calendar is connected (spec §9.2), laid out like the hand-off's Holiday tile. With a
@@ -41,6 +48,28 @@ fun ConnectCalendarCard(connectService: String?, onConnect: () -> Unit, modifier
             HhPillButton("Connect $connectService", onClick = onConnect, primary = true)
         } else {
             HhPillButton("Open settings", onClick = navigator::openSettings, primary = true)
+        }
+    }
+}
+
+/** The Connect card once calendars are connected: each "{Service} · {account}" with Connected, and no button. */
+@Composable
+internal fun ConnectedCalendarCard(rows: List<CalendarRow>, modifier: Modifier = Modifier) {
+    val c = Culvery.colors
+    HhCard(
+        modifier = modifier.fillMaxSize().testTag("calendar_connected"),
+        radius = CalendarDimens.cardRadius,
+        padding = PaddingValues(horizontal = CalendarDimens.connectPaddingH, vertical = CalendarDimens.connectPaddingV),
+    ) {
+        HhIcon("event_available", size = CalendarDimens.connectIconSize, tint = c.accent)
+        Spacer(Modifier.weight(1f))
+        Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.connectButtonTop)) {
+            rows.forEach { row ->
+                Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.connectSubtitleTop)) {
+                    Text(serviceAndAccount(row), style = HhType.cardTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(CONNECTED, style = HhType.secondary, color = c.mute)
+                }
+            }
         }
     }
 }

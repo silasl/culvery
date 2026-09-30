@@ -71,24 +71,40 @@ internal fun healthWords(row: CalendarRow, nowMillis: Long): String = when (row.
     is ConnectionHealth.Error -> SOMETHING_WENT_WRONG
 }
 
+/** "{Service} · {account}", or the service alone when the connection names no account. */
+internal fun serviceAndAccount(row: CalendarRow): String = row.connection.config[CONFIG_ACCOUNT]?.let { "${row.service} · $it" } ?: row.service
+
 /** Which calendar's person chips are open; NUL never appears in a provider id. */
 internal fun sourceKey(source: StoredSource): String = "${source.connectionId}\u0000${source.source.id}"
 
 /** The disconnect being confirmed, with the queued changes it would drop. */
 internal data class Confirming(val row: CalendarRow, val queued: Int)
 
-/** The wizard's Connect step: the Home screen's Connect card at about its Home size (4a design §3.9). */
+/**
+ * The wizard's Connect step: the Home screen's Connect card at about its Home size (4a design §3.9), or, once a calendar
+ * is connected, what is connected.
+ */
 @Composable
 internal fun ConnectStepHost(connections: CalendarConnections) {
+    val rows by connections.rows.collectAsState(initial = emptyList())
     val connectable by connections.connectable.collectAsState(initial = emptyList())
     val connector = rememberConnector(connections)
     val first = connectable.firstOrNull()
-    ConnectStepCard(first?.descriptor?.displayName, onConnect = { first?.let { connector.connect(it.descriptor.id) } })
+    if (rows.isNotEmpty()) {
+        ConnectedStepCard(rows)
+    } else {
+        ConnectStepCard(first?.descriptor?.displayName, onConnect = { first?.let { connector.connect(it.descriptor.id) } })
+    }
 }
 
 @Composable
 internal fun ConnectStepCard(connectService: String?, onConnect: () -> Unit) {
     Box(Modifier.size(CalendarDimens.connectStepWidth, CalendarDimens.connectStepHeight)) { ConnectCalendarCard(connectService, onConnect) }
+}
+
+@Composable
+internal fun ConnectedStepCard(rows: List<CalendarRow>) {
+    Box(Modifier.size(CalendarDimens.connectStepWidth, CalendarDimens.connectStepHeight)) { ConnectedCalendarCard(rows) }
 }
 
 @Composable
@@ -181,7 +197,6 @@ internal fun ReviewCalendars(
 private fun ConnectionHeader(row: CalendarRow, nowMillis: Long, busy: Boolean, onReconnect: (Connection) -> Unit, onDisconnect: (CalendarRow) -> Unit) {
     val c = Culvery.colors
     val needsReconnect = row.health == ConnectionHealth.NeedsSignIn
-    val account = row.connection.config[CONFIG_ACCOUNT]
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(CalendarDimens.settingsIconGap),
@@ -195,7 +210,7 @@ private fun ConnectionHeader(row: CalendarRow, nowMillis: Long, busy: Boolean, o
         HhIcon(row.icon, size = CalendarDimens.settingsIcon, tint = c.ink)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(CalendarDimens.settingsStatusTop)) {
             Text(
-                if (account == null) row.service else "${row.service} · $account",
+                serviceAndAccount(row),
                 style = CalendarType.settingsRowTitle,
                 color = c.ink,
                 maxLines = 1,

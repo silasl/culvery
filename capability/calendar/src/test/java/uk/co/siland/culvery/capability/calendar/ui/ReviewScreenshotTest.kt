@@ -102,6 +102,13 @@ class ReviewScreenshotTest {
     @Test fun connectStepDark() = connectStep("connect_step_dark", true)
     @Test fun connectStepLight() = connectStep("connect_step_light", false)
 
+    private fun connectedStep(name: String, dark: Boolean) = snap(name, dark) {
+        Box(Modifier.padding(MARGIN)) { ConnectedStepCard(connections(ConnectionHealth.Ok).map { it.row }) }
+    }
+
+    @Test fun connectedStepDark() = connectedStep("connected_step_dark", true)
+    @Test fun connectedStepLight() = connectedStep("connected_step_light", false)
+
     private class StillPage(override val id: String, override val title: String, override val order: Int, val content: @Composable () -> Unit) : SettingsPage {
         @Composable
         override fun Content() = content()

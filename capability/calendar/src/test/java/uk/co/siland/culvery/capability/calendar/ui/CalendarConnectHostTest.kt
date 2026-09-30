@@ -123,6 +123,28 @@ class CalendarConnectHostTest {
     }
 
     @Test
+    fun onceConnectedTheWizardsConnectStepSaysSo() {
+        google.connectsAs = googleConnection
+        access.answer(TestAccess.ALEX)
+        compose.setContent {
+            CompositionLocalProvider(LocalOverlayHost provides overlay, LocalShellNavigator provides RecordingNavigator()) {
+                CulveryTheme(dark = true) {
+                    Box {
+                        ConnectStepHost(connections)
+                        overlay.content?.invoke()
+                    }
+                }
+            }
+        }
+        waitFor { compose.onAllNodesWithText("Connect Google Calendar").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Connect Google Calendar").performClick()
+        waitFor { compose.onAllNodesWithText("Google Calendar · family@example.com").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Connected").assertExists()
+        compose.onAllNodesWithText("Connect a calendar").assertCountEquals(0)
+        compose.onAllNodesWithText("Open settings").assertCountEquals(0)
+    }
+
+    @Test
     fun anAdultCannotConnect() {
         google.connectsAs = googleConnection
         // Sam's PIN is refused in the pad, which asks again; then Cancel.
