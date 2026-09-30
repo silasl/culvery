@@ -13,4 +13,10 @@ class RecordingNavigator : ShellNavigator {
     override fun openSettings() {
         settingsOpened++
     }
+
+    var kioskExits = 0
+
+    override fun exitKiosk() {
+        kioskExits++
+    }
 }

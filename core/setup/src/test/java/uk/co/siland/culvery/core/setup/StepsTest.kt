@@ -25,6 +25,7 @@ import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+import uk.co.siland.culvery.core.setup.pages.LocationPage
 import uk.co.siland.culvery.core.setup.steps.DoneStep
 import uk.co.siland.culvery.core.setup.steps.HouseholdStep
 import uk.co.siland.culvery.core.setup.steps.LocationStep
@@ -102,6 +103,19 @@ class StepsTest {
         access.answer("1234")
         assertThat(step.saveHome(canterbury)).isTrue()
         assertThat(access.requests).hasSize(2)
+    }
+
+    @Test
+    fun theHomeLocationPageAlwaysTakesTheOpenSession() = runTest {
+        val access = testAccess(household)
+        access.addAdmin()
+        val page = LocationPage(household, NoSearch, access.control)
+        access.answer(null)
+        assertThat(page.saveHome(canterbury)).isFalse()
+        assertThat(household.location.first()).isNull()
+        access.answer("1234")
+        assertThat(page.saveHome(canterbury)).isTrue()
+        assertThat(household.location.first()).isEqualTo(canterbury.toHome())
     }
 
     private fun youStep(access: TestAccess) =

@@ -117,7 +117,7 @@ class ShellViewModel @Inject constructor(
         settingsOpen.value = false
     }
 
-    fun exitKiosk() {
+    override fun exitKiosk() {
         viewModelScope.launch {
             if (access.authorise(CorePermissions.KIOSK_EXIT) != null) {
                 settingsOpen.value = false

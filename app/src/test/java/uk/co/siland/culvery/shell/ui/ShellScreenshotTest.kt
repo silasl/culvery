@@ -39,6 +39,7 @@ import uk.co.siland.culvery.shell.ToastMessage
 private object NoNavigation : ShellNavigator {
     override fun openTab(id: String) = Unit
     override fun openSettings() = Unit
+    override fun exitKiosk() = Unit
 }
 
 @RunWith(AndroidJUnit4::class)

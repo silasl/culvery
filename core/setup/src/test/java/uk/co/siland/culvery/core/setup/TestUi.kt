@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.setup
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -10,6 +11,8 @@ import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runners.model.Statement
 import org.robolectric.shadows.ShadowLog
+import uk.co.siland.culvery.core.plugin.SettingsPage
+import uk.co.siland.culvery.core.plugin.ShellNavigator
 
 /** The tablet's canvas, for every screenshot in this module. */
 internal val CANVAS_W = 1280.dp
@@ -47,3 +50,21 @@ internal fun ComposeContentTestRule.awaitText(text: String) =
 
 internal fun ComposeContentTestRule.awaitTag(tag: String) =
     waitUntil(5_000) { onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+
+/** A Settings page that draws [content]: the Settings tests' and screenshots' pages. */
+class StillPage(override val id: String, override val title: String, override val order: Int, val content: @Composable () -> Unit) : SettingsPage {
+    @Composable
+    override fun Content() = content()
+}
+
+class RecordingNavigator : ShellNavigator {
+    var kioskExits = 0
+
+    override fun openTab(id: String) = Unit
+
+    override fun openSettings() = Unit
+
+    override fun exitKiosk() {
+        kioskExits++
+    }
+}

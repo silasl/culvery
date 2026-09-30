@@ -9,6 +9,9 @@ interface ShellNavigator {
 
     /** Opens Settings, asking for a PIN if needed. */
     fun openSettings()
+
+    /** Settings › Kiosk (4a design §4.7): leaves kiosk mode after a fresh Admin PIN. */
+    fun exitKiosk()
 }
 
 val LocalShellNavigator = staticCompositionLocalOf<ShellNavigator> {
