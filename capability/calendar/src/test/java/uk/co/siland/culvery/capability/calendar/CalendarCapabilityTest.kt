@@ -31,6 +31,7 @@ class CalendarCapabilityTest {
         val zone = HouseholdZone(household)
         capability = CalendarCapability(
             CalendarRepository(store, household, zone, emptySet(), emptySet()), zone, WallClock { 0L }, stubEditor(store, zone), stubConnections(store),
+            stubReview(store, household),
         )
     }
 
@@ -68,5 +69,16 @@ class CalendarCapabilityTest {
             Triple(COMING_UP_CARD_ID, HomeCardSize.WIDE, 50),
         ).inOrder()
         assertThat(capability.hasTab.first()).isTrue()
+    }
+
+    @Test
+    fun itAddsConnectAndReviewToTheWizardAndCalendarsToSettings() = runTest {
+        assertThat(capability.setupSteps().map { it.id to it.order }).containsExactly("calendar.connect" to 400, "calendar.review" to 410).inOrder()
+        assertThat(capability.settingsPages().map { Triple(it.id, it.title, it.order) }).containsExactly(Triple("calendars", "Calendars", 400))
+        val (connect, review) = capability.setupSteps()
+        assertThat(connect.skippable).isTrue()
+        assertThat(listOf(connect.done.first(), review.shown.first())).containsExactly(false, false)
+        connect()
+        assertThat(listOf(connect.done.first(), review.shown.first(), review.done.first())).containsExactly(true, true, true)
     }
 }

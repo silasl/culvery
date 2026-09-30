@@ -10,6 +10,7 @@ import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.Refusal
+import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.plugin.WallClock
 
 private object NobodyMay : AccessControl {
@@ -45,4 +46,14 @@ internal fun stubConnections(store: CalendarStore): CalendarConnections = Calend
     NobodyMay,
     emptySet(),
     CoroutineScope(Dispatchers.Unconfined),
+)
+
+/** A review that nobody may change, for tests that only need the capability's pages to exist. */
+internal fun stubReview(store: CalendarStore, household: HouseholdRepository): CalendarReview = CalendarReview(
+    store,
+    CalendarSetup(store, emptySet(), { emptyList() }, RecordingToaster(), WallClock { 0L }, EmptyCoroutineContext),
+    stubConnections(store),
+    household,
+    NobodyMay,
+    RecordingToaster(),
 )

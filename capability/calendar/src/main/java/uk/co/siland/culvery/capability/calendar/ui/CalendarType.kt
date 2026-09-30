@@ -105,6 +105,12 @@ internal object CalendarType {
 
     /** 18 sp / 600: a Settings row's "Google Calendar Â· {account}". */
     val settingsRowTitle = HhType.rowTitle.copy(fontSize = 18.sp)
+
+    /** 34 sp / 700: "Your calendars" and "Calendars", as the wizard's and Settings' titles (4a design §4.5). */
+    val reviewTitle = HhType.screenTitle
+
+    /** 13 sp / 700: the "Master" badge. */
+    val badge = syncingPill
 }
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */
@@ -338,6 +344,20 @@ internal object CalendarDimens {
     val settingsIcon = 26.dp
     val settingsIconGap = 16.dp
     val settingsStatusTop = 2.dp
+
+    // Review calendars (4a design §4.5; not in the spec): blocks 12 apart; a calendar's row `surf`, radius 18, padding
+    // 14×20, its parts 12 apart; the Master badge `accentSoft`, radius 12, padding 4×10. The wizard's Connect card
+    // 380×460, about a Home card's size.
+    val reviewBlockGap = 12.dp
+    val reviewRowRadius = 18.dp
+    val reviewRowPaddingV = 14.dp
+    val reviewRowPaddingH = 20.dp
+    val reviewItemGap = 12.dp
+    val badgeRadius = 12.dp
+    val badgePaddingV = 4.dp
+    val badgePaddingH = 10.dp
+    val connectStepWidth = 380.dp
+    val connectStepHeight = 460.dp
 
     /** Chip tint: the person's colour at 0x2E alpha on dark, 0x26 on light. */
     const val CHIP_ALPHA_DARK = 0x2E / 255f

@@ -25,4 +25,6 @@ dependencies {
     // around a Windows path-separator bug in Room's default SupportSQLiteOpenHelper-backed driver (see
     // Migrations.kt).
     testImplementation(libs.androidx.sqlite.framework)
+    // Settings' frame and Kiosk page, for the Calendars page's screenshot.
+    testImplementation(project(":core:setup"))
 }
