@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -49,14 +50,14 @@ class DefaultAccessControlTest {
     @After
     fun tearDown() = db.close()
 
-    private fun TestScope.access() = DefaultAccessControl(
+    private fun TestScope.access(timers: CoroutineScope = backgroundScope, nowMillis: () -> Long = { testScheduler.currentTime }) = DefaultAccessControl(
         registry = PermissionRegistry(setOf(CorePermissionSource(), everyone)),
         pins = pins,
         lockout = LockoutStore(context),
         prompt = prompt,
-        clock = WallClock { testScheduler.currentTime },
+        clock = WallClock { nowMillis() },
         toaster = toasts,
-        scope = backgroundScope,
+        scope = timers,
     )
 
     private var nextColour = 0xFF101010L
@@ -396,6 +397,7 @@ class DefaultAccessControlTest {
         access.beginSetupSession(admin)
         access.endSetupSession()
         assertThat(access.session.value).isEqualTo(admin)
+        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Manage people")
         advanceTimeBy(SESSION_TIMEOUT_MS + 1)
         runCurrent()
         assertThat(access.session.value).isNull()
@@ -412,15 +414,18 @@ class DefaultAccessControlTest {
 
     @Test
     fun aPinEnteredDuringSetupEndsTheSetupSession() = runTest {
-        val access = access()
+        // Timers on their own scheduler: waiting on Room's real threads would otherwise let runTest skip ahead ten minutes.
+        val timers = TestScope()
+        val access = access(timers.backgroundScope)
         access.beginSetupSession(alex())
         person("Mia", Role.CHILD, "9876")
         answerPins("9876")
         // Refused for Alex by the check, so the pad asks; Mia's PIN starts an ordinary session.
         val mia = access.authorise("test.any", allow = { who, _ -> who.person.name == "Mia" })
         assertThat(mia?.person?.name).isEqualTo("Mia")
-        advanceTimeBy(SESSION_TIMEOUT_MS + 1)
-        runCurrent()
+        access.touch()
+        timers.advanceTimeBy(SESSION_TIMEOUT_MS + 1)
+        timers.runCurrent()
         assertThat(access.session.value).isNull()
     }
 
@@ -447,5 +452,10 @@ class DefaultAccessControlTest {
         access.touch()
         assertThat(access.session.value).isNull()
         assertThat(firstPromptFor(access, CorePermissions.SETTINGS_MANAGE).label).isEqualTo("Change settings")
+        answerPins("1234")
+        access.authorise(CorePermissions.SETTINGS_MANAGE)
+        advanceTimeBy(SESSION_TIMEOUT_MS + 1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
     }
 }

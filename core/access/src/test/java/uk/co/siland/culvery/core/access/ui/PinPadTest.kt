@@ -1,6 +1,5 @@
 package uk.co.siland.culvery.core.access.ui
 
-import uk.co.siland.culvery.core.access.pinReasonText
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -23,6 +22,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.access.PinReason
+import uk.co.siland.culvery.core.access.pinReasonText
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
 @OptIn(ExperimentalCoroutinesApi::class)
