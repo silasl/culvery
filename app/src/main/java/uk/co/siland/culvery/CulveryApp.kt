@@ -8,7 +8,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
-import uk.co.siland.culvery.core.access.PinManager
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Startable
@@ -16,7 +15,6 @@ import uk.co.siland.culvery.core.plugin.Startable
 @HiltAndroidApp
 class CulveryApp : Application() {
     @Inject lateinit var household: HouseholdRepository
-    @Inject lateinit var pins: PinManager
     @Inject lateinit var calendarSetup: CalendarSetup
     @Inject lateinit var calendarProviders: Set<@JvmSuppressWildcards CalendarProvider>
     @Inject lateinit var startables: Set<@JvmSuppressWildcards Startable>
@@ -25,7 +23,7 @@ class CulveryApp : Application() {
     override fun onCreate() {
         super.onCreate()
         startAll(startables) { startable, e -> Log.e(TAG, "${startable.javaClass.name} failed to start", e) }
-        appScope.launch { seedDebugData(household, pins, calendarSetup, calendarProviders) }
+        appScope.launch { seedDebugData(household, calendarSetup, calendarProviders) }
         appScope.launch { removeSampleWhenReplaced(calendarSetup) }
     }
 

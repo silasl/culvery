@@ -90,7 +90,7 @@ class SampleAddTest {
         val pins = PinManager(household, PinHasher())
         val store = CalendarStore(calendarDb)
         val zone = HouseholdZone(household)
-        seedDebugData(household, pins, CalendarSetup(store, setOf(fake), { household.people.first() }, toasts, WallClock { System.currentTimeMillis() }), setOf(fake))
+        DebugSampleHousehold(household, pins, CalendarSetup(store, setOf(fake), { household.people.first() }, toasts, WallClock { System.currentTimeMillis() }), setOf(fake)) {}.create()
         var now = System.currentTimeMillis()
         val clock = WallClock { now }
         val prompt = PinPromptController()

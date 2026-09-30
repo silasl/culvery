@@ -70,7 +70,12 @@ class SampleRollbackTest {
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         val store = CalendarStore(calendarDb)
         val zone = HouseholdZone(household)
-        seedDebugData(household, PinManager(household, PinHasher()), CalendarSetup(store, setOf(fake), { household.people.first() }, toasts, WallClock { System.currentTimeMillis() }), setOf(fake))
+        DebugSampleHousehold(
+            household,
+            PinManager(household, PinHasher()),
+            CalendarSetup(store, setOf(fake), { household.people.first() }, toasts, WallClock { System.currentTimeMillis() }),
+            setOf(fake),
+        ) {}.create()
         val sync = CalendarSync(
             store, setOf(fake), setOf(fake), toasts, zone, WallClock { System.currentTimeMillis() }, CalendarWriteLock(),
             SourceRefresher(store, household, WallClock { System.currentTimeMillis() }, toasts),
