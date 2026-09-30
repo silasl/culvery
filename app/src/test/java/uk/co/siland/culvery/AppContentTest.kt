@@ -1,6 +1,7 @@
 package uk.co.siland.culvery
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -22,7 +23,6 @@ import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.shell.FakeAccessControl
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ui.ShellLayers
-import androidx.compose.foundation.layout.PaddingValues
 
 @RunWith(AndroidJUnit4::class)
 class AppContentTest {
@@ -80,7 +80,7 @@ class AppContentTest {
     }
 
     @Test
-    fun aTapInsideAnOpenSheetKeepsSettingsOpen() {
+    fun aTapInsideAnOpenSheetCountsAsATouch() {
         complete = true
         settingsOpen = true
         show()
@@ -99,6 +99,17 @@ class AppContentTest {
         compose.runOnIdle { overlay.show { Text("Sheet") } }
         compose.onNodeWithText("Sheet").assertExists()
         settingsOpen = false
+        compose.onNodeWithText("Sheet").assertDoesNotExist()
+        assertThat(overlay.isShowing).isFalse()
+    }
+
+    @Test
+    fun finishingSetupClosesAnOpenSheet() {
+        complete = false
+        show()
+        compose.runOnIdle { overlay.show { Text("Sheet") } }
+        compose.onNodeWithText("Sheet").assertExists()
+        complete = true
         compose.onNodeWithText("Sheet").assertDoesNotExist()
         assertThat(overlay.isShowing).isFalse()
     }

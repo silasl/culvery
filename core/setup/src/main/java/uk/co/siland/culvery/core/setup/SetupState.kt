@@ -19,11 +19,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.core.household.HouseholdRepository
 
 private const val TAG = "SetupState"
@@ -52,19 +55,24 @@ class SetupState(private val store: DataStore<Preferences>, private val househol
         emit(emptyPreferences())
     }
 
+    // The household's answer, decided once per process, for when the flag isn't stored.
+    private val decided = MutableStateFlow<Boolean?>(null)
+    private val deciding = Mutex()
+
     /**
      * D8: the first read on an install that has never stored the flag decides it, once: complete when an active Admin
      * exists (an install from before 4a), not complete otherwise. A fresh install stores false at that first read, so
      * the Admin its wizard makes later never marks setup complete (ruling 2). A flag that can't be read or written is
-     * decided the same way, from the household, every time.
+     * decided from the household once per process: a later subscription reuses that answer, so the Admin a wizard
+     * makes can't flip it while the flag can't be stored. A flag that is read wins.
      */
     val setupComplete: Flow<Boolean> = flow {
         try {
-            store.edit { stored -> if (COMPLETE !in stored) stored[COMPLETE] = activeAdmin() }
+            store.edit { stored -> if (COMPLETE !in stored) stored[COMPLETE] = decideOnce() }
         } catch (e: IOException) {
             Log.w(TAG, "Couldn't write the setup file (${e::class.simpleName})")
         }
-        emitAll(prefs.map { it[COMPLETE] ?: activeAdmin() })
+        emitAll(prefs.map { it[COMPLETE] ?: decideOnce() })
     }.distinctUntilChanged()
 
     /** Welcome was passed, so a start after a kill resumes past it (4a design §6). */
@@ -76,9 +84,12 @@ class SetupState(private val store: DataStore<Preferences>, private val househol
 
     suspend fun markComplete() {
         store.edit { it[COMPLETE] = true }
+        decided.value = true
     }
 
-    private suspend fun activeAdmin(): Boolean = household.credentials().any { it.isActiveAdmin }
+    private suspend fun decideOnce(): Boolean = deciding.withLock {
+        decided.value ?: household.credentials().any { it.isActiveAdmin }.also { decided.value = it }
+    }
 
     private companion object {
         const val FILE = "setup"

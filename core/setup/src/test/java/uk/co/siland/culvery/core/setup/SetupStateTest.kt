@@ -1,8 +1,11 @@
 package uk.co.siland.culvery.core.setup
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,6 +23,18 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+
+/** A store whose writes fail while [fail] is set, as a full disk would; reads and the edit's decision still run. */
+private class FailingWrites(private val real: DataStore<Preferences>) : DataStore<Preferences> {
+    var fail = true
+    override val data = real.data
+
+    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+        if (!fail) return real.updateData(transform)
+        transform(real.data.first())
+        throw IOException("No space left on device")
+    }
+}
 
 // Robolectric for Room.
 @RunWith(AndroidJUnit4::class)
@@ -96,6 +111,19 @@ class SetupStateTest {
         addAdmin()
         file.writeText("not a preferences file")
         assertThat(start().setupComplete.first()).isTrue()
+    }
+
+    @Test
+    fun aDecisionThatCouldNotBeStoredHoldsForEveryLaterRead() = runTest {
+        val store = FailingWrites(setupStore(scope) { file })
+        val state = SetupState(store, household)
+        assertThat(state.setupComplete.first()).isFalse()
+        // The wizard's You step makes the Admin; the app's screen then subscribes again.
+        addAdmin()
+        assertThat(state.setupComplete.first()).isFalse()
+        store.fail = false
+        state.markComplete()
+        assertThat(state.setupComplete.first()).isTrue()
     }
 
     @Test

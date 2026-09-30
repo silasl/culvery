@@ -16,6 +16,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.PinPromptController
@@ -52,8 +56,8 @@ class MainActivity : ComponentActivity() {
     // Set by Settings › Exit kiosk; cleared when the app comes back to the foreground.
     private var kioskExited = false
 
-    // Last known from SetupState (4a design D10); false until the first read.
-    private var setupComplete = false
+    // SetupState read once for the activity, so the pin and the screen never disagree (4a design D10); null until read.
+    private lateinit var setupComplete: StateFlow<Boolean?>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -70,10 +74,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        setupComplete = setupState.setupComplete.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
         lifecycleScope.launch {
             var previous: Boolean? = null
-            setupState.setupComplete.collect { complete ->
-                setupComplete = complete
+            setupComplete.filterNotNull().collect { complete ->
                 val resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
                 if (pinOnSetupRead(previous, complete, resumed, kioskExited)) pinToScreen()
                 previous = complete
@@ -82,7 +86,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val state by shell.uiState.collectAsStateWithLifecycle()
             val toast by toasts.current.collectAsStateWithLifecycle()
-            val complete by setupState.setupComplete.collectAsStateWithLifecycle<Boolean?>(initialValue = null)
+            val complete by setupComplete.collectAsStateWithLifecycle()
             val overlay = remember { OverlayState() }
             val steps = remember { wizardSteps(coreSteps, capabilities) }
             val pages = remember { settingsPages(corePages, capabilities) }
@@ -129,7 +133,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         if (!kioskExited) hideSystemBars()
-        if (shouldPin(setupComplete, kioskExited)) pinToScreen()
+        if (shouldPin(setupComplete.value == true, kioskExited)) pinToScreen()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

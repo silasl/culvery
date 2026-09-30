@@ -38,7 +38,8 @@ internal fun touchTarget(complete: Boolean?, settingsOpen: Boolean, access: Acce
 
 /**
  * What the app shows (4a design §3.3): nothing until SetupState is read, the wizard until setup is complete, then the
- * shell with Settings over it when open. Settings closing (its session ended, or Close) takes any sheet it opened with it.
+ * shell with Settings over it when open. Settings closing (its session ended, or Close), or setup completing, takes any
+ * open sheet with it.
  */
 @Composable
 internal fun AppContent(
@@ -49,7 +50,7 @@ internal fun AppContent(
     shell: @Composable () -> Unit,
     settings: @Composable () -> Unit,
 ) {
-    LaunchedEffect(settingsOpen) { if (!settingsOpen) overlay.dismiss() }
+    LaunchedEffect(complete, settingsOpen) { if (!settingsOpen) overlay.dismiss() }
     when (complete) {
         null -> Box(Modifier.fillMaxSize().testTag("app_blank").background(Culvery.colors.bg))
         false -> wizard()
