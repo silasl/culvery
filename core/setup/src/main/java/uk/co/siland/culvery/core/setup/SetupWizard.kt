@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
@@ -59,15 +61,18 @@ fun SetupWizard(steps: List<SetupStep>, gate: SetupSessionGate) {
     val needsPin = remember(gate) { gate.needsPin }.collectAsState<Boolean, Boolean?>(initial = null).value
     // Saved, and kept here rather than in Steps, so the gate coming and going doesn't lose the step.
     var current by rememberSaveable { mutableStateOf(-1) }
-    Box(Modifier.fillMaxSize().background(Culvery.colors.bg).testTag("wizard")) {
-        when {
-            statuses == null || needsPin == null -> Unit
-            needsPin -> PinGate(gate)
-            else -> {
-                // Where it resumes is read once, from the first statuses; after that only Next, Back and Skip move it.
-                val at = current.takeIf { it >= 0 } ?: WizardRules.resumeAt(statuses)
-                SideEffect { if (current < 0) current = at }
-                Steps(steps, statuses, at) { current = it }
+    // An uncoloured Text in a step reads in `ink`, not Material's default black.
+    CompositionLocalProvider(LocalContentColor provides Culvery.colors.ink) {
+        Box(Modifier.fillMaxSize().background(Culvery.colors.bg).testTag("wizard")) {
+            when {
+                statuses == null || needsPin == null -> Unit
+                needsPin -> PinGate(gate)
+                else -> {
+                    // Where it resumes is read once, from the first statuses; after that only Next, Back and Skip move it.
+                    val at = current.takeIf { it >= 0 } ?: WizardRules.resumeAt(statuses)
+                    SideEffect { if (current < 0) current = at }
+                    Steps(steps, statuses, at) { current = it }
+                }
             }
         }
     }
@@ -81,6 +86,8 @@ private fun Steps(steps: List<SetupStep>, statuses: List<StepStatus>, current: I
     } else {
         WizardRules.previousShown(current, statuses) ?: WizardRules.nextShown(current, statuses) ?: 0
     }
+    // The step shown becomes the current one, so a hidden step that reappears doesn't pull the wizard back to it.
+    SideEffect { if (index != current) onGoTo(index) }
     val step = steps[index]
     val latest by rememberUpdatedState(statuses)
     val goTo by rememberUpdatedState(onGoTo)

@@ -34,6 +34,7 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.PersonPalette
 
 /** A step whose flows the test drives; [onNextCalls] counts forward taps that reached it. */
 private class FakeStep(
@@ -167,6 +168,13 @@ class SetupWizardTest {
         review.shownFlow.value = false
         compose.awaitText("Step connect")
         compose.onNodeWithText("Step done").assertDoesNotExist()
+        // Reviewing again (Connect reconnected) doesn't pull the wizard back without Next.
+        review.shownFlow.value = true
+        compose.waitForIdle()
+        compose.onNodeWithText("Step connect").assertExists()
+        compose.onNodeWithText("Step review").assertDoesNotExist()
+        compose.onNodeWithTag("wizard_next").performClick()
+        compose.onNodeWithText("Step review").assertExists()
     }
 
     @Test
@@ -223,17 +231,37 @@ class SetupWizardTest {
 
     @Test
     fun aRestoredWizardAsksForThePinAgain() {
-        alexSettingUp()
+        // No setup session: the wizard is let in by the gate's PIN pad, as after a kill.
+        runBlocking { access.addAdmin() }
         val restoration = StateRestorationTester(compose)
         restoration.setContent {
             CulveryTheme(dark = true) { SetupWizard(listOf(FakeStep("a", 0)), SetupSessionGate(household, access.control)) }
         }
+        compose.waitUntil(5_000) { access.prompt.request.value != null }
+        access.prompt.submit("1234")
         compose.awaitText("Step a")
-        // A process death loses the in-memory session; the restored wizard must not carry on without a PIN.
+        // A process death loses the in-memory session; nothing saved may let the restored wizard in without a PIN.
         access.control.lock()
         restoration.emulateSavedInstanceStateRestore()
         compose.waitUntil(5_000) { access.prompt.request.value != null }
+        assertThat(access.prompt.request.value!!.reason).isEqualTo(PinReason.ContinueSetup)
         compose.onNodeWithText("Step a").assertDoesNotExist()
+    }
+
+    @Test
+    fun aChildsPinDoesNotOpenTheGate() {
+        runBlocking {
+            access.addAdmin()
+            access.pins.addPerson("Sam", PersonPalette.colors[1], Role.CHILD, "5678")
+        }
+        show(FakeStep("a", 0))
+        compose.waitUntil(5_000) { access.prompt.request.value != null }
+        val first = access.prompt.request.value
+        access.prompt.submit("5678")
+        compose.waitUntil(5_000) { access.prompt.request.value.let { it !== first && it?.error != null } }
+        assertThat(access.prompt.request.value!!.reason).isEqualTo(PinReason.ContinueSetup)
+        compose.onNodeWithText("Step a").assertDoesNotExist()
+        assertThat(access.control.session.value).isNull()
     }
 
     @Test
