@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -86,5 +87,25 @@ class PinManagerTest {
         pins.setPin(mia.id, "9876")
         household.removePerson(mia.id)
         assertThat(pins.identify("9876")).isNull()
+    }
+
+    @Test
+    fun aPersonAddedWithAPinIsKnownByIt() = runTest {
+        val mia = pins.addPerson("Mia", 0xFFE07BA8, Role.CHILD, "1357")
+        assertThat(pins.identify("1357")).isEqualTo(Identified(mia, Role.CHILD))
+    }
+
+    @Test
+    fun aPersonAddedWithATakenPinIsNotAdded() = runTest {
+        pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, "1234")
+        assertThrows(PinInUseException::class.java) { runBlocking { pins.addPerson("Mia", 0xFFE07BA8, Role.CHILD, "1234") } }
+        assertThat(household.people.first().map { it.name }).containsExactly("Alex")
+    }
+
+    @Test
+    fun aNewHashAllowsTheOwnersOwnPinAndNobodyElses() = runTest {
+        val alex = pins.addPerson("Alex", 0xFF4CB387, Role.ADMIN, "1234")
+        assertThat(pins.hashNew("1234", owner = alex.id).second).isNotEmpty()
+        assertThrows(PinInUseException::class.java) { runBlocking { pins.hashNew("1234", owner = null) } }
     }
 }

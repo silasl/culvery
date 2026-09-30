@@ -29,8 +29,10 @@ class HouseholdRepositoryTest {
     @After
     fun tearDown() = db.close()
 
+    private var nextColour = 0xFF101010L
+
     private suspend fun admin(name: String): Person =
-        repo.addPerson(name, 0xFF4CB387, Role.ADMIN).also { repo.setPinHash(it.id, "hash-$name", "salt") }
+        repo.addPerson(name, nextColour++, Role.ADMIN).also { repo.setPinHash(it.id, "hash-$name", "salt") }
 
     @Test
     fun addedPeopleAppearInInsertionOrder() = runTest {
@@ -142,5 +144,96 @@ class HouseholdRepositoryTest {
         val home = HomeLocation("Balcombe", 51.06, -0.13, "Europe/London")
         repo.setLocation(home)
         assertThat(repo.location.first()).isEqualTo(home)
+    }
+
+    @Test
+    fun aNameInUseIsRefusedWhateverItsCaseOrSpaces() = runTest {
+        repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
+        val refused = assertThrows(DuplicateNameException::class.java) {
+            runBlocking { repo.addPerson("  sAM ", 0xFFE07BA8, Role.CHILD) }
+        }
+        assertThat(refused.name).isEqualTo("sAM")
+        assertThat(refused.message).doesNotContain("sAM")
+        assertThat(repo.people.first().map { it.name }).containsExactly("Sam")
+    }
+
+    @Test
+    fun nobodyCanBeCalledFamily() = runTest {
+        assertThrows(DuplicateNameException::class.java) { runBlocking { repo.addPerson("family", 0xFF5B9BE0, Role.ADULT) } }
+    }
+
+    @Test
+    fun aColourInUseIsRefused() = runTest {
+        repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
+        assertThrows(ColourInUseException::class.java) { runBlocking { repo.addPerson("Mia", 0xFF5B9BE0, Role.CHILD) } }
+    }
+
+    @Test
+    fun renamingAndRecolouringFollowTheSameRules() = runTest {
+        repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
+        val mia = repo.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
+        assertThrows(DuplicateNameException::class.java) { runBlocking { repo.updatePerson(mia.copy(name = "SAM")) } }
+        assertThrows(ColourInUseException::class.java) { runBlocking { repo.updatePerson(mia.copy(color = 0xFF5B9BE0)) } }
+        repo.updatePerson(mia.copy(name = "MIA"))
+        assertThat(repo.person(mia.id)?.name).isEqualTo("MIA")
+    }
+
+    @Test
+    fun aNinthPersonIsRefused() = runTest {
+        repeat(MAX_PEOPLE) { repo.addPerson("P$it", 0xFF100000L + it, Role.ADULT) }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.addPerson("P8", 0xFF200000L, Role.ADULT) } }
+        assertThat(repo.people.first()).hasSize(MAX_PEOPLE)
+    }
+
+    @Test
+    fun aPersonAddedWithAPinHasItFromTheStart() = runTest {
+        assertThat(repo.hasActiveAdmin.first()).isFalse()
+        val alex = repo.addPerson("Alex", 0xFF4CB387, Role.ADMIN, pinHash = "h", salt = "s")
+        assertThat(repo.credential(alex.id)).isEqualTo(Credential(alex.id, Role.ADMIN, "h", "s"))
+        assertThat(repo.hasActiveAdmin.first()).isTrue()
+        assertThat(repo.members.first()).containsExactly(Member(alex, Role.ADMIN, hasPin = true))
+    }
+
+    @Test
+    fun familyHasNoRoleOrPin() = runTest {
+        // Today these fail only as an unknown person; the refusal must name Family.
+        val refusals = listOf(
+            assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.setRole(PersonId.FAMILY, Role.ADULT) } },
+            assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.setPinHash(PersonId.FAMILY, "h", "s") } },
+            assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.clearPin(PersonId.FAMILY) } },
+        )
+        assertThat(refusals.map { it.message }.toSet()).containsExactly("Family has no role or PIN")
+    }
+
+    @Test
+    fun aMemberEditChangesNameColourRoleAndPinTogether() = runTest {
+        admin("Alex")
+        val sam = repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
+        repo.updateMember(sam.id, "Samuel", 0xFF9C7CE3, Role.ADMIN, PinChange.Set("h", "s"))
+        assertThat(repo.member(sam.id)).isEqualTo(Member(Person(sam.id, "Samuel", 0xFF9C7CE3), Role.ADMIN, hasPin = true))
+        repo.updateMember(sam.id, "Samuel", 0xFF9C7CE3, Role.ADULT, PinChange.Remove)
+        assertThat(repo.credential(sam.id)).isEqualTo(Credential(sam.id, Role.ADULT, null, null))
+    }
+
+    @Test
+    fun aRefusedMemberEditChangesNothing() = runTest {
+        repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
+        val mia = repo.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
+        assertThrows(ColourInUseException::class.java) {
+            runBlocking { repo.updateMember(mia.id, "Amelia", 0xFF5B9BE0, Role.ADULT, PinChange.Set("h", "s")) }
+        }
+        assertThat(repo.member(mia.id)).isEqualTo(Member(mia, Role.CHILD, hasPin = false))
+    }
+
+    @Test
+    fun theLastAdminIsKeptThroughAMemberEdit() = runTest {
+        val alex = admin("Alex")
+        assertThrows(LastAdminException::class.java) {
+            runBlocking { repo.updateMember(alex.id, "Alex", alex.color, Role.ADULT, PinChange.Keep) }
+        }
+        assertThrows(LastAdminException::class.java) {
+            runBlocking { repo.updateMember(alex.id, "Alex", alex.color, Role.ADMIN, PinChange.Remove) }
+        }
+        assertThat(repo.member(alex.id)?.isActiveAdmin).isTrue()
     }
 }

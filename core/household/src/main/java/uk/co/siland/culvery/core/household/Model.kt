@@ -41,3 +41,25 @@ data class HomeLocation(
     val longitude: Double,
     val timeZoneId: String,
 )
+
+/** At most eight people (4a design D12): one for each person colour. */
+const val MAX_PEOPLE = 8
+
+/** A person with their role and whether they have a PIN: the people list and the editor (4a design §4.4). */
+data class Member(val person: Person, val role: Role, val hasPin: Boolean) {
+    val isActiveAdmin: Boolean get() = role == Role.ADMIN && hasPin
+}
+
+/** What a member edit does to the PIN. [Set] carries PinManager's hash and salt, both Base64. */
+sealed interface PinChange {
+    data object Keep : PinChange
+
+    data object Remove : PinChange
+
+    class Set(val hash: String, val salt: String) : PinChange
+}
+
+/** [name] is for the editor's message; the exception's own text holds no name, as it may be logged. */
+class DuplicateNameException(val name: String) : Exception("Someone already has that name")
+
+class ColourInUseException : Exception("That colour is already someone's")

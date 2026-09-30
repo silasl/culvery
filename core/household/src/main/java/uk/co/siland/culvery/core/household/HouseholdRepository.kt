@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.household.db.LocationEntity
@@ -18,23 +19,66 @@ class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase)
 
     val peopleWithFamily: Flow<List<Person>> = people.map { listOf(Person.Family) + it }
 
+    /** Real people with their roles and whether they have a PIN, in display order (4a design §4.4). */
+    val members: Flow<List<Member>> = dao.people().map { rows -> rows.map { it.toMember() } }
+
+    val hasActiveAdmin: Flow<Boolean> = members.map { list -> list.any { it.isActiveAdmin } }.distinctUntilChanged()
+
     val location: Flow<HomeLocation?> =
         dao.location().map { it?.let { l -> HomeLocation(l.name, l.latitude, l.longitude, l.timeZoneId) } }
 
     suspend fun person(id: PersonId): Person? =
         if (id == PersonId.FAMILY) Person.Family else dao.person(id.value)?.toPerson()
 
-    suspend fun addPerson(name: String, color: Long, role: Role): Person {
+    suspend fun member(id: PersonId): Member? = dao.person(id.value)?.toMember()
+
+    /**
+     * 4a design §3.7: a name nobody else has (ignoring case and spaces; nobody is "Family"), a colour nobody else has, and
+     * at most [MAX_PEOPLE]. [pinHash] and [salt] set the PIN in the same transaction (PinManager.addPerson), so a person
+     * is never left half made.
+     */
+    suspend fun addPerson(name: String, color: Long, role: Role, pinHash: String? = null, salt: String? = null): Person {
+        require((pinHash == null) == (salt == null)) { "A PIN needs both its hash and its salt" }
         val clean = cleanName(name)
         val id = PersonId.new()
-        dao.upsertPerson(PersonEntity(id.value, clean, color, dao.maxSortOrder() + 1, role, null, null))
+        db.withTransaction {
+            val all = dao.all()
+            require(all.size < MAX_PEOPLE) { "At most $MAX_PEOPLE people" }
+            checkUnique(all, id, clean, color)
+            dao.upsertPerson(PersonEntity(id.value, clean, color, dao.maxSortOrder() + 1, role, pinHash, salt))
+        }
         return Person(id, clean, color)
     }
 
     suspend fun updatePerson(person: Person) {
         require(!person.isFamily) { "Family cannot be edited" }
-        val existing = requireNotNull(dao.person(person.id.value)) { "Unknown person ${person.id.value}" }
-        dao.upsertPerson(existing.copy(name = cleanName(person.name), color = person.color))
+        val clean = cleanName(person.name)
+        db.withTransaction {
+            val existing = requireNotNull(dao.person(person.id.value)) { "Unknown person ${person.id.value}" }
+            checkUnique(dao.all(), person.id, clean, person.color)
+            dao.upsertPerson(existing.copy(name = clean, color = person.color))
+        }
+    }
+
+    /**
+     * Name, colour, role and PIN in one transaction (4a design §5: a refused edit changes nothing), under [addPerson]'s
+     * rules and the last-Admin rule.
+     */
+    suspend fun updateMember(id: PersonId, name: String, color: Long, role: Role, pin: PinChange) {
+        require(id != PersonId.FAMILY) { "Family cannot be edited" }
+        val clean = cleanName(name)
+        db.withTransaction {
+            val current = requireNotNull(dao.person(id.value)) { "Unknown person ${id.value}" }
+            checkUnique(dao.all(), id, clean, color)
+            val renamed = current.copy(name = clean, color = color, role = role)
+            val next = when (pin) {
+                PinChange.Keep -> renamed
+                PinChange.Remove -> renamed.copy(pinHash = null, salt = null)
+                is PinChange.Set -> renamed.copy(pinHash = pin.hash, salt = pin.salt)
+            }
+            guardLastAdmin(current, next)
+            dao.upsertPerson(next)
+        }
     }
 
     suspend fun removePerson(id: PersonId) {
@@ -67,11 +111,14 @@ class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase)
         )
     }
 
-    private suspend fun change(id: PersonId, edit: (PersonEntity) -> PersonEntity) = db.withTransaction {
-        val current = requireNotNull(dao.person(id.value)) { "Unknown person ${id.value}" }
-        val next = edit(current)
-        guardLastAdmin(current, next)
-        dao.upsertPerson(next)
+    private suspend fun change(id: PersonId, edit: (PersonEntity) -> PersonEntity) {
+        require(id != PersonId.FAMILY) { "Family has no role or PIN" }
+        db.withTransaction {
+            val current = requireNotNull(dao.person(id.value)) { "Unknown person ${id.value}" }
+            val next = edit(current)
+            guardLastAdmin(current, next)
+            dao.upsertPerson(next)
+        }
     }
 
     private suspend fun guardLastAdmin(current: PersonEntity, next: PersonEntity?) {
@@ -79,10 +126,19 @@ class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase)
         if (dao.all().count { it.isActiveAdmin() } <= 1) throw LastAdminException()
     }
 
+    private fun checkUnique(all: List<PersonEntity>, id: PersonId, name: String, color: Long) {
+        val others = all.filter { it.id != id.value }
+        if (name.equals(Person.Family.name, ignoreCase = true) || others.any { it.name.equals(name, ignoreCase = true) }) {
+            throw DuplicateNameException(name)
+        }
+        if (others.any { it.color == color }) throw ColourInUseException()
+    }
+
     private fun cleanName(name: String): String =
         name.trim().also { require(it.isNotEmpty()) { "Name must not be blank" } }
 
     private fun PersonEntity.isActiveAdmin() = role == Role.ADMIN && pinHash != null
     private fun PersonEntity.toPerson() = Person(PersonId(id), name, color)
+    private fun PersonEntity.toMember() = Member(toPerson(), role, pinHash != null)
     private fun PersonEntity.toCredential() = Credential(PersonId(id), role, pinHash, salt)
 }
