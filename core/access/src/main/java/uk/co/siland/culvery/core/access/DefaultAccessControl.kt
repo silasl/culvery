@@ -30,6 +30,9 @@ class DefaultAccessControl @Inject constructor(
     override val session: StateFlow<Identified?> = _session.asStateFlow()
 
     private var expiry: Job? = null
+    // authorise restarts the timer under authoriseLock; touch() restarts it from the UI thread.
+    private val expiryLock = Any()
+    @Volatile private var setupPerson: Identified? = null
     // Serialises callers so repeated taps can't stack PIN pads, and a queued caller sees the session the first one started.
     private val authoriseLock = Mutex()
 
@@ -43,6 +46,14 @@ class DefaultAccessControl @Inject constructor(
         val defs = anyOf.map(registry::require)
         return authoriseLock.withLock {
             val current = _session.value
+            val setup = setupPerson
+            if (setup != null && current == setup) {
+                val grants = grantedFor(setup.role, anyOf)
+                if (grants.isNotEmpty() && allow(setup, grants)) {
+                    restartExpiry(SETUP_IDLE_MS)
+                    return@withLock Authorised(setup.person, setup.role, grants)
+                }
+            }
             if (current != null && defs.none { it.freshPin }) {
                 val grants = grantedFor(current.role, anyOf)
                 if (grants.isNotEmpty() && allow(current, grants)) {
@@ -93,26 +104,47 @@ class DefaultAccessControl @Inject constructor(
                 continue
             }
             lockout.reset()
+            // A PIN at the pad starts an ordinary session, whoever it is.
+            setupPerson = null
             _session.value = identified
             restartExpiry()
             return Authorised(identified.person, identified.role, granted)
         }
     }
 
+    override fun beginSetupSession(person: Identified) {
+        setupPerson = person
+        _session.value = person
+        restartExpiry(SETUP_IDLE_MS)
+    }
+
+    override fun endSetupSession() {
+        if (setupPerson == null) return
+        setupPerson = null
+        if (_session.value != null) restartExpiry()
+    }
+
+    override fun touch() {
+        if (_session.value == null) return
+        restartExpiry(if (setupPerson != null) SETUP_IDLE_MS else SESSION_TIMEOUT_MS)
+    }
+
     override fun lock() {
-        expiry?.cancel()
+        setupPerson = null
+        synchronized(expiryLock) { expiry?.cancel() }
         _session.value = null
     }
 
     private fun grantedFor(role: Role, anyOf: Array<out String>): Set<String> =
         anyOf.filter { registry.isGranted(role, it) }.toSet()
 
-    private fun restartExpiry() {
+    private fun restartExpiry(timeoutMillis: Long = SESSION_TIMEOUT_MS) = synchronized(expiryLock) {
         expiry?.cancel()
         val guarded = _session.value
         expiry = scope.launch {
-            delay(SESSION_TIMEOUT_MS)
-            _session.compareAndSet(guarded, null)
+            delay(timeoutMillis)
+            // Only beginSetupSession sets setupPerson; every way a session ends clears it.
+            if (_session.compareAndSet(guarded, null)) setupPerson = null
         }
     }
 }

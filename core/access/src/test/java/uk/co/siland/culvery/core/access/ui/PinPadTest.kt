@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.access.ui
 
+import uk.co.siland.culvery.core.access.pinReasonText
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -168,5 +169,10 @@ class PinPadTest {
         assertThat((area.right - area.left).value).isWithin(1f).of(600f)
         val card = compose.onNodeWithTag("pin_card", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertThat(((card.left + card.right) / 2).value).isWithin(1f).of(980f)
+    }
+
+    @Test
+    fun theCarryOnReasonIsTheWizardsOwnLine() {
+        assertThat(pinReasonText(PinReason.ContinueSetup, "Change settings")).isEqualTo("Enter your PIN to carry on setting up")
     }
 }

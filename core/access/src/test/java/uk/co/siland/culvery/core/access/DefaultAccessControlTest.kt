@@ -340,4 +340,112 @@ class DefaultAccessControlTest {
             .isEqualTo("Enter your PIN to assign this event. It also records who made the change.")
         assertThat(pinReasonText(PinReason.Generic, "Change settings")).isEqualTo("Enter your PIN to change settings.")
     }
+
+    private suspend fun alex(): Identified = Identified(person("Alex", Role.ADMIN, "1234"), Role.ADMIN)
+
+    @Test
+    fun aSetupSessionPassesEveryPermissionWithoutAPin() = runTest {
+        val access = access()
+        access.beginSetupSession(alex())
+        for (permission in listOf(CorePermissions.SETTINGS_MANAGE, CorePermissions.PEOPLE_MANAGE, CorePermissions.KIOSK_EXIT)) {
+            assertThat(withTimeout(1_000) { access.authorise(permission) }).isNotNull()
+        }
+        assertThat(prompt.request.value).isNull()
+    }
+
+    @Test
+    fun aSetupSessionOutlastsTheUsualTwoMinutes() = runTest {
+        val access = access()
+        val admin = alex()
+        access.beginSetupSession(admin)
+        advanceTimeBy(SESSION_TIMEOUT_MS * 4)
+        runCurrent()
+        assertThat(access.session.value).isEqualTo(admin)
+    }
+
+    @Test
+    fun aSetupSessionEndsAfterTenMinutesWithoutATouch() = runTest {
+        val access = access()
+        access.beginSetupSession(alex())
+        advanceTimeBy(SETUP_IDLE_MS + 1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+        // Gone for good: the next fresh-PIN permission asks.
+        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Manage people")
+    }
+
+    @Test
+    fun aTouchRestartsTheSetupSessionsTenMinutes() = runTest {
+        val access = access()
+        val admin = alex()
+        access.beginSetupSession(admin)
+        advanceTimeBy(SETUP_IDLE_MS - 60_000)
+        access.touch()
+        advanceTimeBy(SETUP_IDLE_MS - 60_000)
+        runCurrent()
+        assertThat(access.session.value).isEqualTo(admin)
+        advanceTimeBy(60_001)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    @Test
+    fun endingTheSetupSessionStartsTheUsualTwoMinutes() = runTest {
+        val access = access()
+        val admin = alex()
+        access.beginSetupSession(admin)
+        access.endSetupSession()
+        assertThat(access.session.value).isEqualTo(admin)
+        advanceTimeBy(SESSION_TIMEOUT_MS + 1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    @Test
+    fun lockEndsTheSetupSession() = runTest {
+        val access = access()
+        access.beginSetupSession(alex())
+        access.lock()
+        assertThat(access.session.value).isNull()
+        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Manage people")
+    }
+
+    @Test
+    fun aPinEnteredDuringSetupEndsTheSetupSession() = runTest {
+        val access = access()
+        access.beginSetupSession(alex())
+        person("Mia", Role.CHILD, "9876")
+        answerPins("9876")
+        // Refused for Alex by the check, so the pad asks; Mia's PIN starts an ordinary session.
+        val mia = access.authorise("test.any", allow = { who, _ -> who.person.name == "Mia" })
+        assertThat(mia?.person?.name).isEqualTo("Mia")
+        advanceTimeBy(SESSION_TIMEOUT_MS + 1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    @Test
+    fun aTouchRestartsTheTwoMinutes() = runTest {
+        person("Alex", Role.ADMIN, "1234")
+        val access = access()
+        answerPins("1234")
+        access.authorise(CorePermissions.SETTINGS_MANAGE)
+        advanceTimeBy(100_000)
+        access.touch()
+        advanceTimeBy(100_000)
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        advanceTimeBy(20_001)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    @Test
+    fun aTouchWithNobodySignedInSignsNobodyIn() = runTest {
+        person("Alex", Role.ADMIN, "1234")
+        val access = access()
+        access.touch()
+        assertThat(access.session.value).isNull()
+        assertThat(firstPromptFor(access, CorePermissions.SETTINGS_MANAGE).label).isEqualTo("Change settings")
+    }
 }

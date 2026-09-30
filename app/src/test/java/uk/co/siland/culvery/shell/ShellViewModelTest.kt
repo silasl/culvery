@@ -274,4 +274,15 @@ class ShellViewModelTest {
             assertThat(expectMostRecentItem().homeCards.map { it.card.id }).containsExactly("today")
         }
     }
+
+    @Test
+    fun theShellNeverBeginsASetupSession() = runTest {
+        access.result = admin
+        val vm = vm()
+        vm.openSettings()
+        vm.closeSettings()
+        vm.exitKiosk()
+        vm.signOut()
+        assertThat(access.setupSessionsBegun).isEqualTo(0)
+    }
 }

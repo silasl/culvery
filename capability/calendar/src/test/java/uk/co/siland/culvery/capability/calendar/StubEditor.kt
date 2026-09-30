@@ -23,6 +23,12 @@ private object NobodyMay : AccessControl {
     ): Authorised? = null
 
     override fun lock() = Unit
+
+    override fun beginSetupSession(person: Identified) = Unit
+
+    override fun endSetupSession() = Unit
+
+    override fun touch() = Unit
 }
 
 /**

@@ -61,6 +61,15 @@ class FakeAccessControl(var result: Authorised? = null, private val startsSessio
         return result
     }
     override fun lock() { session.value = null }
+
+    var touches = 0
+    var setupSessionsBegun = 0
+    override fun beginSetupSession(person: Identified) {
+        setupSessionsBegun++
+        session.value = person
+    }
+    override fun endSetupSession() = Unit
+    override fun touch() { touches++ }
 }
 
 /** A capability whose hasTab flow fails once, as a store hiccup would, then says it has a tab. */

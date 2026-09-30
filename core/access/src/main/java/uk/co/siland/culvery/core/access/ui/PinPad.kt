@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -64,8 +65,8 @@ fun PinPadHost(controller: PinPromptController, overSheet: Boolean = false) {
 }
 
 /**
- * Hand-off §7 PIN pad. It catches every tap on the screen: a tap outside the card cancels. The `rgba(0,0,0,.5)`
- * scrim covers the sheet's 600 dp when [overSheet], otherwise the whole screen; the card is centred in it.
+ * Hand-off §7 PIN pad asking who's there. The `rgba(0,0,0,.5)` scrim covers the sheet's 600 dp when [overSheet],
+ * otherwise the whole screen; the card is centred in it.
  */
 @Composable
 fun PinPadSheet(
@@ -77,8 +78,6 @@ fun PinPadSheet(
     onCancel: () -> Unit,
     overSheet: Boolean = false,
 ) {
-    val c = Culvery.colors
-    var digits by remember { mutableStateOf("") }
     // Counts down from the initial value rather than re-reading the wall clock, so tests with a
     // virtual frame clock stay deterministic.
     val secondsLeft by produceState(secondsUntil(lockedUntilMillis), lockedUntilMillis) {
@@ -88,13 +87,83 @@ fun PinPadSheet(
         }
     }
     val locked = secondsLeft > 0
-    val canType = !locked && digits.length < PinHasher.PIN_LENGTH
-    val message = when {
-        locked -> "Too many tries — wait ${secondsLeft}s"
-        error is PinError.WrongPin -> "Wrong PIN — try again"
-        error is PinError.NotAllowed -> error.message
-        else -> ""
+    PinPadFrame(
+        title = "Who's this?",
+        line = pinReasonText(reason, label),
+        message = when {
+            locked -> "Too many tries — wait ${secondsLeft}s"
+            error is PinError.WrongPin -> "Wrong PIN — try again"
+            error is PinError.NotAllowed -> error.message
+            else -> ""
+        },
+        wrongPin = error is PinError.WrongPin,
+        enabled = !locked,
+        onSubmit = onSubmit,
+        onCancel = onCancel,
+        overSheet = overSheet,
+    )
+}
+
+/** 4a design §4.2: choosing a new PIN. */
+const val CHOOSE_PIN = "Choose a 4-digit PIN"
+const val ENTER_IT_AGAIN = "Enter it again"
+const val PINS_DIDNT_MATCH = "Those PINs didn't match — try again."
+
+/**
+ * 4a design §4.2: the PIN pad twice, [CHOOSE_PIN] then [ENTER_IT_AGAIN]; a mismatch starts again with
+ * [PINS_DIDNT_MATCH]. [onChosen] gets the PIN once both agree. [drawScrim] false leaves the scrim to whoever shows it
+ * (the shell's overlay already draws one).
+ */
+@Composable
+fun ChoosePinPad(onChosen: (String) -> Unit, onCancel: () -> Unit, overSheet: Boolean = false, drawScrim: Boolean = true) {
+    var first by remember { mutableStateOf<String?>(null) }
+    var mismatches by remember { mutableIntStateOf(0) }
+    val retrying = first == null && mismatches > 0
+    // A new key for each stage, so the pad starts with no digits.
+    key(first, mismatches) {
+        PinPadFrame(
+            title = if (first == null) CHOOSE_PIN else ENTER_IT_AGAIN,
+            line = null,
+            message = if (retrying) PINS_DIDNT_MATCH else "",
+            wrongPin = retrying,
+            enabled = true,
+            onSubmit = { pin ->
+                val chosen = first
+                when {
+                    chosen == null -> first = pin
+                    chosen == pin -> onChosen(pin)
+                    else -> {
+                        first = null
+                        mismatches++
+                    }
+                }
+            },
+            onCancel = onCancel,
+            overSheet = overSheet,
+            drawScrim = drawScrim,
+        )
     }
+}
+
+/**
+ * The PIN pad's card and keypad (hand-off §7). It catches every tap on the screen: a tap outside the card cancels. The
+ * pad submits on the fourth digit. [wrongPin] rings the empty dots in `danger`; [line] null leaves the reason line out.
+ */
+@Composable
+fun PinPadFrame(
+    title: String,
+    line: String?,
+    message: String,
+    wrongPin: Boolean,
+    enabled: Boolean,
+    onSubmit: (String) -> Unit,
+    onCancel: () -> Unit,
+    overSheet: Boolean = false,
+    drawScrim: Boolean = true,
+) {
+    val c = Culvery.colors
+    var digits by remember { mutableStateOf("") }
+    val canType = enabled && digits.length < PinHasher.PIN_LENGTH
     val type: (String) -> Unit = { d ->
         digits += d
         if (digits.length == PinHasher.PIN_LENGTH) onSubmit(digits)
@@ -117,7 +186,7 @@ fun PinPadSheet(
                 .align(if (overSheet) Alignment.CenterEnd else Alignment.Center)
                 .then(if (overSheet) Modifier.fillMaxHeight().width(ShellTokens.sheetWidth) else Modifier.fillMaxSize())
                 .testTag("pin_area")
-                .background(ShellTokens.pinScrim),
+                .then(if (drawScrim) Modifier.background(ShellTokens.pinScrim) else Modifier),
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -140,10 +209,10 @@ fun PinPadSheet(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(PinPadDimens.titleReasonGap),
                 ) {
-                    Text("Who's this?", style = PinPadType.title, color = c.ink)
-                    Text(pinReasonText(reason, label), style = PinPadType.reason, color = c.mute, textAlign = TextAlign.Center)
+                    Text(title, style = PinPadType.title, color = c.ink)
+                    if (line != null) Text(line, style = PinPadType.reason, color = c.mute, textAlign = TextAlign.Center)
                 }
-                Dots(filled = digits.length, error = error is PinError.WrongPin && digits.isEmpty())
+                Dots(filled = digits.length, error = wrongPin && digits.isEmpty())
                 Text(
                     message,
                     style = PinPadType.error,
@@ -176,7 +245,7 @@ fun PinPadSheet(
                                 .testTag("pin_backspace")
                                 .size(PinPadDimens.key)
                                 .clip(CircleShape)
-                                .clickable(enabled = digits.isNotEmpty() && !locked) { digits = digits.dropLast(1) },
+                                .clickable(enabled = digits.isNotEmpty() && enabled) { digits = digits.dropLast(1) },
                         ) {
                             HhIcon("backspace", size = PinPadDimens.backspaceIcon, tint = c.ink, contentDescription = "Delete last digit")
                         }
