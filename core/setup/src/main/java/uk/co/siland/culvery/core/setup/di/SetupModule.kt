@@ -6,7 +6,6 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
-import dagger.multibindings.Multibinds
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.setup.SampleHousehold
@@ -53,9 +52,6 @@ abstract class SetupModule {
     @Binds
     @IntoSet
     abstract fun kioskPage(page: KioskPage): SettingsPage
-
-    @Multibinds
-    abstract fun settingsPages(): Set<SettingsPage>
 
     /** Present only in debug builds (4a design D11). */
     @BindsOptionalOf
