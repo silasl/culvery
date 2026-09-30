@@ -4,6 +4,6 @@ plugins {
 }
 
 dependencies {
-    // SingleAction launches on a CoroutineScope.
-    implementation(libs.kotlinx.coroutines.core)
+    // SingleAction takes a CoroutineScope in its public API.
+    api(libs.kotlinx.coroutines.core)
 }
