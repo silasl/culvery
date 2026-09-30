@@ -145,6 +145,21 @@ class CalendarConnectHostTest {
     }
 
     @Test
+    fun theWizardsConnectStepNeverFlashesOpenSettings() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CompositionLocalProvider(LocalOverlayHost provides overlay, LocalShellNavigator provides RecordingNavigator()) {
+                CulveryTheme(dark = true) { ConnectStepHost(connections) }
+            }
+        }
+        // The first frame, before the store has answered.
+        compose.onAllNodesWithText("Open settings").assertCountEquals(0)
+        compose.mainClock.autoAdvance = true
+        waitFor { compose.onAllNodesWithText("Connect Google Calendar").fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodesWithText("Open settings").assertCountEquals(0)
+    }
+
+    @Test
     fun anAdultCannotConnect() {
         google.connectsAs = googleConnection
         // Sam's PIN is refused in the pad, which asks again; then Cancel.

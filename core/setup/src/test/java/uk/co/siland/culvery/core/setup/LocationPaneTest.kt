@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.io.IOException
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
@@ -25,6 +26,7 @@ class LocationPaneTest {
     @get:Rule(order = 1) val compose = createComposeRule()
     private val canterbury = PlaceMatch("Canterbury", "England", "United Kingdom", 51.27904, 1.07992, "Europe/London")
     private val saved = CopyOnWriteArrayList<PlaceMatch>()
+    private var saveFails = false
 
     private class FakeSearch : LocationSearch {
         val queries: MutableList<String> = CopyOnWriteArrayList()
@@ -49,6 +51,7 @@ class LocationPaneTest {
         compose.setContent {
             CulveryTheme(dark = true) {
                 LocationPane(search, current, showCurrent) { place ->
+                    if (saveFails) throw IOException("disk full saving ${place.label}")
                     saved += place
                     true
                 }
@@ -132,5 +135,25 @@ class LocationPaneTest {
         show(current = canterbury.toHome(), showCurrent = true)
         advance(100)
         compose.onNodeWithTag("location_current").assertTextContains("Canterbury, England, United Kingdom")
+    }
+
+    @Test
+    fun aFailedSaveSaysSoAndKeepsTheResults() {
+        search.answer = { listOf(canterbury) }
+        saveFails = true
+        show()
+        type("Can")
+        advance(500)
+        compose.onNodeWithTag("place_0").performClick()
+        advance(100)
+        compose.onNodeWithText("Couldn't save — try again.").assertExists()
+        compose.onNodeWithTag("place_0").assertTextContains("Canterbury, England, United Kingdom")
+        assertNoSecretsLogged("LocationPane", listOf("Canterbury", "disk full"))
+        // Trying again clears it.
+        saveFails = false
+        compose.onNodeWithTag("place_0").performClick()
+        advance(100)
+        assertThat(saved).containsExactly(canterbury)
+        compose.onNodeWithText("Couldn't save — try again.").assertDoesNotExist()
     }
 }

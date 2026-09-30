@@ -12,7 +12,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -119,8 +122,8 @@ class StepsTest {
         assertThat(household.location.first()).isEqualTo(canterbury.toHome())
     }
 
-    private fun youStep(access: TestAccess) =
-        YouStep(household, access.pins, access.control, PeopleEditor(household, access.pins, access.control, access.toasts))
+    private fun youStep(access: TestAccess, gate: SetupSessionGate = SetupSessionGate(household, access.control)) =
+        YouStep(household, access.pins, access.control, PeopleEditor(household, access.pins, access.control, access.toasts), gate)
 
     @Test
     fun youCanGoOnOnceThereIsANameAndAPin() = runTest {
@@ -149,6 +152,34 @@ class StepsTest {
         assertThat(you.done.first()).isTrue()
         // The PIN isn't held once the Admin has it.
         assertThat(you.form.pin).isNull()
+    }
+
+    @Test
+    fun theGateStaysDownWhileTheFirstAdminIsMadeAndSignedIn() = runTest {
+        val access = testAccess(household)
+        val gate = SetupSessionGate(household, access.control)
+        val you = youStep(access, gate)
+        you.form.name = "Alex"
+        you.form.pin = "1234"
+        val seen = CopyOnWriteArrayList<Boolean>()
+        val watch = CoroutineScope(Dispatchers.Unconfined).launch { gate.needsPin.collect { seen += it } }
+        val next = async { you.onNext() }
+        // Runs onNext until the Admin is stored, then holds it there, before the setup session, while Room tells the gate.
+        while (storedPeople() == 0) {
+            runCurrent()
+            Thread.sleep(5)
+        }
+        Thread.sleep(500)
+        assertThat(next.await()).isTrue()
+        watch.cancel()
+        assertThat(seen).doesNotContain(true)
+        assertThat(access.control.session.value).isNotNull()
+        assertThat(gate.needsPin.first()).isFalse()
+    }
+
+    private fun storedPeople(): Int = db.openHelper.readableDatabase.query("SELECT COUNT(*) FROM person").use { c ->
+        c.moveToFirst()
+        c.getInt(0)
     }
 
     @Test

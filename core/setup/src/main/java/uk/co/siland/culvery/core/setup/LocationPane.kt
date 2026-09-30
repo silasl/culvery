@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.household.HomeLocation
+import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhTextField
@@ -57,7 +59,7 @@ private fun HomeLocation?.isAt(place: PlaceMatch): Boolean =
 /**
  * 4a design §4.3: the town search and its results, the saved home ticked. A new query cancels the search before it, and
  * with it the request. [showCurrent] (Settings) lists the saved home above the field. [save] stores the chosen town and
- * says whether it did.
+ * says whether it did; if it throws, the pane says it couldn't save and keeps the results to try again.
  */
 @Composable
 internal fun LocationPane(search: LocationSearch, current: HomeLocation?, showCurrent: Boolean, save: suspend (PlaceMatch) -> Boolean) {
@@ -81,8 +83,19 @@ internal fun LocationPane(search: LocationSearch, current: HomeLocation?, showCu
             TownResults.Failed
         }
     }
-    val action = rememberSingleAction(Unit) { e -> Log.w(TAG, "Couldn't save the home (${e::class.simpleName})") }
-    LocationContent(query, { query = it }, results, current, showCurrent, action.busy) { place -> action.run { save(place) } }
+    var saveFailed by remember { mutableStateOf(false) }
+    val action = rememberSingleAction(Unit) { e ->
+        Log.w(TAG, "Couldn't save the home (${e::class.simpleName})")
+        saveFailed = true
+    }
+    val onQuery = { q: String ->
+        query = q
+        saveFailed = false
+    }
+    LocationContent(query, onQuery, results, current, showCurrent, action.busy, saveFailed) { place ->
+        saveFailed = false
+        action.run { save(place) }
+    }
 }
 
 @Composable
@@ -93,6 +106,7 @@ internal fun LocationContent(
     current: HomeLocation?,
     showCurrent: Boolean,
     busy: Boolean,
+    saveFailed: Boolean = false,
     onChoose: (PlaceMatch) -> Unit,
 ) {
     val c = Culvery.colors
@@ -111,6 +125,7 @@ internal fun LocationContent(
                 Text(COULD_NOT_SEARCH, style = SetupType.line, color = c.danger, modifier = Modifier.testTag("location_failed"))
             TownResults.Idle -> Unit
         }
+        if (saveFailed) Text(COULD_NOT_SAVE, style = SetupType.message, color = c.danger, modifier = Modifier.testTag("location_save_failed"))
         Text(USED_FOR, style = SetupType.secondary, color = c.mute)
     }
 }

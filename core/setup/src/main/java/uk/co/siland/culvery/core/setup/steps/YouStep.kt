@@ -41,6 +41,7 @@ import uk.co.siland.culvery.core.setup.PeopleEditor
 import uk.co.siland.culvery.core.setup.PersonRow
 import uk.co.siland.culvery.core.setup.SET_YOUR_PIN
 import uk.co.siland.culvery.core.setup.SetupDimens
+import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupType
 import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.WHOS_SETTING_UP
@@ -70,6 +71,7 @@ class YouStep @Inject constructor(
     private val pins: PinManager,
     private val access: AccessControl,
     private val editor: PeopleEditor,
+    private val gate: SetupSessionGate,
 ) : SetupStep {
     internal val form = YouForm()
 
@@ -82,6 +84,8 @@ class YouStep @Inject constructor(
     override suspend fun onNext(): Boolean {
         if (household.hasActiveAdmin.first()) return true
         val pin = form.pin ?: return false
+        // The new Admin with nobody signed in would bring the gate up and cancel this before the setup session begins.
+        gate.finish()
         return try {
             val admin = pins.addPerson(form.name, form.color, Role.ADMIN, pin)
             access.beginSetupSession(Identified(admin, Role.ADMIN))
@@ -99,6 +103,8 @@ class YouStep @Inject constructor(
             Log.w(TAG, "Couldn't add the first Admin (${e::class.simpleName})")
             form.message = COULD_NOT_SAVE
             false
+        } finally {
+            gate.finishFailed()
         }
     }
 

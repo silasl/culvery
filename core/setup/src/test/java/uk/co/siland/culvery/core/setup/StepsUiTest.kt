@@ -99,7 +99,7 @@ class StepsUiTest {
 
     @Test
     fun setYourPinChoosesItTwiceOverThePad() {
-        val you = YouStep(household, access.pins, access.control, PeopleEditor(household, access.pins, access.control, access.toasts))
+        val you = YouStep(household, access.pins, access.control, PeopleEditor(household, access.pins, access.control, access.toasts), SetupSessionGate(household, access.control))
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
@@ -120,7 +120,7 @@ class StepsUiTest {
 
     @Test
     fun leavingTheStepWithoutNextDropsTheHeldPin() {
-        val you = YouStep(household, access.pins, access.control, PeopleEditor(household, access.pins, access.control, access.toasts))
+        val you = YouStep(household, access.pins, access.control, PeopleEditor(household, access.pins, access.control, access.toasts), SetupSessionGate(household, access.control))
         you.form.pin = "1357"
         var showing by mutableStateOf(true)
         compose.setContent {
@@ -143,7 +143,9 @@ class StepsUiTest {
         access.control.beginSetupSession(Identified(alex, Role.ADMIN))
         val gate = SetupSessionGate(household, access.control)
         val done = DoneStep(state, access.control, gate)
-        compose.setContent { CulveryTheme(dark = true) { SetupWizard(listOf(done), gate) } }
+        compose.setContent {
+            CompositionLocalProvider(LocalOverlayHost provides overlay) { CulveryTheme(dark = true) { SetupWizard(listOf(done), gate) } }
+        }
         compose.awaitText("Culvery is ready")
         compose.onNodeWithTag("wizard_next").performClick()
         compose.waitUntil(5_000) { runBlocking { state.setupComplete.first() } }

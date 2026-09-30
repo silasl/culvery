@@ -1,5 +1,6 @@
 package uk.co.siland.culvery
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -35,6 +36,7 @@ import uk.co.siland.culvery.core.access.PinManager
 import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.setup.SetupSessionGate
@@ -44,6 +46,7 @@ import uk.co.siland.culvery.core.setup.setupStore
 import uk.co.siland.culvery.core.setup.steps.WelcomeStep
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider
+import uk.co.siland.culvery.shell.OverlayState
 
 /** Welcome's Use a sample household in the real wizard, whose PIN gate rises as soon as the sample's Admin exists. */
 @RunWith(AndroidJUnit4::class)
@@ -93,7 +96,9 @@ class SampleWizardTest {
         assertThat(runBlocking { state.setupComplete.first() }).isFalse()
         val gate = SetupSessionGate(household, access)
         val welcome = WelcomeStep(state, household, gate, Optional.of(sample))
-        compose.setContent { CulveryTheme(dark = true) { SetupWizard(listOf(welcome), gate) } }
+        compose.setContent {
+            CompositionLocalProvider(LocalOverlayHost provides OverlayState()) { CulveryTheme(dark = true) { SetupWizard(listOf(welcome), gate) } }
+        }
 
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("welcome_sample").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("welcome_sample").performClick()

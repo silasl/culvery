@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
+import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarReview
 import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.capability.calendar.ReviewConnection
@@ -86,14 +87,17 @@ internal data class Confirming(val row: CalendarRow, val queued: Int)
  */
 @Composable
 internal fun ConnectStepHost(connections: CalendarConnections) {
-    val rows by connections.rows.collectAsState(initial = emptyList())
-    val connectable by connections.connectable.collectAsState(initial = emptyList())
+    // Null until the store answers, so neither the Connect card nor its Open settings fallback flashes up first.
+    val rows = connections.rows.collectAsState<List<CalendarRow>, List<CalendarRow>?>(initial = null).value
+    val connectable = connections.connectable.collectAsState<List<CalendarProvider>, List<CalendarProvider>?>(initial = null).value
     val connector = rememberConnector(connections)
-    val first = connectable.firstOrNull()
-    if (rows.isNotEmpty()) {
-        ConnectedStepCard(rows)
-    } else {
-        ConnectStepCard(first?.descriptor?.displayName, onConnect = { first?.let { connector.connect(it.descriptor.id) } })
+    when {
+        rows == null || connectable == null -> Unit
+        rows.isNotEmpty() -> ConnectedStepCard(rows)
+        else -> {
+            val first = connectable.firstOrNull()
+            ConnectStepCard(first?.descriptor?.displayName, onConnect = { first?.let { connector.connect(it.descriptor.id) } })
+        }
     }
 }
 

@@ -28,12 +28,15 @@ class SetupSessionGate @Inject constructor(
         combine(household.hasActiveAdmin, access.session, finishing) { admin, session, done -> admin && session == null && !done }
             .distinctUntilChanged()
 
-    /** Done is ending setup: its sign-out must not bring the gate back. Set before it signs out. */
+    /**
+     * Holds the gate down while a step changes who is signed in: Done's sign-out, the sample household, the You step's
+     * new Admin. Set before the change.
+     */
     fun finish() {
         finishing.value = true
     }
 
-    /** Done couldn't finish, so setup goes on and the gate returns once nobody is signed in. */
+    /** The change is over or failed, so the gate returns once nobody is signed in. */
     fun finishFailed() {
         finishing.value = false
     }

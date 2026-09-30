@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.flow.combine
 import uk.co.siland.culvery.core.access.CONTINUE_SETUP
+import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhPillButton
@@ -61,6 +62,9 @@ fun SetupWizard(steps: List<SetupStep>, gate: SetupSessionGate) {
     val needsPin = remember(gate) { gate.needsPin }.collectAsState<Boolean, Boolean?>(initial = null).value
     // Saved, and kept here rather than in Steps, so the gate coming and going doesn't lose the step.
     var current by rememberSaveable { mutableStateOf(-1) }
+    // A sheet or card a step opened must not stay up over the gate, or act once it is answered.
+    val overlay = LocalOverlayHost.current
+    LaunchedEffect(needsPin) { if (needsPin == true) overlay.dismiss() }
     // An uncoloured Text in a step reads in `ink`, not Material's default black.
     CompositionLocalProvider(LocalContentColor provides Culvery.colors.ink) {
         Box(Modifier.fillMaxSize().background(Culvery.colors.bg).testTag("wizard")) {

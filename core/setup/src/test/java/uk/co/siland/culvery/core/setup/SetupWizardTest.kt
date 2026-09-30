@@ -2,6 +2,7 @@ package uk.co.siland.culvery.core.setup
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -31,8 +32,10 @@ import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.setup.steps.YouStep
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.PersonPalette
 
@@ -74,6 +77,7 @@ class SetupWizardTest {
     private lateinit var household: HouseholdRepository
     private lateinit var access: TestAccess
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+    private val overlay = RecordingOverlay()
 
     @Before
     fun setUp() {
@@ -88,8 +92,8 @@ class SetupWizardTest {
         db.close()
     }
 
-    private fun show(vararg steps: FakeStep) = compose.setContent {
-        CulveryTheme(dark = true) { SetupWizard(steps.toList(), SetupSessionGate(household, access.control)) }
+    private fun show(vararg steps: SetupStep, gate: SetupSessionGate = SetupSessionGate(household, access.control)) = compose.setContent {
+        CompositionLocalProvider(LocalOverlayHost provides overlay) { CulveryTheme(dark = true) { SetupWizard(steps.toList(), gate) } }
     }
 
     /** Alex, the Admin, in the setup session, as the You step leaves them. */
@@ -235,7 +239,9 @@ class SetupWizardTest {
         runBlocking { access.addAdmin() }
         val restoration = StateRestorationTester(compose)
         restoration.setContent {
-            CulveryTheme(dark = true) { SetupWizard(listOf(FakeStep("a", 0)), SetupSessionGate(household, access.control)) }
+            CompositionLocalProvider(LocalOverlayHost provides overlay) {
+                CulveryTheme(dark = true) { SetupWizard(listOf(FakeStep("a", 0)), SetupSessionGate(household, access.control)) }
+            }
         }
         compose.waitUntil(5_000) { access.prompt.request.value != null }
         access.prompt.submit("1234")
@@ -273,5 +279,33 @@ class SetupWizardTest {
         compose.awaitText("Enter your PIN to carry on setting up")
         compose.onNodeWithTag("wizard_enter_pin").assertExists()
         compose.onNodeWithText("Step a").assertDoesNotExist()
+    }
+
+    @Test
+    fun theGateClosesAnySheetOpenWhenItComesUp() {
+        alexSettingUp()
+        show(FakeStep("a", 0))
+        compose.awaitText("Step a")
+        compose.runOnIdle { overlay.show { Text("Sam's sheet") } }
+        access.control.lock()
+        compose.waitUntil(5_000) { access.prompt.request.value != null }
+        compose.waitForIdle()
+        assertThat(overlay.content).isNull()
+    }
+
+    @Test
+    fun theNewAdminCarriesOnInTheSetupSessionWithNoPinPad() {
+        val gate = SetupSessionGate(household, access.control)
+        val you = YouStep(household, access.pins, access.control, PeopleEditor(household, access.pins, access.control, access.toasts), gate)
+        you.form.name = "Alex"
+        you.form.pin = "1234"
+        show(you, FakeStep("b", 1), gate = gate)
+        compose.awaitTag("you_pin_set")
+        compose.onNodeWithTag("wizard_next").performClick()
+        compose.awaitText("Step b")
+        compose.waitForIdle()
+        assertThat(access.control.session.value).isNotNull()
+        assertThat(access.requests).isEmpty()
+        compose.onNodeWithTag("wizard_gate").assertDoesNotExist()
     }
 }
