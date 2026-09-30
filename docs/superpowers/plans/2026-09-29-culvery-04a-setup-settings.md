@@ -6,7 +6,7 @@
 
 **Architecture:** A new `:core:setup` owns the wizard frame, the Settings frame, the core pages and `SetupState` (one DataStore flag, decided once per install, D8); capabilities contribute their own wizard steps and Settings pages through `Capability.setupSteps()` / `settingsPages()` (D7), so the calendar adds Connect, Review calendars and Settings › Calendars without `:core:setup` knowing it. `AccessControl` gains an in-memory setup session (no PIN, no timeout, ended at Done) and `touch()` for Settings; the household gains name and colour rules, an eight-colour palette and one-transaction member edits; `calendar.db` v5 stores the service's last-seen tick so the daily refresh never undoes a hide made on the tablet. A new `:provider:weather-openmeteo` binds town search (Open-Meteo geocoding, cancellable OkHttp) for 4b to extend with the forecast.
 
-**Tech Stack:** Kotlin 2.2.20, Jetpack Compose (BOM 2025.09.00), Hilt 2.57.1 (KSP), Room 2.8.5 + room-testing (androidx.sqlite 2.6.2), DataStore Preferences 1.1.7 (new), Coroutines 1.10.2, OkHttp 4.12.0 + MockWebServer 4.12.0, kotlinx.serialization 1.9.0, JUnit4 + Robolectric 4.16 + Truth + Turbine, Roborazzi 1.46.1.
+**Tech Stack:** Kotlin 2.2.20, Jetpack Compose (BOM 2025.09.00), Hilt 2.57.1 (KSP), Room 2.8.5 + room-testing (androidx.sqlite 2.6.2), DataStore Preferences 1.2.1 (new), Coroutines 1.10.2, OkHttp 4.12.0 + MockWebServer 4.12.0, kotlinx.serialization 1.9.0, JUnit4 + Robolectric 4.16 + Truth + Turbine, Roborazzi 1.46.1.
 
 **Spec:** `docs/superpowers/specs/2026-09-29-culvery-4a-setup-settings-design.md` (binding). Parent spec: `docs/superpowers/specs/2026-09-23-culvery-v1-design.md` (§7, §8, §9.5, §9.6, §10).
 **Previous plan (format, constraints, review outcome):** `docs/superpowers/plans/2026-09-28-culvery-03a-google-calendar.md`. **Follow-ups:** `docs/superpowers/plans/2026-09-23-plan1-followups.md` (spec §8 says which 4a takes). **Setup doc:** `docs/setup/google-calendar.md`.
@@ -15,17 +15,17 @@
 
 **Task order and why:** contracts and data first, then the logic that uses them, then the screens, then the app wiring, so every task ends green and each layer is tested before anything depends on it.
 1. The contracts (`SetupStep`, `SettingsPage`, the capability hooks), the `:core:setup` module and `SetupState` (D8).
-2. The person palette and the shared controls promoted to `:core:ui` (chips, text field, person chip, swatch, switch, `SingleAction`); the calendar's screenshots must not move.
+2. The person palette and the shared controls promoted to `:core:ui` (chips, text field, person chip, swatch, switch, the sheets' footer button, `SingleAction`); the calendar's screenshots must not move.
 3. Household rules: names, colours, eight people, one-transaction member edits, `addPerson`'s order in the transaction, Family refused, PINs set with the person.
-4. Access: the setup session, `touch()`, and the choose-a-PIN pad.
+4. Access: the setup session (ended by 10 idle minutes), `touch()`, and the choose-a-PIN pad.
 5. `LocationSearch` and `:provider:weather-openmeteo`.
 6. `calendar.db` v5, the refresh rule, `setMapping`, `remapMissingPeople`, the master always shown, the queued-change count, and the household follower (removed people, zone changes).
-7. The wizard frame: navigation, resume, dots, Skip for now, and the PIN gate after a kill.
+7. The wizard frame: navigation, resume, dots, Skip for now, and the PIN gate whenever the setup session is gone.
 8. People: `PeopleEditor` (rules, fresh PIN, lock) and the list and editor sheet.
 9. The core wizard steps: Welcome, Home location (town search), You, Household, Done.
-10. The Settings frame, its core pages (Home location, People, Kiosk), the touch that keeps it open, and Exit kiosk's move.
+10. The Settings frame, its core pages (Home location, People, Kiosk), and Exit kiosk's move.
 11. The calendar's Connect step, Review calendars (wizard and Settings), and Disconnect.
-12. `:app`: the wizard or the shell, lock-task only after setup, Settings replacing the placeholder.
+12. `:app`: the wizard or the shell, touches (sheets included) that keep Settings open, lock-task as soon as setup completes, Settings replacing the placeholder.
 13. The debug seed reworked and **Use a sample household**.
 14. The emulator walkthrough with the user's Google account, the **USER CHECKPOINTS**, the README, the setup doc and the follow-ups.
 
@@ -34,39 +34,40 @@
 Where the spec is ambiguous or doesn't fit the code as it stands, this plan rules as follows. Each is pinned by a test in the task named.
 
 1. **The step contract needs three more members (Task 1).** Spec §3.2's `done` both decides where the wizard resumes and enables Next. That can't work for Welcome (Start must be tappable before Welcome is "done"), You (Next *creates* the Admin, so You can't be done before Next) or Done (never "done", or a resume would skip it). `SetupStep` therefore also has `canGoOn: Flow<Boolean>` (default `done`; enables Next), `nextLabel` (default "Next"; Welcome "Start", Done "Open Culvery") and `suspend fun onNext(): Boolean` (default true; runs before the wizard moves, false stays). Resume still uses `done` alone.
-2. **D8's "first start of this version" is "the first read that finds no stored flag" (Task 1).** The flag is stored at that read: true if an active Admin exists, false otherwise. A fresh install therefore stores false before its wizard creates an Admin, so a kill after the You step can never mark setup complete (spec §9). A test pins it.
+2. **D8's "first start of this version" is "the first read that finds no stored flag" (Task 1).** The flag is stored at that read: true if an active Admin exists, false otherwise. A fresh install therefore stores false before its wizard creates an Admin, so a kill after the You step can never mark setup complete (spec §9). A setup file that can't be read is replaced by an empty one, and a missing flag is always decided from `household.db` (an active Admin or not), so corruption never flips an existing install into the wizard. Tests pin both.
 3. **"The app's OkHttp client" doesn't exist (Task 5).** 3a deliberately kept Google's client inside `GoogleApi`, out of the graph, so no other module's client can collide with it. The Open-Meteo module builds its own client inside its `@Provides`, with the same timeouts.
 4. **`LocationSearchException` carries no cause (Task 5).** An `IOException`'s text can hold the request URL, which holds the query; the exception is thrown with fixed words so a caller that logs it can't leak the town.
 5. **A blank name stays `IllegalArgumentException` (Task 3).** The existing contract and test say so; the sheet's Save is disabled while the name is blank. Nobody may be called "Family" (whatever the case): that is a `DuplicateNameException`, "Someone is already called Family."
 6. **Adding a person asks for a fresh PIN (Task 8).** D6 lists only edits; adding sets a role, and usually a PIN, so it takes `people.manage`. In the wizard the setup session passes it silently.
 7. **A person's edits are one transaction (Task 3).** "Nothing changes" on a failure (§5) can't hold if rename, role and PIN are separate writes, so `HouseholdRepository.updateMember` applies name, colour, role and PIN together, with the name, colour and last-Admin rules checked inside; the PIN is hashed (and checked for clashes) first. A new person's PIN is stored with them (`PinManager.addPerson`), so a clash never leaves someone added without it. The single-field methods stay.
 8. **An Admin always needs a PIN (Task 8).** Choosing Admin without a PIN, or removing an Admin's PIN, is refused with "An Admin needs a PIN." before any PIN pad; the last-Admin rule ("Culvery needs at least one Admin with a PIN.") stays the repository's.
-9. **`endSetupSession()` alone never leaves a session without a timeout (Task 4).** It ends the setup session and starts the usual two minutes; Done then calls `lock()` as the spec says. `lock()` also ends a setup session.
-10. **A PIN or role change of yourself during the wizard signs you out (Task 8).** §3.7's `lock()` rule applies in setup too. The next change then asks for a PIN as it would anywhere else (a normal two-minute session); the setup session is never carried across such a change. Done still ends with `lock()`.
-11. **The PIN gate is read once, as the wizard opens (Task 7).** It asks when an active Admin exists and nobody is signed in (a start after a kill past You), opening the PIN pad at once with "Enter your PIN to carry on setting up" (§3.4); if the pad is cancelled, the wizard shows that line and an **Enter PIN** pill (the spec gives no copy for this). Reading it once, not as a live flow, stops it flashing when Done signs out. Home location comes before You in order, so it too takes `settings.manage` once an Admin exists (Task 9): no step is open to a child after a restart.
+9. **`endSetupSession()` alone never leaves a session without a timeout (Task 4).** It ends the setup session and starts the usual two minutes; Done then calls `lock()` as the spec says. `lock()`, a PIN entered at a pad, and the session's own expiry all end a setup session; only `beginSetupSession` starts one. The setup session itself ends after 10 minutes without a touch in the wizard (spec D9 and §3.4, amended with this review).
+10. **A PIN or role change of yourself during the wizard signs you out (Task 8).** §3.7's `lock()` rule applies in setup too; the wizard's PIN gate then asks for the PIN and begins the setup session again. The setup session is never carried across such a change.
+11. **The PIN gate follows the session (Task 7).** It shows whenever an active Admin exists, nobody is signed in and Done isn't finishing: after a kill past You, after the setup session's 10 idle minutes, after a lock. It opens the PIN pad at once with "Enter your PIN to carry on setting up" (§3.4); if the pad is cancelled, the wizard shows that line and an **Enter PIN** pill (the spec gives no copy for this). Done tells the gate it is finishing before it signs out, so the gate never flashes. Nothing about the gate is saved, so a wizard restored after its process died asks again. Home location comes before You in order, so it too takes `settings.manage` once an Admin exists (Task 9), and so does Done (the setup session passes both silently).
 12. **The refresh's "tick" is `visibleOnTablet` (Task 6).** §3.10 compares the service's `shown`. 3a shows the primary calendar whatever its tick, and `MIGRATION_4_5` copies `visible` (which is `shown || primary`) into `shownInService`; comparing against `shown || primary` means an upgraded row reads as unchanged and the 3a primary rule stands. The master stays shown whatever the service says.
 13. **"{n} changes" for one change (Task 11).** The disconnect line reads ", and 1 change still waiting to sync is dropped." for one; the spec's wording otherwise.
 14. **The Settings › Calendars page keeps 3a's Connect pills (Task 11)** under the review list, so a household that skipped the wizard's Connect can still connect from Settings.
 15. **Exit kiosk moves through `ShellNavigator` (Task 10).** The Kiosk page lives in `:core:setup` and can't see `ShellViewModel`; `ShellNavigator` gains `exitKiosk()`, which the view model already implements.
-16. **Pinning at start (Task 12).** §3.6 pins "on the next resume" once setup completes. `setupComplete` is read asynchronously, so an existing install's first `onResume` runs before it is known; the activity therefore also pins when the *first* read finds setup complete while resumed. A wizard that finishes mid-session still waits for the next resume, as the spec says.
+16. **Pinning when setup completes (Task 12; spec §3.6 amended).** `setupComplete` is read asynchronously, so the activity pins whenever it turns true (the first read included) while resumed, as well as on every resume once it is true. Waiting for "the next resume" left a household that had just tapped Open Culvery unpinned until the tablet next came to the front.
 17. **`HomeLocation.name` holds the result's full line** ("Canterbury, England, United Kingdom"), which Settings shows as the current location (Task 9).
 18. **Copy and layout the spec doesn't give (Tasks 8, 9, 10):** the search field's placeholder "Town or city"; the editor sheet's heading "Add person" (new) or the person's name; a row's second line "{role} · PIN set"; each role chip carries its whole line ("Admin — can change settings and people") rather than a name and a line apart; each Settings page is titled with its name. Once the Admin exists, the You page shows their row (tap to edit in the sheet) instead of the empty form.
-19. **"Couldn't save — try again." is one constant in `:core:plugin` (`COULD_NOT_SAVE`)**, shared by the people editor and the calendar's review page (Tasks 1, 8, 11). `SingleAction` moves from the calendar to `:core:ui` for the same reason (Task 2).
+19. **"Couldn't save — try again." is one constant in `:core:plugin` (`COULD_NOT_SAVE`)**, shared by the people editor and the calendar's review page (Tasks 1, 8, 11). `SingleAction` and the calendar sheets' footer button (`HhSheetButton`) move to `:core:ui` for the same reason (Task 2).
 20. **At most eight people is enforced twice (Task 3, 8):** the repository refuses a ninth, and **Add person** is hidden once eight exist (the spec gives no copy for "full").
+21. **Touches that keep Settings open include its sheets and PIN pads (Task 12).** They draw in the shell's overlay layers, above Settings, so the touch observer sits on the `ShellLayers` root while Settings is open (and while the wizard shows, for the setup session's idle limit). Closing Settings dismisses any sheet it opened.
 
-Nothing in this plan needs a deprecated API. One new dependency is the user's to confirm: **DataStore Preferences 1.1.7** (the spec asks for a DataStore file; the version is this plan's choice, the newest stable line it knows).
+Nothing in this plan needs a deprecated API. One new dependency: **DataStore Preferences 1.2.1** (the spec asks for a DataStore file; the user chose the version).
 
 ## Global Constraints
 
 - Package root `uk.co.siland.culvery`; app name "Culvery". New packages: `uk.co.siland.culvery.core.setup`, `uk.co.siland.culvery.provider.weather_openmeteo`.
 - `minSdk 29`, `compileSdk 35`, `targetSdk 35`, JDK 17, landscape only.
-- Pinned versions: AGP 8.13.0, Gradle 8.13, Kotlin 2.2.20, KSP 2.2.20-2.0.3, Compose BOM 2025.09.00, Hilt 2.57.1, Room 2.8.5 (with `room-testing` 2.8.5), androidx.sqlite 2.6.2, Robolectric 4.16, Roborazzi 1.46.1, OkHttp/MockWebServer 4.12.0, kotlinx-serialization-json 1.9.0. **New in this plan:** `androidx.datastore:datastore-preferences` 1.1.7. All in `gradle/libs.versions.toml`. If a version fails to resolve, take the newest **patch** in the same minor line. Never move to a new major or minor version without asking.
+- Pinned versions: AGP 8.13.0, Gradle 8.13, Kotlin 2.2.20, KSP 2.2.20-2.0.3, Compose BOM 2025.09.00, Hilt 2.57.1, Room 2.8.5 (with `room-testing` 2.8.5), androidx.sqlite 2.6.2, Robolectric 4.16, Roborazzi 1.46.1, OkHttp/MockWebServer 4.12.0, kotlinx-serialization-json 1.9.0. **New in this plan:** `androidx.datastore:datastore-preferences` 1.2.1 (if its AAR metadata needs `compileSdk` above 35, stop and ask). All in `gradle/libs.versions.toml`. If a version fails to resolve, take the newest **patch** in the same minor line. Never move to a new major or minor version without asking.
 - **Deprecated APIs:** use none without asking the user first. If any API this plan uses shows a deprecation warning in these versions, **stop and ask**. The ones worth checking:
   - `forEachGesture` is deprecated: the Settings touch uses `awaitEachGesture` with `awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)` (Task 10);
   - `androidx.compose.ui.platform.LocalLifecycleOwner` is deprecated: don't use it (nothing here needs it);
   - OkHttp 4's Java-style accessors (`response.body()`, `response.code()`, `request.url()`, `RecordedRequest.getPath()` as a call): use the properties and `toHttpUrl()` (Task 5);
   - `CancellableContinuation.resume(value, onCancellation)` with a one-argument lambda is deprecated: `Call.await` uses the plain `kotlin.coroutines.resume(value)` (Task 5);
-  - `PreferenceDataStoreFactory.create(…, produceFile)`, `preferencesDataStoreFile`, `booleanPreferencesKey`, `edit` (Task 1);
+  - `PreferenceDataStoreFactory.create(corruptionHandler, …, produceFile)`, `ReplaceFileCorruptionHandler`, `preferencesDataStoreFile`, `booleanPreferencesKey`, `edit` (Task 1): if any is deprecated in 1.2.1, stop and ask;
   - Material 3 `Switch` and `SwitchDefaults.colors(…)` (Task 2); `BasicTextField(value: String, …)` (as the calendar already uses it);
   - MockWebServer's `setHeadersDelay` and `SocketPolicy.DISCONNECT_AFTER_REQUEST` (Task 5).
 
@@ -88,7 +89,7 @@ Nothing in this plan needs a deprecated API. One new dependency is the user's to
   - Record with `./gradlew <module>:recordRoborazziDebug --tests "<pattern>"` to record only the new images.
   - Look at every new or changed image before committing; the step says what each must show.
   - `@GraphicsMode(GraphicsMode.Mode.NATIVE)` goes only on classes that capture screenshots.
-  - A test's canvas sizes are private `val`s at the top of the test file, as in 3a's `ConnectScreenshotTest`.
+  - A module's tests share one canvas size, one `StillPage`, one `RecordingNavigator`, one `TouchModeRule` and one `assertNoSecretsLogged` (`core/setup`'s `TestUi.kt`; the calendar keeps its own, `TestLogs.kt` beside its `RecordingNavigator` and `TouchModeRule`).
 - Colours and type:
   - Colours come only from `Culvery.colors`, a person's own colour (`PersonPalette`, or a stored person's), `ShellTokens`' two scrims, and `DarkColors.bg` as a person chip's ink.
   - Destructive and warning tones use `danger`, `dangerSoft` and `dangerInk`.
@@ -100,10 +101,11 @@ Nothing in this plan needs a deprecated API. One new dependency is the user's to
   - In Settings: rename and recolour need `settings.manage` (the open session); add, remove, role change and PIN set/change/remove need `people.manage` (fresh PIN); calendar mappings, visibility, master and disconnect need `settings.manage`; Exit kiosk needs `kiosk.exit` (fresh PIN).
   - In the wizard: before the You step, pages call the repositories directly; from You on, they call `authorise` as in Settings and the setup session satisfies it.
   - After a remove, role change or PIN change of the signed-in person, `AccessControl.lock()`.
-  - A touch anywhere inside Settings calls `AccessControl.touch()`.
+  - A touch anywhere while Settings is open (its sheets and PIN pads included), or anywhere in the wizard, calls `AccessControl.touch()`. The setup session ends after 10 minutes without one (`SETUP_IDLE_MS`).
+  - `beginSetupSession` is the wizard's alone: the shell never calls it (a test pins it).
 - **Privacy in logs:** nothing logs a PIN, a person's name, a place name or query, coordinates, or an account email. Log an exception's class name, never its message, wherever the message could hold one of these. Each task with a failure path has a test that reads `ShadowLog`.
 - **Every save goes through `SingleAction`** (now in `:core:ui`), so a double tap saves once.
-- Tests and threads (as 3a): Room runs on its own threads; wait for it in bounded real time with `withContext(Dispatchers.Default) { withTimeout(5_000) { … } }`; asynchronous UI outcomes use `compose.waitUntil(5_000) { … }`; a tag under a clickable parent is found with `useUnmergedTree = true`; never change production semantics for a test. Compose tests that step time set `compose.mainClock.autoAdvance = false`.
+- Tests and threads (as 3a): Room runs on its own threads; wait for it in bounded real time with `withContext(Dispatchers.Default) { withTimeout(5_000) { … } }`; asynchronous UI outcomes use `compose.waitUntil(5_000) { … }`; a tag under a clickable parent is found with `useUnmergedTree = true`; never change production semantics for a test. Compose tests that step time set `compose.mainClock.autoAdvance = false`. **A UI test over Room or DataStore waits for its first content** (`compose.waitUntil(5_000) { compose.onAllNodesWithText(…).fetchSemanticsNodes().isNotEmpty() }`) before its first assertion or tap. A test that types uses `TouchModeRule` at `@get:Rule(order = 0)`. No fixed sleeps in tests: wait for a condition, bounded.
 - **Debug-only code lives in `app/src/debug`** and must not reach release: Task 13 checks the release APK.
 - The shell's overlay layers live inside `ShellLayers`; the wizard and Settings both draw inside it, so sheets, the PIN pad and toasts work there. Don't restructure it.
 - **Copy (spec §3.4, §4, §5), exactly:**
@@ -121,13 +123,15 @@ The spec's review-focus inputs (§9) and this plan's own, each pinned by named t
    - Task 7 `WizardRulesTest.itResumesAtTheFirstShownStepThatIsNotDone`, `aSkippedStepIsWhereItResumes`, `aHiddenStepIsNeverWhereItResumes`
    - Task 9 `StepsTest.aSecondNextAfterTheAdminExistsAddsNobody`, `aKillAfterYouResumesPastIt`, `welcomeIsDoneOnceStartedAndStaysDoneAfterAKill`
    - Task 7 `SetupWizardTest.aDoubleTapOnNextRunsTheStepOnce`
-   - 3a's `connectWithDefaults` already reconnects an account connected twice (review M2); Task 11 `CalendarCapabilityTest.itAddsConnectAndReviewToTheWizardAndCalendarsToSettings` (Connect is done once any connection exists)
+   - Task 7 `WizardRulesTest.itResumesAtReviewOnceConnectIsDone`
+   - Task 11 `CalendarReviewTest.connectingTheSameAccountTwiceKeepsOneConnection`; `CalendarCapabilityTest.itAddsConnectAndReviewToTheWizardAndCalendarsToSettings` (Connect is done once any connection exists)
 2. **The setup session can't outlive setup**: after Done, or after a kill before Done, the next start has no silent Admin session.
-   - Task 4 `aSetupSessionIsNotStored`, `lockEndsTheSetupSession`, `endingTheSetupSessionStartsTheUsualTwoMinutes`
-   - Task 9 `StepsTest.openCulveryEndsTheSetupSessionBeforeSetupIsComplete`
-   - Task 7 `SetupWizardTest.anAdminWithNobodySignedInIsAskedForTheirPinBeforeAnyStep`
+   - Task 4 `aSetupSessionEndsAfterTenMinutesWithoutATouch`, `aPinEnteredDuringSetupEndsTheSetupSession`, `lockEndsTheSetupSession`, `endingTheSetupSessionStartsTheUsualTwoMinutes`; `ShellViewModelTest.theShellNeverBeginsASetupSession`
+   - Task 9 `StepsTest.openCulveryEndsTheSetupSessionBeforeSetupIsComplete`, `withNobodySignedInOpenCulveryAsksForAnAdmin`; `StepsUiTest.openCulveryNeverShowsTheGate`
+   - Task 7 `SetupWizardTest.anAdminWithNobodySignedInIsAskedForTheirPinBeforeAnyStep`, `whenTheSetupSessionEndsTheWizardAsksForThePinAgain`, `aRestoredWizardAsksForThePinAgain`
 3. **An existing install (Admin present) never sees the wizard; a fresh one always does.**
-   - Task 1 `SetupStateTest.anInstallWithAnActiveAdminIsCompleteOnItsFirstStart`, `aFreshInstallIsNotComplete`, `anAdminAddedAfterTheFirstStartNeverCompletesSetup`
+   - Task 1 `SetupStateTest.anInstallWithAnActiveAdminIsCompleteOnItsFirstStart`, `aFreshInstallIsNotComplete`, `anAdminAddedAfterTheFirstStartNeverCompletesSetup`, `aCorruptSetupFileIsDecidedAgainFromTheHousehold`
+   - Task 12 `AppContentTest.untilSetupIsKnownNothingShows`, `anIncompleteSetupShowsTheWizard`, `aCompleteSetupShowsTheShellAndSettings`
    - Task 13 `DebugSeedTest.aFreshDebugInstallHasNoPeopleNoCalendarAndIsNotSetUp`
 4. **The daily refresh never re-shows a calendar the user hid unless its tick in the service changed.**
    - Task 6 `aHiddenCalendarStaysHiddenWhileItsTickIsUnchanged`, `aChangedTickInTheServiceWins`, `theMasterStaysShownWhateverTheServiceSays`, `migrationFromV4CopiesVisibilityIntoTheLastSeenTick`
@@ -138,11 +142,16 @@ The spec's review-focus inputs (§9) and this plan's own, each pinned by named t
 6. **The household can't lose its last Admin through the editor** (demote, remove, clear PIN, or an Admin with no PIN).
    - Task 3 `theLastAdminIsKeptThroughAMemberEdit`; Task 8 `theLastAdminCannotBeDemotedRemovedOrLoseTheirPin`, `anAdminWithoutAPinIsRefusedBeforeAnyPinPad`
 7. **Settings stays open while an adult uses it, and closes two minutes after the last touch.**
-   - Task 4 `aTouchRestartsTheTwoMinutes`, `aTouchDuringTheSetupSessionChangesNothing`; Task 10 `anyTouchInsideSettingsKeepsItOpen`
+   - Task 4 `aTouchRestartsTheTwoMinutes`; Task 12 `AppContentTest.aTapInsideAnOpenSheetKeepsSettingsOpen`, `closingSettingsDismissesItsSheet`; `SetupWiringTest.touchesCountWhileSettingsIsOpenOrTheWizardShows`
 8. **A person removed while a calendar is mapped to them doesn't leave the calendar pointing at nobody.**
    - Task 6 `HouseholdFollowerTest.aCalendarMappedToSomeoneRemovedShowsAsFamily`, `CalendarStoreTest.calendarsOfSomeoneGoneBecomeFamilyAndTheRestStay`
 9. **A mistyped or changed town search never sends two searches at once, and a slow one never overwrites a newer answer.**
    - Task 9 `LocationPaneTest.aNewQueryCancelsTheSearchBeforeIt`, `itSearchesOnlyAfterTwoLettersAndAPause`; Task 5 `cancellingTheSearchCancelsTheCall`
+10. **The setup session ends after 10 minutes without a touch, and the wizard carries on after a PIN** (spec D9 amended).
+   - Task 4 `aSetupSessionEndsAfterTenMinutesWithoutATouch`, `aTouchRestartsTheSetupSessionsTenMinutes`, `aSetupSessionOutlastsTheUsualTwoMinutes`
+   - Task 7 `SetupWizardTest.whenTheSetupSessionEndsTheWizardAsksForThePinAgain`
+11. **Finishing setup pins the kiosk at once, not at some later resume.**
+   - Task 12 `SetupWiringTest.theKioskPinsAsSoonAsSetupCompletesWhileResumed`
 
 ---
 
@@ -156,11 +165,11 @@ core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/
   Setup.kt             (create: SetupStep, SettingsPage, NEXT_LABEL, COULD_NOT_SAVE)
   Capability.kt        (modify: setupSteps(), settingsPages(); SettingsSection() removed in Task 12)
   ShellNavigator.kt    (modify: exitKiosk(), Task 10)
-core/plugin/src/test/…/SetupContractTest.kt        (create)
 
 core/ui/src/main/java/uk/co/siland/culvery/core/ui/
   PersonPalette.kt     (create)
-  Controls.kt          (create: ControlTokens, ControlType, HhChoiceChip, HhTextField, HhPersonChip, HhSwatch, HhSwitch)
+  Controls.kt          (create: ControlTokens, ControlType, HhChoiceChip, HhTextField, HhPersonChip, HhSwatch, HhSwitch,
+                        ButtonTone, HhSheetButton)
   SingleAction.kt      (create: moved from the calendar's Sheets.kt)
   Components.kt        (modify: HhPillButton gains enabled)
 core/ui/src/test/…/PersonPaletteTest.kt, ControlsTest.kt   (create)
@@ -178,7 +187,7 @@ core/setup/                                        (create)
   build.gradle.kts
   src/main/java/uk/co/siland/culvery/core/setup/
     SetupState.kt, LocationSearch.kt, SampleHousehold.kt
-    SetupDimens.kt (SetupDimens, SetupType), SetupCopy.kt (every string), SetupUi.kt (StepTitle, SetupButton)
+    SetupDimens.kt (SetupDimens, SetupType), SetupCopy.kt (every string), SetupUi.kt (StepTitle)
     WizardRules.kt, SetupWizard.kt, SetupSessionGate.kt
     PeopleEditor.kt, PeopleUi.kt, PersonEditorSheet.kt
     LocationPane.kt
@@ -187,7 +196,8 @@ core/setup/                                        (create)
     di/SetupModule.kt
   src/test/resources/robolectric.properties
   src/test/java/uk/co/siland/culvery/core/setup/
-    TestHousehold.kt, RecordingOverlay.kt, SetupStateTest.kt, WizardRulesTest.kt, SetupWizardTest.kt, PeopleEditorTest.kt,
+    TestHousehold.kt, TestUi.kt (canvas, StillPage, RecordingNavigator, TouchModeRule, assertNoSecretsLogged),
+    RecordingOverlay.kt, SetupStateTest.kt, WizardRulesTest.kt, SetupWizardTest.kt, PeopleEditorTest.kt,
     PeopleUiTest.kt, LocationPaneTest.kt, StepsTest.kt, StepsUiTest.kt, SettingsScreenTest.kt, SetupScreenshotTest.kt,
     SettingsScreenshotTest.kt
   src/test/screenshots/*.png
@@ -211,17 +221,19 @@ capability/calendar/
   src/test/java/uk/co/siland/culvery/capability/calendar/
     CalendarStoreTest, CalendarMigrationTest, SourceRefresherTest, StubEditor, CalendarCapabilityTest, ui/ConnectScreenshotTest,
     ui/RecordingNavigator, the fakes' new AccessControl members   (modify)
-    HouseholdFollowerTest, CalendarReviewTest, ui/ReviewCalendarsTest, ui/ReviewScreenshotTest   (create)
+    HouseholdFollowerTest, CalendarReviewTest, TestLogs (assertNoSecretsLogged), ui/ReviewCalendarsTest, ui/ReviewScreenshotTest   (create)
     ui/CalendarSettingsTest (delete)
   src/test/screenshots/settings_calendars_*.png (delete); review_*, connect_step_*, settings_calendars_page_* (new)
 
 app/
   build.gradle.kts                                 (modify)
-  src/main/java/uk/co/siland/culvery/MainActivity.kt, CulveryApp.kt, Kiosk.kt, shell/ShellViewModel.kt   (modify)
-  src/main/java/uk/co/siland/culvery/SetupWiring.kt   (create)
+  src/main/java/uk/co/siland/culvery/MainActivity.kt, CulveryApp.kt, shell/ui/OverlayLayers.kt (ShellLayers' onTouch)   (modify)
+  src/main/java/uk/co/siland/culvery/shell/ShellViewModel.kt   (modify, Task 10: exitKiosk overrides)
+  src/main/java/uk/co/siland/culvery/SetupWiring.kt   (create: wizardSteps, settingsPages, pinOnSetupRead, touchTarget, AppContent)
   src/main/java/uk/co/siland/culvery/shell/ui/SettingsPlaceholder.kt   (delete)
   src/debug/java/uk/co/siland/culvery/DebugSeed.kt, di/DebugSetupModule.kt (create), src/release/…/DebugSeed.kt   (modify)
-  src/test/java/uk/co/siland/culvery/SetupWiringTest.kt (create), shell/Fakes.kt, shell/ui/ShellScreenshotTest.kt   (modify)
+  src/test/java/uk/co/siland/culvery/SetupWiringTest.kt, AppContentTest.kt (create); shell/Fakes.kt, shell/ShellViewModelTest.kt,
+    shell/ui/ShellScreenshotTest.kt   (modify)
   src/test/screenshots/settings_dark.png           (delete)
   src/testDebug/java/uk/co/siland/culvery/DebugSeedTest.kt, SampleAddTest.kt, SampleRollbackTest.kt   (modify)
 
@@ -238,7 +250,6 @@ README.md, docs/setup/google-calendar.md, docs/superpowers/plans/2026-09-23-plan
 - Modify: `gradle/libs.versions.toml`, `settings.gradle.kts`
 - Create: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/Setup.kt`
 - Modify: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/Capability.kt`
-- Test: `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/SetupContractTest.kt` (create)
 - Create: `core/setup/build.gradle.kts`, `core/setup/src/test/resources/robolectric.properties`
 - Create: `core/setup/src/main/java/uk/co/siland/culvery/core/setup/SetupState.kt`
 - Test: `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestHousehold.kt`, `SetupStateTest.kt` (create)
@@ -250,13 +261,14 @@ README.md, docs/setup/google-calendar.md, docs/superpowers/plans/2026-09-23-plan
   - `interface SettingsPage { val id: String; val title: String; val order: Int; @Composable fun Content() }`
   - `const val NEXT_LABEL = "Next"`; `const val COULD_NOT_SAVE = "Couldn't save — try again."` (both `:core:plugin`)
   - `Capability.setupSteps(): List<SetupStep>` and `Capability.settingsPages(): List<SettingsPage>`, both empty by default
-  - `@Singleton class SetupState` — internal constructor `(store: DataStore<Preferences>, household: HouseholdRepository)`; `@Inject` constructor `(@ApplicationContext context: Context, household: HouseholdRepository)`; `val setupComplete: Flow<Boolean>`; `val welcomed: Flow<Boolean>`; `suspend fun markWelcomed()`; `suspend fun markComplete()`
+  - `fun setupStore(scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO), produceFile: () -> File): DataStore<Preferences>` — replaces an unreadable file with an empty one
+  - `@Singleton class SetupState` — constructor `(store: DataStore<Preferences>, household: HouseholdRepository)` (public: the debug seed's tests build one); `@Inject` constructor `(@ApplicationContext context: Context, household: HouseholdRepository)`; `val setupComplete: Flow<Boolean>`; `val welcomed: Flow<Boolean>`; `suspend fun markWelcomed()`; `suspend fun markComplete()`
   - Test helpers (`:core:setup` tests): `internal fun householdDb(): HouseholdDatabase`
 
 - [ ] **Step 1: Add the module and the dependency**
 
 In `gradle/libs.versions.toml`:
-1. Under `[versions]`, after `playServicesAuth = "21.4.0"`, add `datastore = "1.1.7"`.
+1. Under `[versions]`, after `playServicesAuth = "21.4.0"`, add `datastore = "1.2.1"`.
 2. Under `[libraries]`, after the `kotlinx-coroutines-play-services` line, add:
 ```toml
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
@@ -279,7 +291,8 @@ dependencies {
     api(project(":core:access"))
     api(project(":core:household"))
     implementation(project(":core:ui"))
-    implementation(libs.androidx.datastore.preferences)
+    // SetupState's constructor takes a DataStore, which `:app`'s debug tests build.
+    api(libs.androidx.datastore.preferences)
     testImplementation(libs.roborazzi.core)
     testImplementation(libs.roborazzi.compose)
 }
@@ -290,62 +303,9 @@ Create `core/setup/src/test/resources/robolectric.properties`:
 qualifiers=w1280dp-h800dp-land-hdpi
 ```
 
+**Stop and ask the user** if the build then fails with an AAR metadata error asking for `compileSdk` above 35 (DataStore 1.2.1's requirement, not ours to raise), or if any API this task uses from it (`PreferenceDataStoreFactory.create`, `ReplaceFileCorruptionHandler`, `preferencesDataStoreFile`, `booleanPreferencesKey`, `edit`) shows a deprecation warning. Don't fall back to another version without asking.
+
 - [ ] **Step 2: Write the failing tests**
-
-Create `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/SetupContractTest.kt`:
-```kotlin
-package uk.co.siland.culvery.core.plugin
-
-import androidx.compose.runtime.Composable
-import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.runTest
-import org.junit.Test
-
-class SetupContractTest {
-    private val saved = MutableStateFlow(false)
-
-    private val step = object : SetupStep {
-        override val id = "test"
-        override val order = 0
-        override val done: Flow<Boolean> = saved
-
-        @Composable
-        override fun Content(onNext: () -> Unit) = Unit
-    }
-
-    @Test
-    fun aStepIsShownNotSkippableSaysNextAndCanGoOnOnceDone() = runTest {
-        assertThat(step.shown.first()).isTrue()
-        assertThat(step.skippable).isFalse()
-        assertThat(step.nextLabel).isEqualTo("Next")
-        assertThat(step.canGoOn.first()).isFalse()
-        saved.value = true
-        assertThat(step.canGoOn.first()).isTrue()
-        assertThat(step.onNext()).isTrue()
-    }
-
-    @Test
-    fun aCapabilityHasNoStepsOrPagesUnlessItSaysSo() {
-        val capability = object : Capability {
-            override val id = "test"
-            override val label = "Test"
-            override val icon = "star"
-            override val order = 0
-            override val hasTab: Flow<Boolean> = flowOf(false)
-            override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList())
-
-            @Composable
-            override fun TabContent() = Unit
-        }
-        assertThat(capability.setupSteps()).isEmpty()
-        assertThat(capability.settingsPages()).isEmpty()
-    }
-}
-```
 
 Create `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestHousehold.kt`:
 ```kotlin
@@ -365,7 +325,6 @@ Create `core/setup/src/test/java/uk/co/siland/culvery/core/setup/SetupStateTest.
 ```kotlin
 package uk.co.siland.culvery.core.setup
 
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.File
@@ -411,8 +370,10 @@ class SetupStateTest {
     private suspend fun start(): SetupState {
         scope.coroutineContext.job.cancelAndJoin()
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        return SetupState(PreferenceDataStoreFactory.create(scope = scope) { File(folder.root, "setup.preferences_pb") }, household)
+        return SetupState(setupStore(scope) { file }, household)
     }
+
+    private val file get() = File(folder.root, "setup.preferences_pb")
 
     private suspend fun addAdmin(withPin: Boolean = true) {
         val alex = household.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
@@ -453,6 +414,16 @@ class SetupStateTest {
     }
 
     @Test
+    fun aCorruptSetupFileIsDecidedAgainFromTheHousehold() = runTest {
+        // Not a preferences file: DataStore reads it as corrupt, and the handler replaces it with an empty one.
+        file.writeText("not a preferences file")
+        assertThat(start().setupComplete.first()).isFalse()
+        addAdmin()
+        file.writeText("not a preferences file")
+        assertThat(start().setupComplete.first()).isTrue()
+    }
+
+    @Test
     fun welcomeIsRememberedAcrossARestart() = runTest {
         val first = start()
         assertThat(first.welcomed.first()).isFalse()
@@ -464,8 +435,8 @@ class SetupStateTest {
 
 - [ ] **Step 3: Run the tests to see them fail**
 
-Run: `./gradlew :core:plugin:testDebugUnitTest :core:setup:testDebugUnitTest`
-Expected: FAIL to compile with "Unresolved reference 'SetupStep'" (`:core:plugin`) and "Unresolved reference 'SetupState'" (`:core:setup`).
+Run: `./gradlew :core:setup:testDebugUnitTest`
+Expected: FAIL to compile with "Unresolved reference 'SetupState'" and "Unresolved reference 'setupStore'".
 
 - [ ] **Step 4: Write the contracts**
 
@@ -544,47 +515,74 @@ Create `core/setup/src/main/java/uk/co/siland/culvery/core/setup/SetupState.kt`:
 package uk.co.siland.culvery.core.setup
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.household.HouseholdRepository
 
+private const val TAG = "SetupState"
+
+/** The setup file's store. A file that can't be read is replaced by an empty one; SetupState decides it again. */
+fun setupStore(scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO), produceFile: () -> File): DataStore<Preferences> =
+    PreferenceDataStoreFactory.create(
+        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+        scope = scope,
+        produceFile = produceFile,
+    )
+
 /**
  * Whether first-run setup has finished, and whether Welcome was passed (4a design §3.1, D8): a small DataStore file of
  * its own, not Room, as it is two flags.
  */
 @Singleton
-class SetupState internal constructor(
-    private val store: DataStore<Preferences>,
-    private val household: HouseholdRepository,
-) {
+class SetupState(private val store: DataStore<Preferences>, private val household: HouseholdRepository) {
     @Inject
     constructor(@ApplicationContext context: Context, household: HouseholdRepository) :
-        this(PreferenceDataStoreFactory.create { context.preferencesDataStoreFile(FILE) }, household)
+        this(setupStore { context.preferencesDataStoreFile(FILE) }, household)
+
+    private val prefs: Flow<Preferences> = store.data.catch { e ->
+        if (e !is IOException) throw e
+        Log.w(TAG, "Couldn't read the setup file (${e::class.simpleName})")
+        emit(emptyPreferences())
+    }
 
     /**
      * D8: the first read on an install that has never stored the flag decides it, once: complete when an active Admin
      * exists (an install from before 4a), not complete otherwise. A fresh install stores false at that first read, so
-     * the Admin its wizard makes later never marks setup complete (ruling 2).
+     * the Admin its wizard makes later never marks setup complete (ruling 2). A flag that can't be read or written is
+     * decided the same way, from the household, every time.
      */
     val setupComplete: Flow<Boolean> = flow {
-        store.edit { prefs -> if (COMPLETE !in prefs) prefs[COMPLETE] = household.credentials().any { it.isActiveAdmin } }
-        emitAll(store.data.map { it[COMPLETE] == true })
+        try {
+            store.edit { stored -> if (COMPLETE !in stored) stored[COMPLETE] = activeAdmin() }
+        } catch (e: IOException) {
+            Log.w(TAG, "Couldn't write the setup file (${e::class.simpleName})")
+        }
+        emitAll(prefs.map { it[COMPLETE] ?: activeAdmin() })
     }.distinctUntilChanged()
 
     /** Welcome was passed, so a start after a kill resumes past it (4a design §6). */
-    val welcomed: Flow<Boolean> = store.data.map { it[WELCOMED] == true }.distinctUntilChanged()
+    val welcomed: Flow<Boolean> = prefs.map { it[WELCOMED] == true }.distinctUntilChanged()
 
     suspend fun markWelcomed() {
         store.edit { it[WELCOMED] = true }
@@ -593,6 +591,8 @@ class SetupState internal constructor(
     suspend fun markComplete() {
         store.edit { it[COMPLETE] = true }
     }
+
+    private suspend fun activeAdmin(): Boolean = household.credentials().any { it.isActiveAdmin }
 
     private companion object {
         const val FILE = "setup"
@@ -605,7 +605,7 @@ class SetupState internal constructor(
 - [ ] **Step 6: Run the tests to see them pass**
 
 Run: `./gradlew :core:plugin:testDebugUnitTest :core:setup:testDebugUnitTest`
-Expected: PASS (2 + 6 tests).
+Expected: PASS (7 tests in `:core:setup`; the contract's defaults are exercised by the wizard's tests from Task 7 and `SetupWiringTest` in Task 12).
 
 - [ ] **Step 7: Run the gate**
 
@@ -634,7 +634,7 @@ git commit -m "Add the setup contracts, the :core:setup module and whether setup
 - Consumes: nothing new.
 - Produces (all `:core:ui`, public):
   - `object PersonPalette { val colors: List<Long>; fun firstFree(taken: Collection<Long>): Long? }`
-  - `object ControlTokens` (chips, text field, person chip, swatch values; `DISABLED_ALPHA`, `SECONDARY_ALPHA`, `STRIKE_INSET`); `object ControlType { chip; chipSecondary; field }`
+  - `object ControlTokens` (chips, whose values the person chip shares; text field; swatch; the sheets' footer button; `DISABLED_ALPHA`, `SECONDARY_ALPHA`, `STRIKE_INSET`); `object ControlType { chip; chipSecondary; field; button }`
   - `@Composable fun HhChoiceChip(label: String, selected: Boolean, tag: String, onClick: () -> Unit, enabled: Boolean = true, selectedColor: Color = Culvery.colors.accent, selectedInk: Color = Culvery.colors.accentInk, secondary: String? = null, leading: (@Composable (ink: Color) -> Unit)? = null)`
   - `@Composable fun HhTextField(value: String, onValueChange: (String) -> Unit, placeholder: String, tag: String, modifier: Modifier = Modifier, readOnly: Boolean = false, capitalization: KeyboardCapitalization = KeyboardCapitalization.Sentences, onDone: () -> Unit = {})`
   - `@Composable fun HhPersonChip(name: String, color: Color, tag: String, enabled: Boolean, onClick: () -> Unit)`
@@ -642,7 +642,7 @@ git commit -m "Add the setup contracts, the :core:setup module and whether setup
   - `@Composable fun HhSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, tag: String, enabled: Boolean = true)`
   - `HhPillButton(text, onClick, modifier = Modifier, primary = false, enabled = true)`
   - `class SingleAction(scope: CoroutineScope, onError: (Exception) -> Unit)` with `busy: Boolean` and `fun run(action: suspend () -> Unit)`; `@Composable fun rememberSingleAction(key: Any?, onError: (Exception) -> Unit): SingleAction` (moved from the calendar, unchanged)
-  - Calendar: `internal fun ConfirmButton(text, icon, background, content, tag, enabled, onClick, modifier)` moves to `ui/Components.kt` (Task 11 reuses it)
+  - `enum class ButtonTone { Primary, Plain, Quiet, Danger, Destroy }`; `@Composable fun HhSheetButton(text: String, tone: ButtonTone, enabled: Boolean, tag: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: String? = null)` — the calendar sheets' footer button (was the detail sheet's private `ConfirmButton`), used by the person sheet (Task 8) and Review calendars (Task 11)
 
 The five extra colours are violet `#9C7CE3`, lime `#9CC44E`, red `#E06666`, slate `#8B96A8` and brown `#A1785A`. No two of the eight, nor any of them and Family's `#E0A85B`, are closer than 66 in RGB distance (the test's floor is 60). A person's colour doesn't change with the theme: it is drawn on `bg` (`#0E1011` dark, `#EDF0EE` light) and under a `#0E1011` ink, and each of the five keeps that ink readable (the lightest, lime, is lighter than the hand-off's green; the darkest, brown, is lighter than the hand-off's blue).
 
@@ -774,6 +774,14 @@ class ControlsTest {
     }
 
     @Test
+    fun aDisabledSheetButtonIgnoresTaps() {
+        var taps = 0
+        show { HhSheetButton("Save person", ButtonTone.Primary, enabled = false, tag = "save", onClick = { taps++ }) }
+        compose.onNodeWithTag("save").assertIsNotEnabled().performClick()
+        assertThat(taps).isEqualTo(0)
+    }
+
+    @Test
     fun aDisabledPillIgnoresTaps() {
         var taps = 0
         show { HhPillButton("Next", { taps++ }, primary = true, enabled = false) }
@@ -805,7 +813,7 @@ class ControlsTest {
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `./gradlew :core:ui:testDebugUnitTest`
-Expected: FAIL to compile with "Unresolved reference 'PersonPalette'", "'HhSwatch'", "'SingleAction'".
+Expected: FAIL to compile with "Unresolved reference 'PersonPalette'", "'HhSwatch'", "'HhSheetButton'", "'SingleAction'", and "No parameter with name 'enabled' found" for `HhPillButton`.
 
 - [ ] **Step 3: Write the palette, the controls and `SingleAction`**
 
@@ -911,12 +919,12 @@ object ControlTokens {
     val fieldPaddingH = 20.dp
     val fieldBorder = 2.dp
 
-    // Person chip: 48 dp, `surf`, radius 24, padding 0 18, a 12 dp dot 8 from the name.
-    val personChipHeight = 48.dp
-    val personChipRadius = 24.dp
-    val personChipPaddingH = 18.dp
-    val personChipDot = 12.dp
-    val personChipDotGap = 8.dp
+    // The sheets' footer button (hand-off §7): 60 dp, radius 30, padding 0 26, a 24 dp icon 8 from the label.
+    val buttonHeight = 60.dp
+    val buttonRadius = 30.dp
+    val buttonPaddingH = 26.dp
+    val buttonIcon = 24.dp
+    val buttonIconGap = 8.dp
 
     // Colour swatch (4a; not in the spec): a 44 dp circle, 12 apart; chosen, a 3 dp `ink` ring 3 dp outside it; taken,
     // at 38% with a 2 dp `ink` line across it.
@@ -940,6 +948,9 @@ object ControlType {
 
     /** 22 sp / 600: a text field. */
     val field = HhType.sectionTitle.copy(fontWeight = FontWeight.W600)
+
+    /** 17 sp / 700: a sheet's footer button. */
+    val button = HhType.rowTitle.copy(fontWeight = FontWeight.W700)
 }
 
 /**
@@ -1027,23 +1038,68 @@ fun HhTextField(
     )
 }
 
-/** Hand-off §7 person chip: 48 dp, `surf`, radius 24, a 12 dp dot in the person's [color] 8 from their [name]. */
+/** Hand-off §7 person chip: a chip's size and shape, `surf`, a 12 dp dot in the person's [color] 8 from their [name]. */
 @Composable
 fun HhPersonChip(name: String, color: Color, tag: String, enabled: Boolean, onClick: () -> Unit) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(ControlTokens.personChipDotGap),
+        horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipIconGap),
         modifier = Modifier
             .testTag(tag)
-            .height(ControlTokens.personChipHeight)
-            .clip(RoundedCornerShape(ControlTokens.personChipRadius))
+            .height(ControlTokens.chipHeight)
+            .clip(RoundedCornerShape(ControlTokens.chipRadius))
             .background(c.surf)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = ControlTokens.personChipPaddingH),
+            .padding(horizontal = ControlTokens.chipPaddingH),
     ) {
-        Box(Modifier.size(ControlTokens.personChipDot).clip(CircleShape).background(color))
+        Box(Modifier.size(ControlTokens.chipDot).clip(CircleShape).background(color))
         Text(name, style = ControlType.chip, color = c.ink, maxLines = 1)
+    }
+}
+
+/**
+ * [Primary] `accent`; [Plain] `surf2`; [Quiet] `surf` (Keep, on a `dangerSoft` card); [Danger] `surf2` with `danger`
+ * text; [Destroy] `danger` with `dangerInk`.
+ */
+enum class ButtonTone { Primary, Plain, Quiet, Danger, Destroy }
+
+/** The sheets' footer button (hand-off §7): 60 dp, radius 30, 17 sp / 700, an optional icon. Disabled, `surf2` and `mute`. */
+@Composable
+fun HhSheetButton(
+    text: String,
+    tone: ButtonTone,
+    enabled: Boolean,
+    tag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: String? = null,
+) {
+    val c = Culvery.colors
+    val (background, ink) = if (!enabled) {
+        c.surf2 to c.mute
+    } else {
+        when (tone) {
+            ButtonTone.Primary -> c.accent to c.accentInk
+            ButtonTone.Plain -> c.surf2 to c.ink
+            ButtonTone.Quiet -> c.surf to c.ink
+            ButtonTone.Danger -> c.surf2 to c.danger
+            ButtonTone.Destroy -> c.danger to c.dangerInk
+        }
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ControlTokens.buttonIconGap, Alignment.CenterHorizontally),
+        modifier = modifier
+            .testTag(tag)
+            .height(ControlTokens.buttonHeight)
+            .clip(RoundedCornerShape(ControlTokens.buttonRadius))
+            .background(background)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = ControlTokens.buttonPaddingH),
+    ) {
+        if (icon != null) HhIcon(icon, size = ControlTokens.buttonIcon, tint = ink)
+        Text(text, style = ControlType.button, color = ink, maxLines = 1)
     }
 }
 
@@ -1223,15 +1279,23 @@ followed by the unchanged KDoc and bodies of `showDetail` and `showEditor`.
 people.forEach { person -> HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy) { onAssign(person) } }
 ```
    - delete the private `PersonChip`;
-   - cut the private `ConfirmButton` (unchanged) into `ui/Components.kt` as `internal fun ConfirmButton(…)` with the same parameters (Components.kt already imports everything it uses);
-   - add the import `uk.co.siland.culvery.core.ui.HhPersonChip`.
+   - replace the delete confirmation's two buttons with the shared one and delete the private `ConfirmButton`:
+```kotlin
+            HhSheetButton("Keep event", ButtonTone.Quiet, enabled = !busy, tag = "detail_keep", onClick = onKeep, modifier = Modifier.weight(1f))
+            HhSheetButton(
+                "Delete event", ButtonTone.Destroy, enabled = !busy, tag = "detail_confirm_delete", onClick = onConfirmDelete,
+                modifier = Modifier.weight(1f), icon = "delete_forever",
+            )
+```
+     (Same size, shape, colours, icon and centred label as before; the button's 26 dp side padding doesn't move a centred label.)
+   - add the imports `uk.co.siland.culvery.core.ui.HhPersonChip`, `uk.co.siland.culvery.core.ui.HhSheetButton`, `uk.co.siland.culvery.core.ui.ButtonTone`.
 5. `CalendarType.kt`:
    - in `CalendarType`, delete `chip`, `chipSecondary` and `titleField` (keep `personChip`: `pickerCell` and `lockedDates` use it);
    - in `CalendarDimens`, delete `titleHeight`, `titleRadius`, `titlePaddingH`, `titleBorder`, `choiceChipHeight`, `choiceChipPaddingH`, `choiceChipRadius`, `choiceChipGap`, `choiceChipIconGap`, `choiceChipDot`, `choiceChipIcon`, `DISABLED_CHIP_ALPHA`, `CHIP_SECONDARY_ALPHA`, `personChipHeight`, `personChipRadius`, `personChipPaddingH`, `personChipDot` and `personChipDotGap`, with their comment lines (keep `personChipGap`, which spaces the Assign row, and change its comment to "Assign: "Assign to…" 44 dp, radius 22; person chips 8 apart (ControlTokens has the chip).").
 
 Check nothing still uses the removed names:
 ```bash
-grep -rnE "choiceChip|titleHeight|titleRadius|titlePaddingH|titleBorder|DISABLED_CHIP_ALPHA|CHIP_SECONDARY_ALPHA|personChip(Height|Radius|PaddingH|Dot)|CalendarType\.(chip|chipSecondary|titleField)\b|SingleAction\(scope" capability/calendar/src
+grep -rnE "choiceChip|titleHeight|titleRadius|titlePaddingH|titleBorder|DISABLED_CHIP_ALPHA|CHIP_SECONDARY_ALPHA|personChip(Height|Radius|PaddingH|Dot)|CalendarType\.(chip|chipSecondary|titleField)\b|SingleAction\(scope|ConfirmButton" capability/calendar/src
 ```
 Expected: no output.
 
@@ -1268,7 +1332,7 @@ git commit -m "Add the person palette and share the chip, text field, person chi
   - `data class Member(val person: Person, val role: Role, val hasPin: Boolean) { val isActiveAdmin: Boolean }`
   - `sealed interface PinChange { data object Keep; data object Remove; class Set(val hash: String, val salt: String) }`
   - `class DuplicateNameException(val name: String) : Exception`; `class ColourInUseException : Exception` (their texts hold no name)
-  - `HouseholdRepository`: `val members: Flow<List<Member>>`; `val hasActiveAdmin: Flow<Boolean>`; `suspend fun member(id: PersonId): Member?`; `suspend fun addPerson(name: String, color: Long, role: Role, pinHash: String? = null, salt: String? = null): Person` (throws `DuplicateNameException`, `ColourInUseException`, `IllegalArgumentException` for a blank name or a ninth person; `sortOrder` read in the transaction); `updatePerson(person)` applies the name and colour rules; `suspend fun updateMember(id: PersonId, name: String, color: Long, role: Role, pin: PinChange)` (one transaction; the name, colour and last-Admin rules); `setRole`, `setPinHash`, `clearPin` refuse Family with `IllegalArgumentException`
+  - `HouseholdRepository`: `val members: Flow<List<Member>>`; `val hasActiveAdmin: Flow<Boolean>`; `suspend fun member(id: PersonId): Member?`; `suspend fun addPerson(name: String, color: Long, role: Role, pinHash: String? = null, salt: String? = null): Person` (throws `DuplicateNameException`, `ColourInUseException`, `IllegalArgumentException` for a blank name or a ninth person; `sortOrder` read in the transaction, which Room serialises, so two adds never share a place); `updatePerson(person)` applies the name and colour rules; `suspend fun updateMember(id: PersonId, name: String, color: Long, role: Role, pin: PinChange)` (one transaction; the name, colour and last-Admin rules); `setRole`, `setPinHash`, `clearPin` refuse Family with `IllegalArgumentException`
   - `PinManager`: `suspend fun hashNew(pin: String, owner: PersonId?): Pair<String, String>` (hash to salt; `PinInUseException` when anyone but [owner] has it); `suspend fun addPerson(name: String, color: Long, role: Role, pin: String?): Person` (the PIN stored with the person)
 
 - [ ] **Step 1: Give the existing tests' people their own colours**
@@ -1293,7 +1357,7 @@ In `core/access/src/test/java/uk/co/siland/culvery/core/access/DefaultAccessCont
 
 - [ ] **Step 2: Write the failing tests**
 
-In `HouseholdRepositoryTest.kt`, add the imports `kotlinx.coroutines.Dispatchers`, `kotlinx.coroutines.async`, `kotlinx.coroutines.awaitAll`, `kotlinx.coroutines.withContext`, and add these tests:
+In `HouseholdRepositoryTest.kt`, add these tests:
 ```kotlin
     @Test
     fun aNameInUseIsRefusedWhateverItsCaseOrSpaces() = runTest {
@@ -1335,15 +1399,6 @@ In `HouseholdRepositoryTest.kt`, add the imports `kotlinx.coroutines.Dispatchers
     }
 
     @Test
-    fun addsThatRaceStillEachGetTheirOwnPlace() = runTest {
-        // Pins the rule (sortOrder read inside the transaction); it may pass before the change, as races do.
-        withContext(Dispatchers.Default) {
-            (0 until 6).map { i -> async { repo.addPerson("P$i", 0xFF100000L + i, Role.ADULT) } }.awaitAll()
-        }
-        assertThat(db.householdDao().all().map { it.sortOrder }).containsExactly(0, 1, 2, 3, 4, 5)
-    }
-
-    @Test
     fun aPersonAddedWithAPinHasItFromTheStart() = runTest {
         assertThat(repo.hasActiveAdmin.first()).isFalse()
         val alex = repo.addPerson("Alex", 0xFF4CB387, Role.ADMIN, pinHash = "h", salt = "s")
@@ -1354,9 +1409,13 @@ In `HouseholdRepositoryTest.kt`, add the imports `kotlinx.coroutines.Dispatchers
 
     @Test
     fun familyHasNoRoleOrPin() = runTest {
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.setRole(PersonId.FAMILY, Role.ADULT) } }
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.setPinHash(PersonId.FAMILY, "h", "s") } }
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.clearPin(PersonId.FAMILY) } }
+        // Today these fail only as an unknown person; the refusal must name Family.
+        val refusals = listOf(
+            assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.setRole(PersonId.FAMILY, Role.ADULT) } },
+            assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.setPinHash(PersonId.FAMILY, "h", "s") } },
+            assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.clearPin(PersonId.FAMILY) } },
+        )
+        assertThat(refusals.map { it.message }.toSet()).containsExactly("Family has no role or PIN")
     }
 
     @Test
@@ -1580,21 +1639,22 @@ git commit -m "Refuse a name or colour in use and a ninth person, edit a person 
 
 ---
 
-### Task 4: Access — the setup session, `touch()`, and the choose-a-PIN pad (§3.4, §3.5, D5, D9)
+### Task 4: Access — the setup session and its 10 idle minutes, `touch()`, and the choose-a-PIN pad (§3.4, §3.5, D5, D9)
 
 **Files:**
 - Modify: `core/access/src/main/java/uk/co/siland/culvery/core/access/AccessControl.kt`, `DefaultAccessControl.kt`, `ui/PinPad.kt`
 - Test: `core/access/src/test/java/uk/co/siland/culvery/core/access/DefaultAccessControlTest.kt`, `ui/PinPadTest.kt` (modify); `ui/ChoosePinPadTest.kt` (create)
 - Modify (fakes): `app/src/test/java/uk/co/siland/culvery/shell/Fakes.kt`, `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/StubEditor.kt`
+- Test: `app/src/test/java/uk/co/siland/culvery/shell/ShellViewModelTest.kt` (modify: the shell never begins a setup session)
 
 **Interfaces:**
 - Consumes: `Identified`, `PinPromptController`, `SESSION_TIMEOUT_MS` (Plan 1).
 - Produces:
-  - `AccessControl.beginSetupSession(person: Identified)`, `endSetupSession()`, `touch()`
+  - `AccessControl.beginSetupSession(person: Identified)` (the wizard's alone), `endSetupSession()`, `touch()`; `const val SETUP_IDLE_MS = 600_000L` — the setup session ends after 10 minutes without a touch or an authorised action (spec D9, amended)
   - `PinReason.ContinueSetup`; `const val CONTINUE_SETUP = "Enter your PIN to carry on setting up"`; `pinReasonText(PinReason.ContinueSetup, _) == CONTINUE_SETUP`
   - `@Composable fun PinPadFrame(title: String, line: String?, message: String, wrongPin: Boolean, enabled: Boolean, onSubmit: (String) -> Unit, onCancel: () -> Unit, overSheet: Boolean = false, drawScrim: Boolean = true)`
   - `@Composable fun ChoosePinPad(onChosen: (String) -> Unit, onCancel: () -> Unit, overSheet: Boolean = false, drawScrim: Boolean = true)`; `const val CHOOSE_PIN = "Choose a 4-digit PIN"`, `ENTER_IT_AGAIN = "Enter it again"`, `PINS_DIDNT_MATCH = "Those PINs didn't match — try again."`
-  - `FakeAccessControl.touches: Int` (app tests)
+  - `FakeAccessControl.touches: Int`, `FakeAccessControl.setupSessionsBegun: Int` (app tests)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1613,13 +1673,39 @@ In `core/access/src/test/java/uk/co/siland/culvery/core/access/DefaultAccessCont
     }
 
     @Test
-    fun aSetupSessionDoesNotTimeOut() = runTest {
+    fun aSetupSessionOutlastsTheUsualTwoMinutes() = runTest {
         val access = access()
         val admin = alex()
         access.beginSetupSession(admin)
-        advanceTimeBy(SESSION_TIMEOUT_MS * 10)
+        advanceTimeBy(SESSION_TIMEOUT_MS * 4)
         runCurrent()
         assertThat(access.session.value).isEqualTo(admin)
+    }
+
+    @Test
+    fun aSetupSessionEndsAfterTenMinutesWithoutATouch() = runTest {
+        val access = access()
+        access.beginSetupSession(alex())
+        advanceTimeBy(SETUP_IDLE_MS + 1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+        // Gone for good: the next fresh-PIN permission asks.
+        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Manage people")
+    }
+
+    @Test
+    fun aTouchRestartsTheSetupSessionsTenMinutes() = runTest {
+        val access = access()
+        val admin = alex()
+        access.beginSetupSession(admin)
+        advanceTimeBy(SETUP_IDLE_MS - 60_000)
+        access.touch()
+        advanceTimeBy(SETUP_IDLE_MS - 60_000)
+        runCurrent()
+        assertThat(access.session.value).isEqualTo(admin)
+        advanceTimeBy(60_001)
+        runCurrent()
+        assertThat(access.session.value).isNull()
     }
 
     @Test
@@ -1644,12 +1730,17 @@ In `core/access/src/test/java/uk/co/siland/culvery/core/access/DefaultAccessCont
     }
 
     @Test
-    fun aSetupSessionIsNotStored() = runTest {
-        access().beginSetupSession(alex())
-        // The app is killed and starts again: a new access control over the same household.
-        val restarted = access()
-        assertThat(restarted.session.value).isNull()
-        assertThat(firstPromptFor(restarted, CorePermissions.SETTINGS_MANAGE).label).isEqualTo("Change settings")
+    fun aPinEnteredDuringSetupEndsTheSetupSession() = runTest {
+        val access = access()
+        access.beginSetupSession(alex())
+        person("Mia", Role.CHILD, "9876")
+        answerPins("9876")
+        // Refused for Alex by the check, so the pad asks; Mia's PIN starts an ordinary session.
+        val mia = access.authorise("test.any", allow = { who, _ -> who.person.name == "Mia" })
+        assertThat(mia?.person?.name).isEqualTo("Mia")
+        advanceTimeBy(SESSION_TIMEOUT_MS + 1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
     }
 
     @Test
@@ -1670,20 +1761,11 @@ In `core/access/src/test/java/uk/co/siland/culvery/core/access/DefaultAccessCont
 
     @Test
     fun aTouchWithNobodySignedInSignsNobodyIn() = runTest {
+        person("Alex", Role.ADMIN, "1234")
         val access = access()
         access.touch()
         assertThat(access.session.value).isNull()
-    }
-
-    @Test
-    fun aTouchDuringTheSetupSessionChangesNothing() = runTest {
-        val access = access()
-        val admin = alex()
-        access.beginSetupSession(admin)
-        access.touch()
-        advanceTimeBy(SESSION_TIMEOUT_MS * 2)
-        runCurrent()
-        assertThat(access.session.value).isEqualTo(admin)
+        assertThat(firstPromptFor(access, CorePermissions.SETTINGS_MANAGE).label).isEqualTo("Change settings")
     }
 ```
 
@@ -1761,12 +1843,17 @@ class ChoosePinPadTest {
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `./gradlew :core:access:testDebugUnitTest`
-Expected: FAIL to compile with "Unresolved reference 'beginSetupSession'", "'touch'", "'ContinueSetup'", "'ChoosePinPad'".
+Expected: FAIL to compile with "Unresolved reference 'beginSetupSession'", "'touch'", "'SETUP_IDLE_MS'", "'ContinueSetup'", "'ChoosePinPad'".
 
 - [ ] **Step 3: Add the setup session and `touch()`**
 
 In `core/access/src/main/java/uk/co/siland/culvery/core/access/AccessControl.kt`:
-1. Replace the KDoc on `SESSION_TIMEOUT_MS` with `/** Hand-off §7: signed in for 2 minutes after the last authorised action, or the last touch inside Settings (4a design D5). */`.
+1. Replace the KDoc on `SESSION_TIMEOUT_MS` with `/** Hand-off §7: signed in for 2 minutes after the last authorised action, or the last touch while Settings is open (4a design D5). */`, and after it add:
+```kotlin
+
+/** 4a design D9 (amended): the setup session ends after 10 minutes without a touch in the wizard or an authorised action. */
+const val SETUP_IDLE_MS = 600_000L
+```
 2. Replace `enum class PinReason { Generic, Save, Edit, Delete, Assign }` with `enum class PinReason { Generic, Save, Edit, Delete, Assign, ContinueSetup }`.
 3. Replace `pinReasonText` with:
 ```kotlin
@@ -1782,16 +1869,20 @@ const val CONTINUE_SETUP = "Enter your PIN to carry on setting up"
 4. In `interface AccessControl`, before `fun lock()`, add:
 ```kotlin
     /**
-     * 4a design §3.4: [person], the Admin the wizard has just made, is signed in with no timeout, and every authorise for
-     * them passes without a PIN (fresh-PIN permissions too: the PIN was just set) until [endSetupSession] or [lock].
-     * Kept in memory only, so no later start of the app inherits it.
+     * The setup wizard only; the shell never calls it. 4a design §3.4: [person], the Admin the wizard has just made (or
+     * who entered their PIN at its gate), is signed in and every authorise for them passes without a PIN (fresh-PIN
+     * permissions too) until [endSetupSession], [lock], a PIN entered at a pad, or [SETUP_IDLE_MS] without a touch or an
+     * authorised action. Kept in memory only, so no later start of the app inherits it.
      */
     fun beginSetupSession(person: Identified)
 
     /** Ends the setup session; whoever was signed in stays signed in for the usual two minutes. */
     fun endSetupSession()
 
-    /** A touch inside Settings (4a design D5): restarts the session's two minutes. Nothing with nobody signed in, or during setup. */
+    /**
+     * A touch while Settings is open or the wizard shows (4a design D5, D9): restarts the session's two minutes, or the
+     * setup session's ten. Nothing with nobody signed in.
+     */
     fun touch()
 ```
 
@@ -1809,20 +1900,24 @@ In `core/access/src/main/java/uk/co/siland/culvery/core/access/DefaultAccessCont
             val setup = setupPerson
             if (setup != null && current == setup) {
                 val grants = grantedFor(setup.role, anyOf)
-                if (grants.isNotEmpty() && allow(setup, grants)) return@withLock Authorised(setup.person, setup.role, grants)
+                if (grants.isNotEmpty() && allow(setup, grants)) {
+                    restartExpiry(SETUP_IDLE_MS)
+                    return@withLock Authorised(setup.person, setup.role, grants)
+                }
             }
 ```
 3. In `promptUntilResolved`, replace `_session.value = identified` with:
 ```kotlin
-            if (identified != setupPerson) setupPerson = null
+            // A PIN at the pad starts an ordinary session, whoever it is.
+            setupPerson = null
             _session.value = identified
 ```
 4. Replace `lock()` and `restartExpiry()` with:
 ```kotlin
     override fun beginSetupSession(person: Identified) {
-        synchronized(expiryLock) { expiry?.cancel() }
         setupPerson = person
         _session.value = person
+        restartExpiry(SETUP_IDLE_MS)
     }
 
     override fun endSetupSession() {
@@ -1832,7 +1927,8 @@ In `core/access/src/main/java/uk/co/siland/culvery/core/access/DefaultAccessCont
     }
 
     override fun touch() {
-        if (setupPerson == null && _session.value != null) restartExpiry()
+        if (_session.value == null) return
+        restartExpiry(if (setupPerson != null) SETUP_IDLE_MS else SESSION_TIMEOUT_MS)
     }
 
     override fun lock() {
@@ -1841,12 +1937,13 @@ In `core/access/src/main/java/uk/co/siland/culvery/core/access/DefaultAccessCont
         _session.value = null
     }
 
-    private fun restartExpiry() = synchronized(expiryLock) {
+    private fun restartExpiry(timeoutMillis: Long = SESSION_TIMEOUT_MS) = synchronized(expiryLock) {
         expiry?.cancel()
         val guarded = _session.value
         expiry = scope.launch {
-            delay(SESSION_TIMEOUT_MS)
-            _session.compareAndSet(guarded, null)
+            delay(timeoutMillis)
+            // Only beginSetupSession sets setupPerson; every way a session ends clears it.
+            if (_session.compareAndSet(guarded, null)) setupPerson = null
         }
     }
 ```
@@ -2056,9 +2153,27 @@ fun PinPadFrame(
 In `app/src/test/java/uk/co/siland/culvery/shell/Fakes.kt`, in `FakeAccessControl`, after `override fun lock() { session.value = null }` add:
 ```kotlin
     var touches = 0
-    override fun beginSetupSession(person: Identified) { session.value = person }
+    var setupSessionsBegun = 0
+    override fun beginSetupSession(person: Identified) {
+        setupSessionsBegun++
+        session.value = person
+    }
     override fun endSetupSession() = Unit
     override fun touch() { touches++ }
+```
+
+In `app/src/test/java/uk/co/siland/culvery/shell/ShellViewModelTest.kt`, add:
+```kotlin
+    @Test
+    fun theShellNeverBeginsASetupSession() = runTest {
+        access.result = admin
+        val vm = vm()
+        vm.openSettings()
+        vm.closeSettings()
+        vm.exitKiosk()
+        vm.signOut()
+        assertThat(access.setupSessionsBegun).isEqualTo(0)
+    }
 ```
 
 In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/StubEditor.kt`, in `NobodyMay`, after `override fun lock() = Unit` add:
@@ -2073,7 +2188,7 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/S
 
 - [ ] **Step 6: Run the tests to see them pass**
 
-Run: `./gradlew :core:access:testDebugUnitTest`
+Run: `./gradlew :core:access:testDebugUnitTest :app:testDebugUnitTest`
 Expected: PASS, the existing `PinPadTest` cases included.
 
 - [ ] **Step 7: Run the gate**
@@ -2304,14 +2419,21 @@ class OpenMeteoLocationSearchTest {
         failure()
         answer("""{"results":[{"name":"Canterbury","latitude":"fifty-one"}]}""")
         failure()
-        val logs = ShadowLog.getLogs().filter { it.tag == TAG }
-        assertThat(logs.size).isAtLeast(3)
-        logs.forEach { log ->
-            val text = "${log.msg} ${generateSequence(log.throwable) { it.cause }.joinToString(" ")}"
-            for (secret in listOf("Canterbury", "canterbury", "51.", "name=", "fifty-one")) {
-                assertWithMessage(text).that(text).doesNotContain(secret)
-            }
-        }
+        assertNoSecretsLogged(TAG, listOf("Canterbury", "canterbury", "51.", "name=", "fifty-one"), minLines = 3)
+    }
+}
+
+/**
+ * Nothing logged under [tag], with its whole chain of causes, holds any of [secrets]; at least [minLines] were logged,
+ * so a check that saw no log can't pass by default. (`:core:setup` and the calendar have the same helper in their own
+ * test sources; test sources aren't shared between modules.)
+ */
+private fun assertNoSecretsLogged(tag: String, secrets: List<String>, minLines: Int = 1) {
+    val logs = ShadowLog.getLogs().filter { it.tag == tag }
+    assertWithMessage("lines logged under $tag").that(logs.size).isAtLeast(minLines)
+    logs.forEach { log ->
+        val text = "${log.msg} ${generateSequence(log.throwable) { it.cause }.joinToString(" ")}"
+        secrets.forEach { assertWithMessage(text).that(text).doesNotContain(it) }
     }
 }
 ```
@@ -2510,7 +2632,7 @@ git commit -m "Search for the home town through Open-Meteo's geocoding"
   - `CalendarStore.queuedChanges(connectionId: String): Int`
   - `CalendarStore.setMaster` also shows the calendar; `refreshSources` follows a calendar's tick only when it changed in the service (the master always shown)
   - `fun masterGone(serviceName: String): String` = "{Service}: can't find the master calendar — choose a new one in Settings › Calendars."
-  - `@Singleton class HouseholdFollower @Inject constructor(household: HouseholdRepository, zone: HouseholdZone, store: CalendarStore, setup: CalendarSetup, @ApplicationScope scope: CoroutineScope) : Startable`, bound `@IntoSet`
+  - `@Singleton class HouseholdFollower @Inject constructor(household: HouseholdRepository, zone: HouseholdZone, store: CalendarStore, setup: CalendarSetup, @ApplicationScope scope: CoroutineScope) : Startable`, bound `@IntoSet`; `internal val zoneRead: CompletableDeferred<Unit>` (completes when it has read the zone it starts with; tests wait on it)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2716,13 +2838,13 @@ class HouseholdFollowerTest {
         people.close()
     }
 
-    private fun follow() = HouseholdFollower(
+    private fun follow(): HouseholdFollower = HouseholdFollower(
         household,
         HouseholdZone(household),
         store,
         CalendarSetup(store, emptySet(), { emptyList() }, RecordingToaster(), WallClock { 0L }, EmptyCoroutineContext) { syncs.incrementAndGet() },
         scope,
-    ).start()
+    ).also { it.start() }
 
     private suspend fun waitFor(condition: suspend () -> Boolean) =
         withContext(Dispatchers.Default) { withTimeout(5_000) { while (!condition()) delay(10) } }
@@ -2743,14 +2865,16 @@ class HouseholdFollowerTest {
     @Test
     fun aChangeOfTimeZoneAsksForASyncAndTheSameZoneDoesNot() = runBlocking {
         household.setLocation(HomeLocation("London, England, United Kingdom", 51.5074, -0.1278, "Europe/London"))
-        follow()
-        // Lets the follower read the zone it starts with, which never asks for a sync.
-        delay(300)
+        val follower = follow()
+        // The zone it starts with never asks for a sync.
+        withTimeout(5_000) { follower.zoneRead.await() }
         household.setLocation(HomeLocation("Paris, Île-de-France, France", 48.8534, 2.3488, "Europe/Paris"))
         waitFor { syncs.get() == 1 }
+        // Lyon shares Paris's zone, so only Berlin asks.
         household.setLocation(HomeLocation("Lyon, Auvergne-Rhône-Alpes, France", 45.7485, 4.8467, "Europe/Paris"))
-        delay(200)
-        assertThat(syncs.get()).isEqualTo(1)
+        household.setLocation(HomeLocation("Berlin, Land Berlin, Germany", 52.5244, 13.4105, "Europe/Berlin"))
+        waitFor { syncs.get() >= 2 }
+        assertThat(syncs.get()).isEqualTo(2)
     }
 }
 ```
@@ -2896,8 +3020,11 @@ import android.util.Log
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.plugin.ApplicationScope
@@ -2917,10 +3044,14 @@ class HouseholdFollower @Inject constructor(
     private val setup: CalendarSetup,
     @ApplicationScope private val scope: CoroutineScope,
 ) : Startable {
+    /** Completes once the zone it starts with is read; the tests wait on it. */
+    internal val zoneRead = CompletableDeferred<Unit>()
+
     override fun start() {
         scope.launch {
             household.people
-                .retryWithBackoff { Log.w(TAG, "Couldn't read the household's people; retrying", it) }
+                // The type only: a message could hold a name.
+                .retryWithBackoff { Log.w(TAG, "Couldn't read the household's people; retrying (${it::class.simpleName})") }
                 .collect { people ->
                     try {
                         store.remapMissingPeople(people.mapTo(HashSet()) { it.id })
@@ -2931,8 +3062,15 @@ class HouseholdFollower @Inject constructor(
                     }
                 }
         }
-        // The first value is the zone at start, which the sync loop already uses.
-        scope.launch { zone.zone.drop(1).collect { setup.syncSoon() } }
+        scope.launch {
+            zone.zone
+                .retryWithBackoff { Log.w(TAG, "Couldn't read the household's time zone; retrying (${it::class.simpleName})") }
+                .distinctUntilChanged()
+                .onEach { zoneRead.complete(Unit) }
+                // The first value is the zone at start, which the sync loop already uses.
+                .drop(1)
+                .collect { setup.syncSoon() }
+        }
     }
 
     private companion object {
@@ -2960,12 +3098,13 @@ git commit -m "Keep a calendar hidden or shown on the tablet until its tick chan
 
 ---
 
-### Task 7: The wizard frame — steps in order, resume, dots, Back, Next or Skip for now, and the PIN gate after a kill (§3.3, §3.4, §4.1)
+### Task 7: The wizard frame — steps in order, resume, dots, Back, Next or Skip for now, and the PIN gate whenever the setup session is gone (§3.3, §3.4, §4.1, D9)
 
 **Files:**
-- Create: `core/setup/src/main/java/uk/co/siland/culvery/core/setup/SetupDimens.kt` (`SetupDimens`, `SetupType`), `SetupCopy.kt`, `SetupUi.kt` (`StepTitle`, `SetupButton`, `ButtonTone`)
+- Create: `core/setup/src/main/java/uk/co/siland/culvery/core/setup/SetupDimens.kt` (`SetupDimens`, `SetupType`), `SetupCopy.kt`, `SetupUi.kt` (`StepTitle`)
 - Create: `core/setup/src/main/java/uk/co/siland/culvery/core/setup/WizardRules.kt`, `SetupWizard.kt`, `SetupSessionGate.kt`
 - Modify: `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestHousehold.kt`
+- Create: `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestUi.kt`
 - Test: `core/setup/src/test/java/uk/co/siland/culvery/core/setup/WizardRulesTest.kt`, `SetupWizardTest.kt`, `SetupScreenshotTest.kt` (create)
 - Screenshots (`core/setup`): `wizard_frame_{dark,light}`, `wizard_pin_gate_dark` (new)
 
@@ -2974,14 +3113,14 @@ git commit -m "Keep a calendar hidden or shown on the tablet until its tick chan
 - Produces:
   - `internal object SetupDimens` (every layout value for Tasks 7–10); `internal object SetupType`
   - `SetupCopy.kt`: every `:core:setup` string (Tasks 7–10 use them by these names)
-  - `@Composable internal fun StepTitle(title: String, line: String? = null)`; `internal enum class ButtonTone { Primary, Plain, Danger, Destroy }`; `@Composable internal fun SetupButton(text: String, tone: ButtonTone, enabled: Boolean, tag: String, onClick: () -> Unit, modifier: Modifier = Modifier)`
+  - `@Composable internal fun StepTitle(title: String, line: String? = null)` (sheet buttons are `:core:ui`'s `HhSheetButton`, Task 2)
   - `internal data class StepStatus(val shown: Boolean, val done: Boolean, val canGoOn: Boolean)`; `internal sealed interface Forward { data class Next(val label: String, val enabled: Boolean); data object Skip }`
   - `internal object WizardRules { fun resumeAt(statuses: List<StepStatus>): Int; fun nextShown(from: Int, statuses: List<StepStatus>): Int?; fun previousShown(from: Int, statuses: List<StepStatus>): Int?; fun dotCount(statuses: List<StepStatus>): Int; fun dotIndex(current: Int, statuses: List<StepStatus>): Int; fun forward(skippable: Boolean, label: String, status: StepStatus): Forward }`
-  - `class SetupSessionGate @Inject constructor(household: HouseholdRepository, access: AccessControl)` with `suspend fun needsPin(): Boolean` and `suspend fun carryOn(): Boolean`
-  - `@Composable fun SetupWizard(steps: List<SetupStep>, gate: SetupSessionGate)` (steps already in order); `@Composable internal fun WizardFrame(dotCount: Int, dotIndex: Int, back: (() -> Unit)?, forward: Forward, busy: Boolean, onForward: () -> Unit, onSkip: () -> Unit, content: @Composable () -> Unit)`
-  - Test helpers: `internal class RecordingToaster`; `internal class TestAccess(household, clock, sessionScope)` with `control`, `prompt`, `pins`, `toasts`, `requests`, `answer(vararg pins: String?)`, `listen(scope)`; `internal fun TestScope.testAccess(household): TestAccess`; `internal suspend fun TestAccess.addAdmin(name: String = "Alex", pin: String = "1234"): Person`
+  - `@Singleton class SetupSessionGate @Inject constructor(household: HouseholdRepository, access: AccessControl)` with `val needsPin: Flow<Boolean>`, `fun finish()` and `suspend fun carryOn(): Boolean`
+  - `@Composable fun SetupWizard(steps: List<SetupStep>, gate: SetupSessionGate)` (steps already in order); `@Composable internal fun WizardFrame(dotCount: Int, dotIndex: Int, back: (() -> Unit)?, forward: Forward, busy: Boolean, onForward: () -> Unit, onSkip: () -> Unit, content: @Composable () -> Unit)`; `@Composable internal fun PinGateContent(busy: Boolean, onEnterPin: () -> Unit)`
+  - Test helpers: `internal class RecordingToaster`; `internal class TestAccess(household, clock, sessionScope)` with `control`, `prompt`, `pins`, `toasts`, `requests`, `answer(vararg pins: String?)`, `listen(scope)`; `internal fun TestScope.testAccess(household): TestAccess`; `internal suspend fun TestAccess.addAdmin(name: String = "Alex", pin: String = "1234"): Person`; in `TestUi.kt`: `CANVAS_W`, `CANVAS_H`, `class TouchModeRule`, `fun assertNoSecretsLogged(tag: String, secrets: List<String>, minLines: Int = 1)`, `fun ComposeContentTestRule.awaitText(text: String)`, `fun ComposeContentTestRule.awaitTag(tag: String)`
 
-The gate is checked once, when the wizard opens (ruling 11). A PIN or role change of yourself later in the wizard signs you out (ruling 10), and the next change then asks for a PIN as anywhere else; Done still ends with `lock()`.
+The gate follows the session (ruling 11): it shows whenever an active Admin exists, nobody is signed in and Done isn't finishing — after a kill past You, after the setup session's 10 idle minutes (Task 4), after a lock. Nothing about it is saved, so a wizard restored after its process died asks again.
 
 - [ ] **Step 1: Add the test helpers**
 
@@ -3077,6 +3216,59 @@ internal suspend fun TestAccess.addAdmin(name: String = "Alex", pin: String = "1
     pins.addPerson(name, PersonPalette.colors.first(), Role.ADMIN, pin)
 ```
 
+Create `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestUi.kt`:
+```kotlin
+package uk.co.siland.culvery.core.setup
+
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.unit.dp
+import androidx.test.platform.app.InstrumentationRegistry
+import com.google.common.truth.Truth.assertWithMessage
+import org.junit.rules.TestRule
+import org.junit.runner.Description
+import org.junit.runners.model.Statement
+import org.robolectric.shadows.ShadowLog
+
+/** The tablet's canvas, for every screenshot in this module. */
+internal val CANVAS_W = 1280.dp
+internal val CANVAS_H = 800.dp
+
+/**
+ * Puts Robolectric in touch mode, as the tablet is, so focus and the keyboard behave as they do there (the calendar's
+ * rule, copied: test sources aren't shared between modules). Use it at `@get:Rule(order = 0)`, before the compose rule.
+ */
+class TouchModeRule : TestRule {
+    override fun apply(base: Statement, description: Description): Statement = object : Statement() {
+        override fun evaluate() {
+            InstrumentationRegistry.getInstrumentation().setInTouchMode(true)
+            base.evaluate()
+        }
+    }
+}
+
+/**
+ * Nothing logged under [tag], with its whole chain of causes, holds any of [secrets]; at least [minLines] were logged,
+ * so a check that saw no log can't pass by default.
+ */
+internal fun assertNoSecretsLogged(tag: String, secrets: List<String>, minLines: Int = 1) {
+    val logs = ShadowLog.getLogs().filter { it.tag == tag }
+    assertWithMessage("lines logged under $tag").that(logs.size).isAtLeast(minLines)
+    logs.forEach { log ->
+        val text = "${log.msg} ${generateSequence(log.throwable) { it.cause }.joinToString(" ")}"
+        secrets.forEach { assertWithMessage(text).that(text).doesNotContain(it) }
+    }
+}
+
+/** Waits for content read from Room or DataStore before a test's first check or tap. */
+internal fun ComposeContentTestRule.awaitText(text: String) =
+    waitUntil(5_000) { onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+
+internal fun ComposeContentTestRule.awaitTag(tag: String) =
+    waitUntil(5_000) { onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+```
+
 - [ ] **Step 2: Write the failing tests**
 
 Create `core/setup/src/test/java/uk/co/siland/culvery/core/setup/WizardRulesTest.kt`:
@@ -3103,6 +3295,13 @@ class WizardRulesTest {
     fun aSkippedStepIsWhereItResumes() {
         // Welcome passed, Home location skipped (not done), You done.
         assertThat(WizardRules.resumeAt(listOf(status(done = true), status(), status(done = true), status()))).isEqualTo(1)
+    }
+
+    @Test
+    fun itResumesAtReviewOnceConnectIsDone() {
+        // Welcome, …, Connect done; Review shown and not yet done; Done.
+        val statuses = listOf(status(done = true), status(done = true), status(done = true), status(), status(canGoOn = true))
+        assertThat(WizardRules.resumeAt(statuses)).isEqualTo(3)
     }
 
     @Test
@@ -3145,7 +3344,6 @@ class WizardRulesTest {
 }
 ```
 
-Create `core/setup/src/test/java/uk/co/siland/culvery/core/setup/SetupWizardTest.kt`:
 ```kotlin
 package uk.co.siland.culvery.core.setup
 
@@ -3153,6 +3351,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -3174,8 +3373,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.access.CorePermissions
+import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.household.HouseholdRepository
+import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -3187,6 +3388,7 @@ private class FakeStep(
     override val order: Int,
     done: Boolean = false,
     shown: Boolean = true,
+    ready: Boolean = true,
     override val skippable: Boolean = false,
     var goesOn: Boolean = true,
     var hold: CompletableDeferred<Unit>? = null,
@@ -3196,7 +3398,7 @@ private class FakeStep(
     var onNextCalls = 0
     override val shown: Flow<Boolean> = shownFlow
     override val done: Flow<Boolean> = doneFlow
-    override val canGoOn: Flow<Boolean> = MutableStateFlow(true)
+    override val canGoOn: Flow<Boolean> = MutableStateFlow(ready)
 
     override suspend fun onNext(): Boolean {
         onNextCalls++
@@ -3210,6 +3412,7 @@ private class FakeStep(
     }
 }
 
+// The gate reads Room, so each test waits for the wizard's first content before checking or tapping it.
 @RunWith(AndroidJUnit4::class)
 class SetupWizardTest {
     @get:Rule val compose = createComposeRule()
@@ -3235,10 +3438,16 @@ class SetupWizardTest {
         CulveryTheme(dark = true) { SetupWizard(steps.toList(), SetupSessionGate(household, access.control)) }
     }
 
+    /** Alex, the Admin, in the setup session, as the You step leaves them. */
+    private fun alexSettingUp() {
+        val alex = runBlocking { access.addAdmin() }
+        access.control.beginSetupSession(Identified(alex, Role.ADMIN))
+    }
+
     @Test
     fun itOpensAtTheFirstStepNotDoneWithADotForEachShownStep() {
         show(FakeStep("a", 0, done = true), FakeStep("b", 1), FakeStep("c", 2, shown = false), FakeStep("d", 3))
-        compose.onNodeWithText("Step b").assertExists()
+        compose.awaitText("Step b")
         compose.onAllNodesWithTag("wizard_dot").assertCountEquals(3)
     }
 
@@ -3246,14 +3455,23 @@ class SetupWizardTest {
     fun nextRunsTheStepThenMovesOn() {
         val a = FakeStep("a", 0)
         show(a, FakeStep("b", 1))
+        compose.awaitText("Step a")
         compose.onNodeWithTag("wizard_next").performClick()
         compose.onNodeWithText("Step b").assertExists()
         assertThat(a.onNextCalls).isEqualTo(1)
     }
 
     @Test
+    fun aStepThatCannotGoOnDisablesNext() {
+        show(FakeStep("a", 0, ready = false), FakeStep("b", 1))
+        compose.awaitText("Step a")
+        compose.onNodeWithTag("wizard_next").assertIsNotEnabled()
+    }
+
+    @Test
     fun aStepThatSaysNoStays() {
         show(FakeStep("a", 0, goesOn = false), FakeStep("b", 1))
+        compose.awaitText("Step a")
         compose.onNodeWithTag("wizard_next").performClick()
         compose.onNodeWithText("Step a").assertExists()
     }
@@ -3262,6 +3480,7 @@ class SetupWizardTest {
     fun skipForNowMovesOnWithoutTheStep() {
         val a = FakeStep("a", 0, skippable = true)
         show(a, FakeStep("b", 1))
+        compose.awaitText("Skip for now")
         compose.onNodeWithText("Skip for now").performClick()
         compose.onNodeWithText("Step b").assertExists()
         assertThat(a.onNextCalls).isEqualTo(0)
@@ -3270,6 +3489,7 @@ class SetupWizardTest {
     @Test
     fun backGoesToTheShownStepBeforeAndTheFirstHasNone() {
         show(FakeStep("a", 0, done = true), FakeStep("b", 1, shown = false), FakeStep("c", 2))
+        compose.awaitText("Step c")
         compose.onNodeWithTag("wizard_back").performClick()
         compose.onNodeWithText("Step a").assertExists()
         compose.onNodeWithTag("wizard_back").assertDoesNotExist()
@@ -3279,9 +3499,21 @@ class SetupWizardTest {
     fun aStepThatAppearsIsReachedByNext() {
         val review = FakeStep("review", 1, shown = false)
         show(FakeStep("connect", 0), review, FakeStep("done", 2))
+        compose.awaitText("Step connect")
         review.shownFlow.value = true
         compose.onNodeWithTag("wizard_next").performClick()
         compose.onNodeWithText("Step review").assertExists()
+    }
+
+    @Test
+    fun aStepHiddenWhileShowingGivesWayToTheOneBefore() {
+        // Disconnect on Review hides it: the wizard goes back to Connect, not on to Done.
+        val review = FakeStep("review", 1)
+        show(FakeStep("connect", 0, done = true), review, FakeStep("done", 2))
+        compose.awaitText("Step review")
+        review.shownFlow.value = false
+        compose.awaitText("Step connect")
+        compose.onNodeWithText("Step done").assertDoesNotExist()
     }
 
     @Test
@@ -3289,17 +3521,18 @@ class SetupWizardTest {
         val hold = CompletableDeferred<Unit>()
         val a = FakeStep("a", 0, hold = hold)
         show(a, FakeStep("b", 1))
+        compose.awaitText("Step a")
         compose.onNodeWithTag("wizard_next").performClick()
         compose.onNodeWithTag("wizard_next").assertIsNotEnabled().performClick()
         hold.complete(Unit)
-        compose.onNodeWithText("Step b").assertExists()
+        compose.awaitText("Step b")
         assertThat(a.onNextCalls).isEqualTo(1)
     }
 
     @Test
     fun withNoAdminYetTheStepShowsAtOnce() {
         show(FakeStep("a", 0))
-        compose.onNodeWithText("Step a").assertExists()
+        compose.awaitText("Step a")
         assertThat(access.prompt.request.value).isNull()
     }
 
@@ -3312,12 +3545,42 @@ class SetupWizardTest {
         compose.onNodeWithText("Step a").assertDoesNotExist()
         // The pad is already open, so it is answered directly rather than through the listener's queue.
         access.prompt.submit("1234")
-        compose.waitUntil(5_000) { compose.onAllNodesWithTag("wizard_gate").fetchSemanticsNodes().isEmpty() }
-        compose.onNodeWithText("Step a").assertExists()
+        compose.awaitText("Step a")
         // The setup session is back: even a fresh-PIN permission passes without a pad.
         val before = access.requests.size
         assertThat(runBlocking { access.control.authorise(CorePermissions.PEOPLE_MANAGE) }).isNotNull()
         assertThat(access.requests.size).isEqualTo(before)
+    }
+
+    @Test
+    fun whenTheSetupSessionEndsTheWizardAsksForThePinAgain() {
+        // The session's 10 idle minutes are Task 4's tests; here it ends the way they end it, by clearing the session.
+        alexSettingUp()
+        show(FakeStep("a", 0), FakeStep("b", 1))
+        compose.awaitText("Step a")
+        compose.onNodeWithTag("wizard_next").performClick()
+        compose.awaitText("Step b")
+        access.control.lock()
+        compose.waitUntil(5_000) { access.prompt.request.value != null }
+        assertThat(access.prompt.request.value!!.reason).isEqualTo(PinReason.ContinueSetup)
+        access.prompt.submit("1234")
+        // It carries on where it was.
+        compose.awaitText("Step b")
+    }
+
+    @Test
+    fun aRestoredWizardAsksForThePinAgain() {
+        alexSettingUp()
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent {
+            CulveryTheme(dark = true) { SetupWizard(listOf(FakeStep("a", 0)), SetupSessionGate(household, access.control)) }
+        }
+        compose.awaitText("Step a")
+        // A process death loses the in-memory session; the restored wizard must not carry on without a PIN.
+        access.control.lock()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.waitUntil(5_000) { access.prompt.request.value != null }
+        compose.onNodeWithText("Step a").assertDoesNotExist()
     }
 
     @Test
@@ -3326,12 +3589,13 @@ class SetupWizardTest {
         show(FakeStep("a", 0))
         compose.waitUntil(5_000) { access.prompt.request.value != null }
         access.prompt.cancel()
-        compose.onNodeWithText("Enter your PIN to carry on setting up").assertExists()
+        compose.awaitText("Enter your PIN to carry on setting up")
         compose.onNodeWithTag("wizard_enter_pin").assertExists()
         compose.onNodeWithText("Step a").assertDoesNotExist()
     }
 }
 ```
+
 Create `core/setup/src/test/java/uk/co/siland/culvery/core/setup/SetupScreenshotTest.kt`:
 ```kotlin
 package uk.co.siland.culvery.core.setup
@@ -3346,7 +3610,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -3355,10 +3618,6 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
-
-/** The tablet's canvas. */
-private val CANVAS_W = 1280.dp
-private val CANVAS_H = 800.dp
 
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -3400,7 +3659,7 @@ class SetupScreenshotTest {
 - [ ] **Step 3: Run the tests to see them fail**
 
 Run: `./gradlew :core:setup:testDebugUnitTest`
-Expected: FAIL to compile with "Unresolved reference 'StepStatus'", "'WizardRules'", "'SetupWizard'", "'SetupSessionGate'", "'WizardFrame'", "'PinGateContent'".
+Expected: FAIL to compile with "Unresolved reference 'StepStatus'", "'WizardRules'", "'SetupWizard'", "'SetupSessionGate'", "'WizardFrame'", "'PinGateContent'" (`TestUi.kt` and `TestHousehold.kt` compile on their own).
 
 - [ ] **Step 4: Write the dimensions, the copy and the shared pieces**
 
@@ -3451,11 +3710,6 @@ internal object SetupDimens {
     val roleGap = 10.dp
     val footerGap = 10.dp
 
-    // Sheet buttons, as the calendar sheets' footer: 60 dp, radius 30, padding 0 26.
-    val buttonHeight = 60.dp
-    val buttonRadius = 30.dp
-    val buttonPaddingH = 26.dp
-
     // A confirmation, as the calendar's delete confirmation: `dangerSoft`, radius 24, padding 20, 16 between blocks,
     // buttons 12 apart.
     val confirmRadius = 24.dp
@@ -3499,9 +3753,6 @@ internal object SetupType {
 
     /** 14 sp / 700: a refusal in `danger`. */
     val message = HhType.secondary.copy(fontWeight = FontWeight.W700)
-
-    /** 17 sp / 700: a sheet button. */
-    val button = HhType.rowTitle.copy(fontWeight = FontWeight.W700)
 
     /** 18 sp / 700: a confirmation's question. */
     val confirm = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W700)
@@ -3588,24 +3839,13 @@ internal const val EXIT_KIOSK = "Exit kiosk"
 internal const val KIOSK_LINE = "Culvery keeps the tablet on this app. Exit to use other apps; it locks again next time Culvery opens."
 ```
 
-Create `core/setup/src/main/java/uk/co/siland/culvery/core/setup/SetupUi.kt`:
 ```kotlin
 package uk.co.siland.culvery.core.setup
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.testTag
 import uk.co.siland.culvery.core.ui.Culvery
 
 /** A step's or page's title, with an optional line under it in `mute`. */
@@ -3615,34 +3855,6 @@ internal fun StepTitle(title: String, line: String? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.titleLineGap)) {
         Text(title, style = SetupType.title, color = c.ink)
         if (line != null) Text(line, style = SetupType.line, color = c.mute)
-    }
-}
-
-/** [Primary] `accent`; [Plain] `surf2`; [Danger] `surf2` with `danger` text; [Destroy] `danger` with `dangerInk`. */
-internal enum class ButtonTone { Primary, Plain, Danger, Destroy }
-
-/** A sheet's button, as the calendar sheets' footer: 60 dp, radius 30, 17 sp / 700. Disabled, `surf2` and `mute`. */
-@Composable
-internal fun SetupButton(text: String, tone: ButtonTone, enabled: Boolean, tag: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val c = Culvery.colors
-    val (background, ink) = when {
-        !enabled -> c.surf2 to c.mute
-        tone == ButtonTone.Primary -> c.accent to c.accentInk
-        tone == ButtonTone.Danger -> c.surf2 to c.danger
-        tone == ButtonTone.Destroy -> c.danger to c.dangerInk
-        else -> c.surf2 to c.ink
-    }
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .testTag(tag)
-            .height(SetupDimens.buttonHeight)
-            .clip(RoundedCornerShape(SetupDimens.buttonRadius))
-            .background(background)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = SetupDimens.buttonPaddingH),
-    ) {
-        Text(text, style = SetupType.button, color = ink, maxLines = 1)
     }
 }
 ```
@@ -3684,12 +3896,15 @@ internal object WizardRules {
 }
 ```
 
-Create `core/setup/src/main/java/uk/co/siland/culvery/core/setup/SetupSessionGate.kt`:
 ```kotlin
 package uk.co.siland.culvery.core.setup
 
 import javax.inject.Inject
-import kotlinx.coroutines.flow.first
+import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.Identified
@@ -3697,15 +3912,25 @@ import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.household.HouseholdRepository
 
 /**
- * 4a design §3.4: the setup session lives in memory only, so a wizard that opens again after a kill past its You step asks
- * an Admin for their PIN once, then begins the setup session again.
+ * 4a design §3.4, D9: the setup session lives in memory only and lapses after 10 idle minutes, so whenever the wizard
+ * has an Admin but nobody signed in, it asks for an Admin's PIN, then begins the setup session again.
  */
+@Singleton
 class SetupSessionGate @Inject constructor(
-    private val household: HouseholdRepository,
+    household: HouseholdRepository,
     private val access: AccessControl,
 ) {
-    /** An active Admin exists and nobody is signed in: read once, as the wizard opens (ruling 11). */
-    suspend fun needsPin(): Boolean = household.hasActiveAdmin.first() && access.session.value == null
+    private val finishing = MutableStateFlow(false)
+
+    /** An active Admin, nobody signed in, and Done not finishing (ruling 11). */
+    val needsPin: Flow<Boolean> =
+        combine(household.hasActiveAdmin, access.session, finishing) { admin, session, done -> admin && session == null && !done }
+            .distinctUntilChanged()
+
+    /** Done is ending setup: its sign-out must not bring the gate back. Set before it signs out. */
+    fun finish() {
+        finishing.value = true
+    }
 
     /** The PIN pad; an Admin's PIN begins the setup session again. False when cancelled or refused. */
     suspend fun carryOn(): Boolean {
@@ -3740,6 +3965,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -3764,8 +3990,9 @@ private const val TAG = "SetupWizard"
 
 /**
  * The first-run wizard (4a design §3.3, §4.1): the shown [steps], already in order, starting where
- * [WizardRules.resumeAt] says, with progress dots, Back, and Next or Skip for now. If an active Admin exists and nobody
- * is signed in when it opens (a start after a kill past the You step), [gate] asks for their PIN before any step shows.
+ * [WizardRules.resumeAt] says, with progress dots, Back, and Next or Skip for now. Whenever [gate] needs a PIN (an Admin
+ * exists and nobody is signed in: a start after a kill, the setup session's idle limit, a lock), it asks before any step
+ * shows, then the wizard carries on at the same step.
  */
 @Composable
 fun SetupWizard(steps: List<SetupStep>, gate: SetupSessionGate) {
@@ -3773,42 +4000,49 @@ fun SetupWizard(steps: List<SetupStep>, gate: SetupSessionGate) {
         combine(steps.map { step -> combine(step.shown, step.done, step.canGoOn, ::StepStatus) }) { it.toList() }
     }
     val statuses = statusFlow.collectAsState(initial = null).value
-    var gated by rememberSaveable { mutableStateOf<Boolean?>(null) }
-    LaunchedEffect(gate) { if (gated == null) gated = gate.needsPin() }
+    // Not saved: a wizard restored after its process died has lost the setup session and must ask again.
+    val needsPin = remember(gate) { gate.needsPin }.collectAsState<Boolean?>(initial = null).value
+    // Saved, and kept here rather than in Steps, so the gate coming and going doesn't lose the step.
+    var current by rememberSaveable { mutableStateOf(-1) }
     Box(Modifier.fillMaxSize().background(Culvery.colors.bg).testTag("wizard")) {
         when {
-            statuses == null || gated == null -> Unit
-            gated == true -> PinGate(gate, onCarriedOn = { gated = false })
-            else -> Steps(steps, statuses)
+            statuses == null || needsPin == null -> Unit
+            needsPin -> PinGate(gate)
+            else -> {
+                // Where it resumes is read once, from the first statuses; after that only Next, Back and Skip move it.
+                val at = current.takeIf { it >= 0 } ?: WizardRules.resumeAt(statuses)
+                SideEffect { if (current < 0) current = at }
+                Steps(steps, statuses, at) { current = it }
+            }
         }
     }
 }
 
 @Composable
-private fun Steps(steps: List<SetupStep>, statuses: List<StepStatus>) {
-    var current by rememberSaveable { mutableStateOf(WizardRules.resumeAt(statuses)) }
-    // A step hidden while it shows (its connection removed) gives way to the next shown one.
+private fun Steps(steps: List<SetupStep>, statuses: List<StepStatus>, current: Int, onGoTo: (Int) -> Unit) {
+    // A step hidden while it shows (Review, after Disconnect) gives way to the one before it.
     val index = if (statuses.getOrNull(current)?.shown == true) {
         current
     } else {
-        WizardRules.nextShown(current, statuses) ?: WizardRules.previousShown(current, statuses) ?: 0
+        WizardRules.previousShown(current, statuses) ?: WizardRules.nextShown(current, statuses) ?: 0
     }
     val step = steps[index]
     val latest by rememberUpdatedState(statuses)
+    val goTo by rememberUpdatedState(onGoTo)
     val action = rememberSingleAction(step.id) { e -> Log.w(TAG, "${step.id}: Next failed (${e::class.simpleName})") }
     val goOn: () -> Unit = {
         action.run {
-            if (step.onNext()) WizardRules.nextShown(index, latest)?.let { current = it }
+            if (step.onNext()) WizardRules.nextShown(index, latest)?.let { goTo(it) }
         }
     }
     WizardFrame(
         dotCount = WizardRules.dotCount(statuses),
         dotIndex = WizardRules.dotIndex(index, statuses),
-        back = WizardRules.previousShown(index, statuses)?.let { previous -> { current = previous } },
+        back = WizardRules.previousShown(index, statuses)?.let { previous -> { goTo(previous) } },
         forward = WizardRules.forward(step.skippable, step.nextLabel, statuses[index]),
         busy = action.busy,
         onForward = goOn,
-        onSkip = { WizardRules.nextShown(index, latest)?.let { current = it } },
+        onSkip = { WizardRules.nextShown(index, latest)?.let { goTo(it) } },
     ) {
         step.Content(onNext = goOn)
     }
@@ -3888,12 +4122,14 @@ private fun Dots(count: Int, index: Int) {
     }
 }
 
-/** Opens the PIN pad at once; if it is cancelled, [CONTINUE_SETUP] and an Enter PIN pill to try again (ruling 11). */
+/**
+ * Opens the PIN pad at once; if it is cancelled, [CONTINUE_SETUP] and an Enter PIN pill to try again (ruling 11). The gate
+ * goes when the setup session begins again.
+ */
 @Composable
-private fun PinGate(gate: SetupSessionGate, onCarriedOn: () -> Unit) {
-    val carriedOn by rememberUpdatedState(onCarriedOn)
+private fun PinGate(gate: SetupSessionGate) {
     val action = rememberSingleAction(gate) { e -> Log.w(TAG, "Couldn't carry on setting up (${e::class.simpleName})") }
-    val ask = { action.run { if (gate.carryOn()) carriedOn() } }
+    val ask = { action.run { gate.carryOn() } }
     LaunchedEffect(gate) { ask() }
     PinGateContent(busy = action.busy, onEnterPin = ask)
 }
@@ -3945,7 +4181,7 @@ git commit -m "Add the setup wizard's frame: steps in order, resuming where setu
 - Screenshots (`core/setup`): `people_list_{dark,light}`, `person_new_{dark,light}`, `person_error_dark`, `person_remove_dark`, `person_pin_dark` (new)
 
 **Interfaces:**
-- Consumes: `Member`, `MAX_PEOPLE`, `PinChange`, `DuplicateNameException`, `ColourInUseException`, `HouseholdRepository.members`/`member`/`updateMember`/`removePerson`, `PinManager.addPerson`/`hashNew` (Task 3); `AccessControl.session`/`authorise`/`lock`, `ChoosePinPad` (Task 4); `PersonPalette`, `HhSwatch`, `HhChoiceChip`, `HhTextField`, `rememberSingleAction` (Task 2); `SetupDimens`, `SetupType`, `SetupButton`, `StepTitle`, the copy (Task 7); `COULD_NOT_SAVE` (Task 1).
+- Consumes: `Member`, `MAX_PEOPLE`, `PinChange`, `DuplicateNameException`, `ColourInUseException`, `HouseholdRepository.members`/`member`/`updateMember`/`removePerson`, `PinManager.addPerson`/`hashNew` (Task 3); `AccessControl.session`/`authorise`/`lock`, `ChoosePinPad` (Task 4); `PersonPalette`, `HhSwatch`, `HhChoiceChip`, `HhTextField`, `rememberSingleAction` (Task 2); `SetupDimens`, `SetupType`, `StepTitle`, the copy (Task 7); `HhSheetButton`, `ButtonTone` (Task 2); `COULD_NOT_SAVE` (Task 1).
 - Produces:
   - `sealed interface PeopleOutcome { data object Done; data object Cancelled; data class Refused(val message: String) }`
   - `data class PersonDraft(val name: String, val color: Long, val role: Role, val newPin: String? = null, val removePin: Boolean = false)`
@@ -3986,7 +4222,6 @@ package uk.co.siland.culvery.core.setup
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -4170,12 +4405,7 @@ class PeopleEditorTest {
         val sam = sam(pin = "2468")
         db.close()
         assertThat(editor.save(sam.id, draft("Samantha", 1))).isEqualTo(PeopleOutcome.Refused(COULD_NOT_SAVE))
-        val logs = ShadowLog.getLogs().filter { it.tag == "People" }
-        assertThat(logs).isNotEmpty()
-        logs.forEach { log ->
-            val text = "${log.msg} ${generateSequence(log.throwable) { it.cause }.joinToString(" ")}"
-            for (secret in listOf("Sam", "2468", "1234")) assertWithMessage(text).that(text).doesNotContain(secret)
-        }
+        assertNoSecretsLogged("People", listOf("Sam", "2468", "1234"))
     }
 }
 ```
@@ -4222,7 +4452,8 @@ import uk.co.siland.culvery.core.ui.PersonPalette
 /** The people list and sheet over the real editor; Alex is in the setup session, so no PIN pad shows. */
 @RunWith(AndroidJUnit4::class)
 class PeopleUiTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val touchMode = TouchModeRule()
+    @get:Rule(order = 1) val compose = createComposeRule()
     private lateinit var db: HouseholdDatabase
     private lateinit var household: HouseholdRepository
     private lateinit var access: TestAccess
@@ -4246,15 +4477,19 @@ class PeopleUiTest {
         db.close()
     }
 
-    private fun show() = compose.setContent {
-        CulveryTheme(dark = true) {
-            CompositionLocalProvider(LocalOverlayHost provides overlay) {
-                Box {
-                    PeoplePane(editor)
-                    overlay.content?.invoke()
+    /** The list reads Room: wait for Alex's row before the first check or tap. */
+    private fun show() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalOverlayHost provides overlay) {
+                    Box {
+                        PeoplePane(editor)
+                        overlay.content?.invoke()
+                    }
                 }
             }
         }
+        compose.awaitTag("person_Alex")
     }
 
     private fun addSam(pin: String? = null) = runBlocking { access.pins.addPerson("Sam", PersonPalette.colors[1], Role.ADULT, pin) }
@@ -4263,6 +4498,7 @@ class PeopleUiTest {
     fun theListShowsEachPersonsRoleAndWhetherTheyHaveAPin() {
         addSam()
         show()
+        compose.awaitText("Adult · No PIN")
         compose.onNodeWithText("Admin · PIN set").assertExists()
         compose.onNodeWithText("Adult · No PIN").assertExists()
     }
@@ -4317,11 +4553,12 @@ class PeopleUiTest {
     fun removingSomeoneAsksFirst() {
         addSam()
         show()
+        compose.awaitTag("person_Sam")
         compose.onNodeWithTag("person_Sam").performClick()
         compose.onNodeWithTag("person_remove").performClick()
         compose.onNodeWithText("Remove Sam? Sam's events and calendars show as Family.").assertExists()
         compose.onNodeWithTag("person_keep").performClick()
-        compose.onNodeWithTag("person_confirm").assertDoesNotExist()
+        compose.onNodeWithTag("person_confirm_remove").assertDoesNotExist()
         compose.onNodeWithTag("person_remove").performClick()
         compose.onNodeWithTag("person_confirm_remove").performClick()
         compose.waitUntil(5_000) { overlay.content == null }
@@ -4332,6 +4569,7 @@ class PeopleUiTest {
     fun aPinChosenInTheSheetCanBeChangedOrRemoved() {
         addSam()
         show()
+        compose.awaitTag("person_Sam")
         compose.onNodeWithTag("person_Sam").performClick()
         compose.onNodeWithTag("person_set_pin").performClick()
         compose.onNodeWithText("Choose a 4-digit PIN").assertExists()
@@ -4345,7 +4583,7 @@ class PeopleUiTest {
     fun addPersonGoesOnceEightPeopleLiveHere() {
         runBlocking { (1 until MAX_PEOPLE).forEach { i -> access.pins.addPerson("P$i", PersonPalette.colors[i], Role.ADULT, null) } }
         show()
-        compose.onNodeWithTag("person_P7").assertExists()
+        compose.awaitTag("person_P7")
         compose.onNodeWithTag("people_add").assertDoesNotExist()
     }
 
@@ -4607,12 +4845,14 @@ import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.OverlayHost
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.HhSheet
+import uk.co.siland.culvery.core.ui.HhSheetButton
 import uk.co.siland.culvery.core.ui.HhSwatch
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.PersonPalette
@@ -4794,9 +5034,9 @@ internal fun PersonEditorSheet(
                 RemoveConfirmation(existing.person.name, busy, onKeep, onConfirmRemove)
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(SetupDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
-                    if (canRemove) SetupButton(REMOVE_PERSON, ButtonTone.Danger, enabled = !busy, tag = "person_remove", onClick = onRemove)
+                    if (canRemove) HhSheetButton(REMOVE_PERSON, ButtonTone.Danger, enabled = !busy, tag = "person_remove", onClick = onRemove)
                     Spacer(Modifier.weight(1f))
-                    SetupButton(
+                    HhSheetButton(
                         if (existing == null) SAVE_PERSON else SAVE_CHANGES,
                         ButtonTone.Primary,
                         enabled = form.canSave && !busy,
@@ -4833,8 +5073,8 @@ private fun RemoveConfirmation(name: String, busy: Boolean, onKeep: () -> Unit, 
         Text(removeQuestion(name), style = SetupType.confirm, color = c.ink)
         // Keep sits where Remove person was, so a double tap on Remove is harmless.
         Row(horizontalArrangement = Arrangement.spacedBy(SetupDimens.confirmButtonGap), modifier = Modifier.fillMaxWidth()) {
-            SetupButton(KEEP, ButtonTone.Plain, enabled = !busy, tag = "person_keep", onClick = onKeep, modifier = Modifier.weight(1f))
-            SetupButton(REMOVE_PERSON, ButtonTone.Destroy, enabled = !busy, tag = "person_confirm_remove", onClick = onConfirm, modifier = Modifier.weight(1f))
+            HhSheetButton(KEEP, ButtonTone.Plain, enabled = !busy, tag = "person_keep", onClick = onKeep, modifier = Modifier.weight(1f))
+            HhSheetButton(REMOVE_PERSON, ButtonTone.Destroy, enabled = !busy, tag = "person_confirm_remove", onClick = onConfirm, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -4963,7 +5203,7 @@ git commit -m "Add the people list and editor: names, colours, roles and PINs, w
 - Screenshots (`core/setup`): `welcome_{dark,light}`, `welcome_sample_dark`, `location_results_{dark,light}`, `location_failed_dark`, `you_{dark,light}`, `done_{dark,light}` (new)
 
 **Interfaces:**
-- Consumes: `SetupState` (Task 1); `LocationSearch`, `PlaceMatch`, `LocationSearchException` (Task 5); `HouseholdRepository.members`/`hasActiveAdmin`/`location`/`setLocation`, `PinManager.addPerson`, `DuplicateNameException` (Task 3); `AccessControl.beginSetupSession`/`endSetupSession`/`lock`, `ChoosePinPad` (Task 4); `PeopleEditor`, `PeoplePane`, `PersonRow`, `showPersonEditor` (Task 8); `StepTitle`, `WizardFrame`, `Forward`, the copy (Task 7).
+- Consumes: `SetupState` (Task 1); `LocationSearch`, `PlaceMatch`, `LocationSearchException` (Task 5); `HouseholdRepository.members`/`hasActiveAdmin`/`location`/`setLocation`, `PinManager.addPerson`, `DuplicateNameException` (Task 3); `AccessControl.beginSetupSession`/`endSetupSession`/`lock`, `ChoosePinPad` (Task 4); `PeopleEditor`, `PeoplePane`, `PersonRow`, `showPersonEditor` (Task 8); `StepTitle`, `WizardFrame`, `Forward`, `SetupSessionGate.finish()`, the copy, `TouchModeRule`, `awaitText`/`awaitTag` (Task 7).
 - Produces:
   - `fun interface SampleHousehold { suspend fun create() }` (bound only in debug, Task 13)
   - `internal const val MIN_QUERY = 2`, `SEARCH_PAUSE_MS = 400L`; `internal sealed interface TownResults { Idle; Found(places); NoMatch(query); Failed }`; `internal fun PlaceMatch.toHome(): HomeLocation`; `@Composable internal fun LocationPane(search: LocationSearch, current: HomeLocation?, showCurrent: Boolean, save: suspend (PlaceMatch) -> Boolean)`; `@Composable internal fun LocationContent(query, onQuery, results, current, showCurrent, busy, onChoose)`
@@ -4971,13 +5211,13 @@ git commit -m "Add the people list and editor: names, colours, roles and PINs, w
   - `@Singleton class LocationStep @Inject constructor(household, search: LocationSearch, access: AccessControl)` — "location", 100, skippable; `internal suspend fun saveHome(place: PlaceMatch): Boolean`
   - `@Singleton class YouStep @Inject constructor(household, pins: PinManager, access, editor: PeopleEditor)` — "you", 200; `internal val form: YouForm`; `onNext` makes the Admin and begins the setup session
   - `@Singleton class HouseholdStep @Inject constructor(editor: PeopleEditor)` — "household", 300, skippable, done with two or more people
-  - `@Singleton class DoneStep @Inject constructor(state: SetupState, access: AccessControl)` — "done", 1000, `nextLabel` "Open Culvery"; `onNext` ends the setup session, locks, then marks setup complete
+  - `@Singleton class DoneStep @Inject constructor(state: SetupState, access: AccessControl, gate: SetupSessionGate)` — "done", 1000, `nextLabel` "Open Culvery"; `onNext` takes `settings.manage` (silent in the setup session), tells the gate it is finishing, ends the setup session, locks, then marks setup complete
   - `SetupModule` (`:core:setup` `di`): the five steps `@IntoSet`; `@Multibinds Set<SettingsPage>`; `@BindsOptionalOf SampleHousehold`
   - Test helper: `internal class SetupStates(folder: TemporaryFolder, household)` with `suspend fun start(): SetupState` and `fun close()`
 
 - [ ] **Step 1: Write the failing tests**
 
-In `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestHousehold.kt`, add the imports `androidx.datastore.preferences.core.PreferenceDataStoreFactory`, `java.io.File`, `kotlinx.coroutines.cancelAndJoin`, `kotlinx.coroutines.runBlocking`, `org.junit.rules.TemporaryFolder`, and at the end:
+In `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestHousehold.kt`, add the imports `java.io.File`, `kotlinx.coroutines.cancelAndJoin`, `kotlinx.coroutines.runBlocking`, `org.junit.rules.TemporaryFolder`, and at the end:
 ```kotlin
 
 /** SetupState over one file; each [start] is the app starting again, with a new DataStore once the last has let go. */
@@ -4987,7 +5227,7 @@ internal class SetupStates(private val folder: TemporaryFolder, private val hous
     suspend fun start(): SetupState {
         scope.coroutineContext.job.cancelAndJoin()
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        return SetupState(PreferenceDataStoreFactory.create(scope = scope) { File(folder.root, "setup.preferences_pb") }, household)
+        return SetupState(setupStore(scope) { File(folder.root, "setup.preferences_pb") }, household)
     }
 
     fun close() = runBlocking { scope.coroutineContext.job.cancelAndJoin() }
@@ -5111,6 +5351,8 @@ class StepsTest {
         assertThat(access.control.authorise(CorePermissions.PEOPLE_MANAGE)).isNotNull()
         assertThat(access.requests).isEmpty()
         assertThat(you.done.first()).isTrue()
+        // The PIN isn't held once the Admin has it.
+        assertThat(you.form.pin).isNull()
     }
 
     @Test
@@ -5161,7 +5403,7 @@ class StepsTest {
         access.control.beginSetupSession(Identified(alex, Role.ADMIN))
         val state = states.start()
         assertThat(state.setupComplete.first()).isFalse()
-        val done = DoneStep(state, access.control)
+        val done = DoneStep(state, access.control, SetupSessionGate(household, access.control))
         assertThat(done.nextLabel).isEqualTo("Open Culvery")
         assertThat(done.done.first()).isFalse()
         assertThat(done.onNext()).isTrue()
@@ -5170,6 +5412,20 @@ class StepsTest {
         access.answer(null)
         assertThat(access.control.authorise(CorePermissions.SETTINGS_MANAGE)).isNull()
         assertThat(access.requests).hasSize(1)
+    }
+
+    @Test
+    fun withNobodySignedInOpenCulveryAsksForAnAdmin() = runTest {
+        val access = testAccess(household)
+        access.addAdmin()
+        val state = states.start()
+        val done = DoneStep(state, access.control, SetupSessionGate(household, access.control))
+        access.answer(null)
+        assertThat(done.onNext()).isFalse()
+        assertThat(state.setupComplete.first()).isFalse()
+        access.answer("1234")
+        assertThat(done.onNext()).isTrue()
+        assertThat(state.setupComplete.first()).isTrue()
     }
 
 }
@@ -5205,10 +5461,13 @@ import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.access.Identified
+import uk.co.siland.culvery.core.setup.steps.DoneStep
 import uk.co.siland.culvery.core.setup.steps.WelcomeStep
 import uk.co.siland.culvery.core.setup.steps.YouStep
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.PersonPalette
+import kotlinx.coroutines.flow.first
 
 @RunWith(AndroidJUnit4::class)
 class StepsUiTest {
@@ -5245,6 +5504,8 @@ class StepsUiTest {
     @Test
     fun aDebugBuildOffersTheSampleHouseholdToAnEmptyHousehold() {
         welcome(sample = true)
+        // Offered only once the household is read as empty.
+        compose.awaitText("Use a sample household")
         compose.onNodeWithText("Use a sample household").performClick()
         compose.waitUntil(5_000) { samples == 1 }
     }
@@ -5252,7 +5513,7 @@ class StepsUiTest {
     @Test
     fun aReleaseBuildNeverOffersIt() {
         welcome(sample = false)
-        compose.onNodeWithText("Welcome to Culvery").assertExists()
+        compose.awaitText("Welcome to Culvery")
         compose.onNodeWithTag("welcome_sample").assertDoesNotExist()
     }
 
@@ -5260,7 +5521,7 @@ class StepsUiTest {
     fun itIsNotOfferedOnceSomeoneLivesHere() {
         runBlocking { access.pins.addPerson("Sam", PersonPalette.colors[1], Role.ADULT, null) }
         welcome(sample = true)
-        compose.onNodeWithText("Welcome to Culvery").assertExists()
+        compose.awaitText("Welcome to Culvery")
         compose.onNodeWithTag("welcome_sample").assertDoesNotExist()
     }
 
@@ -5277,12 +5538,30 @@ class StepsUiTest {
                 }
             }
         }
-        compose.onNodeWithText("Who's setting this up?").assertExists()
+        compose.awaitTag("you_set_pin")
         compose.onNodeWithTag("you_set_pin").performClick()
         repeat(2) { "1357".forEach { d -> compose.onNodeWithTag("pin_key_$d").performClick() } }
         compose.waitUntil(5_000) { overlay.content == null }
         compose.onNodeWithTag("you_pin_set").assertExists()
         assertThat(you.form.pin).isEqualTo("1357")
+    }
+
+    @Test
+    fun openCulveryNeverShowsTheGate() {
+        val alex = runBlocking { access.addAdmin() }
+        access.control.beginSetupSession(Identified(alex, Role.ADMIN))
+        val state = runBlocking { states.start() }
+        val gate = SetupSessionGate(household, access.control)
+        val done = DoneStep(state, access.control, gate)
+        compose.setContent { CulveryTheme(dark = true) { SetupWizard(listOf(done), gate) } }
+        compose.awaitText("Culvery is ready")
+        compose.onNodeWithTag("wizard_next").performClick()
+        compose.waitUntil(5_000) { runBlocking { state.setupComplete.first() } }
+        compose.waitForIdle()
+        // Signed out, and no PIN pad or gate on the way out.
+        assertThat(access.control.session.value).isNull()
+        assertThat(access.requests).isEmpty()
+        compose.onNodeWithTag("wizard_gate").assertDoesNotExist()
     }
 }
 ```
@@ -5291,6 +5570,7 @@ Create `core/setup/src/test/java/uk/co/siland/culvery/core/setup/LocationPaneTes
 ```kotlin
 package uk.co.siland.culvery.core.setup
 
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -5311,7 +5591,8 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 
 @RunWith(AndroidJUnit4::class)
 class LocationPaneTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val touchMode = TouchModeRule()
+    @get:Rule(order = 1) val compose = createComposeRule()
     private val canterbury = PlaceMatch("Canterbury", "England", "United Kingdom", 51.27904, 1.07992, "Europe/London")
     private val saved = CopyOnWriteArrayList<PlaceMatch>()
 
@@ -5378,14 +5659,23 @@ class LocationPaneTest {
     }
 
     @Test
-    fun choosingATownSavesItAndTheSavedOneIsTicked() {
+    fun choosingATownSavesIt() {
+        search.answer = { listOf(canterbury) }
+        show()
+        type("Can")
+        wait(500)
+        compose.onNodeWithTag("place_0").assertIsNotSelected().performClick()
+        wait(100)
+        assertThat(saved).containsExactly(canterbury)
+    }
+
+    @Test
+    fun theSavedHomeIsTicked() {
         search.answer = { listOf(canterbury) }
         show(current = canterbury.toHome())
         type("Can")
         wait(500)
-        compose.onNodeWithTag("place_0").assertIsSelected().performClick()
-        wait(100)
-        assertThat(saved).containsExactly(canterbury)
+        compose.onNodeWithTag("place_0").assertIsSelected()
     }
 
     @Test
@@ -5827,6 +6117,7 @@ class YouStep @Inject constructor(
         return try {
             val admin = pins.addPerson(form.name, form.color, Role.ADMIN, pin)
             access.beginSetupSession(Identified(admin, Role.ADMIN))
+            form.pin = null
             true
         } catch (e: CancellationException) {
             throw e
@@ -5950,23 +6241,34 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import uk.co.siland.culvery.core.access.AccessControl
+import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.setup.CULVERY_IS_READY
 import uk.co.siland.culvery.core.setup.OPEN_CULVERY
+import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupState
 import uk.co.siland.culvery.core.setup.StepTitle
 
 /** 4a design §3.3, §4.2: "Culvery is ready". Never done, so a resume that gets this far stops here. */
 @Singleton
-class DoneStep @Inject constructor(private val state: SetupState, private val access: AccessControl) : SetupStep {
+class DoneStep @Inject constructor(
+    private val state: SetupState,
+    private val access: AccessControl,
+    private val gate: SetupSessionGate,
+) : SetupStep {
     override val id = "done"
     override val order = 1000
     override val done: Flow<Boolean> = flowOf(false)
     override val canGoOn: Flow<Boolean> = flowOf(true)
     override val nextLabel = OPEN_CULVERY
 
-    /** Signed out first, so Home never opens with the setup session (4a design §9). */
+    /**
+     * An Admin finishes setup (silent in the setup session). Signed out before setup is marked complete, so Home never
+     * opens with the setup session (4a design §9); the gate is told first, so the sign-out doesn't bring it back.
+     */
     override suspend fun onNext(): Boolean {
+        access.authorise(CorePermissions.SETTINGS_MANAGE) ?: return false
+        gate.finish()
         access.endSetupSession()
         access.lock()
         state.markComplete()
@@ -6062,21 +6364,22 @@ git commit -m "Add the wizard's own steps: welcome, home town, the first Admin, 
 
 ---
 
-### Task 10: Settings — the two-pane frame, Home location, People and Kiosk, and the touch that keeps it open (§3.5, §3.6, §4.6, §4.7, D4, D5)
+### Task 10: Settings — the two-pane frame, Home location, People and Kiosk (§3.6, §4.6, §4.7, D4)
 
 **Files:**
 - Modify: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/ShellNavigator.kt`
 - Modify: `app/src/main/java/uk/co/siland/culvery/shell/ShellViewModel.kt`; `app/src/test/java/uk/co/siland/culvery/shell/ui/ShellScreenshotTest.kt`; `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/RecordingNavigator.kt`
 - Create: `core/setup/src/main/java/uk/co/siland/culvery/core/setup/SettingsScreen.kt`, `pages/LocationPage.kt`, `pages/PeoplePage.kt`, `pages/KioskPage.kt`
 - Modify: `core/setup/src/main/java/uk/co/siland/culvery/core/setup/di/SetupModule.kt`
-- Test: `core/setup/src/test/java/uk/co/siland/culvery/core/setup/SettingsScreenTest.kt`, `SettingsScreenshotTest.kt` (create); `StepsTest.kt` (modify)
+- Test: `core/setup/src/test/java/uk/co/siland/culvery/core/setup/SettingsScreenTest.kt`, `SettingsScreenshotTest.kt` (create); `StepsTest.kt`, `TestUi.kt` (modify)
 - Screenshots (`core/setup`): `settings_location_{dark,light}`, `settings_people_{dark,light}`, `settings_kiosk_{dark,light}` (new)
 
 **Interfaces:**
-- Consumes: `SettingsPage` (Task 1); `AccessControl.touch()` (Task 4, wired in Task 12); `LocationPane`, `toHome` (Task 9); `PeoplePane`, `PeopleList` (Task 8); `StepTitle`, `SetupDimens`, the copy (Task 7).
+- Consumes: `SettingsPage` (Task 1); `LocationPane`, `toHome` (Task 9); `PeoplePane`, `PeopleList` (Task 8); `StepTitle`, `SetupDimens`, the copy (Task 7).
 - Produces:
   - `ShellNavigator.exitKiosk()`; `ShellViewModel.exitKiosk()` now overrides it; `RecordingNavigator.kioskExits`
-  - `@Composable fun SettingsScreen(pages: List<SettingsPage>, onClose: () -> Unit, onTouch: () -> Unit)` (pages already in order)
+  - `@Composable fun SettingsScreen(pages: List<SettingsPage>, onClose: () -> Unit)` (pages already in order). The touch that keeps Settings open is on the shell's layers (Task 12), so it counts touches in Settings' sheets and PIN pads too.
+  - Test helpers in `TestUi.kt`: `class StillPage(id, title, order, content: @Composable () -> Unit) : SettingsPage`; `class RecordingNavigator : ShellNavigator` with `kioskExits`
   - `@Singleton class LocationPage @Inject constructor(household, search: LocationSearch, access: AccessControl) : SettingsPage` — "location", "Home location", 0; `internal suspend fun saveHome(place: PlaceMatch): Boolean` (always `settings.manage`)
   - `@Singleton class PeoplePage @Inject constructor(editor: PeopleEditor) : SettingsPage` — "people", "People", 100
   - `@Singleton class KioskPage @Inject constructor() : SettingsPage` — "kiosk", "Kiosk", 900
@@ -6084,23 +6387,39 @@ git commit -m "Add the wizard's own steps: welcome, home town, the first Admin, 
 
 - [ ] **Step 1: Write the failing tests**
 
+In `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestUi.kt`, add the imports `androidx.compose.runtime.Composable`, `uk.co.siland.culvery.core.plugin.SettingsPage`, `uk.co.siland.culvery.core.plugin.ShellNavigator`, and at the end:
+```kotlin
+
+/** A Settings page that draws [content]: the Settings tests' and screenshots' pages. */
+class StillPage(override val id: String, override val title: String, override val order: Int, val content: @Composable () -> Unit) : SettingsPage {
+    @Composable
+    override fun Content() = content()
+}
+
+class RecordingNavigator : ShellNavigator {
+    var kioskExits = 0
+
+    override fun openTab(id: String) = Unit
+
+    override fun openSettings() = Unit
+
+    override fun exitKiosk() {
+        kioskExits++
+    }
+}
+```
+
 Create `core/setup/src/test/java/uk/co/siland/culvery/core/setup/SettingsScreenTest.kt`:
 ```kotlin
 package uk.co.siland.culvery.core.setup
 
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -6108,46 +6427,28 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
-import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.setup.pages.KioskPage
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.HhPillButton
-
-private class TestPage(override val id: String, override val title: String, override val order: Int, val onDo: () -> Unit = {}) : SettingsPage {
-    @Composable
-    override fun Content() {
-        Text("Page $id")
-        HhPillButton("Do $id", onDo, Modifier.testTag("do_$id"))
-    }
-}
-
-private class RecordingNavigator : ShellNavigator {
-    var kioskExits = 0
-    override fun openTab(id: String) = Unit
-    override fun openSettings() = Unit
-    override fun exitKiosk() {
-        kioskExits++
-    }
-}
 
 @RunWith(AndroidJUnit4::class)
 class SettingsScreenTest {
     @get:Rule val compose = createComposeRule()
     private var closes = 0
-    private var touches = 0
     private val navigator = RecordingNavigator()
+
+    private fun page(id: String, title: String, order: Int) = StillPage(id, title, order) { Text("Page $id") }
 
     private fun show(vararg pages: SettingsPage) = compose.setContent {
         CulveryTheme(dark = true) {
             CompositionLocalProvider(LocalShellNavigator provides navigator) {
-                SettingsScreen(pages.toList(), onClose = { closes++ }, onTouch = { touches++ })
+                SettingsScreen(pages.toList(), onClose = { closes++ })
             }
         }
     }
 
     @Test
     fun theFirstPageIsChosenOnOpen() {
-        show(TestPage("a", "Alpha", 0), TestPage("b", "Beta", 1))
+        show(page("a", "Alpha", 0), page("b", "Beta", 1))
         compose.onNodeWithText("Settings").assertExists()
         compose.onNodeWithTag("settings_page_a").assertIsSelected()
         compose.onNodeWithText("Page a").assertExists()
@@ -6155,7 +6456,7 @@ class SettingsScreenTest {
 
     @Test
     fun choosingATitleShowsItsPage() {
-        show(TestPage("a", "Alpha", 0), TestPage("b", "Beta", 1))
+        show(page("a", "Alpha", 0), page("b", "Beta", 1))
         compose.onNodeWithText("Beta").performClick()
         compose.onNodeWithText("Page b").assertExists()
         compose.onNodeWithText("Page a").assertDoesNotExist()
@@ -6163,21 +6464,9 @@ class SettingsScreenTest {
 
     @Test
     fun closeCloses() {
-        show(TestPage("a", "Alpha", 0))
+        show(page("a", "Alpha", 0))
         compose.onNodeWithTag("settings_close").performClick()
         assertThat(closes).isEqualTo(1)
-    }
-
-    @Test
-    fun anyTouchInsideSettingsKeepsItOpen() {
-        var done = 0
-        show(TestPage("a", "Alpha", 0) { done++ })
-        compose.onNodeWithTag("do_a").performClick()
-        assertThat(done).isEqualTo(1)
-        assertThat(touches).isEqualTo(1)
-        // Empty space, bottom right: nothing there takes the tap, and it still counts.
-        compose.onNodeWithTag("settings").performTouchInput { click(Offset(width - 10f, height - 10f)) }
-        assertThat(touches).isEqualTo(2)
     }
 
     @Test
@@ -6219,7 +6508,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -6231,26 +6519,9 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
-import uk.co.siland.culvery.core.plugin.SettingsPage
-import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.setup.pages.KioskPage
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.PersonPalette
-
-/** The tablet's canvas. */
-private val CANVAS_W = 1280.dp
-private val CANVAS_H = 800.dp
-
-private class StillPage(override val id: String, override val title: String, override val order: Int, val content: @Composable () -> Unit) : SettingsPage {
-    @Composable
-    override fun Content() = content()
-}
-
-private object NoNavigation : ShellNavigator {
-    override fun openTab(id: String) = Unit
-    override fun openSettings() = Unit
-    override fun exitKiosk() = Unit
-}
 
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -6279,8 +6550,8 @@ class SettingsScreenshotTest {
     private fun snap(name: String, dark: Boolean, pageId: String) {
         compose.setContent {
             CulveryTheme(dark = dark) {
-                CompositionLocalProvider(LocalShellNavigator provides NoNavigation) {
-                    Box(Modifier.testTag("shot").size(CANVAS_W, CANVAS_H)) { SettingsScreen(pages, onClose = {}, onTouch = {}) }
+                CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
+                    Box(Modifier.testTag("shot").size(CANVAS_W, CANVAS_H)) { SettingsScreen(pages, onClose = {}) }
                 }
             }
         }
@@ -6332,8 +6603,6 @@ package uk.co.siland.culvery.core.setup
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -6355,13 +6624,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
@@ -6372,26 +6639,19 @@ import uk.co.siland.culvery.core.ui.HhPillButton
 
 /**
  * Settings (4a design §4.6): the pages' titles on the left with Close, the chosen page on the right, the first chosen on
- * open. Every touch inside it is passed to [onTouch] before anything handles it (AccessControl.touch, D5), so Settings
- * stays open while it is used; taps on empty space stop here rather than reaching the shell underneath.
+ * open. Taps on empty space stop here rather than reaching the shell underneath. The touches that keep it open are
+ * counted on the shell's layers (Task 12), so its sheets and PIN pads count too.
  */
 @Composable
-fun SettingsScreen(pages: List<SettingsPage>, onClose: () -> Unit, onTouch: () -> Unit) {
+fun SettingsScreen(pages: List<SettingsPage>, onClose: () -> Unit) {
     val c = Culvery.colors
     var chosen by rememberSaveable { mutableStateOf(pages.firstOrNull()?.id) }
     val page = pages.firstOrNull { it.id == chosen } ?: pages.firstOrNull()
-    val touched by rememberUpdatedState(onTouch)
     Row(
         Modifier
             .fillMaxSize()
             .testTag("settings")
             .background(c.bg)
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    touched()
-                }
-            }
             .pointerInput(Unit) { detectTapGestures { } },
     ) {
         Column(
@@ -6595,7 +6855,7 @@ Expected: `BUILD SUCCESSFUL`.
 
 ```bash
 git add core/plugin core/setup app capability/calendar/src/test
-git commit -m "Add two-pane Settings with Home location, People and Kiosk, kept open while it is touched"
+git commit -m "Add two-pane Settings with Home location, People and Kiosk"
 ```
 
 ---
@@ -6608,18 +6868,19 @@ git commit -m "Add two-pane Settings with Home location, People and Kiosk, kept 
 - Create: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/ReviewCalendars.kt`
 - Delete: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/CalendarSettings.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarCapability.kt`, `ui/CalendarType.kt`
-- Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarReviewTest.kt`, `ui/ReviewCalendarsTest.kt`, `ui/ReviewScreenshotTest.kt` (create); `StubEditor.kt`, `CalendarCapabilityTest.kt`, `ui/ConnectScreenshotTest.kt` (modify); `ui/CalendarSettingsTest.kt` (delete)
+- Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarReviewTest.kt`, `TestLogs.kt`, `ui/ReviewCalendarsTest.kt`, `ui/ReviewScreenshotTest.kt` (create); `StubEditor.kt`, `CalendarCapabilityTest.kt`, `ui/ConnectScreenshotTest.kt` (modify); `ui/CalendarSettingsTest.kt` (delete)
 - Screenshots (`capability/calendar`): delete `settings_calendars_{,reconnect_,connect_}{dark,light}.png`; new `review_ok_{dark,light}`, `review_reconnect_{dark,light}`, `review_person_picker_dark`, `review_disconnect_dark`, `connect_step_{dark,light}`, `settings_calendars_page_{dark,light}`
 
 **Interfaces:**
-- Consumes: `CalendarStore.setMapping`/`queuedChanges`/`removeConnection`/`sources` (Task 6, 3a); `CalendarSetup.setMaster`, `CalendarConnections.rows`/`connectable`, `rememberConnector`, `ConnectCardHost`, `AddButton`, `healthWords` (3a); `ConfirmButton`, `HhChoiceChip`, `HhSwitch`, `rememberSingleAction` (Task 2); `SetupStep`, `SettingsPage`, `COULD_NOT_SAVE` (Task 1); `SettingsScreen`, `KioskPage` (Task 10, tests only).
+- Consumes: `CalendarStore.setMapping`/`queuedChanges`/`removeConnection`/`sources` (Task 6, 3a); `CalendarSetup.setMaster`, `CalendarConnections.rows`/`connectable`, `rememberConnector`, `ConnectCardHost`, `AddButton`, `healthWords` (3a); `HhSheetButton`, `ButtonTone`, `HhChoiceChip`, `HhSwitch`, `rememberSingleAction` (Task 2); `SetupStep`, `SettingsPage`, `COULD_NOT_SAVE` (Task 1); `SettingsScreen`, `KioskPage` (Task 10, tests only).
 - Produces:
   - `data class ReviewConnection(val row: CalendarRow, val sources: List<StoredSource>)`
   - `fun nowShowsAs(calendar: String, person: String)`, `calendarHidden(calendar)`, `calendarShown(calendar)`, `newEventsGoTo(calendar)`, `disconnected(service)`, `disconnectQuestion(service: String, queued: Int)`
   - `@Singleton class CalendarReview @Inject constructor(store: CalendarStore, setup: CalendarSetup, calendarConnections: CalendarConnections, household: HouseholdRepository, access: AccessControl, toaster: Toaster)` with `val connections: Flow<List<ReviewConnection>>`, `val people: Flow<List<Person>>` (Family first), `suspend fun setPerson(source: StoredSource, person: Person): Boolean`, `setShown(source, shown: Boolean): Boolean`, `makeMaster(source): Boolean`, `queuedChanges(connectionId: String): Int`, `disconnect(row: CalendarRow): Boolean`
   - `class CalendarConnectStep(repo, connections) : SetupStep` ("calendar.connect", 400, skippable); `class ReviewCalendarsStep(repo, review, connections, clock) : SetupStep` ("calendar.review", 410, shown once connected); `class CalendarsPage(review, connections, clock) : SettingsPage` ("calendars", "Calendars", 400)
   - `CalendarCapability` gains `review: CalendarReview` (last constructor parameter), `setupSteps()`, `settingsPages()`; its `SettingsSection()` override is removed
-  - `internal data class Confirming(val row: CalendarRow, val queued: Int)`; `@Composable internal fun ReviewCalendars(…)` (stateless, below); `internal fun sourceKey(source: StoredSource): String`
+  - `internal data class Confirming(val row: CalendarRow, val queued: Int)`; `internal class ReviewActions(onConnect, onReconnect, onPick, onPerson, onShown, onMakeMaster, onDisconnect, onKeep, onConfirmDisconnect)` (each defaulting to nothing); `@Composable internal fun ReviewCalendars(title: String, connections: List<ReviewConnection>, people: List<Person>, nowMillis: Long, busy: Boolean, picking: String?, confirming: Confirming?, connectable: List<ProviderDescriptor>, actions: ReviewActions)`; `internal fun sourceKey(source: StoredSource): String`
+  - Test helper: `internal fun assertNoSecretsLogged(tag: String, secrets: List<String>, minLines: Int = 1)` (`capability/calendar/src/test/…/TestLogs.kt`)
   - `internal fun stubReview(store: CalendarStore, household: HouseholdRepository): CalendarReview` (tests)
 
 - [ ] **Step 1: Write the failing tests**
@@ -6667,15 +6928,39 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
 ```
 (`connect()` is the file's helper that adds a connection.)
 
+Create `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/TestLogs.kt` (the same helper as `:core:setup`'s `TestUi.kt`; test sources aren't shared between modules):
+```kotlin
+package uk.co.siland.culvery.capability.calendar
+
+import com.google.common.truth.Truth.assertWithMessage
+import org.robolectric.shadows.ShadowLog
+
+/**
+ * Nothing logged under [tag], with its whole chain of causes, holds any of [secrets]; at least [minLines] were logged,
+ * so a check that saw no log can't pass by default.
+ */
+internal fun assertNoSecretsLogged(tag: String, secrets: List<String>, minLines: Int = 1) {
+    val logs = ShadowLog.getLogs().filter { it.tag == tag }
+    assertWithMessage("lines logged under $tag").that(logs.size).isAtLeast(minLines)
+    logs.forEach { log ->
+        val text = "${log.msg} ${generateSequence(log.throwable) { it.cause }.joinToString(" ")}"
+        secrets.forEach { assertWithMessage(text).that(text).doesNotContain(it) }
+    }
+}
+```
+
 Create `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarReviewTest.kt`:
 ```kotlin
 package uk.co.siland.culvery.capability.calendar
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import com.google.common.truth.Truth.assertWithMessage
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -6809,12 +7094,20 @@ class CalendarReviewTest {
         calendar.close()
         assertThat(review.setPerson(swimming, access.mia)).isFalse()
         assertThat(toaster.messages).containsExactly(COULD_NOT_SAVE)
-        val logs = ShadowLog.getLogs().filter { it.tag == "CalendarReview" }
-        assertThat(logs).isNotEmpty()
-        logs.forEach { log ->
-            val text = "${log.msg} ${generateSequence(log.throwable) { it.cause }.joinToString(" ")}"
-            for (secret in listOf("family@example.com", "Mia's swimming", "swim")) assertWithMessage(text).that(text).doesNotContain(secret)
-        }
+        assertNoSecretsLogged("CalendarReview", listOf("family@example.com", "Mia's swimming", "swim"))
+    }
+
+    @Test
+    fun connectingTheSameAccountTwiceKeepsOneConnection() = runTest {
+        val access = testAccess(household)
+        val setup = CalendarSetup(store, setOf(google), { household.people.first() }, toaster, WallClock { 0L }, EmptyCoroutineContext)
+        val connections = CalendarConnections(store, setup, access.control, setOf(google), backgroundScope)
+        // The wizard's Connect step finishes a connect this way; a second tap while the first sets up does the same.
+        connections.finish(connection, reconnecting = false)
+        connections.finish(connection, reconnecting = false)
+        withContext(Dispatchers.Default) { withTimeout(5_000) { while (toaster.messages.size < 2) delay(10) } }
+        assertThat(store.connectionsNow().map { it.connection.id }).containsExactly("g1")
+        assertThat(toaster.messages).containsExactly("Google Calendar connected", "Google Calendar reconnected").inOrder()
     }
 
     @Test
@@ -6893,15 +7186,16 @@ class ReviewCalendarsTest {
                 picking = picking,
                 confirming = confirming,
                 connectable = emptyList(),
-                onConnect = {},
-                onReconnect = { reconnected = it },
-                onPick = { picked = it },
-                onPerson = { source, person -> chosen = source.source.id to person.name },
-                onShown = { source, visible -> shown = source.source.id to visible },
-                onMakeMaster = { mastered = it.source.id },
-                onDisconnect = { disconnecting = it },
-                onKeep = { kept++ },
-                onConfirmDisconnect = { confirmed = it },
+                actions = ReviewActions(
+                    onReconnect = { reconnected = it },
+                    onPick = { picked = it },
+                    onPerson = { source, person -> chosen = source.source.id to person.name },
+                    onShown = { source, visible -> shown = source.source.id to visible },
+                    onMakeMaster = { mastered = it.source.id },
+                    onDisconnect = { disconnecting = it },
+                    onKeep = { kept++ },
+                    onConfirmDisconnect = { confirmed = it },
+                ),
             )
         }
     }
@@ -6964,7 +7258,14 @@ class ReviewCalendarsTest {
             CulveryTheme(dark = true) {
                 ReviewCalendars(
                     "Calendars", listOf(ReviewConnection(row(), listOf(family))), listOf(Person.Family), now, false, null, confirming, emptyList(),
-                    {}, {}, {}, { _, _ -> }, { _, _ -> }, {}, { confirming = Confirming(it, 3) }, { kept++ ; confirming = null }, { confirmed = it },
+                    ReviewActions(
+                        onDisconnect = { confirming = Confirming(it, 3) },
+                        onKeep = {
+                            kept++
+                            confirming = null
+                        },
+                        onConfirmDisconnect = { confirmed = it },
+                    ),
                 )
             }
         }
@@ -7046,11 +7347,11 @@ class ReviewScreenshotTest {
 
     @Composable
     private fun Review(title: String, health: ConnectionHealth, picking: String? = null, confirming: Confirming? = null) = ReviewCalendars(
-        title, connections(health), listOf(Person.Family, sam, mia), now, false, picking, confirming, emptyList(),
-        {}, {}, {}, { _, _ -> }, { _, _ -> }, {}, {}, {}, {},
+        title, connections(health), listOf(Person.Family, sam, mia), now, false, picking, confirming, emptyList(), ReviewActions(),
     )
 
-    private fun snap(name: String, dark: Boolean, content: @Composable () -> Unit) {
+    /** Draws [content] on the canvas, runs [before] (a tap, say), then captures it as [name]. */
+    private fun snap(name: String, dark: Boolean, before: () -> Unit = {}, content: @Composable () -> Unit) {
         compose.setContent {
             CulveryTheme(dark = dark) {
                 CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
@@ -7058,16 +7359,14 @@ class ReviewScreenshotTest {
                 }
             }
         }
+        before()
+        compose.onNodeWithTag("shot").captureRoboImage("src/test/screenshots/$name.png")
     }
 
-    private fun capture(name: String) = compose.onNodeWithTag("shot").captureRoboImage("src/test/screenshots/$name.png")
-
-    private fun wizard(name: String, dark: Boolean, health: ConnectionHealth, picking: String? = null, confirming: Confirming? = null) {
+    private fun wizard(name: String, dark: Boolean, health: ConnectionHealth, picking: String? = null, confirming: Confirming? = null) =
         snap(name, dark) {
             Box(Modifier.padding(MARGIN).width(COLUMN_W)) { Review("Your calendars", health, picking, confirming) }
         }
-        capture(name)
-    }
 
     @Test fun reviewOkDark() = wizard("review_ok_dark", true, ConnectionHealth.Ok)
     @Test fun reviewOkLight() = wizard("review_ok_light", false, ConnectionHealth.Ok)
@@ -7081,11 +7380,8 @@ class ReviewScreenshotTest {
         confirming = Confirming(connections(ConnectionHealth.Ok).single().row, 3),
     )
 
-    private fun connectStep(name: String, dark: Boolean) {
-        snap(name, dark) {
-            Box(Modifier.padding(MARGIN)) { ConnectStepCard(connectService = "Google Calendar", onConnect = {}) }
-        }
-        capture(name)
+    private fun connectStep(name: String, dark: Boolean) = snap(name, dark) {
+        Box(Modifier.padding(MARGIN)) { ConnectStepCard(connectService = "Google Calendar", onConnect = {}) }
     }
 
     @Test fun connectStepDark() = connectStep("connect_step_dark", true)
@@ -7103,9 +7399,7 @@ class ReviewScreenshotTest {
             StillPage("calendars", "Calendars", 400) { Review("Calendars", ConnectionHealth.Ok) },
             KioskPage(),
         )
-        snap(name, dark) { SettingsScreen(pages, onClose = {}, onTouch = {}) }
-        compose.onNodeWithTag("settings_page_calendars").performClick()
-        capture(name)
+        snap(name, dark, before = { compose.onNodeWithTag("settings_page_calendars").performClick() }) { SettingsScreen(pages, onClose = {}) }
     }
 
     @Test fun settingsCalendarsPageDark() = settings("settings_calendars_page_dark", true)
@@ -7359,12 +7653,14 @@ import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPillButton
+import uk.co.siland.culvery.core.ui.HhSheetButton
 import uk.co.siland.culvery.core.ui.HhSwitch
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
@@ -7428,20 +7724,35 @@ internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarCo
         picking = picking,
         confirming = confirming,
         connectable = if (offerConnect) connectable.map { it.descriptor } else emptyList(),
-        onConnect = { connector.connect(it.id) },
-        onReconnect = connector::reconnect,
-        onPick = { key -> picking = if (picking == key) null else key },
-        onPerson = { source, person ->
-            picking = null
-            action.run { review.setPerson(source, person) }
-        },
-        onShown = { source, shown -> action.run { review.setShown(source, shown) } },
-        onMakeMaster = { source -> action.run { review.makeMaster(source) } },
-        onDisconnect = { row -> action.run { confirming = Confirming(row, review.queuedChanges(row.connection.id)) } },
-        onKeep = { confirming = null },
-        onConfirmDisconnect = { row -> action.run { if (review.disconnect(row)) confirming = null } },
+        actions = ReviewActions(
+            onConnect = { connector.connect(it.id) },
+            onReconnect = connector::reconnect,
+            onPick = { key -> picking = if (picking == key) null else key },
+            onPerson = { source, person ->
+                picking = null
+                action.run { review.setPerson(source, person) }
+            },
+            onShown = { source, shown -> action.run { review.setShown(source, shown) } },
+            onMakeMaster = { source -> action.run { review.makeMaster(source) } },
+            onDisconnect = { row -> action.run { confirming = Confirming(row, review.queuedChanges(row.connection.id)) } },
+            onKeep = { confirming = null },
+            onConfirmDisconnect = { row -> action.run { if (review.disconnect(row)) confirming = null } },
+        ),
     )
 }
+
+/** What Review calendars' taps do; each does nothing unless given, so a test or screenshot passes only what it checks. */
+internal class ReviewActions(
+    val onConnect: (ProviderDescriptor) -> Unit = {},
+    val onReconnect: (Connection) -> Unit = {},
+    val onPick: (String) -> Unit = {},
+    val onPerson: (StoredSource, Person) -> Unit = { _, _ -> },
+    val onShown: (StoredSource, Boolean) -> Unit = { _, _ -> },
+    val onMakeMaster: (StoredSource) -> Unit = {},
+    val onDisconnect: (CalendarRow) -> Unit = {},
+    val onKeep: () -> Unit = {},
+    val onConfirmDisconnect: (CalendarRow) -> Unit = {},
+)
 
 /**
  * 4a design §4.5: per connection, "{Service} · {account}", its health, Reconnect when needed and Disconnect (confirmed
@@ -7457,28 +7768,20 @@ internal fun ReviewCalendars(
     picking: String?,
     confirming: Confirming?,
     connectable: List<ProviderDescriptor>,
-    onConnect: (ProviderDescriptor) -> Unit,
-    onReconnect: (Connection) -> Unit,
-    onPick: (String) -> Unit,
-    onPerson: (StoredSource, Person) -> Unit,
-    onShown: (StoredSource, Boolean) -> Unit,
-    onMakeMaster: (StoredSource) -> Unit,
-    onDisconnect: (CalendarRow) -> Unit,
-    onKeep: () -> Unit,
-    onConfirmDisconnect: (CalendarRow) -> Unit,
+    actions: ReviewActions,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.reviewBlockGap), modifier = Modifier.testTag("review_calendars")) {
         Text(title, style = CalendarType.reviewTitle, color = Culvery.colors.ink)
         connections.forEach { connection ->
-            ConnectionHeader(connection.row, nowMillis, busy, onReconnect, onDisconnect)
+            ConnectionHeader(connection.row, nowMillis, busy, actions.onReconnect, actions.onDisconnect)
             if (confirming != null && confirming.row.connection.id == connection.row.connection.id) {
-                DisconnectConfirmation(confirming, busy, onKeep, onConfirmDisconnect)
+                DisconnectConfirmation(confirming, busy, actions.onKeep, actions.onConfirmDisconnect)
             }
             connection.sources.forEach { source ->
-                SourceRow(source, people, busy, picking == sourceKey(source), onPick, onPerson, onShown, onMakeMaster)
+                SourceRow(source, people, busy, picking == sourceKey(source), actions.onPick, actions.onPerson, actions.onShown, actions.onMakeMaster)
             }
         }
-        connectable.forEach { d -> AddButton("Connect ${d.displayName}", "settings_connect_${d.id}") { onConnect(d) } }
+        connectable.forEach { d -> AddButton("Connect ${d.displayName}", "settings_connect_${d.id}") { actions.onConnect(d) } }
     }
 }
 
@@ -7600,8 +7903,11 @@ private fun DisconnectConfirmation(confirming: Confirming, busy: Boolean, onKeep
     ) {
         Text(disconnectQuestion(confirming.row.service, confirming.queued), style = CalendarType.confirmTitle, color = c.ink)
         Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.confirmButtonGap), modifier = Modifier.fillMaxWidth()) {
-            ConfirmButton(KEEP, null, c.surf, c.ink, "review_keep", !busy, onKeep, Modifier.weight(1f))
-            ConfirmButton(DISCONNECT, null, c.danger, c.dangerInk, "review_confirm_disconnect", !busy, { onConfirm(confirming.row) }, Modifier.weight(1f))
+            HhSheetButton(KEEP, ButtonTone.Quiet, enabled = !busy, tag = "review_keep", onClick = onKeep, modifier = Modifier.weight(1f))
+            HhSheetButton(
+                DISCONNECT, ButtonTone.Destroy, enabled = !busy, tag = "review_confirm_disconnect",
+                onClick = { onConfirm(confirming.row) }, modifier = Modifier.weight(1f),
+            )
         }
     }
 }
@@ -7657,25 +7963,29 @@ git commit -m "Review calendars in the wizard and Settings: who each is for, sho
 
 ---
 
-### Task 12: `:app` — the wizard or the shell, lock-task only after setup, and the new Settings (§3.3, §3.6, D8, D10)
+### Task 12: `:app` — the wizard or the shell, touches that keep Settings open, lock-task as soon as setup completes, and the new Settings (§3.3, §3.5, §3.6, D5, D8, D9, D10)
 
 **Files:**
 - Modify: `app/build.gradle.kts`
 - Create: `app/src/main/java/uk/co/siland/culvery/SetupWiring.kt`
-- Modify: `app/src/main/java/uk/co/siland/culvery/MainActivity.kt`
+- Modify: `app/src/main/java/uk/co/siland/culvery/MainActivity.kt`, `app/src/main/java/uk/co/siland/culvery/shell/ui/OverlayLayers.kt`
 - Delete: `app/src/main/java/uk/co/siland/culvery/shell/ui/SettingsPlaceholder.kt`, `app/src/test/screenshots/settings_dark.png`
 - Modify: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/Capability.kt` (`SettingsSection()` removed)
 - Modify: `app/src/test/java/uk/co/siland/culvery/shell/ui/ShellScreenshotTest.kt`
-- Test: `app/src/test/java/uk/co/siland/culvery/SetupWiringTest.kt` (create)
+- Test: `app/src/test/java/uk/co/siland/culvery/SetupWiringTest.kt`, `AppContentTest.kt` (create)
 
 **Interfaces:**
-- Consumes: `SetupState` (Task 1); `SetupWizard`, `SetupSessionGate` (Task 7); `SetupModule` (Tasks 9, 10); `SettingsScreen` (Task 10); `OpenMeteoModule` (Task 5); `Capability.setupSteps()`/`settingsPages()` (Tasks 1, 11); `AccessControl.touch()` (Task 4).
+- Consumes: `SetupState` (Task 1); `SetupWizard`, `SetupSessionGate` (Task 7); `SetupModule` (Tasks 9, 10); `SettingsScreen` (Task 10); `OpenMeteoModule` (Task 5); `Capability.setupSteps()`/`settingsPages()` (Tasks 1, 11); `AccessControl.touch()` (Task 4); `FakeAccessControl.touches` (Task 4).
 - Produces:
   - `internal fun wizardSteps(core: Set<SetupStep>, capabilities: Set<Capability>): List<SetupStep>`; `internal fun settingsPages(core: Set<SettingsPage>, capabilities: Set<Capability>): List<SettingsPage>` — each sorted by `order`
-  - `internal fun shouldPin(setupComplete: Boolean, kioskExited: Boolean): Boolean`
+  - `internal fun shouldPin(setupComplete: Boolean, kioskExited: Boolean): Boolean` (on resume)
+  - `internal fun pinOnSetupRead(previous: Boolean?, now: Boolean, resumed: Boolean, kioskExited: Boolean): Boolean` — pin when `setupComplete` turns true (the first read included) while resumed
+  - `internal fun touchTarget(complete: Boolean?, settingsOpen: Boolean, access: AccessControl): (() -> Unit)?` — `access::touch` while the wizard shows or Settings is open, else null
+  - `@Composable internal fun AppContent(complete: Boolean?, settingsOpen: Boolean, overlay: OverlayHost, wizard: @Composable () -> Unit, shell: @Composable () -> Unit, settings: @Composable () -> Unit)` — null: a blank `bg` (tag `app_blank`); false: the wizard; true: the shell, and Settings over it when open; Settings closing dismisses the overlay
+  - `ShellLayers(overlay, toast, onToastHidden, pinPad, onTouch: (() -> Unit)? = null, shell)` — every touch anywhere in the layers (sheets and PIN pads included) goes to [onTouch] first
   - `Capability` no longer has `SettingsSection()`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing tests**
 
 Create `app/src/test/java/uk/co/siland/culvery/SetupWiringTest.kt`:
 ```kotlin
@@ -7690,6 +8000,8 @@ import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
+import uk.co.siland.culvery.shell.FakeAccessControl
+import uk.co.siland.culvery.shell.FakeCapability
 
 private class Step(override val id: String, override val order: Int) : SetupStep {
     override val done: Flow<Boolean> = flowOf(false)
@@ -7736,20 +8048,167 @@ class SetupWiringTest {
     }
 
     @Test
-    fun theKioskPinsOnlyOnceSetupIsCompleteAndNotAfterExitKiosk() {
+    fun aCapabilityWithoutStepsOrPagesAddsNone() {
+        val plain = FakeCapability("lights", order = 20, shown = true)
+        assertThat(wizardSteps(setOf(Step("welcome", 0)), setOf(plain)).map { it.id }).containsExactly("welcome")
+        assertThat(settingsPages(emptySet(), setOf(plain))).isEmpty()
+    }
+
+    @Test
+    fun onResumeTheKioskPinsOnlyOnceSetupIsCompleteAndNotAfterExitKiosk() {
         assertThat(shouldPin(setupComplete = false, kioskExited = false)).isFalse()
         assertThat(shouldPin(setupComplete = true, kioskExited = false)).isTrue()
         assertThat(shouldPin(setupComplete = true, kioskExited = true)).isFalse()
     }
+
+    @Test
+    fun theKioskPinsAsSoonAsSetupCompletesWhileResumed() {
+        // Open Culvery on Done: false then true, with the activity in front.
+        assertThat(pinOnSetupRead(previous = false, now = true, resumed = true, kioskExited = false)).isTrue()
+        // An existing install's first read, after onResume has run.
+        assertThat(pinOnSetupRead(previous = null, now = true, resumed = true, kioskExited = false)).isTrue()
+        // Not behind the scenes, not after Exit kiosk, not for a read that changed nothing, never for the wizard.
+        assertThat(pinOnSetupRead(previous = false, now = true, resumed = false, kioskExited = false)).isFalse()
+        assertThat(pinOnSetupRead(previous = false, now = true, resumed = true, kioskExited = true)).isFalse()
+        assertThat(pinOnSetupRead(previous = true, now = true, resumed = true, kioskExited = false)).isFalse()
+        assertThat(pinOnSetupRead(previous = null, now = false, resumed = true, kioskExited = false)).isFalse()
+    }
+
+    @Test
+    fun touchesCountWhileSettingsIsOpenOrTheWizardShows() {
+        val access = FakeAccessControl()
+        assertThat(touchTarget(complete = null, settingsOpen = false, access = access)).isNull()
+        assertThat(touchTarget(complete = true, settingsOpen = false, access = access)).isNull()
+        touchTarget(complete = true, settingsOpen = true, access = access)!!.invoke()
+        touchTarget(complete = false, settingsOpen = false, access = access)!!.invoke()
+        assertThat(access.touches).isEqualTo(2)
+    }
 }
 ```
 
-- [ ] **Step 2: Run the test to see it fail**
+Create `app/src/test/java/uk/co/siland/culvery/AppContentTest.kt`:
+```kotlin
+package uk.co.siland.culvery
 
-Run: `./gradlew :app:testDebugUnitTest --tests "*SetupWiringTest*"`
-Expected: FAIL to compile with "Unresolved reference 'wizardSteps'", "'settingsPages'", "'shouldPin'".
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.HhSheet
+import uk.co.siland.culvery.shell.FakeAccessControl
+import uk.co.siland.culvery.shell.OverlayState
+import uk.co.siland.culvery.shell.ui.ShellLayers
+import androidx.compose.foundation.layout.PaddingValues
 
-- [ ] **Step 3: Wire the modules and the rules**
+@RunWith(AndroidJUnit4::class)
+class AppContentTest {
+    @get:Rule val compose = createComposeRule()
+    private val overlay = OverlayState()
+    private val access = FakeAccessControl()
+    private var complete by mutableStateOf<Boolean?>(null)
+    private var settingsOpen by mutableStateOf(false)
+
+    private fun show() = compose.setContent {
+        CulveryTheme(dark = true) {
+            ShellLayers(
+                overlay = overlay,
+                toast = null,
+                onToastHidden = {},
+                pinPad = {},
+                onTouch = touchTarget(complete, settingsOpen, access),
+            ) {
+                AppContent(
+                    complete = complete,
+                    settingsOpen = settingsOpen,
+                    overlay = overlay,
+                    wizard = { Text("Wizard") },
+                    shell = { Text("Shell") },
+                    settings = { Box(Modifier.fillMaxSize().testTag("settings_stand_in")) },
+                )
+            }
+        }
+    }
+
+    @Test
+    fun untilSetupIsKnownNothingShows() {
+        show()
+        compose.onNodeWithTag("app_blank").assertExists()
+        compose.onNodeWithText("Wizard").assertDoesNotExist()
+        compose.onNodeWithText("Shell").assertDoesNotExist()
+    }
+
+    @Test
+    fun anIncompleteSetupShowsTheWizard() {
+        complete = false
+        show()
+        compose.onNodeWithText("Wizard").assertExists()
+        compose.onNodeWithText("Shell").assertDoesNotExist()
+    }
+
+    @Test
+    fun aCompleteSetupShowsTheShellAndSettings() {
+        complete = true
+        show()
+        compose.onNodeWithText("Shell").assertExists()
+        compose.onNodeWithTag("settings_stand_in").assertDoesNotExist()
+        settingsOpen = true
+        compose.onNodeWithTag("settings_stand_in").assertExists()
+    }
+
+    @Test
+    fun aTapInsideAnOpenSheetKeepsSettingsOpen() {
+        complete = true
+        settingsOpen = true
+        show()
+        compose.runOnIdle {
+            overlay.show { HhSheet(PaddingValues()) { Text("Sheet", Modifier.testTag("sheet_text")) } }
+        }
+        compose.onNodeWithTag("sheet_text").performClick()
+        assertThat(access.touches).isEqualTo(1)
+    }
+
+    @Test
+    fun closingSettingsDismissesItsSheet() {
+        complete = true
+        settingsOpen = true
+        show()
+        compose.runOnIdle { overlay.show { Text("Sheet") } }
+        compose.onNodeWithText("Sheet").assertExists()
+        settingsOpen = false
+        compose.onNodeWithText("Sheet").assertDoesNotExist()
+        assertThat(overlay.isShowing).isFalse()
+    }
+
+    @Test
+    fun withSettingsClosedTouchesDoNothing() {
+        complete = true
+        show()
+        compose.onNodeWithText("Shell").performClick()
+        assertThat(access.touches).isEqualTo(0)
+    }
+}
+```
+
+- [ ] **Step 2: Run the tests to see them fail**
+
+Run: `./gradlew :app:testDebugUnitTest --tests "*SetupWiringTest*" --tests "*AppContentTest*"`
+Expected: FAIL to compile with "Unresolved reference 'wizardSteps'", "'settingsPages'", "'shouldPin'", "'pinOnSetupRead'", "'touchTarget'", "'AppContent'", and "No parameter with name 'onTouch' found" for `ShellLayers`.
+
+- [ ] **Step 3: Wire the modules, the rules and the content**
 
 In `app/build.gradle.kts`, after `implementation(project(":core:access"))` add:
 ```kotlin
@@ -7764,9 +8223,19 @@ Create `app/src/main/java/uk/co/siland/culvery/SetupWiring.kt`:
 ```kotlin
 package uk.co.siland.culvery
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.plugin.Capability
+import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
+import uk.co.siland.culvery.core.ui.Culvery
 
 /** The wizard's steps: the core ones and each capability's, by order (4a design D7). */
 internal fun wizardSteps(core: Set<SetupStep>, capabilities: Set<Capability>): List<SetupStep> =
@@ -7776,8 +8245,84 @@ internal fun wizardSteps(core: Set<SetupStep>, capabilities: Set<Capability>): L
 internal fun settingsPages(core: Set<SettingsPage>, capabilities: Set<Capability>): List<SettingsPage> =
     (core + capabilities.flatMap { it.settingsPages() }).sortedBy { it.order }
 
-/** 4a design D10: the kiosk pins only once setup is complete, and not while the household has exited it. */
+/** 4a design D10: on resume, the kiosk pins once setup is complete, and not while the household has exited it. */
 internal fun shouldPin(setupComplete: Boolean, kioskExited: Boolean): Boolean = setupComplete && !kioskExited
+
+/**
+ * Ruling 16: `setupComplete` turning true (the first read included, which can land after onResume) pins at once if
+ * the activity is in front, so Open Culvery locks the tablet straight away.
+ */
+internal fun pinOnSetupRead(previous: Boolean?, now: Boolean, resumed: Boolean, kioskExited: Boolean): Boolean =
+    now && previous != true && resumed && !kioskExited
+
+/** 4a design D5, D9: touches restart the session while Settings is open or the wizard shows (the setup session's ten minutes). */
+internal fun touchTarget(complete: Boolean?, settingsOpen: Boolean, access: AccessControl): (() -> Unit)? =
+    if (complete == false || (complete == true && settingsOpen)) access::touch else null
+
+/**
+ * What the app shows (4a design §3.3): nothing until SetupState is read, the wizard until setup is complete, then the
+ * shell with Settings over it when open. Settings closing (its session ended, or Close) takes any sheet it opened with it.
+ */
+@Composable
+internal fun AppContent(
+    complete: Boolean?,
+    settingsOpen: Boolean,
+    overlay: OverlayHost,
+    wizard: @Composable () -> Unit,
+    shell: @Composable () -> Unit,
+    settings: @Composable () -> Unit,
+) {
+    LaunchedEffect(settingsOpen) { if (!settingsOpen) overlay.dismiss() }
+    when (complete) {
+        null -> Box(Modifier.fillMaxSize().testTag("app_blank").background(Culvery.colors.bg))
+        false -> wizard()
+        true -> {
+            shell()
+            if (settingsOpen) settings()
+        }
+    }
+}
+```
+(The effect runs once at start too, with nothing to dismiss; a calendar sheet opened later from a tab isn't touched, as `settingsOpen` doesn't change.)
+
+In `app/src/main/java/uk/co/siland/culvery/shell/ui/OverlayLayers.kt`:
+1. Add the imports `androidx.compose.foundation.gestures.awaitEachGesture`, `androidx.compose.foundation.gestures.awaitFirstDown`, `androidx.compose.runtime.getValue`, `androidx.compose.runtime.rememberUpdatedState`, `androidx.compose.ui.input.pointer.PointerEventPass`, `androidx.compose.ui.input.pointer.pointerInput`.
+2. Replace `ShellLayers` with:
+```kotlin
+/**
+ * The shell with its overlay layers stacked over it: sheet, then [pinPad] over the sheet, then toasts over everything.
+ * The layers need a parent with its own graphics layer: removing a node redraws only its nearest layered ancestor,
+ * and the composition root has none, so a layer closed with no other animation running (a scrim tap, a toast timing
+ * out) would get a layout pass but no new frame and stay on screen. Every touch anywhere in them, sheets and PIN pads
+ * included, goes to [onTouch] before anything handles it (4a design D5: Settings stays open while used).
+ */
+@Composable
+fun ShellLayers(
+    overlay: OverlayState,
+    toast: ToastMessage?,
+    onToastHidden: (Long) -> Unit,
+    pinPad: @Composable () -> Unit,
+    onTouch: (() -> Unit)? = null,
+    shell: @Composable () -> Unit,
+) {
+    val touched by rememberUpdatedState(onTouch)
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer {}
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    touched?.invoke()
+                }
+            },
+    ) {
+        shell()
+        OverlayLayer(overlay)
+        pinPad()
+        ToastLayer(toast, onHidden = onToastHidden)
+    }
+}
 ```
 
 - [ ] **Step 4: Show the wizard or the shell**
@@ -7793,13 +8338,9 @@ import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -7819,7 +8360,6 @@ import uk.co.siland.culvery.core.setup.SettingsScreen
 import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupState
 import uk.co.siland.culvery.core.setup.SetupWizard
-import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ShellToasts
@@ -7862,12 +8402,12 @@ class MainActivity : ComponentActivity() {
             }
         }
         lifecycleScope.launch {
-            var first = true
+            var previous: Boolean? = null
             setupState.setupComplete.collect { complete ->
                 setupComplete = complete
-                // Ruling 16: the read at start may land after onResume; a wizard finishing waits for the next resume.
-                if (first && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && shouldPin(complete, kioskExited)) pinToScreen()
-                first = false
+                val resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+                if (pinOnSetupRead(previous, complete, resumed, kioskExited)) pinToScreen()
+                previous = complete
             }
         }
         setContent {
@@ -7887,12 +8427,14 @@ class MainActivity : ComponentActivity() {
                         toast = toast,
                         onToastHidden = toasts::hide,
                         pinPad = { PinPadHost(pinPrompt, overSheet = overlay.isShowing) },
+                        onTouch = touchTarget(complete, state.settingsOpen, access),
                     ) {
-                        when (complete) {
-                            // The first read of SetupState: nothing to show yet.
-                            null -> Box(Modifier.fillMaxSize().background(Culvery.colors.bg))
-                            false -> SetupWizard(steps, gate)
-                            true -> {
+                        AppContent(
+                            complete = complete,
+                            settingsOpen = state.settingsOpen,
+                            overlay = overlay,
+                            wizard = { SetupWizard(steps, gate) },
+                            shell = {
                                 CulveryShell(
                                     state = state,
                                     onSelectTab = shell::selectTab,
@@ -7901,9 +8443,9 @@ class MainActivity : ComponentActivity() {
                                     onToggleThemePreview = shell::toggleThemePreview,
                                     tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
                                 )
-                                if (state.settingsOpen) SettingsScreen(pages, onClose = shell::closeSettings, onTouch = access::touch)
-                            }
-                        }
+                            },
+                            settings = { SettingsScreen(pages, onClose = shell::closeSettings) },
+                        )
                     }
                 }
             }
@@ -7927,6 +8469,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 ```
+(`SetupState` already catches a failed read of its file, Task 1, so these collectors see a value, never an `IOException`.)
 
 - [ ] **Step 5: Retire the placeholder and the old Settings hook**
 
@@ -7945,7 +8488,7 @@ Expected: no output.
 - [ ] **Step 6: Run the tests and build both variants**
 
 Run: `./gradlew :app:assembleDebug :app:assembleRelease testDebugUnitTest verifyRoborazziDebug`
-Expected: `BUILD SUCCESSFUL`. Hilt now resolves `SetupState`, `SetupSessionGate`, the five core steps, the three core pages, `Optional<SampleHousehold>` (empty until Task 13), `LocationSearch` (`OpenMeteoModule`), `PeopleEditor`, `CalendarReview` and `HouseholdFollower`. If Hilt names a missing binding, it is one of these; stop and report rather than adding a binding this plan doesn't list.
+Expected: `BUILD SUCCESSFUL`; `ShellLayersRedrawTest` and the shell's baselines are unchanged (the touch observer draws nothing). Hilt now resolves `SetupState`, `SetupSessionGate`, the five core steps, the three core pages, `Optional<SampleHousehold>` (empty until Task 13), `LocationSearch` (`OpenMeteoModule`), `PeopleEditor`, `CalendarReview` and `HouseholdFollower`. If Hilt names a missing binding, it is one of these; stop and report rather than adding a binding this plan doesn't list.
 
 Until Task 13, a fresh debug install still seeds Alex at start and may skip the wizard; don't judge the wizard on the emulator before then.
 
@@ -7953,7 +8496,7 @@ Until Task 13, a fresh debug install still seeds Alex at start and may skip the 
 
 ```bash
 git add app core/plugin
-git commit -m "Open the setup wizard until setup is complete, pin the kiosk only after it, and show the new Settings"
+git commit -m "Open the setup wizard until setup is complete, keep Settings open while it or its sheets are touched, and pin the kiosk as soon as setup completes"
 ```
 
 ---
@@ -7986,7 +8529,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
 import java.time.ZoneId
+import java.io.File
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -7995,7 +8542,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
@@ -8014,6 +8563,8 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.setup.SetupState
+import uk.co.siland.culvery.core.setup.setupStore
 import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider
 
@@ -8023,6 +8574,9 @@ private object NoToasts : Toaster {
 
 @RunWith(AndroidJUnit4::class)
 class DebugSeedTest {
+    @get:Rule val folder = TemporaryFolder()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private lateinit var state: SetupState
     private lateinit var householdDb: HouseholdDatabase
     private lateinit var calendarDb: CalendarDatabase
     private lateinit var household: HouseholdRepository
@@ -8030,7 +8584,6 @@ class DebugSeedTest {
     private lateinit var store: CalendarStore
     private val fake = FakeCalendarProvider()
     private var syncs = 0
-    private var completes = 0
 
     @Before
     fun setUp() {
@@ -8040,10 +8593,12 @@ class DebugSeedTest {
         household = HouseholdRepository(householdDb)
         pins = PinManager(household, PinHasher())
         store = CalendarStore(calendarDb)
+        state = SetupState(setupStore(scope) { File(folder.root, "setup.preferences_pb") }, household)
     }
 
     @After
     fun tearDown() {
+        scope.cancel()
         householdDb.close()
         calendarDb.close()
     }
@@ -8053,7 +8608,7 @@ class DebugSeedTest {
 
     private suspend fun seed(provider: FakeCalendarProvider = fake) = seedDebugData(household, setupFor(provider), setOf(provider))
 
-    private suspend fun sampleHousehold() = DebugSampleHousehold(household, pins, setupFor(fake), setOf(fake)) { completes++ }.create()
+    private suspend fun sampleHousehold() = DebugSampleHousehold(household, pins, setupFor(fake), setOf(fake), state::markComplete).create()
 
     @Test
     fun aFreshDebugInstallHasNoPeopleNoCalendarAndIsNotSetUp() = runTest {
@@ -8061,7 +8616,8 @@ class DebugSeedTest {
         assertThat(household.people.first()).isEmpty()
         assertThat(store.connectionsNow()).isEmpty()
         assertThat(store.master().first()).isNull()
-        assertThat(completes).isEqualTo(0)
+        // So the app opens the wizard.
+        assertThat(state.setupComplete.first()).isFalse()
     }
 
     @Test
@@ -8077,7 +8633,7 @@ class DebugSeedTest {
         assertThat(pins.identify("2468")?.person?.name).isEqualTo("Sam")
         assertThat(pins.identify("1357")?.person?.name).isEqualTo("Mia")
         assertThat(household.location.first()).isEqualTo(HomeLocation("London, England, United Kingdom", 51.5074, -0.1278, "Europe/London"))
-        assertThat(completes).isEqualTo(1)
+        assertThat(state.setupComplete.first()).isTrue()
     }
 
     @Test
@@ -8187,7 +8743,7 @@ with
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `./gradlew :app:testDebugUnitTest`
-Expected: FAIL to compile with "Unresolved reference 'DebugSampleHousehold'", "'DEBUG_CONNECTION_ID'" (private until now), and "Too many arguments for seedDebugData" in `DebugSeedTest`.
+Expected: FAIL to compile with "Unresolved reference 'DebugSampleHousehold'", "Cannot access 'DEBUG_CONNECTION_ID': it is private in file", and "Too many arguments for seedDebugData" in `DebugSeedTest`.
 
 - [ ] **Step 3: Rework the seed and add the sample household**
 
@@ -8195,7 +8751,9 @@ Replace `app/src/debug/java/uk/co/siland/culvery/DebugSeed.kt` with:
 ```kotlin
 package uk.co.siland.culvery
 
+import android.util.Log
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
@@ -8267,7 +8825,14 @@ class DebugSampleHousehold(
             FakeCalendarProvider.SOURCE_SCHOOL to SourceMapping(PersonId.FAMILY, visible = true),
         )
         calendar.connect(Connection(DEBUG_CONNECTION_ID, FakeCalendarProvider.ID, "Sample calendar", emptyMap()), mapping)
-        calendar.setMaster(DEBUG_CONNECTION_ID, FakeCalendarProvider.SOURCE_FAMILY)
+        try {
+            calendar.setMaster(DEBUG_CONNECTION_ID, FakeCalendarProvider.SOURCE_FAMILY)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // The sample still opens; events can be added once a master is chosen in Settings › Calendars.
+            Log.w("Culvery", "Couldn't make the sample Family calendar the master (${e::class.simpleName})")
+        }
         markComplete()
     }
 }
@@ -8393,7 +8958,7 @@ The walkthrough:
 2. **Welcome, then a kill.** Tap **Start**: Home location. Kill and start again (`am force-stop uk.co.siland.culvery`, `am start …`): the wizard reopens at Home location, not Welcome.
 3. **Home location.** Go offline (`svc wifi disable; svc data disable`), type the town: "Couldn't search for towns — check the tablet's Wi-Fi and try again."; **Skip for now** is there. Back online; clear and type the user's town: up to five rows ("Town, Region, Country") appear about half a second after typing stops; tap theirs: ticked. **Next**.
 4. **You.** **USER:** type their name, pick a colour, tap **Set your PIN** and choose their PIN twice (try a mismatch first: "Those PINs didn't match — try again."). **Next** turns on only once name and PIN are set; tap it.
-5. **A kill after You.** Kill and start again: the PIN pad asks "Enter your PIN to carry on setting up". **USER:** enter their PIN. The wizard opens at Household, and the list has exactly one person, them, "Admin · PIN set".
+5. **A kill after You.** Kill and start again: the PIN pad asks "Enter your PIN to carry on setting up". **USER:** enter their PIN. The wizard opens at Household, and the list has exactly one person, them, "Admin · PIN set". Then leave the wizard untouched for 10 minutes: the same PIN pad returns (the setup session's idle limit), and after the PIN the wizard is still on Household.
 6. **Household.** **USER:** add each person (name, colour, role; a PIN for adults who want one). Try a second person with a name already used: "Someone is already called {name}." in the sheet, name kept. Each saves without a PIN pad (the setup session). **Next** (or **Skip for now** if they live alone).
 7. **Connect.** The Connect card: **Connect Google Calendar**. **USER:** choose the account and allow access (both boxes). Toast "Google Calendar connected"; **Next**.
 8. **Review calendars.** "Your calendars" lists "Google Calendar · {email}" and each calendar, the person-named one on that person, the account's own calendar "Master · New events go here" with its switch off-limits. **USER:** change one calendar's person (toast "{calendar} now shows as {person}"), hide one ("{calendar} hidden"). **Next**.
@@ -8401,7 +8966,7 @@ The walkthrough:
    ```bash
    adb -s emulator-5554 logcat -d | grep -E "OpenMeteo|People|PersonSheet|SetupWizard|YouStep|LocationPane|CalendarReview|HouseholdFollower" | tail -40
    ```
-10. **Settings stays open while used.** Rail › Settings, **USER:** their PIN. Two panes: "Settings", Home location / People / Calendars / Kiosk, Close. Tap around the pages every 30 s for 2½ minutes: it stays open. Then leave it: it closes about 2 minutes after the last touch.
+10. **Settings stays open while used.** Rail › Settings, **USER:** their PIN. Two panes: "Settings", Home location / People / Calendars / Kiosk, Close. Tap around the pages, and inside a person's sheet, every 30 s for 2½ minutes: it stays open. Then leave it: it closes about 2 minutes after the last touch.
 11. **People edits.** Settings (PIN) › People: rename someone and change their colour — **Save changes**, no PIN pad. Change someone's role — a fresh PIN pad appears. Set a PIN for someone — fresh PIN pad. The status bar shows the signed-in Admin throughout, until a change to their own role or PIN signs them out.
 12. **Remove someone mapped to a calendar.** Open the person the named calendar maps to, **Remove person**: "Remove {name}? {name}'s events and calendars show as Family." **Remove person**, PIN: toast "{name} removed". Settings › Calendars: that calendar now shows Family.
 13. **A hide survives a restart.** Settings › Calendars: hide a calendar that is ticked in Google ("{calendar} hidden"). Kill and start again (the source refresh runs at start): it is still hidden, and its events stay off Home and the Calendar tab.
@@ -8448,7 +9013,7 @@ In debug builds Welcome also offers **Use a sample household**: **Alex** (Admin,
 5. **Adding a capability.** In step 2, after the sentence about `Startable`, add: "A capability can add wizard steps and Settings pages by returning `SetupStep`s and `SettingsPage`s from `setupSteps()` and `settingsPages()` (`:core:setup` places them by `order`: core steps 0–399, capabilities 400 and up, Done 1000; Settings pages Home location 0, People 100, Kiosk 900)."
 6. **Kiosk mode.** Replace "Release builds pin the app to the screen (Android "screen pinning"). Leave properly via **Settings › Exit kiosk** (Admin PIN, always asked)." with "Release builds pin the app to the screen (Android "screen pinning") once setup is complete, so the first Google connection happens outside it. Leave properly via **Settings › Kiosk › Exit kiosk** (Admin PIN, always asked)."
 7. **PINs.**
-   - Replace "A session lasts 2 minutes after the last PIN-checked action; touching the screen doesn't extend it." with "A session lasts 2 minutes after the last PIN-checked action; while Settings is open, every touch in it restarts the 2 minutes."
+   - Replace "A session lasts 2 minutes after the last PIN-checked action; touching the screen doesn't extend it." with "A session lasts 2 minutes after the last PIN-checked action; while Settings is open, every touch in it (its sheets and PIN pads included) restarts the 2 minutes. During setup the first Admin stays signed in until Done, or until 10 minutes pass without a touch; the wizard then asks for their PIN to carry on."
    - Replace "Exiting kiosk and managing people always ask for a PIN, even mid-session." with "Exiting kiosk, adding or removing someone, changing a role and setting, changing or removing a PIN always ask for a PIN, even mid-session; renaming and recolouring don't. Changing your own role or PIN signs you out."
    - Replace "**Forgotten PIN:** an Admin can reset anyone's PIN in Settings." with "**Forgotten PIN:** an Admin can reset anyone's PIN in Settings › People."
    - After the first bullet add: "- Each person has one of eight colours, and no two share one; so a household has at most eight people. Every household must keep at least one Admin with a PIN."
@@ -8488,6 +9053,8 @@ In `docs/superpowers/plans/2026-09-23-plan1-followups.md`:
 - Per-calendar health in Settings › Calendars (M7) and the repeat-series cap stay 4c's (4a design D15).
 - The PIN pad for choosing a PIN has no reason line; check on the SM-T510 that its two stages read clearly.
 - The wizard's steps and Settings' pages on the SM-T510 with the Samsung keyboard up (the town search, the person sheet's name field).
+- The choose-a-PIN pad (and a sheet's Save) says "That PIN is taken — choose another." when someone else has the PIN, so an Admin can learn that a PIN is in use. Accepted: only an Admin (with a fresh PIN) gets there, and it follows from PINs being unique, since a PIN identifies its person.
+- `DebugSampleHousehold.create()` still completes when making the Family calendar the master fails, but no test forces that failure: the fake has no hook to fail its second calendar-list read alone.
 ```
    and add under it any item you or the user noted during this plan that was deferred rather than fixed.
 
@@ -8508,12 +9075,12 @@ git commit -m "Document the setup wizard, Settings, disconnecting and the new mo
 | D2 home location by town search, no key; Skip for now keeps the tablet's zone | Tasks 5, 9 (`HouseholdZone`'s fallback is 3a's) |
 | D3 the wizard reviews calendars after connecting | Task 11 (`ReviewCalendarsStep`) |
 | D4 Settings is two panes; each right pane is the wizard's matching step | Tasks 10, 11 |
-| D5 Settings closes 2 minutes after the last touch (m5) | Tasks 4 (`touch`), 10 (the observer), 12 (wired to `access::touch`) |
+| D5 Settings closes 2 minutes after the last touch (m5), sheets and PIN pads included | Tasks 4 (`touch`), 12 (`ShellLayers`' observer, `touchTarget`, Settings closing dismisses its sheet) |
 | D6 fresh PIN for remove, role and PIN changes; rename and recolour on the open session | Task 8 (adding too: ruling 6) |
 | D7 capabilities contribute steps and pages | Tasks 1, 11, 12 |
 | D8 the wizard runs while setup isn't complete; each step saves; resume; an existing install is complete | Tasks 1 (`SetupState`, ruling 2), 7 (`resumeAt`), 9 (each step's `done`), 12 |
-| D9 no PIN before an Admin; the setup session until Done | Tasks 4, 7 (gate), 9 (You, Location, Done) |
-| D10 lock-task only after setup | Task 12 (`shouldPin`, ruling 16) |
+| D9 (amended) no PIN before an Admin; the setup session until Done or 10 minutes without a touch, then the PIN gate | Tasks 4 (`SETUP_IDLE_MS`), 7 (gate), 9 (You, Location, Done), 12 (touches in the wizard) |
+| D10 lock-task only after setup, as soon as it completes | Task 12 (`shouldPin`, `pinOnSetupRead`, ruling 16) |
 | D11 the debug seed creates nobody; Use a sample household | Tasks 9 (`SampleHousehold`, Welcome), 13 |
 | D12 eight colours, a colour in use can't be picked, Family's amber, at most eight people | Tasks 2, 3, 8 |
 | D13 mapping changes are tablet-only and immediate; the refresh follows a changed tick only | Tasks 6, 11 |
@@ -8524,7 +9091,7 @@ git commit -m "Document the setup wizard, Settings, disconnecting and the new mo
 | §3.3 wizard flow: orders, dots, Back, Next/Skip, resume, Done | Tasks 7, 9, 11, 12 |
 | §3.4 access during setup: `beginSetupSession`/`endSetupSession`, no PIN before You, the PIN once after a kill | Tasks 4, 7, 9 |
 | §3.5 Settings session: `openSettings` unchanged, `touch()`, people permissions | Tasks 4, 8, 10 |
-| §3.6 kiosk: pin after setup, Settings › Kiosk | Tasks 10, 12 |
+| §3.6 (amended) kiosk: pin as soon as setup completes, Settings › Kiosk | Tasks 10, 12 |
 | §3.7 people: palette, name and colour rules, `sortOrder` in the transaction, Family refused, `lock()` after changing the signed-in person | Tasks 2, 3, 8 |
 | §3.8 location: Open-Meteo, cancellable, no timezone dropped, 2 letters and 400 ms, zone change → sync, nothing logged | Tasks 5, 6 (`HouseholdFollower`), 9 |
 | §3.9 Connect step, Review calendars, `setMapping`, `remapMissingPeople`, master always shown, disconnect | Tasks 6, 11 |

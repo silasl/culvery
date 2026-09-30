@@ -31,8 +31,8 @@ Plan 4 is split into 4a (this spec), 4b (weather) and 4c (release and the on-dev
 | D6 | **Fresh PIN** for removing a person, changing a role and setting, changing or removing a PIN (`people.manage`). Renaming and recolouring need only the open Settings session (`settings.manage`). |
 | D7 | **Capabilities contribute pages** (approach A): `:core:setup` owns the frames and core pages; `Capability` gains `setupSteps()` and `settingsPages()`. |
 | D8 | **When the wizard runs:** while `setupComplete` is false. Each step saves as it goes and the wizard resumes at the first unfinished step. An install that already has an active Admin is marked complete on first start of this version. |
-| D9 | **No PIN before an Admin exists**; after the You step the new Admin stays signed in, with no timeout, until Done. |
-| D10 | **Lock-task starts only after setup is complete**, so the first connect always happens outside the kiosk. |
+| D9 | **No PIN before an Admin exists**; after the You step the new Admin stays signed in until Done, or until **10 minutes pass without a touch in the wizard**; the wizard then shows its PIN gate ("Enter your PIN to carry on setting up") and begins the setup session again. *(Amended in the plan review, 2026-09-30: was "with no timeout".)* |
+| D10 | **Lock-task starts only after setup is complete**, so the first connect always happens outside the kiosk; it starts as soon as setup completes. |
 | D11 | **Debug builds:** the seed no longer creates people or sets a master. The Welcome step has a debug-only **Use a sample household** button. |
 | D12 | **Colours:** 8 person colours in `:core:ui`; a colour in use can't be picked again; Family keeps its amber. At most 8 people. |
 | D13 | **Mapping changes are tablet-only** and apply at once. The daily refresh changes a calendar's visibility only when its tick in the service changes. |
@@ -82,20 +82,21 @@ interface SettingsPage {
 
 ### 3.4 Access during setup (D9)
 
-- `AccessControl` gains `beginSetupSession(person: Identified)` and `endSetupSession()`. A setup session doesn't time out and every `authorise` for that person passes without a PIN (including fresh-PIN permissions: the PIN was just set).
+- `AccessControl` gains `beginSetupSession(person: Identified)` (the wizard's alone) and `endSetupSession()`. Every `authorise` for that person passes without a PIN (including fresh-PIN permissions: the PIN was just set). The setup session ends after **10 minutes without a touch in the wizard** (or an authorised action); each touch restarts the 10 minutes. It also ends at `lock()`, or when any PIN is entered at a pad.
 - Before the You step no Admin exists and the wizard's pages call the repositories directly, with no `authorise`. From the You step on, pages call `authorise` as they would in Settings, and the setup session satisfies it.
 - The You step, on Next, creates the Admin (`addPerson` + `PinManager.setPin`) and calls `beginSetupSession`. Done calls `endSetupSession` and `lock()`.
-- The setup session is in memory only. A wizard that resumes after a kill past the You step asks for an Admin's PIN once ("Enter your PIN to carry on setting up"), then begins the setup session again.
+- The setup session is in memory only. Whenever the wizard has an Admin but nobody signed in (a resume after a kill past the You step, the 10 idle minutes, a lock), it shows its PIN gate ("Enter your PIN to carry on setting up"), then begins the setup session again and carries on at the same step. Done tells the gate it is finishing before it signs out, so the gate doesn't appear on the way to Home.
+- *(Amended in the plan review, 2026-09-30: the setup session had no timeout.)*
 
 ### 3.5 Settings session (D5, D6)
 
 - `openSettings()` is unchanged (`authorise(settings.manage)`).
-- While Settings is open, each touch inside it (a pointer-input observer on the Settings root) calls `AccessControl.touch()`, which restarts the session's 2-minute timer. `settingsOpen` still closes when the session ends.
+- While Settings is open, each touch inside it, its sheets and PIN pads included (a pointer-input observer on the shell's layers), calls `AccessControl.touch()`, which restarts the session's 2-minute timer. `settingsOpen` still closes when the session ends, and closing Settings dismisses any sheet it opened.
 - People actions: rename and recolour call `authorise(settings.manage)` (already satisfied); remove, role change and PIN set/change/remove call `authorise(people.manage)`, which asks for a fresh PIN.
 
 ### 3.6 Kiosk (D10)
 
-`pinToScreen()` runs only when `setupComplete` is true. When setup completes, `MainActivity` pins on the next resume. Settings › Kiosk holds **Exit kiosk** (moved from the Settings footer).
+`pinToScreen()` runs only when `setupComplete` is true: on each resume, and as soon as `setupComplete` turns true while the activity is in front (so Open Culvery locks the tablet at once). Settings › Kiosk holds **Exit kiosk** (moved from the Settings footer). *(Amended in the plan review, 2026-09-30: was "on the next resume".)*
 
 ### 3.7 People (`:core:household`, `:core:access`)
 
@@ -198,7 +199,7 @@ Leaves for 4c: the lockout clock guard, `LockoutStore.commit()`, `kioskExited` o
 ## 9. Review focus
 
 - A kill at every wizard step resumes at the right step with nothing duplicated (no second Admin, no second connection).
-- The setup session can't outlive setup: after Done, or after a kill before Done, the next start has no silent Admin session.
+- The setup session can't outlive setup: after Done, or after a kill before Done, the next start has no silent Admin session; and during setup it lapses after 10 minutes without a touch, after which the wizard asks for the PIN again.
 - An existing install (Admin present) never sees the wizard; a fresh one always does.
 - The daily refresh never re-shows a calendar the user hid unless its tick in the service changed.
 - No PIN, place name, coordinates or account email reaches a log.
