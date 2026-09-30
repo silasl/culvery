@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -326,6 +327,19 @@ fun HhSwatch(color: Color, chosen: Boolean, taken: Boolean, tag: String, onClick
                 .clip(CircleShape)
                 .background(color),
         )
+    }
+}
+
+/** The person colours to pick from, wrapping, 12 apart; swatch i is tagged [tagPrefix] + i. */
+@Composable
+fun HhSwatchGrid(chosen: Long?, taken: Set<Long>, tagPrefix: String, onPick: (Long) -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(ControlTokens.swatchGap),
+        verticalArrangement = Arrangement.spacedBy(ControlTokens.swatchGap),
+    ) {
+        PersonPalette.colors.forEachIndexed { i, colour ->
+            HhSwatch(Color(colour), chosen = chosen == colour, taken = colour in taken, tag = "$tagPrefix$i") { onPick(colour) }
+        }
     }
 }
 

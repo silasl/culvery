@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,7 +40,7 @@ import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhSheetButton
-import uk.co.siland.culvery.core.ui.HhSwatch
+import uk.co.siland.culvery.core.ui.HhSwatchGrid
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.ShellTokens
@@ -185,16 +183,9 @@ internal fun PersonEditorSheet(
                     )
                 }
                 Section(COLOUR) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(ControlTokens.swatchGap),
-                        verticalArrangement = Arrangement.spacedBy(ControlTokens.swatchGap),
-                    ) {
-                        PersonPalette.colors.forEachIndexed { i, colour ->
-                            HhSwatch(Color(colour), chosen = form.color == colour, taken = colour in form.taken, tag = "swatch_$i") {
-                                form.color = colour
-                                form.message = null
-                            }
-                        }
+                    HhSwatchGrid(form.color, form.taken, tagPrefix = "swatch_") {
+                        form.color = it
+                        form.message = null
                     }
                 }
                 Section(ROLE) {

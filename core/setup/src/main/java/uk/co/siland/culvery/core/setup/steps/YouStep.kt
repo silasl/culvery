@@ -3,7 +3,6 @@ package uk.co.siland.culvery.core.setup.steps
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,7 +15,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import javax.inject.Inject
@@ -48,10 +46,9 @@ import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.WHOS_SETTING_UP
 import uk.co.siland.culvery.core.setup.showPersonEditor
 import uk.co.siland.culvery.core.setup.someoneCalled
-import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhPillButton
-import uk.co.siland.culvery.core.ui.HhSwatch
+import uk.co.siland.culvery.core.ui.HhSwatchGrid
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.PersonPalette
 
@@ -159,14 +156,7 @@ internal fun YouFormContent(form: YouForm, onSetPin: () -> Unit) {
             tag = "you_name",
             capitalization = KeyboardCapitalization.Words,
         )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(ControlTokens.swatchGap),
-            verticalArrangement = Arrangement.spacedBy(ControlTokens.swatchGap),
-        ) {
-            PersonPalette.colors.forEachIndexed { i, colour ->
-                HhSwatch(Color(colour), chosen = form.color == colour, taken = false, tag = "you_swatch_$i") { form.color = colour }
-            }
-        }
+        HhSwatchGrid(form.color, taken = emptySet(), tagPrefix = "you_swatch_") { form.color = it }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SetupDimens.rowDotGap)) {
             HhPillButton(SET_YOUR_PIN, onSetPin, Modifier.testTag("you_set_pin"))
             if (form.pin != null) Text(PIN_SET, style = SetupType.secondary, color = c.mute, modifier = Modifier.testTag("you_pin_set"))
