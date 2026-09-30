@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -109,6 +110,8 @@ class YouStep @Inject constructor(
         val members by editor.members.collectAsState(initial = emptyList())
         val admin = members.firstOrNull { it.isActiveAdmin }
         val overlay = LocalOverlayHost.current
+        // A PIN typed but never confirmed with Next isn't kept once the step is left (Back).
+        DisposableEffect(Unit) { onDispose { form.pin = null } }
         StepTitle(WHOS_SETTING_UP)
         if (admin != null) {
             // Ruling 18: once made, the Admin is edited in the sheet like anyone else.

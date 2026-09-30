@@ -33,6 +33,11 @@ class SetupSessionGate @Inject constructor(
         finishing.value = true
     }
 
+    /** Done couldn't finish, so setup goes on and the gate returns once nobody is signed in. */
+    fun finishFailed() {
+        finishing.value = false
+    }
+
     /** The PIN pad; an Admin's PIN begins the setup session again. False when cancelled or refused. */
     suspend fun carryOn(): Boolean {
         val who = access.authorise(CorePermissions.SETTINGS_MANAGE, reason = PinReason.ContinueSetup) ?: return false

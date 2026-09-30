@@ -34,9 +34,14 @@ class DoneStep @Inject constructor(
     override suspend fun onNext(): Boolean {
         access.authorise(CorePermissions.SETTINGS_MANAGE) ?: return false
         gate.finish()
-        access.endSetupSession()
-        access.lock()
-        state.markComplete()
+        try {
+            access.endSetupSession()
+            access.lock()
+            state.markComplete()
+        } catch (e: Throwable) {
+            gate.finishFailed()
+            throw e
+        }
         return true
     }
 

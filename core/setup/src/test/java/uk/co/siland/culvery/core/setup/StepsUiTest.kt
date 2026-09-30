@@ -2,7 +2,11 @@ package uk.co.siland.culvery.core.setup
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -45,6 +49,7 @@ class StepsUiTest {
     private val overlay = RecordingOverlay()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private var samples = 0
+    private val editor get() = PeopleEditor(household, access.pins, access.control, access.toasts)
 
     @Before
     fun setUp() {
@@ -61,9 +66,9 @@ class StepsUiTest {
         db.close()
     }
 
-    private fun welcome(sample: Boolean) {
+    private fun welcome(sample: Boolean, alongside: @Composable () -> Unit = {}) {
         val step = WelcomeStep(runBlocking { states.start() }, household, if (sample) Optional.of(SampleHousehold { samples++ }) else Optional.empty())
-        compose.setContent { CulveryTheme(dark = true) { Column { step.Content(onNext = {}) } } }
+        compose.setContent { CulveryTheme(dark = true) { Column { step.Content(onNext = {}); alongside() } } }
     }
 
     @Test
@@ -85,8 +90,10 @@ class StepsUiTest {
     @Test
     fun itIsNotOfferedOnceSomeoneLivesHere() {
         runBlocking { access.pins.addPerson("Sam", PersonPalette.colors[1], Role.ADULT, null) }
-        welcome(sample = true)
-        compose.awaitText("Welcome to Culvery")
+        // Sam's row comes from the same Room read, so once it shows the household has been read as not empty.
+        welcome(sample = true) { CompositionLocalProvider(LocalOverlayHost provides overlay) { PeoplePane(editor) } }
+        compose.awaitTag("person_Sam")
+        compose.waitForIdle()
         compose.onNodeWithTag("welcome_sample").assertDoesNotExist()
     }
 
@@ -112,10 +119,28 @@ class StepsUiTest {
     }
 
     @Test
+    fun leavingTheStepWithoutNextDropsTheHeldPin() {
+        val you = YouStep(household, access.pins, access.control, PeopleEditor(household, access.pins, access.control, access.toasts))
+        you.form.pin = "1357"
+        var showing by mutableStateOf(true)
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalOverlayHost provides overlay) { Column { if (showing) you.Content(onNext = {}) } }
+            }
+        }
+        compose.awaitTag("you_pin_set")
+        showing = false
+        compose.waitForIdle()
+        assertThat(you.form.pin).isNull()
+    }
+
+    @Test
     fun openCulveryNeverShowsTheGate() {
+        // A fresh install's first read stores "not complete", so only Done's markComplete can make it complete.
+        val state = runBlocking { states.start() }
+        assertThat(runBlocking { state.setupComplete.first() }).isFalse()
         val alex = runBlocking { access.addAdmin() }
         access.control.beginSetupSession(Identified(alex, Role.ADMIN))
-        val state = runBlocking { states.start() }
         val gate = SetupSessionGate(household, access.control)
         val done = DoneStep(state, access.control, gate)
         compose.setContent { CulveryTheme(dark = true) { SetupWizard(listOf(done), gate) } }

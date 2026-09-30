@@ -1,8 +1,17 @@
 package uk.co.siland.culvery.core.setup
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.io.File
+import java.io.IOException
 import java.util.Optional
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -26,6 +35,16 @@ import uk.co.siland.culvery.core.ui.PersonPalette
 /** A search nobody should reach: these tests save towns directly. */
 private object NoSearch : LocationSearch {
     override suspend fun search(query: String): List<PlaceMatch> = error("not searched in these tests")
+}
+
+/** A setup store that runs [beforeWrite] ahead of every write, so a test sees what the app looked like at that moment. */
+private class SpyStore(private val inner: DataStore<Preferences>, private val beforeWrite: () -> Unit) : DataStore<Preferences> {
+    override val data = inner.data
+
+    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+        beforeWrite()
+        return inner.updateData(transform)
+    }
 }
 
 // Robolectric for Room and DataStore's files.
@@ -190,5 +209,47 @@ class StepsTest {
         access.answer("1234")
         assertThat(done.onNext()).isTrue()
         assertThat(state.setupComplete.first()).isTrue()
+    }
+
+    private fun spyState(beforeWrite: () -> Unit): Pair<SetupState, CoroutineScope> {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        return SetupState(SpyStore(setupStore(scope) { File(folder.root, "spy.preferences_pb") }, beforeWrite), household) to scope
+    }
+
+    @Test
+    fun setupIsMarkedCompleteOnlyOnceTheSetupSessionIsOver() = runTest {
+        val access = testAccess(household)
+        val sessionsAtWrites = CopyOnWriteArrayList<Identified?>()
+        val (state, scope) = spyState { sessionsAtWrites += access.control.session.value }
+        try {
+            // A fresh install: its first read stores "not complete".
+            assertThat(state.setupComplete.first()).isFalse()
+            val alex = access.addAdmin()
+            access.control.beginSetupSession(Identified(alex, Role.ADMIN))
+            val done = DoneStep(state, access.control, SetupSessionGate(household, access.control))
+            assertThat(done.onNext()).isTrue()
+            // Two writes: the first read's, then markComplete, which ran with nobody signed in (spec §9).
+            assertThat(sessionsAtWrites).hasSize(2)
+            assertThat(sessionsAtWrites.last()).isNull()
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun ifDoneCannotFinishTheGateComesBack() = runTest {
+        val access = testAccess(household)
+        val alex = access.addAdmin()
+        access.control.beginSetupSession(Identified(alex, Role.ADMIN))
+        val (state, scope) = spyState { throw IOException("disk full") }
+        try {
+            val gate = SetupSessionGate(household, access.control)
+            val done = DoneStep(state, access.control, gate)
+            assertThat(runCatching { done.onNext() }.exceptionOrNull()).isInstanceOf(IOException::class.java)
+            // Signed out, an Admin exists, and Done is no longer finishing: the PIN gate asks again.
+            assertThat(gate.needsPin.first()).isTrue()
+        } finally {
+            scope.cancel()
+        }
     }
 }
