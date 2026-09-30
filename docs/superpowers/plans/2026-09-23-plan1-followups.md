@@ -104,3 +104,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **Later (code health)**
 - Setup session state is held apart from the session (`setupPerson`) and cleared in several places; folding it into the session value would make "ends with the session" structural. Same review suggested one helper for the "settings.manage unless no Admin yet" check and deriving the gate from setupComplete. Deferred: the code is reviewed and tested as is.
 - `DebugSampleHousehold.create()`'s setMaster-failure path has no test; a retry after a partial failure would add people twice (debug only).
+
+**Test health**
+- `StepsUiTest.aReleaseBuildNeverOffersIt` failed once with "connection pool has been closed": a Room query outlived its test. Close the database only after the composition is disposed, or wait for idle first.
