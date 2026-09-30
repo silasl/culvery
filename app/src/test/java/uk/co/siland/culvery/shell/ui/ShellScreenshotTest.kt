@@ -152,11 +152,6 @@ class ShellScreenshotTest {
     fun homeWithCalendarLight() = snap("home_calendar_light", dark = false, state = calendarHome(dark = false))
 
     @Test
-    fun settingsDark() = snap("settings_dark", dark = true) {
-        SettingsPlaceholder(onExitKiosk = {}, onClose = {})
-    }
-
-    @Test
     fun pinPadDark() = snap("pin_pad_dark", dark = true) {
         PinPadSheet("Change settings", PinReason.Generic, error = null, lockedUntilMillis = null, onSubmit = {}, onCancel = {})
     }

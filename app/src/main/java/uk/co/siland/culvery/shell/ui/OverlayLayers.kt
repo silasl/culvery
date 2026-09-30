@@ -2,6 +2,8 @@ package uk.co.siland.culvery.shell.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -13,10 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.ui.HhToast
@@ -28,7 +34,8 @@ import uk.co.siland.culvery.shell.ToastMessage
  * The shell with its overlay layers stacked over it: sheet, then [pinPad] over the sheet, then toasts over everything.
  * The layers need a parent with its own graphics layer: removing a node redraws only its nearest layered ancestor,
  * and the composition root has none, so a layer closed with no other animation running (a scrim tap, a toast timing
- * out) would get a layout pass but no new frame and stay on screen.
+ * out) would get a layout pass but no new frame and stay on screen. Every touch anywhere in them, sheets and PIN pads
+ * included, goes to [onTouch] before anything handles it (4a design D5: Settings stays open while used).
  */
 @Composable
 fun ShellLayers(
@@ -36,9 +43,21 @@ fun ShellLayers(
     toast: ToastMessage?,
     onToastHidden: (Long) -> Unit,
     pinPad: @Composable () -> Unit,
+    onTouch: (() -> Unit)? = null,
     shell: @Composable () -> Unit,
 ) {
-    Box(Modifier.fillMaxSize().graphicsLayer {}) {
+    val touched by rememberUpdatedState(onTouch)
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer {}
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    touched?.invoke()
+                }
+            },
+    ) {
         shell()
         OverlayLayer(overlay)
         pinPad()

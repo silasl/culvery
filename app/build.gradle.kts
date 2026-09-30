@@ -20,8 +20,10 @@ dependencies {
     implementation(project(":core:plugin"))
     implementation(project(":core:household"))
     implementation(project(":core:access"))
+    implementation(project(":core:setup"))
     implementation(project(":capability:calendar"))
     implementation(project(":provider:calendar-google"))
+    implementation(project(":provider:weather-openmeteo"))
     // Sample data only, in debug builds.
     debugImplementation(project(":provider:calendar-fake"))
     implementation(libs.androidx.core.ktx)

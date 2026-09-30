@@ -17,17 +17,23 @@ import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.launch
+import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.access.ui.PinPadHost
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.SettingsPage
+import uk.co.siland.culvery.core.plugin.SetupStep
+import uk.co.siland.culvery.core.setup.SettingsScreen
+import uk.co.siland.culvery.core.setup.SetupSessionGate
+import uk.co.siland.culvery.core.setup.SetupState
+import uk.co.siland.culvery.core.setup.SetupWizard
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ShellToasts
 import uk.co.siland.culvery.shell.ShellViewModel
 import uk.co.siland.culvery.shell.ui.CulveryShell
-import uk.co.siland.culvery.shell.ui.SettingsPlaceholder
 import uk.co.siland.culvery.shell.ui.ShellLayers
 
 @AndroidEntryPoint
@@ -37,9 +43,17 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var pinPrompt: PinPromptController
     @Inject lateinit var capabilities: Set<@JvmSuppressWildcards Capability>
     @Inject lateinit var toasts: ShellToasts
+    @Inject lateinit var access: AccessControl
+    @Inject lateinit var setupState: SetupState
+    @Inject lateinit var gate: SetupSessionGate
+    @Inject lateinit var coreSteps: Set<@JvmSuppressWildcards SetupStep>
+    @Inject lateinit var corePages: Set<@JvmSuppressWildcards SettingsPage>
 
     // Set by Settings › Exit kiosk; cleared when the app comes back to the foreground.
     private var kioskExited = false
+
+    // Last known from SetupState (4a design D10); false until the first read.
+    private var setupComplete = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -56,10 +70,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        lifecycleScope.launch {
+            var previous: Boolean? = null
+            setupState.setupComplete.collect { complete ->
+                setupComplete = complete
+                val resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+                if (pinOnSetupRead(previous, complete, resumed, kioskExited)) pinToScreen()
+                previous = complete
+            }
+        }
         setContent {
             val state by shell.uiState.collectAsStateWithLifecycle()
             val toast by toasts.current.collectAsStateWithLifecycle()
+            val complete by setupState.setupComplete.collectAsStateWithLifecycle<Boolean?>(initialValue = null)
             val overlay = remember { OverlayState() }
+            val steps = remember { wizardSteps(coreSteps, capabilities) }
+            val pages = remember { settingsPages(corePages, capabilities) }
             CompositionLocalProvider(
                 LocalShellNavigator provides shell,
                 LocalOverlayHost provides overlay,
@@ -70,20 +96,25 @@ class MainActivity : ComponentActivity() {
                         toast = toast,
                         onToastHidden = toasts::hide,
                         pinPad = { PinPadHost(pinPrompt, overSheet = overlay.isShowing) },
+                        onTouch = touchTarget(complete, state.settingsOpen, access),
                     ) {
-                        CulveryShell(
-                            state = state,
-                            onSelectTab = shell::selectTab,
-                            onOpenSettings = shell::openSettings,
-                            onSignOut = shell::signOut,
-                            onToggleThemePreview = shell::toggleThemePreview,
-                            tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
+                        AppContent(
+                            complete = complete,
+                            settingsOpen = state.settingsOpen,
+                            overlay = overlay,
+                            wizard = { SetupWizard(steps, gate) },
+                            shell = {
+                                CulveryShell(
+                                    state = state,
+                                    onSelectTab = shell::selectTab,
+                                    onOpenSettings = shell::openSettings,
+                                    onSignOut = shell::signOut,
+                                    onToggleThemePreview = shell::toggleThemePreview,
+                                    tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
+                                )
+                            },
+                            settings = { SettingsScreen(pages, onClose = shell::closeSettings) },
                         )
-                        if (state.settingsOpen) {
-                            SettingsPlaceholder(onExitKiosk = shell::exitKiosk, onClose = shell::closeSettings) {
-                                capabilities.sortedBy { it.order }.forEach { it.SettingsSection() }
-                            }
-                        }
                     }
                 }
             }
@@ -97,10 +128,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (!kioskExited) {
-            hideSystemBars()
-            pinToScreen()
-        }
+        if (!kioskExited) hideSystemBars()
+        if (shouldPin(setupComplete, kioskExited)) pinToScreen()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
