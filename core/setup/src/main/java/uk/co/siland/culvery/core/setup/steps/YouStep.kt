@@ -112,14 +112,7 @@ class YouStep @Inject constructor(
         StepTitle(WHOS_SETTING_UP)
         if (admin != null) {
             // Ruling 18: once made, the Admin is edited in the sheet like anyone else.
-            PersonRow(admin) {
-                overlay.showPersonEditor(
-                    editor,
-                    admin,
-                    taken = members.filter { it != admin }.mapTo(HashSet()) { it.person.color },
-                    lastAdmin = members.count { it.isActiveAdmin } == 1,
-                )
-            }
+            PersonRow(admin) { overlay.showPersonEditor(editor, admin, members) }
         } else {
             YouFormContent(form, onSetPin = {
                 overlay.show {

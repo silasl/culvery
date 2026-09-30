@@ -76,9 +76,14 @@ internal class PersonForm(val existing: Member?, val taken: Set<Long>) {
     fun draft(): PersonDraft = PersonDraft(name, checkNotNull(color), role, newPin, removePin)
 }
 
-/** Opens the editor for [existing], or for a new person when null. [lastAdmin]: [existing] is the only active Admin. */
-internal fun OverlayHost.showPersonEditor(editor: PeopleEditor, existing: Member?, taken: Set<Long>, lastAdmin: Boolean): Unit = show {
-    PersonEditorHost(editor, existing, taken, lastAdmin, onClose = { dismiss() })
+/**
+ * Opens the editor for [existing], or for a new person when null. [members] is the household now: everyone else's
+ * colours are taken, and [existing] may be its only active Admin.
+ */
+internal fun OverlayHost.showPersonEditor(editor: PeopleEditor, existing: Member?, members: List<Member>) {
+    val taken = members.filter { it != existing }.mapTo(HashSet()) { it.person.color }
+    val lastAdmin = existing?.isActiveAdmin == true && members.count { it.isActiveAdmin } == 1
+    show { PersonEditorHost(editor, existing, taken, lastAdmin, onClose = { dismiss() }) }
 }
 
 @Composable

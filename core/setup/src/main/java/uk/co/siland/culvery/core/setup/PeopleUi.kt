@@ -65,14 +65,6 @@ internal fun PersonRow(member: Member, onClick: () -> Unit) {
 internal fun PeoplePane(editor: PeopleEditor) {
     val members by editor.members.collectAsState(initial = emptyList())
     val overlay = LocalOverlayHost.current
-    val activeAdmins = members.count { it.isActiveAdmin }
-    val open: (Member?) -> Unit = { existing ->
-        overlay.showPersonEditor(
-            editor,
-            existing,
-            taken = members.filter { it != existing }.mapTo(HashSet()) { it.person.color },
-            lastAdmin = existing?.isActiveAdmin == true && activeAdmins == 1,
-        )
-    }
-    PeopleList(members, onEdit = { open(it) }, onAdd = if (members.size < MAX_PEOPLE) ({ open(null) }) else null)
+    val open: (Member?) -> Unit = { overlay.showPersonEditor(editor, it, members) }
+    PeopleList(members, onEdit = open, onAdd = if (members.size < MAX_PEOPLE) ({ open(null) }) else null)
 }
