@@ -8,6 +8,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -36,9 +37,12 @@ class HouseholdFollower @Inject constructor(
             household.people
                 // The type only: a message could hold a name.
                 .retryWithBackoff { Log.w(TAG, "Couldn't read the household's people; retrying (${it::class.simpleName})") }
-                .collect { people ->
+                // A rename or recolour leaves nobody's calendars to move.
+                .map { people -> people.mapTo(HashSet()) { it.id } }
+                .distinctUntilChanged()
+                .collect { ids ->
                     try {
-                        store.remapMissingPeople(people.mapTo(HashSet()) { it.id })
+                        store.remapMissingPeople(ids)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {

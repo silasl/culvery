@@ -16,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import javax.inject.Provider
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -50,8 +51,9 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var access: AccessControl
     @Inject lateinit var setupState: SetupState
     @Inject lateinit var gate: SetupSessionGate
-    @Inject lateinit var coreSteps: Set<@JvmSuppressWildcards SetupStep>
-    @Inject lateinit var corePages: Set<@JvmSuppressWildcards SettingsPage>
+    // Only read when the wizard or Settings shows.
+    @Inject lateinit var coreSteps: Provider<Set<@JvmSuppressWildcards SetupStep>>
+    @Inject lateinit var corePages: Provider<Set<@JvmSuppressWildcards SettingsPage>>
 
     // Set by Settings › Exit kiosk; cleared when the app comes back to the foreground.
     private var kioskExited = false
@@ -88,8 +90,6 @@ class MainActivity : ComponentActivity() {
             val toast by toasts.current.collectAsStateWithLifecycle()
             val complete by setupComplete.collectAsStateWithLifecycle()
             val overlay = remember { OverlayState() }
-            val steps = remember { wizardSteps(coreSteps, capabilities) }
-            val pages = remember { settingsPages(corePages, capabilities) }
             CompositionLocalProvider(
                 LocalShellNavigator provides shell,
                 LocalOverlayHost provides overlay,
@@ -106,7 +106,7 @@ class MainActivity : ComponentActivity() {
                             complete = complete,
                             settingsOpen = state.settingsOpen,
                             overlay = overlay,
-                            wizard = { SetupWizard(steps, gate) },
+                            wizard = { SetupWizard(remember { wizardSteps(coreSteps.get(), capabilities) }, gate) },
                             shell = {
                                 CulveryShell(
                                     state = state,
@@ -117,7 +117,7 @@ class MainActivity : ComponentActivity() {
                                     tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
                                 )
                             },
-                            settings = { SettingsScreen(pages, onClose = shell::closeSettings) },
+                            settings = { SettingsScreen(remember { settingsPages(corePages.get(), capabilities) }, onClose = shell::closeSettings) },
                         )
                     }
                 }
