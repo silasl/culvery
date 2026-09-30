@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.setup.SampleHousehold
+import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupState
 import uk.co.siland.culvery.core.setup.START
 import uk.co.siland.culvery.core.setup.StepTitle
@@ -30,6 +31,7 @@ import uk.co.siland.culvery.core.ui.rememberSingleAction
 class WelcomeStep @Inject constructor(
     private val state: SetupState,
     private val household: HouseholdRepository,
+    private val gate: SetupSessionGate,
     private val sample: Optional<SampleHousehold>,
 ) : SetupStep {
     override val id = "welcome"
@@ -48,9 +50,23 @@ class WelcomeStep @Inject constructor(
         val nobodyYet by remember { household.members.map { it.isEmpty() } }.collectAsState(initial = false)
         val action = rememberSingleAction(Unit) { e -> Log.w(TAG, "Couldn't make the sample household (${e::class.simpleName})") }
         WelcomeContent(
-            onSample = if (sample.isPresent && nobodyYet) ({ action.run { sample.get().create() } }) else null,
+            onSample = if (sample.isPresent && nobodyYet) ({ action.run { makeSample() } }) else null,
             busy = action.busy,
         )
+    }
+
+    /**
+     * The sample finishes setup, so the gate is told first, as Done does: otherwise its Admin brings the PIN gate up
+     * mid-build, Welcome leaves the screen and the build is cancelled with only the Admin made.
+     */
+    private suspend fun makeSample() {
+        gate.finish()
+        try {
+            sample.get().create()
+        } catch (e: Throwable) {
+            gate.finishFailed()
+            throw e
+        }
     }
 
     private companion object {

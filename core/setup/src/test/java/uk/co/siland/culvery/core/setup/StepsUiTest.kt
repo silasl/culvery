@@ -67,7 +67,7 @@ class StepsUiTest {
     }
 
     private fun welcome(sample: Boolean, alongside: @Composable () -> Unit = {}) {
-        val step = WelcomeStep(runBlocking { states.start() }, household, if (sample) Optional.of(SampleHousehold { samples++ }) else Optional.empty())
+        val step = WelcomeStep(runBlocking { states.start() }, household, SetupSessionGate(household, access.control), if (sample) Optional.of(SampleHousehold { samples++ }) else Optional.empty())
         compose.setContent { CulveryTheme(dark = true) { Column { step.Content(onNext = {}); alongside() } } }
     }
 

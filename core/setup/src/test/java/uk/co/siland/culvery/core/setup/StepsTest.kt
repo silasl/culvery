@@ -72,12 +72,13 @@ class StepsTest {
 
     @Test
     fun welcomeIsDoneOnceStartedAndStaysDoneAfterAKill() = runTest {
-        val welcome = WelcomeStep(states.start(), household, Optional.empty())
+        val gate = SetupSessionGate(household, testAccess(household).control)
+        val welcome = WelcomeStep(states.start(), household, gate, Optional.empty())
         assertThat(welcome.nextLabel).isEqualTo("Start")
         assertThat(welcome.canGoOn.first()).isTrue()
         assertThat(welcome.done.first()).isFalse()
         assertThat(welcome.onNext()).isTrue()
-        assertThat(WelcomeStep(states.start(), household, Optional.empty()).done.first()).isTrue()
+        assertThat(WelcomeStep(states.start(), household, gate, Optional.empty()).done.first()).isTrue()
     }
 
     @Test
