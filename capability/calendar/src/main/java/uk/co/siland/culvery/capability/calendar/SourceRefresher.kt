@@ -15,8 +15,8 @@ import uk.co.siland.culvery.core.plugin.WallClock
 /** How often a connection's sources are read again from the provider (3a design D7). */
 const val SOURCE_REFRESH_MS = 24 * 60 * 60_000L
 
-/** 3a design D7: the master calendar went, or became read-only, so the add buttons hide. */
-fun masterGone(serviceName: String): String = "$serviceName: can't find the master calendar, so new events can't be added"
+/** 3a design D7, 4a design §4.5: the master calendar went, or became read-only, so the add buttons hide until another is chosen. */
+fun masterGone(serviceName: String): String = "$serviceName: can't find the master calendar — choose a new one in Settings › Calendars."
 
 /**
  * Follows the calendars ticked in the service (3a design §3.4, D7): at the start of a connection's part of a pass,

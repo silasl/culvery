@@ -470,6 +470,86 @@ class CalendarStoreTest {
     }
 
     @Test
+    fun aHiddenCalendarStaysHiddenWhileItsTickIsUnchanged() = runTest {
+        connect("s1", "s2")
+        store.setMapping("c1", "s1", PersonId.FAMILY, visible = false)
+        store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 5_000L, mapping("mia"))
+        store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 6_000L, mapping("mia"))
+        assertThat(store.source("c1", "s1")!!.mapping.visible).isFalse()
+    }
+
+    @Test
+    fun aChangedTickInTheServiceWins() = runTest {
+        connect("s1")
+        store.setMapping("c1", "s1", PersonId.FAMILY, visible = false)
+        store.refreshSources("c1", listOf(listed("s1", shown = false)), 5_000L, mapping("mia"))
+        assertThat(store.source("c1", "s1")!!.mapping.visible).isFalse()
+        store.refreshSources("c1", listOf(listed("s1", shown = true)), 6_000L, mapping("mia"))
+        assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
+        store.setMapping("c1", "s1", PersonId.FAMILY, visible = true)
+        store.refreshSources("c1", listOf(listed("s1", shown = false)), 7_000L, mapping("mia"))
+        assertThat(store.source("c1", "s1")!!.mapping.visible).isFalse()
+    }
+
+    @Test
+    fun theMasterStaysShownWhateverTheServiceSays() = runTest {
+        connect("s1")
+        store.setMaster("c1", "s1")
+        store.refreshSources("c1", listOf(listed("s1", writable = true, shown = false)), 5_000L, mapping("mia"))
+        assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
+    }
+
+    @Test
+    fun setMappingChangesWhoItIsForAndWhetherItShows() = runTest {
+        connect("s1")
+        store.setMapping("c1", "s1", PersonId("mia"), visible = false)
+        assertThat(store.source("c1", "s1")!!.mapping).isEqualTo(SourceMapping(PersonId("mia"), visible = false))
+    }
+
+    @Test
+    fun theMasterCannotBeHidden() = runTest {
+        connect("s1")
+        store.setMaster("c1", "s1")
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { store.setMapping("c1", "s1", PersonId.FAMILY, visible = false) }
+        }
+        assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
+    }
+
+    @Test
+    fun makingAHiddenCalendarTheMasterShowsIt() = runTest {
+        connect("s1")
+        store.setMapping("c1", "s1", PersonId.FAMILY, visible = false)
+        store.setMaster("c1", "s1")
+        assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
+    }
+
+    @Test
+    fun calendarsOfSomeoneGoneBecomeFamilyAndTheRestStay() = runTest {
+        connect("s1", "s2", "s3", mapping = mapOf(
+            "s1" to SourceMapping(PersonId("mia"), visible = true),
+            "s2" to SourceMapping(PersonId("sam"), visible = false),
+        ))
+        store.remapMissingPeople(setOf(PersonId("sam")))
+        assertThat(store.sources().first().associate { it.source.id to it.mapping }).containsExactly(
+            "s1", SourceMapping(PersonId.FAMILY, visible = true),
+            "s2", SourceMapping(PersonId("sam"), visible = false),
+            "s3", SourceMapping(PersonId.FAMILY, visible = true),
+        )
+    }
+
+    @Test
+    fun queuedChangesCountsOnlyThatConnection() = runTest {
+        connect("s1")
+        store.addConnection(Connection("c2", "calendar.test", "Other", emptyMap()), listOf(CalendarSource("t1", "T1", writable = false)), emptyMap())
+        store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null))
+        store.enqueue(change(ChangeKind.DELETE, remoteId = "b", draft = null))
+        store.enqueue(change(ChangeKind.DELETE, remoteId = "c", draft = null).copy(connectionId = "c2", sourceId = "t1"))
+        assertThat(store.queuedChanges("c1")).isEqualTo(2)
+        assertThat(store.queuedChanges("c2")).isEqualTo(1)
+    }
+
+    @Test
     fun makeDueBringsAConnectionsQueueDueWithoutCountingAnAttempt() = runTest {
         connect("s1")
         store.enqueue(change(ChangeKind.DELETE, draft = null, next = 90_000L, attempts = 3))

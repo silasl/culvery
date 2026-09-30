@@ -16,10 +16,12 @@ import uk.co.siland.culvery.capability.calendar.CalendarPermissionSource
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSyncLoop
 import uk.co.siland.culvery.capability.calendar.CalendarWriter
+import uk.co.siland.culvery.capability.calendar.HouseholdFollower
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_1_2
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_2_3
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_3_4
+import uk.co.siland.culvery.capability.calendar.db.MIGRATION_4_5
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
@@ -43,6 +45,10 @@ abstract class CalendarModule {
 
     @Binds
     @IntoSet
+    abstract fun householdFollower(impl: HouseholdFollower): Startable
+
+    @Binds
+    @IntoSet
     abstract fun permissions(impl: CalendarPermissionSource): PermissionSource
 
     companion object {
@@ -50,7 +56,7 @@ abstract class CalendarModule {
         @Singleton
         fun database(@ApplicationContext context: Context): CalendarDatabase =
             Room.databaseBuilder(context, CalendarDatabase::class.java, "calendar.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
     }
 }

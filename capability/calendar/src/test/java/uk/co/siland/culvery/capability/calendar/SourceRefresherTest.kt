@@ -93,7 +93,7 @@ class SourceRefresherTest {
         assertThat(sourceIds()).containsExactly(primary.id, swimming.id)
         refresher.flag("g1", swimming.id)
         refresh()
-        assertThat(toaster.messages).containsExactly("Google Calendar: can't find the master calendar, so new events can't be added")
+        assertThat(toaster.messages).containsExactly("Google Calendar: can't find the master calendar — choose a new one in Settings › Calendars.")
     }
 
     @Test
@@ -103,7 +103,7 @@ class SourceRefresherTest {
         refresh()
         assertThat(store.master().first()).isNull()
         assertThat(sourceIds()).containsExactly(primary.id)
-        assertThat(toaster.messages).containsExactly("Google Calendar: can't find the master calendar, so new events can't be added")
+        assertThat(toaster.messages).containsExactly("Google Calendar: can't find the master calendar — choose a new one in Settings › Calendars.")
     }
 
     @Test

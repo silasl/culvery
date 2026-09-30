@@ -22,6 +22,7 @@ import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_1_2
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_2_3
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_3_4
+import uk.co.siland.culvery.capability.calendar.db.MIGRATION_4_5
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -73,7 +74,7 @@ class CalendarMigrationTest {
         helper.runMigrationsAndValidate(2, listOf(MIGRATION_1_2)).close()
 
         val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .setDriver(AndroidSQLiteDriver())
             .allowMainThreadQueries()
             .build()
@@ -145,7 +146,7 @@ class CalendarMigrationTest {
         }
 
         val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .setDriver(AndroidSQLiteDriver())
             .allowMainThreadQueries()
             .build()
@@ -210,7 +211,7 @@ class CalendarMigrationTest {
         }
 
         val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .setDriver(AndroidSQLiteDriver())
             .allowMainThreadQueries()
             .build()
@@ -245,6 +246,64 @@ class CalendarMigrationTest {
     }
 
     /** The app's own tables, without SQLite's, Android's and Room's bookkeeping. */
+    @Test
+    fun migrationFromV4CopiesVisibilityIntoTheLastSeenTick() = runTest {
+        file.parentFile?.mkdirs()
+        file.delete()
+
+        val v4 = helper.createDatabase(4)
+        v4.execSQL(
+            "INSERT INTO connection (id, providerId, label, configJson, health, healthMessage, lastSyncMillis, " +
+                "sourcesCheckedMillis, needsSignInSinceMillis) " +
+                "VALUES ('c1', 'calendar.test', 'Google', '{}', 'OK', NULL, 1234, 5000, NULL)",
+        )
+        v4.execSQL(
+            "INSERT INTO source (connectionId, sourceId, name, writable, visible, personId, isMaster) " +
+                "VALUES ('c1', 's1', 'Family', 1, 1, 'family', 1), ('c1', 's2', 'Alex', 0, 0, 'alex-id', 0), " +
+                "('c1', 's3', 'Swimming', 0, 1, 'mia-id', 0)",
+        )
+        v4.close()
+
+        val v5 = helper.runMigrationsAndValidate(5, listOf(MIGRATION_4_5))
+        try {
+            assertThat(tableNames(v5)).containsExactly("connection", "event", "outbox", "source", "sync_state").inOrder()
+            val statement = v5.prepare("SELECT sourceId, shownInService FROM source ORDER BY sourceId")
+            val ticks = mutableListOf<Pair<String, Long>>()
+            try {
+                while (statement.step()) ticks += statement.getText(0) to statement.getLong(1)
+            } finally {
+                statement.close()
+            }
+            assertThat(ticks).containsExactly("s1" to 1L, "s2" to 0L, "s3" to 1L).inOrder()
+        } finally {
+            v5.close()
+        }
+
+        val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            // refreshSources runs in withTransaction, which needs the framework open helper, not the driver.
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val store = CalendarStore(db)
+            // The service still ticks as before: an upgraded install keeps every choice, the hidden Alex included.
+            val listed = listOf(
+                CalendarSource("s1", "Family", writable = true, primary = true),
+                CalendarSource("s2", "Alex", writable = false, shown = false),
+                CalendarSource("s3", "Swimming", writable = false),
+            )
+            store.refreshSources("c1", listed, 6_000L) { SourceMapping.Default }
+            assertThat(store.sources().first().associate { it.source.id to it.mapping }).containsExactly(
+                "s1", SourceMapping(PersonId.FAMILY, visible = true),
+                "s2", SourceMapping(PersonId("alex-id"), visible = false),
+                "s3", SourceMapping(PersonId("mia-id"), visible = true),
+            )
+            assertThat(store.master().first()?.source?.id).isEqualTo("s1")
+        } finally {
+            db.close()
+        }
+    }
+
     private fun tableNames(connection: SQLiteConnection): List<String> {
         val statement = connection.prepare(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' " +

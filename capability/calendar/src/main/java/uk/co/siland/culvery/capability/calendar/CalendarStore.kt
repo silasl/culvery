@@ -58,7 +58,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         dao.insertSources(
             sources.map { s ->
                 val m = mapping[s.id] ?: SourceMapping.Default
-                SourceEntity(connection.id, s.id, s.name, s.writable, m.visible, m.person.value)
+                SourceEntity(connection.id, s.id, s.name, s.writable, m.visible, m.person.value, shownInService = s.visibleOnTablet)
             },
         )
         if (masterSourceId != null) {
@@ -78,10 +78,12 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     }
 
     /**
-     * Follows the provider's list of [sources] (3a design §3.4), in one transaction: a new source is added with
-     * [mappingForNew]; an existing one keeps its person and takes the listed name, writability and visibility (the
-     * primary stays visible); one no longer listed goes with its events, cursor and queued changes. Returns true when
-     * the master went, or became read-only, and was cleared. Writes nothing once the connection is gone.
+     * Follows the provider's list of [sources] (3a design §3.4, 4a design §3.10), in one transaction: a new source is
+     * added with [mappingForNew]; an existing one keeps its person, takes the listed name and writability, and takes the
+     * service's tick as its visibility only when that tick has changed since it was last seen (ruling 12: the tick is
+     * `shown || primary`), so a calendar hidden or shown on the tablet stays so; the master is always shown. One no
+     * longer listed goes with its events, cursor and queued changes. Returns true when the master went, or became
+     * read-only, and was cleared. Writes nothing once the connection is gone.
      */
     suspend fun refreshSources(
         connectionId: String,
@@ -101,11 +103,17 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         }
         listed.values.forEach { s ->
             val existing = stored[s.id]
+            val tick = s.visibleOnTablet
             if (existing == null) {
                 val m = mappingForNew(s)
-                dao.insertSources(listOf(SourceEntity(connectionId, s.id, s.name, s.writable, m.visible, m.person.value)))
+                dao.insertSources(listOf(SourceEntity(connectionId, s.id, s.name, s.writable, m.visible, m.person.value, shownInService = tick)))
             } else {
-                dao.updateSource(connectionId, s.id, s.name, s.writable, visible = s.visibleOnTablet)
+                val visible = when {
+                    existing.isMaster -> true
+                    existing.shownInService == tick -> existing.visible
+                    else -> tick
+                }
+                dao.updateSource(connectionId, s.id, s.name, s.writable, visible, tick)
                 if (existing.isMaster && !s.writable) {
                     dao.clearMaster()
                     masterCleared = true
@@ -134,13 +142,33 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     fun master(): Flow<StoredSource?> = dao.master().map { it?.toStored() }
 
     /**
-     * Makes this source the one master calendar, clearing any other, in one transaction. It also records the
+     * Makes this source the one master calendar, and shows it, clearing any other master, in one transaction. It also records the
      * source as writable: only CalendarSetup.setMaster calls this, after checking the provider says it is.
      */
     suspend fun setMaster(connectionId: String, sourceId: String) = db.withTransaction {
         dao.clearMaster()
         require(dao.markMaster(connectionId, sourceId) == 1) { "The master calendar isn't among the connection's calendars" }
     }
+
+    /**
+     * Who a calendar is for and whether it shows, chosen on the tablet (4a design §3.9, D13). The master is always shown:
+     * hiding it is refused.
+     */
+    suspend fun setMapping(connectionId: String, sourceId: String, person: PersonId, visible: Boolean) = db.withTransaction {
+        val row = requireNotNull(dao.source(connectionId, sourceId)) { "No such calendar" }
+        require(visible || !row.isMaster) { "The master calendar is always shown" }
+        dao.setMapping(connectionId, sourceId, person.value, visible)
+    }
+
+    /** Every calendar mapped to someone not in [existing] (removed from the household) now shows as Family (4a design §3.9). */
+    suspend fun remapMissingPeople(existing: Set<PersonId>) = db.withTransaction {
+        dao.allSourcesNow()
+            .filter { it.personId != PersonId.FAMILY.value && PersonId(it.personId) !in existing }
+            .forEach { dao.setPerson(it.connectionId, it.sourceId, PersonId.FAMILY.value) }
+    }
+
+    /** The disconnect confirmation's count (4a design D14). */
+    suspend fun queuedChanges(connectionId: String): Int = dao.countOutboxOf(connectionId)
 
     /**
      * Also keeps the outbox's sign-in pause (3a design D16): the first NeedsSignIn starts it; Ok folds it into each of

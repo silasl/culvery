@@ -35,3 +35,15 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         db.execSQL("ALTER TABLE `connection` ADD COLUMN `needsSignInSinceMillis` INTEGER")
     }
 }
+
+/**
+ * v5 (Plan 4a): the service's last-seen tick per calendar, seeded from `visible` (which until now always followed the
+ * tick, the primary always shown), so the first refresh after the upgrade changes nothing. The SQL must match
+ * schemas/…/5.json exactly.
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `source` ADD COLUMN `shownInService` INTEGER")
+        db.execSQL("UPDATE `source` SET `shownInService` = `visible`")
+    }
+}

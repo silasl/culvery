@@ -41,6 +41,11 @@ data class SourceEntity(
     val personId: String,
     /** At most one row is 1 (CalendarStore.setMaster clears the others in the same transaction). */
     @ColumnInfo(defaultValue = "0") val isMaster: Boolean = false,
+    /**
+     * v5 (4a design §3.10): the service's tick when it was last seen, so a refresh changes `visible` only when the tick
+     * changes; null until first seen.
+     */
+    val shownInService: Boolean? = null,
 )
 
 /** Timed events set the *Instant columns; all-day events set the *Date columns (ISO dates, end exclusive). */
@@ -170,10 +175,10 @@ interface CalendarDao {
     suspend fun deleteOutboxOfSource(connectionId: String, sourceId: String)
 
     @Query(
-        "UPDATE source SET name = :name, writable = :writable, visible = :visible " +
+        "UPDATE source SET name = :name, writable = :writable, visible = :visible, shownInService = :shownInService " +
             "WHERE connectionId = :connectionId AND sourceId = :sourceId",
     )
-    suspend fun updateSource(connectionId: String, sourceId: String, name: String, writable: Boolean, visible: Boolean)
+    suspend fun updateSource(connectionId: String, sourceId: String, name: String, writable: Boolean, visible: Boolean, shownInService: Boolean)
 
     @Query("SELECT * FROM source WHERE connectionId = :connectionId ORDER BY name")
     suspend fun sources(connectionId: String): List<SourceEntity>
@@ -190,8 +195,20 @@ interface CalendarDao {
     @Query("UPDATE source SET isMaster = 0 WHERE isMaster = 1")
     suspend fun clearMaster()
 
-    @Query("UPDATE source SET isMaster = 1, writable = 1 WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    @Query("UPDATE source SET isMaster = 1, writable = 1, visible = 1 WHERE connectionId = :connectionId AND sourceId = :sourceId")
     suspend fun markMaster(connectionId: String, sourceId: String): Int
+
+    @Query("UPDATE source SET personId = :personId, visible = :visible WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun setMapping(connectionId: String, sourceId: String, personId: String, visible: Boolean): Int
+
+    @Query("UPDATE source SET personId = :personId WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun setPerson(connectionId: String, sourceId: String, personId: String)
+
+    @Query("SELECT * FROM source ORDER BY connectionId, name")
+    suspend fun allSourcesNow(): List<SourceEntity>
+
+    @Query("SELECT COUNT(*) FROM outbox WHERE connectionId = :connectionId")
+    suspend fun countOutboxOf(connectionId: String): Int
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertSources(sources: List<SourceEntity>)
@@ -272,7 +289,7 @@ interface CalendarDao {
  */
 @Database(
     entities = [ConnectionEntity::class, SourceEntity::class, EventEntity::class, SyncStateEntity::class, OutboxEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class CalendarDatabase : RoomDatabase() {
