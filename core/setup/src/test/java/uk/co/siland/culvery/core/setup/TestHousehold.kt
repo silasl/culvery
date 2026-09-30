@@ -2,16 +2,20 @@ package uk.co.siland.culvery.core.setup
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
+import org.junit.rules.TemporaryFolder
 import uk.co.siland.culvery.core.access.CorePermissionSource
 import uk.co.siland.culvery.core.access.DefaultAccessControl
 import uk.co.siland.culvery.core.access.LockoutStore
@@ -86,3 +90,16 @@ internal fun TestScope.testAccess(household: HouseholdRepository): TestAccess {
 
 internal suspend fun TestAccess.addAdmin(name: String = "Alex", pin: String = "1234"): Person =
     pins.addPerson(name, PersonPalette.colors.first(), Role.ADMIN, pin)
+
+/** SetupState over one file; each [start] is the app starting again, with a new DataStore once the last has let go. */
+internal class SetupStates(private val folder: TemporaryFolder, private val household: HouseholdRepository) {
+    private var scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    suspend fun start(): SetupState {
+        scope.coroutineContext.job.cancelAndJoin()
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        return SetupState(setupStore(scope) { File(folder.root, "setup.preferences_pb") }, household)
+    }
+
+    fun close() = runBlocking { scope.coroutineContext.job.cancelAndJoin() }
+}
