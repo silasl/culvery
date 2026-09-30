@@ -168,7 +168,7 @@ A stronger device-owner lock is possible later; it is not built yet.
 - Viewing never needs a PIN. Changing things does.
 - A session lasts 2 minutes after the last PIN-checked action; while Settings is open, every touch in it (its sheets and PIN pads included) restarts the 2 minutes. During setup the first Admin stays signed in until Done, or until 10 minutes pass without a touch; the wizard then asks for their PIN to carry on. While someone is signed in, the status bar shows their name and role and a **Sign out** link. Settings closes when the session ends.
 - Calendar changes follow the roles: Admins and Adults can add events for anyone, and edit, delete and assign any event on the master calendar; a Child can add events only for themselves, edit or delete only events they added (and can't move one to someone else), and can't assign. A refused change says why in a toast and signs the person out, so the next tap asks for a PIN. Events from other calendars, and repeating events, can't be changed on the tablet, and an event over several days can have only its title and who changed.
-- Exiting kiosk, adding or removing someone, changing a role and setting, changing or removing a PIN always ask for a PIN, even mid-session; renaming and recolouring don't. Changing your own role or PIN signs you out.
+- Exiting kiosk, adding or removing someone, changing a role and setting, changing or removing a PIN always ask for a PIN, even mid-session; renaming and recolouring don't. Changing your own role or PIN, or removing yourself, signs you out.
 - 5 wrong PINs lock the pad for 30 seconds, doubling each time up to 16 minutes. Only a PIN that is allowed to do the thing clears the count.
 - This is kid-proofing, not strong security.
 

@@ -88,6 +88,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **For Plan 4c**
 - Reordering people (4a design D15).
 - Per-calendar health in Settings › Calendars (M7) and the repeat-series cap stay 4c's (4a design D15).
+- Count the queued changes a source removal dropped in the master-gone toast (D7).
 - The PIN pad for choosing a PIN has no reason line; check on the SM-T510 that its two stages read clearly.
 - The wizard's steps and Settings' pages on the SM-T510 with the Samsung keyboard up (the town search, the person sheet's name field).
 - The choose-a-PIN pad (and a sheet's Save) says "That PIN is taken — choose another." when someone else has the PIN, so an Admin can learn that a PIN is in use. Accepted: only an Admin (with a fresh PIN) gets there, and it follows from PINs being unique, since a PIN identifies its person.
