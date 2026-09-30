@@ -16,9 +16,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - After Exit kiosk, the system bars overlap the content (edge-to-edge, no insets). Pad the root with `WindowInsets.systemBars` when not in kiosk mode.
 - `LockoutStore` uses `commit()`, which is synchronous disk I/O and may be on Main. Switch to `apply()` with an in-memory mirror if StrictMode complains.
 - `kioskExited` is lost when the Activity is recreated by a config change that isn't in the manifest list.
-- The session keeps a snapshot of the person, so a role change or deletion lasts until the session ends, 2 minutes after the last authorised action. The people editor should call `AccessControl.lock()`.
-- Read `addPerson`'s `sortOrder` inside a transaction. Add tests that `setRole`, `setPinHash` and `clearPin` reject Family.
-- Make the debug seed check for an active Admin rather than an empty household. Remove the debug Admin when the wizard creates the first real one.
 - Before shipping to the wall, run the Task 10 Step 7 checks on the device and do a signed release build (`startLockTask` has only run in release, and never on a device).
 
 ## From Plan 2a review (deferred)
@@ -36,7 +33,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 ## From Plan 2b-1 (deferred)
 
 **For Plan 4**
-- m5: Settings closes when the session ends, 2 minutes after the PIN, however busy the adult is. Extend the session on each saved settings action, or give Settings its own session while open.
 - Check DM Sans weights and bold-text truncation on an API 30 AVD (Google Play image); the 2b-1 walkthrough ran on API 35.
 
 **Accessibility pass (with the `HhIcon` item)**
@@ -70,7 +66,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **For Plan 4**
 - L3: decide in the on-device kiosk pass whether connecting and reconnecting Google need a fresh PIN; 3a rides the 2-minute Admin session, and the account chooser's "Add another account" can lead a child out of the app.
 - M4: before connecting, check Play services is available (`isGooglePlayServicesAvailable`), and when the chooser comes back cancelled with no data in lock-task mode, hint to exit kiosk; part of the on-device lock-task pass.
-- H2: when a connection has no master (cleared by D7), make its writable primary the master again, with Settings' master editing; and count the queued changes a source removal dropped in the D7 toast.
 - M7: a source still listed after a refresh but always 403/404 on events.list is flagged for a refresh every pass and keeps its connection "Can't reach": stop re-flagging a kept source, and show per-source health in Settings.
 - L4: release logging policy: keep the account email (in request paths) and calendar names out of release logs.
 - L6: on the device, delete a whole series on a phone and check its instances leave the tablet; the next daily full sync bounds it today (a full sync when a cancelled id is a known series would close it).
@@ -83,9 +78,28 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **For Plan 4**
 - The on-device pass: in a signed release in lock-task mode, check Play services' account chooser and consent screens appear when connecting and reconnecting (3a design §9); if not, exit kiosk around them.
 - The release OAuth client (the release key's SHA-1) with release signing. Until then a release build offers Connect Google Calendar, and it fails with "Couldn't connect" (the README says so).
-- The Connect-a-calendar card's Google button was checked by tests only: a debug build always has the sample calendar, so the card never shows on the emulator.
-- Settings: disconnecting a connection, and editing mappings, visibility and the master (3a design §10).
 - Bound recurring series in the mirror: Google's sync (`singleEvents`, no `timeMax`) stores every instance, e.g. 730 rows up to 2040 for one weekly event. Measure on the SM-T510 and cap stored instances (for example, drop rows past the sync window after each pass).
 - `TodayCardHost` recomposes every 30 s on the clock tick with nothing changed; key the day on the date alone.
 - Emulator Play services 26.34 crash-loops on API 35 after a network change (see the setup doc's §5 note); recheck on the SM-T510 before shipping.
 - A write refused for a missing scope (403, NeedsSignIn) while reads still work: the same pass's `markSynced` sets health back to Ok, so the reconnect chip vanishes and the change retries until its 48 hours run out. Only a later partial revocation leads here (connect refuses partial grants); keep NeedsSignIn from a write until a reconnect.
+
+## From Plan 4a (deferred)
+
+**For Plan 4c**
+- Reordering people (4a design D15).
+- Per-calendar health in Settings › Calendars (M7) and the repeat-series cap stay 4c's (4a design D15).
+- The PIN pad for choosing a PIN has no reason line; check on the SM-T510 that its two stages read clearly.
+- The wizard's steps and Settings' pages on the SM-T510 with the Samsung keyboard up (the town search, the person sheet's name field).
+- The choose-a-PIN pad (and a sheet's Save) says "That PIN is taken — choose another." when someone else has the PIN, so an Admin can learn that a PIN is in use. Accepted: only an Admin (with a fresh PIN) gets there, and it follows from PINs being unique, since a PIN identifies its person.
+- `DebugSampleHousehold.create()` still completes when making the Family calendar the master fails, but no test forces that failure: the fake has no hook to fail its second calendar-list read alone.
+- Cold start skips 130–190 frames on the emulator (main-thread work at launch); measure on the SM-T510 and move work off Main if it shows.
+- Play services "NetworkCapability 37" crash-loops recur on API 35 emulator images whenever Play Store re-updates Play services; Culvery copes (calls fail and retry), but connecting needs a working Play services.
+
+**For the end-of-v1 design and UX review**
+- All 4a layout, colour and copy choices are provisional (wizard padding, rows, swatches, role-chip lines, Settings column, the five extra person colours, the Connect step's connected card — its title wraps onto two lines).
+- Settings page list items have no `Role.Tab` (accessibility), alongside the existing accessibility items.
+- The calendar's DeleteButton keeps its danger text while disabled; the shared HhSheetButton greys out — pick one.
+
+**Later (code health)**
+- Setup session state is held apart from the session (`setupPerson`) and cleared in several places; folding it into the session value would make "ends with the session" structural. Same review suggested one helper for the "settings.manage unless no Admin yet" check and deriving the gate from setupComplete. Deferred: the code is reviewed and tested as is.
+- `DebugSampleHousehold.create()`'s setMaster-failure path has no test; a retry after a partial failure would add people twice (debug only).

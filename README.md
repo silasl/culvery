@@ -17,11 +17,13 @@ Requirements: JDK 17, Android SDK platform 35.
 
 Use `testDebugUnitTest`, not `test` — release unit tests don't include the Compose test activity.
 
-Debug builds seed a sample household on first launch so the app is usable before the setup wizard exists: **Alex** (Admin, PIN 1234), **Sam** (Adult, PIN 2468) and **Mia** (Child, PIN 1357), plus a "Sample calendar" connection showing the design hand-off's week. Its "Family calendar" is the household's master calendar, so events can be added there, and its events edited, deleted and assigned, on the tablet. The sample calendar keeps changes in memory and forgets them when the app restarts. People are only seeded when there is no Admin with a PIN; an install carried over from an earlier build (Plan 1 or 2a) also keeps its stored calendar names, so the sample calendar may show "Family" instead of "Family calendar" — clear the app's data (`adb shell pm clear uk.co.siland.culvery`) for a clean sample. Release builds seed nothing and include no sample calendar.
+A fresh install opens the setup wizard before anything else: Welcome, Home location (town search, through Open-Meteo), You (the first Admin and their PIN), Household, Connect a calendar, Review calendars, Done. Each step saves as it goes, so a restart resumes where setup stopped; after the first Admin exists, a restart asks for their PIN once. An install from an earlier build that already has an Admin goes straight to Home. To run setup again, clear the app's data (`adb shell pm clear uk.co.siland.culvery`).
+
+In debug builds Welcome also offers **Use a sample household**: **Alex** (Admin, PIN 1234), **Sam** (Adult, PIN 2468), **Mia** (Child, PIN 1357), London, and a "Sample calendar" connection showing the design hand-off's week, with its "Family calendar" as the master calendar. The sample calendar keeps changes in memory and forgets them when the app restarts. Release builds offer no sample and include no sample calendar.
 
 To see what the tablet does while a calendar can't be reached, a debug build can take the sample calendar offline and bring it back: `adb shell am broadcast -n uk.co.siland.culvery/.DebugOfflineReceiver --ez offline true` (or `false`). Changes made meanwhile show as syncing and are sent once it is back. This switch is debug-only and reached only over adb; it has no counterpart in the app's UI.
 
-To connect a real Google account, first set up a Google Cloud project with an Android client for your debug key (`docs/setup/google-calendar.md`), add the family's Google account to the device (Settings › Accounts), then Settings › Connect Google Calendar (Admin PIN). Connecting removes the sample calendar, with its events and queued changes, for good. There is no disconnect yet: to undo a connection (the wrong account, or to get the sample back), clear the app's data. Release builds offer Google Calendar only, and its Connect fails until the release key's SHA-1 has its own Android client (Plan 4). A calendar is mapped to a person when its name contains theirs as a whole word, so a name that is also a common word ("May", "Will") can map a calendar like "May half term" to that person; Plan 4's Settings will let you change it.
+To connect a real Google account, first set up a Google Cloud project with an Android client for your debug key (`docs/setup/google-calendar.md`), add the family's Google account to the device (Settings › Accounts), then connect it in the wizard's Connect step, or later in Settings › Calendars (Admin PIN). Connecting removes the sample calendar, with its events and queued changes, for good. Settings › Calendars says who each calendar is for, shows or hides it, picks the master calendar new events go to, and disconnects (dropping its queued changes; Google keeps the grant until you remove it, see `docs/setup/google-calendar.md`). A calendar hidden on the tablet stays hidden until it is ticked or unticked again in Google Calendar. Release builds offer Google Calendar only, and its Connect fails until the release key's SHA-1 has its own Android client (Plan 4). A calendar is mapped to a person when its name contains theirs as a whole word, so a name that is also a common word ("May", "Will") can map a calendar like "May half term" to that person; change it in Settings › Calendars.
 
 ## Screenshot tests
 
@@ -43,13 +45,15 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 |---|---|
 | `:app` | Activity, kiosk mode, nav rail, Home grid, wiring only |
 | `:core:ui` | Design tokens, DM Sans, Material Symbols, shared components |
-| `:core:plugin` | `Capability`, `HomeCard`, `ProviderDescriptor`, `Connection`, `ConnectionHealth`, `ShellNavigator`, `OverlayHost`, `Toaster`, `Startable` |
+| `:core:plugin` | `Capability`, `SetupStep`, `SettingsPage`, `HomeCard`, `ProviderDescriptor`, `Connection`, `ConnectionHealth`, `ShellNavigator`, `OverlayHost`, `Toaster`, `Startable` |
 | `:core:household` | People (with role and PIN hash), Family, home location — `household.db` |
 | `:core:access` | Permissions, PIN hashing, lockout, 2-minute session, PIN pad |
+| `:core:setup` | The first-run wizard, two-pane Settings, the core pages (Home location, People, Kiosk), `SetupState`, `LocationSearch` |
 | `:capability:calendar` | Calendar contract (read and write), `calendar.db` cache and outbox, 5-minute sync, event editor, Home cards, Calendar tab, event detail and add/edit sheets |
 | `:capability:calendar-testkit` | `CalendarProviderContractTest`, the tests every calendar provider must pass |
 | `:provider:calendar-fake` | Debug-only sample calendar (the hand-off's week, relative to today) |
 | `:provider:calendar-google` | Google Calendar API v3 over OkHttp; sign-in and tokens through Play services, nothing stored |
+| `:provider:weather-openmeteo` | Town search through Open-Meteo's geocoding (no key); the forecast comes in Plan 4b |
 
 Rules, enforced when Gradle configures the project (`build-logic/convention/src/main/kotlin/ModuleBoundaries.kt`):
 - `:core:*` depends only on `:core:*`.
@@ -59,12 +63,12 @@ Rules, enforced when Gradle configures the project (`build-logic/convention/src/
 
 Breaking a rule fails the build with `Module boundary: <from> must not depend on <to>`. Each module that stores data owns its own database file.
 
-`calendar.db` stores user configuration (connections, mappings, the master calendar) and queued changes (the `outbox` table; the `event` table is only ever a copy of what the provider has). A queued change's 48-hour age doesn't count time its connection spent waiting for sign-in, so a lapse over a weekend drops nothing. Every schema version bump ships a hand-written Room `Migration` in `db/Migrations.kt` with a `MigrationTestHelper` test in `CalendarMigrationTest`; never use destructive fallback. `CalendarMigrationTest` runs that helper with the driver-based `AndroidSQLiteDriver`, because androidx.sqlite 2.6.x's default driver mis-handles Windows paths. Room exports each schema version to `<module>/schemas/`, and those files are committed.
+`calendar.db` stores user configuration (connections, mappings, the master calendar) and queued changes (the `outbox` table; the `event` table is only ever a copy of what the provider has). Since v5 each calendar also remembers its tick in the service when last seen, so the daily refresh changes whether it shows only when that tick changes. A queued change's 48-hour age doesn't count time its connection spent waiting for sign-in, so a lapse over a weekend drops nothing. Every schema version bump ships a hand-written Room `Migration` in `db/Migrations.kt` with a `MigrationTestHelper` test in `CalendarMigrationTest`; never use destructive fallback. `CalendarMigrationTest` runs that helper with the driver-based `AndroidSQLiteDriver`, because androidx.sqlite 2.6.x's default driver mis-handles Windows paths. Room exports each schema version to `<module>/schemas/`, and those files are committed.
 
 ## Adding a capability
 
 1. Create `capability/<name>/build.gradle.kts` with `id("culvery.android.library")`, `id("culvery.android.compose")`, `id("culvery.hilt")`, and depend on `:core:plugin` (plus `:core:access` if it has actions).
-2. Implement `Capability` (tab, icon, `order`, `hasTab`, Home `cards()`). Card and tab UI move the shell through `LocalShellNavigator.current.openTab(id)` / `.openSettings()`. Sheets open through `LocalOverlayHost.current.show { … }` (draw them with `HhSheet`). Short messages go through the injected `Toaster`, from the code that knows the outcome (a view model or an `@ApplicationScope` job), so the toast still shows if the sheet has closed. Background work (sync loops) is a `Startable` bound `@IntoSet`; the app starts it once at launch.
+2. Implement `Capability` (tab, icon, `order`, `hasTab`, Home `cards()`). Card and tab UI move the shell through `LocalShellNavigator.current.openTab(id)` / `.openSettings()`. Sheets open through `LocalOverlayHost.current.show { … }` (draw them with `HhSheet`). Short messages go through the injected `Toaster`, from the code that knows the outcome (a view model or an `@ApplicationScope` job), so the toast still shows if the sheet has closed. Background work (sync loops) is a `Startable` bound `@IntoSet`; the app starts it once at launch. A capability can add wizard steps and Settings pages by returning `SetupStep`s and `SettingsPage`s from `setupSteps()` and `settingsPages()` (`:core:setup` places them by `order`: core steps 0–399, capabilities 400 and up, Done 1000; Settings pages Home location 0, People 100, Kiosk 900).
 3. Bind it: `@Binds @IntoSet abstract fun bind(impl: MyCapability): Capability` in a Hilt module.
 4. If it has actions, implement `PermissionSource` and bind it `@IntoSet` too; call `AccessControl.authorise("<name>.<action>")` before acting.
 5. `include(":capability:<name>")` in `settings.gradle.kts` and add it to `:app` dependencies.
@@ -151,7 +155,7 @@ A provider connects one kind of calendar service (Google, ICS, CalDAV…) to the
 
 ## Kiosk mode
 
-Release builds pin the app to the screen (Android "screen pinning"). Leave properly via **Settings › Exit kiosk** (Admin PIN, always asked).
+Release builds pin the app to the screen (Android "screen pinning") once setup is complete, so the first Google connection happens outside it. Leave properly via **Settings › Kiosk › Exit kiosk** (Admin PIN, always asked).
 
 Screen pinning can also be undone by holding **Back + Overview**. To stop a child doing that, on the tablet: set a screen lock (PIN), then turn on **Settings › Security › Other security settings › Pin windows › Ask for PIN before unpinning**. Unpinning then drops to the lock screen.
 
@@ -160,14 +164,15 @@ A stronger device-owner lock is possible later; it is not built yet.
 ## PINs
 
 - Everyone can have their own 4-digit PIN. PINs must be unique in the household because the PIN identifies the person. The pad submits on the 4th digit.
+- Each person has one of eight colours, and no two share one; so a household has at most eight people. Every household must keep at least one Admin with a PIN.
 - Viewing never needs a PIN. Changing things does.
-- A session lasts 2 minutes after the last PIN-checked action; touching the screen doesn't extend it. While someone is signed in, the status bar shows their name and role and a **Sign out** link. Settings closes when the session ends.
+- A session lasts 2 minutes after the last PIN-checked action; while Settings is open, every touch in it (its sheets and PIN pads included) restarts the 2 minutes. During setup the first Admin stays signed in until Done, or until 10 minutes pass without a touch; the wizard then asks for their PIN to carry on. While someone is signed in, the status bar shows their name and role and a **Sign out** link. Settings closes when the session ends.
 - Calendar changes follow the roles: Admins and Adults can add events for anyone, and edit, delete and assign any event on the master calendar; a Child can add events only for themselves, edit or delete only events they added (and can't move one to someone else), and can't assign. A refused change says why in a toast and signs the person out, so the next tap asks for a PIN. Events from other calendars, and repeating events, can't be changed on the tablet, and an event over several days can have only its title and who changed.
-- Exiting kiosk and managing people always ask for a PIN, even mid-session.
+- Exiting kiosk, adding or removing someone, changing a role and setting, changing or removing a PIN always ask for a PIN, even mid-session; renaming and recolouring don't. Changing your own role or PIN signs you out.
 - 5 wrong PINs lock the pad for 30 seconds, doubling each time up to 16 minutes. Only a PIN that is allowed to do the thing clears the count.
 - This is kid-proofing, not strong security.
 
-**Forgotten PIN:** an Admin can reset anyone's PIN in Settings. If every Admin has forgotten theirs, clear the app's data (Android Settings › Apps › Culvery › Storage › Clear data). That wipes all configuration and starts setup again.
+**Forgotten PIN:** an Admin can reset anyone's PIN in Settings › People. If every Admin has forgotten theirs, clear the app's data (Android Settings › Apps › Culvery › Storage › Clear data). That wipes all configuration and starts setup again.
 
 ## Licences
 
