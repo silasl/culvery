@@ -55,6 +55,19 @@ class ModuleBoundariesTest {
     }
 
     @Test
+    fun theWeatherModulesFollowTheRules() {
+        allowed(":capability:weather", ":core:household", "api")
+        allowed(":capability:weather", ":core:ui")
+        allowed(":provider:weather-openmeteo", ":capability:weather")
+        allowed(":app", ":capability:weather")
+        banned(":capability:weather", ":provider:weather-openmeteo")
+        banned(":capability:weather", ":provider:weather-openmeteo", "testImplementation")
+        banned(":capability:weather", ":capability:calendar")
+        banned(":provider:calendar-google", ":capability:weather")
+        banned(":core:plugin", ":capability:weather")
+    }
+
+    @Test
     fun appMayDependOnAnything() = allowed(":app", ":provider:calendar-fake", "debugImplementation")
 
     @Test
