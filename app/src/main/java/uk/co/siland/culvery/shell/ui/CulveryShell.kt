@@ -28,7 +28,7 @@ fun CulveryShell(
             NavRail(state.tabs, state.selectedTabId, onSelectTab, onOpenSettings)
             Box(Modifier.weight(1f).padding(start = 28.dp, end = 28.dp, top = 24.dp, bottom = 22.dp)) {
                 if (state.selectedTabId == HOME_TAB_ID) {
-                    HomeScreen(state.now, state.homeCards)
+                    HomeScreen(state.now, state.homeCards, state.headerItems)
                 } else {
                     tabContent(state.selectedTabId)
                 }

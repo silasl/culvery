@@ -11,6 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,11 +21,19 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ui.ComingUpCard
 import uk.co.siland.culvery.capability.calendar.ui.TodayCard
+import uk.co.siland.culvery.capability.weather.Condition
+import uk.co.siland.culvery.capability.weather.DailyWeather
+import uk.co.siland.culvery.capability.weather.HeaderWeather
+import uk.co.siland.culvery.capability.weather.HourlyWeather
+import uk.co.siland.culvery.capability.weather.WeatherView
+import uk.co.siland.culvery.capability.weather.ui.ForecastCard
+import uk.co.siland.culvery.capability.weather.ui.WeatherHeaderItem
 import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.ui.PinPadSheet
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
@@ -97,6 +106,31 @@ class ShellScreenshotTest {
         ),
     )
 
+    private val forecastDays = listOf(
+        DailyWeather(at.toLocalDate(), Condition.PARTLY_CLOUDY, 19.0, 11.0, LocalTime.of(6, 50), LocalTime.of(19, 2)),
+        DailyWeather(at.toLocalDate().plusDays(1), Condition.RAIN, 17.0, 10.0, LocalTime.of(6, 52), LocalTime.of(19, 0)),
+        DailyWeather(at.toLocalDate().plusDays(2), Condition.CLEAR, 21.0, 12.0, LocalTime.of(6, 53), LocalTime.of(18, 58)),
+    )
+
+    /** The whole Home with Today, Coming up, Forecast and the header's weather (4b design §7). */
+    private fun weatherHome(dark: Boolean) = calendarHome(dark).copy(
+        homeCards = HomeCardPlacer.place(
+            listOf(
+                HomeCard("calendar.today", HomeCardSize.TALL, 100) { TodayCard(today) },
+                HomeCard("calendar.comingUp", HomeCardSize.WIDE, 50) { ComingUpCard(comingUp) },
+                HomeCard("weather.forecast", HomeCardSize.REGULAR, 40) {
+                    ForecastCard(
+                        WeatherView.Ready(HourlyWeather(at.withMinute(0), Condition.PARTLY_CLOUDY, 17.0), forecastDays[0], forecastDays, 0L),
+                        nowMillis = 0L,
+                    )
+                },
+            ),
+        ),
+        headerItems = listOf(
+            HeaderItem("weather", 10) { WeatherHeaderItem(HeaderWeather(Condition.PARTLY_CLOUDY, night = false, temperature = 17.0, high = 19.0, low = 11.0)) },
+        ),
+    )
+
     private fun snap(
         name: String,
         dark: Boolean,
@@ -150,6 +184,12 @@ class ShellScreenshotTest {
 
     @Test
     fun homeWithCalendarLight() = snap("home_calendar_light", dark = false, state = calendarHome(dark = false))
+
+    @Test
+    fun homeWithWeatherDark() = snap("home_weather_dark", dark = true, state = weatherHome(dark = true))
+
+    @Test
+    fun homeWithWeatherLight() = snap("home_weather_light", dark = false, state = weatherHome(dark = false))
 
     @Test
     fun pinPadDark() = snap("pin_pad_dark", dark = true) {

@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.shell
 
 import java.time.LocalDateTime
+import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomePlacement
 
 const val HOME_TAB_ID = "home"
@@ -18,5 +19,7 @@ data class ShellUiState(
     val dark: Boolean = true,
     val previewing: Boolean = false,
     val homeCards: List<HomePlacement> = emptyList(),
+    /** Home's header items, by order (4b design §3.8). */
+    val headerItems: List<HeaderItem> = emptyList(),
     val settingsOpen: Boolean = false,
 )

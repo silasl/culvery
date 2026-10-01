@@ -12,19 +12,24 @@ import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.Refusal
 import uk.co.siland.culvery.core.plugin.Capability
+import uk.co.siland.culvery.core.plugin.Daylight
+import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
+import uk.co.siland.culvery.core.plugin.SunTimes
 
 class FakeCapability(
     override val id: String,
     override val order: Int,
     shown: Boolean,
     private val cardList: List<HomeCard> = emptyList(),
+    private val headerList: List<HeaderItem> = emptyList(),
 ) : Capability {
     override val label = id.replaceFirstChar { it.uppercase() }
     override val icon = "star"
     val shownFlow = MutableStateFlow(shown)
     override val hasTab: Flow<Boolean> = shownFlow
     override fun cards(): Flow<List<HomeCard>> = flowOf(cardList)
+    override fun headerItems(): Flow<List<HeaderItem>> = flowOf(headerList)
     @Composable override fun TabContent() {}
 }
 
@@ -96,4 +101,24 @@ class FlakyCardsCapability(override val id: String, override val order: Int, pri
         emit(cardList)
     }
     @Composable override fun TabContent() {}
+}
+
+/** A capability whose header items fail once, as a store hiccup would, then show [items]. */
+class FlakyHeaderCapability(override val id: String, override val order: Int, private val items: List<HeaderItem>) : Capability {
+    private var failures = 1
+    override val label = id.replaceFirstChar { it.uppercase() }
+    override val icon = "star"
+    override val hasTab: Flow<Boolean> = flowOf(false)
+    override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList())
+    override fun headerItems(): Flow<List<HeaderItem>> = flow {
+        if (failures-- > 0) throw IllegalStateException("store hiccup")
+        emit(items)
+    }
+    @Composable override fun TabContent() {}
+}
+
+/** Today's sun times, settable. */
+class FakeDaylight(sun: SunTimes?) : Daylight {
+    val sun = MutableStateFlow(sun)
+    override val today: Flow<SunTimes?> = this.sun
 }

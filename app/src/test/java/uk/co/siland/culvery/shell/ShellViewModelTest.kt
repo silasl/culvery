@@ -4,6 +4,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDateTime
+import java.time.LocalTime
+import java.util.Optional
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
@@ -18,9 +20,12 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Capability
+import uk.co.siland.culvery.core.plugin.Daylight
+import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.ShellNavigator
+import uk.co.siland.culvery.core.plugin.SunTimes
 
 // Robolectric for android.util.Log: a failing capability flow is logged before it is retried.
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -34,7 +39,8 @@ class ShellViewModelTest {
     private val access = FakeAccessControl()
     private val ticks = MutableStateFlow(noon)
 
-    private fun vm(caps: Set<Capability> = emptySet()) = ShellViewModel(caps, { ticks }, access)
+    private fun vm(caps: Set<Capability> = emptySet(), daylight: Daylight? = null) =
+        ShellViewModel(caps, { ticks }, access, Optional.ofNullable(daylight))
 
     @Test
     fun tabsShowOnlyCapabilitiesWithTabsInOrder() = runTest {
@@ -109,7 +115,7 @@ class ShellViewModelTest {
     @Test
     fun settingsNeverOpenWithoutSession() = runTest {
         val noSessionAccess = FakeAccessControl(result = admin, startsSession = false)
-        val vm = ShellViewModel(emptySet(), { ticks }, noSessionAccess)
+        val vm = ShellViewModel(emptySet(), { ticks }, noSessionAccess, Optional.empty())
         vm.uiState.test {
             vm.openSettings()
             assertThat(expectMostRecentItem().settingsOpen).isFalse()
@@ -284,5 +290,73 @@ class ShellViewModelTest {
         vm.exitKiosk()
         vm.signOut()
         assertThat(access.setupSessionsBegun).isEqualTo(0)
+    }
+
+    private val sunrise = LocalTime.of(6, 50)
+    private val sunset = LocalTime.of(19, 20)
+
+    @Test
+    fun headerItemsComeFromEveryCapabilityInTheirOrder() = runTest {
+        val vm = vm(
+            setOf(
+                FakeCapability("climate", order = 40, shown = false, headerList = listOf(HeaderItem("climate", 20) {})),
+                FakeCapability("weather", order = 60, shown = false, headerList = listOf(HeaderItem("weather", 10) {})),
+            ),
+        )
+        vm.uiState.test {
+            assertThat(expectMostRecentItem().headerItems.map { it.id }).containsExactly("weather", "climate").inOrder()
+        }
+    }
+
+    @Test
+    fun headerItemsWhoseFlowFailsComeBackAfterTheRetry() = runTest {
+        val vm = vm(setOf(FlakyHeaderCapability("weather", order = 60, listOf(HeaderItem("weather", 10) {}))))
+        vm.uiState.test {
+            assertThat(expectMostRecentItem().headerItems).isEmpty()
+            advanceTimeBy(1_001)
+            assertThat(expectMostRecentItem().headerItems.map { it.id }).containsExactly("weather")
+        }
+    }
+
+    @Test
+    fun theThemeTurnsDarkAtTodaysSunsetAndLightAtSunrise() = runTest {
+        val vm = vm(daylight = FakeDaylight(SunTimes(sunrise, sunset)))
+        vm.uiState.test {
+            ticks.value = noon.with(LocalTime.of(19, 19))
+            assertThat(expectMostRecentItem().dark).isFalse()
+            ticks.value = noon.with(sunset)
+            assertThat(expectMostRecentItem().dark).isTrue()
+            ticks.value = noon.plusDays(1).with(LocalTime.of(6, 49))
+            assertThat(expectMostRecentItem().dark).isTrue()
+            ticks.value = noon.plusDays(1).with(sunrise)
+            assertThat(expectMostRecentItem().dark).isFalse()
+        }
+    }
+
+    @Test
+    fun withoutDaylightTheThemeUsesSevenAndSeven() = runTest {
+        val vm = vm()
+        vm.uiState.test {
+            ticks.value = noon.with(LocalTime.of(18, 59))
+            assertThat(expectMostRecentItem().dark).isFalse()
+            ticks.value = noon.with(LocalTime.of(19, 0))
+            assertThat(expectMostRecentItem().dark).isTrue()
+            ticks.value = noon.plusDays(1).with(LocalTime.of(6, 59))
+            assertThat(expectMostRecentItem().dark).isTrue()
+            ticks.value = noon.plusDays(1).with(LocalTime.of(7, 0))
+            assertThat(expectMostRecentItem().dark).isFalse()
+        }
+    }
+
+    @Test
+    fun untilTheSunTimesAreKnownTheThemeUsesSevenAndSevenThenFollowsThem() = runTest {
+        val daylight = FakeDaylight(null)
+        val vm = vm(daylight = daylight)
+        vm.uiState.test {
+            ticks.value = noon.with(LocalTime.of(19, 10))
+            assertThat(expectMostRecentItem().dark).isTrue()
+            daylight.sun.value = SunTimes(sunrise, sunset)
+            assertThat(expectMostRecentItem().dark).isFalse()
+        }
     }
 }

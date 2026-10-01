@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.util.Optional
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -24,9 +25,12 @@ import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Capability
+import uk.co.siland.culvery.core.plugin.Daylight
+import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomePlacement
 import uk.co.siland.culvery.core.plugin.ShellNavigator
+import uk.co.siland.culvery.core.plugin.SunTimes
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
 @HiltViewModel
@@ -34,6 +38,7 @@ class ShellViewModel @Inject constructor(
     capabilities: Set<@JvmSuppressWildcards Capability>,
     ticker: MinuteTicker,
     private val access: AccessControl,
+    daylight: Optional<Daylight>,
 ) : ViewModel(), ShellNavigator {
     private val ordered = capabilities.sortedBy { it.order }
     private val selected = MutableStateFlow(HOME_TAB_ID)
@@ -45,9 +50,14 @@ class ShellViewModel @Inject constructor(
     private val now: StateFlow<LocalDateTime> =
         ticker.ticks().stateIn(viewModelScope, SharingStarted.Eagerly, LocalDateTime.now())
 
-    // Sunrise/sunset arrive with the weather capability in Plan 4; until then the 07:00/19:00 fallback applies.
+    // Without Daylight, or until today's times are known, ThemeSchedule's 07:00 / 19:00 applies (4b design §3.8).
+    private val sunToday: Flow<SunTimes?> = daylight.orElse(null)?.today
+        ?.retryWithBackoff { Log.w(TAG, "Couldn't read today's sun times (${it::class.simpleName}); retrying") }
+        ?.onStart { emit(null) }
+        ?: flowOf(null)
+
     private val scheduledDark: StateFlow<Boolean> =
-        now.map { ThemeSchedule.isDark(it.toLocalTime(), null) }
+        combine(now, sunToday) { time, sun -> ThemeSchedule.isDark(time.toLocalTime(), sun) }
             .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeSchedule.isDark(LocalTime.now(), null))
 
     private val tabs: Flow<List<TabItem>> =
@@ -78,6 +88,19 @@ class ShellViewModel @Inject constructor(
             ) { lists -> HomeCardPlacer.place(lists.toList().flatten()) }
         }
 
+    private val headerItems: Flow<List<HeaderItem>> =
+        if (ordered.isEmpty()) {
+            flowOf(emptyList())
+        } else {
+            combine(
+                ordered.map { cap ->
+                    cap.headerItems()
+                        .retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its header items (${it::class.simpleName}); retrying") }
+                        .onStart { emit(emptyList()) }
+                },
+            ) { lists -> lists.toList().flatten().sortedWith(compareBy({ it.order }, { it.id })) }
+        }
+
     val uiState: StateFlow<ShellUiState> =
         combine(
             combine(tabs, selected, access.session, placements, settingsOpen) { tabs, sel, session, cards, settings ->
@@ -92,8 +115,9 @@ class ShellViewModel @Inject constructor(
             now,
             scheduledDark,
             previewing,
-        ) { state, time, scheduled, preview ->
-            state.copy(now = time, dark = scheduled != preview, previewing = preview)
+            headerItems,
+        ) { state, time, scheduled, preview, header ->
+            state.copy(now = time, dark = scheduled != preview, previewing = preview, headerItems = header)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ShellUiState(dark = scheduledDark.value))
 
     init {
