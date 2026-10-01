@@ -18,7 +18,7 @@
 | # | Task | Review |
 |---|---|---|
 | 1 | Move `HouseholdZone` to `:core:household` (D6, §3.3) | sonnet |
-| 2 | `:core:plugin` seams: `HeaderItem`, `headerItems()`, `Daylight`, `wallTimeEachMinute`; `HomeCardPlacer` mixed sizes (§3.2, §8) | sonnet |
+| 2 | `:core:plugin` seams: `HeaderItem`, `headerItems()`, `Daylight`, `wallTimeEachMinute`, `rememberNowMillis` (moved from the calendar); the Forecast's placement (§3.2, §8) | sonnet |
 | 3 | `:capability:weather`: module, contract, `weatherView` and the words, boundary tests (§3.1, §3.7, §4) | sonnet |
 | 4 | `weather.db` and `WeatherStore`: atomic replace, matching (§3.5) | **opus** (state) |
 | 5 | The Open-Meteo forecast (§3.4) | **opus** (parsing, logs) |
@@ -29,23 +29,43 @@
 | 10 | The shell: header items, the household-zone ticker, the sun-times theme (§3.8) | **opus** (theme, zone) |
 | 11 | The walkthrough, the README privacy note and the follow-ups (§6, §7, §8) | sonnet |
 
+## Plan review (2026-10-01)
+
+The user's review of this plan ("all as recommended") is applied in the tasks below:
+1. The household-zone ticker retries a failed zone read, so a Room failure can't crash the shell (Task 10, `HouseholdTickerTest.aFailedZoneReadIsRetriedAndTheClockCarriesOn`).
+2. The forecast's client has a 60 s `callTimeout`, so a dripping body ends (Task 5, `aDrippingBodyEndsAsWeatherUnavailable`); the Google client's missing `callTimeout` is a 4c follow-up (Task 11).
+3. The loop wakes only when the place really changes, so a flaky location read can't fetch every second (Task 6, `aFlakyLocationReadFetchesOnce`).
+4. Review Focus 2 is now "a provider that repeats an hour can't break every fetch"; the clock-change hour offset is a known, untested gap left for a follow-up (ruling 2).
+5. Tests that repeated another layer's are cut (matching, sun times, the age line, the zone): each rule is tested once where it lives, plus one test where it is wired.
+6. No new minute tick: the calendar's `rememberNowMillis` moves to `:core:plugin` (Task 2) and the Forecast card uses it (Task 8).
+7. The two new placer tests that repeated `mixedSizesFillTallThenWideThenRegularBesideIt` are dropped (Connect and Coming up never show together); one new case stays.
+8. `CapabilityDefaultsTest` is dropped.
+9. The rulings below say which are pinned by a test.
+10. `zoneOrDevice(id)` in `:core:household` is the one zone parse (Tasks 1, 3).
+11. The provider's day count is `DAYS_FETCHED`; `WeatherCapability`'s ids and orders are private.
+12. The Home card radius is a `:core:ui` token, `ShellTokens.homeCardRadius`; the calendar's `CalendarDimens.cardRadius` aliases it (Task 8).
+13. The forecast refuses an answer over 1 MiB and drops days and hours outside the seven it asked for (Task 5).
+14. `WeatherFetcher` isn't a singleton; two comments that restated their code are cut.
+15. A cold start shows the device's zone for a moment before Room answers: accepted, noted for 4c (Task 11).
+Questions: the clock-change offset stays a follow-up (Task 11, with the fix); `:app`'s tests may import the weather UI (ruling 12); the card's icons are sun amber, provisional, on the end-of-v1 design review list.
+
 ## Rulings against the code
 
-Where the spec is silent, ambiguous or doesn't fit the code or the real API, this plan rules as follows. Each is pinned by a test in the task named.
+Where the spec is silent, ambiguous or doesn't fit the code or the real API, this plan rules as follows. Pinned by a test in the task named: 1, 3, 4, 5, 7, 8, 13. Not pinned by a test: 2 (a known gap), 6 (a design choice that no unit test can catch going wrong), 9 and 10 (checked by eye in the screenshots), 11 (docs), 12 (`AppSourceTest` pins only the main-code half), 14 and 15 (read in review).
 
 1. **Open-Meteo never sends a null sunrise or sunset (Task 5).** Checked against the live API: on a polar night both are the day's `T00:00`; on a polar day sunrise is the day's `T00:00` and sunset the *next* day's `T00:00`. The provider keeps both times only when both fall on the day's own date with sunrise before sunset (or JSON gives a real `null`); otherwise both are null (§3.1's "null on a polar day or night"). Both or neither: `Daylight` needs both.
-2. **Open-Meteo uses one UTC offset for a whole answer (Task 5, open question to the user).** Checked against the live API (`utc_offset_seconds` is one value; London's 26 October 2025 comes back as 24 hours, with sun times an hour late after the change). Hours therefore never repeat or skip in practice, but a fetch made before a clock change is an hour out for the days after it, until the next fetch (30 minutes, or the next fetch once back online). The store keeps one row per date and per hour start, and the hour lookup tolerates a gap (Review Focus 2); correcting the offset is not in the spec.
+2. **Open-Meteo uses one UTC offset for a whole answer (Task 5, open question to the user).** Checked against the live API (`utc_offset_seconds` is one value; London's 26 October 2025 comes back as 24 hours, with sun times an hour late after the change). Hours therefore never repeat or skip in practice, but a fetch made before a clock change is an hour out for the days after it, until the next fetch (30 minutes, or the next fetch once back online). This is a known gap, untested and left for a follow-up (Task 11: ask in UTC with `timeformat=unixtime` and convert in the household's zone); correcting it is not in the spec. Separately, the store keeps one row per date and per hour start, so a provider that repeats an hour can't break every fetch (Review Focus 2).
 3. **The 2 h age rule is the pure `updatedAgo(fetchedAtMillis, nowMillis)` beside `weatherView` (Task 3).** `Ready` keeps the spec's four fields; §7's "2 h age boundary" test is `WeatherWordsTest.theAgeLineAppearsOnlyPastTwoHours`.
 4. **The header needs the current time, not just the stored hour (Tasks 3, 9).** Night icons depend on now against today's sunset, inside an hour. `headerWeather(view, now): HeaderWeather?` holds the rule, and `headerItems()` emits the weather item only while it is shown, so the shell never draws a divider beside an empty item (§4.1).
-5. **"Now" is a flow, not only a composable tick (Tasks 2, 7, 8).** The header item's presence is a `Flow` (§3.2), so §3.7's minute tick is `wallTimeEachMinute(zones, clock)` in `:core:plugin`: the shell's `MinuteTicker`, `WeatherRepository.view`/`header` and `Daylight.today` all use it with `HouseholdZone.zone`. The card's age line keeps a composable minute tick of its own (`ForecastCardHost`).
+5. **"Now" is a flow, not only a composable tick (Tasks 2, 7, 8).** The header item's presence is a `Flow` (§3.2), so §3.7's minute tick is `wallTimeEachMinute(zones, clock)` in `:core:plugin`: the shell's `MinuteTicker`, `WeatherRepository.view`/`header` and `Daylight.today` all use it with `HouseholdZone.zone`. The card's age line uses the calendar's existing composable tick, `rememberNowMillis`, moved to `:core:plugin` (Task 2).
 6. **The store is read as one snapshot (Task 4).** Room flows over three tables could pair a new `fetch` row with old `day` rows for a moment, which would show the old town's days under the new place. The store watches the `fetch` row (every replace rewrites it) and reads all three tables in one transaction.
 7. **The fetch records the place it asked for, not the place now (Task 6).** `WeatherFetcher.fetch(place)` stores under the `WeatherPlace` it fetched for, so a fetch that finishes after a move is stored under the old coordinates and reads as absent (Review Focus 1); a location change mid-fetch runs another fetch straight after.
-8. **A zone id that doesn't parse (Tasks 3, 6).** As `HouseholdZone`, weather asks in the device zone, but stores under the location's own id string so the data still matches.
+8. **A zone id that doesn't parse (Tasks 1, 3).** Weather asks in the device zone through the same `zoneOrDevice` as `HouseholdZone`, but stores under the location's own id string so the data still matches.
 9. **Sun amber is `SunAmber` in `:core:ui`'s `Colors.kt`, not an `HhColors` member (Task 8).** It is the same in both themes, like `ShellTokens`' scrims; the hand-off gives one value.
 10. **Copy and layout the spec doesn't give (Tasks 3, 8, 10):** every state of the card shows the title "Forecast"; TalkBack condition words are "clear", "partly cloudy", "cloudy", "fog", "drizzle", "rain", "showers", "snow", "thunderstorms"; the first row is spoken "Today, …"; the card's icons are sun amber like the header's; the header items sit 4 dp above the date's bottom, 28 dp apart, with a 1 × 48 dp divider (the hand-off's `padding-bottom: 4px`, `gap: 28px`, `height: 48px`).
 11. **The README has no privacy note yet (Task 11).** §6's "The README's privacy note says so" becomes a new **Privacy** section.
 12. **`:app`'s test sources may import the weather card and header item for the whole-Home screenshot (Task 10)**, as they already import the calendar's cards; `:app`'s main, debug and release code never names `:capability:weather` (`AppSourceTest`).
-13. **`HomeCardPlacer`'s tests live in `:core:plugin` (Task 2)**, beside the placer, not in the shell task.
+13. **`HomeCardPlacer`'s tests live in `:core:plugin` (Task 2)**, beside the placer, not in the shell task. The spec's Today + Coming up + Forecast case is the existing `mixedSizesFillTallThenWideThenRegularBesideIt`; Connect and Coming up never show together (`CalendarCapability.cards()`), so the new case is Connect + Forecast.
 14. **A pass with no provider bound counts as done** (Task 6): the loop waits 30 minutes, not 5, as there is nothing to retry.
 15. **`WeatherUnavailableException` is thrown without a cause by the provider (Task 5)**, as 4a's `LocationSearchException`: an `IOException`'s text can hold the URL, which holds the coordinates.
 
@@ -83,25 +103,25 @@ The five failures most likely to reach a household that no spec test pins, each 
 
 1. **A location change mid-fetch writes the old town's forecast after the move.** Expected: the old town's weather never shows; the new town is fetched straight after.
    - Task 6 `WeatherSyncLoopTest.aLocationChangeMidFetchFetchesTheNewPlaceRightAfter`; `WeatherFetcherTest.itStoresTheForecastUnderThePlaceItAskedFor`
-   - Task 4 `WeatherStoreTest.dataForTheOldPlaceDoesNotMatchTheNewOne`
+   - Task 3 `WeatherViewTest.matchingComparesTheCoordinatesAndTheZoneNotTheName`, `theOldTownsWeatherIsWaitingAfterAMove`
    - Task 7 `WeatherRepositoryTest.aMoveHidesTheOldTownsWeatherAtOnce`
-2. **A clock-change day: hours repeat or skip in local time.** Expected: no crash, no lost fetch; one row per hour; the header finds the hour containing now or hides.
+2. **A provider that repeats an hour can't break every fetch.** Expected: the repeated hour is stored once and the fetch is kept, rather than every replace failing on the hour's key.
    - Task 4 `WeatherStoreTest.aRepeatedHourIsStoredOnce`
-   - Task 3 `WeatherViewTest.theHourContainingNowIsFoundAcrossAGap`
+   - Known gap, untested (ruling 2): Open-Meteo's single offset leaves data fetched before a clock change an hour out until the next fetch; a follow-up (Task 11).
 3. **Midnight passes while the tablet is offline.** Expected: the card and header move to the new day from the cache, the theme uses the new day's sun times, and data that has run out says to check the Wi-Fi.
    - Task 7 `WeatherRepositoryTest.atMidnightTheCardMovesOnWithoutAFetch`, `daylightMovesToTomorrowsTimesAtMidnight`
    - Task 3 `WeatherViewTest.midnightMovesTodayOnAndDropsADay`
 4. **Open-Meteo returns null entries in an array (a model's horizon) or polar sun times.** Expected: that day or hour is dropped, never "null°" or a crash; polar days have no sun times and the theme falls back.
    - Task 5 `OpenMeteoForecastTest.nullEntriesDropThatDayOrHourAndNothingElse`, `aPolarDayOrNightHasNoSunTimes`
 5. **The tablet's own zone differs from the household's.** Expected: the clock, the date, the theme, the card's "today" and the forecast's times all follow the household's zone.
-   - Task 10 `HouseholdTickerTest.theClockShowsTheHouseholdsTimeNotTheDevices`
-   - Task 7 `WeatherRepositoryTest.todayIsTheHouseholdsDateNotTheDevices`
+   - Task 10 `HouseholdTickerTest.theClockShowsTheHouseholdsTimeNotTheDevices` (the shell's clock, date and theme; the weather's "today" uses the same `wallTimeEachMinute` over `HouseholdZone.zone`)
    - Task 6 `WeatherFetcherTest.itAsksInTheHouseholdZoneNotTheDevices`
+   - Task 3 `WeatherViewTest.anInvalidZoneIdAsksInTheDeviceZone`
 
 The spec's own review focus (§9), each pinned:
 - Old town never shown: Review Focus 1 above, and Task 3 `WeatherViewTest.theOldTownsWeatherIsWaitingAfterAMove`.
-- The theme follows the household zone and today's sun times, and falls back cleanly: Task 10 `ShellViewModelTest.theThemeTurnsDarkAtTodaysSunsetAndLightAtSunrise`, `withoutDaylightTheThemeUsesSevenAndSeven`, `untilTheSunTimesAreKnownTheThemeUsesSevenAndSevenThenFollowsThem`; Task 7 `WeatherRepositoryTest.daylight*`; Task 3 `WeatherViewTest.aMissingSunriseOrSunsetGivesNoSunTimes`.
-- The loop can't stop for good and can't spin: Task 6 `WeatherSyncLoopTest.repeatedFailuresTryAtMostOnceEveryFiveMinutes`, `anErrorIsLoggedByTypeAndTheLoopGoesOn`, `aStrayCancellationDoesNotStopTheLoop`.
+- The theme follows the household zone and today's sun times, and falls back cleanly: Task 10 `ShellViewModelTest.theThemeTurnsDarkAtTodaysSunsetAndLightAtSunrise`, `withoutDaylightTheThemeUsesSevenAndSeven`, `untilTheSunTimesAreKnownTheThemeUsesSevenAndSevenThenFollowsThem`; Task 10 `HouseholdTickerTest.aFailedZoneReadIsRetriedAndTheClockCarriesOn`; Task 7 `WeatherRepositoryTest.daylightMovesToTomorrowsTimesAtMidnight`; Task 3 `WeatherViewTest.oldMatchingDataStillGivesTodaysSunTimes`, `sunTimesNeedMatchingDataForToday`, `aMissingSunriseOrSunsetGivesNoSunTimes`.
+- The loop can't stop for good and can't spin: Task 6 `WeatherSyncLoopTest.repeatedFailuresTryAtMostOnceEveryFiveMinutes`, `aFlakyLocationReadFetchesOnce`, `anErrorIsLoggedByTypeAndTheLoopGoesOn`, `aStrayCancellationDoesNotStopTheLoop`; Task 5 `aDrippingBodyEndsAsWeatherUnavailable`.
 - No coordinates, place name or zone in a log: Task 5 `nothingLoggedHoldsTheCoordinatesOrTheZone`; Task 6 `WeatherSyncLoopTest.nothingLoggedHoldsThePlace`.
 - `:app` never imports `:capability:weather`; the boundary test covers it: Task 3 `ModuleBoundariesTest.theWeatherModulesFollowTheRules`; Task 10 `AppSourceTest.theAppsOwnCodeNeverNamesTheWeatherCapability`.
 
@@ -121,7 +141,11 @@ app/src/testDebug/java/uk/co/siland/culvery/SampleAddTest.kt, SampleRollbackTest
 core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/
   HeaderItem.kt (create), Daylight.kt (create), Capability.kt (modify), Runtime.kt (modify: wallTimeEachMinute)
 core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/
-  WallTimeTest.kt, CapabilityDefaultsTest.kt (create), HomeCardPlacerTest.kt (modify)
+  WallTimeTest.kt (create), HomeCardPlacerTest.kt (modify)
+capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/Now.kt, CalendarCapability.kt, ui/ReviewCalendars.kt;
+  tests ui/NowTest.kt, ui/CardHostsMidnightRolloverTest.kt   (Task 2: rememberNowMillis moves to :core:plugin)
+core/ui/src/main/java/uk/co/siland/culvery/core/ui/Shell.kt   (Task 8: ShellTokens.homeCardRadius)
+capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/CalendarType.kt   (Task 8: cardRadius aliases it)
 
 core/ui/src/main/java/uk/co/siland/culvery/core/ui/Colors.kt   (modify, Task 8: SunAmber)
 
@@ -184,7 +208,9 @@ README.md, docs/superpowers/plans/2026-09-23-plan1-followups.md   (modify, Task 
 
 **Interfaces:**
 - Consumes: `HouseholdRepository.location: Flow<HomeLocation?>` (unchanged).
-- Produces: `uk.co.siland.culvery.core.household.HouseholdZone` — `@Singleton class HouseholdZone @Inject constructor(household: HouseholdRepository) { val zone: Flow<ZoneId>; suspend fun current(): ZoneId }`, behaviour unchanged (the device zone without a location or with an id that doesn't parse).
+- Produces (package `uk.co.siland.culvery.core.household`):
+  - `@Singleton class HouseholdZone @Inject constructor(household: HouseholdRepository) { val zone: Flow<ZoneId>; suspend fun current(): ZoneId }`, behaviour unchanged (the device zone without a location or with an id that doesn't parse)
+  - `fun zoneOrDevice(id: String): ZoneId` — the zone [id] names, or the device's; the one zone parse, which weather uses too (Task 3)
 
 - [ ] **Step 1: Move the test first**
 
@@ -255,7 +281,7 @@ Expected: FAIL to compile with "Unresolved reference 'HouseholdZone'".
 ```bash
 git mv capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/HouseholdZone.kt core/household/src/main/java/uk/co/siland/culvery/core/household/HouseholdZone.kt
 ```
-In the moved file change only the package line and drop the import that is now same-package. Its whole content becomes:
+In the moved file change the package line, drop the import that is now same-package, and lift its private `parse` out as the public `zoneOrDevice` (the same behaviour; weather uses it in Task 3). Its whole content becomes:
 ```kotlin
 package uk.co.siland.culvery.core.household
 
@@ -268,21 +294,22 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
+/** The zone [id] names, or the device's when it names none. */
+fun zoneOrDevice(id: String): ZoneId =
+    try {
+        ZoneId.of(id)
+    } catch (e: DateTimeException) {
+        ZoneId.systemDefault()
+    }
+
 /** The household's time zone; the device zone until setup has set a location, or if the stored id is invalid. */
 @Singleton
 class HouseholdZone @Inject constructor(household: HouseholdRepository) {
     val zone: Flow<ZoneId> = household.location
-        .map { location -> location?.timeZoneId?.let(::parse) ?: ZoneId.systemDefault() }
+        .map { location -> location?.let { zoneOrDevice(it.timeZoneId) } ?: ZoneId.systemDefault() }
         .distinctUntilChanged()
 
     suspend fun current(): ZoneId = zone.first()
-
-    private fun parse(id: String): ZoneId? =
-        try {
-            ZoneId.of(id)
-        } catch (e: DateTimeException) {
-            null
-        }
 }
 ```
 
@@ -321,22 +348,24 @@ git commit -m "Move HouseholdZone to :core:household so the shell and weather ca
 
 ---
 
-### Task 2: The `:core:plugin` seams and the placer's mixed sizes (D6, §3.2, §8)
+### Task 2: The `:core:plugin` seams, the shared clock tick and the Forecast's placement (D6, §3.2, §8)
 
 **Review:** sonnet.
 
 **Files:**
 - Create: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/HeaderItem.kt`, `Daylight.kt`
 - Modify: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/Capability.kt`, `Runtime.kt`
-- Test: `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/WallTimeTest.kt`, `CapabilityDefaultsTest.kt` (create); `HomeCardPlacerTest.kt` (modify)
+- Modify (`rememberNowMillis` moves out): `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/Now.kt`, `CalendarCapability.kt`, `ui/ReviewCalendars.kt`; `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/NowTest.kt`, `ui/CardHostsMidnightRolloverTest.kt`
+- Test: `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/WallTimeTest.kt` (create); `HomeCardPlacerTest.kt` (modify)
 
 **Interfaces:**
-- Consumes: `SunTimes(sunrise: LocalTime, sunset: LocalTime)`, `WallClock`, `HomeCardPlacer.place` (all existing).
-- Produces:
+- Consumes: `SunTimes(sunrise: LocalTime, sunset: LocalTime)`, `WallClock`, `HomeCardPlacer.place` (all existing); the calendar's internal `rememberNowMillis(clock, ticks)` and its private 30 s `everyTick` (`capability/calendar/.../ui/Now.kt`, after Task 1's import change).
+- Produces (package `uk.co.siland.culvery.core.plugin`):
   - `class HeaderItem(val id: String, val order: Int, val content: @Composable () -> Unit)`
   - `Capability.headerItems(): Flow<List<HeaderItem>>`, default `flowOf(emptyList())`
   - `interface Daylight { val today: Flow<SunTimes?> }`
   - `fun wallTimeEachMinute(zones: Flow<ZoneId>, clock: WallClock): Flow<LocalDateTime>` — the time now in the latest zone, then at the start of every minute, and at once when the zone changes
+  - `val nowTicks: Flow<Unit>` (every 30 s) and `@Composable fun rememberNowMillis(clock: WallClock, ticks: Flow<Unit> = nowTicks): Long` — moved unchanged from the calendar, now public; the calendar and the Forecast card (Task 8) both use it
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -385,65 +414,8 @@ class WallTimeTest {
 }
 ```
 
-Create `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/CapabilityDefaultsTest.kt`:
+In `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/HomeCardPlacerTest.kt`, add before the class's closing brace (Today + Coming up + Forecast is already `mixedSizesFillTallThenWideThenRegularBesideIt`; Connect and Coming up never show together, so the one new case is the Forecast beside Connect, ruling 13):
 ```kotlin
-package uk.co.siland.culvery.core.plugin
-
-import androidx.compose.runtime.Composable
-import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.runTest
-import org.junit.Test
-
-class CapabilityDefaultsTest {
-    private val bare = object : Capability {
-        override val id = "bare"
-        override val label = "Bare"
-        override val icon = "star"
-        override val order = 0
-        override val hasTab: Flow<Boolean> = flowOf(false)
-
-        @Composable
-        override fun TabContent() = Unit
-
-        override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList())
-    }
-
-    @Test
-    fun aCapabilityAddsNothingToTheHeaderByDefault() = runTest {
-        assertThat(bare.headerItems().first()).isEmpty()
-    }
-}
-```
-
-In `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/HomeCardPlacerTest.kt`, add before the class's closing brace:
-```kotlin
-
-    @Test
-    fun forecastSitsAtRowTwoColumnTwoBesideTodayAndComingUp() {
-        val result = HomeCardPlacer.place(
-            listOf(card("weather.forecast", REGULAR, 40), card("calendar.comingUp", WIDE, 50), card("calendar.today", TALL, 100)),
-        )
-        assertThat(result.layout()).containsExactly(
-            "calendar.today", listOf(0, 0, 1, 2),
-            "calendar.comingUp", listOf(1, 0, 2, 1),
-            "weather.forecast", listOf(1, 1, 1, 1),
-        )
-    }
-
-    @Test
-    fun forecastSitsInTheSameCellBesideConnectAndComingUp() {
-        val result = HomeCardPlacer.place(
-            listOf(card("calendar.connect", TALL, 100), card("calendar.comingUp", WIDE, 50), card("weather.forecast", REGULAR, 40)),
-        )
-        assertThat(result.layout()).containsExactly(
-            "calendar.connect", listOf(0, 0, 1, 2),
-            "calendar.comingUp", listOf(1, 0, 2, 1),
-            "weather.forecast", listOf(1, 1, 1, 1),
-        )
-    }
 
     @Test
     fun withOnlyTheConnectCardTheForecastTakesTheFirstCellBesideIt() {
@@ -455,7 +427,7 @@ In `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/HomeCardPlacerTes
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `./gradlew :core:plugin:testDebugUnitTest`
-Expected: FAIL to compile with "Unresolved reference 'wallTimeEachMinute'" and "Unresolved reference 'headerItems'". (The three placer tests pass on their own once it compiles: the placer already does this; they pin it for the Forecast card.)
+Expected: FAIL to compile with "Unresolved reference 'wallTimeEachMinute'". (The placer case passes on its own once it compiles: the placer already does this; it pins it for the Forecast card.)
 
 - [ ] **Step 3: Add the seams**
 
@@ -494,6 +466,9 @@ Replace the whole of `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin
 ```kotlin
 package uk.co.siland.culvery.core.plugin
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -512,6 +487,7 @@ fun interface WallClock {
 annotation class ApplicationScope
 
 private const val MINUTE_MS = 60_000L
+private const val NOW_TICK_MS = 30_000L
 
 /**
  * The wall time in the latest zone from [zones]: now, then at the start of each minute, and at once when the zone
@@ -527,23 +503,81 @@ private fun minuteTicks(clock: WallClock): Flow<Long> = flow {
         delay(MINUTE_MS - Math.floorMod(now, MINUTE_MS))
     }
 }
+
+/** Every 30 s: how often [rememberNowMillis] reads the clock unless told otherwise. */
+val nowTicks: Flow<Unit> = flow {
+    while (true) {
+        delay(NOW_TICK_MS)
+        emit(Unit)
+    }
+}
+
+/** Wall-clock time that refreshes on every [ticks] emission (every 30 s by default). */
+@Composable
+fun rememberNowMillis(clock: WallClock, ticks: Flow<Unit> = nowTicks): Long {
+    val now by produceState(clock.nowMillis(), clock, ticks) {
+        ticks.collect { value = clock.nowMillis() }
+    }
+    return now
+}
 ```
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [ ] **Step 4: Point the calendar at the moved tick**
 
-Run: `./gradlew :core:plugin:testDebugUnitTest`
-Expected: PASS.
+Replace the whole of `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/Now.kt` with (its `rememberNowMillis` and `everyTick` are now `:core:plugin`'s; the rest is unchanged):
+```kotlin
+package uk.co.siland.culvery.capability.calendar.ui
 
-- [ ] **Step 5: Run the gate**
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import kotlinx.coroutines.flow.Flow
+import uk.co.siland.culvery.core.household.HouseholdZone
+import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.nowTicks
+import uk.co.siland.culvery.core.plugin.rememberNowMillis
+
+@Composable
+internal fun rememberZoneId(zone: HouseholdZone): ZoneId {
+    val z by zone.zone.collectAsState(initial = ZoneId.systemDefault())
+    return z
+}
+
+internal fun todayIn(zone: ZoneId, nowMillis: Long): LocalDate = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+
+@Composable
+internal fun rememberToday(zone: HouseholdZone, clock: WallClock, ticks: Flow<Unit> = nowTicks): LocalDate =
+    todayIn(rememberZoneId(zone), rememberNowMillis(clock, ticks))
+```
+
+Then:
+1. In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarCapability.kt`, replace `import uk.co.siland.culvery.capability.calendar.ui.rememberNowMillis` with `import uk.co.siland.culvery.core.plugin.rememberNowMillis`, in its sorted place.
+2. In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/ReviewCalendars.kt`, `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/NowTest.kt` and `ui/CardHostsMidnightRolloverTest.kt` (same package as the old function, so no import today), add `import uk.co.siland.culvery.core.plugin.rememberNowMillis` in its sorted place.
+
+Check:
+```bash
+grep -rn "calendar.ui.rememberNowMillis\|everyTick" --include=*.kt .
+```
+Expected: no output.
+
+- [ ] **Step 5: Run the tests to see them pass**
+
+Run: `./gradlew :core:plugin:testDebugUnitTest :capability:calendar:testDebugUnitTest`
+Expected: PASS; the calendar's `NowTest` and midnight-rollover tests pass unchanged.
+
+- [ ] **Step 6: Run the gate**
 
 Run: `./gradlew testDebugUnitTest verifyRoborazziDebug`
-Expected: `BUILD SUCCESSFUL` (every existing `Capability` gets the default; the shell doesn't read header items yet).
+Expected: `BUILD SUCCESSFUL` (every existing `Capability` gets the `headerItems()` default; the shell doesn't read header items yet; no screenshot changes).
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add core/plugin
-git commit -m "Let capabilities add items to Home's header and supply today's sun times, and tick the wall time in a zone"
+git add core/plugin capability/calendar
+git commit -m "Let capabilities add items to Home's header and supply today's sun times, tick the wall time in a zone, and share the clock tick"
 ```
 
 ---
@@ -559,11 +593,11 @@ git commit -m "Let capabilities add items to Home's header and supply today's su
 - Test: `capability/weather/src/test/java/uk/co/siland/culvery/capability/weather/SampleWeather.kt`, `WeatherViewTest.kt`, `WeatherWordsTest.kt` (create)
 
 **Interfaces:**
-- Consumes: `HomeLocation(name, latitude, longitude, timeZoneId)`, `SunTimes`, `ProviderDescriptor` (existing).
+- Consumes: `HomeLocation(name, latitude, longitude, timeZoneId)` (existing), `zoneOrDevice(id: String): ZoneId` (Task 1), `SunTimes`, `ProviderDescriptor` (existing).
 - Produces (all in `uk.co.siland.culvery.capability.weather`):
   - Contract (§3.1, exactly): `interface WeatherProvider { val descriptor: ProviderDescriptor; suspend fun forecast(latitude: Double, longitude: Double, zone: ZoneId): Forecast }`; `data class Forecast(days: List<DailyWeather>, hours: List<HourlyWeather>)`; `data class DailyWeather(date: LocalDate, condition: Condition, high: Double, low: Double, sunrise: LocalTime?, sunset: LocalTime?)`; `data class HourlyWeather(start: LocalDateTime, condition: Condition, temperature: Double)`; `enum class Condition { CLEAR, PARTLY_CLOUDY, CLOUDY, FOG, DRIZZLE, RAIN, SHOWERS, SNOW, THUNDER }`; `class WeatherUnavailableException(message: String? = null, cause: Throwable? = null) : Exception`
   - `const val FORECAST_DAYS = 3`
-  - `data class WeatherPlace(latitude: Double, longitude: Double, zoneId: String)` with `constructor(location: HomeLocation)` and `val zone: ZoneId` (the device zone when `zoneId` doesn't parse)
+  - `data class WeatherPlace(latitude: Double, longitude: Double, zoneId: String)` with `constructor(location: HomeLocation)` and `val zone: ZoneId` (`zoneOrDevice(zoneId)`)
   - `data class StoredWeather(place: WeatherPlace, fetchedAtMillis: Long, days: List<DailyWeather>, hours: List<HourlyWeather>)`
   - `fun StoredWeather?.matching(location: HomeLocation?): StoredWeather?`
   - `sealed interface WeatherView { NoLocation; Waiting; Expired; data class Ready(now: HourlyWeather?, today: DailyWeather, days: List<DailyWeather>, fetchedAtMillis: Long) }`
@@ -691,6 +725,20 @@ class WeatherViewTest {
         assertThat(weatherView(LONDON.copy(name = "Westminster"), stored(LONDON), thuMorning)).isInstanceOf(WeatherView.Ready::class.java)
     }
 
+    /** Review Focus 1: a fetch that lands after a move is stored under the place it asked for, so it doesn't match. */
+    @Test
+    fun matchingComparesTheCoordinatesAndTheZoneNotTheName() {
+        val s = stored(LONDON)
+        assertThat(s.matching(LONDON)).isNotNull()
+        assertThat(s.matching(LONDON.copy(name = "Westminster"))).isNotNull()
+        assertThat(s.matching(LEEDS)).isNull()
+        assertThat(s.matching(LONDON.copy(latitude = 51.5075))).isNull()
+        assertThat(s.matching(LONDON.copy(longitude = -0.1279))).isNull()
+        assertThat(s.matching(LONDON.copy(timeZoneId = "Europe/Dublin"))).isNull()
+        assertThat(s.matching(null)).isNull()
+        assertThat((null as StoredWeather?).matching(LONDON)).isNull()
+    }
+
     @Test
     fun readyStartsAtTodayWithTheNextTwoDaysAndTheHourContainingNow() {
         val view = weatherView(LONDON, stored(forecast = forecast(from = THU.minusDays(1))), thuMorning) as WeatherView.Ready
@@ -736,7 +784,7 @@ class WeatherViewTest {
         assertThat(view.today.date).isEqualTo(THU)
     }
 
-    /** Review Focus 2: a day whose 01:00 never comes (the clocks go forward) has 00:00, then 02:00. */
+    /** A day whose 01:00 never comes (the clocks go forward) has 00:00, then 02:00: the lookup leaves the gap empty. */
     @Test
     fun theHourContainingNowIsFoundAcrossAGap() {
         val hours = listOf(HourlyWeather(THU.atTime(0, 0), Condition.CLEAR, 9.0), HourlyWeather(THU.atTime(2, 0), Condition.CLEAR, 8.0))
@@ -893,7 +941,6 @@ import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 
 /** A source of forecasts (4b design §3.1), bound `@IntoSet` by a provider module. */
 interface WeatherProvider {
-    /** e.g. "weather.openmeteo". */
     val descriptor: ProviderDescriptor
 
     /** Times are wall times in [zone]; temperatures °C. Throws WeatherUnavailableException on any failure; nothing else escapes. */
@@ -927,11 +974,11 @@ Create `capability/weather/src/main/java/uk/co/siland/culvery/capability/weather
 ```kotlin
 package uk.co.siland.culvery.capability.weather
 
-import java.time.DateTimeException
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import uk.co.siland.culvery.core.household.HomeLocation
+import uk.co.siland.culvery.core.household.zoneOrDevice
 import uk.co.siland.culvery.core.plugin.SunTimes
 
 /** The Forecast card's days: today and the next two (D1). */
@@ -942,12 +989,7 @@ data class WeatherPlace(val latitude: Double, val longitude: Double, val zoneId:
     constructor(location: HomeLocation) : this(location.latitude, location.longitude, location.timeZoneId)
 
     /** The zone to ask in; the device's when [zoneId] doesn't parse, as `HouseholdZone` falls back. */
-    val zone: ZoneId
-        get() = try {
-            ZoneId.of(zoneId)
-        } catch (e: DateTimeException) {
-            ZoneId.systemDefault()
-        }
+    val zone: ZoneId get() = zoneOrDevice(zoneId)
 }
 
 /** What `weather.db` holds: one fetch, made for [place]. */
@@ -1097,7 +1139,7 @@ internal fun rowDescription(day: DailyWeather, isToday: Boolean): String {
 - [ ] **Step 6: Run the tests to see them pass**
 
 Run: `./gradlew :capability:weather:testDebugUnitTest`
-Expected: PASS (19 in `WeatherViewTest`, 6 in `WeatherWordsTest`).
+Expected: PASS (20 in `WeatherViewTest`, 6 in `WeatherWordsTest`).
 
 - [ ] **Step 7: Cover the new module in the boundary test**
 
@@ -1144,13 +1186,13 @@ git commit -m "Add :capability:weather with its provider contract and the rules 
 - Test: `capability/weather/src/test/java/uk/co/siland/culvery/capability/weather/TestDatabases.kt`, `WeatherStoreTest.kt` (create)
 
 **Interfaces:**
-- Consumes: `WeatherPlace`, `StoredWeather`, `Forecast`, `DailyWeather`, `HourlyWeather`, `Condition`, `matching` (Task 3).
+- Consumes: `WeatherPlace`, `StoredWeather`, `Forecast`, `DailyWeather`, `HourlyWeather`, `Condition` (Task 3). Matching is `StoredWeather?.matching` (Task 3, tested there); the store records the place it is given.
 - Produces:
   - `@Entity("fetch") FetchEntity(id: Int = 0, latitude: Double, longitude: Double, zoneId: String, fetchedAtMillis: Long)`; `@Entity("day") DayEntity(date: String, condition: String, high: Double, low: Double, sunrise: String?, sunset: String?)`; `@Entity("hour") HourEntity(start: String, condition: String, temperature: Double)`
   - `@Dao interface WeatherDao` (`fetchChanges(): Flow<FetchEntity?>`, `fetch()`, `days()`, `hours()`, `clearFetch()`, `clearDays()`, `clearHours()`, `insertFetch(FetchEntity)`, `insertDays(List<DayEntity>)`, `insertHours(List<HourEntity>)`)
   - `abstract class WeatherDatabase : RoomDatabase { abstract fun weatherDao(): WeatherDao }`, version 1
   - `@Singleton class WeatherStore` — `internal constructor(db: WeatherDatabase, dao: WeatherDao)`; `@Inject constructor(db: WeatherDatabase)`; `val stored: Flow<StoredWeather?>`; `suspend fun replace(place: WeatherPlace, forecast: Forecast, fetchedAtMillis: Long)`
-  - Test helpers: `internal fun weatherDb(): WeatherDatabase`, `internal fun householdDb(): HouseholdDatabase`
+  - Test helper: `internal fun weatherDb(): WeatherDatabase`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1161,15 +1203,9 @@ package uk.co.siland.culvery.capability.weather
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import uk.co.siland.culvery.capability.weather.db.WeatherDatabase
-import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 
 internal fun weatherDb(): WeatherDatabase =
     Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), WeatherDatabase::class.java)
-        .allowMainThreadQueries()
-        .build()
-
-internal fun householdDb(): HouseholdDatabase =
-    Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), HouseholdDatabase::class.java)
         .allowMainThreadQueries()
         .build()
 ```
@@ -1259,7 +1295,7 @@ class WeatherStoreTest {
         assertThat(s.hours).hasSize(7 * 24)
     }
 
-    /** Review Focus 2: a clock-change day can list an hour twice; the first is kept and the fetch isn't lost. */
+    /** Review Focus 2: a provider that repeats an hour can't break every fetch; the first is kept. */
     @Test
     fun aRepeatedHourIsStoredOnce() = runTest {
         val f = forecast(days = 1)
@@ -1267,19 +1303,6 @@ class WeatherStoreTest {
         val hours = store.stored.first()!!.hours
         assertThat(hours).hasSize(24)
         assertThat(hours.single { it.start == THU.atTime(1, 0) }.temperature).isEqualTo(17.0)
-    }
-
-    /** Review Focus 1: a fetch that lands after a move is stored under the place it asked for, so it doesn't match. */
-    @Test
-    fun dataForTheOldPlaceDoesNotMatchTheNewOne() = runTest {
-        store.replace(WeatherPlace(LONDON), forecast(), 1_000L)
-        val s = store.stored.first()
-        assertThat(s.matching(LONDON)).isNotNull()
-        assertThat(s.matching(LONDON.copy(name = "Westminster"))).isNotNull()
-        assertThat(s.matching(LEEDS)).isNull()
-        assertThat(s.matching(LONDON.copy(latitude = 51.5075))).isNull()
-        assertThat(s.matching(LONDON.copy(timeZoneId = "Europe/Dublin"))).isNull()
-        assertThat(s.matching(null)).isNull()
     }
 }
 ```
@@ -1488,13 +1511,14 @@ git commit -m "Store the forecast in weather.db, replaced whole by each fetch, a
 - Test: `provider/weather-openmeteo/src/test/java/uk/co/siland/culvery/provider/weather_openmeteo/TestLogs.kt`, `OpenMeteoForecastTest.kt` (create); `OpenMeteoLocationSearchTest.kt` (modify: its private log helper moves to `TestLogs.kt`)
 
 **Interfaces:**
-- Consumes: `WeatherProvider`, `Forecast`, `DailyWeather`, `HourlyWeather`, `Condition`, `WeatherUnavailableException` (Task 3); `SunTimes`, `ProviderDescriptor`, `Feature` (`:core:plugin`).
+- Consumes: `WeatherProvider`, `Forecast`, `DailyWeather`, `HourlyWeather`, `Condition`, `WeatherUnavailableException` (Task 3); `SunTimes`, `ProviderDescriptor`, `Feature`, `WallClock` (`:core:plugin`; `WallClock` is bound by `:app`'s `AppModule`).
 - Produces:
-  - `const val OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"`; `const val OPEN_METEO_PROVIDER_ID = "weather.openmeteo"`
-  - `class OpenMeteoForecast(url: HttpUrl, client: OkHttpClient) : WeatherProvider`
-  - `internal fun wmoCondition(code: Int): Condition`; `internal fun sunTimes(date: LocalDate, sunrise: String?, sunset: String?): SunTimes?`
-  - `internal class Answer(val code: Int, val body: String)`; `internal suspend fun Call.await(): Answer` (moved, unchanged)
-  - `OpenMeteoModule` also provides `WeatherProvider` `@IntoSet` `@Singleton`, on its own client (15 s connect, 30 s read, the calendar sync's)
+  - `const val OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"`; `const val OPEN_METEO_PROVIDER_ID = "weather.openmeteo"`; `internal const val MAX_FORECAST_BYTES = 1_048_576L`
+  - `class OpenMeteoForecast(url: HttpUrl, client: OkHttpClient, clock: WallClock) : WeatherProvider` — keeps only the `DAYS_FETCHED` (7) dates from today in the zone asked for; refuses an answer over `MAX_FORECAST_BYTES`
+  - `internal fun readForecast(answer: ForecastAnswer, today: LocalDate): Forecast`; `internal fun wmoCondition(code: Int): Condition`; `internal fun sunTimes(date: LocalDate, sunrise: String?, sunset: String?): SunTimes?`
+  - `internal class Answer(val code: Int, val body: String)`; `internal class BodyTooLarge : IOException`; `internal suspend fun Call.await(maxBytes: Long? = null): Answer` (moved; without `maxBytes` it reads as before)
+  - `internal fun forecastClient(): OkHttpClient` (`di/OpenMeteoModule.kt`): 15 s connect, 30 s read (the calendar sync's), 60 s whole call
+  - `OpenMeteoModule` also provides `WeatherProvider` `@IntoSet` `@Singleton`, `forecast(clock: WallClock)`, on `forecastClient()`
   - Test helper: `internal fun assertNoSecretsLogged(tag: String, secrets: List<String>, minLines: Int = 1)`
 
 - [ ] **Step 1: Depend on the contract**
@@ -1551,6 +1575,7 @@ package uk.co.siland.culvery.provider.weather_openmeteo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -1579,6 +1604,8 @@ import uk.co.siland.culvery.capability.weather.DailyWeather
 import uk.co.siland.culvery.capability.weather.Forecast
 import uk.co.siland.culvery.capability.weather.HourlyWeather
 import uk.co.siland.culvery.capability.weather.WeatherUnavailableException
+import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.provider.weather_openmeteo.di.forecastClient
 
 /** One day and one hour, as the members of `daily` and `hourly`. */
 private const val DAILY_ONE =
@@ -1592,12 +1619,15 @@ class OpenMeteoForecastTest {
     private lateinit var forecast: OpenMeteoForecast
     private val client = OkHttpClient.Builder().retryOnConnectionFailure(false).build()
 
+    // 10:00 on Thursday 1 October 2026 in London: the week asked for is 1–7 October, the fixture's.
+    private val clock = WallClock { Instant.parse("2026-10-01T09:00:00Z").toEpochMilli() }
+
     @Before
     fun setUp() {
         ShadowLog.clear()
         server = MockWebServer()
         server.start()
-        forecast = OpenMeteoForecast(server.url("/v1/forecast"), client)
+        forecast = OpenMeteoForecast(server.url("/v1/forecast"), client, clock)
     }
 
     @After
@@ -1677,7 +1707,7 @@ class OpenMeteoForecastTest {
     fun aPolarDayOrNightHasNoSunTimes() = runTest {
         answer(
             small(
-                daily = """ "time":["2025-12-21","2025-06-21"],"weather_code":[71,0],"temperature_2m_max":[-0.5,9.0],"temperature_2m_min":[-6.0,3.0],"sunrise":["2025-12-21T00:00","2025-06-21T00:00"],"sunset":["2025-12-21T00:00","2025-06-22T00:00"]""",
+                daily = """ "time":["2026-10-01","2026-10-02"],"weather_code":[71,0],"temperature_2m_max":[-0.5,9.0],"temperature_2m_min":[-6.0,3.0],"sunrise":["2026-10-01T00:00","2026-10-02T00:00"],"sunset":["2026-10-01T00:00","2026-10-03T00:00"]""",
             ),
         )
         val days = london().days
@@ -1746,7 +1776,7 @@ class OpenMeteoForecastTest {
     fun cancellingTheForecastCancelsTheCall() = runTest {
         // Its own client with a long read timeout, so only cancelling the call can end it inside the second.
         val patient = OkHttpClient.Builder().readTimeout(Duration.ofSeconds(30)).build()
-        val slow = OpenMeteoForecast(server.url("/v1/forecast"), patient)
+        val slow = OpenMeteoForecast(server.url("/v1/forecast"), patient, clock)
         // One byte every 3 s: the headers arrive, the body stalls.
         server.enqueue(MockResponse().setBody(fixture()).throttleBody(1, 3, TimeUnit.SECONDS))
         val returned = withContext(Dispatchers.Default) {
@@ -1757,6 +1787,51 @@ class OpenMeteoForecastTest {
         }
         assertThat(returned).isTrue()
         withContext(Dispatchers.Default) { withTimeout(1_000) { while (patient.dispatcher.runningCallsCount() > 0) delay(10) } }
+    }
+
+    @Test
+    fun theForecastClientGivesUpOnAWholeCallAfterSixtySeconds() {
+        assertThat(forecastClient().callTimeoutMillis).isEqualTo(60_000)
+    }
+
+    /** Plan review 2: each byte arrives inside the read timeout, so only the whole-call limit can end it. */
+    @Test
+    fun aDrippingBodyEndsAsWeatherUnavailable() = runTest {
+        // The module's client with its 60 s call limit cut to 1 s, so the test doesn't wait a minute.
+        val hurried = forecastClient().newBuilder().callTimeout(Duration.ofSeconds(1)).build()
+        val dripping = OpenMeteoForecast(server.url("/v1/forecast"), hurried, clock)
+        server.enqueue(MockResponse().setBody(fixture()).throttleBody(1, 300, TimeUnit.MILLISECONDS))
+        val thrown = withContext(Dispatchers.Default) {
+            withTimeout(10_000) { runCatching { dripping.forecast(51.5074, -0.1278, ZoneId.of("Europe/London")) }.exceptionOrNull() }
+        }
+        assertThat(thrown).isInstanceOf(WeatherUnavailableException::class.java)
+    }
+
+    /** Plan review 13. */
+    @Test
+    fun anAnswerOverOneMebibyteIsWeatherUnavailable() = runTest {
+        val tooBig = "x".repeat(MAX_FORECAST_BYTES.toInt() + 1)
+        answer(tooBig)
+        assertThat(failure()).isInstanceOf(WeatherUnavailableException::class.java)
+        // Without a length up front, the read still stops one byte past the limit.
+        server.enqueue(MockResponse().setChunkedBody(tooBig, 64 * 1024))
+        assertThat(failure()).isInstanceOf(WeatherUnavailableException::class.java)
+    }
+
+    /** Plan review 13: only the seven dates from today in the zone asked for are kept. */
+    @Test
+    fun daysAndHoursOutsideTheSevenAskedForAreDropped() = runTest {
+        answer(
+            small(
+                daily = """ "time":["2026-09-30","2026-10-01","2026-10-08"],"weather_code":[3,3,3],"temperature_2m_max":[19.0,19.0,19.0],"temperature_2m_min":[11.0,11.0,11.0],"sunrise":[null,null,null],"sunset":[null,null,null]""",
+                hourly = """ "time":["2026-09-30T23:00","2026-10-01T00:00","2026-10-07T23:00","2026-10-08T00:00"],"temperature_2m":[17.0,17.0,17.0,17.0],"weather_code":[3,3,3,3]""",
+            ),
+        )
+        val f = london()
+        assertThat(f.days.map { it.date }).containsExactly(LocalDate.of(2026, 10, 1))
+        assertThat(f.hours.map { it.start })
+            .containsExactly(LocalDateTime.of(2026, 10, 1, 0, 0), LocalDateTime.of(2026, 10, 7, 23, 0))
+            .inOrder()
     }
 
     @Test
@@ -1794,14 +1869,19 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Response
+import okhttp3.ResponseBody
 
 internal class Answer(val code: Int, val body: String)
 
+/** A body longer than the caller allows. An IOException, so the caller treats it as a failed call. */
+internal class BodyTooLarge : IOException("The answer is longer than allowed")
+
 /**
  * Enqueues the call and suspends until its whole body is in, reading it on OkHttp's thread (3a's `Call.await`):
- * cancelling the coroutine cancels the call, which ends a stalled read at once.
+ * cancelling the coroutine cancels the call, which ends a stalled read at once. With [maxBytes], a longer body is
+ * [BodyTooLarge], read no further than one byte past the limit.
  */
-internal suspend fun Call.await(): Answer = suspendCancellableCoroutine { cont ->
+internal suspend fun Call.await(maxBytes: Long? = null): Answer = suspendCancellableCoroutine { cont ->
     cont.invokeOnCancellation { cancel() }
     enqueue(
         object : Callback {
@@ -1811,7 +1891,7 @@ internal suspend fun Call.await(): Answer = suspendCancellableCoroutine { cont -
 
             override fun onResponse(call: Call, response: Response) {
                 val answer = try {
-                    response.use { Answer(it.code, it.body?.string().orEmpty()) }
+                    response.use { Answer(it.code, it.body?.let { body -> read(body, maxBytes) }.orEmpty()) }
                 } catch (e: Throwable) {
                     // After a cancel this is the closed socket and the continuation is already cancelled; anything else
                     // must reach the caller, or it would hang.
@@ -1822,6 +1902,14 @@ internal suspend fun Call.await(): Answer = suspendCancellableCoroutine { cont -
             }
         },
     )
+}
+
+private fun read(body: ResponseBody, maxBytes: Long?): String {
+    if (maxBytes == null) return body.string()
+    if (body.contentLength() > maxBytes) throw BodyTooLarge()
+    val source = body.source()
+    if (source.request(maxBytes + 1)) throw BodyTooLarge()
+    return source.buffer.readUtf8()
 }
 ```
 
@@ -1916,6 +2004,7 @@ package uk.co.siland.culvery.provider.weather_openmeteo
 import android.util.Log
 import java.io.IOException
 import java.time.DateTimeException
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -1936,13 +2025,17 @@ import uk.co.siland.culvery.capability.weather.WeatherUnavailableException
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.SunTimes
+import uk.co.siland.culvery.core.plugin.WallClock
 
 /** Open-Meteo's forecast API: no key (4b design D7). */
 const val OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 
 const val OPEN_METEO_PROVIDER_ID = "weather.openmeteo"
 
-private const val FORECAST_DAYS = "7"
+/** The real answer is about 6 KB; anything past this isn't a forecast (plan review 13). */
+internal const val MAX_FORECAST_BYTES = 1_048_576L
+
+private const val DAYS_FETCHED = 7
 private const val DAILY = "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset"
 private const val HOURLY = "temperature_2m,weather_code"
 
@@ -1976,7 +2069,11 @@ private val ForecastJson = Json { ignoreUnknownKeys = true }
  * [WeatherUnavailableException] with fixed words and no cause; nothing logged holds the URL, the body, the coordinates
  * or the zone.
  */
-class OpenMeteoForecast(private val url: HttpUrl, private val client: OkHttpClient) : WeatherProvider {
+class OpenMeteoForecast(
+    private val url: HttpUrl,
+    private val client: OkHttpClient,
+    private val clock: WallClock,
+) : WeatherProvider {
     override val descriptor = ProviderDescriptor(
         id = OPEN_METEO_PROVIDER_ID,
         displayName = "Open-Meteo",
@@ -1991,14 +2088,14 @@ class OpenMeteoForecast(private val url: HttpUrl, private val client: OkHttpClie
                     .addQueryParameter("latitude", latitude.toString())
                     .addQueryParameter("longitude", longitude.toString())
                     .addQueryParameter("timezone", zone.id)
-                    .addQueryParameter("forecast_days", FORECAST_DAYS)
+                    .addQueryParameter("forecast_days", DAYS_FETCHED.toString())
                     .addQueryParameter("daily", DAILY)
                     .addQueryParameter("hourly", HOURLY)
                     .build(),
             )
             .build()
         val answer = try {
-            client.newCall(request).await()
+            client.newCall(request).await(MAX_FORECAST_BYTES)
         } catch (e: IOException) {
             // A cancelled caller gets its cancellation, never "unavailable".
             currentCoroutineContext().ensureActive()
@@ -2009,8 +2106,9 @@ class OpenMeteoForecast(private val url: HttpUrl, private val client: OkHttpClie
             Log.w(TAG, "Forecast answered ${answer.code}")
             throw WeatherUnavailableException("The forecast answered ${answer.code}")
         }
+        val today = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone).toLocalDate()
         return try {
-            readForecast(ForecastJson.decodeFromString(ForecastAnswer.serializer(), answer.body))
+            readForecast(ForecastJson.decodeFromString(ForecastAnswer.serializer(), answer.body), today)
         } catch (e: IllegalArgumentException) {
             throw unreadable(e)
         } catch (e: DateTimeException) {
@@ -2027,8 +2125,12 @@ class OpenMeteoForecast(private val url: HttpUrl, private val client: OkHttpClie
     }
 }
 
-/** Throws [Unreadable], `IllegalArgumentException` or `DateTimeException` for an answer it can't read. */
-internal fun readForecast(answer: ForecastAnswer): Forecast {
+/**
+ * Keeps only the [DAYS_FETCHED] dates from [today]: nothing else was asked for. Throws [Unreadable],
+ * `IllegalArgumentException` or `DateTimeException` for an answer it can't read.
+ */
+internal fun readForecast(answer: ForecastAnswer, today: LocalDate): Forecast {
+    val asked = today..today.plusDays(DAYS_FETCHED - 1L)
     val daily = answer.daily ?: throw Unreadable()
     val hourly = answer.hourly ?: throw Unreadable()
     val dates = daily.time.required()
@@ -2043,7 +2145,7 @@ internal fun readForecast(answer: ForecastAnswer): Forecast {
 
     // A null entry (past a model's horizon) drops that day or hour, never the whole answer.
     val days = dates.indices.mapNotNull { i ->
-        val date = dates[i]?.let { LocalDate.parse(it) } ?: return@mapNotNull null
+        val date = dates[i]?.let { LocalDate.parse(it) }?.takeIf { it in asked } ?: return@mapNotNull null
         val code = dayCodes[i] ?: return@mapNotNull null
         val high = highs[i] ?: return@mapNotNull null
         val low = lows[i] ?: return@mapNotNull null
@@ -2051,7 +2153,7 @@ internal fun readForecast(answer: ForecastAnswer): Forecast {
         DailyWeather(date, wmoCondition(code), high, low, sun?.sunrise, sun?.sunset)
     }
     val hours = starts.indices.mapNotNull { i ->
-        val start = starts[i]?.let { LocalDateTime.parse(it) } ?: return@mapNotNull null
+        val start = starts[i]?.let { LocalDateTime.parse(it) }?.takeIf { it.toLocalDate() in asked } ?: return@mapNotNull null
         val code = hourCodes[i] ?: return@mapNotNull null
         val temperature = temperatures[i] ?: return@mapNotNull null
         HourlyWeather(start, wmoCondition(code), temperature)
@@ -2103,6 +2205,7 @@ import javax.inject.Singleton
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import uk.co.siland.culvery.capability.weather.WeatherProvider
+import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.setup.LocationSearch
 import uk.co.siland.culvery.provider.weather_openmeteo.OPEN_METEO_FORECAST_URL
 import uk.co.siland.culvery.provider.weather_openmeteo.OPEN_METEO_GEOCODING_URL
@@ -2113,9 +2216,17 @@ import uk.co.siland.culvery.provider.weather_openmeteo.OpenMeteoLocationSearch
 private val SEARCH_CONNECT_TIMEOUT: Duration = Duration.ofSeconds(10)
 private val SEARCH_READ_TIMEOUT: Duration = Duration.ofSeconds(15)
 
-// The forecast runs in the background, as the calendar's sync does: its timeouts.
+// The forecast runs in the background, as the calendar's sync does: its timeouts, and a whole-call limit, so a body
+// that drips in inside the read timeout can't hold the loop (plan review 2).
 private val FORECAST_CONNECT_TIMEOUT: Duration = Duration.ofSeconds(15)
 private val FORECAST_READ_TIMEOUT: Duration = Duration.ofSeconds(30)
+private val FORECAST_CALL_TIMEOUT: Duration = Duration.ofSeconds(60)
+
+internal fun forecastClient(): OkHttpClient = OkHttpClient.Builder()
+    .connectTimeout(FORECAST_CONNECT_TIMEOUT)
+    .readTimeout(FORECAST_READ_TIMEOUT)
+    .callTimeout(FORECAST_CALL_TIMEOUT)
+    .build()
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -2131,17 +2242,14 @@ object OpenMeteoModule {
     @Provides
     @Singleton
     @IntoSet
-    fun forecast(): WeatherProvider = OpenMeteoForecast(
-        OPEN_METEO_FORECAST_URL.toHttpUrl(),
-        OkHttpClient.Builder().connectTimeout(FORECAST_CONNECT_TIMEOUT).readTimeout(FORECAST_READ_TIMEOUT).build(),
-    )
+    fun forecast(clock: WallClock): WeatherProvider = OpenMeteoForecast(OPEN_METEO_FORECAST_URL.toHttpUrl(), forecastClient(), clock)
 }
 ```
 
 - [ ] **Step 8: Run the tests to see them pass**
 
 Run: `./gradlew :provider:weather-openmeteo:testDebugUnitTest`
-Expected: PASS (12 in `OpenMeteoForecastTest`; the 7 `OpenMeteoLocationSearchTest` cases unchanged).
+Expected: PASS (16 in `OpenMeteoForecastTest`; the 7 `OpenMeteoLocationSearchTest` cases unchanged).
 
 - [ ] **Step 9: Run the gate**
 
@@ -2169,10 +2277,10 @@ git commit -m "Fetch seven days of daily and hourly weather from Open-Meteo in t
 - Consumes: `WeatherProvider`, `WeatherPlace`, `WeatherStore.replace` (Tasks 3, 4); `HouseholdRepository.location`; `WallClock`, `@ApplicationScope CoroutineScope`, `Startable`, `retryWithBackoff` (`:core:plugin`).
 - Produces:
   - `internal const val TAG = "Weather"` (the capability's one log tag)
-  - `@Singleton class WeatherFetcher @Inject constructor(providers: Set<@JvmSuppressWildcards WeatherProvider>, store: WeatherStore, clock: WallClock) { suspend fun fetch(place: WeatherPlace) }` — asks the first provider by `descriptor.id` in `place.zone` and stores under `place`; does nothing without a provider; throws on any failure, leaving the store alone
+  - `class WeatherFetcher @Inject constructor(providers: Set<@JvmSuppressWildcards WeatherProvider>, store: WeatherStore, clock: WallClock) { suspend fun fetch(place: WeatherPlace) }` (unscoped: only the loop holds one) — asks the first provider by `descriptor.id` in `place.zone` and stores under `place`; does nothing without a provider; throws on any failure, leaving the store alone
   - `const val WEATHER_REFRESH_MS = 30 * 60_000L`; `const val WEATHER_RETRY_MS = 5 * 60_000L`
   - `internal fun Flow<HomeLocation?>.places(): Flow<WeatherPlace?>`
-  - `@Singleton class WeatherSyncLoop internal constructor(fetch: suspend (WeatherPlace) -> Unit, places: Flow<WeatherPlace?>, scope: CoroutineScope) : Startable`; `@Inject constructor(fetcher: WeatherFetcher, household: HouseholdRepository, @ApplicationScope scope: CoroutineScope)`
+  - `@Singleton class WeatherSyncLoop internal constructor(fetch: suspend (WeatherPlace) -> Unit, places: Flow<WeatherPlace?>, scope: CoroutineScope) : Startable`; `@Inject constructor(fetcher: WeatherFetcher, household: HouseholdRepository, @ApplicationScope scope: CoroutineScope)` — wakes only when the place really changes, however often the location read is retried
   - Test helpers: `internal class ScriptedWeatherProvider(id: String = "weather.test", answer: () -> Forecast = { forecast() })` with `val asked: MutableList<Triple<Double, Double, ZoneId>>`; `internal fun assertNoSecretsLogged(tag, secrets, minLines = 1)`
 
 - [ ] **Step 1: Write the test helpers**
@@ -2235,7 +2343,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.weather.db.WeatherDatabase
-import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.plugin.WallClock
 
 // Robolectric for Room.
@@ -2278,14 +2385,6 @@ class WeatherFetcherTest {
         assertThat(provider.asked.single().third).isEqualTo(ZoneId.of("Pacific/Auckland"))
     }
 
-    @Test
-    fun anInvalidZoneAsksInTheDeviceZoneAndStillMatches() = runTest {
-        val nowhere = HomeLocation("Nowhere", 10.0, 20.0, "Not/AZone")
-        val provider = ScriptedWeatherProvider()
-        WeatherFetcher(setOf(provider), store, clock).fetch(WeatherPlace(nowhere))
-        assertThat(provider.asked.single().third).isEqualTo(ZoneId.of("America/New_York"))
-        assertThat(store.stored.first().matching(nowhere)).isNotNull()
-    }
 
     @Test
     fun theFirstProviderByIdIsAsked() = runTest {
@@ -2481,6 +2580,20 @@ class WeatherSyncLoopTest {
         assertThat(fetched).containsExactly(london, leeds).inOrder()
     }
 
+    /** Plan review 3: a location read that keeps failing after its value must not wake the loop on each retry. */
+    @Test
+    fun aFlakyLocationReadFetchesOnce() = runTest {
+        val fetched = mutableListOf<WeatherPlace>()
+        val places = flow {
+            emit(london)
+            throw IllegalStateException("store hiccup")
+        }
+        loop(places) { fetched += it }
+        runCurrent()
+        after(60_000)
+        assertThat(fetched).containsExactly(london)
+    }
+
     @Test
     fun aLocationReadThatFailsIsRetried() = runTest {
         val fetched = mutableListOf<WeatherPlace>()
@@ -2518,11 +2631,9 @@ Create `capability/weather/src/main/java/uk/co/siland/culvery/capability/weather
 package uk.co.siland.culvery.capability.weather
 
 import javax.inject.Inject
-import javax.inject.Singleton
 import uk.co.siland.culvery.core.plugin.WallClock
 
 /** One fetch: the forecast for a place, stored under that place (4b design §3.5, ruling 7). */
-@Singleton
 class WeatherFetcher @Inject constructor(
     providers: Set<@JvmSuppressWildcards WeatherProvider>,
     private val store: WeatherStore,
@@ -2599,8 +2710,9 @@ class WeatherSyncLoop internal constructor(
         scope.launch {
             val latest = MutableStateFlow<WeatherPlace?>(null)
             launch {
-                places.distinctUntilChanged()
-                    .retryWithBackoff { Log.w(TAG, "Couldn't read the home location (${it::class.simpleName}); retrying") }
+                // Distinct after the retry: a read that fails after its value re-emits it on every retry (plan review 3).
+                places.retryWithBackoff { Log.w(TAG, "Couldn't read the home location (${it::class.simpleName}); retrying") }
+                    .distinctUntilChanged()
                     .collect {
                         latest.value = it
                         wake.trySend(Unit)
@@ -2621,7 +2733,6 @@ class WeatherSyncLoop internal constructor(
         }
     }
 
-    /** True when the fetch succeeded. */
     private suspend fun runFetch(place: WeatherPlace): Boolean =
         try {
             fetch(place)
@@ -2660,7 +2771,7 @@ git commit -m "Fetch the weather once the home location is known or changes, eve
 
 ### Task 7: `WeatherRepository` — the view, the header and `Daylight` (§3.7; rulings 4, 5)
 
-**Review:** opus (what shows after a move, at midnight, and in another zone).
+**Review:** opus (what shows after a move and at midnight).
 
 **Files:**
 - Create: `capability/weather/src/main/java/uk/co/siland/culvery/capability/weather/WeatherRepository.kt`
@@ -2679,25 +2790,17 @@ package uk.co.siland.culvery.capability.weather
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
-import java.time.Instant
-import java.time.LocalDateTime
 import java.time.LocalTime
-import java.util.TimeZone
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.household.HomeLocation
-import uk.co.siland.culvery.core.household.HouseholdRepository
-import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.plugin.SunTimes
-import uk.co.siland.culvery.core.plugin.WallClock
 
-// Robolectric for android.util.Log (the retries) and for Room in the zone test.
+// Robolectric for android.util.Log, should a retry log. The rules are tested in WeatherViewTest; these test the wiring
+// (a move hides the old town at once; midnight moves the card and the sun times on).
 @RunWith(AndroidJUnit4::class)
 class WeatherRepositoryTest {
     private val location = MutableStateFlow<HomeLocation?>(LONDON)
@@ -2767,22 +2870,6 @@ class WeatherRepositoryTest {
         assertThat(repo.header.first()).isNull()
     }
 
-    @Test
-    fun daylightGivesTodaysTimesFromOldMatchingData() = runTest {
-        stored.value = stored(forecast = forecast(from = THU.minusDays(5)), fetchedAtMillis = 0L)
-        assertThat(repo.today.first()).isEqualTo(SunTimes(SUNRISE, SUNSET))
-    }
-
-    @Test
-    fun daylightIsNullWithoutMatchingDataOrWithoutASunTime() = runTest {
-        stored.value = null
-        assertThat(repo.today.first()).isNull()
-        stored.value = stored(LEEDS)
-        assertThat(repo.today.first()).isNull()
-        stored.value = stored(forecast = Forecast(listOf(day(THU, sunset = null)), hoursOf(THU)))
-        assertThat(repo.today.first()).isNull()
-    }
-
     /** Review Focus 3. */
     @Test
     fun daylightMovesToTomorrowsTimesAtMidnight() = runTest {
@@ -2798,30 +2885,6 @@ class WeatherRepositoryTest {
         }
     }
 
-    /** Review Focus 5: built as Hilt builds it, with the household in Wellington and the tablet in New York. */
-    @Test
-    fun todayIsTheHouseholdsDateNotTheDevices() = runTest {
-        val deviceZone = TimeZone.getDefault()
-        TimeZone.setDefault(TimeZone.getTimeZone("America/New_York"))
-        val householdDb = householdDb()
-        val weatherDb = weatherDb()
-        try {
-            val household = HouseholdRepository(householdDb)
-            household.setLocation(WELLINGTON)
-            val store = WeatherStore(weatherDb)
-            store.replace(WeatherPlace(WELLINGTON), forecast(from = THU), 0L)
-            // 12:00 UTC on Thursday: 08:00 Thursday in New York, 01:00 Friday in Wellington.
-            val clock = WallClock { Instant.parse("2026-10-01T12:00:00Z").toEpochMilli() }
-            val repo = WeatherRepository(household, store, HouseholdZone(household), clock)
-            val view = withContext(Dispatchers.Default) { withTimeout(5_000) { repo.view.first { it is WeatherView.Ready } } }
-            assertThat((view as WeatherView.Ready).today.date).isEqualTo(FRI)
-            assertThat(view.now?.start).isEqualTo(LocalDateTime.of(2026, 10, 2, 1, 0))
-        } finally {
-            householdDb.close()
-            weatherDb.close()
-            TimeZone.setDefault(deviceZone)
-        }
-    }
 }
 ```
 
@@ -2908,21 +2971,23 @@ git commit -m "Work out what the weather shows from the stored forecast, the hom
 **Glyph check (done while writing this plan):** the bundled `core/ui/src/main/res/font/material_symbols_rounded.ttf` was read with a GSUB ligature parser (4 284 ligatures; checked against known present `calendar_add_on`, `backspace`, `home` and a made-up name, which was missing). All eleven names in §4.1–4.2 are present: `sunny`, `partly_cloudy_day`, `partly_cloudy_night`, `clear_night`, `cloud`, `foggy`, `rainy_light`, `rainy`, `rainy_heavy`, `weather_snowy`, `thunderstorm`. No substitution.
 
 **Files:**
-- Modify: `core/ui/src/main/java/uk/co/siland/culvery/core/ui/Colors.kt`
+- Modify: `core/ui/src/main/java/uk/co/siland/culvery/core/ui/Colors.kt`, `Shell.kt`
+- Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/CalendarType.kt` (`cardRadius` aliases the new token)
 - Create: `capability/weather/src/main/java/uk/co/siland/culvery/capability/weather/ui/WeatherDimens.kt`, `ui/ForecastCard.kt`, `ui/WeatherHeaderItem.kt`
 - Test: `capability/weather/src/test/java/uk/co/siland/culvery/capability/weather/ui/RecordingNavigator.kt`, `ui/ForecastCardTest.kt`, `ui/WeatherScreenshotTest.kt` (create)
 - Screenshots (new): `capability/weather/src/test/screenshots/forecast_{ready,age,waiting,expired,no_location}_{dark,light}.png`, `header_{day,night}_{dark,light}.png`
 
 **Interfaces:**
-- Consumes: `WeatherView`, `HeaderWeather`, `DailyWeather` and the words (Task 3); `WeatherRepository.view` (Task 7); `LocalShellNavigator`, `WallClock` (`:core:plugin`); `HhCard`, `HhIcon`, `HhPillButton`, `HhType`, `Culvery.colors` (`:core:ui`).
+- Consumes: `WeatherView`, `HeaderWeather`, `DailyWeather` and the words (Task 3); `WeatherRepository.view` (Task 7); `LocalShellNavigator`, `WallClock`, `rememberNowMillis`, `nowTicks` (`:core:plugin`, Task 2); `HhCard`, `HhIcon`, `HhPillButton`, `HhType`, `Culvery.colors`, `ShellTokens` (`:core:ui`).
 - Produces:
   - `val SunAmber: Color` in `uk.co.siland.culvery.core.ui` (`#E0B85B`, both themes)
+  - `ShellTokens.homeCardRadius = 26.dp` (`:core:ui`): the Home cards' radius; `CalendarDimens.cardRadius` now aliases it
   - `@Composable fun ForecastCard(view: WeatherView, nowMillis: Long, modifier: Modifier = Modifier)` — public (the app's whole-Home screenshot uses it); test tags `weather_forecast`, `forecast_row`, `weather_age`
-  - `@Composable internal fun ForecastCardHost(repo: WeatherRepository, clock: WallClock, ticks: Flow<Unit> = everyMinute)`
+  - `@Composable internal fun ForecastCardHost(repo: WeatherRepository, clock: WallClock, ticks: Flow<Unit> = nowTicks)` — the age line moves on with `rememberNowMillis`; no tick of its own
   - `@Composable fun WeatherHeaderItem(weather: HeaderWeather, modifier: Modifier = Modifier)` — public; test tag `weather_header`
   - `internal object WeatherDimens`
 
-- [ ] **Step 1: Add the sun amber**
+- [ ] **Step 1: Add the sun amber and the Home card radius**
 
 In `core/ui/src/main/java/uk/co/siland/culvery/core/ui/Colors.kt`, after `val LightColors = HhColors(…)` add:
 ```kotlin
@@ -2930,6 +2995,25 @@ In `core/ui/src/main/java/uk/co/siland/culvery/core/ui/Colors.kt`, after `val Li
 /** The hand-off's weather icon colour (§1). The same in both themes, so not an HhColors token. */
 val SunAmber = Color(0xFFE0B85B)
 ```
+
+In `core/ui/src/main/java/uk/co/siland/culvery/core/ui/Shell.kt`, in `object ShellTokens`, after `const val TOAST_MILLIS = 3_500L` add:
+```kotlin
+
+    /** Home's cards (hand-off: Today's `border-radius: 26px`): the calendar's and the weather's. */
+    val homeCardRadius = 26.dp
+```
+
+In `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/CalendarType.kt`, replace
+```kotlin
+    // Shared card radius (Today, Coming up, Connect).
+    val cardRadius = 26.dp
+```
+with
+```kotlin
+    // Shared card radius (Today, Coming up, Connect): Home's, as the weather card's.
+    val cardRadius = ShellTokens.homeCardRadius
+```
+and add `import uk.co.siland.culvery.core.ui.ShellTokens` to that file's imports in its sorted place (if it isn't there already). The calendar's cards keep reading `CalendarDimens.cardRadius`; their pixels don't change.
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -3013,17 +3097,6 @@ class ForecastCardTest {
         compose.onAllNodesWithTag("forecast_row").assertCountEquals(2)
     }
 
-    @Test
-    fun dataTwoHoursOldHasNoAgeLine() {
-        show(READY.copy(fetchedAtMillis = fetched), nowMillis = fetched + 2 * hour)
-        compose.onNodeWithTag("weather_age").assertDoesNotExist()
-    }
-
-    @Test
-    fun olderDataSaysHowOld() {
-        show(READY.copy(fetchedAtMillis = fetched), nowMillis = fetched + 3 * hour)
-        compose.onNodeWithText("Updated 3 h ago").assertExists()
-    }
 
     @Test
     fun waitingSaysItIsGettingTheForecast() {
@@ -3046,6 +3119,7 @@ class ForecastCardTest {
         assertThat(navigator.settingsOpened).isEqualTo(1)
     }
 
+    /** The age rule is `WeatherWordsTest`'s; this pins that the card shows it and moves it on with the clock. */
     @Test
     fun theHostMovesTheAgeLineOnWithTheClock() {
         var now = fetched + 2 * hour
@@ -3158,8 +3232,7 @@ import androidx.compose.ui.unit.dp
 
 /** Weather layout numbers (4b design §4); provisional, for the end-of-v1 design review. */
 internal object WeatherDimens {
-    // Card: as the calendar's cards (radius 26, padding 20 × 22).
-    val cardRadius = 26.dp
+    // Card padding 20 × 22, as the calendar's cards; the radius is ShellTokens.homeCardRadius.
     val cardPaddingV = 20.dp
     val cardPaddingH = 22.dp
 
@@ -3238,16 +3311,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import uk.co.siland.culvery.capability.weather.ADD_LOCATION
 import uk.co.siland.culvery.capability.weather.DailyWeather
 import uk.co.siland.culvery.capability.weather.FORECAST_TITLE
@@ -3263,21 +3333,15 @@ import uk.co.siland.culvery.capability.weather.updatedAgo
 import uk.co.siland.culvery.capability.weather.weatherIcon
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.nowTicks
+import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.SunAmber
-
-private const val MINUTE_MS = 60_000L
-
-private val everyMinute: Flow<Unit> = flow {
-    while (true) {
-        delay(MINUTE_MS)
-        emit(Unit)
-    }
-}
 
 /**
  * The REGULAR Forecast card (4b design §4.2): today and up to two more days, each row day · icon · high · low and one
@@ -3289,7 +3353,7 @@ fun ForecastCard(view: WeatherView, nowMillis: Long, modifier: Modifier = Modifi
     val navigator = LocalShellNavigator.current
     HhCard(
         modifier = modifier.fillMaxSize().testTag("weather_forecast"),
-        radius = WeatherDimens.cardRadius,
+        radius = ShellTokens.homeCardRadius,
         padding = PaddingValues(horizontal = WeatherDimens.cardPaddingH, vertical = WeatherDimens.cardPaddingV),
     ) {
         Text(FORECAST_TITLE, style = HhType.cardTitle, color = c.ink)
@@ -3335,16 +3399,16 @@ private fun ForecastRow(day: DailyWeather, isToday: Boolean) {
 
 /** The card over the repository: nothing until the first view, and the age line moved on each [ticks]. */
 @Composable
-internal fun ForecastCardHost(repo: WeatherRepository, clock: WallClock, ticks: Flow<Unit> = everyMinute) {
+internal fun ForecastCardHost(repo: WeatherRepository, clock: WallClock, ticks: Flow<Unit> = nowTicks) {
     val view by repo.view.collectAsState(initial = null)
-    val nowMillis by produceState(clock.nowMillis(), clock, ticks) { ticks.collect { value = clock.nowMillis() } }
+    val nowMillis = rememberNowMillis(clock, ticks)
     view?.let { ForecastCard(it, nowMillis) }
 }
 ```
 
 - [ ] **Step 7: Run the tests to see them pass**
 
-Run: `./gradlew :capability:weather:testDebugUnitTest :core:ui:testDebugUnitTest`
+Run: `./gradlew :capability:weather:testDebugUnitTest :core:ui:testDebugUnitTest :capability:calendar:testDebugUnitTest`
 Expected: PASS (the new screenshots have no baselines yet, which `testDebugUnitTest` doesn't check).
 
 - [ ] **Step 8: Record and look at the screenshots**
@@ -3363,12 +3427,12 @@ Open each new PNG in `capability/weather/src/test/screenshots/` and check:
 - [ ] **Step 9: Run the gate**
 
 Run: `./gradlew testDebugUnitTest verifyRoborazziDebug`
-Expected: `BUILD SUCCESSFUL`; no other module's baselines change (`SunAmber` is new and nothing else uses it).
+Expected: `BUILD SUCCESSFUL`; no other module's baselines change (`SunAmber` is new and nothing else uses it; the calendar's cards keep 26 dp through the alias).
 
 - [ ] **Step 10: Commit**
 
 ```bash
-git add core/ui/src/main/java/uk/co/siland/culvery/core/ui/Colors.kt capability/weather
+git add core/ui/src/main/java/uk/co/siland/culvery/core/ui/Colors.kt core/ui/src/main/java/uk/co/siland/culvery/core/ui/Shell.kt capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/ui/CalendarType.kt capability/weather
 git commit -m "Show the Forecast card and the header's weather, light and dark"
 ```
 
@@ -3385,7 +3449,7 @@ git commit -m "Show the Forecast card and the header's weather, light and dark"
 **Interfaces:**
 - Consumes: `WeatherRepository` (Task 7), `ForecastCardHost`, `WeatherHeaderItem` (Task 8), `WeatherSyncLoop`, `WeatherProvider` (Tasks 3, 6), `WeatherDatabase` (Task 4); `Capability`, `HomeCard`, `HeaderItem`, `Startable`, `Daylight`, `WallClock` (`:core:plugin`).
 - Produces:
-  - `const val WEATHER_ID = "weather"`, `FORECAST_CARD_ID = "weather.forecast"`, `FORECAST_PRIORITY = 40`, `HEADER_ITEM_ID = "weather"`, `HEADER_ITEM_ORDER = 10`
+  - Private to `WeatherCapability.kt` (nothing outside reads them; tests compare the literal values): `WEATHER_ID = "weather"`, `FORECAST_CARD_ID = "weather.forecast"`, `FORECAST_PRIORITY = 40`, `HEADER_ITEM_ID = "weather"`, `HEADER_ITEM_ORDER = 10`
   - `@Singleton class WeatherCapability @Inject constructor(repo: WeatherRepository, clock: WallClock) : Capability` — `id "weather"`, `label "Weather"`, `icon "partly_cloudy_day"`, `order 60`, `hasTab flowOf(false)`, empty `TabContent`, `cards()` the Forecast card, `headerItems()` the weather item while shown
   - `WeatherModule`: `@Multibinds Set<WeatherProvider>`; `Capability` and `Startable` (`WeatherSyncLoop`) `@IntoSet`; `Daylight` → `WeatherRepository`; `weather.db`
 
@@ -3467,13 +3531,13 @@ import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.WallClock
 
-const val WEATHER_ID = "weather"
-const val FORECAST_CARD_ID = "weather.forecast"
+private const val WEATHER_ID = "weather"
+private const val FORECAST_CARD_ID = "weather.forecast"
 
 /** After Today (100) and Coming up (50): row 2, col 2 (§4.2). */
-const val FORECAST_PRIORITY = 40
-const val HEADER_ITEM_ID = "weather"
-const val HEADER_ITEM_ORDER = 10
+private const val FORECAST_PRIORITY = 40
+private const val HEADER_ITEM_ID = "weather"
+private const val HEADER_ITEM_ORDER = 10
 
 /** Weather on Home (4b design §3.1): no tab, no Settings page, no connection (D7); runs whenever a location is set. */
 @Singleton
@@ -3587,7 +3651,8 @@ git commit -m "Add the weather capability to Home: the Forecast card, the header
 - Produces:
   - `ShellUiState.headerItems: List<HeaderItem>` (default empty), sorted by order then id
   - `ShellViewModel(capabilities, ticker: MinuteTicker, access: AccessControl, daylight: Optional<Daylight>)`
-  - `AppModule.minuteTicker(zone: HouseholdZone, clock: WallClock): MinuteTicker`; `@BindsOptionalOf Daylight`
+  - `internal fun householdTicker(zones: Flow<ZoneId>, clock: WallClock): MinuteTicker` (`MinuteTicker.kt`): `wallTimeEachMinute` over [zones], a failed zone read retried with `retryWithBackoff` (logged by type), so a Room failure can't end the clock or crash the shell
+  - `AppModule.minuteTicker(zone: HouseholdZone, clock: WallClock): MinuteTicker` = `householdTicker(zone.zone, clock)`; `@BindsOptionalOf Daylight`
   - `fun HomeScreen(now: LocalDateTime, placements: List<HomePlacement>, headerItems: List<HeaderItem> = emptyList())`; `fun HomeHeader(now, items, modifier)`; test tags `home_header_items`, `home_header_divider`, `home_header_{id}`
   - `SystemMinuteTicker` is removed
 
@@ -3729,13 +3794,16 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.TimeZone
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
@@ -3743,7 +3811,7 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.di.AppModule
 
-/** Review Focus 5: the shell's clock, date and theme run in the household's zone, not the tablet's. Robolectric for Room. */
+/** Review Focus 5: the shell's clock, date and theme run in the household's zone, not the tablet's. Robolectric for Room and Log. */
 @RunWith(AndroidJUnit4::class)
 class HouseholdTickerTest {
     private val deviceZone = TimeZone.getDefault()
@@ -3775,10 +3843,19 @@ class HouseholdTickerTest {
         assertThat(first).isEqualTo(LocalDateTime.of(2026, 10, 2, 1, 0))
     }
 
+    /** Plan review 1: the zone comes from Room, which can fail; the clock must carry on, not crash the shell. */
     @Test
-    fun withoutALocationTheClockShowsTheDevicesTime() = runTest {
-        val first = AppModule.minuteTicker(HouseholdZone(household), clock).ticks().first()
-        assertThat(first).isEqualTo(LocalDateTime.of(2026, 10, 1, 8, 0))
+    fun aFailedZoneReadIsRetriedAndTheClockCarriesOn() = runTest {
+        ShadowLog.clear()
+        var reads = 0
+        val zones = flow {
+            if (reads++ == 0) throw IllegalStateException("database locked")
+            emit(ZoneId.of("Pacific/Auckland"))
+        }
+        val first = householdTicker(zones, clock).ticks().first()
+        assertThat(first).isEqualTo(LocalDateTime.of(2026, 10, 2, 1, 0))
+        assertThat(ShadowLog.getLogs().map { it.msg })
+            .contains("Couldn't read the household's time zone (IllegalStateException); retrying")
     }
 }
 ```
@@ -3896,7 +3973,7 @@ In `app/src/test/java/uk/co/siland/culvery/shell/ui/ShellScreenshotTest.kt`:
 - [ ] **Step 4: Run the tests to see them fail**
 
 Run: `./gradlew :app:testDebugUnitTest`
-Expected: FAIL to compile with "Too many arguments" for `ShellViewModel`, "Unresolved reference 'headerItems'" on `ShellUiState`, "Too many arguments" for `HomeScreen`, and "Unresolved reference 'minuteTicker'" on `AppModule` (`AppSourceTest` alone would pass).
+Expected: FAIL to compile with "Too many arguments" for `ShellViewModel`, "Unresolved reference 'headerItems'" on `ShellUiState`, "Too many arguments" for `HomeScreen`, "Unresolved reference 'minuteTicker'" on `AppModule` and "Unresolved reference 'householdTicker'" (`AppSourceTest` alone would pass).
 
 - [ ] **Step 5: Carry header items in the state**
 
@@ -3910,13 +3987,29 @@ Replace the whole of `app/src/main/java/uk/co/siland/culvery/shell/MinuteTicker.
 ```kotlin
 package uk.co.siland.culvery.shell
 
+import android.util.Log
 import java.time.LocalDateTime
+import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
+import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.retryWithBackoff
+import uk.co.siland.culvery.core.plugin.wallTimeEachMinute
 
 /** The wall time, each minute; `AppModule` gives it in the household's zone. */
 fun interface MinuteTicker {
     fun ticks(): Flow<LocalDateTime>
 }
+
+/**
+ * The wall time in the latest of [zones] (4b design §3.8). The zone is read from Room, which can fail: the read is
+ * retried, so the clock never stops and `ShellViewModel.now` never sees the failure (plan review 1).
+ */
+internal fun householdTicker(zones: Flow<ZoneId>, clock: WallClock): MinuteTicker = MinuteTicker {
+    val retried = zones.retryWithBackoff { Log.w(TAG, "Couldn't read the household's time zone (${it::class.simpleName}); retrying") }
+    wallTimeEachMinute(retried, clock)
+}
+
+private const val TAG = "MinuteTicker"
 ```
 
 - [ ] **Step 6: Tick in the household zone and take `Daylight` as optional**
@@ -3945,9 +4038,9 @@ import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
-import uk.co.siland.culvery.core.plugin.wallTimeEachMinute
 import uk.co.siland.culvery.shell.MinuteTicker
 import uk.co.siland.culvery.shell.ShellToasts
+import uk.co.siland.culvery.shell.householdTicker
 
 /**
  * An application job's uncaught failure is logged and the process lives on; with the SupervisorJob its siblings keep
@@ -3982,7 +4075,7 @@ abstract class AppModule {
 
         /** The clock, the date and the theme in the household's zone, as the calendar's "today" (4b design §3.8). */
         @Provides
-        fun minuteTicker(zone: HouseholdZone, clock: WallClock): MinuteTicker = MinuteTicker { wallTimeEachMinute(zone.zone, clock) }
+        fun minuteTicker(zone: HouseholdZone, clock: WallClock): MinuteTicker = householdTicker(zone.zone, clock)
     }
 }
 ```
@@ -4387,7 +4480,7 @@ Expected: no output.
 - [ ] **Step 6: Update the follow-ups**
 
 In `docs/superpowers/plans/2026-09-23-plan1-followups.md`:
-1. Under "## For Plan 2 (Calendar capability)", delete "`HomeCardPlacer` has no tests with mixed sizes or a full grid. Add them once real cards exist." (the full grid was covered in Plan 2; mixed sizes with the Forecast card in Task 2).
+1. Under "## For Plan 2 (Calendar capability)", delete "`HomeCardPlacer` has no tests with mixed sizes or a full grid. Add them once real cards exist.": it was already met before 4b (`HomeCardPlacerTest.mixedSizesFillTallThenWideThenRegularBesideIt` and `fullGridDropsEverythingElse`); Task 2 adds only the Forecast beside Connect.
 2. Under "## For Plan 4 (weather, setup, settings, release)", delete "Run the theme schedule in the household's timezone (`HomeLocation.timeZoneId`) and feed it sunrise/sunset." (Tasks 2, 7, 10).
 3. Add at the end of the file:
 ```markdown
@@ -4396,12 +4489,14 @@ In `docs/superpowers/plans/2026-09-23-plan1-followups.md`:
 
 **For Plan 4c**
 - The weather on the SM-T510: the header and the Forecast card at its density, and the fetch over a whole day on the wall.
+- The calendar's Google client has no `callTimeout` either (only connect 15 s and read 30 s, `GoogleCalendarModule`), so a body that drips in can hold a sync pass until the engine's own timeout; give it a whole-call limit as the forecast's (4b plan review 2).
+- On a cold start the clock, the date and the theme show the device's zone for a moment, until Room answers with the household's (`ShellViewModel.now` starts from `LocalDateTime.now()`). Accepted in 4b; check on the SM-T510 whether it shows.
 
 **For the end-of-v1 design and UX review**
-- All 4b layout, colour and copy choices are provisional: the Forecast card's rows, its title in every state, amber icons in the card, the TalkBack condition words, the header items' spacing and divider.
+- All 4b layout, colour and copy choices are provisional: the Forecast card's rows, its title in every state, the card's icons in sun amber like the header's, the TalkBack condition words, the header items' spacing and divider.
 
 **Later**
-- Open-Meteo answers with one UTC offset for the whole forecast, so data fetched before a clock change is an hour out for the days after it until the next fetch; offline across a clock change, the header's hour and the theme's sunset are an hour out. Fixing it means asking for times in UTC (`timeformat=unixtime`) and converting with the household's zone.
+- Open-Meteo answers with one UTC offset for the whole forecast, so data fetched before a clock change is an hour out for the days after it until the next fetch; offline across a clock change, the header's hour and the theme's sunset are an hour out. Known and untested in 4b (ruling 2). Fix: ask with `timeformat=unixtime` and convert each time in the household's zone (dates from the daily rows' own instants).
 ```
    and add under it any item you or the user noted during this plan that was deferred rather than fixed.
 
@@ -4419,26 +4514,26 @@ git commit -m "Document the weather, the household-zone clock and theme, and wha
 | Design | Where |
 |---|---|
 | §1 scope | Tasks 1–11 |
-| D1 Forecast REGULAR, 3 days; row 2 col 3 empty | Tasks 2 (placer tests), 3 (`FORECAST_DAYS`), 8, 9 (`FORECAST_PRIORITY`), 10 (whole-Home screenshot) |
+| D1 Forecast REGULAR, 3 days; row 2 col 3 empty | Tasks 2 (the placer: the existing `mixedSizesFillTallThenWideThenRegularBesideIt` plus the Connect case), 3 (`FORECAST_DAYS`), 8, 9 (priority 40), 10 (whole-Home screenshot) |
 | D2 no location: header hidden, prompt opens Settings (PIN) | Tasks 3 (`NoLocation`), 8 (`noLocationOpensSettings`), 9 (no header item); walkthrough item 1 |
-| D3 the cache: 7 days daily and hourly; the hour now; card from today; age line past 2 h; Expired | Tasks 3 (`weatherView`, `updatedAgo`), 4, 5 (`forecast_days=7`), 7, 8 |
+| D3 the cache: 7 days daily and hourly; the hour now; card from today; age line past 2 h; Expired | Tasks 3 (`weatherView`, `updatedAgo`), 4, 5 (`DAYS_FETCHED`, the seven dates kept), 7, 8 (`theHostMovesTheAgeLineOnWithTheClock`) |
 | D4 °C only | Tasks 3 (`degrees`), 5 (°C from the API); Global Constraints |
 | D5 rows: day, icon, high / low | Tasks 3, 8 |
 | D6 `headerItems()` and `Daylight`; `:app` never names weather; `HouseholdZone` to `:core:household` | Tasks 1, 2, 9, 10 (`AppSourceTest`); Task 3 (`ModuleBoundariesTest`) |
 | D7 no Connection, no wizard step, no Settings page, no tab | Task 9 (`hasTab` false; no `setupSteps`/`settingsPages`) |
 | §3.1 the module, its contract, `Set<WeatherProvider>` (none: Waiting; several: first by id), `WeatherCapability` (60, no tab) | Tasks 3, 6 (`theFirstProviderByIdIsAsked`, `withNoProviderNothingIsFetchedOrStored`), 9 |
 | §3.2 `HeaderItem`, `Capability.headerItems()`, `Daylight`; `@BindsOptionalOf` | Tasks 2, 10 |
-| §3.3 `HouseholdZone` moved unchanged | Task 1 |
-| §3.4 the request, its own client (15 s / 30 s), `Call.await`, WMO mapping, failures, logs | Task 5 (rulings 1, 2, 15) |
+| §3.3 `HouseholdZone` moved, behaviour unchanged; its parse shared as `zoneOrDevice` | Task 1 (used in Task 3) |
+| §3.4 the request, its own client (15 s / 30 s, plus a 60 s whole call), `Call.await`, WMO mapping, failures (and a body over 1 MiB), logs | Task 5 (rulings 1, 2, 15; plan review 2, 13) |
 | §3.5 `weather.db` v1, one-transaction replace, failed fetch leaves it, matching | Tasks 4, 6 (ruling 7) |
-| §3.6 `WeatherSyncLoop`: on start, on change, 30 min, 5 min after failure, waits without a location, survives an `Error` and a stray cancellation | Task 6 |
-| §3.7 `WeatherView`, `weatherView`, the repository's flows, the household-zone minute, `Daylight.today` | Tasks 3, 7 (ruling 5) |
-| §3.8 header items collected and ordered; `MinuteTicker` in the household zone; `scheduledDark` from `Daylight`; preview reset and 400 ms unchanged | Task 10 |
-| §4.1 header item: icon 44 dp amber, "17°", "High · Low", shown only when Ready with now, night icons, placement and divider | Tasks 3 (`headerWeather`), 8, 9, 10 (ruling 10) |
+| §3.6 `WeatherSyncLoop`: on start, on change (only a real change, plan review 3), 30 min, 5 min after failure, waits without a location, survives an `Error` and a stray cancellation | Task 6 |
+| §3.7 `WeatherView`, `weatherView`, the repository's flows, the household-zone minute, `Daylight.today` | Tasks 3, 7 (ruling 5); the card's tick is Task 2's `rememberNowMillis` |
+| §3.8 header items collected and ordered; `MinuteTicker` in the household zone (a failed zone read retried); `scheduledDark` from `Daylight`; preview reset and 400 ms unchanged | Task 10 |
+| §4.1 header item: icon 44 dp amber, "17°", "High · Low", shown only when Ready with now, night icons, placement and divider | Tasks 3 (`headerWeather`), 8 (the amber token; the card radius token), 9, 10 (ruling 10) |
 | §4.2 the card: states, copy, TalkBack rows, age line, icons, rounding | Tasks 3, 8 (glyph check: all present) |
 | §5 errors and offline | Tasks 4, 5, 6, 7; walkthrough items 3–4 |
 | §6 privacy: what Open-Meteo receives; nothing in logs | Tasks 5, 6 (log tests), 11 (README, ruling 11) |
 | §7 testing: unit, provider, Roborazzi light and dark, emulator walkthrough | every task; Task 11 |
-| §8 follow-ups taken | Tasks 2 (placer), 7 and 10 (theme in the zone with sun times); Task 11 Step 6 |
+| §8 follow-ups taken | The placer's mixed sizes were already covered (Task 11 Step 6 marks it met); the theme in the zone with sun times: Tasks 2, 7, 10 |
 | §9 review focus | Review Focus above |
 | §10 out of scope | nothing here adds °F, chance of rain, a tab or page, tapping, hourly detail, alerts or Climate |
