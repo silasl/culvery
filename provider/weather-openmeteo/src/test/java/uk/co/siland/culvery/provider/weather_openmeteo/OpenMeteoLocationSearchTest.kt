@@ -2,7 +2,6 @@ package uk.co.siland.culvery.provider.weather_openmeteo
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import com.google.common.truth.Truth.assertWithMessage
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
@@ -130,19 +129,5 @@ class OpenMeteoLocationSearchTest {
         answer("""{"results":[{"name":"Canterbury","latitude":"fifty-one"}]}""")
         failure()
         assertNoSecretsLogged(TAG, listOf("Canterbury", "canterbury", "51.", "name=", "fifty-one"), minLines = 3)
-    }
-}
-
-/**
- * Nothing logged under [tag], with its whole chain of causes, holds any of [secrets]; at least [minLines] were logged,
- * so a check that saw no log can't pass by default. (`:core:setup` and the calendar have the same helper in their own
- * test sources; test sources aren't shared between modules.)
- */
-private fun assertNoSecretsLogged(tag: String, secrets: List<String>, minLines: Int = 1) {
-    val logs = ShadowLog.getLogs().filter { it.tag == tag }
-    assertWithMessage("lines logged under $tag").that(logs.size).isAtLeast(minLines)
-    logs.forEach { log ->
-        val text = "${log.msg} ${generateSequence(log.throwable) { it.cause }.joinToString(" ")}"
-        secrets.forEach { assertWithMessage(text).that(text).doesNotContain(it) }
     }
 }

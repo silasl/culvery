@@ -22,6 +22,8 @@ dependencies {
     implementation(project(":core:access"))
     implementation(project(":core:setup"))
     implementation(project(":capability:calendar"))
+    // Wired by Hilt alone: :app's own code never names it (4b design D6).
+    implementation(project(":capability:weather"))
     implementation(project(":provider:calendar-google"))
     implementation(project(":provider:weather-openmeteo"))
     // Sample data only, in debug builds.

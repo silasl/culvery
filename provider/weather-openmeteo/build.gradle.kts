@@ -6,6 +6,7 @@ plugins {
 
 dependencies {
     implementation(project(":core:setup"))
+    implementation(project(":capability:weather"))
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.okhttp.mockwebserver)

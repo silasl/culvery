@@ -2,19 +2,13 @@ package uk.co.siland.culvery.provider.weather_openmeteo
 
 import android.util.Log
 import java.io.IOException
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.Call
-import okhttp3.Callback
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
 import uk.co.siland.culvery.core.setup.LocationSearch
 import uk.co.siland.culvery.core.setup.LocationSearchException
 import uk.co.siland.culvery.core.setup.PlaceMatch
@@ -81,33 +75,4 @@ class OpenMeteoLocationSearch(private val url: HttpUrl, private val client: OkHt
             place.timezone?.let { zone -> PlaceMatch(place.name, place.admin1, place.country, place.latitude, place.longitude, zone) }
         }
     }
-}
-
-private class Answer(val code: Int, val body: String)
-
-/**
- * Enqueues the call and suspends until its whole body is in, reading it on OkHttp's thread (3a's `Call.await`):
- * cancelling the coroutine cancels the call, which ends a stalled read at once.
- */
-private suspend fun Call.await(): Answer = suspendCancellableCoroutine { cont ->
-    cont.invokeOnCancellation { cancel() }
-    enqueue(
-        object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                cont.resumeWithException(e)
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                val answer = try {
-                    response.use { Answer(it.code, it.body?.string().orEmpty()) }
-                } catch (e: Throwable) {
-                    // After a cancel this is the closed socket and the continuation is already cancelled; anything else
-                    // must reach the caller, or it would hang.
-                    cont.resumeWithException(e)
-                    return
-                }
-                cont.resume(answer)
-            }
-        },
-    )
 }
