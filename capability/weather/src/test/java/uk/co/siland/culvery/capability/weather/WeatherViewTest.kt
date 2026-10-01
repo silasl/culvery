@@ -28,7 +28,7 @@ class WeatherViewTest {
         assertThat(weatherView(LONDON.copy(name = "Westminster"), stored(LONDON), thuMorning)).isInstanceOf(WeatherView.Ready::class.java)
     }
 
-    /** Review Focus 1: a fetch that lands after a move is stored under the place it asked for, so it doesn't match. */
+    /** A fetch that lands after a move is stored under the place it asked for, so it doesn't match. */
     @Test
     fun matchingComparesTheCoordinatesAndTheZoneNotTheName() {
         val s = stored(LONDON)

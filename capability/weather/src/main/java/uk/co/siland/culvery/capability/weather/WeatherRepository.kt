@@ -38,9 +38,8 @@ class WeatherRepository internal constructor(
     /** The header's weather, or null while it is hidden (§4.1). */
     val header: Flow<HeaderWeather?> = combine(view, now) { v, n -> headerWeather(v, n) }.distinctUntilChanged()
 
-    /** Today's sun times in the household's zone, from matching data however old (§3.7). */
+    /** Today's sun times in the household's zone, from matching data however old (§3.7). The shell retries it, as [header]. */
     override val today: Flow<SunTimes?> =
         combine(location, stored, now.map { it.toLocalDate() }.distinctUntilChanged()) { l, s, date -> sunTimesOn(l, s, date) }
             .distinctUntilChanged()
-            .retryWithBackoff { Log.w(TAG, "Couldn't read today's sun times (${it::class.simpleName}); retrying") }
 }

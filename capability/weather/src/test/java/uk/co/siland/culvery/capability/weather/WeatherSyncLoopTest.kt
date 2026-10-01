@@ -7,8 +7,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
@@ -16,6 +14,8 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -148,7 +148,7 @@ class WeatherSyncLoopTest {
         assertThat(calls).isEqualTo(2)
     }
 
-    /** Review Focus 1: the running fetch isn't cancelled; the new place is fetched straight after it. */
+    /** The running fetch isn't cancelled; the new place is fetched straight after it. */
     @Test
     fun aLocationChangeMidFetchFetchesTheNewPlaceRightAfter() = runTest {
         val gate = CompletableDeferred<Unit>()

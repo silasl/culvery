@@ -44,11 +44,10 @@ class WeatherSyncLoop internal constructor(
     constructor(fetcher: WeatherFetcher, household: HouseholdRepository, @ApplicationScope scope: CoroutineScope) :
         this(fetcher::fetch, household.location.places(), scope)
 
-    private val wake = Channel<Unit>(Channel.CONFLATED)
-
     override fun start() {
         scope.launch {
             val latest = MutableStateFlow<WeatherPlace?>(null)
+            val wake = Channel<Unit>(Channel.CONFLATED)
             launch {
                 // Distinct after the retry: a read that fails after its value re-emits it on every retry (plan review 3).
                 places.retryWithBackoff { Log.w(TAG, "Couldn't read the home location (${it::class.simpleName}); retrying") }

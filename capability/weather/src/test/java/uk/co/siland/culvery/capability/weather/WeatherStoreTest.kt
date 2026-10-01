@@ -81,7 +81,7 @@ class WeatherStoreTest {
         assertThat(s.hours).hasSize(7 * 24)
     }
 
-    /** Review Focus 2: a provider that repeats an hour can't break every fetch; the first is kept. */
+    /** A provider that repeats an hour can't break every fetch; the first is kept. */
     @Test
     fun aRepeatedHourIsStoredOnce() = runTest {
         val f = forecast(days = 1)

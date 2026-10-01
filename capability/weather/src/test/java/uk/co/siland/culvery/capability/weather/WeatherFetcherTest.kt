@@ -23,7 +23,7 @@ class WeatherFetcherTest {
 
     @Before
     fun setUp() {
-        // The tablet's own zone is not the household's (Review Focus 5).
+        // The tablet's own zone is not the household's.
         TimeZone.setDefault(TimeZone.getTimeZone("America/New_York"))
         db = weatherDb()
         store = WeatherStore(db)
@@ -52,7 +52,6 @@ class WeatherFetcherTest {
         WeatherFetcher(setOf(provider), store, clock).fetch(WeatherPlace(WELLINGTON))
         assertThat(provider.asked.single().third).isEqualTo(ZoneId.of("Pacific/Auckland"))
     }
-
 
     @Test
     fun theFirstProviderByIdIsAsked() = runTest {

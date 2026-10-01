@@ -23,7 +23,7 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.di.AppModule
 
-/** Review Focus 5: the shell's clock, date and theme run in the household's zone, not the tablet's. Robolectric for Room and Log. */
+/** The shell's clock, date and theme run in the household's zone, not the tablet's. Robolectric for Room and Log. */
 @RunWith(AndroidJUnit4::class)
 class HouseholdTickerTest {
     private val deviceZone = TimeZone.getDefault()

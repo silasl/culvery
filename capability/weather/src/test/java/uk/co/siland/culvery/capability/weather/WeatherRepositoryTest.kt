@@ -43,7 +43,6 @@ class WeatherRepositoryTest {
         }
     }
 
-    /** Review Focus 1. */
     @Test
     fun aMoveHidesTheOldTownsWeatherAtOnce() = runTest {
         assertThat(repo.view.first()).isInstanceOf(WeatherView.Ready::class.java)
@@ -55,7 +54,7 @@ class WeatherRepositoryTest {
         assertThat(repo.today.first()).isNull()
     }
 
-    /** Review Focus 3: the cache carries the card over midnight, and runs out into Expired. */
+    /** The cache carries the card over midnight, and runs out into Expired. */
     @Test
     fun atMidnightTheCardMovesOnWithoutAFetch() = runTest {
         stored.value = stored(forecast = forecast(from = THU, days = 3))
@@ -91,7 +90,6 @@ class WeatherRepositoryTest {
         assertThat(repo.header.first()).isNull()
     }
 
-    /** Review Focus 3. */
     @Test
     fun daylightMovesToTomorrowsTimesAtMidnight() = runTest {
         val f = forecast(days = 2)

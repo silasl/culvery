@@ -143,7 +143,7 @@ class OpenMeteoForecastTest {
         assertThat(days.map { it.sunset }).containsExactly(null, null)
     }
 
-    /** Review Focus 4: a null entry drops that day or hour; a null sun time leaves the day without sun times. */
+    /** A null entry drops that day or hour; a null sun time leaves the day without sun times. */
     @Test
     fun nullEntriesDropThatDayOrHourAndNothingElse() = runTest {
         answer(

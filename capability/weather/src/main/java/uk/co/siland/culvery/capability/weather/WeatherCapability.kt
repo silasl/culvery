@@ -32,7 +32,7 @@ class WeatherCapability @Inject constructor(
     override val label = "Weather"
     override val icon = "partly_cloudy_day"
 
-    /** No rail position is used. */
+    /** After Security's 50; weather has no tab, so nothing appears on the rail. */
     override val order = 60
     override val hasTab: Flow<Boolean> = flowOf(false)
 

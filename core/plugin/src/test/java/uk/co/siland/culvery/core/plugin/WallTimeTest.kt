@@ -15,7 +15,7 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WallTimeTest {
-    // 09:59:30 UTC on 1 October 2026: 10:59:30 in London (BST), 22:59:30 in Wellington (NZDT).
+    // 09:59:30 UTC on 1 October 2026: 10:59:30 in London (BST), 22:59:30 in Auckland (NZDT).
     private val start = Instant.parse("2026-10-01T09:59:30Z").toEpochMilli()
 
     @Test
