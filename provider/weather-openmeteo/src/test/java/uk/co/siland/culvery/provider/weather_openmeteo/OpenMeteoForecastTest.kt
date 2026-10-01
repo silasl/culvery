@@ -235,15 +235,46 @@ class OpenMeteoForecastTest {
         assertThat(thrown).isInstanceOf(WeatherUnavailableException::class.java)
     }
 
+    /** The recorded answer with an unknown key's string value padding it to exactly [bytes] bytes: valid, so only a cap can refuse it. */
+    private fun padded(bytes: Long): String {
+        val head = fixture().trimEnd().removeSuffix("}") + ""","pad":""""
+        val tail = "\"}"
+        val fill = bytes - (head + tail).toByteArray().size
+        return head + "x".repeat(fill.toInt()) + tail
+    }
+
+    private fun loggedBodyTooLarge() = ShadowLog.getLogs().filter { it.tag == TAG }.any { "BodyTooLarge" in it.msg }
+
     /** Plan review 13. */
     @Test
-    fun anAnswerOverOneMebibyteIsWeatherUnavailable() = runTest {
-        val tooBig = "x".repeat(MAX_FORECAST_BYTES.toInt() + 1)
+    fun anAnswerOverOneMebibyteIsWeatherUnavailableWhetherOrNotItsLengthIsKnown() = runTest {
+        val tooBig = padded(MAX_FORECAST_BYTES + 1)
+        assertThat(tooBig.toByteArray().size.toLong()).isEqualTo(MAX_FORECAST_BYTES + 1)
         answer(tooBig)
         assertThat(failure()).isInstanceOf(WeatherUnavailableException::class.java)
+        assertThat(loggedBodyTooLarge()).isTrue()
+
         // Without a length up front, the read still stops one byte past the limit.
+        ShadowLog.clear()
         server.enqueue(MockResponse().setChunkedBody(tooBig, 64 * 1024))
         assertThat(failure()).isInstanceOf(WeatherUnavailableException::class.java)
+        assertThat(loggedBodyTooLarge()).isTrue()
+    }
+
+    /** The announced length alone refuses it: the body that follows is one byte, so only the early check can name BodyTooLarge. */
+    @Test
+    fun anAnnouncedLengthOverOneMebibyteIsRefusedBeforeReadingTheBody() = runTest {
+        server.enqueue(MockResponse().setBody("x").setHeader("Content-Length", MAX_FORECAST_BYTES + 1))
+        assertThat(failure()).isInstanceOf(WeatherUnavailableException::class.java)
+        assertThat(loggedBodyTooLarge()).isTrue()
+    }
+
+    @Test
+    fun anAnswerOfExactlyOneMebibyteIsRead() = runTest {
+        answer(padded(MAX_FORECAST_BYTES))
+        assertThat(london().days).hasSize(7)
+        server.enqueue(MockResponse().setChunkedBody(padded(MAX_FORECAST_BYTES), 64 * 1024))
+        assertThat(london().days).hasSize(7)
     }
 
     /** Plan review 13: only the seven dates from today in the zone asked for are kept. */
