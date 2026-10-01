@@ -10,7 +10,7 @@ import java.time.ZoneId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import uk.co.siland.culvery.capability.calendar.HouseholdZone
+import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.plugin.WallClock
 
 private const val TICK_MS = 30_000L

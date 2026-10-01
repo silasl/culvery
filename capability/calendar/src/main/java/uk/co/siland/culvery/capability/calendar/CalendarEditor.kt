@@ -20,6 +20,7 @@ import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.Refusal
 import uk.co.siland.culvery.core.household.HouseholdRepository
+import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.ApplicationScope

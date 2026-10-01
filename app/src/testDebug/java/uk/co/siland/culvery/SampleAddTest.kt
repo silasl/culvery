@@ -29,7 +29,6 @@ import uk.co.siland.culvery.capability.calendar.EditResult
 import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
-import uk.co.siland.culvery.capability.calendar.HouseholdZone
 import uk.co.siland.culvery.capability.calendar.OUTBOX_BACKOFF_MS
 import uk.co.siland.culvery.capability.calendar.SourceRefresher
 import uk.co.siland.culvery.capability.calendar.newClientKey
@@ -43,6 +42,7 @@ import uk.co.siland.culvery.core.access.PinManager
 import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
+import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Toaster

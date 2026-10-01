@@ -1,5 +1,7 @@
-package uk.co.siland.culvery.capability.calendar
+package uk.co.siland.culvery.core.household
 
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.ZoneId
@@ -8,8 +10,6 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import uk.co.siland.culvery.core.household.HomeLocation
-import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 
 @RunWith(AndroidJUnit4::class)
@@ -20,7 +20,9 @@ class HouseholdZoneTest {
 
     @Before
     fun setUp() {
-        db = householdDb()
+        db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), HouseholdDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
         household = HouseholdRepository(db)
         zone = HouseholdZone(household)
     }

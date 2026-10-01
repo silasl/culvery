@@ -11,6 +11,7 @@ import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.Refusal
 import uk.co.siland.culvery.core.household.HouseholdRepository
+import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.plugin.WallClock
 
 private object NobodyMay : AccessControl {

@@ -18,7 +18,6 @@ import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.CalendarSync
 import uk.co.siland.culvery.capability.calendar.CalendarWriteLock
 import uk.co.siland.culvery.capability.calendar.ChangeKind
-import uk.co.siland.culvery.capability.calendar.HouseholdZone
 import uk.co.siland.culvery.capability.calendar.PendingChange
 import uk.co.siland.culvery.capability.calendar.SourceRefresher
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
@@ -26,6 +25,7 @@ import uk.co.siland.culvery.core.access.PinHasher
 import uk.co.siland.culvery.core.access.PinManager
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
+import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
