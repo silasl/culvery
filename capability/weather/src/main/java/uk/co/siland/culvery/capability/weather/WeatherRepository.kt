@@ -18,7 +18,7 @@ import uk.co.siland.culvery.core.plugin.retryWithBackoff
 import uk.co.siland.culvery.core.plugin.wallTimeEachMinute
 
 /**
- * What the weather UI and the theme read (4b design ง3.7): the home location, the stored fetch and the household's wall
+ * What the weather UI and the theme read (4b design ยง3.7): the home location, the stored fetch and the household's wall
  * time, by the minute. The rules are the pure [weatherView], [headerWeather] and [sunTimesOn].
  */
 @Singleton
@@ -35,10 +35,10 @@ class WeatherRepository internal constructor(
         .distinctUntilChanged()
         .retryWithBackoff { Log.w(TAG, "Couldn't read the weather (${it::class.simpleName}); retrying") }
 
-    /** The header's weather, or null while it is hidden (ง4.1). */
+    /** The header's weather, or null while it is hidden (ยง4.1). */
     val header: Flow<HeaderWeather?> = combine(view, now) { v, n -> headerWeather(v, n) }.distinctUntilChanged()
 
-    /** Today's sun times in the household's zone, from matching data however old (ง3.7). */
+    /** Today's sun times in the household's zone, from matching data however old (ยง3.7). */
     override val today: Flow<SunTimes?> =
         combine(location, stored, now.map { it.toLocalDate() }.distinctUntilChanged()) { l, s, date -> sunTimesOn(l, s, date) }
             .distinctUntilChanged()
