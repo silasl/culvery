@@ -10,7 +10,6 @@ import uk.co.siland.culvery.capability.calendar.ui.ConnectCardHost
 import uk.co.siland.culvery.capability.calendar.ui.TodayCardHost
 import uk.co.siland.culvery.capability.calendar.ui.WeekViewHost
 import uk.co.siland.culvery.capability.calendar.ui.rememberConnector
-import uk.co.siland.culvery.capability.calendar.ui.rememberNowMillis
 import uk.co.siland.culvery.capability.calendar.ui.rememberToday
 import uk.co.siland.culvery.capability.calendar.ui.rememberZoneId
 import uk.co.siland.culvery.capability.calendar.ui.todayIn
@@ -21,6 +20,7 @@ import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.rememberNowMillis
 
 const val CALENDAR_TAB_ID = "calendar"
 const val CONNECT_CARD_ID = "calendar.connect"

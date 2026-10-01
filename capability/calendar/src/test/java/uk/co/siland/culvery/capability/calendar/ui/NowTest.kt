@@ -11,6 +11,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.rememberNowMillis
 
 @RunWith(AndroidJUnit4::class)
 class NowTest {

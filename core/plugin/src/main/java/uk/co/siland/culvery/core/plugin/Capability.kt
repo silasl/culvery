@@ -2,6 +2,7 @@ package uk.co.siland.culvery.core.plugin
 
 import androidx.compose.runtime.Composable
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 interface Capability : HomeCardContributor {
     val id: String
@@ -21,4 +22,7 @@ interface Capability : HomeCardContributor {
 
     /** This capability's Settings pages (4a design D7), placed by [SettingsPage.order]. */
     fun settingsPages(): List<SettingsPage> = emptyList()
+
+    /** Items on the right of Home's header, by [HeaderItem.order]: weather 10, later indoor climate 20. */
+    fun headerItems(): Flow<List<HeaderItem>> = flowOf(emptyList())
 }

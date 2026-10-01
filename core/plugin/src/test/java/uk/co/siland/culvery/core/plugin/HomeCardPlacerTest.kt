@@ -111,4 +111,10 @@ class HomeCardPlacerTest {
             "f", listOf(0, 1, 1, 1),
         )
     }
+
+    @Test
+    fun withOnlyTheConnectCardTheForecastTakesTheFirstCellBesideIt() {
+        val result = HomeCardPlacer.place(listOf(card("calendar.connect", TALL, 100), card("weather.forecast", REGULAR, 40)))
+        assertThat(result.layout()["weather.forecast"]).isEqualTo(listOf(1, 0, 1, 1))
+    }
 }
