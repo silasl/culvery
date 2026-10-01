@@ -54,6 +54,9 @@ object ShellTokens {
     val toastMaxWidth = 720.dp
     const val TOAST_MILLIS = 3_500L
 
+    /** Home's cards (hand-off: Today's `border-radius: 26px`): the calendar's and the weather's. */
+    val homeCardRadius = 26.dp
+
     // Status-bar sign-in: account_circle 16 dp, 6 dp between items, 16 dp before the theme indicator.
     val statusIcon = 16.dp
     val statusGap = 6.dp

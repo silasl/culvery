@@ -4,6 +4,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.ShellTokens
 
 /** Calendar text styles from the hand-off and Culvery.dc.html that HhType has no name for; all derived from HhType. */
 internal object CalendarType {
@@ -124,8 +125,8 @@ internal object CalendarDimens {
     val todayTimeTop = 3.dp
     val todayBadge = 20.dp
 
-    // Shared card radius (Today, Coming up, Connect).
-    val cardRadius = 26.dp
+    // Shared card radius (Today, Coming up, Connect): Home's, as the weather card's.
+    val cardRadius = ShellTokens.homeCardRadius
 
     // Today row: surf2 pill, radius 16, 14×12 padding, 4 dp person-colour bar.
     val todayRowRadius = 16.dp

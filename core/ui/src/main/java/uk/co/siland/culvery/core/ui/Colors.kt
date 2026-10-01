@@ -51,3 +51,6 @@ val LightColors = HhColors(
     dangerSoft = Color(0xFFF7DFDA),
     dangerInk = Color(0xFFFFFFFF),
 )
+
+/** The hand-off's weather icon colour (§1). The same in both themes, so not an HhColors token. */
+val SunAmber = Color(0xFFE0B85B)
