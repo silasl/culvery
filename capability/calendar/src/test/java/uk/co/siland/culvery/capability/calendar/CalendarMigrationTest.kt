@@ -335,7 +335,15 @@ class CalendarMigrationTest {
         )
         v5.close()
 
-        helper.runMigrationsAndValidate(6, listOf(MIGRATION_5_6)).close()
+        val v6 = helper.runMigrationsAndValidate(6, listOf(MIGRATION_5_6))
+        try {
+            assertThat(scalar(v6, "SELECT COUNT(*) FROM sync_state")).isEqualTo("0")
+            assertThat(scalar(v6, "SELECT COUNT(*) FROM source WHERE readProblem IS NULL")).isEqualTo("2")
+            assertThat(scalar(v6, "SELECT group_concat(shownInService, ',') FROM (SELECT shownInService FROM source ORDER BY sourceId)")).isEqualTo("1,0")
+            assertThat(scalar(v6, "SELECT health || '|' || lastSyncMillis FROM connection WHERE id = 'c1'")).isEqualTo("OK|1234")
+        } finally {
+            v6.close()
+        }
 
         val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
             .addMigrations(*ALL_MIGRATIONS)
@@ -357,6 +365,15 @@ class CalendarMigrationTest {
             assertThat(store.cursor("c1", "s1", window)).isNull()
         } finally {
             db.close()
+        }
+    }
+
+    private fun scalar(connection: SQLiteConnection, sql: String): String? {
+        val statement = connection.prepare(sql)
+        try {
+            return if (statement.step()) statement.getText(0) else null
+        } finally {
+            statement.close()
         }
     }
 

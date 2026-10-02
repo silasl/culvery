@@ -243,17 +243,24 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     /**
      * Drops [sourceId]'s events that end before [window] starts, or start at or after the end of what its full sync read
      * (4c design §6.2, ruling 1): an incremental result can carry any date, and nothing else removes them. What was read
-     * past the window stays, as no incremental result will bring it back. A row a queued change targets stays. Returns
-     * how many went.
+     * past the window stays, as no incremental result will bring it back. A row a queued change targets stays. The
+     * stored key's start moves up to the window's. Returns how many went.
      */
     suspend fun prune(connectionId: String, sourceId: String, window: DateRange): Int = db.withTransaction {
-        val readEnd = dao.syncState(connectionId, sourceId)?.let { CursorKey.parse(it.rangeStart) }?.readEnd ?: window.endExclusive
-        dao.pruneEvents(
+        val state = dao.syncState(connectionId, sourceId)
+        val key = state?.let { CursorKey.parse(it.rangeStart) }
+        val removed = dao.pruneEvents(
             connectionId,
             sourceId,
             window.startInstant.toEpochMilli(),
-            readEnd.atStartOfDay(window.zone).toInstant().toEpochMilli(),
+            (key?.readEnd ?: window.endExclusive).atStartOfDay(window.zone).toInstant().toEpochMilli(),
         )
+        // The key must describe what the store holds: days before the window are gone now, so a window set back to
+        // them (a clock moved back) reads in full instead of keeping a token that cannot restore them.
+        if (state != null && key != null && key.readStart.isBefore(window.start)) {
+            dao.upsertSyncState(state.copy(rangeStart = CursorKey(window.start, key.readEnd, key.zoneId).toString()))
+        }
+        removed
     }
 
     fun eventsBetween(startMillis: Long, endMillis: Long): Flow<List<StoredEvent>> =

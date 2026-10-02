@@ -28,7 +28,7 @@ import uk.co.siland.culvery.core.plugin.Feature
  * source; fixture-specific checks (out-of-range, recurring, cursor) use [sourceWithEvents].
  *
  * Range checks apply to cursorless (first) syncs only. With a cursor, incremental upserts MAY lie outside
- * the range (Google's syncToken can't carry timeMin/timeMax); the store keeps them and queries filter.
+ * the range (Google's syncToken can't carry timeMin/timeMax); the engine prunes what lies outside what it keeps.
  *
  * Optional hooks are `open` with a null default, so a new hook never breaks an existing subclass.
  */

@@ -286,6 +286,28 @@ class CalendarStoreTest {
         assertThat(storedIds()).containsExactly("old")
     }
 
+    /** What the store holds is what the key says: after pruning days away, a window set back to them reads in full. */
+    @Test
+    fun aClockSetBackAfterPruningReadsInFullAgain() = runTest {
+        connect("s1")
+        store.applySync("c1", "s1", read, full(timed("a", "One", 23, 9)))
+        store.prune("c1", "s1", DateRange(window.start.plusDays(3), window.endExclusive.plusDays(3), zone))
+        assertThat(store.cursor("c1", "s1", DateRange(window.start.plusDays(1), window.endExclusive.plusDays(1), zone))).isNull()
+        assertThat(store.cursor("c1", "s1", DateRange(window.start.plusDays(3), window.endExclusive.plusDays(3), zone)))
+            .isEqualTo(SyncCursor("k1"))
+    }
+
+    /** A create the provider has taken but not acknowledged: its event is stored under the client key. */
+    @Test
+    fun pruningKeepsAnEventStoredUnderAQueuedCreatesClientKey() = runTest {
+        connect("s1")
+        store.applySync("c1", "s1", read, full(timed("k-1", "Created", 20, 9), timed("gone", "Gone", 20, 11)))
+        val draft = EventDraft("Created", EventTime.Timed(at(20, 9)), EventTime.Timed(at(20, 10)), forPerson = null, createdBy = null)
+        store.enqueue(PendingChange(0, "c1", "s1", null, ChangeKind.CREATE, draft, attempts = 0, nextAttemptMillis = 0, createdMillis = 0, clientKey = "k-1"))
+        store.prune("c1", "s1", window)
+        assertThat(storedIds()).containsExactly("k-1")
+    }
+
     @Test
     fun cursorIsDroppedWhenWhatWasReadStartsAfterTheWindowStarts() = runTest {
         connect("s1")
