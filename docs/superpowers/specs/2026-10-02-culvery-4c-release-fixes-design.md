@@ -49,7 +49,7 @@ The user tests on the tablet only once there is a product they are happy to use;
 ### 3.3 R8 and resource shrinking
 
 - `isMinifyEnabled = true` and `isShrinkResources = true` for release, with `proguard-android-optimize.txt` and `app/proguard-rules.pro`.
-- `proguard-rules.pro` holds only what libraries don't ship: `-keepattributes SourceFile,LineNumberTable` with `-renamesourcefileattribute SourceFile`, and the `Log` block (§3.4). *(Plan review: kotlinx.serialization 1.9 and OkHttp 4.12 already ship their keeps and `-dontwarn` lines.)*
+- `proguard-rules.pro` holds only what libraries don't ship: `-keepattributes SourceFile,LineNumberTable` with `-renamesourcefileattribute SourceFile`, the `Log` block (§3.4), and `-keepnames` for the app's own `Throwable` subclasses so warnings still name the exception (Task 3 review). *(Plan review: kotlinx.serialization 1.9 and OkHttp 4.12 already ship their keeps and `-dontwarn` lines.)*
 - Unit tests can't exercise R8 (Compose tests run in debug only), so the walkthrough (§8.2) runs the signed, minified build and must connect Google, sync, write, and show weather.
 
 ### 3.4 Release logging (D8)
