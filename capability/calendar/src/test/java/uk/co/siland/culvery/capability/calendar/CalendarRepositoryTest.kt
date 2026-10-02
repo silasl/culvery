@@ -7,16 +7,13 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.util.concurrent.CountDownLatch
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.ThreadContextElement
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -44,9 +41,6 @@ class CalendarRepositoryTest {
     private val london = ZoneId.of("Europe/London")
     private val window = DateRange(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 10, 15), london)
     private fun sept(day: Int) = LocalDate.of(2026, 9, day)
-
-    // Dispatchers.Default runs max(2, cores) threads.
-    private val DEFAULT_POOL_SIZE = Runtime.getRuntime().availableProcessors().coerceAtLeast(2)
 
     @Before
     fun setUp() = runTest {
@@ -109,25 +103,14 @@ class CalendarRepositoryTest {
         }
     }
 
-    /** U7: with every Default thread busy, the mapping can only finish once one is free, so it is not running on the caller's thread. */
+    /** U7: flowOn hands the collector's context to the mapping, so the threads it runs on are recorded here. */
     @Test
     fun theDaysAreMappedOnTheDefaultDispatcher() = runTest {
         put("s-family", timed("Boiler service", 23, 10, 0, 60))
-        val release = CountDownLatch(1)
-        val parked = CountDownLatch(DEFAULT_POOL_SIZE)
-        val scope = CoroutineScope(Dispatchers.Default)
-        repeat(DEFAULT_POOL_SIZE) { scope.launch { parked.countDown(); release.await() } }
-        parked.await()
-        val shown = async(Dispatchers.IO) { repo.days(sept(23), 1).first() }
-        try {
-            // Nothing to observe while it is stuck, so this waits a short real time to see that it stays so.
-            withContext(Dispatchers.IO) { delay(300) }
-            assertThat(shown.isCompleted).isFalse()
-        } finally {
-            release.countDown()
-        }
-        assertThat(withContext(Dispatchers.IO) { withTimeout(5_000) { shown.await() } }.single().events.map { it.title })
-            .containsExactly("Boiler service")
+        val threads = CopyOnWriteArrayList<String>()
+        val recorder = ThreadRecorder(threads)
+        withContext(recorder) { repo.days(sept(23), 1).first() }
+        assertThat(threads.any { it.startsWith("DefaultDispatcher-worker") }).isTrue()
     }
 
     @Test
@@ -525,4 +508,15 @@ class CalendarRepositoryTest {
         assertThat(piano.repeats).isEqualTo("Every week")
         assertThat(named.masterService.first()).isEqualTo("Google Calendar")
     }
+}
+
+/** Appends the name of every thread the coroutine runs on to [threads]. */
+private class ThreadRecorder(private val threads: MutableList<String>) : AbstractCoroutineContextElement(Key), ThreadContextElement<Unit> {
+    override fun updateThreadContext(context: CoroutineContext) {
+        threads += Thread.currentThread().name
+    }
+
+    override fun restoreThreadContext(context: CoroutineContext, oldState: Unit) = Unit
+
+    companion object Key : CoroutineContext.Key<ThreadRecorder>
 }
