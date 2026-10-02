@@ -23,6 +23,7 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.capability.calendar.CalendarSource
+import uk.co.siland.culvery.capability.calendar.READ_REFUSED
 import uk.co.siland.culvery.capability.calendar.ReviewConnection
 import uk.co.siland.culvery.capability.calendar.SourceMapping
 import uk.co.siland.culvery.capability.calendar.StoredSource
@@ -96,6 +97,25 @@ class ReviewScreenshotTest {
         "review_disconnect_dark", true, ConnectionHealth.Ok,
         confirming = Confirming(connections(ConnectionHealth.Ok).single().row, 3),
     )
+
+    /** 4c design §6.4: an unreadable calendar and an unreadable master, in a healthy connection. */
+    private fun readProblem(name: String, dark: Boolean) = snap(name, dark) {
+        Box(Modifier.padding(MARGIN).width(COLUMN_W)) {
+            ReviewCalendars(
+                "Calendars",
+                listOf(
+                    ReviewConnection(
+                        CalendarRow(google, "Google Calendar", "calendar_month", ConnectionHealth.Ok, now - 2 * 60_000),
+                        listOf(sources[0].copy(readProblem = READ_REFUSED), sources[1].copy(readProblem = READ_REFUSED), sources[2]),
+                    ),
+                ),
+                listOf(Person.Family, sam, mia), now, false, null, null, emptyList(), ReviewActions(),
+            )
+        }
+    }
+
+    @Test fun reviewReadProblemDark() = readProblem("review_read_problem_dark", true)
+    @Test fun reviewReadProblemLight() = readProblem("review_read_problem_light", false)
 
     private fun connectStep(name: String, dark: Boolean) = snap(name, dark) {
         Box(Modifier.padding(MARGIN)) { ConnectStepCard(connectService = "Google Calendar", onConnect = {}) }

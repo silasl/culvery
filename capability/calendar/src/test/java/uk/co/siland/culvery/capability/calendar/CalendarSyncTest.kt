@@ -251,11 +251,12 @@ class CalendarSyncTest {
     fun oneFailingSourceDoesNotBlockItsSiblingsButHoldsBackMarkSynced() = runTest {
         connect("c1", "calendar.a", s1, s2)
         a.events = { listOf(swim()) }
-        a.failFor = mapOf("s1" to UnreachableException("s1 down"))
+        // E3: an Unreachable source would end the connection's pass; a failure of its own does not.
+        a.failFor = mapOf("s1" to IllegalStateException("s1 broke"))
         engine().syncAll()
         assertThat(a.calls.map { it.sourceId }).containsExactly("s1", "s2")
         assertThat(cachedTitles()).containsExactly("Swim")
-        assertThat(health("c1")).isEqualTo(ConnectionHealth.Unreachable)
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Error("s1 broke"))
         assertThat(store.connectionsNow().single().lastSyncMillis).isNull()
     }
 
@@ -975,42 +976,97 @@ class CalendarSyncTest {
         assertThat(w.drafts.single().forPersonColor).isEqualTo(SAM_COLOR)
     }
 
+    /** §6.4: a calendar deleted in the service is flagged once, and the next pass's refresh removes it. */
     @Test
-    fun aSourceGoneFlagsARefreshThatRemovesIt() = runTest {
+    fun aRefusedCalendarThatIsGoneLeavesAtTheNextPass() = runTest {
         connect("c1", "calendar.a", s1, s2)
         val sync = engine()
         sync.syncAll()
-        // Deleted in the service: its list call says so before a refresh would.
         a.failFor = mapOf("s2" to SourceGoneException("calendar deleted"))
         a.sourceList = listOf(s1)
         now = now.plusSeconds(300)
         sync.syncAll()
-        assertThat(health("c1")).isEqualTo(ConnectionHealth.Unreachable)
-        assertThat(store.sources().first().map { it.source.id }).containsExactly("s1", "s2")
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
+        assertThat(store.source("c1", "s2")!!.readProblem).isEqualTo(READ_REFUSED)
         now = now.plusSeconds(300)
         sync.syncAll()
         assertThat(store.sources().first().map { it.source.id }).containsExactly("s1")
-        assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
     }
 
+    /** D6, M7: one refused calendar still listed keeps its row's message; the connection stays healthy, it is read each pass, and the list isn't re-read. */
     @Test
-    fun aSourceGoneThatIsStillListedIsKeptAndNotReadAgainEachPass() = runTest {
+    fun aRefusedCalendarStillListedKeepsItsProblemAndTheConnectionStaysHealthy() = runTest {
         connect("c1", "calendar.a", s1, s2)
         val sync = engine()
         sync.syncAll()
-        a.failFor = mapOf("s2" to SourceGoneException("a passing 404"))
+        a.failFor = mapOf("s2" to SourceGoneException("403"))
         now = now.plusSeconds(300)
         sync.syncAll()
         now = now.plusSeconds(300)
         sync.syncAll()
-        assertThat(store.sources().first().map { it.source.id }).containsExactly("s1", "s2")
-        assertThat(store.connectionsNow().single().sourcesCheckedMillis).isEqualTo(now.toEpochMilli())
-        // Still gone to sync, still listed: no calendar list read every pass until the daily refresh.
         val reads = a.sourcesCalls
+        val syncsOfS2 = a.calls.count { it.sourceId == "s2" }
         now = now.plusSeconds(300)
         sync.syncAll()
         assertThat(a.sourcesCalls).isEqualTo(reads)
+        assertThat(a.calls.count { it.sourceId == "s2" }).isEqualTo(syncsOfS2 + 1)
+        assertThat(store.source("c1", "s2")!!.readProblem).isEqualTo(READ_REFUSED)
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
+        assertThat(store.connectionsNow().single().lastSyncMillis).isEqualTo(now.toEpochMilli())
+    }
+
+    @Test
+    fun aRefusedCalendarIsClearedByItsNextGoodRead() = runTest {
+        connect("c1", "calendar.a", s1, s2)
+        val sync = engine()
+        a.failFor = mapOf("s2" to SourceGoneException("403"))
+        sync.syncAll()
+        a.failFor = emptyMap()
+        now = now.plusSeconds(300)
+        sync.syncAll()
+        assertThat(store.source("c1", "s2")!!.readProblem).isNull()
+    }
+
+    /** E3: once the connection can't be reached, its other calendars wait for the next pass. */
+    @Test
+    fun onceAConnectionCantBeReachedItsOtherCalendarsWait() = runTest {
+        connect("c1", "calendar.a", s1, s2)
+        a.failWith = UnreachableException("no network")
+        engine().syncAll()
+        assertThat(a.calls).hasSize(1)
         assertThat(health("c1")).isEqualTo(ConnectionHealth.Unreachable)
+    }
+
+    @Test
+    fun onceAConnectionNeedsSigningInItsOtherCalendarsWait() = runTest {
+        connect("c1", "calendar.a", s1, s2)
+        a.failWith = NeedsSignInException("expired")
+        engine().syncAll()
+        assertThat(a.calls).hasSize(1)
+    }
+
+    /** Plan review 11: with every calendar refused nothing was read, so the connection isn't synced and says it can't reach them. */
+    @Test
+    fun everyCalendarRefusedIsNotASync() = runTest {
+        connect("c1", "calendar.a", s1, s2)
+        val sync = engine()
+        sync.syncAll()
+        val synced = store.connectionsNow().single().lastSyncMillis
+        a.failFor = mapOf("s1" to SourceGoneException("403"), "s2" to SourceGoneException("403"))
+        now = now.plusSeconds(300)
+        sync.syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Unreachable)
+        assertThat(store.connectionsNow().single().lastSyncMillis).isEqualTo(synced)
+    }
+
+    /** E3: a refusal of one calendar isn't the connection failing. */
+    @Test
+    fun aRefusedCalendarDoesNotStopTheOthers() = runTest {
+        connect("c1", "calendar.a", s1, s2)
+        a.failFor = mapOf("s1" to SourceGoneException("403"))
+        engine().syncAll()
+        assertThat(a.calls.map { it.sourceId }).containsExactly("s1", "s2").inOrder()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
     }
 
     @Test

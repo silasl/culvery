@@ -288,10 +288,20 @@ class CalendarSync internal constructor(
         }
         refresher.refreshIfDue(provider, stored)
         var worst: ConnectionHealth = ConnectionHealth.Ok
-        for (source in store.visibleSourcesFor(conn.id)) {
+        val visible = store.visibleSourcesFor(conn.id)
+        var refused = 0
+        for (source in visible) {
             val health = syncSource(provider, conn, source.source, window)
+            if (health == null) {
+                refused++
+                continue
+            }
             if (health.severity() > worst.severity()) worst = health
+            // E3: the connection itself failed; its other calendars would fail the same way, each costing a timeout.
+            if (health == ConnectionHealth.Unreachable || health == ConnectionHealth.NeedsSignIn) break
         }
+        // Every calendar refused: the service answers, but nothing was read, so this isn't a sync (plan review 11).
+        if (visible.isNotEmpty() && refused == visible.size) worst = ConnectionHealth.Unreachable
         if (worst == ConnectionHealth.Ok) {
             store.markSynced(conn.id, clock.nowMillis())
         } else {
@@ -301,14 +311,15 @@ class CalendarSync internal constructor(
 
     /**
      * The store calls sit outside the provider's call: a store failure fails the pass rather than reading as the
-     * provider's health. Any Throwable from the provider (an Error included) flags only this source.
+     * provider's health. Any Throwable from the provider (an Error included) flags only this source. Null: the service
+     * refused this calendar alone (4c §6.4).
      */
     private suspend fun syncSource(
         provider: CalendarProvider,
         conn: Connection,
         source: CalendarSource,
         window: DateRange,
-    ): ConnectionHealth {
+    ): ConnectionHealth? {
         val cursor = store.cursor(conn.id, source.id, window)
         val read = DateRange(window.start, window.endExclusive.plusDays(SYNC_AHEAD_DAYS), window.zone)
         val result = callReader(io, timeoutMillis) { provider.sync(conn, source, read, cursor) }
@@ -320,17 +331,21 @@ class CalendarSync internal constructor(
 
     /**
      * A failed read's health, logged with its cause and the connection's id: never a name or a calendar id, either of
-     * which can be the account's email, and never a token.
+     * which can be the account's email, and never a token. A refused calendar (SourceGone) is the calendar's problem, not
+     * the connection's: null (4c §6.4).
      */
-    private fun healthAfter(e: Throwable, conn: Connection, sourceId: String): ConnectionHealth = when (e) {
+    private suspend fun healthAfter(e: Throwable, conn: Connection, sourceId: String): ConnectionHealth? = when (e) {
         is NeedsSignInException -> {
             Log.w(TAG, "${conn.id}: a source needs signing in again (${e::class.simpleName})")
             ConnectionHealth.NeedsSignIn
         }
         is SourceGoneException -> {
-            Log.w(TAG, "${conn.id}: a source is gone from the service (${e::class.simpleName}); flagging a refresh of its calendars")
-            refresher.flag(conn.id, sourceId)
-            ConnectionHealth.Unreachable
+            // §6.4: one calendar refused while its connection answers. The connection stays healthy; the row says so.
+            if (store.markReadRefused(conn.id, sourceId)) {
+                Log.w(TAG, "${conn.id}: a calendar refused to be read (${e::class.simpleName}); flagging a refresh of its calendars")
+                refresher.flag(conn.id, sourceId)
+            }
+            null
         }
         is UnreachableException -> {
             Log.w(TAG, "${conn.id}: a source is unreachable (${e::class.simpleName})")

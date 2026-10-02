@@ -196,7 +196,14 @@ interface CalendarDao {
     suspend fun deleteSyncState(connectionId: String, sourceId: String)
 
     @Query("DELETE FROM outbox WHERE connectionId = :connectionId AND sourceId = :sourceId")
-    suspend fun deleteOutboxOfSource(connectionId: String, sourceId: String)
+    suspend fun deleteOutboxOfSource(connectionId: String, sourceId: String): Int
+
+    @Query("UPDATE source SET readProblem = :problem WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun setReadProblem(connectionId: String, sourceId: String, problem: String)
+
+    /** Only a row that has one, so a pass that reads well writes nothing (and wakes no flow). */
+    @Query("UPDATE source SET readProblem = NULL WHERE connectionId = :connectionId AND sourceId = :sourceId AND readProblem IS NOT NULL")
+    suspend fun clearReadProblem(connectionId: String, sourceId: String)
 
     @Query(
         "UPDATE source SET name = :name, writable = :writable, visible = :visible, shownInService = :shownInService " +

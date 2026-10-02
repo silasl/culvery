@@ -505,7 +505,7 @@ class CalendarStoreTest {
         store.applySync("c1", "s2", window, full(timed("a", "Walk", 23, 9)))
         store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null).copy(sourceId = "s2"))
         val cleared = store.refreshSources("c1", listOf(listed("s1")), 5_000L, mapping("mia"))
-        assertThat(cleared).isFalse()
+        assertThat(cleared.masterCleared).isFalse()
         assertThat(store.sources().first().map { it.source.id }).containsExactly("s1")
         assertThat(rowsFor("s2")).isEqualTo(Triple(0L, null, 0))
     }
@@ -517,7 +517,7 @@ class CalendarStoreTest {
         store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)))
         store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null))
         val cleared = store.refreshSources("c1", listOf(listed("s2")), 5_000L, mapping("mia"))
-        assertThat(cleared).isTrue()
+        assertThat(cleared.masterCleared).isTrue()
         assertThat(store.master().first()).isNull()
         assertThat(rowsFor("s1")).isEqualTo(Triple(0L, null, 0))
     }
@@ -527,7 +527,7 @@ class CalendarStoreTest {
         connect("s1")
         store.setMaster("c1", "s1")
         val cleared = store.refreshSources("c1", listOf(listed("s1", writable = false)), 5_000L, mapping("mia"))
-        assertThat(cleared).isTrue()
+        assertThat(cleared.masterCleared).isTrue()
         assertThat(store.master().first()).isNull()
         assertThat(store.source("c1", "s1")!!.source.writable).isFalse()
     }
@@ -536,7 +536,7 @@ class CalendarStoreTest {
     fun aWritableMasterStaysTheMasterThroughARefresh() = runTest {
         connect("s1")
         store.setMaster("c1", "s1")
-        assertThat(store.refreshSources("c1", listOf(listed("s1", writable = true)), 5_000L, mapping("mia"))).isFalse()
+        assertThat(store.refreshSources("c1", listOf(listed("s1", writable = true)), 5_000L, mapping("mia")).masterCleared).isFalse()
         assertThat(store.master().first()?.source?.id).isEqualTo("s1")
     }
 
@@ -560,10 +560,29 @@ class CalendarStoreTest {
     }
 
     @Test
+    fun hidingACalendarClearsItsReadProblem() = runTest {
+        connect("s1", "s2")
+        assertThat(store.markReadRefused("c1", "s2")).isTrue()
+        assertThat(store.markReadRefused("c1", "s2")).isFalse()
+        store.setMapping("c1", "s2", PersonId.FAMILY, visible = false)
+        assertThat(store.source("c1", "s2")!!.readProblem).isNull()
+    }
+
+    /** C8: a connection that fails part-way is never half stored. */
+    @Test
+    fun addConnectionWritesNothingWhenItFails() = runTest {
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { store.addConnection(conn, listOf(CalendarSource("s1", "One", writable = true)), emptyMap(), masterSourceId = "missing") }
+        }
+        assertThat(store.connectionsNow()).isEmpty()
+        assertThat(store.sources().first()).isEmpty()
+    }
+
+    @Test
     fun aRefreshForARemovedConnectionWritesNothing() = runTest {
         connect("s1")
         store.removeConnection("c1")
-        assertThat(store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 5_000L, mapping("mia"))).isFalse()
+        assertThat(store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 5_000L, mapping("mia")).masterCleared).isFalse()
         assertThat(store.sources().first()).isEmpty()
     }
 

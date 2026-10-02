@@ -15,8 +15,16 @@ import uk.co.siland.culvery.core.plugin.WallClock
 /** How often a connection's sources are read again from the provider (3a design D7). */
 const val SOURCE_REFRESH_MS = 24 * 60 * 60_000L
 
-/** 3a design D7, 4a design §4.5: the master calendar went, or became read-only, so the add buttons hide until another is chosen. */
-fun masterGone(serviceName: String): String = "$serviceName: can't find the master calendar — choose a new one in Settings › Calendars."
+/**
+ * 3a design D7, 4a design §4.5: the master calendar went, or became read-only, so the add buttons hide until another is
+ * chosen; 4c C7 adds the queued changes that went with it.
+ */
+fun masterGone(serviceName: String, droppedChanges: Int): String =
+    "$serviceName: can't find the master calendar — choose a new one in Settings › Calendars." + when (droppedChanges) {
+        0 -> ""
+        1 -> " 1 change waiting to sync was dropped."
+        else -> " $droppedChanges changes waiting to sync were dropped."
+    }
 
 /**
  * Follows the calendars ticked in the service (3a design §3.4, D7): at the start of a connection's part of a pass,
@@ -40,13 +48,8 @@ class SourceRefresher internal constructor(
     // Per connection: the sources a sync found gone, waiting for a refresh.
     private val flagged = ConcurrentHashMap<String, MutableSet<String>>()
 
-    // Per connection: sources found gone that a flagged refresh saw still listed. Their SourceGone is ignored until
-    // the next scheduled refresh, or every pass would read the calendar list again.
-    private val stillListed = ConcurrentHashMap<String, MutableSet<String>>()
-
-    /** A sync found [sourceId] gone (SourceGoneException): refresh [connectionId] at the next pass. */
+    /** A sync found [sourceId] refused for the first time (4c §6.4): refresh [connectionId] at the next pass. */
     fun flag(connectionId: String, sourceId: String) {
-        if (stillListed[connectionId]?.contains(sourceId) == true) return
         flagged.getOrPut(connectionId) { ConcurrentHashMap.newKeySet() } += sourceId
     }
 
@@ -74,14 +77,10 @@ class SourceRefresher internal constructor(
             return
         }
         val household = people()
-        val masterCleared = store.refreshSources(id, sources, now) { defaultMapping(it, household) }
+        val outcome = store.refreshSources(id, sources, now) { defaultMapping(it, household) }
         refreshed += id
         flagged[id]?.removeAll(gone)
-        val listed = sources.mapTo(HashSet()) { it.id }
-        val kept = stillListed.getOrPut(id) { ConcurrentHashMap.newKeySet() }
-        if (scheduled) kept.clear()
-        kept += gone.filter { it in listed }
-        if (masterCleared) toaster.show(masterGone(provider.descriptor.displayName))
+        if (outcome.masterCleared) toaster.show(masterGone(provider.descriptor.displayName, outcome.droppedChanges))
     }
 
     private companion object {

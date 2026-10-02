@@ -24,12 +24,16 @@ data class StoredConnection(
     val needsSignInSinceMillis: Long? = null,
 )
 
-/** [isMaster]: the household's master calendar, the only source the tablet writes to (spec §6). */
+/**
+ * [isMaster]: the household's master calendar, the only source the tablet writes to (spec §6).
+ * [readProblem]: [READ_REFUSED] while the service refuses this calendar's events although it still lists it (4c §6.4).
+ */
 data class StoredSource(
     val connectionId: String,
     val source: CalendarSource,
     val mapping: SourceMapping,
     val isMaster: Boolean = false,
+    val readProblem: String? = null,
 )
 
 /** One mirrored event. Ids from providers may contain any character, including "/". */

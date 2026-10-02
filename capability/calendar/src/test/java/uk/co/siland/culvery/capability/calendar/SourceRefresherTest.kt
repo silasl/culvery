@@ -96,6 +96,21 @@ class SourceRefresherTest {
         assertThat(toaster.messages).containsExactly("Google Calendar: can't find the master calendar — choose a new one in Settings › Calendars.")
     }
 
+    /** C7: changes waiting for a master that went are counted in its toast. */
+    @Test
+    fun aMasterDeletedWithChangesWaitingSaysHowManyWent() = runTest {
+        val kids = CalendarSource("kids", "Kids", writable = true)
+        connect(listOf(primary, kids), master = kids.id)
+        repeat(2) {
+            store.enqueue(PendingChange(0, "g1", kids.id, "e$it", ChangeKind.DELETE, draft = null, attempts = 0, nextAttemptMillis = 0, createdMillis = 0))
+        }
+        provider.sourceList = listOf(primary)
+        refresh()
+        assertThat(toaster.messages).containsExactly(
+            "Google Calendar: can't find the master calendar — choose a new one in Settings › Calendars. 2 changes waiting to sync were dropped.",
+        )
+    }
+
     @Test
     fun aMasterThatBecameReadOnlyIsClearedWithOneToast() = runTest {
         connect()
@@ -142,26 +157,6 @@ class SourceRefresherTest {
         now -= 60_000
         refresh()
         assertThat(sourceIds()).containsExactly(primary.id, swimming.id)
-    }
-
-    @Test
-    fun aGoneSourceStillListedIsNotFlaggedAgainUntilTheDailyRefresh() = runTest {
-        connect(listOf(primary, swimming))
-        refresh()
-        provider.sourceList = listOf(primary, swimming)
-        refresher.flag("g1", swimming.id)
-        refresh()
-        val calls = provider.sourcesCalls
-        refresher.flag("g1", swimming.id)
-        now += 60_000
-        refresh()
-        assertThat(provider.sourcesCalls).isEqualTo(calls)
-        now += SOURCE_REFRESH_MS
-        refresh()
-        refresher.flag("g1", swimming.id)
-        now += 60_000
-        refresh()
-        assertThat(provider.sourcesCalls).isEqualTo(calls + 2)
     }
 
     @Test

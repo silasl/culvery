@@ -18,6 +18,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.capability.calendar.CalendarSource
+import uk.co.siland.culvery.capability.calendar.READ_REFUSED
 import uk.co.siland.culvery.capability.calendar.ReviewConnection
 import uk.co.siland.culvery.capability.calendar.SourceMapping
 import uk.co.siland.culvery.capability.calendar.StoredSource
@@ -71,6 +72,39 @@ class ReviewCalendarsTest {
                 ),
             )
         }
+    }
+
+    private fun showSources(vararg sources: StoredSource) = compose.setContent {
+        CulveryTheme(dark = true) {
+            ReviewCalendars(
+                title = "Calendars",
+                connections = listOf(ReviewConnection(row(), sources.toList())),
+                people = listOf(Person.Family, mia),
+                nowMillis = now,
+                busy = false,
+                picking = null,
+                confirming = null,
+                connectable = emptyList(),
+                actions = ReviewActions(onShown = { source, visible -> shown = source.source.id to visible }),
+            )
+        }
+    }
+
+    /** D6: the row says so and offers Hide; the connection's line stays "Synced 2 min ago". */
+    @Test
+    fun aCalendarThatCantBeReadSaysSoAndOffersToHideIt() {
+        showSources(family, swim.copy(readProblem = READ_REFUSED))
+        compose.onNodeWithText("Can't read this calendar — check it's still shared with this account").assertExists()
+        compose.onNodeWithText("Synced 2 min ago").assertExists()
+        compose.onNodeWithText("Hide this calendar").performClick()
+        assertThat(shown).isEqualTo("swim" to false)
+    }
+
+    @Test
+    fun theMasterThatCantBeReadAsksForAnotherMasterFirst() {
+        showSources(family.copy(readProblem = READ_REFUSED), swim)
+        compose.onNodeWithText("Choose another master calendar first").assertExists()
+        compose.onNodeWithText("Hide this calendar").assertDoesNotExist()
     }
 
     @Test

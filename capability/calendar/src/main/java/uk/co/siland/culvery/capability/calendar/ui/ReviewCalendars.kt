@@ -64,6 +64,11 @@ internal const val MASTER = "Master"
 internal const val NEW_EVENTS_GO_HERE = "New events go here"
 internal const val MAKE_MASTER = "Make master"
 
+// 4c design §6.4.
+internal const val CANT_READ_CALENDAR = "Can't read this calendar — check it's still shared with this account"
+internal const val HIDE_THIS_CALENDAR = "Hide this calendar"
+internal const val CHOOSE_ANOTHER_MASTER = "Choose another master calendar first"
+
 private const val TAG = "ReviewCalendars"
 
 /** A row's health in words: "Synced 5 min ago", "Can't reach Google Calendar", "Needs reconnecting" or "Something went wrong". */
@@ -278,6 +283,7 @@ private fun SourceRow(
             // The master is always shown (4a design §3.9).
             HhSwitch(source.mapping.visible, { onShown(source, it) }, tag = "review_show_$id", enabled = !source.isMaster && !busy)
         }
+        if (source.readProblem != null) ReadProblem(source, busy, onShown)
         if (picking) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap), verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
                 people.forEach { p ->
@@ -301,4 +307,23 @@ private fun SourceRow(
 @Composable
 private fun Dot(person: Person) {
     Box(Modifier.size(ControlTokens.chipDot).clip(CircleShape).background(Color(person.color)))
+}
+
+/** 4c design §6.4, D6: one calendar that can't be read; Hide it, or, for the master, choose another first. */
+@Composable
+private fun ReadProblem(source: StoredSource, busy: Boolean, onShown: (StoredSource, Boolean) -> Unit) {
+    val c = Culvery.colors
+    val id = source.source.id
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.reviewItemGap),
+        modifier = Modifier.testTag("review_read_problem_$id"),
+    ) {
+        Text(CANT_READ_CALENDAR, style = CalendarType.subtitle, color = c.danger, modifier = Modifier.weight(1f))
+        if (source.isMaster) {
+            Text(CHOOSE_ANOTHER_MASTER, style = CalendarType.subtitle, color = c.mute)
+        } else {
+            HhPillButton(HIDE_THIS_CALENDAR, { onShown(source, false) }, Modifier.testTag("review_hide_$id"), enabled = !busy)
+        }
+    }
 }

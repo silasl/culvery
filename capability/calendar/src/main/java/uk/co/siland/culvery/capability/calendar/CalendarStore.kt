@@ -82,24 +82,25 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
      * added with [mappingForNew]; an existing one keeps its person, takes the listed name and writability, and takes the
      * service's tick as its visibility only when that tick has changed since it was last seen (ruling 12: the tick is
      * `shown || primary`), so a calendar hidden or shown on the tablet stays so; the master is always shown. One no
-     * longer listed goes with its events, cursor and queued changes. Returns true when the master went, or became
-     * read-only, and was cleared. Writes nothing once the connection is gone.
+     * longer listed goes with its events, cursor and queued changes. Says whether the master went, or became
+     * read-only, and was cleared, and how many queued changes went with removed calendars. Writes nothing once the connection is gone.
      */
     suspend fun refreshSources(
         connectionId: String,
         sources: List<CalendarSource>,
         nowMillis: Long,
         mappingForNew: (CalendarSource) -> SourceMapping,
-    ): Boolean = db.withTransaction {
+    ): SourcesRefreshed = db.withTransaction {
         // Removed while the provider was being read: no orphan sources.
-        dao.connection(connectionId) ?: return@withTransaction false
+        dao.connection(connectionId) ?: return@withTransaction SourcesRefreshed(masterCleared = false, droppedChanges = 0)
         val stored = dao.sources(connectionId).associateBy { it.sourceId }
         // A repeated id would break the insert's primary key on every pass.
         val listed = sources.distinctBy { it.id }.associateBy { it.id }
         var masterCleared = false
+        var dropped = 0
         stored.values.filter { it.sourceId !in listed }.forEach { gone ->
             if (gone.isMaster) masterCleared = true
-            removeSourceRows(connectionId, gone.sourceId)
+            dropped += removeSourceRows(connectionId, gone.sourceId)
         }
         listed.values.forEach { s ->
             val existing = stored[s.id]
@@ -121,14 +122,15 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
             }
         }
         dao.markSourcesChecked(connectionId, nowMillis)
-        masterCleared
+        SourcesRefreshed(masterCleared, dropped)
     }
 
-    private suspend fun removeSourceRows(connectionId: String, sourceId: String) {
-        dao.deleteOutboxOfSource(connectionId, sourceId)
+    private suspend fun removeSourceRows(connectionId: String, sourceId: String): Int {
+        val dropped = dao.deleteOutboxOfSource(connectionId, sourceId)
         dao.deleteSyncState(connectionId, sourceId)
         dao.deleteEventsForSource(connectionId, sourceId)
         dao.deleteSource(connectionId, sourceId)
+        return dropped
     }
 
     suspend fun visibleSourcesFor(connectionId: String): List<StoredSource> =
@@ -158,6 +160,8 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         val row = requireNotNull(dao.source(connectionId, sourceId)) { "No such calendar" }
         require(visible || !row.isMaster) { "The master calendar is always shown" }
         dao.setMapping(connectionId, sourceId, person.value, visible)
+        // A hidden calendar isn't read, so its problem has no news (4c ruling 12).
+        if (!visible) dao.clearReadProblem(connectionId, sourceId)
     }
 
     /** Every calendar mapped to someone not in [existing] (removed from the household) now shows as Family (4a design §3.9). */
@@ -169,6 +173,14 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
 
     /** The disconnect confirmation's count (4a design D14). */
     suspend fun queuedChanges(connectionId: String): Int = dao.countOutboxOf(connectionId)
+
+    /** Records that the service refused [sourceId]'s events; true when it had no problem before (4c §6.4). */
+    suspend fun markReadRefused(connectionId: String, sourceId: String): Boolean = db.withTransaction {
+        val row = dao.source(connectionId, sourceId) ?: return@withTransaction false
+        if (row.readProblem != null) return@withTransaction false
+        dao.setReadProblem(connectionId, sourceId, READ_REFUSED)
+        true
+    }
 
     /**
      * Also keeps the outbox's sign-in pause (3a design D16): the first NeedsSignIn starts it; Ok folds it into each of
@@ -244,6 +256,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         db.withTransaction {
             // A source removed while this sync was in flight: no orphan events or stale cursor.
             if (dao.source(connectionId, sourceId) == null) return@withTransaction
+            dao.clearReadProblem(connectionId, sourceId)
             if (result.fullReplace) {
                 dao.deleteEventsForSource(connectionId, sourceId)
             } else {
@@ -360,6 +373,12 @@ private class CursorKey(val readStart: LocalDate, val readEnd: LocalDate, val zo
 
 private fun DateRange.cursorKey(): String = CursorKey(start, endExclusive, zone.id).toString()
 
+/** A calendar the service still lists but whose events it refuses (403/404): its row says so (4c design §6.4). */
+internal const val READ_REFUSED = "REFUSED"
+
+/** What refreshing a connection's calendars did (3a design D7, 4c C7). */
+data class SourcesRefreshed(val masterCleared: Boolean, val droppedChanges: Int)
+
 internal fun ConnectionHealth.code(): String = when (this) {
     ConnectionHealth.Ok -> "OK"
     ConnectionHealth.Unreachable -> "UNREACHABLE"
@@ -433,6 +452,7 @@ private fun SourceEntity.toStored() = StoredSource(
     CalendarSource(sourceId, name, writable),
     SourceMapping(PersonId(personId), visible),
     isMaster,
+    readProblem = readProblem,
 )
 
 private fun RemoteEvent.toEntity(connectionId: String, sourceId: String, zone: ZoneId) = EventEntity(
