@@ -120,6 +120,23 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 **Accessibility pass (with the `HhIcon` item)**
 - The header weather item has no merged TalkBack description: the temperature and High/Low read as two separate items.
+- The Forecast row semantics test probes only the day label; also assert that "17°" is absent (count 0).
 
 **Later**
 - Open-Meteo answers with one UTC offset for the whole forecast, so data fetched before a clock change is an hour out for the days after it until the next fetch; offline across a clock change, the header's hour and the theme's sunset are an hour out. Known and untested in 4b (ruling 2). Fix: ask with `timeformat=unixtime` and convert each time in the household's zone (dates from the daily rows' own instants).
+
+**Test health (4b final review)**
+- No test for repeated days in the store (`distinctBy { it.date }`); only repeated hours are tested.
+- Robolectric prints "SDK 36 requires Java 21" in test output (pre-existing, branch-wide).
+- No test asserts that `WeatherUnavailableException` carries no cause (a privacy rule, ruling 15).
+- The null-entry test in the provider misses a null `time` and a null `low`.
+- No test that clearing the location after a fetch stops fetching (the code is right, `WeatherSyncLoop`).
+- `HouseholdTickerTest`'s Room read lacks the bounded real-time wait.
+
+**Later (code health, 4b final review)**
+- Coordinates with |x| < 0.001 are sent in exponent notation (`OpenMeteoForecast`, `toString`); check Open-Meteo accepts it, or use `toBigDecimal().toPlainString()`. A rejection would mean no weather for a home on the Greenwich or equator strip.
+- `retryWithBackoff` resets its backoff on every value, so a read that emits and then fails logs every second.
+- `WeatherRepository`'s header reads `now` a second time and every collector starts its own minute ticker (four on Home); share one household-zone `now` before Climate adds a second header item.
+- Header items could overlap the clock or date if they grow wide (design review, before Climate).
+- `Http.kt:31-37` resumes with any `Throwable`, so a non-`IOException` can escape the provider's read and break the "nothing else escapes" contract (the loop still catches it).
+- `HomeScreen`'s `headerItems` default value is used only by tests; drop it and pass `emptyList()` there.

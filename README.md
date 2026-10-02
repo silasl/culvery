@@ -21,7 +21,7 @@ A fresh install opens the setup wizard before anything else: Welcome, Home locat
 
 In debug builds Welcome also offers **Use a sample household**: **Alex** (Admin, PIN 1234), **Sam** (Adult, PIN 2468), **Mia** (Child, PIN 1357), London, and a "Sample calendar" connection showing the design hand-off's week, with its "Family calendar" as the master calendar. The sample calendar keeps changes in memory and forgets them when the app restarts. Release builds offer no sample and include no sample calendar.
 
-Once a home location is set, Home's header shows the weather now and the Forecast card shows today and the next two days, from Open-Meteo every 30 minutes (5 minutes after a failed try); offline, both carry on from the last forecast, and after a change of town the old town's weather is never shown. The clock, the date and the theme follow the household's time zone, and the theme turns dark at that day's sunset and light at sunrise (07:00 and 19:00 until the first forecast arrives, and on a day without a sunset).
+Once a home location is set, Home's header shows the weather now and the Forecast card shows today and the next two days, from Open-Meteo every 30 minutes (5 minutes after a failed try); offline, both carry on from the last forecast for as long as it covers today, and after a change of town the old town's weather is never shown. The clock, the date and the theme follow the household's time zone, and the theme turns dark at that day's sunset and light at sunrise (07:00 and 19:00 until today's sun times are known, and on a day without a sunset).
 
 To see what the tablet does while a calendar can't be reached, a debug build can take the sample calendar offline and bring it back: `adb shell am broadcast -n uk.co.siland.culvery/.DebugOfflineReceiver --ez offline true` (or `false`). Changes made meanwhile show as syncing and are sent once it is back. This switch is debug-only and reached only over adb; it has no counterpart in the app's UI.
 
@@ -179,7 +179,7 @@ A stronger device-owner lock is possible later; it is not built yet.
 
 ## Privacy
 
-Open-Meteo (town search and weather; no key, no account) receives the town typed into the search, and then the home's coordinates and time zone with each forecast request, every 30 minutes. Nothing that identifies the household or its people is sent to it. Neither the town, the coordinates nor the time zone is written to the app's log.
+Open-Meteo (town search and weather; no key, no account) receives the town typed into the search, and then the home's coordinates and time zone with each forecast request, every 30 minutes. Beyond the tablet's IP address, which any web request reveals, nothing that identifies the household or its people is sent to it. Neither the town, the coordinates nor the time zone is written to the app's log.
 
 ## Licences
 

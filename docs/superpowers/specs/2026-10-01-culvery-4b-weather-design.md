@@ -173,7 +173,7 @@ Temperatures are rounded half-up to whole degrees; a value that rounds to zero s
 
 ## 6. Privacy
 
-- Open-Meteo receives coordinates and the zone id, nothing that identifies the household. The README's privacy note says so.
+- Open-Meteo receives coordinates and the zone id and, like any web request, sees the tablet's IP address; nothing else identifies the household. The README's privacy note says so.
 - No coordinates, place name or zone id reaches a log (as 4a §3.8).
 
 ## 7. Testing
