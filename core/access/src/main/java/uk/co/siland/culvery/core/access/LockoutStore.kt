@@ -13,7 +13,8 @@ import kotlinx.coroutines.withContext
 
 /**
  * Consecutive-failure counter, in SharedPreferences so it survives the app being killed. Read once, off the main thread,
- * then kept in memory; each change is written in the background (4c K4).
+ * then kept in memory; each change is written in the background (4c K4). Callers must serialise changes
+ * (DefaultAccessControl's authoriseLock does).
  */
 @Singleton
 class LockoutStore internal constructor(private val open: () -> SharedPreferences, private val io: CoroutineContext) {

@@ -21,9 +21,9 @@ internal interface KioskWindow {
     fun allowPlayServices(allowed: Boolean)
 }
 
-/** Told when Android offers no home-app screen (4c §5.1): what went wrong and how to fix it. */
-internal const val HOME_APP_NOT_OFFERED =
-    "Android didn't offer the home-app choice — set Culvery as the home app in Android's Settings › Apps › Default apps."
+/** Told when the home-app choice was declined or never shown (4c §5.1): what is still undone and how to do it. */
+internal const val HOME_APP_NOT_SET =
+    "Culvery isn't the home app yet — exit kiosk, then set it in Android's Settings › Apps › Default apps."
 
 /**
  * Whether Culvery has left the front since the kiosk was exited. It outlives the activity (the view model holds it), so
@@ -115,13 +115,13 @@ internal class KioskLifecycle(
             Log.w(TAG, "No screen to change the home app on this tablet (${e::class.simpleName})")
             returnedToFront()
             if (shouldPin(setupComplete(), kioskExited())) window.pin()
-            say(HOME_APP_NOT_OFFERED)
+            say(HOME_APP_NOT_SET)
         }
     }
 
     /** Android's role dialog closed: cancelled with Culvery still not home means it was refused or never shown. */
     fun roleAnswered(cancelled: Boolean) {
-        if (cancelled && !isHomeApp()) say(HOME_APP_NOT_OFFERED)
+        if (cancelled && !isHomeApp()) say(HOME_APP_NOT_SET)
     }
 
     private companion object {

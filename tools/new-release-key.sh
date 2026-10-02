@@ -4,7 +4,14 @@
 # On Windows, use tools/new-release-key.ps1 in PowerShell instead.
 set -euo pipefail
 
-KEYTOOL=${KEYTOOL:-keytool}
+if [ -z "${KEYTOOL:-}" ]; then
+  KEYTOOL=keytool
+  if ! command -v keytool >/dev/null && [ -n "${JAVA_HOME:-}" ]; then
+    for candidate in "$JAVA_HOME/bin/keytool" "$JAVA_HOME/bin/keytool.exe"; do
+      if [ -x "$candidate" ]; then KEYTOOL=$candidate; break; fi
+    done
+  fi
+fi
 if ! command -v "$KEYTOOL" >/dev/null; then
   echo "keytool isn't on PATH. Use the JDK 17 that builds Culvery (set KEYTOOL to its keytool)."
   exit 1

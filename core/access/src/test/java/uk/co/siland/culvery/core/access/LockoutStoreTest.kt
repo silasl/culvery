@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -69,5 +70,26 @@ class LockoutStoreTest {
         val clockWentBack = t0 - 20 * 60_000L
         assertThat(store.lockedUntil(clockWentBack)).isNull()
         assertThat(store.lockedUntil(t0)).isEqualTo(t0 + 30_000)
+    }
+
+    /** K3: an expired lock keeps the count, so the next failure continues the doubling rather than starting again. */
+    @Test
+    fun anExpiredLockKeepsTheFailureCount() = runTest {
+        repeat(5) { store.recordFailure(t0) }
+        val clockWentBack = t0 - 20 * 60_000L
+        assertThat(store.lockedUntil(clockWentBack)).isNull()
+        store.recordFailure(clockWentBack)
+        assertThat(store.lockedUntil(clockWentBack)).isEqualTo(clockWentBack + 60_000)
+    }
+
+    @Test
+    fun theFileIsOpenedOnceAcrossManyCalls() = runTest {
+        var opened = 0
+        val counted = LockoutStore({ opened++; context.getSharedPreferences("lockout-open-once", Context.MODE_PRIVATE) }, EmptyCoroutineContext)
+        counted.lockedUntil(t0)
+        counted.recordFailure(t0)
+        counted.lockedUntil(t0)
+        counted.reset()
+        assertThat(opened).isEqualTo(1)
     }
 }

@@ -102,6 +102,35 @@ class LocationPaneTest {
         assertThat(saved).containsExactly(canterbury)
     }
 
+    /** Picking a town is the one choice: the field shows its name and the suggestions close, without a new search. */
+    @Test
+    fun choosingATownFillsTheFieldWithItsNameAndClosesTheResults() {
+        search.answer = { listOf(canterbury) }
+        show()
+        type("Can")
+        advance(500)
+        compose.onNodeWithTag("place_0").performClick()
+        advance(1_000)
+        assertThat(saved).containsExactly(canterbury)
+        compose.onNodeWithTag("place_0").assertDoesNotExist()
+        compose.onNodeWithTag("location_query").assertTextContains("Canterbury, England, United Kingdom")
+        assertThat(search.queries).containsExactly("Can")
+    }
+
+    @Test
+    fun editingTheNameAfterChoosingSearchesAgain() {
+        search.answer = { listOf(canterbury) }
+        show()
+        type("Can")
+        advance(500)
+        compose.onNodeWithTag("place_0").performClick()
+        advance(1_000)
+        type("x")
+        advance(500)
+        assertThat(search.queries.last()).contains("x")
+        compose.onNodeWithTag("place_0").assertExists()
+    }
+
     @Test
     fun theSavedHomeIsTicked() {
         search.answer = { listOf(canterbury) }

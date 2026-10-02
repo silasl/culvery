@@ -121,7 +121,13 @@ class KioskLifecycleTest {
         kiosk.openHomeAppScreen { throw ActivityNotFoundException() }
         assertThat(window.calls).containsExactly("unpin", "pin").inOrder()
         assertThat(exited).isFalse()
-        assertThat(said).containsExactly(HOME_APP_NOT_OFFERED)
+        assertThat(said).containsExactly(HOME_APP_NOT_SET)
+    }
+
+    @Test
+    fun theHomeAppToastNamesWhatToDoNext() {
+        assertThat(HOME_APP_NOT_SET)
+            .isEqualTo("Culvery isn't the home app yet — exit kiosk, then set it in Android's Settings › Apps › Default apps.")
     }
 
     @Test
@@ -142,7 +148,7 @@ class KioskLifecycleTest {
         kiosk.roleAnswered(cancelled = false)
         assertThat(said).isEmpty()
         kiosk.roleAnswered(cancelled = true)
-        assertThat(said).containsExactly(HOME_APP_NOT_OFFERED)
+        assertThat(said).containsExactly(HOME_APP_NOT_SET)
     }
 
     /** 4c §5.3: not as device owner, Google's screens need the kiosk unpinned. */

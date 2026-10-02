@@ -110,6 +110,22 @@ class GoogleReadTest {
         assertThat(next.upserts.map { it.recurrenceRule }.distinct()).containsExactly("RRULE:FREQ=WEEKLY;BYDAY=TU")
     }
 
+    /** After a restart the rule cache is empty: a failed re-read then keeps the stored row's rule. */
+    @Test
+    fun aFailedRuleReadAfterARestartKeepsTheStoredRowsRule() = runTest {
+        val stored = mutableMapOf<String, String?>()
+        pianoSeries()
+        val first = testProvider(api, stored = StoredSeries { _, _ -> stored }).sync(conn, family, range, null)
+        first.upserts.forEach { stored[it.remoteId] = it.recurrenceRule }
+        assertThat(stored.values.distinct()).containsExactly("RRULE:FREQ=WEEKLY;BYDAY=TU")
+        pianoSeries(rule = "RRULE:FREQ=DAILY")
+        google.failNext(500) { it.requestUrl!!.pathSegments.last() == "piano" }
+        val restarted = testProvider(api, stored = StoredSeries { _, _ -> stored })
+        val next = restarted.sync(conn, family, range, first.cursor)
+        assertThat(next.upserts).isNotEmpty()
+        assertThat(next.upserts.map { it.recurrenceRule }.distinct()).containsExactly("RRULE:FREQ=WEEKLY;BYDAY=TU")
+    }
+
     /** Ruling 3: with no nightly full sync, a series changed on a phone has its rule read again. */
     @Test
     fun aChangedSeriesHasItsRuleReadAgainOnAnIncrementalPass() = runTest {

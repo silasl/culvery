@@ -283,7 +283,8 @@ private fun SourceRow(
             // The master is always shown (4a design §3.9).
             HhSwitch(source.mapping.visible, { onShown(source, it) }, tag = "review_show_$id", enabled = !source.isMaster && !busy)
         }
-        if (source.readProblem != null) ReadProblem(source, busy, onShown)
+        // A calendar the service hid on its tick has no problem to show, and no Hide to offer.
+        if (source.readProblem != null && source.mapping.visible) ReadProblem(source, busy, onShown)
         if (picking) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap), verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
                 people.forEach { p ->

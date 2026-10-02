@@ -112,6 +112,18 @@ class SourceRefresherTest {
     }
 
     @Test
+    fun aMasterDeletedWithOneChangeWaitingSaysItWasDroppedInTheSingular() = runTest {
+        val kids = CalendarSource("kids", "Kids", writable = true)
+        connect(listOf(primary, kids), master = kids.id)
+        store.enqueue(PendingChange(0, "g1", kids.id, "e0", ChangeKind.DELETE, draft = null, attempts = 0, nextAttemptMillis = 0, createdMillis = 0))
+        provider.sourceList = listOf(primary)
+        refresh()
+        assertThat(toaster.messages).containsExactly(
+            "Google Calendar: can't find the master calendar — choose a new one in Settings › Calendars. 1 change waiting to sync was dropped.",
+        )
+    }
+
+    @Test
     fun aMasterThatBecameReadOnlyIsClearedWithOneToast() = runTest {
         connect()
         provider.sourceList = listOf(primary.copy(writable = false))

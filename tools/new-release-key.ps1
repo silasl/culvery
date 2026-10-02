@@ -3,6 +3,10 @@
 $ErrorActionPreference = 'Stop'
 
 $keytool = if ($env:KEYTOOL) { $env:KEYTOOL } else { 'keytool' }
+if (-not $env:KEYTOOL -and -not (Get-Command $keytool -ErrorAction SilentlyContinue) -and $env:JAVA_HOME) {
+    $fromJavaHome = Join-Path $env:JAVA_HOME 'bin\keytool.exe'
+    if (Test-Path $fromJavaHome) { $keytool = $fromJavaHome }
+}
 if (-not (Get-Command $keytool -ErrorAction SilentlyContinue)) {
     Write-Host "keytool isn't on PATH. Use the JDK 17 that builds Culvery, e.g.:"
     Write-Host '  $env:KEYTOOL = "C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe"; .\tools\new-release-key.ps1'

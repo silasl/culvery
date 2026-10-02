@@ -101,6 +101,13 @@ class ReviewCalendarsTest {
     }
 
     @Test
+    fun aHiddenCalendarShowsNoReadProblem() {
+        showSources(family, swim.copy(mapping = swim.mapping.copy(visible = false), readProblem = READ_REFUSED))
+        compose.onNodeWithText("Can't read this calendar — check it's still shared with this account").assertDoesNotExist()
+        compose.onNodeWithText("Hide this calendar").assertDoesNotExist()
+    }
+
+    @Test
     fun theMasterThatCantBeReadAsksForAnotherMasterFirst() {
         showSources(family.copy(readProblem = READ_REFUSED), swim)
         compose.onNodeWithText("Choose another master calendar first").assertExists()

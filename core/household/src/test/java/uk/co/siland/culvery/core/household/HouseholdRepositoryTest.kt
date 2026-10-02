@@ -275,6 +275,17 @@ class HouseholdRepositoryTest {
         assertThat(repo.people.first().map { it.name }).containsExactly("Alex", "Sam", "Mia").inOrder()
     }
 
+    /** A removed person leaves a gap in the order: the move steps over it rather than needing consecutive places. */
+    @Test
+    fun movingUpAcrossAGapLeftByARemovedPersonSwapsWithTheNextOneAbove() = runTest {
+        repo.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
+        val sam = repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
+        val mia = repo.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
+        repo.removePerson(sam.id)
+        assertThat(repo.move(mia.id, up = true)).isTrue()
+        assertThat(repo.people.first().map { it.name }).containsExactly("Mia", "Alex").inOrder()
+    }
+
     @Test
     fun nobodyMovesAboveTheFirstOrBelowTheLast() = runTest {
         val alex = repo.addPerson("Alex", 0xFF4CB387, Role.ADMIN)

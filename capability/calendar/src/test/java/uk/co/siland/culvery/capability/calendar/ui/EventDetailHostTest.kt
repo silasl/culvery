@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import android.os.Looper
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -19,6 +20,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.CalendarSource
@@ -60,7 +62,8 @@ class EventDetailHostTest {
     private lateinit var repo: CalendarRepository
     private lateinit var editor: CalendarEditor
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+    // The main thread: Room's continuations resume here, never on Room's own threads, so Compose state is only touched on it.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val london = ZoneId.of("Europe/London")
     private val today = LocalDate.of(2026, 9, 23)
     private val writer = ScriptedWriter("calendar.a")
@@ -110,8 +113,14 @@ class EventDetailHostTest {
         }
     }
 
+    // The editor's scope is the main thread's looper: running it between polls keeps Compose state on that thread alone.
+    private fun waitUntil(condition: () -> Boolean) = compose.waitUntil(5_000) {
+        shadowOf(Looper.getMainLooper()).idle()
+        condition()
+    }
+
     private fun waitForText(text: String) =
-        compose.waitUntil(5_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        waitUntil { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
 
     @Test
     fun deleteAsksForThePinBeforeTheConfirmationThenDeletesWithoutAskingAgain() {
@@ -122,7 +131,7 @@ class EventDetailHostTest {
         waitForText("Delete this event?")
         assertThat(access.requests).hasSize(1)
         compose.onNodeWithTag("detail_confirm_delete").performClick()
-        compose.waitUntil(5_000) { closed > 0 }
+        waitUntil { closed > 0 }
         assertThat(access.requests).hasSize(1)
         assertThat(writer.calls).containsExactly("delete:dinner")
     }
@@ -137,8 +146,8 @@ class EventDetailHostTest {
         waitForText("Delete this event?")
         compose.onNodeWithTag("detail_confirm_delete").performClick()
         // The editor toasts the refusal; the sheet goes back to its footer and stays open.
-        compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Delete this event?").fetchSemanticsNodes().isEmpty() }
+        waitUntil { access.toasts.messages.isNotEmpty() }
+        waitUntil { compose.onAllNodesWithText("Delete this event?").fetchSemanticsNodes().isEmpty() }
         assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — Event is locked")
         compose.onNodeWithTag("detail_delete").assertExists()
         assertThat(closed).isEqualTo(0)
@@ -155,9 +164,9 @@ class EventDetailHostTest {
         waitForText("Delete this event?")
         compose.onNodeWithTag("detail_confirm_delete").performClick()
         compose.onNodeWithTag("detail_confirm_delete").performClick()
-        compose.waitUntil(5_000) { writer.calls.isNotEmpty() }
+        waitUntil { writer.calls.isNotEmpty() }
         gate.complete(Unit)
-        compose.waitUntil(5_000) { closed > 0 }
+        waitUntil { closed > 0 }
         assertThat(writer.calls).containsExactly("delete:dinner")
     }
 
@@ -168,7 +177,7 @@ class EventDetailHostTest {
         waitForText("Dinner with Jo & Priya")
         compose.onNodeWithTag("detail_delete").performClick()
         // Access control shows refusals itself, through the toaster.
-        compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
+        waitUntil { access.toasts.messages.isNotEmpty() }
         assertThat(access.toasts.messages).containsExactly("Mia can only change events they created.")
         compose.onNodeWithTag("detail_confirm").assertDoesNotExist()
         assertThat(writer.calls).isEmpty()
@@ -181,8 +190,8 @@ class EventDetailHostTest {
         waitForText("Added from a phone")
         compose.onNodeWithTag("detail_assign").performClick()
         compose.onNodeWithTag("assign_Mia").performClick()
-        compose.waitUntil(5_000) { writer.calls.isNotEmpty() }
-        compose.waitUntil(5_000) {
+        waitUntil { writer.calls.isNotEmpty() }
+        waitUntil {
             compose.onAllNodesWithText("Added from a phone").fetchSemanticsNodes().isEmpty()
         }
         assertThat(writer.calls).containsExactly("update:plumber")
@@ -194,6 +203,6 @@ class EventDetailHostTest {
         show("dinner")
         waitForText("Dinner with Jo & Priya")
         runBlocking { store.applyDeleted(EventRef("c1", "s-family", "dinner")) }
-        compose.waitUntil(5_000) { closed > 0 }
+        waitUntil { closed > 0 }
     }
 }

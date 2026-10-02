@@ -9,6 +9,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.util.TimeZone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -23,6 +24,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
@@ -44,6 +47,15 @@ class HouseholdClockTest {
 
     // 09:59:30 UTC on 1 October 2026: 10:59:30 in London (BST), 22:59:30 in Auckland (NZDT).
     private val beforeTheMinute = Instant.parse("2026-10-01T09:59:30Z").toEpochMilli()
+
+    private val originalZone = TimeZone.getDefault()
+
+    // Neither Auckland nor London, so reading the device's zone instead of the household's fails on any machine.
+    @Before
+    fun deviceIsInNewYork() = TimeZone.setDefault(TimeZone.getTimeZone("America/New_York"))
+
+    @After
+    fun restoreTheDeviceZone() = TimeZone.setDefault(originalZone)
 
     @Test
     fun itGivesTheTimeNowThenAtTheStartOfEachMinute() = runTest {
