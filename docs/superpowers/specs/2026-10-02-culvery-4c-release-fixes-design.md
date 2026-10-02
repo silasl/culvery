@@ -49,7 +49,7 @@ The user tests on the tablet only once there is a product they are happy to use;
 ### 3.3 R8 and resource shrinking
 
 - `isMinifyEnabled = true` and `isShrinkResources = true` for release, with `proguard-android-optimize.txt` and `app/proguard-rules.pro`.
-- `proguard-rules.pro` holds only what libraries don't ship: the kotlinx.serialization keeps for the providers' `@Serializable` classes (`$$serializer`, `serializer()` and companions); `-dontwarn` for OkHttp's optional TLS providers (conscrypt, bouncycastle, openjsse); `-keepattributes SourceFile,LineNumberTable` with `-renamesourcefileattribute SourceFile`.
+- `proguard-rules.pro` holds only what libraries don't ship: `-keepattributes SourceFile,LineNumberTable` with `-renamesourcefileattribute SourceFile`, and the `Log` block (§3.4). *(Plan review: kotlinx.serialization 1.9 and OkHttp 4.12 already ship their keeps and `-dontwarn` lines.)*
 - Unit tests can't exercise R8 (Compose tests run in debug only), so the walkthrough (§8.2) runs the signed, minified build and must connect Google, sync, write, and show weather.
 
 ### 3.4 Release logging (D8)
@@ -106,14 +106,14 @@ The plan records, on the emulator: **before** on a signed release with R8 off an
 ### 5.2 Device owner (optional)
 
 - A `DeviceAdminReceiver` (`CulveryDeviceAdmin`) with no policies beyond lock-task is declared.
-- When `DevicePolicyManager.isDeviceOwnerApp`, Culvery calls `setLockTaskPackages(own package)` on start, so `startLockTask()` enters true lock-task (no prompt, no exit gesture). Otherwise screen pinning works as today.
+- When `DevicePolicyManager.isDeviceOwnerApp`, Culvery calls `setLockTaskPackages(own package, com.google.android.gms)` on start (Play services so the Google chooser shows inside lock-task — plan review), so `startLockTask()` enters true lock-task (no prompt, no exit gesture). Otherwise screen pinning works as today.
 - `docs/setup/release.md` gives `adb shell dpm set-device-owner uk.co.siland.culvery/.CulveryDeviceAdmin`, its precondition (a freshly reset tablet with no accounts yet; add the Google account afterwards) and that undoing it needs a factory reset.
 
 ### 5.3 Connecting Google on the kiosk (D5, K5, K6)
 
 - A new core permission `connections.manage` (ADMIN), added to the fresh-PIN set with `kiosk.exit` and `people.manage`. Connect and Reconnect (wizard and Settings › Calendars) authorise it.
 - Before starting: `GoogleApiAvailability.isGooglePlayServicesAvailable`; if not usable, "Update Google Play services on this tablet, then try again." and nothing starts.
-- Just before the chooser opens, Culvery calls `stopLockTask()` (through a `LockTask` seam); when the connect result comes back — connected, cancelled or failed — it pins again. In the wizard nothing is pinned (4a D10), so the step is skipped.
+- Just before the chooser opens, the provider calls `ShellNavigator.leavePinning()` (unless Culvery is device owner, when the chooser is allowlisted inside lock-task); Culvery pins again in `onResume` when the chooser returns — connected, cancelled or failed. In the wizard nothing is pinned (4a D10), so the step is skipped. *(Plan review: an explicit re-pin on the result never ran, as results arrive before `onResume`.)*
 
 ### 5.4 Kiosk fixes (K1–K4)
 
@@ -139,7 +139,7 @@ The plan records, on the emulator: **before** on a signed release with R8 off an
 
 ### 6.3 Correctness (C3, C4, C9, E3)
 
-- C3: a write refused with NeedsSignIn keeps the connection `NeedsSignIn` until a reconnect; a successful read in the same pass no longer resets it.
+- C3: a write refused with NeedsSignIn keeps the connection `NeedsSignIn` until a reconnect or an accepted write; a successful read in the same pass no longer resets it.
 - C4: all-day events are selected by their local date, not by instant, so they don't straddle two days after a household zone change.
 - C9: when an incremental result cancels a series' master event, every stored instance of that series is removed in the same pass.
 - E3: within a pass, once one of a connection's calendars fails with Unreachable or NeedsSignIn, its remaining calendars are skipped until the next pass. A refusal of one calendar (403/404 while it's still listed) doesn't count — that's §6.4.
@@ -192,7 +192,7 @@ The plan records, on the emulator: **before** on a signed release with R8 off an
 
 ### 8.1 In the build
 
-- **Unit and Robolectric:** the signing failure message; `LogHygieneTest`; `IconFontTest`; `HouseholdClock` (one ticker for all); the cursor key, pruning, `MIGRATION_5_6`, series cancellation, skipping a failing connection; NeedsSignIn kept after a refused write; all-day by local date; `readProblem` set and cleared without touching connection health; `connections.manage` needs a fresh PIN; stepping out of lock-task and back (through `LockTask`); the Play services check; device-owner allowlisting (through a seam); the lockout clock guard; `move` at both ends; the splash hold (cards or 2 s); `distinctUntilChanged` on the calendar lists; the remembered `ColorScheme` (a recomposition counter).
+- **Unit and Robolectric:** the signing failure message; `LogHygieneTest`; `IconFontTest`; `HouseholdClock` (one ticker for all); the cursor key, pruning, `MIGRATION_5_6`, series cancellation, skipping a failing connection; NeedsSignIn kept after a refused write; all-day by local date; `readProblem` set and cleared without touching connection health; `connections.manage` needs a fresh PIN; `leavePinning()` called before the chooser (and skipped as device owner); the Play services check; device-owner allowlisting (through a seam); the lockout clock guard; `move` at both ends; the splash hold (cards or 2 s); `distinctUntilChanged` on the calendar lists; the remembered `ColorScheme` (a recomposition counter).
 - **Roborazzi, light and dark:** the clear-night header icon; the event detail "added on this tablet" icon; Settings › Kiosk with the home-app line; Settings › Calendars with an unreadable calendar and an unreadable master; the people list with move buttons; the Calendar tab on next week and on the furthest week.
 - **Gate:** `./gradlew testDebugUnitTest verifyRoborazziDebug`; and `./gradlew :app:assembleRelease` succeeds with the signing properties set and fails with §3.1's message without them.
 
