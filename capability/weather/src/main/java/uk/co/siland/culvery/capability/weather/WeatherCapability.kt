@@ -12,7 +12,7 @@ import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
-import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.ui.Icons
 
 private const val WEATHER_ID = "weather"
@@ -27,7 +27,7 @@ private const val HEADER_ITEM_ORDER = 10
 @Singleton
 class WeatherCapability @Inject constructor(
     private val repo: WeatherRepository,
-    private val clock: WallClock,
+    private val clock: HouseholdClock,
 ) : Capability {
     override val id = WEATHER_ID
     override val label = "Weather"

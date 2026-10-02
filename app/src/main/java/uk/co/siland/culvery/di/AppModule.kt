@@ -13,16 +13,13 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
-import uk.co.siland.culvery.shell.MinuteTicker
 import uk.co.siland.culvery.shell.ShellToasts
-import uk.co.siland.culvery.shell.householdTicker
 
 /**
  * An application job's uncaught failure is logged and the process lives on; with the SupervisorJob its siblings keep
@@ -54,9 +51,5 @@ abstract class AppModule {
 
         @Provides
         fun wallClock(): WallClock = WallClock { System.currentTimeMillis() }
-
-        /** The clock, the date and the theme in the household's zone, as the calendar's "today" (4b design §3.8). */
-        @Provides
-        fun minuteTicker(zone: HouseholdZone, clock: WallClock): MinuteTicker = householdTicker(zone.zone, clock)
     }
 }

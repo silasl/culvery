@@ -2,6 +2,10 @@ package uk.co.siland.culvery.capability.calendar
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -14,6 +18,7 @@ import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.WallClock
 
 @RunWith(AndroidJUnit4::class)
@@ -22,6 +27,7 @@ class CalendarCapabilityTest {
     private lateinit var householdDb: HouseholdDatabase
     private lateinit var store: CalendarStore
     private lateinit var capability: CalendarCapability
+    private val clockScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
     @Before
     fun setUp() {
@@ -31,13 +37,15 @@ class CalendarCapabilityTest {
         val household = HouseholdRepository(householdDb)
         val zone = HouseholdZone(household)
         capability = CalendarCapability(
-            CalendarRepository(store, household, zone, emptySet(), emptySet()), zone, WallClock { 0L }, stubEditor(store, zone), stubConnections(store),
+            CalendarRepository(store, household, zone, emptySet(), emptySet()), HouseholdClock(zone.zone, WallClock { 0L }, clockScope),
+            stubEditor(store, zone), stubConnections(store),
             stubReview(store, household),
         )
     }
 
     @After
     fun tearDown() {
+        clockScope.cancel()
         calendar.close()
         householdDb.close()
     }

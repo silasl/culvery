@@ -11,15 +11,12 @@ import uk.co.siland.culvery.capability.calendar.ui.TodayCardHost
 import uk.co.siland.culvery.capability.calendar.ui.WeekViewHost
 import uk.co.siland.culvery.capability.calendar.ui.rememberConnector
 import uk.co.siland.culvery.capability.calendar.ui.rememberToday
-import uk.co.siland.culvery.capability.calendar.ui.rememberZoneId
-import uk.co.siland.culvery.capability.calendar.ui.todayIn
-import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
-import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.ui.Icons
 
@@ -31,8 +28,7 @@ const val COMING_UP_CARD_ID = "calendar.comingUp"
 @Singleton
 class CalendarCapability @Inject constructor(
     private val repo: CalendarRepository,
-    private val zone: HouseholdZone,
-    private val clock: WallClock,
+    private val clock: HouseholdClock,
     private val editor: CalendarEditor,
     private val connections: CalendarConnections,
     private val review: CalendarReview,
@@ -58,16 +54,16 @@ class CalendarCapability @Inject constructor(
             listOf(HomeCard(CONNECT_CARD_ID, HomeCardSize.TALL, 100) { ConnectCardHost(connections) })
         } else {
             listOf(
-                HomeCard(TODAY_CARD_ID, HomeCardSize.TALL, 100) { TodayCardHost(repo, editor, rememberToday(zone, clock)) },
-                HomeCard(COMING_UP_CARD_ID, HomeCardSize.WIDE, 50) { ComingUpCardHost(repo, rememberToday(zone, clock)) },
+                HomeCard(TODAY_CARD_ID, HomeCardSize.TALL, 100) { rememberToday(clock)?.let { TodayCardHost(repo, editor, it) } },
+                HomeCard(COMING_UP_CARD_ID, HomeCardSize.WIDE, 50) { rememberToday(clock)?.let { ComingUpCardHost(repo, it) } },
             )
         }
     }
 
     @Composable
     override fun TabContent() {
-        val now = rememberNowMillis(clock)
         val connector = rememberConnector(connections)
-        WeekViewHost(repo, editor, today = todayIn(rememberZoneId(zone), now), nowMillis = now, onReconnect = connector::reconnect)
+        val today = rememberToday(clock) ?: return
+        WeekViewHost(repo, editor, today = today, nowMillis = rememberNowMillis(clock), onReconnect = connector::reconnect)
     }
 }

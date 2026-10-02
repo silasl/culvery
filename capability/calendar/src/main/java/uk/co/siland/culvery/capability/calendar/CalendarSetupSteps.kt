@@ -4,9 +4,9 @@ import androidx.compose.runtime.Composable
 import kotlinx.coroutines.flow.Flow
 import uk.co.siland.culvery.capability.calendar.ui.ConnectStepHost
 import uk.co.siland.culvery.capability.calendar.ui.ReviewCalendarsHost
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
-import uk.co.siland.culvery.core.plugin.WallClock
 
 /** 4a design §4.5. */
 const val YOUR_CALENDARS = "Your calendars"
@@ -28,7 +28,7 @@ class ReviewCalendarsStep(
     repo: CalendarRepository,
     private val review: CalendarReview,
     private val connections: CalendarConnections,
-    private val clock: WallClock,
+    private val clock: HouseholdClock,
 ) : SetupStep {
     override val id = "calendar.review"
     override val order = 410
@@ -40,7 +40,7 @@ class ReviewCalendarsStep(
 }
 
 /** Settings › Calendars (4a design D4): Review calendars, and Connect for a service not yet connected (ruling 14). */
-class CalendarsPage(private val review: CalendarReview, private val connections: CalendarConnections, private val clock: WallClock) : SettingsPage {
+class CalendarsPage(private val review: CalendarReview, private val connections: CalendarConnections, private val clock: HouseholdClock) : SettingsPage {
     override val id = "calendars"
     override val title = CALENDARS
     override val order = 400

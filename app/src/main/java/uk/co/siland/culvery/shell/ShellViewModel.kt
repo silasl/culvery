@@ -29,6 +29,7 @@ import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.HomePlacement
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.SunTimes
@@ -37,7 +38,7 @@ import uk.co.siland.culvery.core.plugin.retryWithBackoff
 @HiltViewModel
 class ShellViewModel @Inject constructor(
     capabilities: Set<@JvmSuppressWildcards Capability>,
-    ticker: MinuteTicker,
+    clock: HouseholdClock,
     private val access: AccessControl,
     daylight: Optional<Daylight>,
 ) : ViewModel(), ShellNavigator {
@@ -50,7 +51,7 @@ class ShellViewModel @Inject constructor(
 
     /** The household's wall time, for the status bar and Home's clock; not part of [uiState], so a tick redraws only them (4c §4.2). */
     val now: StateFlow<LocalDateTime> =
-        ticker.ticks().stateIn(viewModelScope, SharingStarted.Eagerly, LocalDateTime.now())
+        clock.minutes.stateIn(viewModelScope, SharingStarted.Eagerly, LocalDateTime.now())
 
     // Without Daylight, or until today's times are known, ThemeSchedule's 07:00 / 19:00 applies (4b design §3.8).
     private val sunToday: Flow<SunTimes?> = daylight.orElse(null)?.today

@@ -37,9 +37,9 @@ import uk.co.siland.culvery.capability.calendar.syncedLabel
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
-import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
@@ -114,7 +114,7 @@ internal fun ConnectedStepCard(rows: List<CalendarRow>) {
 }
 
 @Composable
-internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarConnections, clock: WallClock, title: String, offerConnect: Boolean) {
+internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarConnections, clock: HouseholdClock, title: String, offerConnect: Boolean) {
     val list by review.connections.collectAsState(initial = emptyList())
     val people by review.people.collectAsState(initial = listOf(Person.Family))
     val connectable by connections.connectable.collectAsState(initial = emptyList())

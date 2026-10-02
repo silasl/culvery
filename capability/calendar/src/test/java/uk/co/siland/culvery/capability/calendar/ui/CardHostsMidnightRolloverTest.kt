@@ -10,7 +10,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -34,6 +38,7 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -56,6 +61,7 @@ class CardHostsMidnightRolloverTest {
     private lateinit var repo: CalendarRepository
     private lateinit var zone: HouseholdZone
     private lateinit var editor: CalendarEditor
+    private val clockScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
     @Before
     fun setUp() = runTest {
@@ -82,6 +88,7 @@ class CardHostsMidnightRolloverTest {
 
     @After
     fun tearDown() {
+        clockScope.cancel()
         calendar.close()
         householdDb.close()
     }
@@ -94,11 +101,11 @@ class CardHostsMidnightRolloverTest {
     @Test
     fun todayCardHostRollsOverAtMidnight() {
         var now = LocalDateTime.of(2026, 9, 23, 23, 59, 50).atZone(london).toInstant().toEpochMilli()
-        val clock = WallClock { now }
-        val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val ticks = MutableStateFlow(now)
+        val clock = HouseholdClock(zone.zone, WallClock { now }, clockScope, ticks)
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides RecordingOverlay()) {
-                CulveryTheme(dark = true) { TodayCardHost(repo, editor, rememberToday(zone, clock, ticks)) }
+                CulveryTheme(dark = true) { rememberToday(clock)?.let { TodayCardHost(repo, editor, it) } }
             }
         }
         compose.waitUntil(timeoutMillis = 5_000) {
@@ -108,7 +115,7 @@ class CardHostsMidnightRolloverTest {
         compose.onNodeWithText("Twenty-fourth event").assertDoesNotExist()
 
         now += 20_000 // 00:00:10 on the 24th
-        ticks.tryEmit(Unit)
+        ticks.value = now
         compose.waitUntil(timeoutMillis = 5_000) {
             compose.onAllNodesWithText("Twenty-fourth event").fetchSemanticsNodes().isNotEmpty()
         }
@@ -120,13 +127,13 @@ class CardHostsMidnightRolloverTest {
     @Test
     fun weekViewHostRollsOverAtMidnight() {
         var now = LocalDateTime.of(2026, 9, 23, 23, 59, 50).atZone(london).toInstant().toEpochMilli()
-        val clock = WallClock { now }
-        val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val ticks = MutableStateFlow(now)
+        val clock = HouseholdClock(zone.zone, WallClock { now }, clockScope, ticks)
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides RecordingOverlay()) {
                 CulveryTheme(dark = true) {
-                    val today = rememberToday(zone, clock, ticks)
-                    WeekViewHost(repo, editor, today, rememberNowMillis(clock, ticks), onReconnect = {})
+                    val today = rememberToday(clock) ?: return@CulveryTheme
+                    WeekViewHost(repo, editor, today, rememberNowMillis(clock), onReconnect = {})
                 }
             }
         }
@@ -137,7 +144,7 @@ class CardHostsMidnightRolloverTest {
         compose.onNodeWithTag("week_day_2026-09-30").assertDoesNotExist()
 
         now += 20_000 // 00:00:10 on the 24th
-        ticks.tryEmit(Unit)
+        ticks.value = now
         compose.waitUntil(timeoutMillis = 5_000) {
             compose.onAllNodesWithTag("week_day_2026-09-30").fetchSemanticsNodes().isNotEmpty()
         }

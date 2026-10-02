@@ -17,7 +17,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
-import kotlinx.coroutines.flow.Flow
 import uk.co.siland.culvery.capability.weather.ADD_LOCATION
 import uk.co.siland.culvery.capability.weather.DailyWeather
 import uk.co.siland.culvery.capability.weather.FORECAST_TITLE
@@ -31,9 +30,8 @@ import uk.co.siland.culvery.capability.weather.degrees
 import uk.co.siland.culvery.capability.weather.rowDescription
 import uk.co.siland.culvery.capability.weather.updatedAgo
 import uk.co.siland.culvery.capability.weather.weatherIcon
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
-import uk.co.siland.culvery.core.plugin.WallClock
-import uk.co.siland.culvery.core.plugin.nowTicks
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
@@ -97,10 +95,10 @@ private fun ForecastRow(day: DailyWeather, isToday: Boolean) {
     }
 }
 
-/** The card over the repository: nothing until the first view, and the age line moved on each [ticks]. */
+/** The card over the repository: nothing until the first view, the age line moves on each minute. */
 @Composable
-internal fun ForecastCardHost(repo: WeatherRepository, clock: WallClock, ticks: Flow<Unit> = nowTicks) {
+internal fun ForecastCardHost(repo: WeatherRepository, clock: HouseholdClock) {
     val view by repo.view.collectAsState(initial = null)
-    val nowMillis = rememberNowMillis(clock, ticks)
+    val nowMillis = rememberNowMillis(clock)
     view?.let { ForecastCard(it, nowMillis) }
 }

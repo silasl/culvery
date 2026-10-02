@@ -2,21 +2,36 @@ package uk.co.siland.culvery.capability.weather
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.time.ZoneId
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.WallClock
 
 // Robolectric for android.util.Log (the repository's retries).
 @RunWith(AndroidJUnit4::class)
 class WeatherCapabilityTest {
     private val location = MutableStateFlow<HomeLocation?>(LONDON)
+    private val clockScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private val stored = MutableStateFlow<StoredWeather?>(stored())
-    private val capability = WeatherCapability(WeatherRepository(location, stored, MutableStateFlow(THU.atTime(10, 30))), WallClock { 0L })
+    private val capability = WeatherCapability(
+        WeatherRepository(location, stored, MutableStateFlow(THU.atTime(10, 30))),
+        HouseholdClock(flowOf(ZoneId.of("Europe/London")), WallClock { 0L }, clockScope),
+    )
+
+    @After
+    fun tearDown() = clockScope.cancel()
 
     @Test
     fun itHasNoTabAndSitsAfterTheRailCapabilities() = runTest {

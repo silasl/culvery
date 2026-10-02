@@ -11,8 +11,14 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.MutableSharedFlow
+import java.time.ZoneId
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,6 +28,7 @@ import uk.co.siland.culvery.capability.weather.THU
 import uk.co.siland.culvery.capability.weather.WeatherRepository
 import uk.co.siland.culvery.capability.weather.WeatherView
 import uk.co.siland.culvery.capability.weather.stored
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -30,8 +37,12 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 class ForecastCardTest {
     @get:Rule val compose = createComposeRule()
     private val navigator = RecordingNavigator()
+    private val clockScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private val fetched = 1_000_000L
     private val hour = 3_600_000L
+
+    @After
+    fun tearDown() = clockScope.cancel()
 
     private fun show(view: WeatherView, nowMillis: Long = fetched) = compose.setContent {
         CompositionLocalProvider(LocalShellNavigator provides navigator) {
@@ -82,8 +93,8 @@ class ForecastCardTest {
     @Test
     fun theHostMovesTheAgeLineOnWithTheClock() {
         var now = fetched + 2 * hour
-        val clock = WallClock { now }
-        val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val ticks = MutableStateFlow(now)
+        val clock = HouseholdClock(flowOf(ZoneId.of("Europe/London")), WallClock { now }, clockScope, ticks)
         val repo = WeatherRepository(
             MutableStateFlow(LONDON),
             MutableStateFlow(stored(fetchedAtMillis = fetched)),
@@ -91,13 +102,13 @@ class ForecastCardTest {
         )
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides navigator) {
-                CulveryTheme(dark = true) { ForecastCardHost(repo, clock, ticks) }
+                CulveryTheme(dark = true) { ForecastCardHost(repo, clock) }
             }
         }
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("forecast_row").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("weather_age").assertDoesNotExist()
         now = fetched + 3 * hour
-        ticks.tryEmit(Unit)
+        ticks.value = now
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Updated 3 h ago").fetchSemanticsNodes().isNotEmpty() }
     }
 }

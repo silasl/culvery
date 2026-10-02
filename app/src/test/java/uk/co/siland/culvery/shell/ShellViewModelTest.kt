@@ -5,13 +5,20 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 import java.util.Optional
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,8 +34,10 @@ import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.SunTimes
+import uk.co.siland.culvery.core.plugin.WallClock
 
 // Robolectric for android.util.Log: a failing capability flow is logged before it is retried.
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -40,7 +49,14 @@ class ShellViewModelTest {
     private val alex = Person(PersonId("alex"), "Alex", 0xFF4CB387)
     private val admin = Authorised(alex, Role.ADMIN, setOf(CorePermissions.SETTINGS_MANAGE, CorePermissions.KIOSK_EXIT))
     private val access = FakeAccessControl()
-    private val ticks = MutableStateFlow(noon)
+    private val london = ZoneId.of("Europe/London")
+    private val clockScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+    private fun at(time: LocalDateTime): Long = time.atZone(london).toInstant().toEpochMilli()
+    private val ticks = MutableStateFlow(at(noon))
+    private val clock = HouseholdClock(flowOf(london), WallClock { ticks.value }, clockScope, ticks)
+
+    @After
+    fun tearDown() = clockScope.cancel()
 
     /** A tick that leaves the theme as it was doesn't re-emit [ShellViewModel.uiState], so read the current value. */
     private fun TestScope.darkNow(vm: ShellViewModel): Boolean {
@@ -49,7 +65,7 @@ class ShellViewModelTest {
     }
 
     private fun vm(caps: Set<Capability> = emptySet(), daylight: Daylight? = null) =
-        ShellViewModel(caps, { ticks }, access, Optional.ofNullable(daylight))
+        ShellViewModel(caps, clock, access, Optional.ofNullable(daylight))
 
     @Test
     fun tabsShowOnlyCapabilitiesWithTabsInOrder() = runTest {
@@ -83,7 +99,7 @@ class ShellViewModelTest {
         val vm = vm()
         vm.uiState.test {
             expectMostRecentItem()
-            ticks.value = noon.plusMinutes(1)
+            ticks.value = at(noon.plusMinutes(1))
             runCurrent()
             expectNoEvents()
         }
@@ -137,7 +153,7 @@ class ShellViewModelTest {
     @Test
     fun settingsNeverOpenWithoutSession() = runTest {
         val noSessionAccess = FakeAccessControl(result = admin, startsSession = false)
-        val vm = ShellViewModel(emptySet(), { ticks }, noSessionAccess, Optional.empty())
+        val vm = ShellViewModel(emptySet(), clock, noSessionAccess, Optional.empty())
         vm.uiState.test {
             vm.openSettings()
             assertThat(expectMostRecentItem().settingsOpen).isFalse()
@@ -223,12 +239,12 @@ class ShellViewModelTest {
                 assertThat(it.dark).isTrue()
                 assertThat(it.previewing).isTrue()
             }
-            ticks.value = noon.withHour(20)
+            ticks.value = at(noon.withHour(20))
             expectMostRecentItem().let {
                 assertThat(it.dark).isTrue()
                 assertThat(it.previewing).isFalse()
             }
-            ticks.value = noon.plusDays(1)
+            ticks.value = at(noon.plusDays(1))
             assertThat(expectMostRecentItem().dark).isFalse()
         }
     }
@@ -344,13 +360,13 @@ class ShellViewModelTest {
     fun theThemeTurnsDarkAtTodaysSunsetAndLightAtSunrise() = runTest {
         val vm = vm(daylight = FakeDaylight(SunTimes(sunrise, sunset)))
         vm.uiState.test {
-            ticks.value = noon.with(LocalTime.of(19, 19))
+            ticks.value = at(noon.with(LocalTime.of(19, 19)))
             assertThat(darkNow(vm)).isFalse()
-            ticks.value = noon.with(sunset)
+            ticks.value = at(noon.with(sunset))
             assertThat(darkNow(vm)).isTrue()
-            ticks.value = noon.plusDays(1).with(LocalTime.of(6, 49))
+            ticks.value = at(noon.plusDays(1).with(LocalTime.of(6, 49)))
             assertThat(darkNow(vm)).isTrue()
-            ticks.value = noon.plusDays(1).with(sunrise)
+            ticks.value = at(noon.plusDays(1).with(sunrise))
             assertThat(darkNow(vm)).isFalse()
             cancelAndIgnoreRemainingEvents()
         }
@@ -360,13 +376,13 @@ class ShellViewModelTest {
     fun withoutDaylightTheThemeUsesSevenAndSeven() = runTest {
         val vm = vm()
         vm.uiState.test {
-            ticks.value = noon.with(LocalTime.of(18, 59))
+            ticks.value = at(noon.with(LocalTime.of(18, 59)))
             assertThat(darkNow(vm)).isFalse()
-            ticks.value = noon.with(LocalTime.of(19, 0))
+            ticks.value = at(noon.with(LocalTime.of(19, 0)))
             assertThat(darkNow(vm)).isTrue()
-            ticks.value = noon.plusDays(1).with(LocalTime.of(6, 59))
+            ticks.value = at(noon.plusDays(1).with(LocalTime.of(6, 59)))
             assertThat(darkNow(vm)).isTrue()
-            ticks.value = noon.plusDays(1).with(LocalTime.of(7, 0))
+            ticks.value = at(noon.plusDays(1).with(LocalTime.of(7, 0)))
             assertThat(darkNow(vm)).isFalse()
             cancelAndIgnoreRemainingEvents()
         }
@@ -377,7 +393,7 @@ class ShellViewModelTest {
         val daylight = FakeDaylight(null)
         val vm = vm(daylight = daylight)
         vm.uiState.test {
-            ticks.value = noon.with(LocalTime.of(19, 10))
+            ticks.value = at(noon.with(LocalTime.of(19, 10)))
             assertThat(expectMostRecentItem().dark).isTrue()
             daylight.sun.value = SunTimes(sunrise, sunset)
             assertThat(expectMostRecentItem().dark).isFalse()
@@ -389,7 +405,7 @@ class ShellViewModelTest {
         ShadowLog.clear()
         val vm = vm(daylight = FlakyDaylight(SunTimes(sunrise, sunset)))
         vm.uiState.test {
-            ticks.value = noon.with(LocalTime.of(19, 10))
+            ticks.value = at(noon.with(LocalTime.of(19, 10)))
             expectMostRecentItem().let {
                 assertThat(vm.now.value.toLocalTime()).isEqualTo(LocalTime.of(19, 10))
                 assertThat(it.dark).isTrue()

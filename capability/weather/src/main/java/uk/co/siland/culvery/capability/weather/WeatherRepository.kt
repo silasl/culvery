@@ -10,12 +10,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
-import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.plugin.Daylight
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.SunTimes
-import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
-import uk.co.siland.culvery.core.plugin.wallTimeEachMinute
 
 /**
  * What the weather UI and the theme read (4b design §3.7): the home location, the stored fetch and the household's wall
@@ -28,8 +26,8 @@ class WeatherRepository internal constructor(
     now: Flow<LocalDateTime>,
 ) : Daylight {
     @Inject
-    constructor(household: HouseholdRepository, store: WeatherStore, zone: HouseholdZone, clock: WallClock) :
-        this(household.location, store.stored, wallTimeEachMinute(zone.zone, clock))
+    constructor(household: HouseholdRepository, store: WeatherStore, clock: HouseholdClock) :
+        this(household.location, store.stored, clock.minutes)
 
     val view: Flow<WeatherView> = combine(location, stored, now) { l, s, n -> weatherView(l, s, n) }
         .distinctUntilChanged()
