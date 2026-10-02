@@ -51,6 +51,6 @@ class PermissionRegistryTest {
 
     @Test
     fun allListsEveryPermission() {
-        assertThat(registry.all()).hasSize(5)
+        assertThat(registry.all()).hasSize(6)
     }
 }

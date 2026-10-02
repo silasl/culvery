@@ -47,7 +47,7 @@ class GoogleReadTest {
 
     @Before
     fun setUp() {
-        provider = GoogleCalendarProvider(GoogleApi(google.start(), FakeTokenSource(), OkHttpClient()), FakeAuthorizer(), NoToasts)
+        provider = testProvider(GoogleApi(google.start(), FakeTokenSource(), OkHttpClient()))
         google.addCalendar(family.id, family.name, primary = true)
     }
 

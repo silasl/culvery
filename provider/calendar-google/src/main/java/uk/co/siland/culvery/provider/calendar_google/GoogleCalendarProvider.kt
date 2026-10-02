@@ -33,6 +33,7 @@ import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
+import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.ui.Icons
@@ -56,6 +57,7 @@ class GoogleCalendarProvider @Inject constructor(
     private val api: GoogleApi,
     private val authorizer: Authorizer,
     private val toaster: Toaster,
+    private val playServices: PlayServicesCheck,
 ) : CalendarProvider, CalendarWriter {
     override val descriptor = ProviderDescriptor(GOOGLE_PROVIDER_ID, GOOGLE_DISPLAY_NAME, Icons.CALENDAR_MONTH, setOf(Feature.READ, Feature.WRITE))
     override val providerId = GOOGLE_PROVIDER_ID
@@ -74,7 +76,8 @@ class GoogleCalendarProvider @Inject constructor(
      */
     @Composable
     override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
-        val flow = remember { GoogleConnectFlow(authorizer, api, toaster) }
+        val flow = remember { GoogleConnectFlow(authorizer, api, toaster, playServices) }
+        val navigator = LocalShellNavigator.current
         val scope = rememberCoroutineScope()
         val connected by rememberUpdatedState(onConnected)
         val cancelled by rememberUpdatedState(onCancel)
@@ -95,7 +98,11 @@ class GoogleCalendarProvider @Inject constructor(
         LaunchedEffect(existing) {
             when (val step = flow.start(existing)) {
                 is ConnectStep.Done -> connected(step.connection)
-                is ConnectStep.ShowScreens -> launcher.launch(IntentSenderRequest.Builder(step.intent.intentSender).build())
+                is ConnectStep.ShowScreens -> {
+                    // A pinned app can't open another app's screens (4c §5.3); Culvery pins again when it is back in front.
+                    navigator.leavePinning()
+                    launcher.launch(IntentSenderRequest.Builder(step.intent.intentSender).build())
+                }
                 ConnectStep.Stopped -> cancelled()
             }
         }

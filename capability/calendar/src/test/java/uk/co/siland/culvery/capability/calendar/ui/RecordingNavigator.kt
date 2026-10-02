@@ -23,4 +23,6 @@ class RecordingNavigator : ShellNavigator {
     override fun chooseHomeApp() = Unit
 
     override fun changeHomeApp() = Unit
+
+    override fun leavePinning() = Unit
 }

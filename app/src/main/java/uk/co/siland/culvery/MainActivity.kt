@@ -44,6 +44,7 @@ import uk.co.siland.culvery.core.plugin.FirstDraw
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
+import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.setup.SettingsScreen
 import uk.co.siland.culvery.core.setup.SetupSessionGate
@@ -74,8 +75,21 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var coreSteps: Provider<Set<@JvmSuppressWildcards SetupStep>>
     @Inject lateinit var corePages: Provider<Set<@JvmSuppressWildcards SettingsPage>>
 
-    // Whether the tablet's device-owner policy lets Google's screens run in lock-task (4c §5.2).
-    internal var ownerAllowsGoogle = false
+    // Whether Culvery is device owner, so it is in true lock-task and Google's chooser needs Play services allowed in it.
+    private var isDeviceOwner = false
+
+    /**
+     * The shell's navigator, with leaving pinning done here and at once: the chooser opens right after it returns and
+     * can't open over a pinned app. As device owner Culvery stays in lock-task, with Play services allowed until
+     * Culvery is back in front.
+     */
+    private val navigator: ShellNavigator by lazy {
+        object : ShellNavigator by shell {
+            override fun leavePinning() {
+                if (isDeviceOwner) allowPlayServicesInLockTask(this@MainActivity, allowed = true) else unpinFromScreen()
+            }
+        }
+    }
 
     // SetupState read once for the activity, so the pin and the screen never disagree (4a design D10); null until read.
     private lateinit var setupComplete: StateFlow<Boolean?>
@@ -105,7 +119,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val shownAt = SystemClock.uptimeMillis()
         setupComplete = setupState.setupComplete.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
-        ownerAllowsGoogle = allowLockTaskIfOwner(this)
+        isDeviceOwner = allowLockTaskIfOwner(this)
         lifecycle.addObserver(kiosk)
         splash.setKeepOnScreenCondition {
             holdSplash(setupComplete.value, shell.uiState.value.cardsLoaded, SystemClock.uptimeMillis() - shownAt)
@@ -134,7 +148,7 @@ class MainActivity : ComponentActivity() {
             val complete by setupComplete.collectAsStateWithLifecycle()
             val overlay = remember { OverlayState() }
             CompositionLocalProvider(
-                LocalShellNavigator provides shell,
+                LocalShellNavigator provides navigator,
                 LocalOverlayHost provides overlay,
             ) {
                 CulveryTheme(dark = state.dark) {
@@ -176,6 +190,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         homeApp.refresh()
+        if (isDeviceOwner) allowPlayServicesInLockTask(this, allowed = false)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

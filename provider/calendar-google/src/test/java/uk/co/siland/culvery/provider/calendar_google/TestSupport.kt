@@ -33,6 +33,14 @@ internal class Toasts : Toaster {
     }
 }
 
+/** The provider over [api], with Play services usable unless a test says otherwise. */
+internal fun testProvider(
+    api: GoogleApi,
+    authorizer: Authorizer = FakeAuthorizer(),
+    toaster: Toaster = NoToasts,
+    playServices: PlayServicesCheck = PlayServicesCheck { true },
+) = GoogleCalendarProvider(api, authorizer, toaster, playServices)
+
 /** Stands in for Play services' account chooser and consent screens; needs Robolectric. */
 internal fun screens(): PendingIntent =
     PendingIntent.getActivity(ApplicationProvider.getApplicationContext(), 0, Intent(), PendingIntent.FLAG_IMMUTABLE)

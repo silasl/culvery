@@ -348,10 +348,21 @@ class DefaultAccessControlTest {
     fun aSetupSessionPassesEveryPermissionWithoutAPin() = runTest {
         val access = access()
         access.beginSetupSession(alex())
-        for (permission in listOf(CorePermissions.SETTINGS_MANAGE, CorePermissions.PEOPLE_MANAGE, CorePermissions.KIOSK_EXIT)) {
+        for (permission in listOf(CorePermissions.SETTINGS_MANAGE, CorePermissions.PEOPLE_MANAGE, CorePermissions.KIOSK_EXIT, CorePermissions.CONNECTIONS_MANAGE)) {
             assertThat(withTimeout(1_000) { access.authorise(permission) }).isNotNull()
         }
         assertThat(prompt.request.value).isNull()
+    }
+
+    /** L3: connecting can lead out of the app through Google's screens, so it always takes a fresh Admin PIN. */
+    @Test
+    fun connectingAsksForAFreshPinEvenDuringASession() = runTest {
+        person("Alex", Role.ADMIN, "1234")
+        val access = access()
+        answerPins("1234")
+        access.authorise(CorePermissions.SETTINGS_MANAGE)
+        val request = firstPromptFor(access, CorePermissions.CONNECTIONS_MANAGE)
+        assertThat(request.label).isEqualTo("Connect calendars")
     }
 
     @Test

@@ -43,7 +43,7 @@ class GoogleWriteTest {
     @Before
     fun setUp() {
         api = GoogleApi(google.start(), FakeTokenSource(), OkHttpClient())
-        provider = GoogleCalendarProvider(api, FakeAuthorizer(), NoToasts)
+        provider = testProvider(api)
         google.addCalendar(family.id, "Family", primary = true)
         google.addCalendar(holidays.id, "UK holidays", accessRole = "reader")
     }

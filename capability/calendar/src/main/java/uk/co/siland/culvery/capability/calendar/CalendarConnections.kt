@@ -56,8 +56,8 @@ class CalendarConnections @Inject constructor(
 
     fun provider(providerId: String): CalendarProvider? = providers.firstOrNull { it.descriptor.id == providerId }
 
-    /** settings.manage: an Admin, and one already signed in isn't asked again (3a design §6). */
-    suspend fun mayConnect(): Boolean = access.authorise(CorePermissions.SETTINGS_MANAGE) != null
+    /** connections.manage: an Admin's fresh PIN every time (4c design D5); the wizard's setup session passes it. */
+    suspend fun mayConnect(): Boolean = access.authorise(CorePermissions.CONNECTIONS_MANAGE) != null
 
     /** Stores what the provider's screen connected, on the application scope, so closing the card can't cancel it. */
     fun finish(connection: Connection, reconnecting: Boolean) {

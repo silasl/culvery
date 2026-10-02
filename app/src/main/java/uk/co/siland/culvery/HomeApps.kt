@@ -16,14 +16,26 @@ import uk.co.siland.culvery.core.plugin.HomeApp
 internal const val GMS_PACKAGE = "com.google.android.gms"
 
 /**
- * As device owner (4c design §5.2), Culvery allowlists itself, so startLockTask() is true lock-task (no prompt, no exit
- * gesture), and Play services, so Google's chooser opens inside it (plan review 13). False when not device owner.
+ * As device owner (4c design §5.2), Culvery allowlists only itself, so startLockTask() is true lock-task (no prompt, no
+ * exit gesture). False when not device owner.
  */
 internal fun allowLockTaskIfOwner(context: Context): Boolean {
     val policies = context.getSystemService(DevicePolicyManager::class.java)
     if (!policies.isDeviceOwnerApp(context.packageName)) return false
-    policies.setLockTaskPackages(ComponentName(context, CulveryDeviceAdmin::class.java), arrayOf(context.packageName, GMS_PACKAGE))
+    setLockTaskPackages(context, policies, withPlayServices = false)
     return true
+}
+
+/**
+ * As device owner, Play services may run in lock-task only while Google's chooser is open (4c design §5.2, §5.3):
+ * allowed just before it opens, and back to Culvery alone once Culvery is in front again, however the chooser ended.
+ */
+internal fun allowPlayServicesInLockTask(context: Context, allowed: Boolean) =
+    setLockTaskPackages(context, context.getSystemService(DevicePolicyManager::class.java), withPlayServices = allowed)
+
+private fun setLockTaskPackages(context: Context, policies: DevicePolicyManager, withPlayServices: Boolean) {
+    val packages = if (withPlayServices) arrayOf(context.packageName, GMS_PACKAGE) else arrayOf(context.packageName)
+    policies.setLockTaskPackages(ComponentName(context, CulveryDeviceAdmin::class.java), packages)
 }
 
 /** [HomeApp] through RoleManager (API 29+). The choice is made outside Culvery, so [refresh] runs on every resume. */

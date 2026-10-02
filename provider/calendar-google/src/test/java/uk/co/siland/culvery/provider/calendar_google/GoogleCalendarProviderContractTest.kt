@@ -22,7 +22,7 @@ class GoogleCalendarProviderContractTest : CalendarProviderContractTest() {
     private val today = LocalDate.of(2026, 9, 23)
     private val google = FakeGoogleServer(london)
     private val family = CalendarSource("family@example.com", "family@example.com", writable = true, primary = true)
-    private val subject = GoogleCalendarProvider(GoogleApi(google.start(), FakeTokenSource(), OkHttpClient()), FakeAuthorizer(), NoToasts)
+    private val subject = testProvider(GoogleApi(google.start(), FakeTokenSource(), OkHttpClient()))
 
     init {
         google.addCalendar(family.id, family.name, primary = true)

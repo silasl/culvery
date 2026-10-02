@@ -5,6 +5,7 @@ import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.activity.result.contract.ActivityResultContract
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.core.app.ActivityOptionsCompat
@@ -19,6 +20,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 
 @RunWith(AndroidJUnit4::class)
 class GoogleConnectScreenTest {
@@ -29,9 +31,16 @@ class GoogleConnectScreenTest {
     private val toasts = Toasts()
     private lateinit var provider: GoogleCalendarProvider
 
+    /** What happened, in order: the navigator's "leave pinning" and the registry's "launch". */
+    private val calls = mutableListOf<String>()
+
+    private fun screen(content: @Composable () -> Unit) = compose.setContent {
+        CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(calls)) { content() }
+    }
+
     @Before
     fun setUp() {
-        provider = GoogleCalendarProvider(GoogleApi(google.start(), FakeTokenSource(), OkHttpClient()), authorizer, toasts)
+        provider = testProvider(GoogleApi(google.start(), FakeTokenSource(), OkHttpClient()), authorizer, toasts)
         google.addCalendar("family@example.com", "Family", primary = true)
     }
 
@@ -44,7 +53,7 @@ class GoogleConnectScreenTest {
     @Test
     fun anAccountAlreadyGrantedConnectsWithNoScreens() {
         var connected: Connection? = null
-        compose.setContent { provider.ConnectScreen(existing = null, onConnected = { connected = it }, onCancel = {}) }
+        screen { provider.ConnectScreen(existing = null, onConnected = { connected = it }, onCancel = {}) }
         compose.waitUntil(5_000) { connected != null }
         assertThat(connected!!.config).containsExactly(CONFIG_ACCOUNT, "family@example.com")
     }
@@ -53,6 +62,7 @@ class GoogleConnectScreenTest {
     private fun screensAnswering(resultCode: Int) = object : ActivityResultRegistryOwner {
         override val activityResultRegistry = object : ActivityResultRegistry() {
             override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I, options: ActivityOptionsCompat?) {
+                calls += "launch"
                 dispatchResult(requestCode, resultCode, null)
             }
         }
@@ -60,11 +70,28 @@ class GoogleConnectScreenTest {
 
     private fun showWithScreens(resultCode: Int, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
         authorizer.next = Authorization.NeedsUser(screens())
-        compose.setContent {
+        screen {
             CompositionLocalProvider(LocalActivityResultRegistryOwner provides screensAnswering(resultCode)) {
                 provider.ConnectScreen(existing = null, onConnected = onConnected, onCancel = onCancel)
             }
         }
+    }
+
+    /** D5: Google's screens can't open over a pinned app, so pinning is left first. */
+    @Test
+    fun theChooserOpensOnlyAfterLeavingPinning() {
+        var connected: Connection? = null
+        showWithScreens(Activity.RESULT_OK, onConnected = { connected = it }, onCancel = {})
+        compose.waitUntil(5_000) { connected != null }
+        assertThat(calls).containsExactly("leave pinning", "launch").inOrder()
+    }
+
+    @Test
+    fun anAccountAlreadyGrantedNeverLeavesPinning() {
+        var connected: Connection? = null
+        screen { provider.ConnectScreen(existing = null, onConnected = { connected = it }, onCancel = {}) }
+        compose.waitUntil(5_000) { connected != null }
+        assertThat(calls).isEmpty()
     }
 
     @Test
@@ -90,7 +117,7 @@ class GoogleConnectScreenTest {
     fun backingOutCancelsWithNothingSaid() {
         authorizer.failWith = authorizationFailure(CommonStatusCodes.CANCELED)
         var cancelled = 0
-        compose.setContent { provider.ConnectScreen(existing = null, onConnected = {}, onCancel = { cancelled++ }) }
+        screen { provider.ConnectScreen(existing = null, onConnected = {}, onCancel = { cancelled++ }) }
         compose.waitUntil(5_000) { cancelled == 1 }
         assertThat(toasts.messages).isEmpty()
     }
@@ -99,7 +126,7 @@ class GoogleConnectScreenTest {
     fun aPlayServicesFailureSaysSoAndCancels() {
         authorizer.failWith = authorizationFailure(CommonStatusCodes.DEVELOPER_ERROR)
         var cancelled = 0
-        compose.setContent { provider.ConnectScreen(existing = null, onConnected = {}, onCancel = { cancelled++ }) }
+        screen { provider.ConnectScreen(existing = null, onConnected = {}, onCancel = { cancelled++ }) }
         compose.waitUntil(5_000) { cancelled == 1 }
         assertThat(toasts.messages).containsExactly("Couldn't connect to Google Calendar — try again")
     }

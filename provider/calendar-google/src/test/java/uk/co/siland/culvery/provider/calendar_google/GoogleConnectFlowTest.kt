@@ -23,12 +23,14 @@ class GoogleConnectFlowTest {
     private val google = FakeGoogleServer()
     private val authorizer = FakeAuthorizer()
     private val toasts = Toasts()
+    private lateinit var api: GoogleApi
     private lateinit var flow: GoogleConnectFlow
     private val stored = Connection("g1", GOOGLE_PROVIDER_ID, GOOGLE_LABEL, mapOf(CONFIG_ACCOUNT to "family@example.com"))
 
     @Before
     fun setUp() {
-        flow = GoogleConnectFlow(authorizer, GoogleApi(google.start(), FakeTokenSource(), OkHttpClient()), toasts)
+        api = GoogleApi(google.start(), FakeTokenSource(), OkHttpClient())
+        flow = GoogleConnectFlow(authorizer, api, toasts, PlayServicesCheck { true })
     }
 
     @After
@@ -42,6 +44,15 @@ class GoogleConnectFlowTest {
             assertWithMessage(text).that(text).doesNotContain("token")
             assertWithMessage(text).that(text).doesNotContain("t1")
         }
+    }
+
+    /** M4: without a usable Play services, Google's screens would fail; say what to do and start nothing. */
+    @Test
+    fun withoutUsablePlayServicesNothingStartsAndItSaysWhy() = runTest {
+        val stuck = GoogleConnectFlow(authorizer, api, toasts, PlayServicesCheck { false })
+        assertThat(stuck.start(existing = null)).isEqualTo(ConnectStep.Stopped)
+        assertThat(toasts.messages).containsExactly(UPDATE_PLAY_SERVICES)
+        assertThat(authorizer.accounts).isEmpty()
     }
 
     @Test

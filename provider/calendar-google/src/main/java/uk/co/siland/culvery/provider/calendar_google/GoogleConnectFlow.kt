@@ -31,15 +31,26 @@ sealed interface ConnectStep {
 }
 
 /**
- * The connect and reconnect flow's logic, apart from the screens it launches (3a design §3.2): ask Play services for
+ * Checks Play services can sign in, then the connect and reconnect flow's logic, apart from the screens it launches (3a design §3.2): ask Play services for
  * the calendar scopes (for the stored account on a reconnect); once both are granted, ask Google whose primary
  * calendar this is, which is the account's email, and check Play services grants that account silently, as every
  * later call will ask. A reconnect to a different account is refused. Backing out says nothing; any other failure
  * says "Couldn't connect", and nothing is stored.
  */
-internal class GoogleConnectFlow(private val authorizer: Authorizer, private val api: GoogleApi, private val toaster: Toaster) {
-    suspend fun start(existing: Connection?): ConnectStep =
-        step(existing, screensAllowed = true) { authorizer.authorize(existing?.config?.get(CONFIG_ACCOUNT)) }
+internal class GoogleConnectFlow(
+    private val authorizer: Authorizer,
+    private val api: GoogleApi,
+    private val toaster: Toaster,
+    private val playServices: PlayServicesCheck,
+) {
+    suspend fun start(existing: Connection?): ConnectStep {
+        if (!playServices.usable()) {
+            Log.w(TAG, "Play services can't run Google's sign-in on this tablet; nothing started")
+            toaster.show(UPDATE_PLAY_SERVICES)
+            return ConnectStep.Stopped
+        }
+        return step(existing, screensAllowed = true) { authorizer.authorize(existing?.config?.get(CONFIG_ACCOUNT)) }
+    }
 
     suspend fun afterScreens(existing: Connection?, data: Intent?): ConnectStep =
         step(existing, screensAllowed = false) { authorizer.authorizationFrom(data) }

@@ -189,6 +189,9 @@ class ShellViewModel @Inject constructor(
         }
     }
 
+    /** The view model has no window: MainActivity's navigator leaves pinning (4c §5.3). */
+    override fun leavePinning() = Unit
+
     /** Culvery is in front again after being stopped; with D3 that includes a Home press from another app. */
     fun returnedToFront() {
         kioskExited = false

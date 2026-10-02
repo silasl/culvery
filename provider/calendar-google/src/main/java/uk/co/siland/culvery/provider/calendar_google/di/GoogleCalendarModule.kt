@@ -16,7 +16,9 @@ import uk.co.siland.culvery.provider.calendar_google.Authorizer
 import uk.co.siland.culvery.provider.calendar_google.GOOGLE_CALENDAR_BASE_URL
 import uk.co.siland.culvery.provider.calendar_google.GoogleApi
 import uk.co.siland.culvery.provider.calendar_google.GoogleCalendarProvider
+import uk.co.siland.culvery.provider.calendar_google.GooglePlayServicesCheck
 import uk.co.siland.culvery.provider.calendar_google.PlayServicesAuthorizer
+import uk.co.siland.culvery.provider.calendar_google.PlayServicesCheck
 import uk.co.siland.culvery.provider.calendar_google.PlayServicesTokenSource
 import uk.co.siland.culvery.provider.calendar_google.TokenSource
 
@@ -40,6 +42,9 @@ abstract class GoogleCalendarModule {
 
     @Binds
     abstract fun authorizer(impl: PlayServicesAuthorizer): Authorizer
+
+    @Binds
+    abstract fun playServices(impl: GooglePlayServicesCheck): PlayServicesCheck
 
     companion object {
         // The client stays inside GoogleApi, not in the graph, so another module's OkHttpClient can't collide with it.

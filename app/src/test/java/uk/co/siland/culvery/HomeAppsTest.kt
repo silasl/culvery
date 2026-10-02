@@ -23,12 +23,27 @@ class HomeAppsTest {
     @After
     fun tearDown() = ShadowRoleManager.reset()
 
-    /** §5.2: as device owner Culvery allowlists itself, and Play services so Google's chooser opens inside lock-task. */
+    /** §5.2: as device owner only Culvery may run in lock-task at start-up. */
     @Test
-    fun asDeviceOwnerCulveryAndPlayServicesMayRunInLockTask() {
+    fun asDeviceOwnerOnlyCulveryMayRunInLockTask() {
         shadowOf(policies).setDeviceOwner(admin)
         assertThat(allowLockTaskIfOwner(context)).isTrue()
-        assertThat(policies.getLockTaskPackages(admin).toList()).containsExactly(context.packageName, GMS_PACKAGE)
+        assertThat(policies.getLockTaskPackages(admin).toList()).containsExactly(context.packageName)
+    }
+
+    /** §5.2: Play services is allowed in lock-task only while Google's chooser is open. */
+    @Test
+    fun asDeviceOwnerPlayServicesIsAllowedOnlyWhileTheChooserIsOpen() {
+        shadowOf(policies).setDeviceOwner(admin)
+        allowLockTaskIfOwner(context)
+        val before = policies.getLockTaskPackages(admin).toList()
+        allowPlayServicesInLockTask(context, allowed = true)
+        val during = policies.getLockTaskPackages(admin).toList()
+        allowPlayServicesInLockTask(context, allowed = false)
+        val after = policies.getLockTaskPackages(admin).toList()
+        assertThat(before).containsExactly(context.packageName)
+        assertThat(during).containsExactly(context.packageName, GMS_PACKAGE)
+        assertThat(after).containsExactly(context.packageName)
     }
 
     @Test
