@@ -450,6 +450,18 @@ class DefaultAccessControlTest {
         assertThat(access.session.value).isNull()
     }
 
+    /** 4c ruling 23: a PIN at the pad replaces the setup session, so its fresh-PIN pass is gone with it. */
+    @Test
+    fun aPinEnteredDuringSetupDoesNotLeaveTheSetupPassBehind() = runTest {
+        val timers = TestScope()
+        val access = access(timers.backgroundScope)
+        access.beginSetupSession(alex())
+        person("Mia", Role.ADMIN, "9876")
+        answerPins("9876")
+        access.authorise("test.any", allow = { who, _ -> who.person.name == "Mia" })
+        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Manage people")
+    }
+
     @Test
     fun aTouchRestartsTheTwoMinutes() = runTest {
         person("Alex", Role.ADMIN, "1234")

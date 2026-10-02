@@ -26,13 +26,23 @@ class DefaultAccessControl @Inject constructor(
     private val toaster: Toaster,
     @ApplicationScope private val scope: CoroutineScope,
 ) : AccessControl {
+    /** Who is signed in, and whether it is the wizard's setup session (4a §3.4): one value, so every end ends both. */
+    private class SignedIn(val who: Identified, val setup: Boolean)
+
+    private val signedIn = MutableStateFlow<SignedIn?>(null)
     private val _session = MutableStateFlow<Identified?>(null)
     override val session: StateFlow<Identified?> = _session.asStateFlow()
+    private val stateLock = Any()
+
+    /** The one place the session changes. */
+    private fun set(next: SignedIn?) = synchronized(stateLock) {
+        signedIn.value = next
+        _session.value = next?.who
+    }
 
     private var expiry: Job? = null
     // authorise restarts the timer under authoriseLock; touch() restarts it from the UI thread.
     private val expiryLock = Any()
-    @Volatile private var setupPerson: Identified? = null
     // Serialises callers so repeated taps can't stack PIN pads, and a queued caller sees the session the first one started.
     private val authoriseLock = Mutex()
 
@@ -45,23 +55,22 @@ class DefaultAccessControl @Inject constructor(
         require(anyOf.isNotEmpty()) { "authorise needs at least one permission" }
         val defs = anyOf.map(registry::require)
         return authoriseLock.withLock {
-            val current = _session.value
-            val setup = setupPerson
-            if (setup != null && current == setup) {
-                val grants = grantedFor(setup.role, anyOf)
-                if (grants.isNotEmpty() && allow(setup, grants)) {
+            val current = signedIn.value
+            if (current != null && current.setup) {
+                val grants = grantedFor(current.who.role, anyOf)
+                if (grants.isNotEmpty() && allow(current.who, grants)) {
                     restartExpiry(SETUP_IDLE_MS)
-                    return@withLock Authorised(setup.person, setup.role, grants)
+                    return@withLock Authorised(current.who.person, current.who.role, grants)
                 }
             }
             if (current != null && defs.none { it.freshPin }) {
-                val grants = grantedFor(current.role, anyOf)
-                if (grants.isNotEmpty() && allow(current, grants)) {
+                val grants = grantedFor(current.who.role, anyOf)
+                if (grants.isNotEmpty() && allow(current.who, grants)) {
                     restartExpiry()
-                    return@withLock Authorised(current.person, current.role, grants)
+                    return@withLock Authorised(current.who.person, current.who.role, grants)
                 }
                 if (refusal is Refusal.Toast) {
-                    toaster.show(refusal.message(current.person.name))
+                    toaster.show(refusal.message(current.who.person.name))
                     // Signed out, so the next tap brings up the PIN pad: an adult can take over from a child.
                     lock()
                     return@withLock null
@@ -105,34 +114,32 @@ class DefaultAccessControl @Inject constructor(
             }
             lockout.reset()
             // A PIN at the pad starts an ordinary session, whoever it is.
-            setupPerson = null
-            _session.value = identified
+            set(SignedIn(identified, setup = false))
             restartExpiry()
             return Authorised(identified.person, identified.role, granted)
         }
     }
 
     override fun beginSetupSession(person: Identified) {
-        setupPerson = person
-        _session.value = person
+        set(SignedIn(person, setup = true))
         restartExpiry(SETUP_IDLE_MS)
     }
 
     override fun endSetupSession() {
-        if (setupPerson == null) return
-        setupPerson = null
-        if (_session.value != null) restartExpiry()
+        val current = signedIn.value ?: return
+        if (!current.setup) return
+        set(SignedIn(current.who, setup = false))
+        restartExpiry()
     }
 
     override fun touch() {
-        if (_session.value == null) return
-        restartExpiry(if (setupPerson != null) SETUP_IDLE_MS else SESSION_TIMEOUT_MS)
+        val current = signedIn.value ?: return
+        restartExpiry(if (current.setup) SETUP_IDLE_MS else SESSION_TIMEOUT_MS)
     }
 
     override fun lock() {
-        setupPerson = null
         synchronized(expiryLock) { expiry?.cancel() }
-        _session.value = null
+        set(null)
     }
 
     private fun grantedFor(role: Role, anyOf: Array<out String>): Set<String> =
@@ -140,11 +147,10 @@ class DefaultAccessControl @Inject constructor(
 
     private fun restartExpiry(timeoutMillis: Long = SESSION_TIMEOUT_MS) = synchronized(expiryLock) {
         expiry?.cancel()
-        val guarded = _session.value
+        val guarded = signedIn.value
         expiry = scope.launch {
             delay(timeoutMillis)
-            // Only beginSetupSession sets setupPerson; every way a session ends clears it.
-            if (_session.compareAndSet(guarded, null)) setupPerson = null
+            synchronized(stateLock) { if (signedIn.value === guarded) set(null) }
         }
     }
 }

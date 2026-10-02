@@ -1,11 +1,15 @@
 package uk.co.siland.culvery.core.plugin
 
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.launch
 
 private const val FIRST_RETRY_MS = 1_000L
 private const val LAST_RETRY_MS = 60_000L
@@ -18,16 +22,26 @@ fun retryDelayMillis(attempt: Long): Long =
 /**
  * Starts the flow again after a failure, waiting [retryDelayMillis], instead of ending it: a store hiccup must not
  * leave a tab, a card or the sync loop's trigger gone until the app restarts (3a design §3.12). [onFailure] logs it.
- * A value getting through starts the waits again from 1 s, so a rare hiccup never waits a minute.
+ * A value that stands for one whole wait starts the waits again from 1 s; one that fails at once doesn't (4c §7.2), so a
+ * read that emits and then fails can't log every second.
  */
 fun <T> Flow<T>.retryWithBackoff(onFailure: (Throwable) -> Unit): Flow<T> = flow {
     // Per collection; onEach sits upstream of retryWhen, so a downstream failure is never caught or retried.
-    var failures = 0L
-    emitAll(
-        onEach { failures = 0 }.retryWhen { cause, _ ->
-            onFailure(cause)
-            delay(retryDelayMillis(failures++))
-            true
-        },
-    )
+    val failures = AtomicLong(0)
+    coroutineScope {
+        var standing: Job? = null
+        emitAll(
+            onEach {
+                standing?.cancel()
+                val wait = failures.get().takeIf { it > 0 }?.let(::retryDelayMillis)
+                standing = wait?.let { launch { delay(it); failures.set(0) } }
+            }.retryWhen { cause, _ ->
+                standing?.cancel()
+                onFailure(cause)
+                delay(retryDelayMillis(failures.getAndIncrement()))
+                true
+            },
+        )
+        standing?.cancel()
+    }
 }

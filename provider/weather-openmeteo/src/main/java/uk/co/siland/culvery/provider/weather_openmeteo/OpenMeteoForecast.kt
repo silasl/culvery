@@ -58,6 +58,9 @@ internal data class HourlyArrays(
     @SerialName("weather_code") val weatherCode: List<Int?>? = null,
 )
 
+/** A coordinate as Open-Meteo reads it: plain digits, never an exponent ("-0.0005", not "-5.0E-4"). */
+internal fun coordinate(value: Double): String = value.toBigDecimal().stripTrailingZeros().toPlainString()
+
 /** A required array is missing, or the arrays of one block differ in length (§3.4). */
 internal class Unreadable : Exception("A forecast array is missing or the wrong length")
 
@@ -84,8 +87,8 @@ class OpenMeteoForecast(
         val request = Request.Builder()
             .url(
                 url.newBuilder()
-                    .addQueryParameter("latitude", latitude.toString())
-                    .addQueryParameter("longitude", longitude.toString())
+                    .addQueryParameter("latitude", coordinate(latitude))
+                    .addQueryParameter("longitude", coordinate(longitude))
                     .addQueryParameter("timezone", zone.id)
                     .addQueryParameter("forecast_days", DAYS_FETCHED.toString())
                     .addQueryParameter("daily", DAILY)

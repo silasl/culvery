@@ -90,4 +90,13 @@ class WeatherStoreTest {
         assertThat(hours).hasSize(24)
         assertThat(hours.single { it.start == THU.atTime(1, 0) }.temperature).isEqualTo(17.0)
     }
+
+    @Test
+    fun aRepeatedDayIsStoredOnce() = runTest {
+        val f = forecast(days = 1)
+        store.replace(WeatherPlace(LONDON), f.copy(days = f.days + f.days.first().copy(high = 30.0)), 1_000L)
+        val days = store.stored.first()!!.days
+        assertThat(days).hasSize(1)
+        assertThat(days.single().high).isEqualTo(f.days.first().high)
+    }
 }

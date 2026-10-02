@@ -25,11 +25,14 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
+import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
+import uk.co.siland.culvery.capability.calendar.CalendarSource
 import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.ChangeKind
 import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.PendingChange
+import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.core.access.PinHasher
 import uk.co.siland.culvery.core.access.PinManager
@@ -112,6 +115,24 @@ class DebugSeedTest {
         assertThat(pins.identify("1357")?.person?.name).isEqualTo("Mia")
         assertThat(household.location.first()).isEqualTo(HomeLocation("London, England, United Kingdom", 51.5074, -0.1278, "Europe/London"))
         assertThat(state.setupComplete.first()).isTrue()
+    }
+
+    /** The sample still opens when its Family calendar can't be made the master; a master is chosen in Settings later. */
+    @Test
+    fun theSampleHouseholdCompletesWhenItsMasterCantBeSet() = runTest {
+        ShadowLog.clear()
+        val secondListFails = object : CalendarProvider by fake {
+            private var lists = 0
+
+            override suspend fun sources(conn: Connection): List<CalendarSource> =
+                if (lists++ == 0) fake.sources(conn) else throw UnreachableException("offline")
+        }
+        val setup = CalendarSetup(store, setOf(secondListFails), { household.people.first() }, NoToasts, WallClock { 0L }) { syncs++ }
+        DebugSampleHousehold(household, pins, setup, setOf(fake), state::markComplete).create()
+        assertThat(state.setupComplete.first()).isTrue()
+        assertThat(store.connectionsNow().map { it.connection.id }).containsExactly(DEBUG_CONNECTION_ID)
+        assertThat(store.master().first()).isNull()
+        assertThat(ShadowLog.getLogs().map { it.msg }).contains("Couldn't make the sample Family calendar the master (UnreachableException)")
     }
 
     @Test

@@ -1,5 +1,10 @@
 package uk.co.siland.culvery.core.setup
 
+import kotlinx.coroutines.flow.first
+import uk.co.siland.culvery.core.access.AccessControl
+import uk.co.siland.culvery.core.access.CorePermissions
+import uk.co.siland.culvery.core.household.HouseholdRepository
+
 /** A step as the wizard reads it at this moment. */
 internal data class StepStatus(val shown: Boolean, val done: Boolean, val canGoOn: Boolean)
 
@@ -29,3 +34,10 @@ internal object WizardRules {
     fun forward(skippable: Boolean, label: String, status: StepStatus): Forward =
         if (skippable && !status.done) Forward.Skip else Forward.Next(label, status.canGoOn || skippable)
 }
+
+/**
+ * 4a design §3.4: a setup change before the first Admin exists needs nobody's PIN; after that, settings.manage (which the
+ * setup session passes). False when the PIN pad was cancelled or refused.
+ */
+internal suspend fun mayChangeSetup(household: HouseholdRepository, access: AccessControl): Boolean =
+    !household.hasActiveAdmin.first() || access.authorise(CorePermissions.SETTINGS_MANAGE) != null

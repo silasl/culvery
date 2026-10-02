@@ -18,10 +18,15 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.MediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.SocketPolicy
+import okio.BufferedSource
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -158,6 +163,67 @@ class OpenMeteoForecastTest {
             DailyWeather(LocalDate.of(2026, 10, 4), Condition.PARTLY_CLOUDY, 17.0, 8.0, null, null),
         ).inOrder()
         assertThat(f.hours).containsExactly(HourlyWeather(LocalDateTime.of(2026, 10, 1, 0, 0), Condition.CLOUDY, 17.0))
+    }
+
+    /** §7.2: a failure reading the body that isn't an IOException is still the forecast's own failure. */
+    @Test
+    fun aBodyThatFailsToReadInAnyWayIsWeatherUnavailable() = runTest {
+        val broken = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .body(
+                        object : ResponseBody() {
+                            override fun contentType(): MediaType? = null
+
+                            override fun contentLength(): Long = -1
+
+                            override fun source(): BufferedSource = throw IllegalStateException("a broken body")
+                        },
+                    )
+                    .build()
+            }
+            .build()
+        val withBrokenBody = OpenMeteoForecast(server.url("/v1/forecast"), broken, clock)
+        val failure = runCatching { withBrokenBody.forecast(51.5074, -0.1278, ZoneId.of("Europe/London")) }.exceptionOrNull()
+        assertThat(failure).isInstanceOf(WeatherUnavailableException::class.java)
+    }
+
+    /** §7.2: Greenwich and the equator are sent as plain numbers, never "-5.0E-4". */
+    @Test
+    fun coordinatesNearZeroAreSentWithoutAnExponent() = runTest {
+        answer(small())
+        forecast.forecast(-0.0005, 51.5, ZoneId.of("Europe/London"))
+        val asked = server.takeRequest().requestUrl!!
+        assertThat(asked.queryParameter("latitude")).isEqualTo("-0.0005")
+        assertThat(asked.queryParameter("longitude")).isEqualTo("51.5")
+    }
+
+    /** 4b ruling 15: no cause, whose text could hold the URL, and so the coordinates. */
+    @Test
+    fun everyFailureCarriesNoCause() = runTest {
+        answer("{}", code = 500)
+        assertThat(failure()?.cause).isNull()
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        assertThat(failure()?.cause).isNull()
+        answer("<html>Gateway</html>")
+        assertThat(failure()?.cause).isNull()
+    }
+
+    @Test
+    fun aNullDateOrLowDropsThatDayAndANullHourDropsThatHour() = runTest {
+        answer(
+            small(
+                daily = """ "time":["2026-10-01",null,"2026-10-03"],"weather_code":[3,3,3],"temperature_2m_max":[19.0,18.0,17.0],"temperature_2m_min":[11.0,10.0,null],"sunrise":["2026-10-01T07:01",null,null],"sunset":["2026-10-01T18:38",null,null]""",
+                hourly = """ "time":["2026-10-01T00:00",null],"temperature_2m":[17.0,16.0],"weather_code":[3,3]""",
+            ),
+        )
+        val f = london()
+        assertThat(f.days.map { it.date }).containsExactly(LocalDate.of(2026, 10, 1))
+        assertThat(f.hours.map { it.start }).containsExactly(LocalDateTime.of(2026, 10, 1, 0, 0))
     }
 
     @Test

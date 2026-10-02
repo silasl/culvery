@@ -68,6 +68,19 @@ class WeatherSyncLoopTest {
     }
 
     @Test
+    fun clearingTheLocationStopsFetching() = runTest {
+        val fetched = mutableListOf<WeatherPlace>()
+        val places = MutableStateFlow<WeatherPlace?>(london)
+        loop(places) { fetched += it }
+        runCurrent()
+        assertThat(fetched).containsExactly(london)
+        places.value = null
+        runCurrent()
+        after(3 * WEATHER_REFRESH_MS)
+        assertThat(fetched).containsExactly(london)
+    }
+
+    @Test
     fun aLocationChangeFetchesAtOnce() = runTest {
         val fetched = mutableListOf<WeatherPlace>()
         val places = MutableStateFlow<WeatherPlace?>(london)

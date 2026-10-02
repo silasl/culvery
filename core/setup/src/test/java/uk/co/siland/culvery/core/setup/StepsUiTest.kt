@@ -20,10 +20,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.access.Identified
@@ -41,8 +41,18 @@ import uk.co.siland.culvery.core.ui.PersonPalette
 
 @RunWith(AndroidJUnit4::class)
 class StepsUiTest {
-    @get:Rule val compose = createComposeRule()
-    @get:Rule val folder = TemporaryFolder()
+    @get:Rule(order = 0) val folder = TemporaryFolder()
+
+    // After the compose rule has disposed the composition: no query can outlive the database.
+    @get:Rule(order = 1) val closing = object : ExternalResource() {
+        override fun after() {
+            scope.cancel()
+            states.close()
+            db.close()
+        }
+    }
+
+    @get:Rule(order = 2) val compose = createComposeRule()
     private lateinit var db: HouseholdDatabase
     private lateinit var household: HouseholdRepository
     private lateinit var states: SetupStates
@@ -58,13 +68,6 @@ class StepsUiTest {
         household = HouseholdRepository(db)
         states = SetupStates(folder, household)
         access = TestAccess(household, WallClock { System.currentTimeMillis() }, scope).also { it.listen(scope) }
-    }
-
-    @After
-    fun tearDown() {
-        scope.cancel()
-        states.close()
-        db.close()
     }
 
     private fun welcome(sample: Boolean, alongside: @Composable () -> Unit = {}) {
