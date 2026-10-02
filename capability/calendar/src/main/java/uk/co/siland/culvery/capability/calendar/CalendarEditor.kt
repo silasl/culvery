@@ -380,6 +380,7 @@ class CalendarEditor internal constructor(
             is WriteOutcome.Accepted -> {
                 try {
                     store.applyAcceptedWrite(to.connection.id, to.source.id, remoteId, outcome, zone.current())
+                    store.writeAccepted(to.connection.id, clock.nowMillis())
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {

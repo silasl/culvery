@@ -261,6 +261,7 @@ class CalendarSync internal constructor(
     ): WriteOutcome =
         try {
             store.applyAcceptedWrite(conn.id, source.id, change.remoteId, accepted, zone, completing = change.id)
+            store.writeAccepted(conn.id, clock.nowMillis())
             accepted
         } catch (e: CancellationException) {
             throw e

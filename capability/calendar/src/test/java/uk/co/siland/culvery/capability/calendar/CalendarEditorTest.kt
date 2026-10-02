@@ -837,6 +837,22 @@ class CalendarEditorTest {
         assertThat(writer.drafts.single().forPersonColor).isEqualTo(access.sam.color)
     }
 
+    /** Plan review 17: a save the provider accepts shows sign-in works again, so the chip a refused one left goes. */
+    @Test
+    fun anAcceptedSaveClearsTheSignInARefusedOneSet() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        writer.failWith = NeedsSignInException("a calendar scope is missing")
+        assertThat(editor.create(draft("Sleepover", PersonId.FAMILY.value))).isEqualTo(EditResult.Queued)
+        assertThat(store.connectionsNow().single().health).isEqualTo(ConnectionHealth.NeedsSignIn)
+        writer.failWith = null
+        assertThat(editor.create(draft("Pizza night", PersonId.FAMILY.value))).isEqualTo(EditResult.Done)
+        val stored = store.connectionsNow().single()
+        assertThat(stored.health).isEqualTo(ConnectionHealth.Ok)
+        assertThat(stored.needsSignInSinceMillis).isNull()
+    }
+
     @Test
     fun aSaveThatNeedsSignInIsQueuedAndFlagsTheConnectionAtOnce() = runTest {
         val access = testAccess(household)

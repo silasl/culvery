@@ -68,18 +68,17 @@ class CalendarRepository @Inject constructor(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun days(start: LocalDate, count: Int): Flow<List<DayUi>> = zone.zone.flatMapLatest { z ->
-        val from = millis(start, z)
-        val to = millis(start.plusDays(count.toLong()), z)
+        // Wide enough for all-day rows synced in any other zone; each day then picks its own (4c C4).
+        val from = millis(start, z) - ZONE_MARGIN_MS
+        val to = millis(start.plusDays(count.toLong()), z) + ZONE_MARGIN_MS
         combine(store.eventsBetween(from, to), store.pending(), catalog, household.peopleWithFamily) { events, pending, cat, people ->
             val byId = people.associateBy { it.id }
             val shown = overlayPending(events, pending, cat::source, z, from, to)
             (0 until count).map { i ->
                 val date = start.plusDays(i.toLong())
-                val dayStart = millis(date, z)
-                val dayEnd = millis(date.plusDays(1), z)
                 DayUi(
                     date,
-                    shown.filter { spanOverlaps(it.event.startSort, it.event.endSort, dayStart, dayEnd) }
+                    shown.filter { it.event.isOn(date, z) }
                         .map { it.event.toUi(date, z, byId, cat, it.syncing) }
                         .sortedWith(compareByDescending<EventUi> { it.allDay }.thenBy { it.startSort }.thenBy { it.title }),
                 )
@@ -125,5 +124,8 @@ class CalendarRepository @Inject constructor(
 
     private companion object {
         const val TAG = "CalendarRepository"
+
+        /** Two days: more than any two zones' offsets differ. */
+        const val ZONE_MARGIN_MS = 2 * 86_400_000L
     }
 }

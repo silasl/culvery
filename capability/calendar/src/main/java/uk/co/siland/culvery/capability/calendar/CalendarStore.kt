@@ -184,9 +184,24 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         dao.setHealth(connectionId, health.code(), (health as? ConnectionHealth.Error)?.message)
     }
 
+    /**
+     * A pass read every calendar. A connection needing sign-in while changes wait (a write was refused for it) stays so
+     * until a reconnect, so the chip doesn't vanish while writes keep failing (4c C3); otherwise it is Ok again.
+     */
     suspend fun markSynced(connectionId: String, atMillis: Long) = db.withTransaction {
-        dao.connection(connectionId)?.let { endPause(it, atMillis) }
+        val row = dao.connection(connectionId) ?: return@withTransaction
+        if (row.health == ConnectionHealth.NeedsSignIn.code() && dao.countOutboxOf(connectionId) > 0) {
+            dao.markSyncTime(connectionId, atMillis)
+            return@withTransaction
+        }
+        endPause(row, atMillis)
         dao.markSynced(connectionId, atMillis)
+    }
+
+    /** A write the provider accepted shows sign-in works: a connection needing it is Ok again (plan review 17). */
+    suspend fun writeAccepted(connectionId: String, nowMillis: Long) = db.withTransaction {
+        val row = dao.connection(connectionId) ?: return@withTransaction
+        if (row.health == ConnectionHealth.NeedsSignIn.code()) setHealth(connectionId, ConnectionHealth.Ok, nowMillis)
     }
 
     private suspend fun endPause(row: ConnectionEntity, nowMillis: Long) {

@@ -685,7 +685,7 @@ class CalendarStoreTest {
         connect("s1")
         store.setHealth("c1", ConnectionHealth.NeedsSignIn, 2_000L)
         store.enqueue(change(ChangeKind.DELETE, draft = null).copy(createdMillis = 5_000L))
-        store.markSynced("c1", 10_000L)
+        store.reconnect("c1", 10_000L)
         assertThat(store.pendingNow().single().createdMillis).isEqualTo(10_000L)
         assertThat(store.connectionsNow().single().needsSignInSinceMillis).isNull()
     }
@@ -696,7 +696,7 @@ class CalendarStoreTest {
         store.enqueue(change(ChangeKind.DELETE, remoteId = "first", draft = null).copy(createdMillis = 1_000L))
         store.setHealth("c1", ConnectionHealth.NeedsSignIn, 2_000L)
         store.enqueue(change(ChangeKind.DELETE, remoteId = "second", draft = null).copy(createdMillis = 5_000L))
-        store.markSynced("c1", 10_000L)
+        store.reconnect("c1", 10_000L)
         // Both now read as made at 9 000 and 10 000; the queue is ordered by id, never by createdMillis.
         assertThat(store.pendingNow().map { it.remoteId to it.createdMillis })
             .containsExactly("first" to 9_000L, "second" to 10_000L).inOrder()

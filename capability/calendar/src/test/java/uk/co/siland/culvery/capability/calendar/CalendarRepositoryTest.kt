@@ -81,6 +81,19 @@ class CalendarRepositoryTest {
         recurring = false,
     )
 
+    /** C4: an all-day event synced in another zone shows on its own date only, not straddling two. */
+    @Test
+    fun anAllDayEventSyncedInAnotherZoneShowsOnItsOwnDate() = runTest {
+        val auckland = ZoneId.of("Pacific/Auckland")
+        store.applySync(
+            "c1", "s-family", DateRange(window.start, window.endExclusive, auckland),
+            SyncResult(listOf(allDayOn("Bin day", sept(23))), emptyList(), null, fullReplace = true),
+        )
+        assertThat(repo.day(sept(23)).first().map { it.title }).containsExactly("Bin day")
+        assertThat(repo.day(sept(22)).first()).isEmpty()
+        assertThat(repo.day(sept(24)).first()).isEmpty()
+    }
+
     private fun allDayOn(title: String, date: LocalDate) =
         RemoteEvent(title, title, EventTime.AllDay(date), EventTime.AllDay(date.plusDays(1)), recurring = false)
 

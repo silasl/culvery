@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.calendar
 
+import java.time.LocalDate
 import java.time.ZoneId
 import uk.co.siland.culvery.core.household.PersonId
 
@@ -86,4 +87,19 @@ internal fun StoredEvent.withFields(d: EventDraft, fields: Set<EventField>, zone
         startSort = newStart.instantIn(zone).toEpochMilli(),
         endSort = newEnd.instantIn(zone).toEpochMilli(),
     )
+}
+
+/**
+ * Whether this event shows on [date] in [zone]. An all-day event goes by its own dates (end exclusive; a zero-length one
+ * on its start date): its sort keys are midnight in the zone it was synced in, which a zone change leaves stale (4c C4).
+ */
+internal fun StoredEvent.isOn(date: LocalDate, zone: ZoneId): Boolean {
+    val from = start
+    val to = end
+    if (from is EventTime.AllDay && to is EventTime.AllDay) {
+        return !date.isBefore(from.date) && (date.isBefore(to.date) || date == from.date)
+    }
+    val dayStart = date.atStartOfDay(zone).toInstant().toEpochMilli()
+    val dayEnd = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    return spanOverlaps(startSort, endSort, dayStart, dayEnd)
 }

@@ -149,6 +149,9 @@ interface CalendarDao {
     @Query("UPDATE connection SET health = 'OK', healthMessage = NULL, lastSyncMillis = :at WHERE id = :id")
     suspend fun markSynced(id: String, at: Long)
 
+    @Query("UPDATE connection SET lastSyncMillis = :at WHERE id = :id")
+    suspend fun markSyncTime(id: String, at: Long)
+
     @Query("SELECT * FROM connection WHERE id = :id")
     suspend fun connection(id: String): ConnectionEntity?
 

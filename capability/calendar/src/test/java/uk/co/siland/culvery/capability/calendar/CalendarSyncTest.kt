@@ -324,6 +324,53 @@ class CalendarSyncTest {
         PendingChange(0, "c1", sourceId, remoteId, kind, draft, attempts, next.toEpochMilli(), created.toEpochMilli(), clientKey),
     )
 
+    /** C3: a write refused for sign-in keeps the reconnect chip while reads still work, until a reconnect. */
+    @Test
+    fun aWriteRefusedForSignInKeepsTheConnectionNeedingSignInWhileReadsWork() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, draft = null)
+        w.failWith = NeedsSignInException("a calendar scope is missing")
+        sync.syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.NeedsSignIn)
+        // A later pass, before the change is due again: the reads work, the chip stays.
+        now = now.plusSeconds(10)
+        sync.syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.NeedsSignIn)
+        assertThat(store.connectionsNow().single().lastSyncMillis).isEqualTo(now.toEpochMilli())
+        store.reconnect("c1", now.toEpochMilli())
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
+    }
+
+    /** Plan review 17: a queued write the provider accepts shows sign-in works, though the change that was refused is still queued. */
+    @Test
+    fun aQueuedWriteTheProviderAcceptsClearsTheSignInAnEarlierRefusalSet() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = writingEngine()
+        queue(ChangeKind.DELETE, draft = null)
+        queue(ChangeKind.DELETE, remoteId = "other", draft = null, next = now.plusSeconds(86_400)) // still waiting, so only the accepted write can clear it
+        w.failWith = NeedsSignInException("a calendar scope is missing")
+        sync.syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.NeedsSignIn)
+        w.failWith = null
+        now = now.plusSeconds(3_600)
+        sync.syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
+    }
+
+    @Test
+    fun aReadThatNeededSigningInClearsOnceReadsWorkWithNothingQueued() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = engine()
+        a.failWith = NeedsSignInException("expired")
+        sync.syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.NeedsSignIn)
+        a.failWith = null
+        now = now.plusSeconds(300)
+        sync.syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Ok)
+    }
+
     @Test
     fun drainDeliversADueDeleteAndCompletesIt() = runTest {
         connect("c1", "calendar.a", s1)
