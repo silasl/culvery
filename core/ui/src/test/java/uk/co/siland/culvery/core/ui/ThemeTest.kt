@@ -1,5 +1,11 @@
 package uk.co.siland.culvery.core.ui
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
@@ -8,6 +14,15 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+
+private var probeCompositions = 0
+
+/** Reads the theme as content does; counts its compositions. */
+@Composable
+private fun Probe() {
+    probeCompositions++
+    Text("probe", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyLarge.copy(color = Culvery.colors.ink))
+}
 
 @RunWith(AndroidJUnit4::class)
 class ThemeTest {
@@ -46,5 +61,21 @@ class ThemeTest {
             .containsExactly(Color(0xFFEE7B6A), Color(0xFF3A211D), Color(0xFF1A0906)).inOrder()
         assertThat(listOf(LightColors.danger, LightColors.dangerSoft, LightColors.dangerInk))
             .containsExactly(Color(0xFFB83A28), Color(0xFFF7DFDA), Color(0xFFFFFFFF)).inOrder()
+    }
+
+    /** P1: the theme rebuilt with the same colours hands its content the same scheme, so content that hasn't changed skips. */
+    @Test
+    fun aRecomposedThemeKeepsItsSchemeSoUnchangedContentSkips() {
+        var tick by mutableIntStateOf(0)
+        compose.setContent {
+            val t = tick
+            // A new content lambda each tick, so CulveryTheme itself runs again.
+            CulveryTheme(dark = true) { if (t >= 0) Probe() }
+        }
+        compose.waitForIdle()
+        val before = probeCompositions
+        tick++
+        compose.waitForIdle()
+        assertThat(probeCompositions).isEqualTo(before)
     }
 }

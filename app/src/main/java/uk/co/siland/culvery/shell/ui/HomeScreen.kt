@@ -41,7 +41,7 @@ private val HEADER_DIVIDER_HEIGHT = 48.dp
 private val HEADER_ITEMS_BOTTOM = 4.dp
 
 @Composable
-fun HomeScreen(now: LocalDateTime, placements: List<HomePlacement>, headerItems: List<HeaderItem> = emptyList()) {
+fun HomeScreen(now: () -> LocalDateTime, placements: List<HomePlacement>, headerItems: List<HeaderItem>) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxSize()) {
         HomeHeader(now, headerItems, Modifier.fillMaxWidth())
         HomeGrid(placements, Modifier.fillMaxWidth().weight(1f))
@@ -53,13 +53,13 @@ fun HomeScreen(now: LocalDateTime, placements: List<HomePlacement>, headerItems:
  * capabilities' items at the right, their bottom [HEADER_ITEMS_BOTTOM] above the date's (4b design §4.1).
  */
 @Composable
-fun HomeHeader(now: LocalDateTime, items: List<HeaderItem>, modifier: Modifier = Modifier) {
+fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modifier = Modifier) {
     val c = Culvery.colors
     Layout(
         modifier = modifier,
         content = {
-            Text(now.format(CLOCK), style = HhType.clock, color = c.ink, modifier = Modifier.testTag("home_clock"))
-            Text(now.format(DATE), style = HhType.date, color = c.mute, modifier = Modifier.testTag("home_date"))
+            Text(now().format(CLOCK), style = HhType.clock, color = c.ink, modifier = Modifier.testTag("home_clock"))
+            Text(now().format(DATE), style = HhType.date, color = c.mute, modifier = Modifier.testTag("home_date"))
             HeaderItems(items)
         },
     ) { measurables, constraints ->

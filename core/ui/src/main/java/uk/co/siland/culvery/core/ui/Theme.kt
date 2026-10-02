@@ -8,6 +8,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
@@ -16,6 +17,15 @@ private val LocalHhColors = staticCompositionLocalOf { DarkColors }
 object Culvery {
     val colors: HhColors
         @Composable get() = LocalHhColors.current
+}
+
+private val CulveryTypography: Typography = Typography().let { t ->
+    t.copy(
+        bodyLarge = t.bodyLarge.copy(fontFamily = DmSans),
+        bodyMedium = t.bodyMedium.copy(fontFamily = DmSans),
+        labelLarge = t.labelLarge.copy(fontFamily = DmSans),
+        titleMedium = t.titleMedium.copy(fontFamily = DmSans),
+    )
 }
 
 @Composable
@@ -36,26 +46,20 @@ fun CulveryTheme(dark: Boolean, content: @Composable () -> Unit) {
         dangerSoft = animated(target.dangerSoft),
         dangerInk = animated(target.dangerInk),
     )
-    val base = if (dark) darkColorScheme() else lightColorScheme()
-    val scheme = base.copy(
-        primary = colors.accent,
-        onPrimary = colors.accentInk,
-        background = colors.bg,
-        onBackground = colors.ink,
-        surface = colors.surf,
-        onSurface = colors.ink,
-        onSurfaceVariant = colors.mute,
-    )
-    val typography = Typography().let { t ->
-        t.copy(
-            bodyLarge = t.bodyLarge.copy(fontFamily = DmSans),
-            bodyMedium = t.bodyMedium.copy(fontFamily = DmSans),
-            labelLarge = t.labelLarge.copy(fontFamily = DmSans),
-            titleMedium = t.titleMedium.copy(fontFamily = DmSans),
+    // Equal colours, same scheme: a theme that runs again doesn't invalidate everything under it (4c §4.2, P1).
+    val scheme = remember(dark, colors) {
+        (if (dark) darkColorScheme() else lightColorScheme()).copy(
+            primary = colors.accent,
+            onPrimary = colors.accentInk,
+            background = colors.bg,
+            onBackground = colors.ink,
+            surface = colors.surf,
+            onSurface = colors.ink,
+            onSurfaceVariant = colors.mute,
         )
     }
     CompositionLocalProvider(LocalHhColors provides colors) {
-        MaterialTheme(colorScheme = scheme, typography = typography, content = content)
+        MaterialTheme(colorScheme = scheme, typography = CulveryTypography, content = content)
     }
 }
 

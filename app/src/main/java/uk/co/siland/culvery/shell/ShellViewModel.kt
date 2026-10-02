@@ -48,7 +48,8 @@ class ShellViewModel @Inject constructor(
     private val kioskExitEvents = Channel<Unit>(Channel.BUFFERED)
     val kioskExit: Flow<Unit> = kioskExitEvents.receiveAsFlow()
 
-    private val now: StateFlow<LocalDateTime> =
+    /** The household's wall time, for the status bar and Home's clock; not part of [uiState], so a tick redraws only them (4c §4.2). */
+    val now: StateFlow<LocalDateTime> =
         ticker.ticks().stateIn(viewModelScope, SharingStarted.Eagerly, LocalDateTime.now())
 
     // Without Daylight, or until today's times are known, ThemeSchedule's 07:00 / 19:00 applies (4b design §3.8).
@@ -119,12 +120,11 @@ class ShellViewModel @Inject constructor(
                     settingsOpen = settings && session != null,
                 )
             },
-            now,
             scheduledDark,
             previewing,
             headerItems,
-        ) { state, time, scheduled, preview, header ->
-            state.copy(now = time, dark = scheduled != preview, previewing = preview, headerItems = header)
+        ) { state, scheduled, preview, header ->
+            state.copy(dark = scheduled != preview, previewing = preview, headerItems = header)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ShellUiState(dark = scheduledDark.value))
 
     init {

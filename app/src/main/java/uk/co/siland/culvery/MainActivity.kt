@@ -96,6 +96,8 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val state by shell.uiState.collectAsStateWithLifecycle()
+            // Read inside the clocks only: a minute's tick recomposes them, not the shell (4c §4.2).
+            val now = shell.now.collectAsStateWithLifecycle()
             val toast by toasts.current.collectAsStateWithLifecycle()
             val complete by setupComplete.collectAsStateWithLifecycle()
             val overlay = remember { OverlayState() }
@@ -119,6 +121,7 @@ class MainActivity : ComponentActivity() {
                             shell = {
                                 CulveryShell(
                                     state = state,
+                                    now = { now.value },
                                     onSelectTab = shell::selectTab,
                                     onOpenSettings = shell::openSettings,
                                     onSignOut = shell::signOut,

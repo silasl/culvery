@@ -1,6 +1,5 @@
 package uk.co.siland.culvery.shell
 
-import java.time.LocalDateTime
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomePlacement
 
@@ -15,7 +14,6 @@ data class ShellUiState(
     val tabs: List<TabItem> = emptyList(),
     val selectedTabId: String = HOME_TAB_ID,
     val session: SessionUi? = null,
-    val now: LocalDateTime = LocalDateTime.now(),
     val dark: Boolean = true,
     val previewing: Boolean = false,
     val homeCards: List<HomePlacement> = emptyList(),

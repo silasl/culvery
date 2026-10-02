@@ -30,7 +30,7 @@ private val TIME = DateTimeFormatter.ofPattern("HH:mm")
 /** Hand-off status bar, plus §7's signed-in indicator: `account_circle` · "{name} · {role}" · "Sign out". */
 @Composable
 fun StatusBar(
-    now: LocalDateTime,
+    now: () -> LocalDateTime,
     dark: Boolean,
     previewing: Boolean,
     session: SessionUi?,
@@ -47,7 +47,7 @@ fun StatusBar(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().height(30.dp).padding(horizontal = 20.dp),
     ) {
-        Text(now.format(TIME), style = HhType.status, color = c.mute)
+        Text(now().format(TIME), style = HhType.status, color = c.mute)
         Spacer(Modifier.weight(1f))
         if (session != null) {
             Row(

@@ -38,18 +38,11 @@ import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
-import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.shell.SessionUi
 import uk.co.siland.culvery.shell.ShellUiState
 import uk.co.siland.culvery.shell.TabItem
 import uk.co.siland.culvery.shell.ToastMessage
-
-private object NoNavigation : ShellNavigator {
-    override fun openTab(id: String) = Unit
-    override fun openSettings() = Unit
-    override fun exitKiosk() = Unit
-}
 
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -95,7 +88,6 @@ class ShellScreenshotTest {
     )
 
     private fun calendarHome(dark: Boolean) = ShellUiState(
-        now = at,
         dark = dark,
         tabs = listOf(TabItem("calendar", "Calendar", "calendar_month")),
         homeCards = HomeCardPlacer.place(
@@ -134,7 +126,7 @@ class ShellScreenshotTest {
     private fun snap(
         name: String,
         dark: Boolean,
-        state: ShellUiState = ShellUiState(now = at, dark = dark),
+        state: ShellUiState = ShellUiState(dark = dark),
         overlay: @Composable () -> Unit = {},
     ) {
         compose.setContent {
@@ -143,6 +135,7 @@ class ShellScreenshotTest {
                     Box(Modifier.fillMaxSize()) {
                         CulveryShell(
                             state = state,
+                            now = { at },
                             onSelectTab = {},
                             onOpenSettings = {},
                             onSignOut = {},
@@ -167,7 +160,7 @@ class ShellScreenshotTest {
     fun homeWithSessionDark() = snap(
         "home_session_dark",
         dark = true,
-        state = ShellUiState(now = at, dark = true, session = SessionUi("Alex", "Admin")),
+        state = ShellUiState(dark = true, session = SessionUi("Alex", "Admin")),
     )
 
     @Test

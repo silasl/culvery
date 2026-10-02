@@ -2,11 +2,17 @@ package uk.co.siland.culvery.shell.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getAlignmentLinePosition
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -24,9 +30,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.plugin.HeaderItem
+import uk.co.siland.culvery.core.plugin.HomeCard
+import uk.co.siland.culvery.core.plugin.HomeCardPlacer
+import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.SessionUi
+import uk.co.siland.culvery.shell.ShellUiState
 
 /** Needs real text metrics: legacy Robolectric graphics fakes glyph widths and font ascents. */
 @RunWith(AndroidJUnit4::class)
@@ -38,7 +49,7 @@ class ShellLayoutTest {
     @Test
     fun dateBaselineSits44dpBelowClockBaseline() {
         compose.setContent {
-            CulveryTheme(dark = true) { HomeScreen(at, emptyList()) }
+            CulveryTheme(dark = true) { HomeScreen({ at }, emptyList(), emptyList()) }
         }
         val clock = compose.onNodeWithTag("home_clock")
         val date = compose.onNodeWithTag("home_date")
@@ -48,7 +59,7 @@ class ShellLayoutTest {
     }
 
     private fun statusBar(session: SessionUi?, onSignOut: () -> Unit = {}) = compose.setContent {
-        CulveryTheme(dark = true) { StatusBar(at, dark = true, previewing = false, session = session, onSignOut = onSignOut, onToggleThemePreview = {}) }
+        CulveryTheme(dark = true) { StatusBar({ at }, dark = true, previewing = false, session = session, onSignOut = onSignOut, onToggleThemePreview = {}) }
     }
 
     @Test
@@ -83,7 +94,7 @@ class ShellLayoutTest {
     private fun item(id: String, order: Int) = HeaderItem(id, order) { Box(Modifier.size(200.dp, 60.dp)) }
 
     private fun home(vararg items: HeaderItem) = compose.setContent {
-        CulveryTheme(dark = true) { HomeScreen(at, emptyList(), items.toList()) }
+        CulveryTheme(dark = true) { HomeScreen({ at }, emptyList(), items.toList()) }
     }
 
     @Test
@@ -118,5 +129,38 @@ class ShellLayoutTest {
         home()
         compose.onAllNodesWithTag("home_header_divider").assertCountEquals(0)
         compose.onNodeWithTag("home_clock").assertExists()
+    }
+
+    /** P2: through the whole shell, as MainActivity draws it, a minute's tick redraws the clocks and nothing on the cards. */
+    @Test
+    fun aMinuteTickRedrawsTheClockAndNotTheCards() {
+        var now by mutableStateOf(at)
+        var cardCompositions = 0
+        val card = HomeCard("card", HomeCardSize.TALL, 1) {
+            cardCompositions++
+            Text("card")
+        }
+        val state = ShellUiState(homeCards = HomeCardPlacer.place(listOf(card)))
+        compose.setContent {
+            CompositionLocalProvider(LocalShellNavigator provides NoNavigation) {
+                CulveryTheme(dark = true) {
+                    CulveryShell(
+                        state = state,
+                        now = { now },
+                        onSelectTab = {},
+                        onOpenSettings = {},
+                        onSignOut = {},
+                        onToggleThemePreview = {},
+                        tabContent = {},
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        val before = cardCompositions
+        now = at.plusMinutes(1)
+        compose.waitForIdle()
+        compose.onNodeWithTag("home_clock").assertTextEquals("11:55")
+        assertThat(cardCompositions).isEqualTo(before)
     }
 }

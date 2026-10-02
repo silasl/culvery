@@ -8,7 +8,9 @@ import java.time.LocalTime
 import java.util.Optional
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -40,6 +42,12 @@ class ShellViewModelTest {
     private val access = FakeAccessControl()
     private val ticks = MutableStateFlow(noon)
 
+    /** A tick that leaves the theme as it was doesn't re-emit [ShellViewModel.uiState], so read the current value. */
+    private fun TestScope.darkNow(vm: ShellViewModel): Boolean {
+        runCurrent()
+        return vm.uiState.value.dark
+    }
+
     private fun vm(caps: Set<Capability> = emptySet(), daylight: Daylight? = null) =
         ShellViewModel(caps, { ticks }, access, Optional.ofNullable(daylight))
 
@@ -59,11 +67,12 @@ class ShellViewModelTest {
 
     @Test
     fun noCapabilitiesGivesHomeOnlyAndTracksTheClock() = runTest {
-        vm().uiState.test {
+        val vm = vm()
+        vm.uiState.test {
             val s = expectMostRecentItem()
             assertThat(s.tabs).isEmpty()
             assertThat(s.selectedTabId).isEqualTo(HOME_TAB_ID)
-            assertThat(s.now).isEqualTo(noon)
+            assertThat(vm.now.value).isEqualTo(noon)
             assertThat(s.dark).isFalse()
         }
     }
@@ -324,13 +333,14 @@ class ShellViewModelTest {
         val vm = vm(daylight = FakeDaylight(SunTimes(sunrise, sunset)))
         vm.uiState.test {
             ticks.value = noon.with(LocalTime.of(19, 19))
-            assertThat(expectMostRecentItem().dark).isFalse()
+            assertThat(darkNow(vm)).isFalse()
             ticks.value = noon.with(sunset)
-            assertThat(expectMostRecentItem().dark).isTrue()
+            assertThat(darkNow(vm)).isTrue()
             ticks.value = noon.plusDays(1).with(LocalTime.of(6, 49))
-            assertThat(expectMostRecentItem().dark).isTrue()
+            assertThat(darkNow(vm)).isTrue()
             ticks.value = noon.plusDays(1).with(sunrise)
-            assertThat(expectMostRecentItem().dark).isFalse()
+            assertThat(darkNow(vm)).isFalse()
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -339,13 +349,14 @@ class ShellViewModelTest {
         val vm = vm()
         vm.uiState.test {
             ticks.value = noon.with(LocalTime.of(18, 59))
-            assertThat(expectMostRecentItem().dark).isFalse()
+            assertThat(darkNow(vm)).isFalse()
             ticks.value = noon.with(LocalTime.of(19, 0))
-            assertThat(expectMostRecentItem().dark).isTrue()
+            assertThat(darkNow(vm)).isTrue()
             ticks.value = noon.plusDays(1).with(LocalTime.of(6, 59))
-            assertThat(expectMostRecentItem().dark).isTrue()
+            assertThat(darkNow(vm)).isTrue()
             ticks.value = noon.plusDays(1).with(LocalTime.of(7, 0))
-            assertThat(expectMostRecentItem().dark).isFalse()
+            assertThat(darkNow(vm)).isFalse()
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -368,7 +379,7 @@ class ShellViewModelTest {
         vm.uiState.test {
             ticks.value = noon.with(LocalTime.of(19, 10))
             expectMostRecentItem().let {
-                assertThat(it.now.toLocalTime()).isEqualTo(LocalTime.of(19, 10))
+                assertThat(vm.now.value.toLocalTime()).isEqualTo(LocalTime.of(19, 10))
                 assertThat(it.dark).isTrue()
             }
             advanceTimeBy(1_001)
