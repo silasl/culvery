@@ -5,15 +5,43 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
+// Release signing from the user's own ~/.gradle/gradle.properties (4c design D4); debug builds and the tests never need it.
+val releaseSigning = ReleaseSigning.KEYS.associateWith { providers.gradleProperty(it) }
+
 android {
     namespace = "uk.co.siland.culvery"
     defaultConfig {
         applicationId = "uk.co.siland.culvery"
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "1.0.0-beta1"
     }
     buildFeatures.buildConfig = true
+    signingConfigs {
+        // AGP's signing config takes plain values, so these are read while configuring, and only when all four are set.
+        if (ReleaseSigning.missing(releaseSigning.mapValues { it.value.orNull }).isEmpty()) {
+            create("release") {
+                storeFile = file(releaseSigning.getValue(ReleaseSigning.STORE_FILE).get())
+                storePassword = releaseSigning.getValue(ReleaseSigning.STORE_PASSWORD).get()
+                keyAlias = releaseSigning.getValue(ReleaseSigning.KEY_ALIAS).get()
+                keyPassword = releaseSigning.getValue(ReleaseSigning.KEY_PASSWORD).get()
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.findByName("release")
+        }
+    }
 }
+
+// A release task stops at once without the properties; it holds the providers, read only when it runs.
+val checkReleaseSigning by tasks.registering {
+    val properties = releaseSigning
+    doLast {
+        if (ReleaseSigning.missing(properties.mapValues { it.value.orNull }).isNotEmpty()) throw GradleException(ReleaseSigning.MESSAGE)
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkReleaseSigning) }
 
 dependencies {
     implementation(project(":core:ui"))

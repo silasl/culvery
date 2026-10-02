@@ -34,7 +34,7 @@ Google renames these console screens from time to time. If a label below doesn't
      Copy the `SHA1:` line under `Variant: debug`.
 3. Click **Create**. Nothing needs to be downloaded or copied into the project. Google matches the app by package name and fingerprint.
 
-A release build is signed with a different key, so it needs a second Android client with that key's SHA-1. That comes with release signing in Plan 4.
+A release build is signed with your release key (`docs/setup/release.md`), so it needs a second Android client: create another client of type **Android** in the same project, with the same package name and the release key's SHA-1, from `./gradlew :app:signingReport` under `Variant: release` (it shows once the release signing properties are set). Keep the debug client: both can sign in.
 
 ## 5. Connect on the tablet
 The emulator (or tablet) needs Google Play services: an image with **Google Play**. Add the family's Google account under **Settings › Accounts** first, so the chooser offers it. Then connect in the setup wizard's Connect step, or later in Culvery's **Settings › Calendars** (Admin PIN): pick the account, allow calendar access (both boxes), and the household's calendars appear. Every calendar in the account is added; the account's own calendar becomes the one the tablet adds events to, and a calendar named after one person (e.g. "Mia's swimming") shows in their colour. **Review calendars** (in the wizard, and Settings › Calendars) changes who each calendar is for, shows or hides it, and picks the master calendar; a calendar hidden there stays hidden until it is ticked or unticked again in Google Calendar. If access lapses, the Calendar tab shows "Google needs reconnecting": tap it and approve again.
