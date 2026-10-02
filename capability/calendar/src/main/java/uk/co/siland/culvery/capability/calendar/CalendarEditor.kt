@@ -250,7 +250,7 @@ class CalendarEditor internal constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.w(TAG, "Couldn't save a $kind", e)
+                Log.w(TAG, "Couldn't save a ${kind.name} (${e::class.simpleName})")
                 EditResult.Rejected(TRY_AGAIN)
             }
             report(kind, label, result)
@@ -366,7 +366,7 @@ class CalendarEditor internal constructor(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Log.w(TAG, "The provider accepted a $kind but the tablet couldn't store it; the next sync will", e)
+                    Log.w(TAG, "The provider accepted a ${kind.name} but the tablet couldn't store it (${e::class.simpleName}); the next sync will")
                 }
                 EditResult.Done
             }

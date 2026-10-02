@@ -60,9 +60,9 @@ internal class GoogleConnectFlow(private val authorizer: Authorizer, private val
             throw e
         } catch (e: Exception) {
             if (e.isUserCancel()) {
-                Log.i(TAG, "Google sign-in was cancelled", e)
+                Log.i(TAG, "Google sign-in was cancelled")
             } else {
-                Log.w(TAG, "Couldn't connect to Google", e)
+                Log.w(TAG, "Couldn't connect to Google (${e::class.simpleName})")
                 stopWithToast()
             }
             ConnectStep.Stopped
@@ -75,8 +75,8 @@ internal class GoogleConnectFlow(private val authorizer: Authorizer, private val
             return stopWithToast()
         }
         val email = api.sendWithToken(grant.token, "GET", api.url("calendars", "primary"))
-            .readOrUnreachable("calendars.get primary")
-            .decode(CalendarResource.serializer(), "calendars.get primary")
+            .readOrUnreachable(GoogleCall("calendars.get primary"))
+            .decode(CalendarResource.serializer(), GoogleCall("calendars.get primary"))
             .id
         val stored = existing?.config?.get(CONFIG_ACCOUNT)
         if (stored != null && !email.equals(stored, ignoreCase = true)) {

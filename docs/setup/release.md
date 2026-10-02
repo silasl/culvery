@@ -37,3 +37,13 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
 A release can't be installed over a debug build (their signatures differ): run `adb uninstall uk.co.siland.culvery` first, which removes the debug build's setup and data. Installing one release over the next keeps everything.
+
+## 4. Reading a release crash
+
+R8 renames the app's classes in a release build, and the log names exceptions by their short (renamed) names. Each build writes `app/build/outputs/mapping/release/mapping.txt`: keep a copy beside every APK you install. To read a stack trace or a log line from that build, run the Android SDK's `retrace` with it:
+
+```bash
+"$LOCALAPPDATA/Android/Sdk/cmdline-tools/latest/bin/retrace" mapping.txt crash.txt
+```
+
+A release logs only warnings and errors, and they name no person, calendar, account, town, coordinates or time zone.

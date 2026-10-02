@@ -118,7 +118,7 @@ class CalendarSetup(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.w(TAG, "Couldn't record ${connection.id} as reconnected", e)
+            Log.w(TAG, "Couldn't record ${connection.id} as reconnected (${e::class.simpleName})")
             false
         }
         if (recorded) {

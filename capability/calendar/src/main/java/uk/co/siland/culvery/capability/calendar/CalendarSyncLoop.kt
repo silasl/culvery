@@ -61,7 +61,7 @@ class CalendarSyncLoop internal constructor(
             // started is never missed.
             launch {
                 connectionIds.distinctUntilChanged()
-                    .retryWithBackoff { Log.w(TAG, "Couldn't read the connections; retrying", it) }
+                    .retryWithBackoff { Log.w(TAG, "Couldn't read the connections (${it::class.simpleName}); retrying") }
                     .collect { wake.trySend(Unit) }
             }
             // The first pass waits only for the first connection list.
@@ -80,10 +80,10 @@ class CalendarSyncLoop internal constructor(
         } catch (e: CancellationException) {
             // Stops the loop only if it was really cancelled; a stray one (an internal timeout) must not.
             currentCoroutineContext().ensureActive()
-            Log.w(TAG, "Calendar sync was cancelled internally", e)
+            Log.w(TAG, "Calendar sync was cancelled internally (${e::class.simpleName})")
         } catch (e: Throwable) {
             // An Error too (review M1): the loop must outlive it, and the application scope's handler never sees it.
-            Log.w(TAG, "Calendar sync failed", e)
+            Log.w(TAG, "Calendar sync failed (${e::class.simpleName})")
         }
     }
 
@@ -94,7 +94,7 @@ class CalendarSyncLoop internal constructor(
             throw e
         } catch (e: Throwable) {
             // An Error too (review M1): escaping here would end the loop.
-            Log.w(TAG, "Couldn't read the outbox; waiting the full interval", e)
+            Log.w(TAG, "Couldn't read the outbox (${e::class.simpleName}); waiting the full interval")
             null
         }
         // After a failed drain, the queue's own times don't count: waiting a second would retry the failure (m2).

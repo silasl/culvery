@@ -23,7 +23,7 @@ class ApplicationScopeTest {
             val sibling = CompletableDeferred<Unit>()
             scope.launch { sibling.complete(Unit) }
             withTimeout(5_000) { sibling.await() }
-            assertThat(ShadowLog.getLogsForTag("Culvery").map { it.throwable?.message }).contains("a sync job failed")
+            assertThat(ShadowLog.getLogsForTag("Culvery").map { it.msg }).contains("An application job failed (IllegalStateException)")
         } finally {
             scope.cancel()
         }

@@ -204,7 +204,7 @@ class CalendarSyncLoopTest {
         advanceTimeBy(SYNC_INTERVAL_MS)
         runCurrent()
         assertThat(count).isEqualTo(2)
-        assertThat(ShadowLog.getLogsForTag("CalendarSync").map { it.throwable?.message }).contains("a writer recursed")
+        assertThat(ShadowLog.getLogsForTag("CalendarSync").map { it.msg }).contains("Calendar sync failed (StackOverflowError)")
     }
 
     @Test

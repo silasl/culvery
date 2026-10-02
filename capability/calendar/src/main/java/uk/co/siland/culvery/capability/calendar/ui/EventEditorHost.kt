@@ -80,7 +80,7 @@ internal fun EventEditorHost(
             throw e
         } catch (e: Exception) {
             // The sheet closes (no form) and says so, instead of the store failure killing the app.
-            Log.w(TAG, "Couldn't open the add/edit sheet", e)
+            Log.w(TAG, "Couldn't open the add/edit sheet (${e::class.simpleName})")
             editor.couldNotOpen()
             Opened(request, null, "")
         }
@@ -92,7 +92,7 @@ internal fun EventEditorHost(
     // Kept only after the tablet failed (TRY_AGAIN), so Try again can't make a second event (3a design §3.12).
     var createKey by remember(request) { mutableStateOf(newClientKey()) }
     val action = rememberSingleAction(request) { e ->
-        Log.w(TAG, "Couldn't save", e)
+        Log.w(TAG, "Couldn't save (${e::class.simpleName})")
         failure = couldNotSave(opened?.label.orEmpty(), TRY_AGAIN)
     }
 
@@ -135,7 +135,7 @@ internal fun EventEditorHost(
                 throw e
             } catch (e: Exception) {
                 // A delete, so the detail sheet's wording rather than the Save failure card.
-                Log.w(TAG, "Couldn't start a delete", e)
+                Log.w(TAG, "Couldn't start a delete (${e::class.simpleName})")
                 editor.couldNotDelete(loaded.label)
             }
         }

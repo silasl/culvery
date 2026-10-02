@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.PathSensitivity
+
 plugins {
     `kotlin-dsl`
 }
@@ -34,4 +36,11 @@ gradlePlugin {
             implementationClass = "RoomConventionPlugin"
         }
     }
+}
+
+// LogHygieneTest reads the app's own sources.
+tasks.test {
+    inputs.files(fileTree(rootDir.parentFile) { include("*/src/main/**/*.kt", "*/*/src/main/**/*.kt", "*/src/release/**/*.kt") })
+        .withPropertyName("culverySources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

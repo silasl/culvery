@@ -44,7 +44,7 @@ internal fun EventDetailHost(
     val loaded: Loaded? by remember(ref, today) { repo.event(ref, today).map { Loaded(it) } }.collectAsState(initial = null)
     val people: List<Person> by repo.people.collectAsState(initial = emptyList())
     var mode by remember(ref, initialMode) { mutableStateOf(initialMode) }
-    val action = rememberSingleAction(ref) { e -> Log.w(TAG, "Couldn't change an event", e) }
+    val action = rememberSingleAction(ref) { e -> Log.w(TAG, "Couldn't change an event (${e::class.simpleName})") }
 
     val state = loaded ?: return
     val detail = state.detail

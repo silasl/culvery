@@ -67,7 +67,7 @@ class ShellViewModel @Inject constructor(
             combine(
                 ordered.map { cap ->
                     // onStart after the retry: a retry must not hide a tab that was showing.
-                    cap.hasTab.retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read whether it has a tab; retrying", it) }
+                    cap.hasTab.retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read whether it has a tab (${it::class.simpleName}); retrying") }
                         .onStart { emit(false) }
                         .map { shown -> if (shown) TabItem(cap.id, cap.label, cap.icon) else null }
                 },
@@ -82,7 +82,7 @@ class ShellViewModel @Inject constructor(
         } else {
             combine(
                 ordered.map { cap ->
-                    cap.cards().retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its Home cards; retrying", it) }
+                    cap.cards().retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its Home cards (${it::class.simpleName}); retrying") }
                         .onStart { emit(emptyList()) }
                 },
             ) { lists -> HomeCardPlacer.place(lists.toList().flatten()) }

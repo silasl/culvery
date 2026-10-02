@@ -288,7 +288,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
 
     private fun OutboxEntity.readOrNull(): PendingChange? =
         runCatching { toPending() }
-            .onFailure { Log.w(TAG, "Dropping unreadable outbox row $id (kind $kind)", it) }
+            .onFailure { Log.w(TAG, "Dropping unreadable outbox row ${this.id} (kind ${this.kind}, ${it::class.simpleName})") }
             .getOrNull()
 
     private companion object {

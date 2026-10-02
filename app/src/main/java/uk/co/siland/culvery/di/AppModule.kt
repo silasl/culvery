@@ -28,7 +28,7 @@ import uk.co.siland.culvery.shell.householdTicker
  * An application job's uncaught failure is logged and the process lives on; with the SupervisorJob its siblings keep
  * running (3a design §3.12).
  */
-internal val LoggingExceptionHandler = CoroutineExceptionHandler { _, e -> Log.e("Culvery", "An application job failed", e) }
+internal val LoggingExceptionHandler = CoroutineExceptionHandler { _, e -> Log.e("Culvery", "An application job failed (${e::class.simpleName})") }
 
 @Module
 @InstallIn(SingletonComponent::class)

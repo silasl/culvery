@@ -71,7 +71,7 @@ class CalendarSync internal constructor(
             // An Error too (review M1), or its row stays due and the loop re-sends it every second. The changes stay
             // queued for a later pass; the sync must still run.
             failedDrains++
-            Log.w(TAG, "The outbox drain failed ($failedDrains in a row); syncing anyway", e)
+            Log.w(TAG, "The outbox drain failed (${this.failedDrains} in a row, ${e::class.simpleName}); syncing anyway")
         }
         connections.forEach { sync(it, window) }
     }
@@ -258,7 +258,7 @@ class CalendarSync internal constructor(
             throw e
         } catch (e: Exception) {
             // Sent again later, which is safe: creates are idempotent by key, updates and deletes by nature.
-            Log.w(TAG, "The provider accepted a queued ${change.kind} but the tablet couldn't store it; retrying later", e)
+            Log.w(TAG, "The provider accepted a queued ${change.kind} but the tablet couldn't store it (${e::class.simpleName}); retrying later")
             WriteOutcome.Retry(blocksConnection = false)
         }
 
@@ -313,20 +313,20 @@ class CalendarSync internal constructor(
      */
     private fun healthAfter(e: Throwable, conn: Connection, sourceId: String): ConnectionHealth = when (e) {
         is NeedsSignInException -> {
-            Log.w(TAG, "${conn.id}: a source needs signing in again", e)
+            Log.w(TAG, "${conn.id}: a source needs signing in again (${e::class.simpleName})")
             ConnectionHealth.NeedsSignIn
         }
         is SourceGoneException -> {
-            Log.w(TAG, "${conn.id}: a source is gone from the service; flagging a refresh of its calendars", e)
+            Log.w(TAG, "${conn.id}: a source is gone from the service (${e::class.simpleName}); flagging a refresh of its calendars")
             refresher.flag(conn.id, sourceId)
             ConnectionHealth.Unreachable
         }
         is UnreachableException -> {
-            Log.w(TAG, "${conn.id}: a source is unreachable", e)
+            Log.w(TAG, "${conn.id}: a source is unreachable (${e::class.simpleName})")
             ConnectionHealth.Unreachable
         }
         else -> {
-            Log.e(TAG, "${conn.id}: a source failed", e)
+            Log.e(TAG, "${conn.id}: a source failed (${e::class.simpleName})")
             ConnectionHealth.Error(e.message ?: e.javaClass.simpleName)
         }
     }

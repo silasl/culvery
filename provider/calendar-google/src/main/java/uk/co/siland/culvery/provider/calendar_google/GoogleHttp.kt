@@ -30,6 +30,10 @@ internal const val READ_ONLY_HERE = "this calendar can't be changed from the tab
 /** The module's one log tag. */
 internal const val TAG = "GoogleCalendar"
 
+/** Which call a log line is about: a fixed name such as "events.list", never a calendar, an email or an id. */
+@JvmInline
+internal value class GoogleCall(val label: String)
+
 private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
 
 /** 403 reasons that mean "try later": Google's rate limits and its quotas (3a design §3.7). */
@@ -103,25 +107,25 @@ internal class GoogleResponse(val code: Int, val body: String) {
  * A successful answer as [deserializer] reads it; a body that doesn't parse means try later (3a design §3.7).
  * [what] is logged, so it names the request and never a calendar, an email or an id.
  */
-internal fun <T> GoogleResponse.decode(deserializer: DeserializationStrategy<T>, what: String): T =
+internal fun <T> GoogleResponse.decode(deserializer: DeserializationStrategy<T>, what: GoogleCall): T =
     try {
         GoogleJson.decodeFromString(deserializer, body)
     } catch (e: IllegalArgumentException) {
         // Not the exception itself: kotlinx.serialization quotes the body, which can hold emails (P8).
-        Log.w(TAG, "$what: Google Calendar sent a body the tablet can't read (${e::class.simpleName})")
+        Log.w(TAG, "${what.label}: Google Calendar sent a body the tablet can't read (${e::class.simpleName})")
         throw UnreachableException("Google Calendar sent an answer the tablet can't read")
     }
 
 /** A read's answer: success, or "try later" for any status the caller didn't handle, logged with Google's reason ([what] as for [decode]). */
-internal fun GoogleResponse.readOrUnreachable(what: String): GoogleResponse {
+internal fun GoogleResponse.readOrUnreachable(what: GoogleCall): GoogleResponse {
     if (isSuccessful) return this
-    Log.w(TAG, "$what: Google Calendar answered $code ($reason)")
+    Log.w(TAG, "${what.label}: Google Calendar answered ${this.code} (${this.reason})")
     throw UnreachableException("Google Calendar answered $code")
 }
 
 /** A write's refusal in the tablet's own words (3a design §3.7, R8); Google's reason is logged ([what] as for [decode]). */
-internal fun GoogleResponse.refusal(what: String): WriteRejectedException {
-    Log.w(TAG, "$what: Google Calendar refused it with $code ($reason)")
+internal fun GoogleResponse.refusal(what: GoogleCall): WriteRejectedException {
+    Log.w(TAG, "${what.label}: Google Calendar refused it with ${this.code} (${this.reason})")
     return WriteRejectedException(if (code == 403) READ_ONLY_HERE else REFUSED)
 }
 
@@ -172,11 +176,11 @@ class GoogleApi(private val baseUrl: HttpUrl, private val tokens: TokenSource, p
             throw UnreachableException("Couldn't reach Google Calendar", e)
         }
         if (answer.code == 403 && answer.reasons.any { it in SCOPE_MISSING }) {
-            Log.w(TAG, "$method ${pathTemplate(url)}: Google Calendar says the grant lacks a calendar scope (${answer.reason})")
+            Log.w(TAG, "${request.method} ${pathTemplate(request.url)}: Google Calendar says the grant lacks a calendar scope (${answer.reason})")
             throw NeedsSignInException("Google Calendar needs the calendar scopes approved again")
         }
         if (answer.code == 429 || answer.code >= 500 || (answer.code == 403 && answer.reasons.any { it in RATE_LIMITS })) {
-            Log.w(TAG, "$method ${pathTemplate(url)}: Google Calendar said try later: ${answer.code} (${answer.reason})")
+            Log.w(TAG, "${request.method} ${pathTemplate(request.url)}: Google Calendar said try later: ${answer.code} (${answer.reason})")
             throw UnreachableException("Google Calendar asked to try later (${answer.code})")
         }
         return answer

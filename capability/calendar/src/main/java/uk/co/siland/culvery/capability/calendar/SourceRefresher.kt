@@ -66,11 +66,11 @@ class SourceRefresher internal constructor(
         if (!scheduled && gone.isEmpty()) return
         // Logged by connection id only: a calendar's name or id can be the account's email.
         val sources = callReader(io, timeoutMillis) { provider.sources(stored.connection) }.getOrElse {
-            Log.w(TAG, "$id: couldn't read its calendars; trying again next pass", it)
+            Log.w(TAG, "${stored.connection.id}: couldn't read its calendars (${it::class.simpleName}); trying again next pass")
             return
         }
         if (sources.none { it.primary }) {
-            Log.w(TAG, "$id: its calendar list has no primary calendar; treating it as a failed read")
+            Log.w(TAG, "${stored.connection.id}: its calendar list has no primary calendar; treating it as a failed read")
             return
         }
         val household = people()

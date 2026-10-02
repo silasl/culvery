@@ -48,7 +48,7 @@ internal class Connector(private val overlay: OverlayHost, private val connectio
     }
 
     private fun installed(providerId: String): CalendarProvider? =
-        connections.provider(providerId).also { if (it == null) Log.w(TAG, "No calendar provider $providerId in this build; nothing to connect") }
+        connections.provider(providerId).also { if (it == null) Log.w(TAG, "No calendar provider for that id in this build; nothing to connect") }
 
     private companion object {
         const val TAG = "CalendarConnect"

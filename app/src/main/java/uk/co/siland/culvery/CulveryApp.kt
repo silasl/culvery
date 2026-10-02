@@ -22,7 +22,7 @@ class CulveryApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        startAll(startables) { startable, e -> Log.e(TAG, "${startable.javaClass.name} failed to start", e) }
+        startAll(startables) { startable, e -> Log.e(TAG, "${startable::class.simpleName} failed to start (${e::class.simpleName})") }
         appScope.launch { seedDebugData(household, calendarSetup, calendarProviders) }
         appScope.launch { removeSampleWhenReplaced(calendarSetup) }
     }

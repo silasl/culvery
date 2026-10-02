@@ -759,7 +759,7 @@ class CalendarSyncTest {
         sync.syncAll()
         // Queued with one attempt behind it, so this is the second: the next backoff step.
         assertThat(store.pendingNow().single().let { it.attempts to it.nextAttemptMillis }).isEqualTo(2 to now.toEpochMilli() + 60_000)
-        assertThat(ShadowLog.getLogsForTag("CalendarWrites").map { it.throwable?.message }).contains("writer recursed")
+        assertThat(ShadowLog.getLogsForTag("CalendarWrites").map { it.msg }).contains("A calendar write failed unexpectedly (StackOverflowError); it will be retried")
     }
 
     @Test

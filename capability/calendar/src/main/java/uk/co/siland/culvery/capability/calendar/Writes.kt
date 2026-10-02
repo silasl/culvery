@@ -78,7 +78,7 @@ internal suspend fun callWriter(io: CoroutineContext, timeoutMillis: Long, call:
         WriteOutcome.Retry(blocksConnection = true)
     } catch (e: Throwable) {
         // An Error too (review M1): logged and retried, never out of the drain.
-        Log.w(TAG, "A calendar write failed unexpectedly; it will be retried", e)
+        Log.w(TAG, "A calendar write failed unexpectedly (${e::class.simpleName}); it will be retried")
         WriteOutcome.Retry(blocksConnection = false)
     }
 
