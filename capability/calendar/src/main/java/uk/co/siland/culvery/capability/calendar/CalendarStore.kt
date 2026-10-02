@@ -210,14 +210,16 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     }
 
     /**
-     * Null when nothing is stored or the cursor belongs to a different window or zone, forcing a full resync.
-     * A zone change must resync: all-day events are stored at midnight in the zone they were synced in.
+     * The sync token while what its full sync read still covers [window], in the same zone (4c ruling 1): a window
+     * that has moved past what was read, or before it (a clock set back), or a zone change, reads in full. A zone
+     * change must: all-day events are stored at midnight in the zone they were synced in.
      */
-    suspend fun cursor(connectionId: String, sourceId: String, range: DateRange): SyncCursor? =
-        dao.syncState(connectionId, sourceId)
-            ?.takeIf { it.rangeStart == range.cursorKey() }
-            ?.cursor
-            ?.let(::SyncCursor)
+    suspend fun cursor(connectionId: String, sourceId: String, window: DateRange): SyncCursor? {
+        val state = dao.syncState(connectionId, sourceId) ?: return null
+        val key = CursorKey.parse(state.rangeStart) ?: return null
+        val covers = !key.readStart.isAfter(window.start) && !key.readEnd.isBefore(window.endExclusive) && key.zoneId == window.zone.id
+        return state.cursor?.takeIf { covers }?.let(::SyncCursor)
+    }
 
     /**
      * Touches only the event mirror and the cursor; queued changes in the outbox are never affected. Writes nothing
@@ -233,8 +235,26 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
                 result.removedIds.chunked(REMOVE_CHUNK).forEach { dao.deleteEvents(connectionId, sourceId, it) }
             }
             dao.upsertEvents(result.upserts.map { it.toEntity(connectionId, sourceId, range.zone) })
-            dao.upsertSyncState(SyncStateEntity(connectionId, sourceId, result.cursor?.value, range.cursorKey()))
+            // An incremental result keeps what the full sync read: only a full sync reads a new range (4c ruling 1).
+            val key = if (result.fullReplace) range.cursorKey() else dao.syncState(connectionId, sourceId)?.rangeStart ?: range.cursorKey()
+            dao.upsertSyncState(SyncStateEntity(connectionId, sourceId, result.cursor?.value, key))
         }
+
+    /**
+     * Drops [sourceId]'s events that end before [window] starts, or start at or after the end of what its full sync read
+     * (4c design §6.2, ruling 1): an incremental result can carry any date, and nothing else removes them. What was read
+     * past the window stays, as no incremental result will bring it back. A row a queued change targets stays. Returns
+     * how many went.
+     */
+    suspend fun prune(connectionId: String, sourceId: String, window: DateRange): Int = db.withTransaction {
+        val readEnd = dao.syncState(connectionId, sourceId)?.let { CursorKey.parse(it.rangeStart) }?.readEnd ?: window.endExclusive
+        dao.pruneEvents(
+            connectionId,
+            sourceId,
+            window.startInstant.toEpochMilli(),
+            readEnd.atStartOfDay(window.zone).toInstant().toEpochMilli(),
+        )
+    }
 
     fun eventsBetween(startMillis: Long, endMillis: Long): Flow<List<StoredEvent>> =
         dao.eventsBetween(startMillis, endMillis).map { rows -> rows.map { it.toStored() } }
@@ -299,7 +319,21 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     }
 }
 
-private fun DateRange.cursorKey(): String = "$start|${zone.id}"
+/** A sync cursor's key (4c ruling 1): the days its full sync read, end exclusive, and the zone it read them in. */
+private class CursorKey(val readStart: LocalDate, val readEnd: LocalDate, val zoneId: String) {
+    override fun toString(): String = "$readStart|$readEnd|$zoneId"
+
+    companion object {
+        /** Null for a key from before v6 (cleared by the migration) or anything unreadable: a full sync. */
+        fun parse(text: String): CursorKey? {
+            val parts = text.split('|')
+            if (parts.size != 3) return null
+            return runCatching { CursorKey(LocalDate.parse(parts[0]), LocalDate.parse(parts[1]), parts[2]) }.getOrNull()
+        }
+    }
+}
+
+private fun DateRange.cursorKey(): String = CursorKey(start, endExclusive, zone.id).toString()
 
 internal fun ConnectionHealth.code(): String = when (this) {
     ConnectionHealth.Ok -> "OK"

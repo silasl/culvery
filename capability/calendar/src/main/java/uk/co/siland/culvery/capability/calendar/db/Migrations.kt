@@ -47,3 +47,17 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         db.execSQL("UPDATE `source` SET `shownInService` = `visible`")
     }
 }
+
+/**
+ * v6 (Plan 4c): a calendar's read problem (§6.4); and every sync cursor cleared, as their key changes meaning (§6.2), so
+ * each calendar is read in full once. The SQL must match schemas/…/6.json exactly.
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `source` ADD COLUMN `readProblem` TEXT")
+        db.execSQL("DELETE FROM `sync_state`")
+    }
+}
+
+/** Every migration, oldest first: the database builder and the tests add these. */
+val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)

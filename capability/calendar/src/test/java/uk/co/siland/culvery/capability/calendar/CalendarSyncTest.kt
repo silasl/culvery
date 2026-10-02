@@ -97,6 +97,13 @@ class CalendarSyncTest {
         recurring = false,
     )
 
+    private fun at(instant: String, title: String) = RemoteEvent(
+        title.lowercase(), title,
+        EventTime.Timed(Instant.parse(instant)),
+        EventTime.Timed(Instant.parse(instant).plusSeconds(3_600)),
+        recurring = false,
+    )
+
     private suspend fun cachedTitles() =
         store.eventsBetween(Instant.parse("2026-09-23T00:00:00Z").toEpochMilli(), Instant.parse("2026-09-24T00:00:00Z").toEpochMilli())
             .first().map { it.title }
@@ -115,14 +122,14 @@ class CalendarSyncTest {
     }
 
     @Test
-    fun windowIsYesterdayToTwoWeeksAheadInTheHouseholdZone() = runTest {
+    fun aFullSyncReadsFromYesterdayToSixWeeksPastTheWindow() = runTest {
         connect("c1", "calendar.a", s1)
         val sync = engine()
         household.setLocation(HomeLocation("Wellington", -41.29, 174.78, "Pacific/Auckland"))
         now = Instant.parse("2026-09-23T13:00:00Z") // already 24 September in Auckland
         sync.syncAll()
         val auckland = ZoneId.of("Pacific/Auckland")
-        assertThat(a.calls.single().range).isEqualTo(DateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 10, 9), auckland))
+        assertThat(a.calls.single().range).isEqualTo(DateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 12, 4), auckland))
     }
 
     @Test
@@ -134,15 +141,42 @@ class CalendarSyncTest {
         assertThat(a.calls.map { it.cursor }).containsExactly(null, SyncCursor("k1")).inOrder()
     }
 
+    /** E2: the pass after local midnight carries on from its token. */
     @Test
-    fun aNewDayResyncsFromScratch() = runTest {
+    fun thePassAfterLocalMidnightKeepsTheCursor() = runTest {
         connect("c1", "calendar.a", s1)
         val sync = engine()
         sync.syncAll()
         now = Instant.parse("2026-09-24T11:00:00Z")
         sync.syncAll()
-        assertThat(a.calls[1].cursor).isNull()
-        assertThat(a.calls[1].range).isEqualTo(DateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 10, 9), london))
+        assertThat(a.calls[1].cursor).isEqualTo(SyncCursor("k1"))
+    }
+
+    /** Ruling 1: exactly SYNC_AHEAD_DAYS later the token still serves; a day after, it reads in full. */
+    @Test
+    fun theTokenServesUntilTheWindowPassesWhatWasRead() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = engine()
+        sync.syncAll()
+        now = now.plusSeconds(SYNC_AHEAD_DAYS * 86_400)
+        sync.syncAll()
+        assertThat(a.calls[1].cursor).isEqualTo(SyncCursor("k1"))
+        now = now.plusSeconds(86_400)
+        sync.syncAll()
+        assertThat(a.calls[2].cursor).isNull()
+    }
+
+    @Test
+    fun eventsAnIncrementalResultBringsOutsideWhatIsKeptArePruned() = runTest {
+        connect("c1", "calendar.a", s1)
+        val sync = engine()
+        a.events = { listOf(swim()) }
+        sync.syncAll()
+        a.events = { listOf(swim(), at("2026-12-25T12:00:00Z", "Christmas lunch"), at("2026-09-01T10:00:00Z", "Long ago")) }
+        now = now.plusSeconds(300)
+        sync.syncAll()
+        assertThat(a.calls.last().cursor).isNotNull()
+        assertThat(store.eventsBetween(Long.MIN_VALUE, Long.MAX_VALUE).first().map { it.title }).containsExactly("Swim")
     }
 
     @Test

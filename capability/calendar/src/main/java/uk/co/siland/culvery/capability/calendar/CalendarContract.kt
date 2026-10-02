@@ -139,8 +139,8 @@ class WriteRejectedException(message: String, cause: Throwable? = null) : Except
  * - They must be main-safe and cancellable: no uninterruptible blocking I/O. The sync engine calls them on
  *   Dispatchers.IO under a 60 s timeout, and a call that times out counts as Unreachable.
  * - [sync] without a cursor returns only events that overlap the range. With a cursor, incremental upserts
- *   MAY lie outside the range (Google's syncToken can't carry timeMin/timeMax); the store keeps them and
- *   queries filter by range.
+ *   MAY lie outside the range (Google's syncToken can't carry timeMin/timeMax); the engine prunes what lies
+ *   outside what it keeps.
  */
 interface CalendarProvider {
     val descriptor: ProviderDescriptor

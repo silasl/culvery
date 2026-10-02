@@ -17,8 +17,16 @@ import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 
 const val SYNC_PAST_DAYS = 1L
-const val SYNC_FUTURE_DAYS = 14L
+
+/** How far ahead the tablet shows: the Calendar tab's four weeks (4c D10); the window is today − 1 to today + 28. */
+const val SYNC_FUTURE_DAYS = 28L
 const val PROVIDER_TIMEOUT_MS = 60_000L
+
+/**
+ * How much further than the window a full sync reads (4c ruling 1): Google's incremental results say nothing about an
+ * unchanged event, so the token serves only while what was read covers the window — six weeks.
+ */
+const val SYNC_AHEAD_DAYS = 42L
 
 @Singleton
 class CalendarSync internal constructor(
@@ -301,9 +309,11 @@ class CalendarSync internal constructor(
         window: DateRange,
     ): ConnectionHealth {
         val cursor = store.cursor(conn.id, source.id, window)
-        val result = callReader(io, timeoutMillis) { provider.sync(conn, source, window, cursor) }
+        val read = DateRange(window.start, window.endExclusive.plusDays(SYNC_AHEAD_DAYS), window.zone)
+        val result = callReader(io, timeoutMillis) { provider.sync(conn, source, read, cursor) }
             .getOrElse { return healthAfter(it, conn, source.id) }
-        store.applySync(conn.id, source.id, window, result)
+        store.applySync(conn.id, source.id, read, result)
+        store.prune(conn.id, source.id, window)
         return ConnectionHealth.Ok
     }
 

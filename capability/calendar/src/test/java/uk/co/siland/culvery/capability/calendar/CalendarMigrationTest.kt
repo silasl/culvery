@@ -19,10 +19,12 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
+import uk.co.siland.culvery.capability.calendar.db.ALL_MIGRATIONS
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_1_2
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_2_3
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_3_4
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_4_5
+import uk.co.siland.culvery.capability.calendar.db.MIGRATION_5_6
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -74,7 +76,7 @@ class CalendarMigrationTest {
         helper.runMigrationsAndValidate(2, listOf(MIGRATION_1_2)).close()
 
         val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(*ALL_MIGRATIONS)
             .setDriver(AndroidSQLiteDriver())
             .allowMainThreadQueries()
             .build()
@@ -96,7 +98,8 @@ class CalendarMigrationTest {
             assertThat(event.start).isEqualTo(EventTime.Timed(Instant.ofEpochMilli(1000)))
 
             val range = DateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 10, 8), ZoneId.of("Europe/London"))
-            assertThat(store.cursor("c1", "s1", range)).isEqualTo(SyncCursor("k7"))
+            // v6 clears every cursor (4c §6.2).
+            assertThat(store.cursor("c1", "s1", range)).isNull()
 
             assertThat(store.pendingNow()).isEmpty()
             assertThat(store.master().first()).isNull()
@@ -146,7 +149,7 @@ class CalendarMigrationTest {
         }
 
         val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(*ALL_MIGRATIONS)
             .setDriver(AndroidSQLiteDriver())
             .allowMainThreadQueries()
             .build()
@@ -156,7 +159,8 @@ class CalendarMigrationTest {
             assertThat(store.master().first()?.source?.id).isEqualTo("s1")
             assertThat(store.eventNow(EventRef("c1", "s1", "e1"))?.title).isEqualTo("Swim")
             val range = DateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 10, 8), ZoneId.of("Europe/London"))
-            assertThat(store.cursor("c1", "s1", range)).isEqualTo(SyncCursor("k7"))
+            // v6 clears every cursor (4c §6.2).
+            assertThat(store.cursor("c1", "s1", range)).isNull()
 
             val pending = store.pendingNow()
             assertThat(pending.map { it.kind })
@@ -211,7 +215,7 @@ class CalendarMigrationTest {
         }
 
         val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(*ALL_MIGRATIONS)
             .setDriver(AndroidSQLiteDriver())
             .allowMainThreadQueries()
             .build()
@@ -228,7 +232,8 @@ class CalendarMigrationTest {
             val event = store.eventNow(EventRef("c1", "s1", "e1"))!!
             assertThat(listOf(event.title, event.recurring, event.recurrenceRule)).containsExactly("Swim", true, null).inOrder()
             val range = DateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 10, 8), ZoneId.of("Europe/London"))
-            assertThat(store.cursor("c1", "s1", range)).isEqualTo(SyncCursor("k7"))
+            // v6 clears every cursor (4c §6.2).
+            assertThat(store.cursor("c1", "s1", range)).isNull()
 
             val pending = store.pendingNow()
             assertThat(pending.map { it.kind })
@@ -280,7 +285,7 @@ class CalendarMigrationTest {
         }
 
         val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(*ALL_MIGRATIONS)
             // refreshSources runs in withTransaction, which needs the framework open helper, not the driver.
             .allowMainThreadQueries()
             .build()
@@ -299,6 +304,57 @@ class CalendarMigrationTest {
                 "s3", SourceMapping(PersonId("mia-id"), visible = true),
             )
             assertThat(store.master().first()?.source?.id).isEqualTo("s1")
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun migrationFromV5ClearsTheCursorsAndKeepsQueuedChangesMappingsAndTheMaster() = runTest {
+        file.parentFile?.mkdirs()
+        file.delete()
+
+        val v5 = helper.createDatabase(5)
+        v5.execSQL(
+            "INSERT INTO connection (id, providerId, label, configJson, health, healthMessage, lastSyncMillis, sourcesCheckedMillis, " +
+                "needsSignInSinceMillis) VALUES ('c1', 'calendar.test', 'Google', '{}', 'OK', NULL, 1234, 1000, NULL)",
+        )
+        v5.execSQL(
+            "INSERT INTO source (connectionId, sourceId, name, writable, visible, personId, isMaster, shownInService) " +
+                "VALUES ('c1', 's1', 'Family', 1, 1, 'family', 1, 1), ('c1', 's2', 'Alex', 0, 0, 'alex-id', 0, 0)",
+        )
+        v5.execSQL(
+            "INSERT INTO event (connectionId, sourceId, remoteId, title, startInstant, startDate, endInstant, endDate, " +
+                "recurring, forPerson, createdBy, startSort, endSort, recurrenceRule) " +
+                "VALUES ('c1', 's1', 'e1', 'Swim', 1000, NULL, 2000, NULL, 0, 'alex-id', 'sam-id', 1000, 2000, NULL)",
+        )
+        v5.execSQL("INSERT INTO sync_state (connectionId, sourceId, cursor, rangeStart) VALUES ('c1', 's1', 'k7', '2026-09-22|Europe/London')")
+        v5.execSQL(
+            "INSERT INTO outbox (connectionId, sourceId, remoteId, kind, draftJson, attempts, nextAttemptMillis, createdMillis, clientKey, fields) " +
+                "VALUES ('c1', 's1', 'e1', 'UPDATE', '$DRAFT_JSON', 2, 5000, 4000, NULL, 'TITLE')",
+        )
+        v5.close()
+
+        helper.runMigrationsAndValidate(6, listOf(MIGRATION_5_6)).close()
+
+        val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
+            .addMigrations(*ALL_MIGRATIONS)
+            .setDriver(AndroidSQLiteDriver())
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val store = CalendarStore(db)
+            assertThat(store.master().first()?.source?.id).isEqualTo("s1")
+            assertThat(store.sources().first().associate { it.source.id to it.mapping }).containsExactly(
+                "s1", SourceMapping(PersonId.FAMILY, visible = true),
+                "s2", SourceMapping(PersonId("alex-id"), visible = false),
+            )
+            assertThat(store.pendingNow().map { Triple(it.remoteId, it.kind, it.fields) })
+                .containsExactly(Triple("e1", ChangeKind.UPDATE, setOf(EventField.TITLE)))
+            assertThat(store.eventNow(EventRef("c1", "s1", "e1"))?.title).isEqualTo("Swim")
+            // No cursor: the first pass after the upgrade reads each calendar in full.
+            val window = DateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 10, 8), ZoneId.of("Europe/London"))
+            assertThat(store.cursor("c1", "s1", window)).isNull()
         } finally {
             db.close()
         }

@@ -195,7 +195,7 @@ class CalendarStoreTest {
     }
 
     @Test
-    fun cursorIsDroppedWhenTheWindowMoves() = runTest {
+    fun cursorIsDroppedOnceTheWindowPassesWhatWasRead() = runTest {
         connect("s1")
         store.applySync("c1", "s1", window, full(timed("a", "One", 23, 9)))
         val nextDay = DateRange(window.start.plusDays(1), window.endExclusive.plusDays(1), zone)
@@ -209,6 +209,89 @@ class CalendarStoreTest {
         val sameDatesElsewhere = DateRange(window.start, window.endExclusive, ZoneId.of("Pacific/Auckland"))
         assertThat(store.cursor("c1", "s1", sameDatesElsewhere)).isNull()
         assertThat(store.cursor("c1", "s1", window)).isEqualTo(SyncCursor("k1"))
+    }
+
+    private fun spanning(id: String, from: Instant, to: Instant) =
+        RemoteEvent(id, id, EventTime.Timed(from), EventTime.Timed(to), recurring = false)
+
+    private val read = DateRange(window.start, window.endExclusive.plusDays(SYNC_AHEAD_DAYS), zone)
+
+    private suspend fun storedIds() = store.eventsBetween(Long.MIN_VALUE, Long.MAX_VALUE).first().map { it.remoteId }
+
+    /** E2: no nightly full resync — a token serves every window that what it read still covers. */
+    @Test
+    fun cursorIsKeptWhileWhatWasReadCoversTheWindow() = runTest {
+        connect("s1")
+        store.applySync("c1", "s1", read, full(timed("a", "One", 23, 9)))
+        val nextDay = DateRange(window.start.plusDays(1), window.endExclusive.plusDays(1), zone)
+        assertThat(store.cursor("c1", "s1", nextDay)).isEqualTo(SyncCursor("k1"))
+    }
+
+    /** Ruling 1: a clock set back asks for days the token never read, so it reads in full again. */
+    @Test
+    fun aClockMovedBackReadsInFullAgain() = runTest {
+        connect("s1")
+        store.applySync("c1", "s1", read, full(timed("a", "One", 23, 9)))
+        val dayBefore = DateRange(window.start.minusDays(1), window.endExclusive.minusDays(1), zone)
+        assertThat(store.cursor("c1", "s1", dayBefore)).isNull()
+    }
+
+    @Test
+    fun anIncrementalResultKeepsWhatTheFullSyncRead() = runTest {
+        connect("s1")
+        store.applySync("c1", "s1", window, full(timed("a", "One", 23, 9)))
+        val later = DateRange(window.start.plusDays(10), window.endExclusive.plusDays(10), zone)
+        store.applySync("c1", "s1", later, SyncResult(emptyList(), emptyList(), SyncCursor("k2"), fullReplace = false))
+        // Still only what the full sync read: a window past it isn't covered, whatever the incremental pass asked with.
+        assertThat(store.cursor("c1", "s1", DateRange(window.start.plusDays(1), window.endExclusive.plusDays(1), zone))).isNull()
+        assertThat(store.cursor("c1", "s1", window)).isEqualTo(SyncCursor("k2"))
+    }
+
+    /** §6.2: what ends before the window, or starts at or after the end of what was read, goes; the edges are exact. */
+    @Test
+    fun pruningDropsWhatEndsBeforeTheWindowOrStartsAfterWhatWasRead() = runTest {
+        connect("s1")
+        store.applySync(
+            "c1", "s1", read,
+            full(
+                timed("old", "Old", 20, 9),
+                spanning("endsAtTheStart", window.startInstant.minusSeconds(3_600), window.startInstant),
+                spanning("edge", at(21, 23), at(22, 1)),
+                timed("kept", "Kept", 23, 9),
+                spanning("lastHour", read.endInstant.minusSeconds(3_600), read.endInstant),
+                spanning("startsAtTheEnd", read.endInstant, read.endInstant.plusSeconds(3_600)),
+            ),
+        )
+        assertThat(store.prune("c1", "s1", window)).isEqualTo(3)
+        assertThat(storedIds()).containsExactly("edge", "kept", "lastHour").inOrder()
+    }
+
+    /** A zero-length event at the window's start overlaps it (spanOverlaps), so pruning keeps it. */
+    @Test
+    fun pruningKeepsAZeroLengthEventAtTheWindowStart() = runTest {
+        connect("s1")
+        store.applySync("c1", "s1", read, full(spanning("instant", window.startInstant, window.startInstant)))
+        assertThat(store.prune("c1", "s1", window)).isEqualTo(0)
+        assertThat(storedIds()).containsExactly("instant")
+    }
+
+    /** Review Focus 3: an event a queued change targets stays until the change is delivered or dropped. */
+    @Test
+    fun pruningKeepsAnEventAQueuedChangeTargets() = runTest {
+        connect("s1")
+        store.applySync("c1", "s1", read, full(timed("old", "Old", 20, 9), timed("gone", "Gone", 20, 11)))
+        val draft = EventDraft("Old, renamed", EventTime.Timed(at(20, 9)), EventTime.Timed(at(20, 10)), forPerson = null, createdBy = null)
+        store.enqueue(PendingChange(0, "c1", "s1", "old", ChangeKind.UPDATE, draft, attempts = 0, nextAttemptMillis = 0, createdMillis = 0, fields = setOf(EventField.TITLE)))
+        store.prune("c1", "s1", window)
+        assertThat(storedIds()).containsExactly("old")
+    }
+
+    @Test
+    fun cursorIsDroppedWhenWhatWasReadStartsAfterTheWindowStarts() = runTest {
+        connect("s1")
+        val readFromLater = DateRange(window.start.plusDays(1), window.endExclusive.plusDays(SYNC_AHEAD_DAYS), zone)
+        store.applySync("c1", "s1", readFromLater, full(timed("a", "One", 23, 9)))
+        assertThat(store.cursor("c1", "s1", window)).isNull()
     }
 
     private val alexId = "alex-id"

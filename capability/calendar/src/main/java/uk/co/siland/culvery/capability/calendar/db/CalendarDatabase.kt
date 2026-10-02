@@ -46,6 +46,11 @@ data class SourceEntity(
      * changes; null until first seen.
      */
     val shownInService: Boolean? = null,
+    /**
+     * v6 (4c design §6.4): "REFUSED" while the service refuses this calendar's events although it still lists it; null
+     * otherwise.
+     */
+    val readProblem: String? = null,
 )
 
 /** Timed events set the *Instant columns; all-day events set the *Date columns (ISO dates, end exclusive). */
@@ -78,7 +83,7 @@ data class SyncStateEntity(
     val connectionId: String,
     val sourceId: String,
     val cursor: String?,
-    /** The window the cursor belongs to, as "<ISO start date>|<zone id>", e.g. "2026-09-22|Europe/London". */
+    /** The cursor's key, "<first day its full sync read>|<first day it didn't>|<zone id>" (ISO dates; 4c ruling 1); the column keeps its v1 name. */
     val rangeStart: String,
 )
 
@@ -110,6 +115,17 @@ data class EventRow(
 
 @Dao
 interface CalendarDao {
+    /** Events outside [start, end) (spanOverlaps' opposite), except those a queued change targets (4c ruling 11). */
+    @Query(
+        """
+        DELETE FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId
+        AND (startSort >= :end OR (endSort <= :start AND startSort < :start))
+        AND remoteId NOT IN (SELECT remoteId FROM outbox WHERE connectionId = :connectionId AND sourceId = :sourceId AND remoteId IS NOT NULL)
+        AND remoteId NOT IN (SELECT clientKey FROM outbox WHERE connectionId = :connectionId AND sourceId = :sourceId AND clientKey IS NOT NULL)
+        """,
+    )
+    suspend fun pruneEvents(connectionId: String, sourceId: String, start: Long, end: Long): Int
+
     @Query("SELECT * FROM connection ORDER BY label, id")
     fun connections(): Flow<List<ConnectionEntity>>
 
@@ -289,7 +305,7 @@ interface CalendarDao {
  */
 @Database(
     entities = [ConnectionEntity::class, SourceEntity::class, EventEntity::class, SyncStateEntity::class, OutboxEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class CalendarDatabase : RoomDatabase() {
