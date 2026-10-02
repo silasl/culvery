@@ -38,6 +38,7 @@ import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.SunTimes
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.shouldPin
 
 // Robolectric for android.util.Log: a failing capability flow is logged before it is retried.
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -209,6 +210,56 @@ class ShellViewModelTest {
             assertThat(expectMostRecentItem().settingsOpen).isTrue()
             access.result = null
             vm.exitKiosk()
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun exitKioskIsRememberedUntilCulveryIsInFrontAgain() = runTest {
+        val vm = vm()
+        access.result = admin
+        vm.exitKiosk()
+        runCurrent()
+        assertThat(shouldPin(setupComplete = true, kioskExited = vm.kioskExited)).isFalse()
+        vm.returnedToFront()
+        assertThat(shouldPin(setupComplete = true, kioskExited = vm.kioskExited)).isTrue()
+    }
+
+    @Test
+    fun changeHomeAppAsksForAFreshPinClosesSettingsAndSignsOut() = runTest {
+        val vm = vm()
+        access.result = admin
+        vm.openSettings()
+        runCurrent()
+        vm.homeAppRequests.test {
+            vm.changeHomeApp()
+            assertThat(awaitItem()).isEqualTo(HomeAppRequest.CHANGE)
+        }
+        assertThat(access.requested.last()).containsExactly(CorePermissions.KIOSK_EXIT)
+        assertThat(access.session.value).isNull()
+        assertThat(vm.kioskExited).isTrue()
+        vm.uiState.test { assertThat(expectMostRecentItem().settingsOpen).isFalse() }
+    }
+
+    @Test
+    fun chooseHomeAppUsesTheOpenSession() = runTest {
+        val vm = vm()
+        access.result = admin
+        vm.homeAppRequests.test {
+            vm.chooseHomeApp()
+            assertThat(awaitItem()).isEqualTo(HomeAppRequest.CHOOSE)
+        }
+        assertThat(access.requested.last()).containsExactly(CorePermissions.SETTINGS_MANAGE)
+        assertThat(access.session.value).isNotNull()
+        assertThat(vm.kioskExited).isFalse()
+    }
+
+    @Test
+    fun aRefusedPinAsksAndroidNothing() = runTest {
+        val vm = vm()
+        vm.homeAppRequests.test {
+            vm.changeHomeApp()
+            vm.chooseHomeApp()
             expectNoEvents()
         }
     }

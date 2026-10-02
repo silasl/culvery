@@ -44,7 +44,7 @@ class SettingsScreenshotTest {
             PeopleList(people, onEdit = {}, onAdd = {})
         },
         StillPage("calendars", "Calendars", 400) { StepTitle("Calendars") },
-        KioskPage(),
+        KioskPage(FakeHomeApp(default = false)),
     )
 
     private fun snap(name: String, dark: Boolean, pageId: String) {

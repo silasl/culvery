@@ -1,16 +1,29 @@
 package uk.co.siland.culvery
 
+import android.app.role.RoleManager
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
+import android.provider.Settings
+import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -37,7 +50,9 @@ import uk.co.siland.culvery.core.setup.SettingsScreen
 import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupState
 import uk.co.siland.culvery.core.setup.SetupWizard
+import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.shell.HomeAppRequest
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ShellToasts
 import uk.co.siland.culvery.shell.ShellViewModel
@@ -55,15 +70,44 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var setupState: SetupState
     @Inject lateinit var gate: SetupSessionGate
     @Inject lateinit var firstDraw: FirstDraw
+    @Inject lateinit var homeApp: AndroidHomeApp
     // Only read when the wizard or Settings shows.
     @Inject lateinit var coreSteps: Provider<Set<@JvmSuppressWildcards SetupStep>>
     @Inject lateinit var corePages: Provider<Set<@JvmSuppressWildcards SettingsPage>>
 
-    // Set by Settings › Exit kiosk; cleared when the app comes back to the foreground.
-    private var kioskExited = false
+    // Whether the tablet's device-owner policy lets Google's screens run in lock-task (4c §5.2).
+    internal var ownerAllowsGoogle = false
 
     // SetupState read once for the activity, so the pin and the screen never disagree (4a design D10); null until read.
     private lateinit var setupComplete: StateFlow<Boolean?>
+
+    // Not `window`: that is the Activity's own.
+    private val kioskWindow = object : KioskWindow {
+        override fun pin() = pinToScreen()
+
+        override fun unpin() = unpinFromScreen()
+
+        override fun hideBars() = hideSystemBars()
+
+        override fun showBars() = showSystemBars()
+
+        override fun moveToBack() {
+            moveTaskToBack(true)
+        }
+    }
+
+    private val kiosk by lazy {
+        KioskLifecycle(
+            kioskWindow,
+            setupComplete = { setupComplete.value == true },
+            isHomeApp = { homeApp.isDefault.value },
+            kioskExited = { shell.kioskExited },
+            returnedToFront = shell::returnedToFront,
+        )
+    }
+
+    // Android's yes/no "make Culvery the home app?" dialog (4c §5.1); its answer is read again on resume anyway.
+    private val askHomeRole = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { homeApp.refresh() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
@@ -71,6 +115,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val shownAt = SystemClock.uptimeMillis()
         setupComplete = setupState.setupComplete.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
+        ownerAllowsGoogle = allowLockTaskIfOwner(this)
+        lifecycle.addObserver(kiosk)
         splash.setKeepOnScreenCondition {
             holdSplash(setupComplete.value, shell.uiState.value.cardsLoaded, SystemClock.uptimeMillis() - shownAt)
         }
@@ -78,19 +124,15 @@ class MainActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this) { }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                shell.kioskExit.collect {
-                    kioskExited = true
-                    unpinFromScreen()
-                    showSystemBars()
-                    moveTaskToBack(true)
-                }
+                launch { shell.kioskExit.collect { kiosk.exitKiosk() } }
+                launch { shell.homeAppRequests.collect(::openHomeAppScreen) }
             }
         }
         lifecycleScope.launch {
             var previous: Boolean? = null
             setupComplete.filterNotNull().collect { complete ->
                 val resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-                if (pinOnSetupRead(previous, complete, resumed, kioskExited)) pinToScreen()
+                if (pinOnSetupRead(previous, complete, resumed, shell.kioskExited)) pinToScreen()
                 previous = complete
             }
         }
@@ -106,51 +148,67 @@ class MainActivity : ComponentActivity() {
                 LocalOverlayHost provides overlay,
             ) {
                 CulveryTheme(dark = state.dark) {
-                    ShellLayers(
-                        overlay = overlay,
-                        toast = toast,
-                        onToastHidden = toasts::hide,
-                        pinPad = { PinPadHost(pinPrompt, overSheet = overlay.isShowing) },
-                        onTouch = touchTarget(complete, state.settingsOpen, access),
-                    ) {
-                        AppContent(
-                            complete = complete,
-                            settingsOpen = state.settingsOpen,
+                    // Zero while the bars are hidden (the pinned kiosk); after Exit kiosk the content clears them (K1).
+                    Box(Modifier.fillMaxSize().background(Culvery.colors.bg).windowInsetsPadding(WindowInsets.systemBars)) {
+                        ShellLayers(
                             overlay = overlay,
-                            wizard = { SetupWizard(remember { wizardSteps(coreSteps.get(), capabilities) }, gate) },
-                            shell = {
-                                CulveryShell(
-                                    state = state,
-                                    now = { now.value },
-                                    onSelectTab = shell::selectTab,
-                                    onOpenSettings = shell::openSettings,
-                                    onSignOut = shell::signOut,
-                                    onToggleThemePreview = shell::toggleThemePreview,
-                                    tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
-                                )
-                            },
-                            settings = { SettingsScreen(remember { settingsPages(corePages.get(), capabilities) }, onClose = shell::closeSettings) },
-                            onHomeDrawn = firstDraw::markDrawn,
-                        )
+                            toast = toast,
+                            onToastHidden = toasts::hide,
+                            pinPad = { PinPadHost(pinPrompt, overSheet = overlay.isShowing) },
+                            onTouch = touchTarget(complete, state.settingsOpen, access),
+                        ) {
+                            AppContent(
+                                complete = complete,
+                                settingsOpen = state.settingsOpen,
+                                overlay = overlay,
+                                wizard = { SetupWizard(remember { wizardSteps(coreSteps.get(), capabilities) }, gate) },
+                                shell = {
+                                    CulveryShell(
+                                        state = state,
+                                        now = { now.value },
+                                        onSelectTab = shell::selectTab,
+                                        onOpenSettings = shell::openSettings,
+                                        onSignOut = shell::signOut,
+                                        onToggleThemePreview = shell::toggleThemePreview,
+                                        tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
+                                    )
+                                },
+                                settings = { SettingsScreen(remember { settingsPages(corePages.get(), capabilities) }, onClose = shell::closeSettings) },
+                                onHomeDrawn = firstDraw::markDrawn,
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    override fun onRestart() {
-        super.onRestart()
-        kioskExited = false
-    }
-
     override fun onResume() {
         super.onResume()
-        if (!kioskExited) hideSystemBars()
-        if (shouldPin(setupComplete.value == true, kioskExited)) pinToScreen()
+        homeApp.refresh()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus && !kioskExited) hideSystemBars()
+        if (hasFocus && !shell.kioskExited) hideSystemBars()
+    }
+
+    /** Android's screens can't open over a pinned app; Culvery pins again when it is next in front (4c §5.1). */
+    private fun openHomeAppScreen(request: HomeAppRequest) {
+        unpinFromScreen()
+        try {
+            when (request) {
+                HomeAppRequest.CHOOSE -> askHomeRole.launch(getSystemService(RoleManager::class.java).createRequestRoleIntent(RoleManager.ROLE_HOME))
+                HomeAppRequest.CHANGE -> startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+            }
+        } catch (e: ActivityNotFoundException) {
+            Log.w(TAG, "No screen to change the home app on this tablet (${e::class.simpleName})")
+            shell.returnedToFront()
+            if (shouldPin(setupComplete.value == true, shell.kioskExited)) pinToScreen()
+        }
+    }
+
+    private companion object {
+        const val TAG = "Culvery"
     }
 }

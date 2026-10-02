@@ -35,6 +35,9 @@ import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.SunTimes
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
+/** What Settings › Kiosk or the Done step asked of Android (4c §5.1). */
+enum class HomeAppRequest { CHOOSE, CHANGE }
+
 @HiltViewModel
 class ShellViewModel @Inject constructor(
     capabilities: Set<@JvmSuppressWildcards Capability>,
@@ -48,6 +51,17 @@ class ShellViewModel @Inject constructor(
     private val previewing = MutableStateFlow(false)
     private val kioskExitEvents = Channel<Unit>(Channel.BUFFERED)
     val kioskExit: Flow<Unit> = kioskExitEvents.receiveAsFlow()
+    private val homeAppEvents = Channel<HomeAppRequest>(Channel.BUFFERED)
+
+    /** Each request to Android about the home app; MainActivity unpins first, as nothing opens over a pinned app. */
+    val homeAppRequests: Flow<HomeAppRequest> = homeAppEvents.receiveAsFlow()
+
+    /**
+     * Exit kiosk or Change home app, and Culvery not back in front since (4c K2). A field, not saved state: a
+     * configuration change keeps it, a process death forgets it, so the kiosk pins again when next in front (ruling 6).
+     */
+    var kioskExited: Boolean = false
+        private set
 
     /** The household's wall time, for the status bar and Home's clock; not part of [uiState], so a tick redraws only them (4c §4.2). */
     val now: StateFlow<LocalDateTime> =
@@ -152,11 +166,37 @@ class ShellViewModel @Inject constructor(
     override fun exitKiosk() {
         viewModelScope.launch {
             if (access.authorise(CorePermissions.KIOSK_EXIT) != null) {
-                settingsOpen.value = false
-                access.lock()
+                leaveKiosk()
                 kioskExitEvents.send(Unit)
             }
         }
+    }
+
+    override fun chooseHomeApp() {
+        viewModelScope.launch {
+            access.authorise(CorePermissions.SETTINGS_MANAGE) ?: return@launch
+            homeAppEvents.send(HomeAppRequest.CHOOSE)
+        }
+    }
+
+    /** Ruling 15: kiosk.exit's fresh PIN (its pad says "Exit kiosk mode", which is what this does). */
+    override fun changeHomeApp() {
+        viewModelScope.launch {
+            access.authorise(CorePermissions.KIOSK_EXIT) ?: return@launch
+            leaveKiosk()
+            homeAppEvents.send(HomeAppRequest.CHANGE)
+        }
+    }
+
+    /** Culvery is in front again after being stopped; with D3 that includes a Home press from another app. */
+    fun returnedToFront() {
+        kioskExited = false
+    }
+
+    private fun leaveKiosk() {
+        kioskExited = true
+        settingsOpen.value = false
+        access.lock()
     }
 
     fun signOut() = access.lock()

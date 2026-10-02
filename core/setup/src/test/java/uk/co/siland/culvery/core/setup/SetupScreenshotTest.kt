@@ -149,6 +149,7 @@ class SetupScreenshotTest {
 
     private fun done(name: String, dark: Boolean) = step(name, dark, 6, Forward.Next("Open Culvery", enabled = true)) {
         StepTitle("Culvery is ready")
+        HomeAppPrompt(onChoose = {})
     }
 
     @Test fun welcomeDark() = welcome("welcome_dark", true, sample = false)

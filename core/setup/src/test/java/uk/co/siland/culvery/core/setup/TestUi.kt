@@ -7,10 +7,12 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertWithMessage
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runners.model.Statement
 import org.robolectric.shadows.ShadowLog
+import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 
@@ -59,6 +61,8 @@ class StillPage(override val id: String, override val title: String, override va
 
 class RecordingNavigator : ShellNavigator {
     var kioskExits = 0
+    var homeAppChoices = 0
+    var homeAppChanges = 0
 
     override fun openTab(id: String) = Unit
 
@@ -67,4 +71,16 @@ class RecordingNavigator : ShellNavigator {
     override fun exitKiosk() {
         kioskExits++
     }
+
+    override fun chooseHomeApp() {
+        homeAppChoices++
+    }
+
+    override fun changeHomeApp() {
+        homeAppChanges++
+    }
+}
+
+class FakeHomeApp(default: Boolean = false) : HomeApp {
+    override val isDefault = MutableStateFlow(default)
 }

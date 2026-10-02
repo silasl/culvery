@@ -22,6 +22,9 @@ internal object SetupDimens {
     val blockGap = 20.dp
     val titleLineGap = 8.dp
 
+    // The home-app prompt (4c §5.1; not in the spec): its button 12 below its line.
+    val homeAppPromptGap = 12.dp
+
     // List rows, people and towns (not in the spec): `surf`, radius 18, padding 16×20, 10 apart; a 16 dp colour dot 16
     // from the text, whose second line is 2 below; a 24 dp icon at the end.
     val rowRadius = 18.dp

@@ -58,7 +58,7 @@ class SettingsScreenTest {
 
     @Test
     fun theKioskPageExitsThroughTheShell() {
-        show(KioskPage())
+        show(KioskPage(FakeHomeApp()))
         compose.onNodeWithText("Culvery keeps the tablet on this app. Exit to use other apps; it locks again next time Culvery opens.").assertExists()
         compose.onNodeWithText("Exit kiosk").performClick()
         assertThat(navigator.kioskExits).isEqualTo(1)

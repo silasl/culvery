@@ -13,9 +13,11 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import uk.co.siland.culvery.AndroidHomeApp
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Daylight
+import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -38,6 +40,9 @@ abstract class AppModule {
 
     @Binds
     abstract fun toaster(impl: ShellToasts): Toaster
+
+    @Binds
+    abstract fun homeApp(impl: AndroidHomeApp): HomeApp
 
     /** Bound by the weather capability; without it the theme keeps 07:00 / 19:00 (4b design §3.8). */
     @BindsOptionalOf

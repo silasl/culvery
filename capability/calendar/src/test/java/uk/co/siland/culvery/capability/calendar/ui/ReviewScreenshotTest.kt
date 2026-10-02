@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,6 +30,7 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.setup.SettingsScreen
@@ -119,7 +121,7 @@ class ReviewScreenshotTest {
             StillPage("location", "Home location", 0) {},
             StillPage("people", "People", 100) {},
             StillPage("calendars", "Calendars", 400) { Review("Calendars", ConnectionHealth.Ok) },
-            KioskPage(),
+            KioskPage(object : HomeApp { override val isDefault = MutableStateFlow(true) }),
         )
         snap(name, dark, before = { compose.onNodeWithTag("settings_page_calendars").performClick() }) { SettingsScreen(pages, onClose = {}) }
     }

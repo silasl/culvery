@@ -12,4 +12,8 @@ class RecordingNavigator : ShellNavigator {
     }
 
     override fun exitKiosk() = Unit
+
+    override fun chooseHomeApp() = Unit
+
+    override fun changeHomeApp() = Unit
 }

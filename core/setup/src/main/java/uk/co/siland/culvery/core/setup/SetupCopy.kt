@@ -66,6 +66,9 @@ internal fun roleLine(role: Role): String = when (role) {
 }
 
 // Settings (§4.6, §4.7)
+internal const val MAKE_HOME_APP = "Make Culvery the home app so it comes back after a restart."
+internal const val CHOOSE_HOME_APP = "Choose home app"
+internal const val CHANGE_HOME_APP = "Change home app"
 internal const val SETTINGS = "Settings"
 internal const val CLOSE = "Close"
 internal const val HOME_LOCATION = "Home location"

@@ -231,7 +231,7 @@ class StepsTest {
         assertThat(state.setupComplete.first()).isFalse()
         val alex = access.addAdmin()
         access.control.beginSetupSession(Identified(alex, Role.ADMIN))
-        val done = DoneStep(state, access.control, SetupSessionGate(household, access.control))
+        val done = DoneStep(state, access.control, SetupSessionGate(household, access.control), FakeHomeApp())
         assertThat(done.nextLabel).isEqualTo("Open Culvery")
         assertThat(done.done.first()).isFalse()
         assertThat(done.onNext()).isTrue()
@@ -248,7 +248,7 @@ class StepsTest {
         val state = states.start()
         assertThat(state.setupComplete.first()).isFalse()
         access.addAdmin()
-        val done = DoneStep(state, access.control, SetupSessionGate(household, access.control))
+        val done = DoneStep(state, access.control, SetupSessionGate(household, access.control), FakeHomeApp())
         access.answer(null)
         assertThat(done.onNext()).isFalse()
         assertThat(state.setupComplete.first()).isFalse()
@@ -272,7 +272,7 @@ class StepsTest {
             assertThat(state.setupComplete.first()).isFalse()
             val alex = access.addAdmin()
             access.control.beginSetupSession(Identified(alex, Role.ADMIN))
-            val done = DoneStep(state, access.control, SetupSessionGate(household, access.control))
+            val done = DoneStep(state, access.control, SetupSessionGate(household, access.control), FakeHomeApp())
             assertThat(done.onNext()).isTrue()
             // Two writes: the first read's, then markComplete, which ran with nobody signed in (spec §9).
             assertThat(sessionsAtWrites).hasSize(2)
@@ -290,7 +290,7 @@ class StepsTest {
         val (state, scope) = spyState { throw IOException("disk full") }
         try {
             val gate = SetupSessionGate(household, access.control)
-            val done = DoneStep(state, access.control, gate)
+            val done = DoneStep(state, access.control, gate, FakeHomeApp())
             assertThat(runCatching { done.onNext() }.exceptionOrNull()).isInstanceOf(IOException::class.java)
             // Signed out, an Admin exists, and Done is no longer finishing: the PIN gate asks again.
             assertThat(gate.needsPin.first()).isTrue()

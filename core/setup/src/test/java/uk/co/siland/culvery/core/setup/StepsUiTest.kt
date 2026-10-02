@@ -31,6 +31,7 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.setup.steps.DoneStep
 import uk.co.siland.culvery.core.setup.steps.WelcomeStep
@@ -142,9 +143,11 @@ class StepsUiTest {
         val alex = runBlocking { access.addAdmin() }
         access.control.beginSetupSession(Identified(alex, Role.ADMIN))
         val gate = SetupSessionGate(household, access.control)
-        val done = DoneStep(state, access.control, gate)
+        val done = DoneStep(state, access.control, gate, FakeHomeApp())
         compose.setContent {
-            CompositionLocalProvider(LocalOverlayHost provides overlay) { CulveryTheme(dark = true) { SetupWizard(listOf(done), gate) } }
+            CompositionLocalProvider(LocalOverlayHost provides overlay, LocalShellNavigator provides RecordingNavigator()) {
+                CulveryTheme(dark = true) { SetupWizard(listOf(done), gate) }
+            }
         }
         compose.awaitText("Culvery is ready")
         compose.onNodeWithTag("wizard_next").performClick()
@@ -154,5 +157,20 @@ class StepsUiTest {
         assertThat(access.control.session.value).isNull()
         assertThat(access.requests).isEmpty()
         compose.onNodeWithTag("wizard_gate").assertDoesNotExist()
+    }
+
+    @Test
+    fun doneOffersTheHomeAppUntilItIsChosen() {
+        val home = FakeHomeApp(default = false)
+        val navigator = RecordingNavigator()
+        val done = DoneStep(runBlocking { states.start() }, access.control, SetupSessionGate(household, access.control), home)
+        compose.setContent {
+            CompositionLocalProvider(LocalShellNavigator provides navigator) { CulveryTheme(dark = true) { done.Content(onNext = {}) } }
+        }
+        compose.onNodeWithText("Choose home app").performClick()
+        assertThat(navigator.homeAppChoices).isEqualTo(1)
+        home.isDefault.value = true
+        compose.waitForIdle()
+        compose.onNodeWithText("Choose home app").assertDoesNotExist()
     }
 }
