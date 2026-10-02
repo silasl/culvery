@@ -140,3 +140,9 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - Header items could overlap the clock or date if they grow wide (design review, before Climate).
 - `Http.kt:31-37` resumes with any `Throwable`, so a non-`IOException` can escape the provider's read and break the "nothing else escapes" contract (the loop still catches it).
 - `HomeScreen`'s `headerItems` default value is used only by tests; drop it and pass `emptyList()` there.
+
+## Feature ideas (2026-10-02, after v1)
+
+**Each its own spec → plan cycle; not in 4c, 4d or 4e**
+- Sleep and wake: dim the screen when nobody is there and wake on a tap. Start with a schedule or sunset (4b's sun times) and the ambient light sensor; camera presence (CameraX at about one frame a second, on-device motion or face detection, nothing stored or sent, and the app says when the camera is on, as Android 11 shows no indicator) is optional on top. Measure its power use against plain dimming on the SM-T510. v1 §14 had screensaver and night dimming out of scope.
+- Bin collections from Mid Sussex District Council: no iCal feed, only a per-property tracker page (`mop.php?Track=…`). A read-only scraper provider fetching daily, mapped to Family, with "can't read" shown on the calendar's row (4c's per-calendar health), since the page can change without notice. The `Track` value identifies the property: store it as connection config and keep it out of logs. Check UKBinCollectionData's Mid Sussex scraper as a reference. Stopgap: repeating events in the family's Google calendar.

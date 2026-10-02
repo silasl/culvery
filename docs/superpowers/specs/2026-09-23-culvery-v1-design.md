@@ -272,3 +272,5 @@ Lights, Music, Climate, Security capabilities; Holiday mode and its rail button;
 3. Holiday mode (core orchestration; capabilities contribute routines and permissions)
 4. Security capability + Arlo provider (flag: no official public API)
 5. Music (Sonos), Climate (vendor TBD)
+6. Sleep and wake (night dimming, tap to wake; optional camera presence)
+7. Council bin-collection providers (scraped, read-only; Mid Sussex first)
