@@ -79,7 +79,7 @@ class FlowRetryTest {
             starts++
             if (starts <= 7) throw IllegalStateException("store hiccup $starts")
             if (starts == 8) {
-                // A value every 30 s for 70 s, then a failure: the first value has stood for the 60 s wait by then.
+                // Values at 0, 30 and 60 s, then a failure at 90 s: the first value has stood for the 60 s wait.
                 repeat(3) { emit("v$it"); delay(30_000) }
                 throw IllegalStateException("store hiccup 8")
             }

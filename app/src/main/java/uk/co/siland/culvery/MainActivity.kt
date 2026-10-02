@@ -44,8 +44,8 @@ import uk.co.siland.culvery.core.plugin.FirstDraw
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
-import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.SetupStep
+import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.setup.SettingsScreen
 import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupState

@@ -182,7 +182,8 @@ class GoogleCalendarProvider @Inject constructor(
         val listed = list(account, source, mapOf("syncToken" to cursor.value)) ?: return null
         val cache = rules.getOrPut(keyOf(conn, source)) { ConcurrentHashMap() }
         // No nightly full sync refreshes a rule any more: a series with a changed instance is read again (4c ruling 3).
-        // A read that fails keeps the rule the series had (the cache's, else the stored row's), so the row isn't downgraded.
+        // A read that fails keeps the rule the series had (the cache's, else the stored row's), so the row isn't
+        // downgraded.
         val before = mutableMapOf<String, String>()
         listed.items.filterNot { it.isGone }.mapNotNullTo(HashSet()) { it.recurringEventId }.forEach { series ->
             cache.remove(series)?.let { before[series] = it }
@@ -190,23 +191,23 @@ class GoogleCalendarProvider @Inject constructor(
         val upserts = mutableListOf<RemoteEvent>()
         val removed = mutableListOf<String>()
         val failed = mutableSetOf<String>()
+        // What the tablet holds of this calendar's series, read once and only if needed.
         var instances: Map<String, String?>? = null
+        suspend fun storedInstances() = instances ?: stored.instances(conn.id, source.id).also { instances = it }
         listed.items.forEach { event ->
             if (event.isGone) {
                 removed += event.id
                 if (event.recurringEventId == null) {
                     // C9: a deleted series comes back as its own id alone (ruling 2).
-                    val known = instances ?: stored.instances(conn.id, source.id).also { instances = it }
                     val instance = instanceOf(event.id)
-                    removed += known.keys.filter { instance.matches(it) }
+                    removed += storedInstances().keys.filter { instance.matches(it) }
                     cache.remove(event.id)
                 }
             } else {
                 var rule = ruleOf(account, source, event, cache, failed)
                 val series = event.recurringEventId
                 if (rule == null && series != null && series in failed) {
-                    rule = before[series]?.ifEmpty { null }
-                        ?: (instances ?: stored.instances(conn.id, source.id).also { instances = it })[event.id]
+                    rule = before[series]?.ifEmpty { null } ?: storedInstances()[event.id]
                 }
                 event.toRemoteEvent(rule)?.let { upserts += it }
             }

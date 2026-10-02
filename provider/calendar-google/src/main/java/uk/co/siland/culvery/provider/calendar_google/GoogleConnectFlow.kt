@@ -32,10 +32,10 @@ sealed interface ConnectStep {
 
 /**
  * Checks Play services can sign in, then the connect and reconnect flow's logic, apart from the screens it launches
- * (3a design §3.2): ask Play services for the calendar scopes (for the stored account on a reconnect); once both
- * are granted, ask Google whose primary calendar this is, which is the account's email, and check Play services
- * grants that account silently, as every later call will ask. A reconnect to a different account is refused. Backing out says nothing; any other failure
- * says "Couldn't connect", and nothing is stored.
+ * (3a design §3.2): ask Play services for the calendar scopes (for the stored account on a reconnect); once both are
+ * granted, ask Google whose primary calendar this is, which is the account's email, and check Play services grants
+ * that account silently, as every later call will ask. A reconnect to a different account is refused. Backing out says
+ * nothing; any other failure says "Couldn't connect", and nothing is stored.
  */
 internal class GoogleConnectFlow(
     private val authorizer: Authorizer,

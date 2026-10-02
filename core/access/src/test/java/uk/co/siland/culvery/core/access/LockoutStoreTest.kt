@@ -44,6 +44,7 @@ class LockoutStoreTest {
         assertThat(store.lockedUntil(t0)).isNull()
     }
 
+    /** A new store reads what the last one wrote; SharedPreferences are cached per process, so this isn't a restart. */
     @Test
     fun lockoutSurvivesNewStoreInstance() = runTest {
         repeat(5) { store.recordFailure(t0) }

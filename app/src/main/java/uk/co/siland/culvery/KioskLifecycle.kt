@@ -34,8 +34,8 @@ internal class FrontTracker {
 }
 
 /**
- * The kiosk over the activity's lifecycle (4a design D10, 4c §5.1, K2): every resume hides the bars and pins, once setup
- * is complete and the kiosk wasn't exited; coming back to the front after being stopped clears "exited".
+ * The kiosk over the activity's lifecycle (4a design D10, 4c §5.1, K2): every resume hides the bars and pins, once
+ * setup is complete and the kiosk wasn't exited; coming back to the front after being stopped clears "exited".
  */
 internal class KioskLifecycle(
     private val window: KioskWindow,
@@ -82,8 +82,8 @@ internal class KioskLifecycle(
     }
 
     /**
-     * Google's screens ended or never opened. A resume restores the kiosk itself; this is for when Culvery never paused,
-     * so nothing else would: lock-task goes back to Culvery alone, or an unpinned Culvery in front pins again.
+     * Google's screens ended or never opened. A resume restores the kiosk itself; this is for when Culvery never
+     * paused, so nothing else would: lock-task goes back to Culvery alone, or an unpinned Culvery in front pins again.
      */
     fun returnToPinning() {
         if (isDeviceOwner()) {
@@ -94,8 +94,8 @@ internal class KioskLifecycle(
     }
 
     /**
-     * Exit kiosk (4c §5.1, ruling 28): unpinned, with the bars showing. As the home app Culvery stays in front: moving to
-     * the back would resume it as home and pin it again at once. Otherwise it moves to the back, as before.
+     * Exit kiosk (4c §5.1, ruling 28): unpinned, with the bars showing. As the home app Culvery stays in front: moving
+     * to the back would resume it as home and pin it again at once. Otherwise it moves to the back, as before.
      */
     fun exitKiosk() {
         window.unpin()
@@ -104,8 +104,8 @@ internal class KioskLifecycle(
     }
 
     /**
-     * Android's screens can't open over a pinned app, so unpin, then [launch] one. When there is none, pin again at once:
-     * nothing pauses Culvery, so nothing else would.
+     * Android's screens can't open over a pinned app, so unpin, then [launch] one. When there is none, pin again at
+     * once: nothing pauses Culvery, so nothing else would.
      */
     fun openHomeAppScreen(launch: () -> Unit) {
         window.unpin()

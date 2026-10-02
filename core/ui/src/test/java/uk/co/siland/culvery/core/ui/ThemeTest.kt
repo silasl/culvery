@@ -70,8 +70,8 @@ class ThemeTest {
         var tick by mutableIntStateOf(0)
         compose.setContent {
             val t = tick
-            // Built outside the composition and capturing the tick: a new lambda instance each tick, so CulveryTheme itself
-            // runs again while Probe's group is unchanged.
+            // A new lambda instance each tick, so CulveryTheme itself runs again while Probe's group is unchanged. The
+            // `t < 0` branch never runs: it only makes the lambda capture the tick.
             val content: @Composable () -> Unit = remember(t) { { Probe(); if (t < 0) Text("never") } }
             CulveryTheme(dark = true, content = content)
         }

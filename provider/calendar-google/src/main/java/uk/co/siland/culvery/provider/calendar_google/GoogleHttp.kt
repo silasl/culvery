@@ -150,7 +150,7 @@ internal fun GoogleResponse.refusal(what: GoogleCall): WriteRejectedException {
  * to map. Main-safe: the connect screen calls it from the main thread.
  */
 class GoogleApi(private val baseUrl: HttpUrl, private val tokens: TokenSource, clients: Lazy<OkHttpClient>) {
-    /** Tests pass a client they built; the app's is built on its first call, off the main thread (4c §4.1). */
+    /** Tests pass a client they built; the app's is built on its first call rather than at start-up (4c §4.1). */
     constructor(baseUrl: HttpUrl, tokens: TokenSource, client: OkHttpClient) : this(baseUrl, tokens, lazyOf(client))
 
     private val client: OkHttpClient by clients

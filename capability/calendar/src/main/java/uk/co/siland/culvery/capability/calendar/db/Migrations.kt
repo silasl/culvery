@@ -49,8 +49,8 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
 }
 
 /**
- * v6 (Plan 4c): a calendar's read problem (§6.4); and every sync cursor cleared, as their key changes meaning (§6.2), so
- * each calendar is read in full once. The SQL must match schemas/…/6.json exactly.
+ * v6 (Plan 4c): a calendar's read problem (§6.4); and every sync cursor cleared, as their key changes meaning (§6.2),
+ * so each calendar is read in full once. The SQL must match schemas/…/6.json exactly.
  */
 val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(db: SupportSQLiteDatabase) {

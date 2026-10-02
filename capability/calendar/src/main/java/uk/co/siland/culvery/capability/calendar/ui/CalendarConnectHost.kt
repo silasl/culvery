@@ -62,9 +62,9 @@ internal fun rememberConnector(connections: CalendarConnections): Connector {
 }
 
 /**
- * The connecting card (3a design §3.3): an Admin check (connections.manage, a fresh PIN each time), then the card with the provider's connect
- * screen inside it, which runs the system's account chooser and consent over it. A connection is finished on the
- * application scope; Cancel, or backing out of the system screens, closes with nothing said.
+ * The connecting card (3a design §3.3): an Admin check (connections.manage, a fresh PIN each time), then the card with
+ * the provider's connect screen inside it, which runs the system's account chooser and consent over it. A connection is
+ * finished on the application scope; Cancel, or backing out of the system screens, closes with nothing said.
  */
 @Composable
 internal fun CalendarConnectHost(request: ConnectRequest, connections: CalendarConnections, onClose: () -> Unit) {

@@ -26,10 +26,10 @@ const val MIN_PASS_GAP_MS = 1_000L
 
 /**
  * Runs a pass (the outbox drain, then a sync) as soon as Home has drawn (or [FIRST_DRAW_WAIT_MS] has passed) and the
- * first connection list has arrived, whenever a
- * connection is added or removed, on [requestSync], when a queued change falls due, and otherwise every
- * [intervalMillis]. A trigger that arrives mid-pass runs one more pass afterwards; it never cancels the running
- * one. [untilNextRetry] is the time until the earliest queued change is due, or null when nothing is queued.
+ * first connection list has arrived, whenever a connection is added or removed, on [requestSync], when a queued change
+ * falls due, and otherwise every [intervalMillis]. A trigger that arrives mid-pass runs one more pass afterwards; it
+ * never cancels the running one. [untilNextRetry] is the time until the earliest queued change is due, or null when
+ * nothing is queued.
  */
 @Singleton
 class CalendarSyncLoop internal constructor(

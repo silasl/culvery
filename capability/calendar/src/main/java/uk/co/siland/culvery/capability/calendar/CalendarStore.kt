@@ -82,8 +82,9 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
      * added with [mappingForNew]; an existing one keeps its person, takes the listed name and writability, and takes the
      * service's tick as its visibility only when that tick has changed since it was last seen (ruling 12: the tick is
      * `shown || primary`), so a calendar hidden or shown on the tablet stays so; the master is always shown. One no
-     * longer listed goes with its events, cursor and queued changes. Says whether the master went, or became
-     * read-only, and was cleared, and how many queued changes went with removed calendars. Writes nothing once the connection is gone.
+     * longer listed goes with its events, cursor and queued changes. Says whether the master went, or became read-only,
+     * and was cleared, and how many queued changes went with removed calendars. Writes nothing once the connection is
+     * gone.
      */
     suspend fun refreshSources(
         connectionId: String,
@@ -198,7 +199,8 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
 
     /**
      * A pass read every calendar. A connection needing sign-in while changes wait (a write was refused for it) stays so
-     * until a reconnect, so the chip doesn't vanish while writes keep failing (4c C3); otherwise it is Ok again.
+     * until a reconnect, an accepted write, or its queue empties, so the chip doesn't vanish while writes keep failing
+     * (4c C3); otherwise it is Ok again.
      */
     suspend fun markSynced(connectionId: String, atMillis: Long) = db.withTransaction {
         val row = dao.connection(connectionId) ?: return@withTransaction
@@ -269,10 +271,10 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         }
 
     /**
-     * Drops [sourceId]'s events that end before [window] starts, or start at or after the end of what its full sync read
-     * (4c design §6.2, ruling 1): an incremental result can carry any date, and nothing else removes them. What was read
-     * past the window stays, as no incremental result will bring it back. A row a queued change targets stays. The
-     * stored key's start moves up to the window's. Returns how many went.
+     * Drops [sourceId]'s events that end before [window] starts, or start at or after the end of what its full sync
+     * read (4c design §6.2, ruling 1): an incremental result can carry any date, and nothing else removes them. What
+     * was read past the window stays, as no incremental result will bring it back. A row a queued change targets stays.
+     * The stored key's start moves up to the window's. Returns how many went.
      */
     suspend fun prune(connectionId: String, sourceId: String, window: DateRange): Int = db.withTransaction {
         val state = dao.syncState(connectionId, sourceId)

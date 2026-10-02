@@ -31,9 +31,10 @@ const val WEATHER_RETRY_MS = 5 * 60_000L
 internal fun Flow<HomeLocation?>.places(): Flow<WeatherPlace?> = map { location -> location?.let(::WeatherPlace) }
 
 /**
- * Fetches as soon as a location is known and whenever its coordinates or zone change, then every
- * [WEATHER_REFRESH_MS], or [WEATHER_RETRY_MS] after a failure (4b design §3.6). Without a location it waits and fetches
- * nothing. A change that arrives mid-fetch runs one more fetch afterwards; it never cancels the running one.
+ * Fetches as soon as Home has drawn (or FIRST_DRAW_WAIT_MS has passed, 4c §4.1) and a location is known, and whenever
+ * its coordinates or zone change, then every [WEATHER_REFRESH_MS], or [WEATHER_RETRY_MS] after a failure (4b design
+ * §3.6). Without a location it waits and fetches nothing. A change that arrives mid-fetch runs one more fetch
+ * afterwards; it never cancels the running one.
  */
 @Singleton
 class WeatherSyncLoop internal constructor(

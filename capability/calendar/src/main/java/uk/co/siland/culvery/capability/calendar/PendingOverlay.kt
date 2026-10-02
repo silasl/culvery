@@ -90,8 +90,9 @@ internal fun StoredEvent.withFields(d: EventDraft, fields: Set<EventField>, zone
 }
 
 /**
- * Whether this event shows on [date] in [zone]. An all-day event goes by its own dates (end exclusive; a zero-length one
- * on its start date): its sort keys are midnight in the zone it was synced in, which a zone change leaves stale (4c C4).
+ * Whether this event shows on [date] in [zone]. An all-day event goes by its own dates (end exclusive; a zero-length
+ * one on its start date): its sort keys are midnight in the zone it was synced in, which a zone change leaves stale
+ * (4c C4).
  */
 internal fun StoredEvent.isOn(date: LocalDate, zone: ZoneId): Boolean {
     val from = start

@@ -331,8 +331,8 @@ class CalendarSync internal constructor(
 
     /**
      * A failed read's health, logged with its cause and the connection's id: never a name or a calendar id, either of
-     * which can be the account's email, and never a token. A refused calendar (SourceGone) is the calendar's problem, not
-     * the connection's: null (4c §6.4).
+     * which can be the account's email, and never a token. A refused calendar (SourceGone) is the calendar's problem,
+     * not the connection's: null (4c §6.4).
      */
     private suspend fun healthAfter(e: Throwable, conn: Connection, sourceId: String): ConnectionHealth? = when (e) {
         is NeedsSignInException -> {

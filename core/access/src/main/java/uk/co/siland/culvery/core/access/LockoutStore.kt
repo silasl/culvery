@@ -12,8 +12,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * Consecutive-failure counter, in SharedPreferences so it survives the app being killed. Read once, off the main thread,
- * then kept in memory; each change is written in the background (4c K4). Callers must serialise changes
+ * Consecutive-failure counter, in SharedPreferences so it survives the app being killed. Read once, off the main
+ * thread, then kept in memory; each change is written in the background (4c K4). Callers must serialise changes
  * (DefaultAccessControl's authoriseLock does).
  */
 @Singleton

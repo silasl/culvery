@@ -36,8 +36,8 @@ internal object WizardRules {
 }
 
 /**
- * 4a design §3.4: a setup change before the first Admin exists needs nobody's PIN; after that, settings.manage (which the
- * setup session passes). False when the PIN pad was cancelled or refused.
+ * 4a design §3.4: a setup change before the first Admin exists needs nobody's PIN; after that, settings.manage (which
+ * the setup session passes). False when the PIN pad was cancelled or refused.
  */
 internal suspend fun mayChangeSetup(household: HouseholdRepository, access: AccessControl): Boolean =
     !household.hasActiveAdmin.first() || access.authorise(CorePermissions.SETTINGS_MANAGE) != null

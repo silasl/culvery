@@ -53,8 +53,8 @@ import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.capability.calendar.isStaleAt
-import uk.co.siland.culvery.capability.calendar.weekTitle
 import uk.co.siland.culvery.capability.calendar.weekSubtitle
+import uk.co.siland.culvery.capability.calendar.weekTitle
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard

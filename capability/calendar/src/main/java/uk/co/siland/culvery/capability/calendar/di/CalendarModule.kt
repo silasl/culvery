@@ -19,8 +19,8 @@ import uk.co.siland.culvery.capability.calendar.CalendarSyncLoop
 import uk.co.siland.culvery.capability.calendar.CalendarWriter
 import uk.co.siland.culvery.capability.calendar.HouseholdFollower
 import uk.co.siland.culvery.capability.calendar.StoredSeries
-import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.ALL_MIGRATIONS
+import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable

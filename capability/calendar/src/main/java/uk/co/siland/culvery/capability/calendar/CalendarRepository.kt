@@ -85,7 +85,7 @@ class CalendarRepository @Inject constructor(
             }
         }
     }
-        // 4c 4.4: a pass that only records its time changes nothing on screen (P4), and the mapping runs off Main (U7).
+        // 4c §4.4: a pass that only records its time changes nothing on screen (P4); the mapping runs off Main (U7).
         .distinctUntilChanged()
         .flowOn(Dispatchers.Default)
 

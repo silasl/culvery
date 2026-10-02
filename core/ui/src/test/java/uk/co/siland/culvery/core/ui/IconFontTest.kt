@@ -56,8 +56,8 @@ class IconFontTest {
     }
 
     /**
-     * S3 was `icon = "smartphone"`, a name the font doesn't have. Every icon still named by a string (in modules without
-     * `:core:ui`, such as `:core:plugin`'s toast icon and Open-Meteo's descriptor) must be one `Icons` names.
+     * S3 was `icon = "smartphone"`, a name the font doesn't have. Every icon still named by a string (in modules
+     * without `:core:ui`, such as `:core:plugin`'s toast icon and Open-Meteo's descriptor) must be one `Icons` names.
      */
     @Test
     fun everyIconNamedInAStringIsInIcons() {

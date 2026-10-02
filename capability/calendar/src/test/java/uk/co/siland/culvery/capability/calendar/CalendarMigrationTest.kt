@@ -18,8 +18,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.ALL_MIGRATIONS
+import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_1_2
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_2_3
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_3_4
