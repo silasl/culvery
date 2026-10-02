@@ -32,9 +32,11 @@ fun <T> Flow<T>.retryWithBackoff(onFailure: (Throwable) -> Unit): Flow<T> = flow
         var standing: Job? = null
         emitAll(
             onEach {
-                standing?.cancel()
-                val wait = failures.get().takeIf { it > 0 }?.let(::retryDelayMillis)
-                standing = wait?.let { launch { delay(it); failures.set(0) } }
+                // Started by the first value after a failure and left running: a flow that emits more often than the wait
+                // must still reset it (retryWhen cancels the timer when the flow fails again).
+                if (standing?.isActive != true) {
+                    standing = failures.get().takeIf { it > 0 }?.let(::retryDelayMillis)?.let { launch { delay(it); failures.set(0) } }
+                }
             }.retryWhen { cause, _ ->
                 standing?.cancel()
                 onFailure(cause)

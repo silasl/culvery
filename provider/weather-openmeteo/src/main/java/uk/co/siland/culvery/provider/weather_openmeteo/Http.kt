@@ -38,7 +38,7 @@ internal suspend fun Call.await(maxBytes: Long? = null): Answer = suspendCancell
                     // After a cancel this is the closed socket and the continuation is already cancelled.
                     cont.resumeWithException(e)
                     return
-                } catch (e: Throwable) {
+                } catch (e: Exception) {
                     // The caller's contract is IOException or the body (§7.2): anything else is a failed read.
                     cont.resumeWithException(ReadFailed())
                     return

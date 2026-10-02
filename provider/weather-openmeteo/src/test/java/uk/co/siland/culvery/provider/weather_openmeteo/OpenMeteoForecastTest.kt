@@ -202,6 +202,16 @@ class OpenMeteoForecastTest {
         assertThat(asked.queryParameter("longitude")).isEqualTo("51.5")
     }
 
+    @Test
+    fun coordinatesThatAreNotNumbersAreWeatherUnavailableWithNoCause() = runTest {
+        for ((lat, lon) in listOf(Double.NaN to 1.0, 1.0 to Double.POSITIVE_INFINITY)) {
+            val failure = runCatching { forecast.forecast(lat, lon, ZoneId.of("Europe/London")) }.exceptionOrNull()
+            assertThat(failure).isInstanceOf(WeatherUnavailableException::class.java)
+            assertThat(failure?.cause).isNull()
+        }
+        assertThat(server.requestCount).isEqualTo(0)
+    }
+
     /** 4b ruling 15: no cause, whose text could hold the URL, and so the coordinates. */
     @Test
     fun everyFailureCarriesNoCause() = runTest {

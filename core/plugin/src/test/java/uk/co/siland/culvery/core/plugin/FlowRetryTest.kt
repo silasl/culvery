@@ -71,6 +71,35 @@ class FlowRetryTest {
         assertThat(result.await()).containsExactly("a", "b").inOrder()
     }
 
+    /** A flow that emits faster than the capped wait still resets it: the timer isn't restarted by every value. */
+    @Test
+    fun aFlowEmittingFasterThanTheWaitStillStartsTheWaitsAgain() = runTest {
+        var starts = 0
+        val flaky = flow {
+            starts++
+            if (starts <= 7) throw IllegalStateException("store hiccup $starts")
+            if (starts == 8) {
+                // A value every 30 s for 70 s, then a failure: the first value has stood for the 60 s wait by then.
+                repeat(3) { emit("v$it"); delay(30_000) }
+                throw IllegalStateException("store hiccup 8")
+            }
+            emit("after")
+        }
+        val result = async { flaky.retryWithBackoff {}.take(4).toList() }
+        runCurrent()
+        // Seven failures: waits of 1, 2, 4, 8, 16, 32 and 60 s.
+        advanceTimeBy(1_000 + 2_000 + 4_000 + 8_000 + 16_000 + 32_000 + 60_000)
+        runCurrent()
+        assertThat(starts).isEqualTo(8)
+        advanceTimeBy(90_000)
+        runCurrent()
+        // The eighth failure waits 1 s, not 60.
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertThat(starts).isEqualTo(9)
+        assertThat(result.await()).containsExactly("v0", "v1", "v2", "after").inOrder()
+    }
+
     /** §7.2: a read that emits and fails at once doesn't retry every second. */
     @Test
     fun aValueThatFailsAtOnceKeepsTheWaitsGrowing() = runTest {

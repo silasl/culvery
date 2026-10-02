@@ -126,15 +126,17 @@ class DefaultAccessControl @Inject constructor(
     }
 
     override fun endSetupSession() {
-        val current = signedIn.value ?: return
-        if (!current.setup) return
-        set(SignedIn(current.who, setup = false))
+        // Read and write under one lock: an expiry or lock() in between must not be undone by a stale write.
+        synchronized(stateLock) {
+            val current = signedIn.value?.takeIf { it.setup } ?: return
+            set(SignedIn(current.who, setup = false))
+        }
         restartExpiry()
     }
 
     override fun touch() {
-        val current = signedIn.value ?: return
-        restartExpiry(if (current.setup) SETUP_IDLE_MS else SESSION_TIMEOUT_MS)
+        val setup = synchronized(stateLock) { signedIn.value?.setup } ?: return
+        restartExpiry(if (setup) SETUP_IDLE_MS else SESSION_TIMEOUT_MS)
     }
 
     override fun lock() {

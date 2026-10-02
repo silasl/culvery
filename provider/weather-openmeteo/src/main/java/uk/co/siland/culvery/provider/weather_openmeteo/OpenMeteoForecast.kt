@@ -84,6 +84,8 @@ class OpenMeteoForecast(
     )
 
     override suspend fun forecast(latitude: Double, longitude: Double, zone: ZoneId): Forecast {
+        // NaN and infinity have no plain-digit form; the failure says nothing of the values.
+        if (!latitude.isFinite() || !longitude.isFinite()) throw WeatherUnavailableException("The place has no usable coordinates")
         val request = Request.Builder()
             .url(
                 url.newBuilder()
