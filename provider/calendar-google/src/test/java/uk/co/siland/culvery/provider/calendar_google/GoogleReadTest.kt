@@ -87,15 +87,27 @@ class GoogleReadTest {
 
     @Test
     fun anInstanceIsNamedForItsSeriesAndAStartAndNothingElse() {
-        assertThat(instanceOf("piano", "piano_20261005T141500Z")).isTrue()
-        assertThat(instanceOf("piano", "piano_20261005")).isTrue()
-        assertThat(instanceOf("piano", "piano_R20261006T141500_20261006T141500Z")).isFalse()
-        assertThat(instanceOf("piano", "pianoforte_20261005")).isFalse()
-        assertThat(instanceOf("piano", "piano_20261005_extra")).isFalse()
+        assertThat(instanceOf("piano").matches("piano_20261005T141500Z")).isTrue()
+        assertThat(instanceOf("piano").matches("piano_20261005")).isTrue()
+        assertThat(instanceOf("piano").matches("piano_R20261006T141500_20261006T141500Z")).isFalse()
+        assertThat(instanceOf("piano").matches("pianoforte_20261005")).isFalse()
+        assertThat(instanceOf("piano").matches("piano_20261005_extra")).isFalse()
         // An id's own characters are never pattern: "." is not "any character", "+" and "(" are not operators.
-        assertThat(instanceOf("a.b+c(d", "a.b+c(d_20261005")).isTrue()
-        assertThat(instanceOf("a.b", "aXb_20261005")).isFalse()
-        assertThat(instanceOf("a+", "aaa_20261005")).isFalse()
+        assertThat(instanceOf("a.b+c(d").matches("a.b+c(d_20261005")).isTrue()
+        assertThat(instanceOf("a.b").matches("aXb_20261005")).isFalse()
+        assertThat(instanceOf("a+").matches("aaa_20261005")).isFalse()
+    }
+
+    /** A failed re-read keeps the rule the instance had: "Weekly on Tuesday" doesn't fall back to "Yes". */
+    @Test
+    fun aFailedRuleReadKeepsTheSeriesRule() = runTest {
+        pianoSeries()
+        val first = provider.sync(conn, family, range, null)
+        pianoSeries(rule = "RRULE:FREQ=DAILY")
+        google.failNext(500) { it.requestUrl!!.pathSegments.last() == "piano" }
+        val next = provider.sync(conn, family, range, first.cursor)
+        assertThat(next.upserts).isNotEmpty()
+        assertThat(next.upserts.map { it.recurrenceRule }.distinct()).containsExactly("RRULE:FREQ=WEEKLY;BYDAY=TU")
     }
 
     /** Ruling 3: with no nightly full sync, a series changed on a phone has its rule read again. */

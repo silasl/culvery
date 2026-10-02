@@ -182,7 +182,11 @@ class GoogleCalendarProvider @Inject constructor(
         val listed = list(account, source, mapOf("syncToken" to cursor.value)) ?: return null
         val cache = rules.getOrPut(keyOf(conn, source)) { ConcurrentHashMap() }
         // No nightly full sync refreshes a rule any more: a series with a changed instance is read again (4c ruling 3).
-        listed.items.filterNot { it.isGone }.mapNotNullTo(HashSet()) { it.recurringEventId }.forEach { cache.remove(it) }
+        // A read that fails keeps the rule the series had (the cache's, else the stored row's), so the row isn't downgraded.
+        val before = mutableMapOf<String, String>()
+        listed.items.filterNot { it.isGone }.mapNotNullTo(HashSet()) { it.recurringEventId }.forEach { series ->
+            cache.remove(series)?.let { before[series] = it }
+        }
         val upserts = mutableListOf<RemoteEvent>()
         val removed = mutableListOf<String>()
         val failed = mutableSetOf<String>()
@@ -193,11 +197,18 @@ class GoogleCalendarProvider @Inject constructor(
                 if (event.recurringEventId == null) {
                     // C9: a deleted series comes back as its own id alone (ruling 2).
                     val known = instances ?: stored.instances(conn.id, source.id).also { instances = it }
-                    removed += known.keys.filter { instanceOf(event.id, it) }
+                    val instance = instanceOf(event.id)
+                    removed += known.keys.filter { instance.matches(it) }
                     cache.remove(event.id)
                 }
             } else {
-                event.toRemoteEvent(ruleOf(account, source, event, cache, failed))?.let { upserts += it }
+                var rule = ruleOf(account, source, event, cache, failed)
+                val series = event.recurringEventId
+                if (rule == null && series != null && series in failed) {
+                    rule = before[series]?.ifEmpty { null }
+                        ?: (instances ?: stored.instances(conn.id, source.id).also { instances = it })[event.id]
+                }
+                event.toRemoteEvent(rule)?.let { upserts += it }
             }
         }
         return SyncResult(upserts, removed, listed.syncToken?.let(::SyncCursor) ?: cursor, fullReplace = false)
@@ -343,9 +354,9 @@ class GoogleCalendarProvider @Inject constructor(
 }
 
 /**
- * Whether [remoteId] is an instance of the series [seriesId] (ruling 2): Google names one "<series>_<original start>",
+ * What an instance id of the series [seriesId] looks like (ruling 2): Google names one "<series>_<original start>",
  * the start as 20261005T141500Z or, for an all-day event, 20261005. A series split from it ("<series>_R<start>") is
  * another series, so only that exact shape counts.
  */
-internal fun instanceOf(seriesId: String, remoteId: String): Boolean =
-    Regex("^${Regex.escape(seriesId)}_\\d{8}(T\\d{6}Z)?$").matches(remoteId)
+internal fun instanceOf(seriesId: String): Regex =
+    Regex("^${Regex.escape(seriesId)}_\\d{8}(T\\d{6}Z)?$")
