@@ -238,10 +238,10 @@ Accessibility, the launcher icon and design changes (4d); anything measured on t
 
 ## Appendix B: before and after (filled in by the plan)
 
-| Measure (emulator) | Before: signed, R8 off, full font | After: signed, minified, all of 4c |
+| Measure (emulator-5554, API 35; London, one Admin, no calendar) | Before: signed, R8 off, full font (2026-10-02) | After: signed, minified, all of 4c |
 |---|---|---|
-| Release APK size | | |
-| `am start -W` TotalTime, 5 runs | | |
-| Skipped frames, cold start | | |
-| gfxinfo p50 / p90 | | |
-| Dalvik / native PSS after start | | |
+| Release APK size | 33.5 MB | |
+| `am start -W` TotalTime, 5 runs | 2240, 2467, 1110, 1855, 1025 ms (median 1855) | |
+| Skipped frames, cold start | 56, 119, 0, 0, 0 | |
+| gfxinfo p50 / p90 | 44 / 350 ms | |
+| Dalvik / native PSS after start | 17.2 / 13.8 MB | |
