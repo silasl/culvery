@@ -89,6 +89,21 @@ class HouseholdRepository @Inject constructor(private val db: HouseholdDatabase)
         }
     }
 
+    /**
+     * Swaps [id] with the person above it ([up]) or below it, in one transaction (4c design §7.1); nobody moves past
+     * either end, and Family, never in the list, never moves. Returns whether anyone moved.
+     */
+    suspend fun move(id: PersonId, up: Boolean): Boolean = db.withTransaction {
+        val all = dao.all()
+        val index = all.indexOfFirst { it.id == id.value }
+        val other = all.getOrNull(if (up) index - 1 else index + 1)
+        if (index < 0 || other == null) return@withTransaction false
+        val person = all[index]
+        dao.upsertPerson(person.copy(sortOrder = other.sortOrder))
+        dao.upsertPerson(other.copy(sortOrder = person.sortOrder))
+        true
+    }
+
     suspend fun credential(id: PersonId): Credential? = dao.person(id.value)?.toCredential()
 
     suspend fun credentials(): List<Credential> = dao.all().map { it.toCredential() }

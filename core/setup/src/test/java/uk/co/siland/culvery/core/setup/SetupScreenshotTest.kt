@@ -70,7 +70,7 @@ class SetupScreenshotTest {
     private fun people(name: String, dark: Boolean) = snap(name, dark) {
         WizardFrame(6, 3, back = {}, forward = Forward.Next("Next", enabled = true), busy = false, onForward = {}, onSkip = {}) {
             StepTitle("Who else lives here?")
-            PeopleList(listOf(alex, sam, mia), onEdit = {}, onAdd = {})
+            PeopleList(listOf(alex, sam, mia), onEdit = {}, onAdd = {}, onMove = null)
         }
     }
 

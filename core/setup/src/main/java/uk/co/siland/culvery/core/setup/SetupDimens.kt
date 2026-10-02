@@ -36,6 +36,9 @@ internal object SetupDimens {
     val rowLineGap = 2.dp
     val rowIcon = 24.dp
 
+    // Move up / Move down (4c §7.1; not in the spec): 48 dp touch targets around the row's 24 dp icon.
+    val moveButton = 48.dp
+
     // The person sheet (§4.4: HhSheet, 600 dp), padded as the calendar's sheets (28×30×26). Not in the spec: sections 20
     // apart, a label 10 above its controls; role chips 10 apart; footer buttons 10 apart.
     val sheetPaddingTop = 28.dp

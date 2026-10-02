@@ -263,4 +263,24 @@ class HouseholdRepositoryTest {
         assertThat(repo.credential(mia.id)?.pinHash).isEqualTo("h")
         assertThat(repo.people.first().map { it.name }).containsExactly("Alex", "Mia")
     }
+
+    @Test
+    fun movingSomeoneUpSwapsThemWithThePersonAbove() = runTest {
+        repo.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
+        repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
+        val mia = repo.addPerson("Mia", 0xFFE07BA8, Role.CHILD)
+        assertThat(repo.move(mia.id, up = true)).isTrue()
+        assertThat(repo.people.first().map { it.name }).containsExactly("Alex", "Mia", "Sam").inOrder()
+        assertThat(repo.move(mia.id, up = false)).isTrue()
+        assertThat(repo.people.first().map { it.name }).containsExactly("Alex", "Sam", "Mia").inOrder()
+    }
+
+    @Test
+    fun nobodyMovesAboveTheFirstOrBelowTheLast() = runTest {
+        val alex = repo.addPerson("Alex", 0xFF4CB387, Role.ADMIN)
+        val sam = repo.addPerson("Sam", 0xFF5B9BE0, Role.ADULT)
+        assertThat(repo.move(alex.id, up = true)).isFalse()
+        assertThat(repo.move(sam.id, up = false)).isFalse()
+        assertThat(repo.people.first().map { it.name }).containsExactly("Alex", "Sam").inOrder()
+    }
 }

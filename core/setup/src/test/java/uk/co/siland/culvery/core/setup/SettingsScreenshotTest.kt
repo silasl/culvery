@@ -41,7 +41,7 @@ class SettingsScreenshotTest {
         },
         StillPage("people", "People", 100) {
             StepTitle("People")
-            PeopleList(people, onEdit = {}, onAdd = {})
+            PeopleList(people, onEdit = {}, onAdd = {}, onMove = { _, _ -> })
         },
         StillPage("calendars", "Calendars", 400) { StepTitle("Calendars") },
         KioskPage(FakeHomeApp(default = false)),

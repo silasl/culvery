@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -70,7 +71,7 @@ class PeopleUiTest {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
                     Box {
-                        PeoplePane(editor)
+                        PeoplePane(editor, reorder = true)
                         overlay.content?.invoke()
                     }
                 }
@@ -88,6 +89,19 @@ class PeopleUiTest {
         compose.awaitText("Adult · No PIN")
         compose.onNodeWithText("Admin · PIN set").assertExists()
         compose.onNodeWithText("Adult · No PIN").assertExists()
+    }
+
+    @Test
+    fun theMoveButtonsMoveSomeoneAndNoneGoesPastAnEnd() {
+        addSam()
+        show()
+        compose.awaitTag("person_up_Sam")
+        compose.onNodeWithTag("person_up_Alex").assertDoesNotExist()
+        compose.onNodeWithTag("person_down_Sam").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Move Sam up").performClick()
+        compose.waitUntil(5_000) { runBlocking { household.people.first().map { it.name } } == listOf("Sam", "Alex") }
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("person_up_Sam").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("person_down_Sam").assertExists()
     }
 
     @Test
@@ -199,7 +213,7 @@ class PeopleUiTest {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
                     Box {
-                        PeoplePane(failing)
+                        PeoplePane(failing, reorder = true)
                         overlay.content?.invoke()
                     }
                 }

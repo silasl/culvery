@@ -53,6 +53,15 @@ internal fun removeQuestion(name: String): String = "Remove $name? $name's event
 
 internal fun removed(name: String): String = "$name removed"
 
+// 4c design §7.1.
+internal fun moveUpLabel(name: String): String = "Move $name up"
+
+internal fun moveDownLabel(name: String): String = "Move $name down"
+
+internal fun movedUp(name: String): String = "$name moved up"
+
+internal fun movedDown(name: String): String = "$name moved down"
+
 internal fun roleName(role: Role): String = when (role) {
     Role.ADMIN -> "Admin"
     Role.ADULT -> "Adult"

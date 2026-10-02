@@ -92,7 +92,7 @@ class StepsUiTest {
     fun itIsNotOfferedOnceSomeoneLivesHere() {
         runBlocking { access.pins.addPerson("Sam", PersonPalette.colors[1], Role.ADULT, null) }
         // Sam's row comes from the same Room read, so once it shows the household has been read as not empty.
-        welcome(sample = true) { CompositionLocalProvider(LocalOverlayHost provides overlay) { PeoplePane(editor) } }
+        welcome(sample = true) { CompositionLocalProvider(LocalOverlayHost provides overlay) { PeoplePane(editor, reorder = false) } }
         compose.awaitTag("person_Sam")
         compose.waitForIdle()
         compose.onNodeWithTag("welcome_sample").assertDoesNotExist()

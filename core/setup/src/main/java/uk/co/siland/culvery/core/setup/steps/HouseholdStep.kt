@@ -22,6 +22,6 @@ class HouseholdStep @Inject constructor(private val editor: PeopleEditor) : Setu
     @Composable
     override fun Content(onNext: () -> Unit) {
         StepTitle(WHO_ELSE)
-        PeoplePane(editor)
+        PeoplePane(editor, reorder = false)
     }
 }

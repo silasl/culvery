@@ -9,7 +9,7 @@ import uk.co.siland.culvery.core.setup.PeopleEditor
 import uk.co.siland.culvery.core.setup.PeoplePane
 import uk.co.siland.culvery.core.setup.StepTitle
 
-/** Settings › People (4a design §4.4): the Household step's list and sheet. */
+/** Settings › People (4a design §4.4): the Household step's list and sheet, and reordering (4c §7.1). */
 @Singleton
 class PeoplePage @Inject constructor(private val editor: PeopleEditor) : SettingsPage {
     override val id = "people"
@@ -19,6 +19,6 @@ class PeoplePage @Inject constructor(private val editor: PeopleEditor) : Setting
     @Composable
     override fun Content() {
         StepTitle(PEOPLE)
-        PeoplePane(editor)
+        PeoplePane(editor, reorder = true)
     }
 }

@@ -91,6 +91,23 @@ class PeopleEditor @Inject constructor(
         return outcome
     }
 
+    /** 4c design §7.1, D7: the open Settings session (settings.manage), no fresh PIN; a toast says who moved, or that it failed. */
+    suspend fun move(id: PersonId, up: Boolean): PeopleOutcome {
+        val name = orNull { household.person(id)?.name }
+        if (name == null) {
+            toaster.show(COULD_NOT_SAVE)
+            return PeopleOutcome.Refused(COULD_NOT_SAVE)
+        }
+        access.authorise(CorePermissions.SETTINGS_MANAGE) ?: return PeopleOutcome.Cancelled
+        var moved = false
+        val outcome = saving { moved = household.move(id, up) }
+        when {
+            outcome is PeopleOutcome.Refused -> toaster.show(outcome.message)
+            moved -> toaster.show(if (up) movedUp(name) else movedDown(name))
+        }
+        return outcome
+    }
+
     /** Whether [id] is who is signed in now. */
     fun isSignedIn(id: PersonId): Boolean = access.session.value?.person?.id == id
 

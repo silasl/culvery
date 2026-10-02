@@ -63,6 +63,19 @@ class PeopleEditorTest {
         assertThat(household.members.first().map { it.person.name }).containsExactly("Alex", "Sam").inOrder()
     }
 
+    /** D7: the open Settings session, no fresh PIN; a toast says who moved. */
+    @Test
+    fun movingSomeoneTakesTheOpenSessionAndSaysSo() = runTest {
+        start()
+        val sam = sam()
+        assertThat(editor.move(sam.id, up = true)).isEqualTo(PeopleOutcome.Done)
+        assertThat(access.requests).isEmpty()
+        assertThat(household.people.first().map { it.name }).containsExactly("Sam", "Alex").inOrder()
+        assertThat(access.toasts.messages).containsExactly("Sam moved up")
+        assertThat(editor.move(sam.id, up = false)).isEqualTo(PeopleOutcome.Done)
+        assertThat(access.toasts.messages.last()).isEqualTo("Sam moved down")
+    }
+
     @Test
     fun renamingAndRecolouringNeedOnlyTheOpenSession() = runTest {
         start()
