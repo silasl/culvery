@@ -10,6 +10,8 @@ On Windows, from the repo root in PowerShell:
 .\tools\new-release-key.ps1
 ```
 
+If Windows PowerShell says running scripts is disabled, run `powershell -ExecutionPolicy Bypass -File .\tools\new-release-key.ps1` instead (or `pwsh .\tools\new-release-key.ps1` with PowerShell 7).
+
 (elsewhere: `bash tools/new-release-key.sh`; in Git Bash it runs only with `winpty`, as keytool would otherwise show the password as you type). It asks where to keep the key (outside the repo; the default is `~/.culvery/`), then runs `keytool`, which asks for the password itself. It prints the four lines to add to **your own** `~/.gradle/gradle.properties` (never the repo's):
 
 ```properties

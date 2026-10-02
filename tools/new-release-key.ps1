@@ -10,7 +10,13 @@ if (-not (Get-Command $keytool -ErrorAction SilentlyContinue)) {
 }
 $alias = 'culvery'
 $defaultDir = Join-Path $HOME '.culvery'
-$repo = (git rev-parse --show-toplevel 2>$null)
+$repo = $null
+try { $repo = (git -C $PSScriptRoot rev-parse --show-toplevel 2>$null) } catch { $repo = $null }
+if ($LASTEXITCODE -ne 0 -or -not $repo) {
+    Write-Host "Can't find the Culvery repo from this script's folder, so can't check the key stays outside it."
+    Write-Host 'Run the script from inside a Culvery checkout, with git on PATH.'
+    exit 1
+}
 
 Write-Host 'Culvery release key'
 Write-Host ''
@@ -21,7 +27,7 @@ $dir = Read-Host "Folder [$defaultDir]"
 if (-not $dir) { $dir = $defaultDir }
 New-Item -ItemType Directory -Force $dir | Out-Null
 $dir = (Resolve-Path $dir).Path
-if ($repo -and $dir.Replace('\', '/').StartsWith(($repo.TrimEnd('/') + '/'), [StringComparison]::OrdinalIgnoreCase)) {
+if (($dir.Replace('\', '/').TrimEnd('/') + '/').StartsWith(($repo.TrimEnd('/') + '/'), [StringComparison]::OrdinalIgnoreCase)) {
     Write-Host 'That folder is inside the repo. Choose one outside it.'
     exit 1
 }

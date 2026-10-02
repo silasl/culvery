@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The 4c Appendix B numbers for the Culvery release installed on one emulator or device (4c design §4.5): the APK's
+# The 4c Appendix B numbers for the Culvery release installed on one emulator or device (4c design section 4.5): the APK's
 # size, five cold starts (am start -W TotalTime and skipped frames each), then gfxinfo's p50/p90 and Dalvik and native
 # PSS after the last start. It only stops and starts Culvery. Takes about a minute.
 # Usage: bash tools/measure-release.sh [serial]   (default emulator-5554)
@@ -19,7 +19,9 @@ for run in 1 2 3 4 5; do
   dev logcat -c
   total=$(dev shell am start -W -n "$PKG/.MainActivity" | tr -d '\r' | sed -n 's/^TotalTime: //p')
   sleep "$SETTLE_SECONDS"
-  skipped=$(dev logcat -d -s Choreographer:I | tr -d '\r' | sed -n 's/.*Skipped \([0-9]*\) frames.*/\1/p' | awk '{ s += $1 } END { print s + 0 }')
+  pid=$(dev shell pidof "$PKG" | tr -d '\r' | awk '{ print $1 }')
+  [ -n "$pid" ] || { echo "Culvery isn't running after the start (run $run)."; exit 1; }
+  skipped=$(dev logcat -d --pid="$pid" -s Choreographer:I | tr -d '\r' | sed -n 's/.*Skipped \([0-9]*\) frames.*/\1/p' | awk '{ s += $1 } END { print s + 0 }')
   echo "Run $run: TotalTime $total ms, skipped frames $skipped"
 done
 echo "gfxinfo (last cold start):"

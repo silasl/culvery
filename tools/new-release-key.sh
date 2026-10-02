@@ -23,7 +23,11 @@ fi
 
 ALIAS=culvery
 DEFAULT_DIR="$HOME/.culvery"
-REPO=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+if ! REPO=$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null); then
+  echo "Can't find the Culvery repo from this script's folder, so can't check the key stays outside it."
+  echo "Run the script from inside a Culvery checkout, with git on PATH."
+  exit 1
+fi
 
 echo "Culvery release key"
 echo
@@ -34,11 +38,9 @@ read -r -p "Folder [$DEFAULT_DIR]: " DIR
 DIR=${DIR:-$DEFAULT_DIR}
 mkdir -p "$DIR"
 DIR=$(cd "$DIR" && pwd -P)
-if [ -n "$REPO" ]; then
-  case "$DIR/" in
-    "$(cd "$REPO" && pwd -P)/"*) echo "That folder is inside the repo. Choose one outside it."; exit 1 ;;
-  esac
-fi
+case "$DIR/" in
+  "$(cd "$REPO" && pwd -P)/"*) echo "That folder is inside the repo. Choose one outside it."; exit 1 ;;
+esac
 STORE="$DIR/culvery-release.jks"
 if [ -e "$STORE" ]; then
   echo "$STORE already exists; it is left as it is. Move it away first to make a new key."
