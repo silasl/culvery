@@ -106,7 +106,7 @@ The plan records, on the emulator: **before** on a signed release with R8 off an
 ### 5.2 Device owner (optional)
 
 - A `DeviceAdminReceiver` (`CulveryDeviceAdmin`) with no policies beyond lock-task is declared.
-- When `DevicePolicyManager.isDeviceOwnerApp`, Culvery calls `setLockTaskPackages(own package, com.google.android.gms)` on start (Play services so the Google chooser shows inside lock-task — plan review), so `startLockTask()` enters true lock-task (no prompt, no exit gesture). Otherwise screen pinning works as today.
+- When `DevicePolicyManager.isDeviceOwnerApp`, Culvery calls `setLockTaskPackages(own package)` on start, and adds `com.google.android.gms` only while the Google chooser is open, removing it when Culvery is back in front (plan review; Task 9 review: a permanent allowlist would let any Play services screen start over the locked kiosk), so `startLockTask()` enters true lock-task (no prompt, no exit gesture). Otherwise screen pinning works as today.
 - `docs/setup/release.md` gives `adb shell dpm set-device-owner uk.co.siland.culvery/.CulveryDeviceAdmin`, its precondition (a freshly reset tablet with no accounts yet; add the Google account afterwards) and that undoing it needs a factory reset.
 
 ### 5.3 Connecting Google on the kiosk (D5, K5, K6)
