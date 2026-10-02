@@ -34,6 +34,7 @@ import javax.inject.Provider
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.AccessControl
@@ -122,6 +123,13 @@ class MainActivity : ComponentActivity() {
             holdSplash(setupComplete.value, shell.uiState.value.cardsLoaded, SystemClock.uptimeMillis() - shownAt)
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        lifecycleScope.launch {
+            // Home with its cards is what the splash waits for; the wizard path is already shown at first draw.
+            if (setupComplete.filterNotNull().first()) {
+                shell.uiState.first { it.cardsLoaded }
+                reportFullyDrawn()
+            }
+        }
         onBackPressedDispatcher.addCallback(this) { }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
