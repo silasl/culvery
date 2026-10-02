@@ -2,69 +2,79 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (chosen: a sonnet implementer per task, then a reviewer per task; tasks marked **Review: opus** get an opus reviewer) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A signed, minified release build with its own OAuth client and a logging policy; Culvery as the tablet's home app (device owner optional); the whole non-device fix backlog; and the size, start-up, runtime and economy fixes from the 4c audit.
+**Goal:** A signed, minified release build with its own OAuth client and a logging policy; Culvery as the tablet's home app (device owner optional); the whole non-device fix backlog; four weeks ahead in the Calendar tab; and the size, start-up, runtime and economy fixes from the 4c audit.
 
-**Architecture:** Build first (signing, the icon subset, R8 and the logging guard), then performance (start-up off Main with a splash, recomposition, one household clock, calendar flows), then the kiosk (home app, device owner, Connect stepping out of lock-task), then calendar sync (ask for less, keep the sync token across midnight with pruning, `calendar.db` v6, correctness, per-calendar health), then people and health lists, then the emulator walkthrough on the signed, minified release. New seams live in `:core:plugin` (`HouseholdClock`, `FirstDraw`, `LockTask`, `HomeApp`, `AppVersion`) and `:capability:calendar` (`StoredSeries`); `:app` binds the Android ones.
+**Architecture:** Build first (signing, the icon subset, R8 and the logging guard), then performance (start-up off Main with a splash, recomposition, one household clock, calendar flows), then the kiosk (the lockout, the home app and device owner, Connect leaving screen pinning), then calendar sync (ask for less, keep the sync token across midnight with pruning and the 4-week window, `calendar.db` v6, series deleted on a phone), the 4-week Calendar tab, correctness and per-calendar health, then people and health lists, then the emulator walkthrough on the signed, minified release. New seams live in `:core:plugin` (`HouseholdClock`, `FirstDraw`, `HomeApp`, `AppVersion`, `ShellNavigator.leavePinning()`) and `:capability:calendar` (`StoredSeries`); `:app` binds the Android ones.
 
-**Tech Stack:** Kotlin 2.2.20, Jetpack Compose (BOM 2025.09.00), Hilt 2.57.1 (KSP), Room 2.8.5, Coroutines 1.10.2, OkHttp 4.12.0 + MockWebServer, kotlinx.serialization 1.9.0, Play services auth 21.4.0, JUnit4 + Robolectric 4.16 + Truth + Turbine, Roborazzi 1.46.1, AGP 8.13.0 (R8). One new dependency: `androidx.core:core-splashscreen` (ruling 19). Python 3 + fontTools for `tools/fonts/subset.py` only; the build never runs Python.
+**Tech Stack:** Kotlin 2.2.20, Jetpack Compose (BOM 2025.09.00), Hilt 2.57.1 (KSP), Room 2.8.5, Coroutines 1.10.2, OkHttp 4.12.0 + MockWebServer, kotlinx.serialization 1.9.0, Play services auth 21.4.0, JUnit4 + Robolectric 4.16 + Truth + Turbine, Roborazzi 1.46.1, AGP 8.13.0 (R8). One new dependency: `androidx.core:core-splashscreen` 1.2.0 (ruling 19). Python 3 + fontTools for `tools/fonts/subset.py` only; the build never runs Python.
 
-**Spec:** `docs/superpowers/specs/2026-10-02-culvery-4c-release-fixes-design.md` (binding; decisions D1–D9, audit ids in its Appendix A). Parent spec: `docs/superpowers/specs/2026-09-23-culvery-v1-design.md` (§4 module rules, §7 storage and sync, §8 access, §10 kiosk).
-**Previous plan (format, constraints):** `docs/superpowers/plans/2026-10-01-culvery-04b-weather.md`. **Follow-ups:** `docs/superpowers/plans/2026-09-23-plan1-followups.md` (spec §9 says what 4c takes; Task 16 moves them out).
+**Spec:** `docs/superpowers/specs/2026-10-02-culvery-4c-release-fixes-design.md` (binding; decisions D1–D11, audit ids in its Appendix A; amended after this plan's review in commit 9b46684). Parent spec: `docs/superpowers/specs/2026-09-23-culvery-v1-design.md` (§4 module rules, §7 storage and sync, §8 access, §9.3 week view as amended by D10, §10 kiosk).
+**Previous plan (format, constraints):** `docs/superpowers/plans/2026-10-01-culvery-04b-weather.md`. **Follow-ups:** `docs/superpowers/plans/2026-09-23-plan1-followups.md` (spec §9 says what 4c takes; Task 19 moves them out).
 
 **Plan series:** 1 Foundation · 2a · 2b-1 · 2b-2 · 3a · 4a · 4b (done) · **4c Release, fixes and performance (this plan)** · 4d design, UX and accessibility · 4e the device.
 
-**Task order and why:** D1's order, with two moves the code forces. E3 (skip a connection's other calendars after Unreachable or NeedsSignIn) moves from Task 12 to Task 13: the refusal it must not count is a `SourceGoneException`, which *is* an `UnreachableException`, so E3 can only be right once §6.4 gives refusals their own path. The `readProblem` column lands with the v6 migration in Task 11 (spec §6.2), its behaviour and UI in Task 13. Every task ends green.
+**Plan review (2026-10-02).** The user ruled on this plan's first draft "all as recommended", and the spec gained D10, D11 and §6.6. This version applies them: the subset keeps the filled icons (Task 2); **Choose home app** asks Android's role dialog and **Change home app** opens the home settings on Exit kiosk's fresh PIN, both surviving a missing screen (Task 9, ruling 15); as the home app, Exit kiosk stays in front, unpinned (Task 9, ruling 28); `LockTask` and `pinAgain` are gone, replaced by `ShellNavigator.leavePinning()` (Task 10, ruling 16); C9 matches instance ids exactly and keeps a split series (Task 13, ruling 2); R8 keeps only three rules of its own and the release build is the check (Task 3, ruling 30); `SampleAddTest` gets `FirstDraw` (Task 4); the lockout, `fields=`, pruning, horizon and icon-guard tests now fail on a mutant; the old Task 8 and Task 11 are split (now Tasks 8–9 and 12–13); `LogHygieneTest` accepts only qualified names and checks `Log.wtf`/`Log.println` (ruling 18); every calendar refused is no sync (Task 16); the cursor key keeps the read's start (Task 12); as device owner Play services is allowlisted and Connect doesn't leave lock-task (ruling 29); the key script refuses Git Bash without `winpty` and has a PowerShell twin, and `.gitignore` ignores keystores (Task 1); signing is inline in `app/build.gradle.kts`; vacuous and duplicate tests are dropped, `remember(animatedColors)` goes, P2 goes through `CulveryShell`, `wallTimeEachMinute`/`WallTimeTest`/`MinuteTicker` go, and `rememberToday` never falls back to the device's zone; an accepted write clears a NeedsSignIn a refused write set (Task 15). Questions: the 42-day read stays (ruling 1); series-rule seeding is dropped (D11, ruling 3); the real release key is made in Task 1 (ruling 21); core-splashscreen 1.2.0 with no fallback (ruling 19). New: the Calendar tab looks four weeks ahead (D10, §6.6; Tasks 12 and 14, ruling 31).
+
+**Task order and why:** D1's order, with three moves the code forces. E3 (skip a connection's other calendars after Unreachable or NeedsSignIn) moves from C3/C4's task (15) to Task 16: the refusal it must not count is a `SourceGoneException`, which *is* an `UnreachableException`, so E3 can only be right once §6.4 gives refusals their own path. The `readProblem` column lands with the v6 migration in Task 12 (spec §6.2), its behaviour and UI in Task 16. D10's wider window lands with the cursor rules in Task 12, the Calendar tab's arrows in Task 14. Every task ends green.
 
 | # | Task | Review |
 |---|---|---|
-| 1 | Release signing, version, `docs/setup/release.md`, `tools/new-release-key.sh`, the "before" numbers (§3.1, §3.2, §4.5) | sonnet |
-| 2 | The icon font: `Icons`, `IconFontTest`, the S3 glyphs, the subset, `ThemeTest`, `lifecycle-viewmodel-ktx` out (§3.5) | sonnet |
+| 1 | Release signing, version, `docs/setup/release.md`, the key scripts, the "before" numbers (§3.1, §3.2, §4.5) | sonnet |
+| 2 | The icon font: `Icons`, `IconFontTest`, the S3 glyphs, the subset with filled forms, `ThemeTest`, `lifecycle-viewmodel-ktx` out (§3.5) | sonnet |
 | 3 | R8, resource shrinking, `proguard-rules.pro`, release logging, `LogHygieneTest`, the `Log.w/e` scrub (§3.3, §3.4, D8) | **opus** (R8, logs) |
 | 4 | Start-up off Main, the first-draw gate, the splash (§4.1) | sonnet |
 | 5 | Recomposition: the remembered `ColorScheme`, `now` out of the root (§4.2) | sonnet |
 | 6 | `HouseholdClock`, one time source (§4.3) | sonnet |
 | 7 | Calendar flows: `distinctUntilChanged`, the stability file, `flowOn` (§4.4) | sonnet |
-| 8 | Kiosk: home app, device owner, K1–K4 (§5.1, §5.2, §5.4) | **opus** (lock-task, lockout) |
-| 9 | Connecting on the kiosk: `connections.manage`, Play services, stepping out of lock-task (§5.3) | **opus** (connect flow) |
-| 10 | Google asks for less: `fields=`, the gzip User-Agent, `callTimeout` (§6.1) | sonnet |
-| 11 | The cursor across midnight, pruning, rule seeding, series cancellation, `calendar.db` v6 (§6.2, C9) | **opus** (sync state, migration) |
-| 12 | C3 and C4 (§6.3) | sonnet |
-| 13 | One calendar that can't be read, E3, the toast count, the `addConnection` test (§6.3 E3, §6.4, §6.5) | **opus** (health) |
-| 14 | Reordering people (§7.1) | sonnet |
-| 15 | Code health and test health (§7.2, §7.3) | **opus** (session state) |
-| 16 | The walkthrough on the signed, minified release; Appendix B; README; follow-ups (§8.2, §9) | sonnet + controller |
+| 8 | The lockout: the clock guard, no disk I/O on Main (§5.4 K3, K4) | **opus** (lockout) |
+| 9 | The home app, Exit kiosk in front, device owner, K1, K2 (§5.1, §5.2, §5.4) | **opus** (lock-task over the lifecycle) |
+| 10 | Connecting on the kiosk: `connections.manage`, Play services, leaving pinning (§5.3) | **opus** (connect flow) |
+| 11 | Google asks for less: `fields=`, the gzip User-Agent, `callTimeout` (§6.1) | sonnet |
+| 12 | The cursor across midnight, pruning, the 4-week window, `calendar.db` v6 (§6.2, §6.6's window) | **opus** (sync state, migration) |
+| 13 | A series deleted on a phone: `StoredSeries`, C9 (§6.3 C9, D11) | **opus** (removals) |
+| 14 | Looking ahead four weeks in the Calendar tab (§6.6, D10) | sonnet |
+| 15 | C3 and C4 (§6.3) | sonnet |
+| 16 | One calendar that can't be read, E3, the toast count, the `addConnection` test (§6.3 E3, §6.4, §6.5) | **opus** (health) |
+| 17 | Reordering people (§7.1) | sonnet |
+| 18 | Code health and test health (§7.2, §7.3) | **opus** (session state) |
+| 19 | The walkthrough on the signed, minified release; Appendix B; README; follow-ups (§8.2, §9) | sonnet + controller |
 
 ## Rulings against the code and the APIs
 
-Where the spec is silent, ambiguous, or doesn't fit the code or the real API, this plan rules as follows. Pinned by a test in the task named: 1, 2, 3, 4, 6, 11, 12, 13, 15, 16, 18, 23, 26. Not pinned by a test: 5 (the header is checked, not its source), 7 (task order), 8 (measured in Task 16), 9 (docs), 10 and 22 (by eye, the latter in a screenshot), 14 (the plural is tested, the singular is copy), 17 (compiles or the step stops), 19 and 20 (build configuration), 21 (process), 24, 25 (screenshots), 27 (insets aren't measurable in Robolectric).
+Where the spec is silent, ambiguous, or doesn't fit the code or the real API, this plan rules as follows. Pinned by a test in the task named: 1, 2, 3, 4, 6, 11, 12, 13, 15, 16, 18, 23, 26, 28, 29, 31. Not pinned by a test: 5 (the header is checked, not its source), 7 (task order), 8 (measured in Task 19), 9 (docs), 10 and 22 (by eye, the latter in a screenshot), 14 (the plural is tested, the singular is copy), 17 (compiles or the step stops), 19 and 20 (build configuration), 21 (process), 24, 25 (screenshots), 27 (insets aren't measurable in Robolectric), 30 (the release build is the check, Task 3 Step 10), 32 (compiler).
 
-1. **Google's incremental sync and the window — a spec deviation (Task 11).** Checked against the Calendar API v3 docs (`guides/sync`, `events/list`, 2026-10-02): `timeMin` and `timeMax` are *incompatible with* `syncToken`; "the result will always contain deleted entries"; "each list request should use the same set of query parameters, including the initial request"; 410 means wipe and full sync. So an incremental result holds every change to the calendar at any date, and *nothing* about an unchanged event. A token from a full sync bounded at today + 15 would never deliver the events already sitting at today + 16 when the window reaches them. Therefore: a full sync reads **42 days past the window's end** (`SYNC_AHEAD_DAYS`); the cursor's key is "`<end of what was read>|<zone>`" (the window's start date is gone, §6.2); a cursor is used while what was read still covers the window (about six weeks), the zone is the same and Google hasn't answered 410; and pruning keeps **[window start, end of what was read)**, not [today − 1, today + 14] as §6.2 says, because pruning anything that was read and is still ahead would lose it for good. Storage stays bounded (≈ 72 days a calendar); a full sync happens every six weeks instead of nightly.
-2. **A cancelled series (C9, Task 11).** With `singleEvents=true` Google lists only instances, whose ids are the series id, `_`, and the original start (`piano_20261005T150000Z`). The cancelled master carries only its id. The capability's contract stays as it is (removals are ids); `:capability:calendar` gains a small read seam, `StoredSeries` (stored repeating instances of one calendar, id → rule), bound to `CalendarStore`, and the Google provider adds every stored instance whose id starts with "`<cancelled id>_`" to the removals. Google's id convention stays inside the Google provider.
-3. **Seeding the rule cache (Task 11)** goes through the same seam: before a full sync maps its events, each listed instance whose id is stored with a rule gives its series that rule. And since no nightly full sync refreshes the rules any more, an incremental pass that carries an instance of a series fetches that series' rule again (once per pass): changes are rare, and a series edited on a phone shows its new Repeats text.
-4. **`fields=` (Task 10, deviation).** §6.1's list leaves out two fields the provider parses — `eventType` and `attendees(self,responseStatus)`, which drop working locations and declined invitations (`GoogleEvent.isGone`) — and includes `updated`, which nothing reads. The plan sends what the provider parses: `items(id,status,summary,start,end,recurringEventId,recurrence,eventType,attendees(self,responseStatus),extendedProperties/private,colorId),nextPageToken,nextSyncToken`; `calendarList.list` sends `items(id,summary,summaryOverride,accessRole,selected,hidden,primary),nextPageToken`.
-5. **The User-Agent's version (Task 10).** `:provider:calendar-google` can't see `BuildConfig`. `:core:plugin` gains a qualifier `@AppVersion`; `:app` provides `BuildConfig.VERSION_NAME` under it.
-6. **`kioskExited` is a `ShellViewModel` field, not a `SavedStateHandle` value (K2, Task 8, deviation).** A ViewModel field survives a configuration change, which is K2's case. A `SavedStateHandle` would also restore "exited" after a process death, so a tablet killed while unpinned would come back unpinned; a field is forgotten, and `onResume` pins again (Review Focus 2).
-7. **E3 moves to Task 13** (see Task order).
+1. **Google's incremental sync and the window — a spec deviation (Task 12).** Checked against the Calendar API v3 docs (`guides/sync`, `events/list`, 2026-10-02): `timeMin` and `timeMax` are *incompatible with* `syncToken`; "the result will always contain deleted entries"; "each list request should use the same set of query parameters, including the initial request"; 410 means wipe and full sync. So an incremental result holds every change to the calendar at any date, and *nothing* about an unchanged event. A token from a full sync bounded at the window's end would never deliver the events already sitting one day past it when the window reaches them. Therefore: a full sync reads **42 days past the window's end** (`SYNC_AHEAD_DAYS`); the cursor's key is "`<start of what was read>|<end of what was read>|<zone>`" (the window's start date as such is gone, §6.2); a cursor is used while what was read still covers the window — its start on or before the window's start, its end on or after the window's end — the zone is the same and Google hasn't answered 410; and pruning keeps **[window start, end of what was read)**, not the window alone as §6.2 says, because pruning anything that was read and is still ahead would lose it for good. With D10's window (today − 1 to + 28) the token lives 42 days, a full sync comes about every six weeks instead of nightly, and storage stays bounded (≈ 72 days a calendar). The user accepted the 42 days at the plan review.
+2. **A cancelled series (C9, Task 13).** With `singleEvents=true` Google lists only instances, whose ids are the series id, `_`, and the original start (`piano_20261005T150000Z`, or `piano_20261005` all day). The cancelled master carries only its id. The capability's contract stays as it is (removals are ids); `:capability:calendar` gains a small read seam, `StoredSeries` (stored repeating instances of one calendar, id → rule), bound to `CalendarStore`, and the Google provider adds every stored instance whose id matches `^<Regex.escape(id)>_\d{8}(T\d{6}Z)?$` to the removals: a series split from it by "this and following" (`piano_R20261006T141500_…`) is another series and stays. Google's id convention stays inside the Google provider.
+3. **No series-rule seeding (D11, Task 13).** `StoredSeries` serves C9 only; a full sync fetches each series' rule as today, now about once every six weeks. Since no nightly full sync refreshes the rules any more, an incremental pass that carries an instance of a series fetches that series' rule again (once per pass): changes are rare, and a series edited on a phone shows its new Repeats text.
+4. **`fields=` (Task 11, deviation).** §6.1's list leaves out two fields the provider parses — `eventType` and `attendees(self,responseStatus)`, which drop working locations and declined invitations (`GoogleEvent.isGone`) — and includes `updated`, which nothing reads. The plan sends what the provider parses: `items(id,status,summary,start,end,recurringEventId,recurrence,eventType,attendees(self,responseStatus),extendedProperties/private,colorId),nextPageToken,nextSyncToken`; `calendarList.list` sends `items(id,summary,summaryOverride,accessRole,selected,hidden,primary),nextPageToken`. The test parses both strings and walks every serializer's descriptor, nested ones too.
+5. **The User-Agent's version (Task 11).** `:provider:calendar-google` can't see `BuildConfig`. `:core:plugin` gains a qualifier `@AppVersion`; `:app` provides `BuildConfig.VERSION_NAME` under it.
+6. **`kioskExited` is a `ShellViewModel` field, not a `SavedStateHandle` value (K2, Task 9, deviation).** A ViewModel field survives a configuration change, which is K2's case. A `SavedStateHandle` would also restore "exited" after a process death, so a tablet killed while unpinned would come back unpinned; a field is forgotten, and `KioskLifecycle` pins again when Culvery is in front (Review Focus 2).
+7. **E3 moves to Task 16** (see Task order).
 8. **What leaves Main at start-up (Task 4, partial by necessity).** `CulveryApp` starts the `Startable`s and the debug seed from `Dispatchers.Default` through `dagger.Lazy`. `MainActivity` still injects the capabilities on Main, and `CalendarCapability → CalendarRepository → Set<CalendarProvider>` builds `GoogleCalendarProvider` there. So the two costly members the audit names become lazy: `GoogleApi`'s `OkHttpClient` and `PlayServicesAuthorizer`'s `AuthorizationClient`.
 9. **A release over a debug install (Task 1, docs).** §3.2 says "`pm clear` or uninstall"; `pm clear` keeps the debug signature, so Android still refuses the install. `docs/setup/release.md` says uninstall.
 10. **The splash (Task 4).** `Theme.SplashScreen` with `windowSplashScreenBackground` `#FF0E1011` (the theme's `windowBackground`); no icon attribute until 4d's launcher icon, so Android shows its default.
-11. **Pruning keeps an event a queued change targets (Task 11):** its sheet and its syncing mark stay right until the change is delivered (Review Focus 3).
-12. **`source.readProblem` (Task 13)** holds `"REFUSED"` or null. A refusal flags a source refresh only when the calendar had no problem yet (so a deleted calendar still leaves at the next pass, and a refused one isn't re-read every pass); `SourceRefresher`'s in-memory "still listed" set goes. **Hide this calendar** clears it (a hidden calendar isn't read). A successful read clears it.
-13. **NeedsSignIn after a refused write (C3, Task 12).** `markSynced` keeps `NEEDS_SIGN_IN` while the connection has queued changes; a reconnect sets Ok and makes them due, as today. A read-only NeedsSignIn (nothing queued) still clears when reads work again.
-14. **C7's singular (Task 13):** "1 change waiting to sync was dropped." (as 4a ruling 13 does for the disconnect question).
-15. **The home app (Task 8).** "Is Culvery the default home app" is `RoleManager.isRoleHeld(ROLE_HOME)` (API 29+), behind `HomeApp` in `:core:plugin`, refreshed on every `onResume`. **Choose home app** and **Change home app** go through `ShellNavigator.openHomeSettings(freshPin)`, because only the activity can unpin and the system's settings can't open while pinned: Choose authorises `settings.manage` (the open Settings session, or the wizard's setup session); Change asks for a fresh PIN through `kiosk.exit` (it leaves the kiosk) and closes Settings and signs out, as Exit kiosk does. Both unpin, then open `Settings.ACTION_HOME_SETTINGS`; Culvery pins again the next time it is in front.
-16. **`LockTask.pinAgain` (Task 9).** Activity results arrive before `onResume`, and `startLockTask` must be called while resumed, so `pinAgain` pins at once only when resumed; otherwise `onResume` pins, as it already does whenever setup is complete and the kiosk wasn't exited.
-17. **The Play services check (Task 9)** sits in `GoogleConnectFlow.start`, after the PIN (in `CalendarConnectHost`) and before anything else. `GoogleApiAvailability` comes with `play-services-auth` (its `play-services-base`); if the compiler can't see it, stop and ask — it would be a second new dependency.
-18. **`LogHygieneTest`'s reach (Task 3):** `src/main` and `src/release` of every module (debug code never ships). Allowed in a message: `${…::class.simpleName}`, `${…code}`, and a named allowlist of ids and fixed words (connection, provider, capability and step ids; change kinds; Google's error reasons; request names; counts).
-19. **`core-splashscreen` 1.2.0 (Task 4)**, the `release` value of Google Maven's `maven-metadata.xml` on 2026-10-02. If `:app:checkDebugAarMetadata` says it needs a compileSdk above 35, use **1.0.1** (the previous stable) instead.
+11. **Pruning keeps an event a queued change targets (Task 12):** its sheet and its syncing mark stay right until the change is delivered (Review Focus 3).
+12. **`source.readProblem` (Task 16)** holds `"REFUSED"` or null. A refusal flags a source refresh only when the calendar had no problem yet (so a deleted calendar still leaves at the next pass, and a refused one isn't re-read every pass); `SourceRefresher`'s in-memory "still listed" set goes. **Hide this calendar** clears it (a hidden calendar isn't read). A successful read clears it. A pass in which every visible calendar was refused read nothing: the connection is Unreachable and isn't marked synced (plan review 11). "Or the primary" isn't applied: `StoredSource` holds no primary flag.
+13. **NeedsSignIn after a refused write (C3, Task 15).** `markSynced` keeps `NEEDS_SIGN_IN` while the connection has queued changes; a reconnect sets Ok and makes them due, as today; and a write the provider accepts (the editor's or the drain's) sets Ok too, since it proves sign-in works (plan review 17). A read-only NeedsSignIn (nothing queued) still clears when reads work again.
+14. **C7's singular (Task 16):** "1 change waiting to sync was dropped." (as 4a ruling 13 does for the disconnect question).
+15. **The home app (Task 9).** "Is Culvery the default home app" is `RoleManager.isRoleHeld(ROLE_HOME)` (API 29+), behind `HomeApp` in `:core:plugin`, read again each time Culvery is in front. **Choose home app** authorises `settings.manage` (the open Settings session, or the wizard's setup session) and starts `RoleManager.createRequestRoleIntent(ROLE_HOME)`: Android's yes/no dialog, with no way from it into Settings. **Change home app** asks for a fresh PIN through `kiosk.exit` (its pad says "Exit kiosk mode", which is what it does), closes Settings and signs out, then opens `Settings.ACTION_HOME_SETTINGS`. Both go through `ShellNavigator` because only the activity can unpin, and nothing opens over a pinned app; both catch `ActivityNotFoundException` and pin again.
+16. **Leaving pinning (Task 10).** `ShellNavigator.leavePinning()` replaces `LockTask`, `ActivityLockTask`, `LocalLockTask` and `pinAgain`: Connect calls it just before launching Google's account chooser, and `KioskLifecycle` pins again whenever Culvery comes back to the front after being stopped, whatever the chooser answered — so a process death behind the chooser also ends pinned. An account already granted never leaves pinning.
+17. **The Play services check (Task 10)** sits in `GoogleConnectFlow.start`, after the PIN (in `CalendarConnectHost`) and before anything else. `GoogleApiAvailability` comes with `play-services-auth` (its `play-services-base`); if the compiler can't see it, stop and ask — it would be a second new dependency.
+18. **`LogHygieneTest`'s reach (Task 3):** `Log.w`, `Log.e`, `Log.wtf` and `Log.println` in `src/main` and `src/release` of every module (debug code never ships). Allowed in a message: `${…::class.simpleName}`, `${….code}`, and a named allowlist of *qualified* ids and fixed words (`conn.id`, `change.kind`, `what.label`, `answer.reason`, …): a bare local (`$id`, `$name`) never passes, whatever it holds today, so locals that carry an id are renamed or qualified.
+19. **`core-splashscreen` 1.2.0 (Task 4)**, the `release` value of Google Maven's `maven-metadata.xml` on 2026-10-02; its `minCompileSdk` is 35, which this project has. No fallback version.
 20. **The stability file (Task 7):** `composeCompiler { stabilityConfigurationFiles.add(…) }` in `culvery.android.compose`; the Kotlin 2.2.20 plugin marks the single-file `stabilityConfigurationFile` deprecated (checked in its jar). The file is `compose-stability.conf` at the repo root.
-21. **"Before" numbers (Task 1)** come from the signed release with R8 off and the full font, so the user creates the release key in Task 1. If they would rather not create the real key yet, the same script makes a throwaway one in another folder for the measurement, and the real one is made before Task 16.
-22. **The S3 glyphs (Task 2):** `clear_night` → `bedtime` unless the side-by-side screenshot shows `nightlight` reads better as a clear night; `smartphone` → `mobile`. `arrow_upward` and `arrow_downward` (Task 14's buttons) join the subset now.
-23. **Setup-session folding (Task 15).** `DefaultAccessControl` keeps one private `SignedIn(who, setup)` value, changed only by one setter that also updates the public `session`; every way a session ends goes through it. The "settings.manage unless no Admin yet" helper is `mayChangeSetup` in `WizardRules.kt`, used by the Location step.
-24. **`rememberNowMillis` ticks each minute (Task 6)**, from `HouseholdClock`, not every 30 s: everything that reads it shows minutes.
-25. **Move up / Move down only in Settings › People (Task 14)**, not the wizard's Household step (§7.1 names Settings).
-26. **`LockoutStore` (K4, Task 8)** loads its two numbers once, on `Dispatchers.IO`, then serves them from memory and writes with `apply()`; its methods become `suspend`, as every caller already is.
-27. **K1's padding (Task 8).** The root pads by `WindowInsets.systemBars` always: those insets are zero while the bars are hidden (the pinned kiosk, and debug builds, which hide them too), so the padding shows only when the bars do — after Exit kiosk — without a pinned-state flag.
+21. **"Before" numbers (Task 1)** come from the signed release with R8 off and the full font, so the user creates the real release key in Task 1 (`tools/new-release-key.sh`, or `tools/new-release-key.ps1` in PowerShell; the script refuses to run in Git Bash without `winpty`, where `keytool` can't ask for a password).
+22. **The icons (Task 2):** `clear_night` → `bedtime` unless the side-by-side screenshot shows `nightlight` reads better as a clear night; `smartphone` → `mobile`. `arrow_upward` and `arrow_downward` (Task 17's buttons) join the subset now. The subset keeps every listed glyph's filled form (the single substitutions behind `rclt` and the FILL axis's FeatureVariations), so the rail's selected tab still draws filled; `IconFontTest` checks each one, and the `home_*` screenshots don't change.
+23. **Setup-session folding (Task 18).** `DefaultAccessControl` keeps one private `SignedIn(who, setup)` value, changed only by one setter that also updates the public `session`; every way a session ends goes through it. The "settings.manage unless no Admin yet" helper is `mayChangeSetup` in `WizardRules.kt`, used by the Location step.
+24. **`rememberNowMillis` ticks each minute (Task 6)**, from `HouseholdClock`, not every 30 s: everything that reads it shows minutes. `rememberToday` is null until the household's zone is read; it never falls back to the device's zone.
+25. **Move up / Move down only in Settings › People (Task 17)**, not the wizard's Household step (§7.1 names Settings).
+26. **`LockoutStore` (K4, Task 8)** loads its two numbers once, on `Dispatchers.IO`, then serves them from memory and writes with `apply()`; its methods become `suspend`, as every caller already is. `MAX_LOCK_MS = BASE_LOCK_MS shl MAX_DOUBLINGS` (16 minutes); a lock ending more than that away has expired (K3).
+27. **K1's padding (Task 9).** The root pads by `WindowInsets.systemBars` always: those insets are zero while the bars are hidden (the pinned kiosk, and debug builds, which hide them too), so the padding shows only when the bars do — after Exit kiosk — without a pinned-state flag.
+28. **Exit kiosk as the home app (Task 9, spec §5.1 as amended).** Exit kiosk unpins and shows the system bars. When Culvery is the home app it stays in front: moving to the back would resume Culvery as home and pin it again at once. A Home press while it is in front pauses and resumes it without stopping it, so it stays unpinned; leaving for another app and coming back pins again. Otherwise it moves to the back as today. `KioskLifecycle` (a `DefaultLifecycleObserver`) holds this, tested on a Robolectric activity.
+29. **Device owner (Task 9).** As device owner Culvery allowlists itself and Google Play services (`com.google.android.gms`) for lock-task, so Google's account chooser opens inside lock-task and Connect doesn't call `leavePinning()`; otherwise screen pinning is left as it is. Tested with `ShadowDevicePolicyManager`.
+30. **R8's own rules (Task 3).** kotlinx.serialization 1.9 and OkHttp 4.12 ship their consumer rules, so `app/proguard-rules.pro` holds only `-keepattributes SourceFile,LineNumberTable`, `-renamesourcefileattribute SourceFile` and the `Log` `-assumenosideeffects` for `v`/`d`/`i`. No test reads the rule text; the minified release running the weather and the town search (Task 3 Step 10), and sign-in and sync in the walkthrough, are the check.
+31. **Looking ahead (D10, §6.6; Tasks 12 and 14).** `SYNC_FUTURE_DAYS` = 28; `MAX_WEEKS_AHEAD` = 3, so the last day shown is today + 27, inside the window (a test pins it). ‹ › sit together before the title, so › stays under a finger while the title's width changes; each greys at its end. The 2-minute wait restarts at any touch in the tab (seen before the children, never consumed); a new day makes a new `WeekShown`, so midnight is back on this week. **+** adds on the first day shown. The editor toasts "Event added for {EEE d MMMM}" when the event starts after today + 27 in the household zone. `WeekViewHost` uses `produceState`, so the shown week stays while the next one loads. The token lifetime stays 42 days (ruling 1).
+32. **`@OptIn(ExperimentalSerializationApi::class)` (Task 11)** is allowed on `GoogleReadTest`'s descriptor walk only, if the compiler asks for it there.
 
 Nothing in this plan needs a deprecated API. Flagged and avoided: `stabilityConfigurationFile` (ruling 20); `PackageManager.getPackageInfo(String, int)` (the version comes from `BuildConfig`, ruling 5).
 
@@ -72,10 +82,10 @@ Nothing in this plan needs a deprecated API. Flagged and avoided: `stabilityConf
 
 - Package root `uk.co.siland.culvery`. Module rules unchanged (`build-logic`'s `ModuleBoundaries`): `:core:*` → `:core:*`; `:capability:*` → `:core:*`; `:provider:*` → `:core:*` and its own capability; `:app` → anything. `:core:plugin` may now depend on `:core:household` (core → core).
 - `minSdk 29`, `compileSdk 35`, `targetSdk 35`, JDK 17, landscape only.
-- Pinned versions as in `gradle/libs.versions.toml`. **One new dependency** (`androidx.core:core-splashscreen`, Task 4). Never change another version. `lifecycle-viewmodel-ktx` leaves (Task 2).
-- **Deprecated APIs:** use none without asking. If an API shows a deprecation warning, **stop and ask**. Watch: OkHttp 4's Java-style accessors (use `response.code`, `request.header(…)`); `stabilityConfigurationFile`; `PackageManager.getPackageInfo(String, int)`; `androidx.compose.ui.platform.LocalLifecycleOwner`. `@OptIn` only for `ExperimentalCoroutinesApi` in tests and the existing `ExperimentalTextApi`/`flatMapLatest` uses. **No new `flatMapLatest` or `debounce`** in main code.
-- Release signing: the keystore lives **outside the repo**; its four values live in the user's `~/.gradle/gradle.properties`. **Never** put a password in code, a doc, a log, a commit, or a command line that Claude runs. The user types every password into `keytool`.
-- **Privacy in logs (D8):** `Log.w`/`Log.e` carry only an exception's `::class.simpleName`, an HTTP code, an id, or fixed text; never an email, a person's, calendar's or town's name, a PIN, coordinates or a zone, and never the throwable itself. `LogHygieneTest` (Task 3) guards it from then on.
+- Pinned versions as in `gradle/libs.versions.toml`. **One new dependency** (`androidx.core:core-splashscreen` 1.2.0, Task 4). Never change another version. `lifecycle-viewmodel-ktx` leaves (Task 2).
+- **Deprecated APIs:** use none without asking. If an API shows a deprecation warning, **stop and ask**. Watch: OkHttp 4's Java-style accessors (use `response.code`, `request.header(…)`); `stabilityConfigurationFile`; `PackageManager.getPackageInfo(String, int)`; `androidx.compose.ui.platform.LocalLifecycleOwner`. `@OptIn` only for `ExperimentalCoroutinesApi` in tests, the existing `ExperimentalTextApi`/`flatMapLatest` uses, and ruling 32's one. **No new `flatMapLatest` or `debounce`** in main code.
+- Release signing: the keystore lives **outside the repo** (`.gitignore` ignores `*.jks` and `*.keystore` anyway); its four values live in the user's `~/.gradle/gradle.properties`. **Never** put a password in code, a doc, a log, a commit, or a command line that Claude runs. The user types every password into `keytool`.
+- **Privacy in logs (D8):** `Log.w`/`Log.e`/`Log.wtf`/`Log.println` carry only an exception's `::class.simpleName`, an HTTP code, a qualified id from `LogHygiene.ALLOWED`, or fixed text; never an email, a person's, calendar's or town's name, a PIN, coordinates or a zone, and never the throwable itself. `LogHygieneTest` (Task 3) guards it from then on.
 - **Layout numbers are named, never inline**, in the module's dimens object (`SetupDimens`, `CalendarDimens`) or as a named `private val` beside the composable, as each file already does. Timing values are named constants.
 - **Copy (spec), exactly:**
   - Signing: "Release signing isn't set up: add culvery.release.storeFile, storePassword, keyAlias and keyPassword to ~/.gradle/gradle.properties (see docs/setup/release.md)."
@@ -84,36 +94,39 @@ Nothing in this plan needs a deprecated API. Flagged and avoided: `stabilityConf
   - Calendars: "Can't read this calendar — check it's still shared with this account"; "Hide this calendar"; "Choose another master calendar first".
   - Master gone: "{Service}: can't find the master calendar — choose a new one in Settings › Calendars. {n} changes waiting to sync were dropped." (singular: "1 change waiting to sync was dropped.")
   - People: "Move {name} up" / "Move {name} down" (spoken); toasts "{name} moved up" / "{name} moved down".
+  - Calendar tab: "This week", "Next week", "In 2 weeks", "In 3 weeks"; the chip "This week"; the toast "Event added for {Tue 17 November}".
 - **Storage:** `calendar.db` goes to v6 with a hand-written `MIGRATION_5_6` and a `MigrationTestHelper` test; commit the exported `6.json`. A capability never edits another module's schema.
 - **Test gate:** `./gradlew testDebugUnitTest verifyRoborazziDebug` (Git Bash) or `.\gradlew.bat testDebugUnitTest verifyRoborazziDebug` (PowerShell); plus `./gradlew -p build-logic :convention:test` in every task that changes `build-logic`. Never plain `test`, `check` or `build` (release unit tests can't run Compose tests, and from Task 1 a release task needs the signing properties). A task runs its module's `testDebugUnitTest` while working; every task ends with the full gate before its commit.
 - Screenshots: baselines in `<module>/src/test/screenshots/`, recorded and verified on Windows; record only the images named with `./gradlew <module>:recordRoborazziDebug --tests "<pattern>"`; look at every new or changed image before committing (the step says what it must show); `@GraphicsMode(GraphicsMode.Mode.NATIVE)` only on classes that capture screenshots or measure text.
 - Tests and threads (as 4b): Room runs on its own threads; wait for it in bounded real time (`withContext(Dispatchers.Default) { withTimeout(5_000) { … } }`); asynchronous UI outcomes use `compose.waitUntil(5_000) { … }`; no fixed sleeps. A test that changes the JVM's default zone restores it in `@After`.
 - Fixtures use London, Leeds, Wellington or other public places, never the household's own.
-- **Write every file as UTF-8** (an earlier implementer wrote ISO-8859-1 through Python; copy contains "—", "›", "·", "…"). Use the Write/Edit tools, or `encoding="utf-8"` in Python.
+- **Write every file as UTF-8** (an earlier implementer wrote ISO-8859-1 through Python; copy contains "—", "›", "·", "…", "‹"). Use the Write/Edit tools, or `encoding="utf-8"` in Python.
 - **Commit messages contain only the message** — no `Co-Authored-By`, `Signed-off-by` or any attribution trailer. Commit on the current branch; never push. **Never** `git checkout -- .` or `git restore .`; to undo your own change, restore only the files you changed, after `git diff --name-only`.
 
 ## Review Focus
 
-The five failures most likely to reach a household that the spec's own tests don't pin, each pinned by the tests named in its owning task:
+The six failures most likely to reach a household that the spec's own tests don't pin, each pinned by the tests or checks named in its owning task:
 
-1. **R8 strips a kotlinx serializer that is reached only through a generated companion or `serializer()`,** so the release build's Google sign-in, calendar sync or weather fails while every debug test passes. Expected: every `@Serializable` class keeps its serializer in the release build.
-   - Task 3 `ReleaseRulesTest.everySerializableClassIsCoveredByAKeepRule`, `theRulesStripDebugAndInfoLogsOnly`; Task 3 Step 13 reads `mapping.txt` for each serializer; Task 16 walkthrough items 3, 4 and 5 run sign-in, sync, a write and the weather on the minified build.
-2. **A process death between `stopLockTask` and the re-pin** (Culvery killed behind Google's account chooser) leaves the tablet unpinned. Expected: when Culvery is next in front it pins again; nothing remembers "exited".
-   - Task 9 `ActivityLockTaskTest.pinAgainWhileInTheBackgroundLeavesItToOnResume`, `pinAgainAfterExitKioskDoesNotPin`; Task 8 `ShellViewModelTest.aNewShellIsNeverExitedSoAProcessDeathPinsAgain`.
+1. **R8 strips something a library reaches only by reflection or a generated companion,** so the release build's Google sign-in, calendar sync or weather fails while every debug test passes. Expected: the minified release reads every answer it read in debug.
+   - Task 3 Step 10 runs the weather and the town search on the minified build and reads the log for `SerializationException`; Task 19 walkthrough items 3, 4 and 5 run sign-in, sync, a write and the weather on it.
+2. **A process death behind Google's account chooser** (Culvery left pinning, then was killed) leaves the tablet unpinned. Expected: when Culvery is next in front it pins again; nothing remembers "exited" across a process death.
+   - Task 9 `KioskLifecycleTest.aFreshStartPins`, `leavingAfterExitKioskAndComingBackPinsAgain`, `ShellViewModelTest.exitKioskIsRememberedUntilCulveryIsInFrontAgain`; Task 10 `GoogleConnectScreenTest.theChooserOpensOnlyAfterLeavingPinning`.
 3. **Pruning deletes an event the user is looking at or a queued change's target** (an event moved out of the window on a phone while an edit for it waits). Expected: a row a queued change targets stays until the change is delivered or dropped.
-   - Task 11 `CalendarStoreTest.pruningKeepsAnEventAQueuedChangeTargets`, `pruningDropsWhatEndsBeforeTheWindowOrStartsAfterWhatWasRead`.
+   - Task 12 `CalendarStoreTest.pruningKeepsAnEventAQueuedChangeTargets`, `pruningDropsWhatEndsBeforeTheWindowOrStartsAfterWhatWasRead`.
 4. **`MIGRATION_5_6` on an install with queued changes.** Expected: queued changes, mappings, visibility, the master and the events survive; only the cursors go; the next pass fully syncs each calendar.
-   - Task 11 `CalendarMigrationTest.migrationFromV5ClearsTheCursorsAndKeepsQueuedChangesMappingsAndTheMaster` (it also checks `store.cursor(…)` is null after the upgrade, so the first pass reads each calendar in full).
-5. **The Home role and lock-task after Exit kiosk.** Culvery is the home app, so every Home press brings it back. Expected: after Exit kiosk it pins again the next time it is in front (D3, §5.1); only **Change home app** (fresh PIN) lets the tablet go back to the normal launcher.
-   - Task 8 `ShellViewModelTest.afterExitKioskComingBackToTheFrontPinsAgain`, `changeHomeAppAsksForAFreshPinClosesSettingsAndSignsOut`, `chooseHomeAppUsesTheOpenSession`.
+   - Task 12 `CalendarMigrationTest.migrationFromV5ClearsTheCursorsAndKeepsQueuedChangesMappingsAndTheMaster` (it also checks `store.cursor(…)` is null after the upgrade, so the first pass reads each calendar in full).
+5. **The Home role and lock-task after Exit kiosk.** Culvery is the home app, so every Home press brings it back. Expected: after Exit kiosk it stays in front unpinned, and pins again once it has left and come back (D3, §5.1); only **Change home app** (fresh PIN) lets the tablet go back to the normal launcher.
+   - Task 9 `KioskLifecycleTest.exitKioskAsTheHomeAppStaysInFrontUnpinnedThroughAHomePress`, `withAnotherHomeAppExitKioskMovesToTheBack`; `ShellViewModelTest.changeHomeAppAsksForAFreshPinClosesSettingsAndSignsOut`, `chooseHomeAppUsesTheOpenSession`.
+6. **The Calendar tab shows a week the tablet doesn't hold,** so a later week looks empty. Expected: the furthest day shown is inside the window every pass keeps; a later week goes back to this week at midnight and after 2 minutes untouched.
+   - Task 14 `CalendarSyncTest.theFurthestWeekShownIsInsideTheWindow`, `WeekViewTest.aLaterWeekGoesBackToThisWeekAtMidnight`, `aLaterWeekGoesBackToThisWeekAfterTwoMinutesWithoutATouch`, `CardHostsMidnightRolloverTest.weekViewHostShowsTheWeekItStepsTo`.
 
 The spec's own review focus (§10), each pinned:
-- Release signs, minifies and works end to end; no secret reaches the repo or a log: Task 1 `ReleaseSigningTest`; Task 3 (rules, mapping check); Task 16 items 1–5.
-- Nothing in a release log names a person, calendar, account, town, coordinates or zone: Task 3 `LogHygieneTest`, `ReleaseRulesTest.theRulesStripDebugAndInfoLogsOnly`; Task 16 item 8.
-- After a reboot the tablet is back in Culvery; Connect can't strand anyone and pins again on every outcome: Task 8 (`HOME` category, `HomeApp`); Task 9 `GoogleConnectScreenTest.theChooserOpensOutsideLockTaskAndPinsAgainOn{Connect,Cancel,Failure}`; Task 16 items 2–3.
-- No nightly full resync, no growth, no missed deletions: Task 11 `CalendarSyncTest.thePassAfterLocalMidnightKeepsTheCursor`, `CalendarStoreTest.pruning…`, `GoogleReadTest.aCancelledSeriesRemovesEveryStoredInstance`, `aFullSyncAfterA410ReusesStoredRules`.
+- Release signs, minifies and works end to end; no secret reaches the repo or a log: Task 1 `ReleaseSigningTest` and Step 5; Task 3 Step 10; Task 19 items 1–5.
+- Nothing in a release log names a person, calendar, account, town, coordinates or zone: Task 3 `LogHygieneTest`; Task 19 item 8.
+- After a reboot the tablet is back in Culvery; Connect can't strand anyone and pins again on every outcome: Task 9 (`HOME` category, `HomeApp`, `KioskLifecycleTest`); Task 10 `GoogleConnectScreenTest.theChooserOpensOnlyAfterLeavingPinning`, `anAccountAlreadyGrantedNeverLeavesPinning`; Task 19 items 1 and 3.
+- No nightly full resync, no growth, no missed deletions: Task 12 `CalendarSyncTest.thePassAfterLocalMidnightKeepsTheCursor`, `theTokenServesUntilTheWindowPassesWhatWasRead`, `CalendarStoreTest.pruning…`; Task 13 `GoogleReadTest.aCancelledSeriesRemovesEveryStoredInstance`.
 - v6 migrates without losing mappings, the master or queued changes: Review Focus 4.
-- Every icon is in the subset: Task 2 `IconFontTest`.
+- Every icon is in the subset, filled forms included: Task 2 `IconFontTest`.
 
 ---
 
@@ -121,47 +134,52 @@ The spec's own review focus (§10), each pinned:
 
 ```
 gradle/libs.versions.toml                         (Task 2: lifecycle-viewmodel-ktx out; Task 4: core-splashscreen in)
+.gitignore                                        (Task 1: *.jks, *.keystore)
 compose-stability.conf                            (create, Task 7)
-build-logic/convention/build.gradle.kts           (Task 1: register culvery.android.release-signing)
+build-logic/convention/build.gradle.kts           (Task 3: the log test's inputs)
 build-logic/convention/src/main/kotlin/
-  ReleaseSigning.kt, ReleaseSigningConventionPlugin.kt     (create, Task 1)
+  ReleaseSigning.kt                                        (create, Task 1)
   AndroidComposeConventionPlugin.kt                        (modify, Task 7)
 build-logic/convention/src/test/kotlin/
-  ReleaseSigningTest.kt (Task 1), LogHygieneTest.kt (Task 3), ReleaseRulesTest.kt (Task 3)
+  ReleaseSigningTest.kt (Task 1), LogHygieneTest.kt (Task 3)
 app/build.gradle.kts                              (Tasks 1, 2, 3, 4)
 app/proguard-rules.pro                            (create, Task 3)
-app/src/main/AndroidManifest.xml                  (Tasks 4, 8)
+app/src/main/AndroidManifest.xml                  (Tasks 4, 9)
 app/src/main/res/values/themes.xml                (Task 4)
-app/src/main/res/xml/device_admin.xml             (create, Task 8)
+app/src/main/res/xml/device_admin.xml             (create, Task 9)
 app/src/main/java/uk/co/siland/culvery/
-  CulveryApp.kt (Tasks 3, 4), MainActivity.kt (Tasks 4, 5, 8, 9), Kiosk.kt (Tasks 8, 9), SetupWiring.kt (Tasks 4, 8),
-  CulveryDeviceAdmin.kt, HomeApps.kt (create, Task 8), ActivityLockTask.kt (create, Task 9)
-  di/AppModule.kt (Tasks 3, 6, 8, 10)
-  shell/ShellUiState.kt, ShellViewModel.kt (Tasks 3, 4, 5, 8), MinuteTicker.kt (Task 6),
+  CulveryApp.kt (Tasks 3, 4), MainActivity.kt (Tasks 4, 5, 9, 10), SetupWiring.kt (Task 4),
+  CulveryDeviceAdmin.kt, HomeApps.kt, KioskLifecycle.kt (create, Task 9)
+  di/AppModule.kt (Tasks 3, 6, 9, 11)
+  shell/ShellUiState.kt, ShellViewModel.kt (Tasks 3, 4, 5, 6, 9, 10), MinuteTicker.kt (deleted, Task 6),
   shell/ui/CulveryShell.kt, HomeScreen.kt, StatusBar.kt (Task 5)
+app/src/testDebug/java/uk/co/siland/culvery/SampleAddTest.kt (Task 4)
 core/ui/src/main/java/uk/co/siland/culvery/core/ui/Icons.kt (create), Theme.kt (Task 5); res/font/material_symbols_rounded.ttf (Task 2)
 core/ui/src/test/java/uk/co/siland/culvery/core/ui/OpenTypeLigatures.kt, IconFontTest.kt (create, Task 2); ThemeTest.kt (Tasks 2, 5)
 core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/
-  FirstDraw.kt (Task 4), HouseholdClock.kt (Task 6), LockTask.kt (Task 9), HomeApp.kt (Task 8), Runtime.kt (Tasks 6, 10),
-  ShellNavigator.kt (Task 8), FlowRetry.kt (Task 15)
-core/access/…/LockoutStore.kt (Task 8), Permissions.kt (Task 9), DefaultAccessControl.kt (Task 15)
-core/household/…/HouseholdRepository.kt, db/HouseholdDatabase.kt (Task 14)
-core/setup/…/pages/KioskPage.kt, steps/DoneStep.kt, SetupCopy.kt, SetupDimens.kt (Tasks 8, 14), PeopleUi.kt, PeopleEditor.kt,
-  pages/PeoplePage.kt (Task 14), WizardRules.kt, steps/LocationStep.kt (Task 15)
-capability/calendar/…/CalendarStore.kt, CalendarSync.kt, CalendarContract.kt, Stored.kt, db/CalendarDatabase.kt, db/Migrations.kt,
-  di/CalendarModule.kt (Tasks 11–13), CalendarRepository.kt (Tasks 7, 12), CalendarSyncLoop.kt (Task 4),
-  SourceRefresher.kt (Task 13), ui/ReviewCalendars.kt (Task 13), ui/Now.kt, CalendarCapability.kt (Task 6)
-capability/calendar/schemas/uk.co.siland.culvery.capability.calendar.db.CalendarDatabase/6.json   (generated, Task 11)
+  FirstDraw.kt (Task 4), HouseholdClock.kt (Task 6), HomeApp.kt (Task 9), Runtime.kt (Tasks 6, 11),
+  ShellNavigator.kt (Tasks 9, 10), FlowRetry.kt (Task 18)
+core/access/…/LockoutStore.kt (Task 8), Permissions.kt (Task 10), DefaultAccessControl.kt (Task 18)
+core/household/…/HouseholdRepository.kt (Task 17)
+core/setup/…/pages/KioskPage.kt, steps/DoneStep.kt, SetupUi.kt (Task 9), SetupCopy.kt, SetupDimens.kt (Tasks 9, 17), PeopleUi.kt,
+  PeopleEditor.kt, pages/PeoplePage.kt, steps/HouseholdStep.kt (Task 17), WizardRules.kt, steps/LocationStep.kt (Task 18)
+capability/calendar/…/CalendarStore.kt, CalendarSync.kt, CalendarContract.kt, db/CalendarDatabase.kt, db/Migrations.kt,
+  di/CalendarModule.kt (Tasks 12, 13, 15, 16), Stored.kt, SourceRefresher.kt, ui/ReviewCalendars.kt (Task 16),
+  CalendarRepository.kt, PendingOverlay.kt (Tasks 7, 15), CalendarSyncLoop.kt (Task 4), CalendarConnections.kt (Task 10),
+  CalendarUi.kt, CalendarEditor.kt, ui/WeekView.kt, ui/CardHosts.kt, ui/Pickers.kt, ui/CalendarType.kt (Task 14; CalendarEditor.kt also 15),
+  ui/Now.kt, CalendarCapability.kt (Task 6)
+capability/calendar/schemas/uk.co.siland.culvery.capability.calendar.db.CalendarDatabase/6.json   (generated, Task 12)
 capability/weather/…/WeatherRepository.kt, WeatherCapability.kt, ui/ForecastCard.kt (Task 6), WeatherSyncLoop.kt (Task 4),
   WeatherWords.kt (Task 2)
-provider/calendar-google/…/GoogleCalendarProvider.kt (Tasks 9, 10, 11), GoogleConnectFlow.kt (Task 9), GoogleHttp.kt (Task 4),
-  TokenSource.kt (Task 4), PlayServices.kt (create, Task 9), di/GoogleCalendarModule.kt (Tasks 4, 9, 10)
-provider/weather-openmeteo/…/Http.kt, OpenMeteoForecast.kt (Task 15)
-tools/new-release-key.sh, tools/measure-release.sh (create, Task 1); tools/fonts/subset.py, icons.txt, README.md (create, Task 2)
-docs/setup/release.md (create, Task 1; Tasks 3, 8 add to it), docs/setup/google-calendar.md (Task 1)
-docs/superpowers/specs/2026-10-02-culvery-4c-release-fixes-design.md (Appendix B, Tasks 1 and 16)
-*/src/test/resources/robolectric.properties (Task 15)
-README.md, docs/superpowers/plans/2026-09-23-plan1-followups.md (Task 16)
+provider/calendar-google/…/GoogleCalendarProvider.kt (Tasks 10, 11, 13), GoogleConnectFlow.kt (Task 10), GoogleHttp.kt (Tasks 3, 4),
+  TokenSource.kt (Task 4), PlayServices.kt (create, Task 10), di/GoogleCalendarModule.kt (Tasks 4, 10, 11)
+provider/weather-openmeteo/…/Http.kt, OpenMeteoForecast.kt (Task 18)
+tools/new-release-key.sh, tools/new-release-key.ps1, tools/measure-release.sh (create, Task 1);
+  tools/fonts/subset.py, icons.txt, README.md (create, Task 2)
+docs/setup/release.md (create, Task 1; Tasks 3, 9 add to it), docs/setup/google-calendar.md (Tasks 1, 10)
+docs/superpowers/specs/2026-10-02-culvery-4c-release-fixes-design.md (Appendix B, Tasks 1 and 19)
+*/src/test/resources/robolectric.properties (Task 18)
+README.md, docs/superpowers/plans/2026-09-23-plan1-followups.md (Task 19)
 ```
 
 `…` stands for the module's package directory; every step spells out the full path.
@@ -173,22 +191,20 @@ README.md, docs/superpowers/plans/2026-09-23-plan1-followups.md (Task 16)
 **Review:** sonnet.
 
 **Files:**
-- Create: `build-logic/convention/src/main/kotlin/ReleaseSigning.kt`, `build-logic/convention/src/main/kotlin/ReleaseSigningConventionPlugin.kt`
-- Modify: `build-logic/convention/build.gradle.kts`
+- Create: `build-logic/convention/src/main/kotlin/ReleaseSigning.kt`
 - Test: `build-logic/convention/src/test/kotlin/ReleaseSigningTest.kt` (create)
-- Modify: `app/build.gradle.kts`
-- Create: `tools/new-release-key.sh`, `tools/measure-release.sh`, `docs/setup/release.md`
+- Modify: `app/build.gradle.kts`, `.gitignore`
+- Create: `tools/new-release-key.sh`, `tools/new-release-key.ps1`, `tools/measure-release.sh`, `docs/setup/release.md`
 - Modify: `docs/setup/google-calendar.md` (§4's last paragraph)
 - Modify (after the checkpoint, by the controller): `docs/superpowers/specs/2026-10-02-culvery-4c-release-fixes-design.md` (Appendix B, "Before" column)
 
 **Interfaces:**
 - Consumes: nothing new.
 - Produces:
-  - Plugin id `culvery.android.release-signing` (`ReleaseSigningConventionPlugin`), applied by `:app` after `culvery.android.application`.
-  - `object ReleaseSigning { STORE_FILE, STORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD: String; KEYS: List<String>; MESSAGE: String; fun missing(values: Map<String, String?>): List<String> }` (default package, as the other `build-logic` files).
-  - A task `checkReleaseSigning`, which `preReleaseBuild` depends on.
-  - `versionCode = 2`, `versionName = "1.0.0-beta1"` (Task 10's User-Agent reads `BuildConfig.VERSION_NAME`).
-  - `tools/measure-release.sh [serial]`, used again in Task 16.
+  - `object ReleaseSigning { STORE_FILE, STORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD: String; KEYS: List<String>; MESSAGE: String; fun missing(values: Map<String, String?>): List<String> }` in `build-logic` (default package). `:app`'s build script sees it because it applies `build-logic`'s plugins; there is no signing plugin (plan review 15).
+  - In `app/build.gradle.kts`: a `release` signing config when all four properties are set; a task `checkReleaseSigning`, which `preReleaseBuild` depends on.
+  - `versionCode = 2`, `versionName = "1.0.0-beta1"` (Task 11's User-Agent reads `BuildConfig.VERSION_NAME`).
+  - `tools/measure-release.sh [serial]`, used again in Task 19.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -216,24 +232,6 @@ class ReleaseSigningTest {
         val partial = all - ReleaseSigning.KEY_ALIAS + (ReleaseSigning.STORE_PASSWORD to " ")
         assertThat(ReleaseSigning.missing(partial)).containsExactly(ReleaseSigning.STORE_PASSWORD, ReleaseSigning.KEY_ALIAS).inOrder()
     }
-
-    @Test
-    fun theMessageSaysWhatToSetAndWhere() {
-        assertThat(ReleaseSigning.MESSAGE).isEqualTo(
-            "Release signing isn't set up: add culvery.release.storeFile, storePassword, keyAlias and keyPassword " +
-                "to ~/.gradle/gradle.properties (see docs/setup/release.md).",
-        )
-    }
-
-    @Test
-    fun thePropertiesAreNamespacedForCulvery() {
-        assertThat(ReleaseSigning.KEYS).containsExactly(
-            "culvery.release.storeFile",
-            "culvery.release.storePassword",
-            "culvery.release.keyAlias",
-            "culvery.release.keyPassword",
-        ).inOrder()
-    }
 }
 ```
 
@@ -242,7 +240,7 @@ class ReleaseSigningTest {
 Run: `./gradlew -p build-logic :convention:test --tests ReleaseSigningTest`
 Expected: FAIL to compile with "Unresolved reference 'ReleaseSigning'".
 
-- [ ] **Step 3: Write `ReleaseSigning` and the plugin**
+- [ ] **Step 3: Write `ReleaseSigning`**
 
 Create `build-logic/convention/src/main/kotlin/ReleaseSigning.kt`:
 ```kotlin
@@ -261,76 +259,56 @@ object ReleaseSigning {
     fun missing(values: Map<String, String?>): List<String> = KEYS.filter { values[it].isNullOrBlank() }
 }
 ```
-
-Create `build-logic/convention/src/main/kotlin/ReleaseSigningConventionPlugin.kt`:
-```kotlin
-import com.android.build.api.dsl.ApplicationExtension
-import org.gradle.api.GradleException
-import org.gradle.api.Plugin
-import org.gradle.api.Project
-import org.gradle.kotlin.dsl.configure
-
-/**
- * Signs release builds with the key [ReleaseSigning] names (4c design D4). Without all four properties a release task
- * fails before it builds anything; debug builds and `testDebugUnitTest` never need them.
- */
-class ReleaseSigningConventionPlugin : Plugin<Project> {
-    override fun apply(target: Project) = with(target) {
-        val values = ReleaseSigning.KEYS.associateWith { providers.gradleProperty(it).orNull }
-        val missing = ReleaseSigning.missing(values)
-        extensions.configure<ApplicationExtension> {
-            if (missing.isEmpty()) {
-                val release = signingConfigs.create("release") {
-                    storeFile = file(values.getValue(ReleaseSigning.STORE_FILE)!!)
-                    storePassword = values.getValue(ReleaseSigning.STORE_PASSWORD)
-                    keyAlias = values.getValue(ReleaseSigning.KEY_ALIAS)
-                    keyPassword = values.getValue(ReleaseSigning.KEY_PASSWORD)
-                }
-                buildTypes.getByName("release").signingConfig = release
-            }
-        }
-        val check = tasks.register("checkReleaseSigning") {
-            doLast { if (missing.isNotEmpty()) throw GradleException(ReleaseSigning.MESSAGE) }
-        }
-        tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(check) }
-    }
-}
-```
-
-In `build-logic/convention/build.gradle.kts`, inside `gradlePlugin { plugins { … } }`, after the `register("room") { … }` block add:
-```kotlin
-        register("releaseSigning") {
-            id = "culvery.android.release-signing"
-            implementationClass = "ReleaseSigningConventionPlugin"
-        }
-```
-
-- [ ] **Step 4: Run the test to see it pass**
-
 Run: `./gradlew -p build-logic :convention:test`
-Expected: PASS (the four new tests and `ModuleBoundariesTest`).
+Expected: PASS (the two new tests and `ModuleBoundariesTest`).
 
-- [ ] **Step 5: Apply it and set the version**
+- [ ] **Step 4: Sign release builds, inline in `:app`, and set the version**
 
-In `app/build.gradle.kts` the `plugins` block becomes:
-```kotlin
-plugins {
-    id("culvery.android.application")
-    id("culvery.android.release-signing")
-    id("culvery.android.compose")
-    id("culvery.hilt")
-    alias(libs.plugins.roborazzi)
-}
-```
-and in `defaultConfig` replace `versionCode = 1` and `versionName = "0.1.0"` with:
+`app/build.gradle.kts`: in `defaultConfig` replace `versionCode = 1` and `versionName = "0.1.0"` with
 ```kotlin
         versionCode = 2
         versionName = "1.0.0-beta1"
 ```
+Above `android {` add:
+```kotlin
+// Release signing from the user's own ~/.gradle/gradle.properties (4c design D4); debug builds and the tests never need it.
+val releaseSigning = ReleaseSigning.KEYS.associateWith { providers.gradleProperty(it) }
+```
+Inside `android { … }`, after `buildFeatures.buildConfig = true`:
+```kotlin
+    signingConfigs {
+        // AGP's signing config takes plain values, so these are read while configuring, and only when all four are set.
+        if (ReleaseSigning.missing(releaseSigning.mapValues { it.value.orNull }).isEmpty()) {
+            create("release") {
+                storeFile = file(releaseSigning.getValue(ReleaseSigning.STORE_FILE).get())
+                storePassword = releaseSigning.getValue(ReleaseSigning.STORE_PASSWORD).get()
+                keyAlias = releaseSigning.getValue(ReleaseSigning.KEY_ALIAS).get()
+                keyPassword = releaseSigning.getValue(ReleaseSigning.KEY_PASSWORD).get()
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.findByName("release")
+        }
+    }
+```
+After the `android { … }` block:
+```kotlin
+// A release task stops at once without the properties; it holds the providers, read only when it runs.
+val checkReleaseSigning by tasks.registering {
+    val properties = releaseSigning
+    doLast {
+        if (ReleaseSigning.missing(properties.mapValues { it.value.orNull }).isNotEmpty()) throw GradleException(ReleaseSigning.MESSAGE)
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkReleaseSigning) }
+```
+`.gitignore`: add two lines, `*.jks` and `*.keystore`, so a key copied into the repo by mistake is never committed.
 
-- [ ] **Step 6: Check a release build without the properties fails with the message**
+- [ ] **Step 5: Check a release build without the properties fails with the message**
 
-First check, without printing any value, that the properties aren't set yet:
+Check, without printing any value, that the properties aren't set yet:
 ```bash
 grep -c "^culvery.release" ~/.gradle/gradle.properties 2>/dev/null || echo 0
 ```
@@ -340,26 +318,98 @@ Run: `./gradlew :app:assembleRelease`
 Expected: `BUILD FAILED` at `:app:checkReleaseSigning` with exactly "Release signing isn't set up: add culvery.release.storeFile, storePassword, keyAlias and keyPassword to ~/.gradle/gradle.properties (see docs/setup/release.md)."
 
 Run: `./gradlew :app:assembleDebug`
-Expected: `BUILD SUCCESSFUL` (debug never reads them).
+Expected: `BUILD SUCCESSFUL` (debug never needs them).
 
-- [ ] **Step 7: Write the key wizard**
+- [ ] **Step 6: Write the key wizards**
 
-Create `tools/new-release-key.sh` (UTF-8, LF line endings):
+Java on Git Bash's terminal can't hide what is typed, so the Bash wizard refuses there unless `winpty` gives `keytool` a console; the PowerShell one is the default on Windows (plan review 14).
+
+Create `tools/new-release-key.ps1` (UTF-8):
+```powershell
+# Makes Culvery's release signing key, one step at a time (4c design D4).
+# You type every password into keytool itself: none is passed on a command line, printed, or written to the repo.
+$ErrorActionPreference = 'Stop'
+
+$keytool = if ($env:KEYTOOL) { $env:KEYTOOL } else { 'keytool' }
+if (-not (Get-Command $keytool -ErrorAction SilentlyContinue)) {
+    Write-Host "keytool isn't on PATH. Use the JDK 17 that builds Culvery, e.g.:"
+    Write-Host '  $env:KEYTOOL = "C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe"; .\tools\new-release-key.ps1'
+    exit 1
+}
+$alias = 'culvery'
+$defaultDir = Join-Path $HOME '.culvery'
+$repo = (git rev-parse --show-toplevel 2>$null)
+
+Write-Host 'Culvery release key'
+Write-Host ''
+Write-Host 'Step 1 of 4: where the key lives.'
+Write-Host 'It must be outside the repo, and backed up somewhere safe: if it is lost, Culvery has to be uninstalled from the'
+Write-Host 'tablet (losing its setup) and Google needs a new OAuth client.'
+$dir = Read-Host "Folder [$defaultDir]"
+if (-not $dir) { $dir = $defaultDir }
+New-Item -ItemType Directory -Force $dir | Out-Null
+$dir = (Resolve-Path $dir).Path
+if ($repo -and $dir.Replace('\', '/').StartsWith(($repo.TrimEnd('/') + '/'), [StringComparison]::OrdinalIgnoreCase)) {
+    Write-Host 'That folder is inside the repo. Choose one outside it.'
+    exit 1
+}
+$store = Join-Path $dir 'culvery-release.jks'
+if (Test-Path $store) {
+    Write-Host "$store already exists; it is left as it is. Move it away first to make a new key."
+    exit 1
+}
+
+Write-Host ''
+Write-Host 'Step 2 of 4: keytool asks for a keystore password (twice), then a name and organisation (anything, e.g.'
+Write-Host '"Culvery"), then asks you to confirm. Choose a long password and keep it with the backup.'
+& $keytool -genkeypair -v -keystore $store -storetype PKCS12 -alias $alias -keyalg RSA -keysize 4096 -validity 10000
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+Write-Host ''
+Write-Host "Step 3 of 4: add these four lines to $HOME\.gradle\gradle.properties (your own Gradle file, never the repo's),"
+Write-Host 'putting the password you just chose in place of <password> on both password lines (a PKCS12 key uses the'
+Write-Host "keystore's password):"
+Write-Host ''
+Write-Host ("culvery.release.storeFile=" + $store.Replace('\', '/'))
+Write-Host 'culvery.release.storePassword=<password>'
+Write-Host "culvery.release.keyAlias=$alias"
+Write-Host 'culvery.release.keyPassword=<password>'
+Write-Host ''
+Read-Host 'Press Enter once they are saved' | Out-Null
+
+Write-Host ''
+Write-Host 'Step 4 of 4: the key''s SHA-1, for the release OAuth client (docs/setup/google-calendar.md, section 4).'
+Write-Host "Run this from the repo root and copy the SHA1 line under 'Variant: release':"
+Write-Host ''
+Write-Host '  .\gradlew.bat :app:signingReport'
+Write-Host ''
+Write-Host "Then back up $store and its password."
+```
+
+Create `tools/new-release-key.sh` (UTF-8, LF line endings), for macOS, Linux, or Git Bash with `winpty`:
 ```bash
 #!/usr/bin/env bash
 # Makes Culvery's release signing key, one step at a time (4c design D4).
 # You type every password into keytool itself: none is passed on a command line, printed, or written to the repo.
+# On Windows, use tools/new-release-key.ps1 in PowerShell instead.
 set -euo pipefail
 
 KEYTOOL=${KEYTOOL:-keytool}
 if ! command -v "$KEYTOOL" >/dev/null; then
-  echo "keytool isn't on PATH. Use the JDK 17 that builds Culvery, e.g.:"
-  echo "  KEYTOOL=\"/c/Program Files/Android/Android Studio/jbr/bin/keytool.exe\" bash tools/new-release-key.sh"
+  echo "keytool isn't on PATH. Use the JDK 17 that builds Culvery (set KEYTOOL to its keytool)."
   exit 1
 fi
-# Git Bash's terminal can't hide typing from Java; winpty gives keytool a console that can.
 RUN=("$KEYTOOL")
-if [ -n "${MSYSTEM:-}" ] && command -v winpty >/dev/null; then RUN=(winpty "$KEYTOOL"); fi
+if [ -n "${MSYSTEM:-}" ]; then
+  # Git Bash's terminal can't hide typing from Java: keytool would show the password as it is typed.
+  if command -v winpty >/dev/null; then
+    RUN=(winpty "$KEYTOOL")
+  else
+    echo "In Git Bash keytool would show your password as you type it. Run this instead, in PowerShell:"
+    echo "  .\\tools\\new-release-key.ps1"
+    exit 1
+  fi
+fi
 
 ALIAS=culvery
 DEFAULT_DIR="$HOME/.culvery"
@@ -414,7 +464,7 @@ echo
 echo "Then back up $STORE and its password."
 ```
 
-- [ ] **Step 8: Write the measuring script**
+- [ ] **Step 7: Write the measuring script**
 
 Create `tools/measure-release.sh` (UTF-8, LF):
 ```bash
@@ -448,7 +498,7 @@ echo "PSS in KB (last cold start):"
 dev shell dumpsys meminfo "$PKG" | tr -d '\r' | grep -E "^ *(Dalvik Heap|Native Heap) "
 ```
 
-- [ ] **Step 9: Write `docs/setup/release.md`**
+- [ ] **Step 8: Write `docs/setup/release.md`**
 
 Create `docs/setup/release.md`:
 ````markdown
@@ -458,13 +508,13 @@ A release build is signed with your own key, shrunk by R8, and logs only warning
 
 ## 1. Make the key (once)
 
-From the repo root, in Git Bash:
+On Windows, from the repo root in PowerShell:
 
-```bash
-bash tools/new-release-key.sh
+```powershell
+.\tools\new-release-key.ps1
 ```
 
-It asks where to keep the key (outside the repo; the default is `~/.culvery/`), then runs `keytool`, which asks for the password itself. It prints the four lines to add to **your own** `~/.gradle/gradle.properties` (never the repo's):
+(elsewhere: `bash tools/new-release-key.sh`; in Git Bash it runs only with `winpty`, as keytool would otherwise show the password as you type). It asks where to keep the key (outside the repo; the default is `~/.culvery/`), then runs `keytool`, which asks for the password itself. It prints the four lines to add to **your own** `~/.gradle/gradle.properties` (never the repo's):
 
 ```properties
 culvery.release.storeFile=C:/Users/you/.culvery/culvery-release.jks
@@ -473,9 +523,9 @@ culvery.release.keyAlias=culvery
 culvery.release.keyPassword=<password>
 ```
 
-Use an absolute path with forward slashes. Back up the `.jks` file and its password together, somewhere other than this computer. **Losing the key** means Culvery can't be updated on the tablet: it has to be uninstalled (its setup is lost) and Google needs a new OAuth client for the new key.
+Use an absolute path with forward slashes. Back up the `.jks` file and its password together, somewhere other than this computer. **Losing the key** means Culvery can't be updated on the tablet: it has to be uninstalled (its setup is lost) and Google needs a new OAuth client for the new key. The repo ignores `*.jks` and `*.keystore`, so a key copied here by mistake isn't committed.
 
-Without all four lines a release build stops at once with "Release signing isn't set up: …". Debug builds and `./gradlew testDebugUnitTest verifyRoborazziDebug` never read them.
+Without all four lines a release build stops at once with "Release signing isn't set up: …". Debug builds and `./gradlew testDebugUnitTest verifyRoborazziDebug` never need them.
 
 ## 2. Give Google the key
 
@@ -491,7 +541,7 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 A release can't be installed over a debug build (their signatures differ): run `adb uninstall uk.co.siland.culvery` first, which removes the debug build's setup and data. Installing one release over the next keeps everything.
 ````
 
-- [ ] **Step 10: Name the release client in the Google setup doc**
+- [ ] **Step 9: Name the release client in the Google setup doc**
 
 In `docs/setup/google-calendar.md`, replace the paragraph
 "A release build is signed with a different key, so it needs a second Android client with that key's SHA-1. That comes with release signing in Plan 4."
@@ -500,27 +550,27 @@ with:
 A release build is signed with your release key (`docs/setup/release.md`), so it needs a second Android client: create another client of type **Android** in the same project, with the same package name and the release key's SHA-1, from `./gradlew :app:signingReport` under `Variant: release` (it shows once the release signing properties are set). Keep the debug client: both can sign in.
 ```
 
-- [ ] **Step 11: Run the gate**
+- [ ] **Step 10: Run the gate**
 
 Run: `./gradlew testDebugUnitTest verifyRoborazziDebug` and `./gradlew -p build-logic :convention:test`
 Expected: `BUILD SUCCESSFUL`, no screenshot differences.
 
-- [ ] **Step 12: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
-git add build-logic app/build.gradle.kts tools/new-release-key.sh tools/measure-release.sh docs/setup/release.md docs/setup/google-calendar.md
+git add build-logic app/build.gradle.kts .gitignore tools/new-release-key.sh tools/new-release-key.ps1 tools/measure-release.sh docs/setup/release.md docs/setup/google-calendar.md
 git commit -m "Sign release builds with a local key from the user's Gradle properties, version 1.0.0-beta1"
 ```
 
-- [ ] **Step 13: STOP — USER CHECKPOINT: the release key, then the "before" numbers**
+- [ ] **Step 12: STOP — USER CHECKPOINT: the release key, then the "before" numbers**
 
 The implementer stops here and reports. **The controller** asks the user to:
-1. Run `bash tools/new-release-key.sh` in their own Git Bash (ruling 21: the real key; or, if they'd rather wait, a throwaway one in another folder such as `~/.culvery-throwaway/`, replaced by the real one before Task 16), add the four lines, and say when done. The controller never sees, asks for or types a password.
+1. Run `.\tools\new-release-key.ps1` in their own PowerShell (ruling 21: the real key, which Task 19 uses too), add the four lines, back up the key, and say when done. The controller never sees, asks for or types a password.
 
 Then the controller, on the running API 35 Google Play emulator `emulator-5554` (don't start or wipe another; ask before uninstalling):
 2. `./gradlew :app:assembleRelease` → `BUILD SUCCESSFUL`. R8 is still off and the font still full: this is §4.5's "before" build.
 3. Ask, then `adb -s emulator-5554 uninstall uk.co.siland.culvery` (it removes the debug build's data), then `adb -s emulator-5554 install app/build/outputs/apk/release/app-release.apk`.
-4. Start it and finish a minimal setup with the user: Welcome › Start; Home location London; You: a test Admin (the user types the PIN); skip the rest; Open Culvery. Home shows the Connect card and London's weather. Every measurement, here and in Task 16, uses this household: London, one Admin, no calendar.
+4. Start it and finish a minimal setup with the user: Welcome › Start; Home location London; You: a test Admin (the user types the PIN); skip the rest; Open Culvery. Home shows the Connect card and London's weather. Every measurement, here and in Task 19, uses this household: London, one Admin, no calendar.
 5. Run `bash tools/measure-release.sh emulator-5554` in the background (about a minute).
 6. Fill the "Before" column of Appendix B in `docs/superpowers/specs/2026-10-02-culvery-4c-release-fixes-design.md`: the APK size in MB (one decimal); the five TotalTimes and their median; skipped frames per run; p50 / p90; Dalvik / native PSS in MB. Show the user the table, then:
 ```bash
@@ -548,7 +598,7 @@ git commit -m "Record the release build's size and start-up before 4c's fixes"
 
 **Interfaces:**
 - Consumes: nothing new.
-- Produces: `object Icons` in `uk.co.siland.culvery.core.ui` with one `const val` per glyph (46 names, below), including `Icons.ARROW_UPWARD` and `Icons.ARROW_DOWNWARD` for Task 14 and `Icons.BEDTIME` (or `Icons.NIGHTLIGHT`, ruling 22) and `Icons.MOBILE`. Every later task names glyphs through it. `:core:plugin`'s `TOAST_ICON_INFO` and `:provider:weather-openmeteo`'s descriptor icon stay literal: those modules don't depend on `:core:ui`; `Icons.INFO` and `Icons.PARTLY_CLOUDY_DAY` keep them in the subset.
+- Produces: `object Icons` in `uk.co.siland.culvery.core.ui` with one `const val` per glyph (46 names, below), including `Icons.ARROW_UPWARD` and `Icons.ARROW_DOWNWARD` for Task 17 and `Icons.BEDTIME` (or `Icons.NIGHTLIGHT`, ruling 22) and `Icons.MOBILE`. Every later task names glyphs through it. `:core:plugin`'s `TOAST_ICON_INFO` and `:provider:weather-openmeteo`'s descriptor icon stay literal: those modules don't depend on `:core:ui`; `Icons.INFO` and `Icons.PARTLY_CLOUDY_DAY` keep them in the subset.
 
 - [ ] **Step 1: Write the font reader the test uses**
 
@@ -560,16 +610,25 @@ import java.io.File
 import java.nio.ByteBuffer
 
 /**
- * The ligatures a TrueType/OpenType font makes: [has] says whether typing a name gives one glyph. Reads the `cmap`
- * (format 12, else 4) and every GSUB ligature lookup (type 4, and type 4 inside a type 7 extension).
+ * The ligatures a TrueType/OpenType font makes: [has] says whether typing a name gives one glyph, and [hasFilledForm]
+ * whether that glyph has its single-substitution alternate (Material Symbols' FILL ≥ 0.99 variant, reached through
+ * `rclt`). Reads the `cmap` (format 12, else 4), every GSUB ligature lookup (type 4) and every single substitution
+ * (type 1), each also inside a type 7 extension.
  */
 internal class OpenTypeLigatures(file: File) {
     private val bytes: ByteBuffer = ByteBuffer.wrap(file.readBytes())
     private val tables: Map<String, Int> = tableOffsets()
     private val glyphOf: (Int) -> Int = characterMap()
-    private val sequences: Set<List<Int>> = ligatureSequences()
+    private val ligatures: Map<List<Int>, Int> = HashMap()
+    private val singles: Map<Int, Int> = HashMap()
 
-    fun has(name: String): Boolean = sequences.contains(name.map { glyphOf(it.code) })
+    init {
+        readSubstitutions()
+    }
+
+    fun has(name: String): Boolean = ligatures.containsKey(name.map { glyphOf(it.code) })
+
+    fun hasFilledForm(name: String): Boolean = ligatures[name.map { glyphOf(it.code) }]?.let(singles::containsKey) == true
 
     private fun u16(at: Int): Int = bytes.getShort(at).toInt() and 0xFFFF
 
@@ -617,10 +676,9 @@ internal class OpenTypeLigatures(file: File) {
         return 0
     }
 
-    private fun ligatureSequences(): Set<List<Int>> {
+    private fun readSubstitutions() {
         val gsub = tables.getValue("GSUB")
         val lookupList = gsub + u16(gsub + 8)
-        val found = HashSet<List<Int>>()
         for (l in 0 until u16(lookupList)) {
             val lookup = lookupList + u16(lookupList + 2 + 2 * l)
             val type = u16(lookup)
@@ -631,20 +689,32 @@ internal class OpenTypeLigatures(file: File) {
                     subtableType = u16(subtable + 2)
                     subtable += u32(subtable + 4).toInt()
                 }
-                if (subtableType == LIGATURE) addLigatures(subtable, found)
+                when (subtableType) {
+                    SINGLE -> addSingles(subtable)
+                    LIGATURE -> addLigatures(subtable)
+                }
             }
         }
-        return found
     }
 
-    private fun addLigatures(subtable: Int, found: MutableSet<List<Int>>) {
+    private fun addSingles(subtable: Int) {
+        val from = coverage(subtable + u16(subtable + 2))
+        val found = singles as HashMap
+        when (u16(subtable)) {
+            1 -> from.forEach { g -> found[g] = (g + bytes.getShort(subtable + 4).toInt()) and 0xFFFF }
+            else -> from.forEachIndexed { i, g -> found[g] = u16(subtable + 6 + 2 * i) }
+        }
+    }
+
+    private fun addLigatures(subtable: Int) {
         val firsts = coverage(subtable + u16(subtable + 2))
+        val found = ligatures as HashMap
         for (i in 0 until u16(subtable + 4)) {
             val set = subtable + u16(subtable + 6 + 2 * i)
             for (j in 0 until u16(set)) {
                 val ligature = set + u16(set + 2 + 2 * j)
                 val components = u16(ligature + 2)
-                found += listOf(firsts[i]) + (0 until components - 1).map { u16(ligature + 4 + 2 * it) }
+                found[listOf(firsts[i]) + (0 until components - 1).map { u16(ligature + 4 + 2 * it) }] = u16(ligature)
             }
         }
     }
@@ -655,6 +725,7 @@ internal class OpenTypeLigatures(file: File) {
     }
 
     private companion object {
+        const val SINGLE = 1
         const val LIGATURE = 4
         const val EXTENSION = 7
     }
@@ -694,6 +765,12 @@ class IconFontTest {
         assertWithMessage("Icons with no ligature in the font").that(named.filterNot(font::has)).isEmpty()
     }
 
+    /** HhIcon(filled = true) — the rail's selected tab — draws the FILL ≥ 0.99 alternate; the subset must keep it. */
+    @Test
+    fun everyNamedIconKeepsItsFilledForm() {
+        assertWithMessage("Icons whose filled form isn't in the font").that(named.filterNot { it in NO_FILLED_FORM || font.hasFilledForm(it) }).isEmpty()
+    }
+
     @Test
     fun theSubsetListMatchesIcons() {
         val listed = File(repo, "tools/fonts/icons.txt").readLines(Charsets.UTF_8)
@@ -703,15 +780,37 @@ class IconFontTest {
         assertThat(listed).containsExactlyElementsIn(named)
     }
 
+    private fun mainSources(): Sequence<File> {
+        val main = "${File.separator}src${File.separator}main${File.separator}"
+        return repo.walkTopDown()
+            .onEnter { it.name !in setOf("build", ".gradle", ".git", "build-logic") }
+            .filter { it.isFile && it.extension == "kt" && main in it.path }
+    }
+
     @Test
     fun noHhIconCallNamesAGlyphInAString() {
-        val main = "${File.separator}src${File.separator}main${File.separator}"
-        val callers = repo.walkTopDown()
-            .onEnter { it.name !in setOf("build", ".gradle", ".git", "build-logic") }
-            .filter { it.isFile && it.extension == "kt" && main in it.path && "HhIcon(\"" in it.readText() }
-            .map { it.relativeTo(repo).path }
-            .toList()
+        val callers = mainSources().filter { "HhIcon(\"" in it.readText() }.map { it.relativeTo(repo).path }.toList()
         assertWithMessage("Use Icons.* instead of a string in").that(callers).isEmpty()
+    }
+
+    /**
+     * S3 was `icon = "smartphone"`, a name the font doesn't have. Every icon still named by a string (in modules without
+     * `:core:ui`, such as `:core:plugin`'s toast icon and Open-Meteo's descriptor) must be one `Icons` names.
+     */
+    @Test
+    fun everyIconNamedInAStringIsInIcons() {
+        val unknown = mainSources().flatMap { file ->
+            ICON_LITERAL.findAll(file.readText()).map { it.groupValues[1] }.filterNot { it in named }.map { "${file.relativeTo(repo).path}: $it" }
+        }.toList()
+        assertWithMessage("Icon names not in Icons").that(unknown).isEmpty()
+    }
+
+    private companion object {
+        /** `icon = "…"`, `icon: String = "…"`, `TOAST_ICON_INFO = "…"`, and the like. */
+        val ICON_LITERAL = Regex("""(?i)icon\w*(?:\s*:\s*String\??)?\s*[=:]\s*"([a-z0-9_]+)"""")
+
+        /** Glyphs whose full font has no filled alternate either (found in Step 9); empty unless that step says otherwise. */
+        val NO_FILLED_FORM: Set<String> = emptySet()
     }
 }
 ```
@@ -846,7 +945,7 @@ weather_snowy
 - [ ] **Step 5: Run it to see S3**
 
 Run: `./gradlew :core:ui:testDebugUnitTest --tests "*IconFontTest*"`
-Expected: `everyNamedIconIsALigatureInTheFont` FAILS listing exactly `[clear_night, smartphone]` (bug S3); `noHhIconCallNamesAGlyphInAString` FAILS listing the files of Step 8; the other two PASS. If the first test lists any *other* name, the reader is wrong, not the font (every other glyph draws in today's screenshots): stop and report.
+Expected: `everyNamedIconIsALigatureInTheFont` FAILS listing exactly `[clear_night, smartphone]` (bug S3); `everyNamedIconKeepsItsFilledForm` FAILS listing at least those two (no ligature, so no filled form); `noHhIconCallNamesAGlyphInAString` FAILS listing the files of Step 8; `theReaderFindsARealLigatureAndNotAWord`, `theSubsetListMatchesIcons` and `everyIconNamedInAStringIsInIcons` PASS. If the ligature test lists any *other* name, the reader is wrong, not the font (every other glyph draws in today's screenshots): stop and report.
 
 - [ ] **Step 6: Look at the candidates for clear night**
 
@@ -952,7 +1051,7 @@ Expected: no output.
 - [ ] **Step 9: Run the test on the full font**
 
 Run: `./gradlew :core:ui:testDebugUnitTest --tests "*IconFontTest*"`
-Expected: PASS (4 tests): `bedtime` and `mobile` are ligatures in today's full font. If either isn't, stop and report which.
+Expected: PASS (6 tests): `bedtime` and `mobile` are ligatures in today's full font, and every named glyph has its filled alternate there. If either name isn't a ligature, stop and report which. If `everyNamedIconKeepsItsFilledForm` still lists a name, the full font itself has no filled form for it: put exactly those names in `NO_FILLED_FORM` and say so in the report.
 
 - [ ] **Step 10: Write the subsetter**
 
@@ -961,7 +1060,7 @@ Create `tools/fonts/subset.py` (UTF-8):
 #!/usr/bin/env python3
 """Subsets Material Symbols Rounded to the glyphs Culvery names in tools/fonts/icons.txt (4c design §3.5).
 
-Keeps all four axes (FILL, GRAD, opsz, wght) and the ligatures, and writes the font the app bundles:
+Keeps all four axes (FILL, GRAD, opsz, wght), the ligatures and the filled alternates, and writes the font the app bundles:
 core/ui/src/main/res/font/material_symbols_rounded.ttf. Needs fontTools (python -m pip install --user fonttools).
 
 Usage: python tools/fonts/subset.py --source <the full Material Symbols Rounded variable .ttf>
@@ -976,23 +1075,28 @@ from fontTools.ttLib import TTFont
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 ICONS = ROOT / "tools" / "fonts" / "icons.txt"
 OUT = ROOT / "core" / "ui" / "src" / "main" / "res" / "font" / "material_symbols_rounded.ttf"
+SINGLE = 1
 LIGATURE = 4
 EXTENSION = 7
 
 
-def ligatures(font):
-    """Each ligature as (its component glyph names) -> the glyph it makes."""
-    found = {}
+def substitutions(font):
+    """Each ligature as (its component glyph names) -> the glyph it makes; and each single substitution, glyph -> glyph.
+
+    The single substitutions include rclt's filled alternates, which the font's FeatureVariations turn on at FILL >= 0.99.
+    """
+    ligatures, singles = {}, {}
     for lookup in font["GSUB"].table.LookupList.Lookup:
         for table in lookup.SubTable:
             if lookup.LookupType == EXTENSION:
                 table = table.ExtSubTable
-            if table.LookupType != LIGATURE:
-                continue
-            for first, ligs in table.ligatures.items():
-                for lig in ligs:
-                    found[tuple([first] + list(lig.Component))] = lig.LigGlyph
-    return found
+            if table.LookupType == SINGLE:
+                singles.update(table.mapping)
+            elif table.LookupType == LIGATURE:
+                for first, ligs in table.ligatures.items():
+                    for lig in ligs:
+                        ligatures[tuple([first] + list(lig.Component))] = lig.LigGlyph
+    return ligatures, singles
 
 
 def main():
@@ -1004,7 +1108,7 @@ def main():
     names = [name for name in names if name and not name.startswith("#")]
     font = TTFont(args.source)
     cmap = font.getBestCmap()
-    found = ligatures(font)
+    found, singles = substitutions(font)
 
     glyphs, missing = set(), []
     for name in names:
@@ -1016,10 +1120,13 @@ def main():
         glyphs.add(found[sequence])
     if missing:
         sys.exit("No ligature in the source font for: " + ", ".join(missing))
+    # HhIcon(filled = true) draws each glyph's filled alternate: keep those too.
+    glyphs.update(singles[g] for g in list(glyphs) if g in singles)
 
     options = subset.Options()
     # Without this the subsetter follows every ligature from the kept letters and keeps almost the whole font.
     options.layout_closure = False
+    # Every feature, rclt included, and with them the FeatureVariations that switch to the filled glyphs.
     options.layout_features = ["*"]
     options.name_IDs = ["*"]
     options.name_languages = ["*"]
@@ -1039,7 +1146,7 @@ Create `tools/fonts/README.md`:
 ````markdown
 # The icon font
 
-Culvery draws its icons with Material Symbols Rounded (Apache 2.0, `core/ui/licenses/Apache-MaterialSymbols.txt`) by ligature: `HhIcon(Icons.HOME)` types "home" in the font. The bundled `core/ui/src/main/res/font/material_symbols_rounded.ttf` is a subset holding only the glyphs in `icons.txt`, with all four axes (FILL, GRAD, opsz, wght): about 180 KB instead of 15 MB. The build never runs Python; the subset is committed.
+Culvery draws its icons with Material Symbols Rounded (Apache 2.0, `core/ui/licenses/Apache-MaterialSymbols.txt`) by ligature: `HhIcon(Icons.HOME)` types "home" in the font. The bundled `core/ui/src/main/res/font/material_symbols_rounded.ttf` is a subset holding only the glyphs in `icons.txt` and their filled alternates (what `HhIcon(filled = true)` draws), with all four axes (FILL, GRAD, opsz, wght): about 180 KB instead of 15 MB. The build never runs Python; the subset is committed.
 
 ## Adding an icon
 
@@ -1055,7 +1162,7 @@ Culvery draws its icons with Material Symbols Rounded (Apache 2.0, `core/ui/lice
    python tools/fonts/subset.py --source "$TMP/material-symbols-full.ttf"
    ```
    It stops and names any icon the source font has no ligature for.
-5. `./gradlew :core:ui:testDebugUnitTest --tests "*IconFontTest*"`: every name in `Icons` must be a ligature in the committed font, and `icons.txt` must match `Icons`.
+5. `./gradlew :core:ui:testDebugUnitTest --tests "*IconFontTest*"`: every name in `Icons` must be a ligature in the committed font with its filled form, and `icons.txt` must match `Icons`.
 ````
 
 - [ ] **Step 11: Subset the font**
@@ -1084,7 +1191,7 @@ Expected: PASS (`IconFontTest` against the subset; `ThemeTest`).
 - [ ] **Step 14: Check the screenshots: only S3's change**
 
 Run: `./gradlew verifyRoborazziDebug`
-Expected: only `detail_untagged_dark` and `detail_untagged_light` (calendar) differ: the "Added from a phone" note's glyph used to be the text "smartphone". (The existing `header_night_*` fixture is partly cloudy, whose glyph always existed, so it doesn't change; Step 15 adds the clear-night images.) Any other difference means the subset draws differently: open `<module>/build/outputs/roborazzi/*_compare.png`, stop and report. Then record those two:
+Expected: only `detail_untagged_dark` and `detail_untagged_light` (calendar) differ; in particular every `home_*` image (`:app`), whose rail draws the selected tab's icon filled, is unchanged: the "Added from a phone" note's glyph used to be the text "smartphone". (The existing `header_night_*` fixture is partly cloudy, whose glyph always existed, so it doesn't change; Step 15 adds the clear-night images.) Any other difference means the subset draws differently: open `<module>/build/outputs/roborazzi/*_compare.png`, stop and report. Then record those two:
 ```bash
 ./gradlew :capability:calendar:recordRoborazziDebug --tests "*DetailScreenshotTest.untagged*"
 ```
@@ -1126,19 +1233,22 @@ git commit -m "Subset the icon font to the glyphs the app names, and draw the cl
 
 ### Task 3: R8, resource shrinking, release logging and `LogHygieneTest` (§3.3, §3.4, D8; ruling 18)
 
-**Review:** opus (R8 rules and log privacy).
+**Review:** opus (R8 and log privacy).
 
 **Files:**
 - Modify: `app/build.gradle.kts`
 - Create: `app/proguard-rules.pro`
-- Test: `build-logic/convention/src/test/kotlin/LogHygieneTest.kt`, `ReleaseRulesTest.kt` (create)
-- Modify (logging): `app/src/main/java/uk/co/siland/culvery/CulveryApp.kt`, `di/AppModule.kt`, `shell/ShellViewModel.kt`; in `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/`: `CalendarEditor.kt`, `CalendarSetup.kt`, `CalendarStore.kt`, `CalendarSync.kt`, `CalendarSyncLoop.kt`, `SourceRefresher.kt`, `Writes.kt`, `ui/EventDetailHost.kt`, `ui/EventEditorHost.kt`; `provider/calendar-google/src/main/java/uk/co/siland/culvery/provider/calendar_google/GoogleConnectFlow.kt`
-- Modify (tests that read a logged throwable): `app/src/test/java/uk/co/siland/culvery/ApplicationScopeTest.kt`; `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSyncLoopTest.kt`, `CalendarSyncTest.kt`
+- Modify: `build-logic/convention/build.gradle.kts` (the test's inputs)
+- Test: `build-logic/convention/src/test/kotlin/LogHygieneTest.kt` (create)
+- Modify (logging): `app/src/main/java/uk/co/siland/culvery/CulveryApp.kt`, `di/AppModule.kt`, `shell/ShellViewModel.kt`; in `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/`: `CalendarEditor.kt`, `CalendarSetup.kt`, `CalendarStore.kt`, `CalendarSync.kt`, `CalendarSyncLoop.kt`, `SourceRefresher.kt`, `Writes.kt`, `ui/CalendarConnectHost.kt`, `ui/EventDetailHost.kt`, `ui/EventEditorHost.kt`; in `provider/calendar-google/src/main/java/uk/co/siland/culvery/provider/calendar_google/`: `GoogleHttp.kt`, `GoogleCalendarProvider.kt`, `GoogleConnectFlow.kt`
+- Modify (tests): `app/src/test/java/uk/co/siland/culvery/ApplicationScopeTest.kt`; `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSyncLoopTest.kt`, `CalendarSyncTest.kt`; `provider/calendar-google/src/test/java/uk/co/siland/culvery/provider/calendar_google/GoogleApiTest.kt`
 - Modify: `docs/setup/release.md` (a section on reading a release crash)
 
 **Interfaces:**
-- Consumes: Task 1's signing (the minified build is built and installed in Step 13).
-- Produces: `LogHygiene.problems(source: String): List<String>` and `LogHygiene.ALLOWED` (in `build-logic`'s tests). From here on every `Log.w`/`Log.e` in shipped code has two arguments, a tag and a string-literal message whose templates are `${…::class.simpleName}`, `${…code}` or an `ALLOWED` id; later tasks write theirs that way.
+- Consumes: Task 1's signing (the minified build is built and installed in Step 12).
+- Produces:
+  - `LogHygiene.problems(source: String): List<String>` and `LogHygiene.ALLOWED` (in `build-logic`'s tests). From here on every `Log.w`/`Log.e`/`Log.wtf`/`Log.println` in shipped code passes a tag and one string-literal message (no throwable) whose templates are `${…::class.simpleName}`, `${….code}` or a qualified id in `ALLOWED`; later tasks write theirs that way.
+  - `@JvmInline internal value class GoogleCall(val label: String)` (`GoogleHttp.kt`): what `decode`, `readOrUnreachable`, `refusal` and `oneOffToChange` log, in place of their `what: String`.
 
 - [ ] **Step 1: Write the failing logging test**
 
@@ -1150,8 +1260,9 @@ import java.io.File
 import org.junit.Test
 
 /**
- * D8: what a release build logs. Every Log.w and Log.e in shipped code passes a tag and one message, never a throwable,
- * and the message interpolates only a type, an HTTP code, or an id or fixed word in [LogHygiene.ALLOWED].
+ * D8: what a release build logs. Every Log.w, Log.e, Log.wtf and Log.println in shipped code passes a tag and one
+ * message, never a throwable, and the message interpolates only a type, an HTTP code, or a qualified id in
+ * [LogHygiene.ALLOWED].
  */
 class LogHygieneTest {
     // build-logic/convention's tests run in that directory.
@@ -1168,11 +1279,14 @@ class LogHygieneTest {
     @Test
     fun aThrowableArgumentIsCaught() {
         assertThat(LogHygiene.problems("""Log.w(TAG, "Couldn't save", e)""")).hasSize(1)
+        assertThat(LogHygiene.problems("""Log.wtf(TAG, "Couldn't save", e)""")).hasSize(1)
     }
 
     @Test
-    fun anInterpolatedNameIsCaught() {
+    fun anInterpolatedNameOrABareLocalIsCaught() {
         assertThat(LogHygiene.problems("""Log.e(TAG, "Couldn't add ${'$'}{person.name}")""")).hasSize(1)
+        assertThat(LogHygiene.problems("""Log.e(TAG, "Couldn't read ${'$'}id")""")).hasSize(1)
+        assertThat(LogHygiene.problems("""Log.println(Log.WARN, TAG, "Couldn't read ${'$'}email")""")).hasSize(1)
     }
 
     @Test
@@ -1186,6 +1300,7 @@ class LogHygieneTest {
             Log.w(TAG, "${'$'}{conn.id}: answered ${'$'}{answer.code} (${'$'}{e::class.simpleName})")
             Log.e(TAG, "first part " +
                 "second (${'$'}{it::class.simpleName})")
+            Log.println(Log.WARN, TAG, "${'$'}{conn.id}: fixed words")
             Log.d(TAG, "stripped from release: ${'$'}{person.name}", e)
         """.trimIndent()
         assertThat(LogHygiene.problems(source)).isEmpty()
@@ -1203,25 +1318,30 @@ class LogHygieneTest {
     }
 }
 
-/** Finds the Log.w and Log.e calls in Kotlin source and says what is wrong with each. */
+/** Finds the Log.w, Log.e, Log.wtf and Log.println calls in Kotlin source and says what is wrong with each. */
 internal object LogHygiene {
-    /** Ids and fixed words a message may interpolate: never a name, email, place, PIN, coordinates or zone. */
+    /**
+     * Qualified ids and fixed words a message may interpolate (plan review 10: never a bare local, whose meaning the
+     * line can't show): never a name, email, place, PIN, coordinates or zone.
+     */
     val ALLOWED = setOf(
-        "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "id", "it.descriptor.id",
-        "providerId", "step.id", "kind", "change.kind", "failedDrains", "reason", "answer.reason", "what", "method",
-        "pathTemplate(url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
+        "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",
+        "step.id", "stored.connection.id", "this.id", "this.kind", "kind.name", "this.failedDrains", "this.reason",
+        "answer.reason", "what.label", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
     )
 
-    private val CALL = Regex("""\bLog\.([we])\(""")
+    private val CALL = Regex("""\bLog\.(w|e|wtf|println)\(""")
     private val TEMPLATE = Regex("""\$\{([^}]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)""")
 
     fun problems(source: String): List<String> = CALL.findAll(source).mapNotNull { match ->
         val line = source.substring(0, match.range.first).count { it == '\n' } + 1
-        problem(arguments(source, match.range.last + 1))?.let { "line $line: $it" }
+        val args = arguments(source, match.range.last + 1)
+        // Log.println(priority, tag, message): the same rule after its priority.
+        problem(if (match.groupValues[1] == "println") args.drop(1) else args)?.let { "line $line: $it" }
     }.toList()
 
     private fun problem(args: List<String>): String? {
-        if (args.size != 2) return "passes ${args.size} arguments: a tag and one message only, never a throwable"
+        if (args.size != 2) return "passes ${args.size} arguments after any priority: a tag and one message only, never a throwable"
         val message = args[1]
         val literals = literals(message)
         if (literals.isEmpty() || message.without(literals).any { it != '+' && !it.isWhitespace() }) {
@@ -1230,11 +1350,11 @@ internal object LogHygiene {
         val bad = literals
             .flatMap { r -> TEMPLATE.findAll(message.substring(r)).map { it.groupValues[1].ifEmpty { it.groupValues[2] } } }
             .filterNot(::allowed)
-        return if (bad.isEmpty()) null else "interpolates ${bad.joinToString()}: only ::class.simpleName, a code or an id in LogHygiene.ALLOWED"
+        return if (bad.isEmpty()) null else "interpolates ${bad.joinToString()}: only ::class.simpleName, a .code or a qualified id in LogHygiene.ALLOWED"
     }
 
     private fun allowed(expression: String): Boolean = expression.trim().let {
-        it.endsWith("::class.simpleName") || it == "code" || it.endsWith(".code") || it in ALLOWED
+        it.endsWith("::class.simpleName") || it.endsWith(".code") || it in ALLOWED
     }
 
     /** The top-level arguments of the call whose "(" ends just before [from]. */
@@ -1327,51 +1447,58 @@ internal object LogHygiene {
     }
 }
 ```
-
-Then make the convention tests run again whenever the code they read changes (Gradle otherwise treats them as up to date, since the app's sources aren't their inputs). In `build-logic/convention/build.gradle.kts`, add at the top `import org.gradle.api.tasks.PathSensitivity` and at the end:
+Then make the test run again whenever the code it reads changes (Gradle otherwise treats it as up to date, since the app's sources aren't its inputs). In `build-logic/convention/build.gradle.kts`, add at the top `import org.gradle.api.tasks.PathSensitivity` and at the end:
 ```kotlin
-// LogHygieneTest and ReleaseRulesTest read the app's own sources and build files.
+// LogHygieneTest reads the app's own sources.
 tasks.test {
-    inputs.files(
-        fileTree(rootDir.parentFile) {
-            include("*/src/main/**/*.kt", "*/*/src/main/**/*.kt", "*/src/release/**/*.kt", "app/proguard-rules.pro", "app/build.gradle.kts")
-        },
-    ).withPropertyName("culverySources").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(rootDir.parentFile) { include("*/src/main/**/*.kt", "*/*/src/main/**/*.kt", "*/src/release/**/*.kt") })
+        .withPropertyName("culverySources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 ```
 
 - [ ] **Step 2: Run it to see what it finds**
 
 Run: `./gradlew -p build-logic :convention:test --tests LogHygieneTest`
-Expected: the four self-checks PASS; `shippedWarningsAndErrorsCarryNoThrowableAndNoPersonalData` FAILS listing about 25 calls that pass a throwable: those in Step 3, and nothing else. If it lists a call that doesn't pass a throwable, read the reason: an interpolation not in `ALLOWED` is either personal data (fix the message) or a fixed id the list lacks (stop and ask before widening `ALLOWED`).
+Expected: the five self-checks PASS; `shippedWarningsAndErrorsCarryNoThrowableAndNoPersonalData` FAILS listing about 25 calls that pass a throwable and about 10 that interpolate a bare local — those in Step 3, and nothing else. A call it lists that Step 3 doesn't is either personal data (fix the message) or a fixed id the list lacks (stop and ask before widening `ALLOWED`).
 
-- [ ] **Step 3: Scrub the throwables (the type only, in the message)**
+- [ ] **Step 3: Scrub the throwables and qualify the ids**
 
 Make each change exactly; nothing else in these files changes:
 - `app/.../CulveryApp.kt`: `Log.e(TAG, "${startable.javaClass.name} failed to start", e)` → `Log.e(TAG, "${startable::class.simpleName} failed to start (${e::class.simpleName})")`
 - `app/.../di/AppModule.kt`: `Log.e("Culvery", "An application job failed", e)` → `Log.e("Culvery", "An application job failed (${e::class.simpleName})")`
 - `app/.../shell/ShellViewModel.kt`: `Log.w(TAG, "${cap.id}: couldn't read whether it has a tab; retrying", it)` → `Log.w(TAG, "${cap.id}: couldn't read whether it has a tab (${it::class.simpleName}); retrying")`; `Log.w(TAG, "${cap.id}: couldn't read its Home cards; retrying", it)` → `Log.w(TAG, "${cap.id}: couldn't read its Home cards (${it::class.simpleName}); retrying")`
-- `CalendarEditor.kt`: `Log.w(TAG, "Couldn't save a $kind", e)` → `Log.w(TAG, "Couldn't save a $kind (${e::class.simpleName})")`; `Log.w(TAG, "The provider accepted a $kind but the tablet couldn't store it; the next sync will", e)` → `Log.w(TAG, "The provider accepted a $kind but the tablet couldn't store it (${e::class.simpleName}); the next sync will")`
+- `CalendarEditor.kt`: `Log.w(TAG, "Couldn't save a $kind", e)` → `Log.w(TAG, "Couldn't save a ${kind.name} (${e::class.simpleName})")`; `Log.w(TAG, "The provider accepted a $kind but the tablet couldn't store it; the next sync will", e)` → `Log.w(TAG, "The provider accepted a ${kind.name} but the tablet couldn't store it (${e::class.simpleName}); the next sync will")`
 - `CalendarSetup.kt`: `Log.w(TAG, "Couldn't record ${connection.id} as reconnected", e)` → `Log.w(TAG, "Couldn't record ${connection.id} as reconnected (${e::class.simpleName})")`
-- `CalendarStore.kt`: `.onFailure { Log.w(TAG, "Dropping unreadable outbox row $id (kind $kind)", it) }` → `.onFailure { Log.w(TAG, "Dropping unreadable outbox row $id (kind $kind, ${it::class.simpleName})") }`
+- `CalendarStore.kt`: `.onFailure { Log.w(TAG, "Dropping unreadable outbox row $id (kind $kind)", it) }` → `.onFailure { Log.w(TAG, "Dropping unreadable outbox row ${this.id} (kind ${this.kind}, ${it::class.simpleName})") }`
 - `CalendarSync.kt`:
-  - `"The outbox drain failed ($failedDrains in a row); syncing anyway", e)` → `"The outbox drain failed ($failedDrains in a row, ${e::class.simpleName}); syncing anyway")`
+  - `"The outbox drain failed ($failedDrains in a row); syncing anyway", e)` → `"The outbox drain failed (${this.failedDrains} in a row, ${e::class.simpleName}); syncing anyway")`
   - `"The provider accepted a queued ${change.kind} but the tablet couldn't store it; retrying later", e)` → `"The provider accepted a queued ${change.kind} but the tablet couldn't store it (${e::class.simpleName}); retrying later")`
   - `"${conn.id}: a source needs signing in again", e)` → `"${conn.id}: a source needs signing in again (${e::class.simpleName})")`
   - `"${conn.id}: a source is gone from the service; flagging a refresh of its calendars", e)` → `"${conn.id}: a source is gone from the service (${e::class.simpleName}); flagging a refresh of its calendars")`
   - `"${conn.id}: a source is unreachable", e)` → `"${conn.id}: a source is unreachable (${e::class.simpleName})")`
   - `Log.e(TAG, "${conn.id}: a source failed", e)` → `Log.e(TAG, "${conn.id}: a source failed (${e::class.simpleName})")`
 - `CalendarSyncLoop.kt`: `"Couldn't read the connections; retrying", it)` → `"Couldn't read the connections (${it::class.simpleName}); retrying")`; `"Calendar sync was cancelled internally", e)` → `"Calendar sync was cancelled internally (${e::class.simpleName})")`; `"Calendar sync failed", e)` → `"Calendar sync failed (${e::class.simpleName})")`; `"Couldn't read the outbox; waiting the full interval", e)` → `"Couldn't read the outbox (${e::class.simpleName}); waiting the full interval")`
-- `SourceRefresher.kt`: `"$id: couldn't read its calendars; trying again next pass", it)` → `"$id: couldn't read its calendars (${it::class.simpleName}); trying again next pass")`
+- `SourceRefresher.kt`: `"$id: couldn't read its calendars; trying again next pass", it)` → `"${stored.connection.id}: couldn't read its calendars (${it::class.simpleName}); trying again next pass")`; `"$id: its calendar list has no primary calendar; treating it as a failed read")` → `"${stored.connection.id}: its calendar list has no primary calendar; treating it as a failed read")`
 - `Writes.kt`: `"A calendar write failed unexpectedly; it will be retried", e)` → `"A calendar write failed unexpectedly (${e::class.simpleName}); it will be retried")`
+- `ui/CalendarConnectHost.kt`: `Log.w(TAG, "No calendar provider $providerId in this build; nothing to connect")` → `Log.w(TAG, "No calendar provider for that id in this build; nothing to connect")`
 - `ui/EventDetailHost.kt`: `{ e -> Log.w(TAG, "Couldn't change an event", e) }` → `{ e -> Log.w(TAG, "Couldn't change an event (${e::class.simpleName})") }`
 - `ui/EventEditorHost.kt`: `"Couldn't open the add/edit sheet", e)` → `"Couldn't open the add/edit sheet (${e::class.simpleName})")`; `"Couldn't save", e)` → `"Couldn't save (${e::class.simpleName})")`; `"Couldn't start a delete", e)` → `"Couldn't start a delete (${e::class.simpleName})")`
-- `GoogleConnectFlow.kt`: `Log.i(TAG, "Google sign-in was cancelled", e)` → `Log.i(TAG, "Google sign-in was cancelled")`; `Log.w(TAG, "Couldn't connect to Google", e)` → `Log.w(TAG, "Couldn't connect to Google (${e::class.simpleName})")`
+- `GoogleConnectFlow.kt`: `Log.i(TAG, "Google sign-in was cancelled", e)` → `Log.i(TAG, "Google sign-in was cancelled")`; `Log.w(TAG, "Couldn't connect to Google", e)` → `Log.w(TAG, "Couldn't connect to Google (${e::class.simpleName})")`; `.readOrUnreachable("calendars.get primary")` → `.readOrUnreachable(GoogleCall("calendars.get primary"))` and `.decode(CalendarResource.serializer(), "calendars.get primary")` → `.decode(CalendarResource.serializer(), GoogleCall("calendars.get primary"))`.
+- `GoogleHttp.kt`: after `TAG` add
+```kotlin
+/** Which call a log line is about: a fixed name such as "events.list", never a calendar, an email or an id. */
+@JvmInline
+internal value class GoogleCall(val label: String)
+```
+  `decode`, `readOrUnreachable` and `refusal` take `what: GoogleCall` (was `String`), and their lines become `Log.w(TAG, "${what.label}: Google Calendar sent a body the tablet can't read (${e::class.simpleName})")`, `Log.w(TAG, "${what.label}: Google Calendar answered ${this.code} (${this.reason})")`, `Log.w(TAG, "${what.label}: Google Calendar refused it with ${this.code} (${this.reason})")`; in `execute`, `"$method ${pathTemplate(url)}: Google Calendar says the grant lacks a calendar scope (${answer.reason})"` → `"${request.method} ${pathTemplate(request.url)}: Google Calendar says the grant lacks a calendar scope (${answer.reason})"` and `"$method ${pathTemplate(url)}: Google Calendar said try later: ${answer.code} (${answer.reason})"` → `"${request.method} ${pathTemplate(request.url)}: Google Calendar said try later: ${answer.code} (${answer.reason})"`.
+- `GoogleCalendarProvider.kt`: every string passed to `readOrUnreachable`, `decode` or `refusal` is wrapped, e.g. `.readOrUnreachable("events.list")` → `.readOrUnreachable(GoogleCall("events.list"))`, `answer.refusal("Adding an event")` → `answer.refusal(GoogleCall("Adding an event"))` (11 places); `oneOffToChange(…, what: String)` takes `what: GoogleCall`, its three callers pass `GoogleCall("Changing an event")` / `GoogleCall("Deleting an event")`, and its line becomes `Log.w(TAG, "${what.label}: it has become a repeating event in Google Calendar, so the tablet leaves it alone")`.
+- `GoogleApiTest.kt`: wrap the strings it passes to `decode`, `refusal` and `readOrUnreachable` in `GoogleCall(…)`.
 
 - [ ] **Step 4: Run it to see it pass**
 
 Run: `./gradlew -p build-logic :convention:test --tests LogHygieneTest`
-Expected: PASS (5 tests).
+Expected: PASS (6 tests).
 
 - [ ] **Step 5: Point the tests that read a logged throwable at the message**
 
@@ -1382,85 +1509,15 @@ Expected: PASS (5 tests).
 Run: `./gradlew :app:testDebugUnitTest :capability:calendar:testDebugUnitTest :provider:calendar-google:testDebugUnitTest`
 Expected: PASS. Any other test that read `it.throwable` from one of Step 3's lines fails here: change it to read the message with the type, the same way, and nothing else.
 
-- [ ] **Step 6: Write the failing release-rules test**
+- [ ] **Step 6: Turn R8 on, with only the rules the libraries don't ship**
 
-Create `build-logic/convention/src/test/kotlin/ReleaseRulesTest.kt`:
-```kotlin
-import com.google.common.truth.Truth.assertThat
-import java.io.File
-import org.junit.Test
-
-/** The release build's R8 setup (4c design §3.3, §3.4): what unit tests can check without running R8. */
-class ReleaseRulesTest {
-    private val repo = File("../..").canonicalFile
-    private val rules get() = File(repo, "app/proguard-rules.pro").readText()
-
-    /** Review Focus 1: a serializer R8 removed would break sign-in, sync or weather in release only. */
-    @Test
-    fun everySerializableClassIsCoveredByAKeepRule() {
-        val packages = repo.walkTopDown()
-            .onEnter { it.name !in setOf("build", ".gradle", ".git", "build-logic") }
-            .filter { it.isFile && it.extension == "kt" && "${File.separator}src${File.separator}main${File.separator}" in it.path }
-            .map { it.readText() }
-            .filter { "@Serializable" in it }
-            .map { Regex("""^package (\S+)""", RegexOption.MULTILINE).find(it)!!.groupValues[1] }
-            .toList()
-        assertThat(packages).isNotEmpty()
-        assertThat(packages.filterNot { it.startsWith("uk.co.siland.culvery.") }).isEmpty()
-        assertThat(rules).contains("-keep,includedescriptorclasses class uk.co.siland.culvery.**\$\$serializer { *; }")
-        assertThat(rules).contains("static <1>\$Companion Companion;")
-        assertThat(rules).contains("kotlinx.serialization.KSerializer serializer(...);")
-    }
-
-    @Test
-    fun theRulesStripDebugAndInfoLogsOnly() {
-        val block = rules.substringAfter("-assumenosideeffects class android.util.Log {").substringBefore("}")
-        assertThat(block.lines().map { it.trim() }.filter { it.isNotEmpty() })
-            .containsExactly("public static int v(...);", "public static int d(...);", "public static int i(...);")
-    }
-
-    @Test
-    fun releaseIsMinifiedAndShrunk() {
-        val build = File(repo, "app/build.gradle.kts").readText()
-        assertThat(build).contains("isMinifyEnabled = true")
-        assertThat(build).contains("isShrinkResources = true")
-        assertThat(build).contains("proguardFiles(getDefaultProguardFile(\"proguard-android-optimize.txt\"), \"proguard-rules.pro\")")
-    }
-}
-```
-
-- [ ] **Step 7: Run it to see it fail**
-
-Run: `./gradlew -p build-logic :convention:test --tests ReleaseRulesTest`
-Expected: FAIL with `FileNotFoundException` for `app/proguard-rules.pro`.
-
-- [ ] **Step 8: Write the rules and turn R8 on**
-
-Create `app/proguard-rules.pro`:
+kotlinx-serialization-core 1.9 ships the keeps for `@Serializable` classes and OkHttp 4.12 the `-dontwarn` lines for its optional TLS providers (plan review 6), so the app's own file holds only what nothing else does. Create `app/proguard-rules.pro`:
 ```proguard
-# Culvery's own R8 rules (4c design §3.3, §3.4): only what the libraries don't ship.
+# Culvery's own R8 rules (4c design §3.3, §3.4); the libraries ship theirs.
 
 # Release stack traces keep their line numbers; source file names are hidden. Read them with the build's mapping.txt.
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
-
-# kotlinx.serialization: the providers' @Serializable classes are read through their generated serializers.
--if @kotlinx.serialization.Serializable class **
--keepclassmembers class <1> {
-    static <1>$Companion Companion;
-}
--if @kotlinx.serialization.Serializable class ** {
-    static **$* *;
-}
--keepclassmembers class <2>$<3> {
-    kotlinx.serialization.KSerializer serializer(...);
-}
--keep,includedescriptorclasses class uk.co.siland.culvery.**$$serializer { *; }
-
-# OkHttp's optional TLS providers, which Android doesn't use.
--dontwarn org.conscrypt.**
--dontwarn org.bouncycastle.**
--dontwarn org.openjsse.**
 
 # Release logging (D8): debug and info lines are removed; warnings and errors stay, and name no one.
 -assumenosideeffects class android.util.Log {
@@ -1469,11 +1526,11 @@ Create `app/proguard-rules.pro`:
     public static int i(...);
 }
 ```
-
-In `app/build.gradle.kts`, inside `android { … }` after `buildFeatures.buildConfig = true` add:
+In `app/build.gradle.kts`, the `buildTypes { release { … } }` block Task 1 added becomes:
 ```kotlin
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -1481,12 +1538,7 @@ In `app/build.gradle.kts`, inside `android { … }` after `buildFeatures.buildCo
     }
 ```
 
-- [ ] **Step 9: Run it to see it pass**
-
-Run: `./gradlew -p build-logic :convention:test`
-Expected: PASS (all of `ReleaseSigningTest`, `LogHygieneTest`, `ReleaseRulesTest`, `ModuleBoundariesTest`).
-
-- [ ] **Step 10: Say how to read a release crash**
+- [ ] **Step 7: Say how to read a release crash**
 
 Append to `docs/setup/release.md`:
 ````markdown
@@ -1502,37 +1554,30 @@ R8 renames the app's classes in a release build, and the log names exceptions by
 A release logs only warnings and errors, and they name no person, calendar, account, town, coordinates or time zone.
 ````
 
-- [ ] **Step 11: Run the gate**
+- [ ] **Step 8: Run the gate**
 
 Run: `./gradlew testDebugUnitTest verifyRoborazziDebug` and `./gradlew -p build-logic :convention:test`
 Expected: `BUILD SUCCESSFUL`, no screenshot differences.
 
-- [ ] **Step 12: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add build-logic app capability provider docs/setup/release.md
 git commit -m "Shrink release builds with R8, strip debug logging, and keep personal data and throwables out of warnings"
 ```
 
-- [ ] **Step 13: Check the minified build keeps every serializer and still runs**
+- [ ] **Step 10: Check the minified build works (Review Focus 1)**
 
-The release signing properties are set (Task 1's checkpoint); this reads none of them.
+Unit tests can't run R8, so the release build itself is the check: what kotlinx.serialization reads (the weather now, Google later in Task 19) must still read. The signing properties are set (Task 1's checkpoint); this reads none of them.
 ```bash
 ./gradlew :app:assembleRelease
-git grep -l "^@Serializable" -- 'provider/*/src/main/*.kt'
-grep -E '\$\$serializer -> ' app/build/outputs/mapping/release/mapping.txt
-```
-Expected: `BUILD SUCCESSFUL`; every `@Serializable` class in the files listed (e.g. `GoogleEvent`, `EventsPage`, the Open-Meteo answers) has a line `uk.co.siland.culvery.….<Class>$$serializer -> uk.co.siland.culvery.….<Class>$$serializer:` (kept under its own name). A missing one is Review Focus 1: stop and report.
-
-Then on `emulator-5554` (the release installed in Task 1, same key, so its data stays):
-```bash
 adb -s emulator-5554 install -r app/build/outputs/apk/release/app-release.apk
 adb -s emulator-5554 logcat -c
 adb -s emulator-5554 shell am start -n uk.co.siland.culvery/.MainActivity
 adb -s emulator-5554 exec-out screencap -p > "$TMP/culvery-4c-r8.png"
-adb -s emulator-5554 logcat -d | grep -E "AndroidRuntime|FATAL|uk.co.siland.culvery" | tail -20
+adb -s emulator-5554 logcat -d | grep -E "AndroidRuntime|FATAL|SerializationException|uk.co.siland.culvery" | tail -20
 ```
-Expected: Home with London's weather in the header within a minute (the forecast's serializer works under R8); no `FATAL`; no `D/` or `I/` line from Culvery's tags. Attach the screenshot to the report.
+Expected: `BUILD SUCCESSFUL`; the install keeps Task 1's household (same key); within a minute Home shows London's weather in the header and the Forecast card (the forecast's serializers work under R8); in Settings › Home location, a search for "Leeds" lists towns (the geocoding serializers); no `FATAL`, no `SerializationException`, and no `D/` or `I/` line from Culvery's tags. Set the location back to London. Attach the screenshot to the report. If the weather or the search fails here and works in debug, R8 removed something the libraries' rules didn't keep: stop and report with the log lines.
 
 ---
 
@@ -1544,7 +1589,7 @@ Expected: Home with London's weather in the header within a minute (the forecast
 - Create: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/FirstDraw.kt`
 - Modify: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/Startable.kt` (KDoc)
 - Test: `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/FirstDrawTest.kt` (create)
-- Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSyncLoop.kt`; test `CalendarSyncLoopTest.kt`
+- Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarSyncLoop.kt`; test `CalendarSyncLoopTest.kt`; `app/src/testDebug/java/uk/co/siland/culvery/SampleAddTest.kt` (it builds the loop with the injected constructor, positionally)
 - Modify: `capability/weather/src/main/java/uk/co/siland/culvery/capability/weather/WeatherSyncLoop.kt`; test `WeatherSyncLoopTest.kt`
 - Modify: `provider/calendar-google/src/main/java/uk/co/siland/culvery/provider/calendar_google/GoogleHttp.kt`, `TokenSource.kt`, `di/GoogleCalendarModule.kt`
 - Modify: `gradle/libs.versions.toml`, `app/build.gradle.kts`, `app/src/main/AndroidManifest.xml`, `app/src/main/res/values/themes.xml`
@@ -1662,7 +1707,7 @@ Expected: PASS (3 tests).
 
 - [ ] **Step 4: Write the failing loop tests**
 
-In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSyncLoopTest.kt` add (imports `uk.co.siland.culvery.core.plugin.FirstDraw`, `uk.co.siland.culvery.core.plugin.FIRST_DRAW_WAIT_MS`):
+In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSyncLoopTest.kt` add (import `uk.co.siland.culvery.core.plugin.FirstDraw`; the 3-second fallback is `FirstDrawTest`'s alone):
 ```kotlin
     @Test
     fun theFirstPassWaitsForHomesFirstFrame() = runTest {
@@ -1675,20 +1720,8 @@ In `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/C
         runCurrent()
         assertThat(count).isEqualTo(1)
     }
-
-    @Test
-    fun withoutAFrameTheFirstPassRunsAfterThreeSeconds() = runTest {
-        var count = 0
-        CalendarSyncLoop({ count++ }, MutableStateFlow(listOf("c1")), backgroundScope, firstDraw = { FirstDraw().await() }).start()
-        advanceTimeBy(FIRST_DRAW_WAIT_MS - 1)
-        runCurrent()
-        assertThat(count).isEqualTo(0)
-        advanceTimeBy(1)
-        runCurrent()
-        assertThat(count).isEqualTo(1)
-    }
 ```
-In `capability/weather/src/test/java/uk/co/siland/culvery/capability/weather/WeatherSyncLoopTest.kt` add (same two imports; the class's `london` field is `WeatherPlace(LONDON)`):
+In `capability/weather/src/test/java/uk/co/siland/culvery/capability/weather/WeatherSyncLoopTest.kt` add (import `uk.co.siland.culvery.core.plugin.FirstDraw`; the class's `london` field is `WeatherPlace(LONDON)`):
 ```kotlin
     @Test
     fun theFirstFetchWaitsForHomesFirstFrame() = runTest {
@@ -1756,7 +1789,9 @@ and in `start()`, after the `launch { places… }` block and before `// Null: wa
             firstDraw()
 ```
 
-Run the two test classes again.
+`app/src/testDebug/java/uk/co/siland/culvery/SampleAddTest.kt` line 109 builds the loop through the injected constructor: `CalendarSyncLoop(sync, store, clock, backgroundScope)` becomes `CalendarSyncLoop(sync, store, clock, FirstDraw().also { it.markDrawn() }, backgroundScope)` (import `uk.co.siland.culvery.core.plugin.FirstDraw`; already drawn, so its passes don't wait).
+
+Run the two test classes again, and `./gradlew :app:testDebugUnitTest --tests "*SampleAddTest*"`.
 Expected: PASS, the existing tests included (they pass no `firstDraw`).
 
 - [ ] **Step 6: Build Google's heavy members lazily (ruling 8)**
@@ -1868,16 +1903,6 @@ class CulveryApp : Application() {
 `app/src/test/java/uk/co/siland/culvery/AppContentTest.kt`: the `AppContent(` call in `show()` gains a last argument `onHomeDrawn = { homeDrawn++ }` with a field `private var homeDrawn = 0`; add:
 ```kotlin
     @Test
-    fun theShellReportsItsFirstFrameOnce() {
-        complete = true
-        show()
-        compose.waitUntil(5_000) { homeDrawn == 1 }
-        settingsOpen = true
-        compose.waitForIdle()
-        assertThat(homeDrawn).isEqualTo(1)
-    }
-
-    @Test
     fun theWizardIsNotHome() {
         complete = false
         show()
@@ -1986,7 +2011,7 @@ androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscree
 (imports: `android.os.SystemClock`, `androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen`.)
 
 Run: `./gradlew :app:checkDebugAarMetadata :app:testDebugUnitTest`
-Expected: `BUILD SUCCESSFUL`, the new tests PASS. If `checkDebugAarMetadata` says core-splashscreen 1.2.0 needs a compileSdk above 35, set `coreSplashscreen = "1.0.1"` (ruling 19), run it again, and say so in the report.
+Expected: `BUILD SUCCESSFUL` (core-splashscreen 1.2.0's minCompileSdk is 35, ruling 19), the new tests PASS.
 
 - [ ] **Step 11: Run the gate**
 
@@ -2009,7 +2034,7 @@ git commit -m "Start the loops off the main thread after Home's first frame, and
 **Files:**
 - Modify: `core/ui/src/main/java/uk/co/siland/culvery/core/ui/Theme.kt`; test `ThemeTest.kt`
 - Modify: `app/src/main/java/uk/co/siland/culvery/shell/ShellUiState.kt`, `shell/ShellViewModel.kt`, `shell/ui/CulveryShell.kt`, `shell/ui/HomeScreen.kt`, `shell/ui/StatusBar.kt`, `MainActivity.kt`
-- Test: `app/src/test/java/uk/co/siland/culvery/shell/ShellViewModelTest.kt`, `shell/ui/ShellLayoutTest.kt`, `shell/ui/ShellScreenshotTest.kt`
+- Test: `app/src/test/java/uk/co/siland/culvery/shell/ShellViewModelTest.kt`, `shell/ui/ShellLayoutTest.kt`, `shell/ui/ShellScreenshotTest.kt`; `shell/ui/NoNavigation.kt` (create, moved out of `ShellScreenshotTest`)
 
 **Interfaces:**
 - Consumes: Task 4's `ShellUiState.cardsLoaded`.
@@ -2092,7 +2117,7 @@ private val CulveryTypography: Typography = Typography().let { t ->
 @Composable
 fun CulveryTheme(dark: Boolean, content: @Composable () -> Unit) {
     val target = if (dark) DarkColors else LightColors
-    val animatedColors = HhColors(
+    val colors = HhColors(
         bg = animated(target.bg),
         surf = animated(target.surf),
         surf2 = animated(target.surf2),
@@ -2107,8 +2132,7 @@ fun CulveryTheme(dark: Boolean, content: @Composable () -> Unit) {
         dangerSoft = animated(target.dangerSoft),
         dangerInk = animated(target.dangerInk),
     )
-    // Same colours, same instances: a theme that runs again doesn't invalidate everything under it (4c §4.2, P1).
-    val colors = remember(animatedColors) { animatedColors }
+    // Equal colours, same scheme: a theme that runs again doesn't invalidate everything under it (4c §4.2, P1).
     val scheme = remember(dark, colors) {
         (if (dark) darkColorScheme() else lightColorScheme()).copy(
             primary = colors.accent,
@@ -2139,7 +2163,7 @@ Expected: PASS (5 tests).
 
 In `app/src/test/java/uk/co/siland/culvery/shell/ui/ShellLayoutTest.kt` add:
 ```kotlin
-    /** P2: a minute's tick redraws the clock and nothing on the cards. */
+    /** P2: through the whole shell, as MainActivity draws it, a minute's tick redraws the clocks and nothing on the cards. */
     @Test
     fun aMinuteTickRedrawsTheClockAndNotTheCards() {
         var now by mutableStateOf(at)
@@ -2148,8 +2172,21 @@ In `app/src/test/java/uk/co/siland/culvery/shell/ui/ShellLayoutTest.kt` add:
             cardCompositions++
             Text("card")
         }
+        val state = ShellUiState(homeCards = HomeCardPlacer.place(listOf(card)))
         compose.setContent {
-            CulveryTheme(dark = true) { HomeScreen({ now }, HomeCardPlacer.place(listOf(card)), emptyList()) }
+            CompositionLocalProvider(LocalShellNavigator provides NoNavigation) {
+                CulveryTheme(dark = true) {
+                    CulveryShell(
+                        state = state,
+                        now = { now },
+                        onSelectTab = {},
+                        onOpenSettings = {},
+                        onSignOut = {},
+                        onToggleThemePreview = {},
+                        tabContent = {},
+                    )
+                }
+            }
         }
         compose.waitForIdle()
         val before = cardCompositions
@@ -2159,11 +2196,11 @@ In `app/src/test/java/uk/co/siland/culvery/shell/ui/ShellLayoutTest.kt` add:
         assertThat(cardCompositions).isEqualTo(before)
     }
 ```
-(imports as needed: `androidx.compose.material3.Text`, `androidx.compose.runtime.getValue`, `androidx.compose.runtime.mutableStateOf`, `androidx.compose.runtime.setValue`, `androidx.compose.ui.test.assertTextEquals`, `uk.co.siland.culvery.core.plugin.HomeCard`, `HomeCardPlacer`, `HomeCardSize`.)
+(imports as needed: `androidx.compose.material3.Text`, `androidx.compose.runtime.CompositionLocalProvider`, `androidx.compose.runtime.getValue`, `androidx.compose.runtime.mutableStateOf`, `androidx.compose.runtime.setValue`, `androidx.compose.ui.test.assertTextEquals`, `uk.co.siland.culvery.core.plugin.HomeCard`, `HomeCardPlacer`, `HomeCardSize`, `LocalShellNavigator`, `uk.co.siland.culvery.shell.ShellUiState`. `NoNavigation` is `ShellScreenshotTest`'s private object: move it to `app/src/test/java/uk/co/siland/culvery/shell/ui/NoNavigation.kt` as `internal object NoNavigation : ShellNavigator` with the same body, and use it from both.)
 In the same file change the existing calls: `HomeScreen(at, emptyList())` → `HomeScreen({ at }, emptyList(), emptyList())`; `HomeScreen(at, emptyList(), items.toList())` → `HomeScreen({ at }, emptyList(), items.toList())`; `StatusBar(at, dark = true, …)` → `StatusBar({ at }, dark = true, …)`.
 
 Run: `./gradlew :app:testDebugUnitTest --tests "*ShellLayoutTest*"`
-Expected: FAIL to compile (`HomeScreen` takes a `LocalDateTime`).
+Expected: FAIL to compile (`CulveryShell` has no `now`; `HomeScreen` takes a `LocalDateTime`).
 
 - [ ] **Step 6: The clocks read the time themselves**
 
@@ -2242,8 +2279,9 @@ git commit -m "Keep the theme's colour scheme across recompositions and let a mi
 - Modify: `core/plugin/build.gradle.kts`
 - Create: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/HouseholdClock.kt`
 - Modify: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/Runtime.kt`
-- Test: `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/HouseholdClockTest.kt` (create)
-- Modify: `app/src/main/java/uk/co/siland/culvery/shell/MinuteTicker.kt`, `di/AppModule.kt`; test `app/src/test/java/uk/co/siland/culvery/shell/HouseholdTickerTest.kt`
+- Test: `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/HouseholdClockTest.kt` (create); `WallTimeTest.kt` (delete: its two cases move into `HouseholdClockTest`)
+- Delete: `app/src/main/java/uk/co/siland/culvery/shell/MinuteTicker.kt`; `app/src/test/java/uk/co/siland/culvery/shell/HouseholdTickerTest.kt` (its cases move into `HouseholdClockTest`)
+- Modify: `app/src/main/java/uk/co/siland/culvery/di/AppModule.kt`, `shell/ShellViewModel.kt`; test `shell/ShellViewModelTest.kt`
 - Modify: `capability/weather/src/main/java/uk/co/siland/culvery/capability/weather/WeatherRepository.kt`, `WeatherCapability.kt`, `ui/ForecastCard.kt`; tests `WeatherCapabilityTest.kt`, `ui/ForecastCardTest.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarCapability.kt`, `CalendarSetupSteps.kt`, `ui/Now.kt`, `ui/ReviewCalendars.kt`; tests `CalendarCapabilityTest.kt`, `ui/NowTest.kt`, `ui/CardHostsMidnightRolloverTest.kt`
 
@@ -2251,11 +2289,10 @@ git commit -m "Keep the theme's colour scheme across recompositions and let a mi
 - Consumes: `HouseholdZone.zone: Flow<ZoneId>` (`:core:household`); `WallClock`; `@ApplicationScope CoroutineScope`; `retryWithBackoff`.
 - Produces (package `uk.co.siland.culvery.core.plugin`):
   - `@Singleton class HouseholdClock(zones: Flow<ZoneId>, wall: WallClock, scope: CoroutineScope, ticks: Flow<Long> = minuteTicks(wall))` with `@Inject constructor(zone: HouseholdZone, wall: WallClock, @ApplicationScope scope: CoroutineScope)`; members `val now: StateFlow<LocalDateTime?>`, `val minutes: Flow<LocalDateTime>`, `val today: Flow<LocalDate>`, `fun nowMillis(): Long`. `ticks` are the epoch millis to show: by default now, then each minute's start.
-  - `@Composable fun rememberNowMillis(clock: HouseholdClock): Long` (replaces the `WallClock` + `ticks` one; `nowTicks` goes).
-  - `internal fun minuteTicks(clock: WallClock): Flow<Long>` (was private).
-  - `:capability:calendar` `internal fun rememberToday(clock: HouseholdClock): LocalDate`; `CalendarCapability(repo, clock: HouseholdClock, editor, connections, review)`; `ReviewCalendarsStep(…, clock: HouseholdClock)`, `CalendarsPage(…, clock: HouseholdClock)`, `ReviewCalendarsHost(…, clock: HouseholdClock, …)`.
+  - `@Composable fun rememberNowMillis(clock: HouseholdClock): Long` (replaces the `WallClock` + `ticks` one). `nowTicks`, `wallTimeEachMinute` and `MinuteTicker` go (plan review 16).
+  - `ShellViewModel(capabilities, clock: HouseholdClock, access, daylight)`.
+  - `:capability:calendar` `internal fun rememberToday(clock: HouseholdClock): LocalDate?` — null until the household's zone is read, never the device's (plan review 16); `CalendarCapability(repo, clock: HouseholdClock, editor, connections, review)`; `ReviewCalendarsStep(…, clock: HouseholdClock)`, `CalendarsPage(…, clock: HouseholdClock)`, `ReviewCalendarsHost(…, clock: HouseholdClock, …)`.
   - `:capability:weather` `WeatherCapability(repo, clock: HouseholdClock)`; `ForecastCardHost(repo: WeatherRepository, clock: HouseholdClock)`.
-  - `AppModule.minuteTicker(clock: HouseholdClock): MinuteTicker` (`householdTicker` goes).
 
 - [ ] **Step 1: Write the failing clock test**
 
@@ -2263,6 +2300,8 @@ Create `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/HouseholdCloc
 ```kotlin
 package uk.co.siland.culvery.core.plugin
 
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
@@ -2270,19 +2309,28 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
+import uk.co.siland.culvery.core.household.HomeLocation
+import uk.co.siland.culvery.core.household.HouseholdRepository
+import uk.co.siland.culvery.core.household.HouseholdZone
+import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 
-/** Robolectric for android.util.Log: a failed zone read is logged before it is retried. */
+/** Robolectric for android.util.Log and Room. */
 @RunWith(AndroidJUnit4::class)
 class HouseholdClockTest {
     private val auckland = ZoneId.of("Pacific/Auckland")
@@ -2292,10 +2340,44 @@ class HouseholdClockTest {
     private val noonUtc = Instant.parse("2026-10-01T12:00:00Z").toEpochMilli()
     private val wall = WallClock { noonUtc }
 
+    // 09:59:30 UTC on 1 October 2026: 10:59:30 in London (BST), 22:59:30 in Auckland (NZDT).
+    private val beforeTheMinute = Instant.parse("2026-10-01T09:59:30Z").toEpochMilli()
+
+    @Test
+    fun itGivesTheTimeNowThenAtTheStartOfEachMinute() = runTest {
+        val clock = HouseholdClock(flowOf(london), WallClock { beforeTheMinute + testScheduler.currentTime }, backgroundScope)
+        assertThat(clock.minutes.take(3).toList()).containsExactly(
+            LocalDateTime.of(2026, 10, 1, 10, 59, 30),
+            LocalDateTime.of(2026, 10, 1, 11, 0),
+            LocalDateTime.of(2026, 10, 1, 11, 1),
+        ).inOrder()
+    }
+
+    @Test
+    fun aZoneChangeGivesTheTimeInTheNewZoneAtOnce() = runTest {
+        val zones = MutableStateFlow(london)
+        val clock = HouseholdClock(zones, WallClock { beforeTheMinute }, backgroundScope, flowOf(beforeTheMinute))
+        clock.minutes.test {
+            assertThat(awaitItem()).isEqualTo(LocalDateTime.of(2026, 10, 1, 10, 59, 30))
+            zones.value = auckland
+            assertThat(awaitItem()).isEqualTo(LocalDateTime.of(2026, 10, 1, 22, 59, 30))
+        }
+    }
+
+    /** The shell's clock, date and theme follow the household's zone, read from Room, not the tablet's. */
     @Test
     fun itShowsTheHouseholdsTimeNotTheDevices() = runTest {
-        val clock = HouseholdClock(flowOf(auckland), wall, backgroundScope, flowOf(noonUtc))
-        assertThat(clock.minutes.first()).isEqualTo(LocalDateTime.of(2026, 10, 2, 1, 0))
+        val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), HouseholdDatabase::class.java).build()
+        try {
+            val household = HouseholdRepository(db)
+            household.setLocation(HomeLocation("Wellington", -41.29, 174.78, "Pacific/Auckland"))
+            val clock = HouseholdClock(HouseholdZone(household), wall, backgroundScope)
+            // Room answers on its own threads: wait in bounded real time (4b test health).
+            val first = withContext(Dispatchers.Default) { withTimeout(5_000) { clock.minutes.first() } }
+            assertThat(first).isEqualTo(LocalDateTime.of(2026, 10, 2, 1, 0))
+        } finally {
+            db.close()
+        }
     }
 
     @Test
@@ -2327,7 +2409,7 @@ class HouseholdClockTest {
         }
     }
 
-    /** 4b plan review 1, moved here: the zone comes from Room, which can fail; the clock carries on. */
+    /** 4b plan review 1: the zone comes from Room, which can fail; the clock carries on. */
     @Test
     fun aFailedZoneReadIsRetriedAndTheClockCarriesOn() = runTest {
         ShadowLog.clear()
@@ -2343,6 +2425,7 @@ class HouseholdClockTest {
     }
 }
 ```
+Delete `core/plugin/src/test/java/uk/co/siland/culvery/core/plugin/WallTimeTest.kt` (its two cases are the first two above).
 
 - [ ] **Step 2: Run it to see it fail**
 
@@ -2358,6 +2441,7 @@ Create `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/HouseholdCloc
 package uk.co.siland.culvery.core.plugin
 
 import android.util.Log
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -2367,6 +2451,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
@@ -2376,7 +2461,8 @@ import uk.co.siland.culvery.core.household.HouseholdZone
 /**
  * The household's wall time (4c design §4.3): one minute ticker for the whole app, in the household's zone. The shell's
  * clocks and theme, the weather and the calendar's "today" all read it. [ticks] are the epoch millis to show; by
- * default now, then each minute's start.
+ * default now, then each minute's start. Every zone in use is offset by whole minutes, so an epoch minute is a minute
+ * on its clock.
  */
 @Singleton
 class HouseholdClock(
@@ -2390,8 +2476,9 @@ class HouseholdClock(
 
     /** Now, then at each minute's start and at once when the zone changes; null until the zone is first read. */
     val now: StateFlow<LocalDateTime?> =
-        wallTimeAt(zones.retryWithBackoff { Log.w(TAG, "Couldn't read the household's time zone (${it::class.simpleName}); retrying") }, ticks)
-            .stateIn(scope, SharingStarted.Eagerly, null)
+        combine(zones.retryWithBackoff { Log.w(TAG, "Couldn't read the household's time zone (${it::class.simpleName}); retrying") }, ticks) { zone, millis ->
+            LocalDateTime.ofInstant(Instant.ofEpochMilli(millis), zone)
+        }.stateIn(scope, SharingStarted.Eagerly, null)
 
     val minutes: Flow<LocalDateTime> = now.filterNotNull()
 
@@ -2406,18 +2493,8 @@ class HouseholdClock(
 }
 ```
 
-`Runtime.kt`: keep `WallClock`, `ApplicationScope`, `MINUTE_MS` and `wallTimeEachMinute`; replace the rest of the file below `MINUTE_MS` with:
+`Runtime.kt`: keep `WallClock`, `ApplicationScope` and `MINUTE_MS`; replace everything below `MINUTE_MS` (`wallTimeEachMinute`, `minuteTicks`, `NOW_TICK_MS`, `nowTicks`, the old `rememberNowMillis`) with:
 ```kotlin
-/**
- * The wall time in the latest zone from [zones]: now, then at the start of each minute, and at once when the zone
- * changes (4b design §3.8). Every zone in use is offset by whole minutes, so an epoch minute is a minute on its clock.
- */
-fun wallTimeEachMinute(zones: Flow<ZoneId>, clock: WallClock): Flow<LocalDateTime> = wallTimeAt(zones, minuteTicks(clock))
-
-/** [ticks]' epoch millis as wall time in the latest of [zones]. */
-internal fun wallTimeAt(zones: Flow<ZoneId>, ticks: Flow<Long>): Flow<LocalDateTime> =
-    combine(zones, ticks) { zone, millis -> LocalDateTime.ofInstant(Instant.ofEpochMilli(millis), zone) }
-
 /** Now, then each minute's start, as epoch millis. */
 internal fun minuteTicks(clock: WallClock): Flow<Long> = flow {
     while (true) {
@@ -2436,44 +2513,37 @@ fun rememberNowMillis(clock: HouseholdClock): Long {
     return now
 }
 ```
-(delete `NOW_TICK_MS` and `nowTicks`; keep the imports the file still uses.)
+(keep only the imports the file still uses.)
 
 Run: `./gradlew :core:plugin:testDebugUnitTest`
-Expected: PASS (`HouseholdClockTest` 4, `WallTimeTest`, `FlowRetryTest`, `FirstDrawTest`, `HomeCardPlacerTest`).
+Expected: PASS (`HouseholdClockTest` 7, `FlowRetryTest`, `FirstDrawTest`, `HomeCardPlacerTest`).
 
-- [ ] **Step 4: The shell's ticker reads it**
+- [ ] **Step 4: The shell reads it, with no pass-through**
 
-`app/.../shell/MinuteTicker.kt` becomes:
+Delete `app/src/main/java/uk/co/siland/culvery/shell/MinuteTicker.kt` and `app/src/test/java/uk/co/siland/culvery/shell/HouseholdTickerTest.kt`. In `di/AppModule.kt` delete the `minuteTicker` provider and its imports (`HouseholdZone`, `MinuteTicker`, `householdTicker`).
+
+`shell/ShellViewModel.kt`: the constructor's `ticker: MinuteTicker,` becomes `clock: HouseholdClock,` (import `uk.co.siland.culvery.core.plugin.HouseholdClock`), and
 ```kotlin
-package uk.co.siland.culvery.shell
-
-import java.time.LocalDateTime
-import kotlinx.coroutines.flow.Flow
-
-/** The wall time, each minute; `AppModule` gives the household clock's (4c design §4.3). */
-fun interface MinuteTicker {
-    fun ticks(): Flow<LocalDateTime>
-}
+    val now: StateFlow<LocalDateTime> =
+        clock.minutes.stateIn(viewModelScope, SharingStarted.Eagerly, LocalDateTime.now())
 ```
-`app/.../di/AppModule.kt`: replace the `minuteTicker` provider with
+(its KDoc from Task 5 stays.)
+
+`ShellViewModelTest.kt`: the clock is a `HouseholdClock` over test ticks in London:
 ```kotlin
-        /** The clock, the date and the theme in the household's zone, from the one household clock (4c design §4.3). */
-        @Provides
-        fun minuteTicker(clock: HouseholdClock): MinuteTicker = MinuteTicker { clock.minutes }
-```
-(import `uk.co.siland.culvery.core.plugin.HouseholdClock`; drop the imports of `HouseholdZone` and `householdTicker`.)
+    private val london = ZoneId.of("Europe/London")
+    private val clockScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+    private fun at(time: LocalDateTime): Long = time.atZone(london).toInstant().toEpochMilli()
+    private val ticks = MutableStateFlow(at(noon))
+    private val clock = HouseholdClock(flowOf(london), WallClock { ticks.value }, clockScope, ticks)
 
-`app/src/test/java/uk/co/siland/culvery/shell/HouseholdTickerTest.kt`: delete `aFailedZoneReadIsRetriedAndTheClockCarriesOn` (it moved to `HouseholdClockTest`), and make the remaining test wait for Room in bounded real time (4b test health):
-```kotlin
-    @Test
-    fun theClockShowsTheHouseholdsTimeNotTheDevices() = runTest {
-        household.setLocation(HomeLocation("Wellington", -41.29, 174.78, "Pacific/Auckland"))
-        val ticker = AppModule.minuteTicker(HouseholdClock(HouseholdZone(household), clock, backgroundScope))
-        val first = withContext(Dispatchers.Default) { withTimeout(5_000) { ticker.ticks().first() } }
-        assertThat(first).isEqualTo(LocalDateTime.of(2026, 10, 2, 1, 0))
-    }
+    @After
+    fun tearDown() = clockScope.cancel()
+
+    private fun vm(caps: Set<Capability> = emptySet(), daylight: Daylight? = null) =
+        ShellViewModel(caps, clock, access, Optional.ofNullable(daylight))
 ```
-(imports: `kotlinx.coroutines.Dispatchers`, `kotlinx.coroutines.withContext`, `kotlinx.coroutines.withTimeout`, `uk.co.siland.culvery.core.plugin.HouseholdClock`; drop `ZoneId`, `flow`, `ShadowLog` if now unused.)
+(replacing the old `ticks` field and `vm`); `ShellViewModel(emptySet(), { ticks }, noSessionAccess, Optional.empty())` becomes `ShellViewModel(emptySet(), clock, noSessionAccess, Optional.empty())`; and every `ticks.value = X` becomes `ticks.value = at(X)` (e.g. `ticks.value = at(noon.with(LocalTime.of(19, 10)))`). Imports as needed.
 
 - [ ] **Step 5: Weather reads it**
 
@@ -2516,31 +2586,31 @@ package uk.co.siland.culvery.capability.calendar.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 
-internal fun todayIn(zone: ZoneId, nowMillis: Long): LocalDate = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
-
-/** Today in the household's zone; it changes only at midnight, so a card keyed on it rebuilds once a day (4c §4.3, C6). */
+/**
+ * Today in the household's zone, or null until that zone is read (never the device's, which can be a different day);
+ * it changes only at midnight, so a card keyed on it rebuilds once a day (4c §4.3, C6).
+ */
 @Composable
-internal fun rememberToday(clock: HouseholdClock): LocalDate {
-    val today by clock.today.collectAsState(initial = clock.now.value?.toLocalDate() ?: todayIn(ZoneId.systemDefault(), clock.nowMillis()))
+internal fun rememberToday(clock: HouseholdClock): LocalDate? {
+    val today by clock.today.collectAsState(initial = clock.now.value?.toLocalDate())
     return today
 }
 ```
-`CalendarCapability.kt`: the constructor's `private val zone: HouseholdZone, private val clock: WallClock,` become `private val clock: HouseholdClock,`; the cards use `rememberToday(clock)`:
+`CalendarCapability.kt`: the constructor's `private val zone: HouseholdZone, private val clock: WallClock,` become `private val clock: HouseholdClock,`; the cards draw once today is known:
 ```kotlin
-                HomeCard(TODAY_CARD_ID, HomeCardSize.TALL, 100) { TodayCardHost(repo, editor, rememberToday(clock)) },
-                HomeCard(COMING_UP_CARD_ID, HomeCardSize.WIDE, 50) { ComingUpCardHost(repo, rememberToday(clock)) },
+                HomeCard(TODAY_CARD_ID, HomeCardSize.TALL, 100) { rememberToday(clock)?.let { TodayCardHost(repo, editor, it) } },
+                HomeCard(COMING_UP_CARD_ID, HomeCardSize.WIDE, 50) { rememberToday(clock)?.let { ComingUpCardHost(repo, it) } },
 ```
 and `TabContent`:
 ```kotlin
     @Composable
     override fun TabContent() {
         val connector = rememberConnector(connections)
-        WeekViewHost(repo, editor, today = rememberToday(clock), nowMillis = rememberNowMillis(clock), onReconnect = connector::reconnect)
+        val today = rememberToday(clock) ?: return
+        WeekViewHost(repo, editor, today = today, nowMillis = rememberNowMillis(clock), onReconnect = connector::reconnect)
     }
 ```
 (drop the `rememberZoneId`, `todayIn`, `HouseholdZone`, `WallClock` imports; import `HouseholdClock`.)
@@ -2572,6 +2642,13 @@ class NowTest {
         compose.waitForIdle()
         compose.onNodeWithText("2026-09-24").assertExists()
     }
+
+    @Test
+    fun untilTheZoneIsReadThereIsNoToday() {
+        val clock = HouseholdClock(flow { awaitCancellation() }, WallClock { 0L }, clockScope, flowOf(0L))
+        compose.setContent { Text(rememberToday(clock).toString()) }
+        compose.onNodeWithText("null").assertExists()
+    }
 }
 ```
 - `ui/CardHostsMidnightRolloverTest.kt`, in both tests: replace `val clock = WallClock { now }` and `val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)` with
@@ -2579,11 +2656,11 @@ class NowTest {
         val ticks = MutableStateFlow(now)
         val clock = HouseholdClock(zone.zone, WallClock { now }, clockScope, ticks)
 ```
-`rememberToday(zone, clock, ticks)` → `rememberToday(clock)`; `rememberNowMillis(clock, ticks)` → `rememberNowMillis(clock)`; `ticks.tryEmit(Unit)` → `ticks.value = now`; add the `clockScope` field, cancelled in `tearDown`.
+`TodayCardHost(repo, editor, rememberToday(zone, clock, ticks))` → `rememberToday(clock)?.let { TodayCardHost(repo, editor, it) }`; `val today = rememberToday(zone, clock, ticks)` → `val today = rememberToday(clock) ?: return@CulveryTheme`; `rememberNowMillis(clock, ticks)` → `rememberNowMillis(clock)`; `ticks.tryEmit(Unit)` → `ticks.value = now`; add the `clockScope` field, cancelled in `tearDown`.
 
 Check nothing names the old shapes:
 ```bash
-git grep -n "nowTicks\|householdTicker\|rememberZoneId" -- '*.kt'
+git grep -n "nowTicks\|householdTicker\|rememberZoneId\|wallTimeEachMinute\|MinuteTicker\|todayIn(" -- '*.kt'
 ```
 Expected: no output.
 
@@ -2694,39 +2771,35 @@ git commit -m "Send calendar days only when they change, map them off the main t
 
 ---
 
-### Task 8: Kiosk — the home app, device owner, K1–K4 (§5.1, §5.2, §5.4, D3; rulings 6, 15, 26, 27)
+### Task 8: The lockout — the clock guard and no disk I/O on Main (§5.4 K3, K4; ruling 26)
 
-**Review:** opus (lock-task state and the lockout).
+**Review:** opus (the lockout).
 
 **Files:**
-- Create: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/HomeApp.kt`
-- Modify: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/ShellNavigator.kt`
-- Modify: `core/access/src/main/java/uk/co/siland/culvery/core/access/LockoutStore.kt`; tests `LockoutStoreTest.kt`, and `DefaultAccessControlTest.kt` where it calls the store directly
-- Modify: `core/setup/src/main/java/uk/co/siland/culvery/core/setup/pages/KioskPage.kt`, `steps/DoneStep.kt`, `SetupUi.kt`, `SetupCopy.kt`, `SetupDimens.kt`
-- Test: `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestUi.kt`, `SettingsScreenTest.kt`, `SettingsScreenshotTest.kt`, `SetupScreenshotTest.kt`, `StepsTest.kt`, `StepsUiTest.kt`; `KioskPageTest.kt` (create)
-- Create: `app/src/main/java/uk/co/siland/culvery/CulveryDeviceAdmin.kt`, `HomeApps.kt`, `app/src/main/res/xml/device_admin.xml`
-- Modify: `app/src/main/AndroidManifest.xml`, `MainActivity.kt`, `shell/ShellViewModel.kt`, `di/AppModule.kt`
-- Test: `app/src/test/java/uk/co/siland/culvery/HomeAppsTest.kt` (create), `shell/ShellViewModelTest.kt`, `shell/ui/ShellScreenshotTest.kt` (its `NoNavigation`)
-- Modify (navigator fakes): `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/RecordingNavigator.kt`, `capability/weather/src/test/java/uk/co/siland/culvery/capability/weather/ui/RecordingNavigator.kt`
-- Modify: `docs/setup/release.md`
-- Screenshots (re-recorded): `core/setup/src/test/screenshots/settings_kiosk_dark.png`, `settings_kiosk_light.png`, `done_dark.png`, `done_light.png`
+- Modify: `core/access/src/main/java/uk/co/siland/culvery/core/access/LockoutStore.kt`
+- Test: `core/access/src/test/java/uk/co/siland/culvery/core/access/LockoutStoreTest.kt`; `DefaultAccessControlTest.kt` where it calls the store directly
 
 **Interfaces:**
-- Consumes: `CorePermissions.KIOSK_EXIT`, `SETTINGS_MANAGE`; `shouldPin`, `pinOnSetupRead` (`SetupWiring.kt`).
-- Produces:
-  - `interface HomeApp { val isDefault: StateFlow<Boolean> }` (`:core:plugin`); `:app`'s `@Singleton class AndroidHomeApp @Inject constructor(@ApplicationContext context: Context) : HomeApp { fun refresh() }`, bound in `AppModule`.
-  - `ShellNavigator.openHomeSettings(freshPin: Boolean)`.
-  - `ShellViewModel.homeSettings: Flow<Unit>`, `ShellViewModel.kioskExited: Boolean` (read-only), `ShellViewModel.returnedToFront()`.
-  - `interface DeviceOwner { fun isOwner(): Boolean; fun allowLockTask(packageName: String) }`, `class AndroidDeviceOwner(context: Context) : DeviceOwner`, `internal fun allowLockTaskIfOwner(owner: DeviceOwner, packageName: String): Boolean` (`:app`, `HomeApps.kt`); `class CulveryDeviceAdmin : DeviceAdminReceiver`.
-  - `LockoutStore`'s `lockedUntil`, `recordFailure`, `reset` are `suspend`; `LockoutStore.MAX_LOCK_MS`.
-  - `:core:setup` `internal fun HomeAppPrompt(onChoose: () -> Unit)`; `KioskPage(homeApp: HomeApp)`; `DoneStep(state, access, gate, homeApp: HomeApp)`; test fake `FakeHomeApp(default: Boolean)`.
+- Consumes: nothing new.
+- Produces: `LockoutStore`'s `lockedUntil`, `recordFailure`, `reset` are `suspend`; `const val LockoutStore.MAX_LOCK_MS = BASE_LOCK_MS shl MAX_DOUBLINGS` (16 minutes).
 
-Ruling 27 (K1, this task): the root pads by `WindowInsets.systemBars` always. Those insets are zero while the bars are hidden (the pinned kiosk, and debug builds, which hide them too), so the padding only shows when the bars do — after Exit kiosk — which is K1's case without a pinned-state flag.
+- [ ] **Step 1: Write the failing lockout tests**
 
-- [ ] **Step 1: Write the failing lockout tests (K3, K4)**
-
-`core/access/src/test/java/uk/co/siland/culvery/core/access/LockoutStoreTest.kt`: every test body becomes `= runTest { … }` (import `kotlinx.coroutines.test.runTest`; the store's methods become `suspend`), and add:
+`core/access/src/test/java/uk/co/siland/culvery/core/access/LockoutStoreTest.kt`: every test body becomes `= runTest { … }` (import `kotlinx.coroutines.test.runTest`; the store's methods become `suspend`). `lockDurationIsCappedAtSixteenMinutes` asserts against the constant, and two tests join it:
 ```kotlin
+    @Test
+    fun lockDurationIsCappedAtSixteenMinutes() = runTest {
+        repeat(100) { store.recordFailure(t0) }
+        assertThat(store.lockedUntil(t0)).isEqualTo(t0 + LockoutStore.MAX_LOCK_MS)
+    }
+
+    /** The longest lock, exactly 16 minutes away, is a real lock: the guard below is "more than", not "at least". */
+    @Test
+    fun tenFailuresLockForTheLongestTime() = runTest {
+        repeat(10) { store.recordFailure(t0) }
+        assertThat(store.lockedUntil(t0)).isEqualTo(t0 + LockoutStore.MAX_LOCK_MS)
+    }
+
     /** K3: a lock more than 16 minutes away means the wall clock went back; it has expired. */
     @Test
     fun aLockFurtherAwayThanTheLongestIsExpired() = runTest {
@@ -2734,12 +2807,6 @@ Ruling 27 (K1, this task): the root pads by `WindowInsets.systemBars` always. Th
         val clockWentBack = t0 - 20 * 60_000L
         assertThat(store.lockedUntil(clockWentBack)).isNull()
         assertThat(store.lockedUntil(t0)).isEqualTo(t0 + 30_000)
-    }
-
-    @Test
-    fun theLongestLockIsSixteenMinutes() {
-        assertThat(LockoutStore.MAX_LOCK_MS).isEqualTo(LockoutStore.BASE_LOCK_MS shl LockoutStore.MAX_DOUBLINGS)
-        assertThat(LockoutStore.MAX_LOCK_MS).isEqualTo(16 * 60_000L)
     }
 ```
 Run: `./gradlew :core:access:testDebugUnitTest --tests "*LockoutStoreTest*"`
@@ -2814,8 +2881,8 @@ class LockoutStore internal constructor(private val open: () -> SharedPreference
         const val BASE_LOCK_MS = 30_000L
         const val MAX_DOUBLINGS = 5
 
-        /** The longest lock, 16 minutes: [BASE_LOCK_MS] doubled [MAX_DOUBLINGS] times. */
-        const val MAX_LOCK_MS = 16 * 60_000L
+        /** The longest lock: 16 minutes. */
+        const val MAX_LOCK_MS = BASE_LOCK_MS shl MAX_DOUBLINGS
 
         private const val FILE = "lockout"
         private const val KEY_FAILURES = "failures"
@@ -2823,12 +2890,52 @@ class LockoutStore internal constructor(private val open: () -> SharedPreference
     }
 }
 ```
-`DefaultAccessControl` already calls these from `suspend` code; nothing changes there. In `DefaultAccessControlTest`, any direct call to `lockout.recordFailure(…)`, `lockout.lockedUntil(…)` or `lockout.reset()` outside a coroutine moves into the test's `runTest` body (or `runBlocking` in a helper).
+`DefaultAccessControl` already calls these from `suspend` code; nothing changes there. In `DefaultAccessControlTest`, any direct call to `lockout.recordFailure(…)`, `lockout.lockedUntil(…)` or `lockout.reset()` outside a coroutine moves into the test's `runTest` body.
 
 Run: `./gradlew :core:access:testDebugUnitTest`
-Expected: PASS (`LockoutStoreTest` 8, `DefaultAccessControlTest` unchanged in what it checks).
+Expected: PASS (`LockoutStoreTest` 8; `DefaultAccessControlTest` unchanged in what it checks).
 
-- [ ] **Step 3: The seams**
+- [ ] **Step 3: Run the gate**
+
+Run: `./gradlew testDebugUnitTest verifyRoborazziDebug`
+Expected: `BUILD SUCCESSFUL`, no screenshot differences.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add core/access
+git commit -m "Keep the PIN lockout in memory, write it in the background, and expire a lock the clock moved too far ahead"
+```
+
+---
+
+### Task 9: The home app, Exit kiosk in front, device owner, K1 and K2 (§5.1, §5.2, §5.4 K1–K2, D3; rulings 6, 15, 27, 28)
+
+**Review:** opus (lock-task state over the activity's lifecycle).
+
+**Files:**
+- Create: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/HomeApp.kt`
+- Modify: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/ShellNavigator.kt`
+- Modify: `core/setup/src/main/java/uk/co/siland/culvery/core/setup/pages/KioskPage.kt`, `steps/DoneStep.kt`, `SetupUi.kt`, `SetupCopy.kt`, `SetupDimens.kt`
+- Test: `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestUi.kt`, `SettingsScreenTest.kt`, `SettingsScreenshotTest.kt`, `SetupScreenshotTest.kt`, `StepsTest.kt`, `StepsUiTest.kt`; `KioskPageTest.kt` (create)
+- Create: `app/src/main/java/uk/co/siland/culvery/CulveryDeviceAdmin.kt`, `HomeApps.kt`, `KioskLifecycle.kt`, `app/src/main/res/xml/device_admin.xml`
+- Modify: `app/src/main/AndroidManifest.xml`, `MainActivity.kt`, `shell/ShellViewModel.kt`, `di/AppModule.kt`
+- Test: `app/src/test/java/uk/co/siland/culvery/HomeAppsTest.kt`, `KioskLifecycleTest.kt` (create), `shell/ShellViewModelTest.kt`, `shell/ui/NoNavigation.kt`
+- Modify (navigator fakes): `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/RecordingNavigator.kt`, `ui/ReviewScreenshotTest.kt`; `capability/weather/src/test/java/uk/co/siland/culvery/capability/weather/ui/RecordingNavigator.kt`
+- Modify: `docs/setup/release.md`
+- Screenshots (re-recorded): `core/setup/src/test/screenshots/settings_kiosk_dark.png`, `settings_kiosk_light.png`, `done_dark.png`, `done_light.png`
+
+**Interfaces:**
+- Consumes: `CorePermissions.KIOSK_EXIT`, `SETTINGS_MANAGE`; `shouldPin`, `pinOnSetupRead` (`SetupWiring.kt`).
+- Produces:
+  - `interface HomeApp { val isDefault: StateFlow<Boolean> }` (`:core:plugin`); `:app`'s `@Singleton class AndroidHomeApp @Inject constructor(@ApplicationContext context: Context) : HomeApp { fun refresh() }`, bound in `AppModule`.
+  - `ShellNavigator.chooseHomeApp()` and `ShellNavigator.changeHomeApp()`.
+  - `enum class HomeAppRequest { CHOOSE, CHANGE }`; `ShellViewModel.homeAppRequests: Flow<HomeAppRequest>`, `ShellViewModel.kioskExited: Boolean` (read-only), `ShellViewModel.returnedToFront()`.
+  - `internal fun allowLockTaskIfOwner(context: Context): Boolean` (`HomeApps.kt`): as device owner, allowlists Culvery and Google Play services (`GMS_PACKAGE`) for lock-task; `class CulveryDeviceAdmin : DeviceAdminReceiver`. Task 10 reads the result.
+  - `internal interface KioskWindow`, `internal class KioskLifecycle(window, setupComplete, isHomeApp, kioskExited, returnedToFront) : DefaultLifecycleObserver { fun exitKiosk() }` (`KioskLifecycle.kt`).
+  - `:core:setup` `internal fun HomeAppPrompt(onChoose: () -> Unit)`; `KioskPage(homeApp: HomeApp)`; `DoneStep(state, access, gate, homeApp: HomeApp)`; test fake `FakeHomeApp(default: Boolean)`.
+
+- [ ] **Step 1: The seams**
 
 Create `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/HomeApp.kt`:
 ```kotlin
@@ -2844,29 +2951,28 @@ interface HomeApp {
 `ShellNavigator.kt`, add after `exitKiosk()`:
 ```kotlin
 
-    /**
-     * Settings › Kiosk and the wizard's Done step (4c design §5.1): leaves screen pinning and opens the system's
-     * home-app setting. [freshPin] is Change home app: a fresh Admin PIN, and Settings closes, as for Exit kiosk.
-     */
-    fun openHomeSettings(freshPin: Boolean)
+    /** The wizard's Done step and Settings › Kiosk (4c §5.1): asks Android to make Culvery the home app (the open session). */
+    fun chooseHomeApp()
+
+    /** Settings › Kiosk (4c §5.1): opens the home-app setting to go back to another launcher, after a fresh Admin PIN. */
+    fun changeHomeApp()
 ```
-Give every fake navigator the method:
-- `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/RecordingNavigator.kt` and `capability/weather/src/test/java/uk/co/siland/culvery/capability/weather/ui/RecordingNavigator.kt`: `override fun openHomeSettings(freshPin: Boolean) = Unit`
-- `app/src/test/java/uk/co/siland/culvery/shell/ui/ShellScreenshotTest.kt`'s `NoNavigation`: the same.
-- `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestUi.kt`'s `RecordingNavigator`: add `val homeSettings = mutableListOf<Boolean>()` and `override fun openHomeSettings(freshPin: Boolean) { homeSettings += freshPin }`; and add to the same file:
+Give every fake navigator the methods:
+- `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/RecordingNavigator.kt`, `capability/weather/src/test/java/uk/co/siland/culvery/capability/weather/ui/RecordingNavigator.kt` and `app/src/test/java/uk/co/siland/culvery/shell/ui/NoNavigation.kt`: `override fun chooseHomeApp() = Unit` and `override fun changeHomeApp() = Unit`.
+- `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestUi.kt`'s `RecordingNavigator`: add `var homeAppChoices = 0`, `var homeAppChanges = 0`, `override fun chooseHomeApp() { homeAppChoices++ }`, `override fun changeHomeApp() { homeAppChanges++ }`; and add to the same file:
 ```kotlin
 class FakeHomeApp(default: Boolean = false) : HomeApp {
     override val isDefault = MutableStateFlow(default)
 }
 ```
+- `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/ReviewScreenshotTest.kt` (it shows the Calendars page, not Kiosk): `KioskPage()` → `KioskPage(object : HomeApp { override val isDefault = MutableStateFlow(true) })` (imports `uk.co.siland.culvery.core.plugin.HomeApp`, `kotlinx.coroutines.flow.MutableStateFlow`); this compiles once Step 7 gives `KioskPage` its parameter.
 
-- [ ] **Step 4: Write the failing shell tests (Review Focus 2 and 5)**
+- [ ] **Step 2: Write the failing view-model tests**
 
 In `app/src/test/java/uk/co/siland/culvery/shell/ShellViewModelTest.kt` add (import `uk.co.siland.culvery.shouldPin`):
 ```kotlin
-    /** Review Focus 5: Culvery is the home app, so after Exit kiosk a Home press brings it back, and it pins again. */
     @Test
-    fun afterExitKioskComingBackToTheFrontPinsAgain() = runTest {
+    fun exitKioskIsRememberedUntilCulveryIsInFrontAgain() = runTest {
         val vm = vm()
         access.result = admin
         vm.exitKiosk()
@@ -2876,21 +2982,15 @@ In `app/src/test/java/uk/co/siland/culvery/shell/ShellViewModelTest.kt` add (imp
         assertThat(shouldPin(setupComplete = true, kioskExited = vm.kioskExited)).isTrue()
     }
 
-    /** Review Focus 2: nothing remembers "exited" across a process death, so the kiosk pins when next in front. */
-    @Test
-    fun aNewShellIsNeverExitedSoAProcessDeathPinsAgain() {
-        assertThat(vm().kioskExited).isFalse()
-    }
-
     @Test
     fun changeHomeAppAsksForAFreshPinClosesSettingsAndSignsOut() = runTest {
         val vm = vm()
         access.result = admin
         vm.openSettings()
         runCurrent()
-        vm.homeSettings.test {
-            vm.openHomeSettings(freshPin = true)
-            awaitItem()
+        vm.homeAppRequests.test {
+            vm.changeHomeApp()
+            assertThat(awaitItem()).isEqualTo(HomeAppRequest.CHANGE)
         }
         assertThat(access.requested.last()).containsExactly(CorePermissions.KIOSK_EXIT)
         assertThat(access.session.value).isNull()
@@ -2902,9 +3002,9 @@ In `app/src/test/java/uk/co/siland/culvery/shell/ShellViewModelTest.kt` add (imp
     fun chooseHomeAppUsesTheOpenSession() = runTest {
         val vm = vm()
         access.result = admin
-        vm.homeSettings.test {
-            vm.openHomeSettings(freshPin = false)
-            awaitItem()
+        vm.homeAppRequests.test {
+            vm.chooseHomeApp()
+            assertThat(awaitItem()).isEqualTo(HomeAppRequest.CHOOSE)
         }
         assertThat(access.requested.last()).containsExactly(CorePermissions.SETTINGS_MANAGE)
         assertThat(access.session.value).isNotNull()
@@ -2912,76 +3012,32 @@ In `app/src/test/java/uk/co/siland/culvery/shell/ShellViewModelTest.kt` add (imp
     }
 
     @Test
-    fun aRefusedPinOpensNoSettings() = runTest {
+    fun aRefusedPinAsksAndroidNothing() = runTest {
         val vm = vm()
-        vm.homeSettings.test {
-            vm.openHomeSettings(freshPin = true)
+        vm.homeAppRequests.test {
+            vm.changeHomeApp()
+            vm.chooseHomeApp()
             expectNoEvents()
         }
     }
 ```
-Create `app/src/test/java/uk/co/siland/culvery/HomeAppsTest.kt`:
-```kotlin
-package uk.co.siland.culvery
+Run: `./gradlew :app:testDebugUnitTest --tests "*ShellViewModelTest*"`
+Expected: FAIL to compile (`kioskExited`, `changeHomeApp`, `HomeAppRequest` unresolved).
 
-import android.app.role.RoleManager
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.google.common.truth.Truth.assertThat
-import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.Shadows.shadowOf
-
-@RunWith(AndroidJUnit4::class)
-class HomeAppsTest {
-    private class FakeOwner(private val owner: Boolean) : DeviceOwner {
-        val allowed = mutableListOf<String>()
-        override fun isOwner() = owner
-        override fun allowLockTask(packageName: String) {
-            allowed += packageName
-        }
-    }
-
-    @Test
-    fun asDeviceOwnerCulveryAllowsItselfLockTask() {
-        val owner = FakeOwner(owner = true)
-        assertThat(allowLockTaskIfOwner(owner, "uk.co.siland.culvery")).isTrue()
-        assertThat(owner.allowed).containsExactly("uk.co.siland.culvery")
-    }
-
-    @Test
-    fun otherwiseScreenPinningIsLeftAsItIs() {
-        val owner = FakeOwner(owner = false)
-        assertThat(allowLockTaskIfOwner(owner, "uk.co.siland.culvery")).isFalse()
-        assertThat(owner.allowed).isEmpty()
-    }
-
-    @Test
-    fun theHomeRoleIsReadAgainOnRefresh() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val roles = shadowOf(context.getSystemService(RoleManager::class.java))
-        roles.addAvailableRole(RoleManager.ROLE_HOME)
-        val home = AndroidHomeApp(context)
-        assertThat(home.isDefault.value).isFalse()
-        roles.addHeldRole(RoleManager.ROLE_HOME)
-        home.refresh()
-        assertThat(home.isDefault.value).isTrue()
-    }
-}
-```
-Run: `./gradlew :app:testDebugUnitTest --tests "*ShellViewModelTest*" --tests "*HomeAppsTest*"`
-Expected: FAIL to compile (`kioskExited`, `openHomeSettings`, `DeviceOwner`, `AndroidHomeApp` unresolved).
-
-- [ ] **Step 5: The shell's half**
+- [ ] **Step 3: The view model's half**
 
 `shell/ShellViewModel.kt`:
+- above the class:
+```kotlin
+/** What Settings › Kiosk or the Done step asked of Android (4c §5.1). */
+enum class HomeAppRequest { CHOOSE, CHANGE }
+```
 - after `val kioskExit: Flow<Unit> = kioskExitEvents.receiveAsFlow()` add
 ```kotlin
-    private val homeSettingsEvents = Channel<Unit>(Channel.BUFFERED)
+    private val homeAppEvents = Channel<HomeAppRequest>(Channel.BUFFERED)
 
-    /** Each time the system's home-app setting should open; MainActivity unpins first (4c §5.1). */
-    val homeSettings: Flow<Unit> = homeSettingsEvents.receiveAsFlow()
+    /** Each request to Android about the home app; MainActivity unpins first, as nothing opens over a pinned app. */
+    val homeAppRequests: Flow<HomeAppRequest> = homeAppEvents.receiveAsFlow()
 
     /**
      * Exit kiosk or Change home app, and Culvery not back in front since (4c K2). A field, not saved state: a
@@ -3001,16 +3057,23 @@ Expected: FAIL to compile (`kioskExited`, `openHomeSettings`, `DeviceOwner`, `An
         }
     }
 
-    override fun openHomeSettings(freshPin: Boolean) {
+    override fun chooseHomeApp() {
         viewModelScope.launch {
-            val permission = if (freshPin) CorePermissions.KIOSK_EXIT else CorePermissions.SETTINGS_MANAGE
-            access.authorise(permission) ?: return@launch
-            if (freshPin) leaveKiosk()
-            homeSettingsEvents.send(Unit)
+            access.authorise(CorePermissions.SETTINGS_MANAGE) ?: return@launch
+            homeAppEvents.send(HomeAppRequest.CHOOSE)
         }
     }
 
-    /** Culvery is in front again (onRestart); with D3 that includes every Home press. */
+    /** Ruling 15: kiosk.exit's fresh PIN (its pad says "Exit kiosk mode", which is what this does). */
+    override fun changeHomeApp() {
+        viewModelScope.launch {
+            access.authorise(CorePermissions.KIOSK_EXIT) ?: return@launch
+            leaveKiosk()
+            homeAppEvents.send(HomeAppRequest.CHANGE)
+        }
+    }
+
+    /** Culvery is in front again after being stopped; with D3 that includes a Home press from another app. */
     fun returnedToFront() {
         kioskExited = false
     }
@@ -3021,22 +3084,214 @@ Expected: FAIL to compile (`kioskExited`, `openHomeSettings`, `DeviceOwner`, `An
         access.lock()
     }
 ```
+Run the test class again.
+Expected: PASS.
 
-- [ ] **Step 6: The home app, device owner and the manifest**
+- [ ] **Step 4: Write the failing activity-level tests (Review Focus 2 and 5)**
 
+Create `app/src/test/java/uk/co/siland/culvery/KioskLifecycleTest.kt`:
+```kotlin
+package uk.co.siland.culvery
+
+import androidx.activity.ComponentActivity
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.Robolectric
+
+/** The kiosk's pinning over a real activity lifecycle (Robolectric drives it), with the window's effects recorded. */
+@RunWith(AndroidJUnit4::class)
+class KioskLifecycleTest {
+    private class RecordingWindow : KioskWindow {
+        val calls = mutableListOf<String>()
+        override fun pin() { calls += "pin" }
+        override fun unpin() { calls += "unpin" }
+        override fun hideBars() { calls += "hideBars" }
+        override fun showBars() { calls += "showBars" }
+        override fun moveToBack() { calls += "moveToBack" }
+    }
+
+    private val window = RecordingWindow()
+    private var exited = false
+    private var home = true
+    private val controller = Robolectric.buildActivity(ComponentActivity::class.java)
+    private val kiosk = KioskLifecycle(
+        window,
+        setupComplete = { true },
+        isHomeApp = { home },
+        kioskExited = { exited },
+        returnedToFront = { exited = false },
+    )
+
+    @Before
+    fun setUp() {
+        controller.get().lifecycle.addObserver(kiosk)
+        controller.setup()
+    }
+
+    /** Review Focus 2: a fresh start (after a process death, say) remembers no "exited", so it pins. */
+    @Test
+    fun aFreshStartPins() {
+        assertThat(window.calls).contains("pin")
+    }
+
+    /** Review Focus 5, D3: as the home app, Exit kiosk stays in front, and a Home press doesn't pin it again. */
+    @Test
+    fun exitKioskAsTheHomeAppStaysInFrontUnpinnedThroughAHomePress() {
+        window.calls.clear()
+        exited = true
+        kiosk.exitKiosk()
+        assertThat(window.calls).containsExactly("unpin", "showBars").inOrder()
+        // Home pressed while Culvery is home and in front: paused and resumed, never stopped.
+        controller.pause().resume()
+        assertThat(window.calls).doesNotContain("pin")
+    }
+
+    @Test
+    fun leavingAfterExitKioskAndComingBackPinsAgain() {
+        exited = true
+        kiosk.exitKiosk()
+        window.calls.clear()
+        controller.pause().stop().start().resume()
+        assertThat(window.calls).contains("pin")
+    }
+
+    @Test
+    fun withAnotherHomeAppExitKioskMovesToTheBack() {
+        home = false
+        exited = true
+        window.calls.clear()
+        kiosk.exitKiosk()
+        assertThat(window.calls).containsExactly("unpin", "showBars", "moveToBack").inOrder()
+    }
+}
+```
+Create `app/src/test/java/uk/co/siland/culvery/HomeAppsTest.kt`:
+```kotlin
+package uk.co.siland.culvery
+
+import android.app.admin.DevicePolicyManager
+import android.app.role.RoleManager
+import android.content.ComponentName
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
+
+@RunWith(AndroidJUnit4::class)
+class HomeAppsTest {
+    private val context = ApplicationProvider.getApplicationContext<Context>()
+    private val policies = context.getSystemService(DevicePolicyManager::class.java)
+    private val admin = ComponentName(context, CulveryDeviceAdmin::class.java)
+
+    /** §5.2: as device owner Culvery allowlists itself, and Play services so Google's chooser opens inside lock-task. */
+    @Test
+    fun asDeviceOwnerCulveryAndPlayServicesMayRunInLockTask() {
+        shadowOf(policies).setDeviceOwner(admin)
+        assertThat(allowLockTaskIfOwner(context)).isTrue()
+        assertThat(policies.getLockTaskPackages(admin).toList()).containsExactly(context.packageName, GMS_PACKAGE)
+    }
+
+    @Test
+    fun otherwiseScreenPinningIsLeftAsItIs() {
+        assertThat(allowLockTaskIfOwner(context)).isFalse()
+    }
+
+    @Test
+    fun theHomeRoleIsReadAgainOnRefresh() {
+        val roles = shadowOf(context.getSystemService(RoleManager::class.java))
+        roles.addAvailableRole(RoleManager.ROLE_HOME)
+        val home = AndroidHomeApp(context)
+        assertThat(home.isDefault.value).isFalse()
+        roles.addHeldRole(RoleManager.ROLE_HOME)
+        home.refresh()
+        assertThat(home.isDefault.value).isTrue()
+    }
+}
+```
+Run: `./gradlew :app:testDebugUnitTest --tests "*KioskLifecycleTest*" --tests "*HomeAppsTest*"`
+Expected: FAIL to compile (`KioskLifecycle`, `KioskWindow`, `allowLockTaskIfOwner`, `GMS_PACKAGE`, `AndroidHomeApp`, `CulveryDeviceAdmin` unresolved).
+
+- [ ] **Step 5: The kiosk's lifecycle, the home app and device owner**
+
+Create `app/src/main/java/uk/co/siland/culvery/KioskLifecycle.kt`:
+```kotlin
+package uk.co.siland.culvery
+
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+
+/** What the kiosk does to the activity's window and task. */
+internal interface KioskWindow {
+    fun pin()
+
+    fun unpin()
+
+    fun hideBars()
+
+    fun showBars()
+
+    fun moveToBack()
+}
+
+/**
+ * The kiosk over the activity's lifecycle (4a design D10, 4c §5.1, K2): every resume hides the bars and pins, once setup
+ * is complete and the kiosk wasn't exited; coming back to the front after being stopped clears "exited".
+ */
+internal class KioskLifecycle(
+    private val window: KioskWindow,
+    private val setupComplete: () -> Boolean,
+    private val isHomeApp: () -> Boolean,
+    private val kioskExited: () -> Boolean,
+    private val returnedToFront: () -> Unit,
+) : DefaultLifecycleObserver {
+    // A configuration change makes a new one, unstopped, so it doesn't count as coming back.
+    private var stopped = false
+
+    override fun onStop(owner: LifecycleOwner) {
+        stopped = true
+    }
+
+    override fun onStart(owner: LifecycleOwner) {
+        if (!stopped) return
+        stopped = false
+        returnedToFront()
+    }
+
+    override fun onResume(owner: LifecycleOwner) {
+        if (!kioskExited()) window.hideBars()
+        if (shouldPin(setupComplete(), kioskExited())) window.pin()
+    }
+
+    /**
+     * Exit kiosk (4c §5.1, ruling 28): unpinned, with the bars showing. As the home app Culvery stays in front: moving to
+     * the back would resume it as home and pin it again at once. Otherwise it moves to the back, as before.
+     */
+    fun exitKiosk() {
+        window.unpin()
+        window.showBars()
+        if (!isHomeApp()) window.moveToBack()
+    }
+}
+```
 Create `app/src/main/java/uk/co/siland/culvery/CulveryDeviceAdmin.kt`:
 ```kotlin
 package uk.co.siland.culvery
 
 import android.app.admin.DeviceAdminReceiver
 
-/** Device owner for true lock-task (4c design §5.2): no policy beyond allowing Culvery's own lock-task. */
+/** Device owner for true lock-task (4c design §5.2): no policy beyond allowing lock-task. */
 class CulveryDeviceAdmin : DeviceAdminReceiver()
 ```
 Create `app/src/main/res/xml/device_admin.xml`:
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 4c design §5.2: no policies; as device owner Culvery only allowlists itself for lock-task. -->
+<!-- 4c design §5.2: no policies; as device owner Culvery only allowlists apps for lock-task. -->
 <device-admin>
     <uses-policies />
 </device-admin>
@@ -3057,30 +3312,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import uk.co.siland.culvery.core.plugin.HomeApp
 
-/** Device-owner lock-task (4c design §5.2), behind a seam for tests. */
-interface DeviceOwner {
-    fun isOwner(): Boolean
+/** Google Play services: its account chooser and consent screens. */
+internal const val GMS_PACKAGE = "com.google.android.gms"
 
-    fun allowLockTask(packageName: String)
-}
-
-/** As device owner Culvery allowlists itself, so startLockTask() is true lock-task: no prompt and no exit gesture. */
-internal fun allowLockTaskIfOwner(owner: DeviceOwner, packageName: String): Boolean {
-    if (!owner.isOwner()) return false
-    owner.allowLockTask(packageName)
+/**
+ * As device owner (4c design §5.2), Culvery allowlists itself, so startLockTask() is true lock-task (no prompt, no exit
+ * gesture), and Play services, so Google's chooser opens inside it (plan review 13). False when not device owner.
+ */
+internal fun allowLockTaskIfOwner(context: Context): Boolean {
+    val policies = context.getSystemService(DevicePolicyManager::class.java)
+    if (!policies.isDeviceOwnerApp(context.packageName)) return false
+    policies.setLockTaskPackages(ComponentName(context, CulveryDeviceAdmin::class.java), arrayOf(context.packageName, GMS_PACKAGE))
     return true
 }
 
-class AndroidDeviceOwner(private val context: Context) : DeviceOwner {
-    private val policies = context.getSystemService(DevicePolicyManager::class.java)
-
-    override fun isOwner(): Boolean = policies.isDeviceOwnerApp(context.packageName)
-
-    override fun allowLockTask(packageName: String) =
-        policies.setLockTaskPackages(ComponentName(context, CulveryDeviceAdmin::class.java), arrayOf(packageName))
-}
-
-/** [HomeApp] through RoleManager (API 29+). The choice is made in the system's settings, so [refresh] runs on every resume. */
+/** [HomeApp] through RoleManager (API 29+). The choice is made outside Culvery, so [refresh] runs on every resume. */
 @Singleton
 class AndroidHomeApp @Inject constructor(@ApplicationContext private val context: Context) : HomeApp {
     private val held = MutableStateFlow(check())
@@ -3126,35 +3372,83 @@ and inside `<application>` after the activity:
             </intent-filter>
         </receiver>
 ```
+Run: `./gradlew :app:testDebugUnitTest --tests "*KioskLifecycleTest*" --tests "*HomeAppsTest*"`
+Expected: PASS (4 + 3).
 
-- [ ] **Step 7: The activity**
+- [ ] **Step 6: The activity**
 
 `MainActivity.kt`:
-- add `@Inject lateinit var homeApp: AndroidHomeApp`;
-- delete `private var kioskExited = false` and its comment; every read of `kioskExited` becomes `shell.kioskExited` (`pinOnSetupRead(previous, complete, resumed, shell.kioskExited)`, `onResume`, `onWindowFocusChanged`);
-- in the `kioskExit` collector delete the line `kioskExited = true` (the view model sets it);
-- after `super.onCreate(savedInstanceState)` and the splash lines, add
+- add `@Inject lateinit var homeApp: AndroidHomeApp`, and a field `internal var ownerAllowsGoogle = false` (Task 10 reads it);
+- delete `private var kioskExited = false` and its comment, and the `onRestart` override; `pinOnSetupRead(previous, complete, resumed, kioskExited)` becomes `pinOnSetupRead(previous, complete, resumed, shell.kioskExited)`; `onWindowFocusChanged` reads `shell.kioskExited`;
+- add the window and the lifecycle:
 ```kotlin
-        allowLockTaskIfOwner(AndroidDeviceOwner(this), packageName)
+    // Not `window`: that is the Activity's own.
+    private val kioskWindow = object : KioskWindow {
+        override fun pin() = pinToScreen()
+
+        override fun unpin() = unpinFromScreen()
+
+        override fun hideBars() = hideSystemBars()
+
+        override fun showBars() = showSystemBars()
+
+        override fun moveToBack() {
+            moveTaskToBack(true)
+        }
+    }
+
+    private val kiosk by lazy {
+        KioskLifecycle(
+            kioskWindow,
+            setupComplete = { setupComplete.value == true },
+            isHomeApp = { homeApp.isDefault.value },
+            kioskExited = { shell.kioskExited },
+            returnedToFront = shell::returnedToFront,
+        )
+    }
+
+    // Android's yes/no "make Culvery the home app?" dialog (4c §5.1); its answer is read again on resume anyway.
+    private val askHomeRole = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { homeApp.refresh() }
 ```
-- in the `repeatOnLifecycle(Lifecycle.State.STARTED)` block, the collector becomes two:
+- in `onCreate`, after `setupComplete = …stateIn(…)` (Task 4 moved it up) add
+```kotlin
+        ownerAllowsGoogle = allowLockTaskIfOwner(this)
+        lifecycle.addObserver(kiosk)
+```
+- the `repeatOnLifecycle(Lifecycle.State.STARTED)` block becomes:
 ```kotlin
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch {
-                    shell.kioskExit.collect {
-                        unpinFromScreen()
-                        showSystemBars()
-                        moveTaskToBack(true)
-                    }
-                }
-                launch {
-                    // The system's settings can't open while pinned; Culvery pins again when next in front (4c §5.1).
-                    shell.homeSettings.collect {
-                        unpinFromScreen()
-                        startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-                    }
-                }
+                launch { shell.kioskExit.collect { kiosk.exitKiosk() } }
+                launch { shell.homeAppRequests.collect(::openHomeAppScreen) }
             }
+```
+- add:
+```kotlin
+    /** Android's screens can't open over a pinned app; Culvery pins again when it is next in front (4c §5.1). */
+    private fun openHomeAppScreen(request: HomeAppRequest) {
+        unpinFromScreen()
+        try {
+            when (request) {
+                HomeAppRequest.CHOOSE -> askHomeRole.launch(getSystemService(RoleManager::class.java).createRequestRoleIntent(RoleManager.ROLE_HOME))
+                HomeAppRequest.CHANGE -> startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+            }
+        } catch (e: ActivityNotFoundException) {
+            Log.w(TAG, "No screen to change the home app on this tablet (${e::class.simpleName})")
+            shell.returnedToFront()
+            if (shouldPin(setupComplete.value == true, shell.kioskExited)) pinToScreen()
+        }
+    }
+
+    private companion object {
+        const val TAG = "Culvery"
+    }
+```
+- `onResume` becomes (the kiosk's own `onResume` runs right after it, as a lifecycle observer):
+```kotlin
+    override fun onResume() {
+        super.onResume()
+        homeApp.refresh()
+    }
 ```
 - the content root pads by the system bars (ruling 27): wrap the `ShellLayers(…) { … }` call in
 ```kotlin
@@ -3163,28 +3457,12 @@ and inside `<application>` after the activity:
                         ShellLayers(…)  // unchanged
                     }
 ```
-- `onRestart` becomes
-```kotlin
-    override fun onRestart() {
-        super.onRestart()
-        shell.returnedToFront()
-    }
-```
-- `onResume` becomes
-```kotlin
-    override fun onResume() {
-        super.onResume()
-        homeApp.refresh()
-        if (!shell.kioskExited) hideSystemBars()
-        if (shouldPin(setupComplete.value == true, shell.kioskExited)) pinToScreen()
-    }
-```
-(imports: `android.content.Intent`, `android.provider.Settings`, `androidx.compose.foundation.background`, `androidx.compose.foundation.layout.Box`, `androidx.compose.foundation.layout.WindowInsets`, `androidx.compose.foundation.layout.fillMaxSize`, `androidx.compose.foundation.layout.systemBars`, `androidx.compose.foundation.layout.windowInsetsPadding`, `androidx.compose.ui.Modifier`, `uk.co.siland.culvery.core.ui.Culvery`.)
+(imports: `android.app.role.RoleManager`, `android.content.ActivityNotFoundException`, `android.content.Intent`, `android.provider.Settings`, `android.util.Log`, `androidx.activity.result.contract.ActivityResultContracts`, `androidx.compose.foundation.background`, `androidx.compose.foundation.layout.Box`, `androidx.compose.foundation.layout.WindowInsets`, `androidx.compose.foundation.layout.fillMaxSize`, `androidx.compose.foundation.layout.systemBars`, `androidx.compose.foundation.layout.windowInsetsPadding`, `androidx.compose.ui.Modifier`, `uk.co.siland.culvery.core.ui.Culvery`, `uk.co.siland.culvery.shell.HomeAppRequest`.)
 
 Run: `./gradlew :app:testDebugUnitTest`
-Expected: PASS (the new tests, and the existing exit-kiosk tests unchanged).
+Expected: PASS.
 
-- [ ] **Step 8: Write the failing Settings and Done tests**
+- [ ] **Step 7: Write the failing Settings and Done tests**
 
 Create `core/setup/src/test/java/uk/co/siland/culvery/core/setup/KioskPageTest.kt`:
 ```kotlin
@@ -3222,16 +3500,16 @@ class KioskPageTest {
         compose.onNodeWithText("Make Culvery the home app so it comes back after a restart.").assertExists()
         compose.onNodeWithText("Change home app").assertDoesNotExist()
         compose.onNodeWithText("Choose home app").performClick()
-        assertThat(navigator.homeSettings).containsExactly(false)
+        assertThat(navigator.homeAppChoices).isEqualTo(1)
     }
 
     @Test
-    fun asTheHomeAppItOffersToChangeItWithAFreshPin() {
+    fun asTheHomeAppItOffersToChangeIt() {
         home.isDefault.value = true
         show()
         compose.onNodeWithText("Make Culvery the home app so it comes back after a restart.").assertDoesNotExist()
         compose.onNodeWithText("Change home app").performClick()
-        assertThat(navigator.homeSettings).containsExactly(true)
+        assertThat(navigator.homeAppChanges).isEqualTo(1)
     }
 
     @Test
@@ -3242,7 +3520,7 @@ class KioskPageTest {
     }
 }
 ```
-`SettingsScreenTest.theKioskPageExitsThroughTheShell`: `show(KioskPage())` → `show(KioskPage(FakeHomeApp()))`. `SettingsScreenshotTest`: `KioskPage()` → `KioskPage(FakeHomeApp(default = false))`. `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/ReviewScreenshotTest.kt` (it shows the Calendars page, not Kiosk): `KioskPage()` → `KioskPage(object : HomeApp { override val isDefault = MutableStateFlow(true) })` (imports `uk.co.siland.culvery.core.plugin.HomeApp`, `kotlinx.coroutines.flow.MutableStateFlow`). `StepsTest` and `StepsUiTest`: every `DoneStep(state, access.control, gate)` / `DoneStep(state, access.control, SetupSessionGate(…))` gets a last argument `FakeHomeApp()`. In `StepsUiTest`, add beside its Done test:
+`SettingsScreenTest.theKioskPageExitsThroughTheShell`: `show(KioskPage())` → `show(KioskPage(FakeHomeApp()))`. `SettingsScreenshotTest`: `KioskPage()` → `KioskPage(FakeHomeApp(default = false))`. `StepsTest` and `StepsUiTest`: every `DoneStep(state, access.control, gate)` / `DoneStep(state, access.control, SetupSessionGate(…))` gets a last argument `FakeHomeApp()`. In `StepsUiTest`, add beside its Done test:
 ```kotlin
     @Test
     fun doneOffersTheHomeAppUntilItIsChosen() {
@@ -3253,7 +3531,7 @@ class KioskPageTest {
             CompositionLocalProvider(LocalShellNavigator provides navigator) { CulveryTheme(dark = true) { done.Content(onNext = {}) } }
         }
         compose.onNodeWithText("Choose home app").performClick()
-        assertThat(navigator.homeSettings).containsExactly(false)
+        assertThat(navigator.homeAppChoices).isEqualTo(1)
         home.isDefault.value = true
         compose.waitForIdle()
         compose.onNodeWithText("Choose home app").assertDoesNotExist()
@@ -3264,7 +3542,7 @@ class KioskPageTest {
 Run: `./gradlew :core:setup:testDebugUnitTest`
 Expected: FAIL to compile (`KioskPage` and `DoneStep` take no `HomeApp`).
 
-- [ ] **Step 9: The page, the step and the prompt**
+- [ ] **Step 8: The page, the step and the prompt**
 
 `SetupCopy.kt`, under `// Settings (§4.6, §4.7)` add:
 ```kotlin
@@ -3328,9 +3606,9 @@ class KioskPage @Inject constructor(private val homeApp: HomeApp) : SettingsPage
         val isHome by homeApp.isDefault.collectAsState()
         StepTitle(KIOSK, KIOSK_LINE)
         if (isHome) {
-            HhPillButton(CHANGE_HOME_APP, { navigator.openHomeSettings(freshPin = true) }, Modifier.testTag("settings_change_home_app"))
+            HhPillButton(CHANGE_HOME_APP, navigator::changeHomeApp, Modifier.testTag("settings_change_home_app"))
         } else {
-            HomeAppPrompt(onChoose = { navigator.openHomeSettings(freshPin = false) })
+            HomeAppPrompt(onChoose = navigator::chooseHomeApp)
         }
         HhPillButton(EXIT_KIOSK, navigator::exitKiosk, Modifier.testTag("settings_exit_kiosk"))
     }
@@ -3344,16 +3622,16 @@ class KioskPage @Inject constructor(private val homeApp: HomeApp) : SettingsPage
         val isHome by homeApp.isDefault.collectAsState()
         Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap)) {
             StepTitle(CULVERY_IS_READY)
-            if (!isHome) HomeAppPrompt(onChoose = { navigator.openHomeSettings(freshPin = false) })
+            if (!isHome) HomeAppPrompt(onChoose = navigator::chooseHomeApp)
         }
     }
 ```
 (imports as needed.) The KDoc line becomes `/** 4a design §3.3, §4.2: "Culvery is ready", and the home-app prompt (4c §5.1). Never done, so a resume that gets this far stops here. */`.
 
-Run: `./gradlew :core:setup:testDebugUnitTest`
-Expected: PASS (`KioskPageTest` 3, the Done test, and the rest; screenshots aren't compared by this task).
+Run: `./gradlew :core:setup:testDebugUnitTest :capability:calendar:testDebugUnitTest`
+Expected: PASS (`KioskPageTest` 3, the Done test, and the rest; screenshots aren't compared by this step).
 
-- [ ] **Step 10: Re-record the two pages and look**
+- [ ] **Step 9: Re-record the two pages and look**
 
 In `SetupScreenshotTest`, the `done` helper's content becomes:
 ```kotlin
@@ -3368,18 +3646,18 @@ Run:
 ```
 Look at all four: `settings_kiosk_*` — the Kiosk title and its line, then "Make Culvery the home app so it comes back after a restart." with a primary **Choose home app** pill below it, then **Exit kiosk**; `done_*` — "Culvery is ready", the same line and pill, Back and **Open Culvery** in the frame. Nothing overlaps.
 
-- [ ] **Step 11: Document the home app and device owner**
+- [ ] **Step 10: Document the home app and device owner**
 
 Append to `docs/setup/release.md`:
 ````markdown
 
 ## 5. Make Culvery the home app
 
-After setup, the Done step (and Settings › Kiosk) shows "Make Culvery the home app so it comes back after a restart." Tap **Choose home app** and pick Culvery as the default home app. From then on a reboot, a power cut or a crash lands back in Culvery, and every Home press brings it back and pins it again. **Exit kiosk** still unpins it until it is next in front. To give the tablet back its normal launcher, use **Settings › Kiosk › Change home app** (a fresh Admin PIN) and choose the other launcher.
+After setup, the Done step (and Settings › Kiosk) shows "Make Culvery the home app so it comes back after a restart." Tap **Choose home app** and answer Android's question. From then on a reboot, a power cut or a crash lands back in Culvery, and every return to the front pins it again. **Exit kiosk** unpins it and, as the home app, leaves it in front with the system bars showing; switch apps from there with Overview. To give the tablet back its normal launcher, use **Settings › Kiosk › Change home app** (a fresh Admin PIN; the pad says "Exit kiosk mode") and choose the other launcher.
 
 ## 6. Device owner (optional)
 
-As device owner, Culvery allowlists itself for lock-task, so pinning needs no confirmation and can't be undone with Back + Overview. It needs a **freshly reset tablet with no accounts on it yet**: set the tablet up without signing in to Google, install the release, then:
+As device owner, Culvery allowlists itself (and Google Play services, for the account chooser) for lock-task, so pinning needs no confirmation and can't be undone with Back + Overview. It needs a **freshly reset tablet with no accounts on it yet**: set the tablet up without signing in to Google, install the release, then:
 
 ```bash
 adb shell dpm set-device-owner uk.co.siland.culvery/.CulveryDeviceAdmin
@@ -3388,44 +3666,43 @@ adb shell dpm set-device-owner uk.co.siland.culvery/.CulveryDeviceAdmin
 Add the family's Google account afterwards (Settings › Accounts). Undoing device owner needs a factory reset. Without it, screen pinning works as described in the README's Kiosk section.
 ````
 
-- [ ] **Step 12: Run the gate**
+- [ ] **Step 11: Run the gate**
 
 Run: `./gradlew testDebugUnitTest verifyRoborazziDebug`
-Expected: `BUILD SUCCESSFUL`, no screenshot differences beyond the four recorded in Step 10.
+Expected: `BUILD SUCCESSFUL`, no screenshot differences beyond the four recorded in Step 9.
 
-- [ ] **Step 13: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
 git add core app capability docs/setup/release.md
-git commit -m "Offer Culvery as the home app, allowlist lock-task as device owner, and fix the kiosk and lockout edge cases"
+git commit -m "Offer Culvery as the home app through Android's dialog, keep Exit kiosk in front, and allowlist lock-task as device owner"
 ```
 
 ---
 
-### Task 9: Connecting Google on the kiosk — `connections.manage`, the Play services check, stepping out of lock-task (§5.3, D5, K5, K6, L3, M4; rulings 16, 17)
+### Task 10: Connecting Google on the kiosk — `connections.manage`, the Play services check, leaving pinning (§5.3, D5, K5, K6, L3, M4; rulings 16, 17)
 
-**Review:** opus (the connect flow and lock-task).
+**Review:** opus (the connect flow and pinning).
 
 **Files:**
 - Modify: `core/access/src/main/java/uk/co/siland/culvery/core/access/Permissions.kt`; test `DefaultAccessControlTest.kt`
-- Create: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/LockTask.kt`
+- Modify: `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/ShellNavigator.kt`
+- Modify (navigator fakes): `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/ui/RecordingNavigator.kt`, `capability/weather/src/test/java/uk/co/siland/culvery/capability/weather/ui/RecordingNavigator.kt`, `core/setup/src/test/java/uk/co/siland/culvery/core/setup/TestUi.kt`, `app/src/test/java/uk/co/siland/culvery/shell/ui/NoNavigation.kt`
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarConnections.kt`; test `ui/CalendarConnectHostTest.kt`
 - Create: `provider/calendar-google/src/main/java/uk/co/siland/culvery/provider/calendar_google/PlayServices.kt`
 - Modify: `provider/calendar-google/src/main/java/uk/co/siland/culvery/provider/calendar_google/GoogleConnectFlow.kt`, `GoogleCalendarProvider.kt`, `di/GoogleCalendarModule.kt`
-- Test: `provider/calendar-google/src/test/java/uk/co/siland/culvery/provider/calendar_google/TestSupport.kt`, `GoogleConnectScreenTest.kt`, `GoogleConnectFlowTest.kt`, `GoogleReadTest.kt`, `GoogleWriteTest.kt`, `GoogleCalendarProviderContractTest.kt`
-- Create: `app/src/main/java/uk/co/siland/culvery/ActivityLockTask.kt`; test `app/src/test/java/uk/co/siland/culvery/ActivityLockTaskTest.kt`
-- Modify: `app/src/main/java/uk/co/siland/culvery/MainActivity.kt`
+- Test: `provider/calendar-google/src/test/java/uk/co/siland/culvery/provider/calendar_google/TestSupport.kt`, `RecordingNavigator.kt` (create), `GoogleConnectScreenTest.kt`, `GoogleConnectFlowTest.kt`, `GoogleReadTest.kt`, `GoogleWriteTest.kt`, `GoogleCalendarProviderContractTest.kt`
+- Modify: `app/src/main/java/uk/co/siland/culvery/MainActivity.kt`, `shell/ShellViewModel.kt`
 - Modify: `docs/setup/google-calendar.md` (§5's release paragraph)
 
 **Interfaces:**
-- Consumes: Task 8's `ShellViewModel.kioskExited`, `shouldPin`.
+- Consumes: Task 9's `MainActivity.ownerAllowsGoogle` and `KioskLifecycle` (which pins again on resume).
 - Produces:
   - `CorePermissions.CONNECTIONS_MANAGE = "connections.manage"` (ADMIN, fresh PIN, label "Connect calendars").
-  - `interface LockTask { fun stepOut(); fun pinAgain(); companion object { val None: LockTask } }` and `val LocalLockTask` (default `LockTask.None`) in `:core:plugin`.
+  - `ShellNavigator.leavePinning()`: unpins at once so a system screen can open; Culvery pins again when next in front. `MainActivity` provides a navigator that does it (not as device owner, where Play services is allowlisted); `ShellViewModel`'s own is a no-op, as it has no window.
   - `fun interface PlayServicesCheck { fun usable(): Boolean }`, `class GooglePlayServicesCheck`, `const val UPDATE_PLAY_SERVICES` in `:provider:calendar-google`.
   - `GoogleCalendarProvider(api: GoogleApi, authorizer: Authorizer, toaster: Toaster, playServices: PlayServicesCheck)`; `GoogleConnectFlow(authorizer, api, toaster, playServices)`.
-  - Test helper `testProvider(api, authorizer = FakeAuthorizer(), toaster = NoToasts, playServices = PlayServicesCheck { true })` in `TestSupport.kt` (Task 11 adds a parameter to it).
-  - `internal class ActivityLockTask(isResumed, shouldPin, pin, unpin) : LockTask` in `:app`.
+  - Test helper `testProvider(api, authorizer = FakeAuthorizer(), toaster = NoToasts, playServices = PlayServicesCheck { true })` in `TestSupport.kt` (Task 13 adds a parameter to it).
 
 - [ ] **Step 1: Write the failing permission tests**
 
@@ -3478,33 +3755,45 @@ Expected: PASS.
 Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarConnectHostTest*"`
 Expected: PASS.
 
-- [ ] **Step 4: The `LockTask` seam**
 
-Create `core/plugin/src/main/java/uk/co/siland/culvery/core/plugin/LockTask.kt`:
+- [ ] **Step 4: The `leavePinning` seam**
+
+`ShellNavigator.kt`, add after `changeHomeApp()`:
 ```kotlin
-package uk.co.siland.culvery.core.plugin
 
-import androidx.compose.runtime.staticCompositionLocalOf
+    /**
+     * Unpins at once, so a system screen such as Google's account chooser can open (4c design §5.3, D5); Culvery pins
+     * again when it is next in front. Nothing when not pinned (the wizard, debug builds).
+     */
+    fun leavePinning()
+```
+Every fake navigator gets `override fun leavePinning() = Unit` (`capability/calendar/…/ui/RecordingNavigator.kt`, `capability/weather/…/ui/RecordingNavigator.kt`, `core/setup/…/TestUi.kt`'s `RecordingNavigator`, `app/…/shell/ui/NoNavigation.kt`). `shell/ShellViewModel.kt` gets
+```kotlin
+    /** The view model has no window: MainActivity's navigator unpins (4c §5.3). */
+    override fun leavePinning() = Unit
+```
+Create `provider/calendar-google/src/test/java/uk/co/siland/culvery/provider/calendar_google/RecordingNavigator.kt`:
+```kotlin
+package uk.co.siland.culvery.provider.calendar_google
 
-/** Screen pinning, for a provider that must show a system screen such as Google's account chooser (4c design §5.3, D5). */
-interface LockTask {
-    /** Unpins so a system screen can open; nothing when not pinned (the wizard, debug builds). */
-    fun stepOut()
+import uk.co.siland.culvery.core.plugin.ShellNavigator
 
-    /** Pins again when the kiosk should be pinned: at once if Culvery is in front, otherwise when it next is. */
-    fun pinAgain()
+/** Records what the connect screen asked of the shell into [calls], which a test may share with other recorders. */
+internal class RecordingNavigator(private val calls: MutableList<String>) : ShellNavigator {
+    override fun openTab(id: String) = Unit
 
-    companion object {
-        /** Nothing pinned: tests and previews. */
-        val None: LockTask = object : LockTask {
-            override fun stepOut() = Unit
+    override fun openSettings() = Unit
 
-            override fun pinAgain() = Unit
-        }
+    override fun exitKiosk() = Unit
+
+    override fun chooseHomeApp() = Unit
+
+    override fun changeHomeApp() = Unit
+
+    override fun leavePinning() {
+        calls += "leave pinning"
     }
 }
-
-val LocalLockTask = staticCompositionLocalOf { LockTask.None }
 ```
 
 - [ ] **Step 5: Write the failing provider tests**
@@ -3518,93 +3807,62 @@ internal fun testProvider(
     toaster: Toaster = NoToasts,
     playServices: PlayServicesCheck = PlayServicesCheck { true },
 ) = GoogleCalendarProvider(api, authorizer, toaster, playServices)
-
-/** What a connect did to the kiosk's pinning, in order. */
-internal class RecordingLockTask : LockTask {
-    val calls = mutableListOf<String>()
-
-    override fun stepOut() {
-        calls += "out"
-    }
-
-    override fun pinAgain() {
-        calls += "in"
-    }
-}
 ```
-(imports `uk.co.siland.culvery.core.plugin.LockTask`, `uk.co.siland.culvery.core.plugin.Toaster`; if `NoToasts` lives in another test file, leave it there.) Replace every `GoogleCalendarProvider(GoogleApi(…), authorizer, toasts)` / `GoogleCalendarProvider(api, FakeAuthorizer(), NoToasts)` in `GoogleConnectScreenTest`, `GoogleReadTest`, `GoogleWriteTest`, `GoogleCalendarProviderContractTest` with `testProvider(GoogleApi(…), authorizer, toasts)` / `testProvider(api)` (same arguments, by name where they aren't the defaults). In `GoogleConnectFlowTest`, `GoogleConnectFlow(authorizer, GoogleApi(…), toasts)` gains a last argument `PlayServicesCheck { true }`.
+(import `uk.co.siland.culvery.core.plugin.Toaster`; if `NoToasts` lives in another test file, leave it there.) Replace every `GoogleCalendarProvider(GoogleApi(…), authorizer, toasts)` / `GoogleCalendarProvider(api, FakeAuthorizer(), NoToasts)` in `GoogleConnectScreenTest`, `GoogleReadTest`, `GoogleWriteTest`, `GoogleCalendarProviderContractTest` with `testProvider(GoogleApi(…), authorizer, toasts)` / `testProvider(api)` (same arguments, by name where they aren't the defaults). In `GoogleConnectFlowTest`, keep the `GoogleApi` `setUp` builds in a field `api` (so the server starts once) and `GoogleConnectFlow(authorizer, api, toasts)` gains a last argument `PlayServicesCheck { true }`.
 
-`GoogleConnectScreenTest.kt`: add a field `private val lockTask = RecordingLockTask()`; `showWithScreens` provides it:
+`GoogleConnectScreenTest.kt`: the connect screen now reads `LocalShellNavigator`, so every `setContent` provides one. Add a field and a wrapper:
 ```kotlin
-            CompositionLocalProvider(
-                LocalActivityResultRegistryOwner provides screensAnswering(resultCode),
-                LocalLockTask provides lockTask,
-            ) {
-                provider.ConnectScreen(existing = null, onConnected = onConnected, onCancel = onCancel)
+    /** What happened, in order: the navigator's "leave pinning" and the registry's "launch". */
+    private val calls = mutableListOf<String>()
+
+    private fun screen(content: @Composable () -> Unit) = compose.setContent {
+        CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(calls)) { content() }
+    }
+```
+Every `compose.setContent { provider.ConnectScreen(…) }` becomes `screen { provider.ConnectScreen(…) }`; in `showWithScreens`, `compose.setContent { CompositionLocalProvider(LocalActivityResultRegistryOwner provides …) { … } }` becomes `screen { CompositionLocalProvider(LocalActivityResultRegistryOwner provides …) { … } }`; and `screensAnswering` records the launch:
+```kotlin
+            override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I, options: ActivityOptionsCompat?) {
+                calls += "launch"
+                dispatchResult(requestCode, resultCode, null)
             }
 ```
-and add:
+Add:
 ```kotlin
+    /** D5: Google's screens can't open over a pinned app, so pinning is left first. */
     @Test
-    fun theChooserOpensOutsideLockTaskAndPinsAgainOnConnect() {
+    fun theChooserOpensOnlyAfterLeavingPinning() {
         var connected: Connection? = null
         showWithScreens(Activity.RESULT_OK, onConnected = { connected = it }, onCancel = {})
         compose.waitUntil(5_000) { connected != null }
-        assertThat(lockTask.calls).containsExactly("out", "in").inOrder()
+        assertThat(calls).containsExactly("leave pinning", "launch").inOrder()
     }
 
     @Test
-    fun theChooserOpensOutsideLockTaskAndPinsAgainOnCancel() {
-        var cancelled = 0
-        showWithScreens(Activity.RESULT_CANCELED, onConnected = {}, onCancel = { cancelled++ })
-        compose.waitUntil(5_000) { cancelled == 1 }
-        assertThat(lockTask.calls).containsExactly("out", "in").inOrder()
-    }
-
-    @Test
-    fun theChooserOpensOutsideLockTaskAndPinsAgainOnFailure() {
-        authorizer.fromScreens = Authorization.NeedsUser(screens())
-        var cancelled = 0
-        showWithScreens(Activity.RESULT_OK, onConnected = {}, onCancel = { cancelled++ })
-        compose.waitUntil(5_000) { cancelled == 1 }
-        assertThat(lockTask.calls).containsExactly("out", "in").inOrder()
-        assertThat(toasts.messages).containsExactly("Couldn't connect to Google Calendar — try again")
-    }
-
-    @Test
-    fun anAccountAlreadyGrantedNeverLeavesLockTask() {
+    fun anAccountAlreadyGrantedNeverLeavesPinning() {
         var connected: Connection? = null
-        compose.setContent {
-            CompositionLocalProvider(LocalLockTask provides lockTask) {
-                provider.ConnectScreen(existing = null, onConnected = { connected = it }, onCancel = {})
-            }
-        }
+        screen { provider.ConnectScreen(existing = null, onConnected = { connected = it }, onCancel = {}) }
         compose.waitUntil(5_000) { connected != null }
-        assertThat(lockTask.calls).isEmpty()
-    }
-
-    /** M4: without a usable Play services, Google's screens would fail; say what to do and start nothing. */
-    @Test
-    fun withoutPlayServicesNothingStarts() {
-        val stuck = testProvider(GoogleApi(google.start(), FakeTokenSource(), OkHttpClient()), authorizer, toasts, PlayServicesCheck { false })
-        var cancelled = 0
-        compose.setContent {
-            CompositionLocalProvider(LocalLockTask provides lockTask) {
-                stuck.ConnectScreen(existing = null, onConnected = {}, onCancel = { cancelled++ })
-            }
-        }
-        compose.waitUntil(5_000) { cancelled == 1 }
-        assertThat(toasts.messages).containsExactly("Update Google Play services on this tablet, then try again.")
-        assertThat(authorizer.accounts).isEmpty()
-        assertThat(lockTask.calls).isEmpty()
+        assertThat(calls).isEmpty()
     }
 ```
-(`google.start()` may be called once per server: if `FakeGoogleServer.start()` can't run twice, build `stuck` over the same base URL `setUp` used — keep that URL in a field.)
+(imports `androidx.compose.runtime.Composable`, `uk.co.siland.culvery.core.plugin.LocalShellNavigator`.)
+
+`GoogleConnectFlowTest.kt`, add (the Play services check is tested here only):
+```kotlin
+    /** M4: without a usable Play services, Google's screens would fail; say what to do and start nothing. */
+    @Test
+    fun withoutUsablePlayServicesNothingStartsAndItSaysWhy() = runTest {
+        val stuck = GoogleConnectFlow(authorizer, api, toasts, PlayServicesCheck { false })
+        assertThat(stuck.start(existing = null)).isEqualTo(ConnectStep.Stopped)
+        assertThat(toasts.messages).containsExactly(UPDATE_PLAY_SERVICES)
+        assertThat(authorizer.accounts).isEmpty()
+    }
+```
 
 Run: `./gradlew :provider:calendar-google:testDebugUnitTest`
 Expected: FAIL to compile (`PlayServicesCheck` unresolved; four-argument `GoogleCalendarProvider`).
 
-- [ ] **Step 6: The check, and stepping out around Google's screens**
+- [ ] **Step 6: The check, and leaving pinning before Google's screens**
 
 Create `provider/calendar-google/src/main/java/uk/co/siland/culvery/provider/calendar_google/PlayServices.kt`:
 ```kotlin
@@ -3653,167 +3911,63 @@ internal class GoogleConnectFlow(
 `GoogleCalendarProvider.kt`: the constructor gains `private val playServices: PlayServicesCheck,` after `toaster`; in `ConnectScreen`:
 ```kotlin
         val flow = remember { GoogleConnectFlow(authorizer, api, toaster, playServices) }
-        val lockTask = LocalLockTask.current
-        val scope = rememberCoroutineScope()
-        val connected by rememberUpdatedState(onConnected)
-        val cancelled by rememberUpdatedState(onCancel)
-        val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            // Google's screens have closed, whatever they answered: back into the kiosk (4c §5.3).
-            lockTask.pinAgain()
-            // Backed out of the chooser or the consent screen: the card closes with nothing said (3a design §3.2).
-            if (result.resultCode != Activity.RESULT_OK) {
-                cancelled()
-                return@rememberLauncherForActivityResult
-            }
-            scope.launch {
-                // Play services has its answer now; screens asked for a second time read as a stop.
-                when (val step = flow.afterScreens(existing, result.data)) {
-                    is ConnectStep.Done -> connected(step.connection)
-                    else -> cancelled()
-                }
-            }
-        }
-        LaunchedEffect(existing) {
-            when (val step = flow.start(existing)) {
-                is ConnectStep.Done -> connected(step.connection)
+        val navigator = LocalShellNavigator.current
+```
+and the `ConnectStep.ShowScreens` branch of its `LaunchedEffect` becomes
+```kotlin
                 is ConnectStep.ShowScreens -> {
-                    // A pinned app can't open another app's screens (4c §5.3); nothing is pinned in the wizard.
-                    lockTask.stepOut()
+                    // A pinned app can't open another app's screens (4c §5.3); Culvery pins again when it is back in front.
+                    navigator.leavePinning()
                     launcher.launch(IntentSenderRequest.Builder(step.intent.intentSender).build())
                 }
-                ConnectStep.Stopped -> cancelled()
-            }
-        }
 ```
-(import `uk.co.siland.culvery.core.plugin.LocalLockTask`.)
+(the launcher's callback is unchanged; import `uk.co.siland.culvery.core.plugin.LocalShellNavigator`.)
 
 `di/GoogleCalendarModule.kt`, in the abstract class:
 ```kotlin
     @Binds
     abstract fun playServices(impl: GooglePlayServicesCheck): PlayServicesCheck
 ```
-Add to `GoogleConnectFlowTest`:
-```kotlin
-    @Test
-    fun withoutUsablePlayServicesNothingStartsAndItSaysWhy() = runTest {
-        val stuck = GoogleConnectFlow(authorizer, GoogleApi(google.start(), FakeTokenSource(), OkHttpClient()), toasts, PlayServicesCheck { false })
-        assertThat(stuck.start(existing = null)).isEqualTo(ConnectStep.Stopped)
-        assertThat(toasts.messages).containsExactly(UPDATE_PLAY_SERVICES)
-        assertThat(authorizer.accounts).isEmpty()
-    }
-```
-(reuse the base URL `setUp` started, as in Step 5, if the server can't start twice.)
-
 Run: `./gradlew :provider:calendar-google:testDebugUnitTest`
 Expected: PASS.
 
-- [ ] **Step 7: Write the failing activity-side test (Review Focus 2)**
 
-Create `app/src/test/java/uk/co/siland/culvery/ActivityLockTaskTest.kt`:
-```kotlin
-package uk.co.siland.culvery
+- [ ] **Step 7: The activity's navigator leaves pinning**
 
-import com.google.common.truth.Truth.assertThat
-import org.junit.Test
-
-class ActivityLockTaskTest {
-    private var resumed = true
-    private var kioskWanted = true
-    private val calls = mutableListOf<String>()
-    private val lockTask = ActivityLockTask(
-        isResumed = { resumed },
-        shouldPin = { kioskWanted },
-        pin = { calls += "pin" },
-        unpin = { calls += "unpin" },
-    )
-
-    @Test
-    fun stepOutUnpins() {
-        lockTask.stepOut()
-        assertThat(calls).containsExactly("unpin")
-    }
-
-    @Test
-    fun pinAgainInFrontPins() {
-        lockTask.pinAgain()
-        assertThat(calls).containsExactly("pin")
-    }
-
-    /** Results arrive before onResume, and a killed Culvery comes back through onCreate: onResume pins then. */
-    @Test
-    fun pinAgainWhileInTheBackgroundLeavesItToOnResume() {
-        resumed = false
-        lockTask.pinAgain()
-        assertThat(calls).isEmpty()
-    }
-
-    @Test
-    fun pinAgainAfterExitKioskDoesNotPin() {
-        kioskWanted = false
-        lockTask.pinAgain()
-        assertThat(calls).isEmpty()
-    }
-}
-```
-Run: `./gradlew :app:testDebugUnitTest --tests "*ActivityLockTaskTest*"`
-Expected: FAIL to compile ("Unresolved reference 'ActivityLockTask'").
-
-- [ ] **Step 8: The activity's `LockTask`**
-
-Create `app/src/main/java/uk/co/siland/culvery/ActivityLockTask.kt`:
-```kotlin
-package uk.co.siland.culvery
-
-import uk.co.siland.culvery.core.plugin.LockTask
-
-/**
- * [LockTask] over the activity (4c design §5.3). startLockTask needs a resumed activity and results arrive before
- * onResume, so [pinAgain] pins only when resumed; otherwise onResume pins, as it does whenever the kiosk should be.
- */
-internal class ActivityLockTask(
-    private val isResumed: () -> Boolean,
-    private val shouldPin: () -> Boolean,
-    private val pin: () -> Unit,
-    private val unpin: () -> Unit,
-) : LockTask {
-    override fun stepOut() = unpin()
-
-    override fun pinAgain() {
-        if (isResumed() && shouldPin()) pin()
-    }
-}
-```
 `MainActivity.kt`: add
 ```kotlin
-    private val lockTask by lazy {
-        ActivityLockTask(
-            isResumed = { lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) },
-            shouldPin = { shouldPin(setupComplete.value == true, shell.kioskExited) },
-            pin = { pinToScreen() },
-            unpin = { unpinFromScreen() },
-        )
+    /**
+     * The shell's navigator, with leaving pinning done here and at once: the chooser opens right after it returns and
+     * can't open over a pinned app. As device owner Play services is allowlisted, so the chooser opens in lock-task.
+     */
+    private val navigator: ShellNavigator by lazy {
+        object : ShellNavigator by shell {
+            override fun leavePinning() {
+                if (!ownerAllowsGoogle) unpinFromScreen()
+            }
+        }
     }
 ```
-and provide it beside the other locals: `LocalLockTask provides lockTask,` in the `CompositionLocalProvider(…)` (import `uk.co.siland.culvery.core.plugin.LocalLockTask`).
+and in `setContent`, `LocalShellNavigator provides shell,` becomes `LocalShellNavigator provides navigator,` (import `uk.co.siland.culvery.core.plugin.ShellNavigator`). Pinning again needs nothing new: when Google's screens close, Culvery resumes and `KioskLifecycle.onResume` pins (Task 9), on every outcome and after a process death alike.
 
 Run: `./gradlew :app:testDebugUnitTest`
 Expected: PASS.
 
-- [ ] **Step 9: Say how connecting works on the kiosk**
+- [ ] **Step 8: Say how connecting works on the kiosk**
 
 In `docs/setup/google-calendar.md`, replace the paragraph
 "Release builds need a second Android client with the release key's SHA-1 (Plan 4). In release kiosk mode the account chooser may not appear; if so, exit kiosk (Settings › Kiosk › Exit kiosk), connect, and return."
 with:
 ```markdown
-Release builds need the second Android client from section 4. On the kiosk, **Connect** and **Reconnect** ask for an Admin's PIN every time, even mid-session, because Google's screens can lead out of the app. If Google Play services can't sign in, Culvery says "Update Google Play services on this tablet, then try again." and starts nothing. While Google's account chooser and consent screens show, Culvery leaves screen pinning, and pins again as soon as they close, whatever they answered.
+Release builds need the second Android client from section 4. On the kiosk, **Connect** and **Reconnect** ask for an Admin's PIN every time, even mid-session, because Google's screens can lead out of the app. If Google Play services can't sign in, Culvery says "Update Google Play services on this tablet, then try again." and starts nothing. While Google's account chooser and consent screens show, Culvery leaves screen pinning, and pins again as soon as it is back in front, whatever they answered (as device owner it stays in lock-task: Play services is allowed in it).
 ```
 
-- [ ] **Step 10: Run the gate**
+- [ ] **Step 9: Run the gate**
 
 Run: `./gradlew testDebugUnitTest verifyRoborazziDebug`
 Expected: `BUILD SUCCESSFUL`, no screenshot differences.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add core capability provider app docs/setup/google-calendar.md
@@ -3822,7 +3976,7 @@ git commit -m "Ask for a fresh Admin PIN to connect Google, check Play services 
 
 ---
 
-### Task 10: Google asks for less — `fields=`, the gzip User-Agent, `callTimeout` (§6.1, E1, C1; rulings 4, 5)
+### Task 11: Google asks for less — `fields=`, the gzip User-Agent, `callTimeout` (§6.1, E1, C1; rulings 4, 5)
 
 **Review:** sonnet.
 
@@ -3833,7 +3987,7 @@ git commit -m "Ask for a fresh Admin PIN to connect Google, check Play services 
 - Test: `provider/calendar-google/src/test/java/uk/co/siland/culvery/provider/calendar_google/GoogleClientTest.kt` (create), `GoogleReadTest.kt`
 
 **Interfaces:**
-- Consumes: Task 1's `versionName`; Task 4's lazy client in `GoogleApi`.
+- Consumes: Task 1's `versionName`; Task 4's lazy client in `GoogleApi`; Task 10's `testProvider(…)`.
 - Produces: `@Qualifier annotation class AppVersion` (`:core:plugin`), provided by `AppModule` as `BuildConfig.VERSION_NAME`; `internal const val EVENT_FIELDS`, `CALENDAR_LIST_FIELDS`; `internal fun userAgent(version: String): String`, `internal fun googleClient(version: String): OkHttpClient` (in `di/GoogleCalendarModule.kt`).
 
 - [ ] **Step 1: Write the failing tests**
@@ -3874,7 +4028,7 @@ class GoogleClientTest {
     }
 }
 ```
-In `GoogleReadTest.kt` add (imports `kotlinx.serialization.descriptors.elementNames`):
+In `GoogleReadTest.kt` add (imports `kotlinx.serialization.descriptors.SerialDescriptor`, `kotlinx.serialization.descriptors.StructureKind`, `com.google.common.truth.Truth.assertWithMessage`; if the compiler asks for `@OptIn(ExperimentalSerializationApi::class)` on the walk, add it there only — ruling 32):
 ```kotlin
     @Test
     fun calendarListsAskOnlyForWhatTheTabletReads() = runTest {
@@ -3891,18 +4045,79 @@ In `GoogleReadTest.kt` add (imports `kotlinx.serialization.descriptors.elementNa
         assertThat(lists.map { it.queryParameter("fields") }).containsExactly(EVENT_FIELDS, EVENT_FIELDS)
     }
 
-    /** Ruling 4: a field the provider parses but doesn't ask for would come back missing, silently. */
+    /**
+     * Ruling 4: a field the provider parses but doesn't ask for would come back missing, silently. Walks each answer's
+     * classes, nested ones too, against Google's `fields` syntax: a field named alone comes whole; one with a
+     * selection, `a(b,c)` or `a/b`, comes with only those.
+     */
     @Test
     fun everyFieldTheProviderParsesIsAskedFor() {
-        GoogleEvent.serializer().descriptor.elementNames.forEach { assertThat(EVENT_FIELDS).contains(it) }
-        CalendarListEntry.serializer().descriptor.elementNames.forEach { assertThat(CALENDAR_LIST_FIELDS).contains(it) }
+        assertAskedFor(FieldsSelection.parse(EVENT_FIELDS), EventsPage.serializer().descriptor, "")
+        assertAskedFor(FieldsSelection.parse(CALENDAR_LIST_FIELDS), CalendarListPage.serializer().descriptor, "")
     }
+
+    private fun assertAskedFor(asked: FieldsSelection, descriptor: SerialDescriptor, path: String) {
+        for (index in 0 until descriptor.elementsCount) {
+            val name = descriptor.getElementName(index)
+            assertWithMessage("$path$name isn't asked for").that(asked.fields).containsKey(name)
+            val only = asked.fields[name] ?: continue
+            var element = descriptor.getElementDescriptor(index)
+            if (element.kind == StructureKind.LIST) element = element.getElementDescriptor(0)
+            if (element.kind == StructureKind.CLASS) assertAskedFor(only, element, "$path$name.")
+        }
+    }
+
+```
+and at the end of the file, outside the class:
+```kotlin
+/** Google's `fields` syntax as a tree: each name maps to its own selection, or to null when it comes whole. */
+private class FieldsSelection(val fields: Map<String, FieldsSelection?>) {
+    companion object {
+        fun parse(text: String): FieldsSelection = FieldsParser(text).parse()
+    }
+}
+
+/** Reads `a,b(c,d),e/f`: a list of names, each with a bracketed list or a one-name path below it. */
+private class FieldsParser(private val text: String) {
+    private var i = 0
+
+    fun parse(): FieldsSelection = list().also { check(i == text.length) { "unparsed fields text" } }
+
+    private fun list(): FieldsSelection {
+        val out = mutableMapOf<String, FieldsSelection?>()
+        while (true) {
+            val (name, only) = item()
+            out[name] = only
+            if (i < text.length && text[i] == ',') i++ else return FieldsSelection(out)
+        }
+    }
+
+    private fun item(): Pair<String, FieldsSelection?> {
+        val start = i
+        while (i < text.length && text[i] !in ",()/") i++
+        val name = text.substring(start, i)
+        return name to when {
+            i < text.length && text[i] == '(' -> {
+                i++
+                list().also {
+                    check(text[i] == ')')
+                    i++
+                }
+            }
+            i < text.length && text[i] == '/' -> {
+                i++
+                FieldsSelection(mapOf(item()))
+            }
+            else -> null
+        }
+    }
+}
 ```
 
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `./gradlew :provider:calendar-google:testDebugUnitTest --tests "*GoogleClientTest*" --tests "*GoogleReadTest*"`
-Expected: FAIL to compile ("Unresolved reference 'googleClient'", "'EVENT_FIELDS'", "'CALENDAR_LIST_FIELDS'").
+Expected: FAIL to compile ("Unresolved reference 'googleClient'", "'EVENT_FIELDS'", "'CALENDAR_LIST_FIELDS'"). Once Step 3 is in, the walk passes; removing any one name from either string (say `colorId`, or `self` inside `attendees(…)`) must make it fail — try one, then put it back.
 
 - [ ] **Step 3: The version, the client and the fields**
 
@@ -3983,7 +4198,7 @@ git commit -m "Ask Google Calendar only for the fields the tablet reads, compres
 
 ---
 
-### Task 11: The sync token across midnight, pruning, rule seeding, series cancellation, `calendar.db` v6 (§6.2, E2, P9, C2, C9; rulings 1, 2, 3, 11)
+### Task 12: The sync token across midnight, pruning, the 4-week window, `calendar.db` v6 (§6.2, §6.6's window, E2, P9, C2; rulings 1, 11)
 
 **Review:** opus (sync state, pruning, the migration).
 
@@ -3991,18 +4206,14 @@ git commit -m "Ask Google Calendar only for the fields the tablet reads, compres
 - Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/db/CalendarDatabase.kt`, `db/Migrations.kt`, `di/CalendarModule.kt`, `CalendarStore.kt`, `CalendarSync.kt`, `CalendarContract.kt`
 - Generated (commit): `capability/calendar/schemas/uk.co.siland.culvery.capability.calendar.db.CalendarDatabase/6.json`
 - Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarMigrationTest.kt`, `CalendarStoreTest.kt`, `CalendarSyncTest.kt`
-- Modify: `provider/calendar-google/src/main/java/uk/co/siland/culvery/provider/calendar_google/GoogleCalendarProvider.kt`
-- Test: `provider/calendar-google/src/test/java/uk/co/siland/culvery/provider/calendar_google/TestSupport.kt`, `GoogleReadTest.kt`
 
 **Interfaces:**
-- Consumes: Task 9's `testProvider(…)` helper.
+- Consumes: nothing new.
 - Produces:
-  - `SourceEntity.readProblem: String?` (v6 column; its behaviour is Task 13's).
+  - `SourceEntity.readProblem: String?` (v6 column; its behaviour is Task 16's).
   - `val MIGRATION_5_6: Migration`; `val ALL_MIGRATIONS: Array<Migration>` (1→2 … 5→6), used by `CalendarModule` and the tests.
-  - `fun interface StoredSeries { suspend fun instances(connectionId: String, sourceId: String): Map<String, String?> }` in `CalendarContract.kt`; `CalendarStore : StoredSeries`, bound in `CalendarModule`.
-  - `CalendarStore.prune(connectionId: String, sourceId: String, keep: DateRange): Int`; `CalendarStore.cursor(connectionId, sourceId, window)` now means "while what was read covers [window]"; `applySync` keeps a cursor's key on an incremental result.
-  - `const val SYNC_AHEAD_DAYS = 42L` (`CalendarSync.kt`).
-  - `GoogleCalendarProvider(api, authorizer, toaster, playServices, stored: StoredSeries)`; `testProvider(…, stored: StoredSeries = StoredSeries { _, _ -> emptyMap() })`.
+  - `CalendarStore.cursor(connectionId, sourceId, window)` now means "while what the full sync read covers [window], in the same zone"; `applySync` keeps a cursor's key on an incremental result; `CalendarStore.prune(connectionId: String, sourceId: String, window: DateRange): Int` keeps [window start, end of what was read).
+  - `const val SYNC_FUTURE_DAYS = 28L` (was 14; D10: the window is today −1 to +28) and `const val SYNC_AHEAD_DAYS = 42L` (`CalendarSync.kt`).
 
 - [ ] **Step 1: Write the failing migration test (Review Focus 4)**
 
@@ -4076,7 +4287,7 @@ Expected: FAIL to compile ("Unresolved reference 'ALL_MIGRATIONS'", "'MIGRATION_
      */
     val readProblem: String? = null,
 ```
-- `SyncStateEntity.rangeStart`'s KDoc becomes `/** The cursor's key, "<end of what its full sync read, ISO date>|<zone id>" (4c ruling 1); the column keeps its v1 name. */`
+- `SyncStateEntity.rangeStart`'s KDoc becomes `/** The cursor's key, "<first day its full sync read>|<first day it didn't>|<zone id>" (ISO dates; 4c ruling 1); the column keeps its v1 name. */`
 - `version = 5` → `version = 6`.
 
 `db/Migrations.kt`, at the end:
@@ -4107,20 +4318,36 @@ Expected: `?? …/6.json`; in it the `source` table's `readProblem` is `"affinit
 Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarMigrationTest*"`
 Expected: PASS (5 tests).
 
+
 - [ ] **Step 3: Write the failing store tests**
 
 `CalendarStoreTest.kt`:
 - rename `cursorIsDroppedWhenTheWindowMoves` to `cursorIsDroppedOnceTheWindowPassesWhatWasRead` (body unchanged: what was read ends where `window` ends, so a window a day later isn't covered);
-- add (imports `uk.co.siland.culvery.capability.calendar.ChangeKind` etc. as the file needs):
+- add:
 ```kotlin
+    private fun spanning(id: String, from: Instant, to: Instant) =
+        RemoteEvent(id, id, EventTime.Timed(from), EventTime.Timed(to), recurring = false)
+
+    private val read = DateRange(window.start, window.endExclusive.plusDays(SYNC_AHEAD_DAYS), zone)
+
+    private suspend fun storedIds() = store.eventsBetween(Long.MIN_VALUE, Long.MAX_VALUE).first().map { it.remoteId }
+
     /** E2: no nightly full resync — a token serves every window that what it read still covers. */
     @Test
     fun cursorIsKeptWhileWhatWasReadCoversTheWindow() = runTest {
         connect("s1")
-        val read = DateRange(window.start, window.endExclusive.plusDays(SYNC_AHEAD_DAYS), zone)
         store.applySync("c1", "s1", read, full(timed("a", "One", 23, 9)))
         val nextDay = DateRange(window.start.plusDays(1), window.endExclusive.plusDays(1), zone)
         assertThat(store.cursor("c1", "s1", nextDay)).isEqualTo(SyncCursor("k1"))
+    }
+
+    /** Ruling 1: a clock set back asks for days the token never read, so it reads in full again. */
+    @Test
+    fun aClockMovedBackReadsInFullAgain() = runTest {
+        connect("s1")
+        store.applySync("c1", "s1", read, full(timed("a", "One", 23, 9)))
+        val dayBefore = DateRange(window.start.minusDays(1), window.endExclusive.minusDays(1), zone)
+        assertThat(store.cursor("c1", "s1", dayBefore)).isNull()
     }
 
     @Test
@@ -4134,59 +4361,45 @@ Expected: PASS (5 tests).
         assertThat(store.cursor("c1", "s1", window)).isEqualTo(SyncCursor("k2"))
     }
 
+    /** §6.2: what ends before the window, or starts at or after the end of what was read, goes; the edges are exact. */
     @Test
     fun pruningDropsWhatEndsBeforeTheWindowOrStartsAfterWhatWasRead() = runTest {
         connect("s1")
-        val edge = RemoteEvent("edge", "Edge", EventTime.Timed(at(21, 23)), EventTime.Timed(at(22, 1)), recurring = false)
-        val far = RemoteEvent("far", "Far", EventTime.Timed(window.endInstant.plusSeconds(9 * 3_600)), EventTime.Timed(window.endInstant.plusSeconds(10 * 3_600)), recurring = false)
-        store.applySync("c1", "s1", window, full(timed("old", "Old", 20, 9), edge, timed("kept", "Kept", 23, 9), far))
-        assertThat(store.prune("c1", "s1", window)).isEqualTo(2)
-        assertThat(store.eventsBetween(Long.MIN_VALUE, Long.MAX_VALUE).first().map { it.remoteId }).containsExactly("edge", "kept").inOrder()
+        store.applySync(
+            "c1", "s1", read,
+            full(
+                timed("old", "Old", 20, 9),
+                spanning("endsAtTheStart", window.startInstant.minusSeconds(3_600), window.startInstant),
+                spanning("edge", at(21, 23), at(22, 1)),
+                timed("kept", "Kept", 23, 9),
+                spanning("lastHour", read.endInstant.minusSeconds(3_600), read.endInstant),
+                spanning("startsAtTheEnd", read.endInstant, read.endInstant.plusSeconds(3_600)),
+            ),
+        )
+        assertThat(store.prune("c1", "s1", window)).isEqualTo(3)
+        assertThat(storedIds()).containsExactly("edge", "kept", "lastHour").inOrder()
     }
 
     /** Review Focus 3: an event a queued change targets stays until the change is delivered or dropped. */
     @Test
     fun pruningKeepsAnEventAQueuedChangeTargets() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(timed("old", "Old", 20, 9), timed("gone", "Gone", 20, 11)))
+        store.applySync("c1", "s1", read, full(timed("old", "Old", 20, 9), timed("gone", "Gone", 20, 11)))
         val draft = EventDraft("Old, renamed", EventTime.Timed(at(20, 9)), EventTime.Timed(at(20, 10)), forPerson = null, createdBy = null)
         store.enqueue(PendingChange(0, "c1", "s1", "old", ChangeKind.UPDATE, draft, attempts = 0, nextAttemptMillis = 0, createdMillis = 0, fields = setOf(EventField.TITLE)))
         store.prune("c1", "s1", window)
-        assertThat(store.eventsBetween(Long.MIN_VALUE, Long.MAX_VALUE).first().map { it.remoteId }).containsExactly("old")
-    }
-
-    @Test
-    fun theStoredSeriesAreEachRepeatingInstanceWithItsRule() = runTest {
-        connect("s1")
-        val weekly = RemoteEvent("piano_1", "Piano", EventTime.Timed(at(23, 15)), EventTime.Timed(at(23, 16)), recurring = true, recurrenceRule = "RRULE:FREQ=WEEKLY")
-        store.applySync("c1", "s1", window, full(weekly, timed("once", "Once", 23, 9)))
-        assertThat(store.instances("c1", "s1")).containsExactly("piano_1", "RRULE:FREQ=WEEKLY")
+        assertThat(storedIds()).containsExactly("old")
     }
 ```
+(imports as the file needs: `java.time.Instant`, `ChangeKind`, `EventDraft`, `EventField`, `PendingChange`.)
 Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarStoreTest*"`
-Expected: FAIL to compile (`prune`, `instances`, `SYNC_AHEAD_DAYS` unresolved).
+Expected: FAIL to compile (`prune`, `SYNC_AHEAD_DAYS` unresolved).
 
 - [ ] **Step 4: The store**
 
-`CalendarContract.kt`: in `CalendarProvider`'s KDoc, the last bullet's sentence "With a cursor, incremental upserts MAY lie outside the range (Google's syncToken can't carry timeMin/timeMax); the store keeps them and queries filter by range." becomes "With a cursor, incremental upserts MAY lie outside the range (Google's syncToken can't carry timeMin/timeMax); the engine prunes what lies outside what it keeps." Then add, after `SyncResult`:
+`CalendarContract.kt`: in `CalendarProvider`'s KDoc, the last bullet's sentence "With a cursor, incremental upserts MAY lie outside the range (Google's syncToken can't carry timeMin/timeMax); the store keeps them and queries filter by range." becomes "With a cursor, incremental upserts MAY lie outside the range (Google's syncToken can't carry timeMin/timeMax); the engine prunes what lies outside what it keeps."
+`db/CalendarDatabase.kt`, in `CalendarDao`:
 ```kotlin
-/**
- * What the tablet already holds of one calendar's repeating events (4c design §6.2, C9): each stored instance's id with
- * its series' rule, null when unknown. A provider may read it to reuse rules and to find a deleted series' instances.
- */
-fun interface StoredSeries {
-    suspend fun instances(connectionId: String, sourceId: String): Map<String, String?>
-}
-```
-`db/CalendarDatabase.kt`: after `EventRow` add
-```kotlin
-data class SeriesInstance(val remoteId: String, val recurrenceRule: String?)
-```
-and in `CalendarDao`:
-```kotlin
-    @Query("SELECT remoteId, recurrenceRule FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId AND recurring = 1")
-    suspend fun seriesInstances(connectionId: String, sourceId: String): List<SeriesInstance>
-
     /** Events outside [start, end) (spanOverlaps' opposite), except those a queued change targets (4c ruling 11). */
     @Query(
         """
@@ -4199,18 +4412,18 @@ and in `CalendarDao`:
     suspend fun pruneEvents(connectionId: String, sourceId: String, start: Long, end: Long): Int
 ```
 `CalendarStore.kt`:
-- the class header becomes `class CalendarStore internal constructor(private val db: CalendarDatabase, private val dao: CalendarDao) : StoredSeries {`
 - `cursor(…)` becomes
 ```kotlin
     /**
-     * The sync token while what its full sync read still covers [window], in the same zone (4c ruling 1); null forces a
-     * full sync. A zone change must resync: all-day events are stored at midnight in the zone they were synced in.
+     * The sync token while what its full sync read still covers [window], in the same zone (4c ruling 1): a window
+     * that has moved past what was read, or before it (a clock set back), or a zone change, reads in full. A zone
+     * change must: all-day events are stored at midnight in the zone they were synced in.
      */
     suspend fun cursor(connectionId: String, sourceId: String, window: DateRange): SyncCursor? {
         val state = dao.syncState(connectionId, sourceId) ?: return null
-        val (readUntil, zoneId) = state.rangeStart.split('|').takeIf { it.size == 2 } ?: return null
-        val covers = runCatching { !LocalDate.parse(readUntil).isBefore(window.endExclusive) }.getOrDefault(false)
-        return state.cursor?.takeIf { covers && zoneId == window.zone.id }?.let(::SyncCursor)
+        val key = CursorKey.parse(state.rangeStart) ?: return null
+        val covers = !key.readStart.isAfter(window.start) && !key.readEnd.isBefore(window.endExclusive) && key.zoneId == window.zone.id
+        return state.cursor?.takeIf { covers }?.let(::SyncCursor)
     }
 ```
 - in `applySync`, replace `dao.upsertSyncState(SyncStateEntity(connectionId, sourceId, result.cursor?.value, range.cursorKey()))` with
@@ -4222,28 +4435,44 @@ and in `CalendarDao`:
 - after `applySync` add
 ```kotlin
     /**
-     * Drops [sourceId]'s events that end before [keep] starts or start at or after it ends (4c design §6.2): an
-     * incremental result can carry any date, and nothing else removes them. A row a queued change targets stays.
-     * Returns how many went.
+     * Drops [sourceId]'s events that end before [window] starts, or start at or after the end of what its full sync read
+     * (4c design §6.2, ruling 1): an incremental result can carry any date, and nothing else removes them. What was read
+     * past the window stays, as no incremental result will bring it back. A row a queued change targets stays. Returns
+     * how many went.
      */
-    suspend fun prune(connectionId: String, sourceId: String, keep: DateRange): Int =
-        dao.pruneEvents(connectionId, sourceId, keep.startInstant.toEpochMilli(), keep.endInstant.toEpochMilli())
-
-    override suspend fun instances(connectionId: String, sourceId: String): Map<String, String?> =
-        dao.seriesInstances(connectionId, sourceId).associate { it.remoteId to it.recurrenceRule }
+    suspend fun prune(connectionId: String, sourceId: String, window: DateRange): Int = db.withTransaction {
+        val readEnd = dao.syncState(connectionId, sourceId)?.let { CursorKey.parse(it.rangeStart) }?.readEnd ?: window.endExclusive
+        dao.pruneEvents(
+            connectionId,
+            sourceId,
+            window.startInstant.toEpochMilli(),
+            readEnd.atStartOfDay(window.zone).toInstant().toEpochMilli(),
+        )
+    }
 ```
-- `private fun DateRange.cursorKey(): String = "$start|${zone.id}"` becomes `private fun DateRange.cursorKey(): String = "$endExclusive|${zone.id}"`.
-
-`di/CalendarModule.kt`, in the abstract class:
+- `private fun DateRange.cursorKey(): String = "$start|${zone.id}"` becomes
 ```kotlin
-    @Binds
-    abstract fun storedSeries(impl: CalendarStore): StoredSeries
+/** A sync cursor's key (4c ruling 1): the days its full sync read, end exclusive, and the zone it read them in. */
+private class CursorKey(val readStart: LocalDate, val readEnd: LocalDate, val zoneId: String) {
+    override fun toString(): String = "$readStart|$readEnd|$zoneId"
+
+    companion object {
+        /** Null for a key from before v6 (cleared by the migration) or anything unreadable: a full sync. */
+        fun parse(text: String): CursorKey? {
+            val parts = text.split('|')
+            if (parts.size != 3) return null
+            return runCatching { CursorKey(LocalDate.parse(parts[0]), LocalDate.parse(parts[1]), parts[2]) }.getOrNull()
+        }
+    }
+}
+
+private fun DateRange.cursorKey(): String = CursorKey(start, endExclusive, zone.id).toString()
 ```
-`CalendarSync.kt`: after `PROVIDER_TIMEOUT_MS` add
+`CalendarSync.kt`: `const val SYNC_FUTURE_DAYS = 14L` becomes `const val SYNC_FUTURE_DAYS = 28L` with the KDoc `/** How far ahead the tablet shows: the Calendar tab's four weeks (4c D10); the window is today − 1 to today + 28. */`, and after `PROVIDER_TIMEOUT_MS` add
 ```kotlin
 /**
  * How much further than the window a full sync reads (4c ruling 1): Google's incremental results say nothing about an
- * unchanged event, so the token serves only while what was read covers the window — about six weeks.
+ * unchanged event, so the token serves only while what was read covers the window — six weeks.
  */
 const val SYNC_AHEAD_DAYS = 42L
 ```
@@ -4253,7 +4482,7 @@ Expected: PASS.
 - [ ] **Step 5: Write the failing sync tests**
 
 `CalendarSyncTest.kt`:
-- `windowIsYesterdayToTwoWeeksAheadInTheHouseholdZone`: its expected range becomes `DateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 11, 20), auckland)` (the window, 23 Sep to 9 Oct, read 42 days further), and rename it `aFullSyncReadsFromYesterdayToSixWeeksPastTheWindow`.
+- `windowIsYesterdayToTwoWeeksAheadInTheHouseholdZone`: rename it `aFullSyncReadsFromYesterdayToSixWeeksPastTheWindow`; its expected range becomes `DateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 12, 4), auckland)` (the window, 23 September to 23 October, read 42 days further).
 - replace `aNewDayResyncsFromScratch` with:
 ```kotlin
     /** E2: the pass after local midnight carries on from its token. */
@@ -4267,14 +4496,18 @@ Expected: PASS.
         assertThat(a.calls[1].cursor).isEqualTo(SyncCursor("k1"))
     }
 
+    /** Ruling 1: exactly SYNC_AHEAD_DAYS later the token still serves; a day after, it reads in full. */
     @Test
-    fun onceTheWindowPassesWhatWasReadItReadsInFullAgain() = runTest {
+    fun theTokenServesUntilTheWindowPassesWhatWasRead() = runTest {
         connect("c1", "calendar.a", s1)
         val sync = engine()
         sync.syncAll()
-        now = now.plusSeconds((SYNC_AHEAD_DAYS + 1) * 86_400)
+        now = now.plusSeconds(SYNC_AHEAD_DAYS * 86_400)
         sync.syncAll()
-        assertThat(a.calls[1].cursor).isNull()
+        assertThat(a.calls[1].cursor).isEqualTo(SyncCursor("k1"))
+        now = now.plusSeconds(86_400)
+        sync.syncAll()
+        assertThat(a.calls[2].cursor).isNull()
     }
 
     @Test
@@ -4299,13 +4532,13 @@ with a helper beside `swim()`:
         recurring = false,
     )
 ```
+(Christmas is past the read's end, 3 December; 1 September is before the window's start, 22 September.)
 Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarSyncTest*"`
 Expected: FAIL: the range is still the window; the next day's cursor is null; nothing is pruned.
 
 - [ ] **Step 6: The engine reads further, keeps its token, and prunes**
 
-`CalendarSync.kt`:
-- `syncSource` becomes
+`CalendarSync.kt`, `syncSource` becomes
 ```kotlin
     private suspend fun syncSource(
         provider: CalendarProvider,
@@ -4318,16 +4551,95 @@ Expected: FAIL: the range is still the window; the next day's cursor is null; no
         val result = callReader(io, timeoutMillis) { provider.sync(conn, source, read, cursor) }
             .getOrElse { return healthAfter(it, conn, source.id) }
         store.applySync(conn.id, source.id, read, result)
-        store.prune(conn.id, source.id, read)
+        store.prune(conn.id, source.id, window)
         return ConnectionHealth.Ok
     }
 ```
 (the store calls stay outside the provider's call, as the KDoc above it says.)
 
-Run: `./gradlew :capability:calendar:testDebugUnitTest`
-Expected: PASS. Any other test that asserted the range passed to a provider equals the window now expects it read `SYNC_AHEAD_DAYS` further; change only that expectation.
+Run: `./gradlew :capability:calendar:testDebugUnitTest`, then `./gradlew testDebugUnitTest`
+Expected: PASS. A test elsewhere that asserted the range passed to a provider, or a window 14 days long, now expects the 28-day window read `SYNC_AHEAD_DAYS` further; change only that expectation.
 
-- [ ] **Step 7: Write the failing Google tests**
+- [ ] **Step 7: Run the gate**
+
+Run: `./gradlew testDebugUnitTest verifyRoborazziDebug`
+Expected: `BUILD SUCCESSFUL`, no screenshot differences.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add capability/calendar
+git commit -m "Keep calendar sync tokens across midnight, prune what falls outside what was read, and sync four weeks ahead"
+```
+
+---
+
+### Task 13: A series deleted on a phone — `StoredSeries` and C9 (§6.3 C9, §6.2 D11; rulings 2, 3)
+
+**Review:** opus (removals from the mirror).
+
+**Files:**
+- Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarContract.kt`, `CalendarStore.kt`, `db/CalendarDatabase.kt`, `di/CalendarModule.kt`
+- Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarStoreTest.kt`
+- Modify: `provider/calendar-google/src/main/java/uk/co/siland/culvery/provider/calendar_google/GoogleCalendarProvider.kt`
+- Test: `provider/calendar-google/src/test/java/uk/co/siland/culvery/provider/calendar_google/TestSupport.kt`, `GoogleReadTest.kt`
+
+**Interfaces:**
+- Consumes: Task 10's `testProvider(…)`; Task 12's store.
+- Produces:
+  - `fun interface StoredSeries { suspend fun instances(connectionId: String, sourceId: String): Map<String, String?> }` in `CalendarContract.kt`; `CalendarStore : StoredSeries`, bound in `CalendarModule`. Used only to find a deleted series' stored instances: the rule cache is not seeded from it (D11).
+  - `GoogleCalendarProvider(api, authorizer, toaster, playServices, stored: StoredSeries)`; `testProvider(…, stored: StoredSeries = StoredSeries { _, _ -> emptyMap() })`.
+
+- [ ] **Step 1: Write the failing store test**
+
+`CalendarStoreTest.kt`, add:
+```kotlin
+    @Test
+    fun theStoredSeriesAreEachRepeatingInstanceWithItsRule() = runTest {
+        connect("s1")
+        val weekly = RemoteEvent("piano_1", "Piano", EventTime.Timed(at(23, 15)), EventTime.Timed(at(23, 16)), recurring = true, recurrenceRule = "RRULE:FREQ=WEEKLY")
+        store.applySync("c1", "s1", window, full(weekly, timed("once", "Once", 23, 9)))
+        assertThat(store.instances("c1", "s1")).containsExactly("piano_1", "RRULE:FREQ=WEEKLY")
+    }
+```
+Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarStoreTest*"`
+Expected: FAIL to compile ("Unresolved reference 'instances'").
+
+- [ ] **Step 2: The seam, read from the store**
+
+`CalendarContract.kt`, after `SyncResult`:
+```kotlin
+/**
+ * What the tablet already holds of one calendar's repeating events (4c design §6.3, C9): each stored instance's id with
+ * its series' rule, null when unknown. A provider reads it to find a deleted series' instances.
+ */
+fun interface StoredSeries {
+    suspend fun instances(connectionId: String, sourceId: String): Map<String, String?>
+}
+```
+`db/CalendarDatabase.kt`: after `EventRow` add
+```kotlin
+data class SeriesInstance(val remoteId: String, val recurrenceRule: String?)
+```
+and in `CalendarDao`:
+```kotlin
+    @Query("SELECT remoteId, recurrenceRule FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId AND recurring = 1")
+    suspend fun seriesInstances(connectionId: String, sourceId: String): List<SeriesInstance>
+```
+`CalendarStore.kt`: the class header becomes `class CalendarStore internal constructor(private val db: CalendarDatabase, private val dao: CalendarDao) : StoredSeries {`, and after `prune` add
+```kotlin
+    override suspend fun instances(connectionId: String, sourceId: String): Map<String, String?> =
+        dao.seriesInstances(connectionId, sourceId).associate { it.remoteId to it.recurrenceRule }
+```
+`di/CalendarModule.kt`, in the abstract class:
+```kotlin
+    @Binds
+    abstract fun storedSeries(impl: CalendarStore): StoredSeries
+```
+Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarStoreTest*"`
+Expected: PASS.
+
+- [ ] **Step 3: Write the failing Google tests**
 
 `TestSupport.kt`: `testProvider` gains a last parameter `stored: StoredSeries = StoredSeries { _, _ -> emptyMap() }` passed as the provider's last argument (import `uk.co.siland.culvery.capability.calendar.StoredSeries`).
 `GoogleReadTest.kt`: keep the API `setUp` builds in a field (`private lateinit var api: GoogleApi`; `api = GoogleApi(google.start(), FakeTokenSource(), OkHttpClient())`; `provider = testProvider(api)`), and add:
@@ -4340,7 +4652,10 @@ Expected: PASS. Any other test that asserted the range passed to a provider equa
         google.putEvent(family.id, google.timed("piano_20260929T141500Z", "Piano", at(29, 15), at(29, 16)) { put("recurringEventId", "piano") })
     }
 
-    /** C9: a series deleted on a phone comes back as its master's id alone; every stored instance of it goes. */
+    /**
+     * C9: a series deleted on a phone comes back as its master's id alone; every stored instance of it goes — and only
+     * its own: not a series split from it ("this and following" makes "<id>_R<start>"), nor another series.
+     */
     @Test
     fun aCancelledSeriesRemovesEveryStoredInstance() = runTest {
         val stored = mutableMapOf<String, String?>()
@@ -4349,25 +4664,12 @@ Expected: PASS. Any other test that asserted the range passed to a provider equa
         google.putEvent(family.id, google.timed("swim_20260923T161500Z", "Swim", at(23, 17), at(23, 18)) { put("recurringEventId", "swim") })
         val first = mirrored.sync(conn, family, range, null)
         first.upserts.forEach { stored[it.remoteId] = it.recurrenceRule }
+        stored["piano_R20261006T141500_20261006T141500Z"] = "RRULE:FREQ=WEEKLY;BYDAY=TU"
+        stored["piano_20261003"] = null
         google.putEvent(family.id, buildJsonObject { put("id", "piano"); put("status", "cancelled") })
         val next = mirrored.sync(conn, family, range, first.cursor)
-        assertThat(next.removedIds).containsAtLeast("piano", "piano_20260922T141500Z", "piano_20260929T141500Z")
-        assertThat(next.removedIds).doesNotContain("swim_20260923T161500Z")
-    }
-
-    /** §6.2: after a 410 the full sync reuses the rules the tablet stored, instead of one events.get per series. */
-    @Test
-    fun aFullSyncAfterA410ReusesStoredRules() = runTest {
-        val stored = mutableMapOf<String, String?>()
-        val mirrored = testProvider(api, stored = StoredSeries { _, _ -> stored })
-        pianoSeries()
-        val first = mirrored.sync(conn, family, range, null)
-        first.upserts.forEach { stored[it.remoteId] = it.recurrenceRule }
-        google.oldestValidToken = Long.MAX_VALUE
-        val again = mirrored.sync(conn, family, range, first.cursor)
-        assertThat(again.fullReplace).isTrue()
-        assertThat(again.upserts.map { it.recurrenceRule }).containsExactly("RRULE:FREQ=WEEKLY;BYDAY=TU", "RRULE:FREQ=WEEKLY;BYDAY=TU")
-        assertThat(asksFor("piano")).isEqualTo(1)
+        assertThat(next.removedIds).containsAtLeast("piano", "piano_20260922T141500Z", "piano_20260929T141500Z", "piano_20261003")
+        assertThat(next.removedIds).containsNoneOf("swim_20260923T161500Z", "piano_R20261006T141500_20261006T141500Z")
     }
 
     /** Ruling 3: with no nightly full sync, a series changed on a phone has its rule read again. */
@@ -4384,13 +4686,12 @@ Expected: PASS. Any other test that asserted the range passed to a provider equa
 (imports `kotlinx.serialization.json.buildJsonObject` and `put` if not there; `StoredSeries`.)
 
 Run: `./gradlew :provider:calendar-google:testDebugUnitTest --tests "*GoogleReadTest*"`
-Expected: FAIL to compile (`testProvider` has no `stored`, the provider takes four arguments), then, once Step 8's constructor is in, the three new tests FAIL on behaviour.
+Expected: FAIL to compile (`testProvider` has no `stored`, the provider takes four arguments), then, once Step 4's constructor is in, the two new tests FAIL on behaviour.
 
-- [ ] **Step 8: Seed, refresh and cancel in the provider**
+- [ ] **Step 4: Cancel and refresh in the provider**
 
 `GoogleCalendarProvider.kt`:
-- the constructor gains `private val stored: StoredSeries,` last (import `uk.co.siland.culvery.capability.calendar.StoredSeries`); update the class KDoc's last sentence to "Each series' RRULE is fetched once and kept in memory per calendar; a full sync starts from the rules the tablet stored, and an incremental pass reads a changed series' rule again (4c rulings 2, 3)."
-- in `full(…)`, after `val listed = …` add `seedRules(conn, source, listed.items, fresh)`.
+- the constructor gains `private val stored: StoredSeries,` last (import `uk.co.siland.culvery.capability.calendar.StoredSeries`); update the class KDoc's last sentence to "Each series' RRULE is fetched once and kept in memory per calendar, until that calendar's next full sync; an incremental pass reads a changed series' rule again (4c ruling 3)."
 - `incremental(…)` becomes
 ```kotlin
     private suspend fun incremental(conn: Connection, account: String, source: CalendarSource, cursor: SyncCursor): SyncResult? {
@@ -4406,9 +4707,9 @@ Expected: FAIL to compile (`testProvider` has no `stored`, the provider takes fo
             if (event.isGone) {
                 removed += event.id
                 if (event.recurringEventId == null) {
-                    // C9: a deleted series comes back as its own id alone; its instances are "<id>_<start>" (ruling 2).
+                    // C9: a deleted series comes back as its own id alone (ruling 2).
                     val known = instances ?: stored.instances(conn.id, source.id).also { instances = it }
-                    removed += known.keys.filter { it.startsWith("${event.id}_") }
+                    removed += known.keys.filter { instanceOf(event.id, it) }
                     cache.remove(event.id)
                 }
             } else {
@@ -4417,45 +4718,459 @@ Expected: FAIL to compile (`testProvider` has no `stored`, the provider takes fo
         }
         return SyncResult(upserts, removed, listed.syncToken?.let(::SyncCursor) ?: cursor, fullReplace = false)
     }
-
-    /** §6.2: each listed instance the tablet stored with a rule gives its series that rule, so a full sync asks only for new series. */
-    private suspend fun seedRules(conn: Connection, source: CalendarSource, items: List<GoogleEvent>, cache: ConcurrentHashMap<String, String>) {
-        val known = stored.instances(conn.id, source.id)
-        items.forEach { event ->
-            val series = event.recurringEventId ?: return@forEach
-            known[event.id]?.let { rule -> cache.putIfAbsent(series, rule) }
-        }
-    }
+```
+- and at the top level of the file:
+```kotlin
+/**
+ * Whether [remoteId] is an instance of the series [seriesId] (ruling 2): Google names one "<series>_<original start>",
+ * the start as 20261005T141500Z or, for an all-day event, 20261005. A series split from it ("<series>_R<start>") is
+ * another series, so only that exact shape counts.
+ */
+internal fun instanceOf(seriesId: String, remoteId: String): Boolean =
+    Regex("^${Regex.escape(seriesId)}_\\d{8}(T\\d{6}Z)?$").matches(remoteId)
 ```
 
 Run: `./gradlew :provider:calendar-google:testDebugUnitTest`
-Expected: PASS (the existing `instancesOfASeriesAreRecurringWithTheSeriesRuleFetchedOnce` still sees 2 fetches: its provider stores nothing).
+Expected: PASS (the existing `instancesOfASeriesAreRecurringWithTheSeriesRuleFetchedOnce` still sees a full sync fetch each rule again: D11).
 
-- [ ] **Step 9: Run the gate**
+- [ ] **Step 5: Run the gate**
 
 Run: `./gradlew testDebugUnitTest verifyRoborazziDebug`
 Expected: `BUILD SUCCESSFUL`, no screenshot differences.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add capability/calendar provider/calendar-google
-git commit -m "Keep calendar sync tokens across midnight, prune what falls outside, reuse stored series rules, and drop a deleted series' instances"
+git commit -m "Drop every stored instance of a series deleted on a phone, and read a changed series' rule again"
 ```
 
 ---
 
-### Task 12: C3 and C4 — NeedsSignIn after a refused write; all-day events by their dates (§6.3; ruling 13)
+### Task 14: Looking ahead four weeks in the Calendar tab (§6.6, D10)
 
 **Review:** sonnet.
 
 **Files:**
-- Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarStore.kt`, `db/CalendarDatabase.kt`, `CalendarRepository.kt`, `PendingOverlay.kt`
-- Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSyncTest.kt`, `CalendarRepositoryTest.kt`
+- Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarUi.kt`, `CalendarEditor.kt`, `ui/WeekView.kt`, `ui/CardHosts.kt`, `ui/Pickers.kt`, `ui/CalendarType.kt`
+- Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarEditorTest.kt`, `CalendarSyncTest.kt`, `ui/SampleUi.kt`, `ui/WeekViewTest.kt`, `ui/CardHostsMidnightRolloverTest.kt`, `ui/WeekScreenshotTest.kt`
+- Screenshots (record, commit): `capability/calendar/src/test/screenshots/week_*.png` (the five existing ones change: the header gains ‹ ›), plus `week_next_light.png`, `week_next_dark.png`, `week_furthest_light.png`, `week_furthest_dark.png`
 
 **Interfaces:**
-- Consumes: Task 11's store.
-- Produces: `CalendarDao.markSyncTime(id: String, at: Long)`; `internal fun StoredEvent.isOn(date: LocalDate, zone: ZoneId): Boolean` (`PendingOverlay.kt`). `CalendarStore.markSynced` keeps `NEEDS_SIGN_IN` while the connection has queued changes.
+- Consumes: Task 2's `Icons.CHEVRON_LEFT` / `Icons.CHEVRON_RIGHT` (already in `icons.txt`); Task 6's `HouseholdClock`, `rememberToday(clock)`, `rememberNowMillis(clock)` and the reworked `CardHostsMidnightRolloverTest`; Task 12's `SYNC_FUTURE_DAYS = 28L`.
+- Produces:
+  - `CalendarUi.kt`: `const val MAX_WEEKS_AHEAD = 3`; `fun lastShownDay(today: LocalDate): LocalDate` (today + 27); `fun weekTitle(weeksAhead: Int): String`; `fun eventAddedFor(day: LocalDate): String`.
+  - `WeekViewState(week, today, sync, nowMillis, weeksAhead: Int = 0)`; `WeekView(state, modifier, onOpen, onAdd, onWeeksAhead: (Int) -> Unit = {}, onReconnect)`.
+  - `ui/WeekView.kt`: `internal class WeekShown` (`weeks`, `show(weeks)`, `touched()`), `@Composable internal fun rememberWeekShown(today: LocalDate): WeekShown`, `internal const val BACK_TO_THIS_WEEK_MS = 120_000L`, `internal fun Modifier.onEveryTouch(onTouch: () -> Unit): Modifier`.
+  - `ui/Pickers.kt`: `RoundButton` becomes `internal`, with `enabled: Boolean = true` before `onClick`.
+  - The editor's add toast: `EVENT_ADDED`, or `eventAddedFor(day)` when the event starts after `lastShownDay(today)`.
+
+- [ ] **Step 1: Write the failing tests for the shown range and the toast**
+
+`CalendarSyncTest.kt`, add (imports `lastShownDay`, `SYNC_FUTURE_DAYS` are same-package):
+```kotlin
+    /** 4c D10: the Calendar tab's furthest day is inside the window each pass keeps. */
+    @Test
+    fun theFurthestWeekShownIsInsideTheWindow() {
+        val today = LocalDate.of(2026, 9, 24)
+        assertThat(lastShownDay(today)).isEqualTo(LocalDate.of(2026, 10, 21))
+        assertThat(lastShownDay(today)).isAtMost(today.plusDays(SYNC_FUTURE_DAYS))
+    }
+```
+`CalendarEditorTest.kt`: the editor's "now" moves from 1970 to a real morning, so "today" means something to the toast:
+- after `london`, add
+```kotlin
+    /** The editor's and the drain's clock start here: Wednesday 23 September, 09:00 in London. */
+    private val opened = LocalDate.of(2026, 9, 23).atTime(9, 0).atZone(london).toInstant().toEpochMilli()
+```
+- in `editor(…)`, `WallClock { testScheduler.currentTime }` → `WallClock { opened + testScheduler.currentTime }`; in `drain(…)`, `WallClock { testScheduler.currentTime + aheadMillis }` → `WallClock { opened + testScheduler.currentTime + aheadMillis }`.
+- the four assertions that compare a stored time with the test's clock gain `opened + `: in `offlineDeleteIsQueued` (`isEqualTo(opened + testScheduler.currentTime + 30_000)`), `aChangeBehindAPendingOneIsQueuedNotWrittenDirectly` (`isEqualTo(opened + testScheduler.currentTime)`), `anOfflineAddIsQueuedWithItsKey` (`isEqualTo(opened + testScheduler.currentTime + OUTBOX_BACKOFF_MS.first())`) and `aSaveThatNeedsSignInIsQueuedAndFlagsTheConnectionAtOnce` (`isEqualTo(opened + testScheduler.currentTime)`). `aWriteSlowerThanTenSecondsIsQueued` reads the scheduler alone and stays. Find them with `git grep -n "testScheduler.currentTime" -- capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarEditorTest.kt`; an editor built inline with its own `WallClock { testScheduler.currentTime }` (two tests that add nothing) stays as it is.
+- add
+```kotlin
+    /** A one-hour event at 18:00 London on [day]. */
+    private fun draftOn(day: LocalDate, title: String): EventDraft {
+        val start = day.atTime(18, 0).atZone(london).toInstant()
+        return EventDraft(title, EventTime.Timed(start), EventTime.Timed(start.plusSeconds(3_600)), PersonId.FAMILY.value, null)
+    }
+
+    /** 4c §6.6: an event after the last day the Calendar tab shows names its day; one on that day doesn't. */
+    @Test
+    fun anEventAddedBeyondTheFurthestWeekNamesItsDay() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        val last = lastShownDay(LocalDate.of(2026, 9, 23))
+        assertThat(editor.create(draftOn(last, "Last shown"))).isEqualTo(EditResult.Done)
+        assertThat(editor.create(draftOn(last.plusDays(1), "Beyond"))).isEqualTo(EditResult.Done)
+        assertThat(access.toasts.messages).containsExactly(EVENT_ADDED, "Event added for Wed 21 October").inOrder()
+    }
+```
+Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarSyncTest*" --tests "*CalendarEditorTest*"`
+Expected: FAIL to compile ("Unresolved reference 'lastShownDay'").
+
+- [ ] **Step 2: The shown range, the titles and the dated toast**
+
+`CalendarUi.kt`, after `WEEKDAY`:
+```kotlin
+internal val DAY_AND_MONTH: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMMM", Locale.ENGLISH)
+
+/** How many weeks past this one the Calendar tab steps to (4c D10): four weeks in all, inside the synced window. */
+const val MAX_WEEKS_AHEAD = 3
+
+/** The last day the Calendar tab can show from [today]: the seventh day of its furthest week. */
+fun lastShownDay(today: LocalDate): LocalDate = today.plusWeeks(MAX_WEEKS_AHEAD + 1L).minusDays(1)
+
+/** The Calendar tab's title for the week [weeksAhead] after this one. */
+fun weekTitle(weeksAhead: Int): String = when (weeksAhead) {
+    0 -> "This week"
+    1 -> "Next week"
+    else -> "In $weeksAhead weeks"
+}
+
+/** 4c §6.6: the toast after adding an event the Calendar tab can't reach, so the family know where it went. */
+fun eventAddedFor(day: LocalDate): String = "Event added for ${day.format(DAY_AND_MONTH)}"
+```
+`CalendarEditor.kt`:
+- `create(…)`: before `return onAppScope(…)` add `val added = addedToast(draft.start)`, and the call becomes `onAppScope(ChangeKind.CREATE, serviceNameOf(to.connection, serviceOf), added) { … }`.
+- `onAppScope(kind: ChangeKind, label: String, block: …)` → `onAppScope(kind: ChangeKind, label: String, added: String = EVENT_ADDED, block: …)`, and inside it `report(kind, label, result)` → `report(kind, label, result, added)`.
+- `report(kind: ChangeKind, label: String, result: EditResult)` → `report(kind: ChangeKind, label: String, result: EditResult, added: String)`, and its `saved && kind == ChangeKind.CREATE -> toaster.show(EVENT_ADDED)` → `toaster.show(added)`.
+- after `openedAt()` add
+```kotlin
+    /** "Event added", or with its day when that is past what the Calendar tab shows (4c §6.6). */
+    private suspend fun addedToast(start: EventTime): String {
+        val z = zone.current()
+        val day = when (start) {
+            is EventTime.AllDay -> start.date
+            is EventTime.Timed -> start.instant.atZone(z).toLocalDate()
+        }
+        val today = Instant.ofEpochMilli(clock.nowMillis()).atZone(z).toLocalDate()
+        return if (day > lastShownDay(today)) eventAddedFor(day) else EVENT_ADDED
+    }
+```
+Run: `./gradlew :capability:calendar:testDebugUnitTest`
+Expected: PASS. Any other test asserting `EVENT_ADDED` whose editor clock is far from its event's date (as `CalendarEditorTest`'s was): give its clock a real morning near the event, as above; don't change the expectation.
+
+- [ ] **Step 3: Write the failing view tests**
+
+`ui/SampleUi.kt`, after `week`:
+```kotlin
+    /** [week] moved [weeks] on: the Calendar tab stepped ahead (4c D10). */
+    fun weekAhead(weeks: Long) = week.copy(
+        start = TODAY.plusWeeks(weeks),
+        days = week.days.map { it.copy(date = it.date.plusWeeks(weeks)) },
+    )
+```
+`ui/WeekViewTest.kt`, add (imports `androidx.compose.material3.Text`, `androidx.compose.runtime.setValue`, `androidx.compose.ui.Modifier`, `androidx.compose.ui.test.assertIsEnabled`, `androidx.compose.ui.test.assertIsNotEnabled`, `uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD`, `uk.co.siland.culvery.capability.calendar.weekTitle`):
+```kotlin
+    /** 4c §6.6: ‹ › step a week at a time; › stops at the furthest week, ‹ at this week; This week jumps back. */
+    @Test
+    fun theArrowsStepAWeekAndStopAtEachEnd() {
+        val asked = mutableListOf<Int>()
+        var weeks by mutableStateOf(0)
+        show { WeekView(state().copy(weeksAhead = weeks), onWeeksAhead = { asked += it; weeks = it }) }
+        compose.onNodeWithTag("week_earlier").assertIsNotEnabled()
+        compose.onNodeWithTag("week_this_week").assertDoesNotExist()
+        compose.onNodeWithTag("week_later").performClick()
+        compose.onNodeWithText("Next week").assertExists()
+        repeat(MAX_WEEKS_AHEAD) { compose.onNodeWithTag("week_later").performClick() }
+        compose.onNodeWithText("In 3 weeks").assertExists()
+        compose.onNodeWithTag("week_later").assertIsNotEnabled()
+        compose.onNodeWithTag("week_earlier").assertIsEnabled()
+        compose.onNodeWithTag("week_this_week").performClick()
+        assertThat(asked).containsExactly(1, 2, 3, 0).inOrder()
+        compose.onNodeWithText("This week").assertExists()
+        compose.onNodeWithTag("week_this_week").assertDoesNotExist()
+    }
+
+    @Test
+    fun eachWeekHasItsTitle() {
+        assertThat((0..MAX_WEEKS_AHEAD).map(::weekTitle)).containsExactly("This week", "Next week", "In 2 weeks", "In 3 weeks").inOrder()
+    }
+
+    /** 4c §6.6: on a later week, + adds on its first day and a column on its own day; no column says Today. */
+    @Test
+    fun aLaterWeekAddsOnItsOwnDays() {
+        val added = mutableListOf<LocalDate>()
+        show { WeekView(WeekViewState(SampleUi.weekAhead(1), SampleUi.TODAY, sync(), now, weeksAhead = 1), onAdd = { added += it }) }
+        compose.onNodeWithTag("week_add_event").performClick()
+        compose.onNodeWithTag("week_add_${SampleUi.TODAY.plusDays(9)}").performClick()
+        assertThat(added).containsExactly(SampleUi.TODAY.plusWeeks(1), SampleUi.TODAY.plusDays(9)).inOrder()
+        compose.onNodeWithText("Today").assertDoesNotExist()
+    }
+
+    /** A touch anywhere restarts the 2-minute wait, and still reaches what was touched. */
+    @Test
+    fun aTouchIsSeenWithoutBeingTaken() {
+        var touches = 0
+        val added = mutableListOf<LocalDate>()
+        show { WeekView(state(), Modifier.onEveryTouch { touches++ }, onAdd = { added += it }) }
+        compose.onNodeWithTag("week_add_${SampleUi.TODAY}").performClick()
+        assertThat(touches).isEqualTo(1)
+        assertThat(added).containsExactly(SampleUi.TODAY)
+    }
+
+    /** 4c §6.6: a later week goes back to this week after 2 minutes without a touch; a touch starts the wait again. */
+    @Test
+    fun aLaterWeekGoesBackToThisWeekAfterTwoMinutesWithoutATouch() {
+        compose.mainClock.autoAdvance = false
+        lateinit var shown: WeekShown
+        show {
+            shown = rememberWeekShown(SampleUi.TODAY)
+            Text(weekTitle(shown.weeks))
+        }
+        compose.runOnIdle { shown.show(2) }
+        compose.mainClock.advanceTimeBy(BACK_TO_THIS_WEEK_MS - 1_000)
+        compose.onNodeWithText("In 2 weeks").assertExists()
+        compose.runOnIdle { shown.touched() }
+        compose.mainClock.advanceTimeBy(BACK_TO_THIS_WEEK_MS - 1_000)
+        compose.onNodeWithText("In 2 weeks").assertExists()
+        compose.mainClock.advanceTimeBy(2_000)
+        compose.onNodeWithText("This week").assertExists()
+    }
+
+    /** 4c §6.6: at midnight the view is back on this week, whatever it showed. */
+    @Test
+    fun aLaterWeekGoesBackToThisWeekAtMidnight() {
+        var today by mutableStateOf(SampleUi.TODAY)
+        lateinit var shown: WeekShown
+        show {
+            shown = rememberWeekShown(today)
+            Text(weekTitle(shown.weeks))
+        }
+        compose.runOnIdle { shown.show(MAX_WEEKS_AHEAD + 1) }
+        compose.onNodeWithText("In 3 weeks").assertExists()
+        today = today.plusDays(1)
+        compose.onNodeWithText("This week").assertExists()
+    }
+```
+`ui/CardHostsMidnightRolloverTest.kt`, add (it already has the `clockScope` field from Task 6; imports `androidx.compose.ui.test.performClick`, `kotlinx.coroutines.flow.MutableStateFlow` if not there):
+```kotlin
+    /** 4c §6.6: › loads the next week from the store. */
+    @Test
+    fun weekViewHostShowsTheWeekItStepsTo() {
+        val now = LocalDateTime.of(2026, 9, 23, 12, 0).atZone(london).toInstant().toEpochMilli()
+        val clock = HouseholdClock(zone.zone, WallClock { now }, clockScope, MutableStateFlow(now))
+        compose.setContent {
+            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides RecordingOverlay()) {
+                CulveryTheme(dark = true) {
+                    val today = rememberToday(clock) ?: return@CulveryTheme
+                    WeekViewHost(repo, editor, today, rememberNowMillis(clock), onReconnect = {})
+                }
+            }
+        }
+        compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodesWithTag("week_day_2026-09-23").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("week_later").performClick()
+        compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodesWithTag("week_day_2026-10-06").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("week_day_2026-09-30").assertExists()
+        compose.onNodeWithTag("week_day_2026-09-29").assertDoesNotExist()
+        compose.onNodeWithText("Next week").assertExists()
+    }
+```
+Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*WeekViewTest*" --tests "*CardHostsMidnightRolloverTest*"`
+Expected: FAIL to compile ("No parameter with name 'weeksAhead'", "Unresolved reference 'rememberWeekShown'").
+
+- [ ] **Step 4: The arrows, the chip and the wait**
+
+`ui/CalendarType.kt`, in `CalendarDimens` after `reconnectIcon`:
+```kotlin
+    // Looking ahead (4c §6.6): ‹ › are the date picker's 48 dp round buttons, 8 apart and 16 before the title; the
+    // This week chip is a 44 dp `surf2` pill 16 after it. An arrow at its end shows at 30%.
+    val weekStepGap = 8.dp
+    val weekTitleGap = 16.dp
+    const val DISABLED_ALPHA = 0.3f
+```
+`ui/Pickers.kt`: `private fun RoundButton(icon: String, label: String, tag: String, onClick: () -> Unit)` becomes
+```kotlin
+@Composable
+internal fun RoundButton(icon: String, label: String, tag: String, enabled: Boolean = true, onClick: () -> Unit) {
+    val c = Culvery.colors
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .testTag(tag)
+            .size(CalendarDimens.pageButton)
+            .alpha(if (enabled) 1f else CalendarDimens.DISABLED_ALPHA)
+            .clip(CircleShape)
+            .background(c.surf2)
+            .clickable(enabled = enabled, onClickLabel = label, onClick = onClick),
+    ) {
+        HhIcon(icon, size = CalendarDimens.pageButtonIcon, tint = c.ink, contentDescription = label)
+    }
+}
+```
+`ui/WeekView.kt`:
+- `data class WeekViewState(val week: WeekUi, val today: LocalDate, val sync: SyncStatusUi, val nowMillis: Long)` → add `, val weeksAhead: Int = 0` (KDoc: `/** [weeksAhead]: how many weeks after this one [week] is (4c D10). */`).
+- the KDoc of `WeekView` becomes:
+```kotlin
+/**
+ * Hand-off §2 and §7: seven days, person-coloured chips and the sync state. ‹ › step a week at a time, from this week
+ * (today and six days) to [MAX_WEEKS_AHEAD] weeks on, inside the synced window (4c D10), through [onWeeksAhead]; This
+ * week jumps back. With [onAdd] (there is a writable master calendar), Add event sits right of the legend and adds on
+ * the first day shown, and a tap on the space below a column's chips, or on its hint, adds on that column's day; chip
+ * taps still open their event. Without it, the legend keeps a 24 dp gap to the right edge. The reconnect chip runs
+ * [onReconnect] (3a design §4.3).
+ */
+```
+- the parameters gain `onWeeksAhead: (Int) -> Unit = {},` before `onReconnect`.
+- `Text("This week", style = CalendarType.weekTitle, color = c.ink)` becomes
+```kotlin
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekStepGap)) {
+                            RoundButton(Icons.CHEVRON_LEFT, "Earlier week", "week_earlier", enabled = state.weeksAhead > 0) {
+                                onWeeksAhead(state.weeksAhead - 1)
+                            }
+                            RoundButton(Icons.CHEVRON_RIGHT, "Later week", "week_later", enabled = state.weeksAhead < MAX_WEEKS_AHEAD) {
+                                onWeeksAhead(state.weeksAhead + 1)
+                            }
+                        }
+                        Spacer(Modifier.width(CalendarDimens.weekTitleGap))
+                        Text(weekTitle(state.weeksAhead), style = CalendarType.weekTitle, color = c.ink, maxLines = 1)
+                        if (state.weeksAhead > 0) {
+                            Spacer(Modifier.width(CalendarDimens.weekTitleGap))
+                            ThisWeekChip { onWeeksAhead(0) }
+                        }
+                    }
+```
+(the arrows sit together before the title, so › stays under a finger tapping through the weeks while the title's width changes.)
+- `AddButton("Add event", "week_add_event") { onAdd(state.today) }` → `{ onAdd(state.week.start) }`.
+- after `ReconnectChip`, add
+```kotlin
+/** Back to this week (4c §6.6): a quiet 44 dp pill beside a later week's title. */
+@Composable
+private fun ThisWeekChip(onClick: () -> Unit) {
+    val c = Culvery.colors
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .testTag("week_this_week")
+            .height(CalendarDimens.touchTarget)
+            .clip(RoundedCornerShape(CalendarDimens.pillRadius))
+            .background(c.surf2)
+            .clickable(onClick = onClick)
+            .padding(horizontal = CalendarDimens.pillPaddingH),
+    ) {
+        Text("This week", style = CalendarType.pill, color = c.ink, maxLines = 1)
+    }
+}
+
+/** After this long without a touch, a later week goes back to this week (4c §6.6). */
+internal const val BACK_TO_THIS_WEEK_MS = 120_000L
+
+/** Which week the Calendar tab shows (4c D10): [weeks] after this one, 0 to [MAX_WEEKS_AHEAD]. */
+@Stable
+internal class WeekShown {
+    var weeks by mutableIntStateOf(0)
+        private set
+    var touches by mutableIntStateOf(0)
+        private set
+
+    fun show(weeks: Int) {
+        this.weeks = weeks.coerceIn(0, MAX_WEEKS_AHEAD)
+    }
+
+    fun touched() {
+        touches++
+    }
+}
+
+/**
+ * A new [WeekShown] each [today], so the view is back on this week at midnight; a later week goes back after
+ * [BACK_TO_THIS_WEEK_MS] without a touch.
+ */
+@Composable
+internal fun rememberWeekShown(today: LocalDate): WeekShown {
+    val shown = remember(today) { WeekShown() }
+    LaunchedEffect(shown, shown.weeks, shown.touches) {
+        if (shown.weeks > 0) {
+            delay(BACK_TO_THIS_WEEK_MS)
+            shown.show(0)
+        }
+    }
+    return shown
+}
+
+/** Calls [onTouch] for every finger that goes down inside, before the children see it, without taking it. */
+internal fun Modifier.onEveryTouch(onTouch: () -> Unit): Modifier = pointerInput(onTouch) {
+    awaitPointerEventScope {
+        while (true) {
+            if (awaitPointerEvent(PointerEventPass.Initial).type == PointerEventType.Press) onTouch()
+        }
+    }
+}
+```
+(imports: `androidx.compose.runtime.LaunchedEffect`, `Stable`, `getValue`, `setValue`, `mutableIntStateOf`, `remember`; `androidx.compose.ui.input.pointer.PointerEventPass`, `PointerEventType`; `kotlinx.coroutines.delay`; `uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD`, `weekTitle`; `uk.co.siland.culvery.core.ui.Icons`.)
+
+`ui/CardHosts.kt`, `WeekViewHost` becomes (KDoc: "The week shown is today plus six days, or a later one the family stepped to (4c D10); [today] moves at midnight, so the week rolls with it and is back on this week. Shows nothing until both flows load. …" — keep the rest of the KDoc):
+```kotlin
+@Composable
+internal fun WeekViewHost(
+    repo: CalendarRepository,
+    editor: CalendarEditor,
+    today: LocalDate,
+    nowMillis: Long,
+    onReconnect: (Connection) -> Unit,
+) {
+    val open = rememberEventOpener(repo, editor, today)
+    val add = rememberEventAdder(repo, editor, today)
+    val shown = rememberWeekShown(today)
+    val start = today.plusWeeks(shown.weeks.toLong())
+    // produceState keeps the week on screen while the next one loads, so a step doesn't blank the view.
+    val week: WeekUi? by produceState<WeekUi?>(null, repo, start) { repo.week(start).collect { value = it } }
+    val sync: SyncStatusUi? by repo.syncStatus.collectAsState(initial = null)
+    val w = week ?: return
+    val s = sync ?: return
+    WeekView(
+        WeekViewState(w, today, s, nowMillis, shown.weeks),
+        modifier = Modifier.onEveryTouch(shown::touched),
+        onOpen = open,
+        onAdd = add,
+        onWeeksAhead = shown::show,
+        onReconnect = { s.reconnect?.let(onReconnect) },
+    )
+}
+```
+(imports `androidx.compose.runtime.produceState`, `androidx.compose.ui.Modifier`.)
+
+Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*WeekViewTest*" --tests "*CardHostsMidnightRolloverTest*"`
+Expected: PASS. If `aLaterWeekGoesBackToThisWeekAfterTwoMinutesWithoutATouch` sees the delay never fire, the effect isn't on the test clock: stop and report rather than wait in real time.
+
+- [ ] **Step 5: Screenshots of a later week, and the header everywhere**
+
+`ui/WeekScreenshotTest.kt`: `snap` gains `weeksAhead: Int = 0` after `canAdd`, passed as `WeekViewState(week, SampleUi.TODAY, sync, now, weeksAhead)`; add
+```kotlin
+    @Test fun weekNextLight() = snap("week_next_light", false, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
+    @Test fun weekNextDark() = snap("week_next_dark", true, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
+    @Test fun weekFurthestLight() = snap("week_furthest_light", false, fresh, SampleUi.weekAhead(3), canAdd = true, weeksAhead = 3)
+    @Test fun weekFurthestDark() = snap("week_furthest_dark", true, fresh, SampleUi.weekAhead(3), canAdd = true, weeksAhead = 3)
+```
+Run: `./gradlew :capability:calendar:recordRoborazziDebug --tests "*WeekScreenshotTest*"`
+Look at each `week_*.png`: the five existing ones differ only in the header (‹ greyed, › before "This week"; columns, legend, Add event and the subtitle unmoved, the reconnect chip still below the subtitle); `week_next_*` say "Next week" with the This week chip and no Today ring; `week_furthest_*` say "In 3 weeks" with › greyed. Anything else moved: stop and report.
+
+- [ ] **Step 6: Run the gate**
+
+Run: `./gradlew testDebugUnitTest verifyRoborazziDebug`
+Expected: `BUILD SUCCESSFUL`, no screenshot differences.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add capability/calendar
+git commit -m "Step the Calendar tab up to four weeks ahead, and name the day when an event is added further out"
+```
+
+---
+
+### Task 15: C3 and C4 — NeedsSignIn after a refused write; all-day events by their dates (§6.3; ruling 13, plan review 17)
+
+**Review:** sonnet.
+
+**Files:**
+- Modify: `capability/calendar/src/main/java/uk/co/siland/culvery/capability/calendar/CalendarStore.kt`, `db/CalendarDatabase.kt`, `CalendarRepository.kt`, `PendingOverlay.kt`, `CalendarEditor.kt`, `CalendarSync.kt`
+- Test: `capability/calendar/src/test/java/uk/co/siland/culvery/capability/calendar/CalendarSyncTest.kt`, `CalendarRepositoryTest.kt`, `CalendarEditorTest.kt`
+
+**Interfaces:**
+- Consumes: Task 12's store; Task 14's `opened` clock in `CalendarEditorTest`.
+- Produces: `CalendarDao.markSyncTime(id: String, at: Long)`; `internal fun StoredEvent.isOn(date: LocalDate, zone: ZoneId): Boolean` (`PendingOverlay.kt`). `CalendarStore.markSynced` keeps `NEEDS_SIGN_IN` while the connection has queued changes; `CalendarStore.writeAccepted(connectionId: String, nowMillis: Long)` clears it when a write gets through.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -4507,8 +5222,26 @@ git commit -m "Keep calendar sync tokens across midnight, prune what falls outsi
         assertThat(repo.day(sept(24)).first()).isEmpty()
     }
 ```
-Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarSyncTest.aWriteRefused*" --tests "*CalendarSyncTest.aReadThatNeeded*" --tests "*CalendarRepositoryTest.anAllDayEvent*"`
-Expected: `aWriteRefusedForSignIn…` FAILS (the second pass's read sets Ok); `aReadThatNeeded…` PASSES (today's behaviour, kept); `anAllDayEvent…` FAILS ("Bin day" also on the 22nd).
+`CalendarEditorTest.kt` (`ConnectionHealth` and `NeedsSignInException` are same-package):
+```kotlin
+    /** Plan review 17: a save the provider accepts shows sign-in works again, so the chip a refused one left goes. */
+    @Test
+    fun anAcceptedSaveClearsTheSignInARefusedOneSet() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        writer.failWith = NeedsSignInException("a calendar scope is missing")
+        assertThat(editor.create(draft("Sleepover", PersonId.FAMILY.value))).isEqualTo(EditResult.Queued)
+        assertThat(store.connectionsNow().single().health).isEqualTo(ConnectionHealth.NeedsSignIn)
+        writer.failWith = null
+        assertThat(editor.create(draft("Pizza night", PersonId.FAMILY.value))).isEqualTo(EditResult.Done)
+        val stored = store.connectionsNow().single()
+        assertThat(stored.health).isEqualTo(ConnectionHealth.Ok)
+        assertThat(stored.needsSignInSinceMillis).isNull()
+    }
+```
+Run: `./gradlew :capability:calendar:testDebugUnitTest --tests "*CalendarSyncTest.aWriteRefused*" --tests "*CalendarSyncTest.aReadThatNeeded*" --tests "*CalendarRepositoryTest.anAllDayEvent*" --tests "*CalendarEditorTest.anAcceptedSave*"`
+Expected: `aWriteRefusedForSignIn…` FAILS (the second pass's read sets Ok); `aReadThatNeeded…` PASSES (today's behaviour, kept); `anAllDayEvent…` FAILS ("Bin day" also on the 22nd); `anAcceptedSave…` FAILS (the health stays NeedsSignIn).
 
 - [ ] **Step 2: C3 — keep NeedsSignIn while changes wait for it**
 
@@ -4532,7 +5265,16 @@ Expected: `aWriteRefusedForSignIn…` FAILS (the second pass's read sets Ok); `a
         endPause(row, atMillis)
         dao.markSynced(connectionId, atMillis)
     }
+
+    /** A write the provider accepted shows sign-in works: a connection needing it is Ok again (plan review 17). */
+    suspend fun writeAccepted(connectionId: String, nowMillis: Long) = db.withTransaction {
+        val row = dao.connection(connectionId) ?: return@withTransaction
+        if (row.health == ConnectionHealth.NeedsSignIn.code()) setHealth(connectionId, ConnectionHealth.Ok, nowMillis)
+    }
 ```
+Both places a write is accepted call it straight after storing it, inside the same `try`:
+- `CalendarEditor.kt`, `attempt(…)`: after `store.applyAcceptedWrite(to.connection.id, to.source.id, remoteId, outcome, zone.current())` add `store.writeAccepted(to.connection.id, clock.nowMillis())`.
+- `CalendarSync.kt`, `complete(…)`: after `store.applyAcceptedWrite(conn.id, source.id, change.remoteId, accepted, zone, completing = change.id)` add `store.writeAccepted(conn.id, clock.nowMillis())`.
 
 - [ ] **Step 3: C4 — all-day events by their own dates**
 
@@ -4584,7 +5326,7 @@ internal fun StoredEvent.isOn(date: LocalDate, zone: ZoneId): Boolean {
 - [ ] **Step 4: Run them to see them pass**
 
 Run: `./gradlew :capability:calendar:testDebugUnitTest`
-Expected: PASS, the three new tests included.
+Expected: PASS, the four new tests included.
 
 - [ ] **Step 5: Run the gate**
 
@@ -4595,12 +5337,12 @@ Expected: `BUILD SUCCESSFUL`, no screenshot differences.
 
 ```bash
 git add capability/calendar
-git commit -m "Keep a connection needing sign-in while its writes wait for it, and place all-day events by their own dates"
+git commit -m "Keep a connection needing sign-in while its writes wait for it, clear it when one gets through, and place all-day events by their own dates"
 ```
 
 ---
 
-### Task 13: One calendar that can't be read, E3, the master-gone count, the `addConnection` test (§6.3 E3, §6.4, §6.5; D6, C5, C7, C8, M7; rulings 7, 12, 14)
+### Task 16: One calendar that can't be read, E3, the master-gone count, the `addConnection` test (§6.3 E3, §6.4, §6.5; D6, C5, C7, C8, M7; rulings 7, 12, 14; plan review 11)
 
 **Review:** opus (connection and calendar health).
 
@@ -4610,13 +5352,14 @@ git commit -m "Keep a connection needing sign-in while its writes wait for it, a
 - Screenshots (new): `capability/calendar/src/test/screenshots/review_read_problem_dark.png`, `review_read_problem_light.png`
 
 **Interfaces:**
-- Consumes: Task 11's `readProblem` column and pruning.
+- Consumes: Task 12's `readProblem` column and pruning; Task 3's log rules.
 - Produces:
   - `StoredSource.readProblem: String?`; `internal const val READ_REFUSED = "REFUSED"`.
   - `CalendarStore.markReadRefused(connectionId: String, sourceId: String): Boolean` (true when newly set); `applySync` clears it; `setMapping(…, visible = false)` clears it.
   - `data class SourcesRefreshed(val masterCleared: Boolean, val droppedChanges: Int)` returned by `CalendarStore.refreshSources`.
   - `fun masterGone(serviceName: String, droppedChanges: Int): String`.
   - `SourceRefresher.flag(connectionId, sourceId)` no longer filters (the store's `markReadRefused` decides).
+  - `CalendarSync.syncSource(…)` and `healthAfter(…)` return `ConnectionHealth?`: null is one calendar refused while its connection answers. A pass in which every visible calendar was refused read nothing: the connection is Unreachable and not marked synced (plan review 11; `StoredSource` holds no primary flag, so "or the primary" can't be told apart and isn't).
 
 - [ ] **Step 1: Write the failing engine tests**
 
@@ -4689,6 +5432,20 @@ git commit -m "Keep a connection needing sign-in while its writes wait for it, a
         a.failWith = NeedsSignInException("expired")
         engine().syncAll()
         assertThat(a.calls).hasSize(1)
+    }
+
+    /** Plan review 11: with every calendar refused nothing was read, so the connection isn't synced and says it can't reach them. */
+    @Test
+    fun everyCalendarRefusedIsNotASync() = runTest {
+        connect("c1", "calendar.a", s1, s2)
+        val sync = engine()
+        sync.syncAll()
+        val synced = store.connectionsNow().single().lastSyncMillis
+        a.failFor = mapOf("s1" to SourceGoneException("403"), "s2" to SourceGoneException("403"))
+        now = now.plusSeconds(300)
+        sync.syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Unreachable)
+        assertThat(store.connectionsNow().single().lastSyncMillis).isEqualTo(synced)
     }
 
     /** E3: a refusal of one calendar isn't the connection failing. */
@@ -4788,14 +5545,24 @@ fun masterGone(serviceName: String, droppedChanges: Int): String =
 `CalendarSync.kt`:
 - in `sync(…)`, the loop becomes
 ```kotlin
-        for (source in store.visibleSourcesFor(conn.id)) {
+        val visible = store.visibleSourcesFor(conn.id)
+        var refused = 0
+        for (source in visible) {
             val health = syncSource(provider, conn, source.source, window)
+            if (health == null) {
+                refused++
+                continue
+            }
             if (health.severity() > worst.severity()) worst = health
             // E3: the connection itself failed; its other calendars would fail the same way, each costing a timeout.
             if (health == ConnectionHealth.Unreachable || health == ConnectionHealth.NeedsSignIn) break
         }
+        // Every calendar refused: the service answers, but nothing was read, so this isn't a sync (plan review 11).
+        if (visible.isNotEmpty() && refused == visible.size) worst = ConnectionHealth.Unreachable
 ```
-- `healthAfter` becomes `private suspend fun healthAfter(…)`, and its `SourceGoneException` branch:
+(the `if (worst == ConnectionHealth.Ok) markSynced … else setHealth …` after it is unchanged.)
+- `syncSource` returns `ConnectionHealth?` (its KDoc gains "Null: the service refused this calendar alone (4c §6.4).").
+- `healthAfter` becomes `private suspend fun healthAfter(…): ConnectionHealth?`, and its `SourceGoneException` branch:
 ```kotlin
         is SourceGoneException -> {
             // §6.4: one calendar refused while its connection answers. The connection stays healthy; the row says so.
@@ -4803,10 +5570,10 @@ fun masterGone(serviceName: String, droppedChanges: Int): String =
                 Log.w(TAG, "${conn.id}: a calendar refused to be read (${e::class.simpleName}); flagging a refresh of its calendars")
                 refresher.flag(conn.id, sourceId)
             }
-            ConnectionHealth.Ok
+            null
         }
 ```
-(Its KDoc keeps saying what is logged; add "A refused calendar (SourceGone) is the calendar's problem, not the connection's (4c §6.4).")
+(Its KDoc keeps saying what is logged; add "A refused calendar (SourceGone) is the calendar's problem, not the connection's: null (4c §6.4).")
 
 - [ ] **Step 4: Point the older tests at the new shapes**
 
@@ -4974,7 +5741,7 @@ git commit -m "Show a calendar that can't be read on its own row, keep its conne
 
 ---
 
-### Task 14: Reordering people (§7.1, D7; ruling 25)
+### Task 17: Reordering people (§7.1, D7; ruling 25)
 
 **Review:** sonnet.
 
@@ -5011,11 +5778,6 @@ git commit -m "Show a calendar that can't be read on its own row, keep its conne
         assertThat(repo.move(sam.id, up = false)).isFalse()
         assertThat(repo.people.first().map { it.name }).containsExactly("Alex", "Sam").inOrder()
     }
-
-    @Test
-    fun familyNeverMoves() {
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.move(PersonId.FAMILY, up = true) } }
-    }
 ```
 Run: `./gradlew :core:household:testDebugUnitTest --tests "*HouseholdRepositoryTest*"`
 Expected: FAIL to compile ("Unresolved reference 'move'").
@@ -5028,18 +5790,15 @@ Expected: FAIL to compile ("Unresolved reference 'move'").
      * Swaps [id] with the person above it ([up]) or below it, in one transaction (4c design §7.1); nobody moves past
      * either end, and Family, never in the list, never moves. Returns whether anyone moved.
      */
-    suspend fun move(id: PersonId, up: Boolean): Boolean {
-        require(id != PersonId.FAMILY) { "Family doesn't move" }
-        return db.withTransaction {
-            val all = dao.all()
-            val index = all.indexOfFirst { it.id == id.value }
-            val other = all.getOrNull(if (up) index - 1 else index + 1)
-            if (index < 0 || other == null) return@withTransaction false
-            val person = all[index]
-            dao.upsertPerson(person.copy(sortOrder = other.sortOrder))
-            dao.upsertPerson(other.copy(sortOrder = person.sortOrder))
-            true
-        }
+    suspend fun move(id: PersonId, up: Boolean): Boolean = db.withTransaction {
+        val all = dao.all()
+        val index = all.indexOfFirst { it.id == id.value }
+        val other = all.getOrNull(if (up) index - 1 else index + 1)
+        if (index < 0 || other == null) return@withTransaction false
+        val person = all[index]
+        dao.upsertPerson(person.copy(sortOrder = other.sortOrder))
+        dao.upsertPerson(other.copy(sortOrder = person.sortOrder))
+        true
     }
 ```
 Run the same tests.
@@ -5234,7 +5993,7 @@ git commit -m "Reorder people in Settings with Move up and Move down"
 
 ---
 
-### Task 15: Code health and test health (§7.2, §7.3; ruling 23)
+### Task 18: Code health and test health (§7.2, §7.3; ruling 23)
 
 **Review:** opus (the access session's state).
 
@@ -5246,7 +6005,7 @@ git commit -m "Reorder people in Settings with Move up and Move down"
 - Test: `core/setup/src/test/java/uk/co/siland/culvery/core/setup/StepsUiTest.kt`; `app/src/testDebug/java/uk/co/siland/culvery/DebugSeedTest.kt`; `capability/weather/src/test/java/uk/co/siland/culvery/capability/weather/WeatherStoreTest.kt`, `WeatherSyncLoopTest.kt`
 - Modify: every `src/test/resources/robolectric.properties` (8: `app`, `capability/calendar`, `capability/weather`, `core/access`, `core/setup`, `provider/calendar-fake`, `provider/calendar-google`, `provider/weather-openmeteo`)
 
-(`HomeScreen`'s test-only `headerItems` default went in Task 5; `HouseholdTickerTest`'s bounded wait in Task 6.)
+(`HomeScreen`'s test-only `headerItems` default went in Task 5; `HouseholdTickerTest` went with `MinuteTicker` in Task 6.)
 
 **Interfaces:**
 - Consumes: nothing new.
@@ -5631,7 +6390,7 @@ git commit -m "Tidy retry backoff, Open-Meteo reads and coordinates, and the set
 
 ---
 
-### Task 16: The walkthrough on the signed, minified release; Appendix B; the README; the follow-ups (§4.5, §8.2, §9)
+### Task 19: The walkthrough on the signed, minified release; Appendix B; the README; the follow-ups (§4.5, §8.2, §9)
 
 **Review:** sonnet (Steps 1–2 by the implementer; Step 3 by the controller with the user).
 
@@ -5639,10 +6398,10 @@ git commit -m "Tidy retry backoff, Open-Meteo reads and coordinates, and the set
 - Modify (after the checkpoint): `docs/superpowers/specs/2026-10-02-culvery-4c-release-fixes-design.md` (Appendix B, "After"), `README.md`, `docs/superpowers/plans/2026-09-23-plan1-followups.md`
 
 **Interfaces:**
-- Consumes: everything above; `tools/measure-release.sh`; the release key and the four properties (Task 1); the release OAuth client (`docs/setup/google-calendar.md` §4).
+- Consumes: everything above; `tools/measure-release.sh`; the real release key and the four properties (Task 1); the release OAuth client (`docs/setup/google-calendar.md` §4).
 - Produces: documentation only.
 
-Who does what: the implementer checks the emulator and the build (Steps 1–2) and stops. **The controller** runs the walkthrough with the user (Step 3), driving the emulator with `adb` and screenshots. The emulator is the **already-running API 35 Google Play emulator `emulator-5554`**; don't start or wipe another. To go offline use `adb -s emulator-5554 shell svc wifi disable` and `svc data disable` (`enable` to come back), **never airplane mode** (Play services' crash loop, `docs/setup/google-calendar.md` §5). Town search and connecting Google need the network: keep the emulator online for them. Use only public towns (London, Edinburgh, Tokyo). The user types every PIN and every Google password; the controller never types one.
+Who does what: the implementer checks the emulator and the build (Steps 1–2) and stops. **The controller** runs the walkthrough with the user (Step 3), driving the emulator with `adb` and screenshots. The emulator is the **already-running API 35 Google Play emulator `emulator-5554`**; don't start or wipe another. To go offline use `adb -s emulator-5554 shell svc wifi disable` and `svc data disable` (`enable` to come back), **never airplane mode** (Play services' crash loop, `docs/setup/google-calendar.md` §5). Town search and connecting Google need the network: keep the emulator online for them. Use only public towns (London, Edinburgh, Tokyo). The user types every PIN, every keystore password and every Google password; the controller never types one.
 
 - [ ] **Step 1: Check the emulator and the signing setup**
 
@@ -5668,18 +6427,23 @@ Expected: `BUILD SUCCESSFUL`; the APK and its mapping file exist; the install su
 - [ ] **Step 3: STOP — the controller runs the walkthrough and the USER CHECKPOINT with the user**
 
 **Before starting, with the user:**
-1. If Task 1 used a throwaway key, the user now makes the real one: `bash tools/new-release-key.sh`, replaces the four lines in `~/.gradle/gradle.properties`, then the controller rebuilds (`./gradlew :app:assembleRelease`), asks, `adb -s emulator-5554 uninstall uk.co.siland.culvery` and installs again.
-2. The user makes the release OAuth client, if not done yet: in <https://console.cloud.google.com/>, the Culvery project › **Google Auth Platform › Clients › Create client** › **Android**; package `uk.co.siland.culvery`; the SHA-1 from `./gradlew :app:signingReport` under `Variant: release` (the controller may run that command: it prints fingerprints, not passwords); **Create**. The emulator has the household's test Google account under Settings › Accounts (`docs/setup/google-calendar.md` §5).
+1. The user makes the release OAuth client, if not done yet: in <https://console.cloud.google.com/>, the Culvery project › **Google Auth Platform › Clients › Create client** › **Android**; package `uk.co.siland.culvery`; the SHA-1 from `./gradlew :app:signingReport` under `Variant: release` (the controller may run that command: it prints fingerprints, not passwords); **Create**. The emulator has the household's test Google account under Settings › Accounts (`docs/setup/google-calendar.md` §5).
 
 The controller does not go to Step 4 until the user approves. At each numbered item take `adb -s emulator-5554 exec-out screencap -p > "$TMP/culvery-4c-<n>.png"` and send the images with the report. Ask the user before each item that changes the household's data.
 
-1. **Setup, the home app, and a reboot (§8.2 item 2; online).** `adb -s emulator-5554 shell pm clear uk.co.siland.culvery`; start it: the splash (the theme's dark background) then the wizard. Welcome › Start; Home location: London; You: a test Admin (the user types the PIN); Household: skip; Connect: skip; Done shows "Make Culvery the home app so it comes back after a restart." Tap **Choose home app**, choose Culvery as the default home app, come back; the line has gone. **Open Culvery**: Home, pinned (`adb -s emulator-5554 shell dumpsys activity activities | grep -i locktaskmodestate` shows `LOCKED` or `PINNED`). `adb -s emulator-5554 reboot`, wait for boot (`adb -s emulator-5554 wait-for-device`, then until `getprop sys.boot_completed` is `1`): Culvery is in front again, pinned.
+1. **Setup, the home app, and a reboot (§8.2 item 2; online).** `adb -s emulator-5554 shell pm clear uk.co.siland.culvery`; start it: the splash (the theme's dark background) then the wizard. Welcome › Start; Home location: London; You: a test Admin (the user types the PIN); Household: skip; Connect: skip; Done shows "Make Culvery the home app so it comes back after a restart." Tap **Choose home app**: Android's own dialog asks whether to make Culvery the default home app, with no way into Settings from it; the user answers yes, and the line has gone. **Open Culvery**: Home, pinned (`adb -s emulator-5554 shell dumpsys activity activities | grep -i locktaskmodestate` shows `LOCKED` or `PINNED`). `adb -s emulator-5554 reboot`, wait for boot (`adb -s emulator-5554 wait-for-device`, then until `getprop sys.boot_completed` is `1`): Culvery is in front again, pinned.
 2. **Cold start numbers (§8.2 item 1).** In this household (London, one Admin, no calendar — as Task 1 measured), run `bash tools/measure-release.sh emulator-5554` in the background. Fill Appendix B's "After" column in the spec the same way as "Before". If any after-number is worse than before, say so plainly in the report.
 3. **Connect Google on the kiosk (§8.2 item 3; online).** Settings (the user's PIN) › Calendars › **Connect Google Calendar**: the PIN pad asks again even though Settings is open ("Enter your PIN to connect calendars."). The account chooser opens; while it shows, `dumpsys activity activities | grep -i locktaskmodestate` says `NONE`. The user picks the account and allows both scopes; Culvery shows "Google Calendar connected" and is pinned again (`LOCKED`/`PINNED`). Then once more with **Back** on the chooser: nothing is said, and it is pinned again.
 4. **Sync, a write, offline (§8.2 item 4).** Within a minute the household's calendars show on the Calendar tab. Add an event for today (+, a title, Save): it appears; the user checks it is in Google Calendar on their phone or the web. Offline (`svc wifi disable; svc data disable`): after the next pass (up to 5 minutes) Settings › Calendars says "Can't reach Google Calendar" and the cached events still show; online again (`enable`): "Synced … ago" within 5 minutes. Midnight: the "no nightly full resync" rule is pinned by `CalendarSyncTest.thePassAfterLocalMidnightKeepsTheCursor` (the Google Play image refuses `adb root`, and a release can't be read with `run-as`); on the emulator check only that after **Exit kiosk**, Android Settings › System › Date & time › automatic off and the date set to tomorrow, then back to Culvery, Home moves to the new day and its events still show; set automatic time back on.
 5. **Clear night (§8.2 item 5).** If the header shows a clear night anywhere convenient (try setting Home location to a town where it is night now, e.g. Tokyo during the UK's afternoon, and check its sky), its icon is the moon glyph, never the words "clear_night"; otherwise compare against `capability/weather/src/test/screenshots/header_clear_night_*.png` and say which was checked. Set Home location back to London.
 6. **A calendar that can't be read (§8.2 item 6).** The user, in Google Calendar on the web, stops sharing one calendar with the household's account (or removes the account from a shared calendar), keeping it in the account's list if Google allows; within two passes Settings › Calendars shows that calendar's row with "Can't read this calendar — check it's still shared with this account" and **Hide this calendar**, while the connection still says "Synced … ago". Tap **Hide this calendar**: "{calendar} hidden", and the message goes. If Google removed the calendar from the account's list instead, the row disappears at the next pass: say which happened.
-7. **Reorder people (§8.2 item 7).** Settings › People › Add person: "Sam", Adult, no PIN (fresh PIN). Sam's row has **Move up**; tap it: "Sam moved up", Sam first; the Calendar tab's legend and the add sheet's Who chips show Sam first.
+7. **Reorder people, look ahead, Exit kiosk (§8.2 item 7).**
+   - Settings › People › Add person: "Sam", Adult, no PIN (fresh PIN). Sam's row has **Move up**; tap it: "Sam moved up", Sam first; the Calendar tab's legend and the add sheet's Who chips show Sam first.
+   - Calendar tab: **›** three times: "Next week", "In 2 weeks", "In 3 weeks", each with seven later days and the **This week** chip; **›** is then greyed and does nothing. **This week** goes back; **‹** is greyed there.
+   - Step to next week, tap the empty space under one day's events: the add sheet opens on that day. Save an event: "Event added", and it shows in that column.
+   - In the add sheet, **Pick date…** a day five weeks ahead and save: the toast says "Event added for {that day, as Tue 17 November}". Delete it afterwards in Google Calendar (or keep it, as the user prefers).
+   - Step to a later week and touch nothing for 2 minutes: the tab is back on "This week".
+   - With Culvery the home app: Settings › Kiosk › **Exit kiosk** (fresh PIN): Culvery stays in front with the system bars showing and `locktaskmodestate` says `NONE`; a Home press leaves it so. Open another app from Overview, then press Home: Culvery is in front and pinned again.
 8. **The release log (§8.2 item 8).**
    ```bash
    adb -s emulator-5554 logcat -d --pid=$(adb -s emulator-5554 shell pidof uk.co.siland.culvery) | tail -200 > "$TMP/culvery-4c-log.txt"
@@ -5688,7 +6452,7 @@ The controller does not go to Step 4 until the user approves. At each numbered i
    ```
    Expected: the first count is 0 for Culvery's own tags (any `V/D/I` lines must be the system's or a library's: name them); the second prints nothing. Look through the warnings: each names a type, a code or an id only.
 
-Send the user these images, dark and light: `settings_kiosk_*`, `done_*` (core/setup), `settings_people_*`, `review_read_problem_*`, `detail_untagged_*`, `header_clear_night_*`, and the walkthrough screenshots; and Appendix B. Name this plan's own choices the spec doesn't give (all provisional, for 4d's review): the home-app prompt under the Done title and above Exit kiosk; the 48 dp Move buttons with arrows, blank at the list's ends; the read-problem line in danger colour with the Hide pill at its right; `bedtime` (or `nightlight`) for clear night and `mobile` for a phone; the splash with no icon until 4d.
+Send the user these images, dark and light: `settings_kiosk_*`, `done_*` (core/setup), `settings_people_*`, `review_read_problem_*`, `detail_untagged_*`, `header_clear_night_*`, `week_next_*`, `week_furthest_*` (capability/calendar), and the walkthrough screenshots; and Appendix B. Name this plan's own choices the spec doesn't give (all provisional, for 4d's review): the home-app prompt under the Done title and above Exit kiosk; the 48 dp Move buttons with arrows, blank at the list's ends; the read-problem line in danger colour with the Hide pill at its right; `bedtime` (or `nightlight`) for clear night and `mobile` for a phone; the splash with no icon until 4d; ‹ › together before the week's title (so › doesn't move as the title's width changes), greyed at their ends, and the quiet This week pill after it.
 
 Ask: "Do these match what you want? Any changes before I update the README?"
 - **If the user asks for changes:** make them, re-record only the affected images with `--tests`, look at them, run `./gradlew testDebugUnitTest verifyRoborazziDebug`, re-send them, and commit with a message describing the change. Repeat until approved.
@@ -5708,14 +6472,15 @@ A release build is signed with your own key, shrunk by R8, and logs only warning
    In the paragraph starting "To connect a real Google account", replace "Release builds offer Google Calendar only, and its Connect fails until the release key's SHA-1 has its own Android client (Plan 4)." with "Release builds offer Google Calendar only, through a second Android OAuth client for the release key (`docs/setup/google-calendar.md` §4). Connecting and reconnecting always ask for an Admin's PIN." After that paragraph's last sentence add: "A calendar the account still lists but whose events Google refuses shows on its own row in Settings › Calendars with **Hide this calendar**; its connection stays healthy."
 2. **Kiosk mode.** Replace the section's three paragraphs with:
 ```markdown
-Release builds pin the app to the screen (Android "screen pinning") once setup is complete, so the first Google connection happens outside it. Setup's Done step, and Settings › Kiosk, offer **Choose home app**: with Culvery as the default home app, a reboot, a power cut or a crash comes back to Culvery, and every Home press brings it back and pins it again. **Settings › Kiosk › Exit kiosk** (Admin PIN, always asked) unpins it until it is next in front; **Change home app** (Admin PIN, always asked) gives the tablet back its normal launcher. While Google's account chooser shows during Connect or Reconnect, Culvery leaves screen pinning and pins again when it closes.
+Release builds pin the app to the screen (Android "screen pinning") once setup is complete, so the first Google connection happens outside it. Setup's Done step, and Settings › Kiosk, offer **Choose home app**, which asks Android's own question: with Culvery as the default home app, a reboot, a power cut or a crash comes back to Culvery, and every return to the front pins it again. **Settings › Kiosk › Exit kiosk** (Admin PIN, always asked) unpins it; as the home app it stays in front with the system bars showing, and pins again once it has left the front and come back. **Change home app** (Admin PIN, always asked) gives the tablet back its normal launcher. While Google's account chooser shows during Connect or Reconnect, Culvery leaves screen pinning and pins again when it is back in front (as device owner it stays in lock-task: Google Play services is allowed in it).
 
 Screen pinning can also be undone by holding **Back + Overview**. To stop a child doing that, on the tablet: set a screen lock (PIN), then turn on **Settings › Security › Other security settings › Pin windows › Ask for PIN before unpinning**. Unpinning then drops to the lock screen.
 
 For a stronger lock, make Culvery the device owner on a freshly reset tablet (`docs/setup/release.md` §6): it then pins with no confirmation and no exit gesture. Undoing that needs a factory reset.
 ```
 3. **PINs.** Replace the line beginning "- Exiting kiosk, adding or removing someone," with "- Exiting kiosk, changing the home app, connecting or reconnecting a calendar, adding or removing someone, changing a role and setting, changing or removing a PIN always ask for a PIN, even mid-session; renaming, recolouring and reordering people don't. Changing your own role or PIN, or removing yourself, signs you out." and the lockout line ends "…up to 16 minutes (a lock set further ahead than that, after the clock went back, has expired). Only a PIN that is allowed to do the thing clears the count."
-4. **Modules.** In the `:core:plugin` row add, after `Daylight`: "`HouseholdClock` (the one minute ticker, in the household's zone), `FirstDraw`, `LockTask`, `HomeApp`".
+4. **Modules.** In the `:core:plugin` row add, after `Daylight`: "`HouseholdClock` (the one minute ticker, in the household's zone), `FirstDraw`, `HomeApp`".
+   In the section describing the Calendar tab (or, if there is none, in the paragraph that names the tabs), say: "The Calendar tab shows this week and steps ahead a week at a time, up to three weeks on; it comes back to this week after 2 minutes untouched and at midnight. Any later date can still be added through **Pick date…**." 
 5. **Privacy.** Add a second paragraph:
 ```markdown
 Google Calendar is asked only for the fields the tablet shows, compressed, about every five minutes per calendar; a full read happens when a calendar is connected, after a change of time zone, or about every six weeks. A release build logs only warnings and errors, naming exception types, HTTP codes and internal ids: never a person, calendar, account, town, coordinates or time zone.
@@ -5744,7 +6509,7 @@ Then rename the headings whose items now wait for the device or the design revie
 ## From Plan 4c (deferred)
 
 **For Plan 4d (design, UX and accessibility)**
-- All 4c layout and copy choices are provisional: the home-app prompt (under Done's title; above Exit kiosk), the 48 dp Move up / Move down buttons, the read-problem line in danger colour with Hide at its right, `bedtime` for a clear night and `mobile` for a phone, and the splash with no icon until the launcher icon exists.
+- All 4c layout and copy choices are provisional: the home-app prompt (under Done's title; above Exit kiosk), the 48 dp Move up / Move down buttons, the read-problem line in danger colour with Hide at its right, `bedtime` for a clear night and `mobile` for a phone, the splash with no icon until the launcher icon exists, and the Calendar tab's ‹ › and This week pill.
 - Move up / Move down have spoken labels but no other accessibility review yet.
 
 **For Plan 4e (the device)**
@@ -5772,36 +6537,37 @@ git commit -m "Document the release build, the home app and kiosk, and what 4c t
 
 | Design | Where |
 |---|---|
-| §1 scope; D9 (no 4d/4e work) | Tasks 1–16; Task 16 Step 5 moves device and design items to 4e and 4d |
-| D1 order | Task order above (E3 moved to Task 13, ruling 7) |
-| D2 audit (Appendix A) | S2/S3 Task 2; U3, U4, U6, U8 Task 4; P1, P2 Task 5; P7, C6 Task 6; P4, P5, U7 Task 7; E1, C1 Task 10; E2, P9, C2 Task 11; E3 Task 13 |
-| D3, §5.1 home app; E6 | Task 8 (`HOME` category, `HomeApp`, Done step, Settings › Kiosk, Change home app); Task 16 item 1 |
-| D4, §3.1 signing, version | Task 1 (`ReleaseSigningTest`; the failure message checked in Step 6) |
-| §3.2 release OAuth client, `docs/setup/release.md` | Task 1 (Steps 9, 10); Task 3 (§4); Task 8 (§5, §6); Task 16 (user creates the client) |
-| §3.3 R8, shrinking, `proguard-rules.pro` | Task 3 (`ReleaseRulesTest`, the mapping check); Task 16 items 3–5 |
-| D8, §3.4 release logging, `LogHygieneTest` | Task 3 (ruling 18); Task 16 item 8 |
-| §3.5 icon font, `Icons`, `IconFontTest`, S3, `ThemeTest`, `lifecycle-viewmodel-ktx` | Task 2 (ruling 22) |
-| §4.1 start-up off Main, first-draw gate, splash | Task 4 (rulings 8, 10, 19) |
+| §1 scope; D9 (no 4d/4e work) | Tasks 1–19; Task 19 Step 5 moves device and design items to 4e and 4d |
+| D1 order | Task order above (E3 in Task 16, ruling 7) |
+| D2 audit (Appendix A) | S2/S3 Task 2; U3, U4, U6, U8 Task 4; P1, P2 Task 5; P7, C6 Task 6; P4, P5, U7 Task 7; E1, C1 Task 11; E2, P9, C2 Task 12; E3 Task 16 |
+| D3, §5.1 home app (Android's role dialog; Change home app on a fresh PIN; Exit kiosk in front as the home app); E6 | Task 9 (`HOME` category, `HomeApp`, Done step, Settings › Kiosk, `KioskLifecycle`); Task 19 items 1 and 7 |
+| D4, §3.1 signing, version | Task 1 (the real key; the failure message checked in Step 5) |
+| §3.2 release OAuth client, `docs/setup/release.md` | Task 1; Task 3 (§4); Task 9 (§5, §6); Task 19 (user creates the client) |
+| §3.3 R8, shrinking, `proguard-rules.pro` | Task 3 (the three rules; Step 10 checks the minified build works); Task 19 items 3–5 |
+| D8, §3.4 release logging, `LogHygieneTest` | Task 3 (ruling 18, plan review 10); Task 19 item 8 |
+| §3.5 icon font, `Icons`, `IconFontTest`, S3, `ThemeTest`, `lifecycle-viewmodel-ktx` | Task 2 (ruling 22; filled forms kept, plan review 1) |
+| §4.1 start-up off Main, first-draw gate, splash | Task 4 (rulings 8, 10, 19; core-splashscreen 1.2.0) |
 | §4.2 remembered `ColorScheme`, `now` out of the root | Task 5 |
 | §4.3 `HouseholdClock`; `TodayCardHost` keyed on the date | Task 6 (ruling 24) |
 | §4.4 `distinctUntilChanged`, stability file, `flowOn` | Task 7 (ruling 20) |
-| §4.5 measuring, Appendix B | Task 1 Step 13 (before, ruling 21); Task 16 item 2 (after) |
-| D5, §5.3 `connections.manage`, Play services, stepping out of lock-task | Task 9 (rulings 16, 17); Task 16 item 3 |
-| §5.2 device owner | Task 8 (`CulveryDeviceAdmin`, `allowLockTaskIfOwner`, docs) |
-| §5.4 K1, K2, K3, K4 | Task 8 (rulings 27, 6, 26) |
-| §6.1 `fields=`, gzip User-Agent, `callTimeout` | Task 10 (rulings 4, 5) |
-| §6.2 cursor key, pruning, rule seeding, v6 | Task 11 (rulings 1–3, 11; the prune bound is a deviation, ruling 1) |
-| §6.3 C3, C4 | Task 12 (ruling 13) |
-| §6.3 C9 | Task 11 (`GoogleReadTest.aCancelledSeriesRemovesEveryStoredInstance`) |
-| §6.3 E3 | Task 13 (ruling 7) |
-| D6, §6.4 one calendar that can't be read (C5, M7) | Task 11 (the column); Task 13 (behaviour, UI; ruling 12); Task 16 item 6 |
-| §6.5 C7 toast count, C8 `addConnection` test | Task 13 (ruling 14) |
-| D7, §7.1 reordering people | Task 14 (ruling 25); Task 16 item 7 |
-| §7.2 code health | Task 15 (`Http.kt`, coordinates, `retryWithBackoff`, setup-session folding and helper, ruling 23); `HomeScreen`'s default: Task 5 |
-| §7.3 test health | Task 15 (`StepsUiTest`, `DebugSampleHousehold`, 4b gaps, SDK 35); `HouseholdTickerTest`'s bounded wait: Task 6 |
-| §8.1 unit, Robolectric and Roborazzi list | Each task's tests; Roborazzi: clear-night header and detail (Task 2), Settings › Kiosk (Task 8), unreadable calendar and master (Task 13), people with move buttons (Task 14) |
-| §8.1 gate, release build with and without the properties | Global Constraints; Task 1 Step 6; Task 3 Step 13; Task 16 Step 2 |
-| §8.2 walkthrough | Task 16 Step 3 (items 1–8; the midnight check is a unit test on the Google Play image) |
-| §9 follow-ups taken | Task 16 Step 5 |
-| §10 review focus | Review Focus above |
-| §11 out of scope | No task adds accessibility work, the launcher icon, device-only checks, the baseline profile, the `eventsBetween` index, or the Later items |
+| §4.5 measuring, Appendix B | Task 1 (before, ruling 21); Task 19 item 2 (after) |
+| D5, §5.3 `connections.manage`, Play services, leaving pinning | Task 10 (rulings 16, 17; `ShellNavigator.leavePinning()`); Task 19 item 3 |
+| §5.2 device owner | Task 9 (`CulveryDeviceAdmin`, `allowLockTaskIfOwner` with Play services, docs) |
+| §5.4 K1, K2 | Task 9 (rulings 27, 6) |
+| §5.4 K3, K4 | Task 8 (ruling 26) |
+| §6.1 `fields=`, gzip User-Agent, `callTimeout` | Task 11 (rulings 4, 5) |
+| §6.2 cursor key, pruning, v6 | Task 12 (rulings 1, 11; the prune bound is a deviation, ruling 1) |
+| §6.2 D11 no series-rule seeding | Task 13 (`StoredSeries` serves C9 only) |
+| §6.3 C3, C4 | Task 15 (ruling 13; an accepted write clears NeedsSignIn, plan review 17) |
+| §6.3 C9 | Task 13 (`GoogleReadTest.aCancelledSeriesRemovesEveryStoredInstance`, the split series kept) |
+| §6.3 E3 | Task 16 (ruling 7) |
+| D6, §6.4 one calendar that can't be read (C5, M7) | Task 12 (the column); Task 16 (behaviour, UI; ruling 12; every calendar refused is no sync, plan review 11); Task 19 item 6 |
+| §6.5 C7 toast count, C8 `addConnection` test | Task 16 (ruling 14) |
+| D10, §6.6 looking ahead | Task 12 (`SYNC_FUTURE_DAYS` = 28); Task 14 (‹ ›, This week, the 2-minute and midnight return, the presets, the dated toast); Task 19 item 7 |
+| D7, §7.1 reordering people | Task 17 (ruling 25); Task 19 item 7 |
+| §7.2 code health | Task 18 (`Http.kt`, coordinates, `retryWithBackoff`, setup-session folding and helper, ruling 23); `HomeScreen`'s default: Task 5 |
+| §7.3 test health | Task 18 (`StepsUiTest`, `DebugSampleHousehold`, 4b gaps, SDK 35); `HouseholdTickerTest` goes with `MinuteTicker`: Task 6 |
+| §8.1 unit, Robolectric and Roborazzi list | Each task's tests; Roborazzi: clear-night header and detail (Task 2), Settings › Kiosk and Done (Task 9), next and furthest week (Task 14), unreadable calendar and master (Task 16), people with move buttons (Task 17) |
+| §8.1 gate, release build with and without the properties | Global Constraints; Task 1 Step 5; Task 3 Step 10; Task 19 Step 2 |
+| §8.2 walkthrough | Task 19 Step 3 (items 1–8; the midnight check is a unit test on the Google Play image) |
+| §9 follow-ups taken | Task 19 Step 5 |
