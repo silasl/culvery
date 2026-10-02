@@ -5,6 +5,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -69,8 +70,10 @@ class ThemeTest {
         var tick by mutableIntStateOf(0)
         compose.setContent {
             val t = tick
-            // A new content lambda each tick, so CulveryTheme itself runs again.
-            CulveryTheme(dark = true) { if (t >= 0) Probe() }
+            // Built outside the composition and capturing the tick: a new lambda instance each tick, so CulveryTheme itself
+            // runs again while Probe's group is unchanged.
+            val content: @Composable () -> Unit = remember(t) { { Probe(); if (t < 0) Text("never") } }
+            CulveryTheme(dark = true, content = content)
         }
         compose.waitForIdle()
         val before = probeCompositions

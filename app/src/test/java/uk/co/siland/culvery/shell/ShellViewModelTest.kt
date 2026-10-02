@@ -77,6 +77,18 @@ class ShellViewModelTest {
         }
     }
 
+    /** A minute's tick that crosses no theme boundary emits nothing: the time isn't part of the state the shell draws from (4c §4.2, P2). */
+    @Test
+    fun aMinuteTickThatChangesNothingElseEmitsNoState() = runTest {
+        val vm = vm()
+        vm.uiState.test {
+            expectMostRecentItem()
+            ticks.value = noon.plusMinutes(1)
+            runCurrent()
+            expectNoEvents()
+        }
+    }
+
     @Test
     fun selectedTabFallsBackToHomeWhenItDisappears() = runTest {
         val calendar = FakeCapability("calendar", order = 10, shown = true)

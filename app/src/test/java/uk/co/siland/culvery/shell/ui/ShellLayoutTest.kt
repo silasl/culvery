@@ -2,7 +2,6 @@ package uk.co.siland.culvery.shell.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,9 +29,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.plugin.HeaderItem
-import uk.co.siland.culvery.core.plugin.HomeCard
-import uk.co.siland.culvery.core.plugin.HomeCardPlacer
-import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.shell.HOME_TAB_ID
@@ -131,16 +127,11 @@ class ShellLayoutTest {
         compose.onNodeWithTag("home_clock").assertExists()
     }
 
-    /** P2: through the whole shell, as MainActivity draws it, a minute's tick redraws the clocks and nothing on the cards. */
+    /** Through the whole shell, as MainActivity draws it, a minute's tick updates the Home clock. */
     @Test
-    fun aMinuteTickRedrawsTheClockAndNotTheCards() {
+    fun aMinuteTickUpdatesTheClock() {
         var now by mutableStateOf(at)
-        var cardCompositions = 0
-        val card = HomeCard("card", HomeCardSize.TALL, 1) {
-            cardCompositions++
-            Text("card")
-        }
-        val state = ShellUiState(homeCards = HomeCardPlacer.place(listOf(card)))
+        val state = ShellUiState()
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides NoNavigation) {
                 CulveryTheme(dark = true) {
@@ -157,10 +148,8 @@ class ShellLayoutTest {
             }
         }
         compose.waitForIdle()
-        val before = cardCompositions
         now = at.plusMinutes(1)
         compose.waitForIdle()
         compose.onNodeWithTag("home_clock").assertTextEquals("11:55")
-        assertThat(cardCompositions).isEqualTo(before)
     }
 }
