@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.Identified
@@ -358,5 +359,23 @@ class ShellViewModelTest {
             daylight.sun.value = SunTimes(sunrise, sunset)
             assertThat(expectMostRecentItem().dark).isFalse()
         }
+    }
+
+    @Test
+    fun sunTimesThatFailToLoadLeaveSevenAndSevenUntilTheRetryThenFollowTheSun() = runTest {
+        ShadowLog.clear()
+        val vm = vm(daylight = FlakyDaylight(SunTimes(sunrise, sunset)))
+        vm.uiState.test {
+            ticks.value = noon.with(LocalTime.of(19, 10))
+            expectMostRecentItem().let {
+                assertThat(it.now.toLocalTime()).isEqualTo(LocalTime.of(19, 10))
+                assertThat(it.dark).isTrue()
+            }
+            advanceTimeBy(1_001)
+            assertThat(expectMostRecentItem().dark).isFalse()
+        }
+        val logs = ShadowLog.getLogs().filter { it.tag == "ShellViewModel" }
+        assertThat(logs.map { it.msg }).containsExactly("Couldn't read today's sun times (IllegalStateException); retrying")
+        assertThat(logs.single().throwable).isNull()
     }
 }

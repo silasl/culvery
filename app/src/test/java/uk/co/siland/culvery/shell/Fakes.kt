@@ -122,3 +122,11 @@ class FakeDaylight(sun: SunTimes?) : Daylight {
     val sun = MutableStateFlow(sun)
     override val today: Flow<SunTimes?> = this.sun
 }
+
+class FlakyDaylight(private val sun: SunTimes) : Daylight {
+    private var failures = 1
+    override val today: Flow<SunTimes?> = flow {
+        if (failures-- > 0) throw IllegalStateException("no forecast for 51.5,-0.1")
+        emit(sun)
+    }
+}
