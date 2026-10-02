@@ -204,7 +204,7 @@ Role → permission bundles come from each `PermissionDef.defaultRoles`; they ar
 - Per hand-off §2 (week view, 7 columns, person legend, person-coloured chips, "synced x ago"). Person colours come from Household.
 - **+** button in the header (next to the legend); tapping empty space in a day column opens quick-add with that day preset.
 - Tapping an event opens the **event detail sheet**: title, time, for whom, created by, source calendar. Edit/Delete shown only when the event is editable (§6) — the permission check happens on tap, not on display.
-- Rolling 7 days starting today (matches hand-off §7); no week navigation — the view never leaves the synced window.
+- Rolling 7 days starting today (matches hand-off §7). *(Amended by the 4c design, D10: ‹ › step a week at a time up to 4 weeks ahead, inside the synced window.)*
 
 ### 9.4 Quick-add / edit sheet (new; hand-off sheet styling, right-side 600 dp)
 Order is chosen so the common case is: tap +, type title, tap a person, tap Save.

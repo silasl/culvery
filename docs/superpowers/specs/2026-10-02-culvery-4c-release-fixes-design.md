@@ -28,6 +28,8 @@ The user tests on the tablet only once there is a product they are happy to use;
 | D6 | **One calendar that can't be read** shows on its own row in Settings › Calendars with **Hide this calendar**; the connection stays healthy while its other calendars sync. |
 | D7 | **Reordering people** with Move up / Move down buttons, in the open Settings session (no fresh PIN). |
 | D8 | **Release logging:** R8 strips `Log.v/d/i`; `Log.w/e` carry only class names, HTTP codes or fixed text; a test guards it. |
+| D10 | **Looking ahead** *(amended after the plan review, 2026-10-02)*: the Calendar tab steps a week at a time up to 4 weeks (this week + 3); adding an event stays possible for any future date; the sync window grows to +28 days. Overrides v1 §9.3's "no week navigation". |
+| D11 | **No series-rule seeding** *(plan review)*: with the sync token kept across midnight, seeding the rule cache from stored rules saves one call per series per full resync; dropped (YAGNI). |
 | D9 | **Out of 4c:** accessibility, the launcher icon and design notes (4d); everything that needs the tablet (4e); the follow-ups file's Later items. |
 
 ## 3. Build and release
@@ -97,9 +99,9 @@ The plan records, on the emulator: **before** on a signed release with R8 off an
 ### 5.1 Culvery as the home app (D3, E6)
 
 - `MainActivity` gains the `HOME` and `DEFAULT` categories.
-- When Culvery isn't the default home app, the wizard's Done step and Settings › Kiosk show: "Make Culvery the home app so it comes back after a restart." with **Choose home app** (opens `Settings.ACTION_HOME_SETTINGS`).
+- When Culvery isn't the default home app, the wizard's Done step and Settings › Kiosk show: "Make Culvery the home app so it comes back after a restart." with **Choose home app**, which asks Android's yes/no role dialog (`RoleManager.createRequestRoleIntent(ROLE_HOME)`) — no way into Settings from it. *(Plan review: was `ACTION_HOME_SETTINGS`, a Settings page a child could back out of into all of Settings.)* Starting either intent catches `ActivityNotFoundException`.
 - Settings › Kiosk gains **Change home app** (fresh Admin PIN), to go back to the normal launcher.
-- **Exit kiosk** is unchanged: it unpins, and Culvery pins again the next time it is in front — now including every Home press.
+- **Exit kiosk** unpins. When Culvery is the home app it stays in front, unpinned with the system bars showing (moving to the back would resume Culvery as home and pin again at once); otherwise it moves to the back as today. Culvery pins again the next time it comes to the front after leaving it.
 
 ### 5.2 Device owner (optional)
 
@@ -132,7 +134,7 @@ The plan records, on the emulator: **before** on a signed release with R8 off an
 
 - The sync cursor's key drops the window's start date (`CalendarStore.kt` keys it `"$start|${zone.id}"` today, so every source fully resyncs at local midnight). A source's sync token lives until Google answers 410 (the existing full-resync path), the source changes, or the household zone changes.
 - After each pass, stored events that end before the window starts or start after it ends (today −1 to +14 days, household zone) are deleted, so incremental results outside the window don't accumulate. The plan checks how Google's incremental results relate to the first request's `timeMin`/`timeMax`.
-- The provider's series-rule cache is seeded from the stored `recurrenceRule`, so a full sync after a 410 doesn't make one `events.get` per series.
+- *(D11)* The series-rule cache is not seeded; a full sync fetches each series' rule as today, now about once per token lifetime instead of nightly.
 - `calendar.db` v6 (with §6.4): `MIGRATION_5_6` clears the stored cursors (one full sync per source on the first start) and adds `source.readProblem`. Hand-written, with a `MigrationTestHelper` test, as the repo requires.
 
 ### 6.3 Correctness (C3, C4, C9, E3)
@@ -153,6 +155,14 @@ The plan records, on the emulator: **before** on a signed release with R8 off an
 
 - C7: the master-gone toast adds the dropped changes when there are any: "{Service}: can't find the master calendar — choose a new one in Settings › Calendars. {n} changes waiting to sync were dropped."
 - C8: a test that `addConnection` is atomic.
+
+### 6.6 Looking ahead (D10)
+
+- The Calendar tab header gets **‹** and **›** beside the title, a week at a time: "This week", "Next week", "In 2 weeks", "In 3 weeks". **›** stops at 3 weeks ahead, **‹** at this week. A **This week** chip shows when not on this week.
+- The view returns to this week after 2 minutes without a touch, and at midnight.
+- Tapping empty space in a future week's day column opens quick-add with that day preset; **+** presets the first day of the week shown (today on this week).
+- Adding stays unlimited through **Pick date…** (already unbounded). When the saved event starts after the last day the tablet shows, the toast says "Event added for {Tue 17 November}" instead of "Event added".
+- `SYNC_FUTURE_DAYS` = 28: the window is today −1 to +28 days, inside the read horizon, so no extra requests; the token is kept while what it read still covers the window, so a full resync comes a little more often. Home's Today and Coming up cards are unchanged.
 
 ## 7. People, and test and code health
 
@@ -183,7 +193,7 @@ The plan records, on the emulator: **before** on a signed release with R8 off an
 ### 8.1 In the build
 
 - **Unit and Robolectric:** the signing failure message; `LogHygieneTest`; `IconFontTest`; `HouseholdClock` (one ticker for all); the cursor key, pruning, `MIGRATION_5_6`, series cancellation, skipping a failing connection; NeedsSignIn kept after a refused write; all-day by local date; `readProblem` set and cleared without touching connection health; `connections.manage` needs a fresh PIN; stepping out of lock-task and back (through `LockTask`); the Play services check; device-owner allowlisting (through a seam); the lockout clock guard; `move` at both ends; the splash hold (cards or 2 s); `distinctUntilChanged` on the calendar lists; the remembered `ColorScheme` (a recomposition counter).
-- **Roborazzi, light and dark:** the clear-night header icon; the event detail "added on this tablet" icon; Settings › Kiosk with the home-app line; Settings › Calendars with an unreadable calendar and an unreadable master; the people list with move buttons.
+- **Roborazzi, light and dark:** the clear-night header icon; the event detail "added on this tablet" icon; Settings › Kiosk with the home-app line; Settings › Calendars with an unreadable calendar and an unreadable master; the people list with move buttons; the Calendar tab on next week and on the furthest week.
 - **Gate:** `./gradlew testDebugUnitTest verifyRoborazziDebug`; and `./gradlew :app:assembleRelease` succeeds with the signing properties set and fails with §3.1's message without them.
 
 ### 8.2 Emulator walkthrough, on the signed, minified release
@@ -194,7 +204,8 @@ The plan records, on the emulator: **before** on a signed release with R8 off an
 4. Calendars sync; an event saves; the pass after local midnight doesn't fully resync (log and a short clock test).
 5. Clear night shows the corrected icon.
 6. Unshare one calendar from the account in Google Calendar: the row's message and **Hide this calendar**.
-7. Reorder people.
+7. Reorder people; step the Calendar tab ahead to its limit, add an event in a future week, add one beyond 4 weeks (the toast names its date), and leave it for 2 minutes (back to this week).
+   Exit kiosk with Culvery as the home app: it stays in front, unpinned.
 8. Release logcat: no debug or info lines from Culvery; no names, emails, towns, coordinates or zones.
 
 ## 9. Follow-ups: what 4c takes
