@@ -17,4 +17,8 @@ internal class RecordingNavigator(private val calls: MutableList<String>) : Shel
     override fun leavePinning() {
         calls += "leave pinning"
     }
+
+    override fun returnToPinning() {
+        calls += "return to pinning"
+    }
 }

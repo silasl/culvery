@@ -83,7 +83,53 @@ class GoogleConnectScreenTest {
         var connected: Connection? = null
         showWithScreens(Activity.RESULT_OK, onConnected = { connected = it }, onCancel = {})
         compose.waitUntil(5_000) { connected != null }
-        assertThat(calls).containsExactly("leave pinning", "launch").inOrder()
+        assertThat(calls).containsExactly("leave pinning", "launch", "return to pinning").inOrder()
+    }
+
+    /** The result arrives, so the kiosk is restored, whatever the answer (the normal path then pins on resume). */
+    @Test
+    fun aCancelledResultReturnsToPinning() {
+        var cancelled = 0
+        showWithScreens(Activity.RESULT_CANCELED, onConnected = {}, onCancel = { cancelled++ })
+        compose.waitUntil(5_000) { cancelled == 1 }
+        assertThat(calls).containsExactly("leave pinning", "launch", "return to pinning").inOrder()
+    }
+
+    /** androidx turns a failed IntentSender launch into a posted RESULT_CANCELED; Culvery never paused, so it restores. */
+    @Test
+    fun aLaunchThatNeverOpensRestoresTheKioskAndCancels() {
+        authorizer.next = Authorization.NeedsUser(screens())
+        var cancelled = 0
+        screen {
+            CompositionLocalProvider(LocalActivityResultRegistryOwner provides unlaunchable { dispatch -> dispatch(Activity.RESULT_CANCELED) }) {
+                provider.ConnectScreen(existing = null, onConnected = {}, onCancel = { cancelled++ })
+            }
+        }
+        compose.waitUntil(5_000) { cancelled == 1 }
+        assertThat(calls).containsExactly("leave pinning", "return to pinning").inOrder()
+        assertThat(toasts.messages).isEmpty()
+    }
+
+    @Test
+    fun aLaunchThatThrowsRestoresTheKioskAndCancels() {
+        authorizer.next = Authorization.NeedsUser(screens())
+        var cancelled = 0
+        screen {
+            CompositionLocalProvider(LocalActivityResultRegistryOwner provides unlaunchable { error("no screen") }) {
+                provider.ConnectScreen(existing = null, onConnected = {}, onCancel = { cancelled++ })
+            }
+        }
+        compose.waitUntil(5_000) { cancelled == 1 }
+        assertThat(calls).containsExactly("leave pinning", "return to pinning").inOrder()
+    }
+
+    /** A registry whose launch opens nothing: [behaviour] may throw, or report a cancelled result as androidx does. */
+    private fun unlaunchable(behaviour: (dispatch: (Int) -> Unit) -> Unit) = object : ActivityResultRegistryOwner {
+        override val activityResultRegistry = object : ActivityResultRegistry() {
+            override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I, options: ActivityOptionsCompat?) {
+                behaviour { code -> dispatchResult(requestCode, code, null) }
+            }
+        }
     }
 
     @Test

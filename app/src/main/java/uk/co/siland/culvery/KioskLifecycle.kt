@@ -16,6 +16,9 @@ internal interface KioskWindow {
     fun showBars()
 
     fun moveToBack()
+
+    /** Device owner only: whether Play services may run in lock-task (4c §5.2). */
+    fun allowPlayServices(allowed: Boolean)
 }
 
 /** Told when Android offers no home-app screen (4c §5.1): what went wrong and how to fix it. */
@@ -38,12 +41,15 @@ internal class KioskLifecycle(
     private val window: KioskWindow,
     private val setupComplete: () -> Boolean,
     private val isHomeApp: () -> Boolean,
+    private val isDeviceOwner: () -> Boolean,
     private val kioskExited: () -> Boolean,
     private val returnedToFront: () -> Unit,
     private val front: FrontTracker,
     private val changingConfigurations: () -> Boolean,
     private val say: (String) -> Unit,
 ) : DefaultLifecycleObserver {
+    private var resumed = false
+
     // A stop for a configuration change is the same activity coming straight back, so it doesn't count as leaving.
     override fun onStop(owner: LifecycleOwner) {
         if (!changingConfigurations()) front.left = true
@@ -56,8 +62,35 @@ internal class KioskLifecycle(
     }
 
     override fun onResume(owner: LifecycleOwner) {
+        resumed = true
+        // Culvery is back in front, however Google's screens ended: Play services is no longer allowed in lock-task.
+        if (isDeviceOwner()) window.allowPlayServices(false)
         if (!kioskExited()) window.hideBars()
         if (shouldPin(setupComplete(), kioskExited())) window.pin()
+    }
+
+    override fun onPause(owner: LifecycleOwner) {
+        resumed = false
+    }
+
+    /**
+     * Google's account chooser can't open over a pinned app (4c §5.3, D5): unpin, or as device owner stay in lock-task
+     * with Play services allowed.
+     */
+    fun leaveForGoogle() {
+        if (isDeviceOwner()) window.allowPlayServices(true) else window.unpin()
+    }
+
+    /**
+     * Google's screens ended or never opened. A resume restores the kiosk itself; this is for when Culvery never paused,
+     * so nothing else would: lock-task goes back to Culvery alone, or an unpinned Culvery in front pins again.
+     */
+    fun returnToPinning() {
+        if (isDeviceOwner()) {
+            window.allowPlayServices(false)
+        } else if (resumed && shouldPin(setupComplete(), kioskExited())) {
+            window.pin()
+        }
     }
 
     /**

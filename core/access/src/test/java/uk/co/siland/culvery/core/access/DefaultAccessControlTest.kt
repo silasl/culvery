@@ -168,6 +168,16 @@ class DefaultAccessControlTest {
     }
 
     @Test
+    fun aChildIsRefusedConnecting() = runTest {
+        person("Mia", Role.CHILD, "9876")
+        val access = access()
+        answerPins("9876", null)
+        assertThat(access.authorise(CorePermissions.CONNECTIONS_MANAGE)).isNull()
+        assertThat(seen.last().error).isEqualTo(PinError.NotAllowed("Mia"))
+        assertThat(access.session.value).isNull()
+    }
+
+    @Test
     fun personWithoutPermissionIsToldAndNotSignedIn() = runTest {
         person("Mia", Role.CHILD, "9876")
         val access = access()

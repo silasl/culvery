@@ -82,6 +82,8 @@ class GoogleCalendarProvider @Inject constructor(
         val connected by rememberUpdatedState(onConnected)
         val cancelled by rememberUpdatedState(onCancel)
         val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            // Whatever the answer, Google's screens are over (or never opened): restore the kiosk (4c §5.3).
+            navigator.returnToPinning()
             // Backed out of the chooser or the consent screen: the card closes with nothing said (3a design §3.2).
             if (result.resultCode != Activity.RESULT_OK) {
                 cancelled()
@@ -101,7 +103,15 @@ class GoogleCalendarProvider @Inject constructor(
                 is ConnectStep.ShowScreens -> {
                     // A pinned app can't open another app's screens (4c §5.3); Culvery pins again when it is back in front.
                     navigator.leavePinning()
-                    launcher.launch(IntentSenderRequest.Builder(step.intent.intentSender).build())
+                    try {
+                        launcher.launch(IntentSenderRequest.Builder(step.intent.intentSender).build())
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Google's screens couldn't open (${e::class.simpleName})")
+                        navigator.returnToPinning()
+                        cancelled()
+                    }
                 }
                 ConnectStep.Stopped -> cancelled()
             }

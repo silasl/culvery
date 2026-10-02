@@ -16,7 +16,7 @@ class PermissionRegistryTest {
 
     @Test
     fun corePermissionsAreAdminOnly() {
-        for (id in listOf(CorePermissions.SETTINGS_MANAGE, CorePermissions.PEOPLE_MANAGE, CorePermissions.KIOSK_EXIT)) {
+        for (id in listOf(CorePermissions.SETTINGS_MANAGE, CorePermissions.PEOPLE_MANAGE, CorePermissions.KIOSK_EXIT, CorePermissions.CONNECTIONS_MANAGE)) {
             assertThat(registry.isGranted(Role.ADMIN, id)).isTrue()
             assertThat(registry.isGranted(Role.ADULT, id)).isFalse()
             assertThat(registry.isGranted(Role.CHILD, id)).isFalse()
@@ -24,7 +24,8 @@ class PermissionRegistryTest {
     }
 
     @Test
-    fun kioskExitAndPeopleNeedAFreshPin() {
+    fun kioskExitPeopleAndConnectingNeedAFreshPin() {
+        assertThat(registry.require(CorePermissions.CONNECTIONS_MANAGE).freshPin).isTrue()
         assertThat(registry.require(CorePermissions.KIOSK_EXIT).freshPin).isTrue()
         assertThat(registry.require(CorePermissions.PEOPLE_MANAGE).freshPin).isTrue()
         assertThat(registry.require(CorePermissions.SETTINGS_MANAGE).freshPin).isFalse()

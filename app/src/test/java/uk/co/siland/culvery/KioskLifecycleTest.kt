@@ -20,12 +20,14 @@ class KioskLifecycleTest {
         override fun hideBars() { calls += "hideBars" }
         override fun showBars() { calls += "showBars" }
         override fun moveToBack() { calls += "moveToBack" }
+        override fun allowPlayServices(allowed: Boolean) { calls += "allowPlayServices($allowed)" }
     }
 
     private val window = RecordingWindow()
     private val front = FrontTracker()
     private var exited = false
     private var home = true
+    private var owner = false
     private var changing = false
     private val said = mutableListOf<String>()
     private val controller = Robolectric.buildActivity(ComponentActivity::class.java)
@@ -35,6 +37,7 @@ class KioskLifecycleTest {
         window,
         setupComplete = { true },
         isHomeApp = { home },
+        isDeviceOwner = { owner },
         kioskExited = { exited },
         returnedToFront = { exited = false },
         front = front,
@@ -140,6 +143,76 @@ class KioskLifecycleTest {
         assertThat(said).isEmpty()
         kiosk.roleAnswered(cancelled = true)
         assertThat(said).containsExactly(HOME_APP_NOT_OFFERED)
+    }
+
+    /** 4c §5.3: not as device owner, Google's screens need the kiosk unpinned. */
+    @Test
+    fun leavingForGoogleUnpinsWhenNotDeviceOwner() {
+        window.calls.clear()
+        kiosk.leaveForGoogle()
+        assertThat(window.calls).containsExactly("unpin")
+    }
+
+    /** 4c §5.2: as device owner Culvery stays in lock-task and Play services is allowed in it, nothing more. */
+    @Test
+    fun leavingForGoogleAsDeviceOwnerAllowsPlayServicesAndStaysPinned() {
+        owner = true
+        window.calls.clear()
+        kiosk.leaveForGoogle()
+        assertThat(window.calls).containsExactly("allowPlayServices(true)")
+    }
+
+    @Test
+    fun resumingAsDeviceOwnerTakesPlayServicesOutOfLockTaskBeforePinning() {
+        owner = true
+        window.calls.clear()
+        controller.pause().resume()
+        assertThat(window.calls.filter { it.startsWith("allowPlayServices") || it == "pin" })
+            .containsExactly("allowPlayServices(false)", "pin").inOrder()
+    }
+
+    @Test
+    fun resumingWhenNotDeviceOwnerNeverTouchesTheAllowlist() {
+        window.calls.clear()
+        controller.pause().resume()
+        assertThat(window.calls.filter { it.startsWith("allowPlayServices") }).isEmpty()
+    }
+
+    /** The chooser never opened, so Culvery never paused: an unpinned Culvery in front pins again at once. */
+    @Test
+    fun returningToPinningWhileInFrontPins() {
+        kiosk.leaveForGoogle()
+        window.calls.clear()
+        kiosk.returnToPinning()
+        assertThat(window.calls).containsExactly("pin")
+    }
+
+    /** The result arrives before onResume, which pins; pinning a paused activity isn't allowed. */
+    @Test
+    fun returningToPinningBeforeTheResumeLeavesItToTheResume() {
+        controller.pause()
+        window.calls.clear()
+        kiosk.returnToPinning()
+        assertThat(window.calls).isEmpty()
+        controller.resume()
+        assertThat(window.calls).contains("pin")
+    }
+
+    @Test
+    fun returningToPinningAfterExitKioskDoesNotPin() {
+        exited = true
+        window.calls.clear()
+        kiosk.returnToPinning()
+        assertThat(window.calls).isEmpty()
+    }
+
+    @Test
+    fun returningToPinningAsDeviceOwnerRemovesPlayServicesFromLockTask() {
+        owner = true
+        kiosk.leaveForGoogle()
+        window.calls.clear()
+        kiosk.returnToPinning()
+        assertThat(window.calls).containsExactly("allowPlayServices(false)")
     }
 
     @Test

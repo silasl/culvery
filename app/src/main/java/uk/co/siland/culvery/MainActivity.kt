@@ -78,16 +78,12 @@ class MainActivity : ComponentActivity() {
     // Whether Culvery is device owner, so it is in true lock-task and Google's chooser needs Play services allowed in it.
     private var isDeviceOwner = false
 
-    /**
-     * The shell's navigator, with leaving pinning done here and at once: the chooser opens right after it returns and
-     * can't open over a pinned app. As device owner Culvery stays in lock-task, with Play services allowed until
-     * Culvery is back in front.
-     */
+    /** The shell's navigator, with the kiosk's side of Google's screens done at once: the chooser opens right after. */
     private val navigator: ShellNavigator by lazy {
         object : ShellNavigator by shell {
-            override fun leavePinning() {
-                if (isDeviceOwner) allowPlayServicesInLockTask(this@MainActivity, allowed = true) else unpinFromScreen()
-            }
+            override fun leavePinning() = kiosk.leaveForGoogle()
+
+            override fun returnToPinning() = kiosk.returnToPinning()
         }
     }
 
@@ -99,6 +95,7 @@ class MainActivity : ComponentActivity() {
             ActivityKioskWindow(this),
             setupComplete = { setupComplete.value == true },
             isHomeApp = { homeApp.isDefault.value },
+            isDeviceOwner = { isDeviceOwner },
             kioskExited = { shell.kioskExited },
             returnedToFront = shell::returnedToFront,
             front = shell.front,
@@ -190,7 +187,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         homeApp.refresh()
-        if (isDeviceOwner) allowPlayServicesInLockTask(this, allowed = false)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

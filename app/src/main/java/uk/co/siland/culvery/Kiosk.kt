@@ -38,6 +38,8 @@ internal class ActivityKioskWindow(private val activity: ComponentActivity) : Ki
 
     override fun showBars() = activity.showSystemBars()
 
+    override fun allowPlayServices(allowed: Boolean) = allowPlayServicesInLockTask(activity, allowed)
+
     override fun moveToBack() {
         activity.moveTaskToBack(true)
     }

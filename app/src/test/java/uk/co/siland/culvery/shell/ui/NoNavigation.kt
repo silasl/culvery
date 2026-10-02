@@ -9,4 +9,5 @@ internal object NoNavigation : ShellNavigator {
     override fun chooseHomeApp() = Unit
     override fun changeHomeApp() = Unit
     override fun leavePinning() = Unit
+    override fun returnToPinning() = Unit
 }

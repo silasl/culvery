@@ -81,6 +81,8 @@ class RecordingNavigator : ShellNavigator {
     }
 
     override fun leavePinning() = Unit
+
+    override fun returnToPinning() = Unit
 }
 
 class FakeHomeApp(default: Boolean = false) : HomeApp {
