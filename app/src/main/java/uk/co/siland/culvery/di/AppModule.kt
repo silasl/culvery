@@ -14,6 +14,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import uk.co.siland.culvery.AndroidHomeApp
+import uk.co.siland.culvery.BuildConfig
+import uk.co.siland.culvery.core.plugin.AppVersion
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Daylight
@@ -56,5 +58,9 @@ abstract class AppModule {
 
         @Provides
         fun wallClock(): WallClock = WallClock { System.currentTimeMillis() }
+
+        @Provides
+        @AppVersion
+        fun appVersion(): String = BuildConfig.VERSION_NAME
     }
 }

@@ -16,6 +16,11 @@ fun interface WallClock {
 @Retention(AnnotationRetention.BINARY)
 annotation class ApplicationScope
 
+/** The app's version name, e.g. "1.0.0-beta1"; bound by `:app` from BuildConfig (4c design §6.1). */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class AppVersion
+
 private const val MINUTE_MS = 60_000L
 
 /** Now, then each minute's start, as epoch millis. */

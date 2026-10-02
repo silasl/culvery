@@ -41,11 +41,19 @@ import uk.co.siland.culvery.core.ui.Icons
 private const val PAGE_SIZE = "250"
 private val WRITE_ROLES = setOf("owner", "writer")
 
+/** What events.list returns (4c §6.1, ruling 4): only what the provider parses; the same on full and incremental lists. */
+internal const val EVENT_FIELDS =
+    "items(id,status,summary,start,end,recurringEventId,recurrence,eventType,attendees(self,responseStatus)," +
+        "extendedProperties/private,colorId),nextPageToken,nextSyncToken"
+
+/** What calendarList.list returns (4c §6.1). */
+internal const val CALENDAR_LIST_FIELDS = "items(id,summary,summaryOverride,accessRole,selected,hidden,primary),nextPageToken"
+
 /**
  * calendarList's query (3a design §3.5): hidden calendars too, so hiding one in Google hides it rather than deleting it
  * and its mapping; none the account can see only as free/busy, whose events it can't read.
  */
-private val CALENDAR_LIST_QUERY = mapOf("showHidden" to "true", "minAccessRole" to "reader")
+private val CALENDAR_LIST_QUERY = mapOf("showHidden" to "true", "minAccessRole" to "reader", "fields" to CALENDAR_LIST_FIELDS)
 
 /**
  * Google Calendar API v3 (3a design §3.1–§3.7). The connection's config holds only the account's email; every call
@@ -193,7 +201,7 @@ class GoogleCalendarProvider @Inject constructor(
         while (true) {
             val url = api.url(
                 "calendars", source.id, "events",
-                query = query + mapOf("singleEvents" to "true", "maxResults" to PAGE_SIZE, "pageToken" to pageToken),
+                query = query + mapOf("singleEvents" to "true", "maxResults" to PAGE_SIZE, "fields" to EVENT_FIELDS, "pageToken" to pageToken),
             )
             val answer = api.send(account, "GET", url)
             if (answer.code == 410) return null

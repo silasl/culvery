@@ -2,6 +2,7 @@ package uk.co.siland.culvery.provider.calendar_google
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -12,6 +13,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -268,5 +271,85 @@ class GoogleReadTest {
     @Test
     fun aConnectionWithNoAccountNeedsSigningIn() = runTest {
         assertThat(failureOf { provider.sources(conn.copy(config = emptyMap())) }).isInstanceOf(NeedsSignInException::class.java)
+    }
+
+    @Test
+    fun calendarListsAskOnlyForWhatTheTabletReads() = runTest {
+        provider.sources(conn)
+        assertThat(google.requests.first().requestUrl!!.queryParameter("fields")).isEqualTo(CALENDAR_LIST_FIELDS)
+    }
+
+    @Test
+    fun fullAndIncrementalEventListsAskOnlyForWhatTheTabletReads() = runTest {
+        val full = provider.sync(conn, family, range, cursor = null)
+        provider.sync(conn, family, range, full.cursor)
+        val lists = google.requests.map { it.requestUrl!! }.filter { it.encodedPath.endsWith("/events") }
+        assertThat(lists).hasSize(2)
+        assertThat(lists.map { it.queryParameter("fields") }).containsExactly(EVENT_FIELDS, EVENT_FIELDS)
+    }
+
+    /**
+     * Ruling 4: a field the provider parses but doesn't ask for would come back missing, silently. Walks each answer's
+     * classes, nested ones too, against Google's `fields` syntax: a field named alone comes whole; one with a
+     * selection, `a(b,c)` or `a/b`, comes with only those.
+     */
+    @Test
+    fun everyFieldTheProviderParsesIsAskedFor() {
+        assertAskedFor(FieldsSelection.parse(EVENT_FIELDS), EventsPage.serializer().descriptor, "")
+        assertAskedFor(FieldsSelection.parse(CALENDAR_LIST_FIELDS), CalendarListPage.serializer().descriptor, "")
+    }
+
+    private fun assertAskedFor(asked: FieldsSelection, descriptor: SerialDescriptor, path: String) {
+        for (index in 0 until descriptor.elementsCount) {
+            val name = descriptor.getElementName(index)
+            assertWithMessage("$path$name isn't asked for").that(asked.fields).containsKey(name)
+            val only = asked.fields[name] ?: continue
+            var element = descriptor.getElementDescriptor(index)
+            if (element.kind == StructureKind.LIST) element = element.getElementDescriptor(0)
+            if (element.kind == StructureKind.CLASS) assertAskedFor(only, element, "$path$name.")
+        }
+    }
+}
+
+/** Google's `fields` syntax as a tree: each name maps to its own selection, or to null when it comes whole. */
+private class FieldsSelection(val fields: Map<String, FieldsSelection?>) {
+    companion object {
+        fun parse(text: String): FieldsSelection = FieldsParser(text).parse()
+    }
+}
+
+/** Reads `a,b(c,d),e/f`: a list of names, each with a bracketed list or a one-name path below it. */
+private class FieldsParser(private val text: String) {
+    private var i = 0
+
+    fun parse(): FieldsSelection = list().also { check(i == text.length) { "unparsed fields text" } }
+
+    private fun list(): FieldsSelection {
+        val out = mutableMapOf<String, FieldsSelection?>()
+        while (true) {
+            val (name, only) = item()
+            out[name] = only
+            if (i < text.length && text[i] == ',') i++ else return FieldsSelection(out)
+        }
+    }
+
+    private fun item(): Pair<String, FieldsSelection?> {
+        val start = i
+        while (i < text.length && text[i] !in ",()/") i++
+        val name = text.substring(start, i)
+        return name to when {
+            i < text.length && text[i] == '(' -> {
+                i++
+                list().also {
+                    check(text[i] == ')')
+                    i++
+                }
+            }
+            i < text.length && text[i] == '/' -> {
+                i++
+                FieldsSelection(mapOf(item()))
+            }
+            else -> null
+        }
     }
 }
