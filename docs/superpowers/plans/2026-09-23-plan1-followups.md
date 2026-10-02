@@ -4,14 +4,12 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 ## For Plan 2 (Calendar capability)
 - `HhIcon` clears semantics and takes no content description. Icon-only buttons need an accessible label.
-- `HomeCardPlacer` has no tests with mixed sizes or a full grid. Add them once real cards exist.
 - The shell composables (`NavRail`, `StatusBar`, `SettingsPlaceholder`) have no UI tests, although the test tags exist. Cover them with the Roborazzi setup.
 - Set a module-wide Robolectric viewport default (`w1280dp-h800dp`) so each test class doesn't need its own `@Config`.
 - Home header: the gap between the clock and the date is about 55 dp on the emulator, against about 12 dp in the hand-off, so the grid sits roughly 40 dp too low. The line-height trim on `HhType.clock` isn't taking effect. Found on the emulator; both AVDs show it.
 
 ## For Plan 4 (weather, setup, settings, release)
 - Guard the lockout against a backwards jump of the wall clock: treat a stored `lockedUntil` more than 16 minutes in the future as expired.
-- Run the theme schedule in the household's timezone (`HomeLocation.timeZoneId`) and feed it sunrise/sunset.
 - Subset the 15 MB Material Symbols font to the glyphs used, and measure memory on the SM-T510.
 - After Exit kiosk, the system bars overlap the content (edge-to-edge, no insets). Pad the root with `WindowInsets.systemBars` when not in kiosk mode.
 - `LockoutStore` uses `commit()`, which is synchronous disk I/O and may be on Main. Switch to `apply()` with an in-memory mirror if StrictMode complains.
@@ -107,3 +105,21 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 **Test health**
 - `StepsUiTest.aReleaseBuildNeverOffersIt` failed once with "connection pool has been closed": a Room query outlived its test. Close the database only after the composition is disposed, or wait for idle first.
+
+## From Plan 4b (deferred)
+
+**For Plan 4c**
+- The weather on the SM-T510: the header and the Forecast card at its density, and the fetch over a whole day on the wall.
+- The calendar's Google client has no `callTimeout` either (only connect 15 s and read 30 s, `GoogleCalendarModule`), so a body that drips in can hold a sync pass until the engine's own timeout; give it a whole-call limit as the forecast's (4b plan review 2).
+- On a cold start the clock, the date and the theme show the device's zone for a moment, until Room answers with the household's (`ShellViewModel.now` starts from `LocalDateTime.now()`). Accepted in 4b; check on the SM-T510 whether it shows.
+
+**For the end-of-v1 design and UX review**
+- All 4b layout, colour and copy choices are provisional: the Forecast card's rows, its title in every state, the card's icons in sun amber like the header's, the TalkBack condition words, the header items' spacing and divider.
+- The Forecast card has a lot of empty space below its three rows.
+- The Home location town list stays open after a town is picked (with a tick). Noticed in the 4b walkthrough; it is 4a behaviour.
+
+**Accessibility pass (with the `HhIcon` item)**
+- The header weather item has no merged TalkBack description: the temperature and High/Low read as two separate items.
+
+**Later**
+- Open-Meteo answers with one UTC offset for the whole forecast, so data fetched before a clock change is an hour out for the days after it until the next fetch; offline across a clock change, the header's hour and the theme's sunset are an hour out. Known and untested in 4b (ruling 2). Fix: ask with `timeformat=unixtime` and convert each time in the household's zone (dates from the daily rows' own instants).

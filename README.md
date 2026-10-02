@@ -21,6 +21,8 @@ A fresh install opens the setup wizard before anything else: Welcome, Home locat
 
 In debug builds Welcome also offers **Use a sample household**: **Alex** (Admin, PIN 1234), **Sam** (Adult, PIN 2468), **Mia** (Child, PIN 1357), London, and a "Sample calendar" connection showing the design hand-off's week, with its "Family calendar" as the master calendar. The sample calendar keeps changes in memory and forgets them when the app restarts. Release builds offer no sample and include no sample calendar.
 
+Once a home location is set, Home's header shows the weather now and the Forecast card shows today and the next two days, from Open-Meteo every 30 minutes (5 minutes after a failed try); offline, both carry on from the last forecast, and after a change of town the old town's weather is never shown. The clock, the date and the theme follow the household's time zone, and the theme turns dark at that day's sunset and light at sunrise (07:00 and 19:00 until the first forecast arrives, and on a day without a sunset).
+
 To see what the tablet does while a calendar can't be reached, a debug build can take the sample calendar offline and bring it back: `adb shell am broadcast -n uk.co.siland.culvery/.DebugOfflineReceiver --ez offline true` (or `false`). Changes made meanwhile show as syncing and are sent once it is back. This switch is debug-only and reached only over adb; it has no counterpart in the app's UI.
 
 To connect a real Google account, first set up a Google Cloud project with an Android client for your debug key (`docs/setup/google-calendar.md`), add the family's Google account to the device (Settings › Accounts), then connect it in the wizard's Connect step, or later in Settings › Calendars (Admin PIN). Connecting removes the sample calendar, with its events and queued changes, for good. Settings › Calendars says who each calendar is for, shows or hides it, picks the master calendar new events go to, and disconnects (dropping its queued changes; Google keeps the grant until you remove it, see `docs/setup/google-calendar.md`). A calendar hidden on the tablet stays hidden until it is ticked or unticked again in Google Calendar. Release builds offer Google Calendar only, and its Connect fails until the release key's SHA-1 has its own Android client (Plan 4). A calendar is mapped to a person when its name contains theirs as a whole word, so a name that is also a common word ("May", "Will") can map a calendar like "May half term" to that person; change it in Settings › Calendars.
@@ -45,15 +47,16 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 |---|---|
 | `:app` | Activity, kiosk mode, nav rail, Home grid, wiring only |
 | `:core:ui` | Design tokens, DM Sans, Material Symbols, shared components |
-| `:core:plugin` | `Capability`, `SetupStep`, `SettingsPage`, `HomeCard`, `ProviderDescriptor`, `Connection`, `ConnectionHealth`, `ShellNavigator`, `OverlayHost`, `Toaster`, `Startable` |
-| `:core:household` | People (with role and PIN hash), Family, home location — `household.db` |
+| `:core:plugin` | `Capability`, `SetupStep`, `SettingsPage`, `HomeCard`, `HeaderItem`, `Daylight`, `ProviderDescriptor`, `Connection`, `ConnectionHealth`, `ShellNavigator`, `OverlayHost`, `Toaster`, `Startable` |
+| `:core:household` | People (with role and PIN hash), Family, home location, the household's time zone (`HouseholdZone`) — `household.db` |
 | `:core:access` | Permissions, PIN hashing, lockout, 2-minute session, PIN pad |
 | `:core:setup` | The first-run wizard, two-pane Settings, the core pages (Home location, People, Kiosk), `SetupState`, `LocationSearch` |
 | `:capability:calendar` | Calendar contract (read and write), `calendar.db` cache and outbox, 5-minute sync, event editor, Home cards, Calendar tab, event detail and add/edit sheets |
 | `:capability:calendar-testkit` | `CalendarProviderContractTest`, the tests every calendar provider must pass |
+| `:capability:weather` | Weather contract (`WeatherProvider`), `weather.db` (the last forecast, for the place it was fetched for), the 30-minute fetch, the header item, the Forecast card, today's sun times (`Daylight`) |
 | `:provider:calendar-fake` | Debug-only sample calendar (the hand-off's week, relative to today) |
 | `:provider:calendar-google` | Google Calendar API v3 over OkHttp; sign-in and tokens through Play services, nothing stored |
-| `:provider:weather-openmeteo` | Town search through Open-Meteo's geocoding (no key); the forecast comes in Plan 4b |
+| `:provider:weather-openmeteo` | Town search (geocoding) and the forecast through Open-Meteo (no key) |
 
 Rules, enforced when Gradle configures the project (`build-logic/convention/src/main/kotlin/ModuleBoundaries.kt`):
 - `:core:*` depends only on `:core:*`.
@@ -68,7 +71,7 @@ Breaking a rule fails the build with `Module boundary: <from> must not depend on
 ## Adding a capability
 
 1. Create `capability/<name>/build.gradle.kts` with `id("culvery.android.library")`, `id("culvery.android.compose")`, `id("culvery.hilt")`, and depend on `:core:plugin` (plus `:core:access` if it has actions).
-2. Implement `Capability` (tab, icon, `order`, `hasTab`, Home `cards()`). Card and tab UI move the shell through `LocalShellNavigator.current.openTab(id)` / `.openSettings()`. Sheets open through `LocalOverlayHost.current.show { … }` (draw them with `HhSheet`). Short messages go through the injected `Toaster`, from the code that knows the outcome (a view model or an `@ApplicationScope` job), so the toast still shows if the sheet has closed. Background work (sync loops) is a `Startable` bound `@IntoSet`; the app starts it once at launch. A capability can add wizard steps and Settings pages by returning `SetupStep`s and `SettingsPage`s from `setupSteps()` and `settingsPages()` (`:core:setup` places them by `order`: core steps 0–399, capabilities 400 and up, Done 1000; Settings pages Home location 0, People 100, Kiosk 900).
+2. Implement `Capability` (tab, icon, `order`, `hasTab`, Home `cards()`). Card and tab UI move the shell through `LocalShellNavigator.current.openTab(id)` / `.openSettings()`. Sheets open through `LocalOverlayHost.current.show { … }` (draw them with `HhSheet`). Short messages go through the injected `Toaster`, from the code that knows the outcome (a view model or an `@ApplicationScope` job), so the toast still shows if the sheet has closed. Background work (sync loops) is a `Startable` bound `@IntoSet`; the app starts it once at launch. A capability can add wizard steps and Settings pages by returning `SetupStep`s and `SettingsPage`s from `setupSteps()` and `settingsPages()` (`:core:setup` places them by `order`: core steps 0–399, capabilities 400 and up, Done 1000; Settings pages Home location 0, People 100, Kiosk 900). Items on the right of Home's header come from `headerItems()` (placed by `HeaderItem.order`: weather 10, then indoor climate 20).
 3. Bind it: `@Binds @IntoSet abstract fun bind(impl: MyCapability): Capability` in a Hilt module.
 4. If it has actions, implement `PermissionSource` and bind it `@IntoSet` too; call `AccessControl.authorise("<name>.<action>")` before acting.
 5. `include(":capability:<name>")` in `settings.gradle.kts` and add it to `:app` dependencies.
@@ -173,6 +176,10 @@ A stronger device-owner lock is possible later; it is not built yet.
 - This is kid-proofing, not strong security.
 
 **Forgotten PIN:** an Admin can reset anyone's PIN in Settings › People. If every Admin has forgotten theirs, clear the app's data (Android Settings › Apps › Culvery › Storage › Clear data). That wipes all configuration and starts setup again.
+
+## Privacy
+
+Open-Meteo (town search and weather; no key, no account) receives the town typed into the search, and then the home's coordinates and time zone with each forecast request, every 30 minutes. Nothing that identifies the household or its people is sent to it. Neither the town, the coordinates nor the time zone is written to the app's log.
 
 ## Licences
 
