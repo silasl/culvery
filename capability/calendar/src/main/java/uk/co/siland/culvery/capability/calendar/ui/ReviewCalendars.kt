@@ -50,6 +50,7 @@ import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.HhSwitch
+import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 /** 3a design §4.1. */
@@ -289,7 +290,7 @@ private fun SourceRow(
                         enabled = !busy,
                         selectedColor = Color(p.color),
                         selectedInk = PersonChipInk,
-                        leading = { ink -> if (selected) HhIcon("check", size = ControlTokens.chipIcon, tint = ink) else Dot(p) },
+                        leading = { ink -> if (selected) HhIcon(Icons.CHECK, size = ControlTokens.chipIcon, tint = ink) else Dot(p) },
                     )
                 }
             }

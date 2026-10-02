@@ -32,6 +32,7 @@ import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhTextField
+import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 /** 4a design §3.8: search once the query has two letters and typing has paused for 400 ms. */
@@ -146,6 +147,6 @@ private fun PlaceRow(label: String, ticked: Boolean, tag: String, onClick: (() -
             .padding(horizontal = SetupDimens.rowPaddingH, vertical = SetupDimens.rowPaddingV),
     ) {
         Text(label, style = SetupType.rowTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        if (ticked) HhIcon("check", size = SetupDimens.rowIcon, tint = c.accent)
+        if (ticked) HhIcon(Icons.CHECK, size = SetupDimens.rowIcon, tint = c.accent)
     }
 }

@@ -49,6 +49,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.Icons
 
 data class WeekViewState(val week: WeekUi, val today: LocalDate, val sync: SyncStatusUi, val nowMillis: Long)
 
@@ -194,7 +195,7 @@ private fun AddHint(date: LocalDate, onAdd: () -> Unit) {
             .heightIn(min = CalendarDimens.addHintMinHeight)
             .clickable(onClickLabel = "Add event", onClick = onAdd),
     ) {
-        HhIcon("add", size = CalendarDimens.addHintIcon, tint = Culvery.colors.mute.copy(alpha = CalendarDimens.ADD_HINT_ALPHA))
+        HhIcon(Icons.ADD, size = CalendarDimens.addHintIcon, tint = Culvery.colors.mute.copy(alpha = CalendarDimens.ADD_HINT_ALPHA))
     }
 }
 
@@ -261,7 +262,7 @@ private fun ReconnectChip(label: String, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = CalendarDimens.pillPaddingH),
     ) {
-        HhIcon("sync_problem", size = CalendarDimens.reconnectIcon, tint = c.danger)
+        HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.reconnectIcon, tint = c.danger)
         Text(
             label,
             style = CalendarType.pill,

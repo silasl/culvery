@@ -35,6 +35,7 @@ import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.ui.Icons
 
 private const val PAGE_SIZE = "250"
 private val WRITE_ROLES = setOf("owner", "writer")
@@ -56,7 +57,7 @@ class GoogleCalendarProvider @Inject constructor(
     private val authorizer: Authorizer,
     private val toaster: Toaster,
 ) : CalendarProvider, CalendarWriter {
-    override val descriptor = ProviderDescriptor(GOOGLE_PROVIDER_ID, GOOGLE_DISPLAY_NAME, "calendar_month", setOf(Feature.READ, Feature.WRITE))
+    override val descriptor = ProviderDescriptor(GOOGLE_PROVIDER_ID, GOOGLE_DISPLAY_NAME, Icons.CALENDAR_MONTH, setOf(Feature.READ, Feature.WRITE))
     override val providerId = GOOGLE_PROVIDER_ID
 
     // By connection and calendar: each series' RRULE, "" for a series with none.

@@ -41,6 +41,7 @@ import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPersonChip
 import uk.co.siland.culvery.core.ui.HhSheet
+import uk.co.siland.culvery.core.ui.Icons
 
 enum class DetailMode { Idle, ChoosingPerson, ConfirmingDelete }
 
@@ -86,7 +87,7 @@ fun EventDetailSheet(
             e.readOnlyReason == ReadOnlyReason.OtherCalendar || e.readOnlyReason == ReadOnlyReason.NotMaster -> {
                 val subscribed = e.readOnlyReason == ReadOnlyReason.OtherCalendar
                 Note(
-                    icon = "lock",
+                    icon = Icons.LOCK,
                     title = if (subscribed) "From ${e.sourceName} (read-only)" else "From ${e.sourceName}",
                     body = if (subscribed) {
                         "This is a subscribed calendar, so it can't be changed here."
@@ -96,12 +97,12 @@ fun EventDetailSheet(
                 )
             }
             e.readOnlyReason == ReadOnlyReason.Recurring -> Note(
-                icon = "event_repeat",
+                icon = Icons.EVENT_REPEAT,
                 title = "Repeating event",
                 body = "Edit repeating events in ${e.serviceName} on your phone.",
             )
             e.untagged -> Note(
-                icon = "smartphone",
+                icon = Icons.MOBILE,
                 title = "Added from a phone",
                 body = "Showing as Family until someone assigns it.",
                 background = c.accentSoft,
@@ -126,11 +127,11 @@ fun EventDetailSheet(
                 HhConfirmCard(
                     tag = "detail_confirm",
                     keep = "Keep event", keepTone = ButtonTone.Quiet, keepTag = "detail_keep",
-                    confirm = "Delete event", confirmTag = "detail_confirm_delete", confirmIcon = "delete_forever",
+                    confirm = "Delete event", confirmTag = "detail_confirm_delete", confirmIcon = Icons.DELETE_FOREVER,
                     busy = busy, onKeep = onKeep, onConfirm = onConfirmDelete,
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.noteIconGap)) {
-                        HhIcon("delete", size = CalendarDimens.footerIcon, tint = c.danger)
+                        HhIcon(Icons.DELETE, size = CalendarDimens.footerIcon, tint = c.danger)
                         Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.noteTextGap)) {
                             Text("Delete this event?", style = ControlType.confirmTitle, color = c.ink)
                             Text(
@@ -144,7 +145,7 @@ fun EventDetailSheet(
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
                     DeleteButton(enabled = !busy, tag = "detail_delete", onClick = onDelete)
-                    PrimaryButton("Edit", "edit", enabled = !busy, tag = "detail_edit", onClick = onEdit, modifier = Modifier.weight(1f))
+                    PrimaryButton("Edit", Icons.EDIT, enabled = !busy, tag = "detail_edit", onClick = onEdit, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -187,7 +188,7 @@ private fun SyncingPill(connectionLabel: String) {
             .background(c.surf2)
             .padding(horizontal = CalendarDimens.syncingPillPaddingH),
     ) {
-        HhIcon("cloud_upload", size = CalendarDimens.syncingPillIcon, tint = c.mute)
+        HhIcon(Icons.CLOUD_UPLOAD, size = CalendarDimens.syncingPillIcon, tint = c.mute)
         Text("Syncing to $connectionLabel…", style = CalendarType.syncingPill, color = c.mute, maxLines = 1)
     }
 }
@@ -200,21 +201,21 @@ private fun InfoCard(detail: EventDetailUi) {
         radius = CalendarDimens.infoRadius,
         padding = PaddingValues(horizontal = CalendarDimens.infoPaddingH, vertical = CalendarDimens.infoPaddingV),
     ) {
-        InfoRow("schedule", "When") { Value(detail.whenLabel) }
+        InfoRow(Icons.SCHEDULE, "When") { Value(detail.whenLabel) }
         Divider()
-        InfoRow("person", "For") {
+        InfoRow(Icons.PERSON, "For") {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.infoDotGap)) {
                 Box(Modifier.size(CalendarDimens.infoDot).clip(CircleShape).background(Color(e.person.color)))
                 Value(e.person.name)
             }
         }
         Divider()
-        InfoRow("edit_note", "Created by") { Value(e.createdBy) }
+        InfoRow(Icons.EDIT_NOTE, "Created by") { Value(e.createdBy) }
         Divider()
-        InfoRow("calendar_month", "Calendar") { Value(calendarLabel(e)) }
+        InfoRow(Icons.CALENDAR_MONTH, "Calendar") { Value(calendarLabel(e)) }
         if (e.recurring) {
             Divider()
-            InfoRow("repeat", "Repeats") { Value(e.repeats) }
+            InfoRow(Icons.REPEAT, "Repeats") { Value(e.repeats) }
         }
     }
 }

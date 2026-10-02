@@ -35,7 +35,9 @@ class ThemeTest {
         val dmSans = res.openRawResource(R.font.dm_sans).use { it.readBytes().size }
         val symbols = res.openRawResource(R.font.material_symbols_rounded).use { it.readBytes().size }
         assertThat(dmSans).isGreaterThan(100_000)
-        assertThat(symbols).isGreaterThan(1_000_000)
+        // The subset of the glyphs Icons names (4c §3.5): about 160 KB; the full font is 15 MB.
+        assertThat(symbols).isGreaterThan(50_000)
+        assertThat(symbols).isLessThan(1_000_000)
     }
 
     @Test

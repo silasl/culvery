@@ -13,6 +13,7 @@ import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.ui.Icons
 
 private const val WEATHER_ID = "weather"
 private const val FORECAST_CARD_ID = "weather.forecast"
@@ -30,7 +31,7 @@ class WeatherCapability @Inject constructor(
 ) : Capability {
     override val id = WEATHER_ID
     override val label = "Weather"
-    override val icon = "partly_cloudy_day"
+    override val icon = Icons.PARTLY_CLOUDY_DAY
 
     /** After Security's 50; weather has no tab, so nothing appears on the rail. */
     override val order = 60

@@ -27,6 +27,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPillButton
+import uk.co.siland.culvery.core.ui.Icons
 
 /** 4a design §4.4: each person with their colour, name, role and whether they have a PIN; tap to edit. */
 @Composable
@@ -56,7 +57,7 @@ internal fun PersonRow(member: Member, onClick: () -> Unit) {
             Text(member.person.name, style = SetupType.rowTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text("${roleName(member.role)} · ${if (member.hasPin) PIN_SET else NO_PIN}", style = SetupType.secondary, color = c.mute, maxLines = 1)
         }
-        HhIcon("chevron_right", size = SetupDimens.rowIcon, tint = c.mute)
+        HhIcon(Icons.CHEVRON_RIGHT, size = SetupDimens.rowIcon, tint = c.mute)
     }
 }
 

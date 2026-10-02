@@ -20,6 +20,7 @@ import java.time.format.DateTimeFormatter
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.ShellType
 import uk.co.siland.culvery.shell.SessionUi
@@ -54,7 +55,7 @@ fun StatusBar(
                 horizontalArrangement = Arrangement.spacedBy(ShellTokens.statusGap),
                 modifier = Modifier.testTag("status_session"),
             ) {
-                HhIcon("account_circle", size = ShellTokens.statusIcon, tint = c.mute)
+                HhIcon(Icons.ACCOUNT_CIRCLE, size = ShellTokens.statusIcon, tint = c.mute)
                 Text("${session.name} · ${session.role}", style = HhType.status, color = c.mute, maxLines = 1)
                 Text(
                     "Sign out",
@@ -73,7 +74,7 @@ fun StatusBar(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.testTag("status_theme").clickable(onClick = onToggleThemePreview).padding(4.dp),
         ) {
-            HhIcon(if (dark) "dark_mode" else "light_mode", size = 16.dp, tint = c.mute)
+            HhIcon(if (dark) Icons.DARK_MODE else Icons.LIGHT_MODE, size = 16.dp, tint = c.mute)
             Text(label, style = HhType.status.copy(fontSize = 12.sp), color = c.mute)
         }
     }

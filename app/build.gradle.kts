@@ -58,7 +58,6 @@ dependencies {
     debugImplementation(project(":provider:calendar-fake"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.roborazzi.core)
     testImplementation(libs.roborazzi.compose)

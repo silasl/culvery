@@ -43,6 +43,7 @@ import uk.co.siland.culvery.capability.calendar.SHORT_DAY
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 
 /** Which picker is drawn over the add/edit sheet. */
@@ -127,8 +128,8 @@ internal fun DatePickerCard(today: LocalDate, selected: LocalDate, onPick: (Loca
                     modifier = Modifier.padding(top = CalendarDimens.pickerRangeTop).testTag("date_range"),
                 )
             }
-            RoundButton("chevron_left", "Earlier weeks", "date_prev") { page-- }
-            RoundButton("chevron_right", "Later weeks", "date_next") { page++ }
+            RoundButton(Icons.CHEVRON_LEFT, "Earlier weeks", "date_prev") { page-- }
+            RoundButton(Icons.CHEVRON_RIGHT, "Later weeks", "date_next") { page++ }
         }
         Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.dateCellGap)) {
             Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.dateCellGap)) {
@@ -247,9 +248,9 @@ private fun RoundButton(icon: String, label: String, tag: String, onClick: () ->
 private fun Stepper(value: Int, name: String, onUp: () -> Unit, onDown: () -> Unit) {
     val c = Culvery.colors
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(CalendarDimens.stepperGap)) {
-        StepButton("expand_less", "${name}_up", "More", onUp)
+        StepButton(Icons.EXPAND_LESS, "${name}_up", "More", onUp)
         Text(value.toString().padStart(2, '0'), style = CalendarType.timeValue, color = c.ink, modifier = Modifier.testTag("${name}_value"))
-        StepButton("expand_more", "${name}_down", "Less", onDown)
+        StepButton(Icons.EXPAND_MORE, "${name}_down", "Less", onDown)
     }
 }
 

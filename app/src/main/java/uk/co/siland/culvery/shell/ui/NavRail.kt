@@ -25,10 +25,11 @@ import androidx.compose.ui.unit.dp
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.TabItem
 
-private val HomeTab = TabItem(HOME_TAB_ID, "Home", "home")
+private val HomeTab = TabItem(HOME_TAB_ID, "Home", Icons.HOME)
 
 /** Who is signed in now shows in the status bar (hand-off §7), not here. */
 @Composable
@@ -65,7 +66,7 @@ fun NavRail(
                 .background(c.surf2)
                 .clickable(onClick = onOpenSettings),
         ) {
-            HhIcon("settings", size = 30.dp, tint = c.ink)
+            HhIcon(Icons.SETTINGS, size = 30.dp, tint = c.ink)
             Text("Settings", style = HhType.labelSmall, color = c.ink)
         }
     }

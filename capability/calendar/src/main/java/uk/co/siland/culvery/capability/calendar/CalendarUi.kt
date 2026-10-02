@@ -9,6 +9,7 @@ import java.util.Locale
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.ui.Icons
 
 const val ALL_DAY_LABEL = "All day"
 const val STALE_AFTER_MS = 30 * 60_000L
@@ -81,9 +82,9 @@ data class SyncStatusUi(
 
 /** Hand-off §7 chip and row badges, in the order they show. */
 enum class Badge(val icon: String, val description: String) {
-    Syncing("cloud_upload", "Syncing"),
-    OtherCalendar("lock", "Read-only calendar"),
-    Repeats("repeat", "Repeats"),
+    Syncing(Icons.CLOUD_UPLOAD, "Syncing"),
+    OtherCalendar(Icons.LOCK, "Read-only calendar"),
+    Repeats(Icons.REPEAT, "Repeats"),
 }
 
 /** `cloud_upload` first, then `lock` (another calendar) or `repeat` (recurring). */

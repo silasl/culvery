@@ -13,6 +13,7 @@ import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.ui.Icons
 
 /** A connection as Settings lists it (3a design §4.1): the service's name and icon, and its health. */
 data class CalendarRow(
@@ -66,6 +67,6 @@ class CalendarConnections @Inject constructor(
     }
 
     private companion object {
-        const val DEFAULT_ICON = "calendar_month"
+        const val DEFAULT_ICON = Icons.CALENDAR_MONTH
     }
 }

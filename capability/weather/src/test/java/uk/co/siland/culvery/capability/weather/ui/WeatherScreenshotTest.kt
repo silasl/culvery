@@ -37,6 +37,7 @@ class WeatherScreenshotTest {
 
     private val day = HeaderWeather(Condition.PARTLY_CLOUDY, night = false, temperature = 17.0, high = 19.0, low = 11.0)
     private val night = day.copy(night = true)
+    private val clearNight = night.copy(condition = Condition.CLEAR)
 
     private fun snap(name: String, dark: Boolean, content: @Composable () -> Unit) {
         compose.setContent {
@@ -66,4 +67,6 @@ class WeatherScreenshotTest {
     @Test fun headerDayLight() = snap("header_day_light", false) { WeatherHeaderItem(day) }
     @Test fun headerNightDark() = snap("header_night_dark", true) { WeatherHeaderItem(night) }
     @Test fun headerNightLight() = snap("header_night_light", false) { WeatherHeaderItem(night) }
+    @Test fun headerClearNightDark() = snap("header_clear_night_dark", true) { WeatherHeaderItem(clearNight) }
+    @Test fun headerClearNightLight() = snap("header_clear_night_light", false) { WeatherHeaderItem(clearNight) }
 }

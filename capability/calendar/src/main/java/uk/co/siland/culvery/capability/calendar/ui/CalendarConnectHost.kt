@@ -21,6 +21,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.Icons
 
 /** 3a design §4.4. */
 internal fun connectingTitle(service: String): String = "Connecting to $service…"
@@ -91,7 +92,7 @@ internal fun ConnectingCard(service: String, onCancel: () -> Unit, content: @Com
     val c = Culvery.colors
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         PickerCard(CalendarDimens.connectingWidth, CalendarDimens.connectingGap, "connecting_card") {
-            HhIcon("calendar_month", size = CalendarDimens.connectingIcon, tint = c.accent)
+            HhIcon(Icons.CALENDAR_MONTH, size = CalendarDimens.connectingIcon, tint = c.accent)
             Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.connectingTextGap)) {
                 Text(connectingTitle(service), style = CalendarType.blockTitle, color = c.ink)
                 Text(CONNECTING_LINE, style = CalendarType.subtitle, color = c.mute)

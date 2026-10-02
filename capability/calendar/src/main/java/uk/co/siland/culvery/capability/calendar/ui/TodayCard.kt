@@ -34,6 +34,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.Icons
 
 /**
  * Hand-off Home "Today" card. [events] null while loading: shows nothing rather than a false "Nothing on today".
@@ -81,7 +82,7 @@ private fun AddCircle(onClick: () -> Unit) {
             .background(c.accent)
             .clickable(onClickLabel = "Add event", onClick = onClick),
     ) {
-        HhIcon("add", size = CalendarDimens.todayAddIcon, tint = c.accentInk, contentDescription = "Add event")
+        HhIcon(Icons.ADD, size = CalendarDimens.todayAddIcon, tint = c.accentInk, contentDescription = "Add event")
     }
 }
 

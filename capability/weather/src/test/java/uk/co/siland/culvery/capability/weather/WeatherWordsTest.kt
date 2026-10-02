@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.weather
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import uk.co.siland.culvery.core.ui.Icons
 
 class WeatherWordsTest {
     private val hour = 3_600_000L
@@ -44,7 +45,7 @@ class WeatherWordsTest {
             Condition.THUNDER, "thunderstorm",
         )
         val night = Condition.entries.associateWith { weatherIcon(it, night = true) }
-        assertThat(night).isEqualTo(day + mapOf(Condition.CLEAR to "clear_night", Condition.PARTLY_CLOUDY to "partly_cloudy_night"))
+        assertThat(night).isEqualTo(day + mapOf(Condition.CLEAR to Icons.BEDTIME, Condition.PARTLY_CLOUDY to "partly_cloudy_night"))
     }
 
     @Test

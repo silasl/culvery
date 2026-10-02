@@ -21,6 +21,7 @@ import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.Icons
 
 /** The wizard's Connect step once a calendar is connected. */
 internal const val CONNECTED = "Connected"
@@ -38,7 +39,7 @@ fun ConnectCalendarCard(connectService: String?, onConnect: () -> Unit, modifier
         radius = CalendarDimens.cardRadius,
         padding = PaddingValues(horizontal = CalendarDimens.connectPaddingH, vertical = CalendarDimens.connectPaddingV),
     ) {
-        HhIcon("calendar_add_on", size = CalendarDimens.connectIconSize, tint = c.accent)
+        HhIcon(Icons.CALENDAR_ADD_ON, size = CalendarDimens.connectIconSize, tint = c.accent)
         Spacer(Modifier.weight(1f))
         Text("Connect a calendar", style = HhType.cardTitle, color = c.ink)
         Spacer(Modifier.height(CalendarDimens.connectSubtitleTop))
@@ -61,7 +62,7 @@ internal fun ConnectedCalendarCard(rows: List<CalendarRow>, modifier: Modifier =
         radius = CalendarDimens.cardRadius,
         padding = PaddingValues(horizontal = CalendarDimens.connectPaddingH, vertical = CalendarDimens.connectPaddingV),
     ) {
-        HhIcon("event_available", size = CalendarDimens.connectIconSize, tint = c.accent)
+        HhIcon(Icons.EVENT_AVAILABLE, size = CalendarDimens.connectIconSize, tint = c.accent)
         Spacer(Modifier.weight(1f))
         Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.connectButtonTop)) {
             rows.forEach { row ->

@@ -110,7 +110,7 @@ fun HhCloseButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .background(c.surf2)
             .clickable(onClickLabel = "Close", onClick = onClick),
     ) {
-        HhIcon("close", size = ShellTokens.closeIcon, tint = c.ink, contentDescription = "Close")
+        HhIcon(Icons.CLOSE, size = ShellTokens.closeIcon, tint = c.ink, contentDescription = "Close")
     }
 }
 

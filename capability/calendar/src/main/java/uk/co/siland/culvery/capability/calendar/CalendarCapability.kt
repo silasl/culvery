@@ -21,6 +21,7 @@ import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
+import uk.co.siland.culvery.core.ui.Icons
 
 const val CALENDAR_TAB_ID = "calendar"
 const val CONNECT_CARD_ID = "calendar.connect"
@@ -38,7 +39,7 @@ class CalendarCapability @Inject constructor(
 ) : Capability {
     override val id = CALENDAR_TAB_ID
     override val label = "Calendar"
-    override val icon = "calendar_month"
+    override val icon = Icons.CALENDAR_MONTH
     override val order = 10
     override val hasTab: Flow<Boolean> = repo.hasConnections
 

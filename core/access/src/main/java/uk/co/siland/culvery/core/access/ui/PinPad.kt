@@ -42,6 +42,7 @@ import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.pinReasonText
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 
 /** [overSheet]: a sheet is open, so the pad covers the sheet's area rather than the whole screen. */
@@ -203,7 +204,7 @@ fun PinPadFrame(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.size(PinPadDimens.badge).clip(CircleShape).background(c.accentSoft),
                 ) {
-                    HhIcon("lock", size = PinPadDimens.badgeIcon, tint = c.accent)
+                    HhIcon(Icons.LOCK, size = PinPadDimens.badgeIcon, tint = c.accent)
                 }
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -247,7 +248,7 @@ fun PinPadFrame(
                                 .clip(CircleShape)
                                 .clickable(enabled = digits.isNotEmpty() && enabled) { digits = digits.dropLast(1) },
                         ) {
-                            HhIcon("backspace", size = PinPadDimens.backspaceIcon, tint = c.ink, contentDescription = "Delete last digit")
+                            HhIcon(Icons.BACKSPACE, size = PinPadDimens.backspaceIcon, tint = c.ink, contentDescription = "Delete last digit")
                         }
                     }
                 }

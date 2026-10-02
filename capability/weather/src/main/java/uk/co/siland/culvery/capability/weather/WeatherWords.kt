@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.weather
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
+import uk.co.siland.culvery.core.ui.Icons
 
 internal const val FORECAST_TITLE = "Forecast"
 internal const val TODAY = "Today"
@@ -34,17 +35,17 @@ internal fun updatedAgo(fetchedAtMillis: Long, nowMillis: Long): String? {
     return if (days == 1L) "Updated 1 day ago" else "Updated $days days ago"
 }
 
-/** Material Symbols names (§4.2), all checked present in the bundled font. */
+/** Material Symbols names (§4.2), each in the subset font (IconFontTest). */
 internal fun weatherIcon(condition: Condition, night: Boolean): String = when (condition) {
-    Condition.CLEAR -> if (night) "clear_night" else "sunny"
-    Condition.PARTLY_CLOUDY -> if (night) "partly_cloudy_night" else "partly_cloudy_day"
-    Condition.CLOUDY -> "cloud"
-    Condition.FOG -> "foggy"
-    Condition.DRIZZLE -> "rainy_light"
-    Condition.RAIN -> "rainy"
-    Condition.SHOWERS -> "rainy_heavy"
-    Condition.SNOW -> "weather_snowy"
-    Condition.THUNDER -> "thunderstorm"
+    Condition.CLEAR -> if (night) Icons.BEDTIME else Icons.SUNNY
+    Condition.PARTLY_CLOUDY -> if (night) Icons.PARTLY_CLOUDY_NIGHT else Icons.PARTLY_CLOUDY_DAY
+    Condition.CLOUDY -> Icons.CLOUD
+    Condition.FOG -> Icons.FOGGY
+    Condition.DRIZZLE -> Icons.RAINY_LIGHT
+    Condition.RAIN -> Icons.RAINY
+    Condition.SHOWERS -> Icons.RAINY_HEAVY
+    Condition.SNOW -> Icons.WEATHER_SNOWY
+    Condition.THUNDER -> Icons.THUNDERSTORM
 }
 
 internal fun conditionWords(condition: Condition): String = when (condition) {

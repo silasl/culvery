@@ -54,6 +54,7 @@ import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhTextField
+import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 
 /** Hand-off §7: the failure card's body. */
@@ -255,7 +256,7 @@ private fun WhoSection(form: EventForm, everyone: List<Person>, childOnly: Perso
                 selectedInk = PersonChipInk,
                 leading = { ink ->
                     if (selected) {
-                        HhIcon("check", size = ControlTokens.chipIcon, tint = ink)
+                        HhIcon(Icons.CHECK, size = ControlTokens.chipIcon, tint = ink)
                     } else {
                         Box(Modifier.size(ControlTokens.chipDot).clip(CircleShape).background(colour))
                     }
@@ -293,7 +294,7 @@ private fun DaySection(form: EventForm, busy: Boolean, onPickDate: () -> Unit) {
             label = picked ?: "Pick date…",
             selected = picked != null,
             tag = "day_pick",
-            leading = { ink -> HhIcon("calendar_month", size = ControlTokens.chipIcon, tint = ink) },
+            leading = { ink -> HhIcon(Icons.CALENDAR_MONTH, size = ControlTokens.chipIcon, tint = ink) },
             onClick = { if (!busy) onPickDate() },
         )
     }
@@ -317,7 +318,7 @@ private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit) 
             label = custom?.time?.format(HOURS_MINUTES) ?: "Pick time…",
             selected = custom != null,
             tag = "time_pick",
-            leading = { ink -> HhIcon("schedule", size = ControlTokens.chipIcon, tint = ink) },
+            leading = { ink -> HhIcon(Icons.SCHEDULE, size = ControlTokens.chipIcon, tint = ink) },
             onClick = { if (!busy) onPickTime() },
         )
     }
@@ -346,7 +347,7 @@ private fun LockedDates(label: String) {
             .background(c.surf)
             .padding(horizontal = CalendarDimens.editorCardPaddingH, vertical = CalendarDimens.editorCardPaddingV),
     ) {
-        HhIcon("date_range", size = CalendarDimens.lockedIcon, tint = c.mute)
+        HhIcon(Icons.DATE_RANGE, size = CalendarDimens.lockedIcon, tint = c.mute)
         Text(label, style = CalendarType.lockedDates, color = c.ink)
     }
 }
@@ -364,7 +365,7 @@ private fun FailureCard(title: String) {
             .background(c.dangerSoft)
             .padding(horizontal = CalendarDimens.editorCardPaddingH, vertical = CalendarDimens.editorCardPaddingV),
     ) {
-        HhIcon("cloud_off", size = CalendarDimens.failureIcon, tint = c.danger)
+        HhIcon(Icons.CLOUD_OFF, size = CalendarDimens.failureIcon, tint = c.danger)
         Column {
             // A long provider reason must not push Save off screen with the keyboard up; the body says what to do.
             Text(title, style = CalendarType.noteTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -384,7 +385,7 @@ private fun Footer(form: EventForm, busy: Boolean, failed: Boolean, onSave: () -
                 form.mode == EventForm.Mode.New -> "Save event"
                 else -> "Save changes"
             },
-            icon = if (failed) "refresh" else "check",
+            icon = if (failed) Icons.REFRESH else Icons.CHECK,
             enabled = form.canSave && !busy,
             tag = "editor_save",
             onClick = onSave,

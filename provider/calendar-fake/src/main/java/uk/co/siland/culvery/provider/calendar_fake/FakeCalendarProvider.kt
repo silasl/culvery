@@ -27,6 +27,7 @@ import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.ui.HhPillButton
+import uk.co.siland.culvery.core.ui.Icons
 
 /** Gap between the ConnectScreen's buttons. */
 private val ConnectScreenButtonGap = 12.dp
@@ -42,7 +43,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     @Inject constructor() : this(Clock.systemUTC())
 
     override val descriptor =
-        ProviderDescriptor(ID, "Sample calendar (debug)", "event", setOf(Feature.READ, Feature.WRITE), userConnectable = false)
+        ProviderDescriptor(ID, "Sample calendar (debug)", Icons.EVENT, setOf(Feature.READ, Feature.WRITE), userConnectable = false)
     override val providerId = ID
 
     @Volatile private var failNext: Throwable? = null

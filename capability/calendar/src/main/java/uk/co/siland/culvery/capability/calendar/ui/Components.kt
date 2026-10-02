@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.Icons
 
 /** Card-header pill ("Week"): hand-off §7, 44 dp tall, radius 22, `surf2` on the whole 44 dp box. */
 @Composable
@@ -65,7 +66,7 @@ internal fun DeleteButton(enabled: Boolean, tag: String, onClick: () -> Unit) {
             .clickable(enabled = enabled, onClickLabel = "Delete", onClick = onClick)
             .padding(horizontal = CalendarDimens.deleteButtonPaddingH),
     ) {
-        HhIcon("delete", size = CalendarDimens.footerIcon, tint = c.danger)
+        HhIcon(Icons.DELETE, size = CalendarDimens.footerIcon, tint = c.danger)
         Text("Delete", style = CalendarType.footerButton, color = c.danger)
     }
 }
@@ -105,7 +106,7 @@ internal fun PrimaryButton(
  * a 15 sp / 700 label; with an [icon], a 24 dp one 6 from the label and padding 0 20 0 14, without one padding 0 20.
  */
 @Composable
-internal fun AddButton(text: String, tag: String, icon: String? = "add", onClick: () -> Unit) {
+internal fun AddButton(text: String, tag: String, icon: String? = Icons.ADD, onClick: () -> Unit) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
