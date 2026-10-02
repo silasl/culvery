@@ -92,4 +92,26 @@ class SetupWiringTest {
         touchTarget(complete = false, settingsOpen = false, access = access)!!.invoke()
         assertThat(access.touches).isEqualTo(2)
     }
+
+    @Test
+    fun theSplashHoldsUntilSetupIsKnown() {
+        assertThat(holdSplash(complete = null, cardsLoaded = false, shownMillis = 0)).isTrue()
+    }
+
+    @Test
+    fun theWizardShowsAtOnce() {
+        assertThat(holdSplash(complete = false, cardsLoaded = false, shownMillis = 0)).isFalse()
+    }
+
+    @Test
+    fun homeWaitsForItsFirstCards() {
+        assertThat(holdSplash(complete = true, cardsLoaded = false, shownMillis = 0)).isTrue()
+        assertThat(holdSplash(complete = true, cardsLoaded = true, shownMillis = 0)).isFalse()
+    }
+
+    @Test
+    fun theSplashNeverHoldsForTwoSeconds() {
+        assertThat(holdSplash(complete = true, cardsLoaded = false, shownMillis = SPLASH_MAX_MS - 1)).isTrue()
+        assertThat(holdSplash(complete = null, cardsLoaded = false, shownMillis = SPLASH_MAX_MS)).isFalse()
+    }
 }

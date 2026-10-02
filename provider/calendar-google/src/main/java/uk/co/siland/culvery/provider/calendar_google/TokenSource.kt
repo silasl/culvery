@@ -81,8 +81,9 @@ internal fun authorizationFailure(statusCode: Int, cause: Throwable? = null): Ex
 internal fun Throwable.isUserCancel(): Boolean = this is PlayServicesStatusException && statusCode == CommonStatusCodes.CANCELED
 
 @Singleton
-class PlayServicesAuthorizer @Inject constructor(@ApplicationContext context: Context) : Authorizer {
-    private val client = Identity.getAuthorizationClient(context)
+class PlayServicesAuthorizer @Inject constructor(@param:ApplicationContext private val context: Context) : Authorizer {
+    // Built on the first call: Hilt makes this class on the main thread while the shell starts (4c §4.1).
+    private val client by lazy { Identity.getAuthorizationClient(context) }
 
     override suspend fun authorize(account: String?): Authorization {
         val request = AuthorizationRequest.builder()

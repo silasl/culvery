@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import uk.co.siland.culvery.core.access.AccessControl
@@ -32,6 +33,13 @@ internal fun shouldPin(setupComplete: Boolean, kioskExited: Boolean): Boolean = 
 internal fun pinOnSetupRead(previous: Boolean?, now: Boolean, resumed: Boolean, kioskExited: Boolean): Boolean =
     previous != true && resumed && shouldPin(now, kioskExited)
 
+/** The splash's longest stay (4c design §4.1). */
+internal const val SPLASH_MAX_MS = 2_000L
+
+/** 4c §4.1: the splash stays until setup's state is known and, when Home shows, its first cards are in; at most [SPLASH_MAX_MS]. */
+internal fun holdSplash(complete: Boolean?, cardsLoaded: Boolean, shownMillis: Long): Boolean =
+    shownMillis < SPLASH_MAX_MS && (complete == null || (complete && !cardsLoaded))
+
 /** 4a design D5, D9: touches restart the session while Settings is open or the wizard shows (the setup session's ten minutes). */
 internal fun touchTarget(complete: Boolean?, settingsOpen: Boolean, access: AccessControl): (() -> Unit)? =
     if (complete == false || (complete == true && settingsOpen)) access::touch else null
@@ -39,7 +47,7 @@ internal fun touchTarget(complete: Boolean?, settingsOpen: Boolean, access: Acce
 /**
  * What the app shows (4a design §3.3): nothing until SetupState is read, the wizard until setup is complete, then the
  * shell with Settings over it when open. Settings closing (its session ended, or Close), or setup completing, takes any
- * open sheet with it.
+ * open sheet with it. The shell's first frame is reported once to [onHomeDrawn].
  */
 @Composable
 internal fun AppContent(
@@ -49,6 +57,7 @@ internal fun AppContent(
     wizard: @Composable () -> Unit,
     shell: @Composable () -> Unit,
     settings: @Composable () -> Unit,
+    onHomeDrawn: () -> Unit,
 ) {
     LaunchedEffect(complete, settingsOpen) { if (!settingsOpen) overlay.dismiss() }
     when (complete) {
@@ -57,6 +66,11 @@ internal fun AppContent(
         true -> {
             shell()
             if (settingsOpen) settings()
+            // Once: the first background passes wait for it (4c §4.1).
+            LaunchedEffect(Unit) {
+                withFrameNanos { }
+                onHomeDrawn()
+            }
         }
     }
 }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.FirstDraw
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
@@ -39,10 +40,11 @@ class WeatherSyncLoop internal constructor(
     private val fetch: suspend (WeatherPlace) -> Unit,
     private val places: Flow<WeatherPlace?>,
     private val scope: CoroutineScope,
+    private val firstDraw: suspend () -> Unit = {},
 ) : Startable {
     @Inject
-    constructor(fetcher: WeatherFetcher, household: HouseholdRepository, @ApplicationScope scope: CoroutineScope) :
-        this(fetcher::fetch, household.location.places(), scope)
+    constructor(fetcher: WeatherFetcher, household: HouseholdRepository, firstDraw: FirstDraw, @ApplicationScope scope: CoroutineScope) :
+        this(fetcher::fetch, household.location.places(), scope, { firstDraw.await() })
 
     override fun start() {
         scope.launch {
@@ -57,6 +59,8 @@ class WeatherSyncLoop internal constructor(
                         wake.trySend(Unit)
                     }
             }
+            // 4c §4.1: start-up's frames first; a place that arrived meanwhile is waiting in the channel.
+            firstDraw()
             // Null: wait for a location, with no timer.
             var wait: Long? = null
             while (true) {

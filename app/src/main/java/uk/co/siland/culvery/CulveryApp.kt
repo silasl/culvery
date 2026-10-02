@@ -2,6 +2,7 @@ package uk.co.siland.culvery
 
 import android.app.Application
 import android.util.Log
+import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -14,17 +15,20 @@ import uk.co.siland.culvery.core.plugin.Startable
 
 @HiltAndroidApp
 class CulveryApp : Application() {
-    @Inject lateinit var household: HouseholdRepository
-    @Inject lateinit var calendarSetup: CalendarSetup
-    @Inject lateinit var calendarProviders: Set<@JvmSuppressWildcards CalendarProvider>
-    @Inject lateinit var startables: Set<@JvmSuppressWildcards Startable>
+    // Lazy and read on the application scope (Dispatchers.Default): the loops and the providers are built off Main (4c §4.1).
+    @Inject lateinit var household: Lazy<HouseholdRepository>
+    @Inject lateinit var calendarSetup: Lazy<CalendarSetup>
+    @Inject lateinit var calendarProviders: Lazy<Set<@JvmSuppressWildcards CalendarProvider>>
+    @Inject lateinit var startables: Lazy<Set<@JvmSuppressWildcards Startable>>
     @Inject @ApplicationScope lateinit var appScope: CoroutineScope
 
     override fun onCreate() {
         super.onCreate()
-        startAll(startables) { startable, e -> Log.e(TAG, "${startable::class.simpleName} failed to start (${e::class.simpleName})") }
-        appScope.launch { seedDebugData(household, calendarSetup, calendarProviders) }
-        appScope.launch { removeSampleWhenReplaced(calendarSetup) }
+        appScope.launch {
+            startAll(startables.get()) { startable, e -> Log.e(TAG, "${startable::class.simpleName} failed to start (${e::class.simpleName})") }
+        }
+        appScope.launch { seedDebugData(household.get(), calendarSetup.get(), calendarProviders.get()) }
+        appScope.launch { removeSampleWhenReplaced(calendarSetup.get()) }
     }
 
     private companion object {

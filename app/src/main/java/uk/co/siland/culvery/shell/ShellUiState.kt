@@ -21,5 +21,7 @@ data class ShellUiState(
     val homeCards: List<HomePlacement> = emptyList(),
     /** Home's header items, by order (4b design §3.8). */
     val headerItems: List<HeaderItem> = emptyList(),
+    /** Every capability's Home cards have answered once: the splash can go (4c §4.1). */
+    val cardsLoaded: Boolean = false,
     val settingsOpen: Boolean = false,
 )

@@ -1,6 +1,7 @@
 package uk.co.siland.culvery
 
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
@@ -10,6 +11,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -26,6 +28,7 @@ import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.access.ui.PinPadHost
 import uk.co.siland.culvery.core.plugin.Capability
+import uk.co.siland.culvery.core.plugin.FirstDraw
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
@@ -51,6 +54,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var access: AccessControl
     @Inject lateinit var setupState: SetupState
     @Inject lateinit var gate: SetupSessionGate
+    @Inject lateinit var firstDraw: FirstDraw
     // Only read when the wizard or Settings shows.
     @Inject lateinit var coreSteps: Provider<Set<@JvmSuppressWildcards SetupStep>>
     @Inject lateinit var corePages: Provider<Set<@JvmSuppressWildcards SettingsPage>>
@@ -62,8 +66,14 @@ class MainActivity : ComponentActivity() {
     private lateinit var setupComplete: StateFlow<Boolean?>
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splash = installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        val shownAt = SystemClock.uptimeMillis()
+        setupComplete = setupState.setupComplete.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
+        splash.setKeepOnScreenCondition {
+            holdSplash(setupComplete.value, shell.uiState.value.cardsLoaded, SystemClock.uptimeMillis() - shownAt)
+        }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         onBackPressedDispatcher.addCallback(this) { }
         lifecycleScope.launch {
@@ -76,7 +86,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        setupComplete = setupState.setupComplete.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
         lifecycleScope.launch {
             var previous: Boolean? = null
             setupComplete.filterNotNull().collect { complete ->
@@ -118,6 +127,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             },
                             settings = { SettingsScreen(remember { settingsPages(corePages.get(), capabilities) }, onClose = shell::closeSettings) },
+                            onHomeDrawn = firstDraw::markDrawn,
                         )
                     }
                 }

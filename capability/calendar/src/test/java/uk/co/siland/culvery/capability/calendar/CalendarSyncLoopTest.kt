@@ -18,6 +18,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
+import uk.co.siland.culvery.core.plugin.FirstDraw
 
 // Robolectric only because the loop logs through android.util.Log when a sync throws.
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -252,5 +253,17 @@ class CalendarSyncLoopTest {
         advanceTimeBy(SYNC_INTERVAL_MS)
         runCurrent()
         assertThat(count).isEqualTo(2)
+    }
+
+    @Test
+    fun theFirstPassWaitsForHomesFirstFrame() = runTest {
+        var count = 0
+        val draw = FirstDraw()
+        CalendarSyncLoop({ count++ }, MutableStateFlow(listOf("c1")), backgroundScope, firstDraw = { draw.await() }).start()
+        runCurrent()
+        assertThat(count).isEqualTo(0)
+        draw.markDrawn()
+        runCurrent()
+        assertThat(count).isEqualTo(1)
     }
 }

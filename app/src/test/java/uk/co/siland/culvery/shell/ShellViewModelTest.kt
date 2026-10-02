@@ -378,4 +378,14 @@ class ShellViewModelTest {
         assertThat(logs.map { it.msg }).containsExactly("Couldn't read today's sun times (IllegalStateException); retrying")
         assertThat(logs.single().throwable).isNull()
     }
+
+    @Test
+    fun cardsAreLoadedOnceEveryCapabilityHasAnswered() = runTest {
+        vm(setOf(FakeCapability("calendar", order = 10, shown = true))).uiState.test {
+            assertThat(expectMostRecentItem().cardsLoaded).isTrue()
+        }
+        vm(setOf(FakeCapability("calendar", order = 10, shown = true), NeverEmittingCapability("lights", order = 20))).uiState.test {
+            assertThat(expectMostRecentItem().cardsLoaded).isFalse()
+        }
+    }
 }

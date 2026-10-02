@@ -10,6 +10,7 @@
         android:theme="@style/Theme.Culvery">
         <activity
             android:name=".MainActivity"
+            android:theme="@style/Theme.Culvery.Starting"
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="sensorLandscape"

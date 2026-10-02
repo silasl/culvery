@@ -2,4 +2,10 @@
     <style name="Theme.Culvery" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">#FF0E1011</item>
     </style>
+
+    <!-- 4c design §4.1: until setup's state and Home's first cards are known, at most 2 s. Its icon comes in 4d. -->
+    <style name="Theme.Culvery.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#FF0E1011</item>
+        <item name="postSplashScreenTheme">@style/Theme.Culvery</item>
+    </style>
 </resources>

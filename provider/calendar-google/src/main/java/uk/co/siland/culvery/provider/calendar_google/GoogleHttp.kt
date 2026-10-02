@@ -149,7 +149,12 @@ internal fun GoogleResponse.refusal(what: GoogleCall): WriteRejectedException {
  * rate-limit or quota 403, 5xx, and a connection that fails or times out. Everything else is returned for the caller
  * to map. Main-safe: the connect screen calls it from the main thread.
  */
-class GoogleApi(private val baseUrl: HttpUrl, private val tokens: TokenSource, private val client: OkHttpClient) {
+class GoogleApi(private val baseUrl: HttpUrl, private val tokens: TokenSource, clients: Lazy<OkHttpClient>) {
+    /** Tests pass a client they built; the app's is built on its first call, off the main thread (4c §4.1). */
+    constructor(baseUrl: HttpUrl, tokens: TokenSource, client: OkHttpClient) : this(baseUrl, tokens, lazyOf(client))
+
+    private val client: OkHttpClient by clients
+
     /** [segments] below the base URL, each encoded (calendar ids hold '@' and '#'), with the non-null [query] values. */
     fun url(vararg segments: String, query: Map<String, String?> = emptyMap()): HttpUrl {
         val builder = baseUrl.newBuilder()

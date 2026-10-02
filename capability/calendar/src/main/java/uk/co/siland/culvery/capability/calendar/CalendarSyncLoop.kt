@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.FIRST_DRAW_WAIT_MS
+import uk.co.siland.culvery.core.plugin.FirstDraw
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
@@ -23,7 +25,8 @@ const val SYNC_INTERVAL_MS = 5 * 60_000L
 const val MIN_PASS_GAP_MS = 1_000L
 
 /**
- * Runs a pass (the outbox drain, then a sync) as soon as the first connection list arrives, whenever a
+ * Runs a pass (the outbox drain, then a sync) as soon as Home has drawn (or [FIRST_DRAW_WAIT_MS] has passed) and the
+ * first connection list has arrived, whenever a
  * connection is added or removed, on [requestSync], when a queued change falls due, and otherwise every
  * [intervalMillis]. A trigger that arrives mid-pass runs one more pass afterwards; it never cancels the running
  * one. [untilNextRetry] is the time until the earliest queued change is due, or null when nothing is queued.
@@ -36,9 +39,10 @@ class CalendarSyncLoop internal constructor(
     private val intervalMillis: Long = SYNC_INTERVAL_MS,
     private val untilNextRetry: suspend () -> Long? = { null },
     private val drainBackoff: () -> Long? = { null },
+    private val firstDraw: suspend () -> Unit = {},
 ) : Startable {
     @Inject
-    constructor(sync: CalendarSync, store: CalendarStore, clock: WallClock, @ApplicationScope scope: CoroutineScope) :
+    constructor(sync: CalendarSync, store: CalendarStore, clock: WallClock, firstDraw: FirstDraw, @ApplicationScope scope: CoroutineScope) :
         this(
             sync::syncAll,
             store.connectionIds(),
@@ -46,6 +50,7 @@ class CalendarSyncLoop internal constructor(
             SYNC_INTERVAL_MS,
             { store.nextAttemptMillis()?.let { it - clock.nowMillis() } },
             sync::drainBackoffMillis,
+            { firstDraw.await() },
         )
 
     private val wake = Channel<Unit>(Channel.CONFLATED)
@@ -64,7 +69,8 @@ class CalendarSyncLoop internal constructor(
                     .retryWithBackoff { Log.w(TAG, "Couldn't read the connections (${it::class.simpleName}); retrying") }
                     .collect { wake.trySend(Unit) }
             }
-            // The first pass waits only for the first connection list.
+            // 4c §4.1: start-up's frames first.
+            firstDraw()
             var wait = intervalMillis
             while (true) {
                 withTimeoutOrNull(wait) { wake.receive() }

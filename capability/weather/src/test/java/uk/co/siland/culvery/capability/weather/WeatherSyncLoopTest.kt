@@ -21,6 +21,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.household.HomeLocation
+import uk.co.siland.culvery.core.plugin.FirstDraw
 import uk.co.siland.culvery.core.plugin.WallClock
 
 // Robolectric only because the loop logs through android.util.Log.
@@ -218,5 +219,17 @@ class WeatherSyncLoopTest {
         assertThat(logged.map { it.msg }.distinct()).containsExactly("Weather fetch failed (IllegalStateException)")
         assertThat(logged.mapNotNull { it.throwable }).isEmpty()
         assertNoSecretsLogged(TAG, listOf("51.5074", "-0.1278", "Europe/London", "London"))
+    }
+
+    @Test
+    fun theFirstFetchWaitsForHomesFirstFrame() = runTest {
+        val fetched = mutableListOf<WeatherPlace>()
+        val draw = FirstDraw()
+        WeatherSyncLoop({ fetched += it }, MutableStateFlow<WeatherPlace?>(london), backgroundScope, firstDraw = { draw.await() }).start()
+        runCurrent()
+        assertThat(fetched).isEmpty()
+        draw.markDrawn()
+        runCurrent()
+        assertThat(fetched).containsExactly(london)
     }
 }

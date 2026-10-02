@@ -27,6 +27,7 @@ import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.HeaderItem
+import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomePlacement
 import uk.co.siland.culvery.core.plugin.ShellNavigator
@@ -76,16 +77,21 @@ class ShellViewModel @Inject constructor(
             }
         }
 
-    private val placements: Flow<List<HomePlacement>> =
+    private class PlacedCards(val placements: List<HomePlacement>, val loaded: Boolean)
+
+    private val placements: Flow<PlacedCards> =
         if (ordered.isEmpty()) {
-            flowOf(emptyList())
+            flowOf(PlacedCards(emptyList(), loaded = true))
         } else {
             combine(
                 ordered.map { cap ->
-                    cap.cards().retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its Home cards (${it::class.simpleName}); retrying") }
-                        .onStart { emit(emptyList()) }
+                    cap.cards()
+                        .map<List<HomeCard>, List<HomeCard>?> { it }
+                        .retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its Home cards (${it::class.simpleName}); retrying") }
+                        // Null until this capability answers.
+                        .onStart { emit(null) }
                 },
-            ) { lists -> HomeCardPlacer.place(lists.toList().flatten()) }
+            ) { lists -> PlacedCards(HomeCardPlacer.place(lists.filterNotNull().flatten()), loaded = lists.none { it == null }) }
         }
 
     private val headerItems: Flow<List<HeaderItem>> =
@@ -108,7 +114,8 @@ class ShellViewModel @Inject constructor(
                     tabs = tabs,
                     selectedTabId = if (sel == HOME_TAB_ID || tabs.any { it.id == sel }) sel else HOME_TAB_ID,
                     session = session?.let { SessionUi(it.person.name, roleLabel(it.role)) },
-                    homeCards = cards,
+                    homeCards = cards.placements,
+                    cardsLoaded = cards.loaded,
                     settingsOpen = settings && session != null,
                 )
             },

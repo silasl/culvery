@@ -31,6 +31,7 @@ class AppContentTest {
     private val access = FakeAccessControl()
     private var complete by mutableStateOf<Boolean?>(null)
     private var settingsOpen by mutableStateOf(false)
+    private var homeDrawn = 0
 
     private fun show() = compose.setContent {
         CulveryTheme(dark = true) {
@@ -48,6 +49,7 @@ class AppContentTest {
                     wizard = { Text("Wizard") },
                     shell = { Text("Shell") },
                     settings = { Box(Modifier.fillMaxSize().testTag("settings_stand_in")) },
+                    onHomeDrawn = { homeDrawn++ },
                 )
             }
         }
@@ -120,5 +122,23 @@ class AppContentTest {
         show()
         compose.onNodeWithText("Shell").performClick()
         assertThat(access.touches).isEqualTo(0)
+    }
+
+    @Test
+    fun theWizardIsNotHome() {
+        complete = false
+        show()
+        compose.waitForIdle()
+        assertThat(homeDrawn).isEqualTo(0)
+    }
+
+    @Test
+    fun homeReportsItsFirstFrameOnce() {
+        complete = true
+        show()
+        compose.waitUntil(5_000) { homeDrawn == 1 }
+        settingsOpen = true
+        compose.waitForIdle()
+        assertThat(homeDrawn).isEqualTo(1)
     }
 }

@@ -45,9 +45,7 @@ abstract class GoogleCalendarModule {
         // The client stays inside GoogleApi, not in the graph, so another module's OkHttpClient can't collide with it.
         @Provides
         @Singleton
-        fun api(tokens: TokenSource): GoogleApi {
-            val client = OkHttpClient.Builder().connectTimeout(CONNECT_TIMEOUT).readTimeout(READ_TIMEOUT).build()
-            return GoogleApi(GOOGLE_CALENDAR_BASE_URL.toHttpUrl(), tokens, client)
-        }
+        fun api(tokens: TokenSource): GoogleApi =
+            GoogleApi(GOOGLE_CALENDAR_BASE_URL.toHttpUrl(), tokens, lazy { OkHttpClient.Builder().connectTimeout(CONNECT_TIMEOUT).readTimeout(READ_TIMEOUT).build() })
     }
 }

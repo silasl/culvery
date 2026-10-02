@@ -60,6 +60,7 @@ dependencies {
     // Sample data only, in debug builds.
     debugImplementation(project(":provider:calendar-fake"))
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
     implementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.roborazzi.core)
