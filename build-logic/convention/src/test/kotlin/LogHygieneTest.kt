@@ -21,6 +21,14 @@ class LogHygieneTest {
     }
 
     @Test
+    fun theScanReachesTheShippedCode() {
+        val sources = shippedSources()
+        assertThat(sources.map { it.name }).contains("CalendarSync.kt")
+        // 77 calls when written; a floor well below that still fails if the scan stops finding them.
+        assertThat(sources.sumOf { LogHygiene.callCount(it.readText()) }).isAtLeast(50)
+    }
+
+    @Test
     fun aThrowableArgumentIsCaught() {
         assertThat(LogHygiene.problems("""Log.w(TAG, "Couldn't save", e)""")).hasSize(1)
         assertThat(LogHygiene.problems("""Log.wtf(TAG, "Couldn't save", e)""")).hasSize(1)
@@ -31,6 +39,12 @@ class LogHygieneTest {
         assertThat(LogHygiene.problems("""Log.e(TAG, "Couldn't add ${'$'}{person.name}")""")).hasSize(1)
         assertThat(LogHygiene.problems("""Log.e(TAG, "Couldn't read ${'$'}id")""")).hasSize(1)
         assertThat(LogHygiene.problems("""Log.println(Log.WARN, TAG, "Couldn't read ${'$'}email")""")).hasSize(1)
+    }
+
+    @Test
+    fun anExpressionThatOnlyEndsWellIsCaught() {
+        assertThat(LogHygiene.problems("""Log.w(TAG, "x ${'$'}{person.name + answer.code}")""")).hasSize(1)
+        assertThat(LogHygiene.problems("""Log.w(TAG, "x ${'$'}{if (a) email else e::class.simpleName}")""")).hasSize(1)
     }
 
     @Test
@@ -77,6 +91,8 @@ internal object LogHygiene {
     private val CALL = Regex("""\bLog\.(w|e|wtf|println)\(""")
     private val TEMPLATE = Regex("""\$\{([^}]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)""")
 
+    fun callCount(source: String): Int = CALL.findAll(source).count()
+
     fun problems(source: String): List<String> = CALL.findAll(source).mapNotNull { match ->
         val line = source.substring(0, match.range.first).count { it == '\n' } + 1
         val args = arguments(source, match.range.last + 1)
@@ -97,9 +113,9 @@ internal object LogHygiene {
         return if (bad.isEmpty()) null else "interpolates ${bad.joinToString()}: only ::class.simpleName, a .code or a qualified id in LogHygiene.ALLOWED"
     }
 
-    private fun allowed(expression: String): Boolean = expression.trim().let {
-        it.endsWith("::class.simpleName") || it.endsWith(".code") || it in ALLOWED
-    }
+    private val TYPE_OR_CODE = Regex("""[A-Za-z_][A-Za-z0-9_.]*(\.code|::class\.simpleName)""")
+
+    private fun allowed(expression: String): Boolean = expression.trim().let { TYPE_OR_CODE.matches(it) || it in ALLOWED }
 
     /** The top-level arguments of the call whose "(" ends just before [from]. */
     private fun arguments(source: String, from: Int): List<String> {

@@ -40,7 +40,7 @@ A release can't be installed over a debug build (their signatures differ): run `
 
 ## 4. Reading a release crash
 
-R8 renames the app's classes in a release build, and the log names exceptions by their short (renamed) names. Each build writes `app/build/outputs/mapping/release/mapping.txt`: keep a copy beside every APK you install. To read a stack trace or a log line from that build, run the Android SDK's `retrace` with it:
+R8 renames the app's classes in a release build, but the app's own exception classes keep their names, so a log line names the exception that caused it. A stack trace still shows renamed classes and methods. Each build writes `app/build/outputs/mapping/release/mapping.txt`: keep a copy beside every APK you install. To read a stack trace from that build, run the Android SDK's `retrace` with it:
 
 ```bash
 "$LOCALAPPDATA/Android/Sdk/cmdline-tools/latest/bin/retrace" mapping.txt crash.txt

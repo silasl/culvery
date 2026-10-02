@@ -32,7 +32,20 @@ internal const val TAG = "GoogleCalendar"
 
 /** Which call a log line is about: a fixed name such as "events.list", never a calendar, an email or an id. */
 @JvmInline
-internal value class GoogleCall(val label: String)
+internal value class GoogleCall private constructor(val label: String) {
+    companion object {
+        val CALENDAR_LIST = GoogleCall("calendarList.list")
+        val EVENTS_LIST = GoogleCall("events.list")
+        val EVENT_SERIES = GoogleCall("events.get series")
+        val EVENT_INSERT = GoogleCall("events.insert")
+        val EVENT_PATCH = GoogleCall("events.patch")
+        val EVENT_GET = GoogleCall("events.get")
+        val PRIMARY_CALENDAR = GoogleCall("calendars.get primary")
+        val ADDING = GoogleCall("Adding an event")
+        val CHANGING = GoogleCall("Changing an event")
+        val DELETING = GoogleCall("Deleting an event")
+    }
+}
 
 private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
 

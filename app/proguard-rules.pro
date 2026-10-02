@@ -10,3 +10,6 @@
     public static int d(...);
     public static int i(...);
 }
+
+# Warnings name the exception that caused them (D8), so the app's own exception classes keep their names.
+-keepnames class uk.co.siland.culvery.** extends java.lang.Throwable

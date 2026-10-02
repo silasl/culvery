@@ -75,8 +75,8 @@ internal class GoogleConnectFlow(private val authorizer: Authorizer, private val
             return stopWithToast()
         }
         val email = api.sendWithToken(grant.token, "GET", api.url("calendars", "primary"))
-            .readOrUnreachable(GoogleCall("calendars.get primary"))
-            .decode(CalendarResource.serializer(), GoogleCall("calendars.get primary"))
+            .readOrUnreachable(GoogleCall.PRIMARY_CALENDAR)
+            .decode(CalendarResource.serializer(), GoogleCall.PRIMARY_CALENDAR)
             .id
         val stored = existing?.config?.get(CONFIG_ACCOUNT)
         if (stored != null && !email.equals(stored, ignoreCase = true)) {

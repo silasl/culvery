@@ -148,7 +148,7 @@ class GoogleApiTest {
     @Test
     fun aBodyThatDoesNotParseIsUnreachable() = runTest {
         google.failNextWith(MockResponse().setBody("<html>Service Unavailable</html>"))
-        assertThat(failureOf { api.send(ACCOUNT, "GET", calendarList).decode(CalendarListPage.serializer(), GoogleCall("list calendars")) })
+        assertThat(failureOf { api.send(ACCOUNT, "GET", calendarList).decode(CalendarListPage.serializer(), GoogleCall.CALENDAR_LIST) })
             .isInstanceOf(UnreachableException::class.java)
     }
 
@@ -208,23 +208,23 @@ class GoogleApiTest {
     fun aRefusalIsInTheTabletsOwnWords() {
         val forbidden = GoogleResponse(403, errorBody(403, "forbidden"))
         val invalid = GoogleResponse(400, errorBody(400, "invalid"))
-        assertThat(forbidden.refusal(GoogleCall("add an event"))).isInstanceOf(WriteRejectedException::class.java)
-        assertThat(forbidden.refusal(GoogleCall("add an event")).message).isEqualTo(READ_ONLY_HERE)
-        assertThat(invalid.refusal(GoogleCall("add an event")).message).isEqualTo(REFUSED)
+        assertThat(forbidden.refusal(GoogleCall.ADDING)).isInstanceOf(WriteRejectedException::class.java)
+        assertThat(forbidden.refusal(GoogleCall.ADDING).message).isEqualTo(READ_ONLY_HERE)
+        assertThat(invalid.refusal(GoogleCall.ADDING).message).isEqualTo(REFUSED)
     }
 
     @Test
     fun aReadThatFailsIsUnreachableAndOneThatWorksIsReturned() = runTest {
         val ok = GoogleResponse(200, "{}")
-        assertThat(ok.readOrUnreachable(GoogleCall("list calendars"))).isSameInstanceAs(ok)
-        assertThat(failureOf { GoogleResponse(404, errorBody(404, "notFound")).readOrUnreachable(GoogleCall("list calendars")) })
+        assertThat(ok.readOrUnreachable(GoogleCall.CALENDAR_LIST)).isSameInstanceAs(ok)
+        assertThat(failureOf { GoogleResponse(404, errorBody(404, "notFound")).readOrUnreachable(GoogleCall.CALENDAR_LIST) })
             .isInstanceOf(UnreachableException::class.java)
     }
 
     /** Review H2: an answer without items is a bad read, never an account with no calendars. */
     @Test
     fun aCalendarListWithoutItemsIsUnreachable() = runTest {
-        assertThat(failureOf { GoogleResponse(200, "{}").decode(CalendarListPage.serializer(), GoogleCall("list calendars")) })
+        assertThat(failureOf { GoogleResponse(200, "{}").decode(CalendarListPage.serializer(), GoogleCall.CALENDAR_LIST) })
             .isInstanceOf(UnreachableException::class.java)
     }
 
@@ -239,11 +239,11 @@ class GoogleApiTest {
                 ),
             )
             val answer = runCatching { api.send(ACCOUNT, "GET", events) }.getOrNull()
-            answer?.refusal(GoogleCall("change an event"))
-            answer?.let { runCatching { it.readOrUnreachable(GoogleCall("list events")) } }
+            answer?.refusal(GoogleCall.CHANGING)
+            answer?.let { runCatching { it.readOrUnreachable(GoogleCall.EVENTS_LIST) } }
         }
         google.failNextWith(MockResponse().setBody("""{"items":"$ACCOUNT"}"""))
-        runCatching { api.send(ACCOUNT, "GET", events).decode(CalendarListPage.serializer(), GoogleCall("list calendars")) }
+        runCatching { api.send(ACCOUNT, "GET", events).decode(CalendarListPage.serializer(), GoogleCall.CALENDAR_LIST) }
         assertThat(ShadowLog.getLogsForTag("GoogleCalendar").size).isAtLeast(4)
         // The assertions are tearDown's.
     }
