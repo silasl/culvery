@@ -76,7 +76,7 @@ The user tests on the tablet only once there is a product they are happy to use;
 
 ### 4.2 Recomposition (P1, P2)
 
-- `CulveryTheme` remembers its `ColorScheme`, keyed on the colours; `Typography` becomes a top-level value. Today a fresh `ColorScheme` each minute disables skipping for the whole UI.
+- `CulveryTheme` remembers its `ColorScheme`, keyed on the colours; `Typography` becomes a top-level value. *(Task 5 review: material3 1.3.2 provides the scheme through a static local with no `equals`, so a fresh scheme would invalidate everything below — but `CulveryTheme` skipped whenever `dark` was unchanged, so the per-minute trigger the audit described never happened. The change stays as hardening.)*
 - `now` leaves `ShellUiState`; the status bar and the Home header read the time from their own state, so a minute tick recomposes the two clocks only.
 
 ### 4.3 One time source (P7, C6)
@@ -232,7 +232,7 @@ Accessibility, the launcher icon and design changes (4d); anything measured on t
 
 **Start-up** (debug, run-from-APK, not representative of release). `am start -W` TotalTime over runs: 8242, 13959, 4671, 3259, 3960, 4497 ms. Skipped frames before Displayed 41–136; every cold start then had one further main-thread stall of 76–304 frames (1.3–5 s). gfxinfo after a cold start: 7 frames, 6 janky, p50 300 ms, p90 1400 ms. Memory after start: Dalvik 19.9 MB PSS, native 16.5 MB, total 114 MB. Timeline: splash to 4.7 s, grey blank to 5.3 s, shell 5.7 s, empty card frames 6.1 s, full Home 6.6 s. Sampled main thread: `CulveryApp.onCreate` 1.48 s (Hilt 1.39 s, of which building the calendar providers — OkHttp, the Google authorization client — 0.66 s); first measure 1.35 s, of which 0.93 s inflating the Material Symbols font.
 
-**Runtime.** The whole UI recomposes every minute with skipping disabled (a fresh `ColorScheme`, `now` at the root); the calendar UI rebuilds every 5 minutes on equal data; six or more independent minute and 30-second tickers; calendar mapping on Main. No leaks, no unbounded caches, no endless animations, no blur.
+**Runtime.** The shell root recomposed every minute (`now` in the root state); the audit's "skipping disabled by a fresh `ColorScheme`" proved not to happen (Task 5 review); the calendar UI rebuilds every 5 minutes on equal data; six or more independent minute and 30-second tickers; calendar mapping on Main. No leaks, no unbounded caches, no endless animations, no blur.
 
 **Economy** (assumed 3 connections × 4 calendars). ~280 calendar passes a day; ~3,400 `events.list` a day plus ~190 at the midnight full resync (≈ 0.36% of the default Google project quota); ~8–9 MB a day, uncompressed and with every field. Weather 48 requests a day, 0.1–0.3 MB. Storage bounded: `calendar.db` ≈ 0.2–1 MB after a year (only the sync window is kept; the midnight full replace has been what removes out-of-window rows). The timers stop if the activity leaves the foreground, and nothing brings the app back after a reboot.
 
