@@ -14,9 +14,11 @@ import javax.inject.Singleton
 import uk.co.siland.culvery.capability.calendar.CalendarCapability
 import uk.co.siland.culvery.capability.calendar.CalendarPermissionSource
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
+import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.CalendarSyncLoop
 import uk.co.siland.culvery.capability.calendar.CalendarWriter
 import uk.co.siland.culvery.capability.calendar.HouseholdFollower
+import uk.co.siland.culvery.capability.calendar.StoredSeries
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.ALL_MIGRATIONS
 import uk.co.siland.culvery.core.access.PermissionSource
@@ -31,6 +33,9 @@ abstract class CalendarModule {
 
     @Multibinds
     abstract fun writers(): Set<CalendarWriter>
+
+    @Binds
+    abstract fun storedSeries(impl: CalendarStore): StoredSeries
 
     @Binds
     @IntoSet

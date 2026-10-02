@@ -113,8 +113,13 @@ data class EventRow(
     val sourcePersonId: String,
 )
 
+data class SeriesInstance(val remoteId: String, val recurrenceRule: String?)
+
 @Dao
 interface CalendarDao {
+    @Query("SELECT remoteId, recurrenceRule FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId AND recurring = 1")
+    suspend fun seriesInstances(connectionId: String, sourceId: String): List<SeriesInstance>
+
     /** Events outside [start, end) (spanOverlaps' opposite), except those a queued change targets (4c ruling 11). */
     @Query(
         """

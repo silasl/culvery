@@ -766,6 +766,14 @@ class CalendarStoreTest {
     }
 
     @Test
+    fun theStoredSeriesAreEachRepeatingInstanceWithItsRule() = runTest {
+        connect("s1")
+        val weekly = RemoteEvent("piano_1", "Piano", EventTime.Timed(at(23, 15)), EventTime.Timed(at(23, 16)), recurring = true, recurrenceRule = "RRULE:FREQ=WEEKLY")
+        store.applySync("c1", "s1", window, full(weekly, timed("once", "Once", 23, 9)))
+        assertThat(store.instances("c1", "s1")).containsExactly("piano_1", "RRULE:FREQ=WEEKLY")
+    }
+
+    @Test
     fun fullReplaceSyncLeavesTheOutboxAlone() = runTest {
         connect("s1")
         store.applySync("c1", "s1", window, full(timed("e1", "Swim", 23, 9)))

@@ -33,6 +33,7 @@ import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.SourceGoneException
+import uk.co.siland.culvery.capability.calendar.StoredSeries
 import uk.co.siland.culvery.capability.calendar.SyncCursor
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.core.plugin.Connection
@@ -43,6 +44,7 @@ class GoogleReadTest {
     private val today = LocalDate.of(2026, 9, 23)
     private val range = DateRange(today.minusDays(1), today.plusDays(15), london)
     private val google = FakeGoogleServer(london)
+    private lateinit var api: GoogleApi
     private lateinit var provider: GoogleCalendarProvider
     private val conn = Connection("g1", GOOGLE_PROVIDER_ID, "Google", mapOf(CONFIG_ACCOUNT to "family@example.com"))
     // Named after the account, as a primary calendar usually is: the log checks catch its id or name in any log line.
@@ -50,8 +52,61 @@ class GoogleReadTest {
 
     @Before
     fun setUp() {
-        provider = testProvider(GoogleApi(google.start(), FakeTokenSource(), OkHttpClient()))
+        api = GoogleApi(google.start(), FakeTokenSource(), OkHttpClient())
+        provider = testProvider(api)
         google.addCalendar(family.id, family.name, primary = true)
+    }
+
+    private fun asksFor(series: String) = google.requests.count { it.requestUrl!!.pathSegments.last() == series }
+
+    private fun pianoSeries(rule: String = "RRULE:FREQ=WEEKLY;BYDAY=TU") {
+        google.putEvent(family.id, google.timed("piano", "Piano", at(22, 15), at(22, 16)) { putJsonArray("recurrence") { add(rule) } })
+        google.putEvent(family.id, google.timed("piano_20260922T141500Z", "Piano", at(22, 15), at(22, 16)) { put("recurringEventId", "piano") })
+        google.putEvent(family.id, google.timed("piano_20260929T141500Z", "Piano", at(29, 15), at(29, 16)) { put("recurringEventId", "piano") })
+    }
+
+    /**
+     * C9: a series deleted on a phone comes back as its master's id alone; every stored instance of it goes — and only
+     * its own: not a series split from it ("this and following" makes "<id>_R<start>"), nor another series.
+     */
+    @Test
+    fun aCancelledSeriesRemovesEveryStoredInstance() = runTest {
+        val stored = mutableMapOf<String, String?>()
+        val mirrored = testProvider(api, stored = StoredSeries { _, _ -> stored })
+        pianoSeries()
+        google.putEvent(family.id, google.timed("swim_20260923T161500Z", "Swim", at(23, 17), at(23, 18)) { put("recurringEventId", "swim") })
+        val first = mirrored.sync(conn, family, range, null)
+        first.upserts.forEach { stored[it.remoteId] = it.recurrenceRule }
+        stored["piano_R20261006T141500_20261006T141500Z"] = "RRULE:FREQ=WEEKLY;BYDAY=TU"
+        stored["piano_20261003"] = null
+        google.putEvent(family.id, buildJsonObject { put("id", "piano"); put("status", "cancelled") })
+        val next = mirrored.sync(conn, family, range, first.cursor)
+        assertThat(next.removedIds).containsAtLeast("piano", "piano_20260922T141500Z", "piano_20260929T141500Z", "piano_20261003")
+        assertThat(next.removedIds).containsNoneOf("swim_20260923T161500Z", "piano_R20261006T141500_20261006T141500Z")
+    }
+
+    @Test
+    fun anInstanceIsNamedForItsSeriesAndAStartAndNothingElse() {
+        assertThat(instanceOf("piano", "piano_20261005T141500Z")).isTrue()
+        assertThat(instanceOf("piano", "piano_20261005")).isTrue()
+        assertThat(instanceOf("piano", "piano_R20261006T141500_20261006T141500Z")).isFalse()
+        assertThat(instanceOf("piano", "pianoforte_20261005")).isFalse()
+        assertThat(instanceOf("piano", "piano_20261005_extra")).isFalse()
+        // An id's own characters are never pattern: "." is not "any character", "+" and "(" are not operators.
+        assertThat(instanceOf("a.b+c(d", "a.b+c(d_20261005")).isTrue()
+        assertThat(instanceOf("a.b", "aXb_20261005")).isFalse()
+        assertThat(instanceOf("a+", "aaa_20261005")).isFalse()
+    }
+
+    /** Ruling 3: with no nightly full sync, a series changed on a phone has its rule read again. */
+    @Test
+    fun aChangedSeriesHasItsRuleReadAgainOnAnIncrementalPass() = runTest {
+        pianoSeries()
+        val first = provider.sync(conn, family, range, null)
+        pianoSeries(rule = "RRULE:FREQ=DAILY")
+        val next = provider.sync(conn, family, range, first.cursor)
+        assertThat(next.upserts.map { it.recurrenceRule }.distinct()).containsExactly("RRULE:FREQ=DAILY")
+        assertThat(asksFor("piano")).isEqualTo(2)
     }
 
     @After

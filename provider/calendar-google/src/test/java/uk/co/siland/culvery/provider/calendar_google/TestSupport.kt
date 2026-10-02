@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertWithMessage
 import kotlin.coroutines.cancellation.CancellationException
 import org.robolectric.shadows.ShadowLog
+import uk.co.siland.culvery.capability.calendar.StoredSeries
 import uk.co.siland.culvery.core.plugin.Toaster
 
 /** What [block] threw, or null if it returned; a cancellation is never swallowed. Shared by this module's tests. */
@@ -39,7 +40,8 @@ internal fun testProvider(
     authorizer: Authorizer = FakeAuthorizer(),
     toaster: Toaster = NoToasts,
     playServices: PlayServicesCheck = PlayServicesCheck { true },
-) = GoogleCalendarProvider(api, authorizer, toaster, playServices)
+    stored: StoredSeries = StoredSeries { _, _ -> emptyMap() },
+) = GoogleCalendarProvider(api, authorizer, toaster, playServices, stored)
 
 /** Stands in for Play services' account chooser and consent screens; needs Robolectric. */
 internal fun screens(): PendingIntent =

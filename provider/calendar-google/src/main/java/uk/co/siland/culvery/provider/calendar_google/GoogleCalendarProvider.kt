@@ -27,6 +27,7 @@ import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.SourceGoneException
+import uk.co.siland.culvery.capability.calendar.StoredSeries
 import uk.co.siland.culvery.capability.calendar.SyncCursor
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.UnreachableException
@@ -57,8 +58,8 @@ private val CALENDAR_LIST_QUERY = mapOf("showHidden" to "true", "minAccessRole" 
 
 /**
  * Google Calendar API v3 (3a design §3.1–§3.7). The connection's config holds only the account's email; every call
- * takes a fresh token from Play services. Each series' RRULE is fetched once and kept in memory per calendar until
- * that calendar's next full sync completes.
+ * takes a fresh token from Play services. Each series' RRULE is fetched once and kept in memory per calendar, until
+ * that calendar's next full sync; an incremental pass reads a changed series' rule again (4c ruling 3).
  */
 @Singleton
 class GoogleCalendarProvider @Inject constructor(
@@ -66,6 +67,7 @@ class GoogleCalendarProvider @Inject constructor(
     private val authorizer: Authorizer,
     private val toaster: Toaster,
     private val playServices: PlayServicesCheck,
+    private val stored: StoredSeries,
 ) : CalendarProvider, CalendarWriter {
     override val descriptor = ProviderDescriptor(GOOGLE_PROVIDER_ID, GOOGLE_DISPLAY_NAME, Icons.CALENDAR_MONTH, setOf(Feature.READ, Feature.WRITE))
     override val providerId = GOOGLE_PROVIDER_ID
@@ -178,14 +180,24 @@ class GoogleCalendarProvider @Inject constructor(
 
     private suspend fun incremental(conn: Connection, account: String, source: CalendarSource, cursor: SyncCursor): SyncResult? {
         val listed = list(account, source, mapOf("syncToken" to cursor.value)) ?: return null
+        val cache = rules.getOrPut(keyOf(conn, source)) { ConcurrentHashMap() }
+        // No nightly full sync refreshes a rule any more: a series with a changed instance is read again (4c ruling 3).
+        listed.items.filterNot { it.isGone }.mapNotNullTo(HashSet()) { it.recurringEventId }.forEach { cache.remove(it) }
         val upserts = mutableListOf<RemoteEvent>()
         val removed = mutableListOf<String>()
         val failed = mutableSetOf<String>()
+        var instances: Map<String, String?>? = null
         listed.items.forEach { event ->
             if (event.isGone) {
                 removed += event.id
+                if (event.recurringEventId == null) {
+                    // C9: a deleted series comes back as its own id alone (ruling 2).
+                    val known = instances ?: stored.instances(conn.id, source.id).also { instances = it }
+                    removed += known.keys.filter { instanceOf(event.id, it) }
+                    cache.remove(event.id)
+                }
             } else {
-                event.toRemoteEvent(ruleOf(account, source, event, rules.getOrPut(keyOf(conn, source)) { ConcurrentHashMap() }, failed))?.let { upserts += it }
+                event.toRemoteEvent(ruleOf(account, source, event, cache, failed))?.let { upserts += it }
             }
         }
         return SyncResult(upserts, removed, listed.syncToken?.let(::SyncCursor) ?: cursor, fullReplace = false)
@@ -329,3 +341,11 @@ class GoogleCalendarProvider @Inject constructor(
     private fun accountOf(conn: Connection): String =
         conn.config[CONFIG_ACCOUNT] ?: throw NeedsSignInException("The Google connection ${conn.id} has no account")
 }
+
+/**
+ * Whether [remoteId] is an instance of the series [seriesId] (ruling 2): Google names one "<series>_<original start>",
+ * the start as 20261005T141500Z or, for an all-day event, 20261005. A series split from it ("<series>_R<start>") is
+ * another series, so only that exact shape counts.
+ */
+internal fun instanceOf(seriesId: String, remoteId: String): Boolean =
+    Regex("^${Regex.escape(seriesId)}_\\d{8}(T\\d{6}Z)?$").matches(remoteId)

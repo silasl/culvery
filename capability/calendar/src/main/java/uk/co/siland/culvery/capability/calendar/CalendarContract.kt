@@ -93,6 +93,14 @@ data class SyncResult(
 )
 
 /**
+ * What the tablet already holds of one calendar's repeating events (4c design §6.3, C9): each stored instance's id with
+ * its series' rule, null when unknown. A provider reads it to find a deleted series' instances.
+ */
+fun interface StoredSeries {
+    suspend fun instances(connectionId: String, sourceId: String): Map<String, String?>
+}
+
+/**
  * What the tablet asks a provider to write. [end] is exclusive, as in [RemoteEvent]. [forPerson] and [createdBy]
  * are household PersonId values ("family" allowed) that the provider stores with the event (Google:
  * extendedProperties.private). Names are never written. [forPersonColor] is that person's colour (ARGB), so the

@@ -25,7 +25,7 @@ import uk.co.siland.culvery.core.plugin.ConnectionHealth
 
 /** The only writer of calendar.db. UI reads go through CalendarRepository. */
 @Singleton
-class CalendarStore internal constructor(private val db: CalendarDatabase, private val dao: CalendarDao) {
+class CalendarStore internal constructor(private val db: CalendarDatabase, private val dao: CalendarDao) : StoredSeries {
     @Inject constructor(db: CalendarDatabase) : this(db, db.calendarDao())
 
     fun connections(): Flow<List<StoredConnection>> = dao.connections().map { rows -> rows.map { it.toStored() } }
@@ -262,6 +262,9 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         }
         removed
     }
+
+    override suspend fun instances(connectionId: String, sourceId: String): Map<String, String?> =
+        dao.seriesInstances(connectionId, sourceId).associate { it.remoteId to it.recurrenceRule }
 
     fun eventsBetween(startMillis: Long, endMillis: Long): Flow<List<StoredEvent>> =
         dao.eventsBetween(startMillis, endMillis).map { rows -> rows.map { it.toStored() } }
