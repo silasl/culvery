@@ -27,3 +27,18 @@ fun ComponentActivity.unpinFromScreen() {
     val am = getSystemService(ActivityManager::class.java)
     if (am.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) stopLockTask()
 }
+
+/** The kiosk's effects on [activity]'s window and task. */
+internal class ActivityKioskWindow(private val activity: ComponentActivity) : KioskWindow {
+    override fun pin() = activity.pinToScreen()
+
+    override fun unpin() = activity.unpinFromScreen()
+
+    override fun hideBars() = activity.hideSystemBars()
+
+    override fun showBars() = activity.showSystemBars()
+
+    override fun moveToBack() {
+        activity.moveTaskToBack(true)
+    }
+}

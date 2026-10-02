@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.Settings
-import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
@@ -81,33 +80,24 @@ class MainActivity : ComponentActivity() {
     // SetupState read once for the activity, so the pin and the screen never disagree (4a design D10); null until read.
     private lateinit var setupComplete: StateFlow<Boolean?>
 
-    // Not `window`: that is the Activity's own.
-    private val kioskWindow = object : KioskWindow {
-        override fun pin() = pinToScreen()
-
-        override fun unpin() = unpinFromScreen()
-
-        override fun hideBars() = hideSystemBars()
-
-        override fun showBars() = showSystemBars()
-
-        override fun moveToBack() {
-            moveTaskToBack(true)
-        }
-    }
-
     private val kiosk by lazy {
         KioskLifecycle(
-            kioskWindow,
+            ActivityKioskWindow(this),
             setupComplete = { setupComplete.value == true },
             isHomeApp = { homeApp.isDefault.value },
             kioskExited = { shell.kioskExited },
             returnedToFront = shell::returnedToFront,
+            front = shell.front,
+            changingConfigurations = { isChangingConfigurations },
+            say = toasts::show,
         )
     }
 
     // Android's yes/no "make Culvery the home app?" dialog (4c §5.1); its answer is read again on resume anyway.
-    private val askHomeRole = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { homeApp.refresh() }
+    private val askHomeRole = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        homeApp.refresh()
+        kiosk.roleAnswered(cancelled = result.resultCode == RESULT_CANCELED)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
@@ -193,22 +183,14 @@ class MainActivity : ComponentActivity() {
         if (hasFocus && !shell.kioskExited) hideSystemBars()
     }
 
-    /** Android's screens can't open over a pinned app; Culvery pins again when it is next in front (4c §5.1). */
-    private fun openHomeAppScreen(request: HomeAppRequest) {
-        unpinFromScreen()
-        try {
-            when (request) {
-                HomeAppRequest.CHOOSE -> askHomeRole.launch(getSystemService(RoleManager::class.java).createRequestRoleIntent(RoleManager.ROLE_HOME))
-                HomeAppRequest.CHANGE -> startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+    private fun openHomeAppScreen(request: HomeAppRequest) = kiosk.openHomeAppScreen {
+        when (request) {
+            HomeAppRequest.CHOOSE -> {
+                val roles = getSystemService(RoleManager::class.java)
+                if (roles == null || !roles.isRoleAvailable(RoleManager.ROLE_HOME)) throw ActivityNotFoundException("No home role")
+                askHomeRole.launch(roles.createRequestRoleIntent(RoleManager.ROLE_HOME))
             }
-        } catch (e: ActivityNotFoundException) {
-            Log.w(TAG, "No screen to change the home app on this tablet (${e::class.simpleName})")
-            shell.returnedToFront()
-            if (shouldPin(setupComplete.value == true, shell.kioskExited)) pinToScreen()
+            HomeAppRequest.CHANGE -> startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
         }
-    }
-
-    private companion object {
-        const val TAG = "Culvery"
     }
 }

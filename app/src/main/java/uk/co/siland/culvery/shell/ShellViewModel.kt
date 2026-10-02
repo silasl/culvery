@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import uk.co.siland.culvery.FrontTracker
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.household.Role
@@ -192,6 +193,9 @@ class ShellViewModel @Inject constructor(
     fun returnedToFront() {
         kioskExited = false
     }
+
+    /** Survives the activity, so a relaunch after Culvery was stopped counts as coming back to the front (K2). */
+    internal val front = FrontTracker()
 
     private fun leaveKiosk() {
         kioskExited = true

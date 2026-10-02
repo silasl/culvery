@@ -1,5 +1,6 @@
 package uk.co.siland.culvery
 
+import android.content.ActivityNotFoundException
 import androidx.activity.ComponentActivity
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -7,6 +8,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
+import org.robolectric.Shadows.shadowOf
 
 /** The kiosk's pinning over a real activity lifecycle (Robolectric drives it), with the window's effects recorded. */
 @RunWith(AndroidJUnit4::class)
@@ -21,15 +23,23 @@ class KioskLifecycleTest {
     }
 
     private val window = RecordingWindow()
+    private val front = FrontTracker()
     private var exited = false
     private var home = true
+    private var changing = false
+    private val said = mutableListOf<String>()
     private val controller = Robolectric.buildActivity(ComponentActivity::class.java)
-    private val kiosk = KioskLifecycle(
+    private val kiosk = kioskFor()
+
+    private fun kioskFor() = KioskLifecycle(
         window,
         setupComplete = { true },
         isHomeApp = { home },
         kioskExited = { exited },
         returnedToFront = { exited = false },
+        front = front,
+        changingConfigurations = { changing },
+        say = { said += it },
     )
 
     @Before
@@ -72,5 +82,70 @@ class KioskLifecycleTest {
         window.calls.clear()
         kiosk.exitKiosk()
         assertThat(window.calls).containsExactly("unpin", "showBars", "moveToBack").inOrder()
+    }
+
+    /** A configuration change that waited for Culvery to return builds a new activity that never saw the stop. */
+    @Test
+    fun aRelaunchAfterBeingStoppedPinsAgain() {
+        exited = true
+        kiosk.exitKiosk()
+        controller.pause().stop()
+        window.calls.clear()
+        val next = Robolectric.buildActivity(ComponentActivity::class.java)
+        next.get().lifecycle.addObserver(kioskFor())
+        next.setup()
+        assertThat(window.calls).contains("pin")
+    }
+
+    @Test
+    fun aConfigurationChangeWhileInFrontKeepsExited() {
+        exited = true
+        kiosk.exitKiosk()
+        changing = true
+        controller.pause().stop()
+        window.calls.clear()
+        val next = Robolectric.buildActivity(ComponentActivity::class.java)
+        next.get().lifecycle.addObserver(kioskFor())
+        next.setup()
+        assertThat(exited).isTrue()
+        assertThat(window.calls).doesNotContain("pin")
+    }
+
+    @Test
+    fun whenNoHomeAppScreenOpensItPinsAgainAndSaysSo() {
+        exited = true
+        window.calls.clear()
+        kiosk.openHomeAppScreen { throw ActivityNotFoundException() }
+        assertThat(window.calls).containsExactly("unpin", "pin").inOrder()
+        assertThat(exited).isFalse()
+        assertThat(said).containsExactly(HOME_APP_NOT_OFFERED)
+    }
+
+    @Test
+    fun aScreenThatOpensIsLeftToPinOnTheNextResume() {
+        window.calls.clear()
+        kiosk.openHomeAppScreen { }
+        assertThat(window.calls).containsExactly("unpin")
+        assertThat(said).isEmpty()
+    }
+
+    @Test
+    fun aCancelledRoleDialogSaysSoUnlessCulveryIsNowHome() {
+        home = true
+        kiosk.roleAnswered(cancelled = true)
+        kiosk.roleAnswered(cancelled = false)
+        assertThat(said).isEmpty()
+        home = false
+        kiosk.roleAnswered(cancelled = false)
+        assertThat(said).isEmpty()
+        kiosk.roleAnswered(cancelled = true)
+        assertThat(said).containsExactly(HOME_APP_NOT_OFFERED)
+    }
+
+    @Test
+    fun theActivityWindowMovesTheTaskToTheBack() {
+        val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+        ActivityKioskWindow(activity).moveToBack()
+        assertThat(shadowOf(activity).isTaskMovedToBack).isTrue()
     }
 }
