@@ -229,16 +229,17 @@ private fun DateCell(date: LocalDate, today: LocalDate, selected: LocalDate, mod
 }
 
 @Composable
-private fun RoundButton(icon: String, label: String, tag: String, onClick: () -> Unit) {
+internal fun RoundButton(icon: String, label: String, tag: String, enabled: Boolean = true, onClick: () -> Unit) {
     val c = Culvery.colors
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .testTag(tag)
             .size(CalendarDimens.pageButton)
+            .alpha(if (enabled) 1f else CalendarDimens.DISABLED_ALPHA)
             .clip(CircleShape)
             .background(c.surf2)
-            .clickable(onClickLabel = label, onClick = onClick),
+            .clickable(enabled = enabled, onClickLabel = label, onClick = onClick),
     ) {
         HhIcon(icon, size = CalendarDimens.pageButtonIcon, tint = c.ink, contentDescription = label)
     }

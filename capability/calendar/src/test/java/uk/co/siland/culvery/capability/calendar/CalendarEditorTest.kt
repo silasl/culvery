@@ -43,6 +43,9 @@ class CalendarEditorTest {
     private lateinit var household: HouseholdRepository
 
     private val london = ZoneId.of("Europe/London")
+
+    /** The editor's and the drain's clock start here: Wednesday 23 September, 09:00 in London. */
+    private val opened = LocalDate.of(2026, 9, 23).atTime(9, 0).atZone(london).toInstant().toEpochMilli()
     private val window = DateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 10, 8), london)
     private val family = CalendarSource("s-family", "Family calendar", writable = true)
     private val school = CalendarSource("s-school", "School terms", writable = false)
@@ -85,7 +88,7 @@ class CalendarEditorTest {
      * while the test waits for Room.
      */
     private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext) = testEditor(
-        store, setOf(writer), access.control, access.toasts, HouseholdZone(household), WallClock { testScheduler.currentTime },
+        store, setOf(writer), access.control, access.toasts, HouseholdZone(household), WallClock { opened + testScheduler.currentTime },
         backgroundScope, requestSync = { syncRequests++ }, io = io, writeLock = lock, personOf = household::person,
     )
 
@@ -97,7 +100,7 @@ class CalendarEditorTest {
 
     /** The outbox drain as the sync loop runs it, [aheadMillis] after the test's clock, with this test's writer. */
     private fun TestScope.drain(access: TestAccess, aheadMillis: Long) = testSync(
-        store, emptySet(), HouseholdZone(household), WallClock { testScheduler.currentTime + aheadMillis }, setOf(writer), access.toasts,
+        store, emptySet(), HouseholdZone(household), WallClock { opened + testScheduler.currentTime + aheadMillis }, setOf(writer), access.toasts,
         writeLock = lock,
     )
 
@@ -105,6 +108,24 @@ class CalendarEditorTest {
     private fun draft(title: String, forPerson: String?, createdBy: String? = null): EventDraft {
         val start = LocalDate.of(2026, 9, 27).atTime(18, 0).atZone(london).toInstant()
         return EventDraft(title, EventTime.Timed(start), EventTime.Timed(start.plusSeconds(3_600)), forPerson, createdBy)
+    }
+
+    /** A one-hour event at 18:00 London on [day]. */
+    private fun draftOn(day: LocalDate, title: String): EventDraft {
+        val start = day.atTime(18, 0).atZone(london).toInstant()
+        return EventDraft(title, EventTime.Timed(start), EventTime.Timed(start.plusSeconds(3_600)), PersonId.FAMILY.value, null)
+    }
+
+    /** 4c §6.6: an event after the last day the Calendar tab shows names its day; one on that day doesn't. */
+    @Test
+    fun anEventAddedBeyondTheFurthestWeekNamesItsDay() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        val last = lastShownDay(LocalDate.of(2026, 9, 23))
+        assertThat(editor.create(draftOn(last, "Last shown"))).isEqualTo(EditResult.Done)
+        assertThat(editor.create(draftOn(last.plusDays(1), "Beyond"))).isEqualTo(EditResult.Done)
+        assertThat(access.toasts.messages).containsExactly(EVENT_ADDED, "Event added for Wed 21 October").inOrder()
     }
 
     /** A change to an event, as the edit sheet sends it; its createdBy is ignored by the editor. */
@@ -270,7 +291,7 @@ class CalendarEditorTest {
         assertThat(editor(access).delete(ref("dinner"))).isEqualTo(EditResult.Queued)
         val queued = store.pendingNow().single()
         assertThat(listOf(queued.kind, queued.remoteId, queued.attempts)).containsExactly(ChangeKind.DELETE, "dinner", 1).inOrder()
-        assertThat(queued.nextAttemptMillis).isEqualTo(testScheduler.currentTime + 30_000)
+        assertThat(queued.nextAttemptMillis).isEqualTo(opened + testScheduler.currentTime + 30_000)
         assertThat(store.eventNow(ref("dinner"))).isNotNull()
         assertThat(syncRequests).isEqualTo(1)
         // The event hides at once (the repository's overlay), so the delete reads as done.
@@ -351,7 +372,7 @@ class CalendarEditorTest {
         assertThat(second.kind).isEqualTo(ChangeKind.ASSIGN)
         assertThat(second.draft?.forPerson).isEqualTo(access.mia.id.value)
         assertThat(second.attempts).isEqualTo(0)
-        assertThat(second.nextAttemptMillis).isEqualTo(testScheduler.currentTime)
+        assertThat(second.nextAttemptMillis).isEqualTo(opened + testScheduler.currentTime)
     }
 
     @Test
@@ -523,7 +544,7 @@ class CalendarEditorTest {
             .containsExactly(ChangeKind.CREATE, "key-1", null, 1).inOrder()
         assertThat(queued.ref).isEqualTo(ref("key-1"))
         assertThat(queued.draft?.createdBy).isEqualTo(access.alex.id.value)
-        assertThat(queued.nextAttemptMillis).isEqualTo(testScheduler.currentTime + OUTBOX_BACKOFF_MS.first())
+        assertThat(queued.nextAttemptMillis).isEqualTo(opened + testScheduler.currentTime + OUTBOX_BACKOFF_MS.first())
         assertThat(access.toasts.messages).containsExactly(EVENT_ADDED)
     }
 
@@ -825,7 +846,7 @@ class CalendarEditorTest {
         val stored = store.connectionsNow().single()
         // The reconnect chip shows now, not at the next sync (3a design §3.7), and the queue stops ageing (D16).
         assertThat(stored.health).isEqualTo(ConnectionHealth.NeedsSignIn)
-        assertThat(stored.needsSignInSinceMillis).isEqualTo(testScheduler.currentTime)
+        assertThat(stored.needsSignInSinceMillis).isEqualTo(opened + testScheduler.currentTime)
         assertThat(store.pendingNow()).hasSize(1)
     }
 }

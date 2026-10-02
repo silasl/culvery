@@ -168,6 +168,12 @@ internal object CalendarDimens {
     val reconnectTop = 8.dp
     val reconnectIcon = 20.dp
 
+    // Looking ahead (4c §6.6): ‹ › are the date picker's 48 dp round buttons, 8 apart and 16 before the title; the
+    // This week chip is a 44 dp `surf2` pill 16 after it. An arrow at its end shows at 30%.
+    val weekStepGap = 8.dp
+    val weekTitleGap = 16.dp
+    const val DISABLED_ALPHA = 0.3f
+
     // Week columns: header inset 4 at the sides and bottom; chip title 2 below the time; badge 15.
     val columnHeaderInset = 4.dp
     val columnGap = 8.dp

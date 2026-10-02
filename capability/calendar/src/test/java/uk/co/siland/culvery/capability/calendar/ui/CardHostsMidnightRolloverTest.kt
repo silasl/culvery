@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -152,5 +153,26 @@ class CardHostsMidnightRolloverTest {
         // The first column's date has moved from the 23rd to the 24th, so the seven-day window now runs 24-30.
         compose.onNodeWithTag("week_day_2026-09-23").assertDoesNotExist()
         compose.onNodeWithTag("week_day_2026-09-30").assertExists()
+    }
+
+    /** 4c §6.6: › loads the next week from the store. */
+    @Test
+    fun weekViewHostShowsTheWeekItStepsTo() {
+        val now = LocalDateTime.of(2026, 9, 23, 12, 0).atZone(london).toInstant().toEpochMilli()
+        val clock = HouseholdClock(zone.zone, WallClock { now }, clockScope, MutableStateFlow(now))
+        compose.setContent {
+            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides RecordingOverlay()) {
+                CulveryTheme(dark = true) {
+                    val today = rememberToday(clock) ?: return@CulveryTheme
+                    WeekViewHost(repo, editor, today, rememberNowMillis(clock), onReconnect = {})
+                }
+            }
+        }
+        compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodesWithTag("week_day_2026-09-23").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("week_later").performClick()
+        compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodesWithTag("week_day_2026-10-06").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("week_day_2026-09-30").assertExists()
+        compose.onNodeWithTag("week_day_2026-09-29").assertDoesNotExist()
+        compose.onNodeWithText("Next week").assertExists()
     }
 }

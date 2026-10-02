@@ -129,6 +129,23 @@ internal val HOURS_MINUTES: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:
 // ENGLISH, not UK: JDK 17's CLDR data gives "Sept" for Locale.UK, and Android versions differ.
 internal val SHORT_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
 internal val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
+internal val DAY_AND_MONTH: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMMM", Locale.ENGLISH)
+
+/** How many weeks past this one the Calendar tab steps to (4c D10): four weeks in all, inside the synced window. */
+const val MAX_WEEKS_AHEAD = 3
+
+/** The last day the Calendar tab can show from [today]: the seventh day of its furthest week. */
+fun lastShownDay(today: LocalDate): LocalDate = today.plusWeeks(MAX_WEEKS_AHEAD + 1L).minusDays(1)
+
+/** The Calendar tab's title for the week [weeksAhead] after this one. */
+fun weekTitle(weeksAhead: Int): String = when (weeksAhead) {
+    0 -> "This week"
+    1 -> "Next week"
+    else -> "In $weeksAhead weeks"
+}
+
+/** 4c §6.6: the toast after adding an event the Calendar tab can't reach, so the family know where it went. */
+fun eventAddedFor(day: LocalDate): String = "Event added for ${day.format(DAY_AND_MONTH)}"
 
 /** An event ending at exactly midnight ends on the day before. */
 private fun lastDayOf(from: ZonedDateTime, to: ZonedDateTime): LocalDate {

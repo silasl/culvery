@@ -33,12 +33,15 @@ class WeekScreenshotTest {
     private val now = SampleUi.NOW
     private val addNothing: (LocalDate) -> Unit = {}
 
-    private fun snap(name: String, dark: Boolean, sync: SyncStatusUi, week: WeekUi = SampleUi.week, canAdd: Boolean = false) {
+    private fun snap(name: String, dark: Boolean, sync: SyncStatusUi, week: WeekUi = SampleUi.week,
+        canAdd: Boolean = false,
+        weeksAhead: Int = 0,
+    ) {
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
                 CulveryTheme(dark = dark) {
                     Box(Modifier.testTag("shot").background(Culvery.colors.bg).size(CONTENT_W, CONTENT_H)) {
-                        WeekView(WeekViewState(week, SampleUi.TODAY, sync, now), onAdd = addNothing.takeIf { canAdd })
+                        WeekView(WeekViewState(week, SampleUi.TODAY, sync, now, weeksAhead), onAdd = addNothing.takeIf { canAdd })
                     }
                 }
             }
@@ -55,4 +58,8 @@ class WeekScreenshotTest {
     @Test fun weekStaleDark() = snap("week_stale_dark", true, stale)
     @Test fun weekNeedsSignInDark() = snap("week_needs_sign_in_dark", true, needsSignIn)
     @Test fun weekSyncingDark() = snap("week_syncing_dark", true, fresh, SampleUi.weekWithSyncing)
+    @Test fun weekNextLight() = snap("week_next_light", false, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
+    @Test fun weekNextDark() = snap("week_next_dark", true, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
+    @Test fun weekFurthestLight() = snap("week_furthest_light", false, fresh, SampleUi.weekAhead(3), canAdd = true, weeksAhead = 3)
+    @Test fun weekFurthestDark() = snap("week_furthest_dark", true, fresh, SampleUi.weekAhead(3), canAdd = true, weeksAhead = 3)
 }

@@ -26,23 +26,34 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import java.time.LocalDate
+import kotlinx.coroutines.delay
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
+import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.capability.calendar.isStaleAt
+import uk.co.siland.culvery.capability.calendar.weekTitle
 import uk.co.siland.culvery.capability.calendar.weekSubtitle
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.Culvery
@@ -51,17 +62,25 @@ import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 
-data class WeekViewState(val week: WeekUi, val today: LocalDate, val sync: SyncStatusUi, val nowMillis: Long)
+/** [weeksAhead]: how many weeks after this one [week] is (4c D10). */
+data class WeekViewState(
+    val week: WeekUi,
+    val today: LocalDate,
+    val sync: SyncStatusUi,
+    val nowMillis: Long,
+    val weeksAhead: Int = 0,
+)
 
 internal fun reconnectLabel(labels: List<String>): String =
     if (labels.size == 1) "${labels.single()} needs reconnecting" else "${labels.size} calendars need reconnecting"
 
 /**
- * Hand-off §2 and §7: a rolling seven days from today, person-coloured chips and the sync state. There is no week
- * navigation, so the view never leaves the synced window. With [onAdd] (there is a writable master calendar), Add event
- * sits right of the legend and adds on today, and a tap on the space below a column's chips, or on its hint, adds on
- * that column's day; chip taps still open their event. Without it, the legend keeps a 24 dp gap to the right edge.
- * The reconnect chip runs [onReconnect] (3a design §4.3).
+ * Hand-off §2 and §7: seven days, person-coloured chips and the sync state. ‹ › step a week at a time, from this week
+ * (today and six days) to [MAX_WEEKS_AHEAD] weeks on, inside the synced window (4c D10), through [onWeeksAhead]; This
+ * week jumps back. With [onAdd] (there is a writable master calendar), Add event sits right of the legend and adds on
+ * the first day shown, and a tap on the space below a column's chips, or on its hint, adds on that column's day; chip
+ * taps still open their event. Without it, the legend keeps a 24 dp gap to the right edge. The reconnect chip runs
+ * [onReconnect] (3a design §4.3).
  */
 @Composable
 fun WeekView(
@@ -69,6 +88,7 @@ fun WeekView(
     modifier: Modifier = Modifier,
     onOpen: (EventRef) -> Unit = {},
     onAdd: ((LocalDate) -> Unit)? = null,
+    onWeeksAhead: (Int) -> Unit = {},
     onReconnect: () -> Unit = {},
 ) {
     val c = Culvery.colors
@@ -82,7 +102,22 @@ fun WeekView(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("This week", style = CalendarType.weekTitle, color = c.ink)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekStepGap)) {
+                            RoundButton(Icons.CHEVRON_LEFT, "Earlier week", "week_earlier", enabled = state.weeksAhead > 0) {
+                                onWeeksAhead(state.weeksAhead - 1)
+                            }
+                            RoundButton(Icons.CHEVRON_RIGHT, "Later week", "week_later", enabled = state.weeksAhead < MAX_WEEKS_AHEAD) {
+                                onWeeksAhead(state.weeksAhead + 1)
+                            }
+                        }
+                        Spacer(Modifier.width(CalendarDimens.weekTitleGap))
+                        Text(weekTitle(state.weeksAhead), style = CalendarType.weekTitle, color = c.ink, maxLines = 1)
+                        if (state.weeksAhead > 0) {
+                            Spacer(Modifier.width(CalendarDimens.weekTitleGap))
+                            ThisWeekChip { onWeeksAhead(0) }
+                        }
+                    }
                     Spacer(Modifier.height(CalendarDimens.subtitleTop))
                     Text(
                         weekSubtitle(state.sync, state.nowMillis),
@@ -103,7 +138,7 @@ fun WeekView(
                             .testTag("week_legend")
                             .then(if (onAdd == null) Modifier.padding(end = CalendarDimens.headerTrailingGap) else Modifier),
                     )
-                    if (onAdd != null) AddButton("Add event", "week_add_event") { onAdd(state.today) }
+                    if (onAdd != null) AddButton("Add event", "week_add_event") { onAdd(state.week.start) }
                 }
             }
             if (state.sync.needsSignIn.isNotEmpty()) {
@@ -271,5 +306,68 @@ private fun ReconnectChip(label: String, onClick: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
+    }
+}
+
+/** Back to this week (4c §6.6): a quiet 44 dp pill beside a later week's title. */
+@Composable
+private fun ThisWeekChip(onClick: () -> Unit) {
+    val c = Culvery.colors
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .testTag("week_this_week")
+            .height(CalendarDimens.touchTarget)
+            .clip(RoundedCornerShape(CalendarDimens.pillRadius))
+            .background(c.surf2)
+            .clickable(onClick = onClick)
+            .padding(horizontal = CalendarDimens.pillPaddingH),
+    ) {
+        Text("This week", style = CalendarType.pill, color = c.ink, maxLines = 1)
+    }
+}
+
+/** After this long without a touch, a later week goes back to this week (4c §6.6). */
+internal const val BACK_TO_THIS_WEEK_MS = 120_000L
+
+/** Which week the Calendar tab shows (4c D10): [weeks] after this one, 0 to [MAX_WEEKS_AHEAD]. */
+@Stable
+internal class WeekShown {
+    var weeks by mutableIntStateOf(0)
+        private set
+    var touches by mutableIntStateOf(0)
+        private set
+
+    fun show(weeks: Int) {
+        this.weeks = weeks.coerceIn(0, MAX_WEEKS_AHEAD)
+    }
+
+    fun touched() {
+        touches++
+    }
+}
+
+/**
+ * A new [WeekShown] each [today], so the view is back on this week at midnight; a later week goes back after
+ * [BACK_TO_THIS_WEEK_MS] without a touch.
+ */
+@Composable
+internal fun rememberWeekShown(today: LocalDate): WeekShown {
+    val shown = remember(today) { WeekShown() }
+    LaunchedEffect(shown, shown.weeks, shown.touches) {
+        if (shown.weeks > 0) {
+            delay(BACK_TO_THIS_WEEK_MS)
+            shown.show(0)
+        }
+    }
+    return shown
+}
+
+/** Calls [onTouch] for every finger that goes down inside, before the children see it, without taking it. */
+internal fun Modifier.onEveryTouch(onTouch: () -> Unit): Modifier = pointerInput(onTouch) {
+    awaitPointerEventScope {
+        while (true) {
+            if (awaitPointerEvent(PointerEventPass.Initial).type == PointerEventType.Press) onTouch()
+        }
     }
 }

@@ -110,6 +110,14 @@ class CalendarSyncTest {
 
     private suspend fun health(id: String) = store.connectionsNow().single { it.connection.id == id }.health
 
+    /** 4c D10: the Calendar tab's furthest day is inside the window each pass keeps. */
+    @Test
+    fun theFurthestWeekShownIsInsideTheWindow() {
+        val today = LocalDate.of(2026, 9, 24)
+        assertThat(lastShownDay(today)).isEqualTo(LocalDate.of(2026, 10, 21))
+        assertThat(lastShownDay(today)).isAtMost(today.plusDays(SYNC_FUTURE_DAYS))
+    }
+
     @Test
     fun syncStoresEventsAndMarksTheConnectionOk() = runTest {
         connect("c1", "calendar.a", s1)

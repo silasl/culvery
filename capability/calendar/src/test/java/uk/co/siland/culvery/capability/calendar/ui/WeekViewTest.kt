@@ -2,12 +2,18 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -24,7 +30,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.EventRef
+import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
+import uk.co.siland.culvery.capability.calendar.weekTitle
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
@@ -227,5 +235,91 @@ class WeekViewTest {
         // A missed tap near the day's name is not a request for a new event: only the space below the chips adds.
         compose.onNodeWithTag("week_day_${SampleUi.TODAY}").performTouchInput { click(Offset(centerX, 10f)) }
         assertThat(added).isEmpty()
+    }
+
+    /** 4c §6.6: ‹ › step a week at a time; › stops at the furthest week, ‹ at this week; This week jumps back. */
+    @Test
+    fun theArrowsStepAWeekAndStopAtEachEnd() {
+        val asked = mutableListOf<Int>()
+        var weeks by mutableStateOf(0)
+        show { WeekView(state().copy(weeksAhead = weeks), onWeeksAhead = { asked += it; weeks = it }) }
+        compose.onNodeWithTag("week_earlier").assertIsNotEnabled()
+        compose.onNodeWithTag("week_this_week").assertDoesNotExist()
+        compose.onNodeWithTag("week_later").performClick()
+        compose.onNodeWithText("Next week").assertExists()
+        repeat(MAX_WEEKS_AHEAD) { compose.onNodeWithTag("week_later").performClick() }
+        compose.onNodeWithText("In 3 weeks").assertExists()
+        compose.onNodeWithTag("week_later").assertIsNotEnabled()
+        compose.onNodeWithTag("week_earlier").assertIsEnabled()
+        compose.onNodeWithTag("week_this_week").performClick()
+        assertThat(asked).containsExactly(1, 2, 3, 0).inOrder()
+        compose.onNodeWithText("This week").assertExists()
+        compose.onNodeWithTag("week_this_week").assertDoesNotExist()
+    }
+
+    @Test
+    fun eachWeekHasItsTitle() {
+        assertThat((0..MAX_WEEKS_AHEAD).map(::weekTitle)).containsExactly("This week", "Next week", "In 2 weeks", "In 3 weeks").inOrder()
+    }
+
+    /** 4c §6.6: on a later week, + adds on its first day and a column on its own day; no column says Today. */
+    @Test
+    fun aLaterWeekAddsOnItsOwnDays() {
+        val added = mutableListOf<LocalDate>()
+        show { WeekView(WeekViewState(SampleUi.weekAhead(1), SampleUi.TODAY, sync(), now, weeksAhead = 1), onAdd = { added += it }) }
+        compose.onNodeWithTag("week_add_event").performClick()
+        compose.onNodeWithTag("week_add_${SampleUi.TODAY.plusDays(9)}").performClick()
+        assertThat(added).containsExactly(SampleUi.TODAY.plusWeeks(1), SampleUi.TODAY.plusDays(9)).inOrder()
+        compose.onNodeWithText("Today").assertDoesNotExist()
+    }
+
+    /** A touch anywhere restarts the 2-minute wait, and still reaches what was touched. */
+    @Test
+    fun aTouchIsSeenWithoutBeingTaken() {
+        var touches = 0
+        val added = mutableListOf<LocalDate>()
+        show { WeekView(state(), Modifier.onEveryTouch { touches++ }, onAdd = { added += it }) }
+        compose.onNodeWithTag("week_add_${SampleUi.TODAY}").performClick()
+        assertThat(touches).isEqualTo(1)
+        assertThat(added).containsExactly(SampleUi.TODAY)
+    }
+
+    /** With the clock paused, a state change from the test isn't seen by the composition until its writes are applied. */
+    private fun applyStateChanges() = compose.runOnIdle { Snapshot.sendApplyNotifications() }
+
+    /** 4c §6.6: a later week goes back to this week after 2 minutes without a touch; a touch starts the wait again. */
+    @Test
+    fun aLaterWeekGoesBackToThisWeekAfterTwoMinutesWithoutATouch() {
+        compose.mainClock.autoAdvance = false
+        lateinit var shown: WeekShown
+        show {
+            shown = rememberWeekShown(SampleUi.TODAY)
+            Text(weekTitle(shown.weeks))
+        }
+        compose.runOnIdle { shown.show(2) }
+        applyStateChanges()
+        compose.mainClock.advanceTimeBy(BACK_TO_THIS_WEEK_MS - 1_000)
+        compose.onNodeWithText("In 2 weeks").assertExists()
+        compose.runOnIdle { shown.touched() }
+        applyStateChanges()
+        compose.mainClock.advanceTimeBy(BACK_TO_THIS_WEEK_MS - 1_000)
+        compose.onNodeWithText("In 2 weeks").assertExists()
+        compose.mainClock.advanceTimeBy(2_000)
+        compose.onNodeWithText("This week").assertExists()
+    }
+
+    /** 4c §6.6: at midnight the view is back on this week, whatever it showed. */
+    @Test
+    fun aLaterWeekGoesBackToThisWeekAtMidnight() {
+        var today by mutableStateOf(SampleUi.TODAY)
+        lateinit var shown: WeekShown
+        show {
+            shown = rememberWeekShown(today)
+            Text(weekTitle(shown.weeks))
+        }
+        compose.runOnIdle { shown.show(MAX_WEEKS_AHEAD + 1) }
+        compose.onNodeWithText("In 3 weeks").assertExists()
+        today = today.plusDays(1)
+        compose.onNodeWithText("This week").assertExists()
     }
 }

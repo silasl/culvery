@@ -112,6 +112,17 @@ class CalendarEditor internal constructor(
     /** Now, in the household zone: the add sheet's "today" and its default time. */
     internal suspend fun openedAt(): ZonedDateTime = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone.current())
 
+    /** "Event added", or with its day when that is past what the Calendar tab shows (4c §6.6). */
+    private suspend fun addedToast(start: EventTime): String {
+        val z = zone.current()
+        val day = when (start) {
+            is EventTime.AllDay -> start.date
+            is EventTime.Timed -> start.instant.atZone(z).toLocalDate()
+        }
+        val today = Instant.ofEpochMilli(clock.nowMillis()).atZone(z).toLocalDate()
+        return if (day > lastShownDay(today)) eventAddedFor(day) else EVENT_ADDED
+    }
+
     /** A signed-in child tapped someone else's Who chip: say why it is disabled (2b-2 design §4.2). */
     internal fun refuseOtherWho(name: String) = toaster.show(cannotAddForOthers(name))
 
@@ -163,7 +174,8 @@ class CalendarEditor internal constructor(
             refusal = Refusal.Toast(::cannotAddForOthers),
         ) ?: return EditResult.Cancelled
         val toSend = draft.copy(createdBy = who.person.id.value, forPersonColor = colorOf(draft.forPerson))
-        return onAppScope(ChangeKind.CREATE, serviceNameOf(to.connection, serviceOf)) {
+        val added = addedToast(draft.start)
+        return onAppScope(ChangeKind.CREATE, serviceNameOf(to.connection, serviceOf), added) {
             writeLock.withLock { attempt(to, ChangeKind.CREATE, remoteId = null, toSend, clientKey = clientKey) }
         }
     }
@@ -243,7 +255,12 @@ class CalendarEditor internal constructor(
      * Rejected(TRY_AGAIN) instead of reaching the sheet's scope and killing the app. A save's refusal is the sheet's
      * to show; if the sheet stops waiting (it was closed), the editor toasts it instead.
      */
-    private suspend fun onAppScope(kind: ChangeKind, label: String, block: suspend () -> EditResult): EditResult {
+    private suspend fun onAppScope(
+        kind: ChangeKind,
+        label: String,
+        added: String = EVENT_ADDED,
+        block: suspend () -> EditResult,
+    ): EditResult {
         val job = scope.async {
             val result = try {
                 block()
@@ -253,7 +270,7 @@ class CalendarEditor internal constructor(
                 Log.w(TAG, "Couldn't save a ${kind.name} (${e::class.simpleName})")
                 EditResult.Rejected(TRY_AGAIN)
             }
-            report(kind, label, result)
+            report(kind, label, result, added)
             // A sync pass already in flight may briefly put back the old mirror; the pass this asks for corrects it.
             requestSync()
             result
@@ -410,13 +427,13 @@ class CalendarEditor internal constructor(
     }
 
     /** A queued change already shows (a delete hides the event), so it reads as done too. */
-    private fun report(kind: ChangeKind, label: String, result: EditResult) {
+    private fun report(kind: ChangeKind, label: String, result: EditResult, added: String) {
         val saved = result == EditResult.Done || result == EditResult.Queued
         when {
             result is EditResult.Rejected && (kind == ChangeKind.DELETE || kind == ChangeKind.ASSIGN) ->
                 toaster.show(couldNotSave(label, result.message))
             saved && kind == ChangeKind.DELETE -> toaster.show(EVENT_DELETED)
-            saved && kind == ChangeKind.CREATE -> toaster.show(EVENT_ADDED)
+            saved && kind == ChangeKind.CREATE -> toaster.show(added)
             saved && kind == ChangeKind.UPDATE -> toaster.show(CHANGES_SAVED)
         }
     }

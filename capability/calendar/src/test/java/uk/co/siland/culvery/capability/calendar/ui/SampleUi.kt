@@ -84,6 +84,12 @@ object SampleUi {
         people,
     )
 
+    /** [week] moved [weeks] on: the Calendar tab stepped ahead (4c D10). */
+    fun weekAhead(weeks: Long) = week.copy(
+        start = TODAY.plusWeeks(weeks),
+        days = week.days.map { it.copy(date = it.date.plusWeeks(weeks)) },
+    )
+
     /** The people who can be assigned (hand-off 06: Alex, Sam, Mia). */
     val household = listOf(alex, sam, mia)
 

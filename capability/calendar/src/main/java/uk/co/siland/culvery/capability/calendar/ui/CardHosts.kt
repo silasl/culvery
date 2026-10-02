@@ -3,7 +3,9 @@ package uk.co.siland.culvery.capability.calendar.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import java.time.LocalDate
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
@@ -29,7 +31,8 @@ internal fun ComingUpCardHost(repo: CalendarRepository, today: LocalDate) {
 }
 
 /**
- * Today plus six days; [today] moves at midnight, so the week rolls with it. Shows nothing until both flows load.
+ * The week shown is today plus six days, or a later one the family stepped to (4c D10); [today] moves at midnight, so
+ * the week rolls with it and is back on this week. Shows nothing until both flows load.
  * Add event and the column taps show only when there is a writable master calendar to add to. The reconnect chip
  * reconnects the first connection that needs it ([onReconnect]).
  */
@@ -43,9 +46,19 @@ internal fun WeekViewHost(
 ) {
     val open = rememberEventOpener(repo, editor, today)
     val add = rememberEventAdder(repo, editor, today)
-    val week: WeekUi? by remember(today) { repo.week(today) }.collectAsState(initial = null)
+    val shown = rememberWeekShown(today)
+    val start = today.plusWeeks(shown.weeks.toLong())
+    // produceState keeps the week on screen while the next one loads, so a step doesn't blank the view.
+    val week: WeekUi? by produceState<WeekUi?>(null, repo, start) { repo.week(start).collect { value = it } }
     val sync: SyncStatusUi? by repo.syncStatus.collectAsState(initial = null)
     val w = week ?: return
     val s = sync ?: return
-    WeekView(WeekViewState(w, today, s, nowMillis), onOpen = open, onAdd = add, onReconnect = { s.reconnect?.let(onReconnect) })
+    WeekView(
+        WeekViewState(w, today, s, nowMillis, shown.weeks),
+        modifier = Modifier.onEveryTouch(shown::touched),
+        onOpen = open,
+        onAdd = add,
+        onWeeksAhead = shown::show,
+        onReconnect = { s.reconnect?.let(onReconnect) },
+    )
 }
