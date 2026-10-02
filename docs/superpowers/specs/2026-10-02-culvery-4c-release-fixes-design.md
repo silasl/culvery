@@ -37,7 +37,7 @@ The user tests on the tablet only once there is a product they are happy to use;
 ### 3.1 Signing (D4)
 
 - `app/build.gradle.kts` gains a `release` signing config read from Gradle properties `culvery.release.storeFile`, `culvery.release.storePassword`, `culvery.release.keyAlias`, `culvery.release.keyPassword`.
-- When a release task runs and any is missing, the build fails with: "Release signing isn't set up: add culvery.release.storeFile, storePassword, keyAlias and keyPassword to ~/.gradle/gradle.properties (see docs/setup/release.md)." Debug builds and the unit-test gate never read them.
+- When a release task runs and any is missing, the build fails with: "Release signing isn't set up: add culvery.release.storeFile, storePassword, keyAlias and keyPassword to ~/.gradle/gradle.properties (see docs/setup/release.md)." Debug builds and the unit-test gate never need them (once set, Gradle reads them while configuring and keeps them in its encrypted, gitignored configuration cache).
 - `tools/new-release-key.sh` (a wizard script) walks the user through `keytool`: the user types the passwords; the script prints the four property lines to add and the key's SHA-1. No password is passed on a command line Claude runs or written to the repo.
 - `versionName = "1.0.0-beta1"`, `versionCode = 2`.
 
