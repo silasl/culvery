@@ -1,13 +1,22 @@
 package uk.co.siland.culvery.capability.calendar
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.util.concurrent.CountDownLatch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -35,6 +44,9 @@ class CalendarRepositoryTest {
     private val london = ZoneId.of("Europe/London")
     private val window = DateRange(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 10, 15), london)
     private fun sept(day: Int) = LocalDate.of(2026, 9, day)
+
+    // Dispatchers.Default runs max(2, cores) threads.
+    private val DEFAULT_POOL_SIZE = Runtime.getRuntime().availableProcessors().coerceAtLeast(2)
 
     @Before
     fun setUp() = runTest {
@@ -83,6 +95,40 @@ class CalendarRepositoryTest {
 
     private suspend fun put(sourceId: String, vararg events: RemoteEvent) =
         store.applySync("c1", sourceId, window, SyncResult(events.toList(), emptyList(), null, fullReplace = true))
+
+    /** P4: a pass that only records its time (markSynced) changes nothing on screen, so nothing is re-sent. */
+    @Test
+    fun aPassThatOnlyMarksTheSyncTimeSendsNothing() = runTest {
+        put("s-family", timed("Boiler service", 23, 10, 0, 60))
+        repo.days(sept(23), 1).test {
+            assertThat(awaitItem().single().events.map { it.title }).containsExactly("Boiler service")
+            store.markSynced("c1", 5_000L)
+            put("s-family", timed("Boiler service", 23, 10, 0, 60), timed("Swim", 23, 16, 0, 60))
+            // An equal list from the sync time's write would arrive first and fail this.
+            assertThat(awaitItem().single().events.map { it.title }).containsExactly("Boiler service", "Swim").inOrder()
+        }
+    }
+
+    /** U7: with every Default thread busy, the mapping can only finish once one is free, so it is not running on the caller's thread. */
+    @Test
+    fun theDaysAreMappedOnTheDefaultDispatcher() = runTest {
+        put("s-family", timed("Boiler service", 23, 10, 0, 60))
+        val release = CountDownLatch(1)
+        val parked = CountDownLatch(DEFAULT_POOL_SIZE)
+        val scope = CoroutineScope(Dispatchers.Default)
+        repeat(DEFAULT_POOL_SIZE) { scope.launch { parked.countDown(); release.await() } }
+        parked.await()
+        val shown = async(Dispatchers.IO) { repo.days(sept(23), 1).first() }
+        try {
+            // Nothing to observe while it is stuck, so this waits a short real time to see that it stays so.
+            withContext(Dispatchers.IO) { delay(300) }
+            assertThat(shown.isCompleted).isFalse()
+        } finally {
+            release.countDown()
+        }
+        assertThat(withContext(Dispatchers.IO) { withTimeout(5_000) { shown.await() } }.single().events.map { it.title })
+            .containsExactly("Boiler service")
+    }
 
     @Test
     fun dayListsEventsInStartOrderWithLabelsAndPeople() = runTest {

@@ -5,11 +5,13 @@ import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
@@ -84,9 +86,12 @@ class CalendarRepository @Inject constructor(
             }
         }
     }
+        // 4c 4.4: a pass that only records its time changes nothing on screen (P4), and the mapping runs off Main (U7).
+        .distinctUntilChanged()
+        .flowOn(Dispatchers.Default)
 
     fun week(start: LocalDate): Flow<WeekUi> =
-        combine(days(start, 7), household.people) { days, people -> WeekUi(start, days, people + Person.Family) }
+        combine(days(start, 7), household.people) { days, people -> WeekUi(start, days, people + Person.Family) }.distinctUntilChanged()
 
     /**
      * One event for the detail sheet, a queued create not yet synced included; null once it is gone or queued for
