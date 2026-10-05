@@ -112,6 +112,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - "Delete this and following" on a phone: Google ends the series with UNTIL rather than cancelling it; check the trailing instances leave the tablet.
 - The `onCreate` hand-over (a standard-task Culvery created while Culvery is already home) couldn't be triggered on API 35; unit-tested only.
 - The R8 build's sign-in, sync, writes and weather on the tablet.
+- The two home-app toasts in `KioskLifecycle.kt` (`HOME_APP_NOT_SET`, `HOME_APP_SCREEN_MISSING`) name Settings › Apps › Default apps; on One UI it's "Choose default apps". Check the wording on the SM-T510.
 - An optional short API 30 emulator pass (no Google): the splash compat path, Choose home app, pinning, DM Sans weights. Offered, not done.
 
 **GitHub and Google (owner actions, not code)**
