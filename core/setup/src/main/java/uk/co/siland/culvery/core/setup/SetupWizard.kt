@@ -71,13 +71,11 @@ fun SetupWizard(steps: List<SetupStep>, gate: SetupSessionGate, progress: SetupS
         .collectAsState(initial = null).value
     val scope = rememberCoroutineScope()
     val passed: (Int) -> Unit = { index ->
-        if (index > (passedThrough ?: -1)) {
-            scope.launch {
-                try {
-                    progress.markPassed(steps[index].id)
-                } catch (e: IOException) {
-                    Log.w(TAG, "Couldn't save how far setup got (${e::class.simpleName})")
-                }
+        scope.launch {
+            try {
+                progress.markPassed(steps[index].id, steps.map { it.id })
+            } catch (e: IOException) {
+                Log.w(TAG, "Couldn't save how far setup got (${e::class.simpleName})")
             }
         }
     }

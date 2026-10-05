@@ -9,6 +9,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -26,12 +29,14 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExternalResource
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.Identified
@@ -76,24 +81,40 @@ private class FakeStep(
     }
 }
 
+/**
+ * The setup file held in memory, so the wizard's writes don't meet Windows' file locks (DataStore's rename can fail on a
+ * write straight after another; SetupStateTest covers the real file). [restart] is a new store over the same contents,
+ * as after a kill. [edits] counts the edits that have finished.
+ */
+private class MemoryStore(private val file: MutableStateFlow<Preferences> = MutableStateFlow(emptyPreferences())) : DataStore<Preferences> {
+    val edits = MutableStateFlow(0)
+    private val writing = Mutex()
+    override val data: Flow<Preferences> = file
+
+    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences = writing.withLock {
+        transform(file.value).also {
+            file.value = it
+            edits.update { n -> n + 1 }
+        }
+    }
+
+    fun restart() = MemoryStore(file)
+}
+
 // The gate reads Room, so each test waits for the wizard's first content before checking or tapping it.
 @RunWith(AndroidJUnit4::class)
 class SetupWizardTest {
-    @get:Rule(order = 0) val folder = TemporaryFolder()
-
     // After the compose rule has disposed the composition: no query can outlive the database.
-    @get:Rule(order = 1) val closing = object : ExternalResource() {
+    @get:Rule(order = 0) val closing = object : ExternalResource() {
         override fun after() {
             scope.cancel()
-            states.close()
             db.close()
         }
     }
 
-    @get:Rule(order = 2) val compose = createComposeRule()
+    @get:Rule(order = 1) val compose = createComposeRule()
     private lateinit var db: HouseholdDatabase
     private lateinit var household: HouseholdRepository
-    private lateinit var states: SetupStates
     private lateinit var access: TestAccess
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private val overlay = RecordingOverlay()
@@ -102,23 +123,25 @@ class SetupWizardTest {
     fun setUp() {
         db = householdDb()
         household = HouseholdRepository(db)
-        states = SetupStates(folder, household)
         access = TestAccess(household, WallClock { System.currentTimeMillis() }, scope).also { it.listen(scope) }
     }
 
     private fun show(vararg steps: SetupStep, gate: SetupSessionGate = SetupSessionGate(household, access.control)) {
-        val progress = runBlocking { states.start() }
+        val progress = SetupState(MemoryStore(), household)
         compose.setContent {
             CompositionLocalProvider(LocalOverlayHost provides overlay) { CulveryTheme(dark = true) { SetupWizard(steps.toList(), gate, progress) } }
         }
     }
 
-    /** The wizard in a [key] the test can change: a new value is a new instance, with nothing saved but the setup file. */
-    private fun showAgainAndAgain(steps: List<SetupStep>, progress: () -> SetupState, instance: () -> Int) {
+    /**
+     * The wizard in a [key] the test can change: a new value is a new instance, with nothing saved but [progress].
+     * No wizard shows while [progress] is null.
+     */
+    private fun showAgainAndAgain(steps: List<SetupStep>, progress: () -> SetupState?, instance: () -> Int) {
         val gate = SetupSessionGate(household, access.control)
         compose.setContent {
             CompositionLocalProvider(LocalOverlayHost provides overlay) {
-                CulveryTheme(dark = true) { key(instance()) { SetupWizard(steps, gate, progress()) } }
+                CulveryTheme(dark = true) { progress()?.let { key(instance()) { SetupWizard(steps, gate, it) } } }
             }
         }
     }
@@ -220,7 +243,8 @@ class SetupWizardTest {
             FakeStep("household", 2, skippable = true),
             FakeStep("done", 3),
         )
-        var progress by mutableStateOf(runBlocking { states.start() })
+        val store = MemoryStore()
+        var progress by mutableStateOf<SetupState?>(SetupState(store, household))
         var instance by mutableIntStateOf(0)
         showAgainAndAgain(steps, { progress }, { instance })
         compose.awaitText("Step location")
@@ -228,10 +252,12 @@ class SetupWizardTest {
         compose.awaitText("Step household")
         compose.onNodeWithTag("wizard_skip").performClick()
         compose.awaitText("Step done")
-        val saved = progress
-        compose.waitUntil(5_000) { runBlocking { saved.passedStep.first() } == "household" }
-        // After a kill: a new DataStore over the same file.
-        progress = runBlocking { states.start() }
+        // The writes run on the main thread's coroutines, so wait while the compose rule keeps that thread going.
+        compose.waitUntil(5_000) { store.edits.value == 2 }
+        // A kill: the wizard goes, then a new store over the same contents.
+        progress = null
+        compose.waitForIdle()
+        progress = SetupState(store.restart(), household)
         instance++
         compose.awaitText("Step done")
         compose.onNodeWithText("Step location").assertDoesNotExist()
@@ -244,7 +270,8 @@ class SetupWizardTest {
     @Test
     fun backThenANewInstanceResumesAfterTheFurthestStepPassed() {
         val steps = listOf(FakeStep("a", 0, skippable = true), FakeStep("b", 1, skippable = true), FakeStep("c", 2))
-        val progress = runBlocking { states.start() }
+        val store = MemoryStore()
+        val progress = SetupState(store, household)
         var instance by mutableIntStateOf(0)
         showAgainAndAgain(steps, { progress }, { instance })
         compose.awaitText("Step a")
@@ -252,14 +279,14 @@ class SetupWizardTest {
         compose.awaitText("Step b")
         compose.onNodeWithTag("wizard_skip").performClick()
         compose.awaitText("Step c")
-        compose.waitUntil(5_000) { runBlocking { progress.passedStep.first() } == "b" }
         compose.onNodeWithTag("wizard_back").performClick()
         compose.awaitText("Step b")
         compose.onNodeWithTag("wizard_back").performClick()
         compose.awaitText("Step a")
         compose.onNodeWithTag("wizard_skip").performClick()
         compose.awaitText("Step b")
-        compose.waitForIdle()
+        // a, b, then a again have all reached the store; the last changed nothing.
+        compose.waitUntil(5_000) { store.edits.value == 3 }
         assertThat(runBlocking { progress.passedStep.first() }).isEqualTo("b")
         instance++
         compose.awaitText("Step c")
@@ -268,7 +295,7 @@ class SetupWizardTest {
     /** 4a's rule holds: a step passed before whose required input has gone can't be passed over on resume. */
     @Test
     fun aPassedStepThatCanNoLongerGoOnIsWhereItResumes() {
-        val progress = runBlocking { states.start().also { it.markPassed("you") } }
+        val progress = SetupState(MemoryStore(), household).also { runBlocking { it.markPassed("you", listOf("welcome", "you", "done")) } }
         val steps = listOf(FakeStep("welcome", 0, done = true), FakeStep("you", 1, ready = false), FakeStep("done", 2))
         showAgainAndAgain(steps, { progress }, { 0 })
         compose.awaitText("Step you")
@@ -330,7 +357,7 @@ class SetupWizardTest {
     fun aRestoredWizardAsksForThePinAgain() {
         // No setup session: the wizard is let in by the gate's PIN pad, as after a kill.
         runBlocking { access.addAdmin() }
-        val progress = runBlocking { states.start() }
+        val progress = SetupState(MemoryStore(), household)
         val restoration = StateRestorationTester(compose)
         restoration.setContent {
             CompositionLocalProvider(LocalOverlayHost provides overlay) {

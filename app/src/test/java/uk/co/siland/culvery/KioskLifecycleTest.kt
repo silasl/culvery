@@ -16,13 +16,17 @@ import org.robolectric.Shadows.shadowOf
 class KioskLifecycleTest {
     private class RecordingWindow : KioskWindow {
         val calls = mutableListOf<String>()
+        var homeStarts = true
         override fun pin() { calls += "pin" }
         override fun unpin() { calls += "unpin" }
         override fun hideBars() { calls += "hideBars" }
         override fun showBars() { calls += "showBars" }
         override fun moveToBack() { calls += "moveToBack" }
         override fun allowPlayServices(allowed: Boolean) { calls += "allowPlayServices($allowed)" }
-        override fun startHome() { calls += "startHome" }
+        override fun startHome() {
+            if (!homeStarts) throw ActivityNotFoundException()
+            calls += "startHome"
+        }
         override fun finishTask() { calls += "finishTask" }
     }
 
@@ -45,7 +49,7 @@ class KioskLifecycleTest {
         isDeviceOwner = { owner },
         kioskExited = { exited },
         returnedToFront = { exited = false },
-        front = front,
+        front = { front },
         changingConfigurations = { changing },
         say = { said += it },
     )
@@ -287,6 +291,51 @@ class KioskLifecycleTest {
         home = false
         window.calls.clear()
         assertThat(kioskFor().handOverToHome()).isFalse()
+        assertThat(window.calls).isEmpty()
+    }
+
+    /**
+     * Review: Culvery made home in Settings while an old standard-task Culvery lives on; that task brought back from
+     * recents (or by Settings' Open, with no onCreate) hands over rather than pinning a second Culvery.
+     */
+    @Test
+    fun aResumeOutsideTheHomeTaskOnceCulveryIsHomeHandsOver() {
+        inHomeTask = false
+        home = false
+        controller.pause().stop()
+        home = true
+        window.calls.clear()
+        controller.start().resume()
+        assertThat(window.calls).containsExactly("startHome", "finishTask").inOrder()
+    }
+
+    /** The instance that hands over in onCreate starts no shell work: neither the front tracker nor the view model. */
+    @Test
+    fun aHandOverReadsNothingOfTheShell() {
+        inHomeTask = false
+        val kiosk = KioskLifecycle(
+            window,
+            setupComplete = { error("setup read") },
+            isHomeApp = { true },
+            inHomeTask = { false },
+            isDeviceOwner = { error("owner read") },
+            kioskExited = { error("shell read") },
+            returnedToFront = { error("shell read") },
+            front = { error("shell read") },
+            changingConfigurations = { false },
+            say = { error("toast") },
+        )
+        assertThat(kiosk.handOverToHome()).isTrue()
+    }
+
+    /** Review: no home screen to start (it can't, but if it did) leaves this instance as it was, not half handed over. */
+    @Test
+    fun aHomeThatWontStartLeavesThisInstanceInCharge() {
+        inHomeTask = false
+        window.homeStarts = false
+        window.calls.clear()
+        assertThat(kiosk.handOverToHome()).isFalse()
+        assertThat(kiosk.handedOver).isFalse()
         assertThat(window.calls).isEmpty()
     }
 

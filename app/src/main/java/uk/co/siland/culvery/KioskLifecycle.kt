@@ -59,7 +59,7 @@ internal class KioskLifecycle(
     private val isDeviceOwner: () -> Boolean,
     private val kioskExited: () -> Boolean,
     private val returnedToFront: () -> Unit,
-    private val front: FrontTracker,
+    private val front: () -> FrontTracker,
     private val changingConfigurations: () -> Boolean,
     private val say: (String) -> Unit,
 ) : DefaultLifecycleObserver {
@@ -71,18 +71,19 @@ internal class KioskLifecycle(
 
     // A stop for a configuration change is the same activity coming straight back, so it doesn't count as leaving.
     override fun onStop(owner: LifecycleOwner) {
-        if (!changingConfigurations()) front.left = true
+        if (!changingConfigurations()) front().left = true
     }
 
     override fun onStart(owner: LifecycleOwner) {
-        if (!front.left) return
-        front.left = false
+        if (!front().left) return
+        front().left = false
         returnedToFront()
     }
 
     override fun onResume(owner: LifecycleOwner) {
         resumed = true
-        if (handedOver) return
+        // Also an old standard-task Culvery brought back (recents, Settings' Open) after Culvery became home elsewhere.
+        if (handOverToHome()) return
         // Culvery is back in front, however Google's screens ended: Play services is no longer allowed in lock-task.
         if (isDeviceOwner()) window.allowPlayServices(false)
         if (!kioskExited()) window.hideBars()
@@ -158,8 +159,13 @@ internal class KioskLifecycle(
     fun handOverToHome(): Boolean {
         if (handedOver) return true
         if (!isHomeApp() || inHomeTask()) return false
+        try {
+            window.startHome()
+        } catch (e: ActivityNotFoundException) {
+            Log.w(TAG, "No home screen to hand over to (${e::class.simpleName})")
+            return false
+        }
         handedOver = true
-        window.startHome()
         window.finishTask()
         return true
     }

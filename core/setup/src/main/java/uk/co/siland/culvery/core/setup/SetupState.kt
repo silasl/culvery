@@ -89,8 +89,12 @@ class SetupState(private val store: DataStore<Preferences>, private val househol
      */
     val passedStep: Flow<String?> = prefs.map { it[PASSED] }.distinctUntilChanged()
 
-    suspend fun markPassed(stepId: String) {
-        store.edit { it[PASSED] = stepId }
+    /** Records [stepId] as passed if it is further in [order] (the wizard's step ids) than the furthest stored. */
+    suspend fun markPassed(stepId: String, order: List<String>) {
+        store.edit { stored ->
+            val furthest = stored[PASSED]?.let(order::indexOf) ?: -1
+            if (order.indexOf(stepId) > furthest) stored[PASSED] = stepId
+        }
     }
 
     suspend fun markComplete() {

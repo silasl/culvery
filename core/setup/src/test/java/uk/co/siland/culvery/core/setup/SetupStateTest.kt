@@ -36,6 +36,8 @@ private class FailingWrites(private val real: DataStore<Preferences>) : DataStor
     }
 }
 
+private val ORDER = listOf("welcome", "location", "you", "household", "calendar.connect", "done")
+
 // Robolectric for Room.
 @RunWith(AndroidJUnit4::class)
 class SetupStateTest {
@@ -129,8 +131,19 @@ class SetupStateTest {
     fun theFurthestStepPassedIsRememberedAcrossARestart() = runTest {
         val first = start()
         assertThat(first.passedStep.first()).isNull()
-        first.markPassed("household")
+        first.markPassed("household", ORDER)
         assertThat(start().passedStep.first()).isEqualTo("household")
+    }
+
+    /** Skip, Back, Skip: passing an earlier step again never moves the furthest back, whatever the wizard last read. */
+    @Test
+    fun anEarlierStepPassedAgainLeavesTheFurthest() = runTest {
+        val state = start()
+        state.markPassed("household", ORDER)
+        state.markPassed("location", ORDER)
+        assertThat(state.passedStep.first()).isEqualTo("household")
+        state.markPassed("calendar.connect", ORDER)
+        assertThat(state.passedStep.first()).isEqualTo("calendar.connect")
     }
 
     @Test
