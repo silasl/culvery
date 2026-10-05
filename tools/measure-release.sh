@@ -5,7 +5,7 @@
 # services crashes logcat showed during the run), then gfxinfo's p50/p90 and Dalvik and native PSS after the last start.
 # TotalTime ends at the first real draw, which is Home with its cards; "Fully drawn" is the same moment reported by the app.
 # A run with Play services crashes is noisy: repeat it. It only stops and starts Culvery. Takes about two minutes.
-# Usage: bash tools/measure-release.sh [serial]   (default emulator-5554)
+# Usage: bash tools/measure-release.sh [serial]   (default emulator-5554; install the signed release on it first)
 set -Eeuo pipefail
 
 SERIAL=${1:-emulator-5554}

@@ -120,7 +120,7 @@ The plan records, on the emulator: **before** on a signed release with R8 off an
 ### 5.4 Kiosk fixes (K1–K4)
 
 - K1: when not pinned (debug, after Exit kiosk) the root pads by `WindowInsets.systemBars`.
-- K2: `kioskExited` lives in a `SavedStateHandle`, so a configuration change keeps it.
+- K2: `kioskExited` is a `ShellViewModel` field, so a configuration change keeps it and a process death forgets it: a tablet killed while unpinned pins again when Culvery is next in front. *(Plan ruling 6: a `SavedStateHandle` would restore "exited" after a process death.)*
 - K3: `LockoutStore` treats a stored `lockedUntil` more than 16 minutes in the future as expired.
 - K4: `LockoutStore` keeps an in-memory mirror and writes with `apply()`; no disk I/O on Main.
 
@@ -134,8 +134,8 @@ The plan records, on the emulator: **before** on a signed release with R8 off an
 
 ### 6.2 No nightly full resync (E2, P9, C2)
 
-- The sync cursor's key drops the window's start date (`CalendarStore.kt` keys it `"$start|${zone.id}"` today, so every source fully resyncs at local midnight). A source's sync token lives until Google answers 410 (the existing full-resync path), the source changes, or the household zone changes.
-- After each pass, stored events that end before the window starts or start after it ends (today −1 to +14 days, household zone) are deleted, so incremental results outside the window don't accumulate. The plan checks how Google's incremental results relate to the first request's `timeMin`/`timeMax`.
+- The sync cursor's key drops the window's start date (`CalendarStore.kt` keys it `"$start|${zone.id}"` today, so every source fully resyncs at local midnight). A source's sync token lives until Google answers 410 (the existing full-resync path), the source changes, the household zone changes, or the window moves past what its full sync read (below).
+- A full sync reads the window (today −1 to +28 days, household zone, §6.6) and 42 days more (`SYNC_AHEAD_DAYS`); the cursor's key is what was read and the zone, and the cursor serves while what was read still covers the window in the same zone. After each pass, stored events that end before the window starts or start at or after the end of what was read are deleted, so incremental results outside it don't accumulate; what was read past the window stays, as no incremental result would bring it back. *(Plan ruling 1: Google's incremental results carry changes at any date and nothing about unchanged events, so pruning to the window alone would lose events for good.)*
 - *(D11)* The series-rule cache is not seeded; a full sync fetches each series' rule as today, now about once per token lifetime instead of nightly.
 - `calendar.db` v6 (with §6.4): `MIGRATION_5_6` clears the stored cursors (one full sync per source on the first start) and adds `source.readProblem`. Hand-written, with a `MigrationTestHelper` test, as the repo requires.
 

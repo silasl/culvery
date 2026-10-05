@@ -54,10 +54,12 @@ After setup, the Done step (and Settings › Kiosk) shows "Make Culvery the home
 
 ## 6. Device owner (optional)
 
-As device owner, Culvery allowlists itself (and Google Play services, for the account chooser) for lock-task, so pinning needs no confirmation and can't be undone with Back + Overview. It needs a **freshly reset tablet with no accounts on it yet**: set the tablet up without signing in to Google, install the release, then:
+As device owner, Culvery allowlists itself for lock-task, so pinning needs no confirmation and can't be undone with Back + Overview. Google Play services is allowed in too, but only while Google's account chooser is open during Connect or Reconnect. It needs a **freshly reset tablet with no accounts on it yet**: set the tablet up without signing in to Google, install the release, then:
 
 ```bash
 adb shell dpm set-device-owner uk.co.siland.culvery/.CulveryDeviceAdmin
 ```
+
+Install the release before running `dpm`: the command needs Culvery's admin component on the tablet, and a device-owner app can't be uninstalled, so a debug build made owner can't be replaced by the release (it is signed with another key) without a factory reset.
 
 Add the family's Google account afterwards (Settings › Accounts). Undoing device owner needs a factory reset. Without it, screen pinning works as described in the README's Kiosk section.
