@@ -2,11 +2,15 @@
 
 Items raised while Plan 1 (foundation) was built and reviewed. They were deferred on purpose and are for the plan that first touches the area.
 
-## For Plan 2 (Calendar capability)
+## From Plan 1 (deferred)
+
+**For Plan 4d (design, UX and accessibility)**
 - `HhIcon` clears semantics and takes no content description. Icon-only buttons need an accessible label.
+- Home header: the gap between the clock and the date is about 55 dp on the emulator, against about 12 dp in the hand-off, so the grid sits roughly 40 dp too low. The line-height trim on `HhType.clock` isn't taking effect. Found on the emulator; both AVDs show it.
+
+**Later**
 - The shell composables (`NavRail`, `StatusBar`, `SettingsPlaceholder`) have no UI tests, although the test tags exist. Cover them with the Roborazzi setup.
 - Set a module-wide Robolectric viewport default (`w1280dp-h800dp`) so each test class doesn't need its own `@Config`.
-- Home header: the gap between the clock and the date is about 55 dp on the emulator, against about 12 dp in the hand-off, so the grid sits roughly 40 dp too low. The line-height trim on `HhType.clock` isn't taking effect. Found on the emulator; both AVDs show it.
 
 ## From Plan 2a review (deferred)
 
@@ -17,7 +21,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **For Plan 4e (the device)**
 - An on-device SM-T510 pass of the calendar UI.
 
-**For the end-of-v1 design and UX review**
+**For Plan 4d (design, UX and accessibility)**
 - `opsz` axis for large text.
 
 ## From Plan 2b-1 (deferred)
@@ -25,7 +29,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **For Plan 4e (the device)**
 - Check DM Sans weights and bold-text truncation on an API 30 AVD (Google Play image); the 2b-1 walkthrough ran on API 35.
 
-**Accessibility pass (with the `HhIcon` item)**
+**For Plan 4d (design, UX and accessibility)**
 - Clickable event rows and week chips have no `Role.Button`.
 - The event detail sheet doesn't scroll. It fits today; longer titles and 2b-2's fields won't.
 
@@ -47,7 +51,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - 5-minute steps on the time picker's minutes (15-minute steps today).
 - Multi-day all-day events: an **Until…** chip when All day is chosen, picking the end date. Multi-day timed events stay on the phone.
 
-**Accessibility pass (with the `HhIcon` item)**
+**For Plan 4d (design, UX and accessibility)**
 - Disabled Who chips lack disabled semantics.
 - `AddEventButton` lacks an `onClickLabel`.
 
@@ -69,7 +73,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - The wizard's steps and Settings' pages on the SM-T510 with the Samsung keyboard up (the town search, the person sheet's name field).
 - Play services "NetworkCapability 37" crash-loops recur on API 35 emulator images whenever Play Store re-updates Play services; Culvery copes (calls fail and retry), but connecting needs a working Play services.
 
-**For the end-of-v1 design and UX review**
+**For Plan 4d (design, UX and accessibility)**
 - All 4a layout, colour and copy choices are provisional (wizard padding, rows, swatches, role-chip lines, Settings column, the five extra person colours, the Connect step's connected card — its title wraps onto two lines).
 - Settings page list items have no `Role.Tab` (accessibility), alongside the existing accessibility items.
 - The calendar's DeleteButton keeps its danger text while disabled; the shared HhSheetButton greys out — pick one.
@@ -81,12 +85,10 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - The weather on the SM-T510: the header and the Forecast card at its density, and the fetch over a whole day on the wall.
 - On a cold start the clock, the date and the theme show the device's zone for a moment, until Room answers with the household's (`ShellViewModel.now` starts from `LocalDateTime.now()`). Accepted in 4b; check on the SM-T510 whether it shows.
 
-**For the end-of-v1 design and UX review**
+**For Plan 4d (design, UX and accessibility)**
 - All 4b layout, colour and copy choices are provisional: the Forecast card's rows, its title in every state, the card's icons in sun amber like the header's, the TalkBack condition words, the header items' spacing and divider.
 - The Forecast card has a lot of empty space below its three rows.
 - Header items could overlap the clock or date if they grow wide (design review, before Climate).
-
-**Accessibility pass (with the `HhIcon` item)**
 - The header weather item has no merged TalkBack description: the temperature and High/Low read as two separate items.
 - The Forecast row semantics test probes only the day label; also assert that "17°" is absent (count 0).
 
@@ -117,6 +119,30 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 **Later**
 - Google Calendar's sync token now lives about six weeks; check quota and data use over a month on the wall (Appendix A's economy estimate assumed a nightly full read).
+
+## From Plan 4c (code minors)
+
+**For Plan 4d (design, UX and accessibility)**
+- T14: time spent in the add/edit overlay counts as idle, so the Calendar tab's 2-minute return to this week can fire under it (`CardHosts.kt`, `WeekView.kt`).
+- T16: the gap above the read-problem danger line is uneven (`ReviewCalendars.kt`).
+- The unpinned window behind Android's home-role dialog: **Choose home app** unpins while Culvery isn't home yet, so a Home press on the dialog lands on the old launcher, unpinned (`KioskLifecycle.kt` `openHomeAppScreen`). Same walk-away class as 4c ruling 10 (no timeout on the unpinned window while Google's chooser shows, without device owner); decide both together with the user.
+
+**Tests and hardening**
+- T1: `tools/measure-release.sh` uses `$LOCALAPPDATA` under `set -u`, so it stops on macOS or Linux when adb isn't on PATH; use `${LOCALAPPDATA:-}`.
+- T2: the icon literal guard misses ternary and positional literals (`icon = if (…) "x" else "y"`, `PrimaryButton("Edit", "edit")`); scan for any snake_case literal that is a full-font ligature but not in `Icons` (`IconFontTest.kt`).
+- T2: `NO_FILLED_FORM` can go stale; assert none of its entries has a filled form and all are in `Icons` (`IconFontTest.kt`).
+- T3: `LogHygieneTest` doesn't check the tag argument, and its call regex is whitespace-sensitive (`build-logic/convention/src/test/kotlin/LogHygieneTest.kt`).
+- T8: test that a K3 expiry keeps the failure count, and that K4 reads the store once (`LockoutStoreTest.kt`).
+- T9: the `isRoleAvailable` half of Choose home app's check is untested (`MainActivity.kt` `openHomeAppScreen`).
+- T14: `WeekViewHost`'s `onEveryTouch` wiring is untested at host level (`CardHosts.kt`).
+- T14: `addedToast` calls `zone.current()` outside `onAppScope`'s try, unlike `master()` and `authorise` (`CalendarEditor.kt`).
+- T15: a read-only NeedsSignIn whose reads recover while queued writes keep failing for other reasons stays NeedsSignIn, and the 48-hour ageing freezes until a reconnect (bounded: the chip shows) (`CalendarStore.kt` `markSynced`, `Writes.kt`).
+- T15: `writeAccepted` sits in the same try as `applyAcceptedWrite`, so its own failure logs misleadingly (`CalendarSync.kt`, `CalendarStore.kt`); `ZONE_MARGIN_MS` is untested (`CalendarRepository.kt`); `markSynced`'s fold after Unreachable following NeedsSignIn lost its test (`CalendarStoreTest.kt`).
+- T16: a calendar deleted after it was flagged unreadable leaves only at the daily refresh (`SourceRefresher.kt`); the master-gone toast's count includes other removed calendars' changes (`CalendarStore.kt`).
+- T17: `move`'s Cancelled and failure paths are untested (`PeopleEditorTest.kt`).
+- T18: the town search's fill after a save overwrites text typed while the save ran (`LocationPane.kt`); `StepsUiTest`'s `after()` masks a `setUp` failure (`StepsUiTest.kt`); `restartExpiry` picks its timeout from a setup flag read before the lock (not reachable today) (`DefaultAccessControl.kt`).
+- Add `android:dataExtractionRules` (`res/xml/data_extraction_rules.xml`) excluding every domain from cloud backup and device transfer: `allowBackup="false"` doesn't stop device-to-device transfer on Android 12+ for targetSdk 31+ (`AndroidManifest.xml`; `docs/privacy.html` now says some tablets may copy the data). Verify on the SM-T510.
+- `MainActivity.onResume` refreshes the home role after `super.onResume()` and relies on API 29+ sending ON_RESUME after it returns, so `KioskLifecycle.onResume` sees the new role; add a one-line comment, or refresh inside the `isHomeApp` read (`MainActivity.kt`).
 
 ## Feature ideas (2026-10-02, after v1)
 
