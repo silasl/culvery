@@ -103,6 +103,8 @@ The plan records, on the emulator: **before** on a signed release with R8 off an
 - Settings › Kiosk gains **Change home app** (fresh Admin PIN), to go back to the normal launcher.
 - **Exit kiosk** unpins. When Culvery is the home app it stays in front, unpinned with the system bars showing (moving to the back would resume Culvery as home and pin again at once); otherwise it moves to the back as today. Culvery pins again the next time it comes to the front after leaving it.
 
+- *(Walkthrough, 2026-10-05.)* One Culvery on screen: when Culvery is the default home app but an instance isn't in the home task (granting the role, or a launcher, recents or Settings start), it starts HOME and closes its own task; the home instance is the only one left. The wizard keeps the furthest step passed (Next or Skip for now) and resumes after it — amending 4a §3.3's "first shown step whose done is false"; a step whose required input is missing still can't be passed, and unsaved input on the current step isn't carried across.
+
 ### 5.2 Device owner (optional)
 
 - A `DeviceAdminReceiver` (`CulveryDeviceAdmin`) with no policies beyond lock-task is declared.
