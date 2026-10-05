@@ -6,7 +6,7 @@ import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.household.HouseholdRepository
 
 /** A step as the wizard reads it at this moment. */
-internal data class StepStatus(val shown: Boolean, val done: Boolean, val canGoOn: Boolean)
+internal data class StepStatus(val shown: Boolean, val done: Boolean, val canGoOn: Boolean, val skippable: Boolean = false)
 
 /** The forward button: the step's own label, enabled or not, or "Skip for now". */
 internal sealed interface Forward {
@@ -17,9 +17,16 @@ internal sealed interface Forward {
 
 /** 4a design §3.3 as plain functions of the steps' statuses, in order. */
 internal object WizardRules {
-    /** The first shown step not done; with every shown step done, the last shown one. */
-    fun resumeAt(statuses: List<StepStatus>): Int =
-        statuses.indexOfFirst { it.shown && !it.done }.takeIf { it >= 0 } ?: statuses.indexOfLast { it.shown }.coerceAtLeast(0)
+    /**
+     * The first shown step neither done nor passed; with none left, the last shown one. A step up to [passedThrough]
+     * (the furthest passed, -1 for none) counts as passed only while it could be passed again: skippable, or able to go
+     * on.
+     */
+    fun resumeAt(statuses: List<StepStatus>, passedThrough: Int = -1): Int {
+        val cleared = { i: Int, s: StepStatus -> s.done || (i <= passedThrough && (s.skippable || s.canGoOn)) }
+        return statuses.withIndex().firstOrNull { (i, s) -> s.shown && !cleared(i, s) }?.index
+            ?: statuses.indexOfLast { it.shown }.coerceAtLeast(0)
+    }
 
     fun nextShown(from: Int, statuses: List<StepStatus>): Int? = (from + 1 until statuses.size).firstOrNull { statuses[it].shown }
 

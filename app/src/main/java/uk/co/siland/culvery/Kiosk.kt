@@ -1,6 +1,7 @@
 package uk.co.siland.culvery
 
 import android.app.ActivityManager
+import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -39,6 +40,13 @@ internal class ActivityKioskWindow(private val activity: ComponentActivity) : Ki
     override fun showBars() = activity.showSystemBars()
 
     override fun allowPlayServices(allowed: Boolean) = allowPlayServicesInLockTask(activity, allowed)
+
+    override fun startHome() {
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(activity.packageName)
+        activity.startActivity(home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    override fun finishTask() = activity.finishAndRemoveTask()
 
     override fun moveToBack() {
         activity.moveTaskToBack(true)

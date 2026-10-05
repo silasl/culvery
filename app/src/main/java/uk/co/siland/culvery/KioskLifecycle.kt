@@ -1,6 +1,7 @@
 package uk.co.siland.culvery
 
 import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -19,7 +20,20 @@ internal interface KioskWindow {
 
     /** Device owner only: whether Play services may run in lock-task (4c §5.2). */
     fun allowPlayServices(allowed: Boolean)
+
+    /** Opens the home task's Culvery, in front of this task. */
+    fun startHome()
+
+    /** Finishes this activity and takes its task out of recents. */
+    fun finishTask()
 }
+
+/**
+ * Whether the activity started with [intent] is in the home task. Android starts the home app with MAIN + HOME, and
+ * MainActivity is always its task's root, so its own starting intent is the task's base intent; a task's activity type
+ * isn't public API on 29–35.
+ */
+internal fun isHomeTask(intent: Intent?): Boolean = intent?.hasCategory(Intent.CATEGORY_HOME) == true
 
 /** Told when the home-app choice was declined or never shown (4c §5.1): what is still undone and how to do it. */
 internal const val HOME_APP_NOT_SET =
@@ -41,6 +55,7 @@ internal class KioskLifecycle(
     private val window: KioskWindow,
     private val setupComplete: () -> Boolean,
     private val isHomeApp: () -> Boolean,
+    private val inHomeTask: () -> Boolean,
     private val isDeviceOwner: () -> Boolean,
     private val kioskExited: () -> Boolean,
     private val returnedToFront: () -> Unit,
@@ -49,6 +64,10 @@ internal class KioskLifecycle(
     private val say: (String) -> Unit,
 ) : DefaultLifecycleObserver {
     private var resumed = false
+
+    /** This instance gave way to the home task's; it neither pins nor unpins again (it is finishing). */
+    var handedOver = false
+        private set
 
     // A stop for a configuration change is the same activity coming straight back, so it doesn't count as leaving.
     override fun onStop(owner: LifecycleOwner) {
@@ -63,6 +82,7 @@ internal class KioskLifecycle(
 
     override fun onResume(owner: LifecycleOwner) {
         resumed = true
+        if (handedOver) return
         // Culvery is back in front, however Google's screens ended: Play services is no longer allowed in lock-task.
         if (isDeviceOwner()) window.allowPlayServices(false)
         if (!kioskExited()) window.hideBars()
@@ -86,6 +106,7 @@ internal class KioskLifecycle(
      * paused, so nothing else would: lock-task goes back to Culvery alone, or an unpinned Culvery in front pins again.
      */
     fun returnToPinning() {
+        if (handedOver) return
         if (isDeviceOwner()) {
             window.allowPlayServices(false)
         } else if (resumed && shouldPin(setupComplete(), kioskExited())) {
@@ -108,6 +129,7 @@ internal class KioskLifecycle(
      * once: nothing pauses Culvery, so nothing else would.
      */
     fun openHomeAppScreen(launch: () -> Unit) {
+        if (handedOver) return
         window.unpin()
         try {
             launch()
@@ -119,9 +141,27 @@ internal class KioskLifecycle(
         }
     }
 
-    /** Android's role dialog closed: cancelled with Culvery still not home means it was refused or never shown. */
+    /**
+     * Android's role dialog closed: Culvery now home hands over to the home task; cancelled with Culvery still not home
+     * means it was refused or never shown.
+     */
     fun roleAnswered(cancelled: Boolean) {
+        if (handOverToHome()) return
         if (cancelled && !isHomeApp()) say(HOME_APP_NOT_SET)
+    }
+
+    /**
+     * One Culvery on screen (4a D8, 4c §5.1): Android keeps the home app in a home task of its own, so a Culvery that is
+     * home but started elsewhere (the launcher, Settings' Open, or the task that said yes to the role) opens the home
+     * task's instead and removes its own task. True when it handed over; the caller then does nothing more.
+     */
+    fun handOverToHome(): Boolean {
+        if (handedOver) return true
+        if (!isHomeApp() || inHomeTask()) return false
+        handedOver = true
+        window.startHome()
+        window.finishTask()
+        return true
     }
 
     private companion object {

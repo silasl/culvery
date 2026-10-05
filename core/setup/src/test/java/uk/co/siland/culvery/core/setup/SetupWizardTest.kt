@@ -3,6 +3,11 @@ package uk.co.siland.culvery.core.setup
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -20,11 +25,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.Identified
@@ -72,9 +79,21 @@ private class FakeStep(
 // The gate reads Room, so each test waits for the wizard's first content before checking or tapping it.
 @RunWith(AndroidJUnit4::class)
 class SetupWizardTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val folder = TemporaryFolder()
+
+    // After the compose rule has disposed the composition: no query can outlive the database.
+    @get:Rule(order = 1) val closing = object : ExternalResource() {
+        override fun after() {
+            scope.cancel()
+            states.close()
+            db.close()
+        }
+    }
+
+    @get:Rule(order = 2) val compose = createComposeRule()
     private lateinit var db: HouseholdDatabase
     private lateinit var household: HouseholdRepository
+    private lateinit var states: SetupStates
     private lateinit var access: TestAccess
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private val overlay = RecordingOverlay()
@@ -83,17 +102,25 @@ class SetupWizardTest {
     fun setUp() {
         db = householdDb()
         household = HouseholdRepository(db)
+        states = SetupStates(folder, household)
         access = TestAccess(household, WallClock { System.currentTimeMillis() }, scope).also { it.listen(scope) }
     }
 
-    @After
-    fun tearDown() {
-        scope.cancel()
-        db.close()
+    private fun show(vararg steps: SetupStep, gate: SetupSessionGate = SetupSessionGate(household, access.control)) {
+        val progress = runBlocking { states.start() }
+        compose.setContent {
+            CompositionLocalProvider(LocalOverlayHost provides overlay) { CulveryTheme(dark = true) { SetupWizard(steps.toList(), gate, progress) } }
+        }
     }
 
-    private fun show(vararg steps: SetupStep, gate: SetupSessionGate = SetupSessionGate(household, access.control)) = compose.setContent {
-        CompositionLocalProvider(LocalOverlayHost provides overlay) { CulveryTheme(dark = true) { SetupWizard(steps.toList(), gate) } }
+    /** The wizard in a [key] the test can change: a new value is a new instance, with nothing saved but the setup file. */
+    private fun showAgainAndAgain(steps: List<SetupStep>, progress: () -> SetupState, instance: () -> Int) {
+        val gate = SetupSessionGate(household, access.control)
+        compose.setContent {
+            CompositionLocalProvider(LocalOverlayHost provides overlay) {
+                CulveryTheme(dark = true) { key(instance()) { SetupWizard(steps, gate, progress()) } }
+            }
+        }
     }
 
     /** Alex, the Admin, in the setup session, as the You step leaves them. */
@@ -181,6 +208,72 @@ class SetupWizardTest {
         compose.onNodeWithText("Step review").assertExists()
     }
 
+    /**
+     * The emulator walkthrough: Location and Household skipped, then a second Culvery (the home task's) opened the
+     * wizard at Location again. Where the wizard got to is in the setup file, so a new instance opens at Done.
+     */
+    @Test
+    fun aNewInstanceResumesPastTheStepsSkippedBefore() {
+        val steps = listOf(
+            FakeStep("welcome", 0, done = true),
+            FakeStep("location", 1, skippable = true),
+            FakeStep("household", 2, skippable = true),
+            FakeStep("done", 3),
+        )
+        var progress by mutableStateOf(runBlocking { states.start() })
+        var instance by mutableIntStateOf(0)
+        showAgainAndAgain(steps, { progress }, { instance })
+        compose.awaitText("Step location")
+        compose.onNodeWithTag("wizard_skip").performClick()
+        compose.awaitText("Step household")
+        compose.onNodeWithTag("wizard_skip").performClick()
+        compose.awaitText("Step done")
+        val saved = progress
+        compose.waitUntil(5_000) { runBlocking { saved.passedStep.first() } == "household" }
+        // After a kill: a new DataStore over the same file.
+        progress = runBlocking { states.start() }
+        instance++
+        compose.awaitText("Step done")
+        compose.onNodeWithText("Step location").assertDoesNotExist()
+        // Back still reaches the skipped steps.
+        compose.onNodeWithTag("wizard_back").performClick()
+        compose.onNodeWithText("Step household").assertExists()
+    }
+
+    /** Going Back doesn't move the furthest step passed back, so a new instance still resumes past it. */
+    @Test
+    fun backThenANewInstanceResumesAfterTheFurthestStepPassed() {
+        val steps = listOf(FakeStep("a", 0, skippable = true), FakeStep("b", 1, skippable = true), FakeStep("c", 2))
+        val progress = runBlocking { states.start() }
+        var instance by mutableIntStateOf(0)
+        showAgainAndAgain(steps, { progress }, { instance })
+        compose.awaitText("Step a")
+        compose.onNodeWithTag("wizard_skip").performClick()
+        compose.awaitText("Step b")
+        compose.onNodeWithTag("wizard_skip").performClick()
+        compose.awaitText("Step c")
+        compose.waitUntil(5_000) { runBlocking { progress.passedStep.first() } == "b" }
+        compose.onNodeWithTag("wizard_back").performClick()
+        compose.awaitText("Step b")
+        compose.onNodeWithTag("wizard_back").performClick()
+        compose.awaitText("Step a")
+        compose.onNodeWithTag("wizard_skip").performClick()
+        compose.awaitText("Step b")
+        compose.waitForIdle()
+        assertThat(runBlocking { progress.passedStep.first() }).isEqualTo("b")
+        instance++
+        compose.awaitText("Step c")
+    }
+
+    /** 4a's rule holds: a step passed before whose required input has gone can't be passed over on resume. */
+    @Test
+    fun aPassedStepThatCanNoLongerGoOnIsWhereItResumes() {
+        val progress = runBlocking { states.start().also { it.markPassed("you") } }
+        val steps = listOf(FakeStep("welcome", 0, done = true), FakeStep("you", 1, ready = false), FakeStep("done", 2))
+        showAgainAndAgain(steps, { progress }, { 0 })
+        compose.awaitText("Step you")
+    }
+
     @Test
     fun aDoubleTapOnNextRunsTheStepOnce() {
         val hold = CompletableDeferred<Unit>()
@@ -237,10 +330,11 @@ class SetupWizardTest {
     fun aRestoredWizardAsksForThePinAgain() {
         // No setup session: the wizard is let in by the gate's PIN pad, as after a kill.
         runBlocking { access.addAdmin() }
+        val progress = runBlocking { states.start() }
         val restoration = StateRestorationTester(compose)
         restoration.setContent {
             CompositionLocalProvider(LocalOverlayHost provides overlay) {
-                CulveryTheme(dark = true) { SetupWizard(listOf(FakeStep("a", 0)), SetupSessionGate(household, access.control)) }
+                CulveryTheme(dark = true) { SetupWizard(listOf(FakeStep("a", 0)), SetupSessionGate(household, access.control), progress) }
             }
         }
         compose.waitUntil(5_000) { access.prompt.request.value != null }

@@ -24,7 +24,7 @@ interface SetupStep {
     /** False hides the step (e.g. Review calendars before a connection exists). */
     val shown: Flow<Boolean> get() = flowOf(true)
 
-    /** True once the step's required input is saved: the wizard resumes at the first shown step that isn't. */
+    /** True once the step's required input is saved: a restart resumes at the first shown step neither done nor passed. */
     val done: Flow<Boolean>
 
     /** Enables the forward button; by default once [done]. */

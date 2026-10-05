@@ -97,7 +97,7 @@ class SampleWizardTest {
         val gate = SetupSessionGate(household, access)
         val welcome = WelcomeStep(state, household, gate, Optional.of(sample))
         compose.setContent {
-            CompositionLocalProvider(LocalOverlayHost provides OverlayState()) { CulveryTheme(dark = true) { SetupWizard(listOf(welcome), gate) } }
+            CompositionLocalProvider(LocalOverlayHost provides OverlayState()) { CulveryTheme(dark = true) { SetupWizard(listOf(welcome), gate, state) } }
         }
 
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("welcome_sample").fetchSemanticsNodes().isNotEmpty() }

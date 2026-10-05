@@ -149,7 +149,7 @@ class StepsUiTest {
         val done = DoneStep(state, access.control, gate, FakeHomeApp())
         compose.setContent {
             CompositionLocalProvider(LocalOverlayHost provides overlay, LocalShellNavigator provides RecordingNavigator()) {
-                CulveryTheme(dark = true) { SetupWizard(listOf(done), gate) }
+                CulveryTheme(dark = true) { SetupWizard(listOf(done), gate, state) }
             }
         }
         compose.awaitText("Culvery is ready")

@@ -27,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -36,7 +37,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import java.io.IOException
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.CONTINUE_SETUP
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SetupStep
@@ -48,16 +52,35 @@ private const val TAG = "SetupWizard"
 
 /**
  * The first-run wizard (4a design §3.3, §4.1): the shown [steps], already in order, starting where
- * [WizardRules.resumeAt] says, with progress dots, Back, and Next or Skip for now. Whenever [gate] needs a PIN (an Admin
- * exists and nobody is signed in: a start after a kill, the setup session's idle limit, a lock), it asks before any step
- * shows, then the wizard carries on at the same step.
+ * [WizardRules.resumeAt] says (past the furthest step [progress] records as passed), with progress dots, Back, and Next
+ * or Skip for now. Whenever [gate] needs a PIN (an Admin exists and nobody is signed in: a start after a kill, the setup
+ * session's idle limit, a lock), it asks before any step shows, then the wizard carries on at the same step.
  */
 @Composable
-fun SetupWizard(steps: List<SetupStep>, gate: SetupSessionGate) {
+fun SetupWizard(steps: List<SetupStep>, gate: SetupSessionGate, progress: SetupState) {
     val statusFlow = remember(steps) {
-        combine(steps.map { step -> combine(step.shown, step.done, step.canGoOn, ::StepStatus) }) { it.toList() }
+        combine(
+            steps.map { step ->
+                combine(step.shown, step.done, step.canGoOn) { shown, done, canGoOn -> StepStatus(shown, done, canGoOn, step.skippable) }
+            },
+        ) { it.toList() }
     }
     val statuses = statusFlow.collectAsState(initial = null).value
+    // The furthest step passed, as an index into [steps]: -1 for none or a step no longer offered, null until read.
+    val passedThrough = remember(steps, progress) { progress.passedStep.map { id -> steps.indexOfFirst { it.id == id } } }
+        .collectAsState(initial = null).value
+    val scope = rememberCoroutineScope()
+    val passed: (Int) -> Unit = { index ->
+        if (index > (passedThrough ?: -1)) {
+            scope.launch {
+                try {
+                    progress.markPassed(steps[index].id)
+                } catch (e: IOException) {
+                    Log.w(TAG, "Couldn't save how far setup got (${e::class.simpleName})")
+                }
+            }
+        }
+    }
     // Not saved: a wizard restored after its process died has lost the setup session and must ask again.
     val needsPin = remember(gate) { gate.needsPin }.collectAsState<Boolean, Boolean?>(initial = null).value
     // Saved, and kept here rather than in Steps, so the gate coming and going doesn't lose the step.
@@ -69,13 +92,13 @@ fun SetupWizard(steps: List<SetupStep>, gate: SetupSessionGate) {
     CompositionLocalProvider(LocalContentColor provides Culvery.colors.ink) {
         Box(Modifier.fillMaxSize().background(Culvery.colors.bg).testTag("wizard")) {
             when {
-                statuses == null || needsPin == null -> Unit
+                statuses == null || needsPin == null || passedThrough == null -> Unit
                 needsPin -> PinGate(gate)
                 else -> {
                     // Where it resumes is read once, from the first statuses; after that only Next, Back and Skip move it.
-                    val at = current.takeIf { it >= 0 } ?: WizardRules.resumeAt(statuses)
+                    val at = current.takeIf { it >= 0 } ?: WizardRules.resumeAt(statuses, passedThrough)
                     SideEffect { if (current < 0) current = at }
-                    Steps(steps, statuses, at) { current = it }
+                    Steps(steps, statuses, at, onPassed = passed) { current = it }
                 }
             }
         }
@@ -83,7 +106,7 @@ fun SetupWizard(steps: List<SetupStep>, gate: SetupSessionGate) {
 }
 
 @Composable
-private fun Steps(steps: List<SetupStep>, statuses: List<StepStatus>, current: Int, onGoTo: (Int) -> Unit) {
+private fun Steps(steps: List<SetupStep>, statuses: List<StepStatus>, current: Int, onPassed: (Int) -> Unit, onGoTo: (Int) -> Unit) {
     // A step hidden while it shows (Review, after Disconnect) gives way to the one before it.
     val index = if (statuses.getOrNull(current)?.shown == true) {
         current
@@ -95,10 +118,16 @@ private fun Steps(steps: List<SetupStep>, statuses: List<StepStatus>, current: I
     val step = steps[index]
     val latest by rememberUpdatedState(statuses)
     val goTo by rememberUpdatedState(onGoTo)
+    val pass by rememberUpdatedState(onPassed)
+    // Passing a step moves on and records it, so a new instance resumes past it.
+    val passTo: (Int) -> Unit = { next ->
+        pass(index)
+        goTo(next)
+    }
     val action = rememberSingleAction(step.id) { e -> Log.w(TAG, "${step.id}: Next failed (${e::class.simpleName})") }
     val goOn: () -> Unit = {
         action.run {
-            if (step.onNext()) WizardRules.nextShown(index, latest)?.let { goTo(it) }
+            if (step.onNext()) WizardRules.nextShown(index, latest)?.let(passTo)
         }
     }
     WizardFrame(
@@ -108,7 +137,7 @@ private fun Steps(steps: List<SetupStep>, statuses: List<StepStatus>, current: I
         forward = WizardRules.forward(step.skippable, step.nextLabel, statuses[index]),
         busy = action.busy,
         onForward = goOn,
-        onSkip = { WizardRules.nextShown(index, latest)?.let { goTo(it) } },
+        onSkip = { WizardRules.nextShown(index, latest)?.let(passTo) },
     ) {
         step.Content(onNext = goOn)
     }

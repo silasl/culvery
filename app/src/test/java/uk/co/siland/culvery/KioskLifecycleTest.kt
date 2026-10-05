@@ -1,6 +1,7 @@
 package uk.co.siland.culvery
 
 import android.content.ActivityNotFoundException
+import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -21,6 +22,8 @@ class KioskLifecycleTest {
         override fun showBars() { calls += "showBars" }
         override fun moveToBack() { calls += "moveToBack" }
         override fun allowPlayServices(allowed: Boolean) { calls += "allowPlayServices($allowed)" }
+        override fun startHome() { calls += "startHome" }
+        override fun finishTask() { calls += "finishTask" }
     }
 
     private val window = RecordingWindow()
@@ -29,6 +32,7 @@ class KioskLifecycleTest {
     private var home = true
     private var owner = false
     private var changing = false
+    private var inHomeTask = true
     private val said = mutableListOf<String>()
     private val controller = Robolectric.buildActivity(ComponentActivity::class.java)
     private val kiosk = kioskFor()
@@ -37,6 +41,7 @@ class KioskLifecycleTest {
         window,
         setupComplete = { true },
         isHomeApp = { home },
+        inHomeTask = { inHomeTask },
         isDeviceOwner = { owner },
         kioskExited = { exited },
         returnedToFront = { exited = false },
@@ -226,5 +231,83 @@ class KioskLifecycleTest {
         val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
         ActivityKioskWindow(activity).moveToBack()
         assertThat(shadowOf(activity).isTaskMovedToBack).isTrue()
+    }
+
+    /** The emulator walkthrough: Choose home app said yes from the launcher's task, so Android made a second Culvery. */
+    @Test
+    fun aGrantedRoleOutsideTheHomeTaskHandsOverToHome() {
+        inHomeTask = false
+        controller.pause()
+        window.calls.clear()
+        kiosk.roleAnswered(cancelled = false)
+        assertThat(window.calls).containsExactly("startHome", "finishTask").inOrder()
+        assertThat(said).isEmpty()
+    }
+
+    /** The instance handing over neither pins nor unpins on its way out: the home task's Culvery does that. */
+    @Test
+    fun anInstanceThatHandedOverNeverPinsAgain() {
+        inHomeTask = false
+        controller.pause()
+        kiosk.roleAnswered(cancelled = false)
+        window.calls.clear()
+        controller.resume()
+        kiosk.returnToPinning()
+        kiosk.openHomeAppScreen { throw ActivityNotFoundException() }
+        assertThat(window.calls).isEmpty()
+    }
+
+    /** A launcher or Settings "Open" while Culvery is already home: onCreate hands over before anything shows. */
+    @Test
+    fun aStartOutsideTheHomeTaskWhileHomeHandsOver() {
+        inHomeTask = false
+        val next = Robolectric.buildActivity(ComponentActivity::class.java)
+        val other = kioskFor()
+        window.calls.clear()
+        assertThat(other.handOverToHome()).isTrue()
+        assertThat(window.calls).containsExactly("startHome", "finishTask").inOrder()
+        next.get().lifecycle.addObserver(other)
+        window.calls.clear()
+        next.setup()
+        assertThat(window.calls).isEmpty()
+    }
+
+    @Test
+    fun aStartInTheHomeTaskStays() {
+        inHomeTask = true
+        window.calls.clear()
+        assertThat(kioskFor().handOverToHome()).isFalse()
+        kiosk.roleAnswered(cancelled = false)
+        assertThat(window.calls).isEmpty()
+    }
+
+    @Test
+    fun aStartOutsideTheHomeTaskWhileAnotherAppIsHomeStays() {
+        inHomeTask = false
+        home = false
+        window.calls.clear()
+        assertThat(kioskFor().handOverToHome()).isFalse()
+        assertThat(window.calls).isEmpty()
+    }
+
+    @Test
+    fun theActivityWindowStartsHomeInItsOwnTaskAndRemovesThisOne() {
+        val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+        val window = ActivityKioskWindow(activity)
+        window.startHome()
+        window.finishTask()
+        val started = shadowOf(activity).nextStartedActivity
+        assertThat(started.action).isEqualTo(Intent.ACTION_MAIN)
+        assertThat(started.categories).containsExactly(Intent.CATEGORY_HOME)
+        assertThat(started.`package`).isEqualTo(activity.packageName)
+        assertThat(started.flags and Intent.FLAG_ACTIVITY_NEW_TASK).isNotEqualTo(0)
+        assertThat(activity.isFinishing).isTrue()
+    }
+
+    @Test
+    fun onlyAHomeIntentIsTheHomeTask() {
+        assertThat(isHomeTask(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))).isTrue()
+        assertThat(isHomeTask(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER))).isFalse()
+        assertThat(isHomeTask(null)).isFalse()
     }
 }

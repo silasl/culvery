@@ -4,7 +4,8 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 class WizardRulesTest {
-    private fun status(shown: Boolean = true, done: Boolean = false, canGoOn: Boolean = done) = StepStatus(shown, done, canGoOn)
+    private fun status(shown: Boolean = true, done: Boolean = false, canGoOn: Boolean = done, skippable: Boolean = false) =
+        StepStatus(shown, done, canGoOn, skippable)
 
     @Test
     fun aFreshWizardOpensAtTheFirstStep() {
@@ -20,6 +21,24 @@ class WizardRulesTest {
     fun aSkippedStepIsWhereItResumes() {
         // Welcome passed, Home location skipped (not done), You done.
         assertThat(WizardRules.resumeAt(listOf(status(done = true), status(), status(done = true), status()))).isEqualTo(1)
+    }
+
+    @Test
+    fun aStepSkippedBeforeIsNotWhereItResumes() {
+        // Welcome passed, Home location skipped, You done, Household skipped: the furthest passed is Household.
+        val statuses = listOf(status(done = true), status(skippable = true), status(done = true), status(skippable = true), status(canGoOn = true))
+        assertThat(WizardRules.resumeAt(statuses, passedThrough = 3)).isEqualTo(4)
+    }
+
+    @Test
+    fun aSkippableStepAfterTheFurthestPassedIsWhereItResumes() {
+        assertThat(WizardRules.resumeAt(listOf(status(skippable = true), status(skippable = true), status()), passedThrough = 0)).isEqualTo(1)
+    }
+
+    @Test
+    fun aPassedStepWhoseRequiredInputIsMissingIsWhereItResumes() {
+        val statuses = listOf(status(done = true), status(), status(skippable = true), status())
+        assertThat(WizardRules.resumeAt(statuses, passedThrough = 2)).isEqualTo(1)
     }
 
     @Test

@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -40,8 +41,8 @@ fun setupStore(scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatch
     )
 
 /**
- * Whether first-run setup has finished, and whether Welcome was passed (4a design §3.1, D8): a small DataStore file of
- * its own, not Room, as it is two flags.
+ * Whether first-run setup has finished, whether Welcome was passed and how far the wizard got (4a design §3.1, D8): a
+ * small DataStore file of its own, not Room, as it is two flags and a step id.
  */
 @Singleton
 class SetupState(private val store: DataStore<Preferences>, private val household: HouseholdRepository) {
@@ -82,6 +83,16 @@ class SetupState(private val store: DataStore<Preferences>, private val househol
         store.edit { it[WELCOMED] = true }
     }
 
+    /**
+     * The id of the furthest step passed with Next or Skip for now, so a new instance or a start after a kill resumes
+     * past steps skipped before (4a design D8, 4c §5.1). Null before any.
+     */
+    val passedStep: Flow<String?> = prefs.map { it[PASSED] }.distinctUntilChanged()
+
+    suspend fun markPassed(stepId: String) {
+        store.edit { it[PASSED] = stepId }
+    }
+
     suspend fun markComplete() {
         store.edit { it[COMPLETE] = true }
         decided.value = true
@@ -95,5 +106,6 @@ class SetupState(private val store: DataStore<Preferences>, private val househol
         const val FILE = "setup"
         val COMPLETE = booleanPreferencesKey("setupComplete")
         val WELCOMED = booleanPreferencesKey("welcomed")
+        val PASSED = stringPreferencesKey("passedStep")
     }
 }

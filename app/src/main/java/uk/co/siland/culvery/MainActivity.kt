@@ -96,6 +96,7 @@ class MainActivity : ComponentActivity() {
             ActivityKioskWindow(this),
             setupComplete = { setupComplete.value == true },
             isHomeApp = { homeApp.isDefault.value },
+            inHomeTask = { isHomeTask(intent) },
             isDeviceOwner = { isDeviceOwner },
             kioskExited = { shell.kioskExited },
             returnedToFront = shell::returnedToFront,
@@ -105,7 +106,7 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    // Android's yes/no "make Culvery the home app?" dialog (4c §5.1); its answer is read again on resume anyway.
+    // Android's yes/no "make Culvery the home app?" dialog (4c §5.1); a yes hands over to the home task's Culvery.
     private val askHomeRole = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         homeApp.refresh()
         kiosk.roleAnswered(cancelled = result.resultCode == RESULT_CANCELED)
@@ -115,6 +116,9 @@ class MainActivity : ComponentActivity() {
         val splash = installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Started outside the home task while Culvery is home (the launcher, Settings' Open): the home task's shows instead.
+        homeApp.refresh()
+        if (kiosk.handOverToHome()) return
         val shownAt = SystemClock.uptimeMillis()
         setupComplete = setupState.setupComplete.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
         isDeviceOwner = allowLockTaskIfOwner(this)
@@ -141,7 +145,7 @@ class MainActivity : ComponentActivity() {
             var previous: Boolean? = null
             setupComplete.filterNotNull().collect { complete ->
                 val resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-                if (pinOnSetupRead(previous, complete, resumed, shell.kioskExited)) pinToScreen()
+                if (!kiosk.handedOver && pinOnSetupRead(previous, complete, resumed, shell.kioskExited)) pinToScreen()
                 previous = complete
             }
         }
@@ -170,7 +174,7 @@ class MainActivity : ComponentActivity() {
                                 complete = complete,
                                 settingsOpen = state.settingsOpen,
                                 overlay = overlay,
-                                wizard = { SetupWizard(remember { wizardSteps(coreSteps.get(), capabilities) }, gate) },
+                                wizard = { SetupWizard(remember { wizardSteps(coreSteps.get(), capabilities) }, gate, setupState) },
                                 shell = {
                                     CulveryShell(
                                         state = state,

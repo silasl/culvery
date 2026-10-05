@@ -126,6 +126,14 @@ class SetupStateTest {
     }
 
     @Test
+    fun theFurthestStepPassedIsRememberedAcrossARestart() = runTest {
+        val first = start()
+        assertThat(first.passedStep.first()).isNull()
+        first.markPassed("household")
+        assertThat(start().passedStep.first()).isEqualTo("household")
+    }
+
+    @Test
     fun welcomeIsRememberedAcrossARestart() = runTest {
         val first = start()
         assertThat(first.welcomed.first()).isFalse()
