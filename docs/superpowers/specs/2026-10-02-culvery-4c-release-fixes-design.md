@@ -240,8 +240,11 @@ Accessibility, the launcher icon and design changes (4d); anything measured on t
 
 | Measure (emulator-5554, API 35; London, one Admin, no calendar) | Before: signed, R8 off, full font (2026-10-02) | After: signed, minified, all of 4c |
 |---|---|---|
-| Release APK size | 33.5 MB | |
-| `am start -W` TotalTime, 5 runs | 2240, 2467, 1110, 1855, 1025 ms (median 1855) | |
-| Skipped frames, cold start | 56, 119, 0, 0, 0 | |
-| gfxinfo p50 / p90 | 44 / 350 ms | |
-| Dalvik / native PSS after start | 17.2 / 13.8 MB | |
+| Release APK size | 33.5 MB | 3.9 MB |
+| `am start -W` TotalTime, 5 runs | 2240, 2467, 1110, 1855, 1025 ms (median 1855) | 2682, 3029, 3102, 2192, 3052 ms (median 3029) — *now Home with its cards, see below* |
+| Skipped frames, cold start | 56, 119, 0, 0, 0 | 135, 51, 0, 146, 105 |
+| gfxinfo p50 / p90 | 44 / 350 ms | 300 / 1900 ms |
+| Dalvik / native PSS after start | 17.2 / 13.8 MB | 2.8 / 17.5 MB |
+
+*Reading these numbers (Task 19, 2026-10-02).* The two columns don't measure the same moment. Before 4c, TotalTime ended at the first, empty frame and the Forecast card arrived 1–1.5 s later; with 4c's splash it ends when Home is drawn with its cards (the "Fully drawn" time `measure-release.sh` now prints equals it to the millisecond). The emulator is also noisy: the first starts after any install take 9–14 s for both builds, and Google Play services' crash loop lines up with the worst runs, so the script now discards five warm-up starts. An interleaved A/B of both builds on the same emulator (steady state, after six discarded starts each) gave: TotalTime median before 1392 / 1668 ms vs after 1691 / 2019 ms (after includes the cards); gfxinfo p90 before 850 / 1250 ms vs after 550 / 1150 ms; time until the Forecast card shows, before 2.7–6 s vs after 2–3.5 s. 4c gets to a usable Home sooner and uses about 15 MB less Dalvik heap; the real numbers come from the SM-T510 in 4e.
+
