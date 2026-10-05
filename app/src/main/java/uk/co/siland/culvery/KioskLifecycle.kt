@@ -42,6 +42,11 @@ internal fun isHomeTask(intent: Intent?): Boolean = intent?.hasCategory(Intent.C
 internal const val HOME_APP_NOT_SET =
     "Culvery isn't the home app yet — exit kiosk, then set it in Android's Settings › Apps › Default apps."
 
+/** Told when Change home app finds no screen to open: Culvery is still home, and Android's Settings can change that. */
+internal const val HOME_APP_SCREEN_MISSING =
+    "Culvery can't open this tablet's home app setting — exit kiosk, then change the home app in Android's " +
+        "Settings › Apps › Default apps."
+
 /**
  * Whether Culvery has left the front since the kiosk was exited. It outlives the activity (the view model holds it), so
  * a relaunch after the activity was stopped still counts as coming back.
@@ -133,9 +138,9 @@ internal class KioskLifecycle(
 
     /**
      * Android's screens can't open over a pinned app, so unpin, then [launch] one. When there is none, pin again at
-     * once: nothing pauses Culvery, so nothing else would.
+     * once (nothing pauses Culvery, so nothing else would) and say [missing].
      */
-    fun openHomeAppScreen(launch: () -> Unit) {
+    fun openHomeAppScreen(missing: String, launch: () -> Unit) {
         if (handedOver) return
         window.unpin()
         try {
@@ -144,13 +149,14 @@ internal class KioskLifecycle(
             Log.w(TAG, "No screen to change the home app on this tablet (${e::class.simpleName})")
             returnedToFront()
             if (shouldPin(setupComplete(), kioskExited())) window.pin()
-            say(HOME_APP_NOT_SET)
+            say(missing)
         }
     }
 
     /**
-     * Android's role dialog closed: Culvery now home hands over to the home task; cancelled with Culvery still not home
-     * means it was refused or never shown.
+     * Android's role dialog closed and this instance is resumed again. After a yes Android has already started the
+     * home task's Culvery, which removed this task, so this runs only if it didn't; then it hands over. Cancelled with
+     * Culvery still not home means it was refused or never shown.
      */
     fun roleAnswered(cancelled: Boolean) {
         if (handOverToHome()) return
@@ -158,9 +164,10 @@ internal class KioskLifecycle(
     }
 
     /**
-     * One Culvery on screen (4a D8, 4c §5.1): Android keeps the home app in a home task of its own, so a Culvery that is
-     * home but started elsewhere (the launcher, Settings' Open, or the task that said yes to the role) opens the home
-     * task's instead and removes its own task. True when it handed over; the caller then does nothing more.
+     * One Culvery on screen (4a D8, 4c §5.1): Android keeps the home app in a home task of its own, so a Culvery that
+     * is home but started or resumed elsewhere (the launcher, Settings' Open, recents) opens the home task's instead
+     * and removes its own task. The task that said yes to the role isn't resumed again: the home task's [onResume]
+     * removes it. True when it handed over; the caller then does nothing more.
      */
     fun handOverToHome(): Boolean {
         if (handedOver) return true

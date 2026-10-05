@@ -208,14 +208,14 @@ class MainActivity : ComponentActivity() {
         if (hasFocus && !kiosk.handedOver && !shell.kioskExited) hideSystemBars()
     }
 
-    private fun openHomeAppScreen(request: HomeAppRequest) = kiosk.openHomeAppScreen {
-        when (request) {
-            HomeAppRequest.CHOOSE -> {
-                val roles = getSystemService(RoleManager::class.java)
-                if (roles == null || !roles.isRoleAvailable(RoleManager.ROLE_HOME)) throw ActivityNotFoundException("No home role")
-                askHomeRole.launch(roles.createRequestRoleIntent(RoleManager.ROLE_HOME))
-            }
-            HomeAppRequest.CHANGE -> startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+    private fun openHomeAppScreen(request: HomeAppRequest) = when (request) {
+        HomeAppRequest.CHOOSE -> kiosk.openHomeAppScreen(HOME_APP_NOT_SET) {
+            val roles = getSystemService(RoleManager::class.java)
+            if (roles == null || !roles.isRoleAvailable(RoleManager.ROLE_HOME)) throw ActivityNotFoundException("No home role")
+            askHomeRole.launch(roles.createRequestRoleIntent(RoleManager.ROLE_HOME))
+        }
+        HomeAppRequest.CHANGE -> kiosk.openHomeAppScreen(HOME_APP_SCREEN_MISSING) {
+            startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
         }
     }
 }

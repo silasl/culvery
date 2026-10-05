@@ -130,10 +130,23 @@ class KioskLifecycleTest {
     fun whenNoHomeAppScreenOpensItPinsAgainAndSaysSo() {
         exited = true
         window.calls.clear()
-        kiosk.openHomeAppScreen { throw ActivityNotFoundException() }
+        kiosk.openHomeAppScreen(HOME_APP_NOT_SET) { throw ActivityNotFoundException() }
         assertThat(window.calls).containsExactly("unpin", "pin").inOrder()
         assertThat(exited).isFalse()
         assertThat(said).containsExactly(HOME_APP_NOT_SET)
+    }
+
+    /** Change home app is offered only while Culvery is home, so its missing screen mustn't say Culvery isn't home. */
+    @Test
+    fun whenTheHomeAppSettingIsMissingChangeSaysWhereToChangeIt() {
+        window.calls.clear()
+        kiosk.openHomeAppScreen(HOME_APP_SCREEN_MISSING) { throw ActivityNotFoundException() }
+        assertThat(window.calls).containsExactly("unpin", "pin").inOrder()
+        assertThat(said).containsExactly(HOME_APP_SCREEN_MISSING)
+        assertThat(HOME_APP_SCREEN_MISSING).isEqualTo(
+            "Culvery can't open this tablet's home app setting — exit kiosk, then change the home app in Android's " +
+                "Settings › Apps › Default apps.",
+        )
     }
 
     @Test
@@ -145,7 +158,7 @@ class KioskLifecycleTest {
     @Test
     fun aScreenThatOpensIsLeftToPinOnTheNextResume() {
         window.calls.clear()
-        kiosk.openHomeAppScreen { }
+        kiosk.openHomeAppScreen(HOME_APP_NOT_SET) { }
         assertThat(window.calls).containsExactly("unpin")
         assertThat(said).isEmpty()
     }
@@ -260,7 +273,7 @@ class KioskLifecycleTest {
         window.calls.clear()
         controller.resume()
         kiosk.returnToPinning()
-        kiosk.openHomeAppScreen { throw ActivityNotFoundException() }
+        kiosk.openHomeAppScreen(HOME_APP_NOT_SET) { throw ActivityNotFoundException() }
         assertThat(window.calls).isEmpty()
     }
 
@@ -381,12 +394,15 @@ class KioskLifecycleTest {
         assertThat(window.calls).doesNotContain("removeOtherTasks")
     }
 
+    /** Only the home task's Culvery removes tasks: one that is home elsewhere and can't hand over keeps the others. */
     @Test
-    fun aResumeOutsideTheHomeTaskRemovesNothing() {
+    fun aHomeResumeOutsideTheHomeTaskThatCantHandOverRemovesNothing() {
         inHomeTask = false
-        home = false
+        window.homeStarts = false
         window.calls.clear()
         controller.pause().resume()
+        assertThat(kiosk.handedOver).isFalse()
+        assertThat(window.calls).contains("pin")
         assertThat(window.calls).doesNotContain("removeOtherTasks")
     }
 
