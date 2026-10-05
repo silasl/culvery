@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The house, its doorway cut out, and the dove on the right eave. Paths from tools/icon/culvery-icon.svg. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFEEF0EF"
+        android:pathData="M31.06,53.92 A3.22,3.22 0 0,1 26.86,49.04 L49.4,29.72 A3.22,3.22 0 0,1 53.6,29.72 L76.14,49.04 A3.22,3.22 0 0,1 71.94,53.92 L70.82,52.96 L70.82,74.48 A2.76,2.76 0 0,1 68.06,77.24 L57.94,77.24 L57.94,68.96 A6.44,6.44 0 0,0 45.06,68.96 L45.06,77.24 L34.94,77.24 A2.76,2.76 0 0,1 32.18,74.48 L32.18,52.96 L31.06,53.92 Z" />
+    <path
+        android:fillColor="#FFE0B85B"
+        android:pathData="M71.67,42.8 C74.32,42.58 76.52,40.15 77.19,37.28 C77.41,36.17 77.63,35.29 77.96,34.63 L79.84,33.96 L78.18,33.3 C77.85,31.76 76.52,30.87 75.31,30.87 C73.87,30.87 72.99,31.98 72.77,33.3 C71.67,34.19 69.24,34.41 67.25,33.96 L61.51,31.09 C60.63,30.65 59.96,31.76 60.63,32.42 L67.03,38.16 C68.35,40.15 69.68,42.36 71.67,42.8 Z" />
+</vector>
