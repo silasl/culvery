@@ -107,7 +107,8 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    // Android's yes/no "make Culvery the home app?" dialog (4c §5.1); a yes hands over to the home task's Culvery.
+    // Android's yes/no "make Culvery the home app?" dialog (4c §5.1). After a yes Android itself starts the home task's
+    // Culvery, which removes this task; this result only arrives if this activity is resumed again.
     private val askHomeRole = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         homeApp.refresh()
         kiosk.roleAnswered(cancelled = result.resultCode == RESULT_CANCELED)

@@ -1,5 +1,6 @@
 package uk.co.siland.culvery
 
+import android.app.ActivityManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.activity.ComponentActivity
@@ -10,6 +11,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowAppTask
 
 /** The kiosk's pinning over a real activity lifecycle (Robolectric drives it), with the window's effects recorded. */
 @RunWith(AndroidJUnit4::class)
@@ -28,6 +30,7 @@ class KioskLifecycleTest {
             calls += "startHome"
         }
         override fun finishTask() { calls += "finishTask" }
+        override fun removeOtherTasks() { calls += "removeOtherTasks" }
     }
 
     private val window = RecordingWindow()
@@ -358,5 +361,47 @@ class KioskLifecycleTest {
         assertThat(isHomeTask(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))).isTrue()
         assertThat(isHomeTask(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER))).isFalse()
         assertThat(isHomeTask(null)).isFalse()
+    }
+
+    /**
+     * The emulator walkthrough: saying yes to the role makes Android start the home task's Culvery itself, and the
+     * launcher-task Culvery that asked is never resumed again, so the home task's Culvery removes it.
+     */
+    @Test
+    fun aResumeInTheHomeTaskWhileHomeRemovesCulverysOtherTasksBeforePinning() {
+        assertThat(window.calls).contains("removeOtherTasks")
+        assertThat(window.calls.indexOf("removeOtherTasks")).isLessThan(window.calls.indexOf("pin"))
+    }
+
+    @Test
+    fun aResumeInTheHomeTaskWhileAnotherAppIsHomeRemovesNothing() {
+        home = false
+        window.calls.clear()
+        controller.pause().resume()
+        assertThat(window.calls).doesNotContain("removeOtherTasks")
+    }
+
+    @Test
+    fun aResumeOutsideTheHomeTaskRemovesNothing() {
+        inHomeTask = false
+        home = false
+        window.calls.clear()
+        controller.pause().resume()
+        assertThat(window.calls).doesNotContain("removeOtherTasks")
+    }
+
+    @Test
+    fun theActivityWindowRemovesEveryCulveryTaskButItsOwn() {
+        val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+        val own = appTask(activity.taskId)
+        val other = appTask(activity.taskId + 1)
+        shadowOf(activity.getSystemService(ActivityManager::class.java)).setAppTasks(listOf(own, other))
+        ActivityKioskWindow(activity).removeOtherTasks()
+        assertThat(shadowOf(other).isFinishedAndRemoved).isTrue()
+        assertThat(shadowOf(own).isFinishedAndRemoved).isFalse()
+    }
+
+    private fun appTask(id: Int): ActivityManager.AppTask = ShadowAppTask.newInstance().also {
+        shadowOf(it).setTaskInfo(ActivityManager.RecentTaskInfo().apply { taskId = id })
     }
 }

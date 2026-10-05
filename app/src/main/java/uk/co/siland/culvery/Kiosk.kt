@@ -48,6 +48,17 @@ internal class ActivityKioskWindow(private val activity: ComponentActivity) : Ki
 
     override fun finishTask() = activity.finishAndRemoveTask()
 
+    override fun removeOtherTasks() {
+        val own = activity.taskId
+        for (task in activity.getSystemService(ActivityManager::class.java).appTasks) {
+            // A task can go between the listing and the call; gone is what was wanted.
+            try {
+                if (task.taskInfo.taskId != own) task.finishAndRemoveTask()
+            } catch (_: IllegalArgumentException) {
+            }
+        }
+    }
+
     override fun moveToBack() {
         activity.moveTaskToBack(true)
     }

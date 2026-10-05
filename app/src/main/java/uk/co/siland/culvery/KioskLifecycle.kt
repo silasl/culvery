@@ -26,6 +26,9 @@ internal interface KioskWindow {
 
     /** Finishes this activity and takes its task out of recents. */
     fun finishTask()
+
+    /** Finishes and takes out of recents every other task of Culvery's. */
+    fun removeOtherTasks()
 }
 
 /**
@@ -84,6 +87,9 @@ internal class KioskLifecycle(
         resumed = true
         // Also an old standard-task Culvery brought back (recents, Settings' Open) after Culvery became home elsewhere.
         if (handOverToHome()) return
+        // Saying yes to the role makes Android start the home task's Culvery itself; the Culvery that asked is never
+        // resumed again to hand over, so it is removed from here.
+        if (isHomeApp() && inHomeTask()) window.removeOtherTasks()
         // Culvery is back in front, however Google's screens ended: Play services is no longer allowed in lock-task.
         if (isDeviceOwner()) window.allowPlayServices(false)
         if (!kioskExited()) window.hideBars()
