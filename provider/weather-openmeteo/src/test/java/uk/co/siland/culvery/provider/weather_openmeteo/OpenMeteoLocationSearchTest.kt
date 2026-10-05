@@ -25,13 +25,13 @@ import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.setup.LocationSearchException
 import uk.co.siland.culvery.core.setup.PlaceMatch
 
-/** Open-Meteo's answer for "Canterbury", trimmed; the third town has no time zone. */
-private const val CANTERBURY = """{"results":[
-  {"id":2653877,"name":"Canterbury","latitude":51.27904,"longitude":1.07992,"elevation":19.0,"feature_code":"PPLA2",
-   "country_code":"GB","admin1":"England","admin2":"Kent","timezone":"Europe/London","country":"United Kingdom"},
-  {"id":2172797,"name":"Canterbury","latitude":-33.91667,"longitude":151.11667,"country_code":"AU",
-   "admin1":"New South Wales","timezone":"Australia/Sydney","country":"Australia"},
-  {"id":9999999,"name":"Canterbury Siding","latitude":10.5,"longitude":20.5,"country":"Nowhere"}
+/** Open-Meteo's answer for "Brighton", trimmed; the third town has no time zone. */
+private const val BRIGHTON = """{"results":[
+  {"id":2654710,"name":"Brighton","latitude":50.82838,"longitude":-0.13947,"elevation":19.0,"feature_code":"PPLA2",
+   "country_code":"GB","admin1":"England","admin2":"East Sussex","timezone":"Europe/London","country":"United Kingdom"},
+  {"id":2174003,"name":"Brighton","latitude":-37.90539,"longitude":144.99,"country_code":"AU",
+   "admin1":"Victoria","timezone":"Australia/Melbourne","country":"Australia"},
+  {"id":9999999,"name":"Brighton Siding","latitude":10.5,"longitude":20.5,"country":"Nowhere"}
 ],"generationtime_ms":0.61}"""
 
 // Robolectric for android.util.Log; the server is a real MockWebServer on localhost.
@@ -54,7 +54,7 @@ class OpenMeteoLocationSearchTest {
 
     private fun answer(body: String, code: Int = 200) = server.enqueue(MockResponse().setResponseCode(code).setBody(body))
 
-    private suspend fun failure(query: String = "Canterbury"): Throwable? =
+    private suspend fun failure(query: String = "Brighton"): Throwable? =
         try {
             search.search(query)
             null
@@ -66,17 +66,17 @@ class OpenMeteoLocationSearchTest {
 
     @Test
     fun itAsksForFiveEnglishResultsAndReadsEachTownWithAZone() = runTest {
-        answer(CANTERBURY)
-        val found = search.search("Canterbury")
+        answer(BRIGHTON)
+        val found = search.search("Brighton")
         val url = server.takeRequest().requestUrl!!
         assertThat(url.encodedPath).isEqualTo("/v1/search")
         assertThat(listOf("name", "count", "language", "format").map { url.queryParameter(it) })
-            .containsExactly("Canterbury", "5", "en", "json").inOrder()
+            .containsExactly("Brighton", "5", "en", "json").inOrder()
         assertThat(found).containsExactly(
-            PlaceMatch("Canterbury", "England", "United Kingdom", 51.27904, 1.07992, "Europe/London"),
-            PlaceMatch("Canterbury", "New South Wales", "Australia", -33.91667, 151.11667, "Australia/Sydney"),
+            PlaceMatch("Brighton", "England", "United Kingdom", 50.82838, -0.13947, "Europe/London"),
+            PlaceMatch("Brighton", "Victoria", "Australia", -37.90539, 144.99, "Australia/Melbourne"),
         ).inOrder()
-        assertThat(found.first().label).isEqualTo("Canterbury, England, United Kingdom")
+        assertThat(found.first().label).isEqualTo("Brighton, England, United Kingdom")
     }
 
     @Test
@@ -109,9 +109,9 @@ class OpenMeteoLocationSearchTest {
         val patient = OkHttpClient.Builder().readTimeout(Duration.ofSeconds(30)).build()
         val slow = OpenMeteoLocationSearch(server.url("/v1/search"), patient)
         // One byte every 3 s: the headers arrive, the body stalls.
-        server.enqueue(MockResponse().setBody(CANTERBURY).throttleBody(1, 3, TimeUnit.SECONDS))
+        server.enqueue(MockResponse().setBody(BRIGHTON).throttleBody(1, 3, TimeUnit.SECONDS))
         val returned = withContext(Dispatchers.Default) {
-            val call = launch { slow.search("Canterbury") }
+            val call = launch { slow.search("Brighton") }
             checkNotNull(runInterruptible(Dispatchers.IO) { server.takeRequest(5, TimeUnit.SECONDS) }) { "the search never reached the server" }
             call.cancel()
             withTimeoutOrNull(1_000) { call.join() } != null
@@ -126,8 +126,8 @@ class OpenMeteoLocationSearchTest {
         failure()
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
         failure()
-        answer("""{"results":[{"name":"Canterbury","latitude":"fifty-one"}]}""")
+        answer("""{"results":[{"name":"Brighton","latitude":"fifty-one"}]}""")
         failure()
-        assertNoSecretsLogged(TAG, listOf("Canterbury", "canterbury", "51.", "name=", "fifty-one"), minLines = 3)
+        assertNoSecretsLogged(TAG, listOf("Brighton", "brighton", "50.", "name=", "fifty-one"), minLines = 3)
     }
 }

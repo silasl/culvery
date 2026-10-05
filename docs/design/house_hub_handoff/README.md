@@ -8,6 +8,8 @@ A full-screen, landscape Android tablet app (wall-mounted / kiosk) for managing 
 ## About the Design Files
 `Culvery.dc.html` is a **design reference built in HTML** — a working prototype of intended look and behaviour, not production code. Recreate it natively for Android. Recommended stack if none exists: **Kotlin + Jetpack Compose (Material 3)**, kiosk/immersive mode (`WindowInsetsController` hide system bars, `FLAG_KEEP_SCREEN_ON`, optional Lock Task / screen pinning).
 
+The `.dc.html` sources and `support.js` are kept locally, not in the repo (the design tool generates them).
+
 Open the HTML file in Chrome to interact with it. Tweakable props: `theme` (auto/dark/light), `showStatusBar`, `armCountdown`, `simulateSaveFailure` (forces the calendar save-failed state).
 
 ## Fidelity

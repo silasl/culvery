@@ -28,7 +28,7 @@ import uk.co.siland.culvery.core.ui.PersonPalette
 class SettingsScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    private val canterbury = PlaceMatch("Canterbury", "England", "United Kingdom", 51.27904, 1.07992, "Europe/London")
+    private val brighton = PlaceMatch("Brighton", "England", "United Kingdom", 50.82838, -0.13947, "Europe/London")
     private val people = listOf(
         Member(Person(PersonId("alex"), "Alex", PersonPalette.colors[0]), Role.ADMIN, hasPin = true),
         Member(Person(PersonId("sam"), "Sam", PersonPalette.colors[1]), Role.ADULT, hasPin = false),
@@ -37,7 +37,7 @@ class SettingsScreenshotTest {
     private val pages = listOf(
         StillPage("location", "Home location", 0) {
             StepTitle("Home location")
-            LocationContent("", {}, TownResults.Idle, canterbury.toHome(), showCurrent = true, busy = false, onChoose = {})
+            LocationContent("", {}, TownResults.Idle, brighton.toHome(), showCurrent = true, busy = false, onChoose = {})
         },
         StillPage("people", "People", 100) {
             StepTitle("People")

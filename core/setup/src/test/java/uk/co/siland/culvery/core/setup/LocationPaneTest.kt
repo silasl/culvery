@@ -24,7 +24,7 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 class LocationPaneTest {
     @get:Rule(order = 0) val touchMode = TouchModeRule()
     @get:Rule(order = 1) val compose = createComposeRule()
-    private val canterbury = PlaceMatch("Canterbury", "England", "United Kingdom", 51.27904, 1.07992, "Europe/London")
+    private val brighton = PlaceMatch("Brighton", "England", "United Kingdom", 50.82838, -0.13947, "Europe/London")
     private val saved = CopyOnWriteArrayList<PlaceMatch>()
     private var saveFails = false
 
@@ -80,7 +80,7 @@ class LocationPaneTest {
 
     @Test
     fun aNewQueryCancelsTheSearchBeforeIt() {
-        search.answer = { q -> if (q == "Ca") awaitCancellation() else listOf(canterbury) }
+        search.answer = { q -> if (q == "Ca") awaitCancellation() else listOf(brighton) }
         show()
         type("Ca")
         advance(500)
@@ -88,38 +88,38 @@ class LocationPaneTest {
         advance(500)
         assertThat(search.queries).containsExactly("Ca", "Can").inOrder()
         assertThat(search.cancelled).isEqualTo(1)
-        compose.onNodeWithTag("place_0").assertTextContains("Canterbury, England, United Kingdom")
+        compose.onNodeWithTag("place_0").assertTextContains("Brighton, England, United Kingdom")
     }
 
     @Test
     fun choosingATownSavesIt() {
-        search.answer = { listOf(canterbury) }
+        search.answer = { listOf(brighton) }
         show()
         type("Can")
         advance(500)
         compose.onNodeWithTag("place_0").assertIsNotSelected().performClick()
         advance(100)
-        assertThat(saved).containsExactly(canterbury)
+        assertThat(saved).containsExactly(brighton)
     }
 
     /** Picking a town is the one choice: the field shows its name and the suggestions close, without a new search. */
     @Test
     fun choosingATownFillsTheFieldWithItsNameAndClosesTheResults() {
-        search.answer = { listOf(canterbury) }
+        search.answer = { listOf(brighton) }
         show()
         type("Can")
         advance(500)
         compose.onNodeWithTag("place_0").performClick()
         advance(1_000)
-        assertThat(saved).containsExactly(canterbury)
+        assertThat(saved).containsExactly(brighton)
         compose.onNodeWithTag("place_0").assertDoesNotExist()
-        compose.onNodeWithTag("location_query").assertTextContains("Canterbury, England, United Kingdom")
+        compose.onNodeWithTag("location_query").assertTextContains("Brighton, England, United Kingdom")
         assertThat(search.queries).containsExactly("Can")
     }
 
     @Test
     fun editingTheNameAfterChoosingSearchesAgain() {
-        search.answer = { listOf(canterbury) }
+        search.answer = { listOf(brighton) }
         show()
         type("Can")
         advance(500)
@@ -133,8 +133,8 @@ class LocationPaneTest {
 
     @Test
     fun theSavedHomeIsTicked() {
-        search.answer = { listOf(canterbury) }
-        show(current = canterbury.toHome())
+        search.answer = { listOf(brighton) }
+        show(current = brighton.toHome())
         type("Can")
         advance(500)
         compose.onNodeWithTag("place_0").assertIsSelected()
@@ -161,14 +161,14 @@ class LocationPaneTest {
 
     @Test
     fun settingsShowsTheSavedHomeAboveTheField() {
-        show(current = canterbury.toHome(), showCurrent = true)
+        show(current = brighton.toHome(), showCurrent = true)
         advance(100)
-        compose.onNodeWithTag("location_current").assertTextContains("Canterbury, England, United Kingdom")
+        compose.onNodeWithTag("location_current").assertTextContains("Brighton, England, United Kingdom")
     }
 
     @Test
     fun aFailedSaveSaysSoAndKeepsTheResults() {
-        search.answer = { listOf(canterbury) }
+        search.answer = { listOf(brighton) }
         saveFails = true
         show()
         type("Can")
@@ -176,13 +176,13 @@ class LocationPaneTest {
         compose.onNodeWithTag("place_0").performClick()
         advance(100)
         compose.onNodeWithText("Couldn't save — try again.").assertExists()
-        compose.onNodeWithTag("place_0").assertTextContains("Canterbury, England, United Kingdom")
-        assertNoSecretsLogged("LocationPane", listOf("Canterbury", "disk full"))
+        compose.onNodeWithTag("place_0").assertTextContains("Brighton, England, United Kingdom")
+        assertNoSecretsLogged("LocationPane", listOf("Brighton", "disk full"))
         // Trying again clears it.
         saveFails = false
         compose.onNodeWithTag("place_0").performClick()
         advance(100)
-        assertThat(saved).containsExactly(canterbury)
+        assertThat(saved).containsExactly(brighton)
         compose.onNodeWithText("Couldn't save — try again.").assertDoesNotExist()
     }
 }

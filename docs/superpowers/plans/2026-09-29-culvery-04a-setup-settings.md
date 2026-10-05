@@ -49,7 +49,7 @@ Where the spec is ambiguous or doesn't fit the code as it stands, this plan rule
 14. **The Settings › Calendars page keeps 3a's Connect pills (Task 11)** under the review list, so a household that skipped the wizard's Connect can still connect from Settings.
 15. **Exit kiosk moves through `ShellNavigator` (Task 10).** The Kiosk page lives in `:core:setup` and can't see `ShellViewModel`; `ShellNavigator` gains `exitKiosk()`, which the view model already implements.
 16. **Pinning when setup completes (Task 12; spec §3.6 amended).** `setupComplete` is read asynchronously, so the activity pins whenever it turns true (the first read included) while resumed, as well as on every resume once it is true. Waiting for "the next resume" left a household that had just tapped Open Culvery unpinned until the tablet next came to the front.
-17. **`HomeLocation.name` holds the result's full line** ("Canterbury, England, United Kingdom"), which Settings shows as the current location (Task 9).
+17. **`HomeLocation.name` holds the result's full line** ("Brighton, England, United Kingdom"), which Settings shows as the current location (Task 9).
 18. **Copy and layout the spec doesn't give (Tasks 8, 9, 10):** the search field's placeholder "Town or city"; the editor sheet's heading "Add person" (new) or the person's name; a row's second line "{role} · PIN set"; each role chip carries its whole line ("Admin — can change settings and people") rather than a name and a line apart; each Settings page is titled with its name. Once the Admin exists, the You page shows their row (tap to edit in the sheet) instead of the empty form.
 19. **"Couldn't save — try again." is one constant in `:core:plugin` (`COULD_NOT_SAVE`)**, shared by the people editor and the calendar's review page (Tasks 1, 8, 11). `SingleAction` and the calendar sheets' footer button (`HhSheetButton`) move to `:core:ui` for the same reason (Task 2).
 20. **At most eight people is enforced twice (Task 3, 8):** the repository refuses a ninth, and **Add person** is hidden once eight exist (the spec gives no copy for "full").
@@ -2217,7 +2217,7 @@ git commit -m "Add the setup session, touch to keep a session open, and a pad fo
 **Interfaces:**
 - Consumes: the `:core:setup` module (Task 1).
 - Produces:
-  - `data class PlaceMatch(val name: String, val region: String?, val country: String?, val latitude: Double, val longitude: Double, val timeZoneId: String) { val label: String }` — "Canterbury, England, United Kingdom"
+  - `data class PlaceMatch(val name: String, val region: String?, val country: String?, val latitude: Double, val longitude: Double, val timeZoneId: String) { val label: String }` — "Brighton, England, United Kingdom"
   - `class LocationSearchException(message: String) : Exception`
   - `interface LocationSearch { suspend fun search(query: String): List<PlaceMatch> }` — up to five towns; throws `LocationSearchException` on a network, HTTP or parse failure; cancelling the caller cancels the HTTP call
   - `const val OPEN_METEO_GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"`
@@ -2239,7 +2239,7 @@ data class PlaceMatch(
     val longitude: Double,
     val timeZoneId: String,
 ) {
-    /** "Canterbury, England, United Kingdom"; a region that repeats the name is left out. */
+    /** "Brighton, England, United Kingdom"; a region that repeats the name is left out. */
     val label: String get() = listOfNotNull(name, region?.takeIf { it != name }, country).joinToString(", ")
 }
 
@@ -2316,13 +2316,13 @@ import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.setup.LocationSearchException
 import uk.co.siland.culvery.core.setup.PlaceMatch
 
-/** Open-Meteo's answer for "Canterbury", trimmed; the third town has no time zone. */
-private const val CANTERBURY = """{"results":[
-  {"id":2653877,"name":"Canterbury","latitude":51.27904,"longitude":1.07992,"elevation":19.0,"feature_code":"PPLA2",
-   "country_code":"GB","admin1":"England","admin2":"Kent","timezone":"Europe/London","country":"United Kingdom"},
-  {"id":2172797,"name":"Canterbury","latitude":-33.91667,"longitude":151.11667,"country_code":"AU",
-   "admin1":"New South Wales","timezone":"Australia/Sydney","country":"Australia"},
-  {"id":9999999,"name":"Canterbury Siding","latitude":10.5,"longitude":20.5,"country":"Nowhere"}
+/** Open-Meteo's answer for "Brighton", trimmed; the third town has no time zone. */
+private const val BRIGHTON = """{"results":[
+  {"id":2654710,"name":"Brighton","latitude":50.82838,"longitude":-0.13947,"elevation":19.0,"feature_code":"PPLA2",
+   "country_code":"GB","admin1":"England","admin2":"East Sussex","timezone":"Europe/London","country":"United Kingdom"},
+  {"id":2174003,"name":"Brighton","latitude":-37.90539,"longitude":144.99,"country_code":"AU",
+   "admin1":"Victoria","timezone":"Australia/Melbourne","country":"Australia"},
+  {"id":9999999,"name":"Brighton Siding","latitude":10.5,"longitude":20.5,"country":"Nowhere"}
 ],"generationtime_ms":0.61}"""
 
 // Robolectric for android.util.Log; the server is a real MockWebServer on localhost.
@@ -2345,7 +2345,7 @@ class OpenMeteoLocationSearchTest {
 
     private fun answer(body: String, code: Int = 200) = server.enqueue(MockResponse().setResponseCode(code).setBody(body))
 
-    private suspend fun failure(query: String = "Canterbury"): Throwable? =
+    private suspend fun failure(query: String = "Brighton"): Throwable? =
         try {
             search.search(query)
             null
@@ -2357,17 +2357,17 @@ class OpenMeteoLocationSearchTest {
 
     @Test
     fun itAsksForFiveEnglishResultsAndReadsEachTownWithAZone() = runTest {
-        answer(CANTERBURY)
-        val found = search.search("Canterbury")
+        answer(BRIGHTON)
+        val found = search.search("Brighton")
         val url = server.takeRequest().requestUrl!!
         assertThat(url.encodedPath).isEqualTo("/v1/search")
         assertThat(listOf("name", "count", "language", "format").map { url.queryParameter(it) })
-            .containsExactly("Canterbury", "5", "en", "json").inOrder()
+            .containsExactly("Brighton", "5", "en", "json").inOrder()
         assertThat(found).containsExactly(
-            PlaceMatch("Canterbury", "England", "United Kingdom", 51.27904, 1.07992, "Europe/London"),
-            PlaceMatch("Canterbury", "New South Wales", "Australia", -33.91667, 151.11667, "Australia/Sydney"),
+            PlaceMatch("Brighton", "England", "United Kingdom", 50.82838, -0.13947, "Europe/London"),
+            PlaceMatch("Brighton", "Victoria", "Australia", -37.90539, 144.99, "Australia/Melbourne"),
         ).inOrder()
-        assertThat(found.first().label).isEqualTo("Canterbury, England, United Kingdom")
+        assertThat(found.first().label).isEqualTo("Brighton, England, United Kingdom")
     }
 
     @Test
@@ -2400,9 +2400,9 @@ class OpenMeteoLocationSearchTest {
         val patient = OkHttpClient.Builder().readTimeout(Duration.ofSeconds(30)).build()
         val slow = OpenMeteoLocationSearch(server.url("/v1/search"), patient)
         // One byte every 3 s: the headers arrive, the body stalls.
-        server.enqueue(MockResponse().setBody(CANTERBURY).throttleBody(1, 3, TimeUnit.SECONDS))
+        server.enqueue(MockResponse().setBody(BRIGHTON).throttleBody(1, 3, TimeUnit.SECONDS))
         val returned = withContext(Dispatchers.Default) {
-            val call = launch { slow.search("Canterbury") }
+            val call = launch { slow.search("Brighton") }
             checkNotNull(runInterruptible(Dispatchers.IO) { server.takeRequest(5, TimeUnit.SECONDS) }) { "the search never reached the server" }
             call.cancel()
             withTimeoutOrNull(1_000) { call.join() } != null
@@ -2417,9 +2417,9 @@ class OpenMeteoLocationSearchTest {
         failure()
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
         failure()
-        answer("""{"results":[{"name":"Canterbury","latitude":"fifty-one"}]}""")
+        answer("""{"results":[{"name":"Brighton","latitude":"fifty-one"}]}""")
         failure()
-        assertNoSecretsLogged(TAG, listOf("Canterbury", "canterbury", "51.", "name=", "fifty-one"), minLines = 3)
+        assertNoSecretsLogged(TAG, listOf("Brighton", "brighton", "50.", "name=", "fifty-one"), minLines = 3)
     }
 }
 
@@ -5273,7 +5273,7 @@ class StepsTest {
     private lateinit var db: HouseholdDatabase
     private lateinit var household: HouseholdRepository
     private lateinit var states: SetupStates
-    private val canterbury = PlaceMatch("Canterbury", "England", "United Kingdom", 51.27904, 1.07992, "Europe/London")
+    private val brighton = PlaceMatch("Brighton", "England", "United Kingdom", 50.82838, -0.13947, "Europe/London")
 
     @Before
     fun setUp() {
@@ -5303,9 +5303,9 @@ class StepsTest {
         val access = testAccess(household)
         val step = LocationStep(household, NoSearch, access.control)
         assertThat(step.done.first()).isFalse()
-        assertThat(step.saveHome(canterbury)).isTrue()
-        assertThat(household.location.first()).isEqualTo(canterbury.toHome())
-        assertThat(household.location.first()?.name).isEqualTo("Canterbury, England, United Kingdom")
+        assertThat(step.saveHome(brighton)).isTrue()
+        assertThat(household.location.first()).isEqualTo(brighton.toHome())
+        assertThat(household.location.first()?.name).isEqualTo("Brighton, England, United Kingdom")
         assertThat(access.requests).isEmpty()
         assertThat(step.done.first()).isTrue()
     }
@@ -5316,10 +5316,10 @@ class StepsTest {
         access.addAdmin()
         val step = LocationStep(household, NoSearch, access.control)
         access.answer(null)
-        assertThat(step.saveHome(canterbury)).isFalse()
+        assertThat(step.saveHome(brighton)).isFalse()
         assertThat(household.location.first()).isNull()
         access.answer("1234")
-        assertThat(step.saveHome(canterbury)).isTrue()
+        assertThat(step.saveHome(brighton)).isTrue()
         assertThat(access.requests).hasSize(2)
     }
 
@@ -5593,7 +5593,7 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 class LocationPaneTest {
     @get:Rule(order = 0) val touchMode = TouchModeRule()
     @get:Rule(order = 1) val compose = createComposeRule()
-    private val canterbury = PlaceMatch("Canterbury", "England", "United Kingdom", 51.27904, 1.07992, "Europe/London")
+    private val brighton = PlaceMatch("Brighton", "England", "United Kingdom", 50.82838, -0.13947, "Europe/London")
     private val saved = CopyOnWriteArrayList<PlaceMatch>()
 
     private class FakeSearch : LocationSearch {
@@ -5647,7 +5647,7 @@ class LocationPaneTest {
 
     @Test
     fun aNewQueryCancelsTheSearchBeforeIt() {
-        search.answer = { q -> if (q == "Ca") awaitCancellation() else listOf(canterbury) }
+        search.answer = { q -> if (q == "Ca") awaitCancellation() else listOf(brighton) }
         show()
         type("Ca")
         wait(500)
@@ -5655,24 +5655,24 @@ class LocationPaneTest {
         wait(500)
         assertThat(search.queries).containsExactly("Ca", "Can").inOrder()
         assertThat(search.cancelled).isEqualTo(1)
-        compose.onNodeWithTag("place_0").assertTextContains("Canterbury, England, United Kingdom")
+        compose.onNodeWithTag("place_0").assertTextContains("Brighton, England, United Kingdom")
     }
 
     @Test
     fun choosingATownSavesIt() {
-        search.answer = { listOf(canterbury) }
+        search.answer = { listOf(brighton) }
         show()
         type("Can")
         wait(500)
         compose.onNodeWithTag("place_0").assertIsNotSelected().performClick()
         wait(100)
-        assertThat(saved).containsExactly(canterbury)
+        assertThat(saved).containsExactly(brighton)
     }
 
     @Test
     fun theSavedHomeIsTicked() {
-        search.answer = { listOf(canterbury) }
-        show(current = canterbury.toHome())
+        search.answer = { listOf(brighton) }
+        show(current = brighton.toHome())
         type("Can")
         wait(500)
         compose.onNodeWithTag("place_0").assertIsSelected()
@@ -5697,9 +5697,9 @@ class LocationPaneTest {
 
     @Test
     fun settingsShowsTheSavedHomeAboveTheField() {
-        show(current = canterbury.toHome(), showCurrent = true)
+        show(current = brighton.toHome(), showCurrent = true)
         wait(100)
-        compose.onNodeWithTag("location_current").assertTextContains("Canterbury, England, United Kingdom")
+        compose.onNodeWithTag("location_current").assertTextContains("Brighton, England, United Kingdom")
     }
 }
 ```
@@ -5711,8 +5711,8 @@ In `core/setup/src/test/java/uk/co/siland/culvery/core/setup/SetupScreenshotTest
             WizardFrame(7, dot, back = if (back) ({}) else null, forward = forward, busy = false, onForward = {}, onSkip = {}, content = content)
         }
 
-    private val canterbury = PlaceMatch("Canterbury", "England", "United Kingdom", 51.27904, 1.07992, "Europe/London")
-    private val canterburyNz = PlaceMatch("Canterbury", "Canterbury", "New Zealand", -43.5, 172.0, "Pacific/Auckland")
+    private val brighton = PlaceMatch("Brighton", "England", "United Kingdom", 50.82838, -0.13947, "Europe/London")
+    private val brightonNz = PlaceMatch("Brighton", "Brighton", "New Zealand", -45.95, 170.33, "Pacific/Auckland")
 
     private fun welcome(name: String, dark: Boolean, sample: Boolean) =
         step(name, dark, 0, Forward.Next("Start", enabled = true), back = false) {
@@ -5721,7 +5721,7 @@ In `core/setup/src/test/java/uk/co/siland/culvery/core/setup/SetupScreenshotTest
 
     private fun location(name: String, dark: Boolean, results: TownResults) = step(name, dark, 1, Forward.Skip) {
         StepTitle("Where's home?")
-        LocationContent("Canter", {}, results, current = canterbury.toHome(), showCurrent = false, busy = false, onChoose = {})
+        LocationContent("Brigh", {}, results, current = brighton.toHome(), showCurrent = false, busy = false, onChoose = {})
     }
 
     private fun you(name: String, dark: Boolean) = step(name, dark, 2, Forward.Next("Next", enabled = true)) {
@@ -5736,8 +5736,8 @@ In `core/setup/src/test/java/uk/co/siland/culvery/core/setup/SetupScreenshotTest
     @Test fun welcomeDark() = welcome("welcome_dark", true, sample = false)
     @Test fun welcomeLight() = welcome("welcome_light", false, sample = false)
     @Test fun welcomeSampleDark() = welcome("welcome_sample_dark", true, sample = true)
-    @Test fun locationResultsDark() = location("location_results_dark", true, TownResults.Found(listOf(canterbury, canterburyNz)))
-    @Test fun locationResultsLight() = location("location_results_light", false, TownResults.Found(listOf(canterbury, canterburyNz)))
+    @Test fun locationResultsDark() = location("location_results_dark", true, TownResults.Found(listOf(brighton, brightonNz)))
+    @Test fun locationResultsLight() = location("location_results_light", false, TownResults.Found(listOf(brighton, brightonNz)))
     @Test fun locationFailedDark() = location("location_failed_dark", true, TownResults.Failed)
     @Test fun youDark() = you("you_dark", true)
     @Test fun youLight() = you("you_light", false)
@@ -6344,7 +6344,7 @@ Expected: PASS (new screenshots not yet recorded).
 Run: `./gradlew :core:setup:recordRoborazziDebug --tests "*SetupScreenshotTest*"`
 Open and check (seven dots each, the step's dot in `accent`):
 - `welcome_{dark,light}`: "Welcome to Culvery", the line in `mute`, no Back, an `accent` **Start**; `welcome_sample_dark` adds a `surf2` **Use a sample household** pill under the line;
-- `location_results_{dark,light}`: "Where's home?", the field reading "Canter", two rows ("Canterbury, England, United Kingdom" ticked in `accent`, "Canterbury, New Zealand"), "Used for the time zone, and for weather." in `mute`, **Back** and **Skip for now**;
+- `location_results_{dark,light}`: "Where's home?", the field reading "Brigh", two rows ("Brighton, England, United Kingdom" ticked in `accent`, "Brighton, New Zealand"), "Used for the time zone, and for weather." in `mute`, **Back** and **Skip for now**;
 - `location_failed_dark`: the field, then "Couldn't search for towns — check the tablet's Wi-Fi and try again." in `danger`;
 - `you_{dark,light}`: "Who's setting this up?", the field reading "Alex", eight swatches with the green ringed, **Set your PIN** with "PIN set" beside it, an enabled **Next**;
 - `done_{dark,light}`: "Culvery is ready" and an `accent` **Open Culvery**.
@@ -6487,11 +6487,11 @@ In `core/setup/src/test/java/uk/co/siland/culvery/core/setup/StepsTest.kt`, add 
         access.addAdmin()
         val page = LocationPage(household, NoSearch, access.control)
         access.answer(null)
-        assertThat(page.saveHome(canterbury)).isFalse()
+        assertThat(page.saveHome(brighton)).isFalse()
         assertThat(household.location.first()).isNull()
         access.answer("1234")
-        assertThat(page.saveHome(canterbury)).isTrue()
-        assertThat(household.location.first()).isEqualTo(canterbury.toHome())
+        assertThat(page.saveHome(brighton)).isTrue()
+        assertThat(household.location.first()).isEqualTo(brighton.toHome())
     }
 ```
 
@@ -6528,7 +6528,7 @@ import uk.co.siland.culvery.core.ui.PersonPalette
 class SettingsScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    private val canterbury = PlaceMatch("Canterbury", "England", "United Kingdom", 51.27904, 1.07992, "Europe/London")
+    private val brighton = PlaceMatch("Brighton", "England", "United Kingdom", 50.82838, -0.13947, "Europe/London")
     private val people = listOf(
         Member(Person(PersonId("alex"), "Alex", PersonPalette.colors[0]), Role.ADMIN, hasPin = true),
         Member(Person(PersonId("sam"), "Sam", PersonPalette.colors[1]), Role.ADULT, hasPin = false),
@@ -6537,7 +6537,7 @@ class SettingsScreenshotTest {
     private val pages = listOf(
         StillPage("location", "Home location", 0) {
             StepTitle("Home location")
-            LocationContent("", {}, TownResults.Idle, canterbury.toHome(), showCurrent = true, busy = false, onChoose = {})
+            LocationContent("", {}, TownResults.Idle, brighton.toHome(), showCurrent = true, busy = false, onChoose = {})
         },
         StillPage("people", "People", 100) {
             StepTitle("People")
@@ -6842,7 +6842,7 @@ Expected: PASS (new screenshots not yet recorded).
 Run: `./gradlew :core:setup:recordRoborazziDebug --tests "*SettingsScreenshotTest*"`
 Open and check:
 - all six: a 320 dp `surf` column on the left with "Settings", then "Home location", "People", "Calendars", "Kiosk" (the chosen one on `accentSoft` in `accent`), and **Close** at the bottom; the page on `bg` to the right;
-- `settings_location_*`: "Home location", the saved home as a ticked row "Canterbury, England, United Kingdom", the empty field reading "Town or city", "Used for the time zone, and for weather.";
+- `settings_location_*`: "Home location", the saved home as a ticked row "Brighton, England, United Kingdom", the empty field reading "Town or city", "Used for the time zone, and for weather.";
 - `settings_people_*`: "People", Alex and Sam rows, **Add person**;
 - `settings_kiosk_*`: "Kiosk", the line "Culvery keeps the tablet on this app. Exit to use other apps; it locks again next time Culvery opens." in `mute`, and **Exit kiosk**.
 

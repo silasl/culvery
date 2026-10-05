@@ -58,7 +58,7 @@ class StepsTest {
     private lateinit var db: HouseholdDatabase
     private lateinit var household: HouseholdRepository
     private lateinit var states: SetupStates
-    private val canterbury = PlaceMatch("Canterbury", "England", "United Kingdom", 51.27904, 1.07992, "Europe/London")
+    private val brighton = PlaceMatch("Brighton", "England", "United Kingdom", 50.82838, -0.13947, "Europe/London")
 
     @Before
     fun setUp() {
@@ -89,9 +89,9 @@ class StepsTest {
         val access = testAccess(household)
         val step = LocationStep(household, NoSearch, access.control)
         assertThat(step.done.first()).isFalse()
-        assertThat(step.saveHome(canterbury)).isTrue()
-        assertThat(household.location.first()).isEqualTo(canterbury.toHome())
-        assertThat(household.location.first()?.name).isEqualTo("Canterbury, England, United Kingdom")
+        assertThat(step.saveHome(brighton)).isTrue()
+        assertThat(household.location.first()).isEqualTo(brighton.toHome())
+        assertThat(household.location.first()?.name).isEqualTo("Brighton, England, United Kingdom")
         assertThat(access.requests).isEmpty()
         assertThat(step.done.first()).isTrue()
     }
@@ -102,10 +102,10 @@ class StepsTest {
         access.addAdmin()
         val step = LocationStep(household, NoSearch, access.control)
         access.answer(null)
-        assertThat(step.saveHome(canterbury)).isFalse()
+        assertThat(step.saveHome(brighton)).isFalse()
         assertThat(household.location.first()).isNull()
         access.answer("1234")
-        assertThat(step.saveHome(canterbury)).isTrue()
+        assertThat(step.saveHome(brighton)).isTrue()
         assertThat(access.requests).hasSize(2)
     }
 
@@ -115,11 +115,11 @@ class StepsTest {
         access.addAdmin()
         val page = LocationPage(household, NoSearch, access.control)
         access.answer(null)
-        assertThat(page.saveHome(canterbury)).isFalse()
+        assertThat(page.saveHome(brighton)).isFalse()
         assertThat(household.location.first()).isNull()
         access.answer("1234")
-        assertThat(page.saveHome(canterbury)).isTrue()
-        assertThat(household.location.first()).isEqualTo(canterbury.toHome())
+        assertThat(page.saveHome(brighton)).isTrue()
+        assertThat(household.location.first()).isEqualTo(brighton.toHome())
     }
 
     private fun youStep(access: TestAccess, gate: SetupSessionGate = SetupSessionGate(household, access.control)) =

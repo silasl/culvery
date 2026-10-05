@@ -9,7 +9,7 @@ data class PlaceMatch(
     val longitude: Double,
     val timeZoneId: String,
 ) {
-    /** "Canterbury, England, United Kingdom"; a region that repeats the name is left out. */
+    /** "Brighton, England, United Kingdom"; a region that repeats the name is left out. */
     val label: String get() = listOfNotNull(name, region?.takeIf { it != name }, country).joinToString(", ")
 }
 

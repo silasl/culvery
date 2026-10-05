@@ -131,7 +131,7 @@ class HouseholdRepositoryTest {
     @Test
     fun locationRoundTrips() = runTest {
         assertThat(repo.location.first()).isNull()
-        val home = HomeLocation("Balcombe", 51.06, -0.13, "Europe/London")
+        val home = HomeLocation("Brighton", 50.82838, -0.13947, "Europe/London")
         repo.setLocation(home)
         assertThat(repo.location.first()).isEqualTo(home)
     }

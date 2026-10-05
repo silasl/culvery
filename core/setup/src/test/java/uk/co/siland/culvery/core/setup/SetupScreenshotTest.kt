@@ -129,8 +129,8 @@ class SetupScreenshotTest {
             WizardFrame(7, dot, back = if (back) ({}) else null, forward = forward, busy = false, onForward = {}, onSkip = {}, content = content)
         }
 
-    private val canterbury = PlaceMatch("Canterbury", "England", "United Kingdom", 51.27904, 1.07992, "Europe/London")
-    private val canterburyNz = PlaceMatch("Canterbury", "Canterbury", "New Zealand", -43.5, 172.0, "Pacific/Auckland")
+    private val brighton = PlaceMatch("Brighton", "England", "United Kingdom", 50.82838, -0.13947, "Europe/London")
+    private val brightonNz = PlaceMatch("Brighton", "Brighton", "New Zealand", -45.95, 170.33, "Pacific/Auckland")
 
     private fun welcome(name: String, dark: Boolean, sample: Boolean) =
         step(name, dark, 0, Forward.Next("Start", enabled = true), back = false) {
@@ -139,7 +139,7 @@ class SetupScreenshotTest {
 
     private fun location(name: String, dark: Boolean, results: TownResults) = step(name, dark, 1, Forward.Skip) {
         StepTitle("Where's home?")
-        LocationContent("Canter", {}, results, current = canterbury.toHome(), showCurrent = false, busy = false, onChoose = {})
+        LocationContent("Brigh", {}, results, current = brighton.toHome(), showCurrent = false, busy = false, onChoose = {})
     }
 
     private fun you(name: String, dark: Boolean) = step(name, dark, 2, Forward.Next("Next", enabled = true)) {
@@ -155,8 +155,8 @@ class SetupScreenshotTest {
     @Test fun welcomeDark() = welcome("welcome_dark", true, sample = false)
     @Test fun welcomeLight() = welcome("welcome_light", false, sample = false)
     @Test fun welcomeSampleDark() = welcome("welcome_sample_dark", true, sample = true)
-    @Test fun locationResultsDark() = location("location_results_dark", true, TownResults.Found(listOf(canterbury, canterburyNz)))
-    @Test fun locationResultsLight() = location("location_results_light", false, TownResults.Found(listOf(canterbury, canterburyNz)))
+    @Test fun locationResultsDark() = location("location_results_dark", true, TownResults.Found(listOf(brighton, brightonNz)))
+    @Test fun locationResultsLight() = location("location_results_light", false, TownResults.Found(listOf(brighton, brightonNz)))
     @Test fun locationFailedDark() = location("location_failed_dark", true, TownResults.Failed)
     @Test fun youDark() = you("you_dark", true)
     @Test fun youLight() = you("you_light", false)

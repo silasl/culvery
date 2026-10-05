@@ -148,7 +148,7 @@ Full screen. Progress dots at the top centre; the step's content in a centred co
 - **Done:** "Culvery is ready", **Open Culvery**.
 
 ### 4.3 Home location
-"Where's home?" A search field; up to 5 result rows ("Canterbury, England, United Kingdom"); the selected one ticked. Below: "Used for the time zone, and for weather." Errors: "Couldn't search for towns — check the tablet's Wi-Fi and try again." No match: "No towns match "{query}"." Settings shows the current location above the field.
+"Where's home?" A search field; up to 5 result rows ("Brighton, England, United Kingdom"); the selected one ticked. Below: "Used for the time zone, and for weather." Errors: "Couldn't search for towns — check the tablet's Wi-Fi and try again." No match: "No towns match "{query}"." Settings shows the current location above the field.
 
 ### 4.4 People
 - **List:** colour dot, name, role, "PIN set" / "No PIN"; tap to edit; **Add person**.
