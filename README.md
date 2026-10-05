@@ -17,6 +17,8 @@ Requirements: JDK 17, Android SDK platform 35.
 
 Use `testDebugUnitTest`, not `test` — release unit tests don't include the Compose test activity.
 
+A release build is signed with your own key, shrunk by R8, and logs only warnings and errors: `./gradlew :app:assembleRelease` once the signing properties are set (`docs/setup/release.md`). Without them, any release task stops at once and says what to set; debug builds and the tests never need them. To time a release build's start-up on a running emulator or tablet, run `tools/measure-release.sh <device>`: it does warm-up starts, then times each start until Home has drawn its cards, and counts Play services crashes.
+
 A fresh install opens the setup wizard before anything else: Welcome, Home location (town search, through Open-Meteo), You (the first Admin and their PIN), Household, Connect a calendar, Review calendars, Done. Each step saves as it goes, so a restart resumes where setup stopped; after the first Admin exists, a restart asks for their PIN once. An install from an earlier build that already has an Admin goes straight to Home. To run setup again, clear the app's data (`adb shell pm clear uk.co.siland.culvery`).
 
 In debug builds Welcome also offers **Use a sample household**: **Alex** (Admin, PIN 1234), **Sam** (Adult, PIN 2468), **Mia** (Child, PIN 1357), London, and a "Sample calendar" connection showing the design hand-off's week, with its "Family calendar" as the master calendar. The sample calendar keeps changes in memory and forgets them when the app restarts. Release builds offer no sample and include no sample calendar.
@@ -25,7 +27,9 @@ Once a home location is set, Home's header shows the weather now and the Forecas
 
 To see what the tablet does while a calendar can't be reached, a debug build can take the sample calendar offline and bring it back: `adb shell am broadcast -n uk.co.siland.culvery/.DebugOfflineReceiver --ez offline true` (or `false`). Changes made meanwhile show as syncing and are sent once it is back. This switch is debug-only and reached only over adb; it has no counterpart in the app's UI.
 
-To connect a real Google account, first set up a Google Cloud project with an Android client for your debug key (`docs/setup/google-calendar.md`), add the family's Google account to the device (Settings › Accounts), then connect it in the wizard's Connect step, or later in Settings › Calendars (Admin PIN). Connecting removes the sample calendar, with its events and queued changes, for good. Settings › Calendars says who each calendar is for, shows or hides it, picks the master calendar new events go to, and disconnects (dropping its queued changes; Google keeps the grant until you remove it, see `docs/setup/google-calendar.md`). A calendar hidden on the tablet stays hidden until it is ticked or unticked again in Google Calendar. Release builds offer Google Calendar only, and its Connect fails until the release key's SHA-1 has its own Android client (Plan 4). A calendar is mapped to a person when its name contains theirs as a whole word, so a name that is also a common word ("May", "Will") can map a calendar like "May half term" to that person; change it in Settings › Calendars.
+To connect a real Google account, first set up a Google Cloud project with an Android client for your debug key (`docs/setup/google-calendar.md`), add the family's Google account to the device (Settings › Accounts), then connect it in the wizard's Connect step, or later in Settings › Calendars (Admin PIN). Connecting removes the sample calendar, with its events and queued changes, for good. Settings › Calendars says who each calendar is for, shows or hides it, picks the master calendar new events go to, and disconnects (dropping its queued changes; Google keeps the grant until you remove it, see `docs/setup/google-calendar.md`). A calendar hidden on the tablet stays hidden until it is ticked or unticked again in Google Calendar. Release builds offer Google Calendar only, through a second Android OAuth client for the release key (`docs/setup/google-calendar.md` §4). Connecting and reconnecting always ask for an Admin's PIN. A calendar is mapped to a person when its name contains theirs as a whole word, so a name that is also a common word ("May", "Will") can map a calendar like "May half term" to that person; change it in Settings › Calendars. A calendar the account still lists but whose events Google refuses shows on its own row in Settings › Calendars with **Hide this calendar**; its connection stays healthy.
+
+The Calendar tab shows this week and steps ahead a week at a time, up to three weeks on; it comes back to this week after 2 minutes untouched and at midnight. Any later date can still be added through **Pick date…**.
 
 ## Screenshot tests
 
@@ -47,7 +51,7 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 |---|---|
 | `:app` | Activity, kiosk mode, nav rail, Home grid, wiring only |
 | `:core:ui` | Design tokens, DM Sans, Material Symbols, shared components |
-| `:core:plugin` | `Capability`, `SetupStep`, `SettingsPage`, `HomeCard`, `HeaderItem`, `Daylight`, `ProviderDescriptor`, `Connection`, `ConnectionHealth`, `ShellNavigator`, `OverlayHost`, `Toaster`, `Startable` |
+| `:core:plugin` | `Capability`, `SetupStep`, `SettingsPage`, `HomeCard`, `HeaderItem`, `Daylight`, `HouseholdClock` (the one minute ticker, in the household's zone), `FirstDraw`, `HomeApp`, `ProviderDescriptor`, `Connection`, `ConnectionHealth`, `ShellNavigator`, `OverlayHost`, `Toaster`, `Startable` |
 | `:core:household` | People (with role and PIN hash), Family, home location, the household's time zone (`HouseholdZone`) — `household.db` |
 | `:core:access` | Permissions, PIN hashing, lockout, 2-minute session, PIN pad |
 | `:core:setup` | The first-run wizard, two-pane Settings, the core pages (Home location, People, Kiosk), `SetupState`, `LocationSearch` |
@@ -158,11 +162,13 @@ A provider connects one kind of calendar service (Google, ICS, CalDAV…) to the
 
 ## Kiosk mode
 
-Release builds pin the app to the screen (Android "screen pinning") once setup is complete, so the first Google connection happens outside it. Leave properly via **Settings › Kiosk › Exit kiosk** (Admin PIN, always asked).
+Release builds pin the app to the screen (Android "screen pinning") once setup is complete, so the first Google connection happens outside it. Setup's Done step, and Settings › Kiosk, offer **Choose home app**, which asks Android's own question: with Culvery as the default home app, a reboot, a power cut or a crash comes back to Culvery, and every return to the front pins it again. Culvery keeps a single instance on screen once it is the home app. **Settings › Kiosk › Exit kiosk** (Admin PIN, always asked) unpins it; as the home app it stays in front with the system bars showing, and pins again once it has left the front and come back. **Change home app** (Admin PIN, always asked) gives the tablet back its normal launcher. While Google's account chooser shows during Connect or Reconnect, Culvery leaves screen pinning and pins again when it is back in front (as device owner it stays in lock-task: Google Play services is allowed in it).
+
+On Android 12 and later (seen on the API 35 emulator), screen pinning asks "App is pinned" after every restart before it pins, and anyone can tap "No thanks". Making Culvery the device owner avoids the prompt, so it is the recommended setup for a wall tablet.
 
 Screen pinning can also be undone by holding **Back + Overview**. To stop a child doing that, on the tablet: set a screen lock (PIN), then turn on **Settings › Security › Other security settings › Pin windows › Ask for PIN before unpinning**. Unpinning then drops to the lock screen.
 
-A stronger device-owner lock is possible later; it is not built yet.
+For a stronger lock, make Culvery the device owner on a freshly reset tablet (`docs/setup/release.md` §6): it then pins with no confirmation and no exit gesture. Undoing that needs a factory reset.
 
 ## PINs
 
@@ -171,8 +177,8 @@ A stronger device-owner lock is possible later; it is not built yet.
 - Viewing never needs a PIN. Changing things does.
 - A session lasts 2 minutes after the last PIN-checked action; while Settings is open, every touch in it (its sheets and PIN pads included) restarts the 2 minutes. During setup the first Admin stays signed in until Done, or until 10 minutes pass without a touch; the wizard then asks for their PIN to carry on. While someone is signed in, the status bar shows their name and role and a **Sign out** link. Settings closes when the session ends.
 - Calendar changes follow the roles: Admins and Adults can add events for anyone, and edit, delete and assign any event on the master calendar; a Child can add events only for themselves, edit or delete only events they added (and can't move one to someone else), and can't assign. A refused change says why in a toast and signs the person out, so the next tap asks for a PIN. Events from other calendars, and repeating events, can't be changed on the tablet, and an event over several days can have only its title and who changed.
-- Exiting kiosk, adding or removing someone, changing a role and setting, changing or removing a PIN always ask for a PIN, even mid-session; renaming and recolouring don't. Changing your own role or PIN, or removing yourself, signs you out.
-- 5 wrong PINs lock the pad for 30 seconds, doubling each time up to 16 minutes. Only a PIN that is allowed to do the thing clears the count.
+- Exiting kiosk, changing the home app, connecting or reconnecting a calendar, adding or removing someone, changing a role and setting, changing or removing a PIN always ask for a PIN, even mid-session; renaming, recolouring and reordering people don't. Changing your own role or PIN, or removing yourself, signs you out.
+- 5 wrong PINs lock the pad for 30 seconds, doubling each time up to 16 minutes (a lock set further ahead than that, after the clock went back, has expired). Only a PIN that is allowed to do the thing clears the count.
 - This is kid-proofing, not strong security.
 
 **Forgotten PIN:** an Admin can reset anyone's PIN in Settings › People. If every Admin has forgotten theirs, clear the app's data (Android Settings › Apps › Culvery › Storage › Clear data). That wipes all configuration and starts setup again.
@@ -181,6 +187,12 @@ A stronger device-owner lock is possible later; it is not built yet.
 
 Open-Meteo (town search and weather; no key, no account) receives the town typed into the search, and then the home's coordinates and time zone with each forecast request, every 30 minutes. Beyond the tablet's IP address, which any web request reveals, nothing that identifies the household or its people is sent to it. Neither the town, the coordinates nor the time zone is written to the app's log.
 
+Google Calendar is asked only for the fields the tablet shows, compressed, about every five minutes per calendar; a full read happens when a calendar is connected, after a change of time zone, or about every six weeks. A release build logs only warnings and errors, naming exception types, HTTP codes and internal ids: never a person, calendar, account, town, coordinates or time zone.
+
+## Homepage and privacy policy
+
+`docs/index.html` and `docs/privacy.html` are served by GitHub Pages from `main` `/docs` at https://silasl.github.io/culvery/ once the repository is public and Pages is on. Google's OAuth Branding uses those two URLs, with `silasl.github.io` as the authorised domain.
+
 ## Licences
 
-DM Sans: SIL Open Font License (`core/ui/licenses/OFL-DMSans.txt`). Material Symbols: Apache 2.0 (`core/ui/licenses/Apache-MaterialSymbols.txt`).
+DM Sans: SIL Open Font License (`core/ui/licenses/OFL-DMSans.txt`). Material Symbols: Apache 2.0 (`core/ui/licenses/Apache-MaterialSymbols.txt`), subset to the glyphs Culvery uses (`tools/fonts/README.md`). The app icon is the project's own artwork (`tools/icon/`). The generated `.dc.html` files and `support.js` in `docs/design/house_hub_handoff/` are kept locally, not in the repository.

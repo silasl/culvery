@@ -8,29 +8,21 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - Set a module-wide Robolectric viewport default (`w1280dp-h800dp`) so each test class doesn't need its own `@Config`.
 - Home header: the gap between the clock and the date is about 55 dp on the emulator, against about 12 dp in the hand-off, so the grid sits roughly 40 dp too low. The line-height trim on `HhType.clock` isn't taking effect. Found on the emulator; both AVDs show it.
 
-## For Plan 4 (weather, setup, settings, release)
-- Guard the lockout against a backwards jump of the wall clock: treat a stored `lockedUntil` more than 16 minutes in the future as expired.
-- Subset the 15 MB Material Symbols font to the glyphs used, and measure memory on the SM-T510.
-- After Exit kiosk, the system bars overlap the content (edge-to-edge, no insets). Pad the root with `WindowInsets.systemBars` when not in kiosk mode.
-- `LockoutStore` uses `commit()`, which is synchronous disk I/O and may be on Main. Switch to `apply()` with an in-memory mirror if StrictMode complains.
-- `kioskExited` is lost when the Activity is recreated by a config change that isn't in the manifest list.
-- Before shipping to the wall, run the Task 10 Step 7 checks on the device and do a signed release build (`startLockTask` has only run in release, and never on a device).
-
 ## From Plan 2a review (deferred)
 
 **For the ICS provider, or the first JVM-only module** (3a design §8)
 - Cover the ICS empty feed with `fullReplace` and zero-duration events.
 - Extend the module guard to JVM-only modules.
 
-**For Plan 4**
-- Test that `addConnection` is atomic.
-- All-day events straddle two days after a household zone change until the next sync: filter all-day events by date.
-- `opsz` axis for large text.
+**For Plan 4e (the device)**
 - An on-device SM-T510 pass of the calendar UI.
+
+**For the end-of-v1 design and UX review**
+- `opsz` axis for large text.
 
 ## From Plan 2b-1 (deferred)
 
-**For Plan 4**
+**For Plan 4e (the device)**
 - Check DM Sans weights and bold-text truncation on an API 30 AVD (Google Play image); the 2b-1 walkthrough ran on API 35.
 
 **Accessibility pass (with the `HhIcon` item)**
@@ -42,7 +34,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 ## From Plan 2b-2 (deferred)
 
-**For Plan 4**
+**For Plan 4e (the device)**
 - I1, T2, T7: in the on-device pass, check the add/edit sheet with Samsung's floating and split keyboards, that the real IME inset reaches the sheet and the toast through `ShellLayers`, and that a tap on the scrim hides the keyboard.
 - The on-device pass: the add/edit sheet with the Samsung keyboard on the SM-T510, and with a signed release in lock-task mode (debug builds never call `startLockTask`, so the 2b-2 walkthrough checked the immersive window only).
 - With the full keyboard up, the add/edit sheet's first Day row is half-hidden and the chips scroll to reach it; check whether that is acceptable on the SM-T510's keyboard.
@@ -61,62 +53,38 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 ## From Plan 3a review (deferred)
 
-**For Plan 4**
-- L3: decide in the on-device kiosk pass whether connecting and reconnecting Google need a fresh PIN; 3a rides the 2-minute Admin session, and the account chooser's "Add another account" can lead a child out of the app.
-- M4: before connecting, check Play services is available (`isGooglePlayServicesAvailable`), and when the chooser comes back cancelled with no data in lock-task mode, hint to exit kiosk; part of the on-device lock-task pass.
-- M7: a source still listed after a refresh but always 403/404 on events.list is flagged for a refresh every pass and keeps its connection "Can't reach": stop re-flagging a kept source, and show per-source health in Settings.
-- L4: release logging policy: keep the account email (in request paths) and calendar names out of release logs.
-- L6: on the device, delete a whole series on a phone and check its instances leave the tablet; the next daily full sync bounds it today (a full sync when a cancelled id is a known series would close it).
-
 **Later**
 - L9: keep a Google access token in memory until a 401 instead of asking Play services for one on every call (it caches them itself; each ask costs an IPC).
 
 ## From Plan 3a (deferred)
 
-**For Plan 4**
+**For Plan 4e (the device)**
 - The on-device pass: in a signed release in lock-task mode, check Play services' account chooser and consent screens appear when connecting and reconnecting (3a design §9); if not, exit kiosk around them.
-- The release OAuth client (the release key's SHA-1) with release signing. Until then a release build offers Connect Google Calendar, and it fails with "Couldn't connect" (the README says so).
-- Bound recurring series in the mirror: Google's sync (`singleEvents`, no `timeMax`) stores every instance, e.g. 730 rows up to 2040 for one weekly event. Measure on the SM-T510 and cap stored instances (for example, drop rows past the sync window after each pass).
-- `TodayCardHost` recomposes every 30 s on the clock tick with nothing changed; key the day on the date alone.
 - Emulator Play services 26.34 crash-loops on API 35 after a network change (see the setup doc's §5 note); recheck on the SM-T510 before shipping.
-- A write refused for a missing scope (403, NeedsSignIn) while reads still work: the same pass's `markSynced` sets health back to Ok, so the reconnect chip vanishes and the change retries until its 48 hours run out. Only a later partial revocation leads here (connect refuses partial grants); keep NeedsSignIn from a write until a reconnect.
 
 ## From Plan 4a (deferred)
 
-**For Plan 4c**
-- Reordering people (4a design D15).
-- Per-calendar health in Settings › Calendars (M7) and the repeat-series cap stay 4c's (4a design D15).
-- Count the queued changes a source removal dropped in the master-gone toast (D7).
+**For Plan 4e (the device)**
 - The PIN pad for choosing a PIN has no reason line; check on the SM-T510 that its two stages read clearly.
 - The wizard's steps and Settings' pages on the SM-T510 with the Samsung keyboard up (the town search, the person sheet's name field).
-- The choose-a-PIN pad (and a sheet's Save) says "That PIN is taken — choose another." when someone else has the PIN, so an Admin can learn that a PIN is in use. Accepted: only an Admin (with a fresh PIN) gets there, and it follows from PINs being unique, since a PIN identifies its person.
-- `DebugSampleHousehold.create()` still completes when making the Family calendar the master fails, but no test forces that failure: the fake has no hook to fail its second calendar-list read alone.
-- Cold start skips 130–190 frames on the emulator (main-thread work at launch); measure on the SM-T510 and move work off Main if it shows.
 - Play services "NetworkCapability 37" crash-loops recur on API 35 emulator images whenever Play Store re-updates Play services; Culvery copes (calls fail and retry), but connecting needs a working Play services.
 
 **For the end-of-v1 design and UX review**
 - All 4a layout, colour and copy choices are provisional (wizard padding, rows, swatches, role-chip lines, Settings column, the five extra person colours, the Connect step's connected card — its title wraps onto two lines).
 - Settings page list items have no `Role.Tab` (accessibility), alongside the existing accessibility items.
 - The calendar's DeleteButton keeps its danger text while disabled; the shared HhSheetButton greys out — pick one.
-
-**Later (code health)**
-- Setup session state is held apart from the session (`setupPerson`) and cleared in several places; folding it into the session value would make "ends with the session" structural. Same review suggested one helper for the "settings.manage unless no Admin yet" check and deriving the gate from setupComplete. Deferred: the code is reviewed and tested as is.
-- `DebugSampleHousehold.create()`'s setMaster-failure path has no test; a retry after a partial failure would add people twice (debug only).
-
-**Test health**
-- `StepsUiTest.aReleaseBuildNeverOffersIt` failed once with "connection pool has been closed": a Room query outlived its test. Close the database only after the composition is disposed, or wait for idle first.
+- The choose-a-PIN pad (and a sheet's Save) says "That PIN is taken — choose another." when someone else has the PIN, so an Admin can learn that a PIN is in use. Accepted: only an Admin (with a fresh PIN) gets there, and it follows from PINs being unique, since a PIN identifies its person.
 
 ## From Plan 4b (deferred)
 
-**For Plan 4c**
+**For Plan 4e (the device)**
 - The weather on the SM-T510: the header and the Forecast card at its density, and the fetch over a whole day on the wall.
-- The calendar's Google client has no `callTimeout` either (only connect 15 s and read 30 s, `GoogleCalendarModule`), so a body that drips in can hold a sync pass until the engine's own timeout; give it a whole-call limit as the forecast's (4b plan review 2).
 - On a cold start the clock, the date and the theme show the device's zone for a moment, until Room answers with the household's (`ShellViewModel.now` starts from `LocalDateTime.now()`). Accepted in 4b; check on the SM-T510 whether it shows.
 
 **For the end-of-v1 design and UX review**
 - All 4b layout, colour and copy choices are provisional: the Forecast card's rows, its title in every state, the card's icons in sun amber like the header's, the TalkBack condition words, the header items' spacing and divider.
 - The Forecast card has a lot of empty space below its three rows.
-- The Home location town list stays open after a town is picked (with a tick). Noticed in the 4b walkthrough; it is 4a behaviour.
+- Header items could overlap the clock or date if they grow wide (design review, before Climate).
 
 **Accessibility pass (with the `HhIcon` item)**
 - The header weather item has no merged TalkBack description: the temperature and High/Low read as two separate items.
@@ -125,21 +93,30 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **Later**
 - Open-Meteo answers with one UTC offset for the whole forecast, so data fetched before a clock change is an hour out for the days after it until the next fetch; offline across a clock change, the header's hour and the theme's sunset are an hour out. Known and untested in 4b (ruling 2). Fix: ask with `timeformat=unixtime` and convert each time in the household's zone (dates from the daily rows' own instants).
 
-**Test health (4b final review)**
-- No test for repeated days in the store (`distinctBy { it.date }`); only repeated hours are tested.
-- Robolectric prints "SDK 36 requires Java 21" in test output (pre-existing, branch-wide).
-- No test asserts that `WeatherUnavailableException` carries no cause (a privacy rule, ruling 15).
-- The null-entry test in the provider misses a null `time` and a null `low`.
-- No test that clearing the location after a fetch stops fetching (the code is right, `WeatherSyncLoop`).
-- `HouseholdTickerTest`'s Room read lacks the bounded real-time wait.
+## From Plan 4c (deferred)
 
-**Later (code health, 4b final review)**
-- Coordinates with |x| < 0.001 are sent in exponent notation (`OpenMeteoForecast`, `toString`); check Open-Meteo accepts it, or use `toBigDecimal().toPlainString()`. A rejection would mean no weather for a home on the Greenwich or equator strip.
-- `retryWithBackoff` resets its backoff on every value, so a read that emits and then fails logs every second.
-- `WeatherRepository`'s header reads `now` a second time and every collector starts its own minute ticker (four on Home); share one household-zone `now` before Climate adds a second header item.
-- Header items could overlap the clock or date if they grow wide (design review, before Climate).
-- `Http.kt:31-37` resumes with any `Throwable`, so a non-`IOException` can escape the provider's read and break the "nothing else escapes" contract (the loop still catches it).
-- `HomeScreen`'s `headerItems` default value is used only by tests; drop it and pass `emptyList()` there.
+**For Plan 4d (design, UX and accessibility)**
+- All 4c layout and copy choices are provisional: the home-app prompt (under Done's title; above Exit kiosk), the 48 dp Move up / Move down buttons, the read-problem line in danger colour with Hide at its right, `bedtime` for a clear night and `mobile` for a phone, the splash with no icon until the launcher icon exists, and the Calendar tab's ‹ › and This week pill.
+- Move up / Move down have spoken labels but no other accessibility review yet.
+- The dovecote launcher icon and splash are provisional.
+
+**For Plan 4e (the device)**
+- Measure Appendix B's numbers on the SM-T510 (start-up, skipped frames, gfxinfo, memory), and the subset font's memory saving there. The emulator's numbers are noisy, and first starts after an install are slow on it.
+- A week-long run on the SM-T510 with no slowdown: Java heap, native heap, PSS, threads, GC and frame jank sampled over time (a soak script was offered and deferred to 4e).
+- Connect and Reconnect in lock-task on the SM-T510, with screen pinning and as device owner: the account chooser opens outside pinning and Culvery pins again. Pinning dropping while the chooser shows wasn't observed in the emulator walkthrough; it is unit-tested.
+- Screen pinning on Android 11: does it prompt after a reboot as Android 15 does? Decide on device owner for the wall.
+- The home app after a real power cut; device-owner provisioning on a freshly reset tablet (`docs/setup/release.md` §6).
+- Confirm on a real account that a calendar unshared from it is refused (403/404) while still listed, and how long Google keeps listing it; check the row and **Hide this calendar** (unshare a calendar shared in from another account).
+- "Delete this and following" on a phone: Google ends the series with UNTIL rather than cancelling it; check the trailing instances leave the tablet.
+- The `onCreate` hand-over (a standard-task Culvery created while Culvery is already home) couldn't be triggered on API 35; unit-tested only.
+- The R8 build's sign-in, sync, writes and weather on the tablet.
+- An optional short API 30 emulator pass (no Google): the splash compat path, Choose home app, pinning, DM Sans weights. Offered, not done.
+
+**GitHub and Google (owner actions, not code)**
+- Make the repository public, enable Pages (`main`, `/docs`), set the OAuth Branding homepage and privacy URLs and the authorised domain, then publish the OAuth app to production (it's in Testing, so grants expire every 7 days).
+
+**Later**
+- Google Calendar's sync token now lives about six weeks; check quota and data use over a month on the wall (Appendix A's economy estimate assumed a nightly full read).
 
 ## Feature ideas (2026-10-02, after v1)
 
