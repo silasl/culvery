@@ -50,7 +50,7 @@ A release logs only warnings and errors, and they name no person, calendar, acco
 
 ## 5. Make Culvery the home app
 
-After setup, the Done step (and Settings › Kiosk) shows "Make Culvery the home app so it comes back after a restart." Tap **Choose home app** and answer Android's question. From then on a reboot, a power cut or a crash lands back in Culvery, and every return to the front pins it again. **Exit kiosk** unpins it and, as the home app, leaves it in front with the system bars showing; switch apps from there with Overview. To give the tablet back its normal launcher, use **Settings › Kiosk › Change home app** (a fresh Admin PIN; the pad says "Exit kiosk mode") and choose the other launcher.
+After setup, the Done step (and Settings › Kiosk) shows "Make Culvery the home app so it comes back after a restart." Tap **Choose home app** and answer Android's question (it needs an Admin signed in, and Culvery is unpinned while Android's dialog shows; do this once at setup, then sign out). From then on a reboot, a power cut or a crash lands back in Culvery, and every return to the front pins it again. **Exit kiosk** unpins it and, as the home app, leaves it in front with the system bars showing; switch apps from there with Overview. To give the tablet back its normal launcher, use **Settings › Kiosk › Change home app** (a fresh Admin PIN; the pad says "Exit kiosk mode") and choose the other launcher; that unpins Culvery too.
 
 ## 6. Device owner (the wall setup)
 
@@ -64,4 +64,6 @@ Install the release before running `dpm`: the command needs Culvery's admin comp
 
 Add the family's Google account afterwards (Settings › Accounts). Undoing device owner needs a factory reset.
 
-Without device owner, Culvery runs in screen pinning, and two moments leave it unpinned: Android's "Choose home app" dialog, and Google's account chooser during Connect or Reconnect. Both need an Admin: Choose home app while an Admin is signed in, Connect or Reconnect with a fresh Admin PIN. A Home or Overview press there leaves Culvery unpinned until it next comes to the front, so sign out when done. This is accepted for screen pinning; there is no re-pin timer.
+As device owner, Culvery stays in lock-task while Google's account chooser is open. With screen pinning, it unpins there until it is back in front.
+
+In both setups, **Choose home app** (an Admin signed in) and **Change home app** (a fresh Admin PIN) unpin Culvery while Android's dialog shows. A Home or Overview press from that dialog leaves Culvery unpinned until it next comes to the front. Do the home-app step once at setup and sign out afterwards. This is accepted; there is no re-pin timer.

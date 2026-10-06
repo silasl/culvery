@@ -2378,6 +2378,8 @@ internal fun SemanticsNodeInteraction.textLayout(): TextLayoutResult {
     return results.single()
 }
 ```
+Superseded: see Global Constraints and spec §6.1 (`Modifier.lineBox`).
+
 `ShellLayoutTest.kt`, add (imports: `uk.co.siland.culvery.capability.weather.Condition`, `uk.co.siland.culvery.capability.weather.HeaderWeather`, `uk.co.siland.culvery.capability.weather.ui.WeatherHeaderItem`, `uk.co.siland.culvery.core.ui.WithFontScale`):
 ```kotlin
     /** Hand-off: the clock's line box is 0.9 × 104 sp; Trim.Both had made it the font's whole 135 dp. */
@@ -2415,6 +2417,8 @@ Run: `./gradlew :app:testDebugUnitTest --tests "*ShellLayoutTest*"`
 Expected: FAIL: "expected 94.0 ± 1 but was 135.x"; "items.left … expected at least …".
 
 - [ ] **Step 3: Fix the clock box and give the items a budget**
+
+Superseded: see Global Constraints and spec §6.1 (`Modifier.lineBox`).
 
 `Type.kt:38-42`:
 ```kotlin

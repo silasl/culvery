@@ -278,7 +278,7 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 
 **For Plan 4e (the device)**
 - The status bar's Sign out and theme toggle rely on Compose's 48 dp touch-target expansion rather than 48 dp of layout (4d-1 ruling 8); check on the SM-T510 that a touch just outside them lands.
-- `HhCloseButton` is `surf2` on `bg` (1.04:1) in light; check on the SM-T510 that it reads as a button (see 4d-2 above).
+- The unpinned window behind Android's home-role dialog (Choose home app, Change home app) is the same with or without device owner: `openHomeAppScreen` unpins either way, so a Home press from the dialog leaves Culvery unpinned until it next comes to the front. Accepted 2026-10-06 with no re-pin timer; device owner only keeps Google's account chooser pinned (`KioskLifecycle.kt`).
 
 ## Feature ideas (2026-10-02, after v1)
 
