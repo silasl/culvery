@@ -59,6 +59,8 @@ class WeatherScreenshotTest {
     @Test fun forecastAgeLight() = card("forecast_age_light", false, READY, READY.fetchedAtMillis + THREE_HOURS)
     @Test fun forecastWaitingDark() = card("forecast_waiting_dark", true, WeatherView.Waiting)
     @Test fun forecastWaitingLight() = card("forecast_waiting_light", false, WeatherView.Waiting)
+    @Test fun forecastFailedDark() = card("forecast_failed_dark", true, WeatherView.Failed)
+    @Test fun forecastFailedLight() = card("forecast_failed_light", false, WeatherView.Failed)
     @Test fun forecastExpiredDark() = card("forecast_expired_dark", true, WeatherView.Expired)
     @Test fun forecastExpiredLight() = card("forecast_expired_light", false, WeatherView.Expired)
     @Test fun forecastNoLocationDark() = card("forecast_no_location_dark", true, WeatherView.NoLocation)

@@ -10,6 +10,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -34,7 +36,8 @@ internal fun Flow<HomeLocation?>.places(): Flow<WeatherPlace?> = map { location 
  * Fetches as soon as Home has drawn (or FIRST_DRAW_WAIT_MS has passed, 4c §4.1) and a location is known, and whenever
  * its coordinates or zone change, then every [WEATHER_REFRESH_MS], or [WEATHER_RETRY_MS] after a failure (4b design
  * §3.6). Without a location it waits and fetches nothing. A change that arrives mid-fetch runs one more fetch
- * afterwards; it never cancels the running one.
+ * afterwards; it never cancels the running one. [lastFailure] says where the last fetch failed, so the card can say a
+ * first fetch didn't get through.
  */
 @Singleton
 class WeatherSyncLoop internal constructor(
@@ -46,6 +49,11 @@ class WeatherSyncLoop internal constructor(
     @Inject
     constructor(fetcher: WeatherFetcher, household: HouseholdRepository, firstDraw: FirstDraw, @ApplicationScope scope: CoroutineScope) :
         this(fetcher::fetch, household.location.places(), scope, { firstDraw.await() })
+
+    private val failure = MutableStateFlow<WeatherPlace?>(null)
+
+    /** The place the last finished fetch failed for, null once one succeeds; a fetch still running changes nothing. */
+    val lastFailure: StateFlow<WeatherPlace?> = failure.asStateFlow()
 
     override fun start() {
         scope.launch {
@@ -77,8 +85,8 @@ class WeatherSyncLoop internal constructor(
         }
     }
 
-    private suspend fun runFetch(place: WeatherPlace): Boolean =
-        try {
+    private suspend fun runFetch(place: WeatherPlace): Boolean {
+        val ok = try {
             fetch(place)
             true
         } catch (e: CancellationException) {
@@ -91,4 +99,7 @@ class WeatherSyncLoop internal constructor(
             Log.w(TAG, "Weather fetch failed (${e::class.simpleName})")
             false
         }
+        failure.value = if (ok) null else place
+        return ok
+    }
 }

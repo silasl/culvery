@@ -245,4 +245,37 @@ class WeatherSyncLoopTest {
         runCurrent()
         assertThat(fetched).containsExactly(london)
     }
+
+    @Test
+    fun theLastFailureNamesThePlaceAndASuccessClearsIt() = runTest {
+        var calls = 0
+        val loop = WeatherSyncLoop({
+            calls++
+            if (calls == 1) throw WeatherUnavailableException("offline")
+        }, MutableStateFlow(london), backgroundScope)
+        assertThat(loop.lastFailure.value).isNull()
+        loop.start()
+        runCurrent()
+        assertThat(loop.lastFailure.value).isEqualTo(london)
+        after(WEATHER_RETRY_MS)
+        assertThat(loop.lastFailure.value).isNull()
+    }
+
+    @Test
+    fun aFetchStillRunningLeavesTheLastFailureShowing() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        var calls = 0
+        val loop = WeatherSyncLoop({
+            calls++
+            if (calls == 1) throw WeatherUnavailableException("offline") else gate.await()
+        }, MutableStateFlow(london), backgroundScope)
+        loop.start()
+        runCurrent()
+        after(WEATHER_RETRY_MS)
+        assertThat(calls).isEqualTo(2)
+        assertThat(loop.lastFailure.value).isEqualTo(london)
+        gate.complete(Unit)
+        runCurrent()
+        assertThat(loop.lastFailure.value).isNull()
+    }
 }

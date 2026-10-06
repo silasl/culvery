@@ -7,6 +7,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -16,20 +17,21 @@ import uk.co.siland.culvery.core.plugin.SunTimes
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
 /**
- * What the weather UI and the theme read (4b design §3.7): the home location, the stored fetch and the household's wall
- * time, by the minute. The rules are the pure [weatherView], [headerWeather] and [sunTimesOn].
+ * What the weather UI and the theme read (4b design §3.7): the home location, the stored fetch, where the last fetch
+ * failed and the household's wall time, by the minute. The rules are the pure [weatherView], [headerWeather] and [sunTimesOn].
  */
 @Singleton
 class WeatherRepository internal constructor(
     location: Flow<HomeLocation?>,
     stored: Flow<StoredWeather?>,
     now: Flow<LocalDateTime>,
+    failures: Flow<WeatherPlace?> = flowOf(null),
 ) : Daylight {
     @Inject
-    constructor(household: HouseholdRepository, store: WeatherStore, clock: HouseholdClock) :
-        this(household.location, store.stored, clock.minutes)
+    constructor(household: HouseholdRepository, store: WeatherStore, clock: HouseholdClock, syncLoop: WeatherSyncLoop) :
+        this(household.location, store.stored, clock.minutes, syncLoop.lastFailure)
 
-    val view: Flow<WeatherView> = combine(location, stored, now) { l, s, n -> weatherView(l, s, n) }
+    val view: Flow<WeatherView> = combine(location, stored, now, failures) { l, s, n, f -> weatherView(l, s, n, f) }
         .distinctUntilChanged()
         .retryWithBackoff { Log.w(TAG, "Couldn't read the weather (${it::class.simpleName}); retrying") }
 

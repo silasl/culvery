@@ -16,6 +16,9 @@ data class WeatherPlace(val latitude: Double, val longitude: Double, val zoneId:
 
     /** The zone to ask in; the device's when [zoneId] doesn't parse, as `HouseholdZone` falls back. */
     val zone: ZoneId get() = zoneOrDevice(zoneId)
+
+    // Printed by mistake (a log, a crash message), a place gives away where the household lives.
+    override fun toString(): String = "WeatherPlace(withheld)"
 }
 
 /** What `weather.db` holds: one fetch, made for [place]. */
@@ -37,6 +40,9 @@ sealed interface WeatherView {
     /** A location is set; nothing stored matches it. */
     data object Waiting : WeatherView
 
+    /** A location is set, nothing stored matches it, and the last fetch for it failed. */
+    data object Failed : WeatherView
+
     /** Matching data, but nothing for today. */
     data object Expired : WeatherView
 
@@ -50,9 +56,11 @@ sealed interface WeatherView {
     ) : WeatherView
 }
 
-fun weatherView(location: HomeLocation?, stored: StoredWeather?, now: LocalDateTime): WeatherView {
+/** [failedFor]: the place the last finished fetch failed for, null once one succeeded. */
+fun weatherView(location: HomeLocation?, stored: StoredWeather?, now: LocalDateTime, failedFor: WeatherPlace? = null): WeatherView {
     if (location == null) return WeatherView.NoLocation
-    val data = stored.matching(location) ?: return WeatherView.Waiting
+    val data = stored.matching(location)
+        ?: return if (failedFor == WeatherPlace(location)) WeatherView.Failed else WeatherView.Waiting
     val date = now.toLocalDate()
     val ahead = data.days.filter { !it.date.isBefore(date) }.sortedBy { it.date }
     val today = ahead.firstOrNull()?.takeIf { it.date == date } ?: return WeatherView.Expired

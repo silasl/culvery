@@ -22,6 +22,7 @@ import uk.co.siland.culvery.capability.weather.DailyWeather
 import uk.co.siland.culvery.capability.weather.FORECAST_TITLE
 import uk.co.siland.culvery.capability.weather.GETTING_FORECAST
 import uk.co.siland.culvery.capability.weather.NO_FORECAST
+import uk.co.siland.culvery.capability.weather.NO_FORECAST_YET
 import uk.co.siland.culvery.capability.weather.OPEN_SETTINGS
 import uk.co.siland.culvery.capability.weather.WeatherRepository
 import uk.co.siland.culvery.capability.weather.WeatherView
@@ -66,6 +67,7 @@ fun ForecastCard(view: WeatherView, nowMillis: Long, modifier: Modifier = Modifi
                 }
             }
             WeatherView.Waiting -> Text(GETTING_FORECAST, style = HhType.body, color = c.mute)
+            WeatherView.Failed -> Text(NO_FORECAST_YET, style = HhType.body, color = c.mute, modifier = Modifier.testTag("weather_failed"))
             WeatherView.Expired -> Text(NO_FORECAST, style = HhType.body, color = c.mute)
             WeatherView.NoLocation -> {
                 Text(ADD_LOCATION, style = HhType.body, color = c.mute)

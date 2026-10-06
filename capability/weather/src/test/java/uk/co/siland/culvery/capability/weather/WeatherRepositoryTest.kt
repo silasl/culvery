@@ -138,4 +138,19 @@ class WeatherRepositoryTest {
             db.close()
         }
     }
+
+    @Test
+    fun aFailedFirstFetchShowsFailedUntilOneSucceeds() = runTest {
+        stored.value = null
+        val failures = MutableStateFlow<WeatherPlace?>(null)
+        val withFailures = WeatherRepository(location, stored, now, failures)
+        withFailures.view.test {
+            assertThat(awaitItem()).isEqualTo(WeatherView.Waiting)
+            failures.value = WeatherPlace(LONDON)
+            assertThat(awaitItem()).isEqualTo(WeatherView.Failed)
+            stored.value = stored()
+            assertThat(awaitItem()).isInstanceOf(WeatherView.Ready::class.java)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

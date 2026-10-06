@@ -125,4 +125,12 @@ class ForecastCardTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
             .assertHeightIsEqualTo(48.dp)
     }
+
+    @Test
+    fun failedSaysThereIsNoForecastYetUnderItsTitle() {
+        show(WeatherView.Failed)
+        compose.onNodeWithText("Forecast").assertExists()
+        compose.onNodeWithText("No forecast yet — check the tablet’s Wi-Fi.").assertExists()
+        compose.onNodeWithText("Getting the forecast…").assertDoesNotExist()
+    }
 }

@@ -154,4 +154,47 @@ class WeatherViewTest {
         assertThat(WeatherPlace(LONDON.copy(timeZoneId = "Not/AZone")).zone).isEqualTo(java.time.ZoneId.systemDefault())
         assertThat(WeatherPlace(WELLINGTON).zone).isEqualTo(java.time.ZoneId.of("Pacific/Auckland"))
     }
+
+    private val london = WeatherPlace(LONDON)
+
+    @Test
+    fun aLocationWithNothingStoredAndAFailedFetchHasFailed() {
+        assertThat(weatherView(LONDON, null, thuMorning, failedFor = london)).isEqualTo(WeatherView.Failed)
+    }
+
+    @Test
+    fun aLocationWithNothingStoredAndNoFailureIsWaiting() {
+        assertThat(weatherView(LONDON, null, thuMorning, failedFor = null)).isEqualTo(WeatherView.Waiting)
+    }
+
+    @Test
+    fun storedWeatherShowsWhateverTheLastFetchDid() {
+        assertThat(weatherView(LONDON, stored(), thuMorning, failedFor = london)).isInstanceOf(WeatherView.Ready::class.java)
+        assertThat(weatherView(LONDON, stored(forecast = forecast(from = THU.minusDays(7))), thuMorning, failedFor = london))
+            .isEqualTo(WeatherView.Expired)
+    }
+
+    /** A town chosen after a failure waits for its own first fetch. */
+    @Test
+    fun aFailureForAnotherPlaceIsStillWaiting() {
+        assertThat(weatherView(LEEDS, null, thuMorning, failedFor = london)).isEqualTo(WeatherView.Waiting)
+    }
+
+    @Test
+    fun aFailureForTheSameTownRenamedIsStillFailed() {
+        assertThat(weatherView(LONDON.copy(name = "Westminster"), null, thuMorning, failedFor = london)).isEqualTo(WeatherView.Failed)
+    }
+
+    @Test
+    fun withoutALocationAFailureStillAsksForOne() {
+        assertThat(weatherView(null, null, thuMorning, failedFor = london)).isEqualTo(WeatherView.NoLocation)
+    }
+
+    /** The release logs promise no coordinates or zone (docs/setup/release.md): a place printed by mistake carries none. */
+    @Test
+    fun aPrintedPlaceHoldsNoCoordinatesOrZone() {
+        listOf(london.toString(), stored().toString()).forEach { printed ->
+            listOf("51.5", "-0.12", "Europe/London").forEach { assertThat(printed).doesNotContain(it) }
+        }
+    }
 }
