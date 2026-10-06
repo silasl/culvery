@@ -228,7 +228,7 @@ A helper (`contrast(fg, bg)` and `over(alpha, surface)`) computes WCAG relative 
 **Evidence.** WeatherView.kt:52 (`?: return WeatherView.Waiting`); WeatherSyncLoop.kt:80-99; ForecastCard.kt:67; WeatherWords.kt.
 
 **Fix.**
-- `WeatherSyncLoop` exposes the outcome of its last finished attempt (a `StateFlow` of succeeded or failed, starting as "none yet").
+- `WeatherSyncLoop` exposes the place whose last fetch failed (`lastFailure: StateFlow<WeatherPlace?>`, null at start and after a success; plan ruling 27).
 - `weatherView` returns a new `WeatherView.Failed` when a location is set, nothing stored matches it and the last attempt failed. With stored data the view is as today, whatever the last attempt did.
 - The Forecast card in `Failed` reads "No forecast yet — check the tablet’s Wi-Fi." under its usual title. The header item stays hidden, as for `Waiting`.
 - The next successful fetch stores data, so the view becomes `Ready` and replaces the message. A retry in progress keeps `Failed` until it finishes.
@@ -290,7 +290,7 @@ A helper (`contrast(fg, bg)` and `over(alpha, surface)`) computes WCAG relative 
 - **New tests.** The `HhButton` matrix (compose and Roborazzi); `HhListRow` styles; `HhSectionLabel` heading and spoken text; `ContrastTest`; chip and Coming up names; the chosen Settings page weight; the clock height; the header budget at 1.3; `weatherView`'s `Failed`; the detail sheet, PIN pad and status bar at 1.3 and 1.5; `forecast_waiting`, `forecast_failed` and the `*_fs15` baselines.
 - **Font scale.** Robolectric's `RuntimeEnvironment.setFontScale` at 1.3 and 1.5. At SDK 35 large sizes scale non-linearly, so these tests cover body text, not the clock (E1).
 - **Gate.** `./gradlew testDebugUnitTest verifyRoborazziDebug` after the re-record.
-- **Emulator walk-through** (debug build, light theme, as the live audit): Home at 1.0, 1.3, 1.5 (clock position, header, Forecast rows, status bar); a week with events (names on chips, contrast); the detail sheet with a long title at 1.5; the PIN pad at 1.5; the wizard dots; Settings people and calendars rows; a forced weather failure (airplane mode with a fresh location) showing the failed line, then recovering.
+- **Emulator walk-through** (debug build, light theme, as the live audit): Home at 1.0, 1.3, 1.5 (clock position, header, Forecast rows, status bar); a week with events (names on chips, contrast); the detail sheet with a long title at 1.5; the PIN pad at 1.5; the wizard dots; Settings people and calendars rows; a forced weather failure (Wi-Fi and data off with `svc wifi/data disable`, never airplane mode, with a fresh location) showing the failed line, then recovering.
 
 ## 8. Plan shape
 
