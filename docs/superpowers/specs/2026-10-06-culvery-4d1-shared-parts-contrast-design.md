@@ -1,7 +1,7 @@
 # Culvery 4d-1: shared parts, contrast and layout bugs (design)
 
 **Date:** 2026-10-06
-**Status:** Draft, for the user's review
+**Status:** Approved (2026-10-06); amended at the plan review (§6.6's status bar, §7 and Decision 10's baselines). Plan: `docs/superpowers/plans/2026-10-06-culvery-04d1-shared-parts-contrast.md`.
 **Parent spec:** `docs/superpowers/specs/2026-09-23-culvery-v1-design.md`
 **Previous plan:** `docs/superpowers/specs/2026-10-02-culvery-4c-release-fixes-design.md` (4c, merged)
 **Follow-ups:** `docs/superpowers/plans/2026-09-23-plan1-followups.md` (its "From the 4d triage" section holds 4d-2, the walk-through, the new 4e items and what was dropped)
@@ -20,7 +20,7 @@ The audits ran on 2026-10-06 (copy, screens, hand-off, accessibility, live emula
 - D4–D7: contrast tokens, names on event chips and Coming up rows, faint affordances.
 - D9–D14: the clock box, the header width budget, the weather failed state, the detail sheet scroll, the PIN pad at large font scales, fixed sizes made minimums.
 - A docs change: device owner as the wall setup (Decision 5).
-- Re-recording the Roborazzi baselines once, at the end.
+- Re-recording the Roborazzi baselines in each task that changes them, after a compare (amended at the plan review, §7).
 
 **Out:**
 - **4d-2, "TalkBack, timeouts, words"** (a later plan): D15–D41, including the overlay idle close (Decision 4) and the copy sweep with curly quotes (Decision 6). Listed in the follow-ups file.
@@ -41,7 +41,7 @@ The audits ran on 2026-10-06 (copy, screens, hand-off, accessibility, live emula
 | 7 | **Vocabulary** (triage Decision 1: master, kiosk, sync, Google, add/edit, assign, read-only): **still to decide**, before 4d-2's copy is written. Options and recommendations are in the follow-ups file. 4d-1 adds no new visible terms from that list. |
 | 8 | **One disabled look** for every button tone: `mute` text on the tone's quiet fill (§4.1). It settles the Plan 4a follow-up: DeleteButton stops keeping its red text while disabled. |
 | 9 | **The quiet button's fill depends on what it sits on** (this spec's call, §4.1): one step above its surface, so on light `bg` it is `surf`, not `surf2`. |
-| 10 | **No layout changes beyond row and button heights**, except the fixes named in §6 (the clock box moves Home up 21 dp; the detail sheet scrolls; minimum sizes replace fixed ones). Visible changes besides those: the rulings' own (names on chips, the deeper light green, the weather colour, capital section labels in the person sheet) and button labels folding to two sizes (§4.1). The Roborazzi baselines are re-recorded once, at the end of the plan; 4d-2 re-records once more. |
+| 10 | **No layout changes beyond row and button heights**, except the fixes named in §6 (the clock box moves Home up 21 dp; the detail sheet scrolls; minimum sizes replace fixed ones). Visible changes besides those: the rulings' own (names on chips, the deeper light green, the weather colour, capital section labels in the person sheet) and button labels folding to two sizes (§4.1). The Roborazzi baselines are re-recorded in each task that changes them, after Roborazzi's compare and a look at every difference, and the user sees every changed baseline at the end (amended at the plan review, user 2026-10-06; was "once, at the end of the plan"). 4d-2 re-records again. |
 
 ## 4. Shared parts (D1–D3)
 
@@ -268,12 +268,12 @@ A helper (`contrast(fg, bg)` and `over(alpha, surface)`) computes WCAG relative 
 **Evidence.** StatusBar.kt:48, 60-79; WeatherDimens.kt:14, 17; ForecastCard.kt:86-94; EventDetailSheet.kt:232; WeekView.kt:115; Controls.kt:203; EventEditorSheet.kt:207; ReviewCalendars.kt:230.
 
 **Fix.**
-- Status bar: `heightIn(min = 30.dp)`; Sign out and the theme toggle get `minimumInteractiveComponentSize()` (48 dp touch) with their visible pill unchanged.
+- Status bar: `heightIn(min = 30.dp)`. Sign out and the theme toggle keep their visible size and rely on Compose's minimum touch target, which already takes a touch up to 48 dp around a smaller clickable. *(Amended at the plan review, user 2026-10-06: `minimumInteractiveComponentSize()` reserves 48 dp of layout, which would make the bar 48 dp and push Home down 18 dp.)*
 - Forecast rows `heightIn(min = 44.dp)`; temperatures `widthIn(min = 44.dp)`, `maxLines = 1, softWrap = false`, with an 8 dp gap between high and low so they never run together.
 - The detail label column `widthIn(min = 104.dp)`, up to two lines.
 - The week title, `HhChoiceChip`'s label and the Review health line: an end ellipsis; the chip `heightIn(min = 48.dp)` with up to two lines; the editor summary up to two lines, so the time isn't cut first.
 
-**Tests.** Robolectric at font scale 1.3 and 1.5 for Home, Week, Detail and the PIN pad: named nodes lie inside their parents, and the status-bar controls' touch height is ≥ 48 dp. Roborazzi baselines at 1.5 for Home, Week, Detail and the PIN pad (`*_fs15`).
+**Tests.** Robolectric at font scale 1.3 and 1.5 for Home, Week, Detail and the PIN pad: named nodes lie inside their parents; the status bar stays 30 dp at 1.0 and a touch just outside Sign out's text still signs out (`assertTouchHeightIsAtLeast` can't fail for any clickable, as Compose pads every clickable's touch bounds to 48 dp). Roborazzi baselines at 1.5 for Home, Week, Detail and the PIN pad (`*_fs15`).
 
 **Left out (walk-through):** the empty Home grid slot (W2), the Forecast card's size and span (W3), `opsz` for large text (W1), the splash's dark flash in the day theme (W9; also checked on the device, E3). Capping the clock's font scale waits for the device (E1): Robolectric runs at SDK 35, whose non-linear scaling already caps the 104 sp clock, while the SM-T510's Android 11 scales it linearly to 156 sp.
 
@@ -286,7 +286,7 @@ A helper (`contrast(fg, bg)` and `over(alpha, surface)`) computes WCAG relative 
 
 ## 7. Testing strategy
 
-- **Order.** Components first (§4), so later tasks use them; tokens and the contrast test next (§5); bugs and font scale last (§6). Each task adds its tests; Roborazzi baselines are verified per task where they don't move and re-recorded **once**, in the final task, after a visual check of every changed image (light and dark).
+- **Order.** Components first (§4), so later tasks use them; tokens and the contrast test next (§5); bugs and font scale last (§6). Each task adds its tests. Each task that changes baselines runs Roborazzi's compare, looks at every difference against its list of expected changes, then re-records them; an unexpected difference is a stop. The final task shows the user every baseline changed by the plan, light and dark, with a line on why. *(Amended at the plan review, user 2026-10-06; was "re-recorded once, in the final task".)*
 - **New tests.** The `HhButton` matrix (compose and Roborazzi); `HhListRow` styles; `HhSectionLabel` heading and spoken text; `ContrastTest`; chip and Coming up names; the chosen Settings page weight; the clock height; the header budget at 1.3; `weatherView`'s `Failed`; the detail sheet, PIN pad and status bar at 1.3 and 1.5; `forecast_waiting`, `forecast_failed` and the `*_fs15` baselines.
 - **Font scale.** Robolectric's `RuntimeEnvironment.setFontScale` at 1.3 and 1.5. At SDK 35 large sizes scale non-linearly, so these tests cover body text, not the clock (E1).
 - **Gate.** `./gradlew testDebugUnitTest verifyRoborazziDebug` after the re-record.
@@ -305,11 +305,11 @@ Eleven tasks, the last a wrap-up:
 8. The weather's failed state (D11).
 9. The detail sheet scroll and the PIN pad (D12, D13).
 10. Fixed sizes to minimums and the status bar (D14); font-scale tests.
-11. The `release.md` change, follow-ups closed, baselines re-recorded once, emulator walk-through.
+11. The `release.md` change, follow-ups closed, every changed baseline shown to the user, emulator walk-through. *(The plan merges 5 and 6 and splits 2, so it has 11 tasks too.)*
 
 ## 9. Risks
 
-- **Baseline churn.** Nearly every baseline changes (the accent, the clock moving 21 dp, button heights, row sizes). A re-record hides regressions if nobody looks, so the final task compares each changed image before accepting it and the review gets a short list of what changed and why. 4d-2 re-records once more; nothing in between.
+- **Baseline churn.** Nearly every baseline changes (the accent, the clock moving 21 dp, button heights, row sizes). A re-record hides regressions if nobody looks, so each task compares every changed image before accepting it, and the user gets a list of what changed and why at the end. 4d-2 re-records again.
 - **`HhButton` migration breadth.** Seven implementations with callers in `:core:ui`, `:core:setup`, `:capability:calendar`, `:capability:weather` and `:provider:calendar-fake` (about 20 files). Test tags must survive the move, as many UI tests find buttons by tag; heights change by 2–16 dp and may push a sheet or a wizard step past its height. Task 2 runs the whole suite before deleting the old functions.
 - **The quiet fill's `on` parameter** can be passed wrongly (a button on `bg` left at the default `Surf`). The Roborazzi matrix shows both; the wizard and Settings baselines show the real callers.
 - **Contrast edges.** Several pairs sit within 0.4 of the threshold (light `danger` on `dangerSoft` 4.50, past cells 4.83, dark `mute` on the lime tint 4.55). The test pins them; any token change has to re-run it.
