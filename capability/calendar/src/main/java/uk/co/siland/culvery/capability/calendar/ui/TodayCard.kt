@@ -72,7 +72,7 @@ fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier, onOpen: (Ev
     }
 }
 
-/** Hand-off §7: a 48 dp `accent` circle (raised from 44, 4d-1), a 26 dp `add` in `accentInk`. */
+/** Hand-off §7: a 48 dp `accent` circle, a 26 dp `add` in `accentInk`. */
 @Composable
 private fun AddCircle(onClick: () -> Unit) {
     val c = Culvery.colors

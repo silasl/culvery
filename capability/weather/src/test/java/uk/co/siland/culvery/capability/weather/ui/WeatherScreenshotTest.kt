@@ -66,6 +66,7 @@ class WeatherScreenshotTest {
     @Test fun forecastExpiredLight() = card("forecast_expired_light", false, WeatherView.Expired)
     @Test fun forecastNoLocationDark() = card("forecast_no_location_dark", true, WeatherView.NoLocation)
     @Test fun forecastNoLocationLight() = card("forecast_no_location_light", false, WeatherView.NoLocation)
+
     private val cold = READY.copy(days = READY.days.map { it.copy(high = it.high - 25, low = it.low - 23) })
 
     @Test

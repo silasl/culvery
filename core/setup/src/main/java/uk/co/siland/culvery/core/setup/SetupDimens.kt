@@ -68,13 +68,13 @@ internal object SetupType {
     /** 16 sp / 400: a title's line, and body text. */
     val line = HhType.body
 
-    /** 17 sp / 600: a row's name, a Settings item. */
+    /** 17 sp / 600: a Settings item. */
     val rowTitle = HhType.rowTitle
 
     /** 17 sp / 700: the chosen Settings page, bold as well as tinted (4d-1 §5.2). */
     val chosenItem = HhType.rowTitle.copy(fontWeight = FontWeight.W700)
 
-    /** 14 sp / 400: a row's second line, a role's line. */
+    /** 14 sp / 400: a line beside or under a control (PIN set, what the town is for). */
     val secondary = HhType.secondary
 
     /** 30 sp / 700, −0.5 tracking: the person sheet's heading (the calendar editor's title). */

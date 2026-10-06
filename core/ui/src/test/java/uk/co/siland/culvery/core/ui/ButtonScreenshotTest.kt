@@ -26,12 +26,10 @@ import org.robolectric.annotation.GraphicsMode
 class ButtonScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    private val tones = listOf(ButtonTone.Primary, ButtonTone.Quiet, ButtonTone.Danger, ButtonTone.Destroy)
-
     @Composable
     private fun Panel(on: ButtonSurface, background: Color) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.background(background).padding(16.dp)) {
-            tones.forEach { tone ->
+            ButtonTone.entries.forEach { tone ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     listOf(true, false).forEach { enabled ->
                         HhButton("Next", {}, tone = tone, enabled = enabled, on = on)

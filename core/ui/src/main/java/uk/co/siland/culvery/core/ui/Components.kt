@@ -45,11 +45,7 @@ fun HhCard(
     )
 }
 
-/**
- * List rows (people, towns, connections, calendars; 4d-1 §4.2): `surf`, radius 18, padding 16 × 20, the leading item
- * 16 from the text, the second line 2 below, trailing items 12 apart, what goes below 12 under the top line. Lists put
- * 10 between rows.
- */
+/** List rows: people, towns, connections, calendars (4d-1 §4.2). Lists put 10 between rows. */
 object ListRowTokens {
     val radius = 18.dp
     val paddingV = 16.dp

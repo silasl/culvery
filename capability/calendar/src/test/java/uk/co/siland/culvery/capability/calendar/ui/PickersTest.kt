@@ -33,7 +33,6 @@ class PickersTest {
     private var cancelled = 0
     private val isButton = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
 
-
     private fun showDates(selected: LocalDate = today) = compose.setContent {
         CulveryTheme(dark = true) {
             PickerLayer(onDismiss = { cancelled++ }) {

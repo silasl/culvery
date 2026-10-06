@@ -10,7 +10,6 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsEqualTo
@@ -39,7 +38,6 @@ class CardsTest {
     @get:Rule val compose = createComposeRule()
     private val navigator = RecordingNavigator()
     private val isButton = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
-
 
     private fun show(content: @Composable () -> Unit) = compose.setContent {
         CompositionLocalProvider(LocalShellNavigator provides navigator) {
@@ -173,9 +171,7 @@ class CardsTest {
     @Test
     fun theConnectCardsButtonIsAButton() {
         show { ConnectCalendarCard(connectService = "Google Calendar", onConnect = {}) }
-        compose.onNodeWithText("Connect Google Calendar")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-            .assertHeightIsEqualTo(48.dp)
+        compose.onNodeWithText("Connect Google Calendar").assert(isButton).assertHeightIsEqualTo(48.dp)
     }
 
     @Test

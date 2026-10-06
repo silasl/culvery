@@ -92,7 +92,7 @@ internal object CalendarType {
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */
 internal object CalendarDimens {
-    // The reconnect chip and Today's +: 48 dp touch targets (raised from 44, 4d-1); the chip's radius half that.
+    // The reconnect chip and Today's +: 48 dp touch targets; the chip's radius half that.
     val touchTarget = 48.dp
     val pillRadius = 24.dp
     val pillPaddingH = 16.dp

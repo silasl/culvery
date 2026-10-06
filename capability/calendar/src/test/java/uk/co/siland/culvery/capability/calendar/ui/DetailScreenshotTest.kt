@@ -38,7 +38,7 @@ class DetailScreenshotTest {
     ) {
         compose.setContent {
             CulveryTheme(dark = dark) {
-                val sheet: @Composable () -> Unit = {
+                WithFontScale(fontScale) {
                     Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
                         Box(Modifier.fillMaxSize().background(ShellTokens.sheetScrim))
                         Box(Modifier.align(Alignment.CenterEnd)) {
@@ -47,7 +47,6 @@ class DetailScreenshotTest {
                         over()
                     }
                 }
-                WithFontScale(fontScale, sheet)
             }
         }
         compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
@@ -62,8 +61,8 @@ class DetailScreenshotTest {
     @Test fun untaggedDark() = snap("detail_untagged_dark", true, SampleUi.detailUntagged, DetailMode.ChoosingPerson)
     @Test fun untaggedLight() = snap("detail_untagged_light", false, SampleUi.detailUntagged, DetailMode.ChoosingPerson)
     @Test fun syncingDark() = snap("detail_syncing_dark", true, SampleUi.detailSyncing)
-    @Test fun fontScale15() = snap("detail_fs15", false, SampleUi.detailLongTitle, fontScale = 1.5f)
     @Test fun syncingLight() = snap("detail_syncing_light", false, SampleUi.detailSyncing)
+    @Test fun fontScale15() = snap("detail_fs15", false, SampleUi.detailLongTitle, fontScale = 1.5f)
     @Test fun deleteConfirmDark() = snap("detail_delete_confirm_dark", true, SampleUi.detailEditable, DetailMode.ConfirmingDelete)
     @Test fun deleteConfirmLight() = snap("detail_delete_confirm_light", false, SampleUi.detailEditable, DetailMode.ConfirmingDelete)
 

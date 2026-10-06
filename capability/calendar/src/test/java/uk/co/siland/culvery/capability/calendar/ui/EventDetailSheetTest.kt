@@ -39,7 +39,6 @@ class EventDetailSheetTest {
     private var busy by mutableStateOf(false)
     private val isButton = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
 
-
     private fun show(detail: EventDetailUi) = compose.setContent {
         CulveryTheme(dark = true) {
             EventDetailSheet(

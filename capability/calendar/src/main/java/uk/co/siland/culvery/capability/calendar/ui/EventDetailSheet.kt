@@ -59,7 +59,6 @@ internal fun calendarLabel(event: EventUi): String =
  * for permission reasons; the checks happen when they are tapped. Delete runs the guard ([onDelete]); only the
  * confirmation's "Delete event" deletes ([onConfirmDelete]). Edit ([onEdit]) shows exactly where Delete does and
  * opens the add/edit sheet without a PIN (2b-2 design D12).
- * The header, info card and note scroll; the footer stays at the bottom.
  */
 @Composable
 fun EventDetailSheet(

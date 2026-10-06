@@ -7,7 +7,6 @@ import org.junit.Test
 /** A quiet fill carries no WCAG ratio (the label names the button) but must not vanish into its surface (4d-1 Decision 9). */
 private const val QUIET_FILL_MIN = 1.1
 
-/** WCAG 2.x: text. */
 private const val TEXT = 4.5
 
 /** WCAG 2.x: large text (≥ 18.66 sp bold or 24 sp), icons and other meaningful parts. */

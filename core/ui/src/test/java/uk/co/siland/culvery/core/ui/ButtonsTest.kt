@@ -28,7 +28,7 @@ import org.junit.runner.RunWith
 class ButtonsTest {
     @get:Rule val compose = createComposeRule()
 
-    private val tones = listOf(ButtonTone.Primary, ButtonTone.Quiet, ButtonTone.Danger, ButtonTone.Destroy)
+    private val tones = ButtonTone.entries
     private val enabledStates = listOf(true, false)
 
     private fun tag(tone: ButtonTone, size: ButtonSize, enabled: Boolean, on: ButtonSurface) = "${tone}_${size}_${enabled}_$on"

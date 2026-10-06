@@ -1,9 +1,6 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.AlignmentLine
-import androidx.compose.ui.layout.FirstBaseline
-import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.TextUnit
 
@@ -16,6 +13,5 @@ fun Modifier.lineBox(height: TextUnit): Modifier = layout { measurable, constrai
     val placeable = measurable.measure(constraints)
     val boxHeight = height.roundToPx()
     val offset = (boxHeight - placeable.height) / 2
-    val lines = mapOf<AlignmentLine, Int>(FirstBaseline to placeable[FirstBaseline] + offset, LastBaseline to placeable[LastBaseline] + offset)
-    layout(placeable.width, boxHeight, lines) { placeable.place(0, offset) }
+    layout(placeable.width, boxHeight) { placeable.place(0, offset) }
 }
