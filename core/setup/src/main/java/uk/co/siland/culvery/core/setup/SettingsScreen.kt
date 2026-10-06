@@ -104,6 +104,6 @@ private fun PageItem(title: String, chosen: Boolean, tag: String, onClick: () ->
             .clickable(onClick = onClick)
             .padding(horizontal = SetupDimens.settingsItemPaddingH),
     ) {
-        Text(title, style = SetupType.rowTitle, color = if (chosen) c.accent else c.ink, maxLines = 1)
+        Text(title, style = if (chosen) SetupType.chosenItem else SetupType.rowTitle, color = if (chosen) c.accent else c.ink, maxLines = 1)
     }
 }

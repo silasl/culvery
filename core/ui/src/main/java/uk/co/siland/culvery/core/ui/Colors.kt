@@ -59,3 +59,15 @@ val LightColors = HhColors(
 
 /** True for the day theme; while the theme fades, from whichever side `bg` has reached. */
 internal val HhColors.isLight: Boolean get() = bg.luminance() > 0.5f
+
+/** Alphas drawn over a surface, kept here so ContrastTest checks the values the screens draw (4d-1 §5). */
+object HhAlpha {
+    private const val TINT_DARK = 0x2E / 255f
+    private const val TINT_LIGHT = 0x26 / 255f
+
+    /** A past day in the date picker, the whole cell over the picker's `surf`; 60 % would be 4.499:1 in light. */
+    const val PAST_DAY = 0.62f
+
+    /** A week chip's tint: the person's colour at this alpha over `surf`. */
+    fun tint(colors: HhColors): Float = if (colors.isLight) TINT_LIGHT else TINT_DARK
+}

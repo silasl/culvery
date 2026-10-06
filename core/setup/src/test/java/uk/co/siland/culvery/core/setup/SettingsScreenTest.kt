@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.font.FontWeight
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -62,5 +63,12 @@ class SettingsScreenTest {
         compose.onNodeWithText("Culvery keeps the tablet on this app. Exit to use other apps; it locks again next time Culvery opens.").assertExists()
         compose.onNodeWithText("Exit kiosk").performClick()
         assertThat(navigator.kioskExits).isEqualTo(1)
+    }
+
+    @Test
+    fun theChosenPageIsBoldAsWellAsTinted() {
+        show(page("a", "Alpha", 0), page("b", "Beta", 1))
+        assertThat(compose.onNodeWithText("Alpha", useUnmergedTree = true).textLayout().layoutInput.style.fontWeight).isEqualTo(FontWeight.W700)
+        assertThat(compose.onNodeWithText("Beta", useUnmergedTree = true).textLayout().layoutInput.style.fontWeight).isEqualTo(FontWeight.W600)
     }
 }

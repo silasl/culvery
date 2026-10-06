@@ -1,8 +1,12 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -18,9 +22,12 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.capability.calendar.ReviewConnection
+import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
 
@@ -63,5 +70,29 @@ class FontScaleTest {
             val text = compose.onNode(hasText(label) and hasAnyAncestor(hasTestTag("settings_row_g1")), useUnmergedTree = true).textLayout()
             assertThat(text.isLineEllipsized(0)).isFalse()
         }
+    }
+
+    /** A long name on a chip in a 1116 dp week at 1.5. */
+    @Test
+    fun atFontScale15ALongNameIsCutBeforeTheTimeAndTheBadgeStays() {
+        val max = Person(PersonId("max"), "Maximilian-Alexander", 0xFF9C7CE3)
+        val swim = SampleUi.event("Swimming", "16:00–17:00", max, recurring = true)
+        val week = SampleUi.week.copy(days = SampleUi.week.days.mapIndexed { i, d -> d.copy(events = if (i == 0) listOf(swim) else emptyList()) })
+        val sync = SyncStatusUi(SampleUi.NOW, emptyList(), listOf("Google"), failingBeforeFirstSync = false)
+        compose.setContent {
+            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
+                CulveryTheme(dark = false) {
+                    WithFontScale(1.5f) {
+                        Box(Modifier.size(1116.dp, 724.dp)) { WeekView(WeekViewState(week, SampleUi.TODAY, sync, SampleUi.NOW)) }
+                    }
+                }
+            }
+        }
+        val line = compose.onNodeWithText("16:00 · Maximilian-Alexander", useUnmergedTree = true).textLayout()
+        assertThat(line.lineCount).isEqualTo(1)
+        assertThat(line.isLineEllipsized(0)).isTrue()
+        // An ellipsised line's visible end is where the "…" starts: after the whole time.
+        assertThat(line.getLineEnd(0, visibleEnd = true)).isAtLeast("16:00".length)
+        compose.onNodeWithContentDescription("Repeats", useUnmergedTree = true).assertIsDisplayed()
     }
 }

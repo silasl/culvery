@@ -247,9 +247,6 @@ internal object CalendarDimens {
     val colonBottom = 10.dp
     val timeButtonGap = 10.dp
 
-    /** Hand-off §7: past days in the date picker at 30%. */
-    const val PAST_DAY_ALPHA = 0.3f
-
     // Add/edit sheet (hand-off §7 Sheet 2 and Culvery.dc.html): padding 24×30×20; the summary 4 below the title and
     // ✕ 16 away; the body 4 below the Title field, 20 between sections, each label 10 above its chips.
     val editorPaddingTop = 24.dp
@@ -280,9 +277,6 @@ internal object CalendarDimens {
     val addHintIcon = 24.dp
     val addHintMinHeight = 48.dp
 
-    /** Hand-off §7: the week column's add hint at 50%. */
-    const val ADD_HINT_ALPHA = 0.5f
-
     // Connecting card (3a design §4.4): the pickers' card (radius 30, padding 26) 440 wide, a 32 dp icon; 14 between
     // blocks and 4 between its two lines (not in the spec: the date picker's spacing); Cancel as the date picker's.
     val connectingWidth = 440.dp
@@ -302,8 +296,4 @@ internal object CalendarDimens {
     val badgePaddingH = 10.dp
     val connectStepWidth = 380.dp
     val connectStepHeight = 460.dp
-
-    /** Chip tint: the person's colour at 0x2E alpha on dark, 0x26 on light. */
-    const val CHIP_ALPHA_DARK = 0x2E / 255f
-    const val CHIP_ALPHA_LIGHT = 0x26 / 255f
 }

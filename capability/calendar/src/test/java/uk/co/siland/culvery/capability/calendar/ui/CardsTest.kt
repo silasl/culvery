@@ -177,4 +177,11 @@ class CardsTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
             .assertHeightIsEqualTo(48.dp)
     }
+
+    @Test
+    fun comingUpRowsNameWhoseEventItIs() {
+        show { ComingUpCard(SampleUi.comingUp) }
+        compose.onNodeWithText("09:00–17:00 · Alex").assertExists()
+        compose.onNodeWithText("12:30–13:30 · Sam").assertExists()
+    }
 }

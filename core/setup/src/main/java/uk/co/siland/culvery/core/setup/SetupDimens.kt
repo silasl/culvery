@@ -15,6 +15,9 @@ internal object SetupDimens {
     val wizardPaddingH = 48.dp
     val dot = 10.dp
     val dotGap = 10.dp
+
+    // The other steps' dots are 1.5 dp `mute` rings: outline against fill tells the current step without colour.
+    val dotOutline = 1.5.dp
     val dotsBottom = 32.dp
     val buttonsTop = 24.dp
 
@@ -67,6 +70,9 @@ internal object SetupType {
 
     /** 17 sp / 600: a row's name, a Settings item. */
     val rowTitle = HhType.rowTitle
+
+    /** 17 sp / 700: the chosen Settings page, bold as well as tinted (4d-1 §5.2). */
+    val chosenItem = HhType.rowTitle.copy(fontWeight = FontWeight.W700)
 
     /** 14 sp / 400: a row's second line, a role's line. */
     val secondary = HhType.secondary

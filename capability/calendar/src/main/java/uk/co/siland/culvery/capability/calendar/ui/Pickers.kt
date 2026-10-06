@@ -45,6 +45,7 @@ import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhAlpha
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
@@ -212,7 +213,7 @@ private fun DateCell(date: LocalDate, today: LocalDate, selected: LocalDate, mod
         contentAlignment = Alignment.Center,
         modifier = modifier
             .testTag("date_cell_$date")
-            .alpha(if (date.isBefore(today) && !isSelected) CalendarDimens.PAST_DAY_ALPHA else 1f)
+            .alpha(if (date.isBefore(today) && !isSelected) HhAlpha.PAST_DAY else 1f)
             .height(CalendarDimens.dateCellHeight)
             .clip(shape)
             .background(if (isSelected) c.accent else c.surf2)

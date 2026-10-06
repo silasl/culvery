@@ -98,4 +98,31 @@ class ContrastTest {
         check("light danger on dangerSoft (4.497)", LightColors.danger, LightColors.dangerSoft, 4.49)
         check("light mute on surf3 (4.705)", LightColors.mute, LightColors.surf3, 4.70)
     }
+
+    @Test
+    fun namesAndTitlesOnEveryPersonTint() {
+        themes.forEach { (name, t) ->
+            (PersonPalette.colors + FAMILY_AMBER).forEach { colour ->
+                val tint = Color(colour).over(HhAlpha.tint(t), t.surf)
+                check("$name mute on the ${colour.toString(16)} tint", t.mute, tint, TEXT)
+                check("$name ink on the ${colour.toString(16)} tint", t.ink, tint, TEXT)
+            }
+        }
+    }
+
+    @Test
+    fun theTintEdgesStayWhereTheyAre() {
+        fun darkTint(colour: Long) = Color(colour).over(HhAlpha.tint(DarkColors), DarkColors.surf)
+        check("dark mute on the lime tint (4.548)", DarkColors.mute, darkTint(0xFF9CC44E), 4.54)
+        check("dark mute on the Family tint (4.602)", DarkColors.mute, darkTint(FAMILY_AMBER), 4.60)
+    }
+
+    @Test
+    fun aPastDayReadsAtItsAlpha() {
+        themes.forEach { (name, t) ->
+            check("$name past day: the cell at its alpha over surf", t.ink.over(HhAlpha.PAST_DAY, t.surf), t.surf2.over(HhAlpha.PAST_DAY, t.surf), TEXT)
+        }
+        val light = LightColors
+        check("light past day (4.830)", light.ink.over(HhAlpha.PAST_DAY, light.surf), light.surf2.over(HhAlpha.PAST_DAY, light.surf), 4.82)
+    }
 }

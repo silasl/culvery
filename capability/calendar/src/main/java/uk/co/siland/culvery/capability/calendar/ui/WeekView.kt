@@ -37,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -60,6 +59,7 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhAlpha
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
@@ -228,7 +228,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
     }
 }
 
-/** Hand-off §7: a faint `add` at the foot of each column, in a tap area at least 48 dp tall. */
+/** Hand-off §7: an `add` in `mute` at the foot of each column, in a tap area at least 48 dp tall. */
 @Composable
 private fun AddHint(date: LocalDate, onAdd: () -> Unit) {
     Box(
@@ -239,25 +239,31 @@ private fun AddHint(date: LocalDate, onAdd: () -> Unit) {
             .heightIn(min = CalendarDimens.addHintMinHeight)
             .clickable(onClickLabel = "Add event", onClick = onAdd),
     ) {
-        HhIcon(Icons.ADD, size = CalendarDimens.addHintIcon, tint = Culvery.colors.mute.copy(alpha = CalendarDimens.ADD_HINT_ALPHA))
+        HhIcon(Icons.ADD, size = CalendarDimens.addHintIcon, tint = Culvery.colors.mute)
     }
 }
 
 @Composable
 private fun EventChip(event: EventUi, onOpen: (EventRef) -> Unit) {
     val c = Culvery.colors
-    val colour = Color(event.person.color)
-    val tint = if (c.bg.luminance() < 0.5f) CalendarDimens.CHIP_ALPHA_DARK else CalendarDimens.CHIP_ALPHA_LIGHT
     Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(CalendarDimens.chipRadius))
-            .background(colour.copy(alpha = tint))
+            .background(Color(event.person.color).copy(alpha = HhAlpha.tint(c)))
             .clickable(onClickLabel = "Open") { onOpen(event.ref) }
             .padding(horizontal = CalendarDimens.chipPaddingH, vertical = CalendarDimens.chipPaddingV),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(event.startLabel, style = CalendarType.chipTime, color = colour, maxLines = 1, modifier = Modifier.weight(1f))
+            // One line, so a long name is cut before the time (4d-1 Decision 2).
+            Text(
+                "${event.startLabel} · ${event.person.name}",
+                style = CalendarType.chipTime,
+                color = c.mute,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
             EventBadges(event, CalendarDimens.chipBadge)
         }
         Spacer(Modifier.height(CalendarDimens.chipTitleTop))

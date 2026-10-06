@@ -82,9 +82,10 @@ class WeekViewTest {
     }
 
     @Test
-    fun allDayEventsSayAllDay() {
+    fun aChipNamesWhoseEventItIs() {
         show { WeekView(state()) }
-        compose.onAllNodesWithText("All day").assertCountEquals(2)
+        compose.onNodeWithText("09:30 · Alex").assertExists()
+        compose.onAllNodesWithText("All day · Family").assertCountEquals(2)
     }
 
     @Test

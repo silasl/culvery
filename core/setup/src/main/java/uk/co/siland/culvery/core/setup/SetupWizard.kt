@@ -2,6 +2,7 @@ package uk.co.siland.culvery.core.setup
 
 import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -206,13 +207,14 @@ private fun Dots(count: Int, index: Int) {
         modifier = Modifier.fillMaxWidth().testTag("wizard_dots"),
     ) {
         repeat(count) { i ->
+            val current = i == index
             Box(
                 Modifier
                     .testTag("wizard_dot")
-                    .semantics { selected = i == index }
+                    .semantics { selected = current }
                     .size(SetupDimens.dot)
                     .clip(CircleShape)
-                    .background(if (i == index) c.accent else c.surf3),
+                    .then(if (current) Modifier.background(c.accent) else Modifier.border(SetupDimens.dotOutline, c.mute, CircleShape)),
             )
         }
     }

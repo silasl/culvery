@@ -107,7 +107,13 @@ private fun CompactRow(event: EventUi) {
         Spacer(Modifier.width(CalendarDimens.compactBarGap))
         Column {
             Text(event.title, style = CalendarType.strong14, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(event.timeLabel, style = CalendarType.small12, color = c.mute, maxLines = 1)
+            Text(
+                "${event.timeLabel} · ${event.person.name}",
+                style = CalendarType.small12,
+                color = c.mute,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
