@@ -21,6 +21,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDateTime
@@ -28,9 +30,13 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
+import uk.co.siland.culvery.capability.weather.Condition
+import uk.co.siland.culvery.capability.weather.HeaderWeather
+import uk.co.siland.culvery.capability.weather.ui.WeatherHeaderItem
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.SessionUi
 import uk.co.siland.culvery.shell.ShellUiState
@@ -52,6 +58,36 @@ class ShellLayoutTest {
         val clockBaseline = clock.getUnclippedBoundsInRoot().top + clock.getAlignmentLinePosition(LastBaseline)
         val dateBaseline = date.getUnclippedBoundsInRoot().top + date.getAlignmentLinePosition(FirstBaseline)
         assertThat((dateBaseline - clockBaseline).value).isWithin(1f).of(44f)
+    }
+
+    /** Hand-off: the clock's line box is 0.9 × 104 sp; Trim.Both had made it the font's whole 135 dp. */
+    @Test
+    fun theClockBoxIsItsLineHeight() {
+        compose.setContent { CulveryTheme(dark = true) { HomeScreen({ at }, emptyList(), emptyList()) } }
+        val clock = compose.onNodeWithTag("home_clock").getUnclippedBoundsInRoot()
+        assertThat(clock.height.value).isWithin(1f).of(94f)
+    }
+
+    /** The weather, then a wide item after it (a future Climate): together they'd run onto the date without a budget. */
+    @Test
+    fun atFontScale13HeaderItemsKeepClearOfTheClockAndDate() {
+        val weather = HeaderItem("weather", 10) {
+            WeatherHeaderItem(HeaderWeather(Condition.PARTLY_CLOUDY, night = false, temperature = 17.0, high = 19.0, low = 11.0))
+        }
+        val wide = HeaderItem("climate", 20) { Box(Modifier.size(800.dp, 60.dp)) }
+        compose.setContent { CulveryTheme(dark = true) { WithFontScale(1.3f) { HomeScreen({ at }, emptyList(), listOf(weather, wide)) } } }
+        val clock = compose.onNodeWithTag("home_clock").getUnclippedBoundsInRoot()
+        val date = compose.onNodeWithTag("home_date").getUnclippedBoundsInRoot()
+        val items = compose.onNodeWithTag("home_header_items").getUnclippedBoundsInRoot()
+        assertThat(items.left.value).isAtLeast(maxOf(clock.right, date.right).value + 28f - 1f)
+        val shown = compose.onNodeWithTag("home_header_weather").getUnclippedBoundsInRoot()
+        assertThat(shown.width.value).isGreaterThan(0f)
+        val degrees = compose.onNodeWithText("17°", useUnmergedTree = true).textLayout()
+        assertThat(degrees.lineCount).isEqualTo(1)
+        assertThat(degrees.isLineEllipsized(0)).isFalse()
+        val highLow = compose.onNodeWithText("High 19° · Low 11°", useUnmergedTree = true).textLayout()
+        assertThat(highLow.lineCount).isEqualTo(1)
+        assertThat(highLow.isLineEllipsized(0)).isFalse()
     }
 
     private fun statusBar(session: SessionUi?, onSignOut: () -> Unit = {}) = compose.setContent {

@@ -92,7 +92,7 @@ class ShellScreenshotTest {
         tabs = listOf(TabItem("calendar", "Calendar", "calendar_month")),
         homeCards = HomeCardPlacer.place(
             listOf(
-                HomeCard("calendar.today", HomeCardSize.TALL, 100) { TodayCard(today) },
+                HomeCard("calendar.today", HomeCardSize.TALL, 100) { TodayCard(today, onAdd = {}) },
                 HomeCard("calendar.comingUp", HomeCardSize.WIDE, 50) { ComingUpCard(comingUp) },
             ),
         ),

@@ -27,6 +27,7 @@ import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomePlacement
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.lineBox
 
 private val CLOCK = DateTimeFormatter.ofPattern("HH:mm")
 private val DATE = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.UK)
@@ -49,8 +50,9 @@ fun HomeScreen(now: () -> LocalDateTime, placements: List<HomePlacement>, header
 }
 
 /**
- * Clock and date, with the date placed by baseline because the clock's line-height trim doesn't apply reliably; the
- * capabilities' items at the right, their bottom [HEADER_ITEMS_BOTTOM] above the date's (4b design §4.1).
+ * Clock and date, the date's baseline [CLOCK_TO_DATE_BASELINES] below the clock's, as the hand-off's CSS places it; the
+ * capabilities' items at the right, in the width the clock and date leave less [HEADER_ITEM_GAP], their bottom
+ * [HEADER_ITEMS_BOTTOM] above the date's (4b design §4.1, 4d-1 §6.2).
  */
 @Composable
 fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modifier = Modifier) {
@@ -58,7 +60,7 @@ fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modi
     Layout(
         modifier = modifier,
         content = {
-            Text(now().format(CLOCK), style = HhType.clock, color = c.ink, modifier = Modifier.testTag("home_clock"))
+            Text(now().format(CLOCK), style = HhType.clock, color = c.ink, modifier = Modifier.testTag("home_clock").lineBox(HhType.clock.lineHeight))
             Text(now().format(DATE), style = HhType.date, color = c.mute, modifier = Modifier.testTag("home_date"))
             HeaderItems(items)
         },
@@ -66,7 +68,8 @@ fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modi
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val clock = measurables[0].measure(loose)
         val date = measurables[1].measure(loose)
-        val right = measurables[2].measure(loose)
+        val budget = constraints.maxWidth - maxOf(clock.width, date.width) - HEADER_ITEM_GAP.roundToPx()
+        val right = measurables[2].measure(loose.copy(maxWidth = budget.coerceAtLeast(0)))
         val dateY = clock[LastBaseline] + CLOCK_TO_DATE_BASELINES.roundToPx() - date[FirstBaseline]
         val dateBottom = dateY + date.height
         val width = constraints.constrainWidth(maxOf(clock.width, date.width))
