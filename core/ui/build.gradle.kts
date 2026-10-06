@@ -3,11 +3,14 @@ import org.gradle.api.tasks.PathSensitivity
 plugins {
     id("culvery.android.library")
     id("culvery.android.compose")
+    alias(libs.plugins.roborazzi)
 }
 
 dependencies {
     // SingleAction takes a CoroutineScope in its public API.
     api(libs.kotlinx.coroutines.core)
+    testImplementation(libs.roborazzi.core)
+    testImplementation(libs.roborazzi.compose)
 }
 
 // IconFontTest reads tools/fonts/icons.txt and every module's main sources.

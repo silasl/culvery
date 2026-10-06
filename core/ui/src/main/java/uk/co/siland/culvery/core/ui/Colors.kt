@@ -2,6 +2,7 @@ package uk.co.siland.culvery.core.ui
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 
 @Immutable
 data class HhColors(
@@ -54,3 +55,6 @@ val LightColors = HhColors(
 
 /** The hand-off's weather icon colour (§1). The same in both themes, so not an HhColors token. */
 val SunAmber = Color(0xFFE0B85B)
+
+/** True for the day theme; while the theme fades, from whichever side `bg` has reached. */
+internal val HhColors.isLight: Boolean get() = bg.luminance() > 0.5f
