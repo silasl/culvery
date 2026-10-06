@@ -60,7 +60,7 @@ internal fun buttonColors(tone: ButtonTone, enabled: Boolean, on: ButtonSurface,
 
 /**
  * The one button (4d-1 §4.1): a pill at least [size]'s height, a one-line label, an optional icon before it. Disabled,
- * every [tone] is the quiet fill with a `mute` label and does nothing. [on] is what the button sits on.
+ * every [tone] is the quiet fill with a `mute` label and does nothing.
  */
 @Composable
 fun HhButton(
