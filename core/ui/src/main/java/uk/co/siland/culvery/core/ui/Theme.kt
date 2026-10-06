@@ -45,6 +45,7 @@ fun CulveryTheme(dark: Boolean, content: @Composable () -> Unit) {
         danger = animated(target.danger),
         dangerSoft = animated(target.dangerSoft),
         dangerInk = animated(target.dangerInk),
+        weather = animated(target.weather),
     )
     // Equal colours, same scheme: a theme that runs again doesn't invalidate everything under it (4c §4.2, P1).
     val scheme = remember(dark, colors) {

@@ -6,7 +6,7 @@ import kotlin.math.sqrt
 import org.junit.Test
 
 /** `:core:household`'s FAMILY_COLOR, which `:core:ui` can't see. */
-private const val FAMILY_AMBER = 0xFFE0A85B
+internal const val FAMILY_AMBER = 0xFFE0A85B
 
 /** The smallest RGB distance allowed between two person colours, or one and Family's; the closest pair is about 66. */
 private const val MIN_DISTANCE = 60.0

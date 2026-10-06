@@ -55,9 +55,8 @@ object ControlTokens {
     val chipDot = 12.dp
     val chipIcon = 20.dp
 
-    /** Hand-off §7: a disabled chip is drawn at 38% and stays tappable; a chip's secondary text is at 72%. */
+    /** Hand-off §7: a disabled chip is drawn at 38% and stays tappable. */
     const val DISABLED_ALPHA = 0.38f
-    const val SECONDARY_ALPHA = 0.72f
 
     // Text field (the hand-off's title field): 64 dp, radius 18, `surf`, padding 0 20, a 2 dp `accent` border while focused.
     val fieldHeight = 64.dp
@@ -136,7 +135,7 @@ fun HhChoiceChip(
         leading?.invoke(ink)
         Text(label, style = ControlType.chip, color = ink, maxLines = 1)
         if (secondary != null) {
-            Text(secondary, style = ControlType.chipSecondary, color = ink.copy(alpha = ControlTokens.SECONDARY_ALPHA), maxLines = 1)
+            Text(secondary, style = ControlType.chipSecondary, color = ink, maxLines = 1)
         }
     }
 }

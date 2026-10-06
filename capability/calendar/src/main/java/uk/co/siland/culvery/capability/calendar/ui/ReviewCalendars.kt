@@ -51,6 +51,7 @@ import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhSwitch
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.PersonChipInk
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 /** 3a design §4.1. */

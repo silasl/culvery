@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 
+/** The theme's colours. [weather] draws the weather icons: amber at night, a darker gold that reads on the day theme's surfaces. */
 @Immutable
 data class HhColors(
     val bg: Color,
@@ -19,6 +20,7 @@ data class HhColors(
     val danger: Color,
     val dangerSoft: Color,
     val dangerInk: Color,
+    val weather: Color,
 )
 
 val DarkColors = HhColors(
@@ -35,6 +37,7 @@ val DarkColors = HhColors(
     danger = Color(0xFFEE7B6A),
     dangerSoft = Color(0xFF3A211D),
     dangerInk = Color(0xFF1A0906),
+    weather = Color(0xFFE0B85B),
 )
 
 val LightColors = HhColors(
@@ -45,16 +48,14 @@ val LightColors = HhColors(
     line = Color(0xFFDAE0DD),
     ink = Color(0xFF111514),
     mute = Color(0xFF5A6461),
-    accent = Color(0xFF2E8A64),
+    accent = Color(0xFF23704F),
     accentInk = Color(0xFFFFFFFF),
     accentSoft = Color(0xFFD3EDE1),
     danger = Color(0xFFB83A28),
     dangerSoft = Color(0xFFF7DFDA),
     dangerInk = Color(0xFFFFFFFF),
+    weather = Color(0xFF8A6400),
 )
-
-/** The hand-off's weather icon colour (§1). The same in both themes, so not an HhColors token. */
-val SunAmber = Color(0xFFE0B85B)
 
 /** True for the day theme; while the theme fades, from whichever side `bg` has reached. */
 internal val HhColors.isLight: Boolean get() = bg.luminance() > 0.5f

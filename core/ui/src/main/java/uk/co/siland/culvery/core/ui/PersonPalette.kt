@@ -1,5 +1,7 @@
 package uk.co.siland.culvery.core.ui
 
+import androidx.compose.ui.graphics.Color
+
 /**
  * The eight person colours (4a design D12). A colour in use can't be picked again, so eight is also the most people a
  * household can have. Family keeps its amber, which is none of these.
@@ -21,3 +23,6 @@ object PersonPalette {
     /** The first colour nobody in [taken] has; null once all eight are used. */
     fun firstFree(taken: Collection<Long>): Long? = colors.firstOrNull { it !in taken }
 }
+
+/** The label and tick on a chip filled with a person's colour: dark in both themes, as every person colour is a mid-tone. */
+val PersonChipInk: Color = DarkColors.bg

@@ -41,7 +41,6 @@ import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.ShellTokens
-import uk.co.siland.culvery.core.ui.SunAmber
 
 /**
  * The REGULAR Forecast card (4b design §4.2): today and up to two more days, each row day · icon · high · low and one
@@ -90,7 +89,7 @@ private fun ForecastRow(day: DailyWeather, isToday: Boolean) {
             .clearAndSetSemantics { contentDescription = description },
     ) {
         Text(dayLabel(day, isToday), style = HhType.rowTitle, color = c.ink, modifier = Modifier.weight(1f))
-        HhIcon(weatherIcon(day.condition, night = false), size = WeatherDimens.rowIcon, tint = SunAmber)
+        HhIcon(weatherIcon(day.condition, night = false), size = WeatherDimens.rowIcon, tint = c.weather)
         Spacer(Modifier.width(WeatherDimens.rowIconGap))
         Text(degrees(day.high), style = HhType.rowTitle, color = c.ink, textAlign = TextAlign.End, modifier = Modifier.width(WeatherDimens.temperatureWidth))
         Text(degrees(day.low), style = HhType.rowTitle, color = c.mute, textAlign = TextAlign.End, modifier = Modifier.width(WeatherDimens.temperatureWidth))

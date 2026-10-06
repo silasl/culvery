@@ -71,6 +71,13 @@ class ControlsTest {
     }
 
     @Test
+    fun aSelectedChipsSecondaryTextIsAtFullStrength() {
+        show { HhChoiceChip("Morning", selected = true, tag = "slot", onClick = {}, secondary = "09:00") }
+        val colour = compose.onNodeWithText("09:00", useUnmergedTree = true).textLayout().layoutInput.style.color
+        assertThat(colour).isEqualTo(DarkColors.accentInk)
+    }
+
+    @Test
     fun aTextFieldShowsItsPlaceholderOnlyWhileEmpty() {
         var value by mutableStateOf("")
         show { HhTextField(value, { value = it }, placeholder = "Town or city", tag = "field") }
