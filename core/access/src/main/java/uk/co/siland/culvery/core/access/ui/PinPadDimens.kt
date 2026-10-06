@@ -24,9 +24,6 @@ internal object PinPadDimens {
     val dotGap = 16.dp
     val dotBorder = 2.dp
 
-    // The error line is always 18 dp high, so the keypad never moves.
-    val errorLine = 18.dp
-
     // Keypad: 76 dp circles, 12 dp between rows, 20 dp between columns.
     val key = 76.dp
     val keyRowGap = 12.dp

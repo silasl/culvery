@@ -39,6 +39,7 @@ import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.shell.SessionUi
 import uk.co.siland.culvery.shell.ShellUiState
 import uk.co.siland.culvery.shell.TabItem
@@ -127,22 +128,25 @@ class ShellScreenshotTest {
         name: String,
         dark: Boolean,
         state: ShellUiState = ShellUiState(dark = dark),
+        fontScale: Float = 1f,
         overlay: @Composable () -> Unit = {},
     ) {
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides NoNavigation) {
                 CulveryTheme(dark = dark) {
-                    Box(Modifier.fillMaxSize()) {
-                        CulveryShell(
-                            state = state,
-                            now = { at },
-                            onSelectTab = {},
-                            onOpenSettings = {},
-                            onSignOut = {},
-                            onToggleThemePreview = {},
-                            tabContent = {},
-                        )
-                        overlay()
+                    WithFontScale(fontScale) {
+                        Box(Modifier.fillMaxSize()) {
+                            CulveryShell(
+                                state = state,
+                                now = { at },
+                                onSelectTab = {},
+                                onOpenSettings = {},
+                                onSignOut = {},
+                                onToggleThemePreview = {},
+                                tabContent = {},
+                            )
+                            overlay()
+                        }
                     }
                 }
             }
@@ -196,6 +200,11 @@ class ShellScreenshotTest {
 
     @Test
     fun pinPadWrongDark() = snap("pin_pad_wrong_dark", dark = true) {
+        PinPadSheet("Change settings", PinReason.Generic, error = PinError.WrongPin, lockedUntilMillis = null, onSubmit = {}, onCancel = {})
+    }
+
+    @Test
+    fun pinPadFontScale15() = snap("pin_pad_fs15", dark = false, fontScale = 1.5f) {
         PinPadSheet("Change settings", PinReason.Generic, error = PinError.WrongPin, lockedUntilMillis = null, onSubmit = {}, onCancel = {})
     }
 }

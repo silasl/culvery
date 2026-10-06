@@ -20,6 +20,7 @@ import uk.co.siland.culvery.core.access.ui.PinPadSheet
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.ShellTokens
+import uk.co.siland.culvery.core.ui.WithFontScale
 
 /** The sheet as the shell shows it: against the right edge, over the scrim, on the 1280×800 canvas. */
 @RunWith(AndroidJUnit4::class)
@@ -32,17 +33,21 @@ class DetailScreenshotTest {
         dark: Boolean,
         detail: EventDetailUi,
         mode: DetailMode = DetailMode.Idle,
+        fontScale: Float = 1f,
         over: @Composable () -> Unit = {},
     ) {
         compose.setContent {
             CulveryTheme(dark = dark) {
-                Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
-                    Box(Modifier.fillMaxSize().background(ShellTokens.sheetScrim))
-                    Box(Modifier.align(Alignment.CenterEnd)) {
-                        EventDetailSheet(detail, SampleUi.household, mode, busy = false, {}, {}, {}, {}, {}, {}, {})
+                val sheet: @Composable () -> Unit = {
+                    Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
+                        Box(Modifier.fillMaxSize().background(ShellTokens.sheetScrim))
+                        Box(Modifier.align(Alignment.CenterEnd)) {
+                            EventDetailSheet(detail, SampleUi.household, mode, busy = false, {}, {}, {}, {}, {}, {}, {})
+                        }
+                        over()
                     }
-                    over()
                 }
+                WithFontScale(fontScale, sheet)
             }
         }
         compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
@@ -57,6 +62,7 @@ class DetailScreenshotTest {
     @Test fun untaggedDark() = snap("detail_untagged_dark", true, SampleUi.detailUntagged, DetailMode.ChoosingPerson)
     @Test fun untaggedLight() = snap("detail_untagged_light", false, SampleUi.detailUntagged, DetailMode.ChoosingPerson)
     @Test fun syncingDark() = snap("detail_syncing_dark", true, SampleUi.detailSyncing)
+    @Test fun fontScale15() = snap("detail_fs15", false, SampleUi.detailLongTitle, fontScale = 1.5f)
     @Test fun syncingLight() = snap("detail_syncing_light", false, SampleUi.detailSyncing)
     @Test fun deleteConfirmDark() = snap("detail_delete_confirm_dark", true, SampleUi.detailEditable, DetailMode.ConfirmingDelete)
     @Test fun deleteConfirmLight() = snap("detail_delete_confirm_light", false, SampleUi.detailEditable, DetailMode.ConfirmingDelete)

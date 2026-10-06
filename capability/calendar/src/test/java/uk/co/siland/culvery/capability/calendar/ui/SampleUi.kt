@@ -135,6 +135,11 @@ object SampleUi {
         "Today · 13:00–13:30",
     )
 
+    /** An editable event whose title runs to several lines at a large font scale. */
+    val detailLongTitle = detailUntagged.copy(
+        event = detailUntagged.event.copy(title = "Plumber quote call about the boiler, the upstairs radiators and the dripping tap in the downstairs loo"),
+    )
+
     /** Hand-off 07. */
     val detailSyncing = detailEditable.copy(event = detailEditable.event.copy(syncing = true))
 

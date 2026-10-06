@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -44,6 +45,7 @@ import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPersonChip
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.ShellTokens
 
 enum class DetailMode { Idle, ChoosingPerson, ConfirmingDelete }
 
@@ -56,6 +58,7 @@ internal fun calendarLabel(event: EventUi): String =
  * for permission reasons; the checks happen when they are tapped. Delete runs the guard ([onDelete]); only the
  * confirmation's "Delete event" deletes ([onConfirmDelete]). Edit ([onEdit]) shows exactly where Delete does and
  * opens the add/edit sheet without a PIN (2b-2 design D12).
+ * The header, info card and note scroll; the footer stays at the bottom.
  */
 @Composable
 fun EventDetailSheet(
@@ -83,51 +86,56 @@ fun EventDetailSheet(
         ),
         modifier = modifier.testTag("detail_sheet"),
     ) {
-        Header(e, onClose)
-        InfoCard(detail)
-        when {
-            e.readOnlyReason == ReadOnlyReason.OtherCalendar || e.readOnlyReason == ReadOnlyReason.NotMaster -> {
-                val subscribed = e.readOnlyReason == ReadOnlyReason.OtherCalendar
-                Note(
-                    icon = Icons.LOCK,
-                    title = if (subscribed) "From ${e.sourceName} (read-only)" else "From ${e.sourceName}",
-                    body = if (subscribed) {
-                        "This is a subscribed calendar, so it can't be changed here."
-                    } else {
-                        "Change events on this calendar in ${e.serviceName} on your phone."
-                    },
-                )
-            }
-            e.readOnlyReason == ReadOnlyReason.Recurring -> Note(
-                icon = Icons.EVENT_REPEAT,
-                title = "Repeating event",
-                body = "Edit repeating events in ${e.serviceName} on your phone.",
-            )
-            e.untagged -> Note(
-                icon = Icons.MOBILE,
-                title = "Added from a phone",
-                body = "Showing as Family until someone assigns it.",
-                background = c.accentSoft,
-                iconTint = c.accent,
-            ) {
-                Spacer(Modifier.height(CalendarDimens.assignTop))
-                if (mode == DetailMode.ChoosingPerson) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.personChipGap),
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    ) {
-                        people.forEach { person -> HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy) { onAssign(person) } }
-                    }
-                } else {
-                    HhButton(
-                        "Assign to…", onChoosePerson, Modifier.testTag("detail_assign"),
-                        tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Surf,
+        // The title has no line limit, so the header scrolls with the body; only the footer stays put (4d-1 §6.4).
+        Column(
+            verticalArrangement = Arrangement.spacedBy(ShellTokens.sheetGap),
+            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+        ) {
+            Header(e, onClose)
+            InfoCard(detail)
+            when {
+                e.readOnlyReason == ReadOnlyReason.OtherCalendar || e.readOnlyReason == ReadOnlyReason.NotMaster -> {
+                    val subscribed = e.readOnlyReason == ReadOnlyReason.OtherCalendar
+                    Note(
+                        icon = Icons.LOCK,
+                        title = if (subscribed) "From ${e.sourceName} (read-only)" else "From ${e.sourceName}",
+                        body = if (subscribed) {
+                            "This is a subscribed calendar, so it can't be changed here."
+                        } else {
+                            "Change events on this calendar in ${e.serviceName} on your phone."
+                        },
                     )
+                }
+                e.readOnlyReason == ReadOnlyReason.Recurring -> Note(
+                    icon = Icons.EVENT_REPEAT,
+                    title = "Repeating event",
+                    body = "Edit repeating events in ${e.serviceName} on your phone.",
+                )
+                e.untagged -> Note(
+                    icon = Icons.MOBILE,
+                    title = "Added from a phone",
+                    body = "Showing as Family until someone assigns it.",
+                    background = c.accentSoft,
+                    iconTint = c.accent,
+                ) {
+                    Spacer(Modifier.height(CalendarDimens.assignTop))
+                    if (mode == DetailMode.ChoosingPerson) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(CalendarDimens.personChipGap),
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        ) {
+                            people.forEach { person -> HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy) { onAssign(person) } }
+                        }
+                    } else {
+                        HhButton(
+                            "Assign to…", onChoosePerson, Modifier.testTag("detail_assign"),
+                            tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Surf,
+                        )
+                    }
                 }
             }
         }
         if (e.editable) {
-            Spacer(Modifier.weight(1f))
             if (mode == DetailMode.ConfirmingDelete) {
                 HhConfirmCard(
                     tag = "detail_confirm",
@@ -143,6 +151,9 @@ fun EventDetailSheet(
                                 "“${e.title}” will be removed from ${e.serviceName} for everyone.",
                                 style = CalendarType.noteBody,
                                 color = c.mute,
+                                // A title synced from a phone can be any length; past three lines it would push Keep off the sheet.
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }

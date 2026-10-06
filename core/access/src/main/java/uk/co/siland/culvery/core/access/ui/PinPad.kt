@@ -11,13 +11,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.access.PinHasher
@@ -218,9 +220,12 @@ fun PinPadFrame(
                     message,
                     style = PinPadType.error,
                     color = c.danger,
-                    maxLines = 1,
+                    // Two lines kept at every font scale, so the keypad doesn't jump when a message appears.
+                    minLines = 2,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.testTag("pin_error").height(PinPadDimens.errorLine),
+                    modifier = Modifier.testTag("pin_error"),
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(PinPadDimens.keyRowGap)) {
                     listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9")).forEach { row ->
@@ -234,10 +239,21 @@ fun PinPadFrame(
                             modifier = Modifier
                                 .testTag("pin_cancel")
                                 .size(PinPadDimens.key)
-                                .clip(CircleShape)
-                                .clickable(onClick = onCancel),
+                                .clickable(
+                                    interactionSource = null,
+                                    indication = ripple(bounded = false, radius = PinPadDimens.key / 2),
+                                    onClick = onCancel,
+                                ),
                         ) {
-                            Text("Cancel", style = PinPadType.cancel, color = c.ink)
+                            // Not clipped to the key: at a large font scale the word runs past the circle rather than breaking.
+                            Text(
+                                "Cancel",
+                                style = PinPadType.cancel,
+                                color = c.ink,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.wrapContentWidth(unbounded = true),
+                            )
                         }
                         DigitKey("0", enabled = canType) { type("0") }
                         Box(
