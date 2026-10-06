@@ -1,14 +1,9 @@
 package uk.co.siland.culvery.core.setup
 
 import android.util.Log
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -17,22 +12,21 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.ListRowTokens
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 /** 4a design §3.8: search once the query has two letters and typing has paused for 400 ms. */
@@ -140,20 +134,11 @@ internal fun LocationContent(
 
 @Composable
 private fun PlaceRow(label: String, ticked: Boolean, tag: String, onClick: (() -> Unit)?) {
-    val c = Culvery.colors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SetupDimens.rowDotGap),
-        modifier = Modifier
-            .testTag(tag)
-            .semantics(mergeDescendants = true) { selected = ticked }
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(SetupDimens.rowRadius))
-            .background(c.surf)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = SetupDimens.rowPaddingH, vertical = SetupDimens.rowPaddingV),
-    ) {
-        Text(label, style = SetupType.rowTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        if (ticked) HhIcon(Icons.CHECK, size = SetupDimens.rowIcon, tint = c.accent)
-    }
+    val tick: (@Composable RowScope.() -> Unit)? = if (ticked) ({ HhIcon(Icons.CHECK, size = ListRowTokens.icon, tint = Culvery.colors.accent) }) else null
+    HhListRow(
+        title = label,
+        modifier = Modifier.testTag(tag).semantics(mergeDescendants = true) { selected = ticked },
+        trailing = tick,
+        onClick = onClick,
+    )
 }

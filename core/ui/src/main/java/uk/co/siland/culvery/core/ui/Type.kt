@@ -50,6 +50,7 @@ object HhType {
     val body = style(16, FontWeight.W400)
     val secondary = style(14, FontWeight.W400)
     val label = style(13, FontWeight.W600)
+    val sectionLabel = style(13, FontWeight.W700).copy(letterSpacing = 0.5.sp)
     val status = style(13, FontWeight.W500)
     val labelSmall = style(12, FontWeight.W700)
     val buttonLabel = style(15, FontWeight.W700)

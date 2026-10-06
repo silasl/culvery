@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -24,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
@@ -50,6 +48,7 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhSwitch
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.rememberSingleAction
@@ -214,35 +213,22 @@ internal fun ReviewCalendars(
 private fun ConnectionHeader(row: CalendarRow, nowMillis: Long, busy: Boolean, onReconnect: (Connection) -> Unit, onDisconnect: (CalendarRow) -> Unit) {
     val c = Culvery.colors
     val needsReconnect = row.health == ConnectionHealth.NeedsSignIn
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.settingsIconGap),
-        modifier = Modifier
-            .testTag("settings_row_${row.connection.id}")
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(CalendarDimens.settingsRowRadius))
-            .background(c.surf)
-            .padding(horizontal = CalendarDimens.settingsRowPaddingH, vertical = CalendarDimens.settingsRowPaddingV),
-    ) {
-        HhIcon(row.icon, size = CalendarDimens.settingsIcon, tint = c.ink)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(CalendarDimens.settingsStatusTop)) {
-            Text(
-                serviceAndAccount(row),
-                style = CalendarType.settingsRowTitle,
-                color = c.ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(healthWords(row, nowMillis), style = CalendarType.subtitle, color = if (needsReconnect) c.danger else c.mute, maxLines = 1)
-        }
-        if (needsReconnect) {
-            HhButton(
-                "Reconnect", { onReconnect(row.connection) }, Modifier.testTag("settings_reconnect"),
-                tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Surf,
-            )
-        }
-        HhButton(DISCONNECT, { onDisconnect(row) }, Modifier.testTag("review_disconnect_${row.connection.id}"), enabled = !busy, on = ButtonSurface.Surf)
-    }
+    HhListRow(
+        title = serviceAndAccount(row),
+        modifier = Modifier.testTag("settings_row_${row.connection.id}"),
+        leading = { HhIcon(row.icon, size = CalendarDimens.settingsIcon, tint = c.ink) },
+        subtitle = healthWords(row, nowMillis),
+        subtitleColor = if (needsReconnect) c.danger else c.mute,
+        trailing = {
+            if (needsReconnect) {
+                HhButton(
+                    "Reconnect", { onReconnect(row.connection) }, Modifier.testTag("settings_reconnect"),
+                    tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Surf,
+                )
+            }
+            HhButton(DISCONNECT, { onDisconnect(row) }, Modifier.testTag("review_disconnect_${row.connection.id}"), enabled = !busy, on = ButtonSurface.Surf)
+        },
+    )
 }
 
 @Composable
@@ -260,60 +246,53 @@ private fun SourceRow(
     val id = source.source.id
     // A person removed since is Family until HouseholdFollower catches up.
     val person = people.firstOrNull { it.id == source.mapping.person } ?: Person.Family
-    Column(
-        verticalArrangement = Arrangement.spacedBy(CalendarDimens.reviewItemGap),
-        modifier = Modifier
-            .testTag("review_source_$id")
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(CalendarDimens.reviewRowRadius))
-            .background(c.surf)
-            .padding(horizontal = CalendarDimens.reviewRowPaddingH, vertical = CalendarDimens.reviewRowPaddingV),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.reviewItemGap)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(CalendarDimens.settingsStatusTop)) {
-                Text(source.source.name, style = CalendarType.settingsRowTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (source.isMaster) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.reviewItemGap)) {
-                        Text(
-                            MASTER,
-                            style = CalendarType.badge,
-                            color = c.accent,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(CalendarDimens.badgeRadius))
-                                .background(c.accentSoft)
-                                .padding(horizontal = CalendarDimens.badgePaddingH, vertical = CalendarDimens.badgePaddingV),
-                        )
-                        Text(NEW_EVENTS_GO_HERE, style = CalendarType.subtitle, color = c.mute)
-                    }
-                } else if (source.source.writable) {
-                    HhButton(MAKE_MASTER, { onMakeMaster(source) }, Modifier.testTag("review_make_master_$id"), enabled = !busy, on = ButtonSurface.Surf)
-                }
-            }
+    HhListRow(
+        title = source.source.name,
+        modifier = Modifier.testTag("review_source_$id"),
+        trailing = {
             HhChoiceChip(person.name, selected = false, tag = "review_person_$id", onClick = { onPick(sourceKey(source)) }, leading = { _ -> Dot(person) })
             Text(SHOW, style = CalendarType.subtitle, color = c.mute)
             // The master is always shown (4a design §3.9).
             HhSwitch(source.mapping.visible, { onShown(source, it) }, tag = "review_show_$id", enabled = !source.isMaster && !busy)
-        }
-        // A calendar the service hid on its tick has no problem to show, and no Hide to offer.
-        if (source.readProblem != null && source.mapping.visible) ReadProblem(source, busy, onShown)
-        if (picking) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap), verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
-                people.forEach { p ->
-                    val selected = p.id == source.mapping.person
-                    HhChoiceChip(
-                        p.name,
-                        selected = selected,
-                        tag = "review_pick_${p.name}",
-                        onClick = { onPerson(source, p) },
-                        enabled = !busy,
-                        selectedColor = Color(p.color),
-                        selectedInk = PersonChipInk,
-                        leading = { ink -> if (selected) HhIcon(Icons.CHECK, size = ControlTokens.chipIcon, tint = ink) else Dot(p) },
+        },
+        below = {
+            if (source.isMaster) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.reviewItemGap)) {
+                    Text(
+                        MASTER,
+                        style = CalendarType.badge,
+                        color = c.accent,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(CalendarDimens.badgeRadius))
+                            .background(c.accentSoft)
+                            .padding(horizontal = CalendarDimens.badgePaddingH, vertical = CalendarDimens.badgePaddingV),
                     )
+                    Text(NEW_EVENTS_GO_HERE, style = CalendarType.subtitle, color = c.mute)
+                }
+            } else if (source.source.writable) {
+                HhButton(MAKE_MASTER, { onMakeMaster(source) }, Modifier.testTag("review_make_master_$id"), enabled = !busy, on = ButtonSurface.Surf)
+            }
+            // A calendar the service hid on its tick has no problem to show, and no Hide to offer.
+            if (source.readProblem != null && source.mapping.visible) ReadProblem(source, busy, onShown)
+            if (picking) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap), verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
+                    people.forEach { p ->
+                        val selected = p.id == source.mapping.person
+                        HhChoiceChip(
+                            p.name,
+                            selected = selected,
+                            tag = "review_pick_${p.name}",
+                            onClick = { onPerson(source, p) },
+                            enabled = !busy,
+                            selectedColor = Color(p.color),
+                            selectedInk = PersonChipInk,
+                            leading = { ink -> if (selected) HhIcon(Icons.CHECK, size = ControlTokens.chipIcon, tint = ink) else Dot(p) },
+                        )
+                    }
                 }
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable

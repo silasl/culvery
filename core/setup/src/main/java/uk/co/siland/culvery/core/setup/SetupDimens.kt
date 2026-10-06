@@ -25,16 +25,10 @@ internal object SetupDimens {
     // The home-app prompt (4c §5.1; not in the spec): its button 12 below its line.
     val homeAppPromptGap = 12.dp
 
-    // List rows, people and towns (not in the spec): `surf`, radius 18, padding 16×20, 10 apart; a 16 dp colour dot 16
-    // from the text, whose second line is 2 below; a 24 dp icon at the end.
-    val rowRadius = 18.dp
-    val rowPaddingV = 16.dp
-    val rowPaddingH = 20.dp
+    // List rows are ListRowTokens'. Not in the spec: 10 between rows, a 16 dp colour dot.
     val rowGap = 10.dp
     val rowDot = 16.dp
     val rowDotGap = 16.dp
-    val rowLineGap = 2.dp
-    val rowIcon = 24.dp
 
     // Move up / Move down (4c §7.1; not in the spec): 48 dp touch targets around the row's 24 dp icon.
     val moveButton = 48.dp
@@ -76,9 +70,6 @@ internal object SetupType {
 
     /** 14 sp / 400: a row's second line, a role's line. */
     val secondary = HhType.secondary
-
-    /** 13 sp / 700: a sheet section's label. */
-    val label = HhType.label.copy(fontWeight = FontWeight.W700)
 
     /** 30 sp / 700, −0.5 tracking: the person sheet's heading (the calendar editor's title). */
     val sheetTitle = HhType.screenTitle.copy(fontSize = 30.sp, letterSpacing = (-0.5).sp)

@@ -77,17 +77,11 @@ internal object CalendarType {
     /** 15 sp / 400: the add/edit sheet's live summary. */
     val editorSummary = subtitle
 
-    /** 13 sp / 700, 0.5 tracking: WHO, DAY, TIME, LENGTH. */
-    val sectionLabel = HhType.label.copy(fontWeight = FontWeight.W700, letterSpacing = 0.5.sp)
-
     /** 16 sp / 600: a locked multi-day edit's dates line. */
     val lockedDates = personChip
 
     /** 22 sp / 700: "Connecting to Google Calendar…" and Settings' "Calendars" (3a design §4). */
     val blockTitle = HhType.sectionTitle
-
-    /** 18 sp / 600: a Settings row's "Google Calendar · {account}". */
-    val settingsRowTitle = HhType.rowTitle.copy(fontSize = 18.sp)
 
     /** 34 sp / 700: "Your calendars" and "Calendars", as the wizard's and Settings' titles (4a design §4.5). */
     val reviewTitle = HhType.screenTitle
@@ -296,23 +290,12 @@ internal object CalendarDimens {
     val connectingTextGap = 4.dp
     val connectingIcon = 32.dp
 
-    // Settings' Calendars block (3a design §4.1): a row `surf`, radius 18, padding 16×20; its pills are the shared button.
-    // Not in the spec: 12 below the title, rows 10 apart, a 26 dp icon 16 from the text, the health 2 below the name,
-    // and rows 600 wide (the sheets' width) so a row reads as one line.
-    val settingsRowRadius = 18.dp
-    val settingsRowPaddingV = 16.dp
-    val settingsRowPaddingH = 20.dp
+    // Settings' Calendars block (3a design §4.1): rows are ListRowTokens'; a connection's 26 dp icon leads it.
     val settingsIcon = 26.dp
-    val settingsIconGap = 16.dp
-    val settingsStatusTop = 2.dp
 
-    // Review calendars (4a design §4.5; not in the spec): blocks 12 apart; a calendar's row `surf`, radius 18, padding
-    // 14×20, its parts 12 apart; the Master badge `accentSoft`, radius 12, padding 4×10. The wizard's Connect card
-    // 380×460, about a Home card's size.
+    // Review calendars (4a design §4.5; not in the spec): blocks 12 apart; a calendar row's parts 12 apart; the Master badge
+    // `accentSoft`, radius 12, padding 4×10. The wizard's Connect card 380×460, about a Home card's size.
     val reviewBlockGap = 12.dp
-    val reviewRowRadius = 18.dp
-    val reviewRowPaddingV = 14.dp
-    val reviewRowPaddingH = 20.dp
     val reviewItemGap = 12.dp
     val badgeRadius = 12.dp
     val badgePaddingV = 4.dp

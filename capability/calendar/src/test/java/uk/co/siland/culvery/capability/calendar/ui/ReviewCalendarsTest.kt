@@ -15,7 +15,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -32,6 +34,7 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
 @RunWith(AndroidJUnit4::class)
@@ -56,17 +59,23 @@ class ReviewCalendarsTest {
     private var kept = 0
     private var confirmed: CalendarRow? = null
 
-    private fun show(health: ConnectionHealth = ConnectionHealth.Ok, picking: String? = null, confirming: Confirming? = null) = compose.setContent {
+    private fun show(
+        health: ConnectionHealth = ConnectionHealth.Ok,
+        picking: String? = null,
+        confirming: Confirming? = null,
+        busy: Boolean = false,
+        connectable: List<ProviderDescriptor> = emptyList(),
+    ) = compose.setContent {
         CulveryTheme(dark = true) {
             ReviewCalendars(
                 title = "Calendars",
                 connections = listOf(ReviewConnection(row(health), listOf(family, swim, chores))),
                 people = listOf(Person.Family, mia),
                 nowMillis = now,
-                busy = false,
+                busy = busy,
                 picking = picking,
                 confirming = confirming,
-                connectable = emptyList(),
+                connectable = connectable,
                 actions = ReviewActions(
                     onReconnect = { reconnected = it },
                     onPick = { picked = it },
@@ -206,5 +215,23 @@ class ReviewCalendarsTest {
                 .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
                 .assertHeightIsEqualTo(48.dp)
         }
+    }
+
+    @Test
+    fun connectionAndCalendarRowsUseTheSharedRowStyles() {
+        show()
+        fun style(text: String) = compose.onNodeWithText(text, useUnmergedTree = true).textLayout().layoutInput.style
+        listOf("Google Calendar · family@example.com", "Chores").forEach {
+            assertThat(style(it).fontSize).isEqualTo(17.sp)
+            assertThat(style(it).fontWeight).isEqualTo(FontWeight.W600)
+        }
+        assertThat(style("Synced 2 min ago").fontSize).isEqualTo(14.sp)
+    }
+
+    @Test
+    fun connectAndReconnectAreDisabledWhileBusy() {
+        show(ConnectionHealth.NeedsSignIn, busy = true, connectable = listOf(ProviderDescriptor("calendar.google", "Google Calendar", "event", emptySet())))
+        compose.onNodeWithTag("settings_connect_calendar.google").assertIsNotEnabled()
+        compose.onNodeWithTag("settings_reconnect").assertIsNotEnabled()
     }
 }

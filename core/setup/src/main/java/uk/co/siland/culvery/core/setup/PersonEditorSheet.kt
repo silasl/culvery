@@ -40,6 +40,7 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhConfirmCard
+import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhSwatchGrid
 import uk.co.siland.culvery.core.ui.HhTextField
@@ -253,7 +254,7 @@ internal fun PersonEditorSheet(
 @Composable
 private fun Section(label: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.labelGap)) {
-        Text(label, style = SetupType.label, color = Culvery.colors.mute)
+        HhSectionLabel(label)
         content()
     }
 }

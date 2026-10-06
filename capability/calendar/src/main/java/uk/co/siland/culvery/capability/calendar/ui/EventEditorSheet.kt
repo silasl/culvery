@@ -56,6 +56,7 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.Icons
@@ -234,7 +235,7 @@ private fun TitleField(form: EventForm, focus: FocusRequester, readOnly: Boolean
 @Composable
 private fun Section(label: String, chips: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
-        Text(label, style = CalendarType.sectionLabel, color = Culvery.colors.mute)
+        HhSectionLabel(label)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
             verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
@@ -246,7 +247,7 @@ private fun Section(label: String, chips: @Composable () -> Unit) {
 
 @Composable
 private fun WhoSection(form: EventForm, everyone: List<Person>, childOnly: PersonId?, busy: Boolean, onRefusedWho: () -> Unit) {
-    Section("WHO") {
+    Section("Who") {
         everyone.forEach { person ->
             val selected = form.who == person.id
             val enabled = childOnly == null || person.id == childOnly
@@ -280,7 +281,7 @@ private fun WhoSection(form: EventForm, everyone: List<Person>, childOnly: Perso
 
 @Composable
 private fun DaySection(form: EventForm, busy: Boolean, onPickDate: () -> Unit) {
-    Section("DAY") {
+    Section("Day") {
         form.dayChoices.forEachIndexed { i, date ->
             HhChoiceChip(
                 label = when (i) {
@@ -306,7 +307,7 @@ private fun DaySection(form: EventForm, busy: Boolean, onPickDate: () -> Unit) {
 
 @Composable
 private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit) {
-    Section("TIME") {
+    Section("Time") {
         HhChoiceChip("All day", form.time == TimeChoice.AllDay, "time_all_day", onClick = { if (!busy) form.chooseTime(TimeChoice.AllDay) })
         TimeSlot.entries.forEach { slot ->
             HhChoiceChip(
@@ -330,7 +331,7 @@ private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit) 
 
 @Composable
 private fun LengthSection(form: EventForm, busy: Boolean) {
-    Section("LENGTH") {
+    Section("Length") {
         form.lengths.forEach { length ->
             HhChoiceChip(lengthLabel(length), form.length == length, "length_${length.toMinutes()}", onClick = { if (!busy) form.chooseLength(length) })
         }
