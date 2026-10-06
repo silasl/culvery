@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -191,5 +192,14 @@ class FontScaleTest {
         val summary = compose.onNodeWithTag("editor_summary").textLayout()
         assertThat(summary.lineCount).isEqualTo(2)
         assertThat(summary.isLineEllipsized(1)).isFalse()
+    }
+
+    /** The hand-off puts the value 18 dp after the label column, which a wide label mustn't swallow. */
+    @Test
+    fun atFontScale15ALongDetailLabelKeepsItsGapToTheValue() {
+        showDetail(DetailMode.Idle)
+        val label = compose.onNodeWithText("Created by", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val value = compose.onNodeWithText("Added from phone", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertThat(value.left.value).isAtLeast(label.right.value + 18f - 0.5f)
     }
 }

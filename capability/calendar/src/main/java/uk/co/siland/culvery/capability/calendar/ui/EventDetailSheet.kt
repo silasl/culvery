@@ -250,6 +250,7 @@ private fun InfoRow(icon: String, label: String, value: @Composable () -> Unit) 
         HhIcon(icon, size = CalendarDimens.infoIcon, tint = c.mute)
         Spacer(Modifier.width(CalendarDimens.infoIconGap))
         Text(label, style = CalendarType.infoLabel, color = c.mute, maxLines = 2, modifier = Modifier.widthIn(min = CalendarDimens.infoLabelWidth))
+        Spacer(Modifier.width(CalendarDimens.infoLabelGap))
         value()
     }
 }

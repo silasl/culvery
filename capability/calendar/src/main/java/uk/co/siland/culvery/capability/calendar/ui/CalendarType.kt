@@ -200,6 +200,8 @@ internal object CalendarDimens {
     val infoIcon = 22.dp
     val infoIconGap = 12.dp
     val infoLabelWidth = 104.dp
+    // Hand-off: the value column starts 204 dp from the sheet's edge, 18 dp after the label column.
+    val infoLabelGap = 18.dp
     val infoDot = 12.dp
     val infoDotGap = 8.dp
 
