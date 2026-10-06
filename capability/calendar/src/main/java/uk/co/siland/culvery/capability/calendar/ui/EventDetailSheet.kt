@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -248,7 +249,7 @@ private fun InfoRow(icon: String, label: String, value: @Composable () -> Unit) 
     ) {
         HhIcon(icon, size = CalendarDimens.infoIcon, tint = c.mute)
         Spacer(Modifier.width(CalendarDimens.infoIconGap))
-        Text(label, style = CalendarType.infoLabel, color = c.mute, maxLines = 1, modifier = Modifier.width(CalendarDimens.infoLabelWidth))
+        Text(label, style = CalendarType.infoLabel, color = c.mute, maxLines = 2, modifier = Modifier.widthIn(min = CalendarDimens.infoLabelWidth))
         value()
     }
 }

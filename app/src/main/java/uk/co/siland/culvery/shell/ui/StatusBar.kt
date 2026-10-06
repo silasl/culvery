@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -26,8 +26,12 @@ import uk.co.siland.culvery.core.ui.ShellType
 import uk.co.siland.culvery.shell.SessionUi
 
 private val TIME = DateTimeFormatter.ofPattern("HH:mm")
+private val STATUS_BAR_MIN_HEIGHT = 30.dp
 
-/** Hand-off status bar, plus §7's signed-in indicator: `account_circle` · "{name} · {role}" · "Sign out". */
+/**
+ * Hand-off status bar, plus §7's signed-in indicator: `account_circle` · "{name} · {role}" · "Sign out". Its controls
+ * take a touch up to 48 dp around them (Compose's minimum touch target), so the bar stays 30 dp unless its text grows.
+ */
 @Composable
 fun StatusBar(
     now: () -> LocalDateTime,
@@ -45,7 +49,7 @@ fun StatusBar(
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().height(30.dp).padding(horizontal = 20.dp),
+        modifier = Modifier.testTag("status_bar").fillMaxWidth().heightIn(min = STATUS_BAR_MIN_HEIGHT).padding(horizontal = 20.dp),
     ) {
         Text(now().format(TIME), style = HhType.status, color = c.mute)
         Spacer(Modifier.weight(1f))

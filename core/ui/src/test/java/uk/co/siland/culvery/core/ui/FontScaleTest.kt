@@ -1,15 +1,18 @@
 package uk.co.siland.culvery.core.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -48,5 +51,21 @@ class FontScaleTest {
         assertThat(label.lineCount).isEqualTo(1)
         assertThat(label.isLineEllipsized(0)).isTrue()
         compose.onNodeWithTag("save").assertHeightIsEqualTo(60.dp)
+    }
+
+    @Test
+    fun atFontScale15AChipsLongLabelTakesTwoLinesAndTheChipGrowsToHoldThem() {
+        val label = "Saturday morning at the leisure centre pool"
+        compose.setContent {
+            CulveryTheme(dark = false) {
+                WithFontScale(1.5f) { Box(Modifier.width(220.dp)) { HhChoiceChip(label, selected = false, tag = "chip", onClick = {}) } }
+            }
+        }
+        val layout = compose.onNodeWithText(label, useUnmergedTree = true).textLayout()
+        assertThat(layout.lineCount).isEqualTo(2)
+        assertThat(layout.isLineEllipsized(1)).isTrue()
+        val chip = compose.onNodeWithTag("chip").getUnclippedBoundsInRoot()
+        val text = compose.onNodeWithText(label, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertThat(text.bottom.value).isAtMost(chip.bottom.value)
     }
 }

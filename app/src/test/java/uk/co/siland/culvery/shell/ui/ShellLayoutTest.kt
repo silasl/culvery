@@ -7,10 +7,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getAlignmentLinePosition
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -20,11 +23,13 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import java.time.LocalDateTime
 import org.junit.Rule
 import org.junit.Test
@@ -106,6 +111,38 @@ class ShellLayoutTest {
         var signedOut = false
         statusBar(SessionUi("Alex", "Admin")) { signedOut = true }
         compose.onNodeWithTag("status_sign_out").performClick()
+        assertThat(signedOut).isTrue()
+    }
+
+    /** A 48 dp touch target mustn't grow the bar: that would push Home down. */
+    @Test
+    fun theStatusBarIs30DpTallAtFontScale1() {
+        statusBar(SessionUi("Alex", "Admin"))
+        compose.onNodeWithTag("status_bar").assertHeightIsEqualTo(30.dp)
+    }
+
+    /** Not `hasVisualOverflow`: it is true for any text narrower than the width it was offered. */
+    @Test
+    fun atFontScale15TheStatusBarGrowsToHoldItsText() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                WithFontScale(1.5f) {
+                    StatusBar({ at }, dark = true, previewing = false, session = SessionUi("Alex", "Admin"), onSignOut = {}, onToggleThemePreview = {})
+                }
+            }
+        }
+        listOf("Sign out", "Auto", "Alex · Admin").forEach {
+            val text = compose.onNodeWithText(it, useUnmergedTree = true).textLayout()
+            assertWithMessage(it).that(text.didOverflowHeight || text.isLineEllipsized(text.lineCount - 1)).isFalse()
+        }
+    }
+
+    /** Compose takes a touch up to 48 dp around a smaller clickable; Sign out's text is about 28 dp tall. */
+    @Test
+    fun signOutTakesATouchJustBelowItsText() {
+        var signedOut = false
+        statusBar(SessionUi("Alex", "Admin")) { signedOut = true }
+        compose.onNodeWithTag("status_sign_out").performTouchInput { click(Offset(centerX, height + 8.dp.toPx())) }
         assertThat(signedOut).isTrue()
     }
 

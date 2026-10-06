@@ -204,6 +204,9 @@ class ShellScreenshotTest {
     }
 
     @Test
+    fun homeFontScale15() = snap("home_fs15", dark = false, state = weatherHome(dark = false), fontScale = 1.5f)
+
+    @Test
     fun pinPadFontScale15() = snap("pin_pad_fs15", dark = false, fontScale = 1.5f) {
         PinPadSheet("Change settings", PinReason.Generic, error = PinError.WrongPin, lockedUntilMillis = null, onSubmit = {}, onCancel = {})
     }

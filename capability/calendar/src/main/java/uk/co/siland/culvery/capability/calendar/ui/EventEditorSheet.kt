@@ -206,7 +206,7 @@ private fun Header(form: EventForm, everyone: List<Person>, onClose: () -> Unit)
                 form.summary { id -> everyone.firstOrNull { it.id == id }?.name },
                 style = CalendarType.editorSummary,
                 color = c.mute,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("editor_summary"),
             )

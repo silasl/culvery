@@ -20,12 +20,16 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
+import java.time.LocalTime
+import java.time.ZoneId
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarRow
+import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.ReviewConnection
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
@@ -136,5 +140,56 @@ class FontScaleTest {
         // An ellipsised line's visible end is where the "…" starts: after the whole time.
         assertThat(line.getLineEnd(0, visibleEnd = true)).isAtLeast("16:00".length)
         compose.onNodeWithContentDescription("Repeats", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun atFontScale15ALaterWeeksTitleGivesWayToThisWeek() {
+        val sync = SyncStatusUi(SampleUi.NOW, emptyList(), listOf("Google"), failingBeforeFirstSync = false)
+        compose.setContent {
+            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
+                CulveryTheme(dark = false) {
+                    WithFontScale(1.5f) {
+                        Box(Modifier.size(800.dp, 724.dp)) {
+                            WeekView(WeekViewState(SampleUi.weekAhead(3), SampleUi.TODAY, sync, SampleUi.NOW, weeksAhead = 3))
+                        }
+                    }
+                }
+            }
+        }
+        assertThat(compose.onNodeWithText("In 3 weeks", useUnmergedTree = true).textLayout().lineCount).isEqualTo(1)
+        val thisWeek = compose.onNode(hasText("This week") and hasAnyAncestor(hasTestTag("week_this_week")), useUnmergedTree = true).textLayout()
+        assertThat(thisWeek.isLineEllipsized(0)).isFalse()
+    }
+
+    @Test
+    fun atFontScale15TheDetailsLabelsAreWhole() {
+        showDetail(DetailMode.Idle)
+        listOf("When", "For", "Created by", "Calendar").forEach {
+            val label = compose.onNodeWithText(it, useUnmergedTree = true).textLayout()
+            assertWithMessage(it).that(label.didOverflowHeight || label.isLineEllipsized(label.lineCount - 1)).isFalse()
+        }
+    }
+
+    @Test
+    fun atFontScale15TheEditorSummaryTakesTwoLinesBeforeCuttingTheName() {
+        val max = Person(PersonId("max"), "Maximilian-Alexander Fotheringham-Smythe", 0xFF9C7CE3)
+        val form = EventForm(EventForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), ZoneId.of("Europe/London"), signedIn = null, preselectedDay = null)
+        form.chooseWho(max.id)
+        compose.setContent {
+            CulveryTheme(dark = false) {
+                WithFontScale(1.5f) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+                        EventEditorSheet(
+                            form = form, people = SampleUi.household + max, childOnly = null, busy = false, failure = null,
+                            picker = EditorPicker.None, onClose = {}, onSave = {}, onDelete = {}, onRefusedWho = {}, onPicker = {},
+                            focusTitleOnOpen = false,
+                        )
+                    }
+                }
+            }
+        }
+        val summary = compose.onNodeWithTag("editor_summary").textLayout()
+        assertThat(summary.lineCount).isEqualTo(2)
+        assertThat(summary.isLineEllipsized(1)).isFalse()
     }
 }

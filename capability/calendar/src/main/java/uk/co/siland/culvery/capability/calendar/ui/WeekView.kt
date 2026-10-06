@@ -116,7 +116,14 @@ fun WeekView(
                             }
                         }
                         Spacer(Modifier.width(CalendarDimens.weekTitleGap))
-                        Text(weekTitle(state.weeksAhead), style = CalendarType.weekTitle, color = c.ink, maxLines = 1)
+                        Text(
+                            weekTitle(state.weeksAhead),
+                            style = CalendarType.weekTitle,
+                            color = c.ink,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
                         if (state.weeksAhead > 0) {
                             Spacer(Modifier.width(CalendarDimens.weekTitleGap))
                             HhButton("This week", { onWeeksAhead(0) }, Modifier.testTag("week_this_week"), on = ButtonSurface.Bg)

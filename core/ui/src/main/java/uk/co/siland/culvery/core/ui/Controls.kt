@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -41,6 +42,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -102,7 +104,7 @@ object ControlType {
 }
 
 /**
- * Hand-off §7 chip: 48 dp, padding 0 18, radius 24, 16 sp / 600; `surf`/`ink`, or [selectedColor]/[selectedInk] when
+ * Hand-off §7 chip: at least 48 dp; a long label takes two lines, then ends in …; padding 0 18, radius 24, 16 sp / 600; `surf`/`ink`, or [selectedColor]/[selectedInk] when
  * selected. A disabled chip is drawn at 38% but stays tappable, so a tap can explain why.
  */
 @Composable
@@ -126,14 +128,14 @@ fun HhChoiceChip(
             .testTag(tag)
             .semantics { this.selected = selected }
             .alpha(if (enabled) 1f else ControlTokens.DISABLED_ALPHA)
-            .height(ControlTokens.chipHeight)
+            .heightIn(min = ControlTokens.chipHeight)
             .clip(RoundedCornerShape(ControlTokens.chipRadius))
             .background(if (selected) selectedColor else c.surf)
             .clickable(onClick = onClick)
             .padding(horizontal = ControlTokens.chipPaddingH),
     ) {
         leading?.invoke(ink)
-        Text(label, style = ControlType.chip, color = ink, maxLines = 1)
+        Text(label, style = ControlType.chip, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         if (secondary != null) {
             Text(secondary, style = ControlType.chipSecondary, color = ink, maxLines = 1)
         }

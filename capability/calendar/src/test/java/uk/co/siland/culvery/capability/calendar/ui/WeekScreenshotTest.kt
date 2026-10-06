@@ -21,6 +21,7 @@ import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.WithFontScale
 
 /** The tab content area: 1280 − 108 rail − 2 × 28 padding wide; 800 − 30 status − 24 − 22 high. */
 private val CONTENT_W = 1116.dp
@@ -36,12 +37,15 @@ class WeekScreenshotTest {
     private fun snap(name: String, dark: Boolean, sync: SyncStatusUi, week: WeekUi = SampleUi.week,
         canAdd: Boolean = false,
         weeksAhead: Int = 0,
+        fontScale: Float = 1f,
     ) {
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
                 CulveryTheme(dark = dark) {
-                    Box(Modifier.testTag("shot").background(Culvery.colors.bg).size(CONTENT_W, CONTENT_H)) {
-                        WeekView(WeekViewState(week, SampleUi.TODAY, sync, now, weeksAhead), onAdd = addNothing.takeIf { canAdd })
+                    WithFontScale(fontScale) {
+                        Box(Modifier.testTag("shot").background(Culvery.colors.bg).size(CONTENT_W, CONTENT_H)) {
+                            WeekView(WeekViewState(week, SampleUi.TODAY, sync, now, weeksAhead), onAdd = addNothing.takeIf { canAdd })
+                        }
                     }
                 }
             }
@@ -53,6 +57,7 @@ class WeekScreenshotTest {
     private val stale = fresh.copy(lastSyncMillis = now - 45 * 60_000)
     private val needsSignIn = fresh.copy(needsSignIn = listOf("Google"))
 
+    @Test fun weekFontScale15() = snap("week_fs15", false, fresh, canAdd = true, fontScale = 1.5f)
     @Test fun weekDark() = snap("week_dark", true, fresh, canAdd = true)
     @Test fun weekLight() = snap("week_light", false, fresh, canAdd = true)
     @Test fun weekStaleDark() = snap("week_stale_dark", true, stale)

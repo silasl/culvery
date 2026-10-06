@@ -191,7 +191,7 @@ internal object CalendarDimens {
     val syncingPillBottom = 8.dp
 
     // Info card: `surf`, radius 22, padding 2×18, rows at least 58 dp with 1 dp `line` dividers;
-    // 22 dp icon, 104 dp label column, 12 dp person dot.
+    // 22 dp icon, a label column at least 104 dp, 12 dp person dot.
     val infoRadius = 22.dp
     val infoPaddingV = 2.dp
     val infoPaddingH = 18.dp

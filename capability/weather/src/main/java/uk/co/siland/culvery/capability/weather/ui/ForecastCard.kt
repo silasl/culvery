@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -15,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import uk.co.siland.culvery.capability.weather.ADD_LOCATION
@@ -86,16 +89,39 @@ private fun ForecastRow(day: DailyWeather, isToday: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .height(WeatherDimens.rowHeight)
+            .heightIn(min = WeatherDimens.rowHeight)
             .testTag("forecast_row")
             .clearAndSetSemantics { contentDescription = description },
     ) {
         Text(dayLabel(day, isToday), style = HhType.rowTitle, color = c.ink, modifier = Modifier.weight(1f))
         HhIcon(weatherIcon(day.condition, night = false), size = WeatherDimens.rowIcon, tint = c.weather)
         Spacer(Modifier.width(WeatherDimens.rowIconGap))
-        Text(degrees(day.high), style = HhType.rowTitle, color = c.ink, textAlign = TextAlign.End, modifier = Modifier.width(WeatherDimens.temperatureWidth))
-        Text(degrees(day.low), style = HhType.rowTitle, color = c.mute, textAlign = TextAlign.End, modifier = Modifier.width(WeatherDimens.temperatureWidth))
+        TemperaturePair(degrees(day.high), degrees(day.low))
     }
+}
+
+/** A day's high and low, each on one line, at least 44 dp wide and right-aligned, 8 dp apart so they never run together. */
+@Composable
+internal fun TemperaturePair(high: String, low: String) {
+    val c = Culvery.colors
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Temperature(high, c.ink)
+        Spacer(Modifier.width(WeatherDimens.temperatureGap))
+        Temperature(low, c.mute)
+    }
+}
+
+@Composable
+private fun Temperature(text: String, color: Color) {
+    Text(
+        text,
+        style = HhType.rowTitle,
+        color = color,
+        textAlign = TextAlign.End,
+        maxLines = 1,
+        softWrap = false,
+        modifier = Modifier.widthIn(min = WeatherDimens.temperatureWidth),
+    )
 }
 
 /** The card over the repository: nothing until the first view, the age line moves on each minute. */

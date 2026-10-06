@@ -24,6 +24,7 @@ import uk.co.siland.culvery.capability.weather.WeatherView
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.WithFontScale
 
 /** A REGULAR cell as the Home grid gives it on the 1280×800 canvas: half the WIDE card's 705 dp less the 14 dp gap. */
 private val REGULAR_W = 345.dp
@@ -65,6 +66,13 @@ class WeatherScreenshotTest {
     @Test fun forecastExpiredLight() = card("forecast_expired_light", false, WeatherView.Expired)
     @Test fun forecastNoLocationDark() = card("forecast_no_location_dark", true, WeatherView.NoLocation)
     @Test fun forecastNoLocationLight() = card("forecast_no_location_light", false, WeatherView.NoLocation)
+    private val cold = READY.copy(days = READY.days.map { it.copy(high = it.high - 25, low = it.low - 23) })
+
+    @Test
+    fun forecastFontScale15() = snap("forecast_fs15", false) {
+        WithFontScale(1.5f) { Box(Modifier.size(REGULAR_W, REGULAR_H)) { ForecastCard(cold, cold.fetchedAtMillis) } }
+    }
+
     @Test fun headerDayDark() = snap("header_day_dark", true) { WeatherHeaderItem(day) }
     @Test fun headerDayLight() = snap("header_day_light", false) { WeatherHeaderItem(day) }
     @Test fun headerNightDark() = snap("header_night_dark", true) { WeatherHeaderItem(night) }

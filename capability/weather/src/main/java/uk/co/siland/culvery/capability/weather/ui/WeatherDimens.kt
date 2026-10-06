@@ -8,13 +8,14 @@ internal object WeatherDimens {
     val cardPaddingV = 20.dp
     val cardPaddingH = 22.dp
 
-    // Title → first row 10; rows 44 tall, so three and the age line fit the 279 dp REGULAR cell; a 30 dp icon (§4.2)
-    // 12 from the temperatures, each temperature right-aligned in 44.
+    // Title → first row 10; rows at least 44 tall, so three and the age line fit the 279 dp REGULAR cell; a 30 dp icon
+    // (§4.2) 12 from the temperatures, each at least 44 wide, right-aligned, 8 apart so they never run together.
     val titleGap = 10.dp
     val rowHeight = 44.dp
     val rowIcon = 30.dp
     val rowIconGap = 12.dp
     val temperatureWidth = 44.dp
+    val temperatureGap = 8.dp
 
     // The prompt's pill 18 below its line, as the Connect card's.
     val promptButtonTop = 18.dp
