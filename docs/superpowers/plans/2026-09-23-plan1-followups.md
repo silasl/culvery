@@ -6,7 +6,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 **For Plan 4d (design, UX and accessibility)**
 - `HhIcon` clears semantics and takes no content description. Icon-only buttons need an accessible label. *(Partly done: `HhIcon` now takes a `contentDescription`. Still unlabelled: the week view's add hints and the weather condition, 4d-2 D26.)*
-- Home header: the gap between the clock and the date is about 55 dp on the emulator, against about 12 dp in the hand-off, so the grid sits roughly 40 dp too low. The line-height trim on `HhType.clock` isn't taking effect. Found on the emulator; both AVDs show it. *(Superseded by 4d-1 D9: the stale figure predates 2a placing the date by baseline; the ink gap now matches the hand-off at 28 dp. The real bug is the clock box: `Trim.Both` cancels the line height, so the box is 135 dp, not 94.)*
 
 **Later**
 - The shell composables (`NavRail`, `StatusBar`, `SettingsPlaceholder`) have no UI tests, although the test tags exist. Cover them with the Roborazzi setup.
@@ -31,7 +30,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 **For Plan 4d (design, UX and accessibility)**
 - Clickable event rows and week chips have no `Role.Button`. *(→ 4d-2 D15.)*
-- The event detail sheet doesn't scroll. It fits today; longer titles and 2b-2's fields won't. *(→ 4d-1 D12.)*
 
 **Next migration or Room upgrade**
 - `androidxSqlite` 2.6.2 is pinned apart from Room's transitive version. Re-check it on each Room bump.
@@ -76,7 +74,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **For Plan 4d (design, UX and accessibility)**
 - All 4a layout, colour and copy choices are provisional (wizard padding, rows, swatches, role-chip lines, Settings column, the five extra person colours, the Connect step's connected card — its title wraps onto two lines). *(→ walk-through W6, W15–W27, W30, W34.)*
 - Settings page list items have no `Role.Tab` (accessibility), alongside the existing accessibility items. *(→ 4d-2 D16.)*
-- The calendar's DeleteButton keeps its danger text while disabled; the shared HhSheetButton greys out — pick one. *(Settled in 4d-1, Decision 8: every disabled button greys out.)*
 - The choose-a-PIN pad (and a sheet's Save) says "That PIN is taken — choose another." when someone else has the PIN, so an Admin can learn that a PIN is in use. Accepted: only an Admin (with a fresh PIN) gets there, and it follows from PINs being unique, since a PIN identifies its person. *(Kept as accepted, 4d triage X3.)*
 
 ## From Plan 4b (deferred)
@@ -88,7 +85,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **For Plan 4d (design, UX and accessibility)**
 - All 4b layout, colour and copy choices are provisional: the Forecast card's rows, its title in every state, the card's icons in sun amber like the header's, the TalkBack condition words, the header items' spacing and divider. *(→ walk-through W3, W7; TalkBack condition words kept, X17; header spacing W34.)*
 - The Forecast card has a lot of empty space below its three rows. *(→ walk-through W3.)*
-- Header items could overlap the clock or date if they grow wide (design review, before Climate). *(→ 4d-1 D10.)*
 - The header weather item has no merged TalkBack description: the temperature and High/Low read as two separate items. *(→ 4d-2 D26.)*
 - The Forecast row semantics test probes only the day label; also assert that "17°" is absent (count 0). *(→ 4d-2 D26.)*
 
@@ -126,7 +122,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **For Plan 4d (design, UX and accessibility)**
 - T14: time spent in the add/edit overlay counts as idle, so the Calendar tab's 2-minute return to this week can fire under it (`CardHosts.kt`, `WeekView.kt`). *(→ 4d-2 D30.)*
 - T16: the gap above the read-problem danger line is uneven (`ReviewCalendars.kt`). *(→ walk-through W31.)*
-- The unpinned window behind Android's home-role dialog: **Choose home app** unpins while Culvery isn't home yet, so a Home press on the dialog lands on the old launcher, unpinned (`KioskLifecycle.kt` `openHomeAppScreen`). Same walk-away class as 4c ruling 10 (no timeout on the unpinned window while Google's chooser shows, without device owner); decide both together with the user. *(Decided 2026-10-06: device owner is documented as the wall setup and the gap is accepted for screen pinning, with no re-pin timer; the `release.md` change is in 4d-1.)*
 
 **Tests and hardening**
 - T1: `tools/measure-release.sh` uses `$LOCALAPPDATA` under `set -u`, so it stops on macOS or Linux when adb isn't on PATH; use `${LOCALAPPDATA:-}`.
@@ -147,7 +142,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 ## From the 4d triage (2026-10-06)
 
-The 4d audits (copy, screens, hand-off, accessibility, live emulator) were triaged into D1–D41, W1–W34, E1–E10 and X1–X17. 4d is split (user, 2026-10-06): **4d-1** "shared parts, contrast, layout bugs" takes D1–D7 and D9–D14 (`docs/superpowers/specs/2026-10-06-culvery-4d1-shared-parts-contrast-design.md`); D8 is not done (palette swaps are W30); the rest is below. Paths are short (`core/ui` Controls.kt, calendar ui/WeekView.kt and so on); line numbers are as of b7cb40d.
+The 4d audits (copy, screens, hand-off, accessibility, live emulator) were triaged into D1–D41, W1–W34, E1–E10 and X1–X17. 4d-1 is done (`docs/superpowers/plans/2026-10-06-culvery-04d1-shared-parts-contrast.md`). 4d is split (user, 2026-10-06): **4d-1** "shared parts, contrast, layout bugs" takes D1–D7 and D9–D14 (`docs/superpowers/specs/2026-10-06-culvery-4d1-shared-parts-contrast-design.md`); D8 is not done (palette swaps are W30); the rest is below. Paths are short (`core/ui` Controls.kt, calendar ui/WeekView.kt and so on); line numbers are as of b7cb40d.
 
 **For Plan 4d-2 (TalkBack, timeouts, words)**
 
@@ -265,6 +260,25 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 - X15 A41 motion: only the 400 ms theme fade; nothing to reduce.
 - X16 A19, the pointer-only area below the chips: covered by the labelled add hint (D26).
 - X17 The 4b "TalkBack condition words": kept; they read well.
+
+## From Plan 4d-1 (deferred)
+
+**For Plan 4d-2 (TalkBack, timeouts, words)**
+- The Forecast row clears its children's semantics, so its day label and icon are checked only by baselines (the temperatures have `TemperatureFontScaleTest`). D26 rewrites those semantics (`ForecastCard.kt`).
+- `WeatherRepositoryTest` feeds the failures in directly; that the `@Inject` constructor passes `WeatherSyncLoop.lastFailure` is checked only on the emulator (walk-through item 7).
+- `HhCloseButton`, the week's ‹ ›, the date picker's ‹ › and the time steppers are `surf2` on `bg` or `surf` with no role of their own; on light `bg` the close button's fill is 1.04:1 (its `ink` icon carries it). Give them `HhButton`'s quiet fill and `Role.Button` in D15's pass (`Shell.kt`, `Pickers.kt`).
+- The week header's reconnect chip stays its own composable (`dangerSoft`; no `HhButton` tone fits). It has `Role.Button`; its label is D15's.
+- At font scale 1.5 the week view's Today column clips its last chip; the column doesn't grow. Let the column grow with its chips, or settle it at the design walk-through.
+
+**For the end-of-v1 design walk-through (the user's own)**
+- Calendars review: a calendar's Master line, Make master and read problem now sit under its top line (`HhListRow`'s `below`); People's move arrows and chevron are 12 dp apart (W31, W27).
+- `HhButton` and `HhChoiceChip` grow with their text at large font scales but have no vertical padding of their own; a two-line chip at 1.5 runs close to its edges.
+- Light `danger` on `dangerSoft` is 4.497:1: fine for the icons drawn there today; `danger` text on `dangerSoft` would need a darker `danger` (`ContrastTest` pins it).
+- The PIN pad now keeps a blank two-line gap between the dots and the keypad when there's no message, so the keypad doesn't move when a message appears (spec §6.5 trade-off).
+
+**For Plan 4e (the device)**
+- The status bar's Sign out and theme toggle rely on Compose's 48 dp touch-target expansion rather than 48 dp of layout (4d-1 ruling 8); check on the SM-T510 that a touch just outside them lands.
+- `HhCloseButton` is `surf2` on `bg` (1.04:1) in light; check on the SM-T510 that it reads as a button (see 4d-2 above).
 
 ## Feature ideas (2026-10-02, after v1)
 

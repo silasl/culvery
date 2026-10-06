@@ -207,7 +207,7 @@ A helper (`contrast(fg, bg)` and `over(alpha, surface)`) computes WCAG relative 
 
 **Evidence.** core/ui Type.kt:38-42; HomeScreen.kt:34-35, 52 (the KDoc "the clock's line-height trim doesn't apply reliably"), 70; live `home_clock` bounds 135 dp tall at every font scale; Compose `LineHeightStyleSpan.calculateTargetMetrics` (hand-off audit H1).
 
-**Fix.** `LineHeightStyle(Alignment.Center, Trim.None)`. With Center, Compose takes half the 41 dp shortfall off each side: the baseline is 82 dp from the box top, as CSS's half-leading puts it (82.3). Not `Alignment.Proportional`, which puts the baseline at 71 dp and the cap-top above the box. The 44 dp baseline-to-baseline placement stays. The date, header items and grid move up 21 dp, onto the hand-off. Correct the KDoc at HomeScreen.kt:52 and close the Plan 1 follow-up.
+**Fix.** A new `core/ui` `Modifier.lineBox(height)` (`LineBox.kt`) on the clock. It measures the text, reports the box as the style's 93.6 sp line height, and places the text centred in it, so glyphs may draw outside the box and the baselines move with the offset: the baseline is 82 dp from the box top, as CSS's half-leading puts it (82.3). `HhType.clock` is unchanged. *(Amended in Task 7: the first plan was `LineHeightStyle(Alignment.Center, Trim.None)`, but Compose won't shrink one line below the font's ascent plus descent through the style, so `Trim.None` left the box at 135 dp.)* The 44 dp baseline-to-baseline placement stays. The date, header items and grid move up 21 dp, onto the hand-off. Correct the KDoc at HomeScreen.kt:52 and close the Plan 1 follow-up.
 
 **Tests.** A compose test: `home_clock` is 94 dp ± 1 tall. Re-recorded Home baselines, one of them with `onAdd` set so Today's + is covered (the live audit found the baseline stale on this, hand-off H6).
 
@@ -270,7 +270,7 @@ A helper (`contrast(fg, bg)` and `over(alpha, surface)`) computes WCAG relative 
 **Fix.**
 - Status bar: `heightIn(min = 30.dp)`. Sign out and the theme toggle keep their visible size and rely on Compose's minimum touch target, which already takes a touch up to 48 dp around a smaller clickable. *(Amended at the plan review, user 2026-10-06: `minimumInteractiveComponentSize()` reserves 48 dp of layout, which would make the bar 48 dp and push Home down 18 dp.)*
 - Forecast rows `heightIn(min = 44.dp)`; temperatures `widthIn(min = 44.dp)`, `maxLines = 1, softWrap = false`, with an 8 dp gap between high and low so they never run together.
-- The detail label column `widthIn(min = 104.dp)`, up to two lines.
+- The detail label column `widthIn(min = 104.dp)`, up to two lines, with an 18 dp gap before the value (`CalendarDimens.infoLabelGap`, added in Task 10 so the value column is the hand-off's 204 dp).
 - The week title, `HhChoiceChip`'s label and the Review health line: an end ellipsis; the chip `heightIn(min = 48.dp)` with up to two lines; the editor summary up to two lines, so the time isn't cut first.
 
 **Tests.** Robolectric at font scale 1.3 and 1.5 for Home, Week, Detail and the PIN pad: named nodes lie inside their parents; the status bar stays 30 dp at 1.0 and a touch just outside Sign out's text still signs out (`assertTouchHeightIsAtLeast` can't fail for any clickable, as Compose pads every clickable's touch bounds to 48 dp). Roborazzi baselines at 1.5 for Home, Week, Detail and the PIN pad (`*_fs15`).
