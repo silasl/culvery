@@ -46,11 +46,15 @@ import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.lengthLabel
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
-import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.ButtonSize
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
+import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.DarkColors
-import uk.co.siland.culvery.core.ui.HhCloseButton
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
+import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhTextField
@@ -379,17 +383,19 @@ private fun FailureCard(title: String) {
 private fun Footer(form: EventForm, busy: Boolean, failed: Boolean, onSave: () -> Unit, onDelete: () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
         if (form.mode is EventForm.Mode.Edit) DeleteButton(enabled = !busy, tag = "editor_delete", onClick = onDelete)
-        PrimaryButton(
+        HhButton(
             text = when {
                 failed -> "Try again"
                 form.mode == EventForm.Mode.New -> "Save event"
                 else -> "Save changes"
             },
+            onClick = onSave,
+            modifier = Modifier.weight(1f).testTag("editor_save"),
+            tone = ButtonTone.Primary,
+            size = ButtonSize.Large,
             icon = if (failed) Icons.REFRESH else Icons.CHECK,
             enabled = form.canSave && !busy,
-            tag = "editor_save",
-            onClick = onSave,
-            modifier = Modifier.weight(1f),
+            on = ButtonSurface.Bg,
         )
     }
 }

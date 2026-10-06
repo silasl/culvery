@@ -25,12 +25,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
@@ -53,7 +56,7 @@ fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier, onOpen: (Ev
         ) {
             Text("Today", style = HhType.cardTitle, color = c.ink, modifier = Modifier.weight(1f))
             if (onAdd != null) AddCircle(onAdd)
-            HeaderChip("Week", onClick = { navigator.openTab(CALENDAR_TAB_ID) })
+            HhButton("Week", { navigator.openTab(CALENDAR_TAB_ID) }, on = ButtonSurface.Surf)
         }
         Spacer(Modifier.height(CalendarDimens.todayHeaderGap))
         when {
@@ -69,7 +72,7 @@ fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier, onOpen: (Ev
     }
 }
 
-/** Hand-off §7: 44 dp, `accent`, a 26 dp `add` in `accentInk`. */
+/** Hand-off §7: a 48 dp `accent` circle (raised from 44, 4d-1), a 26 dp `add` in `accentInk`. */
 @Composable
 private fun AddCircle(onClick: () -> Unit) {
     val c = Culvery.colors
@@ -80,7 +83,7 @@ private fun AddCircle(onClick: () -> Unit) {
             .size(CalendarDimens.touchTarget)
             .clip(CircleShape)
             .background(c.accent)
-            .clickable(onClickLabel = "Add event", onClick = onClick),
+            .clickable(onClickLabel = "Add event", role = Role.Button, onClick = onClick),
     ) {
         HhIcon(Icons.ADD, size = CalendarDimens.todayAddIcon, tint = c.accentInk, contentDescription = "Add event")
     }

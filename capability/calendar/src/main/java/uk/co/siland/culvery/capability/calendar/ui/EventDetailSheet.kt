@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,8 +31,12 @@ import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.ui.ButtonSize
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhConfirmCard
@@ -116,7 +119,10 @@ fun EventDetailSheet(
                         people.forEach { person -> HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy) { onAssign(person) } }
                     }
                 } else {
-                    AssignButton(enabled = !busy, onClick = onChoosePerson)
+                    HhButton(
+                        "Assign to…", onChoosePerson, Modifier.testTag("detail_assign"),
+                        tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Surf,
+                    )
                 }
             }
         }
@@ -144,7 +150,10 @@ fun EventDetailSheet(
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
                     DeleteButton(enabled = !busy, tag = "detail_delete", onClick = onDelete)
-                    PrimaryButton("Edit", Icons.EDIT, enabled = !busy, tag = "detail_edit", onClick = onEdit, modifier = Modifier.weight(1f))
+                    HhButton(
+                        "Edit", onEdit, Modifier.weight(1f).testTag("detail_edit"),
+                        tone = ButtonTone.Primary, size = ButtonSize.Large, icon = Icons.EDIT, enabled = !busy, on = ButtonSurface.Bg,
+                    )
                 }
             }
         }
@@ -267,22 +276,5 @@ private fun Note(
             }
         }
         content()
-    }
-}
-
-@Composable
-private fun AssignButton(enabled: Boolean, onClick: () -> Unit) {
-    val c = Culvery.colors
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .testTag("detail_assign")
-            .height(CalendarDimens.assignButtonHeight)
-            .clip(RoundedCornerShape(CalendarDimens.assignButtonRadius))
-            .background(c.accent)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = CalendarDimens.assignButtonPaddingH),
-    ) {
-        Text("Assign to…", style = CalendarType.assignButton, color = c.accentInk, maxLines = 1)
     }
 }

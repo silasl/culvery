@@ -41,7 +41,11 @@ import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.SHORT_DAY
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
+import uk.co.siland.culvery.core.ui.ButtonSize
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
@@ -152,11 +156,7 @@ internal fun DatePickerCard(today: LocalDate, selected: LocalDate, onPick: (Loca
                 }
             }
         }
-        PickerButton(
-            "Cancel", primary = false, tag = "picker_cancel",
-            height = CalendarDimens.pickerCancelHeight, radius = CalendarDimens.pickerCancelRadius,
-            modifier = Modifier.fillMaxWidth(), onClick = onCancel,
-        )
+        HhButton("Cancel", onCancel, Modifier.fillMaxWidth().testTag("picker_cancel"), size = ButtonSize.Large, on = ButtonSurface.Surf)
     }
 }
 
@@ -178,15 +178,10 @@ internal fun TimePickerCard(initial: LocalTime, onSet: (LocalTime) -> Unit, onCa
             Stepper(minute, "minute", onUp = { minute = minuteStep(minute, up = true) }, onDown = { minute = minuteStep(minute, up = false) })
         }
         Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.timeButtonGap)) {
-            PickerButton(
-                "Cancel", primary = false, tag = "picker_cancel",
-                height = CalendarDimens.timeButtonHeight, radius = CalendarDimens.timeButtonRadius,
-                modifier = Modifier.weight(1f), onClick = onCancel,
-            )
-            PickerButton(
-                "Set time", primary = true, tag = "picker_set",
-                height = CalendarDimens.timeButtonHeight, radius = CalendarDimens.timeButtonRadius,
-                modifier = Modifier.weight(1f), onClick = { onSet(LocalTime.of(hour, minute)) },
+            HhButton("Cancel", onCancel, Modifier.weight(1f).testTag("picker_cancel"), size = ButtonSize.Large, on = ButtonSurface.Surf)
+            HhButton(
+                "Set time", { onSet(LocalTime.of(hour, minute)) }, Modifier.weight(1f).testTag("picker_set"),
+                tone = ButtonTone.Primary, size = ButtonSize.Large, on = ButtonSurface.Surf,
             )
         }
     }
@@ -268,29 +263,5 @@ private fun StepButton(icon: String, tag: String, label: String, onClick: () -> 
             .clickable(onClickLabel = label, onClick = onClick),
     ) {
         HhIcon(icon, size = CalendarDimens.stepperIcon, tint = c.ink, contentDescription = label)
-    }
-}
-
-@Composable
-internal fun PickerButton(
-    text: String,
-    primary: Boolean,
-    tag: String,
-    height: Dp,
-    radius: Dp,
-    modifier: Modifier,
-    onClick: () -> Unit,
-) {
-    val c = Culvery.colors
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .testTag(tag)
-            .height(height)
-            .clip(RoundedCornerShape(radius))
-            .background(if (primary) c.accent else c.surf2)
-            .clickable(onClick = onClick),
-    ) {
-        Text(text, style = CalendarType.pickerButton, color = if (primary) c.accentInk else c.ink, maxLines = 1)
     }
 }

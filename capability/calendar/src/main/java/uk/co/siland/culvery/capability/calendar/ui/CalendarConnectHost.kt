@@ -14,12 +14,16 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.OverlayHost
+import uk.co.siland.culvery.core.ui.ButtonSize
+import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
 
@@ -98,11 +102,7 @@ internal fun ConnectingCard(service: String, onCancel: () -> Unit, content: @Com
                 Text(CONNECTING_LINE, style = CalendarType.subtitle, color = c.mute)
             }
             content()
-            PickerButton(
-                "Cancel", primary = false, tag = "connecting_cancel",
-                height = CalendarDimens.pickerCancelHeight, radius = CalendarDimens.pickerCancelRadius,
-                modifier = Modifier.fillMaxWidth(), onClick = onCancel,
-            )
+            HhButton("Cancel", onCancel, Modifier.fillMaxWidth().testTag("connecting_cancel"), size = ButtonSize.Large, on = ButtonSurface.Surf)
         }
     }
 }

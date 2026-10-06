@@ -42,6 +42,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import java.time.LocalDate
 import kotlinx.coroutines.delay
@@ -56,7 +57,10 @@ import uk.co.siland.culvery.capability.calendar.isStaleAt
 import uk.co.siland.culvery.capability.calendar.weekSubtitle
 import uk.co.siland.culvery.capability.calendar.weekTitle
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
@@ -115,7 +119,7 @@ fun WeekView(
                         Text(weekTitle(state.weeksAhead), style = CalendarType.weekTitle, color = c.ink, maxLines = 1)
                         if (state.weeksAhead > 0) {
                             Spacer(Modifier.width(CalendarDimens.weekTitleGap))
-                            ThisWeekChip { onWeeksAhead(0) }
+                            HhButton("This week", { onWeeksAhead(0) }, Modifier.testTag("week_this_week"), on = ButtonSurface.Bg)
                         }
                     }
                     Spacer(Modifier.height(CalendarDimens.subtitleTop))
@@ -138,7 +142,12 @@ fun WeekView(
                             .testTag("week_legend")
                             .then(if (onAdd == null) Modifier.padding(end = CalendarDimens.headerTrailingGap) else Modifier),
                     )
-                    if (onAdd != null) AddButton("Add event", "week_add_event") { onAdd(state.week.start) }
+                    if (onAdd != null) {
+                        HhButton(
+                            "Add event", { onAdd(state.week.start) }, Modifier.testTag("week_add_event"),
+                            tone = ButtonTone.Primary, icon = Icons.ADD, on = ButtonSurface.Bg,
+                        )
+                    }
                 }
             }
             if (state.sync.needsSignIn.isNotEmpty()) {
@@ -219,7 +228,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
     }
 }
 
-/** Hand-off §7: a faint `add` at the foot of each column, in a tap area at least 40 dp tall. */
+/** Hand-off §7: a faint `add` at the foot of each column, in a tap area at least 48 dp tall. */
 @Composable
 private fun AddHint(date: LocalDate, onAdd: () -> Unit) {
     Box(
@@ -283,7 +292,7 @@ private fun Legend(people: List<Person>, modifier: Modifier = Modifier) {
     }
 }
 
-/** One chip for every connection that needs signing in again: hand-off `dangerSoft` pill, 44 dp, radius 22. */
+/** One chip for every connection that needs signing in again: a `dangerSoft` pill, 48 dp, radius 24. */
 @Composable
 private fun ReconnectChip(label: String, onClick: () -> Unit) {
     val c = Culvery.colors
@@ -294,7 +303,7 @@ private fun ReconnectChip(label: String, onClick: () -> Unit) {
             .height(CalendarDimens.touchTarget)
             .clip(RoundedCornerShape(CalendarDimens.pillRadius))
             .background(c.dangerSoft)
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = CalendarDimens.pillPaddingH),
     ) {
         HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.reconnectIcon, tint = c.danger)
@@ -306,24 +315,6 @@ private fun ReconnectChip(label: String, onClick: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
-    }
-}
-
-/** Back to this week (4c §6.6): a quiet 44 dp pill beside a later week's title. */
-@Composable
-private fun ThisWeekChip(onClick: () -> Unit) {
-    val c = Culvery.colors
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .testTag("week_this_week")
-            .height(CalendarDimens.touchTarget)
-            .clip(RoundedCornerShape(CalendarDimens.pillRadius))
-            .background(c.surf2)
-            .clickable(onClick = onClick)
-            .padding(horizontal = CalendarDimens.pillPaddingH),
-    ) {
-        Text("This week", style = CalendarType.pill, color = c.ink, maxLines = 1)
     }
 }
 

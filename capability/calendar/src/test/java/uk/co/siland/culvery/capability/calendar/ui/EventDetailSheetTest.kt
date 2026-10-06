@@ -3,10 +3,17 @@ package uk.co.siland.culvery.capability.calendar.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -21,6 +28,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.DarkColors
 
 @RunWith(AndroidJUnit4::class)
 class EventDetailSheetTest {
@@ -29,6 +37,8 @@ class EventDetailSheetTest {
     private val calls = mutableListOf<String>()
     private var mode by mutableStateOf(DetailMode.Idle)
     private var busy by mutableStateOf(false)
+    private val isButton = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
+
 
     private fun show(detail: EventDetailUi) = compose.setContent {
         CulveryTheme(dark = true) {
@@ -46,6 +56,22 @@ class EventDetailSheetTest {
                 onEdit = { calls += "edit" },
             )
         }
+    }
+
+    @Test
+    fun deleteAndEditAreLargeButtonsAndADisabledDeleteIsGrey() {
+        busy = true
+        show(SampleUi.detailEditable)
+        compose.onNodeWithTag("detail_edit").assert(isButton).assertHeightIsEqualTo(60.dp)
+        compose.onNodeWithTag("detail_delete").assert(isButton).assertHeightIsEqualTo(60.dp).assertIsNotEnabled()
+        val label = compose.onNode(hasText("Delete") and hasAnyAncestor(hasTestTag("detail_delete")), useUnmergedTree = true).textLayout()
+        assertThat(label.layoutInput.style.color).isEqualTo(DarkColors.mute)
+    }
+
+    @Test
+    fun assignToIsA48DpButton() {
+        show(SampleUi.detailUntagged)
+        compose.onNodeWithTag("detail_assign").assert(isButton).assertHeightIsEqualTo(48.dp)
     }
 
     @Test

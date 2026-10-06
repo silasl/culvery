@@ -1,12 +1,18 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
@@ -25,6 +31,8 @@ class PickersTest {
     private val picked = mutableListOf<LocalDate>()
     private val set = mutableListOf<LocalTime>()
     private var cancelled = 0
+    private val isButton = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
+
 
     private fun showDates(selected: LocalDate = today) = compose.setContent {
         CulveryTheme(dark = true) {
@@ -39,6 +47,14 @@ class PickersTest {
             PickerLayer(onDismiss = { cancelled++ }) {
                 TimePickerCard(initial, onSet = { set += it }, onCancel = { cancelled++ })
             }
+        }
+    }
+
+    @Test
+    fun thePickersButtonsAre60DpButtons() {
+        showTime(LocalTime.of(9, 0))
+        listOf("picker_cancel", "picker_set").forEach {
+            compose.onNodeWithTag(it).assert(isButton).assertHeightIsEqualTo(60.dp)
         }
     }
 

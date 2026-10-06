@@ -33,7 +33,7 @@ import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhType
 
 /**
- * Rows per day before "+N more". The WIDE card is 279 dp tall: 279 − 2 × 20 padding − 44 header − 6 gap = 189 dp
+ * Rows per day before "+N more". The WIDE card is 279 dp tall: 279 − 2 × 20 padding − 48 header − 6 gap = 185 dp
  * for a day column. The day label is about 19 dp, each compact row about 50 dp (8 + 18 + 16 + 8) plus a 6 dp gap,
  * and "+N more" about 16 dp plus its gap. Three rows need 19 + 3 × 56 + 22 = 209 dp and do not fit; two need
  * 19 + 2 × 56 + 22 = 153 dp, which leaves room for font rounding. So 2.
@@ -50,8 +50,7 @@ fun ComingUpCard(days: List<DayUi>?, modifier: Modifier = Modifier) {
         radius = CalendarDimens.cardRadius,
         padding = PaddingValues(horizontal = CalendarDimens.comingUpPaddingH, vertical = CalendarDimens.comingUpPaddingV),
     ) {
-        // One way from Home to the week (2b-1 D6): Today's Week pill. The row keeps the old link's 44 dp height,
-        // so the day columns stay where MAX_ROWS was measured.
+        // The row is Today's header height (its Week button), so the two cards' headers line up.
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().heightIn(min = CalendarDimens.touchTarget),

@@ -29,7 +29,7 @@ internal object CalendarType {
     /** 14 sp / 500: legend names. */
     val legend = HhType.secondary.copy(fontWeight = FontWeight.W500)
 
-    /** 14 sp / 600: the "Week" pill and the reconnect chip. */
+    /** 14 sp / 600: the reconnect chip. */
     val pill = strong14
 
     /** 34 sp / 700, −0.5 tracking: the detail sheet's title. */
@@ -50,14 +50,8 @@ internal object CalendarType {
     /** 14 sp / 400: explanation card text. */
     val noteBody = HhType.secondary
 
-    /** 15 sp / 700: "Assign to…". */
-    val assignButton = HhType.buttonLabel
-
     /** 16 sp / 600: person chips. */
     val personChip = HhType.body.copy(fontWeight = FontWeight.W600)
-
-    /** 17 sp / 700: Delete, Keep event, Delete event. */
-    val footerButton = HhType.rowTitle.copy(fontWeight = FontWeight.W700)
 
     /** 24 sp / 700: "Pick a date", "Pick a time". */
     val pickerTitle = HhType.dateNumber
@@ -70,9 +64,6 @@ internal object CalendarType {
 
     /** 16 sp / 600: date cells. */
     val pickerCell = personChip
-
-    /** 16 sp / 700: Cancel and Set time. */
-    val pickerButton = noteTitle
 
     /** 72 sp / 600, tabular, −2 tracking, line height 1: the time picker's hour and minute. */
     val timeValue = HhType.headerValue.copy(fontSize = 72.sp, letterSpacing = (-2).sp, lineHeight = 72.sp)
@@ -89,14 +80,8 @@ internal object CalendarType {
     /** 13 sp / 700, 0.5 tracking: WHO, DAY, TIME, LENGTH. */
     val sectionLabel = HhType.label.copy(fontWeight = FontWeight.W700, letterSpacing = 0.5.sp)
 
-    /** 18 sp / 700: Save, Save changes, Try again, Edit. */
-    val primaryButton = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W700)
-
     /** 16 sp / 600: a locked multi-day edit's dates line. */
     val lockedDates = personChip
-
-    /** 15 sp / 700: "Add event" in the Calendar header. */
-    val addEventButton = HhType.buttonLabel
 
     /** 22 sp / 700: "Connecting to Google Calendar…" and Settings' "Calendars" (3a design §4). */
     val blockTitle = HhType.sectionTitle
@@ -113,9 +98,9 @@ internal object CalendarType {
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */
 internal object CalendarDimens {
-    // Pills and touch targets (hand-off §7: "Week" chip 44 dp tall, radius 22).
-    val touchTarget = 44.dp
-    val pillRadius = 22.dp
+    // The reconnect chip and Today's +: 48 dp touch targets (raised from 44, 4d-1); the chip's radius half that.
+    val touchTarget = 48.dp
+    val pillRadius = 24.dp
     val pillPaddingH = 16.dp
 
     // Today card: header→first row = 10 gap + 4 margin; row bar→text 14; time line 3 below the title.
@@ -232,25 +217,18 @@ internal object CalendarDimens {
     val noteIconGap = 14.dp
     val noteTextGap = 2.dp
 
-    // Assign: "Assign to…" 44 dp, radius 22; person chips 8 apart (ControlTokens has the chip).
+    // Assign: the button 12 below the note's text; person chips 8 apart (ControlTokens has the chip).
     val assignTop = 12.dp
-    val assignButtonHeight = 44.dp
-    val assignButtonRadius = 22.dp
-    val assignButtonPaddingH = 18.dp
     val personChipGap = 8.dp
 
-    // Footer: Delete 60 dp, padding 0 26, radius 30, `surf2`, `danger` text.
-    val footerButtonHeight = 60.dp
-    val footerButtonRadius = 30.dp
-    val deleteButtonPaddingH = 26.dp
+    // The confirm card's delete icon.
     val footerIcon = 24.dp
-    val footerIconGap = 8.dp
 
     // Pickers (hand-off §7 and Culvery.dc.html): card `surf`, radius 30, padding 26. Date: 520 wide, 14 between blocks,
     // the range 4 below "Pick a date", ‹ › 48 dp circles 8 apart; weekday header padding 4; cells 56 dp, radius 16,
-    // 6 apart, today's ring 2 dp; Cancel 52 dp, radius 26. Time: 440 wide, 18 between blocks; the columns 14 apart;
+    // 6 apart, today's ring 2 dp; Cancel a Large button. Time: 440 wide, 18 between blocks; the columns 14 apart;
     // steppers 88×52, radius 18, a 32 dp icon, 8 from the value; ":" 10 above the baseline; Cancel and Set time
-    // 56 dp, radius 28, 10 apart.
+    // Large buttons 10 apart.
     val pickerRadius = 30.dp
     val pickerPadding = 26.dp
     val datePickerWidth = 520.dp
@@ -264,8 +242,6 @@ internal object CalendarDimens {
     val dateCellRadius = 16.dp
     val dateCellGap = 6.dp
     val dateRing = 2.dp
-    val pickerCancelHeight = 52.dp
-    val pickerCancelRadius = 26.dp
     val timePickerWidth = 440.dp
     val timePickerGap = 18.dp
     val timeColumnGap = 14.dp
@@ -275,8 +251,6 @@ internal object CalendarDimens {
     val stepperIcon = 32.dp
     val stepperGap = 8.dp
     val colonBottom = 10.dp
-    val timeButtonHeight = 56.dp
-    val timeButtonRadius = 28.dp
     val timeButtonGap = 10.dp
 
     /** Hand-off §7: past days in the date picker at 30%. */
@@ -302,23 +276,15 @@ internal object CalendarDimens {
     val failureIcon = 24.dp
     val failureBodyTop = 2.dp
 
-    // Footers: 10 between Delete and the main button; the main button's icon 10 from its label.
+    // Footers: 10 between Delete and the main button.
     val footerGap = 10.dp
-    val primaryIconGap = 10.dp
 
-    // Entry points (hand-off §7): Today's + is a 44 dp `accent` circle (touchTarget) with a 26 dp `add`, 8 from Week.
-    // Add event is 48 dp, radius 24, padding 0 20 0 14, a 24 dp `add` 6 from its label. Each week column ends with a
-    // 24 dp `add` hint at 50% in at least 40 dp.
+    // Entry points (hand-off §7): Today's + (touchTarget) with a 26 dp add, 8 from Week. Each week column ends with a
+    // 24 dp add hint in at least 48 dp.
     val todayAddIcon = 26.dp
     val todayHeaderButtonGap = 8.dp
-    val addEventHeight = 48.dp
-    val addEventRadius = 24.dp
-    val addEventPaddingStart = 14.dp
-    val addEventPaddingEnd = 20.dp
-    val addEventIcon = 24.dp
-    val addEventIconGap = 6.dp
     val addHintIcon = 24.dp
-    val addHintMinHeight = 40.dp
+    val addHintMinHeight = 48.dp
 
     /** Hand-off §7: the week column's add hint at 50%. */
     const val ADD_HINT_ALPHA = 0.5f
@@ -330,7 +296,7 @@ internal object CalendarDimens {
     val connectingTextGap = 4.dp
     val connectingIcon = 32.dp
 
-    // Settings' Calendars block (3a design §4.1): a row `surf`, radius 18, padding 16×20; its pills are AddButton's.
+    // Settings' Calendars block (3a design §4.1): a row `surf`, radius 18, padding 16×20; its pills are the shared button.
     // Not in the spec: 12 below the title, rows 10 apart, a 26 dp icon 16 from the text, the health 2 below the name,
     // and rows 600 wide (the sheets' width) so a row reads as one line.
     val settingsRowRadius = 18.dp

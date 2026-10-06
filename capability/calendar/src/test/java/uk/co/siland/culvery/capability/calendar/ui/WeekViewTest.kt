@@ -9,6 +9,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
@@ -40,6 +44,8 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 class WeekViewTest {
     @get:Rule val compose = createComposeRule()
     private val navigator = RecordingNavigator()
+    private val isButton = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
+
     private val now = SampleUi.NOW
 
     private fun show(content: @Composable () -> Unit) = compose.setContent {
@@ -98,7 +104,7 @@ class WeekViewTest {
     fun theReconnectChipRunsTheReconnect() {
         var reconnects = 0
         show { WeekView(state(sync(agoMinutes = 0, needsSignIn = listOf("Google"))), onReconnect = { reconnects++ }) }
-        compose.onNodeWithText("Google needs reconnecting").assertHeightIsAtLeast(44.dp)
+        compose.onNodeWithText("Google needs reconnecting").assert(isButton).assertHeightIsEqualTo(48.dp)
         compose.onNodeWithText("Google needs reconnecting").performClick()
         assertThat(reconnects).isEqualTo(1)
         assertThat(navigator.settingsOpened).isEqualTo(0)
@@ -221,11 +227,17 @@ class WeekViewTest {
     }
 
     @Test
-    fun eachColumnEndsWithAnAddHintAtLeast40DpTall() {
+    fun eachColumnEndsWithAnAddHintAtLeast48DpTall() {
         show { WeekView(state(), onAdd = {}) }
         (0L..6L).forEach {
-            compose.onNodeWithTag("week_add_${SampleUi.TODAY.plusDays(it)}", useUnmergedTree = true).assertHeightIsAtLeast(40.dp)
+            compose.onNodeWithTag("week_add_${SampleUi.TODAY.plusDays(it)}", useUnmergedTree = true).assertHeightIsAtLeast(48.dp)
         }
+    }
+
+    @Test
+    fun addEventAndThisWeekAre48DpButtons() {
+        show { WeekView(state().copy(weeksAhead = 1), onAdd = {}) }
+        listOf("week_add_event", "week_this_week").forEach { compose.onNodeWithTag(it).assert(isButton).assertHeightIsEqualTo(48.dp) }
     }
 
     @Test

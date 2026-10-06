@@ -42,6 +42,7 @@ import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
@@ -200,7 +201,12 @@ internal fun ReviewCalendars(
                 SourceRow(source, people, busy, picking == sourceKey(source), actions.onPick, actions.onPerson, actions.onShown, actions.onMakeMaster)
             }
         }
-        connectable.forEach { d -> AddButton("Connect ${d.displayName}", "settings_connect_${d.id}") { actions.onConnect(d) } }
+        connectable.forEach { d ->
+            HhButton(
+                "Connect ${d.displayName}", { actions.onConnect(d) }, Modifier.testTag("settings_connect_${d.id}"),
+                tone = ButtonTone.Primary, icon = Icons.ADD, enabled = !busy, on = ButtonSurface.Bg,
+            )
+        }
     }
 }
 
@@ -229,7 +235,12 @@ private fun ConnectionHeader(row: CalendarRow, nowMillis: Long, busy: Boolean, o
             )
             Text(healthWords(row, nowMillis), style = CalendarType.subtitle, color = if (needsReconnect) c.danger else c.mute, maxLines = 1)
         }
-        if (needsReconnect) AddButton("Reconnect", "settings_reconnect", icon = null) { onReconnect(row.connection) }
+        if (needsReconnect) {
+            HhButton(
+                "Reconnect", { onReconnect(row.connection) }, Modifier.testTag("settings_reconnect"),
+                tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Surf,
+            )
+        }
         HhButton(DISCONNECT, { onDisconnect(row) }, Modifier.testTag("review_disconnect_${row.connection.id}"), enabled = !busy, on = ButtonSurface.Surf)
     }
 }

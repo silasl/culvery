@@ -38,6 +38,8 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 class CardsTest {
     @get:Rule val compose = createComposeRule()
     private val navigator = RecordingNavigator()
+    private val isButton = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
+
 
     private fun show(content: @Composable () -> Unit) = compose.setContent {
         CompositionLocalProvider(LocalShellNavigator provides navigator) {
@@ -77,9 +79,9 @@ class CardsTest {
     }
 
     @Test
-    fun weekChipOnTodayIsAFullSizePill() {
+    fun weekOnTodayIsA48DpButton() {
         show { TodayCard(SampleUi.today) }
-        compose.onNodeWithText("Week").assertHeightIsAtLeast(44.dp)
+        compose.onNodeWithText("Week").assert(isButton).assertHeightIsEqualTo(48.dp)
     }
 
     @Test
@@ -160,10 +162,10 @@ class CardsTest {
     }
 
     @Test
-    fun thePlusOnTodayIsA44DpCircleThatAdds() {
+    fun thePlusOnTodayIsA48DpCircleThatAdds() {
         var added = 0
         show { TodayCard(SampleUi.today, onAdd = { added++ }) }
-        compose.onNodeWithTag("today_add").assertHeightIsEqualTo(44.dp).assertWidthIsEqualTo(44.dp).performClick()
+        compose.onNodeWithTag("today_add").assert(isButton).assertHeightIsEqualTo(48.dp).assertWidthIsEqualTo(48.dp).performClick()
         assertThat(added).isEqualTo(1)
         compose.onNodeWithText("Week").assertExists()
     }
