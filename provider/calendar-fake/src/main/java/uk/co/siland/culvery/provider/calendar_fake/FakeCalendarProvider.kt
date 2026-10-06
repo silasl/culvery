@@ -26,7 +26,9 @@ import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
-import uk.co.siland.culvery.core.ui.HhPillButton
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.Icons
 
 /** Gap between the ConnectScreen's buttons. */
@@ -88,15 +90,16 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     @Composable
     override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
         Row(horizontalArrangement = Arrangement.spacedBy(ConnectScreenButtonGap)) {
-            HhPillButton(
+            HhButton(
                 "Connect sample calendar",
                 onClick = {
                     val id = existing?.id ?: UUID.randomUUID().toString()
                     onConnected(Connection(id, ID, "Sample calendar", emptyMap()))
                 },
-                primary = true,
+                tone = ButtonTone.Primary,
+                on = ButtonSurface.Surf,
             )
-            HhPillButton("Cancel", onClick = onCancel)
+            HhButton("Cancel", onCancel, on = ButtonSurface.Surf)
         }
     }
 

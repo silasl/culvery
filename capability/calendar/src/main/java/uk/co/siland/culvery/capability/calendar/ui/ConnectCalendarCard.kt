@@ -16,10 +16,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
 import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 
@@ -46,9 +48,9 @@ fun ConnectCalendarCard(connectService: String?, onConnect: () -> Unit, modifier
         Text("Connect your family's calendar to see it here.", style = HhType.secondary, color = c.mute)
         Spacer(Modifier.height(CalendarDimens.connectButtonTop))
         if (connectService != null) {
-            HhPillButton("Connect $connectService", onClick = onConnect, primary = true)
+            HhButton("Connect $connectService", onConnect, tone = ButtonTone.Primary, on = ButtonSurface.Surf)
         } else {
-            HhPillButton("Open settings", onClick = navigator::openSettings, primary = true)
+            HhButton("Open settings", navigator::openSettings, tone = ButtonTone.Primary, on = ButtonSurface.Surf)
         }
     }
 }

@@ -65,13 +65,6 @@ object ControlTokens {
     val fieldPaddingH = 20.dp
     val fieldBorder = 2.dp
 
-    // The sheets' footer button (hand-off §7): 60 dp, radius 30, padding 0 26, a 24 dp icon 8 from the label.
-    val buttonHeight = 60.dp
-    val buttonRadius = 30.dp
-    val buttonPaddingH = 26.dp
-    val buttonIcon = 24.dp
-    val buttonIconGap = 8.dp
-
     // A confirmation, as the calendar's delete confirmation: `dangerSoft`, radius 24, padding 20, 16 between blocks,
     // buttons 12 apart.
     val confirmRadius = 24.dp
@@ -215,59 +208,13 @@ fun HhPersonChip(name: String, color: Color, tag: String, enabled: Boolean, onCl
 }
 
 /**
- * [Primary] `accent`; [Plain] `surf2`; [Quiet] `surf` (Keep, on a `dangerSoft` card); [Danger] `surf2` with `danger`
- * text; [Destroy] `danger` with `dangerInk`.
- */
-enum class ButtonTone { Primary, Plain, Quiet, Danger, Destroy }
-
-/** The sheets' footer button (hand-off §7): 60 dp, radius 30, 17 sp / 700, an optional icon. Disabled, `surf2` and `mute`. */
-@Composable
-fun HhSheetButton(
-    text: String,
-    tone: ButtonTone,
-    enabled: Boolean,
-    tag: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    icon: String? = null,
-) {
-    val c = Culvery.colors
-    val (background, ink) = if (!enabled) {
-        c.surf2 to c.mute
-    } else {
-        when (tone) {
-            ButtonTone.Primary -> c.accent to c.accentInk
-            ButtonTone.Plain -> c.surf2 to c.ink
-            ButtonTone.Quiet -> c.surf to c.ink
-            ButtonTone.Danger -> c.surf2 to c.danger
-            ButtonTone.Destroy -> c.danger to c.dangerInk
-        }
-    }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(ControlTokens.buttonIconGap, Alignment.CenterHorizontally),
-        modifier = modifier
-            .testTag(tag)
-            .height(ControlTokens.buttonHeight)
-            .clip(RoundedCornerShape(ControlTokens.buttonRadius))
-            .background(background)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = ControlTokens.buttonPaddingH),
-    ) {
-        if (icon != null) HhIcon(icon, size = ControlTokens.buttonIcon, tint = ink)
-        Text(text, style = ControlType.button, color = ink, maxLines = 1)
-    }
-}
-
-/**
- * A confirmation card on `dangerSoft`: [question] above two buttons. Keep, in [keepTone], sits on the left where the
- * action that opened the card was, so a double tap on it is harmless; the confirming button is [ButtonTone.Destroy].
+ * A confirmation card on `dangerSoft`: [question] above two buttons. Keep sits on the left where the action that opened
+ * the card was, so a double tap on it is harmless; the confirming button is [ButtonTone.Destroy].
  */
 @Composable
 fun HhConfirmCard(
     tag: String,
     keep: String,
-    keepTone: ButtonTone,
     keepTag: String,
     confirm: String,
     confirmTag: String,
@@ -288,10 +235,13 @@ fun HhConfirmCard(
     ) {
         question()
         Row(horizontalArrangement = Arrangement.spacedBy(ControlTokens.confirmButtonGap), modifier = Modifier.fillMaxWidth()) {
-            HhSheetButton(keep, keepTone, enabled = !busy, tag = keepTag, onClick = onKeep, modifier = Modifier.weight(1f))
-            HhSheetButton(
-                confirm, ButtonTone.Destroy, enabled = !busy, tag = confirmTag, onClick = onConfirm,
-                modifier = Modifier.weight(1f), icon = confirmIcon,
+            HhButton(
+                keep, onKeep, Modifier.weight(1f).testTag(keepTag),
+                size = ButtonSize.Large, enabled = !busy, on = ButtonSurface.DangerSoft,
+            )
+            HhButton(
+                confirm, onConfirm, Modifier.weight(1f).testTag(confirmTag),
+                tone = ButtonTone.Destroy, size = ButtonSize.Large, icon = confirmIcon, enabled = !busy, on = ButtonSurface.DangerSoft,
             )
         }
     }

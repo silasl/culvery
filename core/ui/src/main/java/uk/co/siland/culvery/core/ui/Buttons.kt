@@ -31,6 +31,12 @@ object ButtonTokens {
     val icon = 24.dp
 }
 
+/**
+ * [Primary] `accent` with `accentInk`; [Quiet] the quiet fill with `ink`; [Danger] the quiet fill with `danger`
+ * (Delete); [Destroy] `danger` with `dangerInk`, only a confirm card's confirming button.
+ */
+enum class ButtonTone { Primary, Quiet, Danger, Destroy }
+
 /** [Regular] 48 dp with a 15 sp / 700 label; [Large] 60 dp with a 17 sp / 700 label (sheet footers, pickers). */
 enum class ButtonSize { Regular, Large }
 
@@ -54,7 +60,7 @@ internal fun buttonColors(tone: ButtonTone, enabled: Boolean, on: ButtonSurface,
         ButtonTone.Primary -> ButtonColors(colors.accent, colors.accentInk)
         ButtonTone.Danger -> ButtonColors(quiet, colors.danger)
         ButtonTone.Destroy -> ButtonColors(colors.danger, colors.dangerInk)
-        ButtonTone.Plain, ButtonTone.Quiet -> ButtonColors(quiet, colors.ink)
+        ButtonTone.Quiet -> ButtonColors(quiet, colors.ink)
     }
 }
 

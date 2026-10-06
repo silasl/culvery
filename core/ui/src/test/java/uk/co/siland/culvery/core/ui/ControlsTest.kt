@@ -1,11 +1,17 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -14,6 +20,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
@@ -73,19 +80,22 @@ class ControlsTest {
     }
 
     @Test
-    fun aDisabledSheetButtonIgnoresTaps() {
-        var taps = 0
-        show { HhSheetButton("Save person", ButtonTone.Primary, enabled = false, tag = "save", onClick = { taps++ }) }
-        compose.onNodeWithTag("save").assertIsNotEnabled().performClick()
-        assertThat(taps).isEqualTo(0)
-    }
-
-    @Test
-    fun aDisabledPillIgnoresTaps() {
-        var taps = 0
-        show { HhPillButton("Next", { taps++ }, primary = true, enabled = false) }
-        compose.onNodeWithText("Next").performClick()
-        assertThat(taps).isEqualTo(0)
+    fun aConfirmCardsButtonsAreLargeButtonsThatStopWhileBusy() {
+        var keeps = 0
+        show {
+            HhConfirmCard(
+                tag = "confirm", keep = "Keep", keepTag = "keep", confirm = "Remove", confirmTag = "remove",
+                busy = true, onKeep = { keeps++ }, onConfirm = {},
+            ) { Text("Remove Sam?") }
+        }
+        listOf("keep", "remove").forEach {
+            compose.onNodeWithTag(it)
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+                .assertHeightIsEqualTo(60.dp)
+                .assertIsNotEnabled()
+        }
+        compose.onNodeWithTag("keep").performClick()
+        assertThat(keeps).isEqualTo(0)
     }
 
     @Test

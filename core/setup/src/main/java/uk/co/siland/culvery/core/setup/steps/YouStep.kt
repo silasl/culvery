@@ -47,8 +47,9 @@ import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.WHOS_SETTING_UP
 import uk.co.siland.culvery.core.setup.showPersonEditor
 import uk.co.siland.culvery.core.setup.someoneCalled
+import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhPillButton
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhSwatchGrid
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.PersonPalette
@@ -157,7 +158,7 @@ internal fun YouFormContent(form: YouForm, onSetPin: () -> Unit) {
         )
         HhSwatchGrid(form.color, taken = emptySet(), tagPrefix = "you_swatch_") { form.color = it }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SetupDimens.rowDotGap)) {
-            HhPillButton(SET_YOUR_PIN, onSetPin, Modifier.testTag("you_set_pin"))
+            HhButton(SET_YOUR_PIN, onSetPin, Modifier.testTag("you_set_pin"), on = ButtonSurface.Bg)
             if (form.pin != null) Text(PIN_SET, style = SetupType.secondary, color = c.mute, modifier = Modifier.testTag("you_pin_set"))
         }
         form.message?.let { Text(it, style = SetupType.message, color = c.danger, modifier = Modifier.testTag("you_message")) }

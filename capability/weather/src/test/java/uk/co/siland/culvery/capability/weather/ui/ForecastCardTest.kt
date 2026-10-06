@@ -1,7 +1,12 @@
 package uk.co.siland.culvery.capability.weather.ui
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -9,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.ZoneId
@@ -110,5 +116,13 @@ class ForecastCardTest {
         now = fetched + 3 * hour
         ticks.value = now
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Updated 3 h ago").fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    @Test
+    fun withoutALocationOpenSettingsIsAButton() {
+        show(WeatherView.NoLocation)
+        compose.onNodeWithText("Open settings")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assertHeightIsEqualTo(48.dp)
     }
 }

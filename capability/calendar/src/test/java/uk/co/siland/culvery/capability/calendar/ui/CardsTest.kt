@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -163,5 +166,13 @@ class CardsTest {
         compose.onNodeWithTag("today_add").assertHeightIsEqualTo(44.dp).assertWidthIsEqualTo(44.dp).performClick()
         assertThat(added).isEqualTo(1)
         compose.onNodeWithText("Week").assertExists()
+    }
+
+    @Test
+    fun theConnectCardsButtonIsAButton() {
+        show { ConnectCalendarCard(connectService = "Google Calendar", onConnect = {}) }
+        compose.onNodeWithText("Connect Google Calendar")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assertHeightIsEqualTo(48.dp)
     }
 }

@@ -6,8 +6,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhPillButton
+import uk.co.siland.culvery.core.ui.HhButton
 
 /** A step's or page's title, with an optional line under it in `mute`. */
 @Composable
@@ -24,6 +26,6 @@ internal fun StepTitle(title: String, line: String? = null) {
 internal fun HomeAppPrompt(onChoose: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.homeAppPromptGap)) {
         Text(MAKE_HOME_APP, style = SetupType.line, color = Culvery.colors.ink)
-        HhPillButton(CHOOSE_HOME_APP, onChoose, Modifier.testTag("choose_home_app"), primary = true)
+        HhButton(CHOOSE_HOME_APP, onChoose, Modifier.testTag("choose_home_app"), tone = ButtonTone.Primary, on = ButtonSurface.Bg)
     }
 }

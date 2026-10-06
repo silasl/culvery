@@ -32,7 +32,6 @@ import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
 import uk.co.siland.culvery.core.household.Person
-import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
@@ -126,7 +125,7 @@ fun EventDetailSheet(
             if (mode == DetailMode.ConfirmingDelete) {
                 HhConfirmCard(
                     tag = "detail_confirm",
-                    keep = "Keep event", keepTone = ButtonTone.Quiet, keepTag = "detail_keep",
+                    keep = "Keep event", keepTag = "detail_keep",
                     confirm = "Delete event", confirmTag = "detail_confirm_delete", confirmIcon = Icons.DELETE_FOREVER,
                     busy = busy, onKeep = onKeep, onConfirm = onConfirmDelete,
                 ) {

@@ -44,8 +44,10 @@ import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.CONTINUE_SETUP
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SetupStep
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhPillButton
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "SetupWizard"
@@ -179,16 +181,17 @@ internal fun WizardFrame(
         }
         Spacer(Modifier.height(SetupDimens.buttonsTop))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            if (back != null) HhPillButton(BACK, back, Modifier.testTag("wizard_back"), enabled = !busy)
+            if (back != null) HhButton(BACK, back, Modifier.testTag("wizard_back"), enabled = !busy, on = ButtonSurface.Bg)
             Spacer(Modifier.weight(1f))
             when (forward) {
-                Forward.Skip -> HhPillButton(SKIP_FOR_NOW, onSkip, Modifier.testTag("wizard_skip"), enabled = !busy)
-                is Forward.Next -> HhPillButton(
+                Forward.Skip -> HhButton(SKIP_FOR_NOW, onSkip, Modifier.testTag("wizard_skip"), enabled = !busy, on = ButtonSurface.Bg)
+                is Forward.Next -> HhButton(
                     forward.label,
                     onForward,
                     Modifier.testTag("wizard_next"),
-                    primary = true,
+                    tone = ButtonTone.Primary,
                     enabled = forward.enabled && !busy,
+                    on = ButtonSurface.Bg,
                 )
             }
         }
@@ -235,6 +238,6 @@ internal fun PinGateContent(busy: Boolean, onEnterPin: () -> Unit) {
         modifier = Modifier.fillMaxSize().testTag("wizard_gate"),
     ) {
         Text(CONTINUE_SETUP, style = SetupType.line, color = Culvery.colors.mute)
-        HhPillButton(ENTER_PIN, onEnterPin, Modifier.testTag("wizard_enter_pin"), primary = true, enabled = !busy)
+        HhButton(ENTER_PIN, onEnterPin, Modifier.testTag("wizard_enter_pin"), tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Bg)
     }
 }

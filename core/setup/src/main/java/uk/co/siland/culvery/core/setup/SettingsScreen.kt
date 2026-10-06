@@ -33,8 +33,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import uk.co.siland.culvery.core.plugin.SettingsPage
+import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhPillButton
+import uk.co.siland.culvery.core.ui.HhButton
 
 /**
  * Settings (4a design §4.6): the pages' titles on the left with Close, the chosen page on the right, the first chosen on
@@ -66,7 +67,7 @@ fun SettingsScreen(pages: List<SettingsPage>, onClose: () -> Unit) {
                 pages.forEach { p -> PageItem(p.title, chosen = p.id == page?.id, tag = "settings_page_${p.id}") { chosen = p.id } }
             }
             Spacer(Modifier.weight(1f))
-            HhPillButton(CLOSE, onClose, Modifier.testTag("settings_close"))
+            HhButton(CLOSE, onClose, Modifier.testTag("settings_close"), on = ButtonSurface.Surf)
         }
         // Each page scrolls from its top.
         key(page?.id) {

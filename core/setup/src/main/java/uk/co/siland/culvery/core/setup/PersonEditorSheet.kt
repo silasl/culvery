@@ -30,16 +30,17 @@ import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.plugin.OverlayHost
+import uk.co.siland.culvery.core.ui.ButtonSize
+import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhConfirmCard
-import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.HhSheet
-import uk.co.siland.culvery.core.ui.HhSheetButton
 import uk.co.siland.culvery.core.ui.HhSwatchGrid
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.PersonPalette
@@ -206,10 +207,10 @@ internal fun PersonEditorSheet(
                 Section(PIN) {
                     Row(horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
                         if (form.hasPin) {
-                            HhPillButton(CHANGE_PIN, onChoosePin, Modifier.testTag("person_change_pin"), enabled = !busy)
-                            HhPillButton(REMOVE_PIN, form::clearPin, Modifier.testTag("person_remove_pin"), enabled = !busy)
+                            HhButton(CHANGE_PIN, onChoosePin, Modifier.testTag("person_change_pin"), enabled = !busy, on = ButtonSurface.Bg)
+                            HhButton(REMOVE_PIN, form::clearPin, Modifier.testTag("person_remove_pin"), enabled = !busy, on = ButtonSurface.Bg)
                         } else {
-                            HhPillButton(SET_PIN, onChoosePin, Modifier.testTag("person_set_pin"), enabled = !busy)
+                            HhButton(SET_PIN, onChoosePin, Modifier.testTag("person_set_pin"), enabled = !busy, on = ButtonSurface.Bg)
                         }
                     }
                 }
@@ -218,7 +219,7 @@ internal fun PersonEditorSheet(
             if (confirmingRemove && existing != null) {
                 HhConfirmCard(
                     tag = "person_confirm",
-                    keep = KEEP, keepTone = ButtonTone.Plain, keepTag = "person_keep",
+                    keep = KEEP, keepTag = "person_keep",
                     confirm = REMOVE_PERSON, confirmTag = "person_confirm_remove",
                     busy = busy, onKeep = onKeep, onConfirm = onConfirmRemove,
                 ) {
@@ -226,14 +227,21 @@ internal fun PersonEditorSheet(
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(SetupDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
-                    if (canRemove) HhSheetButton(REMOVE_PERSON, ButtonTone.Danger, enabled = !busy, tag = "person_remove", onClick = onRemove)
+                    if (canRemove) {
+                        HhButton(
+                            REMOVE_PERSON, onRemove, Modifier.testTag("person_remove"),
+                            tone = ButtonTone.Danger, size = ButtonSize.Large, enabled = !busy, on = ButtonSurface.Bg,
+                        )
+                    }
                     Spacer(Modifier.weight(1f))
-                    HhSheetButton(
+                    HhButton(
                         if (existing == null) SAVE_PERSON else SAVE_CHANGES,
-                        ButtonTone.Primary,
+                        onSave,
+                        Modifier.testTag("person_save"),
+                        tone = ButtonTone.Primary,
+                        size = ButtonSize.Large,
                         enabled = form.canSave && !busy,
-                        tag = "person_save",
-                        onClick = onSave,
+                        on = ButtonSurface.Bg,
                     )
                 }
             }

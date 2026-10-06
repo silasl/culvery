@@ -27,9 +27,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.core.household.MAX_PEOPLE
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
@@ -49,7 +51,7 @@ internal fun PeopleList(members: List<Member>, onEdit: (Member) -> Unit, onAdd: 
                 onClick = { onEdit(member) },
             )
         }
-        if (onAdd != null) HhPillButton(ADD_PERSON, onAdd, Modifier.testTag("people_add"), primary = true)
+        if (onAdd != null) HhButton(ADD_PERSON, onAdd, Modifier.testTag("people_add"), tone = ButtonTone.Primary, on = ButtonSurface.Bg)
     }
 }
 

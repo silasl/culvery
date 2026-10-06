@@ -16,7 +16,8 @@ import uk.co.siland.culvery.core.setup.HomeAppPrompt
 import uk.co.siland.culvery.core.setup.KIOSK
 import uk.co.siland.culvery.core.setup.KIOSK_LINE
 import uk.co.siland.culvery.core.setup.StepTitle
-import uk.co.siland.culvery.core.ui.HhPillButton
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.HhButton
 
 /**
  * Settings › Kiosk (4a design §4.7, 4c §5.1): the home app — Choose it while Culvery isn't, Change it (fresh PIN) while
@@ -34,10 +35,10 @@ class KioskPage @Inject constructor(private val homeApp: HomeApp) : SettingsPage
         val isHome by homeApp.isDefault.collectAsState()
         StepTitle(KIOSK, KIOSK_LINE)
         if (isHome) {
-            HhPillButton(CHANGE_HOME_APP, navigator::changeHomeApp, Modifier.testTag("settings_change_home_app"))
+            HhButton(CHANGE_HOME_APP, navigator::changeHomeApp, Modifier.testTag("settings_change_home_app"), on = ButtonSurface.Bg)
         } else {
             HomeAppPrompt(onChoose = navigator::chooseHomeApp)
         }
-        HhPillButton(EXIT_KIOSK, navigator::exitKiosk, Modifier.testTag("settings_exit_kiosk"))
+        HhButton(EXIT_KIOSK, navigator::exitKiosk, Modifier.testTag("settings_exit_kiosk"), on = ButtonSurface.Bg)
     }
 }

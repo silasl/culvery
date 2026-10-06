@@ -1,5 +1,9 @@
 package uk.co.siland.culvery.provider.calendar_fake
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -52,5 +56,15 @@ class ConnectScreenTest {
         }
         compose.onNodeWithText("Cancel").performClick()
         assertThat(cancelled).isTrue()
+    }
+
+    @Test
+    fun connectAndCancelAreButtons() {
+        compose.setContent {
+            CulveryTheme(dark = true) { FakeCalendarProvider().ConnectScreen(existing = null, onConnected = {}, onCancel = {}) }
+        }
+        listOf("Connect sample calendar", "Cancel").forEach {
+            compose.onNodeWithText(it).assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        }
     }
 }

@@ -3,6 +3,11 @@ package uk.co.siland.culvery.capability.calendar.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
@@ -10,6 +15,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -190,5 +196,15 @@ class ReviewCalendarsTest {
         compose.onNodeWithTag("review_disconnect_g1").performClick()
         compose.onNodeWithTag("review_confirm_disconnect").performClick()
         assertThat(confirmed).isEqualTo(row())
+    }
+
+    @Test
+    fun disconnectAndMakeMasterAreButtons() {
+        show()
+        listOf("review_disconnect_g1", "review_make_master_chores").forEach {
+            compose.onNodeWithTag(it)
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+                .assertHeightIsEqualTo(48.dp)
+        }
     }
 }

@@ -33,10 +33,12 @@ import uk.co.siland.culvery.capability.weather.weatherIcon
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.SunAmber
@@ -69,7 +71,7 @@ fun ForecastCard(view: WeatherView, nowMillis: Long, modifier: Modifier = Modifi
             WeatherView.NoLocation -> {
                 Text(ADD_LOCATION, style = HhType.body, color = c.mute)
                 Spacer(Modifier.height(WeatherDimens.promptButtonTop))
-                HhPillButton(OPEN_SETTINGS, onClick = navigator::openSettings, primary = true)
+                HhButton(OPEN_SETTINGS, navigator::openSettings, tone = ButtonTone.Primary, on = ButtonSurface.Surf)
             }
         }
     }

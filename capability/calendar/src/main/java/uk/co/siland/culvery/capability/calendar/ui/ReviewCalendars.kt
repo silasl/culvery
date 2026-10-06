@@ -41,14 +41,14 @@ import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
-import uk.co.siland.culvery.core.ui.ButtonTone
+import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.HhPillButton
 import uk.co.siland.culvery.core.ui.HhSwitch
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.rememberSingleAction
@@ -189,7 +189,7 @@ internal fun ReviewCalendars(
             if (confirming != null && confirming.row.connection.id == connection.row.connection.id) {
                 HhConfirmCard(
                     tag = "review_confirm",
-                    keep = KEEP, keepTone = ButtonTone.Quiet, keepTag = "review_keep",
+                    keep = KEEP, keepTag = "review_keep",
                     confirm = DISCONNECT, confirmTag = "review_confirm_disconnect",
                     busy = busy, onKeep = actions.onKeep, onConfirm = { actions.onConfirmDisconnect(confirming.row) },
                 ) {
@@ -230,7 +230,7 @@ private fun ConnectionHeader(row: CalendarRow, nowMillis: Long, busy: Boolean, o
             Text(healthWords(row, nowMillis), style = CalendarType.subtitle, color = if (needsReconnect) c.danger else c.mute, maxLines = 1)
         }
         if (needsReconnect) AddButton("Reconnect", "settings_reconnect", icon = null) { onReconnect(row.connection) }
-        HhPillButton(DISCONNECT, { onDisconnect(row) }, Modifier.testTag("review_disconnect_${row.connection.id}"), enabled = !busy)
+        HhButton(DISCONNECT, { onDisconnect(row) }, Modifier.testTag("review_disconnect_${row.connection.id}"), enabled = !busy, on = ButtonSurface.Surf)
     }
 }
 
@@ -275,7 +275,7 @@ private fun SourceRow(
                         Text(NEW_EVENTS_GO_HERE, style = CalendarType.subtitle, color = c.mute)
                     }
                 } else if (source.source.writable) {
-                    HhPillButton(MAKE_MASTER, { onMakeMaster(source) }, Modifier.testTag("review_make_master_$id"), enabled = !busy)
+                    HhButton(MAKE_MASTER, { onMakeMaster(source) }, Modifier.testTag("review_make_master_$id"), enabled = !busy, on = ButtonSurface.Surf)
                 }
             }
             HhChoiceChip(person.name, selected = false, tag = "review_person_$id", onClick = { onPick(sourceKey(source)) }, leading = { _ -> Dot(person) })
@@ -324,7 +324,7 @@ private fun ReadProblem(source: StoredSource, busy: Boolean, onShown: (StoredSou
         if (source.isMaster) {
             Text(CHOOSE_ANOTHER_MASTER, style = CalendarType.subtitle, color = c.mute)
         } else {
-            HhPillButton(HIDE_THIS_CALENDAR, { onShown(source, false) }, Modifier.testTag("review_hide_$id"), enabled = !busy)
+            HhButton(HIDE_THIS_CALENDAR, { onShown(source, false) }, Modifier.testTag("review_hide_$id"), enabled = !busy, on = ButtonSurface.Surf)
         }
     }
 }
