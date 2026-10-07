@@ -270,6 +270,11 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 - The week header's reconnect chip stays its own composable (`dangerSoft`; no `HhButton` tone fits). It has `Role.Button`; its label is D15's.
 - At font scale 1.5 the week view's Today column clips its last chip; the column doesn't grow. Let the column grow with its chips, or settle it at the design walk-through.
 
+**Tests and hardening (from the 4d-1 final review)**
+- `WeatherSyncLoopTest` has no case for a stray `CancellationException` (which should mark the place failed), or for a town change between a failure and the retry.
+- `weight(1f, fill = false)` on the label in `HhButton` and `HhChoiceChip` shows no text under unbounded width (a `horizontalScroll`, `wrapContentWidth(unbounded = true)`). No caller does this today; the weight isn't needed, so drop it and re-run `FontScaleTest`.
+- `Modifier.lineBox` doesn't harden its constraints, so a caller with a height cap would clip the text. Before a second caller, measure with `maxHeight = Infinity` and report `constraints.constrainHeight(boxHeight)`.
+
 **For the end-of-v1 design walk-through (the user's own)**
 - Calendars review: a calendar's Master line, Make master and read problem now sit under its top line (`HhListRow`'s `below`); People's move arrows and chevron are 12 dp apart (W31, W27).
 - `HhButton` and `HhChoiceChip` grow with their text at large font scales but have no vertical padding of their own; a two-line chip at 1.5 runs close to its edges.

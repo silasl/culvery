@@ -65,7 +65,7 @@ class ShellLayoutTest {
         assertThat((dateBaseline - clockBaseline).value).isWithin(1f).of(44f)
     }
 
-    /** Hand-off: the clock's line box is 0.9 × 104 sp; Trim.Both had made it the font's whole 135 dp. */
+    /** Hand-off: the clock's line box is 0.9 × 104 sp. The text alone measures 135 dp; `lineBox` makes the box the line height. */
     @Test
     fun theClockBoxIsItsLineHeight() {
         compose.setContent { CulveryTheme(dark = true) { HomeScreen({ at }, emptyList(), emptyList()) } }
@@ -121,7 +121,7 @@ class ShellLayoutTest {
         compose.onNodeWithTag("status_bar").assertHeightIsEqualTo(30.dp)
     }
 
-    /** Not `hasVisualOverflow`: it is true for any text narrower than the width it was offered. */
+    /** A grown text neither overflows its height nor ends in an ellipsis. */
     @Test
     fun atFontScale15TheStatusBarGrowsToHoldItsText() {
         compose.setContent {

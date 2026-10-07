@@ -28,6 +28,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventUi
+import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhType
@@ -53,7 +54,7 @@ fun ComingUpCard(days: List<DayUi>?, modifier: Modifier = Modifier) {
         // The row is Today's header height (its Week button), so the two cards' headers line up.
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().heightIn(min = CalendarDimens.touchTarget),
+            modifier = Modifier.fillMaxWidth().heightIn(min = ButtonTokens.regularHeight),
         ) {
             Text("Coming up", style = HhType.cardTitle, color = c.ink)
         }

@@ -281,7 +281,7 @@ A helper (`contrast(fg, bg)` and `over(alpha, surface)`) computes WCAG relative 
 
 `docs/setup/release.md`:
 - §6's title drops "(optional)" and becomes "Device owner (the wall setup)"; its first line says this is how the wall tablet should be set up.
-- A short paragraph after it: without device owner, Culvery runs in screen pinning, and two moments leave it unpinned: Android's "Choose home app" dialog, and Google's account chooser during Connect or Reconnect. Both need an Admin PIN to reach and both are modal; a Home press there leaves Culvery unpinned until it next comes to the front. This is accepted for screen pinning; there is no re-pin timer.
+- A short paragraph after it: without device owner, Culvery runs in screen pinning, and two moments leave it unpinned: Android's "Choose home app" dialog, and Google's account chooser during Connect or Reconnect. Both need an Admin PIN to reach and both are modal; a Home press there leaves Culvery unpinned until it next comes to the front. This is accepted for screen pinning; there is no re-pin timer. *(Amended in Task 11: device owner keeps lock-task only while Google's account chooser is open. `KioskLifecycle.openHomeAppScreen` unpins in both setups for Choose home app and Change home app, so that gap is not closed by device owner. It is accepted in both setups with no re-pin timer, and `release.md` and the README say so.)*
 - The Plan 4c code-minor follow-up on the unpinned window is closed by this.
 
 ## 7. Testing strategy
