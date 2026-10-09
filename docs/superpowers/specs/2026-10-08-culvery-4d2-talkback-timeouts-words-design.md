@@ -1,7 +1,7 @@
 # Culvery 4d-2: TalkBack, timeouts and words (design)
 
 **Date:** 2026-10-08
-**Status:** Approved design (user rulings 2026-10-08); amended at planning (2026-10-09: a sheet with unsaved changes outside Settings gets the 20-second warning too, Decision 4 and §6.3). Plan: `docs/superpowers/plans/2026-10-09-culvery-04d2-talkback-timeouts-words.md`.
+**Status:** Approved design (user rulings 2026-10-08); amended at planning (2026-10-09: a sheet with unsaved changes outside Settings gets the 20-second warning too, Decision 4 and §6.3); amended at plan review (2026-10-09, user: "all as recommended", and decision A on the PIN pad refusal): in-page messages are always-present lines (§2, §4.4), the session ends by the wall clock after the tablet sleeps and keeps its hold through an authorise, "Time to take action" is capped at the edit hold, no overlay closes by itself inside Settings or while saving (§6.1–§6.3), a refused PIN names no one and counts as a wrong one (§7.1.2, C64), and §9's tasks 10, 11 and 13 are each split in two. Plan: `docs/superpowers/plans/2026-10-09-culvery-04d2-talkback-timeouts-words.md`.
 **Parent spec:** `docs/superpowers/specs/2026-09-23-culvery-v1-design.md`
 **Previous plan:** `docs/superpowers/specs/2026-10-06-culvery-4d1-shared-parts-contrast-design.md` (4d-1, merged)
 **Follow-ups:** `docs/superpowers/plans/2026-09-23-plan1-followups.md`, sections "For Plan 4d-2 (TalkBack, timeouts, words)" and "From Plan 4d-1 (deferred)".
@@ -29,7 +29,7 @@ The 4d audits (2026-10-06) were triaged into D1–D41. 4d-1 took D1–D7 and D9�
 - A TalkBack check on the emulator, and a curly-quote and vocabulary scan test.
 
 **Out:**
-- **Layout and look.** Everything visual waits for the user’s end-of-v1 walk-through (W1–W34): the Move arrows’ pill (W27), the week legend’s wrap (W33), the Tablet lock status row (W29), the review rows’ heights and the "Always shown" text (W31), the location hint’s place (W18), the failure card’s styling (W19), and so on. 4d-2 adds only what its items need in order to be seen or heard: the "Searching…" and "Try again" lines, the closing warning pill (Settings, and a sheet with unsaved changes), the "Out of date" icon, a disabled Move button at the list’s ends, and the how-to line on Tablet lock (§7.7, §6.2, §7.5, §5.8, §7.8).
+- **Layout and look.** Everything visual waits for the user’s end-of-v1 walk-through (W1–W34): the Move arrows’ pill (W27), the week legend’s wrap (W33), the Tablet lock status row (W29), the review rows’ heights and the "Always shown" text (W31), the location hint’s place (W18), the failure card’s styling (W19), and so on. 4d-2 adds only what its items need in order to be seen or heard: the "Searching…" and "Try again" lines, the closing warning pill (Settings, and a sheet with unsaved changes), the "Out of date" icon, a disabled Move button at the list’s ends, the how-to line on Tablet lock, and the person sheet’s, You step’s and location pane’s message lines keeping one line while empty (§7.7, §6.2, §7.5, §5.8, §7.8, §4.4; the last amended at plan review).
 - **4e (the SM-T510):** E1–E10, including E7, a TalkBack walk of every screen on the device, and E5, One UI’s name for the home-app menu.
 - **Copy rows no D item took:** C25 (keep), C43 ("Pick date…" vs "Pick a date") and C49 ("Try again" → "Try saving again"). The triage assigned them nowhere (Appendix A.3).
 - **The X list** (dropped in the triage); none is re-raised.
@@ -160,10 +160,12 @@ Over `onAllNodes(hasClickAction())`, each node must have a `Role`, a non-blank n
 
 **Fix (Decision 10).**
 - `ToastMessage` gains `urgent: Boolean`; `Toaster.show(message, icon, urgent = false)`. `HhToast` merges its row and sets `liveRegion` to Assertive when urgent, else Polite. Urgent toasts are errors and refusals: every `couldNot…`, `COULD_NOT_SAVE`, the refusals from `Refusal.Toast`, `PeopleOutcome.Refused`, `refuseOtherWho`, the master-gone toast and the drain’s lost-changes toast. Everything else is plain.
-- Polite live regions on: the editor failure card (merged, so title and body read as one), `person_message`, `you_message`, the location lines (the "Searching…" line, no match, failed, save failed, and a results announcer reading "3 towns found" or "1 town found": a zero-size node in the results Column, so the rows stay separately focusable), `pin_error`, the detail sheet’s Saving pill, the week title (§6.4), the date picker’s range line and the time stepper values (§5.5), and the PIN dots (§5.5).
+- Polite live regions on: the editor failure card (merged, so title and body read as one), `person_message`, `you_message`, the location pane’s one status line (the "Searching…" line, no match, failed, save failed, and "3 towns found" or "1 town found" over a list, so the rows stay separately focusable; see the always-present lines below), `pin_error`, the detail sheet’s Saving pill, the week title (§6.4), the date picker’s range line and the time stepper values (§5.5), and the PIN dots (§5.5).
 - `error(message)` on the field a message belongs to: the person sheet’s and You step’s name field for "Someone is already called Sam."; the PIN dots for "Wrong PIN — try again."
 
-**Tests.** `toast` has `LiveRegion` Polite for a plain toast and Assertive for an urgent one; each tag above has `LiveRegion`; the name field has `Error` after a duplicate name. A unit test that each urgent call site passes `urgent = true` (a fake `Toaster` records it).
+- **Always-present lines** *(amended at plan review)*. Compose announces a live region only when a node it already has changes, and leaves a node with no size out of the tree, so a zero-size announcer or a message composed only when it appears may never be spoken. The in-page messages are therefore one always-present line each (`HhMessageLine`, one line tall while empty, its text the message or nothing): `person_message`, `you_message`, and the location pane’s `location_status`, which holds "Searching…", no match, a failed search, a failed save, or nothing, and is described as "3 towns found" over a list. The toast, the two warnings, the editor’s failure card and the Saving pill appear new in their layers: an always-present node there would hide the shell under it from TalkBack, so the emulator check (§8.6) listens for each.
+
+**Tests.** `toast` has `LiveRegion` Polite for a plain toast and Assertive for an urgent one; each tag above has `LiveRegion`; each message line is in the tree, with height, before it has a message; the name field has `Error` after a duplicate name. A unit test that each urgent call site passes `urgent = true` (a fake `Toaster` records it).
 
 ### 4.5 Headings (D19)
 
@@ -309,7 +311,7 @@ interface UserActivity {
 - **Pointer input.** `ShellLayers`’ existing Initial-pass `awaitFirstDown` calls `touched()` always, not only while Settings or the wizard shows. It covers the shell, sheets, pickers and the PIN pad. Scrolling starts with a finger down, so it counts.
 - **TalkBack.** MainActivity sets an `AccessibilityDelegate` on `android.R.id.content` whose `onRequestSendAccessibilityEvent(host, child, event)` calls `touched()` for `TYPE_VIEW_ACCESSIBILITY_FOCUSED`, `TYPE_VIEW_CLICKED` and `TYPE_VIEW_SCROLLED`, then returns the default. Compose sends its accessibility events up the view tree this way, and they are only sent while an accessibility service is on.
 - **`exploring`** follows `AccessibilityManager.isTouchExplorationEnabled` through a `TouchExplorationStateChangeListener`.
-- **`timeout`** returns `baseMillis` unless `exploring`, then `max(baseMillis, getRecommendedTimeoutMillis(baseMillis.toInt(), FLAG_CONTENT_TEXT or FLAG_CONTENT_ICONS or (FLAG_CONTENT_CONTROLS if hasControls)))` (API 29, the app’s minSdk). Ruling 3 names TalkBack, so other people get the base. Never less than the base, so a short system setting can’t shorten anything.
+- **`timeout`** returns `baseMillis` unless `exploring`, then `max(baseMillis, getRecommendedTimeoutMillis(baseMillis.toInt(), FLAG_CONTENT_TEXT or FLAG_CONTENT_ICONS or (FLAG_CONTENT_CONTROLS if hasControls)))` (API 29, the app’s minSdk). Ruling 3 names TalkBack, so other people get the base. Never less than the base, so a short system setting can’t shorten anything; never more than `EDIT_HOLD_MS` unless the base is, so a value set outside Android’s own settings (which stop at 2 minutes) can’t hold anything open longer *(amended at plan review)*.
 - MainActivity keeps feeding `access.touch(…)` (§6.2) from `touches` while Settings is open or the wizard shows, as `touchTarget` does today.
 
 **Tests.** Robolectric: a pointer down in the sheet layer bumps `touches`; an `AccessibilityEvent` of each of the three types sent through the content view bumps it, and `TYPE_VIEW_HOVER_ENTER` doesn’t; `timeout` with exploring off is the base, and with it on is the recommended value from a shadowed `AccessibilityManager`.
@@ -322,8 +324,9 @@ interface UserActivity {
 
 **Fix (Decision 3).**
 - **What counts.** Every `UserActivity` touch while Settings is open (§6.1): screen touches, scrolling, and TalkBack focus, click and scroll events.
-- **How long.** The session’s timeouts come from `UserActivity.timeout`: `SESSION_TIMEOUT_MS` (2 minutes) and `SETUP_IDLE_MS` (10 minutes, the wizard). `DefaultAccessControl` takes a `timeout: (Long) -> Long` so it doesn’t depend on Android.
-- **Unsaved changes.** `touch(holdForEdits: Boolean)`: while an open sheet has unsaved changes (§6.3), each touch restarts the session for `EDIT_HOLD_MS` = 10 minutes (or the recommended value, if longer) instead of 2. There is no longer hold. When it runs out, Settings closes, the sheet closes with it (`AppContent` already does this) and the edits are lost.
+- **How long.** The session’s timeouts come from `UserActivity.timeout`: `SESSION_TIMEOUT_MS` (2 minutes) and `SETUP_IDLE_MS` (10 minutes, the wizard). `DefaultAccessControl` takes the `UserActivity` interface from `:core:plugin`, which has no Android in it.
+- **The tablet asleep** *(amended at plan review)*. The session’s timer is a coroutine delay, which stops while the tablet sleeps; `expiresAt` is wall-clock time. A touch, an authorise, and the app coming to the front each first end a session whose `expiresAt` has passed, so a touch after waking never revives it.
+- **Unsaved changes.** `touch(holdForEdits: Boolean)`: while an open sheet has unsaved changes (§6.3), each touch restarts the session for `EDIT_HOLD_MS` = 10 minutes (or the recommended value, if longer) instead of 2. There is no longer hold. When it runs out, Settings closes, the sheet closes with it (`AppContent` already does this) and the edits are lost. *(Amended at plan review.)* The hold is kept through an authorise on the session (a Save the rules refuse keeps the sheet and its edits), and dropped by the next touch without it; the shell sends one whenever the edits go, so an undone edit or a closed sheet puts the session back on 2 minutes at once.
 - **The warning.** `AccessControl` exposes `expiresAt: StateFlow<Long?>` (wall-clock millis; null with nobody signed in). While Settings is open, the shell shows a pill in the toast position, 20 seconds before `expiresAt`: "Settings closes in 20 seconds. Touch the screen to stay." It is an Assertive live region with the `schedule` icon (already in the subset font), tagged `settings_warning`, drawn over toasts. A touch restarts the countdown and hides the pill; the pill shows once per countdown (it isn’t re-shown by a recomposition inside the same countdown). The text is fixed: it doesn’t count down.
 - **The PIN pad over Settings.** Touches on the pad count, so typing a PIN keeps Settings open. A session that ends while a fresh-PIN pad is up closes Settings and its sheet; the pad stays, since `authorise` is still waiting, and its own idle close (§6.3) cancels it.
 
@@ -352,10 +355,13 @@ interface UserActivity {
   fun setEdited(edited: Boolean)
   ```
 
+  (The plan puts `content` last, so `show { … }` callers keep compiling, and names the second `markEdited`: a `var edited` property’s setter is already `setEdited` on the JVM.)
+
 - **Who reports edits.** The add/change sheet reports `EventForm.edited` (any field differs from where the sheet started, so a new sheet with its defaults is not edited); the person sheet reports its form’s `edited` the same way. The detail sheet, pickers on their own, the connecting card and the PIN chooser report nothing.
 - **The idle close** lives in `ShellLayers`: keyed on the overlay’s content, its edited flag and `touches`, it waits `UserActivity.timeout(OVERLAY_IDLE_MS)` (2 minutes) with no edits, or `EDIT_HOLD_MS` (10 minutes) with edits, then dismisses. A picker belongs to its sheet and closes with it. The connecting card shows with `closesWhenIdle = false`: Google’s account chooser is outside the app, so no touch reaches Culvery while it is open.
-- **Inside Settings** the session (§6.2) closes first or at the same moment, as both run on the same touches; Settings’ warning covers both.
-- **The PIN pad.** `PinPadHost` cancels its request (`controller.cancel()`, so `authorise` returns null as if Cancel were tapped) after `UserActivity.timeout(OVERLAY_IDLE_MS)` without a touch. Digits typed don’t count as edits. A lockout doesn’t stop the idle close.
+- **Inside Settings** no overlay closes by itself: Settings’ own end (§6.2) takes its sheet, and Settings’ warning covers both. An overlay closing first would move TalkBack’s focus, which counts as a touch and would stretch the session. *(Amended at plan review; it was "the session closes first or at the same moment".)*
+- **Saving** counts as edited, so the idle close never cuts a save off half done. *(Amended at plan review.)*
+- **The PIN pad.** `PinPadHost` cancels its request (`controller.cancel()`, so `authorise` returns null as if Cancel were tapped) after `UserActivity.timeout(OVERLAY_IDLE_MS)` without a touch; over Settings a second later, so the session always ends first *(amended at plan review)*. Digits typed don’t count as edits. A lockout doesn’t stop the idle close.
 - **Outside Settings with edits** the sheet closes at 10 minutes and the edits are lost. 20 seconds before, the shell shows the same pill as Settings’ warning (§6.2), with the text "This closes in 20 seconds. Touch the screen to keep your changes.", tagged `sheet_warning`: an Assertive live region, once per countdown, hidden by a touch, fixed text. Without edits there is no warning: nothing is lost. While Settings is open, only Settings’ warning shows. *(Amended at planning, user 2026-10-09; it was "without a warning".)*
 
 **Tests (Compose test clock).** An untouched detail sheet closes at 2 minutes and not at 1:59; a touch inside the sheet restarts it; an add sheet with a typed title is still open at 9:59 and closed at 10:00; the connecting card is open at 30 minutes; the PIN pad cancels at 2 minutes and `authorise` returns null; with TalkBack’s timeout at 5 minutes, the detail sheet stays 5. The add sheet with a typed title shows `sheet_warning` at 9:40 and not at 9:39.999, Assertive, and a touch hides it; an untouched detail sheet never shows it; inside Settings an edited person sheet shows `settings_warning` and not `sheet_warning`.
@@ -429,7 +435,7 @@ Every changed string is in Appendix A, current → new, with its file. This sect
 - **Service names (Decision 12).** `EventUi.connectionLabel` goes; the Saving pill and every failure use `serviceName`. `couldNotSave`, `couldNotSaveAll` and the editor’s failure card take the service name (`serviceNameOf`), not `SourceCatalog.label`. The week subtitle names the service when every connection has the same one (`serviceNames.distinct().singleOrNull()`), and otherwise says "Updated 5 minutes ago". `GOOGLE_LABEL` stays as the stored label (it is the connection’s name inside the app, not shown).
 - **PIN lines from explicit copy (C60).** `pinReasonText` maps each `PinReason` to its own string, not the enum name: Save → "add this event", Edit → "change this event", Delete → "delete this event", Assign → "choose who this event is for", each followed by "It also records who made the change." Generic uses the permission’s label, first letter lower-cased: "Enter your PIN to use other apps."
 - **Permission labels.** `kiosk.exit` "Exit kiosk mode" → "Use other apps"; `calendar.event.assign` "Assign events" → "Choose who events are for"; `people.manage` "Manage people" → "Add and change people" (C70’s second proposal, so the PIN line reads "Enter your PIN to add and change people.").
-- **The refusal in the PIN pad (C64).** `PinError.NotAllowed`’s message names what was refused and who can do it: "Sam can’t change settings. Ask an Admin." when only Admins hold the permission, otherwise "… Ask a grown-up." `DefaultAccessControl` builds it from the request’s label and the registry’s roles.
+- **The refusal in the PIN pad (C64, amended at plan review: user decision A).** A real PIN that may not do the thing gets "That PIN can’t do this. Ask an Admin.", or "That PIN can’t do this. Ask a grown-up." when Adults hold the permission. It names no one, so a PIN found by guessing doesn’t say whose it is, and it counts as a wrong attempt towards the lockout. `PinError.NotAllowed` carries only the message; `DefaultAccessControl` builds it from the registry’s roles.
 - **Read-only notes (Decision 2g).** For both `OtherCalendar` and `NotMaster`, the detail sheet’s note title is "Can’t change here", the badge description is "Can’t change here", and the Calendar row reads "School terms (can’t change here)". The note bodies differ: `OtherCalendar` "This calendar can only be changed by whoever runs it."; `NotMaster` "Change events on this calendar in Google Calendar on your phone." The "Created by" value for a feed event (`CALENDAR_FEED`) becomes the calendar’s own name ("School terms"): "Can’t change here" would not answer "Created by".
 
 #### 7.1.3 The copy-scan test (Decision 8)
@@ -445,7 +451,7 @@ Every changed string is in Appendix A, current → new, with its file. This sect
 - **Self-test.** A fixture source in the test resources holding one case of each rule (a banned word in a `Text(` literal fails; the same word in a test tag, a log line, a KDoc and a `${…}` template passes; an apostrophe in a `require` message passes; `WriteRejectedException("Can't …")` fails) proves the tokenizer, so a broken scanner can’t pass silently.
 - It lands in the same task as the sweep (§9 task 11), so every commit stays green.
 
-**Tests.** `CopyScanTest`; unit tests of `pinReasonText` per reason, `NotAllowed`’s message for an Admin-only and an Adult permission, `weekSubtitle`, `reconnectLabel` ("2 accounts need reconnecting") and the badge descriptions.
+**Tests.** `CopyScanTest`; unit tests of `pinReasonText` per reason, `NotAllowed`’s message for an Admin-only and an Adult permission (no name in it, and a refused PIN counted towards the lockout), `weekSubtitle`, `reconnectLabel` ("2 accounts need reconnecting") and the badge descriptions.
 
 ### 7.2 Errors by cause (D34)
 
@@ -628,7 +634,7 @@ In the final task, on the debug build (API 35 emulator):
 
 ## 9. Plan shape
 
-Fourteen tasks, the last a wrap-up. Labels written in tasks 1–8 already use the new vocabulary; the sweep of existing copy is tasks 11–13.
+Fourteen tasks, the last a wrap-up. Labels written in tasks 1–8 already use the new vocabulary; the sweep of existing copy is tasks 11–13. *(Amended at plan review, user: tasks 10, 11 and 13 are each split in two, session then overlay timing, the sweep then the scanner, routing and search then the copy, so the plan has seventeen.)*
 
 1. **Groundwork.** Try `enableAccessibilityChecks()` under Robolectric and record the result; the test fixtures and `assertClickablesHaveRoleAndLabel()`; `Modifier.hhClickable`; `HhButton.spokenName`; `HhListRow.clickLabel`.
 2. **Roles and labels** on every clickable (D15); the quiet fill and `Role.Button` for Close, ‹ › and the steppers (4d-1 follow-up); the helper called from each screen test.
@@ -717,7 +723,7 @@ Built from the copy audit (C1–C108), adjusted to the rulings. Every visible st
 | C61 | AccessControl.kt:26 | Enter your PIN to carry on setting up | Enter your PIN to carry on setting up. |
 | C70 | Permissions.kt:28 | Manage people | Add and change people |
 | C74 | Permissions.kt:29 | Exit kiosk mode | Use other apps |
-| C64 | PinPromptController.kt:12 | $name can't do that | Sam can’t change settings. Ask an Admin. (or "… Ask a grown-up." when Adults hold the permission) |
+| C64 (amended) | PinPromptController.kt:12 | $name can't do that | That PIN can’t do this. Ask an Admin. (or "That PIN can’t do this. Ask a grown-up." when Adults hold the permission; names no one, user decision A) |
 | quotes | PinPad.kt:94 | Who's this? | Who’s this? |
 | C62 | PinPad.kt:97 | Too many tries — wait 30s | Too many tries — wait 30 seconds. ("1 second") |
 | C63 | PinPad.kt:98 | Wrong PIN — try again | Wrong PIN — try again. |
