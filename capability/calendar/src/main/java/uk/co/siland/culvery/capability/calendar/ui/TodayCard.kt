@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
 import uk.co.siland.culvery.capability.calendar.EventRef
@@ -53,7 +55,7 @@ fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier, onOpen: (Ev
             horizontalArrangement = Arrangement.spacedBy(CalendarDimens.todayHeaderButtonGap),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Today", style = HhType.cardTitle, color = c.ink, modifier = Modifier.weight(1f))
+            Text("Today", style = HhType.cardTitle, color = c.ink, modifier = Modifier.weight(1f).semantics { heading() })
             if (onAdd != null) AddCircle(onAdd)
             HhButton("Week", { navigator.openTab(CALENDAR_TAB_ID) }, on = ButtonSurface.Surf)
         }

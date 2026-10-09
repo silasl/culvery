@@ -37,6 +37,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.HOURS_MINUTES
@@ -199,7 +201,7 @@ private fun Header(form: EventForm, everyone: List<Person>, onClose: () -> Unit)
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(if (form.mode == EventForm.Mode.New) "New event" else "Edit event", style = CalendarType.editorTitle, color = c.ink)
+            Text(if (form.mode == EventForm.Mode.New) "New event" else "Edit event", style = CalendarType.editorTitle, color = c.ink, modifier = Modifier.semantics { heading() })
             Spacer(Modifier.height(CalendarDimens.editorSummaryTop))
             Text(
                 // A tag whose person has left has no name here, and the line ends at the time.

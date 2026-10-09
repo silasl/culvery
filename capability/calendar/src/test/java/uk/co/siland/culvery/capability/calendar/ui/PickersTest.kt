@@ -24,6 +24,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import androidx.compose.ui.test.isHeading
+import androidx.compose.ui.test.onNodeWithText
 
 @RunWith(AndroidJUnit4::class)
 class PickersTest {
@@ -165,5 +167,17 @@ class PickersTest {
         showTime(LocalTime.of(9, 0))
         listOf("Hour up", "Hour down", "Minute up", "Minute down").forEach { compose.onNodeWithContentDescription(it).assert(isButton) }
         compose.assertAccessible()
+    }
+
+    @Test
+    fun thePickersTitlesAreHeadings() {
+        showDates()
+        compose.onNodeWithText("Pick a date").assert(isHeading())
+    }
+
+    @Test
+    fun theTimePickersTitleIsAHeading() {
+        showTime(LocalTime.of(9, 0))
+        compose.onNodeWithText("Pick a time").assert(isHeading())
     }
 }

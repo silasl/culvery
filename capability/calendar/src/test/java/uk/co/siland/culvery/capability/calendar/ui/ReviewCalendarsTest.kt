@@ -36,6 +36,7 @@ import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import androidx.compose.ui.test.isHeading
 
 @RunWith(AndroidJUnit4::class)
 class ReviewCalendarsTest {
@@ -233,5 +234,11 @@ class ReviewCalendarsTest {
         show(ConnectionHealth.NeedsSignIn, busy = true, connectable = listOf(ProviderDescriptor("calendar.google", "Google Calendar", "event", emptySet())))
         compose.onNodeWithTag("settings_connect_calendar.google").assertIsNotEnabled()
         compose.onNodeWithTag("settings_reconnect").assertIsNotEnabled()
+    }
+
+    @Test
+    fun theTitleIsAHeading() {
+        show()
+        compose.onNodeWithText("Calendars").assert(isHeading())
     }
 }

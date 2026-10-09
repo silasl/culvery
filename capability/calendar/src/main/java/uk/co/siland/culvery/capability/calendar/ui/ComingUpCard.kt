@@ -23,6 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -56,7 +59,7 @@ fun ComingUpCard(days: List<DayUi>?, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().heightIn(min = ButtonTokens.regularHeight),
         ) {
-            Text("Coming up", style = HhType.cardTitle, color = c.ink)
+            Text("Coming up", style = HhType.cardTitle, color = c.ink, modifier = Modifier.semantics { heading() })
         }
         Spacer(Modifier.height(CalendarDimens.comingUpHeaderGap))
         if (days != null) {
@@ -67,6 +70,7 @@ fun ComingUpCard(days: List<DayUi>?, modifier: Modifier = Modifier) {
                 days.forEachIndexed { i, day ->
                     DayColumn(
                         label = if (i == 0) "Tomorrow" else day.date.format(WEEKDAY),
+                        spoken = dayHeading(day.date, if (i == 0) "Tomorrow" else null),
                         events = day.events,
                         modifier = Modifier.weight(1f),
                     )
@@ -77,14 +81,14 @@ fun ComingUpCard(days: List<DayUi>?, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun DayColumn(label: String, events: List<EventUi>, modifier: Modifier) {
+private fun DayColumn(label: String, spoken: String, events: List<EventUi>, modifier: Modifier) {
     val c = Culvery.colors
     // Scrolls only if a tall font scale makes MAX_ROWS rows overflow the card.
     Column(
         verticalArrangement = Arrangement.spacedBy(CalendarDimens.comingUpRowGap),
         modifier = modifier.verticalScroll(rememberScrollState()),
     ) {
-        Text(label, style = CalendarType.strong14, color = c.ink)
+        Text(label, style = CalendarType.strong14, color = c.ink, modifier = Modifier.semantics { heading(); contentDescription = spoken })
         if (events.isEmpty()) Text("Free", style = HhType.secondary, color = c.mute)
         events.take(MAX_ROWS).forEach { CompactRow(it) }
         if (events.size > MAX_ROWS) {

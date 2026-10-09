@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.core.setup
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -30,7 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.ui.ButtonSurface
@@ -61,9 +63,9 @@ fun SettingsScreen(pages: List<SettingsPage>, onClose: () -> Unit) {
                 .background(c.surf)
                 .padding(horizontal = SetupDimens.settingsListPaddingH, vertical = SetupDimens.settingsListPaddingV),
         ) {
-            Text(SETTINGS, style = SetupType.title, color = c.ink)
+            Text(SETTINGS, style = SetupType.title, color = c.ink, modifier = Modifier.semantics { heading() })
             Spacer(Modifier.height(SetupDimens.settingsTitleGap))
-            Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.settingsItemGap)) {
+            Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.settingsItemGap), modifier = Modifier.selectableGroup()) {
                 pages.forEach { p -> PageItem(p.title, chosen = p.id == page?.id, tag = "settings_page_${p.id}") { chosen = p.id } }
             }
             Spacer(Modifier.weight(1f))
@@ -96,12 +98,11 @@ private fun PageItem(title: String, chosen: Boolean, tag: String, onClick: () ->
         contentAlignment = Alignment.CenterStart,
         modifier = Modifier
             .testTag(tag)
-            .semantics { selected = chosen }
             .fillMaxWidth()
             .height(SetupDimens.settingsItemHeight)
             .clip(RoundedCornerShape(SetupDimens.settingsItemRadius))
             .then(if (chosen) Modifier.background(c.accentSoft) else Modifier)
-            .clickable(onClick = onClick)
+            .selectable(selected = chosen, role = Role.Tab, onClick = onClick)
             .padding(horizontal = SetupDimens.settingsItemPaddingH),
     ) {
         Text(title, style = if (chosen) SetupType.chosenItem else SetupType.rowTitle, color = if (chosen) c.accent else c.ink, maxLines = 1)

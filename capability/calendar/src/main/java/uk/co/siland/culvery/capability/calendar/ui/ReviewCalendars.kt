@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
@@ -184,7 +186,7 @@ internal fun ReviewCalendars(
     actions: ReviewActions,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.reviewBlockGap), modifier = Modifier.testTag("review_calendars")) {
-        Text(title, style = CalendarType.reviewTitle, color = Culvery.colors.ink)
+        Text(title, style = CalendarType.reviewTitle, color = Culvery.colors.ink, modifier = Modifier.semantics { heading() })
         connections.forEach { connection ->
             ConnectionHeader(connection.row, nowMillis, busy, actions.onReconnect, actions.onDisconnect)
             if (confirming != null && confirming.row.connection.id == connection.row.connection.id) {

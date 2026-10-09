@@ -40,6 +40,8 @@ import uk.co.siland.culvery.capability.calendar.TimeSlot
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.ShellTokens
+import androidx.compose.ui.test.isHeading
+import androidx.compose.ui.test.assert
 
 @RunWith(AndroidJUnit4::class)
 class EventEditorSheetTest {
@@ -291,5 +293,11 @@ class EventEditorSheetTest {
         compose.onNodeWithTag("day_${SampleUi.TODAY}").assertIsDisplayed()
         compose.onNodeWithTag("editor_save").performClick()
         assertThat(calls).containsExactly("save")
+    }
+
+    @Test
+    fun theSheetsTitleIsAHeading() {
+        show(newForm())
+        compose.onNodeWithText("New event").assert(isHeading())
     }
 }

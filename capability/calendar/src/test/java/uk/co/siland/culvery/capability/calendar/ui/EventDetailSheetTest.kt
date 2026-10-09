@@ -31,6 +31,7 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import androidx.compose.ui.test.isHeading
 
 @RunWith(AndroidJUnit4::class)
 class EventDetailSheetTest {
@@ -231,5 +232,11 @@ class EventDetailSheetTest {
         val chip = compose.onNodeWithTag("assign_Alex").assert(isButton)
         assertThat(chip.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("show as Alex’s event")
         compose.assertAccessible()
+    }
+
+    @Test
+    fun theSheetsTitleIsAHeading() {
+        show(SampleUi.detailEditable)
+        compose.onNodeWithText("Dinner with Jo & Priya").assert(isHeading())
     }
 }

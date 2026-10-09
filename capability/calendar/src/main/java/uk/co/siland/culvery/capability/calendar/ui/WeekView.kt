@@ -40,7 +40,9 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import java.time.LocalDate
@@ -123,7 +125,7 @@ fun WeekView(
                             color = c.ink,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
+                            modifier = Modifier.weight(1f, fill = false).testTag("week_title").semantics { heading() },
                         )
                         if (state.weeksAhead > 0) {
                             Spacer(Modifier.width(CalendarDimens.weekTitleGap))
@@ -191,7 +193,14 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
         radius = CalendarDimens.weekColumnRadius,
         padding = PaddingValues(horizontal = CalendarDimens.weekColumnPaddingH, vertical = CalendarDimens.weekColumnPaddingV),
     ) {
-        Row(Modifier.padding(start = inset, end = inset, bottom = inset)) {
+        Row(
+            Modifier
+                .padding(start = inset, end = inset, bottom = inset)
+                .clearAndSetSemantics {
+                    heading()
+                    contentDescription = dayHeading(day.date, if (isToday) "Today" else null)
+                },
+        ) {
             Text(
                 if (isToday) "Today" else day.date.format(WEEKDAY),
                 style = CalendarType.strong14,

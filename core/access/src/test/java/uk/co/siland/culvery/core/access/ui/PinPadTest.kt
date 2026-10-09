@@ -30,6 +30,7 @@ import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.pinReasonText
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import androidx.compose.ui.test.isHeading
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -191,5 +192,12 @@ class PinPadTest {
             compose.onNodeWithTag(it).assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         }
         compose.assertAccessible()
+    }
+
+    @Test
+    fun theTitleIsAHeading() {
+        controller.open("Change settings", null, null)
+        show()
+        compose.onNodeWithText("Who's this?").assert(isHeading())
     }
 }

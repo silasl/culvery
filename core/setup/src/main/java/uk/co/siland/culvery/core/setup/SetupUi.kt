@@ -6,6 +6,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
@@ -16,7 +18,7 @@ import uk.co.siland.culvery.core.ui.HhButton
 internal fun StepTitle(title: String, line: String? = null) {
     val c = Culvery.colors
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.titleLineGap)) {
-        Text(title, style = SetupType.title, color = c.ink)
+        Text(title, style = SetupType.title, color = c.ink, modifier = Modifier.semantics { heading() })
         if (line != null) Text(line, style = SetupType.line, color = c.mute)
     }
 }

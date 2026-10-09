@@ -28,6 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventUi
@@ -189,7 +191,7 @@ private fun Header(e: EventUi, onClose: () -> Unit) {
                     SyncingPill(e.connectionLabel)
                     Spacer(Modifier.height(CalendarDimens.syncingPillBottom))
                 }
-                Text(e.title, style = CalendarType.sheetTitle, color = c.ink)
+                Text(e.title, style = CalendarType.sheetTitle, color = c.ink, modifier = Modifier.semantics { heading() })
             }
         }
         HhCloseButton(onClick = onClose)

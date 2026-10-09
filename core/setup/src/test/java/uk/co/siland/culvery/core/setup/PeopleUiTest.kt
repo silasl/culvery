@@ -38,6 +38,9 @@ import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import androidx.compose.ui.test.isHeading
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.onAllNodesWithText
 
 /** The people list and sheet over the real editor; Alex is in the setup session, so no PIN pad shows. */
 @RunWith(AndroidJUnit4::class)
@@ -238,5 +241,12 @@ class PeopleUiTest {
         assertThat(compose.onNodeWithTag("person_Sam").fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("change Sam’s details")
         assertThat(compose.onNodeWithTag("person_up_Sam").fetchSemanticsNode().config[SemanticsActions.OnClick].label).isNull()
         compose.assertAccessible()
+    }
+
+    @Test
+    fun thePersonSheetsTitleIsAHeading() {
+        show()
+        compose.onNodeWithTag("people_add").performClick()
+        compose.onAllNodesWithText("Add person", useUnmergedTree = true).filterToOne(isHeading()).assertExists()
     }
 }

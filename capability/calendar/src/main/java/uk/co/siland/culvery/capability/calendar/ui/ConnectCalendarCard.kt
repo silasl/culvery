@@ -12,6 +12,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
 import uk.co.siland.culvery.capability.calendar.CalendarRow
@@ -43,7 +45,7 @@ fun ConnectCalendarCard(connectService: String?, onConnect: () -> Unit, modifier
     ) {
         HhIcon(Icons.CALENDAR_ADD_ON, size = CalendarDimens.connectIconSize, tint = c.accent)
         Spacer(Modifier.weight(1f))
-        Text("Connect a calendar", style = HhType.cardTitle, color = c.ink)
+        Text("Connect a calendar", style = HhType.cardTitle, color = c.ink, modifier = Modifier.semantics { heading() })
         Spacer(Modifier.height(CalendarDimens.connectSubtitleTop))
         Text("Connect your family's calendar to see it here.", style = HhType.secondary, color = c.mute)
         Spacer(Modifier.height(CalendarDimens.connectButtonTop))

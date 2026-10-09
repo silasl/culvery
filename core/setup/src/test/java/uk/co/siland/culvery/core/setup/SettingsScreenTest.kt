@@ -17,6 +17,15 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.setup.pages.KioskPage
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.isHeading
+import androidx.compose.ui.test.onParent
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.onAllNodesWithText
+import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 @RunWith(AndroidJUnit4::class)
 class SettingsScreenTest {
@@ -70,5 +79,16 @@ class SettingsScreenTest {
         show(page("a", "Alpha", 0), page("b", "Beta", 1))
         assertThat(compose.onNodeWithText("Alpha", useUnmergedTree = true).textLayout().layoutInput.style.fontWeight).isEqualTo(FontWeight.W700)
         assertThat(compose.onNodeWithText("Beta", useUnmergedTree = true).textLayout().layoutInput.style.fontWeight).isEqualTo(FontWeight.W600)
+    }
+
+    @Test
+    fun thePagesAreTabsInOneGroupUnderAHeading() {
+        show(page("a", "Alpha", 0), KioskPage(FakeHomeApp()))
+        compose.onNodeWithTag("settings_page_a").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).assertIsSelected()
+        compose.onNodeWithTag("settings_page_a").onParent().assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
+        compose.onNodeWithText("Settings").assert(isHeading())
+        compose.onNodeWithTag("settings_page_kiosk").performClick()
+        compose.onAllNodesWithText("Kiosk").filterToOne(isHeading()).assertExists()
+        compose.assertAccessible()
     }
 }

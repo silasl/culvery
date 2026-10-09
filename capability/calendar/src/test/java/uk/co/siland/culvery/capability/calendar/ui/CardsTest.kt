@@ -32,6 +32,8 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import androidx.compose.ui.test.isHeading
+import androidx.compose.ui.test.onNodeWithContentDescription
 
 /** Native graphics: the sized tests check that rows fit the real card sizes, which needs real text metrics. */
 @RunWith(AndroidJUnit4::class)
@@ -205,5 +207,25 @@ class CardsTest {
     fun theConnectCardPassesTheSharedCheck() {
         show { ConnectCalendarCard(connectService = "Google Calendar", onConnect = {}) }
         compose.assertAccessible()
+    }
+
+    @Test
+    fun todaysTitleIsAHeading() {
+        show { TodayCard(SampleUi.today) }
+        compose.onNodeWithText("Today").assert(isHeading())
+    }
+
+    @Test
+    fun comingUpsDaysAreHeadingsThatSayTheDate() {
+        show { ComingUpCard(SampleUi.comingUp) }
+        compose.onNodeWithText("Coming up").assert(isHeading())
+        compose.onNodeWithContentDescription("Tomorrow, Thursday 24 September").assert(isHeading())
+        compose.onNodeWithContentDescription("Friday 25 September").assert(isHeading())
+    }
+
+    @Test
+    fun theConnectCardsTitleIsAHeading() {
+        show { ConnectCalendarCard(connectService = "Google Calendar", onConnect = {}) }
+        compose.onNodeWithText("Connect a calendar").assert(isHeading())
     }
 }

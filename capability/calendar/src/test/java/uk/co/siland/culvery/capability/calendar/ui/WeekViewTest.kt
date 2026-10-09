@@ -42,6 +42,8 @@ import uk.co.siland.culvery.capability.calendar.weekTitle
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import androidx.compose.ui.test.isHeading
+import androidx.compose.ui.test.onChildren
 
 @RunWith(AndroidJUnit4::class)
 class WeekViewTest {
@@ -287,6 +289,7 @@ class WeekViewTest {
         compose.onNodeWithTag("week_add_${SampleUi.TODAY.plusDays(9)}").performClick()
         assertThat(added).containsExactly(SampleUi.TODAY.plusWeeks(1), SampleUi.TODAY.plusDays(9)).inOrder()
         compose.onNodeWithText("Today").assertDoesNotExist()
+        compose.onAllNodesWithContentDescription("Today, ", substring = true).assertCountEquals(0)
     }
 
     /** A touch anywhere restarts the 2-minute wait, and still reaches what was touched. */
@@ -349,5 +352,13 @@ class WeekViewTest {
         val reconnect = compose.onNodeWithText("Google needs reconnecting")
         assertThat(reconnect.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("reconnect")
         assertThat(compose.onNodeWithTag("week_later").fetchSemanticsNode().config[SemanticsActions.OnClick].label).isNull()
+    }
+
+    @Test
+    fun eachColumnHeaderIsOneHeadingThatSaysItsDate() {
+        show { WeekView(state()) }
+        compose.onNodeWithContentDescription("Today, Wednesday 23 September").assert(isHeading()).onChildren().assertCountEquals(0)
+        compose.onNodeWithContentDescription("Thursday 24 September").assert(isHeading())
+        compose.onNodeWithText("This week").assert(isHeading())
     }
 }

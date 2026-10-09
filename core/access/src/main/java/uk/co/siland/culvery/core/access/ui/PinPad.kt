@@ -35,6 +35,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.delay
@@ -211,7 +213,7 @@ fun PinPadFrame(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(PinPadDimens.titleReasonGap),
                 ) {
-                    Text(title, style = PinPadType.title, color = c.ink)
+                    Text(title, style = PinPadType.title, color = c.ink, modifier = Modifier.semantics { heading() })
                     if (line != null) Text(line, style = PinPadType.reason, color = c.mute, textAlign = TextAlign.Center)
                 }
                 Dots(filled = digits.length, error = wrongPin && digits.isEmpty())

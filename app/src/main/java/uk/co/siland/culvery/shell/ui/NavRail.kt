@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.shell.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
@@ -53,8 +55,14 @@ fun NavRail(
             }
             .padding(top = 16.dp, bottom = 20.dp),
     ) {
-        (listOf(HomeTab) + tabs).forEach { tab ->
-            RailItem(tab, selected = tab.id == selectedId) { onSelect(tab.id) }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.selectableGroup(),
+        ) {
+            (listOf(HomeTab) + tabs).forEach { tab ->
+                RailItem(tab, selected = tab.id == selectedId) { onSelect(tab.id) }
+            }
         }
         Spacer(Modifier.weight(1f))
         Column(
@@ -82,7 +90,7 @@ private fun RailItem(tab: TabItem, selected: Boolean, onClick: () -> Unit) {
             .testTag("rail_${tab.id}")
             .width(88.dp)
             .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
             .padding(vertical = 8.dp),
     ) {
         Box(

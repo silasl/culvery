@@ -30,6 +30,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import java.time.DayOfWeek
@@ -124,7 +126,7 @@ internal fun DatePickerCard(today: LocalDate, selected: LocalDate, onPick: (Loca
     PickerCard(CalendarDimens.datePickerWidth, CalendarDimens.datePickerGap, "date_picker") {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.pageButtonGap)) {
             Column(Modifier.weight(1f)) {
-                Text("Pick a date", style = CalendarType.pickerTitle, color = c.ink)
+                Text("Pick a date", style = CalendarType.pickerTitle, color = c.ink, modifier = Modifier.semantics { heading() })
                 Text(
                     pageRangeLabel(start),
                     style = CalendarType.pickerRange,
@@ -167,7 +169,7 @@ internal fun TimePickerCard(initial: LocalTime, onSet: (LocalTime) -> Unit, onCa
     var hour by remember { mutableIntStateOf(initial.hour) }
     var minute by remember { mutableIntStateOf(initial.minute) }
     PickerCard(CalendarDimens.timePickerWidth, CalendarDimens.timePickerGap, "time_picker") {
-        Text("Pick a time", style = CalendarType.pickerTitle, color = c.ink)
+        Text("Pick a time", style = CalendarType.pickerTitle, color = c.ink, modifier = Modifier.semantics { heading() })
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(CalendarDimens.timeColumnGap, Alignment.CenterHorizontally),

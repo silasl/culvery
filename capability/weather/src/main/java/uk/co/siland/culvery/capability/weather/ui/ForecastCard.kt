@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import uk.co.siland.culvery.capability.weather.ADD_LOCATION
 import uk.co.siland.culvery.capability.weather.DailyWeather
@@ -59,7 +61,7 @@ fun ForecastCard(view: WeatherView, nowMillis: Long, modifier: Modifier = Modifi
         radius = ShellTokens.homeCardRadius,
         padding = PaddingValues(horizontal = WeatherDimens.cardPaddingH, vertical = WeatherDimens.cardPaddingV),
     ) {
-        Text(FORECAST_TITLE, style = HhType.cardTitle, color = c.ink)
+        Text(FORECAST_TITLE, style = HhType.cardTitle, color = c.ink, modifier = Modifier.semantics { heading() })
         Spacer(Modifier.height(WeatherDimens.titleGap))
         when (view) {
             is WeatherView.Ready -> {

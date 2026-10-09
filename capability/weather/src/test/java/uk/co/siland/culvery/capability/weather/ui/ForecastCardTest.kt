@@ -39,6 +39,7 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import androidx.compose.ui.test.isHeading
 
 @RunWith(AndroidJUnit4::class)
 class ForecastCardTest {
@@ -139,5 +140,11 @@ class ForecastCardTest {
     fun theNoLocationCardPassesTheSharedCheck() {
         show(WeatherView.NoLocation)
         compose.assertAccessible()
+    }
+
+    @Test
+    fun theTitleIsAHeading() {
+        show(READY)
+        compose.onNodeWithText("Forecast").assert(isHeading())
     }
 }
