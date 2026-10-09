@@ -37,7 +37,7 @@ import uk.co.siland.culvery.shell.ToastMessage
  * and the composition root has none, so a layer closed with no other animation running (a scrim tap, a toast timing
  * out) would get a layout pass but no new frame and stay on screen. Every finger down anywhere in them, sheets and PIN
  * pads included, goes to [onTouch] before anything handles it; the session hears of it from [UserActivity] a moment
- * later, which is always before the finger lifts to click.
+ * later.
  * While a sheet or the PIN pad shows, what it covers is hidden from TalkBack; the toasts never are.
  */
 @Composable

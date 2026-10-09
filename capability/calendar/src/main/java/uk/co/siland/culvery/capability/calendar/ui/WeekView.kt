@@ -48,6 +48,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import java.time.LocalDate
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
@@ -372,12 +373,14 @@ internal class WeekShown {
 internal fun rememberWeekShown(today: LocalDate): WeekShown {
     val shown = remember(today) { WeekShown() }
     val activity = LocalUserActivity.current
-    val touches by activity.touches.collectAsState()
     val exploring by activity.exploring.collectAsState()
-    LaunchedEffect(shown, shown.weeks, touches, exploring) {
+    // Collecting inside the effect keeps a touch from recomposing the host.
+    LaunchedEffect(shown, shown.weeks, exploring) {
         if (shown.weeks > 0 && !exploring) {
-            delay(activity.timeout(BACK_TO_THIS_WEEK_MS))
-            shown.show(0)
+            activity.touches.collectLatest {
+                delay(activity.timeout(BACK_TO_THIS_WEEK_MS))
+                shown.show(0)
+            }
         }
     }
     return shown

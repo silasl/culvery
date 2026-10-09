@@ -31,9 +31,9 @@ class ShellUserActivityTest {
         val child = View(screen).also(content::addView)
         content.accessibilityDelegate = activity.accessibilityDelegate
         listOf(AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED, AccessibilityEvent.TYPE_VIEW_CLICKED, AccessibilityEvent.TYPE_VIEW_SCROLLED)
-            .forEach { content.requestSendAccessibilityEvent(child, AccessibilityEvent(it)) }
+            .forEach { assertThat(content.requestSendAccessibilityEvent(child, AccessibilityEvent(it))).isTrue() }
         assertThat(activity.touches.value).isEqualTo(3)
-        content.requestSendAccessibilityEvent(child, AccessibilityEvent(AccessibilityEvent.TYPE_VIEW_HOVER_ENTER))
+        assertThat(content.requestSendAccessibilityEvent(child, AccessibilityEvent(AccessibilityEvent.TYPE_VIEW_HOVER_ENTER))).isTrue()
         assertThat(activity.touches.value).isEqualTo(3)
     }
 
@@ -53,7 +53,7 @@ class ShellUserActivityTest {
     }
 
     @Test
-    fun withTouchExplorationTimeoutsFollowTimeToTakeActionAndNeverShorten() {
+    fun withTouchExplorationTimeoutsFollowTimeToTakeAction() {
         val activity = ShellUserActivity(context)
         shadowOf(manager).setInteractiveUiTimeout(300_000)
         shadowOf(manager).setNonInteractiveUiTimeout(20_000)
@@ -62,7 +62,15 @@ class ShellUserActivityTest {
         assertThat(activity.exploring.value).isTrue()
         assertThat(activity.timeout(120_000)).isEqualTo(300_000)
         assertThat(activity.timeout(4_000, hasControls = false)).isEqualTo(20_000)
-        assertThat(activity.timeout(600_000)).isEqualTo(600_000)
+    }
+
+    @Test
+    fun aBaseAboveTheEditHoldIsNotCutDown() {
+        val activity = ShellUserActivity(context)
+        shadowOf(manager).setInteractiveUiTimeout(3_600_000)
+        shadowOf(manager).setTouchExplorationEnabled(true)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertThat(activity.timeout(900_000)).isEqualTo(900_000)
     }
 
     /** Android's own setting stops at 2 minutes; a larger value set another way never holds anything past the edit hold. */

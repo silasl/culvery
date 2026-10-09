@@ -139,6 +139,9 @@ class AppContentTest {
         complete = true
         show()
         compose.onNodeWithText("Shell").performClick()
+        compose.waitForIdle()
+        activity.touch()
+        compose.waitForIdle()
         assertThat(access.touches).isEqualTo(0)
     }
 
