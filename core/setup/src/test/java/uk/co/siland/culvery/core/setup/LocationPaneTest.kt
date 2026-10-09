@@ -152,7 +152,7 @@ class LocationPaneTest {
         show()
         type("Can")
         advance(500)
-        compose.onNodeWithText("Couldn't search for towns — check the tablet's Wi-Fi and try again.").assertExists()
+        compose.onNodeWithText("Couldn’t search for towns — check the tablet’s Wi-Fi and try again.").assertExists()
         // Only the fixed words, never the exception's own.
         compose.onNodeWithText("offline", substring = true).assertDoesNotExist()
     }
@@ -162,7 +162,7 @@ class LocationPaneTest {
         show()
         type("Xqz")
         advance(500)
-        compose.onNodeWithText("No towns match \"Xqz\".").assertExists()
+        compose.onNodeWithText("No towns match “Xqz”.").assertExists()
     }
 
     @Test
@@ -181,7 +181,7 @@ class LocationPaneTest {
         advance(500)
         compose.onNodeWithTag("place_0").performClick()
         advance(100)
-        compose.onNodeWithText("Couldn't save — try again.").assertExists()
+        compose.onNodeWithText("Couldn’t save — try again.").assertExists()
         compose.onNodeWithTag("place_0").assertTextContains("Brighton, England, United Kingdom")
         assertNoSecretsLogged("LocationPane", listOf("Brighton", "disk full"))
         // Trying again clears it.
@@ -189,7 +189,7 @@ class LocationPaneTest {
         compose.onNodeWithTag("place_0").performClick()
         advance(100)
         assertThat(saved).containsExactly(brighton)
-        compose.onNodeWithText("Couldn't save — try again.").assertDoesNotExist()
+        compose.onNodeWithText("Couldn’t save — try again.").assertDoesNotExist()
     }
 
     @Test

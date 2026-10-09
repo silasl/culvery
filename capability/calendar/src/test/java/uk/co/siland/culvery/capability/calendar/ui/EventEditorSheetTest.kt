@@ -23,6 +23,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -103,11 +105,11 @@ class EventEditorSheetTest {
     @Test
     fun aNewEventSaysNewEventAndOffersNoDelete() {
         show(newForm())
-        compose.onNodeWithText("New event").assertExists()
+        compose.onAllNodesWithText("Add event").filterToOne(isHeading()).assertExists()
         compose.onNodeWithTag("editor_summary").assertTextEquals("Today · 14:00–15:00 · Family")
-        compose.onNodeWithText("Save event").assertExists()
+        compose.onNodeWithTag("editor_save").assertTextEquals("Add event")
         compose.onNodeWithTag("editor_delete").assertDoesNotExist()
-        compose.onNodeWithText("What's happening?").assertExists()
+        compose.onNodeWithText("What’s happening?").assertExists()
     }
 
     @Test
@@ -132,7 +134,7 @@ class EventEditorSheetTest {
     @Test
     fun anEditSaysEditEventAndOffersDelete() {
         show(dinner())
-        compose.onNodeWithText("Edit event").assertExists()
+        compose.onNodeWithText("Change event").assertExists()
         compose.onNodeWithText("Save changes").assertExists()
         compose.onNodeWithTag("time_pick").assertTextEquals("19:30")
         compose.onNodeWithTag("length_90").assertIsSelected()
@@ -192,15 +194,15 @@ class EventEditorSheetTest {
 
     @Test
     fun aFailureShowsTheCardAndSaveSaysTryAgain() {
-        failure = "Couldn't save to Sample calendar — Calendar is full"
+        failure = "Couldn’t save to Sample calendar — Calendar is full"
         val form = newForm()
         form.updateTitle("Car MOT")
         show(form)
         compose.onNodeWithTag("editor_failure").assertExists()
-        compose.onNodeWithText("Couldn't save to Sample calendar — Calendar is full").assertExists()
+        compose.onNodeWithText("Couldn’t save to Sample calendar — Calendar is full").assertExists()
         compose.onNodeWithText(SAVE_FAILED_BODY).assertExists()
         compose.onNodeWithText("Try again").assertExists()
-        compose.onNodeWithText("Save event").assertDoesNotExist()
+        compose.onNodeWithTag("editor_save").assertTextEquals("Try again")
     }
 
     @Test
@@ -303,7 +305,7 @@ class EventEditorSheetTest {
         val save = compose.onNodeWithTag("editor_save").getUnclippedBoundsInRoot()
         assertThat(save.bottom).isAtMost(screen - keyboard)
         // Hand-off 10: the header, the Title and the first rows of chips stay in view; the rest scrolls.
-        compose.onNodeWithText("New event").assertIsDisplayed()
+        compose.onAllNodesWithText("Add event").filterToOne(isHeading()).assertIsDisplayed()
         compose.onNodeWithTag("editor_title").assertIsDisplayed()
         compose.onNodeWithTag("who_Family").assertIsDisplayed()
         compose.onNodeWithTag("day_${SampleUi.TODAY}").assertIsDisplayed()
@@ -314,13 +316,13 @@ class EventEditorSheetTest {
     @Test
     fun theSheetsTitleIsAHeading() {
         show(newForm())
-        compose.onNodeWithText("New event").assert(isHeading())
+        compose.onAllNodesWithText("Add event").filterToOne(isHeading()).assertExists()
     }
 
     @Test
     fun theSheetIsAPaneAndAPickerHidesIt() {
         show(newForm())
-        compose.onNodeWithTag("editor_sheet").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "New event"))
+        compose.onNodeWithTag("editor_sheet").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Add event"))
         compose.onNodeWithTag("day_pick").performClick()
         compose.onNodeWithTag("date_picker").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Pick a date"))
         compose.onNodeWithTag("editor_save").assertDoesNotExist()

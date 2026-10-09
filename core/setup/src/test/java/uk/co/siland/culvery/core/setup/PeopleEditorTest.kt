@@ -60,7 +60,7 @@ class PeopleEditorTest {
         start()
         access.answer("1234")
         assertThat(editor.add(draft("Sam", 1))).isEqualTo(PeopleOutcome.Done)
-        assertThat(access.requests.map { it.label }).containsExactly("Manage people")
+        assertThat(access.requests.map { it.label }).containsExactly("Add and change people")
         assertThat(household.members.first().map { it.person.name }).containsExactly("Alex", "Sam").inOrder()
     }
 
@@ -103,7 +103,7 @@ class PeopleEditorTest {
         assertThat(editor.save(sam.id, draft("Sam", 1, Role.CHILD, pin = "2468"))).isEqualTo(PeopleOutcome.Done)
         assertThat(household.member(sam.id)?.hasPin).isTrue()
         assertThat(editor.save(sam.id, draft("Sam", 1, Role.CHILD).copy(removePin = true))).isEqualTo(PeopleOutcome.Done)
-        assertThat(access.requests.map { it.label }).containsExactly("Manage people", "Manage people", "Manage people")
+        assertThat(access.requests.map { it.label }).containsExactly("Add and change people", "Add and change people", "Add and change people")
         assertThat(household.member(sam.id)).isEqualTo(Member(sam, Role.CHILD, hasPin = false))
     }
 

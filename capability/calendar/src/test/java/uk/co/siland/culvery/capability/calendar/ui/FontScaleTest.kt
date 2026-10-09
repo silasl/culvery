@@ -125,7 +125,7 @@ class FontScaleTest {
         val max = Person(PersonId("max"), "Maximilian-Alexander", 0xFF9C7CE3)
         val swim = SampleUi.event("Swimming", "16:00–17:00", max, recurring = true)
         val week = SampleUi.week.copy(days = SampleUi.week.days.mapIndexed { i, d -> d.copy(events = if (i == 0) listOf(swim) else emptyList()) })
-        val sync = SyncStatusUi(SampleUi.NOW, emptyList(), listOf("Google"), failingBeforeFirstSync = false)
+        val sync = SyncStatusUi(SampleUi.NOW, emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false)
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
                 CulveryTheme(dark = false) {
@@ -145,7 +145,7 @@ class FontScaleTest {
 
     @Test
     fun atFontScale15ALaterWeeksTitleGivesWayToThisWeek() {
-        val sync = SyncStatusUi(SampleUi.NOW, emptyList(), listOf("Google"), failingBeforeFirstSync = false)
+        val sync = SyncStatusUi(SampleUi.NOW, emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false)
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
                 CulveryTheme(dark = false) {
@@ -199,7 +199,7 @@ class FontScaleTest {
     fun atFontScale15ALongDetailLabelKeepsItsGapToTheValue() {
         showDetail(DetailMode.Idle)
         val label = compose.onNodeWithText("Created by", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val value = compose.onNodeWithText("Added from phone", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val value = compose.onNode(hasText("Added from a phone") and hasAnyAncestor(hasTestTag("detail_info")), useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertThat(value.left.value).isAtLeast(label.right.value + 18f - 0.5f)
     }
 }

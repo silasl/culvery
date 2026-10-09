@@ -53,7 +53,7 @@ class SetupScreenshotTest {
             onForward = {},
             onSkip = {},
         ) {
-            StepTitle("Who's setting this up?", "The step's content goes here.")
+            StepTitle(WHOS_SETTING_UP, "The step's content goes here.")
         }
     }
 
@@ -138,12 +138,12 @@ class SetupScreenshotTest {
         }
 
     private fun location(name: String, dark: Boolean, results: TownResults) = step(name, dark, 1, Forward.Skip) {
-        StepTitle("Where's home?")
+        StepTitle(WHERES_HOME)
         LocationContent("Brigh", {}, results, current = brighton.toHome(), showCurrent = false, busy = false, onChoose = {})
     }
 
     private fun you(name: String, dark: Boolean) = step(name, dark, 2, Forward.Next("Next", enabled = true)) {
-        StepTitle("Who's setting this up?")
+        StepTitle(WHOS_SETTING_UP)
         YouFormContent(YouForm().apply { this.name = "Alex"; pin = "1234" }, onSetPin = {})
     }
 

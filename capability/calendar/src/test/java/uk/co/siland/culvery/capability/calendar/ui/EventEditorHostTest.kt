@@ -169,7 +169,7 @@ class EventEditorHostTest {
     @Test
     fun aNewEventOpensWithItsTitleFocused() {
         showEditor(EditorRequest.New(day = null))
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("editor_title").assertIsFocused()
         compose.onNodeWithTag("who_Family").assertIsSelected()
     }
@@ -177,7 +177,7 @@ class EventEditorHostTest {
     @Test
     fun anEditOpensOnTheEventWithNothingFocused() {
         showEditor(EditorRequest.Edit(dinner))
-        waitForText("Edit event")
+        waitForText("Change event")
         compose.onNodeWithTag("editor_title").assertTextEquals("Dinner with Jo & Priya").assertIsNotFocused()
         compose.onNodeWithTag("time_pick").assertTextEquals("19:30")
     }
@@ -186,7 +186,7 @@ class EventEditorHostTest {
     fun savingANewEventAsksForThePinAddsItAndCloses() {
         access.answer(TestAccess.ALEX)
         showEditor(EditorRequest.New(day = null))
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Parents evening")
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { closed > 0 }
@@ -202,7 +202,7 @@ class EventEditorHostTest {
         now = millisAt(LocalDate.of(2026, 10, 24), 23, 30)
         access.answer(TestAccess.ALEX)
         showEditor(EditorRequest.New(day = null))
-        waitForText("New event")
+        waitForText("Add event")
         // "Today" is the editor's opening time, not the device's.
         compose.onNodeWithTag("day_2026-10-24").assertTextEquals("Today")
         compose.onNodeWithTag("editor_title").performTextInput("Bonfire")
@@ -221,11 +221,11 @@ class EventEditorHostTest {
         writer.failWith = WriteRejectedException("Calendar is full")
         access.answer(TestAccess.ALEX)
         showEditor(EditorRequest.New(day = null))
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Parents evening")
         compose.onNodeWithTag("editor_save").performClick()
         waitForText("Try again")
-        compose.onNodeWithText("Couldn't save to Sample calendar — Calendar is full").assertExists()
+        compose.onNodeWithText("Couldn’t save to Sample calendar — Calendar is full").assertExists()
         compose.onNodeWithTag("editor_title").assertTextEquals("Parents evening")
         assertThat(closed).isEqualTo(0)
         assertThat(access.toasts.messages).isEmpty()
@@ -241,7 +241,7 @@ class EventEditorHostTest {
     @Test
     fun aStoreFailureBeforeTheWriteShowsTheCardAndKeepsTheSheet() {
         showEditor(EditorRequest.Edit(dinner))
-        waitForText("Edit event")
+        waitForText("Change event")
         // An outbox row this version can't read, which reading the queue deletes, and a disk that refuses the delete:
         // the editor throws before it reaches the write, outside its own catch.
         runBlocking {
@@ -265,7 +265,7 @@ class EventEditorHostTest {
     @Test
     fun anUnchangedEditClosesWithoutAPin() {
         showEditor(EditorRequest.Edit(dinner))
-        waitForText("Edit event")
+        waitForText("Change event")
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { closed > 0 }
         assertThat(access.requests).isEmpty()
@@ -276,7 +276,7 @@ class EventEditorHostTest {
     fun savingAnEditSendsTheChange() {
         access.answer(TestAccess.SAM)
         showEditor(EditorRequest.Edit(dinner))
-        waitForText("Edit event")
+        waitForText("Change event")
         compose.onNodeWithTag("length_120").performClick()
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { closed > 0 }
@@ -291,7 +291,7 @@ class EventEditorHostTest {
     fun aChildSavingForFamilyIsToldAndTheSheetKeepsItsInput() {
         access.answer(TestAccess.MIA)
         showEditor(EditorRequest.New(day = null))
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Pizza night")
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
@@ -306,7 +306,7 @@ class EventEditorHostTest {
         access.answer(TestAccess.MIA)
         runBlocking { access.control.authorise(CalendarPermissions.CREATE_SELF) }
         showEditor(EditorRequest.New(day = null))
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("who_Mia").assertIsSelected()
         compose.onNodeWithTag("who_Sam").performClick()
         assertThat(access.toasts.messages).containsExactly("Mia can only add events for themselves.")
@@ -318,7 +318,7 @@ class EventEditorHostTest {
         access.answer(TestAccess.MIA)
         runBlocking { access.control.authorise(CalendarPermissions.CREATE_SELF) }
         showEditor(EditorRequest.Edit(dinner))
-        waitForText("Edit event")
+        waitForText("Change event")
         // The dinner is untagged, so Family is chosen; Mia can't move it to Sam (2b-2 design §6).
         compose.onNodeWithTag("who_Sam").performClick()
         assertThat(access.toasts.messages).containsExactly("Mia can only add events for themselves.")
@@ -332,7 +332,7 @@ class EventEditorHostTest {
         // A second answer is queued, so a second save that got through would reach the writer too.
         access.answer(TestAccess.ALEX, TestAccess.ALEX)
         showEditor(EditorRequest.New(day = null))
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Parents evening")
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { writer.entered.isCompleted }
@@ -354,7 +354,7 @@ class EventEditorHostTest {
     fun deleteAsksForThePinThenHandsOverToTheDetailSheet() {
         access.answer(TestAccess.ALEX)
         showEditor(EditorRequest.Edit(dinner))
-        waitForText("Edit event")
+        waitForText("Change event")
         compose.onNodeWithTag("editor_delete").performClick()
         compose.waitUntil(5_000) { deleting.isNotEmpty() }
         assertThat(deleting).containsExactly(dinner)
@@ -366,12 +366,12 @@ class EventEditorHostTest {
     fun aRefusedDeleteKeepsTheEditorOpen() {
         access.answer(TestAccess.MIA)
         showEditor(EditorRequest.Edit(dinner))
-        waitForText("Edit event")
+        waitForText("Change event")
         compose.onNodeWithTag("editor_delete").performClick()
         compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
         assertThat(access.toasts.messages).containsExactly("Mia can only change events they created.")
         assertThat(deleting).isEmpty()
-        compose.onNodeWithText("Edit event").assertExists()
+        compose.onNodeWithText("Change event").assertExists()
     }
 
     @Test
@@ -383,7 +383,7 @@ class EventEditorHostTest {
     @Test
     fun anEditWhoseEventHasGoneClosesOnSaveWithoutAPin() {
         showEditor(EditorRequest.Edit(dinner))
-        waitForText("Edit event")
+        waitForText("Change event")
         // Deleted on a phone, then synced, while the sheet was open.
         runBlocking { store.applyDeleted(dinner) }
         compose.onNodeWithTag("length_120").performClick()
@@ -398,7 +398,7 @@ class EventEditorHostTest {
         showOverlay { showDetail(dinner, day, repo, editor) }
         waitForText("Created by")
         compose.onNodeWithTag("detail_edit").performClick()
-        waitForText("Edit event")
+        waitForText("Change event")
         compose.onNodeWithTag("detail_sheet").assertDoesNotExist()
         assertThat(access.requests).isEmpty()
     }
@@ -407,7 +407,7 @@ class EventEditorHostTest {
     fun deleteInTheEditorSwapsToTheDetailSheetAskingToConfirm() {
         access.answer(TestAccess.ALEX)
         showOverlay { showEditor(EditorRequest.Edit(dinner), day, repo, editor) }
-        waitForText("Edit event")
+        waitForText("Change event")
         compose.onNodeWithTag("editor_delete").performClick()
         waitForText("Delete this event?")
         compose.onNodeWithTag("detail_confirm_delete").performClick()
@@ -419,7 +419,7 @@ class EventEditorHostTest {
     @Test
     fun closeClosesTheEditor() {
         showOverlay { showEditor(EditorRequest.New(day = null), day, repo, editor) }
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("sheet_close").performClick()
         compose.runOnIdle { assertThat(overlay.dismissed).isEqualTo(1) }
     }
@@ -443,7 +443,7 @@ class EventEditorHostTest {
         waitForText("Sleepover")
         compose.onNodeWithTag("detail_syncing").assertExists()
         compose.onNodeWithTag("detail_edit").performClick()
-        waitForText("Edit event")
+        waitForText("Change event")
         compose.onNodeWithTag("editor_title").performTextReplacement("Sleepover at Ava's")
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { overlay.dismissed > 0 }
@@ -459,7 +459,7 @@ class EventEditorHostTest {
         access.answer(TestAccess.SAM)
         runBlocking { access.control.authorise(CalendarPermissions.CREATE) }
         showEditor(EditorRequest.New(day = null))
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("who_Sam").assertIsSelected()
         // An adult may choose anyone.
         compose.onNodeWithTag("who_Mia").performClick()
@@ -470,15 +470,15 @@ class EventEditorHostTest {
     @Test
     fun eachOpeningGetsAFreshSheet() {
         showOverlay { showEditor(EditorRequest.New(day = null), day, repo, editor) }
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Half-typed")
         compose.onNodeWithTag("length_30").performClick()
         compose.runOnIdle { overlay.showEditor(EditorRequest.Edit(dinner), day, repo, editor) }
-        waitForText("Edit event")
+        waitForText("Change event")
         compose.onNodeWithTag("editor_title").assertTextEquals("Dinner with Jo & Priya").assertIsNotFocused()
         compose.onNodeWithTag("length_90").assertIsSelected()
         compose.runOnIdle { overlay.showEditor(EditorRequest.New(day = null), day, repo, editor) }
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("editor_title").assertIsFocused()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
         compose.onNodeWithTag("length_60").assertIsSelected()
@@ -495,7 +495,7 @@ class EventEditorHostTest {
         }
         access.answer(TestAccess.ALEX)
         showEditor(EditorRequest.New(day = null))
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Parents evening")
         compose.onNodeWithTag("editor_save").performClick()
         waitForText(couldNotSave("Sample calendar", TRY_AGAIN))
@@ -528,7 +528,7 @@ class EventEditorHostTest {
     @Test
     fun aStoreFailureInTheEditorsDeleteToastsLikeTheDetailSheet() {
         showEditor(EditorRequest.Edit(dinner))
-        waitForText("Edit event")
+        waitForText("Change event")
         // An unreadable queued row, which reading the queue deletes, and a disk that refuses the delete.
         runBlocking {
             calendar.useWriterConnection {
@@ -550,7 +550,7 @@ class EventEditorHostTest {
     @Test
     fun typingATitleMarksTheSheetEditedAndClearingItDoesNot() {
         showOverlay { showEditor(EditorRequest.New(day = null), day, repo, editor) }
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Swim")
         compose.waitUntil(5_000) { overlay.edited }
         compose.onNodeWithTag("editor_title").performTextReplacement("")
@@ -562,7 +562,7 @@ class EventEditorHostTest {
     @Test
     fun aSheetWaitingOnItsPinPadCountsAsEditedUntilThePadGoes() {
         showOverlay { showEditor(EditorRequest.Edit(dinner), day, repo, editor) }
-        waitForText("Edit event")
+        waitForText("Change event")
         assertThat(overlay.edited).isFalse()
         compose.onNodeWithTag("editor_delete").performClick()
         compose.waitUntil(5_000) { access.requests.isNotEmpty() }
@@ -576,7 +576,7 @@ class EventEditorHostTest {
     @Test
     fun dismissingAnEditedSheetSavesNothing() {
         showOverlay { showEditor(EditorRequest.New(day = null), day, repo, editor) }
-        waitForText("New event")
+        waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Swim")
         compose.waitUntil(5_000) { overlay.edited }
         compose.runOnIdle { overlay.dismiss() }

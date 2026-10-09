@@ -25,8 +25,8 @@ object CorePermissions {
 class CorePermissionSource @Inject constructor() : PermissionSource {
     override val permissions = listOf(
         PermissionDef(CorePermissions.SETTINGS_MANAGE, "Change settings", setOf(Role.ADMIN)),
-        PermissionDef(CorePermissions.PEOPLE_MANAGE, "Manage people", setOf(Role.ADMIN), freshPin = true),
-        PermissionDef(CorePermissions.KIOSK_EXIT, "Exit kiosk mode", setOf(Role.ADMIN), freshPin = true),
+        PermissionDef(CorePermissions.PEOPLE_MANAGE, "Add and change people", setOf(Role.ADMIN), freshPin = true),
+        PermissionDef(CorePermissions.KIOSK_EXIT, "Use other apps", setOf(Role.ADMIN), freshPin = true),
         // 4c design D5: Google's account chooser can lead out of the app.
         PermissionDef(CorePermissions.CONNECTIONS_MANAGE, "Connect calendars", setOf(Role.ADMIN), freshPin = true),
     )

@@ -182,11 +182,11 @@ class CalendarReviewTest {
     }
 
     @Test
-    fun theDisconnectQuestionCountsWhatIsDropped() {
-        assertThat(disconnectQuestion("Google Calendar", 0)).isEqualTo("Disconnect Google Calendar? Its calendars leave the tablet.")
+    fun theDisconnectQuestionSaysWhatWillBeLost() {
+        assertThat(disconnectQuestion("Google Calendar", 0)).isEqualTo("Disconnect Google Calendar? Its calendars stop showing here.")
         assertThat(disconnectQuestion("Google Calendar", 1))
-            .isEqualTo("Disconnect Google Calendar? Its calendars leave the tablet, and 1 change still waiting to sync is dropped.")
+            .isEqualTo("Disconnect Google Calendar? Its calendars stop showing here, and 1 change not yet saved to Google Calendar will be lost.")
         assertThat(disconnectQuestion("Google Calendar", 3))
-            .isEqualTo("Disconnect Google Calendar? Its calendars leave the tablet, and 3 changes still waiting to sync are dropped.")
+            .isEqualTo("Disconnect Google Calendar? Its calendars stop showing here, and 3 changes not yet saved to Google Calendar will be lost.")
     }
 }

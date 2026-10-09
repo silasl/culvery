@@ -84,13 +84,13 @@ class WeekViewTest {
     @Test
     fun subtitleNamesTheOnlyConnection() {
         show { WeekView(state()) }
-        compose.onNodeWithText("Family calendar · synced with Google 2 min ago").assertExists()
+        compose.onNodeWithText("Updated from Google 2 minutes ago").assertExists()
     }
 
     @Test
     fun staleSubtitleStillShowsTheAge() {
         show { WeekView(state(sync(agoMinutes = 45))) }
-        compose.onNodeWithText("Family calendar · synced with Google 45 min ago").assertExists()
+        compose.onNodeWithText("Updated from Google 45 minutes ago").assertExists()
     }
 
     @Test
@@ -139,7 +139,7 @@ class WeekViewTest {
     fun severalCalendarsNeedingSignInShareOneChip() {
         val status = sync(needsSignIn = listOf("Google", "School"), connections = listOf("Google", "School"))
         show { WeekView(state(status)) }
-        compose.onNodeWithText("2 calendars need reconnecting").assertExists()
+        compose.onNodeWithText("2 accounts need reconnecting").assertExists()
         compose.onNodeWithText("Google needs reconnecting").assertDoesNotExist()
     }
 

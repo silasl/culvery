@@ -28,11 +28,11 @@ fun newEventsGoTo(calendar: String): String = "New events now go to $calendar"
 
 fun disconnected(service: String): String = "$service disconnected"
 
-/** One change reads in the singular (ruling 13). */
-fun disconnectQuestion(service: String, queued: Int): String = "Disconnect $service? Its calendars leave the tablet" + when (queued) {
+/** One change reads in the singular; "will be lost", never "dropped" (4d-2 Decision 2c). */
+fun disconnectQuestion(service: String, queued: Int): String = "Disconnect $service? Its calendars stop showing here" + when (queued) {
     0 -> "."
-    1 -> ", and 1 change still waiting to sync is dropped."
-    else -> ", and $queued changes still waiting to sync are dropped."
+    1 -> ", and 1 change not yet saved to $service will be lost."
+    else -> ", and $queued changes not yet saved to $service will be lost."
 }
 
 /**

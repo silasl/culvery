@@ -19,7 +19,7 @@ internal const val GOOGLE_DISPLAY_NAME = "Google Calendar"
 internal const val GOOGLE_LABEL = "Google"
 
 /** 3a design §3.2: a reconnect must be the same account. */
-fun differentAccount(email: String): String = "That's a different Google account. Reconnect with $email."
+fun differentAccount(email: String): String = "That’s a different Google account. Reconnect with $email."
 
 /** One step of connecting: done, screens the user must see, or stopped (after saying why, if there is a why). */
 sealed interface ConnectStep {

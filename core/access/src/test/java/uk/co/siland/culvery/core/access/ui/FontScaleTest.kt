@@ -60,7 +60,7 @@ class FontScaleTest {
         var message by mutableStateOf("")
         compose.setContent {
             CulveryTheme(dark = false) {
-                WithFontScale(1.5f) { PinPadFrame("Who's this?", null, message, wrongPin = false, enabled = true, onSubmit = {}, onCancel = {}) }
+                WithFontScale(1.5f) { PinPadFrame("Who’s this?", null, message, wrongPin = false, enabled = true, onSubmit = {}, onCancel = {}) }
             }
         }
         val before = compose.onNodeWithTag("pin_key_1").getUnclippedBoundsInRoot().top
@@ -77,7 +77,7 @@ class FontScaleTest {
         compose.setContent {
             CulveryTheme(dark = false) {
                 WithFontScale(1.5f) {
-                    PinPadFrame("Who's this?", null, "", wrongPin = false, enabled = true, onSubmit = { submitted = it }, onCancel = { cancels++ })
+                    PinPadFrame("Who’s this?", null, "", wrongPin = false, enabled = true, onSubmit = { submitted = it }, onCancel = { cancels++ })
                 }
             }
         }

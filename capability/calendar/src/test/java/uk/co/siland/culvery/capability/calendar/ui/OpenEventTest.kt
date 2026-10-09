@@ -178,7 +178,7 @@ class OpenEventTest {
         show { TodayCardHost(repo, editor, today) }
         waitForTag("today_add")
         compose.onNodeWithTag("today_add").performClick()
-        waitForText("New event")
+        waitForTag("editor_sheet")
         compose.onNodeWithTag("editor_summary").assertTextEquals("Today · 14:00–15:00 · Family")
     }
 
@@ -188,7 +188,7 @@ class OpenEventTest {
         show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW, onReconnect = {}) }
         waitForTag("week_add_event")
         compose.onNodeWithTag("week_add_event").performClick()
-        waitForText("New event")
+        waitForTag("editor_sheet")
         compose.onNodeWithTag("editor_summary").assertTextEquals("Today · 14:00–15:00 · Family")
     }
 
@@ -199,7 +199,7 @@ class OpenEventTest {
         val friday = today.plusDays(2)
         waitForTag("week_add_$friday")
         compose.onNodeWithTag("week_add_$friday", useUnmergedTree = true).performClick()
-        waitForText("New event")
+        waitForTag("editor_sheet")
         // A later day starts on Morning.
         compose.onNodeWithTag("editor_summary").assertTextEquals("Fri 25 Sep · 09:00–10:00 · Family")
     }
@@ -211,6 +211,6 @@ class OpenEventTest {
         waitForText("Dinner with Jo & Priya")
         compose.onNodeWithText("Dinner with Jo & Priya").performClick()
         waitForText("Created by")
-        compose.onNodeWithText("New event").assertDoesNotExist()
+        compose.onNodeWithTag("editor_sheet").assertDoesNotExist()
     }
 }

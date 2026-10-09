@@ -83,6 +83,14 @@ class SourceRefresherTest {
     }
 
     @Test
+    fun theMainCalendarGoneToastSaysWhoCanFixItAndWhatWasLost() {
+        val gone = "Google Calendar’s main calendar has gone. An Admin can choose another in Settings › Calendars."
+        assertThat(masterGone("Google Calendar", 0)).isEqualTo(gone)
+        assertThat(masterGone("Google Calendar", 1)).isEqualTo("$gone 1 unsaved change was lost.")
+        assertThat(masterGone("Google Calendar", 3)).isEqualTo("$gone 3 unsaved changes were lost.")
+    }
+
+    @Test
     fun aMasterDeletedInGoogleIsClearedWithOneToast() = runTest {
         // Google's primary can't be deleted, so the master that goes is another calendar made the master.
         val kids = CalendarSource("kids", "Kids", writable = true)
@@ -93,7 +101,7 @@ class SourceRefresherTest {
         assertThat(sourceIds()).containsExactly(primary.id, swimming.id)
         refresher.flag("g1", swimming.id)
         refresh()
-        assertThat(toaster.messages).containsExactly("Google Calendar: can't find the master calendar — choose a new one in Settings › Calendars.")
+        assertThat(toaster.messages).containsExactly(masterGone("Google Calendar", 0))
     }
 
     /** C7: changes waiting for a master that went are counted in its toast. */
@@ -106,9 +114,7 @@ class SourceRefresherTest {
         }
         provider.sourceList = listOf(primary)
         refresh()
-        assertThat(toaster.messages).containsExactly(
-            "Google Calendar: can't find the master calendar — choose a new one in Settings › Calendars. 2 changes waiting to sync were dropped.",
-        )
+        assertThat(toaster.messages).containsExactly(masterGone("Google Calendar", 2))
     }
 
     @Test
@@ -118,9 +124,7 @@ class SourceRefresherTest {
         store.enqueue(PendingChange(0, "g1", kids.id, "e0", ChangeKind.DELETE, draft = null, attempts = 0, nextAttemptMillis = 0, createdMillis = 0))
         provider.sourceList = listOf(primary)
         refresh()
-        assertThat(toaster.messages).containsExactly(
-            "Google Calendar: can't find the master calendar — choose a new one in Settings › Calendars. 1 change waiting to sync was dropped.",
-        )
+        assertThat(toaster.messages).containsExactly(masterGone("Google Calendar", 1))
         assertThat(toaster.urgent).isEqualTo(toaster.messages)
     }
 
@@ -131,7 +135,7 @@ class SourceRefresherTest {
         refresh()
         assertThat(store.master().first()).isNull()
         assertThat(sourceIds()).containsExactly(primary.id)
-        assertThat(toaster.messages).containsExactly("Google Calendar: can't find the master calendar — choose a new one in Settings › Calendars.")
+        assertThat(toaster.messages).containsExactly(masterGone("Google Calendar", 0))
     }
 
     @Test

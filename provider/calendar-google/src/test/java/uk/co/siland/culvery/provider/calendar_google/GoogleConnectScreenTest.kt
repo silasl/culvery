@@ -174,6 +174,6 @@ class GoogleConnectScreenTest {
         var cancelled = 0
         screen { provider.ConnectScreen(existing = null, onConnected = {}, onCancel = { cancelled++ }) }
         compose.waitUntil(5_000) { cancelled == 1 }
-        assertThat(toasts.messages).containsExactly("Couldn't connect to Google Calendar — try again")
+        assertThat(toasts.messages).containsExactly("Couldn’t connect to Google Calendar — try again")
     }
 }

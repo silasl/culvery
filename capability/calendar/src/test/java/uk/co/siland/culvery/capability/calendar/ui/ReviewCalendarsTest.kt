@@ -111,12 +111,12 @@ class ReviewCalendarsTest {
         }
     }
 
-    /** D6: the row says so and offers Hide; the connection's line stays "Synced 2 min ago". */
+    /** D6: the row says so and offers Hide; the connection's line stays "Updated 2 minutes ago". */
     @Test
     fun aCalendarThatCantBeReadSaysSoAndOffersToHideIt() {
         showSources(family, swim.copy(readProblem = READ_REFUSED))
-        compose.onNodeWithText("Can't read this calendar — check it's still shared with this account").assertExists()
-        compose.onNodeWithText("Synced 2 min ago").assertExists()
+        compose.onNodeWithText("Can’t read this calendar — check it’s still shared with this account.").assertExists()
+        compose.onNodeWithText("Updated 2 minutes ago").assertExists()
         compose.onNodeWithText("Hide this calendar").performClick()
         assertThat(shown).isEqualTo("swim" to false)
     }
@@ -124,14 +124,14 @@ class ReviewCalendarsTest {
     @Test
     fun aHiddenCalendarShowsNoReadProblem() {
         showSources(family, swim.copy(mapping = swim.mapping.copy(visible = false), readProblem = READ_REFUSED))
-        compose.onNodeWithText("Can't read this calendar — check it's still shared with this account").assertDoesNotExist()
+        compose.onNodeWithText("Can’t read this calendar — check it’s still shared with this account.").assertDoesNotExist()
         compose.onNodeWithText("Hide this calendar").assertDoesNotExist()
     }
 
     @Test
     fun theMasterThatCantBeReadAsksForAnotherMasterFirst() {
         showSources(family.copy(readProblem = READ_REFUSED), swim)
-        compose.onNodeWithText("Choose another master calendar first").assertExists()
+        compose.onNodeWithText("Choose another main calendar first.").assertExists()
         compose.onNodeWithText("Hide this calendar").assertDoesNotExist()
     }
 
@@ -140,7 +140,7 @@ class ReviewCalendarsTest {
         show()
         compose.onNodeWithText("Calendars").assertExists()
         compose.onNodeWithText("Google Calendar · family@example.com").assertExists()
-        compose.onNodeWithText("Synced 2 min ago").assertExists()
+        compose.onNodeWithText("Updated 2 minutes ago").assertExists()
         compose.onNodeWithTag("settings_reconnect").assertDoesNotExist()
     }
 
@@ -155,7 +155,7 @@ class ReviewCalendarsTest {
     @Test
     fun theMasterIsMarkedAndAlwaysShown() {
         show()
-        compose.onNodeWithText("Master").assertExists()
+        compose.onNodeWithText("Main").assertExists()
         compose.onNodeWithText("New events go here").assertExists()
         compose.onNodeWithTag("review_show_family").assertIsNotEnabled()
         compose.onNodeWithTag("review_show_chores").assertIsEnabled().performClick()
@@ -205,7 +205,7 @@ class ReviewCalendarsTest {
             }
         }
         compose.onNodeWithTag("review_disconnect_g1").performClick()
-        compose.onNodeWithText("Disconnect Google Calendar? Its calendars leave the tablet, and 3 changes still waiting to sync are dropped.").assertExists()
+        compose.onNodeWithText("Disconnect Google Calendar? Its calendars stop showing here, and 3 changes not yet saved to Google Calendar will be lost.").assertExists()
         compose.onNodeWithTag("review_keep").performClick()
         assertThat(kept).isEqualTo(1)
         compose.onNodeWithTag("review_disconnect_g1").performClick()
@@ -231,7 +231,7 @@ class ReviewCalendarsTest {
             assertThat(style(it).fontSize).isEqualTo(17.sp)
             assertThat(style(it).fontWeight).isEqualTo(FontWeight.W600)
         }
-        assertThat(style("Synced 2 min ago").fontSize).isEqualTo(14.sp)
+        assertThat(style("Updated 2 minutes ago").fontSize).isEqualTo(14.sp)
     }
 
     @Test
@@ -284,7 +284,7 @@ class ReviewCalendarsTest {
         show(ConnectionHealth.NeedsSignIn)
         compose.onNodeWithContentDescription("Disconnect Google Calendar, family@example.com").assertExists()
         compose.onNodeWithContentDescription("Reconnect Google Calendar, family@example.com").assertExists()
-        compose.onNodeWithContentDescription("Make master, Chores").assertExists()
+        compose.onNodeWithContentDescription("Use for new events, Chores").assertExists()
         compose.assertAccessible()
     }
 

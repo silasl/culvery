@@ -16,12 +16,17 @@ const val SETUP_IDLE_MS = 600_000L
 /** Why the PIN pad is asking; it picks the pad's reason line. */
 enum class PinReason { Generic, Save, Edit, Delete, Assign, ContinueSetup }
 
-/** The PIN pad's reason line. [label] is the permission's label, used for [PinReason.Generic]. */
+/** The PIN pad's reason line, from explicit copy, never an enum's name (4d-2 §7.1.2, C60). [label] is the permission's, for [PinReason.Generic]. */
 fun pinReasonText(reason: PinReason, label: String): String = when (reason) {
     PinReason.Generic -> "Enter your PIN to ${label.replaceFirstChar { it.lowercase() }}."
     PinReason.ContinueSetup -> CONTINUE_SETUP
-    else -> "Enter your PIN to ${reason.name.lowercase()} this event. It also records who made the change."
+    PinReason.Save -> eventReason("add this event")
+    PinReason.Edit -> eventReason("change this event")
+    PinReason.Delete -> eventReason("delete this event")
+    PinReason.Assign -> eventReason("choose who this event is for")
 }
+
+private fun eventReason(what: String): String = "Enter your PIN to $what. It also records who made the change."
 
 /** 4a design §3.4: the wizard started again after a kill past its You step. */
 const val CONTINUE_SETUP = "Enter your PIN to carry on setting up"

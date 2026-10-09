@@ -16,14 +16,14 @@ import uk.co.siland.culvery.core.plugin.WallClock
 const val SOURCE_REFRESH_MS = 24 * 60 * 60_000L
 
 /**
- * 3a design D7, 4a design §4.5: the master calendar went, or became read-only, so the add buttons hide until another is
- * chosen; 4c C7 adds the queued changes that went with it.
+ * 3a design D7, 4a design §4.5: the main calendar went, or became read-only here, so the add buttons hide until another
+ * is chosen; 4c C7 adds the queued changes that went with it. 4d-2 C85: who can fix it, in the household's words.
  */
 fun masterGone(serviceName: String, droppedChanges: Int): String =
-    "$serviceName: can't find the master calendar — choose a new one in Settings › Calendars." + when (droppedChanges) {
+    "$serviceName’s main calendar has gone. An Admin can choose another in Settings › Calendars." + when (droppedChanges) {
         0 -> ""
-        1 -> " 1 change waiting to sync was dropped."
-        else -> " $droppedChanges changes waiting to sync were dropped."
+        1 -> " 1 unsaved change was lost."
+        else -> " $droppedChanges unsaved changes were lost."
     }
 
 /**

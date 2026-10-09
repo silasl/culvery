@@ -21,7 +21,7 @@ class CalendarPermissionSource @Inject constructor() : PermissionSource {
         PermissionDef(CalendarPermissions.CREATE_SELF, "Add your own events", Role.entries.toSet()),
         PermissionDef(CalendarPermissions.EDIT, "Change any event", setOf(Role.ADMIN, Role.ADULT)),
         PermissionDef(CalendarPermissions.EDIT_OWN, "Change your own events", Role.entries.toSet()),
-        PermissionDef(CalendarPermissions.ASSIGN, "Assign events", setOf(Role.ADMIN, Role.ADULT)),
+        PermissionDef(CalendarPermissions.ASSIGN, "Choose who events are for", setOf(Role.ADMIN, Role.ADULT)),
     )
 }
 
@@ -45,4 +45,4 @@ fun cannotChangeOthers(name: String): String = "$name can only change events the
 /** Hand-off §7 refusal wording for a child adding an event for someone else, or moving one to someone else. */
 fun cannotAddForOthers(name: String): String = "$name can only add events for themselves."
 
-const val ASK_AN_ADULT = "Ask an adult to assign this event."
+const val ASK_AN_ADULT = "Ask a grown-up to choose who this is for."

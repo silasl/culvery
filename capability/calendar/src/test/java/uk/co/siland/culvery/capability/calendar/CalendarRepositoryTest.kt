@@ -273,7 +273,7 @@ class CalendarRepositoryTest {
         assertThat(status.needsSignIn).containsExactly("Google")
         // The chip reconnects the first connection that needs it.
         assertThat(status.reconnect?.id).isEqualTo("c1")
-        assertThat(status.connectionLabels).containsExactly("Google", "School").inOrder()
+        assertThat(status.serviceNames).containsExactly("Google", "School").inOrder()
         assertThat(status.failingBeforeFirstSync).isFalse()
     }
 
@@ -310,7 +310,7 @@ class CalendarRepositoryTest {
         val e = today().single()
         assertThat(e.ref).isEqualTo(ref("Boiler service"))
         assertThat(e.sourceName).isEqualTo("Family")
-        assertThat(e.connectionLabel).isEqualTo("Google")
+        assertThat(e.serviceName).isEqualTo("Google")
     }
 
     @Test
@@ -343,7 +343,7 @@ class CalendarRepositoryTest {
         val byTitle = today().associateBy { it.title }
         assertThat(byTitle.getValue("Dinner with Jo & Priya").createdBy).isEqualTo("Alex")
         assertThat(byTitle.getValue("Plumber quote call").createdBy).isEqualTo(ADDED_FROM_PHONE)
-        assertThat(byTitle.getValue("Gym").createdBy).isEqualTo(CALENDAR_FEED)
+        assertThat(byTitle.getValue("Gym").createdBy).isEqualTo("Alex")
     }
 
     @Test
@@ -517,7 +517,7 @@ class CalendarRepositoryTest {
         put("s-family", timed("Piano", 23, 15, 30, 60).copy(recurring = true, recurrenceRule = "RRULE:FREQ=WEEKLY"))
         val piano = named.day(LocalDate.of(2026, 9, 23)).first().single { it.title == "Piano" }
         assertThat(piano.serviceName).isEqualTo("Google Calendar")
-        assertThat(piano.connectionLabel).isEqualTo("Google")
+        assertThat(piano.serviceName).isEqualTo("Google Calendar")
         assertThat(piano.repeats).isEqualTo("Every week")
         assertThat(named.masterService.first()).isEqualTo("Google Calendar")
     }

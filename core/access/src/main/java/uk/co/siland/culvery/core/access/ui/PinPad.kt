@@ -145,7 +145,7 @@ fun PinPadSheet(
         else -> ""
     }
     PinPadFrame(
-        title = "Who's this?",
+        title = "Who’s this?",
         line = pinReasonText(reason, label),
         message = message,
         // Said once, from the lockout's first value: a line read every second would drown everything else.
@@ -162,7 +162,7 @@ fun PinPadSheet(
 /** 4a design §4.2: choosing a new PIN. */
 const val CHOOSE_PIN = "Choose a 4-digit PIN"
 const val ENTER_IT_AGAIN = "Enter it again"
-const val PINS_DIDNT_MATCH = "Those PINs didn't match — try again."
+const val PINS_DIDNT_MATCH = "Those PINs didn’t match — try again."
 
 /**
  * 4a design §4.2: the PIN pad twice, [CHOOSE_PIN] then [ENTER_IT_AGAIN]; a mismatch starts again with

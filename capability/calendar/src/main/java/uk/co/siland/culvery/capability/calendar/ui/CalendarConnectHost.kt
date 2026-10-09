@@ -30,7 +30,7 @@ import uk.co.siland.culvery.core.ui.Icons
 /** 3a design §4.4. */
 internal fun connectingTitle(service: String): String = "Connecting to $service…"
 
-internal const val CONNECTING_LINE = "Choose the family's Google account and allow access."
+internal const val CONNECTING_LINE = "Choose the family’s Google account and allow access."
 
 /** What the connecting card is for: a new connection to [provider], or reconnecting [existing]. */
 internal data class ConnectRequest(val provider: CalendarProvider, val existing: Connection?)

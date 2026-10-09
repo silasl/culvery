@@ -123,7 +123,7 @@ class DefaultAccessControlTest {
         answerPins("1234")
         access.authorise(CorePermissions.SETTINGS_MANAGE)
         val request = firstPromptFor(access, CorePermissions.KIOSK_EXIT)
-        assertThat(request.label).isEqualTo("Exit kiosk mode")
+        assertThat(request.label).isEqualTo("Use other apps")
     }
 
     @Test
@@ -379,12 +379,14 @@ class DefaultAccessControlTest {
     }
 
     @Test
-    fun pinReasonTextNamesTheActionOrThePermission() {
-        assertThat(pinReasonText(PinReason.Delete, "Change any event"))
-            .isEqualTo("Enter your PIN to delete this event. It also records who made the change.")
-        assertThat(pinReasonText(PinReason.Assign, "Assign events"))
-            .isEqualTo("Enter your PIN to assign this event. It also records who made the change.")
-        assertThat(pinReasonText(PinReason.Generic, "Change settings")).isEqualTo("Enter your PIN to change settings.")
+    fun pinReasonTextIsExplicitCopyForEachReason() {
+        val suffix = " It also records who made the change."
+        assertThat(pinReasonText(PinReason.Save, "x")).isEqualTo("Enter your PIN to add this event.$suffix")
+        assertThat(pinReasonText(PinReason.Edit, "x")).isEqualTo("Enter your PIN to change this event.$suffix")
+        assertThat(pinReasonText(PinReason.Delete, "x")).isEqualTo("Enter your PIN to delete this event.$suffix")
+        assertThat(pinReasonText(PinReason.Assign, "x")).isEqualTo("Enter your PIN to choose who this event is for.$suffix")
+        assertThat(pinReasonText(PinReason.Generic, "Use other apps")).isEqualTo("Enter your PIN to use other apps.")
+        assertThat(pinReasonText(PinReason.Generic, "Add and change people")).isEqualTo("Enter your PIN to add and change people.")
     }
 
     private suspend fun alex(): Identified = Identified(person("Alex", Role.ADMIN, "1234"), Role.ADMIN)
@@ -428,7 +430,7 @@ class DefaultAccessControlTest {
         runCurrent()
         assertThat(access.session.value).isNull()
         // Gone for good: the next fresh-PIN permission asks.
-        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Manage people")
+        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Add and change people")
     }
 
     @Test
@@ -453,7 +455,7 @@ class DefaultAccessControlTest {
         access.beginSetupSession(admin)
         access.endSetupSession()
         assertThat(access.session.value).isEqualTo(admin)
-        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Manage people")
+        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Add and change people")
         advanceTimeBy(SESSION_TIMEOUT_MS + 1)
         runCurrent()
         assertThat(access.session.value).isNull()
@@ -465,7 +467,7 @@ class DefaultAccessControlTest {
         access.beginSetupSession(alex())
         access.lock()
         assertThat(access.session.value).isNull()
-        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Manage people")
+        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Add and change people")
     }
 
     @Test
@@ -494,7 +496,7 @@ class DefaultAccessControlTest {
         person("Mia", Role.ADMIN, "9876")
         answerPins("9876")
         access.authorise("test.any", allow = { who, _ -> who.person.name == "Mia" })
-        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Manage people")
+        assertThat(firstPromptFor(access, CorePermissions.PEOPLE_MANAGE).label).isEqualTo("Add and change people")
     }
 
     @Test

@@ -231,7 +231,7 @@ class GoogleWriteTest {
         assertThat(refused).isInstanceOf(WriteRejectedException::class.java)
         assertThat(refused?.message).isEqualTo(REFUSED)
         google.failNext(403, "forbidden") { it.method == "GET" }
-        assertThat(failureOf { provider.delete(conn, family, key) }?.message).isEqualTo("this calendar can't be changed from the tablet")
+        assertThat(failureOf { provider.delete(conn, family, key) }?.message).isEqualTo("this calendar can’t be changed from the tablet")
         assertThat(google.requests.map { it.method }).containsNoneOf("PATCH", "DELETE")
         assertLogsHoldNoPersonalData(minLines = 2)
     }
@@ -267,7 +267,7 @@ class GoogleWriteTest {
 
     @Test
     fun refusalsUseTheTabletsWordsNotGooglesAndTheOthersAreRetried() = runTest {
-        assertThat(failureOf { provider.create(conn, holidays, draft(), key) }?.message).isEqualTo("this calendar can't be changed from the tablet")
+        assertThat(failureOf { provider.create(conn, holidays, draft(), key) }?.message).isEqualTo("this calendar can’t be changed from the tablet")
         google.failNext(400, "invalid")
         assertThat(failureOf { provider.create(conn, family, draft(), key) }?.message).isEqualTo("the change was refused")
         google.failNext(401, "authError")

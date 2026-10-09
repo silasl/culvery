@@ -463,7 +463,7 @@ class CalendarSyncTest {
         // Not in the mirror, so the provider is asked first (m3); it has no such event.
         assertThat(w.calls).containsExactly("find:swim")
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(toaster.messages).containsExactly("Couldn't save to Service A — The event no longer exists")
+        assertThat(toaster.messages).containsExactly("Couldn’t save to Service A — The event no longer exists")
     }
 
     @Test
@@ -477,7 +477,7 @@ class CalendarSyncTest {
         sync.syncAll()
         assertThat(store.pendingNow()).isEmpty()
         assertThat(cachedTitles()).containsExactly("Swim")
-        assertThat(toaster.messages).containsExactly("Couldn't save to Service A — Event is locked")
+        assertThat(toaster.messages).containsExactly("Couldn’t save to Service A — Event is locked")
         assertThat(toaster.urgent).isEqualTo(toaster.messages)
     }
 
@@ -490,7 +490,7 @@ class CalendarSyncTest {
         w.failWith = WriteRejectedException("Event is locked")
         sync.syncAll()
         assertThat(w.calls).containsExactly("delete:swim", "delete:walk").inOrder()
-        assertThat(toaster.messages).containsExactly("Couldn't save 2 changes to Service A")
+        assertThat(toaster.messages).containsExactly("Couldn’t save 2 changes to Service A")
     }
 
     @Test
@@ -555,7 +555,7 @@ class CalendarSyncTest {
         sync.syncAll()
         assertThat(w.calls).isEmpty()
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(toaster.messages).containsExactly("Couldn't save to Service A")
+        assertThat(toaster.messages).containsExactly("Couldn’t save to Service A")
     }
 
     @Test
@@ -566,7 +566,7 @@ class CalendarSyncTest {
         sync.syncAll()
         assertThat(store.pendingNow()).isEmpty()
         assertThat(w.calls).isEmpty()
-        assertThat(toaster.messages).containsExactly("Couldn't save to Service A")
+        assertThat(toaster.messages).containsExactly("Couldn’t save to Service A")
     }
 
     @Test
@@ -669,7 +669,7 @@ class CalendarSyncTest {
         val job = launch { sync.syncAll() }
         w.entered.await()
         job.cancelAndJoin()
-        assertThat(toaster.messages).containsExactly("Couldn't save to Service A")
+        assertThat(toaster.messages).containsExactly("Couldn’t save to Service A")
     }
 
     @Test
@@ -680,7 +680,7 @@ class CalendarSyncTest {
         sync.syncAll()
         assertThat(w.calls).isEmpty()
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(toaster.messages).containsExactly("Couldn't save to Service A")
+        assertThat(toaster.messages).containsExactly("Couldn’t save to Service A")
     }
 
     @Test
@@ -695,7 +695,7 @@ class CalendarSyncTest {
         // Nothing is sent for an event that was never made.
         assertThat(w.calls).containsExactly("create:Swim")
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(toaster.messages).containsExactly("Couldn't save 3 changes to Service A")
+        assertThat(toaster.messages).containsExactly("Couldn’t save 3 changes to Service A")
     }
 
     @Test
@@ -709,7 +709,7 @@ class CalendarSyncTest {
         // C9: asked for by its key before it is dropped.
         assertThat(w.calls).containsExactly("find:$key")
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(toaster.messages).containsExactly("Couldn't save 2 changes to Service A")
+        assertThat(toaster.messages).containsExactly("Couldn’t save 2 changes to Service A")
     }
 
     @Test
@@ -837,7 +837,7 @@ class CalendarSyncTest {
         editor.join()
         pass.join()
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(toaster.messages).containsExactly("Couldn't save 2 changes to Service A")
+        assertThat(toaster.messages).containsExactly("Couldn’t save 2 changes to Service A")
     }
 
     @Test
@@ -953,7 +953,7 @@ class CalendarSyncTest {
         now = now.plusMillis(60_001)
         sync.syncAll()
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(toaster.messages).containsExactly("Couldn't save to Service A")
+        assertThat(toaster.messages).containsExactly("Couldn’t save to Service A")
     }
 
     @Test
@@ -1076,7 +1076,7 @@ class CalendarSyncTest {
         val sync = writingEngine()
         queue(ChangeKind.DELETE, draft = null)
         sync.syncAll()
-        assertThat(toaster.messages).containsExactly("Couldn't save to C1")
+        assertThat(toaster.messages).containsExactly("Couldn’t save to C1")
     }
 
     private companion object {

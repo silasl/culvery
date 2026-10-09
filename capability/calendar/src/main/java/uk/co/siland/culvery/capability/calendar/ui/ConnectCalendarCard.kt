@@ -47,7 +47,7 @@ fun ConnectCalendarCard(connectService: String?, onConnect: () -> Unit, modifier
         Spacer(Modifier.weight(1f))
         Text("Connect a calendar", style = HhType.cardTitle, color = c.ink, modifier = Modifier.semantics { heading() })
         Spacer(Modifier.height(CalendarDimens.connectSubtitleTop))
-        Text("Connect your family's calendar to see it here.", style = HhType.secondary, color = c.mute)
+        Text("Connect your family’s calendar to see it here.", style = HhType.secondary, color = c.mute)
         Spacer(Modifier.height(CalendarDimens.connectButtonTop))
         if (connectService != null) {
             HhButton("Connect $connectService", onConnect, tone = ButtonTone.Primary, on = ButtonSurface.Surf)

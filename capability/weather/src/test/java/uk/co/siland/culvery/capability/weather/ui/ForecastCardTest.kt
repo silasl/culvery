@@ -95,7 +95,7 @@ class ForecastCardTest {
     @Test
     fun expiredSaysToCheckTheWifi() {
         show(WeatherView.Expired)
-        compose.onNodeWithText("No forecast — check the tablet's Wi-Fi.").assertExists()
+        compose.onNodeWithText("No forecast — check the tablet’s Wi-Fi.").assertExists()
     }
 
     @Test

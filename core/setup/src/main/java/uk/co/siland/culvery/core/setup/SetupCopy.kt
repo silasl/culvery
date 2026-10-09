@@ -12,21 +12,21 @@ internal const val ENTER_PIN = "Enter PIN"
 // Welcome, You, Household, Done (§4.2)
 internal const val START = "Start"
 internal const val WELCOME = "Welcome to Culvery"
-internal const val WELCOME_LINE = "Your home's location, the people who live here, and your calendars."
+internal const val WELCOME_LINE = "Your home’s location, the people who live here, and your calendars."
 internal const val USE_SAMPLE_HOUSEHOLD = "Use a sample household"
-internal const val WHOS_SETTING_UP = "Who's setting this up?"
+internal const val WHOS_SETTING_UP = "Who’s setting this up?"
 internal const val SET_YOUR_PIN = "Set your PIN"
 internal const val WHO_ELSE = "Who else lives here?"
 internal const val CULVERY_IS_READY = "Culvery is ready"
 internal const val OPEN_CULVERY = "Open Culvery"
 
 // Home location (§4.3)
-internal const val WHERES_HOME = "Where's home?"
+internal const val WHERES_HOME = "Where’s home?"
 internal const val TOWN_OR_CITY = "Town or city"
 internal const val USED_FOR = "Used for the time zone, and for weather."
-internal const val COULD_NOT_SEARCH = "Couldn't search for towns — check the tablet's Wi-Fi and try again."
+internal const val COULD_NOT_SEARCH = "Couldn’t search for towns — check the tablet’s Wi-Fi and try again."
 
-internal fun noTownsMatch(query: String): String = "No towns match \"$query\"."
+internal fun noTownsMatch(query: String): String = "No towns match “$query”."
 
 /** Spoken when the results change. */
 internal fun townsFound(count: Int): String = if (count == 1) "1 town found" else "$count towns found"
@@ -53,7 +53,7 @@ internal const val NEEDS_AN_ADMIN = "Culvery needs at least one Admin with a PIN
 
 internal fun someoneCalled(name: String): String = "Someone is already called $name."
 
-internal fun removeQuestion(name: String): String = "Remove $name? $name's events and calendars show as Family."
+internal fun removeQuestion(name: String): String = "Remove $name? $name’s events and calendars show as Family."
 
 internal fun removed(name: String): String = "$name removed"
 
@@ -97,6 +97,6 @@ internal const val SETTINGS = "Settings"
 internal const val CLOSE = "Close"
 internal const val HOME_LOCATION = "Home location"
 internal const val PEOPLE = "People"
-internal const val KIOSK = "Kiosk"
-internal const val EXIT_KIOSK = "Exit kiosk"
+internal const val TABLET_LOCK = "Tablet lock"
+internal const val USE_OTHER_APPS = "Use other apps"
 internal const val KIOSK_LINE = "Culvery keeps the tablet on this app. Exit to use other apps; it locks again next time Culvery opens."

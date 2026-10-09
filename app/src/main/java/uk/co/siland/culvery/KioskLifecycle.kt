@@ -38,14 +38,11 @@ internal interface KioskWindow {
  */
 internal fun isHomeTask(intent: Intent?): Boolean = intent?.hasCategory(Intent.CATEGORY_HOME) == true
 
-/** Told when the home-app choice was declined or never shown (4c §5.1): what is still undone and how to do it. */
-internal const val HOME_APP_NOT_SET =
-    "Culvery isn't the home app yet — exit kiosk, then set it in Android's Settings › Apps › Default apps."
+/** Told when the home-app choice was declined or never shown (4c §5.1); Settings › Tablet lock says how to do it (4d-2 §7.8). */
+internal const val HOME_APP_NOT_SET = "Culvery isn’t the home app yet."
 
-/** Told when Change home app finds no screen to open: Culvery is still home, and Android's Settings can change that. */
-internal const val HOME_APP_SCREEN_MISSING =
-    "Culvery can't open this tablet's home app setting — exit kiosk, then change the home app in Android's " +
-        "Settings › Apps › Default apps."
+/** Told when Change home app finds no screen to open; Settings › Tablet lock says where else to change it. */
+internal const val HOME_APP_SCREEN_MISSING = "Culvery can’t open the home app setting."
 
 /**
  * Whether Culvery has left the front since the kiosk was exited. It outlives the activity (the view model holds it), so

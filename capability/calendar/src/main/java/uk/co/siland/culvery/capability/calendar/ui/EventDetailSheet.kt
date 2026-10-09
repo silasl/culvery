@@ -38,6 +38,7 @@ import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
@@ -55,9 +56,14 @@ import uk.co.siland.culvery.core.ui.ShellTokens
 
 enum class DetailMode { Idle, ChoosingPerson, ConfirmingDelete }
 
-/** The Calendar row's value: the source's name, marked read-only when nobody can change it. */
-internal fun calendarLabel(event: EventUi): String =
-    if (event.readOnlyReason == ReadOnlyReason.OtherCalendar) "${event.sourceName} · read-only" else event.sourceName
+internal const val CANT_CHANGE_HERE = "Can’t change here"
+internal const val CHOOSE_WHO = "Choose who it’s for"
+
+/** The Calendar row's value: the source's name, said to be out of reach when the tablet can't change it (Decision 2g). */
+internal fun calendarLabel(event: EventUi): String = when (event.readOnlyReason) {
+    ReadOnlyReason.OtherCalendar, ReadOnlyReason.NotMaster -> "${event.sourceName} (can’t change here)"
+    else -> event.sourceName
+}
 
 /**
  * Hand-off §7 "Sheet 1 — Event detail". Stateless: the host decides [mode] and [busy]. Buttons are never hidden
@@ -99,27 +105,24 @@ fun EventDetailSheet(
             Header(e, onClose)
             InfoCard(detail)
             when {
-                e.readOnlyReason == ReadOnlyReason.OtherCalendar || e.readOnlyReason == ReadOnlyReason.NotMaster -> {
-                    val subscribed = e.readOnlyReason == ReadOnlyReason.OtherCalendar
-                    Note(
-                        icon = Icons.LOCK,
-                        title = if (subscribed) "From ${e.sourceName} (read-only)" else "From ${e.sourceName}",
-                        body = if (subscribed) {
-                            "This is a subscribed calendar, so it can't be changed here."
-                        } else {
-                            "Change events on this calendar in ${e.serviceName} on your phone."
-                        },
-                    )
-                }
+                e.readOnlyReason == ReadOnlyReason.OtherCalendar || e.readOnlyReason == ReadOnlyReason.NotMaster -> Note(
+                    icon = Icons.LOCK,
+                    title = CANT_CHANGE_HERE,
+                    body = if (e.readOnlyReason == ReadOnlyReason.OtherCalendar) {
+                        "This calendar can only be changed by whoever runs it."
+                    } else {
+                        "Change events on this calendar in ${e.serviceName} on your phone."
+                    },
+                )
                 e.readOnlyReason == ReadOnlyReason.Recurring -> Note(
                     icon = Icons.EVENT_REPEAT,
                     title = "Repeating event",
-                    body = "Edit repeating events in ${e.serviceName} on your phone.",
+                    body = "Change repeating events in ${e.serviceName} on your phone.",
                 )
                 e.untagged -> Note(
                     icon = Icons.MOBILE,
                     title = "Added from a phone",
-                    body = "Showing as Family until someone assigns it.",
+                    body = "Showing as Family until someone chooses who it’s for.",
                     background = c.accentSoft,
                     iconTint = c.accent,
                 ) {
@@ -135,7 +138,7 @@ fun EventDetailSheet(
                         }
                     } else {
                         HhButton(
-                            "Assign to…", onChoosePerson, Modifier.testTag("detail_assign"),
+                            CHOOSE_WHO, onChoosePerson, Modifier.testTag("detail_assign"),
                             tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Surf,
                         )
                     }
@@ -146,7 +149,7 @@ fun EventDetailSheet(
             if (mode == DetailMode.ConfirmingDelete) {
                 HhConfirmCard(
                     tag = "detail_confirm",
-                    keep = "Keep event", keepTag = "detail_keep",
+                    keep = KEEP, keepTag = "detail_keep",
                     confirm = "Delete event", confirmTag = "detail_confirm_delete", confirmIcon = Icons.DELETE_FOREVER,
                     busy = busy, onKeep = onKeep, onConfirm = onConfirmDelete,
                 ) {
@@ -169,7 +172,7 @@ fun EventDetailSheet(
                 Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
                     DeleteButton(enabled = !busy, tag = "detail_delete", onClick = onDelete)
                     HhButton(
-                        "Edit", onEdit, Modifier.weight(1f).testTag("detail_edit"),
+                        "Change", onEdit, Modifier.weight(1f).testTag("detail_edit"),
                         tone = ButtonTone.Primary, size = ButtonSize.Large, icon = Icons.EDIT, enabled = !busy, on = ButtonSurface.Bg,
                     )
                 }
@@ -191,7 +194,7 @@ private fun Header(e: EventUi, onClose: () -> Unit) {
             Spacer(Modifier.width(CalendarDimens.sheetTitleBarGap))
             Column {
                 if (e.syncing) {
-                    SyncingPill(e.connectionLabel)
+                    SyncingPill(e.serviceName)
                     Spacer(Modifier.height(CalendarDimens.syncingPillBottom))
                 }
                 Text(e.title, style = CalendarType.sheetTitle, color = c.ink, modifier = Modifier.semantics { heading() })
@@ -202,7 +205,7 @@ private fun Header(e: EventUi, onClose: () -> Unit) {
 }
 
 @Composable
-private fun SyncingPill(connectionLabel: String) {
+private fun SyncingPill(service: String) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -216,7 +219,7 @@ private fun SyncingPill(connectionLabel: String) {
             .padding(horizontal = CalendarDimens.syncingPillPaddingH),
     ) {
         HhIcon(Icons.CLOUD_UPLOAD, size = CalendarDimens.syncingPillIcon, tint = c.mute)
-        Text("Syncing to $connectionLabel…", style = CalendarType.syncingPill, color = c.mute, maxLines = 1)
+        Text("Saving to $service…", style = CalendarType.syncingPill, color = c.mute, maxLines = 1)
     }
 }
 

@@ -143,16 +143,12 @@ class KioskLifecycleTest {
         kiosk.openHomeAppScreen(HOME_APP_SCREEN_MISSING) { throw ActivityNotFoundException() }
         assertThat(window.calls).containsExactly("unpin", "pin").inOrder()
         assertThat(said).containsExactly(HOME_APP_SCREEN_MISSING)
-        assertThat(HOME_APP_SCREEN_MISSING).isEqualTo(
-            "Culvery can't open this tablet's home app setting — exit kiosk, then change the home app in Android's " +
-                "Settings › Apps › Default apps.",
-        )
+        assertThat(HOME_APP_SCREEN_MISSING).isEqualTo("Culvery can’t open the home app setting.")
     }
 
     @Test
-    fun theHomeAppToastNamesWhatToDoNext() {
-        assertThat(HOME_APP_NOT_SET)
-            .isEqualTo("Culvery isn't the home app yet — exit kiosk, then set it in Android's Settings › Apps › Default apps.")
+    fun theHomeAppToastsAreShort() {
+        assertThat(HOME_APP_NOT_SET).isEqualTo("Culvery isn’t the home app yet.")
     }
 
     @Test

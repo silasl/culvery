@@ -13,8 +13,7 @@ import uk.co.siland.culvery.core.ui.Icons
 
 const val ALL_DAY_LABEL = "All day"
 const val STALE_AFTER_MS = 30 * 60_000L
-const val ADDED_FROM_PHONE = "Added from phone"
-const val CALENDAR_FEED = "Calendar feed"
+const val ADDED_FROM_PHONE = "Added from a phone"
 
 data class EventUi(
     /** Which mirrored event this is; the same on every day a multi-day event covers. */
@@ -31,8 +30,6 @@ data class EventUi(
     val startSort: Long,
     /** The source calendar's name, e.g. "Family calendar" or "School terms". */
     val sourceName: String = "",
-    /** The connection's label ("Google", "Sample calendar"): where changes are sent. */
-    val connectionLabel: String = "",
     /** The service's name ("Google Calendar"): failure, repeating-event and delete copy (3a design D11). */
     val serviceName: String = "",
     /** Null when the tablet may change this event: a non-recurring event on the master calendar. */
@@ -41,7 +38,7 @@ data class EventUi(
     val untagged: Boolean = false,
     /** A change to it is waiting in the outbox. */
     val syncing: Boolean = false,
-    /** A person's name, [ADDED_FROM_PHONE], the service's name or [CALENDAR_FEED]. */
+    /** A person's name, [ADDED_FROM_PHONE], the service's name, or the calendar's own name for one nobody here can change. */
     val createdBy: String = "",
     /** The Repeats row: "Every week"… or "Yes" (3a design D12). */
     val repeats: String = REPEATS_YES,
@@ -67,14 +64,14 @@ data class DayUi(val date: LocalDate, val events: List<EventUi>)
 data class WeekUi(val start: LocalDate, val days: List<DayUi>, val people: List<Person>)
 
 /**
- * [lastSyncMillis] is the oldest successful sync across connections, so one failing calendar can't hide.
- * [connectionLabels] names every connection. [failingBeforeFirstSync] is true when a connection has never
- * synced and is not Ok, which makes the status stale however recent the others are.
+ * [lastSyncMillis] is the oldest successful update across connections, so one failing calendar can't hide.
+ * [serviceNames] names every connection's service (Decision 12). [failingBeforeFirstSync] is true when a connection has
+ * never been updated and is not Ok, which makes the status stale however recent the others are.
  */
 data class SyncStatusUi(
     val lastSyncMillis: Long?,
     val needsSignIn: List<String>,
-    val connectionLabels: List<String>,
+    val serviceNames: List<String>,
     val failingBeforeFirstSync: Boolean,
     /** The first connection that needs signing in again: what the reconnect chip reconnects (3a design §4.3). */
     val reconnect: Connection? = null,
@@ -97,20 +94,23 @@ fun EventUi.badges(): List<Badge> = listOfNotNull(
     },
 )
 
-fun syncedLabel(lastSyncMillis: Long?, nowMillis: Long, connectionLabel: String? = null): String {
-    if (lastSyncMillis == null) return "not synced yet"
-    val synced = if (connectionLabel == null) "synced" else "synced with $connectionLabel"
+/** "Updated 5 minutes ago", "Updated from Google Calendar 5 minutes ago", or "Not updated yet" (4d-2 §7.3: full words). */
+fun updatedLabel(lastSyncMillis: Long?, nowMillis: Long, service: String? = null): String {
+    if (lastSyncMillis == null) return "Not updated yet"
     // A wall clock that jumped backwards gives a negative age; treat it as fresh.
     val minutes = (nowMillis - lastSyncMillis).coerceAtLeast(0) / 60_000
     val hours = minutes / 60
     val ago = when {
         minutes < 1 -> "just now"
-        minutes < 60 -> "$minutes min ago"
-        hours < 48 -> "$hours h ago"
-        else -> "${hours / 24} days ago"
+        minutes < 60 -> plural(minutes, "minute") + " ago"
+        hours < 48 -> plural(hours, "hour") + " ago"
+        else -> plural(hours / 24, "day") + " ago"
     }
-    return "$synced $ago"
+    return if (service == null) "Updated $ago" else "Updated from $service $ago"
 }
+
+/** "1 minute", "5 minutes". */
+internal fun plural(count: Long, unit: String): String = if (count == 1L) "1 $unit" else "$count ${unit}s"
 
 fun isStale(lastSyncMillis: Long?, nowMillis: Long): Boolean =
     lastSyncMillis != null && nowMillis - lastSyncMillis > STALE_AFTER_MS
@@ -118,8 +118,9 @@ fun isStale(lastSyncMillis: Long?, nowMillis: Long): Boolean =
 fun SyncStatusUi.isStaleAt(nowMillis: Long): Boolean =
     failingBeforeFirstSync || isStale(lastSyncMillis, nowMillis)
 
+/** The week's line: the service named when every connection has the same one (Decision 12). */
 fun weekSubtitle(sync: SyncStatusUi, nowMillis: Long): String =
-    "Family calendar · ${syncedLabel(sync.lastSyncMillis, nowMillis, sync.connectionLabels.singleOrNull())}"
+    updatedLabel(sync.lastSyncMillis, nowMillis, sync.serviceNames.distinct().singleOrNull())
 
 /** A tag naming a real person (or Family) wins; otherwise the source's person; otherwise Family. */
 fun resolvePerson(forPerson: String?, sourcePerson: PersonId, people: Map<PersonId, Person>): Person =
@@ -231,18 +232,16 @@ internal class SourceCatalog(
 
     fun source(connectionId: String, sourceId: String): StoredSource? = sources[connectionId to sourceId]
 
-    fun label(connectionId: String): String = connections[connectionId]?.label.orEmpty()
-
     /** The provider's display name; the connection label when the provider isn't installed. */
     fun serviceName(connectionId: String): String = connections[connectionId]?.let { serviceNameOf(it, serviceNames::get) }.orEmpty()
 
     fun hasWriter(connectionId: String): Boolean = connections[connectionId]?.providerId in writerIds
 }
 
-/** Only the master calendar carries the tablet's tags; another writable calendar was filled in [serviceName]. */
-internal fun createdByLabel(createdBy: String?, reason: ReadOnlyReason?, people: Map<PersonId, Person>, serviceName: String): String =
+/** Only the master calendar carries the tablet's tags; another writable calendar was filled in [serviceName]; one nobody here can change is named itself. */
+internal fun createdByLabel(createdBy: String?, reason: ReadOnlyReason?, people: Map<PersonId, Person>, serviceName: String, sourceName: String): String =
     when (reason) {
-        ReadOnlyReason.OtherCalendar -> CALENDAR_FEED
+        ReadOnlyReason.OtherCalendar -> sourceName
         ReadOnlyReason.NotMaster -> serviceName
         else -> createdBy?.let { people[PersonId(it)]?.name } ?: ADDED_FROM_PHONE
     }
@@ -268,12 +267,11 @@ internal fun StoredEvent.toUi(
         recurring = recurring,
         startSort = startSort,
         sourceName = source?.source?.name.orEmpty(),
-        connectionLabel = catalog.label(connectionId),
         serviceName = serviceName,
         readOnlyReason = reason,
         untagged = source?.isMaster == true && source.source.writable && forPerson == null && createdBy == null,
         syncing = syncing,
-        createdBy = createdByLabel(createdBy, reason, people, serviceName),
+        createdBy = createdByLabel(createdBy, reason, people, serviceName, source?.source?.name.orEmpty()),
         repeats = repeatsLabel(recurrenceRule, start, zone),
     )
 }

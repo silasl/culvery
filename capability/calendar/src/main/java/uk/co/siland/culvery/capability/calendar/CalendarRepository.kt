@@ -44,10 +44,11 @@ class CalendarRepository @Inject constructor(
     val people: Flow<List<Person>> = household.people
 
     val syncStatus: Flow<SyncStatusUi> = store.connections().map { connections ->
+        val service = { c: StoredConnection -> serviceNameOf(c.connection, serviceNames::get) }
         SyncStatusUi(
             lastSyncMillis = connections.mapNotNull { it.lastSyncMillis }.minOrNull(),
-            needsSignIn = connections.filter { it.health == ConnectionHealth.NeedsSignIn }.map { it.connection.label },
-            connectionLabels = connections.map { it.connection.label },
+            needsSignIn = connections.filter { it.health == ConnectionHealth.NeedsSignIn }.map(service),
+            serviceNames = connections.map(service),
             failingBeforeFirstSync = connections.any { it.lastSyncMillis == null && it.health != ConnectionHealth.Ok },
             reconnect = connections.firstOrNull { it.health == ConnectionHealth.NeedsSignIn }?.connection,
         )

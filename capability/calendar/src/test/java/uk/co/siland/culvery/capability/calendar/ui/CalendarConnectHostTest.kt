@@ -298,7 +298,7 @@ class CalendarConnectHostTest {
         access.answer(TestAccess.ALEX)
         show(existing = null)
         waitFor { access.toasts.messages.isNotEmpty() }
-        assertThat(access.toasts.messages).containsExactly("Couldn't connect to Google Calendar — try again")
+        assertThat(access.toasts.messages).containsExactly("Couldn’t connect to Google Calendar — try again")
         assertThat(overlay.dismissed).isEqualTo(1)
         runBlocking { assertThat(store.connectionsNow()).isEmpty() }
     }

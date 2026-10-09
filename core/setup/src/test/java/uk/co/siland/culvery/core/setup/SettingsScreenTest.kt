@@ -70,7 +70,7 @@ class SettingsScreenTest {
     fun theKioskPageExitsThroughTheShell() {
         show(KioskPage(FakeHomeApp()))
         compose.onNodeWithText("Culvery keeps the tablet on this app. Exit to use other apps; it locks again next time Culvery opens.").assertExists()
-        compose.onNodeWithText("Exit kiosk").performClick()
+        compose.onNodeWithText("Use other apps").performClick()
         assertThat(navigator.kioskExits).isEqualTo(1)
     }
 
@@ -88,7 +88,7 @@ class SettingsScreenTest {
         compose.onNodeWithTag("settings_page_a").onParent().assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
         compose.onNodeWithText("Settings").assert(isHeading())
         compose.onNodeWithTag("settings_page_kiosk").performClick()
-        compose.onAllNodesWithText("Kiosk").filterToOne(isHeading()).assertExists()
+        compose.onAllNodesWithText("Tablet lock").filterToOne(isHeading()).assertExists()
         compose.assertAccessible()
     }
 

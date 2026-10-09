@@ -82,11 +82,11 @@ class WhenLabelTest {
     fun onlyTheMasterCalendarNamesWhoAddedAnEvent() {
         val alex = Person(PersonId("alex-id"), "Alex", 0xFF4CB387)
         val people = mapOf(alex.id to alex)
-        assertThat(createdByLabel("alex-id", null, people, "Google Calendar")).isEqualTo("Alex")
-        assertThat(createdByLabel("alex-id", ReadOnlyReason.Recurring, people, "Google Calendar")).isEqualTo("Alex")
-        assertThat(createdByLabel(null, null, people, "Google Calendar")).isEqualTo(ADDED_FROM_PHONE)
-        assertThat(createdByLabel("alex-id", ReadOnlyReason.NotMaster, people, "Google Calendar")).isEqualTo("Google Calendar")
-        assertThat(createdByLabel("alex-id", ReadOnlyReason.OtherCalendar, people, "Google Calendar")).isEqualTo(CALENDAR_FEED)
+        assertThat(createdByLabel("alex-id", null, people, "Google Calendar", "Family")).isEqualTo("Alex")
+        assertThat(createdByLabel("alex-id", ReadOnlyReason.Recurring, people, "Google Calendar", "Family")).isEqualTo("Alex")
+        assertThat(createdByLabel(null, null, people, "Google Calendar", "Family")).isEqualTo(ADDED_FROM_PHONE)
+        assertThat(createdByLabel("alex-id", ReadOnlyReason.NotMaster, people, "Google Calendar", "Family")).isEqualTo("Google Calendar")
+        assertThat(createdByLabel("alex-id", ReadOnlyReason.OtherCalendar, people, "Google Calendar", "School terms")).isEqualTo("School terms")
     }
 
     @Test

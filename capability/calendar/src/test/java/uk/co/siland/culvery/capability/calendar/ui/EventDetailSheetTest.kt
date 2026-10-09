@@ -99,10 +99,10 @@ class EventDetailSheetTest {
     @Test
     fun theHouseholdsOwnCalendarPointsToThePhone() {
         show(SampleUi.detailNotMaster)
-        compose.onNodeWithText("From Alex").assertExists()
+        compose.onNodeWithText("Can’t change here").assertExists()
         compose.onNodeWithText("Change events on this calendar in Google Calendar on your phone.").assertExists()
-        compose.onNodeWithText("This is a subscribed calendar, so it can't be changed here.").assertDoesNotExist()
-        compose.onNodeWithText("Alex · read-only").assertDoesNotExist()
+        compose.onNodeWithText("This calendar can only be changed by whoever runs it.").assertDoesNotExist()
+        compose.onNodeWithText("Alex (can’t change here)").assertExists()
         compose.onNodeWithText("Google Calendar").assertExists()
         compose.onNodeWithText("Every week").assertExists()
         compose.onNodeWithTag("detail_delete").assertDoesNotExist()
@@ -112,10 +112,10 @@ class EventDetailSheetTest {
     @Test
     fun anotherCalendarIsReadOnlyWithNoFooter() {
         show(SampleUi.detailReadOnlyFeed)
-        compose.onNodeWithText("From School terms (read-only)").assertExists()
-        compose.onNodeWithText("This is a subscribed calendar, so it can't be changed here.").assertExists()
-        compose.onNodeWithText("School terms · read-only").assertExists()
-        compose.onNodeWithText("Calendar feed").assertExists()
+        compose.onNodeWithText("Can’t change here").assertExists()
+        compose.onNodeWithText("This calendar can only be changed by whoever runs it.").assertExists()
+        compose.onNodeWithText("School terms (can’t change here)").assertExists()
+        compose.onNodeWithText("School terms").assertExists()
         compose.onNodeWithTag("detail_delete").assertDoesNotExist()
         compose.onNodeWithTag("detail_edit").assertDoesNotExist()
     }
@@ -124,7 +124,7 @@ class EventDetailSheetTest {
     fun aRepeatingEventPointsToThePhoneAndShowsRepeats() {
         show(SampleUi.detailRecurring)
         compose.onNodeWithText("Repeating event").assertExists()
-        compose.onNodeWithText("Edit repeating events in Google Calendar on your phone.").assertExists()
+        compose.onNodeWithText("Change repeating events in Google Calendar on your phone.").assertExists()
         compose.onNodeWithText("Every week").assertExists()
         compose.onNodeWithText("Repeats").assertExists()
         compose.onNodeWithTag("detail_delete").assertDoesNotExist()
@@ -134,12 +134,12 @@ class EventDetailSheetTest {
     @Test
     fun anUntaggedEventOffersAssignAndKeepsDelete() {
         show(SampleUi.detailUntagged)
-        compose.onNodeWithText("Added from a phone").assertExists()
-        compose.onNodeWithText("Showing as Family until someone assigns it.").assertExists()
-        compose.onNodeWithText("Added from phone").assertExists()
+        // The note's title, and the Created by value.
+        compose.onAllNodesWithText("Added from a phone").assertCountEquals(2)
+        compose.onNodeWithText("Showing as Family until someone chooses who it’s for.").assertExists()
         compose.onNodeWithTag("detail_delete").assertExists()
         compose.onNodeWithTag("assign_Sam").assertDoesNotExist()
-        compose.onNodeWithText("Assign to…").performClick()
+        compose.onNodeWithText("Choose who it’s for").performClick()
         assertThat(calls).containsExactly("choose")
     }
 
@@ -157,7 +157,7 @@ class EventDetailSheetTest {
     fun aPendingChangeShowsTheSyncingPill() {
         show(SampleUi.detailSyncing)
         compose.onNodeWithTag("detail_syncing").assertExists()
-        compose.onNodeWithText("Syncing to Sample calendar…").assertExists()
+        compose.onNodeWithText("Saving to Google Calendar…").assertExists()
     }
 
     @Test

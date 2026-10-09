@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.flowOf
 const val NEXT_LABEL = "Next"
 
 /** 4a design §5: a setting that didn't save; nothing changed. */
-const val COULD_NOT_SAVE = "Couldn't save — try again."
+const val COULD_NOT_SAVE = "Couldn’t save — try again."
 
 /** The button that closes a confirmation and changes nothing. */
 const val KEEP = "Keep"

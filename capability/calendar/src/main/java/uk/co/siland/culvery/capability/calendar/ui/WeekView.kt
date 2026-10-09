@@ -81,8 +81,9 @@ data class WeekViewState(
     val weeksAhead: Int = 0,
 )
 
-internal fun reconnectLabel(labels: List<String>): String =
-    if (labels.size == 1) "${labels.single()} needs reconnecting" else "${labels.size} calendars need reconnecting"
+/** One chip for every connection needing sign-in: the service by name, or how many accounts (4d-2 C20). */
+internal fun reconnectLabel(services: List<String>): String =
+    if (services.size == 1) "${services.single()} needs reconnecting" else "${services.size} accounts need reconnecting"
 
 /**
  * Hand-off §2 and §7: seven days, person-coloured chips and the sync state. ‹ › step a week at a time, from this week

@@ -91,7 +91,7 @@ private fun DayColumn(label: String, spoken: String, date: LocalDate, events: Li
         modifier = modifier.verticalScroll(rememberScrollState()),
     ) {
         Text(label, style = CalendarType.strong14, color = c.ink, modifier = Modifier.semantics { heading(); contentDescription = spoken })
-        if (events.isEmpty()) Text("Free", style = HhType.secondary, color = c.mute)
+        if (events.isEmpty()) Text("Nothing on", style = HhType.secondary, color = c.mute)
         events.take(MAX_ROWS).forEach { CompactRow(it, date) }
         if (events.size > MAX_ROWS) {
             Text("+${events.size - MAX_ROWS} more", style = CalendarType.small12, color = c.mute)

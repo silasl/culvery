@@ -45,7 +45,7 @@ class CalendarPermissionsTest {
     @Test
     fun refusalWordingMatchesTheHandOff() {
         assertThat(cannotChangeOthers("Mia")).isEqualTo("Mia can only change events they created.")
-        assertThat(ASK_AN_ADULT).isEqualTo("Ask an adult to assign this event.")
+        assertThat(ASK_AN_ADULT).isEqualTo("Ask a grown-up to choose who this is for.")
     }
 
     @Test

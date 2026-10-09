@@ -194,7 +194,7 @@ class PeopleUiTest {
         compose.awaitTag("person_Sam")
         compose.onNodeWithTag("person_Sam").performClick()
         compose.onNodeWithTag("person_remove").performClick()
-        compose.onNodeWithText("Remove Sam? Sam's events and calendars show as Family.").assertExists()
+        compose.onNodeWithText("Remove Sam? Sam’s events and calendars show as Family.").assertExists()
         compose.onNodeWithTag("person_keep").performClick()
         compose.onNodeWithTag("person_confirm_remove").assertDoesNotExist()
         compose.onNodeWithTag("person_remove").performClick()
@@ -235,7 +235,7 @@ class PeopleUiTest {
         db.openHelper.writableDatabase.execSQL("CREATE TRIGGER no_updates BEFORE UPDATE ON person BEGIN SELECT RAISE(ABORT, 'x'); END")
         compose.onNodeWithTag("person_save").performClick()
         compose.waitUntil(5_000) { compose.onNodeWithTag("person_message").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text.orEmpty().isNotEmpty() }
-        compose.onNodeWithTag("person_message").assert(hasText("Couldn't save — try again."))
+        compose.onNodeWithTag("person_message").assert(hasText("Couldn’t save — try again."))
         compose.onNodeWithTag("person_name").assert(hasText("mySam"))
         assertNoSecretsLogged("People", listOf("Sam"))
     }
@@ -261,7 +261,7 @@ class PeopleUiTest {
         compose.onNodeWithTag("person_remove").performClick()
         compose.onNodeWithTag("person_confirm_remove").performClick()
         compose.waitUntil(5_000) { compose.onNodeWithTag("person_message").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text.orEmpty().isNotEmpty() }
-        compose.onNodeWithTag("person_message").assert(hasText("Couldn't save — try again."))
+        compose.onNodeWithTag("person_message").assert(hasText("Couldn’t save — try again."))
         assertNoSecretsLogged("PersonSheet", listOf("Sam"))
     }
 

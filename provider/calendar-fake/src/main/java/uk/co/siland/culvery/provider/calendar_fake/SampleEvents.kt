@@ -58,7 +58,7 @@ internal object SampleEvents {
         Timed("pizza", SOURCE_FAMILY, "Pizza night", 4, t(19, 0), 240, forName = "Family", byName = "Mia"),
         Timed("parkrun", SOURCE_FAMILY, "Parkrun", 5, t(9, 30), 90, forName = "Alex", byName = "Alex"),
         Timed("party", SOURCE_FAMILY, "Birthday party", 5, t(14, 0), 180, forName = "Mia", byName = "Sam"),
-        Timed("lunch", SOURCE_FAMILY, "Sunday lunch at Gran's", 6, t(12, 0), 180, forName = "Family", byName = "Alex"),
+        Timed("lunch", SOURCE_FAMILY, "Sunday lunch at Gran’s", 6, t(12, 0), 180, forName = "Family", byName = "Alex"),
         // Outside a 15-day window: the contract suite's out-of-range fixture.
         Timed("school-trip", SOURCE_FAMILY, "School trip", 20, t(8, 30), 420, forName = "Mia", byName = "Alex"),
     )

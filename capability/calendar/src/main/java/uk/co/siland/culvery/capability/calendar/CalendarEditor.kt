@@ -43,7 +43,7 @@ const val EVENT_ADDED = "Event added"
 const val CHANGES_SAVED = "Changes saved"
 
 /** 3a design §3.12: the add/edit sheet couldn't load what it needs, so it closed. */
-const val COULD_NOT_OPEN = "Couldn't open the event — try again"
+const val COULD_NOT_OPEN = "Couldn’t open the event — try again"
 
 sealed interface EditResult {
     /** The provider accepted the change. The mirror has it, or the next sync brings it (2b-2 design §3.4). */

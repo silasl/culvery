@@ -25,7 +25,7 @@ const val GOOGLE_CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3/"
 
 /** Follow-up R8's fixed wording. Google's own text is neither shown nor logged: it can echo calendar ids (emails). */
 internal const val REFUSED = "the change was refused"
-internal const val READ_ONLY_HERE = "this calendar can't be changed from the tablet"
+internal const val READ_ONLY_HERE = "this calendar can’t be changed from the tablet"
 
 /** The module's one log tag. */
 internal const val TAG = "GoogleCalendar"

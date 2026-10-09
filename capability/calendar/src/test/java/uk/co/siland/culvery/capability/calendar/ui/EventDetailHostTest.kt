@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import android.os.Looper
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -148,7 +149,7 @@ class EventDetailHostTest {
         // The editor toasts the refusal; the sheet goes back to its footer and stays open.
         waitUntil { access.toasts.messages.isNotEmpty() }
         waitUntil { compose.onAllNodesWithText("Delete this event?").fetchSemanticsNodes().isEmpty() }
-        assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — Event is locked")
+        assertThat(access.toasts.messages).containsExactly("Couldn’t save to Sample calendar — Event is locked")
         compose.onNodeWithTag("detail_delete").assertExists()
         assertThat(closed).isEqualTo(0)
     }
@@ -191,9 +192,7 @@ class EventDetailHostTest {
         compose.onNodeWithTag("detail_assign").performClick()
         compose.onNodeWithTag("assign_Mia").performClick()
         waitUntil { writer.calls.isNotEmpty() }
-        waitUntil {
-            compose.onAllNodesWithText("Added from a phone").fetchSemanticsNodes().isEmpty()
-        }
+        waitUntil { compose.onAllNodesWithTag("detail_assign").fetchSemanticsNodes().isEmpty() }
         assertThat(writer.calls).containsExactly("update:plumber")
         assertThat(runBlocking { store.eventNow(EventRef("c1", "s-family", "plumber")) }?.forPerson).isEqualTo(access.mia.id.value)
     }

@@ -22,7 +22,7 @@ fun connected(service: String): String = "$service connected"
 
 fun reconnected(service: String): String = "$service reconnected"
 
-fun couldNotConnect(service: String): String = "Couldn't connect to $service — try again"
+fun couldNotConnect(service: String): String = "Couldn’t connect to $service — try again"
 
 /**
  * Adds and reconnects provider connections and chooses the master calendar: Settings, the Connect card and the

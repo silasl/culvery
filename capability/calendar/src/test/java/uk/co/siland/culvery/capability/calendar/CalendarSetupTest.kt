@@ -149,7 +149,7 @@ class CalendarSetupTest {
         google.sourcesFailWith = UnreachableException("offline")
         assertThat(setup(setOf(google)).connectWithDefaults(googleConnection)).isFalse()
         assertThat(store.connectionsNow()).isEmpty()
-        assertThat(toaster.messages).containsExactly("Couldn't connect to Google Calendar — try again")
+        assertThat(toaster.messages).containsExactly("Couldn’t connect to Google Calendar — try again")
         assertThat(toaster.urgent).isEqualTo(toaster.messages)
     }
 
@@ -159,7 +159,7 @@ class CalendarSetupTest {
         google.sourcesHang = true
         assertThat(setup(setOf(google)).connectWithDefaults(googleConnection)).isFalse()
         assertThat(store.connectionsNow()).isEmpty()
-        assertThat(toaster.messages).containsExactly("Couldn't connect to Google Calendar — try again")
+        assertThat(toaster.messages).containsExactly("Couldn’t connect to Google Calendar — try again")
     }
 
     @Test
@@ -233,7 +233,7 @@ class CalendarSetupTest {
         google.sourceList = google.sourceList.filterNot { it.primary }
         assertThat(setup(setOf(google)).connectWithDefaults(googleConnection)).isFalse()
         assertThat(store.connectionsNow()).isEmpty()
-        assertThat(toaster.messages).containsExactly("Couldn't connect to Google Calendar — try again")
+        assertThat(toaster.messages).containsExactly("Couldn’t connect to Google Calendar — try again")
     }
 
     @Test
@@ -244,7 +244,7 @@ class CalendarSetupTest {
         assertThat(setup(setOf(provider)).reconnect(googleConnection)).isFalse()
         assertThat(store.connectionsNow()).isEmpty()
         assertThat(toaster.messages).containsExactly(
-            "Couldn't connect to Google — try again", "Couldn't connect to Google — try again",
+            "Couldn’t connect to Google — try again", "Couldn’t connect to Google — try again",
         )
     }
 
@@ -257,7 +257,7 @@ class CalendarSetupTest {
         assertThat(setup.reconnect(googleConnection)).isFalse()
         assertThat(store.connectionsNow()).isEmpty()
         assertThat(syncs).isEqualTo(1)
-        assertThat(toaster.messages).containsExactly("Google Calendar connected", "Couldn't connect to Google Calendar — try again").inOrder()
+        assertThat(toaster.messages).containsExactly("Google Calendar connected", "Couldn’t connect to Google Calendar — try again").inOrder()
     }
 
     @Test
@@ -268,6 +268,6 @@ class CalendarSetupTest {
         val setup = CalendarSetup(CalendarStore(db, failing), setOf(google), { listOf(mia) }, toaster, WallClock { now }, EmptyCoroutineContext, 1_000)
         assertThat(setup.connectWithDefaults(googleConnection)).isFalse()
         assertThat(store.sources().first()).isEmpty()
-        assertThat(toaster.messages).containsExactly("Couldn't connect to Google Calendar — try again")
+        assertThat(toaster.messages).containsExactly("Couldn’t connect to Google Calendar — try again")
     }
 }

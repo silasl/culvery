@@ -123,13 +123,13 @@ internal suspend fun CalendarStore.applyAcceptedWrite(
     }
 }
 
-/** "Couldn't save to {label} — {reason}", or just "Couldn't save to {label}" when there is no reason. */
+/** "Couldn’t save to {label} — {reason}", or just "Couldn’t save to {label}" when there is no reason. */
 fun couldNotSave(label: String, reason: String?): String =
-    if (reason == null) "Couldn't save to $label" else "Couldn't save to $label — $reason"
+    if (reason == null) "Couldn’t save to $label" else "Couldn’t save to $label — $reason"
 
 /** One toast for everything a drain pass dropped for [label]; [reasons] has one entry per change. */
 internal fun couldNotSaveAll(label: String, reasons: List<String?>): String =
-    if (reasons.size == 1) couldNotSave(label, reasons.single()) else "Couldn't save ${reasons.size} changes to $label"
+    if (reasons.size == 1) couldNotSave(label, reasons.single()) else "Couldn’t save ${reasons.size} changes to $label"
 
 /**
  * The name failure, repeating-event and delete copy use for [connection] (3a design D11): its provider's display name

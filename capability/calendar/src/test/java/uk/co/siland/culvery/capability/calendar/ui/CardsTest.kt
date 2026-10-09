@@ -78,14 +78,14 @@ class CardsTest {
     @Test
     fun weekChipOnTodayOpensTheCalendarTab() {
         show { TodayCard(SampleUi.today) }
-        compose.onNodeWithText("Week").performClick()
+        compose.onNodeWithText("See the week").performClick()
         assertThat(navigator.tabs).containsExactly(CALENDAR_TAB_ID)
     }
 
     @Test
     fun weekOnTodayIsA48DpButton() {
         show { TodayCard(SampleUi.today) }
-        compose.onNodeWithText("Week").assert(isButton).assertHeightIsEqualTo(48.dp)
+        compose.onNodeWithText("See the week").assert(isButton).assertHeightIsEqualTo(48.dp)
     }
 
     @Test
@@ -119,14 +119,14 @@ class CardsTest {
     @Test
     fun comingUpEmptyDaySaysFree() {
         show { ComingUpCard(SampleUi.comingUpBusy) }
-        compose.onNodeWithText("Free").assertExists()
+        compose.onNodeWithText("Nothing on").assertExists()
     }
 
     @Test
     fun connectCardOpensSettingsWhenNothingCanBeConnected() {
         show { ConnectCalendarCard(connectService = null, onConnect = {}) }
         compose.onNodeWithText("Connect a calendar").assertExists()
-        compose.onNodeWithText("Connect your family's calendar to see it here.").assertExists()
+        compose.onNodeWithText("Connect your family’s calendar to see it here.").assertExists()
         compose.onNodeWithText("Open settings").performClick()
         assertThat(navigator.settingsOpened).isEqualTo(1)
     }
@@ -190,7 +190,7 @@ class CardsTest {
         show { TodayCard(SampleUi.today, onAdd = { added++ }) }
         compose.onNodeWithTag("today_add").assert(isButton).assertHeightIsEqualTo(48.dp).assertWidthIsEqualTo(48.dp).performClick()
         assertThat(added).isEqualTo(1)
-        compose.onNodeWithText("Week").assertExists()
+        compose.onNodeWithText("See the week").assertExists()
     }
 
     @Test

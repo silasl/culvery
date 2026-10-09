@@ -2,46 +2,54 @@ package uk.co.siland.culvery.capability.calendar
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import uk.co.siland.culvery.capability.calendar.ui.reconnectLabel
 
 class SyncLabelsTest {
     private val now = 1_000_000_000_000L
     private fun minutesAgo(m: Long) = now - m * 60_000
 
     @Test
-    fun underAMinuteIsJustNow() = assertThat(syncedLabel(now - 59_000, now)).isEqualTo("synced just now")
+    fun underAMinuteIsJustNow() = assertThat(updatedLabel(now - 59_000, now)).isEqualTo("Updated just now")
 
     @Test
-    fun minutesUnderAnHour() {
-        assertThat(syncedLabel(minutesAgo(1), now)).isEqualTo("synced 1 min ago")
-        assertThat(syncedLabel(minutesAgo(59), now)).isEqualTo("synced 59 min ago")
+    fun minutesInFullWordsSingularAtOne() {
+        assertThat(updatedLabel(minutesAgo(1), now)).isEqualTo("Updated 1 minute ago")
+        assertThat(updatedLabel(minutesAgo(59), now)).isEqualTo("Updated 59 minutes ago")
     }
 
     @Test
     fun hoursUnderFortyEightThenDays() {
-        assertThat(syncedLabel(minutesAgo(60), now)).isEqualTo("synced 1 h ago")
-        assertThat(syncedLabel(minutesAgo(150), now)).isEqualTo("synced 2 h ago")
-        assertThat(syncedLabel(minutesAgo(48 * 60 - 1), now)).isEqualTo("synced 47 h ago")
-        assertThat(syncedLabel(minutesAgo(48 * 60), now)).isEqualTo("synced 2 days ago")
+        assertThat(updatedLabel(minutesAgo(60), now)).isEqualTo("Updated 1 hour ago")
+        assertThat(updatedLabel(minutesAgo(150), now)).isEqualTo("Updated 2 hours ago")
+        assertThat(updatedLabel(minutesAgo(48 * 60 - 1), now)).isEqualTo("Updated 47 hours ago")
+        assertThat(updatedLabel(minutesAgo(48 * 60), now)).isEqualTo("Updated 2 days ago")
     }
 
     @Test
-    fun neverSyncedSaysSo() = assertThat(syncedLabel(null, now)).isEqualTo("not synced yet")
+    fun neverUpdatedSaysSo() = assertThat(updatedLabel(null, now)).isEqualTo("Not updated yet")
 
     @Test
-    fun syncTimeInTheFutureReadsJustNow() = assertThat(syncedLabel(now + 3_600_000, now)).isEqualTo("synced just now")
+    fun aClockThatWentBackwardsReadsJustNow() = assertThat(updatedLabel(now + 3_600_000, now)).isEqualTo("Updated just now")
 
     @Test
-    fun namesTheConnectionWhenGivenOne() {
-        assertThat(syncedLabel(minutesAgo(2), now, "Google")).isEqualTo("synced with Google 2 min ago")
-        assertThat(syncedLabel(now, now, "Google")).isEqualTo("synced with Google just now")
+    fun namesTheServiceWhenGivenOne() {
+        assertThat(updatedLabel(minutesAgo(5), now, "Google Calendar")).isEqualTo("Updated from Google Calendar 5 minutes ago")
+        assertThat(updatedLabel(null, now, "Google Calendar")).isEqualTo("Not updated yet")
     }
 
     @Test
-    fun subtitleNamesTheConnectionOnlyWhenThereIsExactlyOne() {
-        val one = SyncStatusUi(minutesAgo(2), emptyList(), listOf("Google"), failingBeforeFirstSync = false)
-        assertThat(weekSubtitle(one, now)).isEqualTo("Family calendar · synced with Google 2 min ago")
-        val two = one.copy(connectionLabels = listOf("Google", "School"))
-        assertThat(weekSubtitle(two, now)).isEqualTo("Family calendar · synced 2 min ago")
+    fun theSubtitleNamesTheServiceOnlyWhenEveryConnectionHasTheSameOne() {
+        val one = SyncStatusUi(minutesAgo(5), emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false)
+        assertThat(weekSubtitle(one, now)).isEqualTo("Updated from Google Calendar 5 minutes ago")
+        assertThat(weekSubtitle(one.copy(serviceNames = listOf("Google Calendar", "Google Calendar")), now)).isEqualTo("Updated from Google Calendar 5 minutes ago")
+        assertThat(weekSubtitle(one.copy(serviceNames = listOf("Google Calendar", "School")), now)).isEqualTo("Updated 5 minutes ago")
+        assertThat(weekSubtitle(one.copy(lastSyncMillis = null), now)).isEqualTo("Not updated yet")
+    }
+
+    @Test
+    fun theReconnectChipCountsAccounts() {
+        assertThat(reconnectLabel(listOf("Google Calendar"))).isEqualTo("Google Calendar needs reconnecting")
+        assertThat(reconnectLabel(listOf("Google Calendar", "Google Calendar"))).isEqualTo("2 accounts need reconnecting")
     }
 
     @Test
@@ -55,7 +63,7 @@ class SyncLabelsTest {
 
     @Test
     fun aConnectionFailingBeforeItsFirstSyncMakesTheStatusStale() {
-        val status = SyncStatusUi(minutesAgo(1), emptyList(), listOf("Google", "School"), failingBeforeFirstSync = true)
+        val status = SyncStatusUi(minutesAgo(1), emptyList(), listOf("Google Calendar", "School"), failingBeforeFirstSync = true)
         assertThat(status.isStaleAt(now)).isTrue()
         assertThat(status.copy(failingBeforeFirstSync = false).isStaleAt(now)).isFalse()
     }

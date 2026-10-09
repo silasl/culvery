@@ -53,9 +53,9 @@ class WeekScreenshotTest {
         compose.onNodeWithTag("shot").captureRoboImage("src/test/screenshots/$name.png")
     }
 
-    private val fresh = SyncStatusUi(now - 2 * 60_000, emptyList(), listOf("Google"), failingBeforeFirstSync = false)
+    private val fresh = SyncStatusUi(now - 2 * 60_000, emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false)
     private val stale = fresh.copy(lastSyncMillis = now - 45 * 60_000)
-    private val needsSignIn = fresh.copy(needsSignIn = listOf("Google"))
+    private val needsSignIn = fresh.copy(needsSignIn = listOf("Google Calendar"))
 
     @Test fun weekFontScale15() = snap("week_fs15", false, fresh, canAdd = true, fontScale = 1.5f)
     @Test fun weekDark() = snap("week_dark", true, fresh, canAdd = true)

@@ -4,7 +4,6 @@ import java.time.Instant
 import java.time.LocalDate
 import uk.co.siland.culvery.capability.calendar.ADDED_FROM_PHONE
 import uk.co.siland.culvery.capability.calendar.ALL_DAY_LABEL
-import uk.co.siland.culvery.capability.calendar.CALENDAR_FEED
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventRef
@@ -94,7 +93,7 @@ object SampleUi {
     val household = listOf(alex, sam, mia)
 
     private fun EventUi.onFamilyCalendar(createdBy: String) =
-        copy(sourceName = "Family calendar", connectionLabel = "Sample calendar", serviceName = "Google Calendar", createdBy = createdBy)
+        copy(sourceName = "Family calendar", serviceName = "Google Calendar", createdBy = createdBy)
 
     /** Hand-off 03. */
     val detailEditable = EventDetailUi(event("Dinner with Jo & Priya", "19:30–21:00", alex).onFamilyCalendar("Alex"), "Today · 19:30–21:00")
@@ -103,9 +102,8 @@ object SampleUi {
     val detailReadOnlyFeed = EventDetailUi(
         allDay("INSET day — no school", family).copy(
             sourceName = "School terms",
-            connectionLabel = "Sample calendar",
             readOnlyReason = ReadOnlyReason.OtherCalendar,
-            createdBy = CALENDAR_FEED,
+            createdBy = "School terms",
         ),
         "Sat 26 Sep · All day",
     )
@@ -114,7 +112,6 @@ object SampleUi {
     val detailNotMaster = EventDetailUi(
         event("Gym", "07:00–08:00", alex, recurring = true).copy(
             sourceName = "Alex",
-            connectionLabel = "Google",
             serviceName = "Google Calendar",
             readOnlyReason = ReadOnlyReason.NotMaster,
             createdBy = "Google Calendar",

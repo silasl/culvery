@@ -112,7 +112,7 @@ fun EventEditorSheet(
         keyboardController?.hide()
     }
     val everyone = remember(people) { listOf(Person.Family) + people }
-    val title = if (form.mode == EventForm.Mode.New) "New event" else "Edit event"
+    val title = if (form.mode == EventForm.Mode.New) "Add event" else "Change event"
     Box(modifier.testTag("editor_sheet").semantics { paneTitle = title }.width(ShellTokens.sheetWidth).fillMaxHeight()) {
         HhSheet(
             modifier = if (picker != EditorPicker.None) Modifier.clearAndSetSemantics {} else Modifier,
@@ -225,13 +225,13 @@ private fun Header(title: String, form: EventForm, everyone: List<Person>, onClo
     }
 }
 
-/** 64 dp, `surf`, 22 sp / 600, "What's happening?", one line; Done closes the keyboard and never saves. */
+/** 64 dp, `surf`, 22 sp / 600, "What’s happening?", one line; Done closes the keyboard and never saves. */
 @Composable
 private fun TitleField(form: EventForm, focus: FocusRequester, readOnly: Boolean, onDone: () -> Unit) {
     HhTextField(
         value = form.title,
         onValueChange = { form.updateTitle(it) },
-        placeholder = "What's happening?",
+        placeholder = "What’s happening?",
         label = "Event name",
         tag = "editor_title",
         modifier = Modifier.focusRequester(focus),
@@ -399,7 +399,7 @@ private fun Footer(form: EventForm, busy: Boolean, failed: Boolean, onSave: () -
         HhButton(
             text = when {
                 failed -> "Try again"
-                form.mode == EventForm.Mode.New -> "Save event"
+                form.mode == EventForm.Mode.New -> "Add event"
                 else -> "Save changes"
             },
             onClick = onSave,

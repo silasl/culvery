@@ -38,7 +38,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.capability.calendar.ReviewConnection
 import uk.co.siland.culvery.capability.calendar.StoredSource
 import uk.co.siland.culvery.capability.calendar.disconnectQuestion
-import uk.co.siland.culvery.capability.calendar.syncedLabel
+import uk.co.siland.culvery.capability.calendar.updatedLabel
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -65,24 +65,24 @@ import uk.co.siland.culvery.core.ui.rememberSingleAction
 internal const val NEEDS_RECONNECTING = "Needs reconnecting"
 internal const val SOMETHING_WENT_WRONG = "Something went wrong"
 
-// 4a design §4.5.
+// 4a design §4.5; 4d-2 Decision 2a.
 internal const val DISCONNECT = "Disconnect"
 internal const val SHOW = "Show"
-internal const val MASTER = "Master"
+internal const val MAIN = "Main"
 internal const val NEW_EVENTS_GO_HERE = "New events go here"
-internal const val MAKE_MASTER = "Make master"
+internal const val USE_FOR_NEW_EVENTS = "Use for new events"
 
 // 4c design §6.4.
-internal const val CANT_READ_CALENDAR = "Can't read this calendar — check it's still shared with this account"
+internal const val CANT_READ_CALENDAR = "Can’t read this calendar — check it’s still shared with this account."
 internal const val HIDE_THIS_CALENDAR = "Hide this calendar"
-internal const val CHOOSE_ANOTHER_MASTER = "Choose another master calendar first"
+internal const val CHOOSE_ANOTHER_MAIN = "Choose another main calendar first."
 
 private const val TAG = "ReviewCalendars"
 
-/** A row's health in words: "Synced 5 min ago", "Can't reach Google Calendar", "Needs reconnecting" or "Something went wrong". */
+/** A row's health in words: "Updated 5 minutes ago", "Can’t reach Google Calendar", "Needs reconnecting" or "Something went wrong". */
 internal fun healthWords(row: CalendarRow, nowMillis: Long): String = when (row.health) {
-    ConnectionHealth.Ok -> syncedLabel(row.lastSyncMillis, nowMillis).replaceFirstChar { it.uppercase() }
-    ConnectionHealth.Unreachable -> "Can't reach ${row.service}"
+    ConnectionHealth.Ok -> updatedLabel(row.lastSyncMillis, nowMillis)
+    ConnectionHealth.Unreachable -> "Can’t reach ${row.service}"
     ConnectionHealth.NeedsSignIn -> NEEDS_RECONNECTING
     is ConnectionHealth.Error -> SOMETHING_WENT_WRONG
 }
@@ -296,7 +296,7 @@ private fun SourceRow(
             if (source.isMaster) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.reviewItemGap)) {
                     Text(
-                        MASTER,
+                        MAIN,
                         style = CalendarType.badge,
                         color = c.accent,
                         modifier = Modifier
@@ -308,8 +308,8 @@ private fun SourceRow(
                 }
             } else if (source.source.writable) {
                 HhButton(
-                    MAKE_MASTER, { onMakeMaster(source) }, Modifier.testTag("review_make_master_$id"),
-                    enabled = !busy, on = ButtonSurface.Surf, spokenName = withSubject(MAKE_MASTER, source.source.name),
+                    USE_FOR_NEW_EVENTS, { onMakeMaster(source) }, Modifier.testTag("review_make_master_$id"),
+                    enabled = !busy, on = ButtonSurface.Surf, spokenName = withSubject(USE_FOR_NEW_EVENTS, source.source.name),
                 )
             }
             // A calendar the service hid on its tick has no problem to show, and no Hide to offer.
@@ -356,7 +356,7 @@ private fun ReadProblem(source: StoredSource, busy: Boolean, onShown: (StoredSou
     ) {
         Text(CANT_READ_CALENDAR, style = CalendarType.subtitle, color = c.danger, modifier = Modifier.weight(1f))
         if (source.isMaster) {
-            Text(CHOOSE_ANOTHER_MASTER, style = CalendarType.subtitle, color = c.mute)
+            Text(CHOOSE_ANOTHER_MAIN, style = CalendarType.subtitle, color = c.mute)
         } else {
             HhButton(
                 HIDE_THIS_CALENDAR, { onShown(source, false) }, Modifier.testTag("review_hide_$id"),

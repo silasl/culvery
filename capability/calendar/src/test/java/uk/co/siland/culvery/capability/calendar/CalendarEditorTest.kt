@@ -218,7 +218,7 @@ class CalendarEditorTest {
         assertThat(editor(access).assign(ref("plumber"), access.sam.id)).isEqualTo(EditResult.Rejected("Event is locked"))
         assertThat(store.eventNow(ref("plumber"))!!.forPerson).isNull()
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — Event is locked")
+        assertThat(access.toasts.messages).containsExactly("Couldn’t save to Sample calendar — Event is locked")
     }
 
     @Test
@@ -227,7 +227,7 @@ class CalendarEditorTest {
         put(event("plumber", createdBy = null))
         access.answer(TestAccess.MIA)
         assertThat(editor(access).assign(ref("plumber"), access.mia.id)).isEqualTo(EditResult.Cancelled)
-        assertThat(access.toasts.messages).containsExactly("Ask an adult to assign this event.")
+        assertThat(access.toasts.messages).containsExactly("Ask a grown-up to choose who this is for.")
         assertThat(writer.calls).isEmpty()
     }
 
@@ -250,7 +250,7 @@ class CalendarEditorTest {
         assertThat(editor(access).delete(ref("dinner"))).isEqualTo(EditResult.Rejected("Event is locked"))
         assertThat(store.eventNow(ref("dinner"))).isNotNull()
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — Event is locked")
+        assertThat(access.toasts.messages).containsExactly("Couldn’t save to Sample calendar — Event is locked")
     }
 
     /** Makes every [op] on [table] fail inside SQLite, as a full disk or a corrupt page would. */
@@ -280,7 +280,7 @@ class CalendarEditorTest {
         access.answer(TestAccess.ALEX)
         assertThat(editor(access).assign(ref("plumber"), access.sam.id)).isEqualTo(EditResult.Rejected(TRY_AGAIN))
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — try again")
+        assertThat(access.toasts.messages).containsExactly("Couldn’t save to Sample calendar — try again")
         assertThat(access.toasts.urgent).isEqualTo(access.toasts.messages)
     }
 
@@ -588,7 +588,7 @@ class CalendarEditorTest {
         writer.gate?.complete(Unit)
         // Nothing shows the failure card any more, so the editor says it.
         withContext(Dispatchers.Default) { withTimeout(5_000) { while (access.toasts.messages.isEmpty()) delay(10) } }
-        assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — Calendar is full")
+        assertThat(access.toasts.messages).containsExactly("Couldn’t save to Sample calendar — Calendar is full")
         assertThat(access.toasts.urgent).isEqualTo(access.toasts.messages)
     }
 
@@ -681,7 +681,7 @@ class CalendarEditorTest {
         sheet.cancel()
         writer.gate?.complete(Unit)
         withContext(Dispatchers.Default) { withTimeout(5_000) { while (access.toasts.messages.isEmpty()) delay(10) } }
-        assertThat(access.toasts.messages).containsExactly("Couldn't save to Sample calendar — Event is locked")
+        assertThat(access.toasts.messages).containsExactly("Couldn’t save to Sample calendar — Event is locked")
     }
 
     @Test

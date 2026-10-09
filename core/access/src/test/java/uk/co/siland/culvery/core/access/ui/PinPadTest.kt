@@ -100,7 +100,7 @@ class PinPadTest {
     fun tappingTheCardItselfDoesNotCancel() {
         val request = controller.open("Change settings", null, null)
         show()
-        compose.onNodeWithText("Who's this?").performClick()
+        compose.onNodeWithText("Who’s this?").performClick()
         compose.waitForIdle()
         assertThat(request.answer.isCompleted).isFalse()
     }
@@ -109,7 +109,7 @@ class PinPadTest {
     fun asksWhoIsThisWithTheEventReason() {
         controller.open("Change any event", null, null, PinReason.Delete)
         show()
-        compose.onNodeWithText("Who's this?").assertExists()
+        compose.onNodeWithText("Who’s this?").assertExists()
         compose.onNodeWithText("Enter your PIN to delete this event. It also records who made the change.").assertExists()
     }
 
@@ -204,7 +204,7 @@ class PinPadTest {
     fun theTitleIsAHeading() {
         controller.open("Change settings", null, null)
         show()
-        compose.onNodeWithText("Who's this?").assert(isHeading())
+        compose.onNodeWithText("Who’s this?").assert(isHeading())
     }
 
     @Test

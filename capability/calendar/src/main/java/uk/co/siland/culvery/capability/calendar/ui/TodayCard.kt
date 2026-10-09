@@ -58,7 +58,7 @@ fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier, onOpen: (Ev
         ) {
             Text("Today", style = HhType.cardTitle, color = c.ink, modifier = Modifier.weight(1f).semantics { heading() })
             if (onAdd != null) AddCircle(onAdd)
-            HhButton("Week", { navigator.openTab(CALENDAR_TAB_ID) }, on = ButtonSurface.Surf)
+            HhButton("See the week", { navigator.openTab(CALENDAR_TAB_ID) }, on = ButtonSurface.Surf)
         }
         Spacer(Modifier.height(CalendarDimens.todayHeaderGap))
         when {

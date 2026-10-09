@@ -16,7 +16,7 @@ import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.core.plugin.Connection
 
-private const val COULD_NOT_CONNECT = "Couldn't connect to Google Calendar — try again"
+private const val COULD_NOT_CONNECT = "Couldn’t connect to Google Calendar — try again"
 
 @RunWith(AndroidJUnit4::class)
 class GoogleConnectFlowTest {
@@ -90,7 +90,7 @@ class GoogleConnectFlowTest {
     fun aReconnectWithADifferentAccountIsRefused() = runTest {
         google.addCalendar("someone.else@example.com", "Theirs", primary = true)
         assertThat(flow.start(existing = stored)).isEqualTo(ConnectStep.Stopped)
-        assertThat(toasts.messages).containsExactly("That's a different Google account. Reconnect with family@example.com.")
+        assertThat(toasts.messages).containsExactly("That’s a different Google account. Reconnect with family@example.com.")
         assertThat(toasts.urgent).isEqualTo(toasts.messages)
         // Refused before the silent grant for the other account was asked for.
         assertThat(authorizer.accounts).containsExactly("family@example.com")
