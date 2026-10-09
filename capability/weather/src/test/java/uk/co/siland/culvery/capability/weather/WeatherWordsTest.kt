@@ -19,6 +19,12 @@ class WeatherWordsTest {
     }
 
     @Test
+    fun theHeaderIsOneSentence() {
+        assertThat(headerDescription(HeaderWeather(Condition.PARTLY_CLOUDY, night = false, temperature = 17.2, high = 19.0, low = 10.6)))
+            .isEqualTo("Now 17°, partly cloudy, high 19°, low 11°")
+    }
+
+    @Test
     fun theAgeLineAppearsOnlyPastTwoHours() {
         val fetched = 1_000_000L
         fun ago(age: Long) = updatedAgo(fetched, fetched + age)

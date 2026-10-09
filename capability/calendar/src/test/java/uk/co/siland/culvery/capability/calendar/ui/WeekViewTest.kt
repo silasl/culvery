@@ -97,13 +97,21 @@ class WeekViewTest {
     fun recurringChipsShowTheRepeatBadge() {
         show { WeekView(state()) }
         // Swimming, Bin day and Piano.
-        compose.onAllNodesWithContentDescription("Repeats").assertCountEquals(3)
+        compose.onAllNodesWithContentDescription(", repeats", substring = true).assertCountEquals(3)
+    }
+
+    @Test
+    fun aChipSaysWhatWhoWhenAndItsBadgesAsOneItem() {
+        show { WeekView(state()) }
+        compose.onNodeWithContentDescription("Swimming, Mia, Wednesday 16:00, repeats").assert(isButton)
+        compose.onNodeWithContentDescription("Dinner with Jo & Priya, Alex, Wednesday 19:30").assertExists()
+        compose.onNodeWithContentDescription("Colours: Alex, green; Sam, blue; Mia, pink; Family, amber").assertExists()
     }
 
     @Test
     fun legendNamesEveryoneAndFamily() {
         show { WeekView(state()) }
-        listOf("Alex", "Sam", "Mia", "Family").forEach { compose.onNodeWithText(it).assertExists() }
+        compose.onNodeWithContentDescription("Colours: Alex, green; Sam, blue; Mia, pink; Family, amber").assertExists()
     }
 
     @Test
@@ -150,13 +158,13 @@ class WeekViewTest {
     @Test
     fun insetDayFromTheSchoolFeedShowsTheLockBadge() {
         show { WeekView(state()) }
-        compose.onAllNodesWithContentDescription("Read-only calendar").assertCountEquals(1)
+        compose.onAllNodesWithContentDescription(", can’t change here", substring = true).assertCountEquals(1)
     }
 
     @Test
     fun aSyncingChipShowsCloudUpload() {
         show { WeekView(WeekViewState(SampleUi.weekWithSyncing, SampleUi.TODAY, sync(), now)) }
-        compose.onAllNodesWithContentDescription("Syncing").assertCountEquals(1)
+        compose.onAllNodesWithContentDescription(", saving", substring = true).assertCountEquals(1)
     }
 
     @Test

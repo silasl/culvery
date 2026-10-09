@@ -8,9 +8,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.weather.HeaderWeather
 import uk.co.siland.culvery.capability.weather.degrees
+import uk.co.siland.culvery.capability.weather.headerDescription
 import uk.co.siland.culvery.capability.weather.highLow
 import uk.co.siland.culvery.capability.weather.weatherIcon
 import uk.co.siland.culvery.core.ui.Culvery
@@ -24,7 +27,7 @@ fun WeatherHeaderItem(weather: HeaderWeather, modifier: Modifier = Modifier) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(WeatherDimens.headerIconGap),
-        modifier = modifier.testTag("weather_header"),
+        modifier = modifier.testTag("weather_header").semantics(mergeDescendants = true) { contentDescription = headerDescription(weather) },
     ) {
         HhIcon(weatherIcon(weather.condition, weather.night), size = WeatherDimens.headerIcon, tint = c.weather)
         Column {

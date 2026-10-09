@@ -95,7 +95,7 @@ class CardsTest {
     @Test
     fun recurringTodayRowShowsTheRepeatBadge() {
         show { TodayCard(SampleUi.today) }
-        compose.onAllNodesWithContentDescription("Repeats").assertCountEquals(1)
+        compose.onAllNodesWithContentDescription(", repeats", substring = true).assertCountEquals(1)
     }
 
     @Test
@@ -145,6 +145,19 @@ class CardsTest {
     }
 
     @Test
+    fun todayAndComingUpRowsAreEachOneSpokenItem() {
+        show { TodayCard(SampleUi.todayWithBadges) }
+        compose.onNodeWithContentDescription("Dinner with Jo & Priya, Alex, 19:30 to 21:00, saving").assert(isButton)
+    }
+
+    @Test
+    fun aComingUpRowSaysItsDayAndIsNotAButton() {
+        show { ComingUpCard(SampleUi.comingUp) }
+        compose.onNodeWithContentDescription("Office day, Alex, Thursday 09:00")
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
+    }
+
+    @Test
     fun todayRowsAreButtonsThatOpenTheirEvent() {
         val opened = mutableListOf<EventRef>()
         show { TodayCard(SampleUi.today, onOpen = { opened += it }) }
@@ -158,9 +171,9 @@ class CardsTest {
     @Test
     fun todayRowsShowEachOfTheirBadges() {
         show { TodayCard(SampleUi.todayWithBadges) }
-        compose.onAllNodesWithContentDescription("Syncing").assertCountEquals(2)
-        compose.onAllNodesWithContentDescription("Read-only calendar").assertCountEquals(1)
-        compose.onAllNodesWithContentDescription("Repeats").assertCountEquals(1)
+        compose.onAllNodesWithContentDescription(", saving", substring = true).assertCountEquals(2)
+        compose.onAllNodesWithContentDescription(", can’t change here", substring = true).assertCountEquals(1)
+        compose.onAllNodesWithContentDescription(", repeats", substring = true).assertCountEquals(1)
     }
 
     @Test

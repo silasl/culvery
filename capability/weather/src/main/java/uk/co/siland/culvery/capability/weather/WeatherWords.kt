@@ -68,3 +68,7 @@ internal fun rowDescription(day: DailyWeather, isToday: Boolean): String {
     val name = if (isToday) TODAY else day.date.format(LONG_DAY)
     return "$name, ${conditionWords(day.condition)}, high ${degrees(day.high)}, low ${degrees(day.low)}"
 }
+
+/** The header's one TalkBack item: "Now 17°, partly cloudy, high 19°, low 11°" (TalkBack reads ° as "degrees"). */
+internal fun headerDescription(weather: HeaderWeather): String =
+    "Now ${degrees(weather.temperature)}, ${conditionWords(weather.condition)}, high ${degrees(weather.high)}, low ${degrees(weather.low)}"

@@ -252,7 +252,7 @@ private fun InfoRow(icon: String, label: String, value: @Composable () -> Unit) 
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().heightIn(min = CalendarDimens.infoRowMin),
+        modifier = Modifier.fillMaxWidth().heightIn(min = CalendarDimens.infoRowMin).semantics(mergeDescendants = true) {},
     ) {
         HhIcon(icon, size = CalendarDimens.infoIcon, tint = c.mute)
         Spacer(Modifier.width(CalendarDimens.infoIconGap))

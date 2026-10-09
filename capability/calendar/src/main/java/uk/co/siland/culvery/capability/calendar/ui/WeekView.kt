@@ -238,7 +238,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
                 verticalArrangement = Arrangement.spacedBy(CalendarDimens.columnGap),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                items(day.events, key = { it.ref.listKey }) { EventChip(it, onOpen) }
+                items(day.events, key = { it.ref.listKey }) { EventChip(it, day.date, onOpen) }
             }
         }
         if (onAdd != null) AddHint(day.date, onAdd)
@@ -262,13 +262,15 @@ private fun AddHint(date: LocalDate, onAdd: () -> Unit) {
 }
 
 @Composable
-private fun EventChip(event: EventUi, onOpen: (EventRef) -> Unit) {
+private fun EventChip(event: EventUi, day: LocalDate, onOpen: (EventRef) -> Unit) {
     val c = Culvery.colors
     Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(CalendarDimens.chipRadius))
             .background(Color(event.person.color).copy(alpha = HhAlpha.tint(c)))
+            // Merged, not cleared, so the chip's texts stay in the tree for the font-scale tests.
+            .semantics(mergeDescendants = true) { contentDescription = eventOnDay(event, day) }
             .hhClickable({ onOpen(event.ref) }, label = OPEN_EVENT_DETAILS)
             .padding(horizontal = CalendarDimens.chipPaddingH, vertical = CalendarDimens.chipPaddingV),
     ) {
@@ -295,7 +297,7 @@ private fun Legend(people: List<Person>, modifier: Modifier = Modifier) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(CalendarDimens.legendGap),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier,
+        modifier = modifier.clearAndSetSemantics { contentDescription = legendName(people) },
     ) {
         people.forEach { person ->
             Row(

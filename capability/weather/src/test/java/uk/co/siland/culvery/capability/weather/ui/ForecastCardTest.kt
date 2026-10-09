@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -56,6 +57,14 @@ class ForecastCardTest {
         CompositionLocalProvider(LocalShellNavigator provides navigator) {
             CulveryTheme(dark = true) { ForecastCard(view, nowMillis) }
         }
+    }
+
+    /** A forecast row is one item, with nothing of its own left to read. */
+    @Test
+    fun aForecastRowHasNoChildrenAndNoDegreesAreReadApart() {
+        show(READY)
+        compose.onAllNodesWithTag("forecast_row")[0].onChildren().assertCountEquals(0)
+        compose.onAllNodesWithText("°", substring = true).assertCountEquals(0)
     }
 
     @Test

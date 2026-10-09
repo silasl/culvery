@@ -80,11 +80,11 @@ data class SyncStatusUi(
     val reconnect: Connection? = null,
 )
 
-/** Hand-off §7 chip and row badges, in the order they show. */
-enum class Badge(val icon: String, val description: String) {
-    Syncing(Icons.CLOUD_UPLOAD, "Syncing"),
-    OtherCalendar(Icons.LOCK, "Read-only calendar"),
-    Repeats(Icons.REPEAT, "Repeats"),
+/** Hand-off §7 chip and row badges, in the order they show; [spoken] follows the row's words (", repeats"). */
+enum class Badge(val icon: String, val spoken: String) {
+    Syncing(Icons.CLOUD_UPLOAD, "saving"),
+    OtherCalendar(Icons.LOCK, "can’t change here"),
+    Repeats(Icons.REPEAT, "repeats"),
 }
 
 /** `cloud_upload` first, then `lock` (another calendar) or `repeat` (recurring). */
@@ -130,6 +130,8 @@ internal val HOURS_MINUTES: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:
 internal val SHORT_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
 internal val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
 internal val DAY_AND_MONTH: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMMM", Locale.ENGLISH)
+
+internal val FULL_WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)
 
 /** "Tuesday 7 October": how TalkBack names a day. */
 internal val FULL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
@@ -208,6 +210,13 @@ private fun StoredEvent.sliceOn(date: LocalDate, zone: ZoneId): Slice {
         date == lastDay && !endsAtMidnight -> Slice("until $endClock", "until $endClock", allDay = false)
         else -> Slice(ALL_DAY_LABEL, ALL_DAY_LABEL, allDay = true)
     }
+}
+
+/** How TalkBack reads a slice's time: "09:00 to 10:30", "from 22:00", "until 01:00", "all day"; a dash isn't read well. */
+internal fun spokenTime(label: String): String = when {
+    label == ALL_DAY_LABEL -> "all day"
+    label.endsWith("–") -> "from ${label.dropLast(1)}"
+    else -> label.replace("–", " to ")
 }
 
 /** Sources, connection labels, service names and which providers can write: what the UI needs beyond the event row. */

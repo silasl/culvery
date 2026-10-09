@@ -140,7 +140,7 @@ class FontScaleTest {
         assertThat(line.isLineEllipsized(0)).isTrue()
         // An ellipsised line's visible end is where the "…" starts: after the whole time.
         assertThat(line.getLineEnd(0, visibleEnd = true)).isAtLeast("16:00".length)
-        compose.onNodeWithContentDescription("Repeats", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("badge_Repeats", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test

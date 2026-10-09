@@ -38,6 +38,12 @@ import androidx.compose.ui.test.isHeading
 class EventDetailSheetTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test
+    fun eachDetailRowReadsItsLabelAndValueTogether() {
+        show(SampleUi.detailEditable)
+        compose.onNode(hasText("When") and hasText("Today · 19:30–21:00")).assertExists()
+    }
+
     private val calls = mutableListOf<String>()
     private var mode by mutableStateOf(DetailMode.Idle)
     private var busy by mutableStateOf(false)

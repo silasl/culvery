@@ -5,13 +5,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.badges
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 
-/** Hand-off §7 badges, muted: 15 dp on week chips, 20 dp on Today rows. Nothing when there are none. */
+/** Hand-off §7 badges, muted: 15 dp on week chips, 20 dp on Today rows. Nothing when there are none. The row speaks them. */
 @Composable
 internal fun EventBadges(event: EventUi, size: Dp, modifier: Modifier = Modifier) {
     val badges = event.badges()
@@ -22,6 +23,6 @@ internal fun EventBadges(event: EventUi, size: Dp, modifier: Modifier = Modifier
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier,
     ) {
-        badges.forEach { HhIcon(it.icon, size = size, tint = c.mute, contentDescription = it.description) }
+        badges.forEach { HhIcon(it.icon, size = size, tint = c.mute, modifier = Modifier.testTag("badge_${it.name}")) }
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.DayUi
@@ -71,6 +72,7 @@ fun ComingUpCard(days: List<DayUi>?, modifier: Modifier = Modifier) {
                     DayColumn(
                         label = if (i == 0) "Tomorrow" else day.date.format(WEEKDAY),
                         spoken = dayHeading(day.date, if (i == 0) "Tomorrow" else null),
+                        date = day.date,
                         events = day.events,
                         modifier = Modifier.weight(1f),
                     )
@@ -81,7 +83,7 @@ fun ComingUpCard(days: List<DayUi>?, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun DayColumn(label: String, spoken: String, events: List<EventUi>, modifier: Modifier) {
+private fun DayColumn(label: String, spoken: String, date: LocalDate, events: List<EventUi>, modifier: Modifier) {
     val c = Culvery.colors
     // Scrolls only if a tall font scale makes MAX_ROWS rows overflow the card.
     Column(
@@ -90,7 +92,7 @@ private fun DayColumn(label: String, spoken: String, events: List<EventUi>, modi
     ) {
         Text(label, style = CalendarType.strong14, color = c.ink, modifier = Modifier.semantics { heading(); contentDescription = spoken })
         if (events.isEmpty()) Text("Free", style = HhType.secondary, color = c.mute)
-        events.take(MAX_ROWS).forEach { CompactRow(it) }
+        events.take(MAX_ROWS).forEach { CompactRow(it, date) }
         if (events.size > MAX_ROWS) {
             Text("+${events.size - MAX_ROWS} more", style = CalendarType.small12, color = c.mute)
         }
@@ -98,11 +100,12 @@ private fun DayColumn(label: String, spoken: String, events: List<EventUi>, modi
 }
 
 @Composable
-private fun CompactRow(event: EventUi) {
+private fun CompactRow(event: EventUi, day: LocalDate) {
     val c = Culvery.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .semantics(mergeDescendants = true) { contentDescription = eventOnDay(event, day) }
             .height(IntrinsicSize.Min)
             .clip(RoundedCornerShape(CalendarDimens.compactRowRadius))
             .background(c.surf2)
