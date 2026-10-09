@@ -235,16 +235,20 @@ class PinPadTest {
     @Test
     fun theLockoutsSpokenTextStaysFixedWhileItsSecondsTick() {
         compose.mainClock.autoAdvance = false
-        // The pad takes the lockout's first value from the wall clock, as the existing lockout tests do; the ticking runs on the test clock.
-        controller.open("Change settings", PinError.WrongPin, System.currentTimeMillis() + 30_000)
-        show()
+        val start = 1_000_000L
+        controller.open("Change settings", PinError.WrongPin, start + 30_000)
+        // The pad's clock follows the test clock, so a first value recomputed on each tick would show.
+        compose.setContent { CulveryTheme(dark = true) { PinPadHost(controller, nowMillis = { start + compose.mainClock.currentTime }) } }
         compose.mainClock.advanceTimeByFrame()
         val spoken = description("pin_message")
+        val dotsError = compose.onNodeWithTag("pin_dots").fetchSemanticsNode().config[SemanticsProperties.Error]
         val shown = compose.onNodeWithTag("pin_error", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single().text
         compose.mainClock.advanceTimeBy(3_000)
         assertThat(description("pin_message")).isEqualTo(spoken)
+        assertThat(compose.onNodeWithTag("pin_dots").fetchSemanticsNode().config[SemanticsProperties.Error]).isEqualTo(dotsError)
         assertThat(compose.onNodeWithTag("pin_error", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single().text)
             .isNotEqualTo(shown)
-        assertThat(spoken).startsWith("Too many tries")
+        assertThat(spoken).isEqualTo(tooManyTries(30))
+        assertThat(dotsError).isEqualTo(spoken)
     }
 }

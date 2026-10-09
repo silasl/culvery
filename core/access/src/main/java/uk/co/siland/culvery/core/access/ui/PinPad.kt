@@ -60,7 +60,7 @@ import uk.co.siland.culvery.core.ui.hhClickable
 
 /** [overSheet]: a sheet is open, so the pad covers the sheet's area rather than the whole screen. */
 @Composable
-fun PinPadHost(controller: PinPromptController, overSheet: Boolean = false) {
+fun PinPadHost(controller: PinPromptController, overSheet: Boolean = false, nowMillis: () -> Long = System::currentTimeMillis) {
     val request by controller.request.collectAsState()
     request?.let { r ->
         // Keyed on the request so each retry (e.g. after a wrong PIN) starts with empty digits.
@@ -73,6 +73,7 @@ fun PinPadHost(controller: PinPromptController, overSheet: Boolean = false) {
                 onSubmit = controller::submit,
                 onCancel = controller::cancel,
                 overSheet = overSheet,
+                nowMillis = nowMillis,
             )
         }
     }
@@ -100,10 +101,11 @@ fun PinPadSheet(
     onSubmit: (String) -> Unit,
     onCancel: () -> Unit,
     overSheet: Boolean = false,
+    nowMillis: () -> Long = System::currentTimeMillis,
 ) {
     // Counts down from the initial value rather than re-reading the wall clock, so tests with a
     // virtual frame clock stay deterministic.
-    val firstSeconds = remember(lockedUntilMillis) { secondsUntil(lockedUntilMillis) }
+    val firstSeconds = remember(lockedUntilMillis) { secondsUntil(lockedUntilMillis, nowMillis()) }
     val secondsLeft by produceState(firstSeconds, lockedUntilMillis) {
         while (value > 0) {
             delay(1_000)
@@ -240,7 +242,7 @@ fun PinPadFrame(
                     Text(title, style = PinPadType.title, color = c.ink, modifier = Modifier.semantics { heading() })
                     if (line != null) Text(line, style = PinPadType.reason, color = c.mute, textAlign = TextAlign.Center)
                 }
-                Dots(filled = digits.length, error = if (wrongPin && digits.isEmpty()) message else null)
+                Dots(filled = digits.length, error = if (wrongPin && digits.isEmpty()) spokenMessage else null)
                 Box(
                     Modifier
                         .testTag("pin_message")
@@ -351,5 +353,5 @@ private fun DigitKey(digit: String, enabled: Boolean, onClick: () -> Unit) {
     }
 }
 
-private fun secondsUntil(until: Long?): Int =
-    until?.let { ((it - System.currentTimeMillis() + 999) / 1000).toInt().coerceAtLeast(0) } ?: 0
+private fun secondsUntil(until: Long?, now: Long): Int =
+    until?.let { ((it - now + 999) / 1000).toInt().coerceAtLeast(0) } ?: 0

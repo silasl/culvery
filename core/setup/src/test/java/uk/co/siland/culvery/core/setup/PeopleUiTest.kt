@@ -302,4 +302,14 @@ class PeopleUiTest {
         compose.onNodeWithTag("swatch_0").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "used by Alex"))
         compose.assertAccessible()
     }
+
+    @Test
+    fun theMoveUpActionFromTalkBackMovesSomeone() {
+        addSam()
+        show()
+        compose.awaitTag("person_Sam")
+        val up = compose.onNodeWithTag("person_Sam").fetchSemanticsNode().config[SemanticsActions.CustomActions].single { it.label == "Move Sam up" }
+        compose.runOnUiThread { up.action() }
+        compose.waitUntil(5_000) { runBlocking { household.people.first().map { it.name } } == listOf("Sam", "Alex") }
+    }
 }
