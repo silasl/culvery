@@ -13,6 +13,7 @@ android {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":core:ui")))
     api(project(":core:plugin"))
     // PersonId and Person appear in this module's public API (SourceMapping, EventUi).
     api(project(":core:household"))

@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
@@ -13,7 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
@@ -64,9 +65,13 @@ internal fun buttonColors(tone: ButtonTone, enabled: Boolean, on: ButtonSurface,
     }
 }
 
+/** A button's spoken name, kept apart from other descriptions so the shared test helper can check it starts with the label. */
+val SpokenNameKey = SemanticsPropertyKey<String>("SpokenName")
+
 /**
  * The one button (4d-1 §4.1): a pill at least [size]'s height, a one-line label, an optional icon before it. Disabled,
- * every [tone] is the quiet fill with a `mute` label and does nothing.
+ * every [tone] is the quiet fill with a `mute` label and does nothing. [spokenName] names a button whose label repeats
+ * along a list: it starts with [text] and adds the subject ("Disconnect Google Calendar, alex@example.com").
  */
 @Composable
 fun HhButton(
@@ -78,6 +83,7 @@ fun HhButton(
     icon: String? = null,
     enabled: Boolean = true,
     on: ButtonSurface,
+    spokenName: String? = null,
 ) {
     val (fill, ink) = buttonColors(tone, enabled, on, Culvery.colors)
     val large = size == ButtonSize.Large
@@ -96,7 +102,17 @@ fun HhButton(
             .heightIn(min = if (large) ButtonTokens.largeHeight else ButtonTokens.regularHeight)
             .clip(RoundedCornerShape(percent = 50))
             .background(fill)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .then(
+                if (spokenName != null) {
+                    Modifier.semantics {
+                        contentDescription = spokenName
+                        this[SpokenNameKey] = spokenName
+                    }
+                } else {
+                    Modifier
+                },
+            )
+            .hhClickable(onClick, enabled = enabled)
             .padding(start = start, end = if (large) ButtonTokens.largePaddingH else ButtonTokens.regularPaddingH),
     ) {
         if (icon != null) HhIcon(icon, size = ButtonTokens.icon, tint = ink)

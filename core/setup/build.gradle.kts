@@ -6,6 +6,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":core:ui")))
     // SetupStep, SettingsPage, AccessControl and the household's types appear in this module's public API.
     api(project(":core:plugin"))
     api(project(":core:access"))

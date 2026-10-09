@@ -5,6 +5,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":core:ui")))
     implementation(project(":core:ui"))
     api(project(":core:plugin"))
     api(project(":core:household"))

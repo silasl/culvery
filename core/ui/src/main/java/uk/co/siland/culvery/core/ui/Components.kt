@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -19,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -59,8 +57,8 @@ object ListRowTokens {
 
 /**
  * One list row: [title] and [subtitle] one line each, cut with "…"; [trailing] keeps its size and the text takes what's
- * left. With [onClick] the whole row is a button. [below] holds anything under the top line (a calendar's Master line,
- * its read problem, its person picker).
+ * left. With [onClick] the whole row is a button; [clickLabel] says what a tap does ("change Sam’s details"). [below]
+ * holds anything under the top line (a calendar's Master line, its read problem, its person picker).
  */
 @Composable
 fun HhListRow(
@@ -71,6 +69,7 @@ fun HhListRow(
     subtitleColor: Color = Culvery.colors.mute,
     trailing: (@Composable RowScope.() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    clickLabel: String? = null,
     below: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     val c = Culvery.colors
@@ -80,7 +79,7 @@ fun HhListRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(ListRowTokens.radius))
             .background(c.surf)
-            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.hhClickable(onClick, label = clickLabel) else Modifier)
             .padding(horizontal = ListRowTokens.paddingH, vertical = ListRowTokens.paddingV),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
