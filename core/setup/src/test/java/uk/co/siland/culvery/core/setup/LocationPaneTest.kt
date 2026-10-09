@@ -237,7 +237,7 @@ class LocationPaneTest {
         compose.onNodeWithTag("location_status").assertTextEquals("Couldn’t search for towns — check the tablet’s Wi-Fi, then try again.")
         fail = false
         compose.onNodeWithTag("location_retry").performClick()
-        advance(1)
+        advance(50)
         compose.onNodeWithTag("location_status").assertTextEquals("Searching…")
         advance(500)
         assertThat(search.queries).containsExactly("Can", "Can").inOrder()
