@@ -251,10 +251,28 @@ class DefaultAccessControlTest {
         person("Alex", Role.ADMIN, "1234")
         person("Mia", Role.CHILD, "9876")
         val access = access()
-        answerPins("0000", "0000", "0000", "0000", "9876", null)
+        // The right PIN straight after is ignored while locked; then Cancel.
+        answerPins("0000", "0000", "0000", "0000", "9876", "1234", null)
         assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE)).isNull()
         assertThat(seen.last().lockedUntilMillis).isNotNull()
+        assertThat(access.session.value).isNull()
         assertThat(seen.mapNotNull { (it.error as? PinError.NotAllowed)?.message }.joinToString()).doesNotContain("Mia")
+    }
+
+    @Test
+    fun aRefusedPinThatEndsInAToastCountsTowardTheLockout() = runTest {
+        person("Alex", Role.ADMIN, "1234")
+        person("Mia", Role.CHILD, "9876")
+        val access = access()
+        answerPins("0000", "0000", "0000", "0000", "9876")
+        val refused = access.authorise(
+            "test.any",
+            allow = { who, _ -> who.person.name != "Mia" },
+            refusal = Refusal.Toast { "Ask an Admin." },
+        )
+        assertThat(refused).isNull()
+        assertThat(toasts.messages).hasSize(1)
+        assertThat(firstPromptFor(access, CorePermissions.SETTINGS_MANAGE).lockedUntilMillis).isNotNull()
     }
 
     @Test
@@ -575,6 +593,38 @@ class DefaultAccessControlTest {
         advanceTimeBy(1)
         runCurrent()
         assertThat(access.session.value).isNull()
+    }
+
+    @Test
+    fun theHoldEndsWithTheSessionItWasFor() = runTest {
+        val access = access()
+        signedInAlex(access)
+        access.touch(holdForEdits = true)
+        access.lock()
+        answerPins("1234")
+        assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE)).isNotNull()
+        assertThat(access.expiresAt.value).isEqualTo(testScheduler.currentTime + SESSION_TIMEOUT_MS)
+        advanceTimeBy(SESSION_TIMEOUT_MS - 1)
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    /** Someone else's PIN at the pad takes over with their own two minutes, not the hold left by the last person's sheet. */
+    @Test
+    fun theHoldDoesNotPassToTheNextPerson() = runTest {
+        // Timers on their own scheduler, so waiting on Room's threads can't skip past Alex's session before Sam's PIN.
+        val timers = TestScope()
+        val access = access(timers.backgroundScope, nowMillis = { timers.testScheduler.currentTime })
+        person("Sam", Role.ADULT, "5555")
+        signedInAlex(access)
+        access.touch(holdForEdits = true)
+        assertThat(access.expiresAt.value).isEqualTo(EDIT_HOLD_MS)
+        answerPins("5555")
+        assertThat(access.authorise("test.any", allow = { who, _ -> who.person.name == "Sam" })?.person?.name).isEqualTo("Sam")
+        assertThat(access.expiresAt.value).isEqualTo(SESSION_TIMEOUT_MS)
     }
 
     @Test

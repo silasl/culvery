@@ -26,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -132,10 +131,7 @@ class MainActivity : ComponentActivity() {
         setupComplete = setupState.setupComplete.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
         isDeviceOwner = allowLockTaskIfOwner(this)
         lifecycle.addObserver(kiosk)
-        // The session's timer stops while the tablet sleeps; its wall-clock end is checked on the way back.
-        lifecycle.addObserver(LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_RESUME) access.checkExpiry()
-        })
+        lifecycle.addObserver(checksExpiryOnReturn(access))
         // TalkBack's gestures reach the app as accessibility events, not touches: they keep Settings and the sheets open too.
         findViewById<ViewGroup>(android.R.id.content).accessibilityDelegate = userActivity.accessibilityDelegate
         splash.setKeepOnScreenCondition {

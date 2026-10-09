@@ -1,6 +1,9 @@
 package uk.co.siland.culvery
 
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -111,5 +114,21 @@ class SetupWiringTest {
     fun theSplashNeverHoldsForTwoSeconds() {
         assertThat(holdSplash(complete = true, cardsLoaded = false, shownMillis = SPLASH_MAX_MS - 1)).isTrue()
         assertThat(holdSplash(complete = null, cardsLoaded = false, shownMillis = SPLASH_MAX_MS)).isFalse()
+    }
+
+    @Test
+    fun theSessionsEndIsCheckedOnStartAndOnResume() {
+        val access = FakeAccessControl()
+        val owner = object : LifecycleOwner {
+            val registry = LifecycleRegistry.createUnsafe(this)
+            override val lifecycle: Lifecycle get() = registry
+        }
+        owner.registry.addObserver(checksExpiryOnReturn(access))
+        owner.registry.currentState = Lifecycle.State.CREATED
+        assertThat(access.expiryChecks).isEqualTo(0)
+        owner.registry.currentState = Lifecycle.State.STARTED
+        assertThat(access.expiryChecks).isEqualTo(1)
+        owner.registry.currentState = Lifecycle.State.RESUMED
+        assertThat(access.expiryChecks).isEqualTo(2)
     }
 }

@@ -110,7 +110,7 @@ private fun rememberClosingSoon(expiresAt: Long?, nowMillis: () -> Long): Boolea
     var soon by remember(expiresAt) { mutableStateOf(false) }
     LaunchedEffect(expiresAt) {
         val at = expiresAt ?: return@LaunchedEffect
-        // Measured once from the wall clock, then waited on the frame clock: a clock change afterwards can't move it.
+        // Measured once from the wall clock, then waited monotonically: a clock change afterwards can't move it.
         delay(at - CLOSING_WARNING_MS - nowMillis())
         soon = true
     }

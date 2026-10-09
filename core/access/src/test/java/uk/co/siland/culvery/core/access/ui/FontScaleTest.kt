@@ -50,7 +50,9 @@ class FontScaleTest {
     @Test
     fun atFontScale15ARefusalIsShownWhole() {
         show(PinError.NotAllowed("That PIN can’t do this. Ask an Admin."))
-        assertThat(compose.onNodeWithTag("pin_error", useUnmergedTree = true).textLayout().hasVisualOverflow).isFalse()
+        val layout = compose.onNodeWithTag("pin_error", useUnmergedTree = true).textLayout()
+        assertThat(layout.lineCount).isAtMost(2)
+        assertThat(layout.isLineEllipsized(layout.lineCount - 1)).isFalse()
     }
 
     @Test

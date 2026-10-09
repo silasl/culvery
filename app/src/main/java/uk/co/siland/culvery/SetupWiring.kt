@@ -11,7 +11,10 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.flow.drop
+import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.SettingsPage
@@ -45,6 +48,11 @@ internal fun holdSplash(complete: Boolean?, cardsLoaded: Boolean, shownMillis: L
     shownMillis < SPLASH_MAX_MS && (complete == null || (complete && !cardsLoaded))
 
 /** 4a design D5, D9: touches restart the session while Settings is open or the wizard shows (the setup session's ten minutes). */
+/** The session's timer stops while the tablet sleeps; its wall-clock end is checked on the way back, before any touch. */
+internal fun checksExpiryOnReturn(access: AccessControl): LifecycleEventObserver = LifecycleEventObserver { _, event ->
+    if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_RESUME) access.checkExpiry()
+}
+
 internal fun countsTouches(complete: Boolean?, settingsOpen: Boolean): Boolean = complete == false || (complete == true && settingsOpen)
 
 /** While [counting], every touch [activity] reports, a TalkBack gesture's included, runs [onTouch] (4d-2 §6.1). */

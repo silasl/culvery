@@ -40,15 +40,16 @@ class DefaultAccessControl @Inject constructor(
     private val _expiresAt = MutableStateFlow<Long?>(null)
     override val expiresAt: StateFlow<Long?> = _expiresAt.asStateFlow()
 
-    // The last touch's holdForEdits, so an authorise on the session keeps it. Cleared by a touch without it, or sign-out.
+    // The last touch's holdForEdits, so an authorise on the session keeps it. Cleared by a touch without it, or when
+    // whoever is signed in changes (sign-out included). Written only under stateLock.
     @Volatile private var holding = false
 
     /** The one place the session changes. Every caller but sign-out restarts the expiry next, which sets [expiresAt] again. */
     private fun set(next: SignedIn?) = synchronized(stateLock) {
+        if (next?.who != signedIn.value?.who) holding = false
         signedIn.value = next
         _session.value = next?.who
         _expiresAt.value = null
-        if (next == null) holding = false
     }
 
     private var expiry: Job? = null
@@ -150,8 +151,8 @@ class DefaultAccessControl @Inject constructor(
 
     override fun touch(holdForEdits: Boolean) {
         if (endIfPastByWallClock()) return
-        val setup = synchronized(stateLock) { signedIn.value?.setup } ?: return
-        holding = holdForEdits
+        // Read and written together, so an expiry in between can't leave the hold behind for the next person.
+        val setup = synchronized(stateLock) { signedIn.value?.setup?.also { holding = holdForEdits } } ?: return
         restartExpiry(if (setup) SETUP_IDLE_MS else SESSION_TIMEOUT_MS)
     }
 

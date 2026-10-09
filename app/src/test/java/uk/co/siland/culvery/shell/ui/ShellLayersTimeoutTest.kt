@@ -91,6 +91,19 @@ class ShellLayersTimeoutTest {
         assertThat(open("settings_warning")).isTrue()
     }
 
+    /** A sheet and the PIN pad hide what they cover from TalkBack; the warning sits above both, so it is still read. */
+    @Test
+    fun theWarningIsReadOverAnOpenSheetAndThePinPad() {
+        show()
+        overlay.show { Box(Modifier.fillMaxSize().testTag("sheet")) }
+        pinShowing = true
+        expiresAt = compose.mainClock.currentTime + SESSION_TIMEOUT_MS
+        settle()
+        after(SESSION_TIMEOUT_MS - 20_000)
+        assertThat(open("pad")).isTrue()
+        compose.onNodeWithTag("settings_warning").assertTextEquals(SETTINGS_CLOSING)
+    }
+
     @Test
     fun noSessionNoWarning() {
         show()
