@@ -1,5 +1,9 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import uk.co.siland.culvery.core.ui.test.assertAccessible
+import androidx.compose.ui.test.onParent
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.size
@@ -322,5 +326,18 @@ class EventEditorSheetTest {
         compose.onNodeWithTag("editor_save").assertDoesNotExist()
         compose.onNodeWithTag("picker_cancel").performClick()
         compose.onNodeWithTag("editor_save").assertExists()
+    }
+
+    @Test
+    fun whoChipsAreARadioGroupAndAChildsOthersSayWhyNot() {
+        show(newForm(signedIn = SampleUi.mia.id), childOnly = SampleUi.mia.id)
+        compose.onNodeWithTag("who_Mia").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton)).assertIsSelected()
+        compose.onNodeWithTag("who_Mia").onParent().assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
+        val sam = compose.onNodeWithTag("who_Sam").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "not available"))
+        sam.performClick()
+        assertThat(calls).contains("refused")
+        compose.onNodeWithTag("day_pick").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        compose.onNodeWithTag("time_pick").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        compose.assertAccessible()
     }
 }

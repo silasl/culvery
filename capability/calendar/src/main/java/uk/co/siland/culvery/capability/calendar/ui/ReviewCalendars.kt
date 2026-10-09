@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -23,8 +25,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
@@ -226,10 +231,13 @@ private fun ConnectionHeader(row: CalendarRow, nowMillis: Long, busy: Boolean, o
             if (needsReconnect) {
                 HhButton(
                     "Reconnect", { onReconnect(row.connection) }, Modifier.testTag("settings_reconnect"),
-                    tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Surf,
+                    tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Surf, spokenName = forAccount("Reconnect", row),
                 )
             }
-            HhButton(DISCONNECT, { onDisconnect(row) }, Modifier.testTag("review_disconnect_${row.connection.id}"), enabled = !busy, on = ButtonSurface.Surf)
+            HhButton(
+                DISCONNECT, { onDisconnect(row) }, Modifier.testTag("review_disconnect_${row.connection.id}"),
+                enabled = !busy, on = ButtonSurface.Surf, spokenName = forAccount(DISCONNECT, row),
+            )
         },
     )
 }
@@ -253,10 +261,36 @@ private fun SourceRow(
         title = source.source.name,
         modifier = Modifier.testTag("review_source_$id"),
         trailing = {
-            HhChoiceChip(person.name, selected = false, tag = "review_person_$id", onClick = { onPick(sourceKey(source)) }, leading = { _ -> Dot(person) })
-            Text(SHOW, style = CalendarType.subtitle, color = c.mute)
-            // The master is always shown (4a design §3.9).
-            HhSwitch(source.mapping.visible, { onShown(source, it) }, tag = "review_show_$id", enabled = !source.isMaster && !busy)
+            HhChoiceChip(
+                person.name,
+                selected = false,
+                tag = "review_person_$id",
+                onClick = { onPick(sourceKey(source)) },
+                role = Role.Button,
+                clickLabel = changeWhoFor(source.source.name),
+                stateDescription = if (picking) EXPANDED else COLLAPSED,
+                leading = { _ -> Dot(person) },
+            )
+            // Text and switch are one switch: named for the calendar, with why the main one can't be hidden (4a design §3.9).
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(CalendarDimens.reviewItemGap),
+                modifier = Modifier
+                    .testTag("review_show_$id")
+                    .semantics {
+                        contentDescription = "$SHOW ${source.source.name}"
+                        if (source.isMaster) stateDescription = ALWAYS_SHOWN
+                    }
+                    .toggleable(
+                        value = source.mapping.visible,
+                        enabled = !source.isMaster && !busy,
+                        role = Role.Switch,
+                        onValueChange = { onShown(source, it) },
+                    ),
+            ) {
+                Text(SHOW, style = CalendarType.subtitle, color = c.mute)
+                HhSwitch(source.mapping.visible, onCheckedChange = null, tag = "review_show_switch_$id", enabled = !source.isMaster && !busy)
+            }
         },
         below = {
             if (source.isMaster) {
@@ -273,12 +307,19 @@ private fun SourceRow(
                     Text(NEW_EVENTS_GO_HERE, style = CalendarType.subtitle, color = c.mute)
                 }
             } else if (source.source.writable) {
-                HhButton(MAKE_MASTER, { onMakeMaster(source) }, Modifier.testTag("review_make_master_$id"), enabled = !busy, on = ButtonSurface.Surf)
+                HhButton(
+                    MAKE_MASTER, { onMakeMaster(source) }, Modifier.testTag("review_make_master_$id"),
+                    enabled = !busy, on = ButtonSurface.Surf, spokenName = withSubject(MAKE_MASTER, source.source.name),
+                )
             }
             // A calendar the service hid on its tick has no problem to show, and no Hide to offer.
             if (source.readProblem != null && source.mapping.visible) ReadProblem(source, busy, onShown)
             if (picking) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap), verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
+                    verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
+                    modifier = Modifier.selectableGroup(),
+                ) {
                     people.forEach { p ->
                         val selected = p.id == source.mapping.person
                         HhChoiceChip(
@@ -317,7 +358,10 @@ private fun ReadProblem(source: StoredSource, busy: Boolean, onShown: (StoredSou
         if (source.isMaster) {
             Text(CHOOSE_ANOTHER_MASTER, style = CalendarType.subtitle, color = c.mute)
         } else {
-            HhButton(HIDE_THIS_CALENDAR, { onShown(source, false) }, Modifier.testTag("review_hide_$id"), enabled = !busy, on = ButtonSurface.Surf)
+            HhButton(
+                HIDE_THIS_CALENDAR, { onShown(source, false) }, Modifier.testTag("review_hide_$id"),
+                enabled = !busy, on = ButtonSurface.Surf, spokenName = withSubject(HIDE_THIS_CALENDAR, source.source.name),
+            )
         }
     }
 }

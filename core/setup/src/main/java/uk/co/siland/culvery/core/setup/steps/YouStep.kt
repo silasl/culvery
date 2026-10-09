@@ -163,7 +163,7 @@ internal fun YouFormContent(form: YouForm, onSetPin: () -> Unit) {
             capitalization = KeyboardCapitalization.Words,
             error = form.nameError,
         )
-        HhSwatchGrid(form.color, taken = emptySet(), tagPrefix = "you_swatch_") { form.color = it }
+        HhSwatchGrid(form.color, taken = emptyMap(), tagPrefix = "you_swatch_") { form.color = it }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SetupDimens.rowDotGap)) {
             HhButton(SET_YOUR_PIN, onSetPin, Modifier.testTag("you_set_pin"), on = ButtonSurface.Bg)
             if (form.pin != null) Text(PIN_SET, style = SetupType.secondary, color = c.mute, modifier = Modifier.testTag("you_pin_set"))

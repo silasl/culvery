@@ -80,7 +80,7 @@ class SetupButtonsTest {
     fun thePersonSheetsButtonsAreButtons() {
         show {
             PersonEditorSheet(
-                form = PersonForm(sam, taken = setOf(PersonPalette.colors[0])),
+                form = PersonForm(sam, taken = mapOf(PersonPalette.colors[0] to "Alex")),
                 busy = false, canRemove = true, confirmingRemove = false, choosingPin = false,
                 onChoosePin = {}, onPinChosen = {}, onPinCancelled = {}, onSave = {}, onRemove = {}, onKeep = {},
                 onConfirmRemove = {}, onClose = {},

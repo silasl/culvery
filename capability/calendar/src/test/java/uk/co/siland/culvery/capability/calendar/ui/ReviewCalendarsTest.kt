@@ -1,5 +1,10 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import uk.co.siland.culvery.core.ui.test.assertAccessible
+import androidx.compose.ui.test.onParent
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -240,5 +245,52 @@ class ReviewCalendarsTest {
     fun theTitleIsAHeading() {
         show()
         compose.onNodeWithText("Calendars").assert(isHeading())
+    }
+
+    @Test
+    fun showIsOneNamedSwitchAndTheMainCalendarsSaysWhyItIsOff() {
+        show()
+        compose.onNodeWithTag("review_show_chores")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Show Chores")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.Off))
+        compose.onNodeWithTag("review_show_family")
+            .assertIsNotEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "always shown: it’s the main calendar"))
+    }
+
+    @Test
+    fun whoItIsForIsAButtonThatSaysWhetherItIsOpen() {
+        var picking by mutableStateOf<String?>(null)
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ReviewCalendars(
+                    "Calendars", listOf(ReviewConnection(row(), listOf(swim))), listOf(Person.Family, mia), now, false, picking, null, emptyList(),
+                    ReviewActions(onPick = { picking = if (picking == it) null else it }),
+                )
+            }
+        }
+        val chip = compose.onNodeWithTag("review_person_swim")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "collapsed"))
+        assertThat(chip.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("change who Mia's swimming is for")
+        chip.performClick()
+        compose.onNodeWithTag("review_person_swim").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "expanded"))
+        compose.onNodeWithTag("review_pick_Mia").onParent().assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
+    }
+
+    @Test
+    fun eachRepeatedActionNamesItsSubject() {
+        show(ConnectionHealth.NeedsSignIn)
+        compose.onNodeWithContentDescription("Disconnect Google Calendar, family@example.com").assertExists()
+        compose.onNodeWithContentDescription("Reconnect Google Calendar, family@example.com").assertExists()
+        compose.onNodeWithContentDescription("Make master, Chores").assertExists()
+        compose.assertAccessible()
+    }
+
+    @Test
+    fun hideNamesItsCalendar() {
+        showSources(family, swim.copy(readProblem = READ_REFUSED))
+        compose.onNodeWithContentDescription("Hide this calendar, Mia's swimming").assertExists()
     }
 }

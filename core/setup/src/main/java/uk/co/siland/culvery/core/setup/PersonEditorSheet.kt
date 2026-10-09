@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
@@ -55,11 +56,11 @@ import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "PersonSheet"
 
-/** The editor sheet's fields (4a design §4.4). [existing] is null for a new person; [taken] are other people's colours. */
+/** The editor sheet's fields (4a design §4.4). [existing] is null for a new person; [taken] maps other people's colours to their names. */
 @Stable
-internal class PersonForm(val existing: Member?, val taken: Set<Long>) {
+internal class PersonForm(val existing: Member?, val taken: Map<Long, String>) {
     var name by mutableStateOf(existing?.person?.name.orEmpty())
-    var color by mutableStateOf(existing?.person?.color ?: PersonPalette.firstFree(taken))
+    var color by mutableStateOf(existing?.person?.color ?: PersonPalette.firstFree(taken.keys))
     var role by mutableStateOf(existing?.role ?: Role.ADULT)
     var newPin by mutableStateOf<String?>(null)
     var removePin by mutableStateOf(false)
@@ -89,13 +90,13 @@ internal class PersonForm(val existing: Member?, val taken: Set<Long>) {
  * colours are taken, and [existing] may be its only active Admin.
  */
 internal fun OverlayHost.showPersonEditor(editor: PeopleEditor, existing: Member?, members: List<Member>) {
-    val taken = members.filter { it != existing }.mapTo(HashSet()) { it.person.color }
+    val taken = members.filter { it != existing }.associate { it.person.color to it.person.name }
     val lastAdmin = existing?.isActiveAdmin == true && members.count { it.isActiveAdmin } == 1
     show { PersonEditorHost(editor, existing, taken, lastAdmin, onClose = { dismiss() }) }
 }
 
 @Composable
-private fun PersonEditorHost(editor: PeopleEditor, existing: Member?, taken: Set<Long>, lastAdmin: Boolean, onClose: () -> Unit) {
+private fun PersonEditorHost(editor: PeopleEditor, existing: Member?, taken: Map<Long, String>, lastAdmin: Boolean, onClose: () -> Unit) {
     val form = remember(existing) { PersonForm(existing, taken) }
     var confirmingRemove by remember { mutableStateOf(false) }
     var choosingPin by remember { mutableStateOf(false) }
@@ -206,7 +207,7 @@ internal fun PersonEditorSheet(
                     }
                 }
                 Section(ROLE) {
-                    Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.roleGap)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.roleGap), modifier = Modifier.selectableGroup()) {
                         Role.entries.forEach { role ->
                             HhChoiceChip(roleLine(role), selected = form.role == role, tag = "role_${role.name}", onClick = {
                                 form.role = role

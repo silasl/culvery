@@ -25,6 +25,14 @@ class PersonPaletteTest {
     }
 
     @Test
+    fun everyColourHasItsNameInOrderAndFamilyIsAmber() {
+        assertThat(PersonPalette.colors.map { PersonPalette.nameOf(it) })
+            .containsExactly("Green", "Blue", "Pink", "Violet", "Lime", "Red", "Slate", "Brown").inOrder()
+        assertThat(PersonPalette.nameOf(0xFF123456)).isNull()
+        assertThat(FAMILY_COLOUR_NAME).isEqualTo("Amber")
+    }
+
+    @Test
     fun everyColourIsFarFromEveryOtherAndFromFamily() {
         val all = PersonPalette.colors + FAMILY_AMBER
         for (i in all.indices) {

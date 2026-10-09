@@ -22,7 +22,16 @@ object PersonPalette {
 
     /** The first colour nobody in [taken] has; null once all eight are used. */
     fun firstFree(taken: Collection<Long>): Long? = colors.firstOrNull { it !in taken }
+
+    /** Each colour's name, in [colors]' order: what TalkBack says for a swatch and in the week's legend. */
+    val names: List<String> = listOf("Green", "Blue", "Pink", "Violet", "Lime", "Red", "Slate", "Brown")
+
+    /** [argb]'s name; null for a colour that isn't one of these (Family's amber is [FAMILY_COLOUR_NAME]). */
+    fun nameOf(argb: Long): String? = colors.indexOf(argb).takeIf { it >= 0 }?.let(names::get)
 }
+
+/** Family's colour, by name. */
+const val FAMILY_COLOUR_NAME = "Amber"
 
 /** The label and tick on a chip filled with a person's colour: dark in both themes, as every person colour is a mid-tone. */
 val PersonChipInk: Color = DarkColors.bg

@@ -2,7 +2,6 @@ package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -38,11 +39,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -109,8 +112,10 @@ object ControlType {
 }
 
 /**
- * Hand-off §7 chip: at least 48 dp; a long label takes two lines, then ends in …; padding 0 18, radius 24, 16 sp / 600; `surf`/`ink`, or [selectedColor]/[selectedInk] when
- * selected. A disabled chip is drawn at 38% but stays tappable, so a tap can explain why.
+ * Hand-off §7 chip: at least 48 dp; a long label takes two lines, then ends in …; padding 0 18, radius 24, 16 sp / 600;
+ * `surf`/`ink`, or [selectedColor]/[selectedInk] when selected. One of a radio group by default ([role]); a chip that
+ * opens something is `Role.Button`. A disabled chip is drawn at 38% but stays tappable, so a tap can explain why:
+ * TalkBack hears "not available" and "double-tap to find out why".
  */
 @Composable
 fun HhChoiceChip(
@@ -122,21 +127,30 @@ fun HhChoiceChip(
     selectedColor: Color = Culvery.colors.accent,
     selectedInk: Color = Culvery.colors.accentInk,
     secondary: String? = null,
+    role: Role = Role.RadioButton,
+    clickLabel: String? = null,
+    stateDescription: String? = null,
     leading: (@Composable (ink: Color) -> Unit)? = null,
 ) {
     val c = Culvery.colors
     val ink = if (selected) selectedInk else c.ink
+    val state = stateDescription ?: NOT_AVAILABLE.takeIf { !enabled }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipIconGap),
         modifier = Modifier
             .testTag(tag)
-            .semantics { this.selected = selected }
+            .semantics {
+                // A button chip that isn't holding a value says nothing about selection.
+                if (role != Role.Button || selected) this.selected = selected
+                if (state != null) this.stateDescription = state
+            }
             .alpha(if (enabled) 1f else ControlTokens.DISABLED_ALPHA)
             .heightIn(min = ControlTokens.chipHeight)
             .clip(RoundedCornerShape(ControlTokens.chipRadius))
             .background(if (selected) selectedColor else c.surf)
-            .clickable(onClick = onClick)
+            // Never `enabled = false`: that would stop the explaining tap.
+            .hhClickable(onClick, label = clickLabel ?: FIND_OUT_WHY.takeIf { !enabled }, role = role)
             .padding(horizontal = ControlTokens.chipPaddingH),
     ) {
         leading?.invoke(ink)
@@ -146,6 +160,9 @@ fun HhChoiceChip(
         }
     }
 }
+
+private const val NOT_AVAILABLE = "not available"
+private const val FIND_OUT_WHY = "find out why"
 
 /**
  * 64 dp, `surf`, 22 sp / 600, one line; [placeholder] while empty; the keyboard's Done calls [onDone] and never saves.
@@ -280,20 +297,24 @@ fun HhConfirmCard(
     }
 }
 
-/** A person colour to pick (4a design §4.4): ringed when [chosen]; [taken] by someone else, struck through and disabled. */
+/** A person colour to pick (4a design §4.4): ringed when [chosen]; [takenBy] someone else, struck through, disabled and said. */
 @Composable
-fun HhSwatch(color: Color, chosen: Boolean, taken: Boolean, tag: String, onClick: () -> Unit) {
+fun HhSwatch(color: Color, name: String, chosen: Boolean, takenBy: String?, tag: String, onClick: () -> Unit) {
     val c = Culvery.colors
+    val taken = takenBy != null
     val outside = ControlTokens.swatchRing + ControlTokens.swatchRingGap
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .testTag(tag)
-            .semantics { selected = chosen }
+            .semantics {
+                contentDescription = name
+                if (takenBy != null) stateDescription = "used by $takenBy"
+            }
             .size(ControlTokens.swatch + outside * 2)
             .then(if (chosen) Modifier.border(ControlTokens.swatchRing, c.ink, CircleShape) else Modifier)
             .clip(CircleShape)
-            .clickable(enabled = !taken, onClick = onClick),
+            .selectable(selected = chosen, enabled = !taken, role = Role.RadioButton, onClick = onClick),
     ) {
         Box(
             Modifier
@@ -313,22 +334,26 @@ fun HhSwatch(color: Color, chosen: Boolean, taken: Boolean, tag: String, onClick
     }
 }
 
-/** The person colours to pick from, wrapping, 12 apart; swatch i is tagged [tagPrefix] + i. */
+/** The person colours to pick from, a radio group, wrapping, 12 apart; swatch i is tagged [tagPrefix] + i. [taken] maps a colour to who has it. */
 @Composable
-fun HhSwatchGrid(chosen: Long?, taken: Set<Long>, tagPrefix: String, onPick: (Long) -> Unit) {
+fun HhSwatchGrid(chosen: Long?, taken: Map<Long, String>, tagPrefix: String, onPick: (Long) -> Unit) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(ControlTokens.swatchGap),
         verticalArrangement = Arrangement.spacedBy(ControlTokens.swatchGap),
+        modifier = Modifier.selectableGroup(),
     ) {
         PersonPalette.colors.forEachIndexed { i, colour ->
-            HhSwatch(Color(colour), chosen = chosen == colour, taken = colour in taken, tag = "$tagPrefix$i") { onPick(colour) }
+            HhSwatch(Color(colour), PersonPalette.names[i], chosen = chosen == colour, takenBy = taken[colour], tag = "$tagPrefix$i") { onPick(colour) }
         }
     }
 }
 
-/** A Show-style switch in the theme's colours: `accent` when on; a disabled one that is on stays faded `accent`. */
+/**
+ * A Show-style switch in the theme's colours: `accent` when on; a disabled one that is on stays faded `accent`. With
+ * [onCheckedChange] null it only draws: the row around it is the switch TalkBack and the finger use.
+ */
 @Composable
-fun HhSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, tag: String, enabled: Boolean = true) {
+fun HhSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, tag: String, enabled: Boolean = true) {
     val c = Culvery.colors
     val faded = c.accent.copy(alpha = ControlTokens.DISABLED_ALPHA)
     Switch(

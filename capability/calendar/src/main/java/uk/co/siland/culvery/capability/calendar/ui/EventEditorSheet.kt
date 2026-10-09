@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +39,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -245,6 +247,7 @@ private fun Section(label: String, chips: @Composable () -> Unit) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
             verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
+            modifier = Modifier.selectableGroup(),
         ) {
             chips()
         }
@@ -305,6 +308,7 @@ private fun DaySection(form: EventForm, busy: Boolean, onPickDate: () -> Unit) {
             label = picked ?: "Pick date…",
             selected = picked != null,
             tag = "day_pick",
+            role = Role.Button,
             leading = { ink -> HhIcon(Icons.CALENDAR_MONTH, size = ControlTokens.chipIcon, tint = ink) },
             onClick = { if (!busy) onPickDate() },
         )
@@ -329,6 +333,7 @@ private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit) 
             label = custom?.time?.format(HOURS_MINUTES) ?: "Pick time…",
             selected = custom != null,
             tag = "time_pick",
+            role = Role.Button,
             leading = { ink -> HhIcon(Icons.SCHEDULE, size = ControlTokens.chipIcon, tint = ink) },
             onClick = { if (!busy) onPickTime() },
         )

@@ -101,7 +101,7 @@ class SetupScreenshotTest {
         }
     }
 
-    private fun newPerson() = PersonForm(existing = null, taken = setOf(PersonPalette.colors[0]))
+    private fun newPerson() = PersonForm(existing = null, taken = mapOf(PersonPalette.colors[0] to "Alex"))
 
     @Test fun peopleListDark() = people("people_list_dark", true)
     @Test fun peopleListLight() = people("people_list_light", false)
@@ -112,17 +112,17 @@ class SetupScreenshotTest {
     fun personErrorDark() = sheet(
         "person_error_dark",
         true,
-        PersonForm(existing = null, taken = setOf(PersonPalette.colors[0], PersonPalette.colors[1])).apply {
+        PersonForm(existing = null, taken = mapOf(PersonPalette.colors[0] to "Alex", PersonPalette.colors[1] to "Sam")).apply {
             name = "Sam"
             message = "Someone is already called Sam."
         },
     )
 
     @Test
-    fun personRemoveDark() = sheet("person_remove_dark", true, PersonForm(sam, taken = setOf(PersonPalette.colors[0])), confirmingRemove = true)
+    fun personRemoveDark() = sheet("person_remove_dark", true, PersonForm(sam, taken = mapOf(PersonPalette.colors[0] to "Alex")), confirmingRemove = true)
 
     @Test
-    fun personPinDark() = sheet("person_pin_dark", true, PersonForm(sam, taken = setOf(PersonPalette.colors[0])), choosingPin = true)
+    fun personPinDark() = sheet("person_pin_dark", true, PersonForm(sam, taken = mapOf(PersonPalette.colors[0] to "Alex")), choosingPin = true)
 
     private fun step(name: String, dark: Boolean, dot: Int, forward: Forward, back: Boolean = true, content: @Composable () -> Unit) =
         snap(name, dark) {

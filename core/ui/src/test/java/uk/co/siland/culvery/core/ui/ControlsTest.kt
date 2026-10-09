@@ -23,11 +23,13 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import uk.co.siland.culvery.core.ui.test.assertAccessible
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -41,26 +43,49 @@ class ControlsTest {
     private fun show(content: @Composable () -> Unit) =
         compose.setContent { CulveryTheme(dark = true) { content() } }
 
+    private val radio = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton)
+
     @Test
-    fun aTakenSwatchIsDisabledAndIgnoresATap() {
+    fun aTakenSwatchIsNamedDisabledAndSaysWhoHasIt() {
         var taps = 0
-        show { HhSwatch(Color(0xFF5B9BE0), chosen = false, taken = true, tag = "swatch") { taps++ } }
-        compose.onNodeWithTag("swatch").assertIsNotEnabled().performClick()
+        show { HhSwatch(Color(0xFF5B9BE0), "Blue", chosen = false, takenBy = "Sam", tag = "swatch") { taps++ } }
+        compose.onNodeWithTag("swatch")
+            .assert(radio)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Blue")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "used by Sam"))
+            .assertIsNotEnabled()
+            .performClick()
         assertThat(taps).isEqualTo(0)
     }
 
     @Test
-    fun aChosenSwatchIsSelectedAndAFreeOneTakesATap() {
+    fun theSwatchesAreARadioGroupWithTheChosenOneSelected() {
+        var picked: Long? = null
+        show { HhSwatchGrid(PersonPalette.colors[0], taken = mapOf(PersonPalette.colors[2] to "Mia"), tagPrefix = "swatch_") { picked = it } }
+        compose.onNodeWithTag("swatch_0").assert(radio).assertIsSelected()
+        compose.onNodeWithTag("swatch_0").onParent().assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
+        compose.onNodeWithTag("swatch_1").assertIsNotSelected().assertIsEnabled().performClick()
+        assertThat(picked).isEqualTo(PersonPalette.colors[1])
+        compose.assertAccessible()
+    }
+
+    @Test
+    fun aChoiceChipIsARadioButtonAndADisabledOneStillExplainsItself() {
         var taps = 0
         show {
             Row {
-                HhSwatch(Color(0xFF4CB387), chosen = true, taken = false, tag = "chosen") {}
-                HhSwatch(Color(0xFF5B9BE0), chosen = false, taken = false, tag = "free") { taps++ }
+                HhChoiceChip("Mia", selected = false, tag = "mia", onClick = { taps++ }, enabled = false)
+                HhChoiceChip("Pick date…", selected = false, tag = "pick", onClick = {}, role = Role.Button)
             }
         }
-        compose.onNodeWithTag("chosen").assertIsSelected()
-        compose.onNodeWithTag("free").assertIsNotSelected().assertIsEnabled().performClick()
+        val mia = compose.onNodeWithTag("mia")
+            .assert(radio)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "not available"))
+            .assertIsEnabled()
+        assertThat(mia.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("find out why")
+        mia.performClick()
         assertThat(taps).isEqualTo(1)
+        compose.onNodeWithTag("pick").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
     }
 
     @Test

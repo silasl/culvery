@@ -269,4 +269,14 @@ class PeopleUiTest {
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Choose a 4-digit PIN")).assertExists()
         compose.onNodeWithTag("person_save").assertDoesNotExist()
     }
+
+    @Test
+    fun thePersonSheetPassesTheSharedCheck() {
+        addSam()
+        show()
+        compose.awaitTag("person_Sam")
+        compose.onNodeWithTag("person_Sam").performClick()
+        compose.onNodeWithTag("swatch_0").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "used by Alex"))
+        compose.assertAccessible()
+    }
 }
