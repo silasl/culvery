@@ -38,7 +38,7 @@ fun disconnectQuestion(service: String, queued: Int): String = "Disconnect $serv
 /**
  * Review calendars (4a design §3.9, D13, D14), for the wizard and Settings › Calendars: who each calendar is for, whether
  * it shows, the master, and disconnecting. Every change takes `settings.manage`, applies at once and on the tablet only,
- * and is toasted; a failure is "Couldn't save — try again." and changes nothing.
+ * and is toasted; a failure is "Couldn’t save — try again." and changes nothing.
  */
 @Singleton
 class CalendarReview @Inject constructor(

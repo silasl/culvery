@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -119,6 +122,9 @@ class OpenEventTest {
     private fun waitForText(text: String) =
         compose.waitUntil(5_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
 
+    private fun assertAddMode() =
+        compose.onNodeWithTag("editor_sheet").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Add event"))
+
     private fun waitForTag(tag: String) =
         compose.waitUntil(5_000) { compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
 
@@ -179,6 +185,7 @@ class OpenEventTest {
         waitForTag("today_add")
         compose.onNodeWithTag("today_add").performClick()
         waitForTag("editor_sheet")
+        assertAddMode()
         compose.onNodeWithTag("editor_summary").assertTextEquals("Today · 14:00–15:00 · Family")
     }
 
@@ -189,6 +196,7 @@ class OpenEventTest {
         waitForTag("week_add_event")
         compose.onNodeWithTag("week_add_event").performClick()
         waitForTag("editor_sheet")
+        assertAddMode()
         compose.onNodeWithTag("editor_summary").assertTextEquals("Today · 14:00–15:00 · Family")
     }
 
@@ -200,6 +208,7 @@ class OpenEventTest {
         waitForTag("week_add_$friday")
         compose.onNodeWithTag("week_add_$friday", useUnmergedTree = true).performClick()
         waitForTag("editor_sheet")
+        assertAddMode()
         // A later day starts on Morning.
         compose.onNodeWithTag("editor_summary").assertTextEquals("Fri 25 Sep · 09:00–10:00 · Family")
     }

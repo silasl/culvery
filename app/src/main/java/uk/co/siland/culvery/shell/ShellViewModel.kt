@@ -180,7 +180,7 @@ class ShellViewModel @Inject constructor(
         }
     }
 
-    /** Ruling 15: kiosk.exit's fresh PIN (its pad says "Exit kiosk mode", which is what this does). */
+    /** Ruling 15: kiosk.exit's fresh PIN (its pad says "Use other apps", which is what this does). */
     override fun changeHomeApp() {
         viewModelScope.launch {
             access.authorise(CorePermissions.KIOSK_EXIT) ?: return@launch

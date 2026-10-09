@@ -145,7 +145,7 @@ class CalendarEditor internal constructor(
         return write(target, ChangeKind.DELETE, who)
     }
 
-    /** Tags [ref] as being for [person] (hand-off: "Assign to…"). Adults only. */
+    /** Tags [ref] as being for [person] (hand-off: "Choose who it’s for"). Adults only. */
     suspend fun assign(ref: EventRef, person: PersonId): EditResult {
         val target = resolve(ref) ?: return EditResult.NotEditable
         if (target.pending.any { it.kind == ChangeKind.DELETE }) return EditResult.NotEditable

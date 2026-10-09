@@ -2,7 +2,6 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import android.os.Looper
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -192,7 +191,7 @@ class EventDetailHostTest {
         compose.onNodeWithTag("detail_assign").performClick()
         compose.onNodeWithTag("assign_Mia").performClick()
         waitUntil { writer.calls.isNotEmpty() }
-        waitUntil { compose.onAllNodesWithTag("detail_assign").fetchSemanticsNodes().isEmpty() }
+        waitUntil { compose.onAllNodesWithText("Showing as Family until someone chooses who it’s for.").fetchSemanticsNodes().isEmpty() }
         assertThat(writer.calls).containsExactly("update:plumber")
         assertThat(runBlocking { store.eventNow(EventRef("c1", "s-family", "plumber")) }?.forPerson).isEqualTo(access.mia.id.value)
     }

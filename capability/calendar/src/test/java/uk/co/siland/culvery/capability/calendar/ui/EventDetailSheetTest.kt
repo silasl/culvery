@@ -115,7 +115,7 @@ class EventDetailSheetTest {
         compose.onNodeWithText("Can’t change here").assertExists()
         compose.onNodeWithText("This calendar can only be changed by whoever runs it.").assertExists()
         compose.onNodeWithText("School terms (can’t change here)").assertExists()
-        compose.onNodeWithText("School terms").assertExists()
+        compose.onNode(hasText("School terms") and hasAnyAncestor(hasTestTag("detail_info"))).assertExists()
         compose.onNodeWithTag("detail_delete").assertDoesNotExist()
         compose.onNodeWithTag("detail_edit").assertDoesNotExist()
     }

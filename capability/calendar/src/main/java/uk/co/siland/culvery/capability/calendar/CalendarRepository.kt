@@ -40,7 +40,7 @@ class CalendarRepository @Inject constructor(
 
     val hasConnections: Flow<Boolean> = store.connectionIds().map { it.isNotEmpty() }.distinctUntilChanged()
 
-    /** The household's people, for the detail sheet's Assign chips and the add/edit sheet's Who chips. */
+    /** The household's people, for the detail sheet's chips for choosing who it's for and the add/edit sheet's Who chips. */
     val people: Flow<List<Person>> = household.people
 
     val syncStatus: Flow<SyncStatusUi> = store.connections().map { connections ->

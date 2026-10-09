@@ -41,7 +41,7 @@ internal object CalendarType {
     /** 17 sp / 600: info-row values. */
     val infoValue = HhType.rowTitle
 
-    /** 13 sp / 700: "Syncing to …". */
+    /** 13 sp / 700: "Saving to …". */
     val syncingPill = HhType.label.copy(fontWeight = FontWeight.W700)
 
     /** 16 sp / 700: explanation card titles. */
@@ -86,7 +86,7 @@ internal object CalendarType {
     /** 34 sp / 700: "Your calendars" and "Calendars", as the wizard's and Settings' titles (4a design §4.5). */
     val reviewTitle = HhType.screenTitle
 
-    /** 13 sp / 700: the "Master" badge. */
+    /** 13 sp / 700: the "Main" badge. */
     val badge = syncingPill
 }
 
@@ -289,7 +289,7 @@ internal object CalendarDimens {
     // Settings' Calendars block (3a design §4.1): rows are ListRowTokens'; a connection's 26 dp icon leads it.
     val settingsIcon = 26.dp
 
-    // Review calendars (4a design §4.5; not in the spec): blocks 12 apart; a calendar row's parts 12 apart; the Master badge
+    // Review calendars (4a design §4.5; not in the spec): blocks 12 apart; a calendar row's parts 12 apart; the Main badge
     // `accentSoft`, radius 12, padding 4×10. The wizard's Connect card 380×460, about a Home card's size.
     val reviewBlockGap = 12.dp
     val reviewItemGap = 12.dp
