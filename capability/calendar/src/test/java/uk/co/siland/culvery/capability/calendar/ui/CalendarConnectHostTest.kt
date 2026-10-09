@@ -128,6 +128,7 @@ class CalendarConnectHostTest {
         google.connectsAs = googleConnection
         access.answer(TestAccess.ALEX)
         show(existing = null)
+        assertThat(overlay.closesWhenIdle).isFalse()
         waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.toasts.messages).containsExactly("Google Calendar connected")
         assertThat(overlay.dismissed).isEqualTo(1)

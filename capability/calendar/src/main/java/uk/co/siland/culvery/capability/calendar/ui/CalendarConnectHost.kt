@@ -35,7 +35,8 @@ internal const val CONNECTING_LINE = "Choose the family's Google account and all
 /** What the connecting card is for: a new connection to [provider], or reconnecting [existing]. */
 internal data class ConnectRequest(val provider: CalendarProvider, val existing: Connection?)
 
-internal fun OverlayHost.showConnect(request: ConnectRequest, connections: CalendarConnections): Unit = show {
+// Google's chooser is a screen outside the app: no touch reaches Culvery while it is open, so the card mustn't close by itself.
+internal fun OverlayHost.showConnect(request: ConnectRequest, connections: CalendarConnections): Unit = show(closesWhenIdle = false) {
     CalendarConnectHost(request, connections, onClose = { dismiss() })
 }
 

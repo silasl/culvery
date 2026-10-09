@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -47,20 +48,32 @@ internal const val SPLASH_MAX_MS = 2_000L
 internal fun holdSplash(complete: Boolean?, cardsLoaded: Boolean, shownMillis: Long): Boolean =
     shownMillis < SPLASH_MAX_MS && (complete == null || (complete && !cardsLoaded))
 
-/** 4a design D5, D9: touches restart the session while Settings is open or the wizard shows (the setup session's ten minutes). */
 /** The session's timer stops while the tablet sleeps; its wall-clock end is checked on the way back, before any touch. */
 internal fun checksExpiryOnReturn(access: AccessControl): LifecycleEventObserver = LifecycleEventObserver { _, event ->
     if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_RESUME) access.checkExpiry()
 }
 
+/** 4a design D5, D9: touches restart the session while Settings is open or the wizard shows (the setup session's ten minutes). */
 internal fun countsTouches(complete: Boolean?, settingsOpen: Boolean): Boolean = complete == false || (complete == true && settingsOpen)
 
-/** While [counting], every touch [activity] reports, a TalkBack gesture's included, runs [onTouch] (4d-2 §6.1). */
+/**
+ * While [counting], every touch [activity] reports, a TalkBack gesture's included, runs [onTouch] with whether the open
+ * sheet has unsaved changes ([edited]). The session is re-armed whenever [edited] changes too: typing goes to the
+ * keyboard's window, so a sheet's first change counts as a touch, and edits undone or a sheet closed go back to the
+ * plain two minutes at once rather than at the next tap. Counting stopping with the hold on drops it the same way, so
+ * Settings closed over an edited sheet doesn't leave its session on the edit hold (4d-2 §6.2).
+ */
 @Composable
-internal fun SessionTouches(activity: UserActivity, counting: Boolean, onTouch: () -> Unit) {
+internal fun SessionTouches(activity: UserActivity, counting: Boolean, edited: Boolean, onTouch: (holdForEdits: Boolean) -> Unit) {
     val touch by rememberUpdatedState(onTouch)
+    val hold by rememberUpdatedState(edited)
+    val holding = remember { booleanArrayOf(false) }
     LaunchedEffect(activity, counting) {
-        if (counting) activity.touches.drop(1).collect { touch() }
+        if (counting) activity.touches.drop(1).collect { touch(hold) }
+    }
+    LaunchedEffect(counting, edited) {
+        if (counting) touch(edited) else if (holding[0]) touch(false)
+        holding[0] = counting && edited
     }
 }
 

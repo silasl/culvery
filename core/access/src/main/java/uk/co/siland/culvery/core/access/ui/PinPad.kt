@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -47,22 +48,43 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.access.PinHasher
 import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.pinReasonText
+import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
+import uk.co.siland.culvery.core.plugin.OVERLAY_IDLE_MS
+import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 
-/** [overSheet]: a sheet is open, so the pad covers the sheet's area rather than the whole screen. */
+/**
+ * [overSheet]: a sheet is open, so the pad covers the sheet's area rather than the whole screen. Left alone, it cancels
+ * after [OVERLAY_IDLE_MS]; [overSettings]: only once the longest Settings session would have ended, so the session
+ * always ends first and the pad's close can't move TalkBack's focus and stretch it (4d-2 §6.3).
+ */
 @Composable
-fun PinPadHost(controller: PinPromptController, overSheet: Boolean = false, nowMillis: () -> Long = System::currentTimeMillis) {
+fun PinPadHost(
+    controller: PinPromptController,
+    activity: UserActivity,
+    overSheet: Boolean = false,
+    overSettings: Boolean = false,
+    nowMillis: () -> Long = System::currentTimeMillis,
+) {
     val request by controller.request.collectAsState()
     request?.let { r ->
+        // Each touch starts the wait again; then it cancels as Cancel does, so authorise returns null. A lockout doesn't stop it.
+        LaunchedEffect(r, overSettings) {
+            activity.touches.collectLatest {
+                delay(if (overSettings) activity.timeout(EDIT_HOLD_MS) + SETTINGS_MARGIN_MS else activity.timeout(OVERLAY_IDLE_MS))
+                controller.cancel()
+            }
+        }
         // Keyed on the request so each retry (e.g. after a wrong PIN) starts with empty digits.
         key(r) {
             PinPadSheet(
@@ -78,6 +100,9 @@ fun PinPadHost(controller: PinPromptController, overSheet: Boolean = false, nowM
         }
     }
 }
+
+/** How much longer than the longest Settings session the pad waits over it; Settings closing re-keys the pad to its own wait. */
+private const val SETTINGS_MARGIN_MS = 1_000L
 
 internal const val ENTER_YOUR_PIN = "Enter your PIN"
 

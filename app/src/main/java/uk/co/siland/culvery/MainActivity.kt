@@ -177,17 +177,19 @@ class MainActivity : ComponentActivity() {
                 CulveryTheme(dark = state.dark) {
                     // Zero while the bars are hidden (the pinned kiosk); after Exit kiosk the content clears them (K1).
                     Box(Modifier.fillMaxSize().background(Culvery.colors.bg).windowInsetsPadding(WindowInsets.systemBars)) {
-                        SessionTouches(userActivity, countsTouches(complete, state.settingsOpen)) { access.touch() }
+                        val counting = countsTouches(complete, state.settingsOpen)
+                        SessionTouches(userActivity, counting, overlay.edited) { hold -> access.touch(holdForEdits = hold) }
                         ShellLayers(
                             overlay = overlay,
                             toast = toast,
                             onToastHidden = toasts::hide,
                             pinShowing = pinRequest != null,
-                            pinPad = { PinPadHost(pinPrompt, overSheet = overlay.isShowing) },
+                            pinPad = { PinPadHost(pinPrompt, userActivity, overSheet = overlay.isShowing, overSettings = state.settingsOpen) },
                             activity = userActivity,
                             onTouch = userActivity::touched,
                             settingsExpiresAt = if (state.settingsOpen) sessionEnds else null,
                             nowMillis = wallClock::nowMillis,
+                            overlaysCloseWhenIdle = !counting,
                         ) {
                             AppContent(
                                 complete = complete,

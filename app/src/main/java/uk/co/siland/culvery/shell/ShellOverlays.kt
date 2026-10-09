@@ -19,14 +19,27 @@ class OverlayState : OverlayHost {
     var content: (@Composable () -> Unit)? by mutableStateOf(null)
         private set
 
+    var closesWhenIdle by mutableStateOf(true)
+        private set
+
+    var edited by mutableStateOf(false)
+        private set
+
     val isShowing: Boolean get() = content != null
 
-    override fun show(content: @Composable () -> Unit) {
+    override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) {
+        this.closesWhenIdle = closesWhenIdle
+        edited = false
         this.content = content
+    }
+
+    override fun markEdited(edited: Boolean) {
+        this.edited = edited
     }
 
     override fun dismiss() {
         content = null
+        edited = false
     }
 }
 

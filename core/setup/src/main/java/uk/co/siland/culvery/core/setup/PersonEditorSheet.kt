@@ -14,11 +14,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -67,6 +70,11 @@ internal class PersonForm(val existing: Member?, val taken: Map<Long, String>) {
     var message by mutableStateOf<String?>(null)
     var nameError by mutableStateOf<String?>(null)
 
+    private val opening = listOf(name, color, role)
+
+    /** Anything differs from how the sheet opened (a PIN chosen or removed counts): closing it now would lose it. */
+    val edited: Boolean get() = listOf(name, color, role) != opening || newPin != null || removePin
+
     val hasPin: Boolean get() = newPin != null || (existing?.hasPin == true && !removePin)
     val canSave: Boolean get() = name.isNotBlank() && color != null
 
@@ -92,11 +100,18 @@ internal class PersonForm(val existing: Member?, val taken: Map<Long, String>) {
 internal fun OverlayHost.showPersonEditor(editor: PeopleEditor, existing: Member?, members: List<Member>) {
     val taken = members.filter { it != existing }.associate { it.person.color to it.person.name }
     val lastAdmin = existing?.isActiveAdmin == true && members.count { it.isActiveAdmin } == 1
-    show { PersonEditorHost(editor, existing, taken, lastAdmin, onClose = { dismiss() }) }
+    show { PersonEditorHost(editor, existing, taken, lastAdmin, onClose = { dismiss() }, onEdited = ::markEdited) }
 }
 
 @Composable
-private fun PersonEditorHost(editor: PeopleEditor, existing: Member?, taken: Map<Long, String>, lastAdmin: Boolean, onClose: () -> Unit) {
+private fun PersonEditorHost(
+    editor: PeopleEditor,
+    existing: Member?,
+    taken: Map<Long, String>,
+    lastAdmin: Boolean,
+    onClose: () -> Unit,
+    onEdited: (Boolean) -> Unit,
+) {
     val form = remember(existing) { PersonForm(existing, taken) }
     var confirmingRemove by remember { mutableStateOf(false) }
     var choosingPin by remember { mutableStateOf(false) }
@@ -104,6 +119,9 @@ private fun PersonEditorHost(editor: PeopleEditor, existing: Member?, taken: Map
         Log.w(TAG, "Couldn't save a person (${e::class.simpleName})")
         form.message = COULD_NOT_SAVE
     }
+    // Saving counts as edited, so the idle close never cuts a save off half done.
+    val edited by rememberUpdatedState(onEdited)
+    LaunchedEffect(form) { snapshotFlow { form.edited || action.busy }.collect { edited(it) } }
     val settle: (PeopleOutcome) -> Unit = { outcome ->
         when (outcome) {
             PeopleOutcome.Done -> onClose()

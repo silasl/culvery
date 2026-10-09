@@ -546,4 +546,43 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_failure").assertDoesNotExist()
         assertThat(deleting).isEmpty()
     }
+
+    @Test
+    fun typingATitleMarksTheSheetEditedAndClearingItDoesNot() {
+        showOverlay { showEditor(EditorRequest.New(day = null), day, repo, editor) }
+        waitForText("New event")
+        compose.onNodeWithTag("editor_title").performTextInput("Swim")
+        compose.waitUntil(5_000) { overlay.edited }
+        compose.onNodeWithTag("editor_title").performTextReplacement("")
+        compose.waitUntil(5_000) { !overlay.edited }
+        assertThat(overlay.closesWhenIdle).isTrue()
+    }
+
+    /** While the PIN pad of a Save or Delete is up the sheet counts as edited, so the shell gives it the longer wait. */
+    @Test
+    fun aSheetWaitingOnItsPinPadCountsAsEditedUntilThePadGoes() {
+        showOverlay { showEditor(EditorRequest.Edit(dinner), day, repo, editor) }
+        waitForText("Edit event")
+        assertThat(overlay.edited).isFalse()
+        compose.onNodeWithTag("editor_delete").performClick()
+        compose.waitUntil(5_000) { access.requests.isNotEmpty() }
+        compose.waitUntil(5_000) { overlay.edited }
+        compose.runOnIdle { access.prompt.cancel() }
+        compose.waitUntil(5_000) { !overlay.edited }
+        assertThat(deleting).isEmpty()
+    }
+
+    /** Closing by itself is the overlay's dismiss: an edited sheet goes with its edits and nothing is saved. */
+    @Test
+    fun dismissingAnEditedSheetSavesNothing() {
+        showOverlay { showEditor(EditorRequest.New(day = null), day, repo, editor) }
+        waitForText("New event")
+        compose.onNodeWithTag("editor_title").performTextInput("Swim")
+        compose.waitUntil(5_000) { overlay.edited }
+        compose.runOnIdle { overlay.dismiss() }
+        compose.waitForIdle()
+        assertThat(writer.calls).isEmpty()
+        assertThat(access.requests).isEmpty()
+        assertThat(overlay.edited).isFalse()
+    }
 }

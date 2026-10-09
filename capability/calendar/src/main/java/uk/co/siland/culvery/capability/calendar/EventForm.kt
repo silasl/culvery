@@ -97,6 +97,13 @@ class EventForm(
     var length: Duration by mutableStateOf(original?.let(::lengthOf) ?: DEFAULT_LENGTH)
         private set
 
+    private data class Answers(val title: String, val who: PersonId, val day: LocalDate, val time: TimeChoice, val length: Duration)
+
+    private val opening = Answers(title, who, day, time, length)
+
+    /** Any field differs from how the sheet opened: closing it now would lose something (4d-2 §6.3). Changed back, it isn't. */
+    val edited: Boolean get() = Answers(title, who, day, time, length) != opening
+
     private var whoTouched = false
 
     // Until a Time chip is touched, changing the day re-applies the default (a new event only).

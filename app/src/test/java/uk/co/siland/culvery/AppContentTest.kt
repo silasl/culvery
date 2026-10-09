@@ -38,7 +38,7 @@ class AppContentTest {
 
     private fun show() = compose.setContent {
         CulveryTheme(dark = true) {
-            SessionTouches(activity, countsTouches(complete, settingsOpen)) { access.touch() }
+            SessionTouches(activity, countsTouches(complete, settingsOpen), overlay.edited) { hold -> access.touch(hold) }
             ShellLayers(
                 overlay = overlay,
                 toast = null,
@@ -47,6 +47,7 @@ class AppContentTest {
                 pinPad = {},
                 activity = activity,
                 onTouch = activity::touch,
+                overlaysCloseWhenIdle = !countsTouches(complete, settingsOpen),
             ) {
                 AppContent(
                     complete = complete,
@@ -95,9 +96,10 @@ class AppContentTest {
         compose.runOnIdle {
             overlay.show { HhSheet(PaddingValues()) { Text("Sheet", Modifier.testTag("sheet_text")) } }
         }
+        val before = compose.runOnIdle { access.touches }
         compose.onNodeWithTag("sheet_text").performClick()
         compose.waitForIdle()
-        assertThat(access.touches).isEqualTo(1)
+        assertThat(access.touches).isEqualTo(before + 1)
     }
 
     /** A38: whatever UserActivity counts (a TalkBack gesture on the device) reaches the session as a finger does. */
@@ -106,9 +108,10 @@ class AppContentTest {
         complete = true
         settingsOpen = true
         show()
+        val before = compose.runOnIdle { access.touches }
         activity.touch()
         compose.waitForIdle()
-        assertThat(access.touches).isEqualTo(1)
+        assertThat(access.touches).isEqualTo(before + 1)
     }
 
     @Test
@@ -117,10 +120,72 @@ class AppContentTest {
         settingsOpen = true
         show()
         compose.runOnIdle { overlay.show { Text("Sheet") } }
+        compose.runOnIdle { overlay.markEdited(true) }
         compose.onNodeWithText("Sheet").assertExists()
         settingsOpen = false
         compose.onNodeWithText("Sheet").assertDoesNotExist()
         assertThat(overlay.isShowing).isFalse()
+        assertThat(overlay.edited).isFalse()
+    }
+
+    /** Settings closed over an edited sheet leaves its session on two minutes, not the edit hold: reopening it needs the PIN sooner. */
+    @Test
+    fun closingSettingsOverAnEditedSheetDropsTheHold() {
+        complete = true
+        settingsOpen = true
+        show()
+        compose.runOnIdle { overlay.show { Text("Sheet") } }
+        compose.runOnIdle { overlay.markEdited(true) }
+        compose.waitForIdle()
+        assertThat(access.holds.last()).isTrue()
+        settingsOpen = false
+        compose.waitForIdle()
+        assertThat(access.holds.last()).isFalse()
+        val after = access.touches
+        activity.touch()
+        compose.waitForIdle()
+        assertThat(access.touches).isEqualTo(after)
+    }
+
+    /** Typing goes to the keyboard's window, which Culvery's touch detector never sees, so the sheet's first change holds the session. */
+    @Test
+    fun anOpenSheetsFirstChangeHoldsTheSettingsSession() {
+        complete = true
+        settingsOpen = true
+        show()
+        compose.runOnIdle { overlay.show { Text("Sheet") } }
+        compose.runOnIdle { overlay.markEdited(true) }
+        compose.waitForIdle()
+        assertThat(access.holds.last()).isTrue()
+    }
+
+    /** Edits undone, or the sheet closed, put the session straight back on two minutes. */
+    @Test
+    fun closingAnEditedSheetPutsSettingsBackOnTwoMinutes() {
+        complete = true
+        settingsOpen = true
+        show()
+        compose.runOnIdle { overlay.show { Text("Sheet") } }
+        compose.runOnIdle { overlay.markEdited(true) }
+        compose.waitForIdle()
+        compose.runOnIdle { overlay.dismiss() }
+        compose.waitForIdle()
+        assertThat(access.holds.takeLast(2)).containsExactly(true, false).inOrder()
+    }
+
+    @Test
+    fun undoingTheEditsPutsSettingsBackOnTwoMinutes() {
+        complete = true
+        settingsOpen = true
+        show()
+        compose.runOnIdle { overlay.show { Text("Sheet") } }
+        compose.runOnIdle { overlay.markEdited(true) }
+        compose.waitForIdle()
+        compose.runOnIdle { overlay.markEdited(false) }
+        compose.waitForIdle()
+        activity.touch()
+        compose.waitForIdle()
+        assertThat(access.holds.takeLast(3)).containsExactly(true, false, false).inOrder()
     }
 
     @Test

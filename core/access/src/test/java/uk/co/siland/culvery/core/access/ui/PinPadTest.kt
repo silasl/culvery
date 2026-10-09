@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.access.ui
 
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -29,6 +30,8 @@ import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.pinReasonText
+import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import androidx.compose.ui.test.isHeading
@@ -39,8 +42,10 @@ class PinPadTest {
     @get:Rule val compose = createComposeRule()
     private val controller = PinPromptController()
 
-    private fun show(overSheet: Boolean = false) =
-        compose.setContent { CulveryTheme(dark = true) { PinPadHost(controller, overSheet) } }
+    private val activity = FakeUserActivity()
+
+    private fun show(overSheet: Boolean = false, overSettings: Boolean = false) =
+        compose.setContent { CulveryTheme(dark = true) { PinPadHost(controller, activity, overSheet, overSettings) } }
 
     private fun tap(vararg keys: String) = keys.forEach { compose.onNodeWithTag("pin_key_$it").performClick() }
 
@@ -238,7 +243,7 @@ class PinPadTest {
         val start = 1_000_000L
         controller.open("Change settings", PinError.WrongPin, start + 30_000)
         // The pad's clock follows the test clock, so a first value recomputed on each tick would show.
-        compose.setContent { CulveryTheme(dark = true) { PinPadHost(controller, nowMillis = { start + compose.mainClock.currentTime }) } }
+        compose.setContent { CulveryTheme(dark = true) { PinPadHost(controller, activity, nowMillis = { start + compose.mainClock.currentTime }) } }
         compose.mainClock.advanceTimeByFrame()
         val spoken = description("pin_message")
         val dotsError = compose.onNodeWithTag("pin_dots").fetchSemanticsNode().config[SemanticsProperties.Error]
@@ -250,5 +255,48 @@ class PinPadTest {
             .isNotEqualTo(shown)
         assertThat(spoken).isEqualTo(tooManyTries(30))
         assertThat(dotsError).isEqualTo(spoken)
+    }
+
+    /** 4d-2 §6.3: a pad left alone cancels, so authorise returns null; a touch starts the wait again; a lockout doesn't stop it. */
+    @Test
+    fun anIdlePadCancelsAtTwoMinutesAndATouchKeepsIt() {
+        compose.mainClock.autoAdvance = false
+        val request = controller.open("Change settings", PinError.WrongPin, System.currentTimeMillis() + 300_000)
+        show()
+        compose.mainClock.advanceTimeBy(60_000)
+        activity.touch()
+        compose.runOnIdle { Snapshot.sendApplyNotifications() }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(119_900)
+        assertThat(request.answer.isCompleted).isFalse()
+        compose.mainClock.advanceTimeBy(200)
+        assertThat(request.answer.getCompleted()).isNull()
+    }
+
+    /** Digits typed and left are never sent: the pad cancels as its Cancel key does. */
+    @Test
+    fun digitsLeftOnAnIdlePadAreNotSubmitted() {
+        compose.mainClock.autoAdvance = false
+        val request = controller.open("Change settings", null, null)
+        show()
+        tap("1", "2", "3")
+        compose.mainClock.advanceTimeBy(120_100)
+        assertThat(request.answer.getCompleted()).isNull()
+    }
+
+    /**
+     * 4d-2 §6.3: over Settings the pad outlasts the longest session, edits held included, by a second, so the session
+     * always ends first and the pad's close can't move TalkBack's focus and stretch it. Settings closing re-keys the pad
+     * to its own two minutes.
+     */
+    @Test
+    fun overSettingsThePadOutlastsTheLongestSessionByASecond() {
+        compose.mainClock.autoAdvance = false
+        val request = controller.open("Change settings", null, null)
+        show(overSettings = true)
+        compose.mainClock.advanceTimeBy(EDIT_HOLD_MS + 900)
+        assertThat(request.answer.isCompleted).isFalse()
+        compose.mainClock.advanceTimeBy(200)
+        assertThat(request.answer.getCompleted()).isNull()
     }
 }

@@ -98,4 +98,27 @@ class ModalLayersTest {
         pane("Enter your PIN").assertExists()
         compose.onNodeWithTag("toast").assertExists()
     }
+
+    @Test
+    fun thePinPadOverSettingsHidesSettingsWhileItShows() {
+        show()
+        settingsOpen = true
+        pinShowing = true
+        pane("Enter your PIN").assertExists()
+        pane("Settings").assertDoesNotExist()
+        compose.onNodeWithText("Settings page").assertDoesNotExist()
+        pinShowing = false
+        pane("Settings").assertExists()
+    }
+
+    @Test
+    fun theSheetComesBackWhenThePinPadOverItCloses() {
+        show()
+        showSheet()
+        pinShowing = true
+        compose.onNodeWithText("Sheet body").assertDoesNotExist()
+        pinShowing = false
+        pane("Enter your PIN").assertDoesNotExist()
+        compose.onNodeWithText("Sheet body").assertExists()
+    }
 }

@@ -461,4 +461,22 @@ class EventFormTest {
     fun aNewEventTouchesEveryField() {
         assertThat(new().touched).containsExactlyElementsIn(EventField.entries)
     }
+
+    @Test
+    fun aNewSheetWithItsDefaultsIsNotEditedAndATitleMakesItSo() {
+        val form = EventForm(EventForm.Mode.New, today, LocalTime.of(11, 54), london, signedIn = null, preselectedDay = null)
+        assertThat(form.edited).isFalse()
+        form.updateTitle("Swim")
+        assertThat(form.edited).isTrue()
+    }
+
+    @Test
+    fun anEditChangedBackIsNotEdited() {
+        val form = EventForm(EventForm.Mode.New, today, LocalTime.of(11, 54), london, signedIn = null, preselectedDay = null)
+        form.updateTitle("Swim")
+        form.updateTitle("")
+        form.chooseLength(Duration.ofHours(2))
+        form.chooseLength(Duration.ofHours(1))
+        assertThat(form.edited).isFalse()
+    }
 }

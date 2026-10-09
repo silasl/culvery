@@ -9,7 +9,9 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -72,6 +74,7 @@ internal fun EventEditorHost(
     editor: CalendarEditor,
     onClose: () -> Unit,
     onDeleteAuthorised: (EventRef) -> Unit,
+    onEdited: (Boolean) -> Unit = {},
 ) {
     val opened: Opened? by produceState<Opened?>(null, request) {
         value = try {
@@ -104,6 +107,9 @@ internal fun EventEditorHost(
         return
     }
     val household = people ?: return
+    // Saving counts as edited, so the idle close never cuts a save off half done.
+    val edited by rememberUpdatedState(onEdited)
+    LaunchedEffect(form) { snapshotFlow { form.edited || action.busy }.collect { edited(it) } }
 
     fun save() {
         if (action.busy || !form.canSave) return

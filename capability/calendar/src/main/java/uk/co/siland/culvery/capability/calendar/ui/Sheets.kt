@@ -36,5 +36,6 @@ internal fun OverlayHost.showEditor(request: EditorRequest, today: LocalDate, re
         editor = editor,
         onClose = { dismiss() },
         onDeleteAuthorised = { ref -> showDetail(ref, today, repo, editor, DetailMode.ConfirmingDelete) },
+        onEdited = ::markEdited,
     )
 }

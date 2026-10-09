@@ -27,7 +27,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import uk.co.siland.culvery.core.plugin.CLOSING_WARNING_MS
+import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
+import uk.co.siland.culvery.core.plugin.OVERLAY_IDLE_MS
 import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.ui.HhToast
 import uk.co.siland.culvery.core.ui.Icons
@@ -37,6 +40,7 @@ import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ToastMessage
 
 internal const val SETTINGS_CLOSING = "Settings closes in 20 seconds. Touch the screen to stay."
+internal const val SHEET_CLOSING = "This closes in 20 seconds. Touch the screen to keep your changes."
 
 /**
  * The shell with its overlay layers stacked over it: sheet, then [pinPad] over the sheet, then toasts over everything.
@@ -46,7 +50,9 @@ internal const val SETTINGS_CLOSING = "Settings closes in 20 seconds. Touch the 
  * pads included, goes to [onTouch] before anything handles it; the session hears of it from [UserActivity] a moment
  * later.
  * While a sheet or the PIN pad shows, what it covers is hidden from TalkBack; the toasts never are.
- * [settingsExpiresAt] is the session's end while Settings is open; 20 seconds before it a spoken warning shows over everything.
+ * [settingsExpiresAt] is the session's end while Settings is open; 20 seconds before it, or before an edited sheet outside
+ * Settings closes, a spoken warning shows over everything. [overlaysCloseWhenIdle] is false while Settings or the wizard
+ * shows: a sheet closing by itself would move TalkBack's focus, which counts as a touch and would stretch the session.
  */
 @Composable
 fun ShellLayers(
@@ -59,10 +65,12 @@ fun ShellLayers(
     onTouch: () -> Unit,
     settingsExpiresAt: Long? = null,
     nowMillis: () -> Long = System::currentTimeMillis,
+    overlaysCloseWhenIdle: Boolean = true,
     shell: @Composable () -> Unit,
 ) {
     val touched by rememberUpdatedState(onTouch)
     val settingsClosingSoon = rememberClosingSoon(settingsExpiresAt, nowMillis)
+    val sheetClosingSoon = rememberSheetClosingSoon(overlay, activity, closes = overlaysCloseWhenIdle)
     Box(
         Modifier
             .fillMaxSize()
@@ -79,7 +87,11 @@ fun ShellLayers(
         OverlayLayer(overlay, hidden = pinShowing)
         pinPad()
         ToastLayer(toast, activity, onHidden = onToastHidden)
-        if (settingsClosingSoon) ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning")
+        // While Settings is open only its warning shows: both run on the same touches.
+        when {
+            settingsClosingSoon -> ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning")
+            sheetClosingSoon -> ClosingWarningLayer(SHEET_CLOSING, "sheet_warning")
+        }
     }
 }
 
@@ -113,6 +125,34 @@ private fun rememberClosingSoon(expiresAt: Long?, nowMillis: () -> Long): Boolea
         // Measured once from the wall clock, then waited monotonically: a clock change afterwards can't move it.
         delay(at - CLOSING_WARNING_MS - nowMillis())
         soon = true
+    }
+    return soon
+}
+
+/**
+ * Closes the overlay after [OVERLAY_IDLE_MS] without a touch, or [EDIT_HOLD_MS] while it has unsaved changes, and is true
+ * from [CLOSING_WARNING_MS] before an edited one goes (4d-2 §6.3). Any touch, a TalkBack gesture's included, starts it
+ * again; a card that waits on a screen outside the app, or any overlay while not [closes], stays.
+ */
+@Composable
+private fun rememberSheetClosingSoon(overlay: OverlayState, activity: UserActivity, closes: Boolean): Boolean {
+    val content = overlay.content
+    val edited = overlay.edited
+    var soon by remember(content, edited, closes) { mutableStateOf(false) }
+    LaunchedEffect(content, edited, overlay.closesWhenIdle, closes) {
+        if (content == null || !overlay.closesWhenIdle || !closes) return@LaunchedEffect
+        // Collected here rather than as state, so a touch restarts the wait without recomposing the shell.
+        activity.touches.collectLatest {
+            soon = false
+            if (edited) {
+                delay(activity.timeout(EDIT_HOLD_MS) - CLOSING_WARNING_MS)
+                soon = true
+                delay(CLOSING_WARNING_MS)
+            } else {
+                delay(activity.timeout(OVERLAY_IDLE_MS))
+            }
+            overlay.dismiss()
+        }
     }
     return soon
 }

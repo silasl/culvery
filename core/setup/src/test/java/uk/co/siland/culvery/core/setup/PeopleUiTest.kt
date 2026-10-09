@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
@@ -311,5 +312,15 @@ class PeopleUiTest {
         val up = compose.onNodeWithTag("person_Sam").fetchSemanticsNode().config[SemanticsActions.CustomActions].single { it.label == "Move Sam up" }
         compose.runOnUiThread { up.action() }
         compose.waitUntil(5_000) { runBlocking { household.people.first().map { it.name } } == listOf("Sam", "Alex") }
+    }
+
+    @Test
+    fun typingANameMarksThePersonSheetEdited() {
+        show()
+        compose.onNodeWithTag("people_add").performClick()
+        compose.onNodeWithTag("person_name").performTextInput("Sam")
+        compose.waitUntil(5_000) { overlay.edited }
+        compose.onNodeWithTag("person_name").performTextReplacement("")
+        compose.waitUntil(5_000) { !overlay.edited }
     }
 }
