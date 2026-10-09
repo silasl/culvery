@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 sealed interface PinError {
     data object WrongPin : PinError
-    data class NotAllowed(val name: String, val message: String = "$name can't do that") : PinError
+    data class NotAllowed(val message: String) : PinError
 }
 
 /** One showing of the PIN pad. Identity equality: every retry is a new request. */

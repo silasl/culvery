@@ -39,6 +39,7 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupState
 import uk.co.siland.culvery.core.setup.SetupWizard
@@ -88,7 +89,7 @@ class SampleWizardTest {
         // Nobody answers the PIN pad, so a gate that rises stays up.
         val access = DefaultAccessControl(
             PermissionRegistry(setOf(CorePermissionSource())), pins, LockoutStore(ApplicationProvider.getApplicationContext()),
-            PinPromptController(), clock, noToasts, scope,
+            PinPromptController(), clock, noToasts, scope, FakeUserActivity(),
         )
         val calendar = CalendarSetup(store, setOf(fake), { household.people.first() }, noToasts, clock)
         val sample = DebugSampleHousehold(household, pins, calendar, setOf(fake), state::markComplete)

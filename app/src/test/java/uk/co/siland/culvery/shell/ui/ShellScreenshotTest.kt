@@ -178,6 +178,9 @@ class ShellScreenshotTest {
     }
 
     @Test
+    fun settingsWarningDark() = snap("settings_warning_dark", dark = true) { ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning") }
+
+    @Test
     fun homeWithCalendarDark() = snap("home_calendar_dark", dark = true, state = calendarHome(dark = true))
 
     @Test

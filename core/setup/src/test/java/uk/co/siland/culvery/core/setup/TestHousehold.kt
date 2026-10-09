@@ -30,6 +30,7 @@ import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.PersonPalette
 
 internal fun householdDb(): HouseholdDatabase =
@@ -69,6 +70,7 @@ internal class TestAccess(household: HouseholdRepository, clock: WallClock, sess
         clock = clock,
         toaster = toasts,
         scope = sessionScope,
+        userActivity = FakeUserActivity(),
     )
 
     fun answer(vararg pins: String?) = synchronized(answers) { answers.addAll(pins) }

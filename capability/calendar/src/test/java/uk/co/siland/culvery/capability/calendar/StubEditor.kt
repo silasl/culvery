@@ -16,6 +16,7 @@ import uk.co.siland.culvery.core.plugin.WallClock
 
 private object NobodyMay : AccessControl {
     override val session: StateFlow<Identified?> = MutableStateFlow(null)
+    override val expiresAt: StateFlow<Long?> = MutableStateFlow(null)
 
     override suspend fun authorise(
         vararg anyOf: String,
@@ -30,7 +31,9 @@ private object NobodyMay : AccessControl {
 
     override fun endSetupSession() = Unit
 
-    override fun touch() = Unit
+    override fun touch(holdForEdits: Boolean) = Unit
+
+    override fun checkExpiry() = Unit
 }
 
 /**

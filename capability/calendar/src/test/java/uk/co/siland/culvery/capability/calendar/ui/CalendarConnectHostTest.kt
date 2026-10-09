@@ -257,9 +257,9 @@ class CalendarConnectHostTest {
         waitFor { overlay.dismissed == 1 }
         runBlocking { assertThat(store.connectionsNow()).isEmpty() }
         assertThat(access.toasts.messages).isEmpty()
-        // One connections.manage check: its pad, then the same pad again saying Sam may not.
+        // One connections.manage check: its pad, then the same pad again saying that PIN can’t.
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL, CONNECT_LABEL)
-        assertThat(access.requests.last().error).isEqualTo(PinError.NotAllowed("Sam"))
+        assertThat(access.requests.last().error).isEqualTo(PinError.NotAllowed("That PIN can’t do this. Ask an Admin."))
         assertThat(google.connectScreenShown).isEqualTo(0)
         compose.onAllNodesWithText("Connecting to Google Calendar…").assertCountEquals(0)
     }

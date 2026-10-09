@@ -22,6 +22,7 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 
 /**
  * The real access rules over an in-memory household, with PIN pads answered from a queue.
@@ -87,6 +88,7 @@ internal suspend fun testAccess(
         clock = clock,
         toaster = toasts,
         scope = sessionScope,
+        userActivity = FakeUserActivity(),
     )
     return TestAccess(control, prompt, toasts, alex, sam, mia).also { it.listen(listenIn) }
 }

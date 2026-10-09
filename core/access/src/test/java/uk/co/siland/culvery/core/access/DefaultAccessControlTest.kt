@@ -24,7 +24,9 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 
 @RunWith(AndroidJUnit4::class)
 class DefaultAccessControlTest {
@@ -50,7 +52,11 @@ class DefaultAccessControlTest {
     @After
     fun tearDown() = db.close()
 
-    private fun TestScope.access(timers: CoroutineScope = backgroundScope, nowMillis: () -> Long = { testScheduler.currentTime }) = DefaultAccessControl(
+    private fun TestScope.access(
+        timers: CoroutineScope = backgroundScope,
+        nowMillis: () -> Long = { testScheduler.currentTime },
+        activity: FakeUserActivity = FakeUserActivity(),
+    ) = DefaultAccessControl(
         registry = PermissionRegistry(setOf(CorePermissionSource(), everyone)),
         pins = pins,
         lockout = LockoutStore(context),
@@ -58,6 +64,7 @@ class DefaultAccessControlTest {
         clock = WallClock { nowMillis() },
         toaster = toasts,
         scope = timers,
+        userActivity = activity,
     )
 
     private var nextColour = 0xFF101010L
@@ -173,7 +180,7 @@ class DefaultAccessControlTest {
         val access = access()
         answerPins("9876", null)
         assertThat(access.authorise(CorePermissions.CONNECTIONS_MANAGE)).isNull()
-        assertThat(seen.last().error).isEqualTo(PinError.NotAllowed("Mia"))
+        assertThat(seen.last().error).isEqualTo(PinError.NotAllowed("That PIN can’t do this. Ask an Admin."))
         assertThat(access.session.value).isNull()
     }
 
@@ -183,7 +190,7 @@ class DefaultAccessControlTest {
         val access = access()
         answerPins("9876", null)
         assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE)).isNull()
-        assertThat(seen.last().error).isEqualTo(PinError.NotAllowed("Mia"))
+        assertThat(seen.last().error).isEqualTo(PinError.NotAllowed("That PIN can’t do this. Ask an Admin."))
         assertThat(access.session.value).isNull()
     }
 
@@ -238,14 +245,22 @@ class DefaultAccessControlTest {
         assertThat(seen.last().lockedUntilMillis).isNotNull()
     }
 
+    /** A sibling's PIN at an Admin's pad uses up a try like a wrong one, so it can't be found by guessing for free. */
     @Test
-    fun notAllowedPinDoesNotCountTowardLockout() = runTest {
+    fun aRefusedRealPinCountsTowardTheLockoutAndNamesNoOne() = runTest {
         person("Alex", Role.ADMIN, "1234")
         person("Mia", Role.CHILD, "9876")
         val access = access()
         answerPins("0000", "0000", "0000", "0000", "9876", null)
         assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE)).isNull()
-        assertThat(seen.last().lockedUntilMillis).isNull()
+        assertThat(seen.last().lockedUntilMillis).isNotNull()
+        assertThat(seen.mapNotNull { (it.error as? PinError.NotAllowed)?.message }.joinToString()).doesNotContain("Mia")
+    }
+
+    @Test
+    fun aRefusalSaysWhoToAsk() {
+        assertThat(refusedHere(openToAdults = false)).isEqualTo("That PIN can’t do this. Ask an Admin.")
+        assertThat(refusedHere(openToAdults = true)).isEqualTo("That PIN can’t do this. Ask a grown-up.")
     }
 
     @Test
@@ -321,7 +336,7 @@ class DefaultAccessControlTest {
         val access = access()
         answerPins("9876", null)
         assertThat(access.authorise("test.any", allow = { _, _ -> false })).isNull()
-        assertThat(seen.last().error).isEqualTo(PinError.NotAllowed("Mia", "Mia can't do that"))
+        assertThat(seen.last().error).isEqualTo(PinError.NotAllowed("That PIN can’t do this. Ask a grown-up."))
         assertThat(toasts.messages).isEmpty()
     }
 
@@ -491,6 +506,143 @@ class DefaultAccessControlTest {
         access.authorise(CorePermissions.SETTINGS_MANAGE)
         advanceTimeBy(SESSION_TIMEOUT_MS + 1)
         runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    private suspend fun TestScope.signedInAlex(access: DefaultAccessControl) {
+        person("Alex", Role.ADMIN, "1234")
+        answerPins("1234")
+        access.authorise(CorePermissions.SETTINGS_MANAGE)
+    }
+
+    /** 4d-2 §6.2: ends at 2 minutes, not a moment before; a touch at 1:50 moves it to 3:50. */
+    @Test
+    fun theSessionEndsTwoMinutesAfterTheLastTouch() = runTest {
+        val access = access()
+        signedInAlex(access)
+        advanceTimeBy(110_000)
+        access.touch()
+        advanceTimeBy(SESSION_TIMEOUT_MS - 1)
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    @Test
+    fun editsHoldTheSessionTenMinutesAndNoLonger() = runTest {
+        val access = access()
+        signedInAlex(access)
+        access.touch(holdForEdits = true)
+        advanceTimeBy(EDIT_HOLD_MS - 1_000)
+        access.touch(holdForEdits = true)
+        advanceTimeBy(EDIT_HOLD_MS - 1)
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    /** Once the edits go (a sheet closed or undone), the next touch puts the session back on 2 minutes. */
+    @Test
+    fun aTouchWithoutTheHoldGoesBackToTwoMinutes() = runTest {
+        val access = access()
+        signedInAlex(access)
+        access.touch(holdForEdits = true)
+        advanceTimeBy(30_000)
+        access.touch(holdForEdits = false)
+        advanceTimeBy(SESSION_TIMEOUT_MS - 1)
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    /** A Save on the session shortcut keeps the hold, so a refused save's sheet isn't lost at 2 minutes. */
+    @Test
+    fun anAuthoriseOnTheShortcutKeepsTheHold() = runTest {
+        val access = access()
+        signedInAlex(access)
+        access.touch(holdForEdits = true)
+        advanceTimeBy(1_000)
+        assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE)).isNotNull()
+        advanceTimeBy(EDIT_HOLD_MS - 1)
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    @Test
+    fun talkBacksTimeToTakeActionStretchesTheSession() = runTest {
+        val access = access(activity = FakeUserActivity(timeouts = { base, _ -> if (base == SESSION_TIMEOUT_MS) 300_000L else base }))
+        signedInAlex(access)
+        assertThat(access.expiresAt.value).isEqualTo(testScheduler.currentTime + 300_000L)
+        advanceTimeBy(300_000L - 1)
+        runCurrent()
+        assertThat(access.session.value).isNotNull()
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(access.session.value).isNull()
+    }
+
+    @Test
+    fun expiresAtFollowsEachRestartAndClearsWhenTheSessionEnds() = runTest {
+        val access = access()
+        assertThat(access.expiresAt.value).isNull()
+        signedInAlex(access)
+        assertThat(access.expiresAt.value).isEqualTo(testScheduler.currentTime + SESSION_TIMEOUT_MS)
+        advanceTimeBy(10_000)
+        access.touch(holdForEdits = true)
+        assertThat(access.expiresAt.value).isEqualTo(testScheduler.currentTime + EDIT_HOLD_MS)
+        access.lock()
+        assertThat(access.expiresAt.value).isNull()
+        access.touch()
+        assertThat(access.expiresAt.value).isNull()
+    }
+
+    /** The timer stops while the tablet sleeps; the wall clock doesn't, so a touch after waking can't revive the session. */
+    @Test
+    fun aTouchAfterTheWallClockPassedTheEndSignsOut() = runTest {
+        var wall = 0L
+        val access = access(nowMillis = { wall })
+        signedInAlex(access)
+        wall = SESSION_TIMEOUT_MS - 1
+        access.touch()
+        assertThat(access.session.value).isNotNull()
+        wall += SESSION_TIMEOUT_MS
+        access.touch()
+        assertThat(access.session.value).isNull()
+        assertThat(access.expiresAt.value).isNull()
+    }
+
+    @Test
+    fun checkExpiryEndsASessionOnlyOnceTheWallClockHasPassedItsEnd() = runTest {
+        var wall = 0L
+        val access = access(nowMillis = { wall })
+        signedInAlex(access)
+        wall = SESSION_TIMEOUT_MS - 1
+        access.checkExpiry()
+        assertThat(access.session.value).isNotNull()
+        wall = SESSION_TIMEOUT_MS
+        access.checkExpiry()
+        assertThat(access.session.value).isNull()
+    }
+
+    /** The session shortcut checks first, so it never authorises on a session that has already run out. */
+    @Test
+    fun anAuthoriseAfterTheWallClockPassedTheEndAsksForAPin() = runTest {
+        var wall = 0L
+        val access = access(nowMillis = { wall })
+        signedInAlex(access)
+        wall = SESSION_TIMEOUT_MS
+        answerPins(null)
+        // On the shortcut it would pass without a pad; null means the pad came up and was cancelled.
+        assertThat(access.authorise(CorePermissions.SETTINGS_MANAGE)).isNull()
         assertThat(access.session.value).isNull()
     }
 }

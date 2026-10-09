@@ -15,7 +15,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -24,12 +27,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlinx.coroutines.delay
+import uk.co.siland.culvery.core.plugin.CLOSING_WARNING_MS
 import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.ui.HhToast
+import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.toastMillis
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ToastMessage
+
+internal const val SETTINGS_CLOSING = "Settings closes in 20 seconds. Touch the screen to stay."
 
 /**
  * The shell with its overlay layers stacked over it: sheet, then [pinPad] over the sheet, then toasts over everything.
@@ -39,6 +46,7 @@ import uk.co.siland.culvery.shell.ToastMessage
  * pads included, goes to [onTouch] before anything handles it; the session hears of it from [UserActivity] a moment
  * later.
  * While a sheet or the PIN pad shows, what it covers is hidden from TalkBack; the toasts never are.
+ * [settingsExpiresAt] is the session's end while Settings is open; 20 seconds before it a spoken warning shows over everything.
  */
 @Composable
 fun ShellLayers(
@@ -49,9 +57,12 @@ fun ShellLayers(
     pinPad: @Composable () -> Unit,
     activity: UserActivity,
     onTouch: () -> Unit,
+    settingsExpiresAt: Long? = null,
+    nowMillis: () -> Long = System::currentTimeMillis,
     shell: @Composable () -> Unit,
 ) {
     val touched by rememberUpdatedState(onTouch)
+    val settingsClosingSoon = rememberClosingSoon(settingsExpiresAt, nowMillis)
     Box(
         Modifier
             .fillMaxSize()
@@ -68,6 +79,7 @@ fun ShellLayers(
         OverlayLayer(overlay, hidden = pinShowing)
         pinPad()
         ToastLayer(toast, activity, onHidden = onToastHidden)
+        if (settingsClosingSoon) ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning")
     }
 }
 
@@ -91,6 +103,40 @@ fun OverlayLayer(state: OverlayState, hidden: Boolean = false) {
     }
 }
 
+/** True from [CLOSING_WARNING_MS] before [expiresAt] until it moves; false without one. Once per countdown: keyed on it. */
+@Composable
+private fun rememberClosingSoon(expiresAt: Long?, nowMillis: () -> Long): Boolean {
+    // Keyed, so a new end resets it in the same frame the touch lands in, not a frame later.
+    var soon by remember(expiresAt) { mutableStateOf(false) }
+    LaunchedEffect(expiresAt) {
+        val at = expiresAt ?: return@LaunchedEffect
+        // Measured once from the wall clock, then waited on the frame clock: a clock change afterwards can't move it.
+        delay(at - CLOSING_WARNING_MS - nowMillis())
+        soon = true
+    }
+    return soon
+}
+
+/** Where toasts and warnings sit: bottom-centre, 28 dp above the bottom or above the on-screen keyboard (hand-off §7). */
+@Composable
+private fun ToastSlot(keyboard: WindowInsets, content: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(keyboard.only(WindowInsetsSides.Bottom))
+            .padding(bottom = ShellTokens.toastBottom),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        content()
+    }
+}
+
+/** A warning pill where toasts sit (hand-off §7's toast, `schedule` icon), spoken at once; its words are fixed, never a countdown. */
+@Composable
+internal fun ClosingWarningLayer(text: String, tag: String, keyboard: WindowInsets = WindowInsets.ime) {
+    ToastSlot(keyboard) { HhToast(text, Icons.SCHEDULE, Modifier.testTag(tag), urgent = true) }
+}
+
 /**
  * Draws [toast] bottom-centre, 28 dp above the bottom or above the on-screen keyboard while it shows (hand-off §7),
  * and reports it hidden after its reading time ([toastMillis]), or TalkBack's longer one; a new toast restarts the timer.
@@ -102,13 +148,5 @@ fun ToastLayer(toast: ToastMessage?, activity: UserActivity, keyboard: WindowIns
         delay(activity.timeout(toastMillis(t.message, t.urgent), hasControls = false))
         onHidden(t.id)
     }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(keyboard.only(WindowInsetsSides.Bottom))
-            .padding(bottom = ShellTokens.toastBottom),
-        contentAlignment = Alignment.BottomCenter,
-    ) {
-        HhToast(t.message, t.icon, urgent = t.urgent)
-    }
+    ToastSlot(keyboard) { HhToast(t.message, t.icon, urgent = t.urgent) }
 }

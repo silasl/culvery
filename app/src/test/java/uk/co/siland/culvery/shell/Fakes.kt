@@ -74,7 +74,14 @@ class FakeAccessControl(var result: Authorised? = null, private val startsSessio
         session.value = person
     }
     override fun endSetupSession() = Unit
-    override fun touch() { touches++ }
+    override val expiresAt = MutableStateFlow<Long?>(null)
+    val holds = mutableListOf<Boolean>()
+    var expiryChecks = 0
+    override fun checkExpiry() { expiryChecks++ }
+    override fun touch(holdForEdits: Boolean) {
+        touches++
+        holds += holdForEdits
+    }
 }
 
 /** A capability whose hasTab flow fails once, as a store hiccup would, then says it has a tab. */

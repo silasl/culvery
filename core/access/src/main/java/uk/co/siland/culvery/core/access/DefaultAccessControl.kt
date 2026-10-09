@@ -13,9 +13,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
 import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.plugin.WallClock
 
+/** The access rules. [userActivity] gives each wait Android's "Time to take action" when TalkBack is on (4d-2 §6.1). */
 @Singleton
 class DefaultAccessControl @Inject constructor(
     private val registry: PermissionRegistry,
@@ -25,6 +28,7 @@ class DefaultAccessControl @Inject constructor(
     private val clock: WallClock,
     private val toaster: Toaster,
     @ApplicationScope private val scope: CoroutineScope,
+    private val userActivity: UserActivity,
 ) : AccessControl {
     /** Who is signed in, and whether it is the wizard's setup session (4a §3.4): one value, so every end ends both. */
     private class SignedIn(val who: Identified, val setup: Boolean)
@@ -33,11 +37,18 @@ class DefaultAccessControl @Inject constructor(
     private val _session = MutableStateFlow<Identified?>(null)
     override val session: StateFlow<Identified?> = _session.asStateFlow()
     private val stateLock = Any()
+    private val _expiresAt = MutableStateFlow<Long?>(null)
+    override val expiresAt: StateFlow<Long?> = _expiresAt.asStateFlow()
 
-    /** The one place the session changes. */
+    // The last touch's holdForEdits, so an authorise on the session keeps it. Cleared by a touch without it, or sign-out.
+    @Volatile private var holding = false
+
+    /** The one place the session changes. Every caller but sign-out restarts the expiry next, which sets [expiresAt] again. */
     private fun set(next: SignedIn?) = synchronized(stateLock) {
         signedIn.value = next
         _session.value = next?.who
+        _expiresAt.value = null
+        if (next == null) holding = false
     }
 
     private var expiry: Job? = null
@@ -55,6 +66,7 @@ class DefaultAccessControl @Inject constructor(
         require(anyOf.isNotEmpty()) { "authorise needs at least one permission" }
         val defs = anyOf.map(registry::require)
         return authoriseLock.withLock {
+            endIfPastByWallClock()
             val current = signedIn.value
             if (current != null && current.setup) {
                 val grants = grantedFor(current.who.role, anyOf)
@@ -104,12 +116,13 @@ class DefaultAccessControl @Inject constructor(
             }
             val granted = grantedFor(identified.role, anyOf)
             if (granted.isEmpty() || !allow(identified, granted)) {
-                // A real but refused PIN neither resets nor counts, so a child's own PIN can't clear the counter.
+                // Counted as a wrong PIN and never resets the count, so a sibling's PIN can't be found for free or clear it.
+                lockout.recordFailure(clock.nowMillis())
                 if (refusal is Refusal.Toast) {
                     toaster.show(refusal.message(identified.person.name), urgent = true)
                     return null
                 }
-                error = PinError.NotAllowed(identified.person.name)
+                error = PinError.NotAllowed(refusedHere(openToAdults = anyOf.any { registry.isGranted(Role.ADULT, it) }))
                 continue
             }
             lockout.reset()
@@ -126,6 +139,7 @@ class DefaultAccessControl @Inject constructor(
     }
 
     override fun endSetupSession() {
+        if (endIfPastByWallClock()) return
         // Read and write under one lock: an expiry or lock() in between must not be undone by a stale write.
         synchronized(stateLock) {
             val current = signedIn.value?.takeIf { it.setup } ?: return
@@ -134,9 +148,23 @@ class DefaultAccessControl @Inject constructor(
         restartExpiry()
     }
 
-    override fun touch() {
+    override fun touch(holdForEdits: Boolean) {
+        if (endIfPastByWallClock()) return
         val setup = synchronized(stateLock) { signedIn.value?.setup } ?: return
+        holding = holdForEdits
         restartExpiry(if (setup) SETUP_IDLE_MS else SESSION_TIMEOUT_MS)
+    }
+
+    override fun checkExpiry() {
+        endIfPastByWallClock()
+    }
+
+    /** True, with the session ended, once the wall clock has passed [expiresAt]; the expiry's delay stops while the tablet sleeps. */
+    private fun endIfPastByWallClock(): Boolean {
+        val ends = _expiresAt.value ?: return false
+        if (clock.nowMillis() < ends) return false
+        lock()
+        return true
     }
 
     override fun lock() {
@@ -147,11 +175,14 @@ class DefaultAccessControl @Inject constructor(
     private fun grantedFor(role: Role, anyOf: Array<out String>): Set<String> =
         anyOf.filter { registry.isGranted(role, it) }.toSet()
 
-    private fun restartExpiry(timeoutMillis: Long = SESSION_TIMEOUT_MS) = synchronized(expiryLock) {
+    /** [baseMillis], or the edit hold while [holding]; stretched by TalkBack's time; [expiresAt] set to match. */
+    private fun restartExpiry(baseMillis: Long = SESSION_TIMEOUT_MS) = synchronized(expiryLock) {
         expiry?.cancel()
         val guarded = signedIn.value
+        val millis = userActivity.timeout(if (holding) maxOf(baseMillis, EDIT_HOLD_MS) else baseMillis)
+        _expiresAt.value = guarded?.let { clock.nowMillis() + millis }
         expiry = scope.launch {
-            delay(timeoutMillis)
+            delay(millis)
             synchronized(stateLock) { if (signedIn.value === guarded) set(null) }
         }
     }

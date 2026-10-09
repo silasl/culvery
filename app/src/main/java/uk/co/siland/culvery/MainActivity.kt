@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -49,6 +50,7 @@ import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.plugin.ShellNavigator
+import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.setup.SettingsScreen
 import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupState
@@ -72,6 +74,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var toasts: ShellToasts
     @Inject lateinit var userActivity: ShellUserActivity
     @Inject lateinit var access: AccessControl
+    @Inject lateinit var wallClock: WallClock
     @Inject lateinit var setupState: SetupState
     @Inject lateinit var gate: SetupSessionGate
     @Inject lateinit var firstDraw: FirstDraw
@@ -129,6 +132,10 @@ class MainActivity : ComponentActivity() {
         setupComplete = setupState.setupComplete.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
         isDeviceOwner = allowLockTaskIfOwner(this)
         lifecycle.addObserver(kiosk)
+        // The session's timer stops while the tablet sleeps; its wall-clock end is checked on the way back.
+        lifecycle.addObserver(LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_RESUME) access.checkExpiry()
+        })
         // TalkBack's gestures reach the app as accessibility events, not touches: they keep Settings and the sheets open too.
         findViewById<ViewGroup>(android.R.id.content).accessibilityDelegate = userActivity.accessibilityDelegate
         splash.setKeepOnScreenCondition {
@@ -164,6 +171,7 @@ class MainActivity : ComponentActivity() {
             val toast by toasts.current.collectAsStateWithLifecycle()
             val complete by setupComplete.collectAsStateWithLifecycle()
             val pinRequest by pinPrompt.request.collectAsStateWithLifecycle()
+            val sessionEnds by access.expiresAt.collectAsStateWithLifecycle()
             val overlay = remember { OverlayState() }
             CompositionLocalProvider(
                 LocalShellNavigator provides navigator,
@@ -182,6 +190,8 @@ class MainActivity : ComponentActivity() {
                             pinPad = { PinPadHost(pinPrompt, overSheet = overlay.isShowing) },
                             activity = userActivity,
                             onTouch = userActivity::touched,
+                            settingsExpiresAt = if (state.settingsOpen) sessionEnds else null,
+                            nowMillis = wallClock::nowMillis,
                         ) {
                             AppContent(
                                 complete = complete,

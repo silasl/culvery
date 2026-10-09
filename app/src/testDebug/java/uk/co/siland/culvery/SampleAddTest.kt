@@ -48,6 +48,7 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.FirstDraw
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider
 
 /**
@@ -104,6 +105,7 @@ class SampleAddTest {
             clock,
             toasts,
             backgroundScope,
+            FakeUserActivity(),
         )
         val lock = CalendarWriteLock()
         val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, clock, lock, SourceRefresher(store, household, clock, toasts))

@@ -48,8 +48,8 @@ class FontScaleTest {
     }
 
     @Test
-    fun atFontScale15ARefusalForALongNameIsShownWhole() {
-        show(PinError.NotAllowed("Maximilian Fotheringham"))
+    fun atFontScale15ARefusalIsShownWhole() {
+        show(PinError.NotAllowed("That PIN can’t do this. Ask an Admin."))
         assertThat(compose.onNodeWithTag("pin_error", useUnmergedTree = true).textLayout().hasVisualOverflow).isFalse()
     }
 

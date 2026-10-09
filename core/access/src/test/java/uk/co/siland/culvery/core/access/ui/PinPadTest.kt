@@ -124,9 +124,9 @@ class PinPadTest {
 
     @Test
     fun notAllowedShowsItsMessage() {
-        controller.open("Change settings", PinError.NotAllowed("Mia"), null)
+        controller.open("Change settings", PinError.NotAllowed("That PIN can’t do this. Ask an Admin."), null)
         show()
-        compose.onNodeWithText("Mia can't do that").assertExists()
+        compose.onNodeWithText("That PIN can’t do this. Ask an Admin.").assertExists()
     }
 
     @Test
