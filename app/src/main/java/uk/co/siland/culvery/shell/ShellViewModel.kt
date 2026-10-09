@@ -34,6 +34,7 @@ import uk.co.siland.culvery.core.plugin.HomePlacement
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.SunTimes
+import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
 /** What Settings › Kiosk or the Done step asked of Android (4c §5.1). */
@@ -45,6 +46,7 @@ class ShellViewModel @Inject constructor(
     clock: HouseholdClock,
     private val access: AccessControl,
     daylight: Optional<Daylight>,
+    private val toaster: Toaster,
 ) : ViewModel(), ShellNavigator {
     private val ordered = capabilities.sortedBy { it.order }
     private val selected = MutableStateFlow(HOME_TAB_ID)
@@ -173,6 +175,8 @@ class ShellViewModel @Inject constructor(
             if (access.authorise(CorePermissions.KIOSK_EXIT) != null) {
                 leaveKiosk()
                 kioskExitEvents.send(Unit)
+                // As the home app Culvery stays in front, so nothing else shows that it worked.
+                toaster.show(USING_OTHER_APPS)
             }
         }
     }
@@ -184,7 +188,7 @@ class ShellViewModel @Inject constructor(
         }
     }
 
-    /** Ruling 15: kiosk.exit's fresh PIN (its pad says "Use other apps", which is what this does). */
+    /** Asks for kiosk.exit's fresh PIN: its pad says "Use other apps", which is what this does. */
     override fun changeHomeApp() {
         viewModelScope.launch {
             access.authorise(CorePermissions.KIOSK_EXIT) ?: return@launch
@@ -226,3 +230,5 @@ internal fun roleLabel(role: Role): String = when (role) {
 }
 
 private const val TAG = "ShellViewModel"
+
+internal const val USING_OTHER_APPS = "You can use other apps now. Culvery locks again when it next opens."

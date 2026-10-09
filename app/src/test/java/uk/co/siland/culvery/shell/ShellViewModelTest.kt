@@ -51,6 +51,7 @@ class ShellViewModelTest {
     private val alex = Person(PersonId("alex"), "Alex", 0xFF4CB387)
     private val admin = Authorised(alex, Role.ADMIN, setOf(CorePermissions.SETTINGS_MANAGE, CorePermissions.KIOSK_EXIT))
     private val access = FakeAccessControl()
+    private val toasts = ShellToasts()
     private val london = ZoneId.of("Europe/London")
     private val clockScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private fun at(time: LocalDateTime): Long = time.atZone(london).toInstant().toEpochMilli()
@@ -67,7 +68,7 @@ class ShellViewModelTest {
     }
 
     private fun vm(caps: Set<Capability> = emptySet(), daylight: Daylight? = null) =
-        ShellViewModel(caps, clock, access, Optional.ofNullable(daylight))
+        ShellViewModel(caps, clock, access, Optional.ofNullable(daylight), toasts)
 
     @Test
     fun tabsShowOnlyCapabilitiesWithTabsInOrder() = runTest {
@@ -183,7 +184,7 @@ class ShellViewModelTest {
     @Test
     fun settingsNeverOpenWithoutSession() = runTest {
         val noSessionAccess = FakeAccessControl(result = admin, startsSession = false)
-        val vm = ShellViewModel(emptySet(), clock, noSessionAccess, Optional.empty())
+        val vm = ShellViewModel(emptySet(), clock, noSessionAccess, Optional.empty(), toasts)
         vm.uiState.test {
             vm.openSettings()
             assertThat(expectMostRecentItem().settingsOpen).isFalse()
@@ -200,6 +201,15 @@ class ShellViewModelTest {
             access.session.value = null
             assertThat(expectMostRecentItem().settingsOpen).isFalse()
         }
+    }
+
+    @Test
+    fun usingOtherAppsSaysWhatHappensNext() = runTest {
+        access.result = admin
+        val vm = vm()
+        vm.exitKiosk()
+        runCurrent()
+        assertThat(toasts.current.value?.message).isEqualTo("You can use other apps now. Culvery locks again when it next opens.")
     }
 
     @Test

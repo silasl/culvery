@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import uk.co.siland.culvery.core.household.MAX_PEOPLE
 import uk.co.siland.culvery.core.household.Member
+import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
@@ -77,7 +78,7 @@ internal fun PersonRow(
         title = name,
         modifier = Modifier.testTag("person_$name").semantics { if (moves.isNotEmpty()) customActions = moves },
         leading = { Box(Modifier.size(SetupDimens.rowDot).clip(CircleShape).background(Color(member.person.color))) },
-        subtitle = "${roleName(member.role)} · ${if (member.hasPin) PIN_SET else NO_PIN}",
+        subtitle = "${roleName(member.role)} · ${pinState(member)}",
         trailing = {
             if (reorderable) {
                 MoveButton(Icons.ARROW_UPWARD, moveUpLabel(name), "person_up_$name", onUp, atEnd = ALREADY_FIRST)
@@ -88,6 +89,13 @@ internal fun PersonRow(
         onClick = onClick,
         clickLabel = changeDetailsLabel(name),
     )
+}
+
+/** An Admin's PIN state, or what an Adult or Child without one can't do. */
+private fun pinState(member: Member): String = when {
+    member.hasPin -> PIN_SET
+    member.role == Role.ADMIN -> NO_PIN
+    else -> NO_PIN_CANT_ADD
 }
 
 /** A Move up or Move down button; at the list's ends disabled and faint, saying why ([atEnd]), so focus has a place to stay. */

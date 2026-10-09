@@ -151,6 +151,7 @@ internal fun EventEditorHost(
         EventEditorSheet(
             form = form,
             people = household,
+            service = loaded.label,
             childOnly = session?.takeIf { it.role == Role.CHILD }?.person?.id,
             busy = action.busy,
             failure = failure,

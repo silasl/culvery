@@ -8,8 +8,8 @@ import uk.co.siland.culvery.core.ui.Icons
 internal const val FORECAST_TITLE = "Forecast"
 internal const val TODAY = "Today"
 internal const val GETTING_FORECAST = "Getting the forecast…"
-internal const val NO_FORECAST = "No forecast — check the tablet’s Wi-Fi."
-internal const val NO_FORECAST_YET = "No forecast yet — check the tablet’s Wi-Fi."
+internal const val NO_FORECAST = "No forecast — check the tablet’s Wi-Fi. Culvery will try again."
+internal const val NO_FORECAST_YET = "No forecast yet — check the tablet’s Wi-Fi. Culvery will try again."
 internal const val ADD_LOCATION = "Add your home location to see the weather."
 internal const val ADD_HOME_LOCATION = "Add home location"
 

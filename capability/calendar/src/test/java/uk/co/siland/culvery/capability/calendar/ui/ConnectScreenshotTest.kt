@@ -37,7 +37,7 @@ class ConnectScreenshotTest {
     private fun connecting(name: String, dark: Boolean) = snap(name, dark) {
         Box(Modifier.testTag("shot").size(CANVAS_W, CANVAS_H).background(Culvery.colors.bg)) {
             Box(Modifier.fillMaxSize().background(ShellTokens.sheetScrim))
-            ConnectingCard("Google Calendar", onCancel = {})
+            ConnectingCard("Google Calendar", onCancel = {}, hint = "Choose the family’s Google account and allow access.")
         }
     }
 

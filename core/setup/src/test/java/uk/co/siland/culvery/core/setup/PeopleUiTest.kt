@@ -96,9 +96,28 @@ class PeopleUiTest {
     fun theListShowsEachPersonsRoleAndWhetherTheyHaveAPin() {
         addSam()
         show()
-        compose.awaitText("Adult · No PIN")
+        compose.awaitText("Adult · No PIN — can’t add events")
         compose.onNodeWithText("Admin · PIN set").assertExists()
-        compose.onNodeWithText("Adult · No PIN").assertExists()
+        compose.onNodeWithText("Adult · No PIN — can’t add events").assertExists()
+    }
+
+    @Test
+    fun withoutAPinAnAdultOrChildCanOnlyLookAndTheSheetSaysSo() {
+        addSam()
+        show()
+        compose.awaitTag("person_Sam")
+        compose.onNodeWithTag("person_Sam").performClick()
+        compose.onNodeWithText("Without a PIN, Sam can only look.").assertExists()
+        compose.onNodeWithTag("person_set_pin").performClick()
+        repeat(2) { "2468".forEach { d -> compose.onNodeWithTag("pin_key_$d").performClick() } }
+        compose.onNodeWithText("Without a PIN, Sam can only look.").assertDoesNotExist()
+    }
+
+    @Test
+    fun anAdminIsNeverToldTheyCanOnlyLook() {
+        show()
+        compose.onNodeWithTag("person_Alex").performClick()
+        compose.onNodeWithText("can only look", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -194,7 +213,7 @@ class PeopleUiTest {
         compose.awaitTag("person_Sam")
         compose.onNodeWithTag("person_Sam").performClick()
         compose.onNodeWithTag("person_remove").performClick()
-        compose.onNodeWithText("Remove Sam? Sam’s events and calendars show as Family.").assertExists()
+        compose.onNodeWithText("Remove Sam? Sam’s events and calendars will show as Family.").assertExists()
         compose.onNodeWithTag("person_keep").performClick()
         compose.onNodeWithTag("person_confirm_remove").assertDoesNotExist()
         compose.onNodeWithTag("person_remove").performClick()

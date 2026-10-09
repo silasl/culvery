@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.setup.pages
 
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -12,12 +13,15 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SettingsPageIds
 import uk.co.siland.culvery.core.setup.CHANGE_HOME_APP
+import uk.co.siland.culvery.core.setup.HOME_APP_HOW_TO
 import uk.co.siland.culvery.core.setup.HomeAppPrompt
+import uk.co.siland.culvery.core.setup.SetupType
 import uk.co.siland.culvery.core.setup.TABLET_LOCK
+import uk.co.siland.culvery.core.setup.TABLET_LOCK_LINE
 import uk.co.siland.culvery.core.setup.USE_OTHER_APPS
-import uk.co.siland.culvery.core.setup.KIOSK_LINE
 import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 
 /**
@@ -34,12 +38,14 @@ class KioskPage @Inject constructor(private val homeApp: HomeApp) : SettingsPage
     override fun Content() {
         val navigator = LocalShellNavigator.current
         val isHome by homeApp.isDefault.collectAsState()
-        StepTitle(TABLET_LOCK, KIOSK_LINE)
+        StepTitle(TABLET_LOCK, TABLET_LOCK_LINE)
         if (isHome) {
             HhButton(CHANGE_HOME_APP, navigator::changeHomeApp, Modifier.testTag("settings_change_home_app"), on = ButtonSurface.Bg)
         } else {
             HomeAppPrompt(onChoose = navigator::chooseHomeApp)
         }
+        // The how-to the toasts used to hold, where there is time to read it.
+        Text(HOME_APP_HOW_TO, style = SetupType.secondary, color = Culvery.colors.mute, modifier = Modifier.testTag("kiosk_how_to"))
         HhButton(USE_OTHER_APPS, navigator::exitKiosk, Modifier.testTag("settings_exit_kiosk"), on = ButtonSurface.Bg)
     }
 }

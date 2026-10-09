@@ -127,7 +127,7 @@ internal fun ConnectedStepCard(rows: List<CalendarRow>) {
 }
 
 @Composable
-internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarConnections, clock: HouseholdClock, title: String, offerConnect: Boolean) {
+internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarConnections, clock: HouseholdClock, title: String, offerConnect: Boolean, line: String? = null) {
     val list by review.connections.collectAsState(initial = emptyList())
     val people by review.people.collectAsState(initial = listOf(Person.Family))
     val connectable by connections.connectable.collectAsState(initial = emptyList())
@@ -144,6 +144,7 @@ internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarCo
         picking = picking,
         confirming = confirming,
         connectable = if (offerConnect) connectable.map { it.descriptor } else emptyList(),
+        line = line,
         actions = ReviewActions(
             onConnect = { connector.connect(it.id) },
             onReconnect = connector::reconnect,
@@ -189,9 +190,19 @@ internal fun ReviewCalendars(
     confirming: Confirming?,
     connectable: List<ProviderDescriptor>,
     actions: ReviewActions,
+    line: String? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.reviewBlockGap), modifier = Modifier.testTag("review_calendars")) {
         Text(title, style = CalendarType.reviewTitle, color = Culvery.colors.ink, modifier = Modifier.semantics { heading() })
+        if (line != null) Text(line, style = CalendarType.subtitle, color = Culvery.colors.mute)
+        if (connections.isEmpty()) {
+            Text(
+                "Connect your family’s Google Calendar to see it on Home.",
+                style = CalendarType.subtitle,
+                color = Culvery.colors.mute,
+                modifier = Modifier.testTag("review_none"),
+            )
+        }
         connections.forEach { connection ->
             ConnectionHeader(connection.row, nowMillis, busy, actions.onReconnect, actions.onDisconnect)
             if (confirming != null && confirming.row.connection.id == connection.row.connection.id) {

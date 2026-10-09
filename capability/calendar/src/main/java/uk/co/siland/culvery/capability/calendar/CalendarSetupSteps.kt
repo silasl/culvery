@@ -11,6 +11,7 @@ import uk.co.siland.culvery.core.plugin.SetupStep
 
 /** 4a design §4.5. */
 const val YOUR_CALENDARS = "Your calendars"
+const val YOUR_CALENDARS_LINE = "Choose who each calendar is for, and which to show. New events go to the main calendar."
 const val CALENDARS = "Calendars"
 
 /** The wizard's Connect step (4a design §3.9): the Connect card, or Skip for now. Done once any connection exists. */
@@ -37,7 +38,7 @@ class ReviewCalendarsStep(
     override val done: Flow<Boolean> = repo.hasConnections
 
     @Composable
-    override fun Content(onNext: () -> Unit) = ReviewCalendarsHost(review, connections, clock, YOUR_CALENDARS, offerConnect = false)
+    override fun Content(onNext: () -> Unit) = ReviewCalendarsHost(review, connections, clock, YOUR_CALENDARS, offerConnect = false, line = YOUR_CALENDARS_LINE)
 }
 
 /** Settings › Calendars (4a design D4): Review calendars, and Connect for a service not yet connected (ruling 14). */

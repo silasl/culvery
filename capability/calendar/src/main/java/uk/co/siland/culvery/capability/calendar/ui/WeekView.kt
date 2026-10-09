@@ -57,7 +57,7 @@ import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.capability.calendar.isStaleAt
-import uk.co.siland.culvery.capability.calendar.weekSubtitle
+import uk.co.siland.culvery.capability.calendar.weekLine
 import uk.co.siland.culvery.capability.calendar.weekTitle
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
@@ -140,14 +140,18 @@ fun WeekView(
                         }
                     }
                     Spacer(Modifier.height(CalendarDimens.subtitleTop))
-                    Text(
-                        weekSubtitle(state.sync, state.nowMillis),
-                        style = CalendarType.subtitle,
-                        color = if (state.sync.isStaleAt(state.nowMillis)) c.danger else c.mute,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.testTag("week_subtitle"),
-                    )
+                    val stale = state.sync.isStaleAt(state.nowMillis)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.staleIconGap)) {
+                        if (stale) HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.staleIcon, tint = c.danger, modifier = Modifier.testTag("week_out_of_date"))
+                        Text(
+                            weekLine(state.sync, state.nowMillis),
+                            style = CalendarType.subtitle,
+                            color = if (stale) c.danger else c.mute,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.testTag("week_subtitle"),
+                        )
+                    }
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

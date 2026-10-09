@@ -30,8 +30,6 @@ import uk.co.siland.culvery.core.ui.Icons
 /** 3a design §4.4. */
 internal fun connectingTitle(service: String): String = "Connecting to $service…"
 
-internal const val CONNECTING_LINE = "Choose the family’s Google account and allow access."
-
 /** What the connecting card is for: a new connection to [provider], or reconnecting [existing]. */
 internal data class ConnectRequest(val provider: CalendarProvider, val existing: Connection?)
 
@@ -78,7 +76,7 @@ internal fun CalendarConnectHost(request: ConnectRequest, connections: CalendarC
         // The PIN pad is up.
         null -> Unit
         false -> LaunchedEffect(request) { onClose() }
-        true -> ConnectingCard(request.provider.descriptor.displayName, onCancel = onClose) {
+        true -> ConnectingCard(request.provider.descriptor.displayName, onCancel = onClose, hint = request.provider.descriptor.connectHint) {
             request.provider.ConnectScreen(
                 existing = request.existing,
                 onConnected = { connection ->
@@ -93,14 +91,14 @@ internal fun CalendarConnectHost(request: ConnectRequest, connections: CalendarC
 
 /** 3a design §4.4: centred over the scrim; [content] is the provider's connect screen. */
 @Composable
-internal fun ConnectingCard(service: String, onCancel: () -> Unit, content: @Composable () -> Unit = {}) {
+internal fun ConnectingCard(service: String, onCancel: () -> Unit, hint: String? = null, content: @Composable () -> Unit = {}) {
     val c = Culvery.colors
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         PickerCard(CalendarDimens.connectingWidth, CalendarDimens.connectingGap, "connecting_card", paneTitle = connectingPane(service)) {
             HhIcon(Icons.CALENDAR_MONTH, size = CalendarDimens.connectingIcon, tint = c.accent)
             Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.connectingTextGap)) {
                 Text(connectingTitle(service), style = CalendarType.blockTitle, color = c.ink)
-                Text(CONNECTING_LINE, style = CalendarType.subtitle, color = c.mute)
+                if (hint != null) Text(hint, style = CalendarType.subtitle, color = c.mute)
             }
             content()
             HhButton("Cancel", onCancel, Modifier.fillMaxWidth().testTag("connecting_cancel"), size = ButtonSize.Large, on = ButtonSurface.Surf)

@@ -160,7 +160,7 @@ class OverlayLayersTest {
         compose.runOnIdle {
             overlay.show {
                 EventEditorSheet(
-                    form = form, people = emptyList(), childOnly = null, busy = false, failure = null,
+                    form = form, people = emptyList(), service = "Google Calendar", childOnly = null, busy = false, failure = null,
                     picker = EditorPicker.None, onClose = overlay::dismiss, onSave = {}, onDelete = {},
                     onRefusedWho = {}, onPicker = {}, focusTitleOnOpen = false,
                 )

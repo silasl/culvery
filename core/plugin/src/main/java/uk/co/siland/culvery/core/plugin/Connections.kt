@@ -11,6 +11,8 @@ data class ProviderDescriptor(
     val features: Set<Feature>,
     /** Offered as "Connect {displayName}" in Settings and on the Connect-a-calendar card; false for the debug sample. */
     val userConnectable: Boolean = true,
+    /** The connecting card's second line, e.g. what to choose in the provider's screens; none when it has nothing to add. */
+    val connectHint: String? = null,
 )
 
 /**

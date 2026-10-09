@@ -88,6 +88,7 @@ class EventEditorSheetTest {
             EventEditorSheet(
                 form = form,
                 people = SampleUi.household,
+                service = "Google Calendar",
                 childOnly = childOnly,
                 busy = busy,
                 failure = failure,
@@ -181,7 +182,7 @@ class EventEditorSheetTest {
         val halfTerm = editForm(EventTime.AllDay(LocalDate.of(2026, 9, 28)), EventTime.AllDay(LocalDate.of(2026, 10, 1)), "Half term", "family")
         show(halfTerm)
         compose.onNodeWithTag("editor_locked_dates").assertExists()
-        compose.onNodeWithText("Mon 28 – Wed 30 · change dates on your phone").assertExists()
+        compose.onNodeWithText("Mon 28 – Wed 30 · change dates in Google Calendar on your phone").assertExists()
         compose.onNodeWithTag("day_pick").assertDoesNotExist()
         compose.onNodeWithTag("time_all_day").assertDoesNotExist()
         compose.onNodeWithTag("who_Family").assertIsSelected()
@@ -298,7 +299,7 @@ class EventEditorSheetTest {
             CulveryTheme(dark = true) {
                 Box(Modifier.size(ShellTokens.sheetWidth, screen)) {
                     EventEditorSheet(
-                        form = form, people = SampleUi.household, childOnly = null, busy = false, failure = null,
+                        form = form, people = SampleUi.household, service = "Google Calendar", childOnly = null, busy = false, failure = null,
                         picker = EditorPicker.None, onClose = {}, onSave = { calls += "save" }, onDelete = {},
                         onRefusedWho = {}, onPicker = {}, keyboard = WindowInsets(bottom = keyboard),
                     )

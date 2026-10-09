@@ -64,7 +64,13 @@ class CardsTest {
     }
 
     @Test
-    fun emptyTodaySaysNothingOnToday() {
+    fun anEmptyTodayWithAddSaysWhatToDo() {
+        show { TodayCard(emptyList(), onAdd = {}) }
+        compose.onNodeWithText("Nothing on today. Tap + to add something.").assertExists()
+    }
+
+    @Test
+    fun anEmptyTodayWithoutAddJustSaysSo() {
         show { TodayCard(emptyList()) }
         compose.onNodeWithText("Nothing on today").assertExists()
     }
@@ -113,7 +119,7 @@ class CardsTest {
         showSized(705, 279) { ComingUpCard(SampleUi.comingUpBusy) }
         compose.onNodeWithText("Swim club").assertIsDisplayed()
         compose.onNodeWithText("Football").assertDoesNotExist()
-        compose.onNodeWithText("+2 more").assertIsDisplayed()
+        compose.onNodeWithText("+2 more in Calendar").assertIsDisplayed()
     }
 
     @Test

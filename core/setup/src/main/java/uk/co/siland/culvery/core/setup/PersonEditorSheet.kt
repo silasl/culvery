@@ -242,6 +242,9 @@ internal fun PersonEditorSheet(
                             HhButton(SET_PIN, onChoosePin, Modifier.testTag("person_set_pin"), enabled = !busy, on = ButtonSurface.Bg)
                         }
                     }
+                    if (form.role != Role.ADMIN && !form.hasPin) {
+                        Text(canOnlyLook(form.name), style = SetupType.secondary, color = c.mute, modifier = Modifier.testTag("person_look_only"))
+                    }
                 }
             }
             HhMessageLine(form.message, SetupType.message, c.danger, "person_message")

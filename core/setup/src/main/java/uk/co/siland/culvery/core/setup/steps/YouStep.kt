@@ -33,6 +33,7 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SetupStep
+import uk.co.siland.culvery.core.setup.CHANGE_PIN
 import uk.co.siland.culvery.core.setup.NAME
 import uk.co.siland.culvery.core.setup.PIN_SET
 import uk.co.siland.culvery.core.setup.PIN_TAKEN
@@ -45,6 +46,7 @@ import uk.co.siland.culvery.core.setup.SetupType
 import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.WHOS_SETTING_UP
 import uk.co.siland.culvery.core.setup.YOUR_DETAILS_NOT_SAVED
+import uk.co.siland.culvery.core.setup.YOU_LINE
 import uk.co.siland.culvery.core.setup.YOUR_NAME
 import uk.co.siland.culvery.core.setup.showPersonEditor
 import uk.co.siland.culvery.core.setup.someoneCalled
@@ -120,7 +122,7 @@ class YouStep @Inject constructor(
         val overlay = LocalOverlayHost.current
         // A PIN typed but never confirmed with Next isn't kept once the step is left (Back).
         DisposableEffect(Unit) { onDispose { form.pin = null } }
-        StepTitle(WHOS_SETTING_UP)
+        StepTitle(WHOS_SETTING_UP, YOU_LINE)
         if (admin != null) {
             // Ruling 18: once made, the Admin is edited in the sheet like anyone else.
             PersonRow(admin) { overlay.showPersonEditor(editor, admin, members) }
@@ -165,7 +167,7 @@ internal fun YouFormContent(form: YouForm, onSetPin: () -> Unit) {
         )
         HhSwatchGrid(form.color, taken = emptyMap(), tagPrefix = "you_swatch_") { form.color = it }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SetupDimens.rowDotGap)) {
-            HhButton(SET_YOUR_PIN, onSetPin, Modifier.testTag("you_set_pin"), on = ButtonSurface.Bg)
+            HhButton(if (form.pin == null) SET_YOUR_PIN else CHANGE_PIN, onSetPin, Modifier.testTag("you_set_pin"), on = ButtonSurface.Bg)
             if (form.pin != null) Text(PIN_SET, style = SetupType.secondary, color = c.mute, modifier = Modifier.testTag("you_pin_set"))
         }
         HhMessageLine(form.message, SetupType.message, c.danger, "you_message")

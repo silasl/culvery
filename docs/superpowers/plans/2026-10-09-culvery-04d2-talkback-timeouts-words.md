@@ -6659,6 +6659,8 @@ The 4d triage found the red "not synced yet" is expected on the emulator (a pass
 adb -s emulator-5554 shell run-as uk.co.siland.culvery sqlite3 databases/calendar.db \
   "SELECT id, providerId, health, healthMessage, lastSyncMillis FROM connection;"
 ```
+
+Notes: deferred to the final walk-through (Steps 1 and 8 read the emulator, which is off); read the connection health from Settings › Calendars there.
 Record the rows (without `id`s or account emails) and the cause in one line under this step in the plan file ("Notes: …"). If `run-as` says the package isn't debuggable, a release build is installed: record "not readable: release build installed" and go on; don't reinstall anything.
 
 - [ ] **Step 2: Write the failing tests**

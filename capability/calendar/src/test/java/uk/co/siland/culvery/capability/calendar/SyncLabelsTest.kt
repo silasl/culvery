@@ -47,6 +47,15 @@ class SyncLabelsTest {
     }
 
     @Test
+    fun aStaleWeekSaysOutOfDateFirst() {
+        val stale = SyncStatusUi(minutesAgo(180), emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false)
+        assertThat(weekLine(stale, now)).isEqualTo("Out of date — updated from Google Calendar 3 hours ago")
+        assertThat(weekLine(stale.copy(serviceNames = listOf("Google Calendar", "School")), now)).isEqualTo("Out of date — updated 3 hours ago")
+        assertThat(weekLine(stale.copy(lastSyncMillis = null, failingBeforeFirstSync = true), now)).isEqualTo("Out of date — not updated yet")
+        assertThat(weekLine(stale.copy(lastSyncMillis = minutesAgo(5)), now)).isEqualTo("Updated from Google Calendar 5 minutes ago")
+    }
+
+    @Test
     fun theReconnectChipCountsAccounts() {
         assertThat(reconnectLabel(listOf("Google Calendar"))).isEqualTo("Google Calendar needs reconnecting")
         assertThat(reconnectLabel(listOf("Google Calendar", "Google Calendar"))).isEqualTo("2 accounts need reconnecting")

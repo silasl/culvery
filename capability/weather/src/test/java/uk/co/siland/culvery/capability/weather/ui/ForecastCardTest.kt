@@ -95,7 +95,7 @@ class ForecastCardTest {
     @Test
     fun expiredSaysToCheckTheWifi() {
         show(WeatherView.Expired)
-        compose.onNodeWithText("No forecast — check the tablet’s Wi-Fi.").assertExists()
+        compose.onNodeWithText("No forecast — check the tablet’s Wi-Fi. Culvery will try again.").assertExists()
     }
 
     @Test
@@ -140,7 +140,7 @@ class ForecastCardTest {
     fun failedSaysThereIsNoForecastYetUnderItsTitle() {
         show(WeatherView.Failed)
         compose.onNodeWithText("Forecast").assertExists()
-        compose.onNodeWithText("No forecast yet — check the tablet’s Wi-Fi.").assertExists()
+        compose.onNodeWithText("No forecast yet — check the tablet’s Wi-Fi. Culvery will try again.").assertExists()
         compose.onNodeWithText("Getting the forecast…").assertDoesNotExist()
     }
 

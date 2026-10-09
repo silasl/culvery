@@ -182,13 +182,13 @@ class EventFormTest {
     fun anEventOverSeveralDaysLocksItsDates() {
         val halfTerm = edit(EventTime.AllDay(LocalDate.of(2026, 9, 22)), EventTime.AllDay(LocalDate.of(2026, 9, 25)), "Half term", "family")
         assertThat(halfTerm.datesLocked).isTrue()
-        assertThat(halfTerm.lockedDatesLabel).isEqualTo("Tue 22 – Thu 24 · change dates on your phone")
+        assertThat(halfTerm.lockedDatesLabel("Google Calendar")).isEqualTo("Tue 22 – Thu 24 · change dates in Google Calendar on your phone")
         assertThat(halfTerm.summary()).isEqualTo("Yesterday – Tomorrow · All day · Family")
         assertThat(edit(EventTime.AllDay(today), EventTime.AllDay(today.plusDays(1))).datesLocked).isFalse()
         // 22:00 to 01:00 crosses midnight; 22:00 to 00:00 ends at midnight, which counts as the same day.
         assertThat(editTimed(today.atTime(22, 0), 180).datesLocked).isTrue()
         assertThat(editTimed(today.atTime(22, 0), 120).datesLocked).isFalse()
-        assertThat(editTimed(today.atTime(22, 0), 120).lockedDatesLabel).isNull()
+        assertThat(editTimed(today.atTime(22, 0), 120).lockedDatesLabel("Google Calendar")).isNull()
     }
 
     @Test
@@ -198,14 +198,14 @@ class EventFormTest {
             EventTime.AllDay(LocalDate.of(2026, 10, 3)),
             "Half term", "family",
         )
-        assertThat(crossMonth.lockedDatesLabel).isEqualTo("Wed 30 Sep – Fri 2 Oct · change dates on your phone")
+        assertThat(crossMonth.lockedDatesLabel("Google Calendar")).isEqualTo("Wed 30 Sep – Fri 2 Oct · change dates in Google Calendar on your phone")
 
         val crossYear = edit(
             EventTime.AllDay(LocalDate.of(2026, 12, 31)),
             EventTime.AllDay(LocalDate.of(2027, 1, 3)),
             "New Year trip", "family",
         )
-        assertThat(crossYear.lockedDatesLabel).isEqualTo("Thu 31 Dec – Sat 2 Jan · change dates on your phone")
+        assertThat(crossYear.lockedDatesLabel("Google Calendar")).isEqualTo("Thu 31 Dec – Sat 2 Jan · change dates in Google Calendar on your phone")
     }
 
     @Test

@@ -22,6 +22,7 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -90,7 +91,21 @@ class WeekViewTest {
     @Test
     fun staleSubtitleStillShowsTheAge() {
         show { WeekView(state(sync(agoMinutes = 45))) }
-        compose.onNodeWithText("Updated from Google 45 minutes ago").assertExists()
+        compose.onNodeWithText("Out of date — updated from Google 45 minutes ago").assertExists()
+    }
+
+    @Test
+    fun aStaleWeekShowsTheIconAndTheWordsAsWellAsTheColour() {
+        show { WeekView(state(sync(agoMinutes = 45, connections = listOf("Google Calendar")))) }
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("Out of date — updated from Google Calendar 45 minutes ago")
+        compose.onNodeWithTag("week_out_of_date", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun aFreshWeekHasNoIcon() {
+        show { WeekView(state(sync(agoMinutes = 2, connections = listOf("Google Calendar")))) }
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("Updated from Google Calendar 2 minutes ago")
+        compose.onNodeWithTag("week_out_of_date", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test

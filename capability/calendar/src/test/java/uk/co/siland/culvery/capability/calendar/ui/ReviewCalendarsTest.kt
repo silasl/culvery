@@ -289,6 +289,33 @@ class ReviewCalendarsTest {
     }
 
     @Test
+    fun withNothingConnectedTheCalendarsPageSaysWhatToDo() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ReviewCalendars(
+                    title = "Calendars", connections = emptyList(), people = listOf(Person.Family), nowMillis = now, busy = false,
+                    picking = null, confirming = null, connectable = emptyList(), actions = ReviewActions(),
+                )
+            }
+        }
+        compose.onNodeWithText("Connect your family’s Google Calendar to see it on Home.").assertExists()
+    }
+
+    @Test
+    fun theWizardsStepHasItsLine() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ReviewCalendars(
+                    title = "Your calendars", connections = listOf(ReviewConnection(row(), listOf(family))), people = listOf(Person.Family),
+                    nowMillis = now, busy = false, picking = null, confirming = null, connectable = emptyList(), actions = ReviewActions(),
+                    line = "Choose who each calendar is for, and which to show. New events go to the main calendar.",
+                )
+            }
+        }
+        compose.onNodeWithText("Choose who each calendar is for, and which to show. New events go to the main calendar.").assertExists()
+    }
+
+    @Test
     fun hideNamesItsCalendar() {
         showSources(family, swim.copy(readProblem = READ_REFUSED))
         compose.onNodeWithContentDescription("Hide this calendar, Mia's swimming").assertExists()

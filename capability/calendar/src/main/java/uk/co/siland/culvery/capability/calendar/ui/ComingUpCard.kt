@@ -94,7 +94,7 @@ private fun DayColumn(label: String, spoken: String, date: LocalDate, events: Li
         if (events.isEmpty()) Text("Nothing on", style = HhType.secondary, color = c.mute)
         events.take(MAX_ROWS).forEach { CompactRow(it, date) }
         if (events.size > MAX_ROWS) {
-            Text("+${events.size - MAX_ROWS} more", style = CalendarType.small12, color = c.mute)
+            Text("+${events.size - MAX_ROWS} more in Calendar", style = CalendarType.small12, color = c.mute)
         }
     }
 }

@@ -181,7 +181,7 @@ class FontScaleTest {
                 WithFontScale(1.5f) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
                         EventEditorSheet(
-                            form = form, people = SampleUi.household + max, childOnly = null, busy = false, failure = null,
+                            form = form, people = SampleUi.household + max, service = "Google Calendar", childOnly = null, busy = false, failure = null,
                             picker = EditorPicker.None, onClose = {}, onSave = {}, onDelete = {}, onRefusedWho = {}, onPicker = {},
                             focusTitleOnOpen = false,
                         )

@@ -66,6 +66,7 @@ class EditorScreenshotTest {
                         EventEditorSheet(
                             form = form,
                             people = SampleUi.household,
+                            service = "Google Calendar",
                             childOnly = childOnly,
                             busy = false,
                             failure = failure,

@@ -61,6 +61,7 @@ class WeekScreenshotTest {
     @Test fun weekDark() = snap("week_dark", true, fresh, canAdd = true)
     @Test fun weekLight() = snap("week_light", false, fresh, canAdd = true)
     @Test fun weekStaleDark() = snap("week_stale_dark", true, stale)
+    @Test fun weekStaleLight() = snap("week_stale_light", false, stale)
     @Test fun weekNeedsSignInDark() = snap("week_needs_sign_in_dark", true, needsSignIn)
     @Test fun weekSyncingDark() = snap("week_syncing_dark", true, fresh, SampleUi.weekWithSyncing)
     @Test fun weekNextLight() = snap("week_next_light", false, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)

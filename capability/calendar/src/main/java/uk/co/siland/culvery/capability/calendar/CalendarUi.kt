@@ -122,6 +122,12 @@ fun SyncStatusUi.isStaleAt(nowMillis: Long): Boolean =
 fun weekSubtitle(sync: SyncStatusUi, nowMillis: Long): String =
     updatedLabel(sync.lastSyncMillis, nowMillis, sync.serviceNames.distinct().singleOrNull())
 
+/** The week's line with its state in words as well as colour: "Out of date — updated from Google Calendar 3 hours ago". */
+fun weekLine(sync: SyncStatusUi, nowMillis: Long): String {
+    val line = weekSubtitle(sync, nowMillis)
+    return if (sync.isStaleAt(nowMillis)) "Out of date — ${line.replaceFirstChar { it.lowercase() }}" else line
+}
+
 /** A tag naming a real person (or Family) wins; otherwise the source's person; otherwise Family. */
 fun resolvePerson(forPerson: String?, sourcePerson: PersonId, people: Map<PersonId, Person>): Person =
     forPerson?.let { people[PersonId(it)] } ?: people[sourcePerson] ?: Person.Family
@@ -151,7 +157,7 @@ fun weekTitle(weeksAhead: Int): String = when (weeksAhead) {
 }
 
 /** 4c §6.6: the toast after adding an event the Calendar tab can't reach, so the family know where it went. */
-fun eventAddedFor(day: LocalDate): String = "Event added for ${day.format(DAY_AND_MONTH)}"
+fun eventAddedFor(day: LocalDate): String = "Event added on ${day.format(DAY_AND_MONTH)}."
 
 /** An event ending at exactly midnight ends on the day before. */
 private fun lastDayOf(from: ZonedDateTime, to: ZonedDateTime): LocalDate {

@@ -125,7 +125,7 @@ class CalendarEditorTest {
         val last = lastShownDay(LocalDate.of(2026, 9, 23))
         assertThat(editor.create(draftOn(last, "Last shown"))).isEqualTo(EditResult.Done)
         assertThat(editor.create(draftOn(last.plusDays(1), "Beyond"))).isEqualTo(EditResult.Done)
-        assertThat(access.toasts.messages).containsExactly(EVENT_ADDED, "Event added for Wed 21 October").inOrder()
+        assertThat(access.toasts.messages).containsExactly(EVENT_ADDED, "Event added on Wed 21 October.").inOrder()
     }
 
     /** A change to an event, as the edit sheet sends it; its createdBy is ignored by the editor. */

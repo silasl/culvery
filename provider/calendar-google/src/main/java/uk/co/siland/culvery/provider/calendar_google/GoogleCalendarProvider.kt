@@ -69,7 +69,7 @@ class GoogleCalendarProvider @Inject constructor(
     private val playServices: PlayServicesCheck,
     private val stored: StoredSeries,
 ) : CalendarProvider, CalendarWriter {
-    override val descriptor = ProviderDescriptor(GOOGLE_PROVIDER_ID, GOOGLE_DISPLAY_NAME, Icons.CALENDAR_MONTH, setOf(Feature.READ, Feature.WRITE))
+    override val descriptor = ProviderDescriptor(GOOGLE_PROVIDER_ID, GOOGLE_DISPLAY_NAME, Icons.CALENDAR_MONTH, setOf(Feature.READ, Feature.WRITE), connectHint = "Choose the family’s Google account and allow access.")
     override val providerId = GOOGLE_PROVIDER_ID
 
     // By connection and calendar: each series' RRULE, "" for a series with none.

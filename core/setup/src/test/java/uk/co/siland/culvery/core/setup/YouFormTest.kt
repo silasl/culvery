@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -37,5 +38,14 @@ class YouFormTest {
     fun theYouStepPassesTheSharedCheck() {
         compose.setContent { CulveryTheme(dark = true) { YouFormContent(YouForm(), onSetPin = {}) } }
         compose.assertAccessible()
+    }
+
+    @Test
+    fun thePinButtonSaysChangeOnceAPinIsChosen() {
+        val form = YouForm()
+        compose.setContent { CulveryTheme(dark = true) { YouFormContent(form, onSetPin = {}) } }
+        compose.onNodeWithTag("you_set_pin").assertTextEquals("Set your PIN")
+        compose.runOnIdle { form.pin = "1234" }
+        compose.onNodeWithTag("you_set_pin").assertTextEquals("Change PIN")
     }
 }

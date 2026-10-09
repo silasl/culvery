@@ -177,15 +177,14 @@ class EventForm(
         get() = day.takeIf { it !in dayChoices }?.format(SHORT_DAY)
 
     /**
-     * A locked multi-day edit's one line: "Mon 22 – Wed 24 · change dates on your phone", or, when the span crosses
-     * a month, "Wed 30 Sep – Fri 2 Oct · change dates on your phone" on both ends.
+     * A locked multi-day edit's one line: "Mon 22 – Wed 24 · change dates in Google Calendar on your phone", or, when the
+     * span crosses a month, "Wed 30 Sep – Fri 2 Oct · …" on both ends; [service] names where to change them.
      */
-    val lockedDatesLabel: String?
-        get() = original?.takeIf { datesLocked }?.let { o ->
-            val (first, last) = daySpan(o.start, o.end, zone)
-            val formatter = if (first.month == last.month && first.year == last.year) DAY_AND_DATE else SHORT_DAY
-            "${first.format(formatter)} – ${last.format(formatter)} · change dates on your phone"
-        }
+    fun lockedDatesLabel(service: String): String? = original?.takeIf { datesLocked }?.let { o ->
+        val (first, last) = daySpan(o.start, o.end, zone)
+        val formatter = if (first.month == last.month && first.year == last.year) DAY_AND_DATE else SHORT_DAY
+        "${first.format(formatter)} – ${last.format(formatter)} · change dates in $service on your phone"
+    }
 
     /**
      * What Save sends. All day is one whole date. A timed event starts at the chosen local time in the household zone

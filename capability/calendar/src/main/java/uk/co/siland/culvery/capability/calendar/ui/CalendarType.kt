@@ -139,6 +139,10 @@ internal object CalendarDimens {
     // Week view header: subtitle 4 below the title; legend 18 between people, 7 dot→name, 24 to the
     // right-hand button slot (2b's Add event); reconnect chip 8 below the subtitle.
     val subtitleTop = 4.dp
+
+    // The stale week's sync_problem, 6 dp before its words.
+    val staleIcon = 16.dp
+    val staleIconGap = 6.dp
     val legendGap = 18.dp
     val legendDotGap = 7.dp
     val legendDot = 10.dp

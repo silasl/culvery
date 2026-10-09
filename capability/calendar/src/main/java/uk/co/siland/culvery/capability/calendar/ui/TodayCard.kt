@@ -63,7 +63,7 @@ fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier, onOpen: (Ev
         Spacer(Modifier.height(CalendarDimens.todayHeaderGap))
         when {
             events == null -> {}
-            events.isEmpty() -> Text("Nothing on today", style = HhType.body, color = c.mute)
+            events.isEmpty() -> Text(if (onAdd != null) "Nothing on today. Tap + to add something." else "Nothing on today", style = HhType.body, color = c.mute)
             else -> LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(CalendarDimens.todayRowGap),
                 modifier = Modifier.fillMaxWidth().weight(1f),

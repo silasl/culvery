@@ -88,6 +88,7 @@ data class SaveFailure(val service: String, val problem: WriteProblem)
 fun EventEditorSheet(
     form: EventForm,
     people: List<Person>,
+    service: String,
     childOnly: PersonId?,
     busy: Boolean,
     failure: SaveFailure?,
@@ -147,7 +148,7 @@ fun EventEditorSheet(
                 ) {
                     WhoSection(form, everyone, childOnly, busy, onRefusedWho)
                     if (form.datesLocked) {
-                        LockedDates(form.lockedDatesLabel.orEmpty())
+                        LockedDates(form.lockedDatesLabel(service).orEmpty())
                     } else {
                         DaySection(form, busy) {
                             closeKeyboard()

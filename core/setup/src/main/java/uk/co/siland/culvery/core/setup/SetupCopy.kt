@@ -12,9 +12,10 @@ internal const val ENTER_PIN = "Enter PIN"
 // Welcome, You, Household, Done (§4.2)
 internal const val START = "Start"
 internal const val WELCOME = "Welcome to Culvery"
-internal const val WELCOME_LINE = "Your home’s location, the people who live here, and your calendars."
+internal const val WELCOME_LINE = "We’ll set up your home’s location, the people who live here, and your calendars."
 internal const val USE_SAMPLE_HOUSEHOLD = "Use a sample household"
 internal const val WHOS_SETTING_UP = "Who’s setting this up?"
+internal const val YOU_LINE = "You’ll be the Admin — you can change settings and people. Admins need a PIN."
 internal const val SET_YOUR_PIN = "Set your PIN"
 internal const val WHO_ELSE = "Who else lives here?"
 internal const val CULVERY_IS_READY = "Culvery is ready"
@@ -23,7 +24,7 @@ internal const val OPEN_CULVERY = "Open Culvery"
 // Home location (§4.3)
 internal const val WHERES_HOME = "Where’s home?"
 internal const val TOWN_OR_CITY = "Town or city"
-internal const val USED_FOR = "Used for the time zone, and for weather."
+internal const val USED_FOR = "Used for the clock’s time zone and the weather."
 internal const val COULD_NOT_SEARCH = "Couldn’t search for towns — check the tablet’s Wi-Fi, then try again."
 internal const val SEARCHING = "Searching…"
 internal const val TRY_AGAIN = "Try again"
@@ -37,6 +38,11 @@ internal fun townsFound(count: Int): String = if (count == 1) "1 town found" els
 internal const val ADD_PERSON = "Add person"
 internal const val PIN_SET = "PIN set"
 internal const val NO_PIN = "No PIN"
+internal const val NO_PIN_CANT_ADD = "No PIN — can’t add events"
+
+/** An Adult or Child without a PIN can't be told apart from anyone, so they can only look. */
+internal fun canOnlyLook(name: String): String =
+    if (name.isBlank()) "Without a PIN, they can only look." else "Without a PIN, ${name.trim()} can only look."
 internal const val NAME = "Name"
 internal const val YOUR_NAME = "Your name"
 internal const val COLOUR = "Colour"
@@ -64,7 +70,7 @@ internal fun couldNotMove(name: String): String = "Couldn’t move $name — try
 internal const val YOUR_DETAILS_NOT_SAVED = "Couldn’t save your details — try again."
 internal const val HOME_NOT_SAVED = "Couldn’t save the home location — try again."
 
-internal fun removeQuestion(name: String): String = "Remove $name? $name’s events and calendars show as Family."
+internal fun removeQuestion(name: String): String = "Remove $name? $name’s events and calendars will show as Family."
 
 internal fun removed(name: String): String = "$name removed."
 
@@ -110,4 +116,5 @@ internal const val HOME_LOCATION = "Home location"
 internal const val PEOPLE = "People"
 internal const val TABLET_LOCK = "Tablet lock"
 internal const val USE_OTHER_APPS = "Use other apps"
-internal const val KIOSK_LINE = "Culvery keeps the tablet on this app. Exit to use other apps; it locks again next time Culvery opens."
+internal const val TABLET_LOCK_LINE = "Culvery keeps the tablet on this app. Tap Use other apps to leave it. It locks again when Culvery next opens."
+internal const val HOME_APP_HOW_TO = "If that doesn’t work: tap Use other apps, then choose the home app in Android’s Settings › Apps › Default apps."
