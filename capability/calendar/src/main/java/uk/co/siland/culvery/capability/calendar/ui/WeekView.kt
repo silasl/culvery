@@ -371,7 +371,7 @@ internal class WeekShown {
 
 /**
  * A new [WeekShown] each [today], so the view is back on this week at midnight. A later week goes back after
- * [BACK_TO_THIS_WEEK_MS] (or TalkBack's longer time) without a touch anywhere, a sheet's included; never while TalkBack
+ * [BACK_TO_THIS_WEEK_MS] without a touch anywhere, a sheet's included; never while TalkBack
  * is on, where it would move the page under a reader (4d-2 §6.4).
  */
 @Composable

@@ -378,7 +378,7 @@ interface UserActivity {
 - Otherwise the wait is `UserActivity.timeout(BACK_TO_THIS_WEEK_MS)`.
 - The week title is a Polite live region, so "This week" is announced when it changes (by ‹ ›, This week, or the snap-back).
 
-**Tests.** A host-level test of `WeekViewHost` with a fake `UserActivity`: a touch reported while an overlay is showing restarts the wait (closes T14’s untested wiring); with `exploring` true the week stays on a later week after 10 minutes; with it false it returns at 2 minutes; the title has a live region.
+**Tests.** A host-level test of `WeekViewHost` with a fake `UserActivity`: a touch reported while an overlay is showing restarts the wait (closes T14’s untested wiring); with `exploring` true the week stays on a later week after 10 minutes; with it false it returns at 2 minutes; the title has a live region. *(Amended in Task 17: no host test; `AppContentTest` and `WeekViewTest` pin it, plan ruling 30.)*
 
 ### 6.5 Toast durations (D31)
 
@@ -481,7 +481,7 @@ Every changed string is in Appendix A, current → new, with its file. This sect
   | `Refused(null)` or the provider’s generic refusal | "Google Calendar wouldn’t accept this change." | the same |
   | `Refused(reason)` | "Couldn’t save to Google Calendar — {reason}." | "Couldn’t delete — {reason}." |
 
-  The provider’s generic refusal becomes one shared constant beside `EVENT_GONE`, `WRITE_REFUSED`, which Google uses instead of its own `REFUSED`, and `callWriter`’s fallback (Writes.kt:66) gives `Refused(null)`. `report` (CalendarEditor.kt:435) picks the Delete column for a delete, so a failed delete never says "save" (C52); `COULD_NOT_DELETE` and `couldNotDelete` use it.
+  The provider’s generic refusal becomes one shared constant beside `EVENT_GONE`, `WRITE_REFUSED`, which Google uses instead of its own `REFUSED`, and `callWriter`’s fallback (Writes.kt:66) gives `Refused(null)`. `report` (CalendarEditor.kt:435) picks the Delete column for a delete, so a failed delete never says "save" (C52); `COULD_NOT_DELETE` and `couldNotDelete` use it. *(Amended in Task 17: no `WRITE_REFUSED` constant; a rejected write has a null reason with the same visible copy, plan ruling 29.)*
 - **Reasons in lower case**, with no end punctuation since they follow a dash: `EVENT_GONE` "the event has been deleted"; Google’s `READ_ONLY_HERE` "this calendar can’t be changed from the tablet"; the sample provider’s "repeating events can’t be changed here" and "{calendar} can’t be changed here".
 - **The failure card’s body by cause** (C48): `Tablet` "Nothing was saved. Your details are still here — try again."; `Refused` "Nothing was saved. Your details are still here to add in Google Calendar on your phone." The `SAVE_FAILED_BODY` constant becomes a function of the cause.
 - **Lost changes** (C53, the drain): one change "A change couldn’t be saved to Google Calendar and was lost — {reason}." (or "… and was lost." for a generic refusal); several "3 changes couldn’t be saved to Google Calendar and were lost."
