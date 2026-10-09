@@ -80,7 +80,7 @@ class SourceRefresher internal constructor(
         val outcome = store.refreshSources(id, sources, now) { defaultMapping(it, household) }
         refreshed += id
         flagged[id]?.removeAll(gone)
-        if (outcome.masterCleared) toaster.show(masterGone(provider.descriptor.displayName, outcome.droppedChanges))
+        if (outcome.masterCleared) toaster.show(masterGone(provider.descriptor.displayName, outcome.droppedChanges), urgent = true)
     }
 
     private companion object {

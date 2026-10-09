@@ -24,8 +24,9 @@ const val TOAST_ICON_INFO = "info"
 /**
  * A short bottom-centre message (hand-off §7). Injected wherever a toast is shown (access control, the calendar
  * editor, the outbox drain), so a toast never depends on a composable still being on screen. Safe from any
- * thread. A new toast replaces the current one.
+ * thread. A new toast replaces the current one. [urgent] for errors and refusals: TalkBack interrupts to say it, and it
+ * stays longer.
  */
 interface Toaster {
-    fun show(message: String, icon: String = TOAST_ICON_INFO)
+    fun show(message: String, icon: String = TOAST_ICON_INFO, urgent: Boolean = false)
 }

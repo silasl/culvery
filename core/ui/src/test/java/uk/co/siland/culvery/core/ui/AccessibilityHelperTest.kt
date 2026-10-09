@@ -71,7 +71,7 @@ class AccessibilityHelperTest {
             HhButton("Disconnect", {}, on = ButtonSurface.Surf, spokenName = "Disconnect Google Calendar, alex@example.com")
             HhListRow("Sam", subtitle = "Adult · PIN set", onClick = {}, clickLabel = "change Sam’s details")
             Box(Modifier.size(48.dp).hhClickable({}, role = Role.Tab)) { Text("Home") }
-            HhTextField("", {}, placeholder = "Town or city", tag = "field")
+            HhTextField("", {}, placeholder = "Town or city", label = "Town or city", tag = "field")
         }
         compose.assertClickablesHaveRoleAndLabel()
     }

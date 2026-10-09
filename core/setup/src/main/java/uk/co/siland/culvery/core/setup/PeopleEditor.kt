@@ -28,7 +28,8 @@ sealed interface PeopleOutcome {
     data object Cancelled : PeopleOutcome
 
     /** Nothing changed; the sheet shows [message] and keeps what was typed. */
-    data class Refused(val message: String) : PeopleOutcome
+    /** [nameTaken] marks the name field as well as saying it. */
+    data class Refused(val message: String, val nameTaken: Boolean = false) : PeopleOutcome
 }
 
 /** A person as the sheet has them. [newPin] is a PIN chosen in the sheet; [removePin] is Remove PIN tapped. */
@@ -95,14 +96,14 @@ class PeopleEditor @Inject constructor(
     suspend fun move(id: PersonId, up: Boolean): PeopleOutcome {
         val name = orNull { household.person(id)?.name }
         if (name == null) {
-            toaster.show(COULD_NOT_SAVE)
+            toaster.show(COULD_NOT_SAVE, urgent = true)
             return PeopleOutcome.Refused(COULD_NOT_SAVE)
         }
         access.authorise(CorePermissions.SETTINGS_MANAGE) ?: return PeopleOutcome.Cancelled
         var moved = false
         val outcome = saving { moved = household.move(id, up) }
         when {
-            outcome is PeopleOutcome.Refused -> toaster.show(outcome.message)
+            outcome is PeopleOutcome.Refused -> toaster.show(outcome.message, urgent = true)
             moved -> toaster.show(if (up) movedUp(name) else movedDown(name))
         }
         return outcome
@@ -122,7 +123,7 @@ class PeopleEditor @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: DuplicateNameException) {
-            PeopleOutcome.Refused(someoneCalled(e.name))
+            PeopleOutcome.Refused(someoneCalled(e.name), nameTaken = true)
         } catch (e: ColourInUseException) {
             PeopleOutcome.Refused(COLOUR_TAKEN)
         } catch (e: PinInUseException) {

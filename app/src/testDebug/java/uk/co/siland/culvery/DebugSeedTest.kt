@@ -50,7 +50,7 @@ import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider
 
 private object NoToasts : Toaster {
-    override fun show(message: String, icon: String) = Unit
+    override fun show(message: String, icon: String, urgent: Boolean) = Unit
 }
 
 @RunWith(AndroidJUnit4::class)

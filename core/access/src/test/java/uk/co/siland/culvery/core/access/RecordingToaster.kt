@@ -5,7 +5,11 @@ import uk.co.siland.culvery.core.plugin.Toaster
 class RecordingToaster : Toaster {
     val messages = mutableListOf<String>()
 
-    override fun show(message: String, icon: String) {
+    /** The messages shown as urgent (errors and refusals). */
+    val urgent = mutableListOf<String>()
+
+    override fun show(message: String, icon: String, urgent: Boolean) {
         messages += message
+        if (urgent) this.urgent += message
     }
 }

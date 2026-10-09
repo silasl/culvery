@@ -45,11 +45,13 @@ import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupType
 import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.WHOS_SETTING_UP
+import uk.co.siland.culvery.core.setup.YOUR_NAME
 import uk.co.siland.culvery.core.setup.showPersonEditor
 import uk.co.siland.culvery.core.setup.someoneCalled
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhMessageLine
 import uk.co.siland.culvery.core.ui.HhSwatchGrid
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.PersonPalette
@@ -61,6 +63,7 @@ internal class YouForm {
     var color by mutableStateOf(PersonPalette.colors.first())
     var pin by mutableStateOf<String?>(null)
     var message by mutableStateOf<String?>(null)
+    var nameError by mutableStateOf<String?>(null)
 
     val ready: Boolean get() = name.isNotBlank() && pin != null
 }
@@ -96,6 +99,7 @@ class YouStep @Inject constructor(
             throw e
         } catch (e: DuplicateNameException) {
             form.message = someoneCalled(e.name)
+            form.nameError = form.message
             false
         } catch (e: PinInUseException) {
             form.message = PIN_TAKEN
@@ -151,16 +155,19 @@ internal fun YouFormContent(form: YouForm, onSetPin: () -> Unit) {
             onValueChange = {
                 form.name = it
                 form.message = null
+                form.nameError = null
             },
             placeholder = NAME,
+            label = YOUR_NAME,
             tag = "you_name",
             capitalization = KeyboardCapitalization.Words,
+            error = form.nameError,
         )
         HhSwatchGrid(form.color, taken = emptySet(), tagPrefix = "you_swatch_") { form.color = it }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SetupDimens.rowDotGap)) {
             HhButton(SET_YOUR_PIN, onSetPin, Modifier.testTag("you_set_pin"), on = ButtonSurface.Bg)
             if (form.pin != null) Text(PIN_SET, style = SetupType.secondary, color = c.mute, modifier = Modifier.testTag("you_pin_set"))
         }
-        form.message?.let { Text(it, style = SetupType.message, color = c.danger, modifier = Modifier.testTag("you_message")) }
+        HhMessageLine(form.message, SetupType.message, c.danger, "you_message")
     }
 }

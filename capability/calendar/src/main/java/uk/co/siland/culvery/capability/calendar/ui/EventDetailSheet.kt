@@ -28,7 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -207,6 +209,7 @@ private fun SyncingPill(connectionLabel: String) {
         horizontalArrangement = Arrangement.spacedBy(CalendarDimens.syncingPillIconGap),
         modifier = Modifier
             .testTag("detail_syncing")
+            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
             .height(CalendarDimens.syncingPillHeight)
             .clip(RoundedCornerShape(CalendarDimens.syncingPillRadius))
             .background(c.surf2)

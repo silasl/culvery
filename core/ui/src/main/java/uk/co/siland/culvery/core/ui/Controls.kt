@@ -37,8 +37,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -142,16 +147,21 @@ fun HhChoiceChip(
     }
 }
 
-/** 64 dp, `surf`, 22 sp / 600, one line; [placeholder] while empty; the keyboard's Done calls [onDone] and never saves. */
+/**
+ * 64 dp, `surf`, 22 sp / 600, one line; [placeholder] while empty; the keyboard's Done calls [onDone] and never saves.
+ * [label] is its name for TalkBack once text hides the placeholder; [error] is read with it.
+ */
 @Composable
 fun HhTextField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
+    label: String,
     tag: String,
     modifier: Modifier = Modifier,
     readOnly: Boolean = false,
     capitalization: KeyboardCapitalization = KeyboardCapitalization.Sentences,
+    error: String? = null,
     onDone: () -> Unit = {},
 ) {
     val c = Culvery.colors
@@ -168,6 +178,10 @@ fun HhTextField(
         keyboardActions = KeyboardActions(onDone = { onDone() }),
         modifier = modifier
             .testTag(tag)
+            .semantics {
+                contentDescription = label
+                if (error != null) error(error)
+            }
             .fillMaxWidth()
             .height(ControlTokens.fieldHeight)
             .onFocusChanged { focused = it.isFocused },
@@ -184,6 +198,24 @@ fun HhTextField(
                 if (value.isEmpty()) Text(placeholder, style = ControlType.field, color = c.mute, maxLines = 1)
                 inner()
             }
+        },
+    )
+}
+
+/**
+ * An in-page message that TalkBack hears appear. Compose speaks a live region only when a node it already has changes,
+ * and leaves a node with no size out of the tree, so the line is always composed and one line tall while empty.
+ * [spoken] is its description when it differs from what shows ("3 towns found" under a list).
+ */
+@Composable
+fun HhMessageLine(message: String?, style: TextStyle, color: Color, tag: String, modifier: Modifier = Modifier, spoken: String? = message) {
+    Text(
+        message.orEmpty(),
+        style = style,
+        color = color,
+        modifier = modifier.testTag(tag).semantics {
+            liveRegion = LiveRegionMode.Polite
+            if (spoken != null && spoken != message) contentDescription = spoken
         },
     )
 }

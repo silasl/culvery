@@ -41,8 +41,12 @@ internal class RecordingToaster : Toaster {
     // Written from Room's and the app scope's threads, read on the test's.
     val messages: MutableList<String> = CopyOnWriteArrayList()
 
-    override fun show(message: String, icon: String) {
+    /** The messages shown as urgent (errors and refusals). */
+    val urgent: MutableList<String> = CopyOnWriteArrayList()
+
+    override fun show(message: String, icon: String, urgent: Boolean) {
         messages += message
+        if (urgent) this.urgent += message
     }
 }
 

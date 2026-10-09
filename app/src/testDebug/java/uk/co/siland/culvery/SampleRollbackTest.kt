@@ -40,7 +40,7 @@ class SampleRollbackTest {
     private class Toasts : Toaster {
         val messages = mutableListOf<String>()
 
-        override fun show(message: String, icon: String) {
+        override fun show(message: String, icon: String, urgent: Boolean) {
             messages += message
         }
     }

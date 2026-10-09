@@ -75,6 +75,7 @@ class CalendarReviewTest {
         assertThat(review.setPerson(source("swim"), access.mia)).isTrue()
         assertThat(source("swim").mapping.person).isEqualTo(access.mia.id)
         assertThat(toaster.messages).containsExactly("Mia's swimming now shows as Mia")
+        assertThat(toaster.urgent).isEmpty()
         assertThat(access.requests.map { it.label }).containsExactly("Change settings")
     }
 
@@ -105,6 +106,7 @@ class CalendarReviewTest {
         assertThat(review.setShown(source(family.id), shown = false)).isFalse()
         assertThat(source(family.id).mapping.visible).isTrue()
         assertThat(toaster.messages).containsExactly(COULD_NOT_SAVE)
+        assertThat(toaster.urgent).isEqualTo(toaster.messages)
     }
 
     @Test
@@ -162,6 +164,7 @@ class CalendarReviewTest {
         calendar.close()
         assertThat(review.setPerson(swimming, access.mia)).isFalse()
         assertThat(toaster.messages).containsExactly(COULD_NOT_SAVE)
+        assertThat(toaster.urgent).isEqualTo(toaster.messages)
         assertNoSecretsLogged("CalendarReview", listOf("family@example.com", "Mia's swimming", "swim"))
     }
 

@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.calendar.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -244,5 +245,11 @@ class EventDetailSheetTest {
     fun theSheetIsAPaneTalkBackAnnounces() {
         show(SampleUi.detailEditable)
         compose.onNodeWithTag("detail_sheet").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Event details"))
+    }
+
+    @Test
+    fun theSyncingPillIsSpokenPolitely() {
+        show(SampleUi.detailSyncing)
+        compose.onNodeWithTag("detail_syncing").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
     }
 }

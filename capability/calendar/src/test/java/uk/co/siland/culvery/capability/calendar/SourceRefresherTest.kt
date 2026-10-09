@@ -121,6 +121,7 @@ class SourceRefresherTest {
         assertThat(toaster.messages).containsExactly(
             "Google Calendar: can't find the master calendar — choose a new one in Settings › Calendars. 1 change waiting to sync was dropped.",
         )
+        assertThat(toaster.urgent).isEqualTo(toaster.messages)
     }
 
     @Test

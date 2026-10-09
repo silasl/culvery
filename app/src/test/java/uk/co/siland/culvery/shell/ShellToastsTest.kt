@@ -29,4 +29,12 @@ class ShellToastsTest {
         toasts.hide(toasts.current.value!!.id)
         assertThat(toasts.current.value).isNull()
     }
+
+    @Test
+    fun anUrgentToastSaysSo() {
+        toasts.show("Couldn’t save — try again.", urgent = true)
+        assertThat(toasts.current.value?.urgent).isTrue()
+        toasts.show("Event added.")
+        assertThat(toasts.current.value?.urgent).isFalse()
+    }
 }

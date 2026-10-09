@@ -150,6 +150,7 @@ class CalendarSetupTest {
         assertThat(setup(setOf(google)).connectWithDefaults(googleConnection)).isFalse()
         assertThat(store.connectionsNow()).isEmpty()
         assertThat(toaster.messages).containsExactly("Couldn't connect to Google Calendar — try again")
+        assertThat(toaster.urgent).isEqualTo(toaster.messages)
     }
 
     @Test

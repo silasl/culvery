@@ -6,7 +6,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -17,6 +20,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -81,10 +85,45 @@ class ControlsTest {
     @Test
     fun aTextFieldShowsItsPlaceholderOnlyWhileEmpty() {
         var value by mutableStateOf("")
-        show { HhTextField(value, { value = it }, placeholder = "Town or city", tag = "field") }
+        show { HhTextField(value, { value = it }, placeholder = "Town or city", label = "Town or city", tag = "field") }
         compose.onNodeWithText("Town or city").assertExists()
         value = "Ca"
         compose.onNodeWithText("Town or city").assertDoesNotExist()
+    }
+
+    @Test
+    fun aToastIsPoliteAndAnUrgentOneIsAssertive() {
+        show {
+            Row {
+                HhToast("Event added.", Icons.INFO, Modifier.testTag("plain"))
+                HhToast("Couldn’t save — try again.", Icons.INFO, Modifier.testTag("urgent"), urgent = true)
+            }
+        }
+        compose.onNodeWithTag("plain").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        compose.onNodeWithTag("urgent").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive))
+    }
+
+    @Test
+    fun aFilledTextFieldKeepsItsNameAndCarriesItsError() {
+        show { HhTextField("Alex", {}, placeholder = "Name", label = "Name", tag = "field", error = "Someone is already called Alex.") }
+        compose.onNodeWithTag("field")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Name")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, "Someone is already called Alex."))
+    }
+
+    /** Compose speaks a live region only when a node it already has changes, so the line must be there while empty. */
+    @Test
+    fun aMessageLineIsInTheTreeAndOneLineTallBeforeItHasAMessage() {
+        var message by mutableStateOf<String?>(null)
+        show { HhMessageLine(message, ControlType.chip, Color.Red, "line", spoken = message?.let { "said: $it" }) }
+        val empty = compose.onNodeWithTag("line")
+            .assertTextEquals("")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        assertThat(empty.fetchSemanticsNode().size.height).isGreaterThan(0)
+        message = "Couldn’t save — try again."
+        compose.onNodeWithTag("line")
+            .assertTextEquals("Couldn’t save — try again.")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("said: Couldn’t save — try again.")))
     }
 
     @Test

@@ -190,7 +190,7 @@ class CalendarSync internal constructor(
             }
         } finally {
             // Those changes are already gone, so they are told even when a later change fails the pass.
-            dropped.forEach { (label, reasons) -> toaster.show(couldNotSaveAll(label, reasons)) }
+            dropped.forEach { (label, reasons) -> toaster.show(couldNotSaveAll(label, reasons), urgent = true) }
         }
     }
 

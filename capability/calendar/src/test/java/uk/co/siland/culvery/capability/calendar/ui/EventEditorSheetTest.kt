@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -175,6 +176,14 @@ class EventEditorSheetTest {
         compose.onNodeWithTag("day_pick").assertDoesNotExist()
         compose.onNodeWithTag("time_all_day").assertDoesNotExist()
         compose.onNodeWithTag("who_Family").assertIsSelected()
+    }
+
+    @Test
+    fun theFailureCardIsSpokenPolitelyAndTheTitleFieldIsNamed() {
+        failure = "Couldn’t save — try again."
+        show(newForm())
+        compose.onNodeWithTag("editor_failure").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        compose.onNodeWithTag("editor_title").assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Event name")))
     }
 
     @Test

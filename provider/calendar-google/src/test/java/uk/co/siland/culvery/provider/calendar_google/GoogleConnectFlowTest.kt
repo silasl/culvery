@@ -52,6 +52,7 @@ class GoogleConnectFlowTest {
         val stuck = GoogleConnectFlow(authorizer, api, toasts, PlayServicesCheck { false })
         assertThat(stuck.start(existing = null)).isEqualTo(ConnectStep.Stopped)
         assertThat(toasts.messages).containsExactly(UPDATE_PLAY_SERVICES)
+        assertThat(toasts.urgent).isEqualTo(toasts.messages)
         assertThat(authorizer.accounts).isEmpty()
     }
 
@@ -90,6 +91,7 @@ class GoogleConnectFlowTest {
         google.addCalendar("someone.else@example.com", "Theirs", primary = true)
         assertThat(flow.start(existing = stored)).isEqualTo(ConnectStep.Stopped)
         assertThat(toasts.messages).containsExactly("That's a different Google account. Reconnect with family@example.com.")
+        assertThat(toasts.urgent).isEqualTo(toasts.messages)
         // Refused before the silent grant for the other account was asked for.
         assertThat(authorizer.accounts).containsExactly("family@example.com")
     }
@@ -120,9 +122,11 @@ class GoogleConnectFlowTest {
     fun anyOtherPlayServicesFailureStopsAndSaysSo() = runTest {
         listOf(CommonStatusCodes.DEVELOPER_ERROR, CommonStatusCodes.INTERNAL_ERROR, CommonStatusCodes.SIGN_IN_REQUIRED).forEach { status ->
             toasts.messages.clear()
+            toasts.urgent.clear()
             authorizer.failWith = authorizationFailure(status)
             assertWithMessage("status $status").that(flow.start(existing = null)).isEqualTo(ConnectStep.Stopped)
             assertWithMessage("status $status").that(toasts.messages).containsExactly(COULD_NOT_CONNECT)
+            assertWithMessage("status $status").that(toasts.urgent).isEqualTo(toasts.messages)
         }
     }
 

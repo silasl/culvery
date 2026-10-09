@@ -61,7 +61,7 @@ class SampleWizardTest {
     private lateinit var state: SetupState
     private val fake = FakeCalendarProvider()
     private val noToasts = object : Toaster {
-        override fun show(message: String, icon: String) = Unit
+        override fun show(message: String, icon: String, urgent: Boolean) = Unit
     }
 
     @Before

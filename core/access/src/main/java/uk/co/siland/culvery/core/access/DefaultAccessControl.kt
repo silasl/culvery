@@ -70,7 +70,7 @@ class DefaultAccessControl @Inject constructor(
                     return@withLock Authorised(current.who.person, current.who.role, grants)
                 }
                 if (refusal is Refusal.Toast) {
-                    toaster.show(refusal.message(current.who.person.name))
+                    toaster.show(refusal.message(current.who.person.name), urgent = true)
                     // Signed out, so the next tap brings up the PIN pad: an adult can take over from a child.
                     lock()
                     return@withLock null
@@ -106,7 +106,7 @@ class DefaultAccessControl @Inject constructor(
             if (granted.isEmpty() || !allow(identified, granted)) {
                 // A real but refused PIN neither resets nor counts, so a child's own PIN can't clear the counter.
                 if (refusal is Refusal.Toast) {
-                    toaster.show(refusal.message(identified.person.name))
+                    toaster.show(refusal.message(identified.person.name), urgent = true)
                     return null
                 }
                 error = PinError.NotAllowed(identified.person.name)

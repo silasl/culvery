@@ -291,6 +291,7 @@ class DefaultAccessControlTest {
         assertThat(refused).isNull()
         assertThat(seen).hasSize(1)
         assertThat(toasts.messages).containsExactly("Alex may not")
+        assertThat(toasts.urgent).isEqualTo(toasts.messages)
         assertThat(access.session.value).isNull()
         // The next tap brings up the PIN pad, so someone else can take over.
         assertThat(access.authorise("test.any")).isNotNull()
@@ -309,6 +310,7 @@ class DefaultAccessControlTest {
         )
         assertThat(result).isNull()
         assertThat(toasts.messages).containsExactly("Mia can only change events they created.")
+        assertThat(toasts.urgent).isEqualTo(toasts.messages)
         assertThat(prompt.request.value).isNull()
         assertThat(access.session.value).isNull()
     }

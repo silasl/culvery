@@ -1,9 +1,14 @@
 package uk.co.siland.culvery.core.setup
 
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -194,5 +199,28 @@ class LocationPaneTest {
         type("Can")
         advance(500)
         assertThat(compose.onNodeWithTag("place_0").fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("use as home")
+    }
+
+    private val polite = SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite)
+
+    @Test
+    fun theStatusLineIsThereBeforeAnySearchAndSpeaksTheCountOverAList() {
+        search.answer = { listOf(brighton) }
+        show()
+        compose.onNodeWithTag("location_status").assertTextEquals("").assert(polite)
+        type("Can")
+        advance(500)
+        compose.onNodeWithTag("location_status")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("1 town found")))
+            .assert(polite)
+        compose.onNodeWithTag("location_query").assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Town or city")))
+    }
+
+    @Test
+    fun noMatchIsSaidOnTheSameLine() {
+        show()
+        type("Xqz")
+        advance(500)
+        compose.onNodeWithTag("location_status").assertTextContains("Xqz", substring = true).assert(polite)
     }
 }

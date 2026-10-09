@@ -478,6 +478,7 @@ class CalendarSyncTest {
         assertThat(store.pendingNow()).isEmpty()
         assertThat(cachedTitles()).containsExactly("Swim")
         assertThat(toaster.messages).containsExactly("Couldn't save to Service A — Event is locked")
+        assertThat(toaster.urgent).isEqualTo(toaster.messages)
     }
 
     @Test
@@ -650,7 +651,7 @@ class CalendarSyncTest {
         connect("c1", "calendar.a", s1)
         a.events = { listOf(swim()) }
         val broken = object : Toaster {
-            override fun show(message: String, icon: String) = error("toasts are down")
+            override fun show(message: String, icon: String, urgent: Boolean) = error("toasts are down")
         }
         val sync = engineWith(setOf(w), broken)
         queue(ChangeKind.DELETE, draft = null, sourceId = "gone")
@@ -794,7 +795,7 @@ class CalendarSyncTest {
         connect("c1", "calendar.a", s1)
         var toastsWork = false
         val flaky = object : Toaster {
-            override fun show(message: String, icon: String) {
+            override fun show(message: String, icon: String, urgent: Boolean) {
                 if (!toastsWork) error("toasts are down")
             }
         }

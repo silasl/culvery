@@ -124,13 +124,13 @@ class CalendarEditor internal constructor(
     }
 
     /** A signed-in child tapped someone else's Who chip: say why it is disabled (2b-2 design §4.2). */
-    internal fun refuseOtherWho(name: String) = toaster.show(cannotAddForOthers(name))
+    internal fun refuseOtherWho(name: String) = toaster.show(cannotAddForOthers(name), urgent = true)
 
     /** The add/edit sheet couldn't load (a store failure): it closes and says so. */
-    internal fun couldNotOpen() = toaster.show(COULD_NOT_OPEN)
+    internal fun couldNotOpen() = toaster.show(COULD_NOT_OPEN, urgent = true)
 
     /** The editor's Delete failed before it could ask to confirm (a store failure): the detail sheet's delete wording. */
-    internal fun couldNotDelete(label: String) = toaster.show(couldNotSave(label, TRY_AGAIN))
+    internal fun couldNotDelete(label: String) = toaster.show(couldNotSave(label, TRY_AGAIN), urgent = true)
 
     /** The delete guard, run before the confirmation appears: true when this person may delete [ref]. */
     suspend fun mayDelete(ref: EventRef): Boolean {
@@ -279,7 +279,7 @@ class CalendarEditor internal constructor(
             job.await()
         } catch (e: CancellationException) {
             if (kind == ChangeKind.CREATE || kind == ChangeKind.UPDATE) {
-                scope.launch { (job.await() as? EditResult.Rejected)?.let { toaster.show(couldNotSave(label, it.message)) } }
+                scope.launch { (job.await() as? EditResult.Rejected)?.let { toaster.show(couldNotSave(label, it.message), urgent = true) } }
             }
             throw e
         }
@@ -308,7 +308,7 @@ class CalendarEditor internal constructor(
                     if (kind == ChangeKind.DELETE) EditResult.Queued else EditResult.NotEditable
                 event == null -> if (kind == ChangeKind.DELETE) EditResult.Done else EditResult.NotEditable
                 who != null && !mayChange(who.granted, Identified(who.person, who.role), createdByOf(event, pending)) -> {
-                    toaster.show(cannotChangeOthers(who.person.name))
+                    toaster.show(cannotChangeOthers(who.person.name), urgent = true)
                     // As a refusal on the session shortcut does (2b-1 U2): the next tap asks for a PIN.
                     access.lock()
                     EditResult.Cancelled
@@ -432,7 +432,7 @@ class CalendarEditor internal constructor(
         val saved = result == EditResult.Done || result == EditResult.Queued
         when {
             result is EditResult.Rejected && (kind == ChangeKind.DELETE || kind == ChangeKind.ASSIGN) ->
-                toaster.show(couldNotSave(label, result.message))
+                toaster.show(couldNotSave(label, result.message), urgent = true)
             saved && kind == ChangeKind.DELETE -> toaster.show(EVENT_DELETED)
             saved && kind == ChangeKind.CREATE -> toaster.show(added)
             saved && kind == ChangeKind.UPDATE -> toaster.show(CHANGES_SAVED)

@@ -46,7 +46,7 @@ internal class GoogleConnectFlow(
     suspend fun start(existing: Connection?): ConnectStep {
         if (!playServices.usable()) {
             Log.w(TAG, "Play services can't run Google's sign-in on this tablet; nothing started")
-            toaster.show(UPDATE_PLAY_SERVICES)
+            toaster.show(UPDATE_PLAY_SERVICES, urgent = true)
             return ConnectStep.Stopped
         }
         return step(existing, screensAllowed = true) { authorizer.authorize(existing?.config?.get(CONFIG_ACCOUNT)) }
@@ -91,7 +91,7 @@ internal class GoogleConnectFlow(
             .id
         val stored = existing?.config?.get(CONFIG_ACCOUNT)
         if (stored != null && !email.equals(stored, ignoreCase = true)) {
-            toaster.show(differentAccount(stored))
+            toaster.show(differentAccount(stored), urgent = true)
             return ConnectStep.Stopped
         }
         // Every later call asks for this email silently; an alias Play services doesn't know would need the user forever.
@@ -104,7 +104,7 @@ internal class GoogleConnectFlow(
     }
 
     private fun stopWithToast(): ConnectStep {
-        toaster.show(couldNotConnect(GOOGLE_DISPLAY_NAME))
+        toaster.show(couldNotConnect(GOOGLE_DISPLAY_NAME), urgent = true)
         return ConnectStep.Stopped
     }
 }

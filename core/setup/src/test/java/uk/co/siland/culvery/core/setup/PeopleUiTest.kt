@@ -2,7 +2,9 @@ package uk.co.siland.culvery.core.setup
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -134,8 +136,12 @@ class PeopleUiTest {
         compose.onNodeWithTag("people_add").performClick()
         compose.onNodeWithTag("person_name").performTextInput("alex")
         compose.onNodeWithTag("person_save").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithTag("person_message").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onNodeWithTag("person_message").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text.orEmpty().isNotEmpty() }
         compose.onNodeWithTag("person_message").assert(hasText("Someone is already called alex."))
+        compose.onNodeWithTag("person_message").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        compose.onNodeWithTag("person_name")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, "Someone is already called alex."))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Name")))
         compose.onNodeWithTag("person_name").assert(hasText("alex"))
     }
 
@@ -204,7 +210,7 @@ class PeopleUiTest {
         compose.onNodeWithTag("person_name").performTextInput("my")
         db.openHelper.writableDatabase.execSQL("CREATE TRIGGER no_updates BEFORE UPDATE ON person BEGIN SELECT RAISE(ABORT, 'x'); END")
         compose.onNodeWithTag("person_save").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithTag("person_message").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onNodeWithTag("person_message").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text.orEmpty().isNotEmpty() }
         compose.onNodeWithTag("person_message").assert(hasText("Couldn't save — try again."))
         compose.onNodeWithTag("person_name").assert(hasText("mySam"))
         assertNoSecretsLogged("People", listOf("Sam"))
@@ -214,7 +220,7 @@ class PeopleUiTest {
     fun anErrorThatEscapesTheEditorShowsCouldNotSaveAndLogsOnlyItsClass() {
         addSam()
         val failing = PeopleEditor(household, access.pins, access.control, object : uk.co.siland.culvery.core.plugin.Toaster {
-            override fun show(message: String, icon: String) = throw IllegalStateException("Sam removed")
+            override fun show(message: String, icon: String, urgent: Boolean) = throw IllegalStateException("Sam removed")
         })
         compose.setContent {
             CulveryTheme(dark = true) {
@@ -230,7 +236,7 @@ class PeopleUiTest {
         compose.onNodeWithTag("person_Sam").performClick()
         compose.onNodeWithTag("person_remove").performClick()
         compose.onNodeWithTag("person_confirm_remove").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithTag("person_message").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onNodeWithTag("person_message").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text.orEmpty().isNotEmpty() }
         compose.onNodeWithTag("person_message").assert(hasText("Couldn't save — try again."))
         assertNoSecretsLogged("PersonSheet", listOf("Sam"))
     }

@@ -522,6 +522,7 @@ class EventEditorHostTest {
         showEditor(EditorRequest.Edit(EventRef("c1", "s-family", "broken")))
         compose.waitUntil(5_000) { closed > 0 }
         assertThat(access.toasts.messages).containsExactly(COULD_NOT_OPEN)
+        assertThat(access.toasts.urgent).isEqualTo(access.toasts.messages)
     }
 
     @Test
@@ -541,6 +542,7 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_delete").performClick()
         compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
         assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", TRY_AGAIN))
+        assertThat(access.toasts.urgent).isEqualTo(access.toasts.messages)
         compose.onNodeWithTag("editor_failure").assertDoesNotExist()
         assertThat(deleting).isEmpty()
     }

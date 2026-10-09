@@ -24,6 +24,7 @@ import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
+import uk.co.siland.culvery.core.ui.HhMessageLine
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
@@ -114,22 +115,35 @@ internal fun LocationContent(
     val c = Culvery.colors
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap)) {
         if (showCurrent && current != null) PlaceRow(current.name, ticked = true, tag = "location_current", onClick = null)
-        HhTextField(query, onQuery, TOWN_OR_CITY, "location_query", capitalization = KeyboardCapitalization.Words)
-        when (results) {
-            is TownResults.Found -> Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.rowGap)) {
+        HhTextField(query, onQuery, TOWN_OR_CITY, TOWN_OR_CITY, "location_query", capitalization = KeyboardCapitalization.Words)
+        if (results is TownResults.Found) {
+            Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.rowGap)) {
                 results.places.forEachIndexed { i, place ->
                     PlaceRow(place.label, ticked = current.isAt(place), tag = "place_$i", onClick = if (busy) null else ({ onChoose(place) }))
                 }
             }
-            is TownResults.NoMatch ->
-                Text(noTownsMatch(results.query), style = SetupType.line, color = c.mute, modifier = Modifier.testTag("location_none"))
-            TownResults.Failed ->
-                Text(COULD_NOT_SEARCH, style = SetupType.line, color = c.danger, modifier = Modifier.testTag("location_failed"))
-            TownResults.Idle -> Unit
         }
-        if (saveFailed) Text(COULD_NOT_SAVE, style = SetupType.message, color = c.danger, modifier = Modifier.testTag("location_save_failed"))
+        val status = statusLine(results, saveFailed)
+        HhMessageLine(
+            status.text,
+            if (status.isSave) SetupType.message else SetupType.line,
+            if (status.isError) c.danger else c.mute,
+            "location_status",
+            spoken = status.spoken,
+        )
         Text(USED_FOR, style = SetupType.secondary, color = c.mute)
     }
+}
+
+private class StatusLine(val text: String?, val spoken: String? = text, val isError: Boolean = false, val isSave: Boolean = false)
+
+/** The one line under the field: a failed save first, then what the search found. */
+private fun statusLine(results: TownResults, saveFailed: Boolean): StatusLine = when {
+    saveFailed -> StatusLine(COULD_NOT_SAVE, isError = true, isSave = true)
+    results is TownResults.NoMatch -> StatusLine(noTownsMatch(results.query))
+    results is TownResults.Failed -> StatusLine(COULD_NOT_SEARCH, isError = true)
+    results is TownResults.Found -> StatusLine(null, spoken = townsFound(results.places.size))
+    else -> StatusLine(null)
 }
 
 @Composable

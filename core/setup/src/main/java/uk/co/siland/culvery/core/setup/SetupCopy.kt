@@ -28,11 +28,15 @@ internal const val COULD_NOT_SEARCH = "Couldn't search for towns — check the t
 
 internal fun noTownsMatch(query: String): String = "No towns match \"$query\"."
 
+/** Spoken when the results change. */
+internal fun townsFound(count: Int): String = if (count == 1) "1 town found" else "$count towns found"
+
 // People (§4.4)
 internal const val ADD_PERSON = "Add person"
 internal const val PIN_SET = "PIN set"
 internal const val NO_PIN = "No PIN"
 internal const val NAME = "Name"
+internal const val YOUR_NAME = "Your name"
 internal const val COLOUR = "Colour"
 internal const val ROLE = "Role"
 internal const val PIN = "PIN"

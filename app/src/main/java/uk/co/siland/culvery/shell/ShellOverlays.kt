@@ -30,7 +30,7 @@ class OverlayState : OverlayHost {
     }
 }
 
-data class ToastMessage(val id: Long, val message: String, val icon: String)
+data class ToastMessage(val id: Long, val message: String, val icon: String, val urgent: Boolean = false)
 
 @Singleton
 class ShellToasts @Inject constructor() : Toaster {
@@ -38,8 +38,8 @@ class ShellToasts @Inject constructor() : Toaster {
     private val _current = MutableStateFlow<ToastMessage?>(null)
     val current: StateFlow<ToastMessage?> = _current.asStateFlow()
 
-    override fun show(message: String, icon: String) {
-        _current.value = ToastMessage(ids.incrementAndGet(), message, icon)
+    override fun show(message: String, icon: String, urgent: Boolean) {
+        _current.value = ToastMessage(ids.incrementAndGet(), message, icon, urgent)
     }
 
     /** Hides [id] if it is still the one showing, so an older toast's timer can't hide a newer toast. */

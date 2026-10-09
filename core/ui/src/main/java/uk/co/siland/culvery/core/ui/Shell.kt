@@ -25,6 +25,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -113,15 +116,16 @@ fun HhCloseButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** The toast pill: `ink` background, `bg` text, 16 sp / 600, padding 14×22, radius 26. */
+/** The toast pill: `ink` background, `bg` text, 16 sp / 600, padding 14×22, radius 26. One spoken item, polite unless [urgent]. */
 @Composable
-fun HhToast(message: String, icon: String, modifier: Modifier = Modifier) {
+fun HhToast(message: String, icon: String, modifier: Modifier = Modifier, urgent: Boolean = false) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ShellTokens.toastIconGap),
         modifier = modifier
             .testTag("toast")
+            .semantics(mergeDescendants = true) { liveRegion = if (urgent) LiveRegionMode.Assertive else LiveRegionMode.Polite }
             .widthIn(max = ShellTokens.toastMaxWidth)
             .clip(RoundedCornerShape(ShellTokens.toastRadius))
             .background(c.ink)

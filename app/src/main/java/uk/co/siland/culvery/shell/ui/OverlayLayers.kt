@@ -105,6 +105,6 @@ fun ToastLayer(toast: ToastMessage?, keyboard: WindowInsets = WindowInsets.ime, 
             .padding(bottom = ShellTokens.toastBottom),
         contentAlignment = Alignment.BottomCenter,
     ) {
-        HhToast(t.message, t.icon)
+        HhToast(t.message, t.icon, urgent = t.urgent)
     }
 }

@@ -22,15 +22,19 @@ internal suspend fun failureOf(block: suspend () -> Unit): Throwable? =
 
 /** Toasts nobody reads. */
 internal object NoToasts : Toaster {
-    override fun show(message: String, icon: String) = Unit
+    override fun show(message: String, icon: String, urgent: Boolean) = Unit
 }
 
 /** Records every toast's message. */
 internal class Toasts : Toaster {
     val messages = mutableListOf<String>()
 
-    override fun show(message: String, icon: String) {
+    /** The messages shown as urgent (errors and refusals). */
+    val urgent = mutableListOf<String>()
+
+    override fun show(message: String, icon: String, urgent: Boolean) {
         messages += message
+        if (urgent) this.urgent += message
     }
 }
 

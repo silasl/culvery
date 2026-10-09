@@ -37,8 +37,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -228,6 +230,7 @@ private fun TitleField(form: EventForm, focus: FocusRequester, readOnly: Boolean
         value = form.title,
         onValueChange = { form.updateTitle(it) },
         placeholder = "What's happening?",
+        label = "Event name",
         tag = "editor_title",
         modifier = Modifier.focusRequester(focus),
         readOnly = readOnly,
@@ -368,6 +371,7 @@ private fun FailureCard(title: String) {
         horizontalArrangement = Arrangement.spacedBy(CalendarDimens.editorCardIconGap),
         modifier = Modifier
             .testTag("editor_failure")
+            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
             .fillMaxWidth()
             .clip(RoundedCornerShape(CalendarDimens.editorCardRadius))
             .background(c.dangerSoft)

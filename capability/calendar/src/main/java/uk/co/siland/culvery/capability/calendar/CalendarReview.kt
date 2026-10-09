@@ -93,7 +93,7 @@ class CalendarReview @Inject constructor(
         } catch (e: Exception) {
             // The type only (P8): a message can hold a calendar id, which is often the account's email.
             Log.w(TAG, "Couldn't save a calendar change (${e::class.simpleName})")
-            toaster.show(COULD_NOT_SAVE)
+            toaster.show(COULD_NOT_SAVE, urgent = true)
             false
         }
     }

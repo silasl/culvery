@@ -14,6 +14,7 @@ import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
@@ -72,8 +73,16 @@ class PeopleEditorTest {
         assertThat(access.requests).isEmpty()
         assertThat(household.people.first().map { it.name }).containsExactly("Sam", "Alex").inOrder()
         assertThat(access.toasts.messages).containsExactly("Sam moved up")
+        assertThat(access.toasts.urgent).isEmpty()
         assertThat(editor.move(sam.id, up = false)).isEqualTo(PeopleOutcome.Done)
         assertThat(access.toasts.messages.last()).isEqualTo("Sam moved down")
+    }
+
+    @Test
+    fun aMoveThatCantFindThePersonSaysSoUrgently() = runTest {
+        start()
+        assertThat(editor.move(PersonId("gone"), up = true)).isEqualTo(PeopleOutcome.Refused(COULD_NOT_SAVE))
+        assertThat(access.toasts.urgent).containsExactly(COULD_NOT_SAVE)
     }
 
     @Test
@@ -102,7 +111,7 @@ class PeopleEditorTest {
     fun aNameInUseIsRefusedAndNothingChanges() = runTest {
         start()
         val sam = sam()
-        assertThat(editor.save(sam.id, draft("ALEX", 1))).isEqualTo(PeopleOutcome.Refused("Someone is already called ALEX."))
+        assertThat(editor.save(sam.id, draft("ALEX", 1))).isEqualTo(PeopleOutcome.Refused("Someone is already called ALEX.", nameTaken = true))
         assertThat(household.person(sam.id)?.name).isEqualTo("Sam")
     }
 

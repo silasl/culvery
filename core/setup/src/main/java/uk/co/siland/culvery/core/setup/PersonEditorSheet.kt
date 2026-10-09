@@ -44,6 +44,7 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhConfirmCard
+import uk.co.siland.culvery.core.ui.HhMessageLine
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhSwatchGrid
@@ -63,6 +64,7 @@ internal class PersonForm(val existing: Member?, val taken: Set<Long>) {
     var newPin by mutableStateOf<String?>(null)
     var removePin by mutableStateOf(false)
     var message by mutableStateOf<String?>(null)
+    var nameError by mutableStateOf<String?>(null)
 
     val hasPin: Boolean get() = newPin != null || (existing?.hasPin == true && !removePin)
     val canSave: Boolean get() = name.isNotBlank() && color != null
@@ -107,6 +109,7 @@ private fun PersonEditorHost(editor: PeopleEditor, existing: Member?, taken: Set
             PeopleOutcome.Cancelled -> Unit
             is PeopleOutcome.Refused -> {
                 form.message = outcome.message
+                form.nameError = outcome.message.takeIf { outcome.nameTaken }
                 confirmingRemove = false
             }
         }
@@ -187,10 +190,13 @@ internal fun PersonEditorSheet(
                         onValueChange = {
                             form.name = it
                             form.message = null
+                            form.nameError = null
                         },
                         placeholder = NAME,
+                        label = NAME,
                         tag = "person_name",
                         capitalization = KeyboardCapitalization.Words,
+                        error = form.nameError,
                     )
                 }
                 Section(COLOUR) {
@@ -220,7 +226,7 @@ internal fun PersonEditorSheet(
                     }
                 }
             }
-            form.message?.let { Text(it, style = SetupType.message, color = c.danger, modifier = Modifier.testTag("person_message")) }
+            HhMessageLine(form.message, SetupType.message, c.danger, "person_message")
             if (confirmingRemove && existing != null) {
                 HhConfirmCard(
                     tag = "person_confirm",

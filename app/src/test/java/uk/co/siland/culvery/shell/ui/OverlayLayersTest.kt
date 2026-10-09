@@ -7,7 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.click
@@ -157,5 +159,11 @@ class OverlayLayersTest {
         showLayer()
         compose.runOnIdle { overlay.show { Text("Sheet body") } }
         compose.onNodeWithTag("overlay_scrim").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+    }
+
+    @Test
+    fun theToastLayerSpeaksAnUrgentToastAssertively() {
+        compose.setContent { CulveryTheme(dark = true) { ToastLayer(ToastMessage(1, "Couldn’t save — try again.", "info", urgent = true)) {} } }
+        compose.onNodeWithTag("toast").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive))
     }
 }

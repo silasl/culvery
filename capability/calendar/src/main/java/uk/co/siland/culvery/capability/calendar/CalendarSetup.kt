@@ -101,7 +101,7 @@ class CalendarSetup(
             requestSync()
             toaster.show(connected(serviceNameOf(connection, providers::displayNameOf)))
         } else {
-            toaster.show(couldNotConnect(serviceNameOf(connection, providers::displayNameOf)))
+            toaster.show(couldNotConnect(serviceNameOf(connection, providers::displayNameOf)), urgent = true)
         }
         stored
     }
@@ -125,7 +125,7 @@ class CalendarSetup(
             requestSync()
             toaster.show(reconnected(serviceNameOf(connection, providers::displayNameOf)))
         } else {
-            toaster.show(couldNotConnect(serviceNameOf(connection, providers::displayNameOf)))
+            toaster.show(couldNotConnect(serviceNameOf(connection, providers::displayNameOf)), urgent = true)
         }
         return recorded
     }
