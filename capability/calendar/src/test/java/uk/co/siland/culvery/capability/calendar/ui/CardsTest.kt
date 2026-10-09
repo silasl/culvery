@@ -14,7 +14,9 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -147,7 +149,11 @@ class CardsTest {
     @Test
     fun todayAndComingUpRowsAreEachOneSpokenItem() {
         show { TodayCard(SampleUi.todayWithBadges) }
-        compose.onNodeWithContentDescription("Dinner with Jo & Priya, Alex, 19:30 to 21:00, saving").assert(isButton)
+        val name = "Dinner with Jo & Priya, Alex, 19:30 to 21:00, saving"
+        compose.onNodeWithContentDescription(name).assert(isButton)
+        // One merged node holds the row's texts: without the merge each Text is its own node and has no description.
+        compose.onAllNodes(hasText("19:30", substring = true)).assertCountEquals(1)
+        compose.onAllNodes(hasText("19:30", substring = true))[0].assertContentDescriptionEquals(name)
     }
 
     @Test
@@ -155,6 +161,8 @@ class CardsTest {
         show { ComingUpCard(SampleUi.comingUp) }
         compose.onNodeWithContentDescription("Office day, Alex, Thursday 09:00")
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
+        compose.onAllNodes(hasText("Office day")).assertCountEquals(1)
+        compose.onAllNodes(hasText("Office day"))[0].assertContentDescriptionEquals("Office day, Alex, Thursday 09:00")
     }
 
     @Test
@@ -166,8 +174,8 @@ class CardsTest {
         assertThat(opened).containsExactly(EventRef("sample", "family", "School run"))
     }
 
-    // Counted on the merged tree, as a person hears them: each row merges its badges' descriptions, so a row
-    // counts once per badge kind. Don't switch these to useUnmergedTree.
+    // Counted on the merged tree, as a person hears them: each row's spoken name ends with its badges' words, so
+    // a row counts once per badge kind. Don't switch these to useUnmergedTree.
     @Test
     fun todayRowsShowEachOfTheirBadges() {
         show { TodayCard(SampleUi.todayWithBadges) }

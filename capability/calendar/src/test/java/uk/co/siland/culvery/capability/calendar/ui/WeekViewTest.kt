@@ -14,7 +14,9 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsEnabled
@@ -105,7 +107,11 @@ class WeekViewTest {
         show { WeekView(state()) }
         compose.onNodeWithContentDescription("Swimming, Mia, Wednesday 16:00, repeats").assert(isButton)
         compose.onNodeWithContentDescription("Dinner with Jo & Priya, Alex, Wednesday 19:30").assertExists()
-        compose.onNodeWithContentDescription("Colours: Alex, green; Sam, blue; Mia, pink; Family, amber").assertExists()
+        // One merged node holds the chip's texts: without the merge each Text is its own node and has no description.
+        compose.onAllNodes(hasText("Dinner with Jo & Priya")).assertCountEquals(1)
+        compose.onAllNodes(hasText("Dinner with Jo & Priya"))[0]
+            .assertContentDescriptionEquals("Dinner with Jo & Priya, Alex, Wednesday 19:30")
+        compose.onAllNodes(hasText("19:30 · Alex", substring = true)).assertCountEquals(1)
     }
 
     @Test
