@@ -1,7 +1,7 @@
 package uk.co.siland.culvery.core.ui
 
 /**
- * 4d-2 §7.1.3: reads Kotlin source the way the copy rules need. Comments (KDoc included) go; string literals are
+ * Reads Kotlin source the way the copy rules need. Comments (KDoc included) go; string literals are
  * collected where they start; the code inside `${…}` is read as code again, with its own literals, while `$name` stays
  * as text. Whether a literal is code's is decided by the calls it sits in, whatever line they start on.
  */
@@ -18,8 +18,8 @@ internal object CopyScan {
             """DateTimeFormatter\.ofPattern|\bRegex|\btoRegex|@\w+|\b\w*Exception)\s*$""",
     )
 
-    // Kotlin's error(…), where a statement or an expression starts; Compose's semantics error(…) follows an `if (…)`.
-    private val KOTLIN_ERROR = Regex("""(?:^|[\n=>{;]|throw|\?:)\s*error\s*$""")
+    // Kotlin's error(…), where a statement or an expression starts; Compose's semantics error(…), which TalkBack speaks, opens a lambda or follows an `if (…)`.
+    private val KOTLIN_ERROR = Regex("""(?:^|[\n=>;]|throw|\?:)\s*error\s*$""")
 
     private val TAG_LINE = Regex("""\bTAG\b\s*=|^\s*@""")
 
@@ -123,7 +123,7 @@ internal object CopyScan {
             if (masked[j] == '{' && head.endsWith(")")) head = head.substring(0, openerOf(head)).trimEnd()
             val code = when {
                 head.endsWith("WriteRejectedException") -> false
-                KOTLIN_ERROR.containsMatchIn(head) -> true
+                KOTLIN_ERROR.containsMatchIn(head) -> !head.removeSuffix("error").trimEnd().endsWith("{")
                 else -> CODE_CALL.containsMatchIn(head)
             }
             if (code) return true

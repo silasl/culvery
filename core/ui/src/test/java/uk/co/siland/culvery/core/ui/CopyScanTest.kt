@@ -5,7 +5,7 @@ import com.google.common.truth.Truth.assertWithMessage
 import java.io.File
 import org.junit.Test
 
-/** 4d-2 Decision 8: no system word and no straight quote or apostrophe in any copy in the app's main sources. */
+/** No system word and no straight quote or apostrophe in any copy in the app's main sources. */
 class CopyScanTest {
     // Unit tests run in the module's directory.
     private val repo = File("../..")
@@ -44,6 +44,9 @@ class CopyScanTest {
             "He said \"go\" there" to "a straight quote",
             "That's it" to "a straight apostrophe",
             "kiosk" to "says \"kiosk\"",
+            "That name's taken too" to "a straight apostrophe",
+            "Can't go there" to "a straight apostrophe",
+            "Can't go on" to "a straight apostrophe",
         )
     }
 
@@ -53,7 +56,7 @@ class CopyScanTest {
         val findings = mainSources().flatMap { file ->
             CopyScan.scan(shortPath(file), file.readText(Charsets.UTF_8)).asSequence()
         }.filterNot { f -> (f.path to f.literal) in allow }.toList()
-        assertWithMessage("Copy with a system word or a straight quote (4d-2 §7.1):\n" + findings.joinToString("\n") { "${it.path}:${it.line}: ${it.literal} (${it.why})" })
+        assertWithMessage("Copy with a system word or a straight quote (system words are master, kiosk, sync, read-only, assign and feed):\n" + findings.joinToString("\n") { "${it.path}:${it.line}: ${it.literal} (${it.why})" })
             .that(findings).isEmpty()
     }
 

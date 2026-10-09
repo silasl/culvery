@@ -22,3 +22,16 @@ fun identifier() = "kiosk"
 fun key() = "settings.page"
 fun pattern() = Regex("(?:['’]s)?")
 fun curly() = "That’s it — “quoted” — Settings › Apps."
+fun spokenDirect() = Modifier.semantics { error("That name's taken too") }
+fun spokenMerged() = Modifier.semantics(mergeDescendants = true) { error("Can't go there") }
+fun checked(x: Int) = check(x > 0) { "x can't be zero" }
+fun todo() = TODO("can't do this yet")
+fun formatted() = DateTimeFormatter.ofPattern("d MMM 'at' HH:mm")
+fun regexWithOptions() = "x".toRegex(setOf(RegexOption.valueOf("it's here")))
+@Foo val annotatedLine = "it's here"
+fun annotatedParameter() = foo(@Named("it's here") 1)
+private const val TAG = "the master's tag"
+fun deep() = require(foo(bar("can't")))
+fun spokenOverLines() = Modifier.semantics {
+    error("Can't go on")
+}
