@@ -110,7 +110,7 @@ class EventFormTest {
         assertThat(form.day).isEqualTo(today)
         assertThat(form.time).isEqualTo(TimeChoice.Custom(LocalTime.of(19, 30)))
         assertThat(form.length).isEqualTo(Duration.ofMinutes(90))
-        assertThat(form.lengths.map(::lengthLabel)).containsExactly("30 min", "1 h", "2 h", "1 h 30").inOrder()
+        assertThat(form.lengths.map(::lengthLabel)).containsExactly("30 minutes", "1 hour", "2 hours", "1 hour 30 minutes").inOrder()
         assertThat(form.datesLocked).isFalse()
         assertThat(form.unchanged).isTrue()
     }
@@ -125,7 +125,7 @@ class EventFormTest {
     @Test
     fun lengthLabels() {
         assertThat(listOf(30L, 45L, 60L, 65L, 90L, 180L).map { lengthLabel(Duration.ofMinutes(it)) })
-            .containsExactly("30 min", "45 min", "1 h", "1 h 05", "1 h 30", "3 h").inOrder()
+            .containsExactly("30 minutes", "45 minutes", "1 hour", "1 hour 5 minutes", "1 hour 30 minutes", "3 hours").inOrder()
     }
 
     @Test

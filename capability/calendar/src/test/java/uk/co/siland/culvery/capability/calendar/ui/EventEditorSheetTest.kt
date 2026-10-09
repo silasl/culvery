@@ -46,6 +46,9 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.TimeSlot
+import uk.co.siland.culvery.capability.calendar.WriteProblem
+import uk.co.siland.culvery.capability.calendar.couldNotSave
+import uk.co.siland.culvery.capability.calendar.saveFailedBody
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.ShellTokens
@@ -63,7 +66,7 @@ class EventEditorSheetTest {
     private val calls = mutableListOf<String>()
     private var picker by mutableStateOf(EditorPicker.None)
     private var busy by mutableStateOf(false)
-    private var failure by mutableStateOf<String?>(null)
+    private var failure by mutableStateOf<SaveFailure?>(null)
 
     /** A new event opened at 11:54 on the hand-off's Wednesday. */
     private fun newForm(signedIn: PersonId? = null) =
@@ -186,7 +189,7 @@ class EventEditorSheetTest {
 
     @Test
     fun theFailureCardIsSpokenPolitelyAndTheTitleFieldIsNamed() {
-        failure = "Couldn’t save — try again."
+        failure = SaveFailure("Google Calendar", WriteProblem.Tablet)
         show(newForm())
         compose.onNodeWithTag("editor_failure").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
         compose.onNodeWithTag("editor_title").assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Event name")))
@@ -194,13 +197,13 @@ class EventEditorSheetTest {
 
     @Test
     fun aFailureShowsTheCardAndSaveSaysTryAgain() {
-        failure = "Couldn’t save to Sample calendar — Calendar is full"
+        failure = SaveFailure("Sample calendar", WriteProblem.Refused("Calendar is full"))
         val form = newForm()
         form.updateTitle("Car MOT")
         show(form)
         compose.onNodeWithTag("editor_failure").assertExists()
-        compose.onNodeWithText("Couldn’t save to Sample calendar — Calendar is full").assertExists()
-        compose.onNodeWithText(SAVE_FAILED_BODY).assertExists()
+        compose.onNodeWithText(couldNotSave("Sample calendar", WriteProblem.Refused("Calendar is full"))).assertExists()
+        compose.onNodeWithText(saveFailedBody("Sample calendar", WriteProblem.Refused("Calendar is full"))).assertExists()
         compose.onNodeWithText("Try again").assertExists()
         compose.onNodeWithTag("editor_save").assertTextEquals("Try again")
     }

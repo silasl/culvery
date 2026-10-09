@@ -14,9 +14,11 @@ import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.UnreachableException
+import uk.co.siland.culvery.capability.calendar.couldNotConnect
 import uk.co.siland.culvery.core.plugin.Connection
 
-private const val COULD_NOT_CONNECT = "Couldn’t connect to Google Calendar — try again"
+private val COULD_NOT_CONNECT = couldNotConnect(GOOGLE_DISPLAY_NAME, unreachable = false)
+private val COULD_NOT_REACH = couldNotConnect(GOOGLE_DISPLAY_NAME, unreachable = true)
 
 @RunWith(AndroidJUnit4::class)
 class GoogleConnectFlowTest {
@@ -160,6 +162,6 @@ class GoogleConnectFlowTest {
         authorizer.failWith = null
         google.failNext(503)
         assertThat(flow.start(existing = null)).isEqualTo(ConnectStep.Stopped)
-        assertThat(toasts.messages).containsExactly(COULD_NOT_CONNECT, COULD_NOT_CONNECT)
+        assertThat(toasts.messages).containsExactly(COULD_NOT_REACH, COULD_NOT_REACH)
     }
 }

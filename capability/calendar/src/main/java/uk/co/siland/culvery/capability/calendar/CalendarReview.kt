@@ -18,15 +18,15 @@ import uk.co.siland.culvery.core.plugin.Toaster
 data class ReviewConnection(val row: CalendarRow, val sources: List<StoredSource>)
 
 // 4a design §4.5.
-fun nowShowsAs(calendar: String, person: String): String = "$calendar now shows as $person"
+fun nowShowsAs(calendar: String, person: String): String = "$calendar now shows as $person."
 
-fun calendarHidden(calendar: String): String = "$calendar hidden"
+fun calendarHidden(calendar: String): String = "$calendar hidden."
 
-fun calendarShown(calendar: String): String = "$calendar shown"
+fun calendarShown(calendar: String): String = "$calendar shown."
 
-fun newEventsGoTo(calendar: String): String = "New events now go to $calendar"
+fun newEventsGoTo(calendar: String): String = "New events now go to $calendar."
 
-fun disconnected(service: String): String = "$service disconnected"
+fun disconnected(service: String): String = "$service disconnected."
 
 /** One change reads in the singular; "will be lost", never "dropped" (4d-2 Decision 2c). */
 fun disconnectQuestion(service: String, queued: Int): String = "Disconnect $service? Its calendars stop showing here" + when (queued) {

@@ -29,8 +29,17 @@ internal fun ageMillis(change: PendingChange, pausedSince: Long?, nowMillis: Lon
     return (nowMillis - change.createdMillis - running).coerceAtLeast(0)
 }
 
-/** Why a change to an event that is gone is refused; public so providers refuse with the same words. */
-const val EVENT_GONE = "The event no longer exists"
+/** Why a change to an event that is gone is refused; lower case, to follow a dash. Providers refuse with the same words. */
+const val EVENT_GONE = "the event has been deleted"
+
+/** Why a change didn't reach the calendar. The editor never meets an unreachable provider: it queues instead. */
+sealed interface WriteProblem {
+    /** The tablet failed before the provider answered (a store failure): trying again may work. */
+    data object Tablet : WriteProblem
+
+    /** The provider refused for good. [reason] is lower case, to follow a dash; null when it gave none. */
+    data class Refused(val reason: String?) : WriteProblem
+}
 
 /**
  * What an update of [kind] changes: an assign only who the event is for; an update its stored [fields], or every
@@ -44,8 +53,8 @@ internal sealed interface WriteOutcome {
     /** The provider took the change. [event] is what it now holds; null for a delete. */
     data class Accepted(val event: RemoteEvent?) : WriteOutcome
 
-    /** The provider refused the change for good. */
-    data class Rejected(val message: String) : WriteOutcome
+    /** The provider refused the change for good; [reason] is null when it gave none of its own. */
+    data class Rejected(val reason: String?) : WriteOutcome
 
     /**
      * Try again later. [blocksConnection]: the provider didn't answer, so its other changes should wait too.
@@ -63,7 +72,7 @@ internal suspend fun callWriter(io: CoroutineContext, timeoutMillis: Long, call:
     try {
         WriteOutcome.Accepted(withContext(io) { withTimeout(timeoutMillis) { call() } })
     } catch (e: WriteRejectedException) {
-        WriteOutcome.Rejected(e.message ?: "the calendar refused the change")
+        WriteOutcome.Rejected(e.message)
     } catch (e: TimeoutCancellationException) {
         // Rethrows if it was the caller's own timeout, not this call's.
         currentCoroutineContext().ensureActive()
@@ -123,13 +132,32 @@ internal suspend fun CalendarStore.applyAcceptedWrite(
     }
 }
 
-/** "Couldn’t save to {label} — {reason}", or just "Couldn’t save to {label}" when there is no reason. */
-fun couldNotSave(label: String, reason: String?): String =
-    if (reason == null) "Couldn’t save to $label" else "Couldn’t save to $label — $reason"
+/** A save that didn't happen, by its cause. */
+fun couldNotSave(service: String, problem: WriteProblem): String = when (problem) {
+    WriteProblem.Tablet -> "Couldn’t save — try again."
+    is WriteProblem.Refused -> problem.reason?.let { "Couldn’t save to $service — $it." } ?: wouldNotAccept(service)
+}
 
-/** One toast for everything a drain pass dropped for [label]; [reasons] has one entry per change. */
-internal fun couldNotSaveAll(label: String, reasons: List<String?>): String =
-    if (reasons.size == 1) couldNotSave(label, reasons.single()) else "Couldn’t save ${reasons.size} changes to $label"
+/** A delete that didn't happen: never "save". */
+fun couldNotDelete(service: String, problem: WriteProblem): String = when (problem) {
+    WriteProblem.Tablet -> "Couldn’t delete — try again."
+    is WriteProblem.Refused -> problem.reason?.let { "Couldn’t delete — $it." } ?: wouldNotAccept(service)
+}
+
+private fun wouldNotAccept(service: String): String = "$service wouldn’t accept this change."
+
+/** The editor's failure card's body: trying again helps only when the tablet failed. */
+fun saveFailedBody(service: String, problem: WriteProblem): String = when (problem) {
+    WriteProblem.Tablet -> "Nothing was saved. Your details are still here — try again."
+    is WriteProblem.Refused -> "Nothing was saved. Your details are still here to add in $service on your phone."
+}
+
+/** One toast for everything a drain pass lost for [service]; [reasons] has one entry per change. */
+internal fun changesLost(service: String, reasons: List<String?>): String = when {
+    reasons.size > 1 -> "${reasons.size} changes couldn’t be saved to $service and were lost."
+    reasons.single() == null -> "A change couldn’t be saved to $service and was lost."
+    else -> "A change couldn’t be saved to $service and was lost — ${reasons.single()}."
+}
 
 /**
  * The name failure, repeating-event and delete copy use for [connection] (3a design D11): its provider's display name

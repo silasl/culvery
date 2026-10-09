@@ -135,9 +135,10 @@ class SourceGoneException(message: String? = null, cause: Throwable? = null) : U
 
 /**
  * A permanent refusal: retrying would not help (Google: a 4xx other than 401, 429 and the 403 rate limits).
- * A delete that finds the event already gone (404 or 410) is a success, not a refusal.
+ * A delete that finds the event already gone (404 or 410) is a success, not a refusal. [message] is the reason in
+ * lower case, to follow a dash; null when the provider can say no more, shown as "{service} wouldn’t accept this change."
  */
-class WriteRejectedException(message: String, cause: Throwable? = null) : Exception(message, cause)
+class WriteRejectedException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
 
 /**
  * A calendar service. Implementations live in :provider:calendar-* and bind themselves with

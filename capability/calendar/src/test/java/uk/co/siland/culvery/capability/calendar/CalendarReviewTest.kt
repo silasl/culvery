@@ -74,7 +74,7 @@ class CalendarReviewTest {
         access.answer(TestAccess.ALEX)
         assertThat(review.setPerson(source("swim"), access.mia)).isTrue()
         assertThat(source("swim").mapping.person).isEqualTo(access.mia.id)
-        assertThat(toaster.messages).containsExactly("Mia's swimming now shows as Mia")
+        assertThat(toaster.messages).containsExactly("Mia's swimming now shows as Mia.")
         assertThat(toaster.urgent).isEmpty()
         assertThat(access.requests.map { it.label }).containsExactly("Change settings")
     }
@@ -86,7 +86,7 @@ class CalendarReviewTest {
         val gone = Person(PersonId("gone"), "Gone", 0xFF000000)
         assertThat(review.setPerson(source("swim"), gone)).isTrue()
         assertThat(source("swim").mapping.person).isEqualTo(PersonId.FAMILY)
-        assertThat(toaster.messages).containsExactly("Mia's swimming now shows as Family")
+        assertThat(toaster.messages).containsExactly("Mia's swimming now shows as Family.")
     }
 
     @Test
@@ -96,7 +96,7 @@ class CalendarReviewTest {
         review.setShown(source("swim"), shown = false)
         assertThat(source("swim").mapping.visible).isFalse()
         review.setShown(source("swim"), shown = true)
-        assertThat(toaster.messages).containsExactly("Mia's swimming hidden", "Mia's swimming shown").inOrder()
+        assertThat(toaster.messages).containsExactly("Mia's swimming hidden.", "Mia's swimming shown.").inOrder()
     }
 
     @Test
@@ -115,7 +115,7 @@ class CalendarReviewTest {
         access.answer(TestAccess.ALEX)
         assertThat(review.makeMaster(source("chores"))).isTrue()
         assertThat(store.master().first()?.source?.id).isEqualTo("chores")
-        assertThat(toaster.messages).containsExactly("New events now go to Chores")
+        assertThat(toaster.messages).containsExactly("New events now go to Chores.")
     }
 
     @Test
@@ -136,7 +136,7 @@ class CalendarReviewTest {
         assertThat(store.pendingNow()).isEmpty()
         assertThat(store.sources().first()).isEmpty()
         assertThat(store.eventsBetween(0, Long.MAX_VALUE).first()).isEmpty()
-        assertThat(toaster.messages).containsExactly("Google Calendar disconnected")
+        assertThat(toaster.messages).containsExactly("Google Calendar disconnected.")
     }
 
     @Test
@@ -178,7 +178,7 @@ class CalendarReviewTest {
         connections.finish(connection, reconnecting = false)
         withContext(Dispatchers.Default) { withTimeout(5_000) { while (toaster.messages.size < 2) delay(10) } }
         assertThat(store.connectionsNow().map { it.connection.id }).containsExactly("g1")
-        assertThat(toaster.messages).containsExactly("Google Calendar connected", "Google Calendar reconnected").inOrder()
+        assertThat(toaster.messages).containsExactly("Google Calendar connected.", "Google Calendar reconnected.").inOrder()
     }
 
     @Test

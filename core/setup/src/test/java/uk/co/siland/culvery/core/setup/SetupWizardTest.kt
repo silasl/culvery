@@ -399,7 +399,7 @@ class SetupWizardTest {
         show(FakeStep("a", 0))
         compose.waitUntil(5_000) { access.prompt.request.value != null }
         access.prompt.cancel()
-        compose.awaitText("Enter your PIN to carry on setting up")
+        compose.awaitText("Enter your PIN to carry on setting up.")
         compose.onNodeWithTag("wizard_enter_pin").assertExists()
         compose.onNodeWithText("Step a").assertDoesNotExist()
     }

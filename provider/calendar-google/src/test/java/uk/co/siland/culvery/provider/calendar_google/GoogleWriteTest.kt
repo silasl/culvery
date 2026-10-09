@@ -198,8 +198,9 @@ class GoogleWriteTest {
         provider.create(conn, family, draft(), key)
         google.putEvent(family.id, google.timed(key, "Swim", at(23, 16), at(23, 17)) { putJsonArray("recurrence") { add("RRULE:FREQ=WEEKLY") } })
         // A PATCH would change every instance of the series.
-        assertThat(failureOf { provider.update(conn, family, key, draft(title = "Swim club"), setOf(EventField.TITLE)) }?.message)
-            .isEqualTo("the change was refused")
+        val refused = failureOf { provider.update(conn, family, key, draft(title = "Swim club"), setOf(EventField.TITLE)) }
+        assertThat(refused).isInstanceOf(WriteRejectedException::class.java)
+        assertThat(refused?.message).isNull()
         assertThat(google.requests.map { it.method }).doesNotContain("PATCH")
         assertLogsHoldNoPersonalData(minLines = 1)
     }
@@ -217,7 +218,9 @@ class GoogleWriteTest {
         provider.create(conn, family, draft(), key)
         google.putEvent(family.id, google.timed(key, "Swim", at(23, 16), at(23, 17)) { putJsonArray("recurrence") { add("RRULE:FREQ=WEEKLY") } })
         // A DELETE would remove the whole series.
-        assertThat(failureOf { provider.delete(conn, family, key) }?.message).isEqualTo("the change was refused")
+        val refused = failureOf { provider.delete(conn, family, key) }
+        assertThat(refused).isInstanceOf(WriteRejectedException::class.java)
+        assertThat(refused?.message).isNull()
         assertThat(google.requests.map { it.method }).doesNotContain("DELETE")
         assertThat(google.event(family.id, key)!!.text("status")).isEqualTo("confirmed")
         assertLogsHoldNoPersonalData(minLines = 1)
@@ -229,7 +232,7 @@ class GoogleWriteTest {
         google.failNext(400, "invalid") { it.method == "GET" }
         val refused = failureOf { provider.update(conn, family, key, draft(title = "Swim club"), setOf(EventField.TITLE)) }
         assertThat(refused).isInstanceOf(WriteRejectedException::class.java)
-        assertThat(refused?.message).isEqualTo(REFUSED)
+        assertThat(refused?.message).isNull()
         google.failNext(403, "forbidden") { it.method == "GET" }
         assertThat(failureOf { provider.delete(conn, family, key) }?.message).isEqualTo("this calendar can’t be changed from the tablet")
         assertThat(google.requests.map { it.method }).containsNoneOf("PATCH", "DELETE")
@@ -269,7 +272,9 @@ class GoogleWriteTest {
     fun refusalsUseTheTabletsWordsNotGooglesAndTheOthersAreRetried() = runTest {
         assertThat(failureOf { provider.create(conn, holidays, draft(), key) }?.message).isEqualTo("this calendar can’t be changed from the tablet")
         google.failNext(400, "invalid")
-        assertThat(failureOf { provider.create(conn, family, draft(), key) }?.message).isEqualTo("the change was refused")
+        val refused = failureOf { provider.create(conn, family, draft(), key) }
+        assertThat(refused).isInstanceOf(WriteRejectedException::class.java)
+        assertThat(refused?.message).isNull()
         google.failNext(401, "authError")
         google.failNext(401, "authError")
         assertThat(failureOf { provider.create(conn, family, draft(), key) }).isInstanceOf(NeedsSignInException::class.java)

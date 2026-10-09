@@ -200,7 +200,7 @@ class PeopleUiTest {
         compose.onNodeWithTag("person_remove").performClick()
         compose.onNodeWithTag("person_confirm_remove").performClick()
         compose.waitUntil(5_000) { overlay.content == null }
-        assertThat(access.toasts.messages).containsExactly("Sam removed")
+        assertThat(access.toasts.messages).containsExactly("Sam removed.")
     }
 
     @Test
@@ -235,7 +235,7 @@ class PeopleUiTest {
         db.openHelper.writableDatabase.execSQL("CREATE TRIGGER no_updates BEFORE UPDATE ON person BEGIN SELECT RAISE(ABORT, 'x'); END")
         compose.onNodeWithTag("person_save").performClick()
         compose.waitUntil(5_000) { compose.onNodeWithTag("person_message").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text.orEmpty().isNotEmpty() }
-        compose.onNodeWithTag("person_message").assert(hasText("Couldn’t save — try again."))
+        compose.onNodeWithTag("person_message").assert(hasText("Couldn’t save Sam’s details — try again."))
         compose.onNodeWithTag("person_name").assert(hasText("mySam"))
         assertNoSecretsLogged("People", listOf("Sam"))
     }
@@ -261,7 +261,7 @@ class PeopleUiTest {
         compose.onNodeWithTag("person_remove").performClick()
         compose.onNodeWithTag("person_confirm_remove").performClick()
         compose.waitUntil(5_000) { compose.onNodeWithTag("person_message").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text.orEmpty().isNotEmpty() }
-        compose.onNodeWithTag("person_message").assert(hasText("Couldn’t save — try again."))
+        compose.onNodeWithTag("person_message").assert(hasText("Couldn’t save Sam’s details — try again."))
         assertNoSecretsLogged("PersonSheet", listOf("Sam"))
     }
 

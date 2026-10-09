@@ -29,7 +29,7 @@ fun pinReasonText(reason: PinReason, label: String): String = when (reason) {
 private fun eventReason(what: String): String = "Enter your PIN to $what. It also records who made the change."
 
 /** 4a design §3.4: the wizard started again after a kill past its You step. */
-const val CONTINUE_SETUP = "Enter your PIN to carry on setting up"
+const val CONTINUE_SETUP = "Enter your PIN to carry on setting up."
 
 /** What happens when the identified person may not do the thing. */
 sealed interface Refusal {

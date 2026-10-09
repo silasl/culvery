@@ -29,7 +29,7 @@ sealed interface TimeChoice {
 /** 2b-2 design D8: a title is at most 100 characters. */
 const val MAX_TITLE_LENGTH = 100
 
-/** Hand-off §7 Length chips: 30 min, 1 h, 2 h. */
+/** Hand-off §7 Length chips: 30 minutes, 1 hour, 2 hours. */
 val LENGTH_CHOICES: List<Duration> = listOf(Duration.ofMinutes(30), Duration.ofHours(1), Duration.ofHours(2))
 
 private val DEFAULT_LENGTH: Duration = Duration.ofHours(1)
@@ -37,14 +37,14 @@ private const val MINUTES_PER_HOUR = 60L
 private const val DAYS_SHOWN = 7L
 private val DAY_AND_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d", Locale.ENGLISH)
 
-/** "30 min", "1 h", "1 h 30": whole hours read "{h} h", under an hour "{m} min", otherwise "{h} h {mm}". */
+/** "30 minutes", "1 hour", "1 hour 30 minutes": full words, singular at one. */
 fun lengthLabel(length: Duration): String {
     val hours = length.toHours()
     val minutes = length.toMinutes() % MINUTES_PER_HOUR
     return when {
-        hours == 0L -> "$minutes min"
-        minutes == 0L -> "$hours h"
-        else -> "$hours h ${minutes.toString().padStart(2, '0')}"
+        hours == 0L -> plural(minutes, "minute")
+        minutes == 0L -> plural(hours, "hour")
+        else -> "${plural(hours, "hour")} ${plural(minutes, "minute")}"
     }
 }
 
@@ -112,7 +112,7 @@ class EventForm(
     // Until Day, Time or Length is touched, an edit keeps the event's own start and end.
     private var whenTouched = false
 
-    /** The Length chips: 30 min, 1 h, 2 h, and an edited event's own length when it is none of those (D3). */
+    /** The Length chips: 30 minutes, 1 hour, 2 hours, and an edited event's own length when it is none of those (D3). */
     val lengths: List<Duration> = LENGTH_CHOICES + listOfNotNull(original?.let(::lengthOf)?.takeIf { it !in LENGTH_CHOICES })
 
     /** Today and the six days after it: the Day chips before Pick date…. */

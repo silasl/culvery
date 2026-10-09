@@ -18,11 +18,13 @@ import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 
 /** 3a design §3.3 toasts. */
-fun connected(service: String): String = "$service connected"
+fun connected(service: String): String = "$service connected."
 
-fun reconnected(service: String): String = "$service reconnected"
+fun reconnected(service: String): String = "$service reconnected."
 
-fun couldNotConnect(service: String): String = "Couldn’t connect to $service — try again"
+/** A service that couldn't be reached says check the Wi-Fi; any other failure, try again. */
+fun couldNotConnect(service: String, unreachable: Boolean): String =
+    if (unreachable) "Couldn’t reach $service — check the tablet’s Wi-Fi, then try again." else "Couldn’t connect to $service — try again."
 
 /**
  * Adds and reconnects provider connections and chooses the master calendar: Settings, the Connect card and the
@@ -75,6 +77,7 @@ class CalendarSetup(
      * instead, never added twice (review M2): the check and the add run under one lock, whoever calls.
      */
     suspend fun connectWithDefaults(connection: Connection): Boolean = connecting.withLock {
+        var failure: Throwable? = null
         val stored = try {
             // Inside the try: a store failure here is a failed connect with its toast, like any other.
             alreadyConnected(connection)?.let { return@withLock reconnect(it) }
@@ -95,13 +98,17 @@ class CalendarSetup(
         } catch (e: Throwable) {
             // Only the type (P8): a message can hold a calendar id, which is often the account's email.
             Log.w(TAG, "Couldn't connect ${connection.providerId} (${e::class.simpleName})")
+            failure = e
             false
         }
         if (stored) {
             requestSync()
             toaster.show(connected(serviceNameOf(connection, providers::displayNameOf)))
         } else {
-            toaster.show(couldNotConnect(serviceNameOf(connection, providers::displayNameOf)), urgent = true)
+            toaster.show(
+                couldNotConnect(serviceNameOf(connection, providers::displayNameOf), unreachable = failure is UnreachableException),
+                urgent = true,
+            )
         }
         stored
     }
@@ -125,7 +132,7 @@ class CalendarSetup(
             requestSync()
             toaster.show(reconnected(serviceNameOf(connection, providers::displayNameOf)))
         } else {
-            toaster.show(couldNotConnect(serviceNameOf(connection, providers::displayNameOf)), urgent = true)
+            toaster.show(couldNotConnect(serviceNameOf(connection, providers::displayNameOf), unreachable = false), urgent = true)
         }
         return recorded
     }

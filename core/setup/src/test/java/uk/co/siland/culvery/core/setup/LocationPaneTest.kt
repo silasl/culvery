@@ -181,7 +181,7 @@ class LocationPaneTest {
         advance(500)
         compose.onNodeWithTag("place_0").performClick()
         advance(100)
-        compose.onNodeWithText("Couldn’t save — try again.").assertExists()
+        compose.onNodeWithText("Couldn’t save the home location — try again.").assertExists()
         compose.onNodeWithTag("place_0").assertTextContains("Brighton, England, United Kingdom")
         assertNoSecretsLogged("LocationPane", listOf("Brighton", "disk full"))
         // Trying again clears it.
@@ -189,7 +189,7 @@ class LocationPaneTest {
         compose.onNodeWithTag("place_0").performClick()
         advance(100)
         assertThat(saved).containsExactly(brighton)
-        compose.onNodeWithText("Couldn’t save — try again.").assertDoesNotExist()
+        compose.onNodeWithText("Couldn’t save the home location — try again.").assertDoesNotExist()
     }
 
     @Test

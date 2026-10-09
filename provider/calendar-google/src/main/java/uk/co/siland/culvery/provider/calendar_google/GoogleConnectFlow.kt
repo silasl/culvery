@@ -6,6 +6,7 @@ import android.util.Log
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
+import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.couldNotConnect
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Toaster
@@ -74,7 +75,8 @@ internal class GoogleConnectFlow(
                 Log.i(TAG, "Google sign-in was cancelled")
             } else {
                 Log.w(TAG, "Couldn't connect to Google (${e::class.simpleName})")
-                stopWithToast()
+                // Play services answering with a status is not the network failing.
+                stopWithToast(unreachable = e is UnreachableException && e !is PlayServicesStatusException)
             }
             ConnectStep.Stopped
         }
@@ -103,8 +105,8 @@ internal class GoogleConnectFlow(
         return ConnectStep.Done(Connection(id, GOOGLE_PROVIDER_ID, GOOGLE_LABEL, mapOf(CONFIG_ACCOUNT to email)))
     }
 
-    private fun stopWithToast(): ConnectStep {
-        toaster.show(couldNotConnect(GOOGLE_DISPLAY_NAME), urgent = true)
+    private fun stopWithToast(unreachable: Boolean = false): ConnectStep {
+        toaster.show(couldNotConnect(GOOGLE_DISPLAY_NAME, unreachable), urgent = true)
         return ConnectStep.Stopped
     }
 }

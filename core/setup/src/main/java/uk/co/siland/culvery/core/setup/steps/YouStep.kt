@@ -31,7 +31,6 @@ import uk.co.siland.culvery.core.access.ui.ChoosePinPad
 import uk.co.siland.culvery.core.household.DuplicateNameException
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Role
-import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.setup.NAME
@@ -45,6 +44,7 @@ import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupType
 import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.WHOS_SETTING_UP
+import uk.co.siland.culvery.core.setup.YOUR_DETAILS_NOT_SAVED
 import uk.co.siland.culvery.core.setup.YOUR_NAME
 import uk.co.siland.culvery.core.setup.showPersonEditor
 import uk.co.siland.culvery.core.setup.someoneCalled
@@ -106,7 +106,7 @@ class YouStep @Inject constructor(
             false
         } catch (e: Exception) {
             Log.w(TAG, "Couldn't add the first Admin (${e::class.simpleName})")
-            form.message = COULD_NOT_SAVE
+            form.message = YOUR_DETAILS_NOT_SAVED
             false
         } finally {
             gate.finishFailed()

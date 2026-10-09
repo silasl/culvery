@@ -61,9 +61,9 @@ import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.PersonChipInk
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
-/** 3a design §4.1. */
+/** 3a design §4.1: a status ("Needs reconnecting") or a sentence that says what to do. */
 internal const val NEEDS_RECONNECTING = "Needs reconnecting"
-internal const val SOMETHING_WENT_WRONG = "Something went wrong"
+internal const val STOPPED_UPDATING = "Stopped updating — disconnect and connect again."
 
 // 4a design §4.5; 4d-2 Decision 2a.
 internal const val DISCONNECT = "Disconnect"
@@ -79,12 +79,12 @@ internal const val CHOOSE_ANOTHER_MAIN = "Choose another main calendar first."
 
 private const val TAG = "ReviewCalendars"
 
-/** A row's health in words: "Updated 5 minutes ago", "Can’t reach Google Calendar", "Needs reconnecting" or "Something went wrong". */
+/** A row's health in words: "Updated 5 minutes ago", "Can’t reach Google Calendar — check the tablet’s Wi-Fi.", "Needs reconnecting" or what to do when it stopped. */
 internal fun healthWords(row: CalendarRow, nowMillis: Long): String = when (row.health) {
     ConnectionHealth.Ok -> updatedLabel(row.lastSyncMillis, nowMillis)
-    ConnectionHealth.Unreachable -> "Can’t reach ${row.service}"
+    ConnectionHealth.Unreachable -> "Can’t reach ${row.service} — check the tablet’s Wi-Fi."
     ConnectionHealth.NeedsSignIn -> NEEDS_RECONNECTING
-    is ConnectionHealth.Error -> SOMETHING_WENT_WRONG
+    is ConnectionHealth.Error -> STOPPED_UPDATING
 }
 
 /** "{Service} · {account}", or the service alone when the connection names no account. */

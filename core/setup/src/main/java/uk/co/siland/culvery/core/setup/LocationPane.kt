@@ -20,7 +20,6 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.household.HomeLocation
-import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
@@ -139,7 +138,7 @@ private class StatusLine(val text: String?, val spoken: String? = text, val isEr
 
 /** The one line under the field: a failed save first, then what the search found. */
 private fun statusLine(results: TownResults, saveFailed: Boolean): StatusLine = when {
-    saveFailed -> StatusLine(COULD_NOT_SAVE, isError = true, isSave = true)
+    saveFailed -> StatusLine(HOME_NOT_SAVED, isError = true, isSave = true)
     results is TownResults.NoMatch -> StatusLine(noTownsMatch(results.query))
     results is TownResults.Failed -> StatusLine(COULD_NOT_SEARCH, isError = true)
     results is TownResults.Found -> StatusLine(null, spoken = townsFound(results.places.size))

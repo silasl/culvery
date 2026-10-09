@@ -57,10 +57,11 @@ import uk.co.siland.culvery.capability.calendar.PendingChange
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.ScriptedWriter
 import uk.co.siland.culvery.capability.calendar.SyncResult
-import uk.co.siland.culvery.capability.calendar.TRY_AGAIN
 import uk.co.siland.culvery.capability.calendar.TestAccess
+import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.calendarDb
+import uk.co.siland.culvery.capability.calendar.couldNotDelete
 import uk.co.siland.culvery.capability.calendar.couldNotSave
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
@@ -225,7 +226,7 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_title").performTextInput("Parents evening")
         compose.onNodeWithTag("editor_save").performClick()
         waitForText("Try again")
-        compose.onNodeWithText("Couldn’t save to Sample calendar — Calendar is full").assertExists()
+        compose.onNodeWithText(couldNotSave("Sample calendar", WriteProblem.Refused("Calendar is full"))).assertExists()
         compose.onNodeWithTag("editor_title").assertTextEquals("Parents evening")
         assertThat(closed).isEqualTo(0)
         assertThat(access.toasts.messages).isEmpty()
@@ -255,7 +256,7 @@ class EventEditorHostTest {
         }
         compose.onNodeWithTag("length_120").performClick()
         compose.onNodeWithTag("editor_save").performClick()
-        waitForText(couldNotSave("Sample calendar", TRY_AGAIN))
+        waitForText(couldNotSave("Sample calendar", WriteProblem.Tablet))
         compose.onNodeWithTag("editor_failure").assertExists()
         compose.onNodeWithTag("editor_save").assertIsEnabled()
         assertThat(closed).isEqualTo(0)
@@ -498,7 +499,7 @@ class EventEditorHostTest {
         waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Parents evening")
         compose.onNodeWithTag("editor_save").performClick()
-        waitForText(couldNotSave("Sample calendar", TRY_AGAIN))
+        waitForText(couldNotSave("Sample calendar", WriteProblem.Tablet))
         runBlocking { calendar.useWriterConnection { it.execSQL("DROP TRIGGER fail_outbox") } }
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { closed > 0 }
@@ -541,7 +542,7 @@ class EventEditorHostTest {
         }
         compose.onNodeWithTag("editor_delete").performClick()
         compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
-        assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", TRY_AGAIN))
+        assertThat(access.toasts.messages).containsExactly(couldNotDelete("Sample calendar", WriteProblem.Tablet))
         assertThat(access.toasts.urgent).isEqualTo(access.toasts.messages)
         compose.onNodeWithTag("editor_failure").assertDoesNotExist()
         assertThat(deleting).isEmpty()

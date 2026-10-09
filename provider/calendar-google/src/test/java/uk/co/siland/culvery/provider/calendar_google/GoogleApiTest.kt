@@ -210,7 +210,7 @@ class GoogleApiTest {
         val invalid = GoogleResponse(400, errorBody(400, "invalid"))
         assertThat(forbidden.refusal(GoogleCall.ADDING)).isInstanceOf(WriteRejectedException::class.java)
         assertThat(forbidden.refusal(GoogleCall.ADDING).message).isEqualTo(READ_ONLY_HERE)
-        assertThat(invalid.refusal(GoogleCall.ADDING).message).isEqualTo(REFUSED)
+        assertThat(invalid.refusal(GoogleCall.ADDING).message).isNull()
     }
 
     @Test

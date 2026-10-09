@@ -20,8 +20,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.EditResult
 import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.EventRef
-import uk.co.siland.culvery.capability.calendar.TRY_AGAIN
-import uk.co.siland.culvery.capability.calendar.couldNotSave
+import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.Role
@@ -90,13 +89,13 @@ internal fun EventEditorHost(
     }
     val people: List<Person>? by repo.people.collectAsState(initial = null)
     val session by editor.session.collectAsState()
-    var failure by remember(request) { mutableStateOf<String?>(null) }
+    var failure by remember(request) { mutableStateOf<SaveFailure?>(null) }
     var picker by remember(request) { mutableStateOf(EditorPicker.None) }
-    // Kept only after the tablet failed (TRY_AGAIN), so Try again can't make a second event (3a design §3.12).
+    // Kept only after the tablet failed (WriteProblem.Tablet), so Try again can't make a second event (3a design §3.12).
     var createKey by remember(request) { mutableStateOf(newClientKey()) }
     val action = rememberSingleAction(request) { e ->
         Log.w(TAG, "Couldn't save (${e::class.simpleName})")
-        failure = couldNotSave(opened?.label.orEmpty(), TRY_AGAIN)
+        failure = SaveFailure(opened?.label.orEmpty(), WriteProblem.Tablet)
     }
 
     // Swapped straight to another request, the last form shows until this one's loads: wait instead.
@@ -123,10 +122,10 @@ internal fun EventEditorHost(
                 EventForm.Mode.New -> editor.create(form.draft(createdBy = null), createKey)
                 is EventForm.Mode.Edit -> editor.update(mode.original.ref, form.draft(createdBy = null), form.touched)
             }
-            if (result != EditResult.Rejected(TRY_AGAIN)) createKey = newClientKey()
+            if (result != EditResult.Rejected(WriteProblem.Tablet)) createKey = newClientKey()
             when (result) {
                 EditResult.Done, EditResult.Queued, EditResult.NotEditable -> onClose()
-                is EditResult.Rejected -> failure = couldNotSave(loaded.label, result.message)
+                is EditResult.Rejected -> failure = SaveFailure(loaded.label, result.problem)
                 EditResult.Cancelled -> Unit
             }
         }

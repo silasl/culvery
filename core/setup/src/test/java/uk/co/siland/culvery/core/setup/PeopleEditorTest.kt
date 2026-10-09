@@ -72,10 +72,10 @@ class PeopleEditorTest {
         assertThat(editor.move(sam.id, up = true)).isEqualTo(PeopleOutcome.Done)
         assertThat(access.requests).isEmpty()
         assertThat(household.people.first().map { it.name }).containsExactly("Sam", "Alex").inOrder()
-        assertThat(access.toasts.messages).containsExactly("Sam moved up")
+        assertThat(access.toasts.messages).containsExactly("Sam moved up.")
         assertThat(access.toasts.urgent).isEmpty()
         assertThat(editor.move(sam.id, up = false)).isEqualTo(PeopleOutcome.Done)
-        assertThat(access.toasts.messages.last()).isEqualTo("Sam moved down")
+        assertThat(access.toasts.messages.last()).isEqualTo("Sam moved down.")
     }
 
     @Test
@@ -119,7 +119,7 @@ class PeopleEditorTest {
     fun aTakenColourIsRefused() = runTest {
         start()
         val sam = sam()
-        assertThat(editor.save(sam.id, draft("Sam", 0))).isEqualTo(PeopleOutcome.Refused("That colour is taken."))
+        assertThat(editor.save(sam.id, draft("Sam", 0))).isEqualTo(PeopleOutcome.Refused("That colour is taken — choose another."))
     }
 
     @Test
@@ -180,7 +180,7 @@ class PeopleEditorTest {
         val sam = sam()
         access.answer("1234")
         assertThat(editor.remove(sam.id)).isEqualTo(PeopleOutcome.Done)
-        assertThat(access.toasts.messages).containsExactly("Sam removed")
+        assertThat(access.toasts.messages).containsExactly("Sam removed.")
         assertThat(household.members.first().map { it.person.name }).containsExactly("Alex")
     }
 
@@ -207,7 +207,7 @@ class PeopleEditorTest {
         val sam = sam(pin = "2468")
         // A closed database cancels Room's scope (a CancellationException, rightly rethrown), so break the table instead.
         db.openHelper.writableDatabase.execSQL("DROP TABLE person")
-        assertThat(editor.save(sam.id, draft("Samantha", 1))).isEqualTo(PeopleOutcome.Refused(COULD_NOT_SAVE))
+        assertThat(editor.save(sam.id, draft("Samantha", 1))).isEqualTo(PeopleOutcome.Refused(couldNotSaveDetails(null)))
         assertNoSecretsLogged("People", listOf("Sam", "2468", "1234"))
     }
 
@@ -241,7 +241,7 @@ class PeopleEditorTest {
         db.openHelper.writableDatabase.execSQL(
             "CREATE TRIGGER no_updates BEFORE UPDATE ON person BEGIN SELECT RAISE(ABORT, 'Samantha 2468'); END",
         )
-        assertThat(editor.save(sam.id, draft("Samantha", 1))).isEqualTo(PeopleOutcome.Refused(COULD_NOT_SAVE))
+        assertThat(editor.save(sam.id, draft("Samantha", 1))).isEqualTo(PeopleOutcome.Refused(couldNotSaveDetails("Sam")))
         assertThat(household.person(sam.id)?.name).isEqualTo("Sam")
         assertNoSecretsLogged("People", listOf("Sam", "2468", "1234"))
     }

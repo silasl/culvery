@@ -178,7 +178,7 @@ class CalendarSync internal constructor(
                 }
                 when (outcome) {
                     is WriteOutcome.Accepted -> if (aged && ref != null) foundCreates += ref
-                    is WriteOutcome.Rejected -> drop(change, label, outcome.message)
+                    is WriteOutcome.Rejected -> drop(change, label, outcome.reason)
                     is WriteOutcome.Retry -> {
                         val next = retryLater(change, now)
                         ref?.let { blockedRefs[it] = next }
@@ -190,7 +190,7 @@ class CalendarSync internal constructor(
             }
         } finally {
             // Those changes are already gone, so they are told even when a later change fails the pass.
-            dropped.forEach { (label, reasons) -> toaster.show(couldNotSaveAll(label, reasons), urgent = true) }
+            dropped.forEach { (label, reasons) -> toaster.show(changesLost(label, reasons), urgent = true) }
         }
     }
 

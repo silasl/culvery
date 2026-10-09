@@ -32,7 +32,9 @@ import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.ScriptedWriter
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.TestAccess
+import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
+import uk.co.siland.culvery.capability.calendar.couldNotDelete
 import uk.co.siland.culvery.capability.calendar.calendarDb
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
@@ -148,7 +150,7 @@ class EventDetailHostTest {
         // The editor toasts the refusal; the sheet goes back to its footer and stays open.
         waitUntil { access.toasts.messages.isNotEmpty() }
         waitUntil { compose.onAllNodesWithText("Delete this event?").fetchSemanticsNodes().isEmpty() }
-        assertThat(access.toasts.messages).containsExactly("Couldn’t save to Sample calendar — Event is locked")
+        assertThat(access.toasts.messages).containsExactly(couldNotDelete("Sample calendar", WriteProblem.Refused("Event is locked")))
         compose.onNodeWithTag("detail_delete").assertExists()
         assertThat(closed).isEqualTo(0)
     }

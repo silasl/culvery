@@ -7,8 +7,8 @@ import kotlinx.coroutines.flow.flowOf
 /** The wizard's forward button, unless a step names its own. */
 const val NEXT_LABEL = "Next"
 
-/** 4a design §5: a setting that didn't save; nothing changed. */
-const val COULD_NOT_SAVE = "Couldn’t save — try again."
+/** 4a design §5, 4d-2 §7.2: a setting that didn't save; nothing changed. */
+const val COULD_NOT_SAVE = "Couldn’t save that change — try again."
 
 /** The button that closes a confirmation and changes nothing. */
 const val KEEP = "Keep"

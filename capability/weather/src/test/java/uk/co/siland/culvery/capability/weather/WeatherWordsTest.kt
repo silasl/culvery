@@ -29,9 +29,9 @@ class WeatherWordsTest {
         val fetched = 1_000_000L
         fun ago(age: Long) = updatedAgo(fetched, fetched + age)
         assertThat(ago(2 * hour)).isNull()
-        assertThat(ago(2 * hour + 1)).isEqualTo("Updated 2 h ago")
-        assertThat(ago(3 * hour)).isEqualTo("Updated 3 h ago")
-        assertThat(ago(24 * hour - 1)).isEqualTo("Updated 23 h ago")
+        assertThat(ago(2 * hour + 1)).isEqualTo("Updated 2 hours ago")
+        assertThat(ago(3 * hour)).isEqualTo("Updated 3 hours ago")
+        assertThat(ago(24 * hour - 1)).isEqualTo("Updated 23 hours ago")
         assertThat(ago(24 * hour)).isEqualTo("Updated 1 day ago")
         assertThat(ago(49 * hour)).isEqualTo("Updated 2 days ago")
     }

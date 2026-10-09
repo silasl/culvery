@@ -26,7 +26,7 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.TimeSlot
-import uk.co.siland.culvery.capability.calendar.couldNotSave
+import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -55,7 +55,7 @@ class EditorScreenshotTest {
         form: EventForm,
         height: Dp? = null,
         childOnly: PersonId? = null,
-        failure: String? = null,
+        failure: SaveFailure? = null,
         picker: EditorPicker = EditorPicker.None,
     ) {
         compose.setContent {
@@ -145,7 +145,7 @@ class EditorScreenshotTest {
         return EventForm(EventForm.Mode.Edit(visit), SampleUi.TODAY, LocalTime.of(11, 54), london, null, null)
     }
 
-    private val failure = couldNotSave("Sample calendar", "Calendar is full")
+    private val failure = SaveFailure("Sample calendar", WriteProblem.Refused("Calendar is full"))
 
     @Test fun keyboardDark() = snap("editor_keyboard_dark", true, keyboard(), height = ABOVE_THE_KEYBOARD)
     @Test fun keyboardLight() = snap("editor_keyboard_light", false, keyboard(), height = ABOVE_THE_KEYBOARD)

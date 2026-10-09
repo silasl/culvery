@@ -23,8 +23,7 @@ import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 
 const val GOOGLE_CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3/"
 
-/** Follow-up R8's fixed wording. Google's own text is neither shown nor logged: it can echo calendar ids (emails). */
-internal const val REFUSED = "the change was refused"
+/** Google's own refusal text is neither shown nor logged: it can echo calendar ids (emails). */
 internal const val READ_ONLY_HERE = "this calendar can’t be changed from the tablet"
 
 /** The module's one log tag. */
@@ -139,7 +138,7 @@ internal fun GoogleResponse.readOrUnreachable(what: GoogleCall): GoogleResponse 
 /** A write's refusal in the tablet's own words (3a design §3.7, R8); Google's reason is logged ([what] as for [decode]). */
 internal fun GoogleResponse.refusal(what: GoogleCall): WriteRejectedException {
     Log.w(TAG, "${what.label}: Google Calendar refused it with ${this.code} (${this.reason})")
-    return WriteRejectedException(if (code == 403) READ_ONLY_HERE else REFUSED)
+    return WriteRejectedException(if (code == 403) READ_ONLY_HERE else null)
 }
 
 /**

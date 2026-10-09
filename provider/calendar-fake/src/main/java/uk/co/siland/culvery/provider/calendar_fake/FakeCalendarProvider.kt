@@ -143,7 +143,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
         fields: Set<EventField>,
     ): RemoteEvent = write(source) {
         val current = current(remoteId) ?: throw WriteRejectedException(EVENT_GONE)
-        if (current.recurring) throw WriteRejectedException("Repeating events can’t be changed here")
+        if (current.recurring) throw WriteRejectedException("repeating events can’t be changed here")
         val event = current.copy(
             title = if (EventField.TITLE in fields) draft.title else current.title,
             start = if (EventField.TIMES in fields) draft.start else current.start,

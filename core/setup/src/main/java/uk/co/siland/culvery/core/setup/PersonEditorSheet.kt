@@ -35,7 +35,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.core.access.ui.ChoosePinPad
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Role
-import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.ui.ButtonSize
@@ -117,7 +116,7 @@ private fun PersonEditorHost(
     var choosingPin by remember { mutableStateOf(false) }
     val action = rememberSingleAction(existing) { e ->
         Log.w(TAG, "Couldn't save a person (${e::class.simpleName})")
-        form.message = COULD_NOT_SAVE
+        form.message = couldNotSaveDetails(existing?.person?.name)
     }
     // Saving counts as edited, so the idle close never cuts a save off half done.
     val edited by rememberUpdatedState(onEdited)

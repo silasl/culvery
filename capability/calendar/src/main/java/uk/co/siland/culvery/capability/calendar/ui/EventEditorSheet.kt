@@ -51,7 +51,10 @@ import uk.co.siland.culvery.capability.calendar.HOURS_MINUTES
 import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.TimeSlot
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
+import uk.co.siland.culvery.capability.calendar.WriteProblem
+import uk.co.siland.culvery.capability.calendar.couldNotSave
 import uk.co.siland.culvery.capability.calendar.lengthLabel
+import uk.co.siland.culvery.capability.calendar.saveFailedBody
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ButtonSize
@@ -70,8 +73,8 @@ import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.PersonChipInk
 import uk.co.siland.culvery.core.ui.ShellTokens
 
-/** Hand-off §7: the failure card's body. */
-const val SAVE_FAILED_BODY = "Nothing was changed. Your details are still here — check the connection and try again."
+/** A save that failed: where it was going ([service]) and why ([problem]); the card says both. */
+data class SaveFailure(val service: String, val problem: WriteProblem)
 
 /**
  * Hand-off §7 "Sheet 2 — Quick-add / edit" (2b-2 design §4.2). Stateless apart from the [form] it edits: the host
@@ -87,7 +90,7 @@ fun EventEditorSheet(
     people: List<Person>,
     childOnly: PersonId?,
     busy: Boolean,
-    failure: String?,
+    failure: SaveFailure?,
     picker: EditorPicker,
     onClose: () -> Unit,
     onSave: () -> Unit,
@@ -368,9 +371,9 @@ private fun LockedDates(label: String) {
     }
 }
 
-/** Hand-off 14: the calendar refused the save; the details are still in the sheet. */
+/** Hand-off 14: the save didn't happen; the details are still in the sheet, and the body says what to do next. */
 @Composable
-private fun FailureCard(title: String) {
+private fun FailureCard(failure: SaveFailure) {
     val c = Culvery.colors
     Row(
         horizontalArrangement = Arrangement.spacedBy(CalendarDimens.editorCardIconGap),
@@ -385,9 +388,9 @@ private fun FailureCard(title: String) {
         HhIcon(Icons.CLOUD_OFF, size = CalendarDimens.failureIcon, tint = c.danger)
         Column {
             // A long provider reason must not push Save off screen with the keyboard up; the body says what to do.
-            Text(title, style = CalendarType.noteTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(couldNotSave(failure.service, failure.problem), style = CalendarType.noteTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(CalendarDimens.failureBodyTop))
-            Text(SAVE_FAILED_BODY, style = CalendarType.noteBody, color = c.mute)
+            Text(saveFailedBody(failure.service, failure.problem), style = CalendarType.noteBody, color = c.mute)
         }
     }
 }

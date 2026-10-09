@@ -32,18 +32,15 @@ import uk.co.siland.culvery.core.plugin.WallClock
 /** How long the editor tries the provider before queueing the change instead (2b-1 design D3). */
 const val WRITE_ATTEMPT_MS = 10_000L
 
-/** The reason shown when the tablet itself fails to save a change: nothing the provider said. */
-internal const val TRY_AGAIN = "try again"
-
 /** Hand-off §7: the toast after a delete. */
-const val EVENT_DELETED = "Event deleted"
+const val EVENT_DELETED = "Event deleted."
 
 /** 2b-2 design D1: the toasts after a save. */
-const val EVENT_ADDED = "Event added"
-const val CHANGES_SAVED = "Changes saved"
+const val EVENT_ADDED = "Event added."
+const val CHANGES_SAVED = "Changes saved."
 
 /** 3a design §3.12: the add/edit sheet couldn't load what it needs, so it closed. */
-const val COULD_NOT_OPEN = "Couldn’t open the event — try again"
+const val COULD_NOT_OPEN = "Couldn’t open the event — try again."
 
 sealed interface EditResult {
     /** The provider accepted the change. The mirror has it, or the next sync brings it (2b-2 design §3.4). */
@@ -57,7 +54,7 @@ sealed interface EditResult {
      * or an assign the editor has toasted why. For a save the sheet shows it; if the sheet has closed, the editor
      * toasts it.
      */
-    data class Rejected(val message: String) : EditResult
+    data class Rejected(val problem: WriteProblem) : EditResult
 
     /** The PIN pad was cancelled, or the person was refused and told so by a toast. */
     data object Cancelled : EditResult
@@ -130,7 +127,7 @@ class CalendarEditor internal constructor(
     internal fun couldNotOpen() = toaster.show(COULD_NOT_OPEN, urgent = true)
 
     /** The editor's Delete failed before it could ask to confirm (a store failure): the detail sheet's delete wording. */
-    internal fun couldNotDelete(label: String) = toaster.show(couldNotSave(label, TRY_AGAIN), urgent = true)
+    internal fun couldNotDelete(label: String) = toaster.show(couldNotDelete(label, WriteProblem.Tablet), urgent = true)
 
     /** The delete guard, run before the confirmation appears: true when this person may delete [ref]. */
     suspend fun mayDelete(ref: EventRef): Boolean {
@@ -252,7 +249,7 @@ class CalendarEditor internal constructor(
     /**
      * Runs [block] on the application scope, so closing the sheet mid-write can't lose the change or its toast, then
      * reports the outcome and nudges the sync loop. A store failure (disk full, corruption) becomes
-     * Rejected(TRY_AGAIN) instead of reaching the sheet's scope and killing the app. A save's refusal is the sheet's
+     * Rejected(Tablet) instead of reaching the sheet's scope and killing the app. A save's refusal is the sheet's
      * to show; if the sheet stops waiting (it was closed), the editor toasts it instead.
      */
     private suspend fun onAppScope(
@@ -268,7 +265,7 @@ class CalendarEditor internal constructor(
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Couldn't save a ${kind.name} (${e::class.simpleName})")
-                EditResult.Rejected(TRY_AGAIN)
+                EditResult.Rejected(WriteProblem.Tablet)
             }
             report(kind, label, result, added)
             // A sync pass already in flight may briefly put back the old mirror; the pass this asks for corrects it.
@@ -279,7 +276,7 @@ class CalendarEditor internal constructor(
             job.await()
         } catch (e: CancellationException) {
             if (kind == ChangeKind.CREATE || kind == ChangeKind.UPDATE) {
-                scope.launch { (job.await() as? EditResult.Rejected)?.let { toaster.show(couldNotSave(label, it.message), urgent = true) } }
+                scope.launch { (job.await() as? EditResult.Rejected)?.let { toaster.show(couldNotSave(label, it.problem), urgent = true) } }
             }
             throw e
         }
@@ -388,7 +385,7 @@ class CalendarEditor internal constructor(
                 }
                 EditResult.Done
             }
-            is WriteOutcome.Rejected -> EditResult.Rejected(outcome.message)
+            is WriteOutcome.Rejected -> EditResult.Rejected(WriteProblem.Refused(outcome.reason))
             is WriteOutcome.Retry -> {
                 // The reconnect chip shows at once rather than at the next sync (3a design §3.7).
                 if (outcome.needsSignIn) store.setHealth(to.connection.id, ConnectionHealth.NeedsSignIn, clock.nowMillis())
@@ -427,12 +424,12 @@ class CalendarEditor internal constructor(
         return EditResult.Queued
     }
 
-    /** A queued change already shows (a delete hides the event), so it reads as done too. */
+    /** A queued change already shows (a delete hides the event), so it reads as done too. A failed delete says delete. */
     private fun report(kind: ChangeKind, label: String, result: EditResult, added: String) {
         val saved = result == EditResult.Done || result == EditResult.Queued
         when {
-            result is EditResult.Rejected && (kind == ChangeKind.DELETE || kind == ChangeKind.ASSIGN) ->
-                toaster.show(couldNotSave(label, result.message), urgent = true)
+            result is EditResult.Rejected && kind == ChangeKind.DELETE -> toaster.show(couldNotDelete(label, result.problem), urgent = true)
+            result is EditResult.Rejected && kind == ChangeKind.ASSIGN -> toaster.show(couldNotSave(label, result.problem), urgent = true)
             saved && kind == ChangeKind.DELETE -> toaster.show(EVENT_DELETED)
             saved && kind == ChangeKind.CREATE -> toaster.show(added)
             saved && kind == ChangeKind.UPDATE -> toaster.show(CHANGES_SAVED)

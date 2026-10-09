@@ -124,7 +124,7 @@ class PinPadTest {
     fun wrongPinShowsTheErrorLineWithEmptyDigits() {
         controller.open("Change settings", PinError.WrongPin, null)
         show()
-        compose.onNodeWithText("Wrong PIN — try again").assertExists()
+        compose.onNodeWithText("Wrong PIN — try again.").assertExists()
     }
 
     @Test
@@ -185,8 +185,16 @@ class PinPadTest {
     }
 
     @Test
+    fun thePinPadsLinesAreSentencesInFullWords() {
+        assertThat(tooManyTries(30)).isEqualTo("Too many tries — wait 30 seconds.")
+        assertThat(tooManyTries(1)).isEqualTo("Too many tries — wait 1 second.")
+        assertThat(WRONG_PIN).isEqualTo("Wrong PIN — try again.")
+        assertThat(pinReasonText(PinReason.ContinueSetup, "x")).isEqualTo("Enter your PIN to carry on setting up.")
+    }
+
+    @Test
     fun theCarryOnReasonIsTheWizardsOwnLine() {
-        assertThat(pinReasonText(PinReason.ContinueSetup, "Change settings")).isEqualTo("Enter your PIN to carry on setting up")
+        assertThat(pinReasonText(PinReason.ContinueSetup, "Change settings")).isEqualTo("Enter your PIN to carry on setting up.")
     }
 
     @Test

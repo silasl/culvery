@@ -46,16 +46,25 @@ internal const val REMOVE_PIN = "Remove PIN"
 internal const val SAVE_PERSON = "Save person"
 internal const val SAVE_CHANGES = "Save changes"
 internal const val REMOVE_PERSON = "Remove person"
-internal const val COLOUR_TAKEN = "That colour is taken."
+internal const val COLOUR_TAKEN = "That colour is taken — choose another."
 internal const val PIN_TAKEN = "That PIN is taken — choose another."
 internal const val ADMIN_NEEDS_PIN = "An Admin needs a PIN."
 internal const val NEEDS_AN_ADMIN = "Culvery needs at least one Admin with a PIN."
 
 internal fun someoneCalled(name: String): String = "Someone is already called $name."
 
+// A failure names what wasn't saved (4d-2 §7.2).
+internal fun couldNotSaveDetails(name: String?): String =
+    if (name == null) "Couldn’t save this person — try again." else "Couldn’t save $name’s details — try again."
+
+internal fun couldNotMove(name: String): String = "Couldn’t move $name — try again."
+
+internal const val YOUR_DETAILS_NOT_SAVED = "Couldn’t save your details — try again."
+internal const val HOME_NOT_SAVED = "Couldn’t save the home location — try again."
+
 internal fun removeQuestion(name: String): String = "Remove $name? $name’s events and calendars show as Family."
 
-internal fun removed(name: String): String = "$name removed"
+internal fun removed(name: String): String = "$name removed."
 
 // 4c design §7.1.
 internal fun moveUpLabel(name: String): String = "Move $name up"
@@ -68,9 +77,9 @@ internal const val ALREADY_LAST = "already last"
 /** The wizard's dots, spoken: "Step 3 of 7". */
 internal fun stepOf(index: Int, count: Int): String = "Step ${index + 1} of $count"
 
-internal fun movedUp(name: String): String = "$name moved up"
+internal fun movedUp(name: String): String = "$name moved up."
 
-internal fun movedDown(name: String): String = "$name moved down"
+internal fun movedDown(name: String): String = "$name moved down."
 
 // What a tap does, for TalkBack: after "double-tap to", in lower case.
 internal fun changeDetailsLabel(name: String): String = "change $name’s details"

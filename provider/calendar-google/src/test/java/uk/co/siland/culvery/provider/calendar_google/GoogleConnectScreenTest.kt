@@ -19,6 +19,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
+import uk.co.siland.culvery.capability.calendar.couldNotConnect
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 
@@ -174,6 +175,6 @@ class GoogleConnectScreenTest {
         var cancelled = 0
         screen { provider.ConnectScreen(existing = null, onConnected = {}, onCancel = { cancelled++ }) }
         compose.waitUntil(5_000) { cancelled == 1 }
-        assertThat(toasts.messages).containsExactly("Couldn’t connect to Google Calendar — try again")
+        assertThat(toasts.messages).containsExactly(couldNotConnect("Google Calendar", unreachable = false))
     }
 }

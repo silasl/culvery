@@ -26,12 +26,12 @@ internal fun degrees(celsius: Double): String = "${celsius.roundToInt()}°"
 
 internal fun highLow(high: Double, low: Double): String = "High ${degrees(high)} · Low ${degrees(low)}"
 
-/** "Updated 3 h ago" once the data is past [STALE_AFTER_MS] old, else null (§4.2). */
+/** "Updated 3 hours ago" once the data is past [STALE_AFTER_MS] old, else null (§4.2). */
 internal fun updatedAgo(fetchedAtMillis: Long, nowMillis: Long): String? {
     val age = nowMillis - fetchedAtMillis
     if (age <= STALE_AFTER_MS) return null
     val hours = age / HOUR_MS
-    if (hours < HOURS_IN_DAY) return "Updated $hours h ago"
+    if (hours < HOURS_IN_DAY) return "Updated $hours hours ago"
     val days = hours / HOURS_IN_DAY
     return if (days == 1L) "Updated 1 day ago" else "Updated $days days ago"
 }

@@ -126,7 +126,7 @@ class ForecastCardTest {
         compose.onNodeWithTag("weather_age").assertDoesNotExist()
         now = fetched + 3 * hour
         ticks.value = now
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Updated 3 h ago").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Updated 3 hours ago").fetchSemanticsNodes().isNotEmpty() }
     }
 
     @Test

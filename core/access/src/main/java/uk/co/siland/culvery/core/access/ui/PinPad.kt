@@ -106,9 +106,9 @@ private const val SETTINGS_MARGIN_MS = 1_000L
 
 internal const val ENTER_YOUR_PIN = "Enter your PIN"
 
-internal const val WRONG_PIN = "Wrong PIN — try again"
+internal const val WRONG_PIN = "Wrong PIN — try again."
 
-internal fun tooManyTries(seconds: Int): String = "Too many tries — wait ${seconds}s"
+internal fun tooManyTries(seconds: Int): String = "Too many tries — wait ${if (seconds == 1) "1 second" else "$seconds seconds"}."
 
 /** "2 of 4 digits entered": the dots, spoken, never the digits themselves. */
 internal fun digitsEntered(count: Int): String = "$count of ${PinHasher.PIN_LENGTH} digits entered"

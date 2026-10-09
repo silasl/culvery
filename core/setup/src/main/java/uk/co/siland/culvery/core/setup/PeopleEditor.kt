@@ -58,18 +58,18 @@ class PeopleEditor @Inject constructor(
     suspend fun add(draft: PersonDraft): PeopleOutcome {
         if (draft.role == Role.ADMIN && draft.newPin == null) return PeopleOutcome.Refused(ADMIN_NEEDS_PIN)
         access.authorise(CorePermissions.PEOPLE_MANAGE) ?: return PeopleOutcome.Cancelled
-        return saving { pins.addPerson(draft.name, draft.color, draft.role, draft.newPin) }
+        return saving(couldNotSaveDetails(draft.name.trim().ifEmpty { null })) { pins.addPerson(draft.name, draft.color, draft.role, draft.newPin) }
     }
 
     suspend fun save(id: PersonId, draft: PersonDraft): PeopleOutcome {
-        val before = orNull { household.member(id) } ?: return PeopleOutcome.Refused(COULD_NOT_SAVE)
+        val before = orNull { household.member(id) } ?: return PeopleOutcome.Refused(couldNotSaveDetails(null))
         val roleChanged = draft.role != before.role
         val pinChanged = draft.newPin != null || draft.removePin
         val keepsAPin = draft.newPin != null || (before.hasPin && !draft.removePin)
         if (draft.role == Role.ADMIN && !keepsAPin) return PeopleOutcome.Refused(ADMIN_NEEDS_PIN)
         val permission = if (roleChanged || pinChanged) CorePermissions.PEOPLE_MANAGE else CorePermissions.SETTINGS_MANAGE
         access.authorise(permission) ?: return PeopleOutcome.Cancelled
-        val outcome = saving {
+        val outcome = saving(couldNotSaveDetails(before.person.name)) {
             val pin = when {
                 draft.newPin != null -> pins.changeTo(draft.newPin, owner = id)
                 draft.removePin -> PinChange.Remove
@@ -82,9 +82,9 @@ class PeopleEditor @Inject constructor(
     }
 
     suspend fun remove(id: PersonId): PeopleOutcome {
-        val name = orNull { household.person(id)?.name } ?: return PeopleOutcome.Refused(COULD_NOT_SAVE)
+        val name = orNull { household.person(id)?.name } ?: return PeopleOutcome.Refused(couldNotSaveDetails(null))
         access.authorise(CorePermissions.PEOPLE_MANAGE) ?: return PeopleOutcome.Cancelled
-        val outcome = saving { household.removePerson(id) }
+        val outcome = saving(couldNotSaveDetails(name)) { household.removePerson(id) }
         if (outcome == PeopleOutcome.Done) {
             lockIfSignedIn(id)
             toaster.show(removed(name))
@@ -101,7 +101,7 @@ class PeopleEditor @Inject constructor(
         }
         access.authorise(CorePermissions.SETTINGS_MANAGE) ?: return PeopleOutcome.Cancelled
         var moved = false
-        val outcome = saving { moved = household.move(id, up) }
+        val outcome = saving(couldNotMove(name)) { moved = household.move(id, up) }
         when {
             outcome is PeopleOutcome.Refused -> toaster.show(outcome.message, urgent = true)
             moved -> toaster.show(if (up) movedUp(name) else movedDown(name))
@@ -116,7 +116,7 @@ class PeopleEditor @Inject constructor(
         if (isSignedIn(id)) access.lock()
     }
 
-    private suspend fun saving(block: suspend () -> Unit): PeopleOutcome =
+    private suspend fun saving(failure: String, block: suspend () -> Unit): PeopleOutcome =
         try {
             block()
             PeopleOutcome.Done
@@ -132,7 +132,7 @@ class PeopleEditor @Inject constructor(
             PeopleOutcome.Refused(NEEDS_AN_ADMIN)
         } catch (e: Exception) {
             failed(e)
-            PeopleOutcome.Refused(COULD_NOT_SAVE)
+            PeopleOutcome.Refused(failure)
         }
 
     private suspend fun <T> orNull(block: suspend () -> T?): T? =

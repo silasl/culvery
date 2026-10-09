@@ -43,6 +43,7 @@ import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
 import uk.co.siland.culvery.capability.calendar.stubEditor
 import uk.co.siland.culvery.capability.calendar.testAccess
+import uk.co.siland.culvery.capability.calendar.couldNotConnect
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -130,7 +131,7 @@ class CalendarConnectHostTest {
         show(existing = null)
         assertThat(overlay.closesWhenIdle).isFalse()
         waitFor { access.toasts.messages.isNotEmpty() }
-        assertThat(access.toasts.messages).containsExactly("Google Calendar connected")
+        assertThat(access.toasts.messages).containsExactly("Google Calendar connected.")
         assertThat(overlay.dismissed).isEqualTo(1)
         runBlocking { assertThat(store.master().first()?.source?.id).isEqualTo("family@example.com") }
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
@@ -145,7 +146,7 @@ class CalendarConnectHostTest {
         show(existing = null)
         waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.requests.map { it.label }).containsExactly(SETTINGS_LABEL, CONNECT_LABEL).inOrder()
-        assertThat(access.toasts.messages).containsExactly("Google Calendar connected")
+        assertThat(access.toasts.messages).containsExactly("Google Calendar connected.")
     }
 
     @Test
@@ -166,7 +167,7 @@ class CalendarConnectHostTest {
         compose.onNodeWithText("Connect Google Calendar").performClick()
         waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
-        assertThat(access.toasts.messages).containsExactly("Google Calendar connected")
+        assertThat(access.toasts.messages).containsExactly("Google Calendar connected.")
     }
 
     @Test
@@ -178,7 +179,7 @@ class CalendarConnectHostTest {
         compose.onNodeWithTag("settings_connect_calendar.google").performClick()
         waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
-        assertThat(access.toasts.messages).containsExactly("Google Calendar connected")
+        assertThat(access.toasts.messages).containsExactly("Google Calendar connected.")
     }
 
     @Test
@@ -194,7 +195,7 @@ class CalendarConnectHostTest {
         compose.onNodeWithTag("settings_reconnect").performClick()
         waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
-        assertThat(access.toasts.messages).containsExactly("Google Calendar reconnected")
+        assertThat(access.toasts.messages).containsExactly("Google Calendar reconnected.")
     }
 
     private fun showSettingsCalendars() {
@@ -286,7 +287,7 @@ class CalendarConnectHostTest {
         access.answer(TestAccess.ALEX)
         show(existing = googleConnection)
         waitFor { access.toasts.messages.isNotEmpty() }
-        assertThat(access.toasts.messages).containsExactly("Google Calendar reconnected")
+        assertThat(access.toasts.messages).containsExactly("Google Calendar reconnected.")
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
         runBlocking { assertThat(store.connectionsNow().single().health).isEqualTo(ConnectionHealth.Ok) }
     }
@@ -298,7 +299,7 @@ class CalendarConnectHostTest {
         access.answer(TestAccess.ALEX)
         show(existing = null)
         waitFor { access.toasts.messages.isNotEmpty() }
-        assertThat(access.toasts.messages).containsExactly("Couldn’t connect to Google Calendar — try again")
+        assertThat(access.toasts.messages).containsExactly(couldNotConnect("Google Calendar", unreachable = true))
         assertThat(overlay.dismissed).isEqualTo(1)
         runBlocking { assertThat(store.connectionsNow()).isEmpty() }
     }
@@ -334,7 +335,7 @@ class CalendarConnectHostTest {
         waitFor { compose.onAllNodesWithText("Google needs reconnecting").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Google needs reconnecting").performClick()
         waitFor { access.toasts.messages.isNotEmpty() }
-        assertThat(access.toasts.messages).containsExactly("Google Calendar reconnected")
+        assertThat(access.toasts.messages).containsExactly("Google Calendar reconnected.")
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
         runBlocking {
             assertThat(store.connectionsNow().associate { it.connection.id to it.health })
