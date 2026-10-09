@@ -1,18 +1,21 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -185,5 +188,43 @@ class PickersTest {
     fun theTimePickerIsAPane() {
         showTime(LocalTime.of(9, 0))
         compose.onNodeWithTag("time_picker").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Pick a time"))
+    }
+
+    @Test
+    fun aDateCellSaysItsDayAndWhetherItIsToday() {
+        showDates(selected = today.plusDays(1))
+        compose.onNodeWithTag("date_cell_$today")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Wednesday 23 September, today")))
+            .assert(isButton)
+        compose.onNodeWithContentDescription("Thursday 24 September").assertIsSelected()
+        compose.assertAccessible()
+    }
+
+    /** TalkBack's double-tap is the semantics action: it must pick the day as a touch does. */
+    @Test
+    fun aDateCellIsPickedFromTalkBack() {
+        showDates()
+        compose.onNodeWithTag("date_cell_${today.plusDays(2)}").performSemanticsAction(SemanticsActions.OnClick)
+        assertThat(picked).containsExactly(today.plusDays(2))
+    }
+
+    @Test
+    fun theRangeLineIsSpokenWhenItChanges() {
+        showDates()
+        compose.onNodeWithTag("date_next").performClick()
+        compose.onNodeWithTag("date_range")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+            .assertTextEquals("Mon 26 Oct – Sun 29 Nov")
+    }
+
+    @Test
+    fun eachStepperValueIsSpokenWithItsNameAndNoLeadingZero() {
+        showTime(LocalTime.of(7, 0))
+        compose.onNodeWithTag("hour_value")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Hour 7")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        compose.onNodeWithTag("hour_up").performClick()
+        compose.onNodeWithTag("hour_value").assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Hour 8")))
+        compose.onNodeWithTag("minute_value").assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Minute 0")))
     }
 }

@@ -101,16 +101,39 @@ class PeopleUiTest {
     }
 
     @Test
-    fun theMoveButtonsMoveSomeoneAndNoneGoesPastAnEnd() {
+    fun theMoveButtonsMoveSomeoneAndTheEndsSayWhyTheyAreOff() {
         addSam()
         show()
         compose.awaitTag("person_up_Sam")
-        compose.onNodeWithTag("person_up_Alex").assertDoesNotExist()
-        compose.onNodeWithTag("person_down_Sam").assertDoesNotExist()
+        compose.onNodeWithTag("person_up_Alex").assertIsNotEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "already first"))
+        compose.onNodeWithTag("person_down_Sam").assertIsNotEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "already last"))
         compose.onNodeWithContentDescription("Move Sam up").performClick()
         compose.waitUntil(5_000) { runBlocking { household.people.first().map { it.name } } == listOf("Sam", "Alex") }
-        compose.waitUntil(5_000) { compose.onAllNodesWithTag("person_up_Sam").fetchSemanticsNodes().isEmpty() }
-        compose.onNodeWithTag("person_down_Sam").assertExists()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("person_up_Sam").fetchSemanticsNodes().singleOrNull()?.config?.contains(SemanticsProperties.Disabled) == true }
+        compose.onNodeWithTag("person_down_Sam").assertIsEnabled()
+    }
+
+    /** The row is keyed by the person, so TalkBack's focus moves with them, not with the position. */
+    @Test
+    fun movingSomeoneKeepsTheirRowAndItsActions() {
+        addSam()
+        show()
+        compose.awaitTag("person_Sam")
+        val samRow = compose.onNodeWithTag("person_Sam").fetchSemanticsNode()
+        assertThat(samRow.config[SemanticsActions.CustomActions].map { it.label }).containsExactly("Move Sam up")
+        compose.onNodeWithContentDescription("Move Sam up").performClick()
+        // singleOrNull: a fetch mid-recomposition must not throw out of waitUntil.
+        fun top(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().singleOrNull()?.boundsInRoot?.top
+        compose.waitUntil(5_000) {
+            val sam = top("person_Sam")
+            val alex = top("person_Alex")
+            sam != null && alex != null && sam < alex
+        }
+        assertThat(compose.onNodeWithTag("person_Sam").fetchSemanticsNode().id).isEqualTo(samRow.id)
+        assertThat(compose.onNodeWithTag("person_Sam").fetchSemanticsNode().config[SemanticsActions.CustomActions].map { it.label })
+            .containsExactly("Move Sam down")
     }
 
     @Test

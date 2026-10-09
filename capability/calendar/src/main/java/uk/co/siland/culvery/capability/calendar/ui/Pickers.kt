@@ -30,8 +30,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -132,7 +137,10 @@ internal fun DatePickerCard(today: LocalDate, selected: LocalDate, onPick: (Loca
                     pageRangeLabel(start),
                     style = CalendarType.pickerRange,
                     color = c.mute,
-                    modifier = Modifier.padding(top = CalendarDimens.pickerRangeTop).testTag("date_range"),
+                    modifier = Modifier
+                        .padding(top = CalendarDimens.pickerRangeTop)
+                        .testTag("date_range")
+                        .semantics { liveRegion = LiveRegionMode.Polite },
                 )
             }
             RoundButton(Icons.CHEVRON_LEFT, "Earlier weeks", "date_prev", on = ButtonSurface.Surf) { page-- }
@@ -221,7 +229,12 @@ private fun DateCell(date: LocalDate, today: LocalDate, selected: LocalDate, mod
             .clip(shape)
             .background(if (isSelected) c.accent else c.surf2)
             .then(if (date == today) Modifier.border(CalendarDimens.dateRing, c.accent, shape) else Modifier)
-            .hhClickable(onClick),
+            .hhClickable(onClick)
+            // After the click, so it clears only the number inside; one click serves a touch and TalkBack alike.
+            .clearAndSetSemantics {
+                contentDescription = dateCellName(date, today)
+                this.selected = isSelected
+            },
     ) {
         Text(dateCellLabel(date), style = CalendarType.pickerCell, color = if (isSelected) c.accentInk else c.ink, maxLines = 1)
     }
@@ -250,7 +263,16 @@ private fun Stepper(value: Int, tag: String, name: String, onUp: () -> Unit, onD
     val c = Culvery.colors
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(CalendarDimens.stepperGap)) {
         StepButton(Icons.EXPAND_LESS, "${tag}_up", "$name up", onUp)
-        Text(value.toString().padStart(2, '0'), style = CalendarType.timeValue, color = c.ink, modifier = Modifier.testTag("${tag}_value"))
+        Text(
+            value.toString().padStart(2, '0'),
+            style = CalendarType.timeValue,
+            color = c.ink,
+            // "Hour 7", not "zero seven"; spoken as it changes.
+            modifier = Modifier.testTag("${tag}_value").semantics {
+                contentDescription = "$name $value"
+                liveRegion = LiveRegionMode.Polite
+            },
+        )
         StepButton(Icons.EXPAND_MORE, "${tag}_down", "$name down", onDown)
     }
 }

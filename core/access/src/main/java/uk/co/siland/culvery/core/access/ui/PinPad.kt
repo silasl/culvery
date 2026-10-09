@@ -34,8 +34,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -74,6 +80,13 @@ fun PinPadHost(controller: PinPromptController, overSheet: Boolean = false) {
 
 internal const val ENTER_YOUR_PIN = "Enter your PIN"
 
+internal const val WRONG_PIN = "Wrong PIN — try again"
+
+internal fun tooManyTries(seconds: Int): String = "Too many tries — wait ${seconds}s"
+
+/** "2 of 4 digits entered": the dots, spoken, never the digits themselves. */
+internal fun digitsEntered(count: Int): String = "$count of ${PinHasher.PIN_LENGTH} digits entered"
+
 /**
  * Hand-off §7 PIN pad asking who's there. The `rgba(0,0,0,.5)` scrim covers the sheet's 600 dp when [overSheet],
  * otherwise the whole screen; the card is centred in it.
@@ -90,22 +103,26 @@ fun PinPadSheet(
 ) {
     // Counts down from the initial value rather than re-reading the wall clock, so tests with a
     // virtual frame clock stay deterministic.
-    val secondsLeft by produceState(secondsUntil(lockedUntilMillis), lockedUntilMillis) {
+    val firstSeconds = remember(lockedUntilMillis) { secondsUntil(lockedUntilMillis) }
+    val secondsLeft by produceState(firstSeconds, lockedUntilMillis) {
         while (value > 0) {
             delay(1_000)
             value -= 1
         }
     }
     val locked = secondsLeft > 0
+    val message = when {
+        locked -> tooManyTries(secondsLeft)
+        error is PinError.WrongPin -> WRONG_PIN
+        error is PinError.NotAllowed -> error.message
+        else -> ""
+    }
     PinPadFrame(
         title = "Who's this?",
         line = pinReasonText(reason, label),
-        message = when {
-            locked -> "Too many tries — wait ${secondsLeft}s"
-            error is PinError.WrongPin -> "Wrong PIN — try again"
-            error is PinError.NotAllowed -> error.message
-            else -> ""
-        },
+        message = message,
+        // Said once, from the lockout's first value: a line read every second would drown everything else.
+        spokenMessage = if (locked) tooManyTries(firstSeconds) else message,
         wrongPin = error is PinError.WrongPin,
         enabled = !locked,
         onSubmit = onSubmit,
@@ -165,6 +182,7 @@ fun PinPadFrame(
     title: String,
     line: String?,
     message: String,
+    spokenMessage: String = message,
     wrongPin: Boolean,
     enabled: Boolean,
     onSubmit: (String) -> Unit,
@@ -222,18 +240,28 @@ fun PinPadFrame(
                     Text(title, style = PinPadType.title, color = c.ink, modifier = Modifier.semantics { heading() })
                     if (line != null) Text(line, style = PinPadType.reason, color = c.mute, textAlign = TextAlign.Center)
                 }
-                Dots(filled = digits.length, error = wrongPin && digits.isEmpty())
-                Text(
-                    message,
-                    style = PinPadType.error,
-                    color = c.danger,
-                    // Two lines kept at every font scale, so the keypad doesn't jump when a message appears.
-                    minLines = 2,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.testTag("pin_error"),
-                )
+                Dots(filled = digits.length, error = if (wrongPin && digits.isEmpty()) message else null)
+                Box(
+                    Modifier
+                        .testTag("pin_message")
+                        .semantics {
+                            liveRegion = LiveRegionMode.Polite
+                            if (spokenMessage.isNotEmpty()) contentDescription = spokenMessage
+                        },
+                ) {
+                    Text(
+                        message,
+                        style = PinPadType.error,
+                        color = c.danger,
+                        // Two lines kept at every font scale, so the keypad doesn't jump when a message appears.
+                        minLines = 2,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        // The box above speaks it; this line's own text may tick.
+                        modifier = Modifier.testTag("pin_error").semantics { hideFromAccessibility() },
+                    )
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(PinPadDimens.keyRowGap)) {
                     listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9")).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(PinPadDimens.keyColumnGap)) {
@@ -281,17 +309,25 @@ fun PinPadFrame(
     }
 }
 
+/** [error], when set, rings the empty dots in `danger` and is read with them. */
 @Composable
-private fun Dots(filled: Int, error: Boolean) {
+private fun Dots(filled: Int, error: String?) {
     val c = Culvery.colors
-    Row(horizontalArrangement = Arrangement.spacedBy(PinPadDimens.dotGap), modifier = Modifier.testTag("pin_dots")) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(PinPadDimens.dotGap),
+        modifier = Modifier.testTag("pin_dots").clearAndSetSemantics {
+            contentDescription = digitsEntered(filled)
+            liveRegion = LiveRegionMode.Polite
+            if (error != null) error(error)
+        },
+    ) {
         repeat(PinHasher.PIN_LENGTH) { i ->
             val dot = Modifier.size(PinPadDimens.dot).clip(CircleShape)
             Box(
                 if (i < filled) {
                     dot.background(c.ink)
                 } else {
-                    dot.border(PinPadDimens.dotBorder, if (error) c.danger else c.mute, CircleShape)
+                    dot.border(PinPadDimens.dotBorder, if (error != null) c.danger else c.mute, CircleShape)
                 },
             )
         }

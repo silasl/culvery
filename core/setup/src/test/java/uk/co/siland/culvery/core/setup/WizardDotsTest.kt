@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -48,5 +50,15 @@ class WizardDotsTest {
         }
         assertThat(centre(2)).isEqualTo(LightColors.accent.toArgb())
         assertThat(centre(0)).isEqualTo(LightColors.bg.toArgb())
+    }
+
+    @Test
+    fun theDotsAreOneSpokenStep() {
+        compose.setContent {
+            CulveryTheme(dark = false) {
+                WizardFrame(7, 0, back = null, forward = Forward.Next("Start", enabled = true), busy = false, onForward = {}, onSkip = {}) {}
+            }
+        }
+        compose.onNodeWithTag("wizard_dots").assertContentDescriptionEquals("Step 1 of 7")
     }
 }

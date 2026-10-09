@@ -36,7 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import java.io.IOException
 import kotlinx.coroutines.flow.combine
@@ -132,8 +133,9 @@ private fun Steps(steps: List<SetupStep>, statuses: List<StepStatus>, current: I
         }
     }
     WizardFrame(
-        dotCount = WizardRules.dotCount(statuses),
-        dotIndex = WizardRules.dotIndex(index, statuses),
+        // Every step, shown or not, so the total doesn't grow when Review calendars appears.
+        dotCount = statuses.size,
+        dotIndex = index,
         back = WizardRules.previousShown(index, statuses)?.let { previous -> { goTo(previous) } },
         forward = WizardRules.forward(step.skippable, step.nextLabel, statuses[index]),
         busy = action.busy,
@@ -204,14 +206,14 @@ private fun Dots(count: Int, index: Int) {
     val c = Culvery.colors
     Row(
         horizontalArrangement = Arrangement.spacedBy(SetupDimens.dotGap, Alignment.CenterHorizontally),
-        modifier = Modifier.fillMaxWidth().testTag("wizard_dots"),
+        modifier = Modifier.fillMaxWidth().testTag("wizard_dots").semantics { contentDescription = stepOf(index, count) },
     ) {
         repeat(count) { i ->
             val current = i == index
             Box(
                 Modifier
                     .testTag("wizard_dot")
-                    .semantics { selected = current }
+                    .semantics { hideFromAccessibility() }
                     .size(SetupDimens.dot)
                     .clip(CircleShape)
                     .then(if (current) Modifier.background(c.accent) else Modifier.border(SetupDimens.dotOutline, c.mute, CircleShape)),

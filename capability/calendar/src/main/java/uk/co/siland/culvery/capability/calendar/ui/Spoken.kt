@@ -31,3 +31,6 @@ internal fun addEventOn(date: LocalDate): String = "Add event on ${date.format(F
 
 /** A day as a heading: "Today, Tuesday 6 October", "Tomorrow, Wednesday 7 October", "Thursday 8 October". */
 internal fun dayHeading(date: LocalDate, prefix: String? = null): String = listOfNotNull(prefix, date.format(FULL_DATE)).joinToString(", ")
+
+/** "Tuesday 7 October, today": a date cell's name (its selected state is the tree's). */
+internal fun dateCellName(date: LocalDate, today: LocalDate): String = dayHeading(date) + if (date == today) ", today" else ""

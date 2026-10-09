@@ -68,13 +68,6 @@ class WizardRulesTest {
     }
 
     @Test
-    fun theDotsCountOnlyShownSteps() {
-        val statuses = listOf(status(), status(shown = false), status(), status())
-        assertThat(WizardRules.dotCount(statuses)).isEqualTo(3)
-        assertThat(WizardRules.dotIndex(2, statuses)).isEqualTo(1)
-    }
-
-    @Test
     fun aSkippableStepNotDoneOffersSkipForNow() {
         assertThat(WizardRules.forward(skippable = true, "Next", status())).isEqualTo(Forward.Skip)
         assertThat(WizardRules.forward(skippable = true, "Next", status(done = true))).isEqualTo(Forward.Next("Next", enabled = true))

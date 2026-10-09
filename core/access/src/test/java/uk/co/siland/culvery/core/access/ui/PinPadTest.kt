@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.core.access.ui
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -206,5 +207,44 @@ class PinPadTest {
         controller.open("Change settings", null, null)
         show()
         compose.onNodeWithTag("pin_scrim").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Enter your PIN"))
+    }
+
+    private fun description(tag: String): String =
+        compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single()
+
+    @Test
+    fun theDotsSayHowManyDigitsAreInAndSpeakEachOne() {
+        controller.open("Change settings", null, null)
+        show()
+        assertThat(description("pin_dots")).isEqualTo("0 of 4 digits entered")
+        compose.onNodeWithTag("pin_dots").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        tap("1")
+        assertThat(description("pin_dots")).isEqualTo("1 of 4 digits entered")
+    }
+
+    @Test
+    fun aWrongPinIsAnErrorOnTheDotsAndItsMessageIsALiveRegion() {
+        controller.open("Change settings", PinError.WrongPin, null)
+        show()
+        compose.onNodeWithTag("pin_dots").assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, WRONG_PIN))
+        assertThat(description("pin_message")).isEqualTo(WRONG_PIN)
+        compose.onNodeWithTag("pin_message").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+    }
+
+    /** How many times TalkBack speaks it is the emulator's to hear; here, its spoken text never ticks. */
+    @Test
+    fun theLockoutsSpokenTextStaysFixedWhileItsSecondsTick() {
+        compose.mainClock.autoAdvance = false
+        // The pad takes the lockout's first value from the wall clock, as the existing lockout tests do; the ticking runs on the test clock.
+        controller.open("Change settings", PinError.WrongPin, System.currentTimeMillis() + 30_000)
+        show()
+        compose.mainClock.advanceTimeByFrame()
+        val spoken = description("pin_message")
+        val shown = compose.onNodeWithTag("pin_error", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single().text
+        compose.mainClock.advanceTimeBy(3_000)
+        assertThat(description("pin_message")).isEqualTo(spoken)
+        assertThat(compose.onNodeWithTag("pin_error", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single().text)
+            .isNotEqualTo(shown)
+        assertThat(spoken).startsWith("Too many tries")
     }
 }

@@ -5,22 +5,28 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import uk.co.siland.culvery.core.household.MAX_PEOPLE
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
+import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
@@ -38,13 +44,16 @@ import uk.co.siland.culvery.core.ui.rememberSingleAction
 internal fun PeopleList(members: List<Member>, onEdit: (Member) -> Unit, onAdd: (() -> Unit)?, onMove: ((Member, Boolean) -> Unit)?) {
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.rowGap), modifier = Modifier.testTag("people_list")) {
         members.forEachIndexed { i, member ->
-            PersonRow(
-                member,
-                reorderable = onMove != null,
-                onUp = if (onMove != null && i > 0) ({ onMove(member, true) }) else null,
-                onDown = if (onMove != null && i < members.lastIndex) ({ onMove(member, false) }) else null,
-                onClick = { onEdit(member) },
-            )
+            // Keyed by the person, so a move moves this row's node, and TalkBack's focus with it.
+            key(member.person.id) {
+                PersonRow(
+                    member,
+                    reorderable = onMove != null,
+                    onUp = if (onMove != null && i > 0) ({ onMove(member, true) }) else null,
+                    onDown = if (onMove != null && i < members.lastIndex) ({ onMove(member, false) }) else null,
+                    onClick = { onEdit(member) },
+                )
+            }
         }
         if (onAdd != null) HhButton(ADD_PERSON, onAdd, Modifier.testTag("people_add"), tone = ButtonTone.Primary, on = ButtonSurface.Bg)
     }
@@ -60,15 +69,19 @@ internal fun PersonRow(
 ) {
     val c = Culvery.colors
     val name = member.person.name
+    val moves = listOfNotNull(
+        onUp?.let { up -> CustomAccessibilityAction(moveUpLabel(name)) { up(); true } },
+        onDown?.let { down -> CustomAccessibilityAction(moveDownLabel(name)) { down(); true } },
+    )
     HhListRow(
         title = name,
-        modifier = Modifier.testTag("person_$name"),
+        modifier = Modifier.testTag("person_$name").semantics { if (moves.isNotEmpty()) customActions = moves },
         leading = { Box(Modifier.size(SetupDimens.rowDot).clip(CircleShape).background(Color(member.person.color))) },
         subtitle = "${roleName(member.role)} · ${if (member.hasPin) PIN_SET else NO_PIN}",
         trailing = {
             if (reorderable) {
-                MoveButton(Icons.ARROW_UPWARD, moveUpLabel(name), "person_up_$name", onUp)
-                MoveButton(Icons.ARROW_DOWNWARD, moveDownLabel(name), "person_down_$name", onDown)
+                MoveButton(Icons.ARROW_UPWARD, moveUpLabel(name), "person_up_$name", onUp, atEnd = ALREADY_FIRST)
+                MoveButton(Icons.ARROW_DOWNWARD, moveDownLabel(name), "person_down_$name", onDown, atEnd = ALREADY_LAST)
             }
             HhIcon(Icons.CHEVRON_RIGHT, size = ListRowTokens.icon, tint = c.mute)
         },
@@ -77,20 +90,18 @@ internal fun PersonRow(
     )
 }
 
-/** A Move up or Move down button; at the list's ends its empty space, so the buttons line up. */
+/** A Move up or Move down button; at the list's ends disabled and faint, saying why ([atEnd]), so focus has a place to stay. */
 @Composable
-private fun MoveButton(icon: String, label: String, tag: String, onClick: (() -> Unit)?) {
-    if (onClick == null) {
-        Spacer(Modifier.size(SetupDimens.moveButton))
-        return
-    }
+private fun MoveButton(icon: String, label: String, tag: String, onClick: (() -> Unit)?, atEnd: String) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .testTag(tag)
             .size(SetupDimens.moveButton)
+            .alpha(if (onClick == null) ControlTokens.DISABLED_ALPHA else 1f)
             .clip(CircleShape)
-            .hhClickable(onClick),
+            .then(if (onClick == null) Modifier.semantics { stateDescription = atEnd } else Modifier)
+            .hhClickable(onClick ?: {}, enabled = onClick != null),
     ) {
         HhIcon(icon, size = ListRowTokens.icon, tint = Culvery.colors.ink, contentDescription = label)
     }

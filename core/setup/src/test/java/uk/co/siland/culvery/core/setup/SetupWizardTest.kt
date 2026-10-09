@@ -8,6 +8,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -153,10 +154,11 @@ class SetupWizardTest {
     }
 
     @Test
-    fun itOpensAtTheFirstStepNotDoneWithADotForEachShownStep() {
+    fun itOpensAtTheFirstStepNotDoneWithADotForEveryStep() {
         show(FakeStep("a", 0, done = true), FakeStep("b", 1), FakeStep("c", 2, shown = false), FakeStep("d", 3))
         compose.awaitText("Step b")
-        compose.onAllNodesWithTag("wizard_dot").assertCountEquals(3)
+        compose.onAllNodesWithTag("wizard_dot").assertCountEquals(4)
+        compose.onNodeWithTag("wizard_dots").assertContentDescriptionEquals("Step 2 of 4")
     }
 
     @Test

@@ -62,6 +62,12 @@ internal fun moveUpLabel(name: String): String = "Move $name up"
 
 internal fun moveDownLabel(name: String): String = "Move $name down"
 
+internal const val ALREADY_FIRST = "already first"
+internal const val ALREADY_LAST = "already last"
+
+/** The wizard's dots, spoken: "Step 3 of 7". */
+internal fun stepOf(index: Int, count: Int): String = "Step ${index + 1} of $count"
+
 internal fun movedUp(name: String): String = "$name moved up"
 
 internal fun movedDown(name: String): String = "$name moved down"

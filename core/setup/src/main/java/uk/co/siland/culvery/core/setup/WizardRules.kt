@@ -32,11 +32,6 @@ internal object WizardRules {
 
     fun previousShown(from: Int, statuses: List<StepStatus>): Int? = (from - 1 downTo 0).firstOrNull { statuses[it].shown }
 
-    fun dotCount(statuses: List<StepStatus>): Int = statuses.count { it.shown }
-
-    /** [current]'s place among the shown steps. */
-    fun dotIndex(current: Int, statuses: List<StepStatus>): Int = statuses.take(current).count { it.shown }
-
     /** A skippable step that isn't done offers Skip for now; otherwise Next, enabled once the step can go on. */
     fun forward(skippable: Boolean, label: String, status: StepStatus): Forward =
         if (skippable && !status.done) Forward.Skip else Forward.Next(label, status.canGoOn || skippable)
