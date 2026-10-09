@@ -45,7 +45,7 @@ enum class ButtonSize { Regular, Large }
 enum class ButtonSurface { Bg, Surf, DangerSoft }
 
 /** The quiet and disabled fill on [on]. On light `bg` it is `surf`: `surf2` there is 1.04:1 and the button vanishes. */
-internal fun quietFill(on: ButtonSurface, colors: HhColors): Color = when (on) {
+fun quietFill(on: ButtonSurface, colors: HhColors): Color = when (on) {
     ButtonSurface.Bg -> if (colors.isLight) colors.surf else colors.surf2
     ButtonSurface.Surf -> colors.surf2
     ButtonSurface.DangerSoft -> colors.surf

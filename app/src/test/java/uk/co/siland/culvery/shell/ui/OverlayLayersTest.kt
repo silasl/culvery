@@ -7,6 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -147,5 +150,12 @@ class OverlayLayersTest {
         compose.onNodeWithTag("overlay_scrim").performTouchInput { click(Offset(10f, 10f)) }
         compose.onNodeWithTag("editor_sheet").assertDoesNotExist()
         assertThat(overlay.isShowing).isFalse()
+    }
+
+    @Test
+    fun theScrimIsSilent() {
+        showLayer()
+        compose.runOnIdle { overlay.show { Text("Sheet body") } }
+        compose.onNodeWithTag("overlay_scrim").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
     }
 }

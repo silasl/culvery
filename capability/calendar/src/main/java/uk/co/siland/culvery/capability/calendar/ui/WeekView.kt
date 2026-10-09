@@ -2,7 +2,6 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,7 +40,8 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import java.time.LocalDate
 import kotlinx.coroutines.delay
@@ -65,6 +65,7 @@ import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.hhClickable
 
 /** [weeksAhead]: how many weeks after this one [week] is (4c D10). */
 data class WeekViewState(
@@ -108,10 +109,10 @@ fun WeekView(
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekStepGap)) {
-                            RoundButton(Icons.CHEVRON_LEFT, "Earlier week", "week_earlier", enabled = state.weeksAhead > 0) {
+                            RoundButton(Icons.CHEVRON_LEFT, "Earlier week", "week_earlier", on = ButtonSurface.Bg, enabled = state.weeksAhead > 0) {
                                 onWeeksAhead(state.weeksAhead - 1)
                             }
-                            RoundButton(Icons.CHEVRON_RIGHT, "Later week", "week_later", enabled = state.weeksAhead < MAX_WEEKS_AHEAD) {
+                            RoundButton(Icons.CHEVRON_RIGHT, "Later week", "week_later", on = ButtonSurface.Bg, enabled = state.weeksAhead < MAX_WEEKS_AHEAD) {
                                 onWeeksAhead(state.weeksAhead + 1)
                             }
                         }
@@ -235,7 +236,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
     }
 }
 
-/** Hand-off §7: an `add` in `mute` at the foot of each column, in a tap area at least 48 dp tall. */
+/** Hand-off §7: an `add` in `mute` at the foot of each column, in a tap area at least 48 dp tall, named with its day. */
 @Composable
 private fun AddHint(date: LocalDate, onAdd: () -> Unit) {
     Box(
@@ -244,7 +245,8 @@ private fun AddHint(date: LocalDate, onAdd: () -> Unit) {
             .testTag("week_add_$date")
             .fillMaxWidth()
             .heightIn(min = CalendarDimens.addHintMinHeight)
-            .clickable(onClickLabel = "Add event", onClick = onAdd),
+            .semantics { contentDescription = addEventOn(date) }
+            .hhClickable(onAdd),
     ) {
         HhIcon(Icons.ADD, size = CalendarDimens.addHintIcon, tint = Culvery.colors.mute)
     }
@@ -258,7 +260,7 @@ private fun EventChip(event: EventUi, onOpen: (EventRef) -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(CalendarDimens.chipRadius))
             .background(Color(event.person.color).copy(alpha = HhAlpha.tint(c)))
-            .clickable(onClickLabel = "Open") { onOpen(event.ref) }
+            .hhClickable({ onOpen(event.ref) }, label = OPEN_EVENT_DETAILS)
             .padding(horizontal = CalendarDimens.chipPaddingH, vertical = CalendarDimens.chipPaddingV),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -316,7 +318,7 @@ private fun ReconnectChip(label: String, onClick: () -> Unit) {
             .height(CalendarDimens.touchTarget)
             .clip(RoundedCornerShape(CalendarDimens.pillRadius))
             .background(c.dangerSoft)
-            .clickable(role = Role.Button, onClick = onClick)
+            .hhClickable(onClick, label = RECONNECT_ACTION)
             .padding(horizontal = CalendarDimens.pillPaddingH),
     ) {
         HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.reconnectIcon, tint = c.danger)

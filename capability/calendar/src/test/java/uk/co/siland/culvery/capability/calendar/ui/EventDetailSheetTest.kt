@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -29,6 +30,7 @@ import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
+import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 @RunWith(AndroidJUnit4::class)
 class EventDetailSheetTest {
@@ -212,5 +214,22 @@ class EventDetailSheetTest {
     fun anUntaggedEventCanBeEdited() {
         show(SampleUi.detailUntagged)
         compose.onNodeWithTag("detail_edit").assertExists()
+    }
+
+    @Test
+    fun everyModeOfTheSheetPassesTheSharedCheck() {
+        show(SampleUi.detailEditable)
+        compose.assertAccessible()
+        mode = DetailMode.ConfirmingDelete
+        compose.assertAccessible()
+    }
+
+    @Test
+    fun theChipsToChooseWhoSayWhatATapDoes() {
+        mode = DetailMode.ChoosingPerson
+        show(SampleUi.detailUntagged)
+        val chip = compose.onNodeWithTag("assign_Alex").assert(isButton)
+        assertThat(chip.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("show as Alex’s event")
+        compose.assertAccessible()
     }
 }

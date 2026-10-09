@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.setup
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
@@ -184,5 +185,14 @@ class LocationPaneTest {
         advance(100)
         assertThat(saved).containsExactly(brighton)
         compose.onNodeWithText("Couldn't save — try again.").assertDoesNotExist()
+    }
+
+    @Test
+    fun aTownSaysATapMakesItHome() {
+        search.answer = { listOf(brighton) }
+        show()
+        type("Can")
+        advance(500)
+        assertThat(compose.onNodeWithTag("place_0").fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("use as home")
     }
 }

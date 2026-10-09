@@ -124,7 +124,9 @@ fun EventDetailSheet(
                             horizontalArrangement = Arrangement.spacedBy(CalendarDimens.personChipGap),
                             modifier = Modifier.horizontalScroll(rememberScrollState()),
                         ) {
-                            people.forEach { person -> HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy) { onAssign(person) } }
+                            people.forEach { person ->
+                                HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy, clickLabel = showAsEvent(person.name)) { onAssign(person) }
+                            }
                         }
                     } else {
                         HhButton(

@@ -2,7 +2,6 @@ package uk.co.siland.culvery.core.setup
 
 import android.util.Log
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import uk.co.siland.culvery.core.household.MAX_PEOPLE
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
@@ -29,6 +27,7 @@ import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
+import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 /**
@@ -74,6 +73,7 @@ internal fun PersonRow(
             HhIcon(Icons.CHEVRON_RIGHT, size = ListRowTokens.icon, tint = c.mute)
         },
         onClick = onClick,
+        clickLabel = changeDetailsLabel(name),
     )
 }
 
@@ -90,7 +90,7 @@ private fun MoveButton(icon: String, label: String, tag: String, onClick: (() ->
             .testTag(tag)
             .size(SetupDimens.moveButton)
             .clip(CircleShape)
-            .clickable(onClickLabel = label, role = Role.Button, onClick = onClick),
+            .hhClickable(onClick),
     ) {
         HhIcon(icon, size = ListRowTokens.icon, tint = Culvery.colors.ink, contentDescription = label)
     }

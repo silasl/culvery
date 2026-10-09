@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
 import uk.co.siland.culvery.capability.calendar.EventRef
@@ -38,6 +36,7 @@ import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.hhClickable
 
 /**
  * Hand-off Home "Today" card. [events] null while loading: shows nothing rather than a false "Nothing on today".
@@ -83,7 +82,7 @@ private fun AddCircle(onClick: () -> Unit) {
             .size(CalendarDimens.touchTarget)
             .clip(CircleShape)
             .background(c.accent)
-            .clickable(onClickLabel = "Add event", role = Role.Button, onClick = onClick),
+            .hhClickable(onClick),
     ) {
         HhIcon(Icons.ADD, size = CalendarDimens.todayAddIcon, tint = c.accentInk, contentDescription = "Add event")
     }
@@ -98,7 +97,7 @@ private fun TodayRow(event: EventUi, onOpen: (EventRef) -> Unit) {
             .height(IntrinsicSize.Min)
             .clip(RoundedCornerShape(CalendarDimens.todayRowRadius))
             .background(c.surf2)
-            .clickable(onClickLabel = "Open") { onOpen(event.ref) }
+            .hhClickable({ onOpen(event.ref) }, label = OPEN_EVENT_DETAILS)
             .padding(horizontal = CalendarDimens.todayRowPaddingH, vertical = CalendarDimens.todayRowPaddingV),
     ) {
         ColourBar(Color(event.person.color), width = CalendarDimens.todayBarWidth)

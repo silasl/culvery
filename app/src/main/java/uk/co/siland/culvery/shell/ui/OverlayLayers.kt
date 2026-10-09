@@ -1,10 +1,9 @@
 package uk.co.siland.culvery.shell.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,7 +63,7 @@ fun ShellLayers(
     }
 }
 
-/** The sheet layer: a scrim over the whole shell that dismisses on tap, and the content against the right edge. */
+/** The sheet layer: a scrim over the whole shell that dismisses on a tap, and the content against the right edge. */
 @Composable
 fun OverlayLayer(state: OverlayState) {
     val content = state.content ?: return
@@ -75,12 +73,8 @@ fun OverlayLayer(state: OverlayState) {
                 .fillMaxSize()
                 .testTag("overlay_scrim")
                 .background(ShellTokens.sheetScrim)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClickLabel = "Close",
-                    onClick = state::dismiss,
-                ),
+                // A gesture, not a clickable: TalkBack never lands on the scrim; every sheet has its own Close.
+                .pointerInput(state) { detectTapGestures { state.dismiss() } },
         )
         content()
     }

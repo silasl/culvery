@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -97,7 +96,7 @@ fun HhSheet(padding: PaddingValues, modifier: Modifier = Modifier, content: @Com
     )
 }
 
-/** 48 dp round `surf2` close button with a 26 dp `close` icon. */
+/** 48 dp round quiet button with a 26 dp `close` icon, named by its icon. Sheets are `bg`, so its fill is the quiet fill on `bg`. */
 @Composable
 fun HhCloseButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = Culvery.colors
@@ -107,8 +106,8 @@ fun HhCloseButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .testTag("sheet_close")
             .size(ShellTokens.closeButton)
             .clip(CircleShape)
-            .background(c.surf2)
-            .clickable(onClickLabel = "Close", onClick = onClick),
+            .background(quietFill(ButtonSurface.Bg, c))
+            .hhClickable(onClick),
     ) {
         HhIcon(Icons.CLOSE, size = ShellTokens.closeIcon, tint = c.ink, contentDescription = "Close")
     }

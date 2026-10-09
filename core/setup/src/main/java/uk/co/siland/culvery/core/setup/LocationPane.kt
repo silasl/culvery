@@ -140,5 +140,6 @@ private fun PlaceRow(label: String, ticked: Boolean, tag: String, onClick: (() -
         modifier = Modifier.testTag(tag).semantics(mergeDescendants = true) { selected = ticked },
         trailing = tick,
         onClick = onClick,
+        clickLabel = USE_AS_HOME,
     )
 }

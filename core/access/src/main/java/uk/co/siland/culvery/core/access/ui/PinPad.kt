@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +26,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.delay
@@ -46,6 +47,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
+import uk.co.siland.culvery.core.ui.hhClickable
 
 /** [overSheet]: a sheet is open, so the pad covers the sheet's area rather than the whole screen. */
 @Composable
@@ -172,16 +174,13 @@ fun PinPadFrame(
         if (digits.length == PinHasher.PIN_LENGTH) onSubmit(digits)
     }
 
+    val cancel by rememberUpdatedState(onCancel)
     Box(
         modifier = Modifier
             .fillMaxSize()
             .testTag("pin_scrim")
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClickLabel = "Cancel",
-                onClick = onCancel,
-            ),
+            // A gesture, not a clickable: TalkBack never lands on the scrim, which holds the card; the card has Cancel.
+            .pointerInput(Unit) { detectTapGestures { cancel() } },
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -242,6 +241,7 @@ fun PinPadFrame(
                                 .clickable(
                                     interactionSource = null,
                                     indication = ripple(bounded = false, radius = PinPadDimens.key / 2),
+                                    role = Role.Button,
                                     onClick = onCancel,
                                 ),
                         ) {
@@ -262,7 +262,7 @@ fun PinPadFrame(
                                 .testTag("pin_backspace")
                                 .size(PinPadDimens.key)
                                 .clip(CircleShape)
-                                .clickable(enabled = digits.isNotEmpty() && enabled) { digits = digits.dropLast(1) },
+                                .hhClickable({ digits = digits.dropLast(1) }, enabled = digits.isNotEmpty() && enabled),
                         ) {
                             HhIcon(Icons.BACKSPACE, size = PinPadDimens.backspaceIcon, tint = c.ink, contentDescription = "Delete last digit")
                         }
@@ -300,7 +300,7 @@ private fun DigitKey(digit: String, enabled: Boolean, onClick: () -> Unit) {
             .size(PinPadDimens.key)
             .clip(CircleShape)
             .background(c.surf2)
-            .clickable(enabled = enabled, onClick = onClick)
+            .hhClickable(onClick, enabled = enabled)
             .alpha(if (enabled) 1f else 0.4f),
     ) {
         Text(digit, style = PinPadType.digit, color = c.ink)

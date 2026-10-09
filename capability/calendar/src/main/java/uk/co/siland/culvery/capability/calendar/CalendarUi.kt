@@ -131,6 +131,9 @@ internal val SHORT_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d M
 internal val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
 internal val DAY_AND_MONTH: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMMM", Locale.ENGLISH)
 
+/** "Tuesday 7 October": how TalkBack names a day. */
+internal val FULL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
+
 /** How many weeks past this one the Calendar tab steps to (4c D10): four weeks in all, inside the synced window. */
 const val MAX_WEEKS_AHEAD = 3
 

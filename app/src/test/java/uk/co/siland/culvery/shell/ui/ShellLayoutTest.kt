@@ -10,7 +10,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.LastBaseline
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertTextEquals
@@ -23,6 +27,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
@@ -42,6 +47,7 @@ import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
+import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.SessionUi
 import uk.co.siland.culvery.shell.ShellUiState
@@ -147,10 +153,48 @@ class ShellLayoutTest {
     }
 
     @Test
-    fun signOutAnnouncesItsAction() {
+    fun signOutIsNamedOnce() {
         statusBar(SessionUi("Alex", "Admin"))
         val onClick = compose.onNodeWithTag("status_sign_out").fetchSemanticsNode().config[SemanticsActions.OnClick]
-        assertThat(onClick.label).isEqualTo("Sign out")
+        assertThat(onClick.label).isNull()
+        compose.assertAccessible()
+    }
+
+    private fun themeToggle(dark: Boolean, previewing: Boolean): Pair<String, String?> {
+        compose.setContent {
+            CulveryTheme(dark = dark) { StatusBar({ at }, dark = dark, previewing = previewing, session = null, onSignOut = {}, onToggleThemePreview = {}) }
+        }
+        val node = compose.onNodeWithTag("status_theme").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        val config = node.fetchSemanticsNode().config
+        return config[SemanticsProperties.ContentDescription].single() to config[SemanticsActions.OnClick].label
+    }
+
+    @Test
+    fun theThemeToggleOnAutoByDayOffersTheNightTheme() {
+        assertThat(themeToggle(dark = false, previewing = false)).isEqualTo("Theme: Auto" to "preview the night theme")
+    }
+
+    @Test
+    fun theThemeToggleOnAutoByNightOffersTheDayTheme() {
+        assertThat(themeToggle(dark = true, previewing = false)).isEqualTo("Theme: Auto" to "preview the day theme")
+    }
+
+    @Test
+    fun theThemeTogglePreviewingOffersTheWayBack() {
+        assertThat(themeToggle(dark = true, previewing = true)).isEqualTo("Theme: Night" to "go back to the automatic theme")
+    }
+
+    /** TalkBack's double-tap is the semantics action, not a touch: it must reach the same toggle. */
+    @Test
+    fun theThemeToggleWorksFromTalkBack() {
+        var toggles = 0
+        compose.setContent {
+            CulveryTheme(dark = false) { StatusBar({ at }, dark = false, previewing = false, session = null, onSignOut = {}, onToggleThemePreview = { toggles++ }) }
+        }
+        compose.onNodeWithTag("status_theme").performSemanticsAction(SemanticsActions.OnClick)
+        assertThat(toggles).isEqualTo(1)
+        compose.onNodeWithTag("status_theme").performClick()
+        assertThat(toggles).isEqualTo(2)
     }
 
     @Test

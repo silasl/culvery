@@ -2,6 +2,7 @@ package uk.co.siland.culvery.core.setup
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -36,6 +37,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.PersonPalette
+import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 /** The people list and sheet over the real editor; Alex is in the setup session, so no PIN pad shows. */
 @RunWith(AndroidJUnit4::class)
@@ -226,5 +228,15 @@ class PeopleUiTest {
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("person_message").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("person_message").assert(hasText("Couldn't save — try again."))
         assertNoSecretsLogged("PersonSheet", listOf("Sam"))
+    }
+
+    @Test
+    fun aPersonsRowSaysItChangesTheirDetailsAndTheMoveButtonsAreNamedOnce() {
+        addSam()
+        show()
+        compose.awaitTag("person_Sam")
+        assertThat(compose.onNodeWithTag("person_Sam").fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("change Sam’s details")
+        assertThat(compose.onNodeWithTag("person_up_Sam").fetchSemanticsNode().config[SemanticsActions.OnClick].label).isNull()
+        compose.assertAccessible()
     }
 }

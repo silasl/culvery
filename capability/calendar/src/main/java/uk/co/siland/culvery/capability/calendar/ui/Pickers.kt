@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +50,8 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
+import uk.co.siland.culvery.core.ui.hhClickable
+import uk.co.siland.culvery.core.ui.quietFill
 
 /** Which picker is drawn over the add/edit sheet. */
 enum class EditorPicker { None, Date, Time }
@@ -93,21 +95,18 @@ internal fun minuteStep(minute: Int, up: Boolean): Int = when {
     else -> Math.floorMod(minute - MINUTE_STEP, MINUTES_PER_HOUR)
 }
 
-/** Over the sheet only (2b-2 design D4): a scrim that cancels on tap, with [content] centred on it. */
+/** Over the sheet only (2b-2 design D4): a scrim that cancels on a tap, with [content] centred on it. */
 @Composable
 internal fun PickerLayer(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    val dismiss by rememberUpdatedState(onDismiss)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Box(
             Modifier
                 .fillMaxSize()
                 .testTag("picker_scrim")
                 .background(ShellTokens.pinScrim)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClickLabel = "Cancel",
-                    onClick = onDismiss,
-                ),
+                // A gesture, not a clickable: TalkBack never lands on the scrim; the card has Cancel.
+                .pointerInput(Unit) { detectTapGestures { dismiss() } },
         )
         content()
     }
@@ -133,8 +132,8 @@ internal fun DatePickerCard(today: LocalDate, selected: LocalDate, onPick: (Loca
                     modifier = Modifier.padding(top = CalendarDimens.pickerRangeTop).testTag("date_range"),
                 )
             }
-            RoundButton(Icons.CHEVRON_LEFT, "Earlier weeks", "date_prev") { page-- }
-            RoundButton(Icons.CHEVRON_RIGHT, "Later weeks", "date_next") { page++ }
+            RoundButton(Icons.CHEVRON_LEFT, "Earlier weeks", "date_prev", on = ButtonSurface.Surf) { page-- }
+            RoundButton(Icons.CHEVRON_RIGHT, "Later weeks", "date_next", on = ButtonSurface.Surf) { page++ }
         }
         Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.dateCellGap)) {
             Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.dateCellGap)) {
@@ -174,9 +173,9 @@ internal fun TimePickerCard(initial: LocalTime, onSet: (LocalTime) -> Unit, onCa
             horizontalArrangement = Arrangement.spacedBy(CalendarDimens.timeColumnGap, Alignment.CenterHorizontally),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Stepper(hour, "hour", onUp = { hour = hourStep(hour, up = true) }, onDown = { hour = hourStep(hour, up = false) })
+            Stepper(hour, "hour", "Hour", onUp = { hour = hourStep(hour, up = true) }, onDown = { hour = hourStep(hour, up = false) })
             Text(":", style = CalendarType.timeColon, color = c.ink, modifier = Modifier.padding(bottom = CalendarDimens.colonBottom))
-            Stepper(minute, "minute", onUp = { minute = minuteStep(minute, up = true) }, onDown = { minute = minuteStep(minute, up = false) })
+            Stepper(minute, "minute", "Minute", onUp = { minute = minuteStep(minute, up = true) }, onDown = { minute = minuteStep(minute, up = false) })
         }
         Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.timeButtonGap)) {
             HhButton("Cancel", onCancel, Modifier.weight(1f).testTag("picker_cancel"), size = ButtonSize.Large, on = ButtonSurface.Surf)
@@ -218,14 +217,15 @@ private fun DateCell(date: LocalDate, today: LocalDate, selected: LocalDate, mod
             .clip(shape)
             .background(if (isSelected) c.accent else c.surf2)
             .then(if (date == today) Modifier.border(CalendarDimens.dateRing, c.accent, shape) else Modifier)
-            .clickable(onClick = onClick),
+            .hhClickable(onClick),
     ) {
         Text(dateCellLabel(date), style = CalendarType.pickerCell, color = if (isSelected) c.accentInk else c.ink, maxLines = 1)
     }
 }
 
+/** A round quiet button named by its icon ([label]); its fill is the quiet fill on [on]. */
 @Composable
-internal fun RoundButton(icon: String, label: String, tag: String, enabled: Boolean = true, onClick: () -> Unit) {
+internal fun RoundButton(icon: String, label: String, tag: String, on: ButtonSurface, enabled: Boolean = true, onClick: () -> Unit) {
     val c = Culvery.colors
     Box(
         contentAlignment = Alignment.Center,
@@ -234,23 +234,24 @@ internal fun RoundButton(icon: String, label: String, tag: String, enabled: Bool
             .size(CalendarDimens.pageButton)
             .alpha(if (enabled) 1f else CalendarDimens.DISABLED_ALPHA)
             .clip(CircleShape)
-            .background(c.surf2)
-            .clickable(enabled = enabled, onClickLabel = label, onClick = onClick),
+            .background(quietFill(on, c))
+            .hhClickable(onClick, enabled = enabled),
     ) {
         HhIcon(icon, size = CalendarDimens.pageButtonIcon, tint = c.ink, contentDescription = label)
     }
 }
 
 @Composable
-private fun Stepper(value: Int, name: String, onUp: () -> Unit, onDown: () -> Unit) {
+private fun Stepper(value: Int, tag: String, name: String, onUp: () -> Unit, onDown: () -> Unit) {
     val c = Culvery.colors
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(CalendarDimens.stepperGap)) {
-        StepButton(Icons.EXPAND_LESS, "${name}_up", "More", onUp)
-        Text(value.toString().padStart(2, '0'), style = CalendarType.timeValue, color = c.ink, modifier = Modifier.testTag("${name}_value"))
-        StepButton(Icons.EXPAND_MORE, "${name}_down", "Less", onDown)
+        StepButton(Icons.EXPAND_LESS, "${tag}_up", "$name up", onUp)
+        Text(value.toString().padStart(2, '0'), style = CalendarType.timeValue, color = c.ink, modifier = Modifier.testTag("${tag}_value"))
+        StepButton(Icons.EXPAND_MORE, "${tag}_down", "$name down", onDown)
     }
 }
 
+/** On the picker card (`surf`), so the quiet fill on `surf`. */
 @Composable
 private fun StepButton(icon: String, tag: String, label: String, onClick: () -> Unit) {
     val c = Culvery.colors
@@ -260,8 +261,8 @@ private fun StepButton(icon: String, tag: String, label: String, onClick: () -> 
             .testTag(tag)
             .size(CalendarDimens.stepperWidth, CalendarDimens.stepperHeight)
             .clip(RoundedCornerShape(CalendarDimens.stepperRadius))
-            .background(c.surf2)
-            .clickable(onClickLabel = label, onClick = onClick),
+            .background(quietFill(ButtonSurface.Surf, c))
+            .hhClickable(onClick),
     ) {
         HhIcon(icon, size = CalendarDimens.stepperIcon, tint = c.ink, contentDescription = label)
     }

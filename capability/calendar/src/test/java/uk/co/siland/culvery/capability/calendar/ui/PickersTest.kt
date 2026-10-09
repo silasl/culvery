@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -9,6 +10,7 @@ import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -21,6 +23,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 @RunWith(AndroidJUnit4::class)
 class PickersTest {
@@ -146,5 +149,21 @@ class PickersTest {
         compose.onNodeWithTag("picker_cancel").performClick()
         assertThat(set).isEmpty()
         assertThat(cancelled).isEqualTo(1)
+    }
+
+    @Test
+    fun theDatePickersScrimIsSilentAndEveryControlIsNamed() {
+        showDates()
+        compose.onNodeWithTag("picker_scrim").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        compose.onNodeWithContentDescription("Earlier weeks").assert(isButton)
+        assertThat(compose.onNodeWithTag("date_prev").fetchSemanticsNode().config[SemanticsActions.OnClick].label).isNull()
+        compose.assertAccessible()
+    }
+
+    @Test
+    fun theStepButtonsSayWhichValueAndWhichWay() {
+        showTime(LocalTime.of(9, 0))
+        listOf("Hour up", "Hour down", "Minute up", "Minute down").forEach { compose.onNodeWithContentDescription(it).assert(isButton) }
+        compose.assertAccessible()
     }
 }

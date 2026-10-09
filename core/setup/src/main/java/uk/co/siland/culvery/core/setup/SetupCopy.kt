@@ -62,6 +62,11 @@ internal fun movedUp(name: String): String = "$name moved up"
 
 internal fun movedDown(name: String): String = "$name moved down"
 
+// What a tap does, for TalkBack: after "double-tap to", in lower case.
+internal fun changeDetailsLabel(name: String): String = "change $name’s details"
+
+internal const val USE_AS_HOME = "use as home"
+
 internal fun roleName(role: Role): String = when (role) {
     Role.ADMIN -> "Admin"
     Role.ADULT -> "Adult"

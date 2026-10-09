@@ -1,6 +1,11 @@
 package uk.co.siland.culvery.core.access.ui
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertWidthIsEqualTo
@@ -24,6 +29,7 @@ import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.pinReasonText
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -174,5 +180,16 @@ class PinPadTest {
     @Test
     fun theCarryOnReasonIsTheWizardsOwnLine() {
         assertThat(pinReasonText(PinReason.ContinueSetup, "Change settings")).isEqualTo("Enter your PIN to carry on setting up")
+    }
+
+    @Test
+    fun theScrimIsSilentAndEveryKeyIsANamedButton() {
+        controller.open("Change settings", null, null)
+        show()
+        compose.onNodeWithTag("pin_scrim").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        listOf("pin_key_5", "pin_cancel", "pin_backspace").forEach {
+            compose.onNodeWithTag(it).assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        }
+        compose.assertAccessible()
     }
 }

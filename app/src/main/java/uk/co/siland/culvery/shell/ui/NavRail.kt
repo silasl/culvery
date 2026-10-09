@@ -26,6 +26,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.TabItem
 
@@ -64,7 +65,7 @@ fun NavRail(
                 .size(80.dp)
                 .clip(RoundedCornerShape(26.dp))
                 .background(c.surf2)
-                .clickable(onClick = onOpenSettings),
+                .hhClickable(onOpenSettings),
         ) {
             HhIcon(Icons.SETTINGS, size = 30.dp, tint = c.ink)
             Text("Settings", style = HhType.labelSmall, color = c.ink)

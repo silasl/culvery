@@ -38,6 +38,7 @@ import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 @RunWith(AndroidJUnit4::class)
 class ForecastCardTest {
@@ -132,5 +133,11 @@ class ForecastCardTest {
         compose.onNodeWithText("Forecast").assertExists()
         compose.onNodeWithText("No forecast yet — check the tablet’s Wi-Fi.").assertExists()
         compose.onNodeWithText("Getting the forecast…").assertDoesNotExist()
+    }
+
+    @Test
+    fun theNoLocationCardPassesTheSharedCheck() {
+        show(WeatherView.NoLocation)
+        compose.assertAccessible()
     }
 }

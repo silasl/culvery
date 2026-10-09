@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -30,6 +31,7 @@ import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 /** Native graphics: the sized tests check that rows fit the real card sizes, which needs real text metrics. */
 @RunWith(AndroidJUnit4::class)
@@ -179,5 +181,29 @@ class CardsTest {
         show { ComingUpCard(SampleUi.comingUp) }
         compose.onNodeWithText("09:00–17:00 · Alex").assertExists()
         compose.onNodeWithText("12:30–13:30 · Sam").assertExists()
+    }
+
+    private fun clickLabel(node: androidx.compose.ui.test.SemanticsNodeInteraction): String? =
+        node.fetchSemanticsNode().config[SemanticsActions.OnClick].label
+
+    @Test
+    fun todayRowsSayTheyOpenTheirEventAndThePlusIsNamedOnce() {
+        show { TodayCard(SampleUi.todayWithBadges, onAdd = {}) }
+        val row = compose.onNodeWithText("Dinner with Jo & Priya").assert(isButton)
+        assertThat(clickLabel(row)).isEqualTo("open event details")
+        assertThat(clickLabel(compose.onNodeWithTag("today_add").assert(isButton))).isNull()
+        compose.assertAccessible()
+    }
+
+    @Test
+    fun theOtherHomeCardsPassTheSharedCheck() {
+        show { ComingUpCard(SampleUi.comingUp) }
+        compose.assertAccessible()
+    }
+
+    @Test
+    fun theConnectCardPassesTheSharedCheck() {
+        show { ConnectCalendarCard(connectService = "Google Calendar", onConnect = {}) }
+        compose.assertAccessible()
     }
 }

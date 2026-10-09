@@ -190,7 +190,7 @@ fun HhTextField(
 
 /** Hand-off §7 person chip: a chip's size and shape, `surf`, a 12 dp dot in the person's [color] 8 from their [name]. */
 @Composable
-fun HhPersonChip(name: String, color: Color, tag: String, enabled: Boolean, onClick: () -> Unit) {
+fun HhPersonChip(name: String, color: Color, tag: String, enabled: Boolean, clickLabel: String? = null, onClick: () -> Unit) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -200,7 +200,7 @@ fun HhPersonChip(name: String, color: Color, tag: String, enabled: Boolean, onCl
             .height(ControlTokens.chipHeight)
             .clip(RoundedCornerShape(ControlTokens.chipRadius))
             .background(c.surf)
-            .clickable(enabled = enabled, onClick = onClick)
+            .hhClickable(onClick, label = clickLabel, enabled = enabled)
             .padding(horizontal = ControlTokens.chipPaddingH),
     ) {
         Box(Modifier.size(ControlTokens.chipDot).clip(CircleShape).background(color))
