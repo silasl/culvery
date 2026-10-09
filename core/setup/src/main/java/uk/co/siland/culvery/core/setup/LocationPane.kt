@@ -57,7 +57,7 @@ private fun HomeLocation?.isAt(place: PlaceMatch): Boolean =
 
 /**
  * 4a design §4.3: the town search and its results, the saved home ticked. A new query cancels the search before it, and
- * with it the request. [showCurrent] (Settings) lists the saved home above the field. [save] stores the chosen town and
+ * with it the request. It says "Searching…" through the pause and the request, and a failed search offers Try again. [showCurrent] (Settings) lists the saved home above the field. [save] stores the chosen town and
  * says whether it did; if it throws, the pane says it couldn't save and keeps the results to try again. A town that
  * saved fills the field with its name and closes the list (one choice).
  */
@@ -80,7 +80,7 @@ internal fun LocationPane(search: LocationSearch, current: HomeLocation?, showCu
         } catch (e: CancellationException) {
             throw e
         } catch (e: LocationSearchException) {
-            // The message can hold a status code the copy is fixed and nothing is logged.
+            // The message can hold a status code, so the copy is fixed and nothing is logged.
             TownResults.Failed
         } catch (e: Exception) {
             Log.w(TAG, "Town search failed (${e::class.simpleName})")

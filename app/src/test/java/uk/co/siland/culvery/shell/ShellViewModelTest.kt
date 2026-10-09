@@ -145,6 +145,24 @@ class ShellViewModelTest {
     }
 
     @Test
+    fun aNamedPageStaysClosedWithoutAuthorisationThenOpensOnceAuthorised() = runTest {
+        access.result = null
+        val vm = vm()
+        vm.uiState.test {
+            vm.openSettings(SettingsPageIds.LOCATION)
+            val closed = expectMostRecentItem()
+            assertThat(closed.settingsOpen).isFalse()
+            assertThat(closed.settingsPage).isNull()
+            assertThat(access.requested.last()).containsExactly(CorePermissions.SETTINGS_MANAGE)
+            access.result = admin
+            vm.openSettings(SettingsPageIds.LOCATION)
+            val open = expectMostRecentItem()
+            assertThat(open.settingsOpen).isTrue()
+            assertThat(open.settingsPage).isEqualTo("location")
+        }
+    }
+
+    @Test
     fun settingsOpenOnlyWhenAuthorised() = runTest {
         val vm = vm()
         vm.uiState.test {
