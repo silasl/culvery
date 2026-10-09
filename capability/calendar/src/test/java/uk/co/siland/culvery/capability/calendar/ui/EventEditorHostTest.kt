@@ -219,14 +219,14 @@ class EventEditorHostTest {
 
     @Test
     fun aRefusedSaveKeepsTheSheetAndItsInputAndOffersTryAgain() {
-        writer.failWith = WriteRejectedException("Calendar is full")
+        writer.failWith = WriteRejectedException("calendar is full")
         access.answer(TestAccess.ALEX)
         showEditor(EditorRequest.New(day = null))
         waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Parents evening")
         compose.onNodeWithTag("editor_save").performClick()
         waitForText("Try again")
-        compose.onNodeWithText(couldNotSave("Sample calendar", WriteProblem.Refused("Calendar is full"))).assertExists()
+        compose.onNodeWithText(couldNotSave("Sample calendar", WriteProblem.Refused("calendar is full"))).assertExists()
         compose.onNodeWithTag("editor_title").assertTextEquals("Parents evening")
         assertThat(closed).isEqualTo(0)
         assertThat(access.toasts.messages).isEmpty()

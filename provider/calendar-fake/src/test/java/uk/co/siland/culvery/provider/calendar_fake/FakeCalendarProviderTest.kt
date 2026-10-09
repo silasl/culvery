@@ -212,10 +212,10 @@ class FakeCalendarProviderTest {
     @Test
     fun rejectNextWriteRejectsOnlyTheNextWrite() = runTest {
         val fake = providerOn(today)
-        fake.rejectNextWrite("Event is locked")
+        fake.rejectNextWrite("event is locked")
         val error = runCatching { fake.create(conn, family, draft("Sleepover"), newClientKey()) }.exceptionOrNull()
         assertThat(error).isInstanceOf(WriteRejectedException::class.java)
-        assertThat(error?.message).isEqualTo("Event is locked")
+        assertThat(error?.message).isEqualTo("event is locked")
         assertThat(fake.create(conn, family, draft("Sleepover"), newClientKey()).title).isEqualTo("Sleepover")
     }
 

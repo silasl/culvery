@@ -213,12 +213,12 @@ class CalendarEditorTest {
     fun aRejectedAssignChangesNothingAndSaysWhy() = runTest {
         val access = testAccess(household)
         put(event("plumber", createdBy = null))
-        writer.failWith = WriteRejectedException("Event is locked")
+        writer.failWith = WriteRejectedException("event is locked")
         access.answer(TestAccess.ALEX)
-        assertThat(editor(access).assign(ref("plumber"), access.sam.id)).isEqualTo(EditResult.Rejected(WriteProblem.Refused("Event is locked")))
+        assertThat(editor(access).assign(ref("plumber"), access.sam.id)).isEqualTo(EditResult.Rejected(WriteProblem.Refused("event is locked")))
         assertThat(store.eventNow(ref("plumber"))!!.forPerson).isNull()
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", WriteProblem.Refused("Event is locked")))
+        assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", WriteProblem.Refused("event is locked")))
     }
 
     @Test
@@ -245,12 +245,12 @@ class CalendarEditorTest {
     fun aRejectedDeleteChangesNothing() = runTest {
         val access = testAccess(household)
         put(event("dinner", createdBy = access.alex.id.value))
-        writer.failWith = WriteRejectedException("Event is locked")
+        writer.failWith = WriteRejectedException("event is locked")
         access.answer(TestAccess.ALEX)
-        assertThat(editor(access).delete(ref("dinner"))).isEqualTo(EditResult.Rejected(WriteProblem.Refused("Event is locked")))
+        assertThat(editor(access).delete(ref("dinner"))).isEqualTo(EditResult.Rejected(WriteProblem.Refused("event is locked")))
         assertThat(store.eventNow(ref("dinner"))).isNotNull()
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(access.toasts.messages).containsExactly(couldNotDelete("Sample calendar", WriteProblem.Refused("Event is locked")))
+        assertThat(access.toasts.messages).containsExactly(couldNotDelete("Sample calendar", WriteProblem.Refused("event is locked")))
     }
 
     /** Makes every [op] on [table] fail inside SQLite, as a full disk or a corrupt page would. */
@@ -502,9 +502,9 @@ class CalendarEditorTest {
     @Test
     fun aRefusedAddChangesNothingAndLeavesTheSayingToTheSheet() = runTest {
         val access = testAccess(household)
-        writer.failWith = WriteRejectedException("Calendar is full")
+        writer.failWith = WriteRejectedException("calendar is full")
         access.answer(TestAccess.ALEX)
-        assertThat(editor(access).create(draft("Sleepover", PersonId.FAMILY.value))).isEqualTo(EditResult.Rejected(WriteProblem.Refused("Calendar is full")))
+        assertThat(editor(access).create(draft("Sleepover", PersonId.FAMILY.value))).isEqualTo(EditResult.Rejected(WriteProblem.Refused("calendar is full")))
         assertThat(store.eventNow(ref("key-1"))).isNull()
         assertThat(store.pendingNow()).isEmpty()
         assertThat(access.toasts.messages).isEmpty()
@@ -579,7 +579,7 @@ class CalendarEditorTest {
     fun closingTheSheetBeforeARefusalToastsIt() = runTest {
         val access = testAccess(household)
         writer.gate = CompletableDeferred()
-        writer.failWith = WriteRejectedException("Calendar is full")
+        writer.failWith = WriteRejectedException("calendar is full")
         access.answer(TestAccess.ALEX)
         val editor = editor(access, io = Dispatchers.Default)
         val sheet = launch { editor.create(draft("Sleepover", PersonId.FAMILY.value)) }
@@ -588,7 +588,7 @@ class CalendarEditorTest {
         writer.gate?.complete(Unit)
         // Nothing shows the failure card any more, so the editor says it.
         withContext(Dispatchers.Default) { withTimeout(5_000) { while (access.toasts.messages.isEmpty()) delay(10) } }
-        assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", WriteProblem.Refused("Calendar is full")))
+        assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", WriteProblem.Refused("calendar is full")))
         assertThat(access.toasts.urgent).isEqualTo(access.toasts.messages)
     }
 
@@ -661,9 +661,9 @@ class CalendarEditorTest {
     fun aRefusedChangeLeavesTheSayingToTheSheet() = runTest {
         val access = testAccess(household)
         put(event("dinner", createdBy = access.alex.id.value))
-        writer.failWith = WriteRejectedException("Event is locked")
+        writer.failWith = WriteRejectedException("event is locked")
         access.answer(TestAccess.ALEX)
-        assertThat(editor(access).update(ref("dinner"), edited("Pizza"))).isEqualTo(EditResult.Rejected(WriteProblem.Refused("Event is locked")))
+        assertThat(editor(access).update(ref("dinner"), edited("Pizza"))).isEqualTo(EditResult.Rejected(WriteProblem.Refused("event is locked")))
         assertThat(store.eventNow(ref("dinner"))!!.title).isEqualTo("dinner")
         assertThat(access.toasts.messages).isEmpty()
     }
@@ -673,7 +673,7 @@ class CalendarEditorTest {
         val access = testAccess(household)
         put(event("dinner", createdBy = access.alex.id.value))
         writer.gate = CompletableDeferred()
-        writer.failWith = WriteRejectedException("Event is locked")
+        writer.failWith = WriteRejectedException("event is locked")
         access.answer(TestAccess.ALEX)
         val editor = editor(access, io = Dispatchers.Default)
         val sheet = launch { editor.update(ref("dinner"), edited("Pizza")) }
@@ -681,7 +681,7 @@ class CalendarEditorTest {
         sheet.cancel()
         writer.gate?.complete(Unit)
         withContext(Dispatchers.Default) { withTimeout(5_000) { while (access.toasts.messages.isEmpty()) delay(10) } }
-        assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", WriteProblem.Refused("Event is locked")))
+        assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", WriteProblem.Refused("event is locked")))
     }
 
     @Test

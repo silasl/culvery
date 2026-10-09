@@ -197,13 +197,13 @@ class EventEditorSheetTest {
 
     @Test
     fun aFailureShowsTheCardAndSaveSaysTryAgain() {
-        failure = SaveFailure("Sample calendar", WriteProblem.Refused("Calendar is full"))
+        failure = SaveFailure("Sample calendar", WriteProblem.Refused("calendar is full"))
         val form = newForm()
         form.updateTitle("Car MOT")
         show(form)
         compose.onNodeWithTag("editor_failure").assertExists()
-        compose.onNodeWithText(couldNotSave("Sample calendar", WriteProblem.Refused("Calendar is full"))).assertExists()
-        compose.onNodeWithText(saveFailedBody("Sample calendar", WriteProblem.Refused("Calendar is full"))).assertExists()
+        compose.onNodeWithText(couldNotSave("Sample calendar", WriteProblem.Refused("calendar is full"))).assertExists()
+        compose.onNodeWithText(saveFailedBody("Sample calendar", WriteProblem.Refused("calendar is full"))).assertExists()
         compose.onNodeWithText("Try again").assertExists()
         compose.onNodeWithTag("editor_save").assertTextEquals("Try again")
     }

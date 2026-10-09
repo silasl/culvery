@@ -473,11 +473,11 @@ class CalendarSyncTest {
         val sync = writingEngine()
         sync.syncAll()
         queue(ChangeKind.DELETE, draft = null)
-        w.failWith = WriteRejectedException("Event is locked")
+        w.failWith = WriteRejectedException("event is locked")
         sync.syncAll()
         assertThat(store.pendingNow()).isEmpty()
         assertThat(cachedTitles()).containsExactly("Swim")
-        assertThat(toaster.messages).containsExactly(changesLost("Service A", listOf("Event is locked")))
+        assertThat(toaster.messages).containsExactly(changesLost("Service A", listOf("event is locked")))
         assertThat(toaster.urgent).isEqualTo(toaster.messages)
     }
 
@@ -487,7 +487,7 @@ class CalendarSyncTest {
         val sync = writingEngine()
         queue(ChangeKind.DELETE, remoteId = "swim", draft = null)
         queue(ChangeKind.DELETE, remoteId = "walk", draft = null)
-        w.failWith = WriteRejectedException("Event is locked")
+        w.failWith = WriteRejectedException("event is locked")
         sync.syncAll()
         assertThat(w.calls).containsExactly("delete:swim", "delete:walk").inOrder()
         assertThat(toaster.messages).containsExactly(changesLost("Service A", listOf(null, null)))
@@ -690,7 +690,7 @@ class CalendarSyncTest {
         queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
         queue(ChangeKind.UPDATE, remoteId = key, draft = swimDraft("sam-id"))
         queue(ChangeKind.DELETE, remoteId = key, draft = null)
-        w.failWith = WriteRejectedException("Calendar is full")
+        w.failWith = WriteRejectedException("calendar is full")
         sync.syncAll()
         // Nothing is sent for an event that was never made.
         assertThat(w.calls).containsExactly("create:Swim")
@@ -718,7 +718,7 @@ class CalendarSyncTest {
         val sync = writingEngine()
         queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
         queue(ChangeKind.DELETE, remoteId = "swim", draft = null)
-        w.failWith = WriteRejectedException("Calendar is full")
+        w.failWith = WriteRejectedException("calendar is full")
         sync.syncAll()
         // The delete was tried (and refused too) on its own account.
         assertThat(w.calls).containsExactly("create:Swim", "delete:swim").inOrder()
@@ -819,7 +819,7 @@ class CalendarSyncTest {
         // Real threads for the write, so runTest can't skip virtual time while the test holds the lock.
         val sync = engineWith(setOf(w), toaster, io = Dispatchers.Default, timeoutMillis = PROVIDER_TIMEOUT_MS, lock = lock)
         queue(ChangeKind.CREATE, remoteId = null, draft = swimDraft("mia-id"), clientKey = key)
-        w.failWith = WriteRejectedException("Calendar is full")
+        w.failWith = WriteRejectedException("calendar is full")
         a.failWith = UnreachableException("reads are down")
         // The editor holds the lock while it queues a change behind the create.
         val holding = CompletableDeferred<Unit>()

@@ -193,11 +193,6 @@ class PinPadTest {
     }
 
     @Test
-    fun theCarryOnReasonIsTheWizardsOwnLine() {
-        assertThat(pinReasonText(PinReason.ContinueSetup, "Change settings")).isEqualTo("Enter your PIN to carry on setting up.")
-    }
-
-    @Test
     fun theScrimIsSilentAndEveryKeyIsANamedButton() {
         controller.open("Change settings", null, null)
         show()

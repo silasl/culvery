@@ -145,7 +145,7 @@ class EditorScreenshotTest {
         return EventForm(EventForm.Mode.Edit(visit), SampleUi.TODAY, LocalTime.of(11, 54), london, null, null)
     }
 
-    private val failure = SaveFailure("Sample calendar", WriteProblem.Refused("Calendar is full"))
+    private val failure = SaveFailure("Sample calendar", WriteProblem.Refused("calendar is full"))
 
     @Test fun keyboardDark() = snap("editor_keyboard_dark", true, keyboard(), height = ABOVE_THE_KEYBOARD)
     @Test fun keyboardLight() = snap("editor_keyboard_light", false, keyboard(), height = ABOVE_THE_KEYBOARD)

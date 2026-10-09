@@ -73,7 +73,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
         offline = value
     }
 
-    /** The next create, update or delete throws WriteRejectedException([message]). */
+    /** The next create, update or delete throws WriteRejectedException([message]); reasons are lower case, to follow a dash. */
     fun rejectNextWrite(message: String) = synchronized(lock) { rejectNext = message }
 
     /** The next create, update or delete throws UnreachableException, as if the tablet were offline. */

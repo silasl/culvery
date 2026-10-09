@@ -140,7 +140,7 @@ class EventDetailHostTest {
 
     @Test
     fun aRejectedDeleteKeepsTheSheetOpen() {
-        writer.failWith = WriteRejectedException("Event is locked")
+        writer.failWith = WriteRejectedException("event is locked")
         access.answer(TestAccess.ALEX)
         show("dinner")
         waitForText("Dinner with Jo & Priya")
@@ -150,7 +150,7 @@ class EventDetailHostTest {
         // The editor toasts the refusal; the sheet goes back to its footer and stays open.
         waitUntil { access.toasts.messages.isNotEmpty() }
         waitUntil { compose.onAllNodesWithText("Delete this event?").fetchSemanticsNodes().isEmpty() }
-        assertThat(access.toasts.messages).containsExactly(couldNotDelete("Sample calendar", WriteProblem.Refused("Event is locked")))
+        assertThat(access.toasts.messages).containsExactly(couldNotDelete("Sample calendar", WriteProblem.Refused("event is locked")))
         compose.onNodeWithTag("detail_delete").assertExists()
         assertThat(closed).isEqualTo(0)
     }
