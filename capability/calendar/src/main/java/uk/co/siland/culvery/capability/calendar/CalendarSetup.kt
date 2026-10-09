@@ -77,7 +77,7 @@ class CalendarSetup(
      * instead, never added twice (review M2): the check and the add run under one lock, whoever calls.
      */
     suspend fun connectWithDefaults(connection: Connection): Boolean = connecting.withLock {
-        var failure: Throwable? = null
+        var unreachable = false
         val stored = try {
             // Inside the try: a store failure here is a failed connect with its toast, like any other.
             alreadyConnected(connection)?.let { return@withLock reconnect(it) }
@@ -98,7 +98,7 @@ class CalendarSetup(
         } catch (e: Throwable) {
             // Only the type (P8): a message can hold a calendar id, which is often the account's email.
             Log.w(TAG, "Couldn't connect ${connection.providerId} (${e::class.simpleName})")
-            failure = e
+            unreachable = e is UnreachableException
             false
         }
         if (stored) {
@@ -106,7 +106,7 @@ class CalendarSetup(
             toaster.show(connected(serviceNameOf(connection, providers::displayNameOf)))
         } else {
             toaster.show(
-                couldNotConnect(serviceNameOf(connection, providers::displayNameOf), unreachable = failure is UnreachableException),
+                couldNotConnect(serviceNameOf(connection, providers::displayNameOf), unreachable),
                 urgent = true,
             )
         }

@@ -65,8 +65,8 @@ data class WeekUi(val start: LocalDate, val days: List<DayUi>, val people: List<
 
 /**
  * [lastSyncMillis] is the oldest successful update across connections, so one failing calendar can't hide.
- * [serviceNames] names every connection's service (Decision 12). [failingBeforeFirstSync] is true when a connection has
- * never been updated and is not Ok, which makes the status stale however recent the others are.
+ * [serviceNames] names every connection's service (4d-2 Decision 12). [failingBeforeFirstSync] is true when a
+ * connection has never been updated and is not Ok, which makes the status stale however recent the others are.
  */
 data class SyncStatusUi(
     val lastSyncMillis: Long?,
@@ -118,7 +118,7 @@ fun isStale(lastSyncMillis: Long?, nowMillis: Long): Boolean =
 fun SyncStatusUi.isStaleAt(nowMillis: Long): Boolean =
     failingBeforeFirstSync || isStale(lastSyncMillis, nowMillis)
 
-/** The week's line: the service named when every connection has the same one (Decision 12). */
+/** The week's line: the service named when every connection has the same one (4d-2 Decision 12). */
 fun weekSubtitle(sync: SyncStatusUi, nowMillis: Long): String =
     updatedLabel(sync.lastSyncMillis, nowMillis, sync.serviceNames.distinct().singleOrNull())
 

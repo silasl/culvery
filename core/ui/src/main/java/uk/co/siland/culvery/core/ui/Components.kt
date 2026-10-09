@@ -58,7 +58,7 @@ object ListRowTokens {
 /**
  * One list row: [title] and [subtitle] one line each, cut with "…"; [trailing] keeps its size and the text takes what's
  * left. With [onClick] the whole row is a button; [clickLabel] says what a tap does ("change Sam’s details"). [below]
- * holds anything under the top line (a calendar's Master line, its read problem, its person picker).
+ * holds anything under the top line (a calendar's Main line, its read problem, its person picker).
  */
 @Composable
 fun HhListRow(

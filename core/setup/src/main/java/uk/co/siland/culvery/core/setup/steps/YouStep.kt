@@ -46,8 +46,8 @@ import uk.co.siland.culvery.core.setup.SetupType
 import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.WHOS_SETTING_UP
 import uk.co.siland.culvery.core.setup.YOUR_DETAILS_NOT_SAVED
-import uk.co.siland.culvery.core.setup.YOU_LINE
 import uk.co.siland.culvery.core.setup.YOUR_NAME
+import uk.co.siland.culvery.core.setup.YOU_LINE
 import uk.co.siland.culvery.core.setup.showPersonEditor
 import uk.co.siland.culvery.core.setup.someoneCalled
 import uk.co.siland.culvery.core.ui.ButtonSurface

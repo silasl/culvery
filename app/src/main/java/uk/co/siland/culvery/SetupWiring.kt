@@ -53,7 +53,7 @@ internal fun checksExpiryOnReturn(access: AccessControl): LifecycleEventObserver
     if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_RESUME) access.checkExpiry()
 }
 
-/** 4a design D5, D9: touches restart the session while Settings is open or the wizard shows (the setup session's ten minutes). */
+/** 4a design D5, D9: whether touches restart the session: while Settings is open or the wizard shows (the setup session's ten minutes). */
 internal fun countsTouches(complete: Boolean?, settingsOpen: Boolean): Boolean = complete == false || (complete == true && settingsOpen)
 
 /**

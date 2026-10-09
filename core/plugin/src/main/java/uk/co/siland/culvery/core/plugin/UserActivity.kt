@@ -25,7 +25,7 @@ val LocalUserActivity = staticCompositionLocalOf<UserActivity> {
 /** An overlay with nothing to lose closes after this long without a touch (4d-2 Decision 4). */
 const val OVERLAY_IDLE_MS = 120_000L
 
-/** A sheet with unsaved changes, and the Settings session over it, last this long after the last touch (Decision 3). */
+/** A sheet with unsaved changes, and the Settings session over it, last this long after the last touch (4d-2 Decision 3). */
 const val EDIT_HOLD_MS = 600_000L
 
 /** How long before a close the spoken warning shows. */

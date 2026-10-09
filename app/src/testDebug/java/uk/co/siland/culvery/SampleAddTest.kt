@@ -31,8 +31,8 @@ import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.OUTBOX_BACKOFF_MS
 import uk.co.siland.culvery.capability.calendar.SourceRefresher
-import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
+import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.core.access.CorePermissionSource
 import uk.co.siland.culvery.core.access.DefaultAccessControl
 import uk.co.siland.culvery.core.access.LockoutStore

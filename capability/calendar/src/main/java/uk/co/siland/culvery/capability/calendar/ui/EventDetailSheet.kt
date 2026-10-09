@@ -59,7 +59,7 @@ enum class DetailMode { Idle, ChoosingPerson, ConfirmingDelete }
 internal const val CANT_CHANGE_HERE = "Can’t change here"
 internal const val CHOOSE_WHO = "Choose who it’s for"
 
-/** The Calendar row's value: the source's name, said to be out of reach when the tablet can't change it (Decision 2g). */
+/** The Calendar row's value: the source's name, said to be out of reach when the tablet can't change it (4d-2 Decision 2g). */
 internal fun calendarLabel(event: EventUi): String = when (event.readOnlyReason) {
     ReadOnlyReason.OtherCalendar, ReadOnlyReason.NotMaster -> "${event.sourceName} (can’t change here)"
     else -> event.sourceName

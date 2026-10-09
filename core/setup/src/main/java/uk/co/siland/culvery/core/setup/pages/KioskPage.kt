@@ -16,10 +16,10 @@ import uk.co.siland.culvery.core.setup.CHANGE_HOME_APP
 import uk.co.siland.culvery.core.setup.HOME_APP_HOW_TO
 import uk.co.siland.culvery.core.setup.HomeAppPrompt
 import uk.co.siland.culvery.core.setup.SetupType
+import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.TABLET_LOCK
 import uk.co.siland.culvery.core.setup.TABLET_LOCK_LINE
 import uk.co.siland.culvery.core.setup.USE_OTHER_APPS
-import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton

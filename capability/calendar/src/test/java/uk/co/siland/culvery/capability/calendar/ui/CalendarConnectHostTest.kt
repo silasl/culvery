@@ -2,10 +2,9 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -30,22 +29,22 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
-import uk.co.siland.culvery.capability.calendar.ReviewCalendarsStep
-import uk.co.siland.culvery.capability.calendar.YOUR_CALENDARS_LINE
 import uk.co.siland.culvery.capability.calendar.CalendarReview
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
 import uk.co.siland.culvery.capability.calendar.CalendarSource
 import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.PROVIDER_TIMEOUT_MS
+import uk.co.siland.culvery.capability.calendar.ReviewCalendarsStep
 import uk.co.siland.culvery.capability.calendar.ScriptedProvider
 import uk.co.siland.culvery.capability.calendar.TestAccess
 import uk.co.siland.culvery.capability.calendar.UnreachableException
+import uk.co.siland.culvery.capability.calendar.YOUR_CALENDARS_LINE
 import uk.co.siland.culvery.capability.calendar.calendarDb
+import uk.co.siland.culvery.capability.calendar.couldNotConnect
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
 import uk.co.siland.culvery.capability.calendar.stubEditor
 import uk.co.siland.culvery.capability.calendar.testAccess
-import uk.co.siland.culvery.capability.calendar.couldNotConnect
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -58,8 +57,8 @@ import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
-import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
 /** settings.manage's name on the PIN pad. */

@@ -71,7 +71,7 @@ internal object CalendarType {
     /** 64 sp / 600: the ":" between them. */
     val timeColon = HhType.headerValue.copy(fontSize = 64.sp)
 
-    /** 30 sp / 700, −0.5 tracking: "New event", "Edit event". */
+    /** 30 sp / 700, −0.5 tracking: "Add event", "Change event". */
     val editorTitle = HhType.screenTitle.copy(fontSize = 30.sp, letterSpacing = (-0.5).sp)
 
     /** 15 sp / 400: the add/edit sheet's live summary. */

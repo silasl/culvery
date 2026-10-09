@@ -102,7 +102,7 @@ internal data class Confirming(val row: CalendarRow, val queued: Int)
  */
 @Composable
 internal fun ConnectStepHost(connections: CalendarConnections) {
-    // Null until the store answers, so neither the Connect card nor its Open settings fallback flashes up first.
+    // Null until the store answers, so neither the Connect card nor its no-services line flashes up first.
     val rows = connections.rows.collectAsState<List<CalendarRow>, List<CalendarRow>?>(initial = null).value
     val connectable = connections.connectable.collectAsState<List<CalendarProvider>, List<CalendarProvider>?>(initial = null).value
     val connector = rememberConnector(connections)
@@ -177,7 +177,7 @@ internal class ReviewActions(
 
 /**
  * 4a design §4.5: per connection, "{Service} · {account}", its health, Reconnect when needed and Disconnect (confirmed
- * first); per calendar, its name, who it is for (tap for Family and the people), Show, and Master or Make master.
+ * first); per calendar, its name, who it is for (tap for Family and the people), Show, and Main or Use for new events.
  */
 @Composable
 internal fun ReviewCalendars(
@@ -268,6 +268,7 @@ private fun SourceRow(
     val id = source.source.id
     // A person removed since is Family until HouseholdFollower catches up.
     val person = people.firstOrNull { it.id == source.mapping.person } ?: Person.Family
+    val showToggles = !source.isMaster && !busy
     HhListRow(
         title = source.source.name,
         modifier = Modifier.testTag("review_source_$id"),
@@ -294,13 +295,13 @@ private fun SourceRow(
                     }
                     .toggleable(
                         value = source.mapping.visible,
-                        enabled = !source.isMaster && !busy,
+                        enabled = showToggles,
                         role = Role.Switch,
                         onValueChange = { onShown(source, it) },
                     ),
             ) {
                 Text(SHOW, style = CalendarType.subtitle, color = c.mute)
-                HhSwitch(source.mapping.visible, onCheckedChange = null, tag = "review_show_switch_$id", enabled = !source.isMaster && !busy)
+                HhSwitch(source.mapping.visible, onCheckedChange = null, tag = "review_show_switch_$id", enabled = showToggles)
             }
         },
         below = {

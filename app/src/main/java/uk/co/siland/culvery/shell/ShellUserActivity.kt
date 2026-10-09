@@ -44,7 +44,7 @@ class ShellUserActivity @Inject constructor(@ApplicationContext context: Context
         val flags = AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_ICONS or controls
         val recommended = m.getRecommendedTimeoutMillis(baseMillis.toInt(), flags).toLong()
         // Android's own setting stops at 2 minutes; a larger value set another way never holds anything past the edit hold.
-        return minOf(maxOf(baseMillis, recommended), maxOf(baseMillis, EDIT_HOLD_MS))
+        return maxOf(baseMillis, minOf(recommended, EDIT_HOLD_MS))
     }
 
     /** For `android.R.id.content`: a TalkBack focus move, double-tap or scroll is a touch. Events are only sent while a service listens. */

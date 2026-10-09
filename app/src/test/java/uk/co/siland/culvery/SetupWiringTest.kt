@@ -79,7 +79,7 @@ class SetupWiringTest {
         assertThat(pinOnSetupRead(previous = false, now = true, resumed = true, kioskExited = false)).isTrue()
         // An existing install's first read, after onResume has run.
         assertThat(pinOnSetupRead(previous = null, now = true, resumed = true, kioskExited = false)).isTrue()
-        // Not behind the scenes, not after Exit kiosk, not for a read that changed nothing, never for the wizard.
+        // Not behind the scenes, not after Use other apps, not for a read that changed nothing, never for the wizard.
         assertThat(pinOnSetupRead(previous = false, now = true, resumed = false, kioskExited = false)).isFalse()
         assertThat(pinOnSetupRead(previous = false, now = true, resumed = true, kioskExited = true)).isFalse()
         assertThat(pinOnSetupRead(previous = true, now = true, resumed = true, kioskExited = false)).isFalse()

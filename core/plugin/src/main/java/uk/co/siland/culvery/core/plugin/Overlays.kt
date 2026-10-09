@@ -6,10 +6,14 @@ import androidx.compose.runtime.staticCompositionLocalOf
 /**
  * Lets capability UI show a sheet above the rail and content without depending on :app. The shell draws a scrim
  * that dismisses on tap, and places [show]'s content against the right edge, full height. An overlay left alone closes
- * after 2 minutes, or 10 while it has unsaved changes (4d-2 §6.3).
+ * after 2 minutes, or 10 while it has unsaved changes (4d-2 §6.3); never while Settings or the wizard shows, nor one
+ * shown with [show]'s `closesWhenIdle` false.
  */
 interface OverlayHost {
-    /** Replaces anything already shown. [closesWhenIdle] false for a card waiting on a screen outside the app, where no touch can reach Culvery. */
+    /**
+     * Replaces anything already shown. [closesWhenIdle] false for a card waiting on a screen outside the app, where no
+     * touch can reach Culvery.
+     */
     fun show(closesWhenIdle: Boolean = true, content: @Composable () -> Unit)
 
     /** The open sheet has changes that closing it would lose, or is saving them; reset by each show and dismiss. */

@@ -1,6 +1,5 @@
 package uk.co.siland.culvery.core.setup
 
-import uk.co.siland.culvery.core.ui.test.assertAccessible
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -15,6 +14,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.setup.steps.YouForm
 import uk.co.siland.culvery.core.setup.steps.YouFormContent
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 @RunWith(AndroidJUnit4::class)
 class YouFormTest {

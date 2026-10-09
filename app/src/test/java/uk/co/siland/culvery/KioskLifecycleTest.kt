@@ -69,7 +69,7 @@ class KioskLifecycleTest {
         assertThat(window.calls).contains("pin")
     }
 
-    /** Review Focus 5, D3: as the home app, Exit kiosk stays in front, and a Home press doesn't pin it again. */
+    /** Review Focus 5, D3: as the home app, Use other apps stays in front, and a Home press doesn't pin it again. */
     @Test
     fun exitKioskAsTheHomeAppStaysInFrontUnpinnedThroughAHomePress() {
         window.calls.clear()

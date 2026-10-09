@@ -13,10 +13,10 @@ interface ShellNavigator {
     /** Settings › Tablet lock (4a design §4.7): Use other apps, after a fresh Admin PIN. */
     fun exitKiosk()
 
-    /** The wizard's Done step and Settings › Kiosk (4c §5.1): asks Android to make Culvery the home app (the open session). */
+    /** The wizard's Done step and Settings › Tablet lock (4c §5.1): asks Android to make Culvery the home app (the open session). */
     fun chooseHomeApp()
 
-    /** Settings › Kiosk (4c §5.1): opens the home-app setting to go back to another launcher, after a fresh Admin PIN. */
+    /** Settings › Tablet lock (4c §5.1): opens the home-app setting to go back to another launcher, after a fresh Admin PIN. */
     fun changeHomeApp()
 
     /**

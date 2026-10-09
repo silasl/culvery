@@ -16,6 +16,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -32,7 +33,6 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.test.assertAccessible
-import androidx.compose.ui.test.isHeading
 
 @RunWith(AndroidJUnit4::class)
 class EventDetailSheetTest {
@@ -179,7 +179,7 @@ class EventDetailSheetTest {
         compose.onNodeWithTag("detail_edit").assertDoesNotExist()
         val keep = compose.onNodeWithTag("detail_keep").getUnclippedBoundsInRoot()
         val confirm = compose.onNodeWithTag("detail_confirm_delete").getUnclippedBoundsInRoot()
-        // A second tap where Delete was lands on Keep event, so a double tap is harmless.
+        // A second tap where Delete was lands on Keep, so a double tap is harmless.
         val deleteCentreX = (delete.left + delete.right) / 2
         val deleteCentreY = (delete.top + delete.bottom) / 2
         assertThat(deleteCentreX).isAtLeast(keep.left)

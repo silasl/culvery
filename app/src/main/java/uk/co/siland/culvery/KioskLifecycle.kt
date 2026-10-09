@@ -124,7 +124,7 @@ internal class KioskLifecycle(
     }
 
     /**
-     * Exit kiosk (4c §5.1, ruling 28): unpinned, with the bars showing. As the home app Culvery stays in front: moving
+     * Use other apps (4c §5.1, ruling 28): unpinned, with the bars showing. As the home app Culvery stays in front: moving
      * to the back would resume it as home and pin it again at once. Otherwise it moves to the back, as before.
      */
     fun exitKiosk() {

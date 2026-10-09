@@ -175,7 +175,7 @@ class MainActivity : ComponentActivity() {
                 LocalUserActivity provides userActivity,
             ) {
                 CulveryTheme(dark = state.dark) {
-                    // Zero while the bars are hidden (the pinned kiosk); after Exit kiosk the content clears them (K1).
+                    // Zero while the bars are hidden (the pinned kiosk); after Use other apps the content clears them (K1).
                     Box(Modifier.fillMaxSize().background(Culvery.colors.bg).windowInsetsPadding(WindowInsets.systemBars)) {
                         val counting = countsTouches(complete, state.settingsOpen)
                         SessionTouches(userActivity, counting, overlay.edited) { hold -> access.touch(holdForEdits = hold) }

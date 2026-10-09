@@ -112,10 +112,10 @@ object ControlType {
 }
 
 /**
- * Hand-off §7 chip: at least 48 dp; a long label takes two lines, then ends in …; padding 0 18, radius 24, 16 sp / 600;
- * `surf`/`ink`, or [selectedColor]/[selectedInk] when selected. One of a radio group by default ([role]); a chip that
- * opens something is `Role.Button`. A disabled chip is drawn at 38% but stays tappable, so a tap can explain why:
- * TalkBack hears "not available" and "double-tap to find out why".
+ * Hand-off §7 chip: at least 48 dp; a long label takes two lines, then ends in …; padding 0 18, radius 24,
+ * 16 sp / 600; `surf`/`ink`, or [selectedColor]/[selectedInk] when selected. One of a radio group by default ([role]);
+ * a chip that opens something is `Role.Button`. A disabled chip is drawn at 38% but stays tappable, so a tap can
+ * explain why: TalkBack hears "not available" and "double-tap to find out why".
  */
 @Composable
 fun HhChoiceChip(

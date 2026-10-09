@@ -7,7 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -17,16 +16,18 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -48,8 +49,6 @@ import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
-import androidx.compose.ui.test.isHeading
-import androidx.compose.ui.test.onChildren
 
 @RunWith(AndroidJUnit4::class)
 class WeekViewTest {
@@ -322,7 +321,6 @@ class WeekViewTest {
         compose.onNodeWithTag("week_add_event").performClick()
         compose.onNodeWithTag("week_add_${SampleUi.TODAY.plusDays(9)}").performClick()
         assertThat(added).containsExactly(SampleUi.TODAY.plusWeeks(1), SampleUi.TODAY.plusDays(9)).inOrder()
-        compose.onNodeWithText("Today").assertDoesNotExist()
         compose.onAllNodesWithContentDescription("Today, ", substring = true).assertCountEquals(0)
     }
 

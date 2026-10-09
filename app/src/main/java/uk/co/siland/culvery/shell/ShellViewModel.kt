@@ -37,7 +37,7 @@ import uk.co.siland.culvery.core.plugin.SunTimes
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
-/** What Settings › Kiosk or the Done step asked of Android (4c §5.1). */
+/** What Settings › Tablet lock or the Done step asked of Android (4c §5.1). */
 enum class HomeAppRequest { CHOOSE, CHANGE }
 
 @HiltViewModel
@@ -63,7 +63,7 @@ class ShellViewModel @Inject constructor(
     val homeAppRequests: Flow<HomeAppRequest> = homeAppEvents.receiveAsFlow()
 
     /**
-     * Exit kiosk or Change home app, and Culvery not back in front since (4c K2). A field, not saved state: a
+     * Use other apps or Change home app, and Culvery not back in front since (4c K2). A field, not saved state: a
      * configuration change keeps it, a process death forgets it, so the kiosk pins again when next in front (ruling 6).
      */
     var kioskExited: Boolean = false

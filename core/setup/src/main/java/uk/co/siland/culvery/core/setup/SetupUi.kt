@@ -23,7 +23,7 @@ internal fun StepTitle(title: String, line: String? = null) {
     }
 }
 
-/** 4c design §5.1: shown while Culvery isn't the home app, in the wizard's Done step and Settings › Kiosk. */
+/** 4c design §5.1: shown while Culvery isn't the home app, in the wizard's Done step and Settings › Tablet lock. */
 @Composable
 internal fun HomeAppPrompt(onChoose: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.homeAppPromptGap)) {

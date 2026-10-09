@@ -87,7 +87,7 @@ fun ShellLayers(
         OverlayLayer(overlay, hidden = pinShowing)
         pinPad()
         ToastLayer(toast, activity, onHidden = onToastHidden)
-        // While Settings is open only its warning shows: both run on the same touches.
+        // One warning at a time, and Settings' first: Settings closing takes any open sheet with it.
         when {
             settingsClosingSoon -> ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning")
             sheetClosingSoon -> ClosingWarningLayer(SHEET_CLOSING, "sheet_warning")

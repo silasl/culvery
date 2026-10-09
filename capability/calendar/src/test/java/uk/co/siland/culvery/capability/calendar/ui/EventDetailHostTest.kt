@@ -34,8 +34,8 @@ import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.TestAccess
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
-import uk.co.siland.culvery.capability.calendar.couldNotDelete
 import uk.co.siland.culvery.capability.calendar.calendarDb
+import uk.co.siland.culvery.capability.calendar.couldNotDelete
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
 import uk.co.siland.culvery.capability.calendar.testAccess
