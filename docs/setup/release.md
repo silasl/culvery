@@ -50,7 +50,7 @@ A release logs only warnings and errors, and they name no person, calendar, acco
 
 ## 5. Make Culvery the home app
 
-After setup, the Done step (and Settings › Kiosk) shows "Make Culvery the home app so it comes back after a restart." Tap **Choose home app** and answer Android's question (it needs an Admin signed in, and Culvery is unpinned while Android's dialog shows; do this once at setup, then sign out). From then on a reboot, a power cut or a crash lands back in Culvery, and every return to the front pins it again. **Exit kiosk** unpins it and, as the home app, leaves it in front with the system bars showing; switch apps from there with Overview. To give the tablet back its normal launcher, use **Settings › Kiosk › Change home app** (a fresh Admin PIN; the pad says "Exit kiosk mode") and choose the other launcher; that unpins Culvery too.
+After setup, the Done step (and Settings › Tablet lock) shows "Make Culvery the home app so it comes back after a restart." Tap **Choose home app** and answer Android's question (it needs an Admin signed in, and Culvery is unpinned while Android's dialog shows; do this once at setup, then sign out). From then on a reboot, a power cut or a crash lands back in Culvery, and every return to the front pins it again. **Use other apps** unpins it and, as the home app, leaves it in front with the system bars showing; switch apps from there with Overview. To give the tablet back its normal launcher, use **Settings › Tablet lock › Change home app** (a fresh Admin PIN; the pad says "Enter your PIN to use other apps.") and choose the other launcher; that unpins Culvery too.
 
 ## 6. Device owner (the wall setup)
 

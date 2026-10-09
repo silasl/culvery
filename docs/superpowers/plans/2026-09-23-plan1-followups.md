@@ -4,9 +4,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 ## From Plan 1 (deferred)
 
-**For Plan 4d (design, UX and accessibility)**
-- `HhIcon` clears semantics and takes no content description. Icon-only buttons need an accessible label. *(Partly done: `HhIcon` now takes a `contentDescription`. Still unlabelled: the week view's add hints and the weather condition, 4d-2 D26.)*
-
 **Later**
 - The shell composables (`NavRail`, `StatusBar`, `SettingsPlaceholder`) have no UI tests, although the test tags exist. Cover them with the Roborazzi setup.
 - Set a module-wide Robolectric viewport default (`w1280dp-h800dp`) so each test class doesn't need its own `@Config`.
@@ -28,9 +25,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **For Plan 4e (the device)**
 - Check DM Sans weights and bold-text truncation on an API 30 AVD (Google Play image); the 2b-1 walkthrough ran on API 35.
 
-**For Plan 4d (design, UX and accessibility)**
-- Clickable event rows and week chips have no `Role.Button`. *(→ 4d-2 D15.)*
-
 **Next migration or Room upgrade**
 - `androidxSqlite` 2.6.2 is pinned apart from Room's transitive version. Re-check it on each Room bump.
 
@@ -48,10 +42,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - Lengths beyond 2 h: a 3 h chip and **Pick end…** (an end time on the same day).
 - 5-minute steps on the time picker's minutes (15-minute steps today).
 - Multi-day all-day events: an **Until…** chip when All day is chosen, picking the end date. Multi-day timed events stay on the phone.
-
-**For Plan 4d (design, UX and accessibility)**
-- Disabled Who chips lack disabled semantics. *(→ 4d-2 D23.)*
-- `AddEventButton` lacks an `onClickLabel`. *(→ 4d-2 D15.)*
 
 ## From Plan 3a review (deferred)
 
@@ -73,7 +63,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 **For Plan 4d (design, UX and accessibility)**
 - All 4a layout, colour and copy choices are provisional (wizard padding, rows, swatches, role-chip lines, Settings column, the five extra person colours, the Connect step's connected card — its title wraps onto two lines). *(→ walk-through W6, W15–W27, W30, W34.)*
-- Settings page list items have no `Role.Tab` (accessibility), alongside the existing accessibility items. *(→ 4d-2 D16.)*
 - The choose-a-PIN pad (and a sheet's Save) says "That PIN is taken — choose another." when someone else has the PIN, so an Admin can learn that a PIN is in use. Accepted: only an Admin (with a fresh PIN) gets there, and it follows from PINs being unique, since a PIN identifies its person. *(Kept as accepted, 4d triage X3.)*
 
 ## From Plan 4b (deferred)
@@ -85,8 +74,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 **For Plan 4d (design, UX and accessibility)**
 - All 4b layout, colour and copy choices are provisional: the Forecast card's rows, its title in every state, the card's icons in sun amber like the header's, the TalkBack condition words, the header items' spacing and divider. *(→ walk-through W3, W7; TalkBack condition words kept, X17; header spacing W34.)*
 - The Forecast card has a lot of empty space below its three rows. *(→ walk-through W3.)*
-- The header weather item has no merged TalkBack description: the temperature and High/Low read as two separate items. *(→ 4d-2 D26.)*
-- The Forecast row semantics test probes only the day label; also assert that "17°" is absent (count 0). *(→ 4d-2 D26.)*
 
 **Later**
 - Open-Meteo answers with one UTC offset for the whole forecast, so data fetched before a clock change is an hour out for the days after it until the next fetch; offline across a clock change, the header's hour and the theme's sunset are an hour out. Known and untested in 4b (ruling 2). Fix: ask with `timeformat=unixtime` and convert each time in the household's zone (dates from the daily rows' own instants).
@@ -95,7 +82,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 **For Plan 4d (design, UX and accessibility)**
 - All 4c layout and copy choices are provisional: the home-app prompt (under Done's title; above Exit kiosk), the 48 dp Move up / Move down buttons, the read-problem line in danger colour with Hide at its right, `bedtime` for a clear night and `mobile` for a phone, the splash with no icon until the launcher icon exists, and the Calendar tab's ‹ › and This week pill. *(→ walk-through W7, W8, W13, W21, W27, W31; the splash icon has landed, X4.)*
-- Move up / Move down have spoken labels but no other accessibility review yet. *(→ 4d-2 D28.)*
 - The dovecote launcher icon and splash are provisional. *(→ walk-through W8, W9.)*
 
 **For Plan 4e (the device)**
@@ -108,7 +94,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - "Delete this and following" on a phone: Google ends the series with UNTIL rather than cancelling it; check the trailing instances leave the tablet.
 - The `onCreate` hand-over (a standard-task Culvery created while Culvery is already home) couldn't be triggered on API 35; unit-tested only.
 - The R8 build's sign-in, sync, writes and weather on the tablet.
-- The two home-app toasts in `KioskLifecycle.kt` (`HOME_APP_NOT_SET`, `HOME_APP_SCREEN_MISSING`) name Settings › Apps › Default apps; on One UI it's "Choose default apps". Check the wording on the SM-T510. *(Also the how-to line D41 adds to the Kiosk page; 4d triage E5.)*
+- One UI's name for Android's default-apps menu: the Tablet lock page's how-to line says "Settings › Apps › Default apps" (`HOME_APP_HOW_TO` in `SetupCopy.kt`); on One UI it may be "Choose default apps". Check on the SM-T510 (E5).
 - An optional short API 30 emulator pass (no Google): the splash compat path, Choose home app, pinning, DM Sans weights. Offered, not done.
 
 **GitHub and Google (owner actions, not code)**
@@ -120,7 +106,6 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 ## From Plan 4c (code minors)
 
 **For Plan 4d (design, UX and accessibility)**
-- T14: time spent in the add/edit overlay counts as idle, so the Calendar tab's 2-minute return to this week can fire under it (`CardHosts.kt`, `WeekView.kt`). *(→ 4d-2 D30.)*
 - T16: the gap above the read-problem danger line is uneven (`ReviewCalendars.kt`). *(→ walk-through W31.)*
 
 **Tests and hardening**
@@ -130,7 +115,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 - T3: `LogHygieneTest` doesn't check the tag argument, and its call regex is whitespace-sensitive (`build-logic/convention/src/test/kotlin/LogHygieneTest.kt`).
 - T8: test that a K3 expiry keeps the failure count, and that K4 reads the store once (`LockoutStoreTest.kt`).
 - T9: the `isRoleAvailable` half of Choose home app's check is untested (`MainActivity.kt` `openHomeAppScreen`).
-- T14: `WeekViewHost`'s `onEveryTouch` wiring is untested at host level (`CardHosts.kt`).
+- T14: `WeekViewHost`'s `onEveryTouch` wiring is untested at host level (`CardHosts.kt`). (4d-2 pinned the behaviour with `AppContentTest` and `WeekViewTest` instead of a host test.)
 - T14: `addedToast` calls `zone.current()` outside `onAppScope`'s try, unlike `master()` and `authorise` (`CalendarEditor.kt`).
 - T15: a read-only NeedsSignIn whose reads recover while queued writes keep failing for other reasons stays NeedsSignIn, and the 48-hour ageing freezes until a reconnect (bounded: the chip shows) (`CalendarStore.kt` `markSynced`, `Writes.kt`).
 - T15: `writeAccepted` sits in the same try as `applyAcceptedWrite`, so its own failure logs misleadingly (`CalendarSync.kt`, `CalendarStore.kt`); `ZONE_MARGIN_MS` is untested (`CalendarRepository.kt`); `markSynced`'s fold after Unreachable following NeedsSignIn lost its test (`CalendarStoreTest.kt`).
@@ -142,54 +127,7 @@ Items raised while Plan 1 (foundation) was built and reviewed. They were deferre
 
 ## From the 4d triage (2026-10-06)
 
-The 4d audits (copy, screens, hand-off, accessibility, live emulator) were triaged into D1–D41, W1–W34, E1–E10 and X1–X17. 4d-1 is done (`docs/superpowers/plans/2026-10-06-culvery-04d1-shared-parts-contrast.md`). 4d is split (user, 2026-10-06): **4d-1** "shared parts, contrast, layout bugs" takes D1–D7 and D9–D14 (`docs/superpowers/specs/2026-10-06-culvery-4d1-shared-parts-contrast-design.md`); D8 is not done (palette swaps are W30); the rest is below. Paths are short (`core/ui` Controls.kt, calendar ui/WeekView.kt and so on); line numbers are as of b7cb40d.
-
-**For Plan 4d-2 (TalkBack, timeouts, words)**
-
-Decision 1, vocabulary, **still to decide** before 4d-2's copy is written. Each term is a visible product word; the recommendation comes first, then any alternative.
-- a. "Master" calendar → **"Main"** badge, button "Use for new events", "Choose another main calendar first". Alt: no noun, only "New events go here". (C79, C85)
-- b. Kiosk → page **"Tablet lock"**, button and PIN line **"Use other apps"**. Alt: "Lock to Culvery" / "Leave Culvery". (C70, C74–C77)
-- c. Sync → **"Updated … ago" / "Saving to Google Calendar…" / "will be lost"**; the week subtitle drops "Family calendar" and reads "Updated from Google Calendar 5 minutes ago". (C17, C18, C24, C39, C84, C85)
-- d. Google → **"Google Calendar" in every visible string** (`connectionLabel` becomes the service's display name). (C20, C39, C47)
-- e. Add and edit: Add stays "Add event" → sheet "Add event" → button "Add event" → toast "Event added". Change: button **"Change"** → sheet "Change event" → "Save changes" → "Changes saved" (the permissions and notes already say "change"). Alt: "Edit" everywhere, renaming the permissions. (C30, C35, C40, C60)
-- f. Assign → **"Choose who it's for"** (also the permission and "Ask a grown-up to choose who this is for."). (C32, C68)
-- g. Read-only, subscribed, feed → **"can't change here"**; also right for the not-the-main-calendar case, which today wrongly says "Read-only calendar". (C24, C28, C37, C38)
-- h. Minor: "Free" → "Nothing on"; the "Week" chip → "See the week"; "Added from a phone" in both places; "Keep" alone everywhere. (C2, C4, C31/C36, C99)
-
-TalkBack plumbing:
-- D15 Clickables announce no role; labels say "Open" or repeat the visible text; the theme toggle reads a bare "Auto" (new `Modifier.hhClickable` in core/ui; every raw `clickable` in a11y A6): a helper with `Role.Button` by default; labels say what happens ("open event details", "Add event", "preview night theme"); drop labels equal to the name; a shared `assertClickablesHaveRoleAndLabel()` called from each screen's test.
-- D16 The nav rail and Settings page list have no Tab role or selected state (NavRail.kt:67-84, SettingsScreen.kt:91-108): `selectable(selected, role = Role.Tab)` in `selectableGroup()`.
-- D17 Overlays aren't modal: TalkBack can activate the rail behind Settings or a sheet; no pane titles; nameless focusable scrims (OverlayLayers.kt:61-85, SetupWiring.kt:67-68, PinPad.kt:173-183, Pickers.kt:93-108, sheet roots): `clearAndSetSemantics {}` on whatever is behind an overlay; scrims cleared; `paneTitle` on each overlay.
-- D18 No async result is announced: toasts, the editor failure card, person/You/location messages, PIN errors, the Syncing pill (Shell.kt:600-615, EventEditorSheet.kt:357-376, PersonEditorSheet.kt:217, YouStep.kt:163, LocationPane.kt:124-136, PinPad.kt:217, EventDetailSheet.kt:179): `liveRegion` Polite; Assertive for refusals and errors via `ToastMessage.urgent`; `error()` on the field concerned.
-- D19 No headings anywhere (titles, card titles, sheet and picker titles, week column headers): `heading()`; merge each week column header into "Today, Tuesday 6 October". (4d-1 adds the section-label headings.)
-
-Names and states:
-- D20 Text fields lose their name once filled (Controls.kt:211-254 `HhTextField` and callers): a `label` on the field's semantics; `error(message)` on a refusal.
-- D21 Colour swatches have no name; "taken" shows only as a strike-through (Controls.kt:360-390, PersonPalette.kt): a named palette; `selectable(role = RadioButton)` in `selectableGroup`; stateDescription "Used by Sam".
-- D22 Calendars review: the Show switch is unnamed; the master's switch is disabled with no reason; the person chip reads as plain text; Disconnect, Make master and Hide repeat with no subject (ReviewCalendars.kt:233-330, Controls.kt:405-427): row `toggleable(Role.Switch)` named "Show {calendar}"; a master stateDescription; chip `Role.Button` "Change who {calendar} is for" with expanded/collapsed; per-row labels name the calendar or account.
-- D23 Choice chips have no role or group; disabled Who chips sound normal (Controls.kt:192-200, EventEditorSheet.kt:243-275): `selectable(Role.RadioButton)` + `selectableGroup`; disabled-but-tappable chips get stateDescription "Not available".
-- D24 Pickers: date cells read "21"; all four steppers are "More"/"Less"; changes are silent (Pickers.kt:93-256): cell "Tuesday 7 October, today" with selected state; "Hour up/down", "Minute up/down"; liveRegion on the stepper values and the range text.
-- D25 PIN dots are silent; the lockout must not tick every second (PinPad.kt:84-99, 260-275): dots "2 of 4 digits entered" as a liveRegion; the lockout announced once.
-- D26 Week and Home semantics: chips lack whose and which day; seven unlabelled add hints; the legend; detail rows split label from value; the weather header is two items with no condition (WeekView.kt:224-284, ComingUpCard.kt:97-113, EventDetailSheet.kt:224-235, WeatherHeaderItem.kt:21-34, ForecastCardTest.kt:62): `clearAndSetSemantics` descriptions ("Swimming, Sam, Tuesday 09:00", "Add event on Tue 7 October", "Now 17 degrees, partly cloudy. High 19, low 11"); merge InfoRow and the legend; tests assert "°" count 0 in forecast rows and the header.
-- D27 Wizard dots are nameless "selected" nodes, and the total grows from 6 to 7 mid-flow (SetupWizard.kt:198-216): "Step n of m"; count Review from the start.
-- D28 Move up/down: focus follows the position, not the person; the end of the list drops focus; no row actions (PeopleUi.kt:41-108): `key(person.id)`; a disabled button with stateDescription at the ends; `customActions` on the row.
-
-Timeouts:
-- D29 Settings closes 2 min after the last *pointer* touch, losing an open sheet's edits; TalkBack activity never counts; no warning (AccessControl.kt:10,13; DefaultAccessControl.kt:150-157; SetupWiring.kt:43-62; OverlayLayers.kt:54-58; MainActivity): `calculateRecommendedTimeoutMillis`; accessibility focus, click and scroll events count as touches; a 20 s live-region warning.
-- D30 The week view snaps back under an open add/edit sheet and under TalkBack (WeekView.kt:330-373, CardHosts.kt:58; 4c code minor T14 and its untested host wiring): overlay touches count as activity in `WeekViewHost`; no snap-back while touch exploration is on; the recommended timeout; liveRegion on the title.
-- D31 Toasts last a fixed 3.5 s, including errors and 100–140-character how-tos (OverlayLayers.kt:93-99, ShellTokens): the recommended timeout; about a 6 s base for errors and refusals; scale with length, capped at 8 s.
-- D32 A stray tap leaves a sheet over the wall display indefinitely; no shell overlay closes by itself, only Settings closing dismisses them (ShellOverlays.kt, SetupWiring.kt:62, the editor and detail hosts). **Ruled 2026-10-06:** any overlay with no edits closes after 2 minutes idle; the full-column add target stays (W28). Test with a fake clock: an untouched overlay is dismissed and an edited one isn't.
-
-Words (after Decision 1; curly quotes and apostrophes everywhere, ruled 2026-10-06):
-- D33 Apply the Decision 1 glossary and curly quotes (SetupCopy.kt, CalendarUi.kt, ReviewCalendars.kt, EventDetailSheet.kt, EventEditorSheet.kt, CalendarEditor.kt, CalendarPermissions.kt, Permissions.kt, AccessControl.kt): map each PIN reason to explicit copy instead of the enum name (C60); `connectionLabel` = the display name; a source-scan test that fails on master/kiosk/sync/read-only/assign/feed or a straight quote in UI copy.
-- D34 Errors don't give the cause or the fix; a delete failure says "Couldn't save"; `EVENT_GONE` and the fake provider's reasons are capitalised mid-sentence; the failure card says "check the connection" for refusals (Writes.kt:33,66,128-132; CalendarEditor.kt:36,46,133; EventEditorSheet.kt:61; ReviewCalendars.kt:57-77; plugin/Setup.kt:11; CalendarSetup.kt:25; PinPromptController.kt:12; FakeCalendarProvider.kt): per-cause copy (network vs refused); `COULD_NOT_DELETE`; reasons in lower case; "Something went wrong" → "Stopped updating — disconnect and connect again".
-- D35 Abbreviations and end punctuation (WeatherWords.kt:33-35, CalendarUi.kt:100-112, EventForm.kt:45-47, PinPad.kt:95-111, AccessControl.kt:26): minutes, hours and seconds in full; a full stop on every sentence; "from 22:00" for TalkBack.
-- D36 Copy that's wrong about who can act: roles promise abilities without a PIN; the button still says "Set your PIN" after one is set; the first person isn't told they're the Admin (SetupCopy.kt:17,72-74, PeopleUi.kt:80, YouStep.kt:148-163): "Without a PIN, Sam can only look." (row: "Adult · No PIN — can't add events"); "Change PIN" once set; the You step line.
-- D37 The stale-sync subtitle is red alone (WeekView.kt:125, CalendarUi.kt:100-121): an icon or the words "Out of date", with D33's copy; plan step 1 reads the emulator's `connection` row (health, healthMessage) to confirm the cause. Investigated in the triage: expected on the emulator, where a pass with any failing calendar or unreachable Play services never stamps `lastSyncMillis` (CalendarSync.kt:303-309); see E10.
-- D38 Dead-end buttons: Forecast's "Open settings" opens Settings at whatever page; the Connect card's fallback leads nowhere (ShellNavigator.kt:11, ShellViewModel.kt:157, ForecastCard.kt:72, ConnectCalendarCard.kt:51): `openSettings(page)`; "Add home location"; hide the fallback and say "No calendar services are available on this tablet."
-- D39 Smaller copy and empty states (SetupCopy.kt, TodayCard.kt:61, ComingUpCard.kt:91, WeatherWords.kt:11, EventForm.kt:180, CalendarUi.kt:148, SourceRefresher.kt:23-26, CalendarConnectHost.kt:29, CalendarSetupSteps.kt:38): as the copy audit proposed (C1, C3, C10, C46, C50, C59, C75, C85, C87e, C90, C94, C98, S29); Settings › Calendars when not connected: "Connect your family's Google Calendar to see it on Home."; the Connect line "Choose the family's Google account" comes from the provider descriptor.
-- D40 Location search: nothing on screen while searching; a failed search has no retry; the baseline shows a state the app never reaches (LocationPane.kt:85-95,124-136; SetupScreenshotTest.location()): `TownResults.Searching` "Searching…"; a plain "Try again" that re-runs the query; the fixture renders the real forward state.
-- D41 Exit kiosk gives no feedback; the home-app how-tos are 100–140-character toasts (KioskLifecycle.kt:42-48,133-137, KioskPage.kt): a toast on exit; a short home-app toast with the how-to as a `mute` line on the Kiosk page (wording per Decision 1b; One UI's menu name per E5).
+The 4d audits (copy, screens, hand-off, accessibility, live emulator) were triaged into D1–D41, W1–W34, E1–E10 and X1–X17. 4d-1 is done (`docs/superpowers/plans/2026-10-06-culvery-04d1-shared-parts-contrast.md`). 4d-2 is done (`docs/superpowers/plans/2026-10-09-culvery-04d2-talkback-timeouts-words.md`): D15–D41 and Decision 1 are closed. 4d is split (user, 2026-10-06): **4d-1** "shared parts, contrast, layout bugs" takes D1–D7 and D9–D14 (`docs/superpowers/specs/2026-10-06-culvery-4d1-shared-parts-contrast-design.md`); D8 is not done (palette swaps are W30); the rest is below. Paths are short (`core/ui` Controls.kt, calendar ui/WeekView.kt and so on); line numbers are as of b7cb40d.
 
 **For the end-of-v1 design walk-through (the user's own)**
 
@@ -263,12 +201,6 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 
 ## From Plan 4d-1 (deferred)
 
-**For Plan 4d-2 (TalkBack, timeouts, words)**
-- The Forecast row clears its children's semantics, so its day label and icon are checked only by baselines (the temperatures have `TemperatureFontScaleTest`). D26 rewrites those semantics (`ForecastCard.kt`).
-- `WeatherRepositoryTest` feeds the failures in directly; that the `@Inject` constructor passes `WeatherSyncLoop.lastFailure` is checked only on the emulator (walk-through item 7).
-- `HhCloseButton`, the week's ‹ ›, the date picker's ‹ › and the time steppers are `surf2` on `bg` or `surf` with no role of their own; on light `bg` the close button's fill is 1.04:1 (its `ink` icon carries it). Give them `HhButton`'s quiet fill and `Role.Button` in D15's pass (`Shell.kt`, `Pickers.kt`).
-- The week header's reconnect chip stays its own composable (`dangerSoft`; no `HhButton` tone fits). It has `Role.Button`; its label is D15's.
-- At font scale 1.5 the week view's Today column clips its last chip; the column doesn't grow. Let the column grow with its chips, or settle it at the design walk-through.
 
 **Tests and hardening (from the 4d-1 final review)**
 - `WeatherSyncLoopTest` has no case for a stray `CancellationException` (which should mark the place failed), or for a town change between a failure and the retry.
@@ -280,10 +212,55 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 - `HhButton` and `HhChoiceChip` grow with their text at large font scales but have no vertical padding of their own; a two-line chip at 1.5 runs close to its edges.
 - Light `danger` on `dangerSoft` is 4.497:1: fine for the icons drawn there today; `danger` text on `dangerSoft` would need a darker `danger` (`ContrastTest` pins it).
 - The PIN pad now keeps a blank two-line gap between the dots and the keypad when there's no message, so the keypad doesn't move when a message appears (spec §6.5 trade-off).
+- At font scale 1.5 the week view's Today column clips its last chip; the column doesn't grow. Let the column grow with its chips, or settle it at the design walk-through.
 
 **For Plan 4e (the device)**
 - The status bar's Sign out and theme toggle rely on Compose's 48 dp touch-target expansion rather than 48 dp of layout (4d-1 ruling 8); check on the SM-T510 that a touch just outside them lands.
 - The unpinned window behind Android's home-role dialog (Choose home app, Change home app) is the same with or without device owner: `openHomeAppScreen` unpins either way, so a Home press from the dialog leaves Culvery unpinned until it next comes to the front. Accepted 2026-10-06 with no re-pin timer; device owner only keeps Google's account chooser pinned (`KioskLifecycle.kt`).
+- `WeatherRepositoryTest` feeds the failures in directly; that the `@Inject` constructor passes `WeatherSyncLoop.lastFailure` is checked only on the emulator (walk-through item 7).
+
+## From Plan 4d-2 (deferred)
+
+**For Plan 4e (the device)**
+- E7 stays: a TalkBack walk of every screen on the SM-T510. The emulator check (`docs/superpowers/plans/2026-10-09-4d2-walkthrough.md`) covered Home, an event, adding an event, the PIN pad, Settings › People and the Settings warning.
+- The Settings session counts no touch while Google's account chooser is open during a Reconnect from Settings › Calendars, so a slow chooser can close Settings behind it (4d-2 spec §10; E6).
+- `ShellUserActivity` relies on Compose sending TalkBack's accessibility events up through `requestSendAccessibilityEvent`. `ShellUserActivityTest` pins only the delegate's filter (it sends the events itself); only the emulator check (walk-through A.4 path 6) shows Compose sending them. Re-run that check after a Compose upgrade.
+- The clock set back during sleep: the session and the sheet timeouts compare wall-clock time, so a session can outlast a sleep if someone sets the clock back. Pre-existing and unreachable in lock-task; compare against `elapsedRealtime` (`DefaultAccessControl.kt`).
+- Wizard PIN pad hardening: no wizard PIN pad shows over a live setup session today, because every wizard PIN goes through `SetupSessionGate.carryOn`. If the gate changes, a pad there cancels at 2 minutes; make `overSettings` mean "counting" so it follows the session (`SetupWiring.kt`).
+
+**For the end-of-v1 design walk-through (the user's own)**
+- Copy rows no 4d-2 item owned: C25, C43 ("Pick date…" or "Pick a date"), C49 ("Try again" or "Try saving again") (4d-2 spec Appendix A.3).
+- The week legend now says each colour's name; keep it or drop it now that chips name their person (W33).
+- The warning pills, "Searching…", "Try again", the "Out of date" icon, the Tablet lock how-to line and the message lines' blank line while empty are placed by the plan, not designed (4d-2 spec §2).
+- The tap on a faint end Move arrow opens the row editor (pre-existing; W27).
+- "Searching…" replaces a visible town list on every keystroke, so rows can vanish under a finger (spec §7.7).
+- The Settings › Calendars empty-state line names Google Calendar even with no connectable provider (unreachable in a release build).
+
+**Tests and hardening (from the 4d-2 task reviews)**
+- FLAG: the Show row's touch target is about 32 dp since its switch became draw-only; add `minimumInteractiveComponentSize` or `heightIn` and `assertHeightIsAtLeast(48.dp)` (`ReviewCalendars.kt`).
+- FLAG: "find out why" and "not available" are also said on a selected disabled Who chip and on a busy review picker chip, and the custom `stateDescription` hides "selected"; add them only when `!enabled && !selected` (`EventEditorSheet.kt`, `Controls.kt`).
+- FLAG: no test that the PIN pad re-keys to 2 minutes when `overSettings` turns false; dropping it from the `LaunchedEffect` keys fails nothing, and the pad would stay up for 10:01 over the wall (`OverlayLayers.kt`).
+- FLAG: `PeopleUiTest` hit "connection pool has been closed" at teardown twice (once in `theMoveUpActionFromTalkBackMovesSomeone`, once in Task 10); it passes in isolation.
+- `assertClickablesHaveRoleAndLabel`: its `EditableText` skip could skip a clickable wrapper around a text field (skip only when `Role` is null); its false-pass routes (a child `onClick` folded into a merging parent, `clearAndSetSemantics` removing `onClick`) are undocumented in the KDoc; no test for a label that repeats merged child text.
+- `testImplementation(testFixtures(...))` sits first in three build files.
+- `Pickers.kt:5` has an unused `foundation.clickable` import; `WeekViewTest` checks the add hints in the unmerged tree (TalkBack reads the merged one); `WeekViewTest.kt:291` `onNodeWithText("Today").assertDoesNotExist()` is dead.
+- New imports are out of order in about ten test files, `CardsTest`, `WeekViewTest`, `WeatherHeaderItemTest` and `CalendarConnectHostTest`.
+- No test pins the review switch having no `OnClick`; the disabled-Who test doesn't assert `who_Mia` stays selected; the Show row's ripple changed; `SemanticsActions` is imported unused.
+- `MainActivity`'s `pinShowing` wiring and the Task 11 session wiring are tested only by the emulator check.
+- Nested pane titles (person sheet over Settings, editor over picker) are confirmed only by the emulator check.
+- Toaster KDoc says toasts "stay longer", true only since `toastMillis`.
+- No test that typing clears `nameError`, or that a non-`nameTaken` refusal leaves no `Error` (`PersonSheet`); `PeopleUiTest`'s `waitUntil` uses `fetchSemanticsNode`, which throws instead of retrying.
+- When a lockout ends the PIN pad's live region says "Wrong PIN — try again" with no new attempt (stale words); checked in the emulator check.
+- The §5.7 stable-total test became a hidden-step count test; its name ("…AndSpeakEachOne") misleads.
+- Explicit `mergeDescendants` on the week chip and Today row is redundant (`hhClickable` merges) and no test can detect it.
+- `SetupWiring.kt:50`: the `countsTouches` KDoc sits above `checksExpiryOnReturn`; move it down.
+- `OverlayLayers.kt:90`'s comment gives the wrong reason; `Overlays.kt:8`'s KDoc omits the Settings, wizard and `closesWhenIdle` exceptions; `SetupWiring`'s `booleanArray` box; `touch(edited)` on activity recreation re-arms the session (pre-existing).
+- The copy scan (`CopyScan.kt`): an `@label` head before a lambda is skipped; one-word apostrophe fragments skip the quote check; concatenation splits; `lineAt` is O(n) per literal; the `Log.`, `testTag`, `requireNotNull`, `checkNotNull`, `Regex` and `\w*Exception` exemptions have no fixtures.
+- `TinyProvider.kt` (calendar-testkit) still has capitalised exception messages; a failed add names the person two ways.
+- `LocationPane`'s KDoc has a line of about 230 characters.
+
+**Decisions for the user**
+- The calendar's refusal toasts after a PIN (`Refusal.Toast`: "Mia can only change events they created.") still name the person whose PIN it was; the PIN pad's own refusal names no one (decision A). Should the toasts say "That PIN …" too?
 
 ## Feature ideas (2026-10-02, after v1)
 
