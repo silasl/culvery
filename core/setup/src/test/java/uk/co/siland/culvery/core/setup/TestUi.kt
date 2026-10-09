@@ -66,7 +66,7 @@ class RecordingNavigator : ShellNavigator {
 
     override fun openTab(id: String) = Unit
 
-    override fun openSettings() = Unit
+    override fun openSettings(page: String?) = Unit
 
     override fun exitKiosk() {
         kioskExits++

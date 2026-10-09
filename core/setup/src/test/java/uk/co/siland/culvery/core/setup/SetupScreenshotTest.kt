@@ -17,10 +17,12 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
+import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
+import uk.co.siland.culvery.core.plugin.NEXT_LABEL
 import uk.co.siland.culvery.core.setup.steps.WelcomeContent
 import uk.co.siland.culvery.core.setup.steps.YouForm
 import uk.co.siland.culvery.core.setup.steps.YouFormContent
@@ -137,10 +139,12 @@ class SetupScreenshotTest {
             WelcomeContent(onSample = if (sample) ({}) else null, busy = false)
         }
 
-    private fun location(name: String, dark: Boolean, results: TownResults) = step(name, dark, 1, Forward.Skip) {
-        StepTitle(WHERES_HOME)
-        LocationContent("Brigh", {}, results, current = brighton.toHome(), showCurrent = false, busy = false, onChoose = {})
-    }
+    /** The forward button the real step shows: Next once a home is saved, Skip for now without one. */
+    private fun location(name: String, dark: Boolean, results: TownResults, current: HomeLocation? = brighton.toHome()) =
+        step(name, dark, 1, WizardRules.forward(skippable = true, NEXT_LABEL, StepStatus(shown = true, done = current != null, canGoOn = current != null, skippable = true))) {
+            StepTitle(WHERES_HOME)
+            LocationContent("Brigh", {}, results, current = current, showCurrent = false, busy = false, onChoose = {})
+        }
 
     private fun you(name: String, dark: Boolean) = step(name, dark, 2, Forward.Next("Next", enabled = true)) {
         StepTitle(WHOS_SETTING_UP)
@@ -157,6 +161,7 @@ class SetupScreenshotTest {
     @Test fun welcomeSampleDark() = welcome("welcome_sample_dark", true, sample = true)
     @Test fun locationResultsDark() = location("location_results_dark", true, TownResults.Found(listOf(brighton, brightonNz)))
     @Test fun locationResultsLight() = location("location_results_light", false, TownResults.Found(listOf(brighton, brightonNz)))
+    @Test fun locationSearchingDark() = location("location_searching_dark", true, TownResults.Searching, current = null)
     @Test fun locationFailedDark() = location("location_failed_dark", true, TownResults.Failed)
     @Test fun youDark() = you("you_dark", true)
     @Test fun youLight() = you("you_light", false)

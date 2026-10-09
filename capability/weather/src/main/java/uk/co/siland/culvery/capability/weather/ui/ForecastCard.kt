@@ -22,13 +22,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import uk.co.siland.culvery.capability.weather.ADD_HOME_LOCATION
 import uk.co.siland.culvery.capability.weather.ADD_LOCATION
 import uk.co.siland.culvery.capability.weather.DailyWeather
 import uk.co.siland.culvery.capability.weather.FORECAST_TITLE
 import uk.co.siland.culvery.capability.weather.GETTING_FORECAST
 import uk.co.siland.culvery.capability.weather.NO_FORECAST
 import uk.co.siland.culvery.capability.weather.NO_FORECAST_YET
-import uk.co.siland.culvery.capability.weather.OPEN_SETTINGS
 import uk.co.siland.culvery.capability.weather.WeatherRepository
 import uk.co.siland.culvery.capability.weather.WeatherView
 import uk.co.siland.culvery.capability.weather.dayLabel
@@ -38,6 +38,7 @@ import uk.co.siland.culvery.capability.weather.updatedAgo
 import uk.co.siland.culvery.capability.weather.weatherIcon
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.SettingsPageIds
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
@@ -77,7 +78,7 @@ fun ForecastCard(view: WeatherView, nowMillis: Long, modifier: Modifier = Modifi
             WeatherView.NoLocation -> {
                 Text(ADD_LOCATION, style = HhType.body, color = c.mute)
                 Spacer(Modifier.height(WeatherDimens.promptButtonTop))
-                HhButton(OPEN_SETTINGS, navigator::openSettings, tone = ButtonTone.Primary, on = ButtonSurface.Surf)
+                HhButton(ADD_HOME_LOCATION, { navigator.openSettings(SettingsPageIds.LOCATION) }, tone = ButtonTone.Primary, on = ButtonSurface.Surf)
             }
         }
     }

@@ -4,13 +4,15 @@ import uk.co.siland.culvery.core.plugin.ShellNavigator
 
 class RecordingNavigator : ShellNavigator {
     val tabs = mutableListOf<String>()
+    val pages = mutableListOf<String?>()
     var settingsOpened = 0
 
     override fun openTab(id: String) {
         tabs += id
     }
 
-    override fun openSettings() {
+    override fun openSettings(page: String?) {
+        pages += page
         settingsOpened++
     }
 

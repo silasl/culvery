@@ -43,12 +43,12 @@ import uk.co.siland.culvery.core.ui.HhButton
 /**
  * Settings (4a design §4.6): the pages' titles on the left with Close, the chosen page on the right, the first chosen on
  * open. Taps on empty space stop here rather than reaching the shell underneath. The touches that keep it open are
- * counted on the shell's layers (Task 12), so its sheets and PIN pads count too.
+ * counted on the shell's layers, so its sheets and PIN pads count too.
  */
 @Composable
-fun SettingsScreen(pages: List<SettingsPage>, onClose: () -> Unit) {
+fun SettingsScreen(pages: List<SettingsPage>, onClose: () -> Unit, initialPage: String? = null) {
     val c = Culvery.colors
-    var chosen by rememberSaveable { mutableStateOf(pages.firstOrNull()?.id) }
+    var chosen by rememberSaveable { mutableStateOf(pages.firstOrNull { it.id == initialPage }?.id ?: pages.firstOrNull()?.id) }
     val page = pages.firstOrNull { it.id == chosen } ?: pages.firstOrNull()
     Row(
         Modifier

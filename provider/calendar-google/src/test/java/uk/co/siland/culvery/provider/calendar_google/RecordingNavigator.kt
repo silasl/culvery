@@ -6,7 +6,7 @@ import uk.co.siland.culvery.core.plugin.ShellNavigator
 internal class RecordingNavigator(private val calls: MutableList<String>) : ShellNavigator {
     override fun openTab(id: String) = Unit
 
-    override fun openSettings() = Unit
+    override fun openSettings(page: String?) = Unit
 
     override fun exitKiosk() = Unit
 

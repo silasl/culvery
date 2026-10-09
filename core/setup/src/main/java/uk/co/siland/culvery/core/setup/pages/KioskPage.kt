@@ -10,6 +10,7 @@ import javax.inject.Singleton
 import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
+import uk.co.siland.culvery.core.plugin.SettingsPageIds
 import uk.co.siland.culvery.core.setup.CHANGE_HOME_APP
 import uk.co.siland.culvery.core.setup.HomeAppPrompt
 import uk.co.siland.culvery.core.setup.TABLET_LOCK
@@ -25,7 +26,7 @@ import uk.co.siland.culvery.core.ui.HhButton
  */
 @Singleton
 class KioskPage @Inject constructor(private val homeApp: HomeApp) : SettingsPage {
-    override val id = "kiosk"
+    override val id = SettingsPageIds.TABLET_LOCK
     override val title = TABLET_LOCK
     override val order = 900
 

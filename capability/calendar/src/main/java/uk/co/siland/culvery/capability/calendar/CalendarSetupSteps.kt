@@ -6,6 +6,7 @@ import uk.co.siland.culvery.capability.calendar.ui.ConnectStepHost
 import uk.co.siland.culvery.capability.calendar.ui.ReviewCalendarsHost
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.SettingsPage
+import uk.co.siland.culvery.core.plugin.SettingsPageIds
 import uk.co.siland.culvery.core.plugin.SetupStep
 
 /** 4a design §4.5. */
@@ -41,7 +42,7 @@ class ReviewCalendarsStep(
 
 /** Settings › Calendars (4a design D4): Review calendars, and Connect for a service not yet connected (ruling 14). */
 class CalendarsPage(private val review: CalendarReview, private val connections: CalendarConnections, private val clock: HouseholdClock) : SettingsPage {
-    override val id = "calendars"
+    override val id = SettingsPageIds.CALENDARS
     override val title = CALENDARS
     override val order = 400
 

@@ -9,6 +9,7 @@ import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.plugin.SettingsPage
+import uk.co.siland.culvery.core.plugin.SettingsPageIds
 import uk.co.siland.culvery.core.setup.HOME_LOCATION
 import uk.co.siland.culvery.core.setup.LocationPane
 import uk.co.siland.culvery.core.setup.LocationSearch
@@ -23,7 +24,7 @@ class LocationPage @Inject constructor(
     private val search: LocationSearch,
     private val access: AccessControl,
 ) : SettingsPage {
-    override val id = "location"
+    override val id = SettingsPageIds.LOCATION
     override val title = HOME_LOCATION
     override val order = 0
 

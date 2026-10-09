@@ -32,12 +32,11 @@ internal const val CONNECTED = "Connected"
 
 /**
  * Takes the Today slot until a calendar is connected (spec §9.2), laid out like the hand-off's Holiday tile. With a
- * provider the household can connect, its button connects it (3a design §4.2); otherwise it opens Settings.
+ * provider the household can connect, its button connects it (3a design §4.2); with none, it says so and offers nothing.
  */
 @Composable
 fun ConnectCalendarCard(connectService: String?, onConnect: () -> Unit, modifier: Modifier = Modifier) {
     val c = Culvery.colors
-    val navigator = LocalShellNavigator.current
     HhCard(
         modifier = modifier.fillMaxSize().testTag("calendar_connect"),
         radius = CalendarDimens.cardRadius,
@@ -47,12 +46,12 @@ fun ConnectCalendarCard(connectService: String?, onConnect: () -> Unit, modifier
         Spacer(Modifier.weight(1f))
         Text("Connect a calendar", style = HhType.cardTitle, color = c.ink, modifier = Modifier.semantics { heading() })
         Spacer(Modifier.height(CalendarDimens.connectSubtitleTop))
-        Text("Connect your family’s calendar to see it here.", style = HhType.secondary, color = c.mute)
-        Spacer(Modifier.height(CalendarDimens.connectButtonTop))
         if (connectService != null) {
+            Text("Connect your family’s calendar to see it here.", style = HhType.secondary, color = c.mute)
+            Spacer(Modifier.height(CalendarDimens.connectButtonTop))
             HhButton("Connect $connectService", onConnect, tone = ButtonTone.Primary, on = ButtonSurface.Surf)
         } else {
-            HhButton("Open settings", navigator::openSettings, tone = ButtonTone.Primary, on = ButtonSurface.Surf)
+            Text("No calendar services are available on this tablet.", style = HhType.secondary, color = c.mute, modifier = Modifier.testTag("connect_none"))
         }
     }
 }

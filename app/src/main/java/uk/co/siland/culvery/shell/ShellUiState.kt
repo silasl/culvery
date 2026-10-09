@@ -22,4 +22,6 @@ data class ShellUiState(
     /** Every capability's Home cards have answered once: the splash can go (4c §4.1). */
     val cardsLoaded: Boolean = false,
     val settingsOpen: Boolean = false,
+    /** The page Settings opens on; null for the first. */
+    val settingsPage: String? = null,
 )

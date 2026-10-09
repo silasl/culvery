@@ -207,7 +207,7 @@ class MainActivity : ComponentActivity() {
                                         tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
                                     )
                                 },
-                                settings = { SettingsScreen(remember { settingsPages(corePages.get(), capabilities) }, onClose = shell::closeSettings) },
+                                settings = { SettingsScreen(remember { settingsPages(corePages.get(), capabilities) }, onClose = shell::closeSettings, initialPage = state.settingsPage) },
                                 onHomeDrawn = firstDraw::markDrawn,
                             )
                         }

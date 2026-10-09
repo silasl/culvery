@@ -152,7 +152,7 @@ class LocationPaneTest {
         show()
         type("Can")
         advance(500)
-        compose.onNodeWithText("Couldn’t search for towns — check the tablet’s Wi-Fi and try again.").assertExists()
+        compose.onNodeWithText("Couldn’t search for towns — check the tablet’s Wi-Fi, then try again.").assertExists()
         // Only the fixed words, never the exception's own.
         compose.onNodeWithText("offline", substring = true).assertDoesNotExist()
     }
@@ -162,7 +162,7 @@ class LocationPaneTest {
         show()
         type("Xqz")
         advance(500)
-        compose.onNodeWithText("No towns match “Xqz”.").assertExists()
+        compose.onNodeWithText("No towns match “Xqz” — check the spelling or try a nearby town.").assertExists()
     }
 
     @Test
@@ -214,6 +214,49 @@ class LocationPaneTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("1 town found")))
             .assert(polite)
         compose.onNodeWithTag("location_query").assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Town or city")))
+    }
+
+    @Test
+    fun aSearchSaysSoWhileItRuns() {
+        search.answer = { awaitCancellation() }
+        show()
+        type("Can")
+        advance(100)
+        compose.onNodeWithTag("location_status").assertTextEquals("Searching…").assert(polite)
+        advance(500)
+        compose.onNodeWithTag("location_status").assertTextEquals("Searching…")
+    }
+
+    @Test
+    fun tryAgainRunsTheSameSearchAgain() {
+        var fail = true
+        search.answer = { if (fail) throw LocationSearchException("offline") else listOf(brighton) }
+        show()
+        type("Can")
+        advance(500)
+        compose.onNodeWithTag("location_status").assertTextEquals("Couldn’t search for towns — check the tablet’s Wi-Fi, then try again.")
+        fail = false
+        compose.onNodeWithTag("location_retry").performClick()
+        advance(500)
+        assertThat(search.queries).containsExactly("Can", "Can").inOrder()
+        compose.onNodeWithTag("place_0").assertExists()
+        compose.onNodeWithTag("location_retry").assertDoesNotExist()
+    }
+
+    @Test
+    fun editingTheQueryDuringARetryShowsOnlyTheNewQuerysTowns() {
+        search.answer = { throw LocationSearchException("offline") }
+        show()
+        type("Can")
+        advance(500)
+        search.answer = { q -> if (q == "Can") awaitCancellation() else listOf(brighton) }
+        compose.onNodeWithTag("location_retry").performClick()
+        advance(500)
+        type("x")
+        advance(500)
+        assertThat(search.queries).containsExactly("Can", "Can", "Canx").inOrder()
+        assertThat(search.cancelled).isEqualTo(1)
+        compose.onNodeWithTag("place_0").assertTextContains("Brighton, England, United Kingdom")
     }
 
     @Test

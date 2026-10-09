@@ -123,12 +123,10 @@ class CardsTest {
     }
 
     @Test
-    fun connectCardOpensSettingsWhenNothingCanBeConnected() {
+    fun withNothingToConnectTheCardSaysSoAndOffersNoButton() {
         show { ConnectCalendarCard(connectService = null, onConnect = {}) }
-        compose.onNodeWithText("Connect a calendar").assertExists()
-        compose.onNodeWithText("Connect your family’s calendar to see it here.").assertExists()
-        compose.onNodeWithText("Open settings").performClick()
-        assertThat(navigator.settingsOpened).isEqualTo(1)
+        compose.onNodeWithText("No calendar services are available on this tablet.").assertExists()
+        compose.onAllNodes(hasClickAction()).assertCountEquals(0)
     }
 
     @Test

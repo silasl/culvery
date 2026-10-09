@@ -48,7 +48,10 @@ class ShellViewModel @Inject constructor(
 ) : ViewModel(), ShellNavigator {
     private val ordered = capabilities.sortedBy { it.order }
     private val selected = MutableStateFlow(HOME_TAB_ID)
-    private val settingsOpen = MutableStateFlow(false)
+    /** Settings open, on a page or (null page) the first; null while closed. */
+    private class OpenSettings(val page: String?)
+
+    private val settings = MutableStateFlow<OpenSettings?>(null)
     private val previewing = MutableStateFlow(false)
     private val kioskExitEvents = Channel<Unit>(Channel.BUFFERED)
     val kioskExit: Flow<Unit> = kioskExitEvents.receiveAsFlow()
@@ -126,14 +129,15 @@ class ShellViewModel @Inject constructor(
 
     val uiState: StateFlow<ShellUiState> =
         combine(
-            combine(tabs, selected, access.session, placements, settingsOpen) { tabs, sel, session, cards, settings ->
+            combine(tabs, selected, access.session, placements, settings) { tabs, sel, session, cards, settings ->
                 ShellUiState(
                     tabs = tabs,
                     selectedTabId = if (sel == HOME_TAB_ID || tabs.any { it.id == sel }) sel else HOME_TAB_ID,
                     session = session?.let { SessionUi(it.person.name, roleLabel(it.role)) },
                     homeCards = cards.placements,
                     cardsLoaded = cards.loaded,
-                    settingsOpen = settings && session != null,
+                    settingsOpen = settings != null && session != null,
+                    settingsPage = settings?.page,
                 )
             },
             scheduledDark,
@@ -145,7 +149,7 @@ class ShellViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { scheduledDark.drop(1).collect { previewing.value = false } }
-        viewModelScope.launch { access.session.collect { if (it == null) settingsOpen.value = false } }
+        viewModelScope.launch { access.session.collect { if (it == null) settings.value = null } }
     }
 
     fun selectTab(id: String) {
@@ -154,14 +158,14 @@ class ShellViewModel @Inject constructor(
 
     override fun openTab(id: String) = selectTab(id)
 
-    override fun openSettings() {
+    override fun openSettings(page: String?) {
         viewModelScope.launch {
-            if (access.authorise(CorePermissions.SETTINGS_MANAGE) != null) settingsOpen.value = true
+            if (access.authorise(CorePermissions.SETTINGS_MANAGE) != null) settings.value = OpenSettings(page)
         }
     }
 
     fun closeSettings() {
-        settingsOpen.value = false
+        settings.value = null
     }
 
     override fun exitKiosk() {
@@ -204,7 +208,7 @@ class ShellViewModel @Inject constructor(
 
     private fun leaveKiosk() {
         kioskExited = true
-        settingsOpen.value = false
+        settings.value = null
         access.lock()
     }
 

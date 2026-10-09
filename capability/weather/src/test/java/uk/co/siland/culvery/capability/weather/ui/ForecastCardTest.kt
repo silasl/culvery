@@ -99,11 +99,10 @@ class ForecastCardTest {
     }
 
     @Test
-    fun noLocationOpensSettings() {
+    fun noLocationOffersToAddItAndOpensThatPage() {
         show(WeatherView.NoLocation)
-        compose.onNodeWithText("Add your home location to see the weather.").assertExists()
-        compose.onNodeWithText("Open settings").performClick()
-        assertThat(navigator.settingsOpened).isEqualTo(1)
+        compose.onNodeWithText("Add home location").performClick()
+        assertThat(navigator.pages).containsExactly("location")
     }
 
     /** The age rule is `WeatherWordsTest`'s; this pins that the card shows it and moves it on with the clock. */
@@ -132,7 +131,7 @@ class ForecastCardTest {
     @Test
     fun withoutALocationOpenSettingsIsAButton() {
         show(WeatherView.NoLocation)
-        compose.onNodeWithText("Open settings")
+        compose.onNodeWithText("Add home location")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
             .assertHeightIsEqualTo(48.dp)
     }

@@ -1,4 +1,4 @@
 # Copy-scan allowlist: module/File.kt | literal | reason. An entry needs a reason a reviewer accepts.
 capability/calendar/CalendarPermissions.kt | calendar.event.assign | a permission id, stored and compared, never shown
 core/access/Permissions.kt | kiosk.exit | a permission id, stored and compared, never shown
-core/setup/KioskPage.kt | kiosk | the Tablet lock page's id, never shown
+core/plugin/ShellNavigator.kt | kiosk | the Tablet lock page's id, never shown (4d-2 §7.6)

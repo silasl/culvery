@@ -52,6 +52,30 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun settingsOpensOnTheAskedPageOrTheFirstForAnUnknownOne() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalShellNavigator provides navigator) {
+                    SettingsScreen(listOf(page("a", "Alpha", 0), page("location", "Home location", 1)), onClose = {}, initialPage = "location")
+                }
+            }
+        }
+        compose.onNodeWithTag("settings_page_location").assertIsSelected()
+    }
+
+    @Test
+    fun anUnknownPageOpensTheFirst() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalShellNavigator provides navigator) {
+                    SettingsScreen(listOf(page("a", "Alpha", 0), page("b", "Beta", 1)), onClose = {}, initialPage = "nowhere")
+                }
+            }
+        }
+        compose.onNodeWithTag("settings_page_a").assertIsSelected()
+    }
+
+    @Test
     fun choosingATitleShowsItsPage() {
         show(page("a", "Alpha", 0), page("b", "Beta", 1))
         compose.onNodeWithText("Beta").performClick()

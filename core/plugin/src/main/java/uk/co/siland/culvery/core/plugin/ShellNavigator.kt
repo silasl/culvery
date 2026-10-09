@@ -7,10 +7,10 @@ interface ShellNavigator {
     /** Selects a rail tab by capability id; ignored if that tab is not shown. */
     fun openTab(id: String)
 
-    /** Opens Settings, asking for a PIN if needed. */
-    fun openSettings()
+    /** Opens Settings, asking for a PIN if needed, on [page] (one of [SettingsPageIds]) or the first page. */
+    fun openSettings(page: String? = null)
 
-    /** Settings › Kiosk (4a design §4.7): leaves kiosk mode after a fresh Admin PIN. */
+    /** Settings › Tablet lock (4a design §4.7): Use other apps, after a fresh Admin PIN. */
     fun exitKiosk()
 
     /** The wizard's Done step and Settings › Kiosk (4c §5.1): asks Android to make Culvery the home app (the open session). */
@@ -29,6 +29,16 @@ interface ShellNavigator {
 
     /** The system screen ended or never opened: restores what [leavePinning] gave up, if Culvery is already in front. */
     fun returnToPinning()
+}
+
+/** Settings' page ids, so a capability can open a page without depending on `:core:setup` (4d-2 §7.6). */
+object SettingsPageIds {
+    const val LOCATION = "location"
+    const val PEOPLE = "people"
+    const val CALENDARS = "calendars"
+
+    /** Tablet lock's; stored nowhere, so the old name costs nothing. */
+    const val TABLET_LOCK = "kiosk"
 }
 
 val LocalShellNavigator = staticCompositionLocalOf<ShellNavigator> {

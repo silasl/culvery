@@ -20,7 +20,9 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.household.HomeLocation
+import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhMessageLine
@@ -38,6 +40,8 @@ private const val TAG = "LocationPane"
 internal sealed interface TownResults {
     data object Idle : TownResults
 
+    data object Searching : TownResults
+
     data class Found(val places: List<PlaceMatch>) : TownResults
 
     data class NoMatch(val query: String) : TownResults
@@ -45,7 +49,7 @@ internal sealed interface TownResults {
     data object Failed : TownResults
 }
 
-/** Stored with the result's whole line as its name (ruling 17). */
+/** Stored with the result's whole line as its name. */
 internal fun PlaceMatch.toHome(): HomeLocation = HomeLocation(label, latitude, longitude, timeZoneId)
 
 private fun HomeLocation?.isAt(place: PlaceMatch): Boolean =
@@ -61,19 +65,22 @@ private fun HomeLocation?.isAt(place: PlaceMatch): Boolean =
 internal fun LocationPane(search: LocationSearch, current: HomeLocation?, showCurrent: Boolean, save: suspend (PlaceMatch) -> Boolean) {
     var query by rememberSaveable { mutableStateOf("") }
     var chosen by rememberSaveable { mutableStateOf<String?>(null) }
-    val results by produceState<TownResults>(TownResults.Idle, query) {
+    var retries by rememberSaveable { mutableStateOf(0) }
+    val results by produceState<TownResults>(TownResults.Idle, query, retries) {
         val q = query.trim()
         if (q.length < MIN_QUERY || query == chosen) {
             value = TownResults.Idle
             return@produceState
         }
+        // Shown through the pause and the request: something is happening.
+        value = TownResults.Searching
         delay(SEARCH_PAUSE_MS)
         value = try {
             search.search(q).let { if (it.isEmpty()) TownResults.NoMatch(q) else TownResults.Found(it) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: LocationSearchException) {
-            // The message can hold a status code (ruling 4): the copy is fixed and nothing is logged.
+            // The message can hold a status code the copy is fixed and nothing is logged.
             TownResults.Failed
         } catch (e: Exception) {
             Log.w(TAG, "Town search failed (${e::class.simpleName})")
@@ -89,7 +96,7 @@ internal fun LocationPane(search: LocationSearch, current: HomeLocation?, showCu
         query = q
         saveFailed = false
     }
-    LocationContent(query, onQuery, results, current, showCurrent, action.busy, saveFailed) { place ->
+    LocationContent(query, onQuery, results, current, showCurrent, action.busy, saveFailed, onRetry = { retries++ }) { place ->
         saveFailed = false
         action.run {
             if (save(place)) {
@@ -109,6 +116,7 @@ internal fun LocationContent(
     showCurrent: Boolean,
     busy: Boolean,
     saveFailed: Boolean = false,
+    onRetry: () -> Unit = {},
     onChoose: (PlaceMatch) -> Unit,
 ) {
     val c = Culvery.colors
@@ -130,6 +138,9 @@ internal fun LocationContent(
             "location_status",
             spoken = status.spoken,
         )
+        if (results is TownResults.Failed && !saveFailed) {
+            HhButton(TRY_AGAIN, onRetry, Modifier.testTag("location_retry"), on = ButtonSurface.Bg)
+        }
         Text(USED_FOR, style = SetupType.secondary, color = c.mute)
     }
 }
@@ -141,6 +152,7 @@ private fun statusLine(results: TownResults, saveFailed: Boolean): StatusLine = 
     saveFailed -> StatusLine(HOME_NOT_SAVED, isError = true, isSave = true)
     results is TownResults.NoMatch -> StatusLine(noTownsMatch(results.query))
     results is TownResults.Failed -> StatusLine(COULD_NOT_SEARCH, isError = true)
+    results is TownResults.Searching -> StatusLine(SEARCHING)
     results is TownResults.Found -> StatusLine(null, spoken = townsFound(results.places.size))
     else -> StatusLine(null)
 }

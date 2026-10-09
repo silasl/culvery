@@ -35,6 +35,7 @@ import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.HouseholdClock
+import uk.co.siland.culvery.core.plugin.SettingsPageIds
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.SunTimes
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -130,6 +131,16 @@ class ShellViewModelTest {
         )
         vm.uiState.test {
             assertThat(expectMostRecentItem().homeCards.map { it.card.id }).containsExactly("today", "forecast")
+        }
+    }
+
+    @Test
+    fun settingsOpensOnTheAskedPage() = runTest {
+        access.result = admin
+        val vm = vm()
+        vm.uiState.test {
+            vm.openSettings(SettingsPageIds.LOCATION)
+            assertThat(expectMostRecentItem().settingsPage).isEqualTo("location")
         }
     }
 

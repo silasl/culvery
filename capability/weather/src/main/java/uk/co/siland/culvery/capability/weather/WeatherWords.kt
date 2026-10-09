@@ -11,7 +11,7 @@ internal const val GETTING_FORECAST = "Getting the forecast…"
 internal const val NO_FORECAST = "No forecast — check the tablet’s Wi-Fi."
 internal const val NO_FORECAST_YET = "No forecast yet — check the tablet’s Wi-Fi."
 internal const val ADD_LOCATION = "Add your home location to see the weather."
-internal const val OPEN_SETTINGS = "Open settings"
+internal const val ADD_HOME_LOCATION = "Add home location"
 
 /** Past this the card says how old its data is (D3). */
 internal const val STALE_AFTER_MS = 2 * 60 * 60_000L

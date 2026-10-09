@@ -24,9 +24,11 @@ internal const val OPEN_CULVERY = "Open Culvery"
 internal const val WHERES_HOME = "Where’s home?"
 internal const val TOWN_OR_CITY = "Town or city"
 internal const val USED_FOR = "Used for the time zone, and for weather."
-internal const val COULD_NOT_SEARCH = "Couldn’t search for towns — check the tablet’s Wi-Fi and try again."
+internal const val COULD_NOT_SEARCH = "Couldn’t search for towns — check the tablet’s Wi-Fi, then try again."
+internal const val SEARCHING = "Searching…"
+internal const val TRY_AGAIN = "Try again"
 
-internal fun noTownsMatch(query: String): String = "No towns match “$query”."
+internal fun noTownsMatch(query: String): String = "No towns match “$query” — check the spelling or try a nearby town."
 
 /** Spoken when the results change. */
 internal fun townsFound(count: Int): String = if (count == 1) "1 town found" else "$count towns found"
