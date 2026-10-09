@@ -7,6 +7,9 @@ import uk.co.siland.culvery.capability.calendar.FULL_DATE
 
 internal const val OPEN_EVENT_DETAILS = "open event details"
 internal const val RECONNECT_ACTION = "reconnect"
+internal const val EVENT_DETAILS = "Event details"
+
+internal fun connectingPane(service: String): String = "Connecting to $service"
 
 internal fun showAsEvent(name: String): String = "show as $name’s event"
 

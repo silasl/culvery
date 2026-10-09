@@ -36,6 +36,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -70,6 +71,8 @@ fun PinPadHost(controller: PinPromptController, overSheet: Boolean = false) {
         }
     }
 }
+
+internal const val ENTER_YOUR_PIN = "Enter your PIN"
 
 /**
  * Hand-off §7 PIN pad asking who's there. The `rgba(0,0,0,.5)` scrim covers the sheet's 600 dp when [overSheet],
@@ -108,6 +111,7 @@ fun PinPadSheet(
         onSubmit = onSubmit,
         onCancel = onCancel,
         overSheet = overSheet,
+        paneTitle = ENTER_YOUR_PIN,
     )
 }
 
@@ -167,6 +171,7 @@ fun PinPadFrame(
     onCancel: () -> Unit,
     overSheet: Boolean = false,
     drawScrim: Boolean = true,
+    paneTitle: String = title,
 ) {
     val c = Culvery.colors
     var digits by remember { mutableStateOf("") }
@@ -181,6 +186,7 @@ fun PinPadFrame(
         modifier = Modifier
             .fillMaxSize()
             .testTag("pin_scrim")
+            .semantics { this.paneTitle = paneTitle }
             // A gesture, not a clickable: TalkBack never lands on the scrim, which holds the card; the card has Cancel.
             .pointerInput(Unit) { detectTapGestures { cancel() } },
     ) {

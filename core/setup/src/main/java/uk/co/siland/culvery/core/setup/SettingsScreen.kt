@@ -33,6 +33,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.ui.ButtonSurface
@@ -53,6 +54,7 @@ fun SettingsScreen(pages: List<SettingsPage>, onClose: () -> Unit) {
         Modifier
             .fillMaxSize()
             .testTag("settings")
+            .semantics { paneTitle = SETTINGS }
             .background(c.bg)
             .pointerInput(Unit) { detectTapGestures { } },
     ) {

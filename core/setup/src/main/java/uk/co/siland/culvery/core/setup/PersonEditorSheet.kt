@@ -22,7 +22,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -154,7 +156,7 @@ internal fun PersonEditorSheet(
 ) {
     val c = Culvery.colors
     val existing = form.existing
-    Box(Modifier.fillMaxHeight().width(ShellTokens.sheetWidth)) {
+    Box(Modifier.fillMaxHeight().width(ShellTokens.sheetWidth).semantics { paneTitle = existing?.person?.name ?: ADD_PERSON }) {
         HhSheet(
             PaddingValues(
                 top = SetupDimens.sheetPaddingTop,
@@ -162,7 +164,7 @@ internal fun PersonEditorSheet(
                 end = SetupDimens.sheetPaddingH,
                 bottom = SetupDimens.sheetPaddingBottom,
             ),
-            Modifier.testTag("person_sheet"),
+            Modifier.testTag("person_sheet").then(if (choosingPin) Modifier.clearAndSetSemantics {} else Modifier),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

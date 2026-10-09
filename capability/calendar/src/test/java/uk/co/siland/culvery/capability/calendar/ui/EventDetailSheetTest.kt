@@ -239,4 +239,10 @@ class EventDetailSheetTest {
         show(SampleUi.detailEditable)
         compose.onNodeWithText("Dinner with Jo & Priya").assert(isHeading())
     }
+
+    @Test
+    fun theSheetIsAPaneTalkBackAnnounces() {
+        show(SampleUi.detailEditable)
+        compose.onNodeWithTag("detail_sheet").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Event details"))
+    }
 }

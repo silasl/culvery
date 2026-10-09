@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -123,7 +124,7 @@ internal fun DatePickerCard(today: LocalDate, selected: LocalDate, onPick: (Loca
     val c = Culvery.colors
     var page by remember { mutableIntStateOf(pageOf(selected, today)) }
     val start = pageStart(page, today)
-    PickerCard(CalendarDimens.datePickerWidth, CalendarDimens.datePickerGap, "date_picker") {
+    PickerCard(CalendarDimens.datePickerWidth, CalendarDimens.datePickerGap, "date_picker", paneTitle = "Pick a date") {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.pageButtonGap)) {
             Column(Modifier.weight(1f)) {
                 Text("Pick a date", style = CalendarType.pickerTitle, color = c.ink, modifier = Modifier.semantics { heading() })
@@ -168,7 +169,7 @@ internal fun TimePickerCard(initial: LocalTime, onSet: (LocalTime) -> Unit, onCa
     val c = Culvery.colors
     var hour by remember { mutableIntStateOf(initial.hour) }
     var minute by remember { mutableIntStateOf(initial.minute) }
-    PickerCard(CalendarDimens.timePickerWidth, CalendarDimens.timePickerGap, "time_picker") {
+    PickerCard(CalendarDimens.timePickerWidth, CalendarDimens.timePickerGap, "time_picker", paneTitle = "Pick a time") {
         Text("Pick a time", style = CalendarType.pickerTitle, color = c.ink, modifier = Modifier.semantics { heading() })
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -190,11 +191,12 @@ internal fun TimePickerCard(initial: LocalTime, onSet: (LocalTime) -> Unit, onCa
 }
 
 @Composable
-internal fun PickerCard(width: Dp, gap: Dp, tag: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun PickerCard(width: Dp, gap: Dp, tag: String, paneTitle: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
         verticalArrangement = Arrangement.spacedBy(gap),
         modifier = Modifier
             .testTag(tag)
+            .semantics { this.paneTitle = paneTitle }
             .width(width)
             .clip(RoundedCornerShape(CalendarDimens.pickerRadius))
             .background(Culvery.colors.surf)

@@ -8,6 +8,8 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -248,5 +250,17 @@ class PeopleUiTest {
         show()
         compose.onNodeWithTag("people_add").performClick()
         compose.onAllNodesWithText("Add person", useUnmergedTree = true).filterToOne(isHeading()).assertExists()
+    }
+
+    @Test
+    fun aPersonsSheetIsAPaneThatItsPinChooserHides() {
+        addSam()
+        show()
+        compose.awaitTag("person_Sam")
+        compose.onNodeWithTag("person_Sam").performClick()
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Sam")).assertExists()
+        compose.onNodeWithTag("person_set_pin").performClick()
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Choose a 4-digit PIN")).assertExists()
+        compose.onNodeWithTag("person_save").assertDoesNotExist()
     }
 }

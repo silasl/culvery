@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
@@ -86,7 +87,7 @@ fun EventDetailSheet(
             top = CalendarDimens.sheetPaddingTop,
             bottom = CalendarDimens.sheetPaddingBottom,
         ),
-        modifier = modifier.testTag("detail_sheet"),
+        modifier = modifier.testTag("detail_sheet").semantics { paneTitle = EVENT_DETAILS },
     ) {
         // The title has no line limit, so the header scrolls with the body; only the footer stays put (4d-1 §6.4).
         Column(

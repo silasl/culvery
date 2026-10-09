@@ -15,6 +15,8 @@ import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -256,7 +258,8 @@ class EventEditorSheetTest {
         compose.onNodeWithTag("time_Evening").performClick()
         compose.onNodeWithTag("editor_title").assertIsFocused()
         compose.onNodeWithTag("day_pick").performClick()
-        compose.onNodeWithTag("editor_title").assertIsNotFocused()
+        // The picker hides the sheet from TalkBack, so the focus is read from the unmerged tree.
+        compose.onNodeWithTag("editor_title", useUnmergedTree = true).assertIsNotFocused()
     }
 
     @Test
@@ -299,5 +302,16 @@ class EventEditorSheetTest {
     fun theSheetsTitleIsAHeading() {
         show(newForm())
         compose.onNodeWithText("New event").assert(isHeading())
+    }
+
+    @Test
+    fun theSheetIsAPaneAndAPickerHidesIt() {
+        show(newForm())
+        compose.onNodeWithTag("editor_sheet").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "New event"))
+        compose.onNodeWithTag("day_pick").performClick()
+        compose.onNodeWithTag("date_picker").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Pick a date"))
+        compose.onNodeWithTag("editor_save").assertDoesNotExist()
+        compose.onNodeWithTag("picker_cancel").performClick()
+        compose.onNodeWithTag("editor_save").assertExists()
     }
 }

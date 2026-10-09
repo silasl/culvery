@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.OverlayHost
@@ -64,7 +65,7 @@ internal fun AppContent(
         null -> Box(Modifier.fillMaxSize().testTag("app_blank").background(Culvery.colors.bg))
         false -> wizard()
         true -> {
-            shell()
+            Box(Modifier.fillMaxSize().then(if (settingsOpen) Modifier.clearAndSetSemantics {} else Modifier)) { shell() }
             if (settingsOpen) settings()
             // Once: the first background passes wait for it (4c §4.1).
             LaunchedEffect(Unit) {

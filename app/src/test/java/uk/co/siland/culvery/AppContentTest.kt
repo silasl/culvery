@@ -39,6 +39,7 @@ class AppContentTest {
                 overlay = overlay,
                 toast = null,
                 onToastHidden = {},
+                pinShowing = false,
                 pinPad = {},
                 onTouch = touchTarget(complete, settingsOpen, access),
             ) {

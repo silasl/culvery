@@ -157,6 +157,7 @@ class MainActivity : ComponentActivity() {
             val now = shell.now.collectAsStateWithLifecycle()
             val toast by toasts.current.collectAsStateWithLifecycle()
             val complete by setupComplete.collectAsStateWithLifecycle()
+            val pinRequest by pinPrompt.request.collectAsStateWithLifecycle()
             val overlay = remember { OverlayState() }
             CompositionLocalProvider(
                 LocalShellNavigator provides navigator,
@@ -169,6 +170,7 @@ class MainActivity : ComponentActivity() {
                             overlay = overlay,
                             toast = toast,
                             onToastHidden = toasts::hide,
+                            pinShowing = pinRequest != null,
                             pinPad = { PinPadHost(pinPrompt, overSheet = overlay.isShowing) },
                             onTouch = touchTarget(complete, state.settingsOpen, access),
                         ) {

@@ -95,7 +95,7 @@ internal fun CalendarConnectHost(request: ConnectRequest, connections: CalendarC
 internal fun ConnectingCard(service: String, onCancel: () -> Unit, content: @Composable () -> Unit = {}) {
     val c = Culvery.colors
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        PickerCard(CalendarDimens.connectingWidth, CalendarDimens.connectingGap, "connecting_card") {
+        PickerCard(CalendarDimens.connectingWidth, CalendarDimens.connectingGap, "connecting_card", paneTitle = connectingPane(service)) {
             HhIcon(Icons.CALENDAR_MONTH, size = CalendarDimens.connectingIcon, tint = c.accent)
             Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.connectingTextGap)) {
                 Text(connectingTitle(service), style = CalendarType.blockTitle, color = c.ink)

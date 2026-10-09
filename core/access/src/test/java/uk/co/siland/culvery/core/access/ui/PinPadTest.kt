@@ -200,4 +200,11 @@ class PinPadTest {
         show()
         compose.onNodeWithText("Who's this?").assert(isHeading())
     }
+
+    @Test
+    fun thePadIsAPaneThatAsksForThePin() {
+        controller.open("Change settings", null, null)
+        show()
+        compose.onNodeWithTag("pin_scrim").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Enter your PIN"))
+    }
 }

@@ -91,4 +91,10 @@ class SettingsScreenTest {
         compose.onAllNodesWithText("Kiosk").filterToOne(isHeading()).assertExists()
         compose.assertAccessible()
     }
+
+    @Test
+    fun settingsIsAPane() {
+        show(page("a", "Alpha", 0))
+        compose.onNodeWithTag("settings").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Settings"))
+    }
 }

@@ -41,6 +41,7 @@ class ShellLayersRedrawTest {
                 overlay = overlay,
                 toast = toast,
                 onToastHidden = { id -> if (toast?.id == id) toast = null },
+                pinShowing = false,
                 pinPad = {},
                 shell = { Text("Shell") },
             )

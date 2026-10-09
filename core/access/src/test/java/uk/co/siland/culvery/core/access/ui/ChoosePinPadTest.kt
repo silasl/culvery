@@ -1,5 +1,8 @@
 package uk.co.siland.culvery.core.access.ui
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -55,5 +58,13 @@ class ChoosePinPadTest {
         compose.onNodeWithTag("pin_cancel").performClick()
         assertThat(cancelled).isEqualTo(1)
         assertThat(chosen).isNull()
+    }
+
+    @Test
+    fun eachStageIsAPaneNamedByItsTitle() {
+        show()
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Choose a 4-digit PIN")).assertExists()
+        tap("2468")
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Enter it again")).assertExists()
     }
 }

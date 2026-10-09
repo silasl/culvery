@@ -37,7 +37,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.EventForm
@@ -106,8 +108,10 @@ fun EventEditorSheet(
         keyboardController?.hide()
     }
     val everyone = remember(people) { listOf(Person.Family) + people }
-    Box(modifier.testTag("editor_sheet").width(ShellTokens.sheetWidth).fillMaxHeight()) {
+    val title = if (form.mode == EventForm.Mode.New) "New event" else "Edit event"
+    Box(modifier.testTag("editor_sheet").semantics { paneTitle = title }.width(ShellTokens.sheetWidth).fillMaxHeight()) {
         HhSheet(
+            modifier = if (picker != EditorPicker.None) Modifier.clearAndSetSemantics {} else Modifier,
             padding = PaddingValues(
                 start = CalendarDimens.sheetPaddingH,
                 end = CalendarDimens.sheetPaddingH,
@@ -121,7 +125,7 @@ fun EventEditorSheet(
                 verticalArrangement = Arrangement.spacedBy(ShellTokens.sheetGap),
                 modifier = Modifier.fillMaxSize().windowInsetsPadding(keyboard.only(WindowInsetsSides.Bottom)),
             ) {
-                Header(form, everyone) {
+                Header(title, form, everyone) {
                     closeKeyboard()
                     onClose()
                 }
@@ -193,7 +197,7 @@ fun EventEditorSheet(
 }
 
 @Composable
-private fun Header(form: EventForm, everyone: List<Person>, onClose: () -> Unit) {
+private fun Header(title: String, form: EventForm, everyone: List<Person>, onClose: () -> Unit) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.Top,
@@ -201,7 +205,7 @@ private fun Header(form: EventForm, everyone: List<Person>, onClose: () -> Unit)
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(if (form.mode == EventForm.Mode.New) "New event" else "Edit event", style = CalendarType.editorTitle, color = c.ink, modifier = Modifier.semantics { heading() })
+            Text(title, style = CalendarType.editorTitle, color = c.ink, modifier = Modifier.semantics { heading() })
             Spacer(Modifier.height(CalendarDimens.editorSummaryTop))
             Text(
                 // A tag whose person has left has no name here, and the line ends at the time.

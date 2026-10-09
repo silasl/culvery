@@ -180,4 +180,10 @@ class PickersTest {
         showTime(LocalTime.of(9, 0))
         compose.onNodeWithText("Pick a time").assert(isHeading())
     }
+
+    @Test
+    fun theTimePickerIsAPane() {
+        showTime(LocalTime.of(9, 0))
+        compose.onNodeWithTag("time_picker").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Pick a time"))
+    }
 }

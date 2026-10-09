@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.ui.HhToast
 import uk.co.siland.culvery.core.ui.ShellTokens
@@ -34,12 +35,14 @@ import uk.co.siland.culvery.shell.ToastMessage
  * and the composition root has none, so a layer closed with no other animation running (a scrim tap, a toast timing
  * out) would get a layout pass but no new frame and stay on screen. Every touch anywhere in them, sheets and PIN pads
  * included, goes to [onTouch] before anything handles it (4a design D5: Settings stays open while used).
+ * While a sheet or the PIN pad shows, what it covers is hidden from TalkBack; the toasts never are.
  */
 @Composable
 fun ShellLayers(
     overlay: OverlayState,
     toast: ToastMessage?,
     onToastHidden: (Long) -> Unit,
+    pinShowing: Boolean,
     pinPad: @Composable () -> Unit,
     onTouch: (() -> Unit)? = null,
     shell: @Composable () -> Unit,
@@ -56,8 +59,9 @@ fun ShellLayers(
                 }
             },
     ) {
-        shell()
-        OverlayLayer(overlay)
+        // A TalkBack double-tap is an action, not a touch, so a scrim can't stop it: what is covered leaves the tree.
+        Box(Modifier.fillMaxSize().then(if (overlay.isShowing || pinShowing) Modifier.clearAndSetSemantics {} else Modifier)) { shell() }
+        OverlayLayer(overlay, hidden = pinShowing)
         pinPad()
         ToastLayer(toast, onHidden = onToastHidden)
     }
@@ -65,9 +69,12 @@ fun ShellLayers(
 
 /** The sheet layer: a scrim over the whole shell that dismisses on a tap, and the content against the right edge. */
 @Composable
-fun OverlayLayer(state: OverlayState) {
+fun OverlayLayer(state: OverlayState, hidden: Boolean = false) {
     val content = state.content ?: return
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+    Box(
+        Modifier.fillMaxSize().then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
         Box(
             Modifier
                 .fillMaxSize()

@@ -3,6 +3,9 @@ package uk.co.siland.culvery.capability.calendar.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -330,5 +333,11 @@ class CalendarConnectHostTest {
             assertThat(store.connectionsNow().associate { it.connection.id to it.health })
                 .containsExactly("a0", ConnectionHealth.Ok, "g1", ConnectionHealth.Ok)
         }
+    }
+
+    @Test
+    fun theConnectingCardIsAPane() {
+        compose.setContent { CulveryTheme(dark = true) { ConnectingCard("Google Calendar", onCancel = {}) } }
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Connecting to Google Calendar")).assertExists()
     }
 }
