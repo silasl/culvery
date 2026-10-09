@@ -85,12 +85,10 @@ class SetupWiringTest {
 
     @Test
     fun touchesCountWhileSettingsIsOpenOrTheWizardShows() {
-        val access = FakeAccessControl()
-        assertThat(touchTarget(complete = null, settingsOpen = false, access = access)).isNull()
-        assertThat(touchTarget(complete = true, settingsOpen = false, access = access)).isNull()
-        touchTarget(complete = true, settingsOpen = true, access = access)!!.invoke()
-        touchTarget(complete = false, settingsOpen = false, access = access)!!.invoke()
-        assertThat(access.touches).isEqualTo(2)
+        assertThat(countsTouches(complete = null, settingsOpen = false)).isFalse()
+        assertThat(countsTouches(complete = true, settingsOpen = false)).isFalse()
+        assertThat(countsTouches(complete = true, settingsOpen = true)).isTrue()
+        assertThat(countsTouches(complete = false, settingsOpen = false)).isTrue()
     }
 
     @Test

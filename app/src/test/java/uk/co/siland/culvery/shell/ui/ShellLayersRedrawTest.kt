@@ -19,8 +19,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.ShellTokens
+import uk.co.siland.culvery.core.ui.toastMillis
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ToastMessage
 
@@ -43,6 +44,8 @@ class ShellLayersRedrawTest {
                 onToastHidden = { id -> if (toast?.id == id) toast = null },
                 pinShowing = false,
                 pinPad = {},
+                activity = FakeUserActivity(),
+                onTouch = {},
                 shell = { Text("Shell") },
             )
         }
@@ -83,7 +86,7 @@ class ShellLayersRedrawTest {
         compose.onNodeWithText("Event deleted").assertExists()
         drawAndForgetInvalidations()
 
-        compose.mainClock.advanceTimeBy(ShellTokens.TOAST_MILLIS + 100)
+        compose.mainClock.advanceTimeBy(toastMillis("Event deleted", urgent = false) + 100)
         compose.onNodeWithText("Event deleted").assertDoesNotExist()
 
         assertThat(wasInvalidated()).isTrue()

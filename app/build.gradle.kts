@@ -48,6 +48,7 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkR
 
 dependencies {
     testImplementation(testFixtures(project(":core:ui")))
+    testImplementation(testFixtures(project(":core:plugin")))
     implementation(project(":core:ui"))
     implementation(project(":core:plugin"))
     implementation(project(":core:household"))

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.Settings
+import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
@@ -44,6 +45,7 @@ import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.FirstDraw
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.plugin.ShellNavigator
@@ -56,6 +58,7 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.shell.HomeAppRequest
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ShellToasts
+import uk.co.siland.culvery.shell.ShellUserActivity
 import uk.co.siland.culvery.shell.ShellViewModel
 import uk.co.siland.culvery.shell.ui.CulveryShell
 import uk.co.siland.culvery.shell.ui.ShellLayers
@@ -67,6 +70,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var pinPrompt: PinPromptController
     @Inject lateinit var capabilities: Set<@JvmSuppressWildcards Capability>
     @Inject lateinit var toasts: ShellToasts
+    @Inject lateinit var userActivity: ShellUserActivity
     @Inject lateinit var access: AccessControl
     @Inject lateinit var setupState: SetupState
     @Inject lateinit var gate: SetupSessionGate
@@ -125,6 +129,8 @@ class MainActivity : ComponentActivity() {
         setupComplete = setupState.setupComplete.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
         isDeviceOwner = allowLockTaskIfOwner(this)
         lifecycle.addObserver(kiosk)
+        // TalkBack's gestures reach the app as accessibility events, not touches: they keep Settings and the sheets open too.
+        findViewById<ViewGroup>(android.R.id.content).accessibilityDelegate = userActivity.accessibilityDelegate
         splash.setKeepOnScreenCondition {
             holdSplash(setupComplete.value, shell.uiState.value.cardsLoaded, SystemClock.uptimeMillis() - shownAt)
         }
@@ -162,17 +168,20 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(
                 LocalShellNavigator provides navigator,
                 LocalOverlayHost provides overlay,
+                LocalUserActivity provides userActivity,
             ) {
                 CulveryTheme(dark = state.dark) {
                     // Zero while the bars are hidden (the pinned kiosk); after Exit kiosk the content clears them (K1).
                     Box(Modifier.fillMaxSize().background(Culvery.colors.bg).windowInsetsPadding(WindowInsets.systemBars)) {
+                        SessionTouches(userActivity, countsTouches(complete, state.settingsOpen)) { access.touch() }
                         ShellLayers(
                             overlay = overlay,
                             toast = toast,
                             onToastHidden = toasts::hide,
                             pinShowing = pinRequest != null,
                             pinPad = { PinPadHost(pinPrompt, overSheet = overlay.isShowing) },
-                            onTouch = touchTarget(complete, state.settingsOpen, access),
+                            activity = userActivity,
+                            onTouch = userActivity::touched,
                         ) {
                             AppContent(
                                 complete = complete,

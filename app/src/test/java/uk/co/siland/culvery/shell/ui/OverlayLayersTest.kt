@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -32,6 +33,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.ui.EditorPicker
 import uk.co.siland.culvery.capability.calendar.ui.EventEditorSheet
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.shell.OverlayState
@@ -80,44 +82,61 @@ class OverlayLayersTest {
         compose.onNodeWithText("Second").assertDoesNotExist()
     }
 
-    @Test
-    fun toastHidesAfterThreeAndAHalfSeconds() {
-        var toast by mutableStateOf<ToastMessage?>(null)
+    private val activity = FakeUserActivity()
+    private var toast by mutableStateOf<ToastMessage?>(null)
+
+    private fun showToasts() {
         compose.mainClock.autoAdvance = false
-        compose.setContent {
-            CulveryTheme(dark = true) { ToastLayer(toast) { id -> if (toast?.id == id) toast = null } }
-        }
-        toast = ToastMessage(1, "Event deleted", "info")
+        compose.setContent { CulveryTheme(dark = true) { ToastLayer(toast, activity) { id -> if (toast?.id == id) toast = null } } }
+    }
+
+    private fun post(message: ToastMessage) {
+        toast = message
         compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithText("Event deleted").assertExists()
-        compose.mainClock.advanceTimeBy(3_000)
-        compose.onNodeWithText("Event deleted").assertExists()
-        compose.mainClock.advanceTimeBy(600)
+    }
+
+    private fun shownAt(millis: Long, text: String): Boolean {
+        compose.mainClock.advanceTimeBy(millis)
         compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithText("Event deleted").assertDoesNotExist()
+        return compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
     }
 
     @Test
-    fun aNewToastRestartsTheTimer() {
-        var toast by mutableStateOf<ToastMessage?>(ToastMessage(1, "First", "info"))
-        compose.mainClock.autoAdvance = false
-        compose.setContent {
-            CulveryTheme(dark = true) { ToastLayer(toast) { id -> if (toast?.id == id) toast = null } }
-        }
-        compose.mainClock.advanceTimeBy(3_000)
-        toast = ToastMessage(2, "Second", "info")
-        compose.waitForIdle()
+    fun aPlainToastLastsFourSeconds() {
+        showToasts()
+        post(ToastMessage(1, "Event deleted.", "info"))
+        assertThat(shownAt(3_880, "Event deleted.")).isTrue()
+        assertThat(shownAt(120, "Event deleted.")).isFalse()
+    }
+
+    @Test
+    fun anUrgentToastLastsSixSeconds() {
+        showToasts()
+        post(ToastMessage(1, "Couldn’t save — try again.", "info", urgent = true))
+        assertThat(shownAt(5_880, "Couldn’t save — try again.")).isTrue()
+        assertThat(shownAt(120, "Couldn’t save — try again.")).isFalse()
+    }
+
+    @Test
+    fun withTalkBacksLongerTimeAToastStaysForIt() {
+        activity.timeouts = { base, hasControls -> if (hasControls) base else 20_000L }
+        showToasts()
+        post(ToastMessage(1, "Event deleted.", "info"))
+        assertThat(shownAt(19_880, "Event deleted.")).isTrue()
+        assertThat(shownAt(120, "Event deleted.")).isFalse()
+    }
+
+    /** The plain toast that replaces an urgent one lasts its own 4 s and reads politely. */
+    @Test
+    fun aPlainToastAfterAnUrgentOneKeepsItsOwnTimeAndPoliteness() {
+        showToasts()
+        post(ToastMessage(1, "Couldn’t save — try again.", "info", urgent = true))
         compose.mainClock.advanceTimeBy(1_000)
-        compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithText("Second").assertExists()
-        compose.onNodeWithText("First").assertDoesNotExist()
-        // The second toast's own 3.5 s runs from about 3.0 s: still showing at 6.3 s, gone by 6.6 s.
-        compose.mainClock.advanceTimeBy(2_300)
-        compose.onNodeWithText("Second").assertExists()
-        compose.mainClock.advanceTimeBy(300)
-        compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithText("Second").assertDoesNotExist()
+        post(ToastMessage(2, "Event added.", "info"))
+        compose.onNodeWithTag("toast").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        assertThat(shownAt(3_880, "Event added.")).isTrue()
+        assertThat(shownAt(120, "Event added.")).isFalse()
     }
 
     @Test
@@ -125,7 +144,7 @@ class OverlayLayersTest {
         val keyboard = 320.dp
         compose.setContent {
             CulveryTheme(dark = true) {
-                ToastLayer(ToastMessage(1, "Mia can only add events for themselves.", "info"), keyboard = WindowInsets(bottom = keyboard)) {}
+                ToastLayer(ToastMessage(1, "Mia can only add events for themselves.", "info"), activity, keyboard = WindowInsets(bottom = keyboard)) {}
             }
         }
         val screen = compose.onRoot().getUnclippedBoundsInRoot()
@@ -163,7 +182,7 @@ class OverlayLayersTest {
 
     @Test
     fun theToastLayerSpeaksAnUrgentToastAssertively() {
-        compose.setContent { CulveryTheme(dark = true) { ToastLayer(ToastMessage(1, "Couldn’t save — try again.", "info", urgent = true)) {} } }
+        compose.setContent { CulveryTheme(dark = true) { ToastLayer(ToastMessage(1, "Couldn’t save — try again.", "info", urgent = true), activity) {} } }
         compose.onNodeWithTag("toast").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive))
     }
 }

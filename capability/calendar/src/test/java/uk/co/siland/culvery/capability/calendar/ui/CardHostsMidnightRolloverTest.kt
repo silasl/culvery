@@ -42,6 +42,8 @@ import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.LocalUserActivity
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -131,7 +133,11 @@ class CardHostsMidnightRolloverTest {
         val ticks = MutableStateFlow(now)
         val clock = HouseholdClock(zone.zone, WallClock { now }, clockScope, ticks)
         compose.setContent {
-            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides RecordingOverlay()) {
+            CompositionLocalProvider(
+                LocalShellNavigator provides RecordingNavigator(),
+                LocalOverlayHost provides RecordingOverlay(),
+                LocalUserActivity provides FakeUserActivity(),
+            ) {
                 CulveryTheme(dark = true) {
                     val today = rememberToday(clock) ?: return@CulveryTheme
                     WeekViewHost(repo, editor, today, rememberNowMillis(clock), onReconnect = {})
@@ -161,7 +167,11 @@ class CardHostsMidnightRolloverTest {
         val now = LocalDateTime.of(2026, 9, 23, 12, 0).atZone(london).toInstant().toEpochMilli()
         val clock = HouseholdClock(zone.zone, WallClock { now }, clockScope, MutableStateFlow(now))
         compose.setContent {
-            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides RecordingOverlay()) {
+            CompositionLocalProvider(
+                LocalShellNavigator provides RecordingNavigator(),
+                LocalOverlayHost provides RecordingOverlay(),
+                LocalUserActivity provides FakeUserActivity(),
+            ) {
                 CulveryTheme(dark = true) {
                     val today = rememberToday(clock) ?: return@CulveryTheme
                     WeekViewHost(repo, editor, today, rememberNowMillis(clock), onReconnect = {})

@@ -54,6 +54,8 @@ import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.LocalUserActivity
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
@@ -314,7 +316,11 @@ class CalendarConnectHostTest {
         val repo = CalendarRepository(store, household, zone, emptySet(), emptySet())
         val editor = stubEditor(store, zone)
         compose.setContent {
-            CompositionLocalProvider(LocalOverlayHost provides overlay, LocalShellNavigator provides RecordingNavigator()) {
+            CompositionLocalProvider(
+                LocalOverlayHost provides overlay,
+                LocalShellNavigator provides RecordingNavigator(),
+                LocalUserActivity provides FakeUserActivity(),
+            ) {
                 CulveryTheme(dark = true) {
                     Box {
                         val connector = rememberConnector(connections)

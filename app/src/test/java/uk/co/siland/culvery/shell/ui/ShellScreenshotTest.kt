@@ -38,6 +38,7 @@ import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.shell.SessionUi
@@ -172,7 +173,7 @@ class ShellScreenshotTest {
         // The toast hides itself after 3.5 s; hold the clock so it is still there for the capture.
         compose.mainClock.autoAdvance = false
         snap("home_toast_dark", dark = true) {
-            ToastLayer(ToastMessage(1, "Mia can only change events they created.", "info")) {}
+            ToastLayer(ToastMessage(1, "Mia can only change events they created.", "info"), FakeUserActivity()) {}
         }
     }
 

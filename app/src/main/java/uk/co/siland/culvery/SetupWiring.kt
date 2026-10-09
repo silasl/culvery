@@ -5,15 +5,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import uk.co.siland.culvery.core.access.AccessControl
+import kotlinx.coroutines.flow.drop
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
+import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.ui.Culvery
 
 /** The wizard's steps: the core ones and each capability's, by order (4a design D7). */
@@ -42,8 +45,16 @@ internal fun holdSplash(complete: Boolean?, cardsLoaded: Boolean, shownMillis: L
     shownMillis < SPLASH_MAX_MS && (complete == null || (complete && !cardsLoaded))
 
 /** 4a design D5, D9: touches restart the session while Settings is open or the wizard shows (the setup session's ten minutes). */
-internal fun touchTarget(complete: Boolean?, settingsOpen: Boolean, access: AccessControl): (() -> Unit)? =
-    if (complete == false || (complete == true && settingsOpen)) access::touch else null
+internal fun countsTouches(complete: Boolean?, settingsOpen: Boolean): Boolean = complete == false || (complete == true && settingsOpen)
+
+/** While [counting], every touch [activity] reports, a TalkBack gesture's included, runs [onTouch] (4d-2 §6.1). */
+@Composable
+internal fun SessionTouches(activity: UserActivity, counting: Boolean, onTouch: () -> Unit) {
+    val touch by rememberUpdatedState(onTouch)
+    LaunchedEffect(activity, counting) {
+        if (counting) activity.touches.drop(1).collect { touch() }
+    }
+}
 
 /**
  * What the app shows (4a design §3.3): nothing until SetupState is read, the wizard until setup is complete, then the

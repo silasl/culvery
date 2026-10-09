@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -36,13 +37,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import java.time.LocalDate
@@ -58,6 +59,7 @@ import uk.co.siland.culvery.capability.calendar.isStaleAt
 import uk.co.siland.culvery.capability.calendar.weekSubtitle
 import uk.co.siland.culvery.capability.calendar.weekTitle
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
@@ -125,7 +127,10 @@ fun WeekView(
                             color = c.ink,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false).testTag("week_title").semantics { heading() },
+                            modifier = Modifier.weight(1f, fill = false).testTag("week_title").semantics {
+                                heading()
+                                liveRegion = LiveRegionMode.Polite
+                            },
                         )
                         if (state.weeksAhead > 0) {
                             Spacer(Modifier.width(CalendarDimens.weekTitleGap))
@@ -352,39 +357,28 @@ internal const val BACK_TO_THIS_WEEK_MS = 120_000L
 internal class WeekShown {
     var weeks by mutableIntStateOf(0)
         private set
-    var touches by mutableIntStateOf(0)
-        private set
 
     fun show(weeks: Int) {
         this.weeks = weeks.coerceIn(0, MAX_WEEKS_AHEAD)
     }
-
-    fun touched() {
-        touches++
-    }
 }
 
 /**
- * A new [WeekShown] each [today], so the view is back on this week at midnight; a later week goes back after
- * [BACK_TO_THIS_WEEK_MS] without a touch.
+ * A new [WeekShown] each [today], so the view is back on this week at midnight. A later week goes back after
+ * [BACK_TO_THIS_WEEK_MS] (or TalkBack's longer time) without a touch anywhere, a sheet's included; never while TalkBack
+ * is on, where it would move the page under a reader (4d-2 §6.4).
  */
 @Composable
 internal fun rememberWeekShown(today: LocalDate): WeekShown {
     val shown = remember(today) { WeekShown() }
-    LaunchedEffect(shown, shown.weeks, shown.touches) {
-        if (shown.weeks > 0) {
-            delay(BACK_TO_THIS_WEEK_MS)
+    val activity = LocalUserActivity.current
+    val touches by activity.touches.collectAsState()
+    val exploring by activity.exploring.collectAsState()
+    LaunchedEffect(shown, shown.weeks, touches, exploring) {
+        if (shown.weeks > 0 && !exploring) {
+            delay(activity.timeout(BACK_TO_THIS_WEEK_MS))
             shown.show(0)
         }
     }
     return shown
-}
-
-/** Calls [onTouch] for every finger that goes down inside, before the children see it, without taking it. */
-internal fun Modifier.onEveryTouch(onTouch: () -> Unit): Modifier = pointerInput(onTouch) {
-    awaitPointerEventScope {
-        while (true) {
-            if (awaitPointerEvent(PointerEventPass.Initial).type == PointerEventType.Press) onTouch()
-        }
-    }
 }

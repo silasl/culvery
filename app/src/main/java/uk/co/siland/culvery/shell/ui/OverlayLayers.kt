@@ -24,8 +24,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlinx.coroutines.delay
+import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.ui.HhToast
 import uk.co.siland.culvery.core.ui.ShellTokens
+import uk.co.siland.culvery.core.ui.toastMillis
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ToastMessage
 
@@ -33,8 +35,9 @@ import uk.co.siland.culvery.shell.ToastMessage
  * The shell with its overlay layers stacked over it: sheet, then [pinPad] over the sheet, then toasts over everything.
  * The layers need a parent with its own graphics layer: removing a node redraws only its nearest layered ancestor,
  * and the composition root has none, so a layer closed with no other animation running (a scrim tap, a toast timing
- * out) would get a layout pass but no new frame and stay on screen. Every touch anywhere in them, sheets and PIN pads
- * included, goes to [onTouch] before anything handles it (4a design D5: Settings stays open while used).
+ * out) would get a layout pass but no new frame and stay on screen. Every finger down anywhere in them, sheets and PIN
+ * pads included, goes to [onTouch] before anything handles it; the session hears of it from [UserActivity] a moment
+ * later, which is always before the finger lifts to click.
  * While a sheet or the PIN pad shows, what it covers is hidden from TalkBack; the toasts never are.
  */
 @Composable
@@ -44,7 +47,8 @@ fun ShellLayers(
     onToastHidden: (Long) -> Unit,
     pinShowing: Boolean,
     pinPad: @Composable () -> Unit,
-    onTouch: (() -> Unit)? = null,
+    activity: UserActivity,
+    onTouch: () -> Unit,
     shell: @Composable () -> Unit,
 ) {
     val touched by rememberUpdatedState(onTouch)
@@ -55,7 +59,7 @@ fun ShellLayers(
             .pointerInput(Unit) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    touched?.invoke()
+                    touched()
                 }
             },
     ) {
@@ -63,7 +67,7 @@ fun ShellLayers(
         Box(Modifier.fillMaxSize().then(if (overlay.isShowing || pinShowing) Modifier.clearAndSetSemantics {} else Modifier)) { shell() }
         OverlayLayer(overlay, hidden = pinShowing)
         pinPad()
-        ToastLayer(toast, onHidden = onToastHidden)
+        ToastLayer(toast, activity, onHidden = onToastHidden)
     }
 }
 
@@ -89,13 +93,13 @@ fun OverlayLayer(state: OverlayState, hidden: Boolean = false) {
 
 /**
  * Draws [toast] bottom-centre, 28 dp above the bottom or above the on-screen keyboard while it shows (hand-off §7),
- * and reports it hidden after 3.5 s; a new toast restarts the timer.
+ * and reports it hidden after its reading time ([toastMillis]), or TalkBack's longer one; a new toast restarts the timer.
  */
 @Composable
-fun ToastLayer(toast: ToastMessage?, keyboard: WindowInsets = WindowInsets.ime, onHidden: (Long) -> Unit) {
+fun ToastLayer(toast: ToastMessage?, activity: UserActivity, keyboard: WindowInsets = WindowInsets.ime, onHidden: (Long) -> Unit) {
     val t = toast ?: return
     LaunchedEffect(t.id) {
-        delay(ShellTokens.TOAST_MILLIS)
+        delay(activity.timeout(toastMillis(t.message, t.urgent), hasControls = false))
         onHidden(t.id)
     }
     Box(

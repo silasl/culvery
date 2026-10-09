@@ -5,7 +5,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import java.time.LocalDate
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
@@ -34,7 +33,8 @@ internal fun ComingUpCardHost(repo: CalendarRepository, today: LocalDate) {
  * The week shown is today plus six days, or a later one the family stepped to (4c D10); [today] moves at midnight, so
  * the week rolls with it and is back on this week. Shows nothing until both flows load.
  * Add event and the column taps show only when there is a writable master calendar to add to. The reconnect chip
- * reconnects the first connection that needs it ([onReconnect]).
+ * reconnects the first connection that needs it ([onReconnect]). The return to this week counts every touch the shell
+ * sees (4d-2 §6.4).
  */
 @Composable
 internal fun WeekViewHost(
@@ -55,7 +55,6 @@ internal fun WeekViewHost(
     val s = sync ?: return
     WeekView(
         WeekViewState(w, today, s, nowMillis, shown.weeks),
-        modifier = Modifier.onEveryTouch(shown::touched),
         onOpen = open,
         onAdd = add,
         onWeeksAhead = shown::show,

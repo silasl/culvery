@@ -18,6 +18,7 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.shell.FakeAccessControl
@@ -33,15 +34,19 @@ class AppContentTest {
     private var settingsOpen by mutableStateOf(false)
     private var homeDrawn = 0
 
+    private val activity = FakeUserActivity()
+
     private fun show() = compose.setContent {
         CulveryTheme(dark = true) {
+            SessionTouches(activity, countsTouches(complete, settingsOpen)) { access.touch() }
             ShellLayers(
                 overlay = overlay,
                 toast = null,
                 onToastHidden = {},
                 pinShowing = false,
                 pinPad = {},
-                onTouch = touchTarget(complete, settingsOpen, access),
+                activity = activity,
+                onTouch = activity::touch,
             ) {
                 AppContent(
                     complete = complete,
@@ -91,6 +96,18 @@ class AppContentTest {
             overlay.show { HhSheet(PaddingValues()) { Text("Sheet", Modifier.testTag("sheet_text")) } }
         }
         compose.onNodeWithTag("sheet_text").performClick()
+        compose.waitForIdle()
+        assertThat(access.touches).isEqualTo(1)
+    }
+
+    /** A38: whatever UserActivity counts (a TalkBack gesture on the device) reaches the session as a finger does. */
+    @Test
+    fun aUserActivityTouchWhileSettingsIsOpenReachesTheSession() {
+        complete = true
+        settingsOpen = true
+        show()
+        activity.touch()
+        compose.waitForIdle()
         assertThat(access.touches).isEqualTo(1)
     }
 

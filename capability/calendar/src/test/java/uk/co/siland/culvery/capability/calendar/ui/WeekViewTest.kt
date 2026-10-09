@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -42,6 +43,8 @@ import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.weekTitle
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.LocalUserActivity
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import androidx.compose.ui.test.isHeading
@@ -55,8 +58,10 @@ class WeekViewTest {
 
     private val now = SampleUi.NOW
 
+    private val activity = FakeUserActivity()
+
     private fun show(content: @Composable () -> Unit) = compose.setContent {
-        CompositionLocalProvider(LocalShellNavigator provides navigator) {
+        CompositionLocalProvider(LocalShellNavigator provides navigator, LocalUserActivity provides activity) {
             CulveryTheme(dark = true) { content() }
         }
     }
@@ -306,39 +311,82 @@ class WeekViewTest {
         compose.onAllNodesWithContentDescription("Today, ", substring = true).assertCountEquals(0)
     }
 
-    /** A touch anywhere restarts the 2-minute wait, and still reaches what was touched. */
-    @Test
-    fun aTouchIsSeenWithoutBeingTaken() {
-        var touches = 0
-        val added = mutableListOf<LocalDate>()
-        show { WeekView(state(), Modifier.onEveryTouch { touches++ }, onAdd = { added += it }) }
-        compose.onNodeWithTag("week_add_${SampleUi.TODAY}").performClick()
-        assertThat(touches).isEqualTo(1)
-        assertThat(added).containsExactly(SampleUi.TODAY)
-    }
-
     /** With the clock paused, a state change from the test isn't seen by the composition until its writes are applied. */
     private fun applyStateChanges() = compose.runOnIdle { Snapshot.sendApplyNotifications() }
 
-    /** 4c §6.6: a later week goes back to this week after 2 minutes without a touch; a touch starts the wait again. */
-    @Test
-    fun aLaterWeekGoesBackToThisWeekAfterTwoMinutesWithoutATouch() {
-        compose.mainClock.autoAdvance = false
+    private fun showShown(): () -> WeekShown {
         lateinit var shown: WeekShown
         show {
             shown = rememberWeekShown(SampleUi.TODAY)
             Text(weekTitle(shown.weeks))
         }
-        compose.runOnIdle { shown.show(2) }
+        return { shown }
+    }
+
+    /** 4c §6.6, 4d-2 §6.4: a later week goes back after 2 minutes without a touch anywhere; a touch starts the wait again. */
+    @Test
+    fun aLaterWeekGoesBackToThisWeekAfterTwoMinutesWithoutATouch() {
+        compose.mainClock.autoAdvance = false
+        val shown = showShown()
+        compose.runOnIdle { shown().show(2) }
         applyStateChanges()
-        compose.mainClock.advanceTimeBy(BACK_TO_THIS_WEEK_MS - 1_000)
+        compose.mainClock.advanceTimeBy(BACK_TO_THIS_WEEK_MS - 100)
         compose.onNodeWithText("In 2 weeks").assertExists()
-        compose.runOnIdle { shown.touched() }
+        activity.touch()
         applyStateChanges()
-        compose.mainClock.advanceTimeBy(BACK_TO_THIS_WEEK_MS - 1_000)
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(BACK_TO_THIS_WEEK_MS - 100)
         compose.onNodeWithText("In 2 weeks").assertExists()
-        compose.mainClock.advanceTimeBy(2_000)
+        compose.mainClock.advanceTimeBy(200)
         compose.onNodeWithText("This week").assertExists()
+    }
+
+    @Test
+    fun withTalkBackOnALaterWeekStays() {
+        compose.mainClock.autoAdvance = false
+        activity.exploring.value = true
+        val shown = showShown()
+        compose.runOnIdle { shown().show(1) }
+        applyStateChanges()
+        compose.mainClock.advanceTimeBy(10 * 60_000L)
+        compose.onNodeWithText("Next week").assertExists()
+    }
+
+    /** Switched off mid-way, the 2-minute wait starts from that moment. */
+    @Test
+    fun turningTouchExplorationOffStartsTheWaitAgain() {
+        compose.mainClock.autoAdvance = false
+        activity.exploring.value = true
+        val shown = showShown()
+        compose.runOnIdle { shown().show(1) }
+        applyStateChanges()
+        compose.mainClock.advanceTimeBy(10 * 60_000L)
+        activity.exploring.value = false
+        applyStateChanges()
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(BACK_TO_THIS_WEEK_MS - 100)
+        compose.onNodeWithText("Next week").assertExists()
+        compose.mainClock.advanceTimeBy(200)
+        compose.onNodeWithText("This week").assertExists()
+    }
+
+    @Test
+    fun aLongTimeToTakeActionHoldsALaterWeekLonger() {
+        compose.mainClock.autoAdvance = false
+        activity.timeouts = { base, _ -> if (base == BACK_TO_THIS_WEEK_MS) 300_000L else base }
+        val shown = showShown()
+        compose.runOnIdle { shown().show(1) }
+        applyStateChanges()
+        compose.mainClock.advanceTimeBy(299_900)
+        compose.onNodeWithText("Next week").assertExists()
+        compose.mainClock.advanceTimeBy(200)
+        compose.onNodeWithText("This week").assertExists()
+    }
+
+    @Test
+    fun theWeeksTitleIsAPoliteLiveRegion() {
+        show { WeekView(state()) }
+        compose.onNodeWithTag("week_title").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
     }
 
     /** 4c §6.6: at midnight the view is back on this week, whatever it showed. */

@@ -22,8 +22,10 @@ import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.shell.ShellToasts
+import uk.co.siland.culvery.shell.ShellUserActivity
 
 /**
  * An application job's uncaught failure is logged and the process lives on; with the SupervisorJob its siblings keep
@@ -42,6 +44,9 @@ abstract class AppModule {
 
     @Binds
     abstract fun toaster(impl: ShellToasts): Toaster
+
+    @Binds
+    abstract fun userActivity(impl: ShellUserActivity): UserActivity
 
     @Binds
     abstract fun homeApp(impl: AndroidHomeApp): HomeApp

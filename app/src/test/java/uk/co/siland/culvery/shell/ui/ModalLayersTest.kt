@@ -21,6 +21,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.AppContent
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.hhClickable
@@ -44,6 +45,8 @@ class ModalLayersTest {
                 onToastHidden = {},
                 pinShowing = pinShowing,
                 pinPad = { if (pinShowing) Box(Modifier.fillMaxSize().semantics { paneTitle = "Enter your PIN" }) { Text("Pad key") } },
+                activity = FakeUserActivity(),
+                onTouch = {},
             ) {
                 AppContent(
                     complete = true,

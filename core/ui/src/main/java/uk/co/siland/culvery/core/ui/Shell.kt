@@ -46,7 +46,7 @@ object ShellTokens {
     val closeButton = 48.dp
     val closeIcon = 26.dp
 
-    // Toast: bottom-centre pill 28 dp above the bottom, padding 14×22, radius 26, `info` icon, 3.5 s.
+    // Toast: bottom-centre pill 28 dp above the bottom, padding 14×22, radius 26, `info` icon; its time is [toastMillis].
     val toastBottom = 28.dp
     val toastPaddingV = 14.dp
     val toastPaddingH = 22.dp
@@ -54,7 +54,6 @@ object ShellTokens {
     val toastIcon = 22.dp
     val toastIconGap = 10.dp
     val toastMaxWidth = 720.dp
-    const val TOAST_MILLIS = 3_500L
 
     /** Home's cards (hand-off: Today's `border-radius: 26px`): the calendar's and the weather's. */
     val homeCardRadius = 26.dp
@@ -74,6 +73,13 @@ object ShellType {
 
     /** 12 sp / 700: the status bar's "Sign out". */
     val signOut = HhType.labelSmall
+}
+
+/** How long a toast shows (4d-2 §6.5): 4 s, 6 s for an error or refusal, longer for long text, at most 8 s. */
+fun toastMillis(message: String, urgent: Boolean): Long {
+    val base = if (urgent) 6_000L else 4_000L
+    // 50 ms a character is a slow reader's pace; 40 characters fit in the base time.
+    return minOf(base + 50L * (message.length - 40).coerceAtLeast(0), 8_000L)
 }
 
 /**
