@@ -30,6 +30,8 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
+import uk.co.siland.culvery.capability.calendar.ReviewCalendarsStep
+import uk.co.siland.culvery.capability.calendar.YOUR_CALENDARS_LINE
 import uk.co.siland.culvery.capability.calendar.CalendarReview
 import uk.co.siland.culvery.capability.calendar.CalendarSetup
 import uk.co.siland.culvery.capability.calendar.CalendarSource
@@ -196,6 +198,15 @@ class CalendarConnectHostTest {
         waitFor { access.toasts.messages.isNotEmpty() }
         assertThat(access.requests.map { it.label }).containsExactly(CONNECT_LABEL)
         assertThat(access.toasts.messages).containsExactly("Google Calendar reconnected.")
+    }
+
+    @Test
+    fun theWizardsCalendarsStepHasItsLine() {
+        runBlocking { store.addConnection(googleConnection, google.sourceList, emptyMap(), masterSourceId = "family@example.com") }
+        val clock = HouseholdClock(HouseholdZone(household).zone, WallClock { System.currentTimeMillis() }, scope)
+        val step = ReviewCalendarsStep(CalendarRepository(store, household, HouseholdZone(household), setOf(google), emptySet()), review, connections, clock)
+        compose.setContent { CulveryTheme(dark = true) { CompositionLocalProvider(LocalOverlayHost provides overlay, LocalShellNavigator provides RecordingNavigator()) { step.Content(onNext = {}) } } }
+        waitFor { compose.onAllNodesWithText(YOUR_CALENDARS_LINE).fetchSemanticsNodes().isNotEmpty() }
     }
 
     private fun showSettingsCalendars() {

@@ -207,6 +207,7 @@ class ShellViewModelTest {
     fun usingOtherAppsSaysWhatHappensNext() = runTest {
         access.result = admin
         val vm = vm()
+        assertThat(toasts.current.value).isNull()
         vm.exitKiosk()
         runCurrent()
         assertThat(toasts.current.value?.message).isEqualTo("You can use other apps now. Culvery locks again when it next opens.")

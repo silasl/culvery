@@ -147,7 +147,7 @@ class SetupScreenshotTest {
         }
 
     private fun you(name: String, dark: Boolean) = step(name, dark, 2, Forward.Next("Next", enabled = true)) {
-        StepTitle(WHOS_SETTING_UP)
+        StepTitle(WHOS_SETTING_UP, YOU_LINE)
         YouFormContent(YouForm().apply { this.name = "Alex"; pin = "1234" }, onSetPin = {})
     }
 

@@ -44,7 +44,7 @@ class KioskPage @Inject constructor(private val homeApp: HomeApp) : SettingsPage
         } else {
             HomeAppPrompt(onChoose = navigator::chooseHomeApp)
         }
-        // The how-to the toasts used to hold, where there is time to read it.
+        // Shown whether or not Culvery is the home app: the page is where there is time to read it.
         Text(HOME_APP_HOW_TO, style = SetupType.secondary, color = Culvery.colors.mute, modifier = Modifier.testTag("kiosk_how_to"))
         HhButton(USE_OTHER_APPS, navigator::exitKiosk, Modifier.testTag("settings_exit_kiosk"), on = ButtonSurface.Bg)
     }

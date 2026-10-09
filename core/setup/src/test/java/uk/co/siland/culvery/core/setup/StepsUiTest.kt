@@ -123,6 +123,13 @@ class StepsUiTest {
     }
 
     @Test
+    fun theYouStepTellsThemTheyWillBeTheAdmin() {
+        val you = YouStep(household, access.pins, access.control, PeopleEditor(household, access.pins, access.control, access.toasts), SetupSessionGate(household, access.control))
+        compose.setContent { CulveryTheme(dark = true) { CompositionLocalProvider(LocalOverlayHost provides overlay) { Column { you.Content(onNext = {}) } } } }
+        compose.awaitText("You’ll be the Admin — you can change settings and people. Admins need a PIN.")
+    }
+
+    @Test
     fun leavingTheStepWithoutNextDropsTheHeldPin() {
         val you = YouStep(household, access.pins, access.control, PeopleEditor(household, access.pins, access.control, access.toasts), SetupSessionGate(household, access.control))
         you.form.pin = "1357"

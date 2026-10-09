@@ -114,10 +114,21 @@ class PeopleUiTest {
     }
 
     @Test
-    fun anAdminIsNeverToldTheyCanOnlyLook() {
+    fun anAdminWithoutAPinIsNeverToldTheyCanOnlyLook() {
         show()
-        compose.onNodeWithTag("person_Alex").performClick()
-        compose.onNodeWithText("can only look", substring = true).assertDoesNotExist()
+        compose.onNodeWithTag("people_add").performClick()
+        compose.onNodeWithText("Without a PIN, they can only look.").assertExists()
+        compose.onNodeWithTag("role_ADMIN").performClick()
+        compose.onNodeWithTag("person_set_pin").assertExists()
+        compose.onNodeWithTag("person_look_only").assertDoesNotExist()
+    }
+
+    @Test
+    fun aChildWithoutAPinIsToldTheyCanOnlyLook() {
+        show()
+        compose.onNodeWithTag("people_add").performClick()
+        compose.onNodeWithTag("role_CHILD").performClick()
+        compose.onNodeWithTag("person_look_only").assertExists()
     }
 
     @Test
