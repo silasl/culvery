@@ -1,0 +1,24 @@
+// CopyScanTest's self-test: one case of each rule. The master word in this comment is never read.
+/** KDoc that says master and can't. */
+fun banned() { Text("Make master") }
+fun inflected() { Text("It syncs every hour") }
+fun tagged() = Modifier.testTag("Make master now")
+fun logged() = Log.w(TAG, "The master calendar can't be read")
+fun loggedOverLines() = Log.w(
+    TAG,
+    "The master calendar can't be read",
+)
+fun templated(x: Int) = "Shown ${x.toString().padStart(2, '0')} times"
+fun nested(admin: Boolean) = "That PIN can’t do this. ${if (admin) "Ask an Admin." else "Ask the master."}"
+fun required(x: Int) = require(x > 0) { "x can't be zero" }
+fun kotlinError(): Nothing = error("can't happen")
+fun spokenError(bad: Boolean) = Modifier.semantics { if (bad) error("That name's taken") }
+fun shownRefusal(): Nothing = throw WriteRejectedException("Can't change this")
+fun hiddenFailure(): Nothing = throw IllegalStateException("can't happen")
+fun quoted() = "No towns match \"Brigh\"."
+fun raw() = """He said "go" there"""
+fun apostrophe() = "That's it"
+fun identifier() = "kiosk"
+fun key() = "settings.page"
+fun pattern() = Regex("(?:['’]s)?")
+fun curly() = "That’s it — “quoted” — Settings › Apps."
