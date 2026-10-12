@@ -8,7 +8,9 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.click
@@ -56,6 +58,38 @@ class PinPadTest {
         tap("1", "2", "3", "4")
         compose.waitForIdle()
         assertThat(request.answer.getCompleted()).isEqualTo("1234")
+    }
+
+    /** Disabled keys at the fourth digit made TalkBack read the focused key again, which drowned the refusal. */
+    @Test
+    fun theKeysStayEnabledAtTheFourthDigitAndAFifthIsIgnored() {
+        val submitted = mutableListOf<String>()
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                PinPadFrame("Who’s this?", line = null, message = "", wrongPin = false, enabled = true, onSubmit = { submitted += it }, onCancel = {})
+            }
+        }
+        tap("1", "2", "3", "4")
+        compose.onNodeWithTag("pin_key_4").assertIsEnabled()
+        tap("5")
+        compose.waitForIdle()
+        assertThat(submitted).containsExactly("1234")
+    }
+
+    /**
+     * A retry keeps the pad's nodes and empties the digits. Rebuilt nodes moved TalkBack's focus to the new key, and its
+     * reading of that key flushed "That PIN can’t do this. Ask an Admin." before it was said.
+     */
+    @Test
+    fun aRetryKeepsThePadAndEmptiesTheDigits() {
+        controller.open("Change settings", null, null)
+        show()
+        val key = compose.onNodeWithTag("pin_key_4").fetchSemanticsNode().id
+        tap("1", "2", "3")
+        controller.open("Change settings", PinError.NotAllowed("That PIN can’t do this. Ask an Admin."), null)
+        compose.waitForIdle()
+        assertThat(compose.onNodeWithTag("pin_key_4").fetchSemanticsNode().id).isEqualTo(key)
+        compose.onNodeWithTag("pin_dots").assertContentDescriptionEquals("0 of 4 digits entered")
     }
 
     @Test
@@ -132,6 +166,19 @@ class PinPadTest {
         controller.open("Change settings", PinError.NotAllowed("That PIN can’t do this. Ask an Admin."), null)
         show()
         compose.onNodeWithText("That PIN can’t do this. Ask an Admin.").assertExists()
+    }
+
+    /** The pad stays up between tries, so a lock that arrives on a retry must start its own countdown. */
+    @Test
+    fun aLockThatArrivesOnARetryDisablesTheKeys() {
+        compose.mainClock.autoAdvance = false
+        controller.open("Change settings", PinError.WrongPin, null)
+        show()
+        compose.onNodeWithTag("pin_key_1").assertIsEnabled()
+        controller.open("Change settings", PinError.WrongPin, System.currentTimeMillis() + 30_000)
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("pin_key_1").assertIsNotEnabled()
+        compose.onNodeWithText("Too many tries", substring = true).assertExists()
     }
 
     @Test

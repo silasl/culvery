@@ -22,10 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -85,19 +83,17 @@ fun PinPadHost(
                 controller.cancel()
             }
         }
-        // Keyed on the request so each retry (e.g. after a wrong PIN) starts with empty digits.
-        key(r) {
-            PinPadSheet(
-                label = r.label,
-                reason = r.reason,
-                error = r.error,
-                lockedUntilMillis = r.lockedUntilMillis,
-                onSubmit = controller::submit,
-                onCancel = controller::cancel,
-                overSheet = overSheet,
-                nowMillis = nowMillis,
-            )
-        }
+        PinPadSheet(
+            label = r.label,
+            reason = r.reason,
+            error = r.error,
+            lockedUntilMillis = r.lockedUntilMillis,
+            onSubmit = controller::submit,
+            onCancel = controller::cancel,
+            overSheet = overSheet,
+            nowMillis = nowMillis,
+            clearOn = r,
+        )
     }
 }
 
@@ -127,16 +123,21 @@ fun PinPadSheet(
     onCancel: () -> Unit,
     overSheet: Boolean = false,
     nowMillis: () -> Long = System::currentTimeMillis,
+    clearOn: Any? = null,
 ) {
     // Counts down from the initial value rather than re-reading the wall clock, so tests with a
     // virtual frame clock stay deterministic.
     val firstSeconds = remember(lockedUntilMillis) { secondsUntil(lockedUntilMillis, nowMillis()) }
-    val secondsLeft by produceState(firstSeconds, lockedUntilMillis) {
-        while (value > 0) {
+    // Reset in the same composition as the lock: the pad stays up between tries, so a lock arriving on a retry must
+    // show at once, not after a stale count of 0.
+    val countdown = remember(lockedUntilMillis) { mutableIntStateOf(firstSeconds) }
+    LaunchedEffect(countdown) {
+        while (countdown.intValue > 0) {
             delay(1_000)
-            value -= 1
+            countdown.intValue -= 1
         }
     }
+    val secondsLeft = countdown.intValue
     val locked = secondsLeft > 0
     val message = when {
         locked -> tooManyTries(secondsLeft)
@@ -156,6 +157,7 @@ fun PinPadSheet(
         onCancel = onCancel,
         overSheet = overSheet,
         paneTitle = ENTER_YOUR_PIN,
+        clearOn = clearOn,
     )
 }
 
@@ -174,30 +176,28 @@ fun ChoosePinPad(onChosen: (String) -> Unit, onCancel: () -> Unit, overSheet: Bo
     var first by remember { mutableStateOf<String?>(null) }
     var mismatches by remember { mutableIntStateOf(0) }
     val retrying = first == null && mismatches > 0
-    // A new key for each stage, so the pad starts with no digits.
-    key(first, mismatches) {
-        PinPadFrame(
-            title = if (first == null) CHOOSE_PIN else ENTER_IT_AGAIN,
-            line = null,
-            message = if (retrying) PINS_DIDNT_MATCH else "",
-            wrongPin = retrying,
-            enabled = true,
-            onSubmit = { pin ->
-                val chosen = first
-                when {
-                    chosen == null -> first = pin
-                    chosen == pin -> onChosen(pin)
-                    else -> {
-                        first = null
-                        mismatches++
-                    }
+    PinPadFrame(
+        title = if (first == null) CHOOSE_PIN else ENTER_IT_AGAIN,
+        line = null,
+        message = if (retrying) PINS_DIDNT_MATCH else "",
+        wrongPin = retrying,
+        enabled = true,
+        onSubmit = { pin ->
+            val chosen = first
+            when {
+                chosen == null -> first = pin
+                chosen == pin -> onChosen(pin)
+                else -> {
+                    first = null
+                    mismatches++
                 }
-            },
-            onCancel = onCancel,
-            overSheet = overSheet,
-            drawScrim = drawScrim,
-        )
-    }
+            }
+        },
+        onCancel = onCancel,
+        overSheet = overSheet,
+        drawScrim = drawScrim,
+        clearOn = first to mismatches,
+    )
 }
 
 /**
@@ -217,13 +217,19 @@ fun PinPadFrame(
     overSheet: Boolean = false,
     drawScrim: Boolean = true,
     paneTitle: String = title,
+    clearOn: Any? = null,
 ) {
     val c = Culvery.colors
-    var digits by remember { mutableStateOf("") }
-    val canType = enabled && digits.length < PinHasher.PIN_LENGTH
+    // Emptied for each try by [clearOn], not by rebuilding the pad: new nodes move TalkBack's focus, and its reading of
+    // the focused key flushes the try's message before it is said.
+    var digits by remember(clearOn) { mutableStateOf("") }
+    // The keys stay enabled at the fourth digit: disabling them made TalkBack read the focused key again, which drowned
+    // the message the PIN brought. A fifth digit is ignored instead.
     val type: (String) -> Unit = { d ->
-        digits += d
-        if (digits.length == PinHasher.PIN_LENGTH) onSubmit(digits)
+        if (enabled && digits.length < PinHasher.PIN_LENGTH) {
+            digits += d
+            if (digits.length == PinHasher.PIN_LENGTH) onSubmit(digits)
+        }
     }
 
     val cancel by rememberUpdatedState(onCancel)
@@ -292,7 +298,7 @@ fun PinPadFrame(
                 Column(verticalArrangement = Arrangement.spacedBy(PinPadDimens.keyRowGap)) {
                     listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9")).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(PinPadDimens.keyColumnGap)) {
-                            row.forEach { d -> DigitKey(d, enabled = canType) { type(d) } }
+                            row.forEach { d -> DigitKey(d, enabled = enabled) { type(d) } }
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(PinPadDimens.keyColumnGap)) {
@@ -318,7 +324,7 @@ fun PinPadFrame(
                                 modifier = Modifier.wrapContentWidth(unbounded = true),
                             )
                         }
-                        DigitKey("0", enabled = canType) { type("0") }
+                        DigitKey("0", enabled = enabled) { type("0") }
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
