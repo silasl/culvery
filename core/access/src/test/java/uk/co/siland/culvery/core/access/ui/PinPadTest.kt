@@ -1,5 +1,8 @@
 package uk.co.siland.culvery.core.access.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -71,6 +74,8 @@ class PinPadTest {
         }
         tap("1", "2", "3", "4")
         compose.onNodeWithTag("pin_key_4").assertIsEnabled()
+        // A submitted PIN is being checked: Delete can't reopen the dots for a PIN that would never be checked.
+        compose.onNodeWithTag("pin_backspace").assertIsNotEnabled()
         tap("5")
         compose.waitForIdle()
         assertThat(submitted).containsExactly("1234")
@@ -179,6 +184,18 @@ class PinPadTest {
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithTag("pin_key_1").assertIsNotEnabled()
         compose.onNodeWithText("Too many tries", substring = true).assertExists()
+    }
+
+    /** When the wait ends nobody has typed, so the last refusal isn't said again. */
+    @Test
+    fun theEndOfALockSaysYouCanTryAgainAndClearsTheDotsError() {
+        compose.mainClock.autoAdvance = false
+        controller.open("Change settings", PinError.WrongPin, System.currentTimeMillis() + 2_000)
+        show()
+        compose.mainClock.advanceTimeBy(3_000)
+        compose.onNodeWithTag("pin_message").assertContentDescriptionEquals("You can try again.")
+        compose.onNodeWithTag("pin_dots").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Error))
+        compose.onNodeWithTag("pin_key_1").assertIsEnabled()
     }
 
     @Test
@@ -350,6 +367,23 @@ class PinPadTest {
         val request = controller.open("Change settings", null, null)
         show(overSettings = true)
         compose.mainClock.advanceTimeBy(EDIT_HOLD_MS + 900)
+        assertThat(request.answer.isCompleted).isFalse()
+        compose.mainClock.advanceTimeBy(200)
+        assertThat(request.answer.getCompleted()).isNull()
+    }
+
+    /** Settings closing under the pad puts it back on its own 2 minutes, not the 10:01 it waited over Settings. */
+    @Test
+    fun whenSettingsClosesUnderThePadItCancelsAtTwoMinutes() {
+        compose.mainClock.autoAdvance = false
+        val request = controller.open("Change settings", null, null)
+        var overSettings by mutableStateOf(true)
+        compose.setContent { CulveryTheme(dark = true) { PinPadHost(controller, activity, overSettings = overSettings) } }
+        compose.mainClock.advanceTimeBy(60_000)
+        overSettings = false
+        compose.runOnIdle { Snapshot.sendApplyNotifications() }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(119_900)
         assertThat(request.answer.isCompleted).isFalse()
         compose.mainClock.advanceTimeBy(200)
         assertThat(request.answer.getCompleted()).isNull()

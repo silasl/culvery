@@ -9,6 +9,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -158,6 +159,8 @@ class ReviewCalendarsTest {
         compose.onNodeWithText("Main").assertExists()
         compose.onNodeWithText("New events go here").assertExists()
         compose.onNodeWithTag("review_show_family").assertIsNotEnabled()
+        // 48 tall: the draw-only switch no longer brings Material's touch size.
+        compose.onNodeWithTag("review_show_chores").assertHeightIsAtLeast(48.dp)
         compose.onNodeWithTag("review_show_chores").assertIsEnabled().performClick()
         assertThat(shown).isEqualTo("chores" to true)
     }

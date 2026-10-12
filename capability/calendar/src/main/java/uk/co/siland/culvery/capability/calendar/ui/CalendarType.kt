@@ -295,6 +295,8 @@ internal object CalendarDimens {
     // `accentSoft`, radius 12, padding 4×10. The wizard's Connect card 380×460, about a Home card's size.
     val reviewBlockGap = 12.dp
     val reviewItemGap = 12.dp
+    /** The Show row's touch height: its switch is draw-only, so it brings no touch size of its own. */
+    val reviewShowMinHeight = 48.dp
     val badgeRadius = 12.dp
     val badgePaddingV = 4.dp
     val badgePaddingH = 10.dp

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectableGroup
@@ -288,6 +289,7 @@ private fun SourceRow(
                 horizontalArrangement = Arrangement.spacedBy(CalendarDimens.reviewItemGap),
                 modifier = Modifier
                     .testTag("review_show_$id")
+                    .heightIn(min = CalendarDimens.reviewShowMinHeight)
                     .semantics {
                         contentDescription = "$SHOW ${source.source.name}"
                         if (source.isMaster) stateDescription = ALWAYS_SHOWN

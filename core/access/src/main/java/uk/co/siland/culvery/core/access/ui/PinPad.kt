@@ -105,6 +105,8 @@ internal const val ENTER_YOUR_PIN = "Enter your PIN"
 
 internal const val WRONG_PIN = "Wrong PIN — try again."
 
+internal const val TRY_AGAIN = "You can try again."
+
 internal fun tooManyTries(seconds: Int): String {
     val minutes = seconds / 60L
     val rest = seconds % 60L
@@ -147,8 +149,11 @@ fun PinPadSheet(
     }
     val secondsLeft = countdown.intValue
     val locked = secondsLeft > 0
+    // Nobody has typed since the lock began, so its end doesn't repeat the try before it.
+    val lockEnded = firstSeconds > 0 && !locked
     val message = when {
         locked -> tooManyTries(secondsLeft)
+        lockEnded -> TRY_AGAIN
         error is PinError.WrongPin -> WRONG_PIN
         error is PinError.NotAllowed -> error.message
         else -> ""
@@ -159,7 +164,7 @@ fun PinPadSheet(
         message = message,
         // Said once, from the lockout's first value: a line read every second would drown everything else.
         spokenMessage = if (locked) tooManyTries(firstSeconds) else message,
-        wrongPin = error is PinError.WrongPin,
+        wrongPin = error is PinError.WrongPin && !lockEnded,
         enabled = !locked,
         onSubmit = onSubmit,
         onCancel = onCancel,
@@ -339,7 +344,8 @@ fun PinPadFrame(
                                 .testTag("pin_backspace")
                                 .size(PinPadDimens.key)
                                 .clip(CircleShape)
-                                .hhClickable({ digits = digits.dropLast(1) }, enabled = digits.isNotEmpty() && enabled),
+                                // Off once four are in: that PIN is being checked.
+                                .hhClickable({ digits = digits.dropLast(1) }, enabled = digits.length in 1 until PinHasher.PIN_LENGTH && enabled),
                         ) {
                             HhIcon(Icons.BACKSPACE, size = PinPadDimens.backspaceIcon, tint = c.ink, contentDescription = "Delete last digit")
                         }

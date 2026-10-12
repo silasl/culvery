@@ -237,9 +237,7 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 - The Settings › Calendars empty-state line names Google Calendar even with no connectable provider (unreachable in a release build).
 
 **Tests and hardening (from the 4d-2 task reviews)**
-- FLAG: the Show row's touch target is about 32 dp since its switch became draw-only; add `minimumInteractiveComponentSize` or `heightIn` and `assertHeightIsAtLeast(48.dp)` (`ReviewCalendars.kt`).
 - FLAG: "find out why" and "not available" are also said on a selected disabled Who chip and on a busy review picker chip, and the custom `stateDescription` hides "selected"; add them only when `!enabled && !selected` (`EventEditorSheet.kt`, `Controls.kt`).
-- FLAG: no test that the PIN pad re-keys to 2 minutes when `overSettings` turns false; dropping it from the `LaunchedEffect` keys fails nothing, and the pad would stay up for 10:01 over the wall (`OverlayLayers.kt`).
 - FLAG: `PeopleUiTest` hit "connection pool has been closed" at teardown twice (once in `theMoveUpActionFromTalkBackMovesSomeone`, once in Task 10); it passes in isolation.
 - `assertClickablesHaveRoleAndLabel`: its `EditableText` skip could skip a clickable wrapper around a text field (skip only when `Role` is null); its false-pass routes (a child `onClick` folded into a merging parent, `clearAndSetSemantics` removing `onClick`) are undocumented in the KDoc; no test for a label that repeats merged child text.
 - `testImplementation(testFixtures(...))` sits first in three build files.
@@ -250,9 +248,9 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 - Nested pane titles (person sheet over Settings, editor over picker) are confirmed only by the emulator check.
 - Toaster KDoc says toasts "stay longer", true only since `toastMillis`.
 - No test that typing clears `nameError`, or that a non-`nameTaken` refusal leaves no `Error` (`PersonSheet`); `PeopleUiTest`'s `waitUntil` uses `fetchSemanticsNode`, which throws instead of retrying.
-- When a lockout ends the PIN pad's live region says "Wrong PIN — try again" with no new attempt (stale words); checked in the emulator check.
 - The §5.7 stable-total test became a hidden-step count test; its name ("…AndSpeakEachOne") misleads.
 - Explicit `mergeDescendants` on the week chip and Today row is redundant (`hhClickable` merges) and no test can detect it.
+- `WeekView.kt:389`: the `activity.timeout(BACK_TO_THIS_WEEK_MS)` call only runs when `!exploring`, where `timeout()` returns the base; a plain `delay(BACK_TO_THIS_WEEK_MS)` says the same.
 - `SetupWiring.kt:50`: the `countsTouches` KDoc sits above `checksExpiryOnReturn`; move it down.
 - `OverlayLayers.kt:90`'s comment gives the wrong reason; `Overlays.kt:8`'s KDoc omits the Settings, wizard and `closesWhenIdle` exceptions; `SetupWiring`'s `booleanArray` box; `touch(edited)` on activity recreation re-arms the session (pre-existing).
 - The copy scan (`CopyScan.kt`): an `@label` head before a lambda is skipped; one-word apostrophe fragments skip the quote check; concatenation splits; `lineAt` is O(n) per literal; the `Log.`, `testTag`, `requireNotNull`, `checkNotNull`, `Regex` and `\w*Exception` exemptions have no fixtures.
@@ -268,8 +266,7 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 - "Searching…" wasn't heard when typing a town (too brief, or not announced); "No towns match …" was, once. The town results appearing aren't announced.
 - The toast "Event added on …" wasn't listened to with TalkBack on (the PIN was typed with TalkBack off); other toasts were said once.
 - A.4 path 12 (sleep past the session) skipped: `adb root` is refused on the Google Play image.
-- Stopped before the end: what TalkBack says when a lockout ends; the PIN pad over an edited person sheet outliving Settings by a second (A.4 path 13, second half); focus parked on a scrolled Settings list (path 10, second half). Run them on the SM-T510.
-- The lockout line reads "Too many tries — wait 240 seconds." once failures double the lock; minutes would read better past 60 seconds (wording, for Part B).
+- Stopped before the end: what TalkBack says when a lockout ends (now "You can try again.", tested in Robolectric only); the PIN pad over an edited person sheet outliving Settings by a second (A.4 path 13, second half); focus parked on a scrolled Settings list (path 10, second half). Run them on the SM-T510.
 
 - A described row is two steps at each call site (a description on the parent, `shownNotSpoken()` on the children: Today and Coming up rows, week chips, the header weather), so the next one can forget the hiding; `assertNothingReadTwice` catches it only where a test draws it. A `DescribedRow(description) { … }` would own both (simplify review).
 - `HhTextField` hides a placeholder only when it equals the label; a `placeholder: String? = null` that defaults to the label would say so instead of comparing strings (simplify review).

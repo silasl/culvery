@@ -213,3 +213,5 @@ Without TalkBack. The user goes through these screens and says what reads wrong;
    - The person sheet’s blank message line pushes "Set PIN" to the scroll edge above the confirm card.
 
 Ask: "Do the words read right? Anything to change before 4d-2 is done?"
+
+**Outcome (2026-10-12):** the user went through Part B and ruled the words fine, §7's carried items included (kept as they are). Rulings in the same pass: the calendar's refusal toasts keep the person's name; the PIN pad's refusal differs from a wrong PIN on purpose (it names no one and counts towards the lockout); a long lockout says minutes ("wait 4 minutes", 58acff7); the end of a lockout says "You can try again." instead of repeating the last refusal.
