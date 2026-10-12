@@ -25,6 +25,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -218,6 +219,16 @@ class ShellLayoutTest {
         val items = compose.onNodeWithTag("home_header_items").getUnclippedBoundsInRoot()
         assertThat(items.right.value).isWithin(1f).of(root.right.value)
         assertThat((date.bottom - items.bottom).value).isWithin(1f).of(4f)
+    }
+
+    /** The items sit level with the clock, so by position TalkBack read them between the clock and the date. */
+    @Test
+    fun theHeaderIsReadClockDateThenItems() {
+        home(item("weather", 10))
+        compose.onNodeWithTag("home_clock").onParent().assert(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true))
+        listOf("home_clock" to 0f, "home_date" to 1f, "home_header_items" to 2f).forEach { (tag, index) ->
+            compose.onNodeWithTag(tag).assert(SemanticsMatcher.expectValue(SemanticsProperties.TraversalIndex, index))
+        }
     }
 
     @Test

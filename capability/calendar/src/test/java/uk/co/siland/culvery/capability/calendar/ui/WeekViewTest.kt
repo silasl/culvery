@@ -22,6 +22,8 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -31,6 +33,7 @@ import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
@@ -49,6 +52,7 @@ import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 
 @RunWith(AndroidJUnit4::class)
 class WeekViewTest {
@@ -126,11 +130,12 @@ class WeekViewTest {
         show { WeekView(state()) }
         compose.onNodeWithContentDescription("Swimming, Mia, Wednesday 16:00, repeats").assert(isButton)
         compose.onNodeWithContentDescription("Dinner with Jo & Priya, Alex, Wednesday 19:30").assertExists()
-        // One merged node holds the chip's texts: without the merge each Text is its own node and has no description.
+        // The chip's texts show under it, kept out of what TalkBack reads, so the chip is said once.
         compose.onAllNodes(hasText("Dinner with Jo & Priya")).assertCountEquals(1)
-        compose.onAllNodes(hasText("Dinner with Jo & Priya"))[0]
+        compose.onAllNodes(hasText("Dinner with Jo & Priya"))[0].onParent()
             .assertContentDescriptionEquals("Dinner with Jo & Priya, Alex, Wednesday 19:30")
         compose.onAllNodes(hasText("19:30 · Alex", substring = true)).assertCountEquals(1)
+        compose.assertNothingReadTwice()
     }
 
     @Test
@@ -422,7 +427,7 @@ class WeekViewTest {
         show { WeekView(state(sync(needsSignIn = listOf("Google"))).copy(weeksAhead = 1), onAdd = {}) }
         compose.assertAccessible()
         compose.onNodeWithContentDescription("Add event on Wednesday 23 September", useUnmergedTree = true).assert(isButton)
-        val chip = compose.onNodeWithText("Parkrun")
+        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Parkrun")))
         assertThat(chip.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("open event details")
         val reconnect = compose.onNodeWithText("Google needs reconnecting")
         assertThat(reconnect.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("reconnect")

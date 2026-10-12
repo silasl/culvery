@@ -18,6 +18,7 @@ import uk.co.siland.culvery.core.ui.PersonPalette
 internal const val OPEN_EVENT_DETAILS = "open event details"
 internal const val RECONNECT_ACTION = "reconnect"
 internal const val EVENT_DETAILS = "Event details"
+internal const val DELETE_QUESTION = "Delete this event?"
 internal const val ALWAYS_SHOWN = "always shown: it’s the main calendar"
 internal const val EXPANDED = "expanded"
 internal const val COLLAPSED = "collapsed"

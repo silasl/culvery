@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
@@ -23,6 +24,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -36,6 +38,7 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 
 /** Native graphics: the sized tests check that rows fit the real card sizes, which needs real text metrics. */
 @RunWith(AndroidJUnit4::class)
@@ -155,9 +158,10 @@ class CardsTest {
         show { TodayCard(SampleUi.todayWithBadges) }
         val name = "Dinner with Jo & Priya, Alex, 19:30 to 21:00, saving"
         compose.onNodeWithContentDescription(name).assert(isButton)
-        // One merged node holds the row's texts: without the merge each Text is its own node and has no description.
+        // The row's texts show in one node under the row, kept out of what TalkBack reads, so the name is said once.
         compose.onAllNodes(hasText("19:30", substring = true)).assertCountEquals(1)
-        compose.onAllNodes(hasText("19:30", substring = true))[0].assertContentDescriptionEquals(name)
+        compose.onAllNodes(hasText("19:30", substring = true))[0].onParent().assertContentDescriptionEquals(name)
+        compose.assertNothingReadTwice()
     }
 
     @Test
@@ -166,15 +170,15 @@ class CardsTest {
         compose.onNodeWithContentDescription("Office day, Alex, Thursday 09:00")
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
         compose.onAllNodes(hasText("Office day")).assertCountEquals(1)
-        compose.onAllNodes(hasText("Office day"))[0].assertContentDescriptionEquals("Office day, Alex, Thursday 09:00")
+        compose.onAllNodes(hasText("Office day"))[0].onParent().assertContentDescriptionEquals("Office day, Alex, Thursday 09:00")
+        compose.assertNothingReadTwice()
     }
 
     @Test
     fun todayRowsAreButtonsThatOpenTheirEvent() {
         val opened = mutableListOf<EventRef>()
         show { TodayCard(SampleUi.today, onOpen = { opened += it }) }
-        compose.onNodeWithText("School run").assert(hasClickAction())
-        compose.onNodeWithText("School run").performClick()
+        compose.onNode(hasClickAction() and hasAnyDescendant(hasText("School run"))).performClick()
         assertThat(opened).containsExactly(EventRef("sample", "family", "School run"))
     }
 
@@ -216,7 +220,7 @@ class CardsTest {
     @Test
     fun todayRowsSayTheyOpenTheirEventAndThePlusIsNamedOnce() {
         show { TodayCard(SampleUi.todayWithBadges, onAdd = {}) }
-        val row = compose.onNodeWithText("Dinner with Jo & Priya").assert(isButton)
+        val row = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Dinner with Jo & Priya"))).assert(isButton)
         assertThat(clickLabel(row)).isEqualTo("open event details")
         assertThat(clickLabel(compose.onNodeWithTag("today_add").assert(isButton))).isNull()
         compose.assertAccessible()

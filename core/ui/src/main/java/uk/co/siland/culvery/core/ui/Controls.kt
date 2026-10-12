@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -212,7 +213,13 @@ fun HhTextField(
                     .then(if (focused) Modifier.border(ControlTokens.fieldBorder, c.accent, shape) else Modifier)
                     .padding(horizontal = ControlTokens.fieldPaddingH),
             ) {
-                if (value.isEmpty()) Text(placeholder, style = ControlType.field, color = c.mute, maxLines = 1)
+                // A placeholder that only repeats the label would be read after it; a different one is a useful hint.
+                if (value.isEmpty()) {
+                    Text(
+                        placeholder, style = ControlType.field, color = c.mute, maxLines = 1,
+                        modifier = if (placeholder == label) Modifier.shownNotSpoken() else Modifier,
+                    )
+                }
                 inner()
             }
         },
@@ -222,16 +229,25 @@ fun HhTextField(
 /**
  * An in-page message that TalkBack hears appear. Compose speaks a live region only when a node it already has changes,
  * and leaves a node with no size out of the tree, so the line is always composed and one line tall while empty.
- * [spoken] is its description when it differs from what shows ("3 towns found" under a list).
+ * [spoken] is its description when it differs from what shows ("3 towns found" under a list). Not [live] when the same
+ * words are a field's error, which TalkBack already says as it appears.
  */
 @Composable
-fun HhMessageLine(message: String?, style: TextStyle, color: Color, tag: String, modifier: Modifier = Modifier, spoken: String? = message) {
+fun HhMessageLine(
+    message: String?,
+    style: TextStyle,
+    color: Color,
+    tag: String,
+    modifier: Modifier = Modifier,
+    spoken: String? = message,
+    live: Boolean = true,
+) {
     Text(
         message.orEmpty(),
         style = style,
         color = color,
         modifier = modifier.testTag(tag).semantics {
-            liveRegion = LiveRegionMode.Polite
+            if (live) liveRegion = LiveRegionMode.Polite
             if (spoken != null && spoken != message) contentDescription = spoken
         },
     )
@@ -259,11 +275,13 @@ fun HhPersonChip(name: String, color: Color, tag: String, enabled: Boolean, clic
 
 /**
  * A confirmation card on `dangerSoft`: [question] above two buttons. Keep sits on the left where the action that opened
- * the card was, so a double tap on it is harmless; the confirming button is [ButtonTone.Destroy].
+ * the card was, so a double tap on it is harmless; the confirming button is [ButtonTone.Destroy]. TalkBack announces
+ * [title] as the card appears, which it otherwise does silently under the focus it leaves on the sheet.
  */
 @Composable
 fun HhConfirmCard(
     tag: String,
+    title: String,
     keep: String,
     keepTag: String,
     confirm: String,
@@ -278,6 +296,8 @@ fun HhConfirmCard(
         verticalArrangement = Arrangement.spacedBy(ControlTokens.confirmGap),
         modifier = Modifier
             .testTag(tag)
+            .semantics { paneTitle = title }
+            .readAsOne()
             .fillMaxWidth()
             .clip(RoundedCornerShape(ControlTokens.confirmRadius))
             .background(Culvery.colors.dangerSoft)

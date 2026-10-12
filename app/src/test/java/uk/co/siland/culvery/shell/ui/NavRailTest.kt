@@ -36,6 +36,13 @@ class NavRailTest {
         }
     }
 
+    /** Read through on its own: by position its tabs fell between the clock and the date. */
+    @Test
+    fun theRailIsReadThroughBeforeThePage() {
+        show()
+        compose.onNodeWithTag("rail_settings").onParent().assert(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true))
+    }
+
     @Test
     fun theRailsItemsAreTabsInOneGroupAndSettingsIsAButtonOutsideIt() {
         show()

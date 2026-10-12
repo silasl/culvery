@@ -36,6 +36,7 @@ fun HhCard(
 ) {
     Column(
         modifier = modifier
+            .readAsOne()
             .clip(RoundedCornerShape(radius))
             .background(color)
             .padding(padding),

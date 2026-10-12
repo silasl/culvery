@@ -17,6 +17,8 @@ import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
@@ -28,6 +30,7 @@ import uk.co.siland.culvery.core.plugin.HomePlacement
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.lineBox
+import uk.co.siland.culvery.core.ui.readAsOne
 
 private val CLOCK = DateTimeFormatter.ofPattern("HH:mm")
 private val DATE = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.UK)
@@ -57,11 +60,15 @@ fun HomeScreen(now: () -> LocalDateTime, placements: List<HomePlacement>, header
 @Composable
 fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modifier = Modifier) {
     val c = Culvery.colors
+    // Read clock, date, then the items: the items sit level with the clock, so by position they'd come between.
     Layout(
-        modifier = modifier,
+        modifier = modifier.readAsOne(),
         content = {
-            Text(now().format(CLOCK), style = HhType.clock, color = c.ink, modifier = Modifier.testTag("home_clock").lineBox(HhType.clock.lineHeight))
-            Text(now().format(DATE), style = HhType.date, color = c.mute, modifier = Modifier.testTag("home_date"))
+            Text(
+                now().format(CLOCK), style = HhType.clock, color = c.ink,
+                modifier = Modifier.testTag("home_clock").lineBox(HhType.clock.lineHeight).semantics { traversalIndex = 0f },
+            )
+            Text(now().format(DATE), style = HhType.date, color = c.mute, modifier = Modifier.testTag("home_date").semantics { traversalIndex = 1f })
             HeaderItems(items)
         },
     ) { measurables, constraints ->
@@ -88,7 +95,7 @@ private fun HeaderItems(items: List<HeaderItem>) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(HEADER_ITEM_GAP),
-        modifier = Modifier.testTag("home_header_items"),
+        modifier = Modifier.testTag("home_header_items").semantics { traversalIndex = 2f },
     ) {
         items.forEachIndexed { i, item ->
             key(item.id) {

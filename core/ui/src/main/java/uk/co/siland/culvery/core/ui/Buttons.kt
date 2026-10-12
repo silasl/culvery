@@ -122,7 +122,7 @@ fun HhButton(
             color = ink,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
+            modifier = Modifier.weight(1f, fill = false).then(if (spokenName != null) Modifier.shownNotSpoken() else Modifier),
         )
     }
 }

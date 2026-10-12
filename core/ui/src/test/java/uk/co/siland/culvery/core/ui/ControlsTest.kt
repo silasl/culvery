@@ -151,15 +151,25 @@ class ControlsTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("said: Couldn’t save — try again.")))
     }
 
+    /** The same words as a field's error: TalkBack says the error as it appears, so the line stays quiet. */
+    @Test
+    fun aMessageLineThatIsNotLiveHasNoLiveRegion() {
+        show { HhMessageLine("Someone is already called Alex.", ControlType.chip, Color.Red, "line", live = false) }
+        compose.onNodeWithTag("line")
+            .assertTextEquals("Someone is already called Alex.")
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
+    }
+
     @Test
     fun aConfirmCardsButtonsAreLargeButtonsThatStopWhileBusy() {
         var keeps = 0
         show {
             HhConfirmCard(
-                tag = "confirm", keep = "Keep", keepTag = "keep", confirm = "Remove", confirmTag = "remove",
+                tag = "confirm", title = "Remove Sam?", keep = "Keep", keepTag = "keep", confirm = "Remove", confirmTag = "remove",
                 busy = true, onKeep = { keeps++ }, onConfirm = {},
             ) { Text("Remove Sam?") }
         }
+        compose.onNodeWithTag("confirm").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Remove Sam?"))
         listOf("keep", "remove").forEach {
             compose.onNodeWithTag(it)
                 .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))

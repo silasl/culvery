@@ -13,9 +13,12 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
@@ -172,6 +175,27 @@ class PickersTest {
         compose.assertAccessible()
     }
 
+    /** TalkBack heard "Minute 0", "Hour 14" as the picker opened, a "Colon" stop, and both up buttons before either value. */
+    @Test
+    fun theTimePickerReadsEachColumnInTurnAndSpeaksAValueOnlyOnceItChanges() {
+        showTime(LocalTime.of(9, 0))
+        compose.onNodeWithText(":", useUnmergedTree = true).assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+        listOf("hour", "minute").forEach { column ->
+            compose.onNodeWithTag("${column}_value").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
+                .onParent().assert(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true))
+        }
+        compose.onNodeWithTag("hour_up").performClick()
+        compose.onNodeWithTag("hour_value").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        compose.onNodeWithTag("minute_value").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
+    }
+
+    @Test
+    fun theWeekdayLettersAreLeftToTheCells() {
+        showDates()
+        compose.onAllNodesWithText("Mon", useUnmergedTree = true).onFirst()
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+    }
+
     @Test
     fun thePickersTitlesAreHeadings() {
         showDates()
@@ -222,7 +246,6 @@ class PickersTest {
         showTime(LocalTime.of(7, 0))
         compose.onNodeWithTag("hour_value")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Hour 7")))
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
         compose.onNodeWithTag("hour_up").performClick()
         compose.onNodeWithTag("hour_value").assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Hour 8")))
         compose.onNodeWithTag("minute_value").assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Minute 0")))

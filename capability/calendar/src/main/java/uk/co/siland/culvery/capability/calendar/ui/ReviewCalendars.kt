@@ -60,6 +60,7 @@ import uk.co.siland.culvery.core.ui.HhSwitch
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.PersonChipInk
 import uk.co.siland.culvery.core.ui.rememberSingleAction
+import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /** 3a design §4.1: a status ("Needs reconnecting") or a sentence that says what to do. */
 internal const val NEEDS_RECONNECTING = "Needs reconnecting"
@@ -206,13 +207,15 @@ internal fun ReviewCalendars(
         connections.forEach { connection ->
             ConnectionHeader(connection.row, nowMillis, busy, actions.onReconnect, actions.onDisconnect)
             if (confirming != null && confirming.row.connection.id == connection.row.connection.id) {
+                val question = disconnectQuestion(confirming.row.service, confirming.queued)
                 HhConfirmCard(
                     tag = "review_confirm",
+                    title = question,
                     keep = KEEP, keepTag = "review_keep",
                     confirm = DISCONNECT, confirmTag = "review_confirm_disconnect",
                     busy = busy, onKeep = actions.onKeep, onConfirm = { actions.onConfirmDisconnect(confirming.row) },
                 ) {
-                    Text(disconnectQuestion(confirming.row.service, confirming.queued), style = ControlType.confirmTitle, color = Culvery.colors.ink)
+                    Text(question, style = ControlType.confirmTitle, color = Culvery.colors.ink)
                 }
             }
             connection.sources.forEach { source ->
@@ -300,7 +303,7 @@ private fun SourceRow(
                         onValueChange = { onShown(source, it) },
                     ),
             ) {
-                Text(SHOW, style = CalendarType.subtitle, color = c.mute)
+                Text(SHOW, style = CalendarType.subtitle, color = c.mute, modifier = Modifier.shownNotSpoken())
                 HhSwitch(source.mapping.visible, onCheckedChange = null, tag = "review_show_switch_$id", enabled = showToggles)
             }
         },

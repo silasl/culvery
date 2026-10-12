@@ -40,6 +40,7 @@ import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
+import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /**
  * Hand-off Home "Today" card. [events] null while loading: shows nothing rather than a false "Nothing on today".
@@ -106,7 +107,7 @@ private fun TodayRow(event: EventUi, onOpen: (EventRef) -> Unit) {
     ) {
         ColourBar(Color(event.person.color), width = CalendarDimens.todayBarWidth)
         Spacer(Modifier.width(CalendarDimens.todayBarGap))
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).shownNotSpoken()) {
             Text(event.title, style = HhType.rowTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(CalendarDimens.todayTimeTop))
             Text(

@@ -247,15 +247,17 @@ internal fun PersonEditorSheet(
                     }
                 }
             }
-            HhMessageLine(form.message, SetupType.message, c.danger, "person_message")
+            HhMessageLine(form.message, SetupType.message, c.danger, "person_message", live = form.message != form.nameError)
             if (confirmingRemove && existing != null) {
+                val question = removeQuestion(existing.person.name)
                 HhConfirmCard(
                     tag = "person_confirm",
+                    title = question,
                     keep = KEEP, keepTag = "person_keep",
                     confirm = REMOVE_PERSON, confirmTag = "person_confirm_remove",
                     busy = busy, onKeep = onKeep, onConfirm = onConfirmRemove,
                 ) {
-                    Text(removeQuestion(existing.person.name), style = ControlType.confirmTitle, color = c.ink)
+                    Text(question, style = ControlType.confirmTitle, color = c.ink)
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(SetupDimens.footerGap), modifier = Modifier.fillMaxWidth()) {

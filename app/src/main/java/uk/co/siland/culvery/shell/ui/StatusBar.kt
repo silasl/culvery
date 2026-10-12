@@ -25,6 +25,7 @@ import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.ShellType
 import uk.co.siland.culvery.core.ui.hhClickable
+import uk.co.siland.culvery.core.ui.shownNotSpoken
 import uk.co.siland.culvery.shell.SessionUi
 
 private val TIME = DateTimeFormatter.ofPattern("HH:mm")
@@ -95,7 +96,7 @@ fun StatusBar(
                 .padding(4.dp),
         ) {
             HhIcon(if (dark) Icons.DARK_MODE else Icons.LIGHT_MODE, size = 16.dp, tint = c.mute)
-            Text(label, style = HhType.status.copy(fontSize = 12.sp), color = c.mute)
+            Text(label, style = HhType.status.copy(fontSize = 12.sp), color = c.mute, modifier = Modifier.shownNotSpoken())
         }
     }
 }

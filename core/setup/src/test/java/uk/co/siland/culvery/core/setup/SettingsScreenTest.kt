@@ -116,6 +116,13 @@ class SettingsScreenTest {
         compose.assertAccessible()
     }
 
+    /** TalkBack reads the title, the page list and Close before the page, not the page between the title and the list. */
+    @Test
+    fun thePageListIsReadThroughBeforeThePage() {
+        show(page("a", "Alpha", 0))
+        compose.onNodeWithTag("settings_close").onParent().assert(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true))
+    }
+
     @Test
     fun settingsIsAPane() {
         show(page("a", "Alpha", 0))

@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -33,6 +34,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
@@ -59,6 +61,7 @@ import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.quietFill
+import uk.co.siland.culvery.core.ui.readAsOne
 
 /** Which picker is drawn over the add/edit sheet. */
 enum class EditorPicker { None, Date, Time }
@@ -153,7 +156,8 @@ internal fun DatePickerCard(today: LocalDate, selected: LocalDate, onPick: (Loca
                         style = CalendarType.pickerWeekday,
                         color = c.mute,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f).padding(vertical = CalendarDimens.weekdayPaddingV),
+                        // Each cell says its weekday.
+                        modifier = Modifier.weight(1f).padding(vertical = CalendarDimens.weekdayPaddingV).semantics { hideFromAccessibility() },
                     )
                 }
             }
@@ -184,7 +188,10 @@ internal fun TimePickerCard(initial: LocalTime, onSet: (LocalTime) -> Unit, onCa
             modifier = Modifier.fillMaxWidth(),
         ) {
             Stepper(hour, "hour", "Hour", onUp = { hour = hourStep(hour, up = true) }, onDown = { hour = hourStep(hour, up = false) })
-            Text(":", style = CalendarType.timeColon, color = c.ink, modifier = Modifier.padding(bottom = CalendarDimens.colonBottom))
+            Text(
+                ":", style = CalendarType.timeColon, color = c.ink,
+                modifier = Modifier.padding(bottom = CalendarDimens.colonBottom).semantics { hideFromAccessibility() },
+            )
             Stepper(minute, "minute", "Minute", onUp = { minute = minuteStep(minute, up = true) }, onDown = { minute = minuteStep(minute, up = false) })
         }
         Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.timeButtonGap)) {
@@ -260,19 +267,25 @@ internal fun RoundButton(icon: String, label: String, tag: String, on: ButtonSur
 @Composable
 private fun Stepper(value: Int, tag: String, name: String, onUp: () -> Unit, onDown: () -> Unit) {
     val c = Culvery.colors
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(CalendarDimens.stepperGap)) {
-        StepButton(Icons.EXPAND_LESS, "${tag}_up", "$name up", onUp)
+    var stepped by remember { mutableStateOf(false) }
+    // Read up, value, down, then the next column.
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(CalendarDimens.stepperGap),
+        modifier = Modifier.readAsOne(),
+    ) {
+        StepButton(Icons.EXPAND_LESS, "${tag}_up", "$name up") { stepped = true; onUp() }
         Text(
             value.toString().padStart(2, '0'),
             style = CalendarType.timeValue,
             color = c.ink,
-            // "Hour 7", not "zero seven"; spoken as it changes.
+            // "Hour 7", not "zero seven"; spoken as it changes, not as the picker opens.
             modifier = Modifier.testTag("${tag}_value").semantics {
                 contentDescription = "$name $value"
-                liveRegion = LiveRegionMode.Polite
+                if (stepped) liveRegion = LiveRegionMode.Polite
             },
         )
-        StepButton(Icons.EXPAND_MORE, "${tag}_down", "$name down", onDown)
+        StepButton(Icons.EXPAND_MORE, "${tag}_down", "$name down") { stepped = true; onDown() }
     }
 }
 

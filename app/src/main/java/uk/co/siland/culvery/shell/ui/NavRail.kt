@@ -29,6 +29,7 @@ import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
+import uk.co.siland.culvery.core.ui.readAsOne
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.TabItem
 
@@ -47,6 +48,7 @@ fun NavRail(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
+            .readAsOne()
             .fillMaxHeight()
             .width(108.dp)
             .drawBehind {

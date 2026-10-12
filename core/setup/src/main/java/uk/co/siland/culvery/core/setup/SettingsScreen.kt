@@ -39,6 +39,7 @@ import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.readAsOne
 
 /**
  * Settings (4a design §4.6): the pages' titles on the left with Close, the chosen page on the right, the first chosen on
@@ -60,6 +61,7 @@ fun SettingsScreen(pages: List<SettingsPage>, onClose: () -> Unit, initialPage: 
     ) {
         Column(
             Modifier
+                .readAsOne()
                 .width(SetupDimens.settingsList)
                 .fillMaxHeight()
                 .background(c.surf)

@@ -259,6 +259,16 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 - `TinyProvider.kt` (calendar-testkit) still has capitalised exception messages; a failed add names the person two ways.
 - `LocationPane`'s KDoc has a line of about 230 characters.
 
+**From the TalkBack check (walk-through A.5, 2026-10-12)**
+- When a sheet or Settings closes, TalkBack's focus can fall to Android's status-bar clock ("13:16") instead of something in Culvery: after Settings timed out at 2 minutes and after "Event deleted." closed the event sheet (after the 10-minute close it landed on Settings, as it should). Compose has no call to place TalkBack's focus; try `FocusRequester` on the control that opened the overlay and check whether TalkBack follows input focus on the SM-T510.
+- The first open of an event announced its title twice ("[event], Heading" ×2) and the first PIN pad of a session said "Enter your PIN", "Who’s this?, Heading" twice; later opens said them once. Not reproduced; listen again on the SM-T510.
+- After a date is picked, focus goes to the Time chips instead of back to Pick date… (Cancel on the time picker does return to Pick time…).
+- The confirm card's title and its message are two stops ("Delete this event?", "“Swim” will be removed …"); fine, but they could be one.
+- Settings › Calendars: "Main" and "New events go here" are two stops.
+- "Searching…" wasn't heard when typing a town (too brief, or not announced); "No towns match …" was, once. The town results appearing aren't announced.
+- The toast "Event added on …" wasn't listened to with TalkBack on (the PIN was typed with TalkBack off); other toasts were said once.
+- A.4 path 12 (sleep past the session) skipped: `adb root` is refused on the Google Play image.
+
 **Decisions for the user**
 - The calendar's refusal toasts after a PIN (`Refusal.Toast`: "Mia can only change events they created.") still name the person whose PIN it was; the PIN pad's own refusal names no one (decision A). Should the toasts say "That PIN …" too?
 

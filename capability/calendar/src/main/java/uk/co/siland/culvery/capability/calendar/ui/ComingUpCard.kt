@@ -36,6 +36,7 @@ import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /**
  * Rows per day before "+N more". The WIDE card is 279 dp tall: 279 − 2 × 20 padding − 48 header − 6 gap = 185 dp
@@ -113,7 +114,7 @@ private fun CompactRow(event: EventUi, day: LocalDate) {
     ) {
         ColourBar(Color(event.person.color), width = CalendarDimens.compactBarWidth)
         Spacer(Modifier.width(CalendarDimens.compactBarGap))
-        Column {
+        Column(Modifier.shownNotSpoken()) {
             Text(event.title, style = CalendarType.strong14, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 "${event.timeLabel} · ${event.person.name}",

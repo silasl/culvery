@@ -19,6 +19,7 @@ import uk.co.siland.culvery.capability.weather.weatherIcon
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /** Hand-off §1's weather block: the condition in the weather colour, "17°", and "High 19° · Low 11°" (4b design §4.1). */
 @Composable
@@ -30,7 +31,7 @@ fun WeatherHeaderItem(weather: HeaderWeather, modifier: Modifier = Modifier) {
         modifier = modifier.testTag("weather_header").semantics(mergeDescendants = true) { contentDescription = headerDescription(weather) },
     ) {
         HhIcon(weatherIcon(weather.condition, weather.night), size = WeatherDimens.headerIcon, tint = c.weather)
-        Column {
+        Column(Modifier.shownNotSpoken()) {
             Text(degrees(weather.temperature), style = HhType.headerValue, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(highLow(weather.high, weather.low), style = HhType.secondary, color = c.mute, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }

@@ -2,7 +2,6 @@ package uk.co.siland.culvery.core.setup
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -192,7 +191,8 @@ class PeopleUiTest {
         compose.onNodeWithTag("person_save").performClick()
         compose.waitUntil(5_000) { compose.onNodeWithTag("person_message").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text.orEmpty().isNotEmpty() }
         compose.onNodeWithTag("person_message").assert(hasText("Someone is already called alex."))
-        compose.onNodeWithTag("person_message").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        // TalkBack says the field's error as it appears; a live line would say the same words again.
+        compose.onNodeWithTag("person_message").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
         compose.onNodeWithTag("person_name")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, "Someone is already called alex."))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Name")))

@@ -71,6 +71,7 @@ import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
+import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /** [weeksAhead]: how many weeks after this one [week] is (4c D10). */
 data class WeekViewState(
@@ -280,12 +281,11 @@ private fun EventChip(event: EventUi, day: LocalDate, onOpen: (EventRef) -> Unit
             .fillMaxWidth()
             .clip(RoundedCornerShape(CalendarDimens.chipRadius))
             .background(Color(event.person.color).copy(alpha = HhAlpha.tint(c)))
-            // Merged, not cleared, so the chip's texts stay in the tree for the font-scale tests.
             .semantics(mergeDescendants = true) { contentDescription = eventOnDay(event, day) }
             .hhClickable({ onOpen(event.ref) }, label = OPEN_EVENT_DETAILS)
             .padding(horizontal = CalendarDimens.chipPaddingH, vertical = CalendarDimens.chipPaddingV),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.shownNotSpoken()) {
             // One line, so a long name is cut before the time (4d-1 Decision 2).
             Text(
                 "${event.startLabel} · ${event.person.name}",
@@ -298,7 +298,10 @@ private fun EventChip(event: EventUi, day: LocalDate, onOpen: (EventRef) -> Unit
             EventBadges(event, CalendarDimens.chipBadge)
         }
         Spacer(Modifier.height(CalendarDimens.chipTitleTop))
-        Text(event.title, style = CalendarType.chipTitle, color = c.ink, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Text(
+            event.title, style = CalendarType.chipTitle, color = c.ink, maxLines = 3, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.shownNotSpoken(),
+        )
     }
 }
 

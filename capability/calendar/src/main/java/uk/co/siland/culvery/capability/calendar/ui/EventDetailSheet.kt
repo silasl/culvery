@@ -149,6 +149,7 @@ fun EventDetailSheet(
             if (mode == DetailMode.ConfirmingDelete) {
                 HhConfirmCard(
                     tag = "detail_confirm",
+                    title = DELETE_QUESTION,
                     keep = KEEP, keepTag = "detail_keep",
                     confirm = "Delete event", confirmTag = "detail_confirm_delete", confirmIcon = Icons.DELETE_FOREVER,
                     busy = busy, onKeep = onKeep, onConfirm = onConfirmDelete,
@@ -156,7 +157,7 @@ fun EventDetailSheet(
                     Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.noteIconGap)) {
                         HhIcon(Icons.DELETE, size = CalendarDimens.footerIcon, tint = c.danger)
                         Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.noteTextGap)) {
-                            Text("Delete this event?", style = ControlType.confirmTitle, color = c.ink)
+                            Text(DELETE_QUESTION, style = ControlType.confirmTitle, color = c.ink)
                             Text(
                                 "“${e.title}” will be removed from ${e.serviceName} for everyone.",
                                 style = CalendarType.noteBody,
