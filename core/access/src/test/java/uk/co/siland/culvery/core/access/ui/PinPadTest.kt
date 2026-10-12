@@ -235,6 +235,11 @@ class PinPadTest {
     fun thePinPadsLinesAreSentencesInFullWords() {
         assertThat(tooManyTries(30)).isEqualTo("Too many tries — wait 30 seconds.")
         assertThat(tooManyTries(1)).isEqualTo("Too many tries — wait 1 second.")
+        // Past a minute, minutes: a doubled lock said "wait 240 seconds".
+        assertThat(tooManyTries(60)).isEqualTo("Too many tries — wait 1 minute.")
+        assertThat(tooManyTries(240)).isEqualTo("Too many tries — wait 4 minutes.")
+        assertThat(tooManyTries(239)).isEqualTo("Too many tries — wait 3 minutes 59 seconds.")
+        assertThat(tooManyTries(61)).isEqualTo("Too many tries — wait 1 minute 1 second.")
         assertThat(WRONG_PIN).isEqualTo("Wrong PIN — try again.")
         assertThat(pinReasonText(PinReason.ContinueSetup, "x")).isEqualTo("Enter your PIN to carry on setting up.")
     }

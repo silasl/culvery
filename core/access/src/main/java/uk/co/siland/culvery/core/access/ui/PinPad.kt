@@ -104,7 +104,18 @@ internal const val ENTER_YOUR_PIN = "Enter your PIN"
 
 internal const val WRONG_PIN = "Wrong PIN — try again."
 
-internal fun tooManyTries(seconds: Int): String = "Too many tries — wait ${if (seconds == 1) "1 second" else "$seconds seconds"}."
+internal fun tooManyTries(seconds: Int): String {
+    val minutes = seconds / 60
+    val rest = seconds % 60
+    val wait = when {
+        minutes == 0 -> count(rest, "second")
+        rest == 0 -> count(minutes, "minute")
+        else -> "${count(minutes, "minute")} ${count(rest, "second")}"
+    }
+    return "Too many tries — wait $wait."
+}
+
+private fun count(n: Int, unit: String): String = if (n == 1) "1 $unit" else "$n ${unit}s"
 
 /** "2 of 4 digits entered": the dots, spoken, never the digits themselves. */
 internal fun digitsEntered(count: Int): String = "$count of ${PinHasher.PIN_LENGTH} digits entered"
