@@ -95,7 +95,8 @@ private fun HeaderItems(items: List<HeaderItem>) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(HEADER_ITEM_GAP),
-        modifier = Modifier.testTag("home_header_items").semantics { traversalIndex = 2f },
+        // A group, or its index wouldn't reach the items inside it.
+        modifier = Modifier.testTag("home_header_items").readAsOne().semantics { traversalIndex = 2f },
     ) {
         items.forEachIndexed { i, item ->
             key(item.id) {
