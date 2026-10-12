@@ -1,6 +1,5 @@
 package uk.co.siland.culvery.core.setup
 
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -21,7 +20,7 @@ class YouFormTest {
     @get:Rule val compose = createComposeRule()
 
     @Test
-    fun aTakenNameIsAnErrorOnTheNamedFieldAndSpokenPolitely() {
+    fun aTakenNameIsAnErrorOnTheNamedFieldAndSaidOnce() {
         val form = YouForm().apply {
             name = "Family"
             message = "Someone is already called Family."
@@ -31,7 +30,8 @@ class YouFormTest {
         compose.onNodeWithTag("you_name")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Your name")))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, "Someone is already called Family."))
-        compose.onNodeWithTag("you_message").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        // TalkBack says the field's error as it appears; a live line would say the same words again.
+        compose.onNodeWithTag("you_message").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
     }
 
     @Test

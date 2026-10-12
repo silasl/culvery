@@ -41,7 +41,6 @@ import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
-import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
@@ -247,18 +246,15 @@ internal fun PersonEditorSheet(
                     }
                 }
             }
-            HhMessageLine(form.message, SetupType.message, c.danger, "person_message", live = form.message != form.nameError)
+            HhMessageLine(form.message, SetupType.message, c.danger, "person_message", fieldError = form.nameError)
             if (confirmingRemove && existing != null) {
-                val question = removeQuestion(existing.person.name)
                 HhConfirmCard(
                     tag = "person_confirm",
-                    title = question,
+                    title = removeQuestion(existing.person.name),
                     keep = KEEP, keepTag = "person_keep",
                     confirm = REMOVE_PERSON, confirmTag = "person_confirm_remove",
                     busy = busy, onKeep = onKeep, onConfirm = onConfirmRemove,
-                ) {
-                    Text(question, style = ControlType.confirmTitle, color = c.ink)
-                }
+                )
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(SetupDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
                     if (canRemove) {

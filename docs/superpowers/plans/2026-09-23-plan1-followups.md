@@ -271,6 +271,9 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 - Stopped before the end: what TalkBack says when a lockout ends; the PIN pad over an edited person sheet outliving Settings by a second (A.4 path 13, second half); focus parked on a scrolled Settings list (path 10, second half). Run them on the SM-T510.
 - The lockout line reads "Too many tries — wait 240 seconds." once failures double the lock; minutes would read better past 60 seconds (wording, for Part B).
 
+- A described row is two steps at each call site (a description on the parent, `shownNotSpoken()` on the children: Today and Coming up rows, week chips, the header weather), so the next one can forget the hiding; `assertNothingReadTwice` catches it only where a test draws it. A `DescribedRow(description) { … }` would own both (simplify review).
+- `HhTextField` hides a placeholder only when it equals the label; a `placeholder: String? = null` that defaults to the label would say so instead of comparing strings (simplify review).
+
 **Decisions for the user**
 - The calendar's refusal toasts after a PIN (`Refusal.Toast`: "Mia can only change events they created.") still name the person whose PIN it was; the PIN pad's own refusal names no one (decision A). Should the toasts say "That PIN …" too?
 

@@ -15,7 +15,6 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsEqualTo
-import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
@@ -39,6 +38,7 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
+import uk.co.siland.culvery.core.ui.test.onClickableShowing
 
 /** Native graphics: the sized tests check that rows fit the real card sizes, which needs real text metrics. */
 @RunWith(AndroidJUnit4::class)
@@ -178,7 +178,7 @@ class CardsTest {
     fun todayRowsAreButtonsThatOpenTheirEvent() {
         val opened = mutableListOf<EventRef>()
         show { TodayCard(SampleUi.today, onOpen = { opened += it }) }
-        compose.onNode(hasClickAction() and hasAnyDescendant(hasText("School run"))).performClick()
+        compose.onClickableShowing("School run").performClick()
         assertThat(opened).containsExactly(EventRef("sample", "family", "School run"))
     }
 
@@ -220,7 +220,7 @@ class CardsTest {
     @Test
     fun todayRowsSayTheyOpenTheirEventAndThePlusIsNamedOnce() {
         show { TodayCard(SampleUi.todayWithBadges, onAdd = {}) }
-        val row = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Dinner with Jo & Priya"))).assert(isButton)
+        val row = compose.onClickableShowing("Dinner with Jo & Priya").assert(isButton)
         assertThat(clickLabel(row)).isEqualTo("open event details")
         assertThat(clickLabel(compose.onNodeWithTag("today_add").assert(isButton))).isNull()
         compose.assertAccessible()

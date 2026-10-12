@@ -153,8 +153,13 @@ class ControlsTest {
 
     /** The same words as a field's error: TalkBack says the error as it appears, so the line stays quiet. */
     @Test
-    fun aMessageLineThatIsNotLiveHasNoLiveRegion() {
-        show { HhMessageLine("Someone is already called Alex.", ControlType.chip, Color.Red, "line", live = false) }
+    fun aMessageLineShowingItsFieldsErrorHasNoLiveRegion() {
+        show {
+            HhMessageLine(
+                "Someone is already called Alex.", ControlType.chip, Color.Red, "line",
+                fieldError = "Someone is already called Alex.",
+            )
+        }
         compose.onNodeWithTag("line")
             .assertTextEquals("Someone is already called Alex.")
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))

@@ -49,7 +49,6 @@ import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
-import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
@@ -207,16 +206,13 @@ internal fun ReviewCalendars(
         connections.forEach { connection ->
             ConnectionHeader(connection.row, nowMillis, busy, actions.onReconnect, actions.onDisconnect)
             if (confirming != null && confirming.row.connection.id == connection.row.connection.id) {
-                val question = disconnectQuestion(confirming.row.service, confirming.queued)
                 HhConfirmCard(
                     tag = "review_confirm",
-                    title = question,
+                    title = disconnectQuestion(confirming.row.service, confirming.queued),
                     keep = KEEP, keepTag = "review_keep",
                     confirm = DISCONNECT, confirmTag = "review_confirm_disconnect",
                     busy = busy, onKeep = actions.onKeep, onConfirm = { actions.onConfirmDisconnect(confirming.row) },
-                ) {
-                    Text(question, style = ControlType.confirmTitle, color = Culvery.colors.ink)
-                }
+                )
             }
             connection.sources.forEach { source ->
                 SourceRow(source, people, busy, picking == sourceKey(source), actions.onPick, actions.onPerson, actions.onShown, actions.onMakeMaster)

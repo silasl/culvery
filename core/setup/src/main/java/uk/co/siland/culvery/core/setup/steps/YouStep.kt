@@ -170,6 +170,6 @@ internal fun YouFormContent(form: YouForm, onSetPin: () -> Unit) {
             HhButton(if (form.pin == null) SET_YOUR_PIN else CHANGE_PIN, onSetPin, Modifier.testTag("you_set_pin"), on = ButtonSurface.Bg)
             if (form.pin != null) Text(PIN_SET, style = SetupType.secondary, color = c.mute, modifier = Modifier.testTag("you_pin_set"))
         }
-        HhMessageLine(form.message, SetupType.message, c.danger, "you_message")
+        HhMessageLine(form.message, SetupType.message, c.danger, "you_message", fieldError = form.nameError)
     }
 }

@@ -12,5 +12,8 @@ import androidx.compose.ui.semantics.semantics
  */
 fun Modifier.shownNotSpoken(): Modifier = semantics(mergeDescendants = true) { hideFromAccessibility() }
 
+/** "1 minute", "5 minutes". */
+fun plural(count: Long, unit: String): String = if (count == 1L) "1 $unit" else "$count ${unit}s"
+
 /** A block TalkBack reads through before moving on, instead of by screen position across its neighbours. */
 fun Modifier.readAsOne(): Modifier = semantics { isTraversalGroup = true }

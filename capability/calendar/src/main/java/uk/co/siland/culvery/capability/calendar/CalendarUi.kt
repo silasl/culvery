@@ -10,6 +10,7 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.plural
 
 const val ALL_DAY_LABEL = "All day"
 const val STALE_AFTER_MS = 30 * 60_000L
@@ -108,9 +109,6 @@ fun updatedLabel(lastSyncMillis: Long?, nowMillis: Long, service: String? = null
     }
     return if (service == null) "Updated $ago" else "Updated from $service $ago"
 }
-
-/** "1 minute", "5 minutes". */
-internal fun plural(count: Long, unit: String): String = if (count == 1L) "1 $unit" else "$count ${unit}s"
 
 fun isStale(lastSyncMillis: Long?, nowMillis: Long): Boolean =
     lastSyncMillis != null && nowMillis - lastSyncMillis > STALE_AFTER_MS

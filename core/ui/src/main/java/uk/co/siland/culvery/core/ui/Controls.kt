@@ -229,8 +229,8 @@ fun HhTextField(
 /**
  * An in-page message that TalkBack hears appear. Compose speaks a live region only when a node it already has changes,
  * and leaves a node with no size out of the tree, so the line is always composed and one line tall while empty.
- * [spoken] is its description when it differs from what shows ("3 towns found" under a list). Not [live] when the same
- * words are a field's error, which TalkBack already says as it appears.
+ * [spoken] is its description when it differs from what shows ("3 towns found" under a list). Not live while it shows
+ * [fieldError], a field's error that TalkBack already says as it appears.
  */
 @Composable
 fun HhMessageLine(
@@ -240,14 +240,14 @@ fun HhMessageLine(
     tag: String,
     modifier: Modifier = Modifier,
     spoken: String? = message,
-    live: Boolean = true,
+    fieldError: String? = null,
 ) {
     Text(
         message.orEmpty(),
         style = style,
         color = color,
         modifier = modifier.testTag(tag).semantics {
-            if (live) liveRegion = LiveRegionMode.Polite
+            if (message == null || message != fieldError) liveRegion = LiveRegionMode.Polite
             if (spoken != null && spoken != message) contentDescription = spoken
         },
     )
@@ -276,7 +276,8 @@ fun HhPersonChip(name: String, color: Color, tag: String, enabled: Boolean, clic
 /**
  * A confirmation card on `dangerSoft`: [question] above two buttons. Keep sits on the left where the action that opened
  * the card was, so a double tap on it is harmless; the confirming button is [ButtonTone.Destroy]. TalkBack announces
- * [title] as the card appears, which it otherwise does silently under the focus it leaves on the sheet.
+ * [title] as the card appears, which it otherwise does silently under the focus it leaves on the sheet; [question]
+ * shows it unless the card says more.
  */
 @Composable
 fun HhConfirmCard(
@@ -290,7 +291,7 @@ fun HhConfirmCard(
     onKeep: () -> Unit,
     onConfirm: () -> Unit,
     confirmIcon: String? = null,
-    question: @Composable () -> Unit,
+    question: @Composable () -> Unit = { Text(title, style = ControlType.confirmTitle, color = Culvery.colors.ink) },
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(ControlTokens.confirmGap),

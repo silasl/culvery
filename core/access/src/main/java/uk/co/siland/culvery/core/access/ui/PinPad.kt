@@ -60,6 +60,7 @@ import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.hhClickable
+import uk.co.siland.culvery.core.ui.plural
 
 /**
  * [overSheet]: a sheet is open, so the pad covers the sheet's area rather than the whole screen. Left alone, it cancels
@@ -105,17 +106,15 @@ internal const val ENTER_YOUR_PIN = "Enter your PIN"
 internal const val WRONG_PIN = "Wrong PIN — try again."
 
 internal fun tooManyTries(seconds: Int): String {
-    val minutes = seconds / 60
-    val rest = seconds % 60
+    val minutes = seconds / 60L
+    val rest = seconds % 60L
     val wait = when {
-        minutes == 0 -> count(rest, "second")
-        rest == 0 -> count(minutes, "minute")
-        else -> "${count(minutes, "minute")} ${count(rest, "second")}"
+        minutes == 0L -> plural(rest, "second")
+        rest == 0L -> plural(minutes, "minute")
+        else -> "${plural(minutes, "minute")} ${plural(rest, "second")}"
     }
     return "Too many tries — wait $wait."
 }
-
-private fun count(n: Int, unit: String): String = if (n == 1) "1 $unit" else "$n ${unit}s"
 
 /** "2 of 4 digits entered": the dots, spoken, never the digits themselves. */
 internal fun digitsEntered(count: Int): String = "$count of ${PinHasher.PIN_LENGTH} digits entered"
@@ -136,12 +135,10 @@ fun PinPadSheet(
     nowMillis: () -> Long = System::currentTimeMillis,
     clearOn: Any? = null,
 ) {
-    // Counts down from the initial value rather than re-reading the wall clock, so tests with a
-    // virtual frame clock stay deterministic.
-    val firstSeconds = remember(lockedUntilMillis) { secondsUntil(lockedUntilMillis, nowMillis()) }
-    // Reset in the same composition as the lock: the pad stays up between tries, so a lock arriving on a retry must
-    // show at once, not after a stale count of 0.
-    val countdown = remember(lockedUntilMillis) { mutableIntStateOf(firstSeconds) }
+    // Counts down from the lock's first value (deterministic under a virtual frame clock), reset in the same composition
+    // as a lock that arrives on a retry, so it shows at once.
+    val countdown = remember(lockedUntilMillis) { mutableIntStateOf(secondsUntil(lockedUntilMillis, nowMillis())) }
+    val firstSeconds = remember(countdown) { countdown.intValue }
     LaunchedEffect(countdown) {
         while (countdown.intValue > 0) {
             delay(1_000)
@@ -207,7 +204,7 @@ fun ChoosePinPad(onChosen: (String) -> Unit, onCancel: () -> Unit, overSheet: Bo
         onCancel = onCancel,
         overSheet = overSheet,
         drawScrim = drawScrim,
-        clearOn = first to mismatches,
+        clearOn = first,
     )
 }
 

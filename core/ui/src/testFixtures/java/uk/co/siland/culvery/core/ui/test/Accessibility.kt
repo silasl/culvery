@@ -6,8 +6,11 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import uk.co.siland.culvery.core.ui.SpokenNameKey
 
@@ -69,6 +72,13 @@ private fun SemanticsNode.shownText(): String =
     (listOf(this) + children.filter { SemanticsProperties.HideFromAccessibility in it.config })
         .flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty() }
         .joinToString(" ") { it.text }
+
+/** A node [readAsOne][uk.co.siland.culvery.core.ui.readAsOne] made a traversal group. */
+val isReadAsOne: SemanticsMatcher = SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true)
+
+/** The clickable row or chip that shows [text]: its texts sit in a [shownNotSpoken][uk.co.siland.culvery.core.ui.shownNotSpoken] child. */
+fun SemanticsNodeInteractionsProvider.onClickableShowing(text: String): SemanticsNodeInteraction =
+    onNode(hasClickAction() and hasAnyDescendant(hasText(text)))
 
 /** The calls a screen test makes for each state it renders. */
 fun ComposeContentTestRule.assertAccessible() {

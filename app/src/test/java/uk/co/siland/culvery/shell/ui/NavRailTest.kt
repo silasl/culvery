@@ -20,6 +20,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.isReadAsOne
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.TabItem
 
@@ -40,7 +41,7 @@ class NavRailTest {
     @Test
     fun theRailIsReadThroughBeforeThePage() {
         show()
-        compose.onNodeWithTag("rail_settings").onParent().assert(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true))
+        compose.onNodeWithTag("rail_settings").onParent().assert(isReadAsOne)
     }
 
     @Test

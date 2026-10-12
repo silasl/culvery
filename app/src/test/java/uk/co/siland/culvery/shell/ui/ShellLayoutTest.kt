@@ -49,6 +49,7 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.isReadAsOne
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.SessionUi
 import uk.co.siland.culvery.shell.ShellUiState
@@ -225,10 +226,8 @@ class ShellLayoutTest {
     @Test
     fun theHeaderIsReadClockDateThenItems() {
         home(item("weather", 10))
-        listOf("home_clock", "home_header_items").forEach {
-            compose.onNodeWithTag(it).onParent().assert(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true))
-        }
-        compose.onNodeWithTag("home_header_items").assert(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true))
+        compose.onNodeWithTag("home_clock").onParent().assert(isReadAsOne)
+        compose.onNodeWithTag("home_header_items").assert(isReadAsOne)
         listOf("home_clock" to 0f, "home_date" to 1f, "home_header_items" to 2f).forEach { (tag, index) ->
             compose.onNodeWithTag(tag).assert(SemanticsMatcher.expectValue(SemanticsProperties.TraversalIndex, index))
         }

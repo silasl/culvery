@@ -32,6 +32,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.isReadAsOne
 
 @RunWith(AndroidJUnit4::class)
 class PickersTest {
@@ -182,7 +183,7 @@ class PickersTest {
         compose.onNodeWithText(":", useUnmergedTree = true).assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
         listOf("hour", "minute").forEach { column ->
             compose.onNodeWithTag("${column}_value").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
-                .onParent().assert(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true))
+                .onParent().assert(isReadAsOne)
         }
         compose.onNodeWithTag("hour_up").performClick()
         compose.onNodeWithTag("hour_value").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))

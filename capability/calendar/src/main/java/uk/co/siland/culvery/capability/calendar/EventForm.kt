@@ -11,6 +11,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.ui.plural
 
 /** Hand-off §7 Time chips. */
 enum class TimeSlot(val label: String, val time: LocalTime) {

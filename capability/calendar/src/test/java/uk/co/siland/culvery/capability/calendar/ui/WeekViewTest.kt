@@ -22,8 +22,6 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
-import androidx.compose.ui.test.hasAnyDescendant
-import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -53,6 +51,7 @@ import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
+import uk.co.siland.culvery.core.ui.test.onClickableShowing
 
 @RunWith(AndroidJUnit4::class)
 class WeekViewTest {
@@ -427,7 +426,7 @@ class WeekViewTest {
         show { WeekView(state(sync(needsSignIn = listOf("Google"))).copy(weeksAhead = 1), onAdd = {}) }
         compose.assertAccessible()
         compose.onNodeWithContentDescription("Add event on Wednesday 23 September", useUnmergedTree = true).assert(isButton)
-        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Parkrun")))
+        val chip = compose.onClickableShowing("Parkrun")
         assertThat(chip.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("open event details")
         val reconnect = compose.onNodeWithText("Google needs reconnecting")
         assertThat(reconnect.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("reconnect")

@@ -26,6 +26,7 @@ import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.setup.pages.KioskPage
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.isReadAsOne
 
 @RunWith(AndroidJUnit4::class)
 class SettingsScreenTest {
@@ -120,7 +121,7 @@ class SettingsScreenTest {
     @Test
     fun thePageListIsReadThroughBeforeThePage() {
         show(page("a", "Alpha", 0))
-        compose.onNodeWithTag("settings_close").onParent().assert(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true))
+        compose.onNodeWithTag("settings_close").onParent().assert(isReadAsOne)
     }
 
     @Test
