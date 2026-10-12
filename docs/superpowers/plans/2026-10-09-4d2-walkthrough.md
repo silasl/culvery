@@ -84,7 +84,100 @@ For each, note what TalkBack said, in order, in the transcript below; anything t
 
 ### A.5 Transcript
 
-(Filled in by the controller: the navigation method that worked, then for each path what TalkBack said, and what was fixed or listed.)
+Run 2026-10-12 on the signed release, with the controller driving and household names written as [person], [event], [town], [calendar], [account].
+
+Build: signed release, `install -r` over the existing household (2026-10-12).
+Speech capture: TalkBack 15 Log output level VERBOSE (was ERROR; restore in A.6), `logcat --pid` of TalkBack, lines `Speaking fragment text=`.
+`uiautomator events` suspends TalkBack (Bound services empty while it runs) — not used.
+Navigation: `adb shell input` taps/swipes don't reach TalkBack's touch explorer; the emulator console's virtual touchscreen (`event mouse x y 0 1/0`, over the console socket so a double-tap is fast enough) works. Keyboard Alt+arrows didn't move focus.
+TalkBack's declared interactiveUiTimeout is 10000 ms (so recommended timeout with TalkBack on and no "Time to take action" set ≈ 10 s → Culvery's timeout stays 2 min).
+
+#### Path 1 Home
+- Home tab: "selected, Home, Tab, 1 of 2, In list, 2 items" ✓
+- Order: Home tab → clock → header weather → Calendar tab → date → Today heading → Add event → See the week → Coming up heading → "Nothing on today. Tap + to add something." → day headings/rows → Forecast → Settings. FAULT: rail tabs interleave with the header (geometric order); Today's empty line read after "Coming up".
+- Header weather: "Now 10°, cloudy, high 16°, low 7°, 10°, High 16° · Low 7°". FAULT: description then the visible text again.
+- Coming up row: "[event], [person], Tuesday 16:10, [event], 16:10–16:25 · [person]". FAULT: read twice. Not clickable (no role/hint) — by design (rows aren't tappable).
+- Day headings: "Tomorrow, Tuesday 13 October, Heading", "Wednesday 14 October, Heading" ✓; "Nothing on" ✓
+- Forecast rows: "Today, cloudy, high 16°, low 7°", "Tuesday, rain, high 17°, low 9°" ✓ one item each
+- Today +: "Add event, Button" ✓; "See the week, Button" ✓; "Settings, Button" ✓
+- No Today rows today (nothing on).
+
+#### Calendar tab (paths 1/9)
+- Activating Calendar tab: "Calendar", "This week", "selected".
+- Order: Earlier week (disabled) → Later week → "This week, Heading" → legend "Colours: [person], blue; …" → Add event → "Updated from Google Calendar just now" → Calendar tab (rail again mid-page) → day headings Mon…Sun all in a row → Settings. FAULT: the chips are skipped when swiping on from the headings; after a chip, the order goes to all seven "Add event on <day>" buttons. Columns need to be traversal groups (heading, chips, + per day). Rail needs to be its own group.
+- Week chip (path 9): "[event], [person], Wednesday 09:00, 09:00 · [person], [event], Button". FAULT: read twice (description + merged texts).
+- "Add event on Monday 12 October, Button" ✓
+
+#### Path 2 An event
+- Open: "[event], Heading" ×2 — the pane title "Event details" is not announced on first open. FAULT: heading twice.
+- Rows: "Close, Button"; "When, Wed 14 Oct · 09:00–10:00"; "For, [person]"; "Created by, [person]"; "Calendar, [calendar]"; "Delete, Button"; "Change, Button" ✓ one item each.
+- Delete → PIN pad (Delete needs a PIN): "Enter your PIN", "Who’s this?, Heading" ×2. FAULT: opening announcement twice.
+- Pad: reason line "Enter your PIN to delete this event. It also records who made the change."; "0 of 4 digits entered"; keys "1, Button" … "0, Button"; "Cancel, Button"; "Delete last digit, Button, disabled" ✓
+- Cancel: "Event details" (pane title, said on return) then focus back on "Delete, Button" ✓
+- Confirm card / Keep: not reached yet (needs the user's PIN).
+
+#### Settings (paths 5, 6, 7, 14)
+- Opening (TalkBack was off for the PIN): focus on "Settings, Heading".
+- Order: "Settings, Heading" → page heading → page content → the page tabs ("selected, Home location, Tab, 1 of 4, In list, 4 items", "People, Tab, 2 of 4", …) → "Close, Button". FAULT: the page is read before the page list; the list should follow the title.
+- Home location: "Selected, [town]" ✓; field "Edit box, Town or city, Town or city" FAULT (label twice when empty); note line ✓.
+- Path 7 search: "Xqz" matched a real place (results not announced); "Qzxjvq": "No towns match “Qzxjvq” — check the spelling or try a nearby town." once ✓. "Searching…" not heard (too brief, or not announced). Nothing saved.
+- People (path 5): tab activation "People, Tab, 2 of 4", "People", "selected"; "People, Heading"; row "[person], Adult · No PIN — can’t add events, Button" then hint "Double-tap to change [person]’s details, Actions available…" ✓; "already first, Move [person] up, Button, disabled" ✓; "Move [person] down, Button" ✓; "Add person, Button" ✓.
+- Move down: toast "[person] moved down." once; focus stays on the moved row's Move down ("already last") ✓. Moved back up the same way ("[person] moved up.") — order restored.
+- Custom actions (swipe down on the row): "Move [person] down", "Activate" ✓.
+- Calendars (path 14): "Google Calendar · [account]"; "Disconnect Google Calendar, [account], Disconnect, Button" FAULT (visible "Disconnect" again); "Updated 3 minutes ago" (health fits: synced; no Out of date today); "[calendar]"; "collapsed, Family, Button" + "Double-tap to change who [calendar] is for" ✓; "always shown: it’s the main calendar, Show [calendar], Show, Switch, disabled" FAULT (visible "Show" again); "Main" and "New events go here" as two stops (minor).
+- Path 6 warning: idle from 11:42:05 → "Settings closes in 20 seconds. Touch the screen to stay." once at ~1:40 ✓; Settings closed at ~2:00 ✓. On close: nothing announced; TalkBack focus went to the system status-bar clock ("11:43"). FAULT (minor): focus leaves the app on close. Swipe-to-stay half not yet run.
+
+#### Person sheet (paths 5, 7, 8, 11, 13)
+- Open: "[person]" (pane title) then "[person], Heading" ✓ (once).
+- "Close, Button"; "Name, Heading"; field "[person], Edit box, Name" → Field names: content description kept the value ✓ (Task 5 Step 0 fallback not needed).
+- Swatches: "used by [person], Green, Radio button, disabled, 1 of 8, In list, 8 items"; "Selected, Blue, Radio button, 2 of 8"; "Not selected, Pink, Radio button, 3 of 8" … ✓
+- Role: "Selected, Adult — can add and change any event, Radio button, 2 of 3" ✓; "PIN, Heading"; "Set PIN, Button"; "Without a PIN, [person] can only look."; "Remove person, Button"; "Save changes, Button".
+- Path 8: no empty stop for the blank message line ✓.
+- Path 11: Set PIN → "Choose a 4-digit PIN" (nested pane's own title) then "0 of 4 digits entered" ✓. Cancel → "Culvery", focus on "Name, Heading" (minor: not back on Set PIN).
+- Path 7 duplicate name + Save changes: "Error: Someone is already called [person]." then "Someone is already called [person]." FAULT: said twice (field error + message line).
+- Path 13: edited sheet, last touch ~11:58:50; still open at 12:01:13 (2:20) ✓.
+- Path 13: warning "Settings closes in 20 seconds. Touch the screen to stay." at 12:08:34 (≈9:42 after the last touch) ✓; Settings closed with the sheet at ≈12:08:54 (≈10:03) ✓; edits lost (name unchanged) ✓. Focus after close: "Settings, Button" ✓.
+
+#### Path 3 Adding an event (test event "Swim", deleted afterwards)
+- Editor: "Add event, Heading"; "Close, Button"; summary "Today · 14:00–15:00 · Family"; field "Editing, Edit box, Event name, What’s happening?" (placeholder is a useful hint here); after typing: "Editing, Swim, Edit box, Event name" → Field names: content description kept the value ✓.
+- Who chips: "Selected, Family, Radio button, 1 of 3, In list, 3 items" … ✓; Day chips radio buttons ✓; "Pick date…, Button"; Time chips "Not selected, Morning, 09:00, Radio button, 2 of 4" ✓.
+- Date picker: "Pick a date" (nested pane title) then "Mon 12 Oct – Sun 15 Nov"; "Earlier weeks, Button", "Later weeks, Button"; weekday letters Mon…Sun each a stop (minor: 7 extra stops); cells "Not selected, Tuesday 13 October, Button", "Selected, Monday 12 October, today, Button" ✓. After picking: focus on "Morning" (minor: not back on Pick date…).
+- Time picker: on open "Pick a time", "Minute 0", "Hour 14", "Pick a time, Heading" FAULT (values spoken on opening); order Hour up → Minute up → Hour 14 → "Colon" → Minute 0 → Hour down → Minute down: FAULT ("Colon" a stop; columns read across, not up/value/down). A press: "Minute 15", then "Minute 30" — said once each ✓. Cancel → back on "Pick time…" ✓.
+- The editor and its PIN pad timed out while the user was away (expected); redone with TalkBack off. Toast "Event added on …" not heard (TalkBack off for the PIN); toasts were heard once elsewhere ("[person] moved down.", "Event deleted.").
+
+#### Path 2 (continued) on the test event
+- Open (second time): "Double-tap to open event details", "Event details", "Swim, Heading" — once each ✓ (the first-open double didn't repeat).
+- Delete (signed in, no PIN): the confirm card appears but isn't announced; focus moves to the title "Swim, Heading". FAULT: the card should be announced (or take focus).
+- Card: "Delete this event?"; "“Swim” will be removed from Google Calendar for everyone."; "Keep, Button"; "Delete event, Button" ✓. Keep → focus on "Change, Button" ✓.
+- Delete event: "Event deleted." once ✓; then "Culvery", "13:16" — FAULT: focus falls to the system status-bar clock when the sheet closes.
+
+#### Fixes (1575429, de812fd) and the recheck on the new release build
+- Home: "selected, Home, Tab …", "Calendar, Tab, 2 of 2", "Settings, Button" → "13:32" → "Monday 12 October" → "Now 12°, cloudy, high 15°, low 7°" (once) → "Today, Heading" → Add event → See the week → "Nothing on today. Tap + to add something." → "Coming up, Heading" → "Tomorrow, Tuesday 13 October, Heading" → "[event], Family, Tuesday 16:10" (once) → … → Forecast ✓. (de812fd: the header items row needed to be a traversal group of its own for its index to apply.)
+- Week: per day "Today, Monday 12 October, Heading" → chips "[event], Family, Tuesday 16:10, Button" (once) → "Add event on <day>, Button" ✓.
+- Settings: "Settings, Heading" → the four page tabs → "Close, Button" → the page ✓; field "Edit box, Town or city" (once) ✓; "Disconnect Google Calendar, [account], Button" ✓; "always shown: it’s the main calendar, Show [calendar], Switch, disabled" ✓.
+
+#### Paths 6 and 10 (new build)
+- Idle from 13:34:46: "Settings closes in 20 seconds. Touch the screen to stay." at 13:36:26 (1:40) ✓; one swipe at 13:36:28 ("Main") kept Settings open past 2:00 ✓ (open at 13:37:05).
+- Then a tap on the status-bar clock and nothing else: warning again at 13:38:10, closed at 13:38:29 (2:01 after the swipe) — parked focus didn't stretch it ✓. Focus after close: the status-bar clock again (listed).
+- Focus parked on a scrolled Settings list: not run (the People list is too short to scroll).
+
+#### Path 4 The PIN pad (throwaway person "Test", Adult, PIN 1234 — the user agreed to the controller pressing its keys; the user's double-click didn't reach TalkBack)
+- Open (signed out): "0 of 4 digits entered", "Enter your PIN", "Who’s this?, Heading".
+- First digit: "1 of 4 digits entered" once ✓.
+- A PIN no one has (1999): "Wrong PIN — try again." once; the dots' "0 of 4" not said again ✓. Repeat wrong PINs: "0 of 4 digits entered, Error: Wrong PIN — try again." once per try ✓.
+- Test's PIN: FAULT on the first build — the refusal showed but wasn't said: the keys went disabled at the fourth digit and the pad was rebuilt for each try, and TalkBack's re-reading of the focused key ("4, Button") flushed the queued message. Fixed in 4c9c0f1; then: "0 of 4 digits entered", "That PIN can’t do this. Ask an Admin." ✓ (no name).
+- Lockout: the 4c9c0f1 change first made a lock arriving on a retry invisible (the countdown kept its stale 0; PINs typed while locked were still discarded) — caught here, fixed in the same commit. Then: "0 of 4 digits entered, Error: Too many tries — wait 240 seconds." once; keys disabled; the line ticks on screen without being re-read ✓ (240 s because earlier failures doubled the lock). The end of the lock wasn't heard: the check was stopped at the user's request.
+- Idle pad closed at 2 minutes → focus back on "Settings, Button" ✓.
+
+#### Not run
+- Path 12 (sleep past the session): `adb root` refused on the Google Play image.
+- Path 13's second half (PIN pad over an edited sheet): stopped at the user's request.
+- Path 7's toast "Event added on …" with TalkBack on (the PIN was typed with TalkBack off).
+
+#### Restored
+- TalkBack's three settings put back (enabled_accessibility_services deleted, accessibility_enabled 0, touch_exploration_enabled 0).
+- Still to restore: TalkBack's Log output level back to ERROR (needs Use other apps); the person "Test" to remove (the user).
+
 
 ### A.6 Turn TalkBack off and restore
 

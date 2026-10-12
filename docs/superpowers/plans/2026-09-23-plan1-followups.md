@@ -268,6 +268,8 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 - "Searching…" wasn't heard when typing a town (too brief, or not announced); "No towns match …" was, once. The town results appearing aren't announced.
 - The toast "Event added on …" wasn't listened to with TalkBack on (the PIN was typed with TalkBack off); other toasts were said once.
 - A.4 path 12 (sleep past the session) skipped: `adb root` is refused on the Google Play image.
+- Stopped before the end: what TalkBack says when a lockout ends; the PIN pad over an edited person sheet outliving Settings by a second (A.4 path 13, second half); focus parked on a scrolled Settings list (path 10, second half). Run them on the SM-T510.
+- The lockout line reads "Too many tries — wait 240 seconds." once failures double the lock; minutes would read better past 60 seconds (wording, for Part B).
 
 **Decisions for the user**
 - The calendar's refusal toasts after a PIN (`Refusal.Toast`: "Mia can only change events they created.") still name the person whose PIN it was; the PIN pad's own refusal names no one (decision A). Should the toasts say "That PIN …" too?
