@@ -271,9 +271,6 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 - A described row is two steps at each call site (a description on the parent, `shownNotSpoken()` on the children: Today and Coming up rows, week chips, the header weather), so the next one can forget the hiding; `assertNothingReadTwice` catches it only where a test draws it. A `DescribedRow(description) { … }` would own both (simplify review).
 - `HhTextField` hides a placeholder only when it equals the label; a `placeholder: String? = null` that defaults to the label would say so instead of comparing strings (simplify review).
 
-**Decisions for the user**
-- The calendar's refusal toasts after a PIN (`Refusal.Toast`: "Mia can only change events they created.") still name the person whose PIN it was; the PIN pad's own refusal names no one (decision A). Should the toasts say "That PIN …" too?
-
 ## Feature ideas (2026-10-02, after v1)
 
 **Each its own spec → plan cycle; not in 4c, 4d or 4e**
