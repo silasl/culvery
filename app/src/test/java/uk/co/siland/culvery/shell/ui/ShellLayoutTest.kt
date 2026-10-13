@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
@@ -46,11 +47,13 @@ import uk.co.siland.culvery.capability.weather.HeaderWeather
 import uk.co.siland.culvery.capability.weather.ui.WeatherHeaderItem
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.isReadAsOne
 import uk.co.siland.culvery.shell.HOME_TAB_ID
+import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.SessionUi
 import uk.co.siland.culvery.shell.ShellUiState
 
@@ -122,11 +125,15 @@ class ShellLayoutTest {
         assertThat(signedOut).isTrue()
     }
 
-    /** A 48 dp touch target mustn't grow the bar: that would push Home down. */
+    /**
+     * 4e session 2b: on the SM-T510 Compose didn't widen the controls' small targets, so a touch just outside Sign out or
+     * the theme button missed. The bar is 48 dp and each control takes its full height.
+     */
     @Test
-    fun theStatusBarIs30DpTallAtFontScale1() {
+    fun theStatusBarIs48DpTallAndItsControlsTakeItsHeight() {
         statusBar(SessionUi("Alex", "Admin"))
-        compose.onNodeWithTag("status_bar").assertHeightIsEqualTo(30.dp)
+        compose.onNodeWithTag("status_bar").assertHeightIsEqualTo(48.dp)
+        listOf("status_sign_out", "status_theme").forEach { compose.onNodeWithTag(it).assertHeightIsAtLeast(48.dp) }
     }
 
     /** A grown text neither overflows its height nor ends in an ellipsis. */
@@ -145,12 +152,33 @@ class ShellLayoutTest {
         }
     }
 
-    /** Compose takes a touch up to 48 dp around a smaller clickable; Sign out's text is about 28 dp tall. */
+
+    /**
+     * 4e session 2b: on the SM-T510 a touch just below the words "Sign out" or the theme's label missed: Compose didn't
+     * widen their small targets there. Each now takes the bar's full 48 dp.
+     */
     @Test
-    fun signOutTakesATouchJustBelowItsText() {
+    fun inTheShellSignOutAndTheThemeTakeATouchJustBelowThem() {
         var signedOut = false
-        statusBar(SessionUi("Alex", "Admin")) { signedOut = true }
-        compose.onNodeWithTag("status_sign_out").performTouchInput { click(Offset(centerX, height + 8.dp.toPx())) }
+        var toggled = 0
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                // As in the app: the layers that count touches and hold the sheets wrap the shell.
+                ShellLayers(
+                    OverlayState(), toast = null, onToastHidden = {}, pinShowing = false, pinPad = {},
+                    activity = FakeUserActivity(), onTouch = {},
+                ) {
+                    CulveryShell(
+                        ShellUiState(session = SessionUi("Alex", "Admin")), { at },
+                        onSelectTab = {}, onOpenSettings = {}, onSignOut = { signedOut = true }, onToggleThemePreview = { toggled++ },
+                    ) {}
+                }
+            }
+        }
+        // The words are about 18 dp tall: 13 dp below a control's centre is just under them.
+        compose.onNodeWithTag("status_theme").performTouchInput { click(Offset(centerX, centerY + 13.dp.toPx())) }
+        assertThat(toggled).isEqualTo(1)
+        compose.onNodeWithTag("status_sign_out").performTouchInput { click(Offset(centerX, centerY + 13.dp.toPx())) }
         assertThat(signedOut).isTrue()
     }
 

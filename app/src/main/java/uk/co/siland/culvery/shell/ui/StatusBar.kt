@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -29,7 +30,8 @@ import uk.co.siland.culvery.core.ui.shownNotSpoken
 import uk.co.siland.culvery.shell.SessionUi
 
 private val TIME = DateTimeFormatter.ofPattern("HH:mm")
-private val STATUS_BAR_MIN_HEIGHT = 30.dp
+// A control's whole tap area: on the SM-T510 Compose didn't widen smaller targets, so a touch just outside missed (4e).
+private val STATUS_BAR_MIN_HEIGHT = 48.dp
 
 // What the theme toggle's tap does, for TalkBack.
 private const val PREVIEW_NIGHT = "preview the night theme"
@@ -37,8 +39,8 @@ private const val PREVIEW_DAY = "preview the day theme"
 private const val BACK_TO_AUTOMATIC = "go back to the automatic theme"
 
 /**
- * Hand-off status bar, plus §7's signed-in indicator: `account_circle` · "{name} · {role}" · "Sign out". Its controls
- * take a touch up to 48 dp around them (Compose's minimum touch target), so the bar stays 30 dp unless its text grows.
+ * Hand-off status bar, plus §7's signed-in indicator: `account_circle` · "{name} · {role}" · "Sign out". The bar and its
+ * two controls are [STATUS_BAR_MIN_HEIGHT] tall, more if the text grows.
  */
 @Composable
 fun StatusBar(
@@ -81,6 +83,8 @@ fun StatusBar(
                     modifier = Modifier
                         .testTag("status_sign_out")
                         .hhClickable(onSignOut)
+                        .heightIn(min = STATUS_BAR_MIN_HEIGHT)
+                        .wrapContentHeight()
                         .padding(horizontal = ShellTokens.statusSignOutPaddingH, vertical = ShellTokens.statusSignOutPaddingV),
                 )
             }
@@ -93,6 +97,7 @@ fun StatusBar(
                 .testTag("status_theme")
                 .hhClickable(onToggleThemePreview, label = action)
                 .semantics { contentDescription = "Theme: $label" }
+                .heightIn(min = STATUS_BAR_MIN_HEIGHT)
                 .padding(4.dp),
         ) {
             HhIcon(if (dark) Icons.DARK_MODE else Icons.LIGHT_MODE, size = 16.dp, tint = c.mute)
