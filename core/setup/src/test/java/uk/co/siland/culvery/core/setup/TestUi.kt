@@ -5,12 +5,8 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.unit.dp
-import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.junit.rules.TestRule
-import org.junit.runner.Description
-import org.junit.runners.model.Statement
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.SettingsPage
@@ -19,19 +15,6 @@ import uk.co.siland.culvery.core.plugin.ShellNavigator
 /** The tablet's canvas, for every screenshot in this module. */
 internal val CANVAS_W = 1280.dp
 internal val CANVAS_H = 800.dp
-
-/**
- * Puts Robolectric in touch mode, as the tablet is, so focus and the keyboard behave as they do there (the calendar's
- * rule, copied: test sources aren't shared between modules). Use it at `@get:Rule(order = 0)`, before the compose rule.
- */
-class TouchModeRule : TestRule {
-    override fun apply(base: Statement, description: Description): Statement = object : Statement() {
-        override fun evaluate() {
-            InstrumentationRegistry.getInstrumentation().setInTouchMode(true)
-            base.evaluate()
-        }
-    }
-}
 
 /**
  * Nothing logged under [tag], with its whole chain of causes, holds any of [secrets]; at least [minLines] were logged,

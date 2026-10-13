@@ -9,17 +9,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -126,12 +123,13 @@ fun EventEditorSheet(
                 top = CalendarDimens.editorPaddingTop,
                 bottom = CalendarDimens.editorPaddingBottom,
             ),
+            keyboard = keyboard,
         ) {
             // With the keyboard up (about 320 dp) the sheet's content is about 480 dp tall: the header, Title and
             // footer stay put and the chips scroll (2b-2 design §4.4). The background still runs behind the keyboard.
             Column(
                 verticalArrangement = Arrangement.spacedBy(ShellTokens.sheetGap),
-                modifier = Modifier.fillMaxSize().windowInsetsPadding(keyboard.only(WindowInsetsSides.Bottom)),
+                modifier = Modifier.fillMaxSize(),
             ) {
                 Header(title, form, everyone) {
                     closeKeyboard()

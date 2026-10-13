@@ -25,6 +25,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.TouchModeRule
 
 @RunWith(AndroidJUnit4::class)
 class LocationPaneTest {

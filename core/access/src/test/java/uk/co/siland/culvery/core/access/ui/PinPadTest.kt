@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.access.ui
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -14,7 +15,9 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -39,12 +42,16 @@ import uk.co.siland.culvery.core.access.pinReasonText
 import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.HhTextField
+import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class PinPadTest {
-    @get:Rule val compose = createComposeRule()
+    /** Focus behaves as on the tablet only in touch mode, set before the activity launches. */
+    @get:Rule(order = 0) val touchMode = TouchModeRule()
+    @get:Rule(order = 1) val compose = createComposeRule()
     private val controller = PinPromptController()
 
     private val activity = FakeUserActivity()
@@ -95,6 +102,24 @@ class PinPadTest {
         compose.waitForIdle()
         assertThat(compose.onNodeWithTag("pin_key_4").fetchSemanticsNode().id).isEqualTo(key)
         compose.onNodeWithTag("pin_dots").assertContentDescriptionEquals("0 of 4 digits entered")
+    }
+
+    /** 4e session 1: a PIN pad opened from a step with the keyboard up stayed under the keyboard. */
+    @Test
+    fun theKeyboardClosesWhenAPadOpens() {
+        var padUp by mutableStateOf(false)
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                Column {
+                    HhTextField("Sam", {}, placeholder = "Name", label = "Name", tag = "field")
+                    if (padUp) PinPadFrame("Choose a 4-digit PIN", line = null, message = "", wrongPin = false, enabled = true, onSubmit = {}, onCancel = {})
+                }
+            }
+        }
+        compose.onNodeWithTag("field").performClick().assertIsFocused()
+        padUp = true
+        compose.waitForIdle()
+        compose.onNodeWithTag("field").assertIsNotFocused()
     }
 
     @Test

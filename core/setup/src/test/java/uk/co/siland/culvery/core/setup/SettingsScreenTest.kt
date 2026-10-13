@@ -1,13 +1,18 @@
 package uk.co.siland.culvery.core.setup
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -16,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -122,6 +128,21 @@ class SettingsScreenTest {
     fun thePageListIsReadThroughBeforeThePage() {
         show(page("a", "Alpha", 0))
         compose.onNodeWithTag("settings_close").onParent().assert(isReadAsOne)
+    }
+
+    /** 4e session 1: with the keyboard up for the town search, Close must stay reachable. */
+    @Test
+    fun closeStaysAboveTheKeyboard() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalShellNavigator provides navigator) {
+                    Box(Modifier.size(1280.dp, 800.dp)) {
+                        SettingsScreen(listOf(page("a", "Alpha", 0)), onClose = {}, keyboard = WindowInsets(bottom = 320.dp))
+                    }
+                }
+            }
+        }
+        assertThat(compose.onNodeWithTag("settings_close").getUnclippedBoundsInRoot().bottom).isAtMost(480.dp)
     }
 
     @Test

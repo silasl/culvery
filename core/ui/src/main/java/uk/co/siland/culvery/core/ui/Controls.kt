@@ -37,6 +37,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -183,6 +184,7 @@ fun HhTextField(
     onDone: () -> Unit = {},
 ) {
     val c = Culvery.colors
+    val focusManager = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(ControlTokens.fieldRadius)
     BasicTextField(
@@ -193,7 +195,11 @@ fun HhTextField(
         textStyle = ControlType.field.copy(color = c.ink),
         cursorBrush = SolidColor(c.accent),
         keyboardOptions = KeyboardOptions(capitalization = capitalization, imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { onDone() }),
+        // Leaving the field closes the keyboard: a KeyboardActions onDone replaces Compose's own closing.
+        keyboardActions = KeyboardActions(onDone = {
+            onDone()
+            focusManager.clearFocus()
+        }),
         modifier = modifier
             .testTag(tag)
             .semantics {

@@ -52,6 +52,7 @@ import uk.co.siland.culvery.capability.calendar.saveFailedBody
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.ShellTokens
+import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 @RunWith(AndroidJUnit4::class)

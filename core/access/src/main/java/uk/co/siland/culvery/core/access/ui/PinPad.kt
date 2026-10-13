@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -236,6 +237,9 @@ fun PinPadFrame(
     // Emptied for each try by [clearOn], not by rebuilding the pad: new nodes move TalkBack's focus, and its reading of
     // the focused key flushes the try's message before it is said.
     var digits by remember(clearOn) { mutableStateOf("") }
+    // A pad opened from a field (a name, then Set PIN) would sit under the keyboard; leaving the field closes it.
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(Unit) { focusManager.clearFocus() }
     // The keys stay enabled at the fourth digit: disabling them made TalkBack read the focused key again, which drowned
     // the message the PIN brought. A fifth digit is ignored instead.
     val type: (String) -> Unit = { d ->

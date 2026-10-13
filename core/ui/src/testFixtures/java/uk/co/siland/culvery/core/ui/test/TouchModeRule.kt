@@ -1,4 +1,4 @@
-package uk.co.siland.culvery.capability.calendar.ui
+package uk.co.siland.culvery.core.ui.test
 
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.rules.TestRule

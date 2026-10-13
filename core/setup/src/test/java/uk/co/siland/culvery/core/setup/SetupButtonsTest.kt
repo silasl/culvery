@@ -1,18 +1,24 @@
 package uk.co.siland.culvery.core.setup
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -56,6 +62,17 @@ class SetupButtonsTest {
             }
         }
         listOf("wizard_back", "wizard_next", "welcome_sample", "people_add").forEach { assertButton(it, 48.dp) }
+    }
+
+    /** 4e session 1: the Samsung keyboard covered Back and Next, and the hidden navigation bar left no way to close it. */
+    @Test
+    fun theWizardsButtonsStayAboveTheKeyboard() {
+        show {
+            Box(Modifier.size(1280.dp, 800.dp)) {
+                WizardFrame(6, 2, back = {}, forward = Forward.Next("Next", enabled = true), busy = false, onForward = {}, onSkip = {}, keyboard = WindowInsets(bottom = 320.dp)) {}
+            }
+        }
+        assertThat(compose.onNodeWithTag("wizard_next").getUnclippedBoundsInRoot().bottom).isAtMost(480.dp)
     }
 
     @Test

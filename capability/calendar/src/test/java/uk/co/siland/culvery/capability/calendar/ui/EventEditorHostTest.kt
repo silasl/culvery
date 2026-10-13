@@ -77,6 +77,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.TouchModeRule
 
 /**
  * The add/edit sheet wired to a real repository, editor and access rules, as EventDetailHostTest wires the detail

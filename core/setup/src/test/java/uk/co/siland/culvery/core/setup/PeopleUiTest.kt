@@ -44,6 +44,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.PersonPalette
+import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 /** The people list and sheet over the real editor; Alex is in the setup session, so no PIN pad shows. */

@@ -8,11 +8,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -87,7 +92,12 @@ fun toastMillis(message: String, urgent: Boolean): Long {
  * Taps on empty sheet space are swallowed so they don't reach the scrim underneath.
  */
 @Composable
-fun HhSheet(padding: PaddingValues, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+fun HhSheet(
+    padding: PaddingValues,
+    modifier: Modifier = Modifier,
+    keyboard: WindowInsets = WindowInsets.ime,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val c = Culvery.colors
     Column(
         verticalArrangement = Arrangement.spacedBy(ShellTokens.sheetGap),
@@ -100,6 +110,8 @@ fun HhSheet(padding: PaddingValues, modifier: Modifier = Modifier, content: @Com
                 drawLine(c.line, Offset(x, 0f), Offset(x, size.height), ShellTokens.sheetBorder.toPx())
             }
             .pointerInput(Unit) { detectTapGestures { } }
+            // The background runs behind the keyboard; the content stays above it.
+            .windowInsetsPadding(keyboard.only(WindowInsetsSides.Bottom))
             .padding(padding),
         content = content,
     )
