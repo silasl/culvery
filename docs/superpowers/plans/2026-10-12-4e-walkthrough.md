@@ -482,6 +482,8 @@ Wi-Fi read back in §4.2 (no `culvery-4e-saved-wifi_on` left). Confirm with the 
 
 ## 5. Session 5: TalkBack (as short as possible)
 
+**Skipped (2026-10-13):** the user chose to skip the TalkBack session ("not that important at the moment"). E7 and the 4d-2 TalkBack items stay in the follow-ups for a later device check.
+
 **Changes:** the accessibility services, accessibility on, touch exploration, TalkBack's log output level. The controller drives; the user listens. **TalkBack is off whenever a real PIN is typed**, and the capture stopped. Closes: E7; from the 4d-2 transcript: the twice-said first opens, focus after an event or Settings closes, focus parked on a scrolled list, "You can try again." when a lockout ends (if time allows). Carried: the PIN pad over an edited sheet (a 10-minute wait) and the toast with TalkBack on.
 
 ### 5.0 Save
