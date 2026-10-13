@@ -198,7 +198,9 @@ The home-app check: Samsung's launcher (decision 5). Then the session end (nothi
 - Faults:
   1. The keyboard's **Done** doesn't close the keyboard in any Culvery field (town search, names, PIN steps): `HhTextField` passes its own `onDone`, which replaces Compose's default of hiding the keyboard.
   2. The keyboard covers the wizard's **Back**/**Next** and the PIN pad opened from a step; with the navigation bar hidden there's no Back to close it. Culvery draws edge to edge, so `adjustResize` no longer shrinks the window; the event editor pads for the keyboard (`WindowInsets.ime`), the wizard, Settings and the person sheet don't.
-- Carried: the user's names list (asked; the names check used the names seen on screen meanwhile).
+  3. Choosing a town from the results left the keyboard up (the user, re-entering the town in Settings › Home location). Fixed in 5dded58 (choosing clears focus); the user confirmed on the tablet.
+- Fixes installed: 57a7cbe (faults 1–2), 698627e (yellow), 5dded58 (fault 3); each `install -r`, household kept. Fault 2 checked on the tablet: Settings' Close sits above the keyboard; Done closes it.
+- Carried: nothing (the names list arrived after the session).
 - Taste: the user asked to swap the grey (Slate) person colour for a yellow — done after this session, at the user's request (was W30).
 
 ## 2a. Session 2a: font scale, dark theme, splash, zone, bars
