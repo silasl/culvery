@@ -306,14 +306,16 @@ Nothing changed: Culvery's theme on **Auto**, nobody signed in. The session end.
 
 ### 2b.5 Transcript
 
-- Date, build installed:
-- Keyboard (Day row, Add event reachable, scrim tap, town search, name field):
-- Sign out / theme toggle, just outside:
-- Weather at the density:
-- PIN chooser stages:
-- Faults:
-- Carried:
-- Taste:
+- Date, build installed: 2026-10-13, 5dded58; then 61e055a (fault 1).
+- Add/edit sheet with the Samsung keyboard: **Add event** stays above the keyboard; with five people the Who chips take two rows, so the Day row sits below the fold and is reached by scrolling the chips area (2b-2 design §4.4, as designed). A tap on the dimmed area hides the keyboard and closes the sheet (nothing typed, nothing added).
+- Settings with the keyboard: the town results show above it; a person's name field stays visible above it (the user). Done closes it (checked in session 1).
+- Sign out / theme, a touch just outside: FAULT 1 — `input tap` 4 px below the theme button and below Sign out did nothing; 1 px outside the theme button's bounds, still inside the bar, also missed: Compose didn't widen the targets on the device (the same taps pass under Robolectric, with and without `ShellLayers`). 4d-1 ruling 8 relied on that widening. The user, asked whether the bar needs these controls at all, kept both and chose a taller bar: the status bar and both controls are 48 dp (61e055a; the page moves down 18 dp; app baselines re-recorded). Rechecked by the user's finger: a tap just below **Auto** and just below **Sign out** both land.
+- Weather at the tablet's density: readable from across the room, nothing clipped (the user).
+- PIN chooser: "Choose a 4-digit PIN", then "Enter it again": clear; **Cancel** saved nothing (the user).
+- Restored: nothing changed; theme **Auto**; signed out. Pin check: first `NONE` — Culvery in front but unpinned after the 61e055a install (the user's answer to the pinning message isn't known); the user pressed Home and reopened Culvery, tapped **Got it**: PINNED, nobody signed in, Settings closed. (Session 3 looks at pinning after an install or restart.)
+- Faults: 1 (above).
+- Carried: nothing.
+- Taste: the 48 dp status bar's look (W-list: status bar).
 
 ## 3. Session 3: lock and restart
 
