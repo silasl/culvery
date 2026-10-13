@@ -16,6 +16,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarSource
@@ -294,22 +295,37 @@ class GoogleCalendarProvider @Inject constructor(
      */
     override suspend fun update(conn: Connection, source: CalendarSource, remoteId: String, draft: EventDraft, fields: Set<EventField>): RemoteEvent {
         val account = accountOf(conn)
-        oneOffToChange(account, source, remoteId, GoogleCall.CHANGING) ?: throw WriteRejectedException(EVENT_GONE)
-        val answer = api.send(account, "PATCH", api.url("calendars", source.id, "events", remoteId), patchBody(draft, fields))
-        return when {
-            answer.isSuccessful -> answer.decode(GoogleEvent.serializer(), GoogleCall.EVENT_PATCH).written()
-            answer.isGoneStatus -> throw WriteRejectedException(EVENT_GONE)
-            else -> throw answer.refusal(GoogleCall.CHANGING)
-        }
+        toChange(account, source, remoteId, GoogleCall.CHANGING) ?: throw WriteRejectedException(EVENT_GONE)
+        return patch(account, source, remoteId, patchBody(draft, fields))
     }
 
     /** Gone already (looked up first, or 404 or 410) is success; an event since made a series is refused, not deleted whole. */
     override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) {
         val account = accountOf(conn)
-        oneOffToChange(account, source, remoteId, GoogleCall.DELETING) ?: return
+        toChange(account, source, remoteId, GoogleCall.DELETING) ?: return
         val answer = api.send(account, "DELETE", api.url("calendars", source.id, "events", remoteId))
         if (answer.isSuccessful || answer.isGoneStatus) return
         throw answer.refusal(GoogleCall.DELETING)
+    }
+
+    /**
+     * A PATCH of the series itself with only who it is for (4e): every occurrence follows it. Looks first, as [update]
+     * does: gone → EVENT_GONE; one no longer a series is refused, as a PATCH would then change only that event.
+     */
+    override suspend fun assignSeries(conn: Connection, source: CalendarSource, seriesId: String, draft: EventDraft) {
+        val account = accountOf(conn)
+        toChange(account, source, seriesId, GoogleCall.CHANGING, series = true) ?: throw WriteRejectedException(EVENT_GONE)
+        patch(account, source, seriesId, patchBody(draft, setOf(EventField.FOR_PERSON)))
+    }
+
+    /** A PATCH of [remoteId]; returns the event as Google now holds it. */
+    private suspend fun patch(account: String, source: CalendarSource, remoteId: String, body: JsonObject): RemoteEvent {
+        val answer = api.send(account, "PATCH", api.url("calendars", source.id, "events", remoteId), body)
+        return when {
+            answer.isSuccessful -> answer.decode(GoogleEvent.serializer(), GoogleCall.EVENT_PATCH).written()
+            answer.isGoneStatus -> throw WriteRejectedException(EVENT_GONE)
+            else -> throw answer.refusal(GoogleCall.CHANGING)
+        }
     }
 
     override suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent? =
@@ -329,14 +345,16 @@ class GoogleCalendarProvider @Inject constructor(
 
     /**
      * The event about to be changed or deleted; null when it's gone. Any other refusal of the look is the write's
-     * refusal (3a design §3.7). One since made a series is refused (no If-Match: writes are rare).
+     * refusal (3a design §3.7). A one-off since made a series, or a [series] no longer one, is refused (no If-Match:
+     * writes are rare).
      */
-    private suspend fun oneOffToChange(account: String, source: CalendarSource, remoteId: String, what: GoogleCall): GoogleEvent? {
+    private suspend fun toChange(account: String, source: CalendarSource, remoteId: String, what: GoogleCall, series: Boolean = false): GoogleEvent? {
         val answer = get(account, source, remoteId) ?: return null
         if (!answer.isSuccessful) throw answer.refusal(what)
         val event = answer.decode(GoogleEvent.serializer(), GoogleCall.EVENT_GET).takeUnless { it.isGone } ?: return null
-        if (event.recurrence != null) {
-            Log.w(TAG, "${what.label}: it has become a repeating event in Google Calendar, so the tablet leaves it alone")
+        if ((event.recurrence != null) != series) {
+            val now = if (series) "is no longer" else "has become"
+            Log.w(TAG, "${what.label}: it $now a repeating event in Google Calendar, so the tablet leaves it alone")
             throw WriteRejectedException()
         }
         return event

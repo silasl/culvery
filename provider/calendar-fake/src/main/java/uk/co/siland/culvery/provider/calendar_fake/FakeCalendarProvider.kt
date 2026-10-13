@@ -60,6 +60,8 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     private val created = linkedMapOf<String, RemoteEvent>()
     private val changed = mutableMapOf<String, RemoteEvent>()
     private val deleted = mutableSetOf<String>()
+    // Who each series was changed to be for, by series id.
+    private val seriesFor = mutableMapOf<String, String?>()
     private var rejectNext: String? = null
     private var unreachableNext = false
 
@@ -118,7 +120,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
             if (cursor == current) return SyncResult(emptyList(), emptyList(), current, fullReplace = false)
             val samples = SampleEvents.forSource(source.id, today, range.zone, idsByName)
                 .filterNot { it.remoteId in deleted }
-                .map { changed[it.remoteId] ?: it }
+                .map { changed[it.remoteId] ?: it.withSeriesPerson() }
             val written = if (source.id == SOURCE_FAMILY) created.values.toList() else emptyList()
             current to samples + written
         }
@@ -162,6 +164,11 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
         Unit
     }
 
+    override suspend fun assignSeries(conn: Connection, source: CalendarSource, seriesId: String, draft: EventDraft) = write(source) {
+        if (familySamples().none { it.seriesId == seriesId }) throw WriteRejectedException(EVENT_GONE)
+        seriesFor[seriesId] = draft.forPerson
+    }
+
     override suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent? = synchronized(lock) {
         if (offline) throw UnreachableException(OFFLINE_MESSAGE)
         if (unreachableNext) {
@@ -176,9 +183,16 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
         in deleted -> null
         in created -> created[remoteId]
         in changed -> changed[remoteId]
-        else -> SampleEvents.forSource(SOURCE_FAMILY, LocalDate.now(clock.withZone(zone)), zone, idsByName)
-            .firstOrNull { it.remoteId == remoteId }
+        else -> familySamples().firstOrNull { it.remoteId == remoteId }?.withSeriesPerson()
     }
+
+    /** The Family calendar's samples as of today. Called under [lock]. */
+    private fun familySamples(): List<RemoteEvent> =
+        SampleEvents.forSource(SOURCE_FAMILY, LocalDate.now(clock.withZone(zone)), zone, idsByName)
+
+    /** An occurrence with who its series was changed to be for, if it was. Called under [lock]. */
+    private fun RemoteEvent.withSeriesPerson(): RemoteEvent =
+        seriesId?.takeIf { it in seriesFor }?.let { copy(forPerson = seriesFor[it]) } ?: this
 
     private inline fun <T> write(source: CalendarSource, block: () -> T): T = synchronized(lock) {
         if (offline) throw UnreachableException(OFFLINE_MESSAGE)

@@ -76,6 +76,8 @@ data class EventEntity(
     val endSort: Long,
     /** v4: the series' RRULE line; null when unknown. */
     val recurrenceRule: String? = null,
+    /** v7: the series this occurrence belongs to; null for a one-off, or until the first full read after the upgrade. */
+    val seriesId: String? = null,
 )
 
 @Entity(tableName = "sync_state", primaryKeys = ["connectionId", "sourceId"])
@@ -253,6 +255,9 @@ interface CalendarDao {
     @Upsert
     suspend fun upsertEvents(events: List<EventEntity>)
 
+    @Query("UPDATE event SET forPerson = :forPerson WHERE connectionId = :connectionId AND sourceId = :sourceId AND seriesId = :seriesId")
+    suspend fun assignSeries(connectionId: String, sourceId: String, seriesId: String, forPerson: String?)
+
     @Query(
         """
         SELECT e.*, s.personId AS sourcePersonId FROM event e
@@ -320,7 +325,7 @@ interface CalendarDao {
  */
 @Database(
     entities = [ConnectionEntity::class, SourceEntity::class, EventEntity::class, SyncStateEntity::class, OutboxEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class CalendarDatabase : RoomDatabase() {

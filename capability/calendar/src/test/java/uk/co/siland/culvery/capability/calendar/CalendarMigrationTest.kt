@@ -25,6 +25,7 @@ import uk.co.siland.culvery.capability.calendar.db.MIGRATION_2_3
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_3_4
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_4_5
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_5_6
+import uk.co.siland.culvery.capability.calendar.db.MIGRATION_6_7
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -363,6 +364,60 @@ class CalendarMigrationTest {
             // No cursor: the first pass after the upgrade reads each calendar in full.
             val window = DateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 10, 8), ZoneId.of("Europe/London"))
             assertThat(store.cursor("c1", "s1", window)).isNull()
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun migrationFromV6AddsAnEmptySeriesAndClearsTheCursorsKeepingEverythingElse() = runTest {
+        file.parentFile?.mkdirs()
+        file.delete()
+
+        val v6 = helper.createDatabase(6)
+        v6.execSQL(
+            "INSERT INTO connection (id, providerId, label, configJson, health, healthMessage, lastSyncMillis, sourcesCheckedMillis, " +
+                "needsSignInSinceMillis) VALUES ('c1', 'calendar.test', 'Google', '{}', 'OK', NULL, 1234, 1000, NULL)",
+        )
+        v6.execSQL(
+            "INSERT INTO source (connectionId, sourceId, name, writable, visible, personId, isMaster, shownInService, readProblem) " +
+                "VALUES ('c1', 's1', 'Family', 1, 1, 'family', 1, 1, NULL)",
+        )
+        v6.execSQL(
+            "INSERT INTO event (connectionId, sourceId, remoteId, title, startInstant, startDate, endInstant, endDate, " +
+                "recurring, forPerson, createdBy, startSort, endSort, recurrenceRule) " +
+                "VALUES ('c1', 's1', 'piano_1', 'Piano', 1000, NULL, 2000, NULL, 1, 'alex-id', 'sam-id', 1000, 2000, 'RRULE:FREQ=WEEKLY')",
+        )
+        v6.execSQL("INSERT INTO sync_state (connectionId, sourceId, cursor, rangeStart) VALUES ('c1', 's1', 'k7', '2026-09-22|2026-10-08|Europe/London')")
+        v6.execSQL(
+            "INSERT INTO outbox (connectionId, sourceId, remoteId, kind, draftJson, attempts, nextAttemptMillis, createdMillis, clientKey, fields) " +
+                "VALUES ('c1', 's1', 'e1', 'UPDATE', '$DRAFT_JSON', 2, 5000, 4000, NULL, 'TITLE')",
+        )
+        v6.close()
+
+        val v7 = helper.runMigrationsAndValidate(7, listOf(MIGRATION_6_7))
+        try {
+            assertThat(scalar(v7, "SELECT COUNT(*) FROM event WHERE seriesId IS NULL")).isEqualTo("1")
+            // No cursor: the first pass after the upgrade reads each calendar in full, which fills in each series.
+            assertThat(scalar(v7, "SELECT COUNT(*) FROM sync_state")).isEqualTo("0")
+        } finally {
+            v7.close()
+        }
+
+        val db = Room.databaseBuilder(context, CalendarDatabase::class.java, file.path)
+            .addMigrations(*ALL_MIGRATIONS)
+            .setDriver(AndroidSQLiteDriver())
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val store = CalendarStore(db)
+            assertThat(store.master().first()?.source?.id).isEqualTo("s1")
+            val piano = store.eventNow(EventRef("c1", "s1", "piano_1"))!!
+            assertThat(listOf(piano.title, piano.forPerson, piano.createdBy, piano.recurrenceRule))
+                .containsExactly("Piano", "alex-id", "sam-id", "RRULE:FREQ=WEEKLY").inOrder()
+            assertThat(piano.seriesId).isNull()
+            assertThat(store.pendingNow().map { Triple(it.remoteId, it.kind, it.fields) })
+                .containsExactly(Triple("e1", ChangeKind.UPDATE, setOf(EventField.TITLE)))
         } finally {
             db.close()
         }

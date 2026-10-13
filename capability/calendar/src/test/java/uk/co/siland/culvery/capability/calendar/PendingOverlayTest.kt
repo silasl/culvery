@@ -56,6 +56,19 @@ class PendingOverlayTest {
     }
 
     @Test
+    fun aQueuedSeriesAssignShowsThePersonOnEveryOccurrenceOfThatSeries() {
+        val swim1 = stored("swim_1", 9).copy(recurring = true, seriesId = "swim")
+        val swim2 = stored("swim_2", 11).copy(recurring = true, seriesId = "swim")
+        val draft = EventDraft("Swim", at(9), at(10), forPerson = "sam", createdBy = null)
+        val shown = overlay(listOf(swim1, swim2, stored("b", 10)), listOf(change(1, ChangeKind.ASSIGN_SERIES, "swim", draft)))
+        assertThat(shown.map { Triple(it.event.remoteId, it.event.forPerson, it.syncing) }).containsExactly(
+            Triple("swim_1", "sam", true),
+            Triple("b", null, false),
+            Triple("swim_2", "sam", true),
+        ).inOrder()
+    }
+
+    @Test
     fun laterChangesWinInQueueOrder() {
         val first = EventDraft("a", at(9), at(10), forPerson = "sam", createdBy = null)
         val second = first.copy(forPerson = "mia")

@@ -326,6 +326,27 @@ class CalendarRepositoryTest {
     }
 
     @Test
+    fun aRepeatingMasterEventWhoseSeriesIsKnownCanBeAssignedButNotChanged() = runTest {
+        put("s-family", timed("Swimming", 23, 16, 0, 60).copy(recurring = true, seriesId = "swim"), timed("Piano", 23, 17, 0, 60).copy(recurring = true))
+        put("s-alex", timed("Gym", 23, 7, 0, 60).copy(recurring = true, seriesId = "gym"))
+        val byTitle = today().associateBy { it.title }
+        assertThat(byTitle.getValue("Swimming").let { Triple(it.readOnlyReason, it.editable, it.assignable) })
+            .isEqualTo(Triple(ReadOnlyReason.Recurring, false, true))
+        assertThat(byTitle.getValue("Piano").assignable).isFalse()
+        assertThat(byTitle.getValue("Gym").assignable).isFalse()
+    }
+
+    @Test
+    fun detailShowsAQueuedSeriesAssignAsSyncing() = runTest {
+        val swim = timed("Swimming", 23, 16, 0, 60).copy(recurring = true, seriesId = "swim")
+        put("s-family", swim)
+        queue(ChangeKind.ASSIGN_SERIES, "swim", EventDraft(swim.title, swim.start, swim.end, sam.id.value, null))
+        val detail = repo.event(ref(swim.remoteId), today = sept(23)).first()!!
+        assertThat(detail.event.syncing).isTrue()
+        assertThat(detail.event.person.name).isEqualTo("Sam")
+    }
+
+    @Test
     fun aMasterWhoseProviderHasNoWriterIsReadOnly() = runTest {
         val noWriter = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet())
         put("s-family", timed("Boiler service", 23, 10, 0, 60))

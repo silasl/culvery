@@ -57,17 +57,27 @@ data class StoredEvent(
     val endSort: Long,
     /** The series' RRULE line, for the Repeats row (3a design D12); null when unknown. */
     val recurrenceRule: String? = null,
+    /** The series this occurrence belongs to, what a repeating event's Choose who it’s for changes (4e); null otherwise. */
+    val seriesId: String? = null,
 ) {
     val ref: EventRef get() = EventRef(connectionId, sourceId, remoteId)
 }
 
-/** ASSIGN changes only who an event is for: it is sent as the event is when it is sent, with the new person. */
-enum class ChangeKind { CREATE, UPDATE, DELETE, ASSIGN }
+/**
+ * ASSIGN changes only who an event is for: it is sent as the event is when it is sent, with the new person.
+ * ASSIGN_SERIES does that for every occurrence of a repeating event (4e): its remoteId is the series' id.
+ */
+enum class ChangeKind {
+    CREATE, UPDATE, DELETE, ASSIGN, ASSIGN_SERIES;
+
+    val isAssign: Boolean get() = this == ASSIGN || this == ASSIGN_SERIES
+}
 
 /**
  * One queued write, kept until the provider accepts or refuses it. [remoteId] is null only for CREATE, which
  * carries its [clientKey] instead: the id the provider gives the event (CalendarWriter.create), so a retried create
- * can't make a second one. [draft] is null only for DELETE, and for ASSIGN only its forPerson counts. [fields] are
+ * can't make a second one. [draft] is null only for DELETE, and for ASSIGN and ASSIGN_SERIES only its forPerson and
+ * colour count. [fields] are
  * what an UPDATE changes (3a design C3); null on a row queued before v4, which sent every field. [createdMillis] is
  * moved forward by each finished sign-in pause (D16), so it is read only for the change's age. [id] is 0 until the
  * store assigns one.

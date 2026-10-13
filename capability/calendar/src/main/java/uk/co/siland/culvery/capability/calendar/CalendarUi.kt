@@ -43,6 +43,8 @@ data class EventUi(
     val createdBy: String = "",
     /** The Repeats row: "Every week"… or "Yes" (3a design D12). */
     val repeats: String = REPEATS_YES,
+    /** The detail sheet offers Choose who it’s for: an editable event, or a repeating one on the master (4e). */
+    val assignable: Boolean = readOnlyReason == null,
 ) {
     val editable: Boolean get() = readOnlyReason == null
 }
@@ -277,5 +279,6 @@ internal fun StoredEvent.toUi(
         syncing = syncing,
         createdBy = createdByLabel(createdBy, reason, people, serviceName, source?.source?.name.orEmpty()),
         repeats = repeatsLabel(recurrenceRule, start, zone),
+        assignable = mayAssign(this, reason),
     )
 }

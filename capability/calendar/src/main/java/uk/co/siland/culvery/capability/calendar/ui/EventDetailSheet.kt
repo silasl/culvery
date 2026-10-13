@@ -117,8 +117,11 @@ fun EventDetailSheet(
                 e.readOnlyReason == ReadOnlyReason.Recurring -> Note(
                     icon = Icons.EVENT_REPEAT,
                     title = "Repeating event",
-                    body = "Change repeating events in ${e.serviceName} on your phone.",
-                )
+                    body = "Change repeating events in ${e.serviceName} on your phone." +
+                        if (e.assignable) " Choosing who it’s for changes every time it repeats." else "",
+                ) {
+                    if (e.assignable) ChooseWho(people, mode, busy, onChoosePerson, onAssign)
+                }
                 e.untagged -> Note(
                     icon = Icons.MOBILE,
                     title = "Added from a phone",
@@ -126,22 +129,7 @@ fun EventDetailSheet(
                     background = c.accentSoft,
                     iconTint = c.accent,
                 ) {
-                    Spacer(Modifier.height(CalendarDimens.assignTop))
-                    if (mode == DetailMode.ChoosingPerson) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(CalendarDimens.personChipGap),
-                            modifier = Modifier.horizontalScroll(rememberScrollState()),
-                        ) {
-                            people.forEach { person ->
-                                HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy, clickLabel = showAsEvent(person.name)) { onAssign(person) }
-                            }
-                        }
-                    } else {
-                        HhButton(
-                            CHOOSE_WHO, onChoosePerson, Modifier.testTag("detail_assign"),
-                            tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Surf,
-                        )
-                    }
+                    ChooseWho(people, mode, busy, onChoosePerson, onAssign)
                 }
             }
         }
@@ -179,6 +167,27 @@ fun EventDetailSheet(
                 }
             }
         }
+    }
+}
+
+/** Choose who it’s for, then the household’s chips once it is tapped. */
+@Composable
+private fun ChooseWho(people: List<Person>, mode: DetailMode, busy: Boolean, onChoosePerson: () -> Unit, onAssign: (Person) -> Unit) {
+    Spacer(Modifier.height(CalendarDimens.assignTop))
+    if (mode == DetailMode.ChoosingPerson) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(CalendarDimens.personChipGap),
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+        ) {
+            people.forEach { person ->
+                HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy, clickLabel = showAsEvent(person.name)) { onAssign(person) }
+            }
+        }
+    } else {
+        HhButton(
+            CHOOSE_WHO, onChoosePerson, Modifier.testTag("detail_assign"),
+            tone = ButtonTone.Primary, enabled = !busy, on = ButtonSurface.Surf,
+        )
     }
 }
 

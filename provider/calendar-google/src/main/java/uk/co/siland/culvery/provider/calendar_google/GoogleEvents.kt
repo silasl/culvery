@@ -61,6 +61,7 @@ internal fun GoogleEvent.toRemoteEvent(rule: String?): RemoteEvent? {
         forPerson = tags[PERSON_KEY],
         createdBy = tags[CREATED_BY_KEY],
         recurrenceRule = rule,
+        seriesId = recurringEventId,
     )
 }
 

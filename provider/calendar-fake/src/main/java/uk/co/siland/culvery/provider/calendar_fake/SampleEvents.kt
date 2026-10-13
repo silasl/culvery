@@ -96,6 +96,7 @@ internal object SampleEvents {
                             forPerson = tag(e.forName, idsByName),
                             createdBy = tag(e.byName, idsByName),
                             recurrenceRule = if (e.weekly) WEEKLY_RULE else null,
+                            seriesId = e.id.takeIf { e.weekly },
                         ),
                     )
                 }
@@ -113,6 +114,7 @@ internal object SampleEvents {
                             forPerson = tag(e.forName, idsByName),
                             createdBy = tag(e.byName, idsByName),
                             recurrenceRule = if (e.weekly) WEEKLY_RULE else null,
+                            seriesId = e.id.takeIf { e.weekly },
                         ),
                     )
                 }

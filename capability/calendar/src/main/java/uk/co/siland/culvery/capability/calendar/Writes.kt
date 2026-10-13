@@ -46,7 +46,7 @@ sealed interface WriteProblem {
  * field for a row queued before v4 stored them.
  */
 internal fun fieldsFor(kind: ChangeKind, fields: Set<EventField>?): Set<EventField> =
-    if (kind == ChangeKind.ASSIGN) setOf(EventField.FOR_PERSON) else fields ?: EventField.entries.toSet()
+    if (kind.isAssign) setOf(EventField.FOR_PERSON) else fields ?: EventField.entries.toSet()
 
 /** What one writer call came to. */
 internal sealed interface WriteOutcome {
@@ -112,23 +112,28 @@ internal suspend fun <T> callReader(io: CoroutineContext, timeoutMillis: Long, r
     }
 
 /**
- * Puts a write the provider accepted into the mirror: the event it now holds, or, for a delete, the event
- * removed. [remoteId] is the event's id before the write, needed only for a delete. [completing] is the outbox
- * row the write came from, completed in the same transaction.
+ * Puts a write the provider accepted into the mirror: the event it now holds; for a delete, the event removed; for a
+ * series assign, [forPerson] on every occurrence held. [remoteId] is the event's (or series') id before the write,
+ * needed for a delete and a series assign. [completing] is the outbox row the write came from, completed in the same
+ * transaction.
  */
 internal suspend fun CalendarStore.applyAcceptedWrite(
+    kind: ChangeKind,
     connectionId: String,
     sourceId: String,
     remoteId: String?,
+    forPerson: String?,
     accepted: WriteOutcome.Accepted,
     zone: ZoneId,
     completing: Long? = null,
 ) {
     val event = accepted.event
-    if (event == null) {
-        applyDeleted(EventRef(connectionId, sourceId, requireNotNull(remoteId) { "An accepted delete needs its remoteId" }), completing)
-    } else {
-        applyAccepted(connectionId, sourceId, event, zone, completing)
+    when {
+        kind == ChangeKind.ASSIGN_SERIES ->
+            applySeriesAssigned(connectionId, sourceId, requireNotNull(remoteId) { "A series assign needs its series" }, forPerson, completing)
+        event == null ->
+            applyDeleted(EventRef(connectionId, sourceId, requireNotNull(remoteId) { "An accepted delete needs its remoteId" }), completing)
+        else -> applyAccepted(connectionId, sourceId, event, zone, completing)
     }
 }
 

@@ -205,6 +205,51 @@ class GoogleWriteTest {
         assertLogsHoldNoPersonalData(minLines = 1)
     }
 
+    private fun putSeries(id: String = "piano") =
+        google.putEvent(family.id, google.timed(id, "Piano", at(22, 15), at(22, 16)) { putJsonArray("recurrence") { add("RRULE:FREQ=WEEKLY") } })
+
+    @Test
+    fun aSeriesAssignPatchesTheSeriesWithOnlyWhoItIsFor() = runTest {
+        putSeries()
+        provider.assignSeries(conn, family, "piano", draft(title = "Something else", forPerson = "sam-id", color = 0xFF5B9BE0))
+        val patch = google.requests.single { it.method == "PATCH" }
+        assertThat(patch.requestUrl!!.pathSegments.takeLast(4)).containsExactly("calendars", family.id, "events", "piano").inOrder()
+        val sent = google.bodies.last()
+        assertThat(sent.keys).containsExactly("extendedProperties", "colorId")
+        assertThat(sent.obj("extendedProperties").obj("private")).isEqualTo(JsonObject(mapOf(PERSON_KEY to JsonPrimitive("sam-id"))))
+        assertThat(sent.text("colorId")).isEqualTo("9")
+        val series = google.event(family.id, "piano")!!
+        assertThat(series.text("summary")).isEqualTo("Piano")
+        assertThat(series.obj("start").text("dateTime")).isEqualTo("2026-09-22T14:00:00Z")
+        assertThat(series["recurrence"]).isNotNull()
+    }
+
+    @Test
+    fun aSeriesAssignOfASeriesThatIsGoneIsRefusedAsGoneAndSendsNoPatch() = runTest {
+        putSeries()
+        google.cancel(family.id, "piano")
+        assertThat(failureOf { provider.assignSeries(conn, family, "piano", draft()) }?.message).isEqualTo(EVENT_GONE)
+        assertThat(failureOf { provider.assignSeries(conn, family, "nope0", draft()) }?.message).isEqualTo(EVENT_GONE)
+        assertThat(google.requests.map { it.method }).doesNotContain("PATCH")
+    }
+
+    @Test
+    fun aSeriesAssignOfAnEventThatIsNotASeriesIsRefused() = runTest {
+        provider.create(conn, family, draft(), key)
+        val refused = failureOf { provider.assignSeries(conn, family, key, draft(forPerson = "sam-id")) }
+        assertThat(refused).isInstanceOf(WriteRejectedException::class.java)
+        assertThat(google.requests.map { it.method }).doesNotContain("PATCH")
+        assertLogsHoldNoPersonalData(minLines = 1)
+    }
+
+    @Test
+    fun anUpdateOfASeriesIsStillRefusedEvenForWhoItIsFor() = runTest {
+        putSeries()
+        val refused = failureOf { provider.update(conn, family, "piano", draft(forPerson = "sam-id"), setOf(EventField.FOR_PERSON)) }
+        assertThat(refused).isInstanceOf(WriteRejectedException::class.java)
+        assertThat(google.requests.map { it.method }).doesNotContain("PATCH")
+    }
+
     @Test
     fun aDeleteOfAnEventCancelledOnThePhoneSucceedsAndSendsNoDelete() = runTest {
         provider.create(conn, family, draft(), key)

@@ -115,7 +115,8 @@ class CalendarRepository @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun shownEvent(ref: EventRef): Flow<Shown?> = zone.zone.flatMapLatest { z ->
         combine(store.event(ref), store.pending(), catalog, household.peopleWithFamily) { stored, pending, cat, people ->
-            overlayPending(listOfNotNull(stored), pending.filter { it.ref == ref }, cat::source, z, Long.MIN_VALUE, Long.MAX_VALUE)
+            val forIt = pending.filter { it.ref == ref || (it.kind == ChangeKind.ASSIGN_SERIES && it.remoteId == stored?.seriesId) }
+            overlayPending(listOfNotNull(stored), forIt, cat::source, z, Long.MIN_VALUE, Long.MAX_VALUE)
                 .singleOrNull()
                 ?.let { Shown(it, cat, people.associateBy { p -> p.id }, z) }
         }

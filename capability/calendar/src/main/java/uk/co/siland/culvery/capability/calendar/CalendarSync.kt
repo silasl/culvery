@@ -197,7 +197,7 @@ class CalendarSync internal constructor(
     /** Whether the change carries what its kind needs; one that doesn't can never be sent. */
     private fun PendingChange.isComplete(): Boolean = when (kind) {
         ChangeKind.CREATE -> draft != null && clientKey != null
-        ChangeKind.UPDATE -> remoteId != null && draft != null
+        ChangeKind.UPDATE, ChangeKind.ASSIGN_SERIES -> remoteId != null && draft != null
         ChangeKind.ASSIGN, ChangeKind.DELETE -> remoteId != null
     }
 
@@ -240,6 +240,14 @@ class CalendarSync internal constructor(
                 }
                 callWriter(io, timeoutMillis) { writer.update(conn, source, remoteId, draft, fieldsFor(ChangeKind.ASSIGN, null)) }
             }
+            ChangeKind.ASSIGN_SERIES -> {
+                val seriesId = checkNotNull(change.remoteId)
+                val draft = checkNotNull(change.draft)
+                callWriter(io, timeoutMillis) {
+                    writer.assignSeries(conn, source, seriesId, draft)
+                    null
+                }
+            }
             ChangeKind.DELETE -> {
                 val remoteId = checkNotNull(change.remoteId)
                 callWriter(io, timeoutMillis) {
@@ -260,7 +268,7 @@ class CalendarSync internal constructor(
         zone: ZoneId,
     ): WriteOutcome =
         try {
-            store.applyAcceptedWrite(conn.id, source.id, change.remoteId, accepted, zone, completing = change.id)
+            store.applyAcceptedWrite(change.kind, conn.id, source.id, change.remoteId, change.draft?.forPerson, accepted, zone, completing = change.id)
             store.writeAccepted(conn.id, clock.nowMillis())
             accepted
         } catch (e: CancellationException) {

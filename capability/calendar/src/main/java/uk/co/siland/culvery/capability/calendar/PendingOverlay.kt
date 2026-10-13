@@ -33,7 +33,7 @@ internal fun PendingChange.asCreatedEvent(sourcePerson: PersonId, zone: ZoneId):
 
 /**
  * Lays [pending] changes over [events] in queue order. A delete hides the event. An update shows the draft's
- * values for its fields; an assign shows only its person. A create adds its draft, on a visible source, under its client key, so
+ * values for its fields; an assign shows only its person, a series assign on every occurrence of its series. A create adds its draft, on a visible source, under its client key, so
  * the changes queued behind it apply to it and it keeps its ref once it syncs. Only events overlapping
  * [windowStart, windowEnd) are returned, in start order.
  */
@@ -56,6 +56,15 @@ internal fun overlayPending(
                 val current = shown[ref] ?: continue
                 if (draft != null) {
                     shown[ref] = ShownEvent(current.event.withFields(draft, fieldsFor(change.kind, change.fields), zone), syncing = true)
+                }
+            }
+            ChangeKind.ASSIGN_SERIES -> if (draft != null) {
+                val fields = fieldsFor(change.kind, null)
+                for (entry in shown.entries) {
+                    val e = entry.value.event
+                    if (e.connectionId == change.connectionId && e.sourceId == change.sourceId && e.seriesId == change.remoteId) {
+                        entry.setValue(ShownEvent(e.withFields(draft, fields, zone), syncing = true))
+                    }
                 }
             }
             ChangeKind.CREATE -> {

@@ -145,16 +145,20 @@ class CalendarEditor internal constructor(
         return write(target, ChangeKind.DELETE, who)
     }
 
-    /** Tags [ref] as being for [person] (hand-off: "Choose who it’s for"). Adults only. */
+    /**
+     * Tags [ref] as being for [person] (hand-off: "Choose who it’s for"). Adults only. On an occurrence of a repeating
+     * event it tags the whole series (4e).
+     */
     suspend fun assign(ref: EventRef, person: PersonId): EditResult {
-        val target = resolve(ref) ?: return EditResult.NotEditable
+        val target = resolve(ref, assigning = true) ?: return EditResult.NotEditable
         if (target.pending.any { it.kind == ChangeKind.DELETE }) return EditResult.NotEditable
         access.authorise(
             CalendarPermissions.ASSIGN,
             reason = PinReason.Assign,
             refusal = Refusal.Toast { ASK_AN_ADULT },
         ) ?: return EditResult.Cancelled
-        return write(target, ChangeKind.ASSIGN, who = null, forPerson = person.value)
+        val kind = if (target.event.recurring) ChangeKind.ASSIGN_SERIES else ChangeKind.ASSIGN
+        return write(target, kind, who = null, forPerson = person.value)
     }
 
     /**
@@ -215,13 +219,18 @@ class CalendarEditor internal constructor(
         return Destination(connection, source, writer)
     }
 
-    /** [ref] if the tablet may change it: an event in the mirror, or a queued create not yet synced. */
-    private suspend fun resolve(ref: EventRef): Target? {
+    /**
+     * [ref] if the tablet may change it, or when [assigning] only choose who it is for: an event in the mirror, or a
+     * queued create not yet synced.
+     */
+    private suspend fun resolve(ref: EventRef, assigning: Boolean = false): Target? {
         val source = store.source(ref.connectionId, ref.sourceId) ?: return null
         val pending = store.pendingNow().filter { it.ref == ref }
         val event = store.eventNow(ref) ?: queuedCreate(pending, source.mapping.person, zone.current()) ?: return null
         val to = destination(ref.connectionId, source.source) ?: return null
-        if (readOnlyReason(event, source, hasWriter = true) != null) return null
+        val reason = readOnlyReason(event, source, hasWriter = true)
+        val allowed = if (assigning) mayAssign(event, reason) else reason == null
+        if (!allowed) return null
         return Target(event, to, pending)
     }
 
@@ -287,8 +296,8 @@ class CalendarEditor internal constructor(
 
     /**
      * Under [writeLock] it reads the queue and the event afresh. A change behind a pending one for the same event
-     * (a queued create included) is queued after it rather than sent directly, where it could land first and be
-     * undone. [who] is checked again against the event's creator as it is now: it may have changed while the PIN pad
+     * (a queued create included), or for a series assign the same series, is queued after it rather than sent
+     * directly, where it could land first and be undone. [who] is checked again against the event's creator as it is now: it may have changed while the PIN pad
      * was up.
      */
     private suspend fun write(
@@ -301,7 +310,8 @@ class CalendarEditor internal constructor(
     ): EditResult = onAppScope(kind, serviceNameOf(target.to.connection, serviceOf)) {
         writeLock.withLock {
             val ref = target.event.ref
-            val pending = store.pendingNow().filter { it.ref == ref }
+            val queued = store.pendingNow()
+            val pending = queued.filter { it.ref == ref }
             val event = store.eventNow(ref) ?: queuedCreate(pending, target.event.sourcePerson, zone.current())
             when {
                 pending.any { it.kind == ChangeKind.DELETE } ->
@@ -315,10 +325,12 @@ class CalendarEditor internal constructor(
                 }
                 else -> {
                     val draft = draftFor(kind, event, pending, forPerson, edit, fields)
-                    if (pending.isNotEmpty()) {
-                        queue(target.to, kind, ref.remoteId, draft, attempted = false, fields = fields)
+                    val sendTo = if (kind == ChangeKind.ASSIGN_SERIES) checkNotNull(event.seriesId) else ref.remoteId
+                    val ahead = queued.filter { it.ref == ref.copy(remoteId = sendTo) }
+                    if (ahead.isNotEmpty()) {
+                        queue(target.to, kind, sendTo, draft, attempted = false, fields = fields)
                     } else {
-                        attempt(target.to, kind, ref.remoteId, draft, fields = fields)
+                        attempt(target.to, kind, sendTo, draft, fields = fields)
                     }
                 }
             }
@@ -326,7 +338,8 @@ class CalendarEditor internal constructor(
     }
 
     /**
-     * No draft for a delete. An assign sends the event as it is now, with the new person and their colour. An update
+     * No draft for a delete. An assign, of one event or its series, sends the event as it is now, with the new person
+     * and their colour. An update
      * lays the sheet's [fields] over the event as shown now (its queued changes included) and keeps its creator.
      */
     private suspend fun draftFor(
@@ -338,7 +351,7 @@ class CalendarEditor internal constructor(
         fields: Set<EventField>?,
     ): EventDraft? = when (kind) {
         ChangeKind.DELETE -> null
-        ChangeKind.ASSIGN -> assignDraft(event, forPerson, colorOf(forPerson))
+        ChangeKind.ASSIGN, ChangeKind.ASSIGN_SERIES -> assignDraft(event, forPerson, colorOf(forPerson))
         ChangeKind.UPDATE -> {
             val sheet = checkNotNull(edit) { "An update needs its draft" }
             val touched = checkNotNull(fields) { "An update needs its fields" }
@@ -372,6 +385,10 @@ class CalendarEditor internal constructor(
                     to.writer.delete(to.connection, to.source, checkNotNull(remoteId))
                     null
                 }
+                ChangeKind.ASSIGN_SERIES -> {
+                    to.writer.assignSeries(to.connection, to.source, checkNotNull(remoteId), checkNotNull(draft))
+                    null
+                }
                 ChangeKind.UPDATE, ChangeKind.ASSIGN ->
                     to.writer.update(to.connection, to.source, checkNotNull(remoteId), checkNotNull(draft), fieldsFor(kind, fields))
             }
@@ -379,7 +396,7 @@ class CalendarEditor internal constructor(
         return when (outcome) {
             is WriteOutcome.Accepted -> {
                 try {
-                    store.applyAcceptedWrite(to.connection.id, to.source.id, remoteId, outcome, zone.current())
+                    store.applyAcceptedWrite(kind, to.connection.id, to.source.id, remoteId, draft?.forPerson, outcome, zone.current())
                     store.writeAccepted(to.connection.id, clock.nowMillis())
                 } catch (e: CancellationException) {
                     throw e
@@ -432,7 +449,7 @@ class CalendarEditor internal constructor(
         val saved = result == EditResult.Done || result == EditResult.Queued
         when {
             result is EditResult.Rejected && kind == ChangeKind.DELETE -> toaster.show(couldNotDelete(label, result.problem), urgent = true)
-            result is EditResult.Rejected && kind == ChangeKind.ASSIGN -> toaster.show(couldNotSave(label, result.problem), urgent = true)
+            result is EditResult.Rejected && kind.isAssign -> toaster.show(couldNotSave(label, result.problem), urgent = true)
             saved && kind == ChangeKind.DELETE -> toaster.show(EVENT_DELETED)
             saved && kind == ChangeKind.CREATE -> toaster.show(added)
             saved && kind == ChangeKind.UPDATE -> toaster.show(CHANGES_SAVED)

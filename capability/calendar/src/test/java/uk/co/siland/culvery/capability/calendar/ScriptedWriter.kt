@@ -5,12 +5,13 @@ import kotlinx.coroutines.awaitCancellation
 import uk.co.siland.culvery.core.plugin.Connection
 
 /**
- * An in-test writer. [calls] reads "create:<title>", "update:<remoteId>", "delete:<remoteId>" or "find:<remoteId>".
+ * An in-test writer. [calls] reads "create:<title>", "update:<remoteId>", "delete:<remoteId>", "find:<remoteId>"
+ * or "assignSeries:<seriesId>".
  * Creates keep the contract: the client key is the event's id, and a repeated key returns the event it made.
  */
 internal class ScriptedWriter(override val providerId: String) : CalendarWriter {
     val calls = mutableListOf<String>()
-    /** The drafts sent to create and update, in order. */
+    /** The drafts sent to create, update and assignSeries, in order. */
     val drafts = mutableListOf<EventDraft>()
     /** The fields sent with each update, in order. */
     val fieldSets = mutableListOf<Set<EventField>>()
@@ -64,6 +65,12 @@ internal class ScriptedWriter(override val providerId: String) : CalendarWriter 
 
     override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) {
         record("delete:$remoteId", null)
+        gate?.await()
+        failWith?.let { throw it }
+    }
+
+    override suspend fun assignSeries(conn: Connection, source: CalendarSource, seriesId: String, draft: EventDraft) {
+        record("assignSeries:$seriesId", draft)
         gate?.await()
         failWith?.let { throw it }
     }

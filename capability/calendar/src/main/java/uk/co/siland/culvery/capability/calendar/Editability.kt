@@ -17,6 +17,13 @@ internal fun readOnlyReason(event: StoredEvent, source: StoredSource?, hasWriter
     else -> null
 }
 
+/**
+ * Whether the tablet may choose who [event] is for, given its [reason]: whatever it may change, and an occurrence of a
+ * repeating event on the master whose series is known (4e), which changes every occurrence.
+ */
+internal fun mayAssign(event: StoredEvent, reason: ReadOnlyReason?): Boolean =
+    reason == null || (reason == ReadOnlyReason.Recurring && event.seriesId != null)
+
 /** Where new events go: the master calendar and its connection. */
 internal class WritableMaster(val source: StoredSource, val connection: Connection)
 

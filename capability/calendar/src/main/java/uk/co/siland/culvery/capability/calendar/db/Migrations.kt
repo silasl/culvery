@@ -59,5 +59,16 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+/**
+ * v7 (Plan 4e): the series each occurrence belongs to; and every sync cursor cleared, so each calendar is read in full
+ * once and its stored occurrences get their series. The SQL must match schemas/…/7.json exactly.
+ */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `event` ADD COLUMN `seriesId` TEXT")
+        db.execSQL("DELETE FROM `sync_state`")
+    }
+}
+
 /** Every migration, oldest first: the database builder and the tests add these. */
-val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)

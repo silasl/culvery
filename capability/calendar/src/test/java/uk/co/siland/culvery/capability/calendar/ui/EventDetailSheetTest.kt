@@ -124,11 +124,34 @@ class EventDetailSheetTest {
     fun aRepeatingEventPointsToThePhoneAndShowsRepeats() {
         show(SampleUi.detailRecurring)
         compose.onNodeWithText("Repeating event").assertExists()
-        compose.onNodeWithText("Change repeating events in Google Calendar on your phone.").assertExists()
+        compose.onNodeWithText("Change repeating events in Google Calendar on your phone.", substring = true).assertExists()
         compose.onNodeWithText("Every week").assertExists()
         compose.onNodeWithText("Repeats").assertExists()
         compose.onNodeWithTag("detail_delete").assertDoesNotExist()
         compose.onNodeWithTag("detail_edit").assertDoesNotExist()
+    }
+
+    @Test
+    fun aRepeatingEventOnTheFamilyCalendarOffersChooseWhoItsForButNotChangeOrDelete() {
+        show(SampleUi.detailRecurring)
+        compose.onNodeWithText("Choosing who it’s for changes every time it repeats.", substring = true).assertExists()
+        compose.onNodeWithTag("detail_assign").assert(isButton).assertHeightIsEqualTo(48.dp)
+        compose.onNodeWithTag("detail_delete").assertDoesNotExist()
+        compose.onNodeWithTag("detail_edit").assertDoesNotExist()
+        compose.assertAccessible()
+        compose.onNodeWithText("Choose who it’s for").performClick()
+        assertThat(calls).containsExactly("choose")
+        mode = DetailMode.ChoosingPerson
+        compose.onNodeWithTag("assign_Sam").performClick()
+        assertThat(calls).containsExactly("choose", "assign:Sam").inOrder()
+        compose.assertAccessible()
+    }
+
+    @Test
+    fun aRepeatingEventThatCanNotBeAssignedOffersNoChoice() {
+        show(SampleUi.detailRecurring.copy(event = SampleUi.detailRecurring.event.copy(assignable = false)))
+        compose.onNodeWithText("Change repeating events in Google Calendar on your phone.").assertExists()
+        compose.onNodeWithTag("detail_assign").assertDoesNotExist()
     }
 
     @Test

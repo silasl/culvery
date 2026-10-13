@@ -785,6 +785,14 @@ class CalendarStoreTest {
     }
 
     @Test
+    fun eventsKeepTheirSeries() = runTest {
+        connect("s1")
+        store.applySync("c1", "s1", window, full(timed("piano_1", "Piano", 23, 15).copy(recurring = true, seriesId = "piano"), timed("once", "Once", 23, 9)))
+        assertThat(store.eventNow(EventRef("c1", "s1", "piano_1"))!!.seriesId).isEqualTo("piano")
+        assertThat(store.eventNow(EventRef("c1", "s1", "once"))!!.seriesId).isNull()
+    }
+
+    @Test
     fun theStoredSeriesAreEachRepeatingInstanceWithItsRule() = runTest {
         connect("s1", "s2")
         val weekly = RemoteEvent("piano_1", "Piano", EventTime.Timed(at(23, 15)), EventTime.Timed(at(23, 16)), recurring = true, recurrenceRule = "RRULE:FREQ=WEEKLY")

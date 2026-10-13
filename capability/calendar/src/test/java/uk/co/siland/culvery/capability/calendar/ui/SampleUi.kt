@@ -122,7 +122,7 @@ object SampleUi {
 
     /** Hand-off 05. */
     val detailRecurring = EventDetailUi(
-        event("Swimming", "16:00–17:00", mia, recurring = true).onFamilyCalendar("Sam").copy(repeats = "Every week"),
+        event("Swimming", "16:00–17:00", mia, recurring = true).onFamilyCalendar("Sam").copy(repeats = "Every week", assignable = true),
         "Today · 16:00–17:00",
     )
 

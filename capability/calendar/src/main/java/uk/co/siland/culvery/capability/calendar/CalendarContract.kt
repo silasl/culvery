@@ -48,7 +48,8 @@ const val CONFIG_ACCOUNT = "account"
  * as in Google Calendar and iCalendar. [start] and [end] are both Timed or both AllDay.
  * Recurring events arrive already expanded, one RemoteEvent per occurrence, each with its own [remoteId],
  * and [recurring] set. [forPerson] and [createdBy] are household PersonId values when the provider stores them.
- * [recurrenceRule] is the series' RRULE line (e.g. "RRULE:FREQ=WEEKLY") when the provider knows it.
+ * [recurrenceRule] is the series' RRULE line (e.g. "RRULE:FREQ=WEEKLY") when the provider knows it. [seriesId] is the
+ * series an occurrence belongs to (Google: recurringEventId), what [CalendarWriter.assignSeries] takes; null otherwise.
  */
 data class RemoteEvent(
     val remoteId: String,
@@ -59,6 +60,7 @@ data class RemoteEvent(
     val forPerson: String? = null,
     val createdBy: String? = null,
     val recurrenceRule: String? = null,
+    val seriesId: String? = null,
 )
 
 /** Local dates in the household's [zone]; [endExclusive] is the first day not included. */
@@ -203,4 +205,11 @@ interface CalendarWriter {
     suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent?
 
     suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String)
+
+    /**
+     * Changes who every occurrence of the series [seriesId] is for to [draft]'s forPerson, with its colour; nothing else
+     * of the series (its title, times and repeat rule are kept). A series that is gone throws
+     * [WriteRejectedException] ([EVENT_GONE]); an id that is no longer a series is refused.
+     */
+    suspend fun assignSeries(conn: Connection, source: CalendarSource, seriesId: String, draft: EventDraft)
 }

@@ -316,6 +316,13 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
             completing?.let { dao.deleteOutbox(it) }
         }
 
+    /** Shows an accepted series assign on every occurrence of [seriesId] held and, if it came from the outbox, completes it. */
+    suspend fun applySeriesAssigned(connectionId: String, sourceId: String, seriesId: String, forPerson: String?, completing: Long? = null) =
+        db.withTransaction {
+            dao.assignSeries(connectionId, sourceId, seriesId, forPerson)
+            completing?.let { dao.deleteOutbox(it) }
+        }
+
     /** Removes an accepted delete from the mirror and, if it came from the outbox, completes it. */
     suspend fun applyDeleted(ref: EventRef, completing: Long? = null) = db.withTransaction {
         dao.deleteEvents(ref.connectionId, ref.sourceId, listOf(ref.remoteId))
@@ -472,6 +479,7 @@ private fun RemoteEvent.toEntity(connectionId: String, sourceId: String, zone: Z
     startSort = start.instantIn(zone).toEpochMilli(),
     endSort = end.instantIn(zone).toEpochMilli(),
     recurrenceRule = recurrenceRule,
+    seriesId = seriesId,
 )
 
 private fun timeOf(instant: Long?, date: String?): EventTime =
@@ -491,6 +499,7 @@ private fun EventRow.toStored() = StoredEvent(
     startSort = event.startSort,
     endSort = event.endSort,
     recurrenceRule = event.recurrenceRule,
+    seriesId = event.seriesId,
 )
 
 private fun PendingChange.toEntity() = OutboxEntity(

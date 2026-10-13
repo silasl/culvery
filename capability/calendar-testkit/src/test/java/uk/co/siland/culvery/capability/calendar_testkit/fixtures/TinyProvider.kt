@@ -149,6 +149,11 @@ class TinyProvider(
         }
     }
 
+    override suspend fun assignSeries(conn: Connection, source: CalendarSource, seriesId: String, draft: EventDraft) {
+        checkWritable(source)
+        throw WriteRejectedException("No series $seriesId")
+    }
+
     override suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent? =
         if (findNothing || source.id != WRITABLE.id) null else written[remoteId]
 

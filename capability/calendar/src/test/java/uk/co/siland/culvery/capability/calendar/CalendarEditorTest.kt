@@ -439,6 +439,74 @@ class CalendarEditorTest {
         assertThat(access.requests).isEmpty()
     }
 
+    /** Two Wednesdays of a weekly swim, occurrences of the series "swim". */
+    private suspend fun putWeeklySwim(forPerson: String? = null) {
+        val first = event("swim_1", createdBy = null, forPerson, recurring = true).copy(seriesId = "swim")
+        fun EventTime.nextWeek() = EventTime.Timed((this as EventTime.Timed).instant.plusSeconds(7 * 86_400L))
+        put(first, first.copy(remoteId = "swim_2", start = first.start.nextWeek(), end = first.end.nextWeek()))
+    }
+
+    @Test
+    fun adultCanChooseWhoARepeatingEventIsForAndEveryTimeItRepeatsChanges() = runTest {
+        val access = testAccess(household)
+        putWeeklySwim(forPerson = access.alex.id.value)
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access).assign(ref("swim_1"), access.sam.id)).isEqualTo(EditResult.Done)
+        assertThat(writer.calls).containsExactly("assignSeries:swim")
+        assertThat(writer.drafts.single().let { it.forPerson to it.forPersonColor }).isEqualTo(access.sam.id.value to access.sam.color)
+        assertThat(access.requests.single().reason).isEqualTo(PinReason.Assign)
+        assertThat(syncRequests).isEqualTo(1)
+        assertThat(listOf("swim_1", "swim_2").map { store.eventNow(ref(it))!!.forPerson }).containsExactly(access.sam.id.value, access.sam.id.value)
+        assertThat(access.toasts.messages).isEmpty()
+    }
+
+    @Test
+    fun childCannotChooseWhoARepeatingEventIsFor() = runTest {
+        val access = testAccess(household)
+        putWeeklySwim()
+        access.answer(TestAccess.MIA)
+        assertThat(editor(access).assign(ref("swim_1"), access.mia.id)).isEqualTo(EditResult.Cancelled)
+        assertThat(access.toasts.messages).containsExactly("Ask a grown-up to choose who this is for.")
+        assertThat(writer.calls).isEmpty()
+    }
+
+    @Test
+    fun anOfflineChoiceForARepeatingEventIsQueuedForTheSeriesAndSentByTheDrain() = runTest {
+        val access = testAccess(household)
+        putWeeklySwim()
+        writer.failWith = UnreachableException("offline")
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access).assign(ref("swim_2"), access.sam.id)).isEqualTo(EditResult.Queued)
+        val queued = store.pendingNow().single()
+        assertThat(listOf(queued.kind, queued.remoteId, queued.draft?.forPerson)).containsExactly(ChangeKind.ASSIGN_SERIES, "swim", access.sam.id.value).inOrder()
+        assertThat(syncRequests).isEqualTo(1)
+        writer.failWith = null
+        drain(access, aheadMillis = 60_000).syncAll()
+        assertThat(writer.calls).containsExactly("assignSeries:swim", "assignSeries:swim")
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(listOf("swim_1", "swim_2").map { store.eventNow(ref(it))!!.forPerson }).containsExactly(access.sam.id.value, access.sam.id.value)
+    }
+
+    @Test
+    fun aRepeatingEventStillCanNotBeChangedOrDeleted() = runTest {
+        val access = testAccess(household)
+        putWeeklySwim()
+        val editor = editor(access)
+        assertThat(editor.update(ref("swim_1"), draft("Swim club", null))).isEqualTo(EditResult.NotEditable)
+        assertThat(editor.delete(ref("swim_1"))).isEqualTo(EditResult.NotEditable)
+        assertThat(editor.mayDelete(ref("swim_1"))).isFalse()
+        assertThat(access.requests).isEmpty()
+        assertThat(writer.calls).isEmpty()
+    }
+
+    @Test
+    fun aRepeatingEventWhoseSeriesIsNotKnownYetCanNotBeAssigned() = runTest {
+        val access = testAccess(household)
+        put(event("swim", createdBy = null, recurring = true))
+        assertThat(editor(access).assign(ref("swim"), access.sam.id)).isEqualTo(EditResult.NotEditable)
+        assertThat(access.requests).isEmpty()
+    }
+
     @Test
     fun aMissingEventIsNotEditable() = runTest {
         val access = testAccess(household)

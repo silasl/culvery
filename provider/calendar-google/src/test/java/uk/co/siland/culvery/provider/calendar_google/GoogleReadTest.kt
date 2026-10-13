@@ -246,6 +246,7 @@ class GoogleReadTest {
         assertThat(event.start).isEqualTo(EventTime.Timed(at(23, 19, 30)))
         assertThat(event.forPerson to event.createdBy).isEqualTo("mia-id" to "sam-id")
         assertThat(event.recurring).isFalse()
+        assertThat(event.seriesId).isNull()
     }
 
     @Test
@@ -282,6 +283,7 @@ class GoogleReadTest {
         val upserts = provider.sync(conn, family, range, null).upserts
         assertThat(upserts.map { it.recurring to it.recurrenceRule })
             .containsExactly(true to "RRULE:FREQ=WEEKLY;BYDAY=TU", true to "RRULE:FREQ=WEEKLY;BYDAY=TU")
+        assertThat(upserts.map { it.seriesId }).containsExactly("piano", "piano")
         assertThat(google.requests.count { it.requestUrl!!.pathSegments.last() == "piano" }).isEqualTo(1)
         // A full sync starts the cache again.
         provider.sync(conn, family, range, null)
