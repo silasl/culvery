@@ -613,14 +613,15 @@ After the pin check: the user turns **USB debugging** off (Settings › Develope
 
 ### 6.4 Transcript
 
-- Date (day 1), build installed:
-- APK size; TotalTime ×5 (median); fully drawn ×5; skipped frames ×5; Play services crashes:
-- gfxinfo (frames, janky, p50/p90); Dalvik / native PSS after the last start:
-- Running snapshot (elapsed, CPU time, RSS, threads, Dalvik/native/TOTAL PSS, views, activities, frames, janky, p50/p90/p99):
-- Against Appendix B (emulator); the font saving carried (17.2 → 2.8 MB Dalvik, emulator):
-- USB debugging off:
-- Faults:
-- Carried:
+- Date (day 1), build installed: 2026-10-13, 72041ba.
+- APK 3,919,966 bytes; TotalTime 491, 506, 492, 510, 542 ms (median 506); fully drawn the same; skipped frames 0 ×5; Play services crashes 0.
+- gfxinfo (last cold start): 27 frames, 26 janky (96%), p50 21 ms, p90 69 ms; Dalvik / native PSS 3.4 / 10.9 MB.
+- Running snapshot (about 1 min after the last start): elapsed 01:00, CPU 1 s, RSS 103 MB, 45 threads; Dalvik 4.4 / native 11.0 / TOTAL 63.2 MB PSS; 6 views, 1 activity; frames as above, p99 150 ms.
+- Against Appendix B (emulator, median 3,029 ms; skipped up to 146; p50/p90 300/1,900 ms; Dalvik/native 2.8/17.5 MB): the tablet starts about 6× faster, skips no frames and draws far faster. The start-up frames are still mostly over 16 ms (p50 21 ms) — first frames on 2019 hardware. The font saving is carried from the emulator (17.2 → 2.8 MB Dalvik).
+- Pin check: PINNED, nobody signed in, Settings closed.
+- USB debugging off: (the user, after this session)
+- Faults: none.
+- Carried: nothing.
 
 ## 7. The family week, the day 3–4 read and day 7
 
