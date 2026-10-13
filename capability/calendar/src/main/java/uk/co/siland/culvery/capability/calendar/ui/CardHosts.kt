@@ -59,5 +59,6 @@ internal fun WeekViewHost(
         onAdd = add,
         onWeeksAhead = shown::show,
         onReconnect = { s.reconnect?.let(onReconnect) },
+        onUpdateNow = editor::updateNow,
     )
 }

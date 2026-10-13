@@ -138,6 +138,15 @@ class CalendarEditorTest {
     private suspend fun waitForThePad(access: TestAccess) =
         withContext(Dispatchers.Default) { withTimeout(5_000) { while (access.requests.isEmpty()) delay(10) } }
 
+    /** 4e: the week's Update now asks for a pass at once, without a PIN (it changes nothing). */
+    @Test
+    fun updateNowAsksForASyncWithoutAPin() = runTest {
+        val access = testAccess(household)
+        editor(access).updateNow()
+        assertThat(syncRequests).isEqualTo(1)
+        assertThat(access.requests).isEmpty()
+    }
+
     @Test
     fun adultCanDeleteAnyMasterEvent() = runTest {
         val access = testAccess(household)

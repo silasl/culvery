@@ -103,6 +103,9 @@ class CalendarEditor internal constructor(
         household::person, providers::displayNameOf,
     )
 
+    /** The week's Update now: a sync pass at once. It changes nothing, so it asks for no PIN. */
+    fun updateNow() = requestSync()
+
     /** Who is signed in now: the add/edit sheet's Who default and its disabled chips (2b-2 design D2). */
     internal val session: StateFlow<Identified?> get() = access.session
 

@@ -110,6 +110,34 @@ class WeekViewTest {
         compose.onNodeWithTag("week_out_of_date", useUnmergedTree = true).assertDoesNotExist()
     }
 
+    /** 4e: on the tablet the line went red and nothing could be done about it. */
+    @Test
+    fun aStaleWeekOffersUpdateNowWhichAsksForASyncAndSaysUpdating() {
+        var asked = 0
+        show { WeekView(state(sync(agoMinutes = 45, connections = listOf("Google Calendar"))), onUpdateNow = { asked++ }) }
+        compose.onNodeWithTag("week_update_now").assert(isButton).performClick()
+        assertThat(asked).isEqualTo(1)
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("Updating…")
+        compose.onNodeWithTag("week_update_now").assertDoesNotExist()
+    }
+
+    @Test
+    fun aFreshWeekHasNoUpdateNow() {
+        show { WeekView(state(sync(agoMinutes = 2)), onUpdateNow = {}) }
+        compose.onNodeWithTag("week_update_now").assertDoesNotExist()
+    }
+
+    /** A sync that fails leaves the age unchanged: after a while the line says so again and the button comes back. */
+    @Test
+    fun aFailedUpdateGoesBackToTheStaleLine() {
+        compose.mainClock.autoAdvance = false
+        show { WeekView(state(sync(agoMinutes = 45, connections = listOf("Google Calendar"))), onUpdateNow = {}) }
+        compose.onNodeWithTag("week_update_now").performClick()
+        compose.mainClock.advanceTimeBy(UPDATING_SHOWN_MS + 100)
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("Out of date — updated from Google Calendar 45 minutes ago")
+        compose.onNodeWithTag("week_update_now").assertExists()
+    }
+
     @Test
     fun aChipNamesWhoseEventItIs() {
         show { WeekView(state()) }

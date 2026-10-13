@@ -30,6 +30,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -92,7 +93,8 @@ internal fun reconnectLabel(services: List<String>): String =
  * week jumps back. With [onAdd] (there is a writable master calendar), Add event sits right of the legend and adds on
  * the first day shown, and a tap on the space below a column's chips, or on its hint, adds on that column's day; chip
  * taps still open their event. Without it, the legend keeps a 24 dp gap to the right edge. The reconnect chip runs
- * [onReconnect] (3a design §4.3).
+ * [onReconnect] (3a design §4.3). While the week is out of date, Update now runs [onUpdateNow] and the line says
+ * "Updating…" until the sync lands or [UPDATING_SHOWN_MS] passes (4e).
  */
 @Composable
 fun WeekView(
@@ -102,8 +104,15 @@ fun WeekView(
     onAdd: ((LocalDate) -> Unit)? = null,
     onWeeksAhead: (Int) -> Unit = {},
     onReconnect: () -> Unit = {},
+    onUpdateNow: () -> Unit = {},
 ) {
     val c = Culvery.colors
+    // Reset by a sync landing (a new age), or after a while if it failed and the age stayed the same.
+    var updating by remember(state.sync.lastSyncMillis) { mutableStateOf(false) }
+    if (updating) LaunchedEffect(Unit) {
+        delay(UPDATING_SHOWN_MS)
+        updating = false
+    }
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.weekHeaderGap), modifier = modifier.fillMaxSize()) {
         Column {
             // The title+subtitle column and the legend share one bottom-aligned row, so the legend stays level
@@ -143,15 +152,26 @@ fun WeekView(
                     Spacer(Modifier.height(CalendarDimens.subtitleTop))
                     val stale = state.sync.isStaleAt(state.nowMillis)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.staleIconGap)) {
-                        if (stale) HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.staleIcon, tint = c.danger, modifier = Modifier.testTag("week_out_of_date"))
+                        if (stale && !updating) HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.staleIcon, tint = c.danger, modifier = Modifier.testTag("week_out_of_date"))
                         Text(
-                            weekLine(state.sync, state.nowMillis),
+                            if (updating) UPDATING else weekLine(state.sync, state.nowMillis),
                             style = CalendarType.subtitle,
-                            color = if (stale) c.danger else c.mute,
+                            color = if (stale && !updating) c.danger else c.mute,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.testTag("week_subtitle"),
+                            modifier = Modifier.weight(1f, fill = false).testTag("week_subtitle").semantics { liveRegion = LiveRegionMode.Polite },
                         )
+                        if (stale && !updating) {
+                            HhButton(
+                                UPDATE_NOW,
+                                {
+                                    updating = true
+                                    onUpdateNow()
+                                },
+                                Modifier.testTag("week_update_now"),
+                                on = ButtonSurface.Bg,
+                            )
+                        }
                     }
                 }
                 Row(
@@ -393,3 +413,8 @@ internal fun rememberWeekShown(today: LocalDate): WeekShown {
     }
     return shown
 }
+
+/** How long "Updating…" stands in for an out-of-date line before a failed sync shows it again. */
+internal const val UPDATING_SHOWN_MS = 30_000L
+private const val UPDATE_NOW = "Update now"
+private const val UPDATING = "Updating…"
