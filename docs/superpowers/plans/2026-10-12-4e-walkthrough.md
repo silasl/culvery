@@ -625,6 +625,11 @@ After the pin check: the user turns **USB debugging** off (Settings › Develope
 
 ## 7. The family week, the day 3–4 read and day 7
 
+**Notes from the week (the user), and what came of each:**
+- The week line showed "Out of date" in red with nothing to do: **Update now** while the week is out of date (8791ea6, installed at the next cable session). Why the syncs fell behind: read at the next cable session.
+- In-app branding: listed for the end-of-v1 design walk-through (93011b2).
+- Repeating events can't be given a person on the tablet: the user chose to allow **Who it's for** on a repeat (applied to the whole series; times and titles still change on a phone). To build after day 7, in 4e, with a test and a tablet check.
+
 ### 7.1 The week
 
 Shared use (decision 4), Samsung's launcher as home. The son leaves Culvery with Settings › Tablet lock › **Use other apps** (an Admin types the PIN); Culvery pins again when it next comes to the front. The user notes anything odd with the time and what was on screen. The tablet stays on its charger; a restart loses the crash buffer (note when one happened).
