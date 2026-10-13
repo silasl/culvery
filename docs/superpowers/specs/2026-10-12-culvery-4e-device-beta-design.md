@@ -24,7 +24,8 @@ Done means: every check in §4 run and recorded (passed, fixed, or listed with a
 - The user does every physical step (Developer options, cable, reboots, the power cut, the phone) and types every PIN and password. The controller drives over adb.
 - **The son's tablet:** the controller never clears another app's data, uninstalls anything but Culvery, or changes a setting a check doesn't need. Every changed setting (font scale, dark mode, the home app, TalkBack and its log level, Wi-Fi) is saved first and put back in the same session, even if the check fails.
 - **No household names in logs or the transcript:** people, events, towns and the account are written as [person], [event], [town], [account]. Logs and screenshots are deleted once the session's notes are written; the transcript is checked for names before it is committed.
-- **No PIN in a log:** the speech log is paused while a real PIN is typed (4d-2's rule).
+- **No PIN in a log:** TalkBack is off and the speech log stopped while a real PIN is typed (plan review, 2026-10-12; was: the speech log paused, 4d-2's rule).
+- **USB debugging** is off during the family week (the PC's key is kept), on again only for the day 3–4 read and day 7 (plan review, 2026-10-12).
 - **Offline** only with Wi-Fi off (`svc wifi disable`, then `enable`); never airplane mode.
 - **Install** only signed releases with `adb install -r`. The first install is fresh (no Culvery on the tablet). Never uninstall Culvery once set up without the user's yes: it deletes the household.
 - Sessions are 20–30 minutes. TalkBack's session is the shortest possible (the 4d-2 check was wearing).
@@ -39,10 +40,12 @@ Each item names the follow-up it closes (E-numbers from the 4d triage; the rest 
 1. The user turns on Developer options and USB debugging, plugs in and accepts this PC's key. The controller records the Android and One UI versions, the screen size and density.
 2. Build and install the signed release (`docs/setup/release.md` §3). Same key and release OAuth client as 4c.
 3. The user runs the setup wizard for real: the home location, the real people with their colours and roles, the Admin PIN, and Connect with the family account already on the tablet. The household is the one used for the family week.
-4. Checks: Connect in screen pinning (the chooser opens outside the pin; Culvery pins again when back in front); the first sync; the weather arrives; the R8 build's sign-in, sync, a write (an event added and deleted, with the user's yes) and weather work (4c).
+4. Checks: Connect in screen pinning (the chooser opens outside the pin; Culvery pins again when back in front); the first sync; the weather arrives; the R8 build's sign-in, sync and weather work (4c). The write (an event added and deleted, with the user's yes) moves to Session 4 (plan review, 2026-10-12).
 5. Culvery is not made the home app (decision 5).
 
 ### 4.2 Session 2: look and layout
+
+Run as two sessions, each with its own save and restore (plan review, 2026-10-12): **2a** font scale (with DM Sans), the dark theme, the splash, the cold-start zone and the bars; **2b** the keyboard, Sign out and the theme toggle, the weather, the PIN chooser. The navigation bar is only recorded, not changed; Android's dark mode is not touched; Samsung's floating and split keyboards are closed as not wall use (the scrim tap stays) (plan review, 2026-10-12).
 
 - Font scale 1.3 and 1.5 (Android 11 scales linearly; the emulator capped it): the clock and the Home grid (E1; cap the clock if the grid overflows), the rail's "Calendar" label (E8), week chip titles with real data (E9). Put the scale back.
 - The dark theme against the dark screenshots (E4).
@@ -70,17 +73,17 @@ Each item names the follow-up it closes (E-numbers from the 4d triage; the rest 
 
 ### 4.5 Session 5: TalkBack (as short as possible)
 
-TalkBack on, driven by the controller; the user only listens. One walk of Home, an event, the PIN pad and Settings (E7), plus what the emulator check left: what is said when a lockout ends ("You can try again."), focus after Settings or a sheet closes (the status-bar clock on the emulator), the twice-said first opens, the PIN pad over an edited sheet outliving Settings by a second, focus parked on a scrolled list (4d-2 follow-ups). Speech is read from TalkBack's verbose log (set back to its saved level afterwards). On the emulator `adb input` didn't reach TalkBack; on the device, try `adb input` first, then ask the user to swipe.
+TalkBack on, driven by the controller; the user only listens. One walk of Home, an event, the PIN pad and Settings (E7), plus what the emulator check left: what is said when a lockout ends ("You can try again."), focus after Settings or a sheet closes (the status-bar clock on the emulator), the twice-said first opens, the PIN pad over an edited sheet outliving Settings by a second, focus parked on a scrolled list (4d-2 follow-ups). Speech is read from TalkBack's verbose log (set back to its saved level afterwards). On the emulator `adb input` didn't reach TalkBack; on the device, try `adb input` first, then ask the user to swipe. Trimmed (plan review, 2026-10-12): TalkBack is off whenever a real PIN is typed; if `adb input` fails the session stops after Home and asks; the lockout's end is heard only if under 20 minutes have passed; the PIN pad over an edited sheet (a 10-minute wait) and the toast with TalkBack on are carried.
 
 ### 4.6 Session 6: performance, day 1
 
-`tools/measure-release.sh` on the tablet: `am start -W` TotalTime (5 runs), skipped frames, `dumpsys gfxinfo`, Dalvik and native PSS, threads; the subset font's memory saving (4c Appendix B). Saved for day 7.
+`tools/measure-release.sh` on the tablet: `am start -W` TotalTime (5 runs), skipped frames, `dumpsys gfxinfo`, Dalvik and native PSS, threads; the subset font's memory saving (4c Appendix B). Saved for day 7. The font saving is carried from the emulator (Dalvik 17.2 → 2.8 MB), not re-measured on the tablet (plan review, 2026-10-12).
 
 ## 5. The planned code change: no backup or transfer
 
-- Add `app/src/main/res/xml/data_extraction_rules.xml` excluding every domain (`root`, `file`, `database`, `sharedpref`, `external`) from `cloud-backup` and `device-transfer`, and set `android:dataExtractionRules` on `<application>`. Keep `allowBackup="false"`, which is what Android 11 (the SM-T510) and earlier honour for both; the rules cover Android 12 and later, where transfer ignores `allowBackup` for apps targeting 31+.
+- Add `app/src/main/res/xml/data_extraction_rules.xml` excluding every domain (`root`, `file`, `database`, `sharedpref`, `external`, and `device_root`, `device_file`, `device_database`, `device_sharedpref`: nine, plan review, 2026-10-12) from `cloud-backup` and `device-transfer`, and set `android:dataExtractionRules` on `<application>`. Keep `allowBackup="false"`, which is what Android 11 (the SM-T510) and earlier honour for both; the rules cover Android 12 and later, where transfer ignores `allowBackup` for apps targeting 31+.
 - A unit test fails if the manifest loses either attribute or the rules file loses an exclusion.
-- `docs/privacy.html`: Culvery's data stays on the tablet; it isn't copied to a cloud backup or to a new tablet by Android's device transfer.
+- `docs/privacy.html`: "Culvery tells Android not to include its data in app backup or device transfer, so Android does not copy it to a cloud backup or a new tablet." (plan review, 2026-10-12)
 - On the tablet: `adb shell bmgr backupnow uk.co.siland.culvery` doesn't back Culvery up.
 
 ## 6. Faults found on the tablet
