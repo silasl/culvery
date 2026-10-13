@@ -260,18 +260,18 @@ Culvery's theme button on **Auto**. Then the session end.
 
 ### 2a.7 Transcript
 
-- Date, build installed:
-- Font scale 1.3 (clock, grid, rail, chips):
-- Font scale 1.5 (same):
-- DM Sans weights:
-- Dark theme vs baselines:
-- Splash (seen; TotalTime):
-- Cold-start zone:
-- Bars / handle (navigation type):
-- Restored (read back):
-- Faults:
-- Carried:
-- Taste:
+- Date, build installed: 2026-10-13, 5dded58.
+- Font scale 1.3: Home fits; the clock keeps its size (the grid isn't pushed off); rail "Calendar" whole; no clipping. (Screenshot, controller.)
+- Font scale 1.5: Home fits; Coming up's chip title ellipsizes ("…"); rail "Calendar" just whole (E8 ✓); week chips three lines with real titles (E9 ✓); the week subtitle "Updated from Google Calendar 2 minut…" is cut short (taste). E1 ✓: no cap needed.
+- DM Sans weights: clock and titles medium, body regular, nothing cut short (2b-1 ✓).
+- Dark theme vs baselines: the night theme reads brown, not the baselines' near-black — Samsung's Eye comfort shield (`system blue_light_filter` 1, opacity 6) tints the whole screen, and screenshots carry the tint; Culvery's colours are the neutral ones in `Colors.kt`. `settings put system blue_light_filter 0` (with the user's yes) didn't switch the filter off; restored to 1. The user sees brown on the tablet too. E4: the theme matches by code; on this tablet it's seen through the filter (a wall setup note, not a fault).
+- Splash: a logo screen, then Home; no dark flash (E3 ✓, informs W9). Cold `am start -W`: TotalTime 603 ms (a first, warmer try: WaitTime 1644 ms).
+- Cold-start zone: tablet Europe/London, household in the UK: same zone, not reachable on this household (plan ruling 4).
+- Bars / handle: navigation is **Buttons**; while pinned, no bars and no handle show — edge to edge (E2 ✓).
+- Restored (read back): font scale 1.1; blue_light_filter 1; Culvery's theme button back on **Auto**. Pin check: PINNED, nobody signed in, Settings closed.
+- Faults: none.
+- Carried: E4 on a screen without Eye comfort shield (the wall tablet, or after the household decides).
+- Taste: the week subtitle cut short at 1.5; whether the wall keeps Eye comfort shield on (it browns the night theme).
 
 ## 2b. Session 2b: keyboard, status-bar touches, weather, PIN chooser
 
