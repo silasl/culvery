@@ -139,6 +139,7 @@ After 4e and before the v1 release. Taste calls only; each line names its audit 
 - W5 Today card's empty space below "Nothing on today" (L4; the copy part is D39).
 - W6 Connect step rebuild: StepTitle, one 60 dp button, a connection row; drop the connected card (S10, S11, F:4a).
 - W7 Condition-tinted forecast and header icons; `clear_night` vs `bedtime` (S33, F:4c, 4b amber).
+- Branding inside the app (the user, 2026-10-13, 4e): the Culvery name or mark shows only on the splash; place it somewhere on Home or the rail.
 - W8 Launcher icon: the bird's size, and the gap in the themed layer (S37, F:4c).
 - W9 Splash dark flash in the day theme: crossfade, or keep it (S38, hL1; device check E3).
 - W10 Status bar: "Auto" vs "Night"/"Day"; a preview cue (hS1).
