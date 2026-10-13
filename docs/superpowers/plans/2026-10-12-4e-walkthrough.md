@@ -185,19 +185,21 @@ The home-app check: Samsung's launcher (decision 5). Then the session end (nothi
 
 ### 1.8 Transcript
 
-- Date, build installed:
-- Device (model, Android/SDK, One UI, patch, size, density, font scale, zone; TalkBack, launcher, keyboard packages):
-- Pinning settings and screen lock:
-- Install (Play Protect? `flags=[` without ALLOW_BACKUP?):
-- Wizard (Connect unpinned; chooser speed; the Samsung keyboard in the town search and name fields):
-- Pinned after Done:
-- First sync, weather:
-- Warnings:
-- Backup:
-- Home app:
+- Date, build installed: 2026-10-13, release 1.0.0-beta1 at ef494cd (fresh install).
+- Device: SM-T510, Android 11 / SDK 30, One UI version not in getprop, patch 2022-12-01, 1200×1920 at density 240, font scale 1.1 (the son's, left as is), zone Europe/London. TalkBack is Samsung's `com.samsung.android.accessibility.talkback`; launcher `com.sec.android.app.launcher`; keyboard `com.sec.android.inputmethod`.
+- Pinning settings and screen lock: "Pin windows" (`lock_to_app_enabled`) 0, "Lock tablet when unpinning" (`lock_to_app_exit_locked`) null; the tablet has a PIN screen lock (the user). `locksettings get-disabled` fails on this build (needs a credential). Nothing changed.
+- Install: `Success`, no Play Protect prompt seen; `flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]` — no ALLOW_BACKUP.
+- Wizard: the chooser opened and came back quickly, no problems (the user). The Samsung keyboard: FAULT, see below — the controller closed it over adb (`input keyevent KEYCODE_BACK`) about five times to let the user carry on.
+- Pinned after Done: `PINNED` although "Pin windows" is off; Android showed "App is pinned", the user tapped **Got it**.
+- First sync, weather: the week and the weather were on Home when setup finished.
+- Warnings: none from Culvery; only libEGL/Gralloc graphics notices and the release's "Not starting debugger" line.
+- Backup: `bmgr` reports "Backup Manager currently disabled"; `backupnow` → "Backup is not allowed". Device transfer and the Android 12+ rules: not tried (Android 11).
+- Home app: Samsung's launcher (decision 5).
 - Faults:
-- Carried:
-- Taste:
+  1. The keyboard's **Done** doesn't close the keyboard in any Culvery field (town search, names, PIN steps): `HhTextField` passes its own `onDone`, which replaces Compose's default of hiding the keyboard.
+  2. The keyboard covers the wizard's **Back**/**Next** and the PIN pad opened from a step; with the navigation bar hidden there's no Back to close it. Culvery draws edge to edge, so `adjustResize` no longer shrinks the window; the event editor pads for the keyboard (`WindowInsets.ime`), the wizard, Settings and the person sheet don't.
+- Carried: the user's names list (asked; the names check used the names seen on screen meanwhile).
+- Taste: the user asked to swap the grey (Slate) person colour for a yellow — done after this session, at the user's request (was W30).
 
 ## 2a. Session 2a: font scale, dark theme, splash, zone, bars
 
