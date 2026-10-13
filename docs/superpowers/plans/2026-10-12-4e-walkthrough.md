@@ -468,16 +468,17 @@ Wi-Fi read back in §4.2 (no `culvery-4e-saved-wifi_on` left). Confirm with the 
 
 ### 4.9 Transcript
 
-- Date, build installed:
-- Forecast offline:
-- Reconnect (chooser speed; Connecting card; unpinned during; Settings after 2:30; pinned after):
-- Connection health row:
-- Unshared calendar (permission level and person before/after; refused while listed; the row; Hide; how long listed):
-- Delete this and following (times):
-- Write from the tablet:
-- Faults:
-- Carried:
-- Taste:
+- Date, build installed: 2026-10-13, 72041ba.
+- Forecast offline: Wi-Fi off (saved `wifi_on` 1), Culvery restarted: after 30 s the Forecast card and the header weather still showed the last forecast (the cached one, as designed). Wi-Fi back on, read back 1.
+- Reconnect: not run — **Reconnect** shows only when Google needs a new sign-in; the connection was healthy, and Disconnect + Connect would lose the calendars' people and the main calendar. The chooser's speed was seen at setup (quick). Carried: a slow chooser closing Settings (4d-2 §10), when Google next asks for a reconnect.
+- Connection health row: "Updated 3 minutes ago", no red "not synced yet" (E10 ✓).
+- Unshared calendar: skipped (the user kept the session light).
+- Delete this and following: "4e series" (daily, 5 times from tomorrow) first went into another calendar on the phone and didn't show; moved to the main calendar, it reached the tablet within a few minutes; "This and following" on the third left the first two on the tablet within about 5 minutes; deleting all cleared the tablet.
+- Write from the tablet: "4e test" added (PIN), on the phone within minutes; deleted on the tablet (PIN), gone from the phone (the R8 build's writes ✓).
+- Pinning after a restart from adb (`am force-stop` + `am start`, with or without the LAUNCHER category): never reached `PINNED` within 30 s, with no lock-task line in the log after the start; opening Culvery from the app list (after a reboot, and here) pins with the "App is pinned / Got it" message. Not something the family does; the user asked not to dig further. Carried.
+- Faults: none.
+- Carried: the slow-chooser check; a cold start from adb not pinning (above).
+- Taste: the user expected to be able to change a repeating event on the tablet (it can't, by design: change repeats on a phone).
 
 ## 5. Session 5: TalkBack (as short as possible)
 
