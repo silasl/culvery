@@ -24,11 +24,11 @@ class HouseholdMigrationTest {
     val helper = MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), file, AndroidSQLiteDriver(), HouseholdDatabase::class)
 
     @Test
-    fun redBecomesOrangeAndVioletAndBrownTakeTheFirstFreeColours() = runTest {
+    fun redBecomesOrangeAndVioletBrownAndSlateTakeTheFirstFreeColours() = runTest {
         file.parentFile?.mkdirs()
         file.delete()
         val v1 = helper.createDatabase(1)
-        listOf("red" to 0xFFE06666, "green" to 0xFF4CB387, "violet" to 0xFF9C7CE3, "brown" to 0xFFA1785A)
+        listOf("red" to 0xFFE06666, "green" to 0xFF4CB387, "violet" to 0xFF9C7CE3, "brown" to 0xFFA1785A, "slate" to 0xFF8B96A8)
             .forEachIndexed { i, (id, colour) ->
                 v1.execSQL("INSERT INTO person (id, name, color, sortOrder, role, pinHash, salt) VALUES ('$id', '$id', $colour, $i, 'ADULT', NULL, NULL)")
             }
@@ -45,6 +45,7 @@ class HouseholdMigrationTest {
             "green", 0xFF4CB387,
             "violet", 0xFF5B9BE0,
             "brown", 0xFFE07BA8,
+            "slate", 0xFF9CC44E,
         )
     }
 }
