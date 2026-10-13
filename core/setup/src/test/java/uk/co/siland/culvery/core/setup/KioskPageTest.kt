@@ -51,7 +51,7 @@ class KioskPageTest {
         compose.onNodeWithText("Change home app").assertExists()
     }
 
-    private val howTo = "If that doesn’t work: tap Use other apps, then choose the home app in Android’s Settings › Apps › Default apps."
+    private val howTo = "If that doesn’t work: tap Use other apps, then choose the home app in Android’s Settings › Apps › Choose default apps › Home app."
 
     @Test
     fun theHowToLineShowsWhetherOrNotCulveryIsTheHomeApp() {
