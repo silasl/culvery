@@ -10,7 +10,7 @@ value class PersonId(val value: String) {
     }
 }
 
-const val FAMILY_COLOR: Long = 0xFFE0A85B
+const val FAMILY_COLOR: Long = 0xFF9C7CE3
 
 data class Person(val id: PersonId, val name: String, val color: Long) {
     val isFamily: Boolean get() = id == PersonId.FAMILY
@@ -42,8 +42,8 @@ data class HomeLocation(
     val timeZoneId: String,
 )
 
-/** At most eight people (4a design D12): one for each person colour. */
-const val MAX_PEOPLE = 8
+/** At most six people (4a design D12): one for each person colour. */
+const val MAX_PEOPLE = 6
 
 /** A person with their role and whether they have a PIN: the people list and the editor (4a design §4.4). */
 data class Member(val person: Person, val role: Role, val hasPin: Boolean) {

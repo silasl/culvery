@@ -168,7 +168,7 @@ class WeekViewTest {
     @Test
     fun legendNamesEveryoneAndFamily() {
         show { WeekView(state()) }
-        compose.onNodeWithContentDescription("Colours: Alex, green; Sam, blue; Mia, pink; Family, amber").assertExists()
+        compose.onNodeWithContentDescription("Colours: Alex, green; Sam, blue; Mia, pink; Family, violet").assertExists()
     }
 
     @Test

@@ -115,7 +115,7 @@ private fun MoveButton(icon: String, label: String, tag: String, onClick: (() ->
     }
 }
 
-/** The people list and its editor sheet: the wizard's Household step and Settings › People ([reorder]). Add person goes at eight. */
+/** The people list and its editor sheet: the wizard's Household step and Settings › People ([reorder]). Add person goes at [MAX_PEOPLE]. */
 @Composable
 internal fun PeoplePane(editor: PeopleEditor, reorder: Boolean) {
     val members by editor.members.collectAsState(initial = emptyList())

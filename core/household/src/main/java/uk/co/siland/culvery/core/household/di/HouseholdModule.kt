@@ -9,6 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+import uk.co.siland.culvery.core.household.db.MIGRATION_1_2
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -16,5 +17,5 @@ object HouseholdModule {
     @Provides
     @Singleton
     fun database(@ApplicationContext context: Context): HouseholdDatabase =
-        Room.databaseBuilder(context, HouseholdDatabase::class.java, "household.db").build()
+        Room.databaseBuilder(context, HouseholdDatabase::class.java, "household.db").addMigrations(MIGRATION_1_2).build()
 }

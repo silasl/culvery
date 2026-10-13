@@ -249,10 +249,10 @@ class PeopleUiTest {
     }
 
     @Test
-    fun addPersonGoesOnceEightPeopleLiveHere() {
+    fun addPersonGoesOnceTheHouseholdIsFull() {
         runBlocking { (1 until MAX_PEOPLE).forEach { i -> access.pins.addPerson("P$i", PersonPalette.colors[i], Role.ADULT, null) } }
         show()
-        compose.awaitTag("person_P7")
+        compose.awaitTag("person_P${MAX_PEOPLE - 1}")
         compose.onNodeWithTag("people_add").assertDoesNotExist()
     }
 

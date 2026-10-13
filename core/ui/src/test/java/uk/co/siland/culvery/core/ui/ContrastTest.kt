@@ -87,7 +87,7 @@ class ContrastTest {
 
     @Test
     fun aChipFilledWithAPersonsColourReadsOnEveryColour() {
-        (PersonPalette.colors + FAMILY_AMBER).forEach { colour ->
+        (PersonPalette.colors + FAMILY_VIOLET).forEach { colour ->
             check("chip ink on ${colour.toString(16)}", PersonChipInk, Color(colour), TEXT)
         }
     }
@@ -101,7 +101,7 @@ class ContrastTest {
     @Test
     fun namesAndTitlesOnEveryPersonTint() {
         themes.forEach { (name, t) ->
-            (PersonPalette.colors + FAMILY_AMBER).forEach { colour ->
+            (PersonPalette.colors + FAMILY_VIOLET).forEach { colour ->
                 val tint = Color(colour).over(HhAlpha.tint(t), t.surf)
                 check("$name mute on the ${colour.toString(16)} tint", t.mute, tint, TEXT)
                 check("$name ink on the ${colour.toString(16)} tint", t.ink, tint, TEXT)
@@ -113,7 +113,6 @@ class ContrastTest {
     fun theTintEdgesStayWhereTheyAre() {
         fun darkTint(colour: Long) = Color(colour).over(HhAlpha.tint(DarkColors), DarkColors.surf)
         check("dark mute on the lime tint (4.548)", DarkColors.mute, darkTint(0xFF9CC44E), 4.54)
-        check("dark mute on the Family tint (4.602)", DarkColors.mute, darkTint(FAMILY_AMBER), 4.60)
     }
 
     @Test

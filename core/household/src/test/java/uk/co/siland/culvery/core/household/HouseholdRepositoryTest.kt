@@ -172,10 +172,17 @@ class HouseholdRepositoryTest {
         assertThat(repo.person(mia.id)?.name).isEqualTo("MIA")
     }
 
+    /** 4e: six person colours, and Family's violet is none of them. */
     @Test
-    fun aNinthPersonIsRefused() = runTest {
+    fun sixPeopleAtMostAndFamilyIsViolet() {
+        assertThat(MAX_PEOPLE).isEqualTo(6)
+        assertThat(Person.Family.color).isEqualTo(0xFF9C7CE3)
+    }
+
+    @Test
+    fun aPersonPastTheLimitIsRefused() = runTest {
         repeat(MAX_PEOPLE) { repo.addPerson("P$it", 0xFF100000L + it, Role.ADULT) }
-        assertThrows(HouseholdFullException::class.java) { runBlocking { repo.addPerson("P8", 0xFF200000L, Role.ADULT) } }
+        assertThrows(HouseholdFullException::class.java) { runBlocking { repo.addPerson("Extra", 0xFF200000L, Role.ADULT) } }
         assertThat(repo.people.first()).hasSize(MAX_PEOPLE)
     }
 

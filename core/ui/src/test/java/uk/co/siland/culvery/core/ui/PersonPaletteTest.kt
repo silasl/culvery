@@ -6,9 +6,9 @@ import kotlin.math.sqrt
 import org.junit.Test
 
 /** `:core:household`'s FAMILY_COLOR, which `:core:ui` can't see. */
-internal const val FAMILY_AMBER = 0xFFE0A85B
+internal const val FAMILY_VIOLET = 0xFF9C7CE3
 
-/** The smallest RGB distance allowed between two person colours, or one and Family's; the closest pair is about 66. */
+/** The smallest RGB distance allowed between two person colours, or one and Family's; the closest pair is about 72. */
 private const val MIN_DISTANCE = 60.0
 
 class PersonPaletteTest {
@@ -18,23 +18,23 @@ class PersonPaletteTest {
         sqrt(channels(a).zip(channels(b)).sumOf { (x, y) -> ((x - y) * (x - y)).toDouble() })
 
     @Test
-    fun eightDistinctColoursStartingWithTheHandOffsThree() {
-        assertThat(PersonPalette.colors).hasSize(8)
-        assertThat(PersonPalette.colors.toSet()).hasSize(8)
+    fun sixDistinctColoursStartingWithTheHandOffsThree() {
+        assertThat(PersonPalette.colors).hasSize(6)
+        assertThat(PersonPalette.colors.toSet()).hasSize(6)
         assertThat(PersonPalette.colors.take(3)).containsExactly(0xFF4CB387, 0xFF5B9BE0, 0xFFE07BA8).inOrder()
     }
 
     @Test
-    fun everyColourHasItsNameInOrderAndFamilyIsAmber() {
+    fun everyColourHasItsNameInOrderAndFamilyIsViolet() {
         assertThat(PersonPalette.colors.map { PersonPalette.nameOf(it) })
-            .containsExactly("Green", "Blue", "Pink", "Violet", "Lime", "Red", "Yellow", "Brown").inOrder()
+            .containsExactly("Green", "Blue", "Pink", "Lime", "Orange", "Yellow").inOrder()
         assertThat(PersonPalette.nameOf(0xFF123456)).isNull()
-        assertThat(FAMILY_COLOUR_NAME).isEqualTo("Amber")
+        assertThat(FAMILY_COLOUR_NAME).isEqualTo("Violet")
     }
 
     @Test
     fun everyColourIsFarFromEveryOtherAndFromFamily() {
-        val all = PersonPalette.colors + FAMILY_AMBER
+        val all = PersonPalette.colors + FAMILY_VIOLET
         for (i in all.indices) {
             for (j in i + 1 until all.size) {
                 assertWithMessage("%s and %s", all[i].toString(16), all[j].toString(16))
@@ -44,11 +44,11 @@ class PersonPaletteTest {
         }
     }
 
-    /** 4e: the user swapped the grey slate for a yellow; Family's amber stays the nearest colour to it. */
+    /** 4e: yellow for the grey slate, orange for the red; brown gone, and violet is Family's now. */
     @Test
-    fun theSeventhColourIsYellowNotSlate() {
-        assertThat(PersonPalette.colors[6]).isEqualTo(0xFFCEC018)
-        assertThat(PersonPalette.colors).doesNotContain(0xFF8B96A8)
+    fun theUsersFourESwapsStay() {
+        assertThat(PersonPalette.colors).containsAtLeast(0xFFCEC018, 0xFFE04A26)
+        assertThat(PersonPalette.colors).containsNoneOf(0xFF8B96A8, 0xFFE06666, 0xFFA1785A, FAMILY_VIOLET)
     }
 
     @Test

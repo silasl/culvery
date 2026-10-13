@@ -57,7 +57,7 @@ interface HouseholdDao {
     suspend fun upsertLocation(location: LocationEntity)
 }
 
-@Database(entities = [PersonEntity::class, LocationEntity::class], version = 1)
+@Database(entities = [PersonEntity::class, LocationEntity::class], version = 2)
 abstract class HouseholdDatabase : RoomDatabase() {
     abstract fun householdDao(): HouseholdDao
 }
