@@ -626,15 +626,16 @@ After the pin check: the user turns **USB debugging** off (Settings › Develope
 ## 7. The family week, the day 3–4 read and day 7
 
 **Notes from the week (the user), and what came of each:**
-- The week line showed "Out of date" in red with nothing to do: **Update now** while the week is out of date (8791ea6, installed at the next cable session). Why the syncs fell behind: read at the next cable session.
+- The week line showed "Out of date" in red with nothing to do: **Update now** while the week is out of date (8791ea6; on the tablet after day 7). Why the syncs fell behind: read at the next cable session.
 - In-app branding: listed for the end-of-v1 design walk-through (93011b2).
-- Repeating events can't be given a person on the tablet: the user chose to allow **Who it's for** on a repeat (applied to the whole series; times and titles still change on a phone). Built: 5cb4fdb (calendar database v7, `seriesId`; the Google provider PATCHes only the series' private tag and colour). To check on the tablet at the next cable session: assign a repeat, see every occurrence change, and see the person on a phone.
-- Family's amber was too close to the new yellow: the user chose six person colours (green, blue, pink, lime, orange `#E04A26` for red, yellow; brown and violet gone) and Family **violet** `#9C7CE3`; at most six people now (e43426a). Household database v2 moves red to orange and violet or brown to the first free colour. To check on the tablet: everyone's colour after the install, and the colour key says "Family, violet".
+- Repeating events can't be given a person on the tablet: the user chose to allow **Who it's for** on a repeat (applied to the whole series; times and titles still change on a phone). Built: 5cb4fdb (calendar database v7, `seriesId`; the Google provider PATCHes only the series' private tag and colour). To check on the emulator now (assign a repeat, see every occurrence change, see the person on a phone), and on the tablet after day 7.
+- Family's amber was too close to the new yellow: the user chose six person colours (green, blue, pink, lime, orange `#E04A26` for red, yellow; brown and violet gone) and Family **violet** `#9C7CE3`; at most six people now (e43426a). Household database v2 moves red to orange and violet or brown to the first free colour. To check on the emulator now, and on the tablet after day 7: everyone's colour after the install, and the colour key says "Family, violet".
 
 **Handover (2026-10-13).** The branch `plan-4e-device-beta` is at 284ef1a, gate green. The tablet still runs the day-1 build. Next, in order:
-1. **The day 3–4 cable session** (§7.2), when the user is ready: install the current build (Update now, Who it's for on repeats, the new colours) with its mapping saved as `$TMP/culvery-4e-mapping-<commit>.txt`; run §7.2's read; read Culvery's warnings (§7.3 step 3) for why the week went out of date; check the two items above on the tablet. `retrace.bat` needs the command-line tools from the SDK Manager first. USB debugging: the user was asked to turn it off for the week; not confirmed.
-2. **Day 7** (§7.3), then the close-out (§8).
-3. **After 4e:** the Ring doorbell plan (brainstorm, spec, plan), then the user's end-of-v1 design walk-through.
+1. **The emulator check, now:** Update now, Who it's for on repeats and the new colours (the user's ruling, 2026-10-13: nothing new goes on the tablet during the week).
+2. **The day 3–4 cable session** (§7.2), when the user is ready: a read only, no install. Run §7.2's read and read Culvery's warnings (§7.3 step 3) for why the week went out of date. `retrace.bat` needs the command-line tools from the SDK Manager first. USB debugging: the user was asked to turn it off for the week; not confirmed.
+3. **Day 7** (§7.3); then install the current build on the tablet (its mapping saved as `$TMP/culvery-4e-mapping-<commit>.txt`) and check the two items above there; then the close-out (§8).
+4. **After 4e:** the Ring doorbell plan (brainstorm, spec, plan), then the user's end-of-v1 design walk-through.
 Carried, unchanged: the slow chooser check, a forced power-off, the adb cold start not pinning, E4 with Eye comfort shield off, TalkBack (E7), the Use other apps toast too short (taste).
 
 ### 7.1 The week
