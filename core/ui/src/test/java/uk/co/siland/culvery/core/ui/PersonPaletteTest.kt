@@ -27,7 +27,7 @@ class PersonPaletteTest {
     @Test
     fun everyColourHasItsNameInOrderAndFamilyIsAmber() {
         assertThat(PersonPalette.colors.map { PersonPalette.nameOf(it) })
-            .containsExactly("Green", "Blue", "Pink", "Violet", "Lime", "Red", "Slate", "Brown").inOrder()
+            .containsExactly("Green", "Blue", "Pink", "Violet", "Lime", "Red", "Yellow", "Brown").inOrder()
         assertThat(PersonPalette.nameOf(0xFF123456)).isNull()
         assertThat(FAMILY_COLOUR_NAME).isEqualTo("Amber")
     }
@@ -42,6 +42,13 @@ class PersonPaletteTest {
                     .isAtLeast(MIN_DISTANCE)
             }
         }
+    }
+
+    /** 4e: the user swapped the grey slate for a yellow; Family's amber stays the nearest colour to it. */
+    @Test
+    fun theSeventhColourIsYellowNotSlate() {
+        assertThat(PersonPalette.colors[6]).isEqualTo(0xFFCEC018)
+        assertThat(PersonPalette.colors).doesNotContain(0xFF8B96A8)
     }
 
     @Test
