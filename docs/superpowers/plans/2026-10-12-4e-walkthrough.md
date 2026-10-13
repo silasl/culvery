@@ -388,17 +388,19 @@ then the compare block again. Still a mismatch: the user sets it by hand (**Use 
 
 ### 3.9 Transcript
 
-- Date, build installed:
-- After a reboot (Samsung home): pinning question?
-- Use other apps: toast words; pinned again?
-- One UI's menu path (E5):
-- Culvery as home: unpinned behind the dialog? After a reboot:
-- Forced restart:
-- Hand-over:
-- Back to Samsung's launcher (read back; fallback used?):
-- Faults:
-- Carried:
-- Taste:
+- Date, build installed: 2026-10-13, 61e055a; then 72041ba (fault 1).
+- Saved home: `android/com.android.internal.app.ResolverActivity` — no default home app (Culvery offers itself as one, so Android asked on every Home press). Ruled with the user (B): restore to **One UI Home** (`com.sec.android.app.launcher/.activities.LauncherActivity`) as the default.
+- Pinning after a reboot: after `adb reboot` the tablet came back on USB only after the user unplugged and replugged the cable (and allowed USB debugging again). Opened from the app list, Culvery showed "App is pinned" with **Got it** only (no **No thanks**): `PINNED`. (In session 2b, after an install, Culvery was found unpinned once — likely **No thanks** on that message.)
+- Use other apps: it unpinned at once; the toast was gone before the user could read it (`toastMillis` on a non-TalkBack tablet; noted, see Taste). A minute in another app, then Culvery from the app list: pinned again, nothing special.
+- One UI's menu: **Settings › Apps › Choose default apps › Home app**. FAULT 1: the how-to line said "Settings › Apps › Default apps"; now "…Settings › Apps › Choose default apps › Home app." (72041ba; `KioskPageTest` first, the two kiosk baselines re-recorded; the user approved the words).
+- Culvery as home + reboot: Choose home app → Culvery, Always; signed out; `adb reboot`; after unlocking, Culvery came up by itself, already `PINNED`.
+- Forced power-off: skipped — the power + Volume down hold didn't force a restart on this tablet, and the user judged the reboot enough.
+- Hand-over: a launcher start while Culvery was home went to the running instance ("intent has been delivered to currently running top-most instance"); one Culvery task (#80, type home), `PINNED`: not triggered.
+- Back to One UI Home: Change home app (Admin PIN) → One UI Home, Always.
+- Restored (home app read back): `com.sec.android.app.launcher/.activities.LauncherActivity` ✓. Pin check: PINNED, nobody signed in, Settings closed.
+- Faults: 1 (above).
+- Carried: the forced power-off check (4c) — a real power cut on the wall tablet.
+- Taste: the Use other apps toast is too short to read before Culvery leaves the screen.
 
 ## 4. Session 4: Google, a write, and the forecast offline
 
