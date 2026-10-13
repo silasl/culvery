@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -121,13 +122,18 @@ internal fun LocationContent(
     onChoose: (PlaceMatch) -> Unit,
 ) {
     val c = Culvery.colors
+    val focusManager = LocalFocusManager.current
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap)) {
         if (showCurrent && current != null) PlaceRow(current.name, ticked = true, tag = "location_current", onClick = null)
         HhTextField(query, onQuery, TOWN_OR_CITY, TOWN_OR_CITY, "location_query", capitalization = KeyboardCapitalization.Words)
         if (results is TownResults.Found) {
             Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.rowGap)) {
                 results.places.forEachIndexed { i, place ->
-                    PlaceRow(place.label, ticked = current.isAt(place), tag = "place_$i", onClick = if (busy) null else ({ onChoose(place) }))
+                    PlaceRow(place.label, ticked = current.isAt(place), tag = "place_$i", onClick = if (busy) null else ({
+                        // Choosing ends the typing, so the keyboard goes too.
+                        focusManager.clearFocus()
+                        onChoose(place)
+                    }))
                 }
             }
         }

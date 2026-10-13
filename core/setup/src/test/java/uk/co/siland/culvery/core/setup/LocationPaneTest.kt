@@ -5,6 +5,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
@@ -122,6 +124,19 @@ class LocationPaneTest {
         compose.onNodeWithTag("place_0").assertDoesNotExist()
         compose.onNodeWithTag("location_query").assertTextContains("Brighton, England, United Kingdom")
         assertThat(search.queries).containsExactly("Can")
+    }
+
+    /** 4e: on the SM-T510 the keyboard stayed up over Settings after a town was chosen. */
+    @Test
+    fun choosingATownClosesTheKeyboard() {
+        search.answer = { listOf(brighton) }
+        show()
+        type("Can")
+        advance(500)
+        compose.onNodeWithTag("location_query").assertIsFocused()
+        compose.onNodeWithTag("place_0").performClick()
+        advance(1_000)
+        compose.onNodeWithTag("location_query").assertIsNotFocused()
     }
 
     @Test
