@@ -34,6 +34,8 @@ import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.TabItem
 
 private val HomeTab = TabItem(HOME_TAB_ID, "Home", Icons.HOME)
+private val MARK_WIDTH = 48.dp
+private val MARK_GAP = 8.dp
 
 /** Who is signed in now shows in the status bar (hand-off §7), not here. */
 @Composable
@@ -57,6 +59,7 @@ fun NavRail(
             }
             .padding(top = 16.dp, bottom = 20.dp),
     ) {
+        CulveryMark(MARK_WIDTH, Modifier.testTag("rail_mark").padding(bottom = MARK_GAP))
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),

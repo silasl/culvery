@@ -9,11 +9,14 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,5 +58,17 @@ class NavRailTest {
         compose.onNodeWithTag("rail_settings").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         compose.onNodeWithTag("rail_settings").onParent().assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.SelectableGroup))
         compose.assertAccessible()
+    }
+
+    /** 5 §A.1: about 48 dp, above Home; a picture, not a button, which TalkBack skips. */
+    @Test
+    fun theMarkSitsAboveHomeAndTalkBackSkipsIt() {
+        show()
+        val mark = compose.onNodeWithTag("rail_mark", useUnmergedTree = true)
+        mark.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+        mark.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
+        val bounds = mark.getUnclippedBoundsInRoot()
+        assertThat(bounds.width.value).isWithin(0.5f).of(48f)
+        assertThat(bounds.bottom.value).isAtMost(compose.onNodeWithTag("rail_home").getUnclippedBoundsInRoot().top.value)
     }
 }
