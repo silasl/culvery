@@ -3,7 +3,7 @@ package uk.co.siland.culvery.capability.door
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import java.time.ZoneId
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -100,19 +100,22 @@ class DoorAlertsTest {
         assertThat(alerts.showing.value).isNull()
     }
 
-    /** The first card's 2 minutes end at the instant a new ring comes: the new ring's card stays. */
+    /** Ring 2 holds the lock across card 1's 2 minutes: the timer, queued behind it, must not close ring 2's card. */
     @Test
-    fun aRingAsTheTwoMinutesEndKeepsItsCard() = runTest {
-        val alerts = alerts()
+    fun aRingHoldingTheLockAsTheTwoMinutesEndKeepsItsCard() = runTest {
+        var gate: CompletableDeferred<Unit>? = null
+        val alerts = DoorAlerts(host, { seen += it }, { prefs }, chime, { gate?.await(); london }, WallClock { start + testScheduler.currentTime }, backgroundScope)
         alerts.onRecorded(rung(1))
-        // Queued after the card's timer, at the same instant: the timer runs first.
-        backgroundScope.launch {
-            delay(CARD_MS)
-            alerts.onRecorded(rung(2))
-        }
-        advanceTimeBy(CARD_MS)
+        advanceTimeBy(CARD_MS - 1_000)
+        gate = CompletableDeferred()
+        backgroundScope.launch { alerts.onRecorded(rung(2)) }
+        runCurrent()
+        advanceTimeBy(1_000)
+        runCurrent()
+        gate.complete(Unit)
         runCurrent()
         assertThat(alerts.showing.value?.eventId).isEqualTo(2)
+        assertThat(host.dismissed).isEqualTo(0)
         assertThat(host.content).isNotNull()
     }
 
@@ -149,7 +152,7 @@ class DoorAlertsTest {
         assertThat(chime.volumes).isEmpty()
     }
 
-    /** Review Focus 4: stored while Culvery is behind another app; coming back raises nothing. */
+    /** 5 §2.7: stored while Culvery is behind another app; coming back raises nothing. */
     @Test
     fun aRingInTheBackgroundShowsNoCardWhenCulveryReturns() = runTest {
         host.inFront.value = false
@@ -162,7 +165,7 @@ class DoorAlertsTest {
         assertThat(seen).isEmpty()
     }
 
-    /** Review Focus 1: Ring's text post, then the same notification with the snapshot: one card, its picture, one chime, the same 2 minutes. */
+    /** 5 §4.3: Ring's text post, then the same notification with the snapshot: one card, its picture, one chime, the same 2 minutes. */
     @Test
     fun aSnapshotRepostUpdatesTheShowingCardWithoutAChime() = runTest {
         val alerts = alerts()
