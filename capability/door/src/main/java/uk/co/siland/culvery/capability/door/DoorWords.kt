@@ -31,3 +31,19 @@ fun clockTime(atMillis: Long, zone: ZoneId): String = clockText(Instant.ofEpochM
 
 /** The card's spoken words: what, where, when (5 §5.1), leaving out a device Ring did not name. */
 fun cardWords(title: String, device: String, time: String): String = listOf(title, device, time).filter { it.isNotEmpty() }.joinToString(", ")
+
+internal const val TODAY = "Today"
+internal const val YESTERDAY = "Yesterday"
+internal const val NO_RINGS_TODAY = "No rings or motion today."
+internal const val SNAPSHOT = "Snapshot"
+internal const val SHOW_FULL_SIZE = "show it full size"
+
+/** "Ring", "Motion", or "Ring alert" for one the parser couldn't place (5 §5.2). */
+fun kindLabel(event: DoorEvent): String = when {
+    event.kind == DoorKind.MOTION -> "Motion"
+    event.unrecognised -> RING_ALERT
+    else -> "Ring"
+}
+
+/** "14:02 · Ring": a row's line and its sheet's heading. */
+fun eventLine(event: DoorEvent, zone: ZoneId): String = "${clockTime(event.atMillis, zone)} · ${kindLabel(event)}"

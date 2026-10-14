@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import uk.co.siland.culvery.capability.door.ui.DoorTabHost
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
@@ -49,5 +50,5 @@ class DoorCapability @Inject constructor(
     override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList())
 
     @Composable
-    override fun TabContent() = Unit
+    override fun TabContent() = DoorTabHost(store, clock.today, zone.zone, status = flowOf(null))
 }

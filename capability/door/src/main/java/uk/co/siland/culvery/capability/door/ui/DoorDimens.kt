@@ -16,4 +16,20 @@ internal object DoorDimens {
     // A snapshot at 16:9, radius 16.
     const val SNAPSHOT_RATIO = 16f / 9f
     val snapshotRadius = 16.dp
+
+    // The tab: rows 10 apart, 18 above a day's label; thumbnails 64 × 36 (16:9), radius 10, read at 128 px.
+    val rowGap = 10.dp
+    val sectionTop = 18.dp
+    val thumbWidth = 64.dp
+    val thumbHeight = 36.dp
+    val thumbRadius = 10.dp
+    const val THUMB_PX = 128
+
+    // The status line: a 20 dp icon 8 from its words.
+    val statusIcon = 20.dp
+    val statusGap = 8.dp
+
+    // The full-size sheet's padding, as the calendar's sheets.
+    val sheetPaddingH = 30.dp
+    val sheetPaddingV = 28.dp
 }
