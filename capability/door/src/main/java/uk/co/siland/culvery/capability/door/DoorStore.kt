@@ -65,9 +65,9 @@ class DoorStore internal constructor(
         val earlier = dao.sameNotice(notice.key, notice.whenMillis, notice.atMillis - MERGE_MS)
         val recorded = if (earlier != null) {
             val saved = notice.snapshot?.let { save(earlier.id, it) } == true
-            val row = earlier.copy(device = notice.device, unrecognised = notice.unrecognised, hasSnapshot = earlier.hasSnapshot || saved)
-            dao.update(row)
-            Recorded(row.toEvent(), isNew = false)
+            dao.updateNotice(earlier.id, notice.device, notice.unrecognised)
+            if (saved) dao.markHasSnapshot(earlier.id)
+            Recorded(dao.byId(earlier.id).toEvent(), isNew = false)
         } else {
             val row = DoorEventEntity(
                 noticeKey = notice.key, noticeWhen = notice.whenMillis, atMillis = notice.atMillis, kind = notice.kind.name,
@@ -75,9 +75,8 @@ class DoorStore internal constructor(
             )
             val id = dao.insert(row)
             val saved = notice.snapshot?.let { save(id, it) } == true
-            val stored = row.copy(id = id, hasSnapshot = saved)
-            if (saved) dao.update(stored)
-            Recorded(stored.toEvent(), isNew = true)
+            if (saved) dao.markHasSnapshot(id)
+            Recorded(dao.byId(id).toEvent(), isNew = true)
         }
         pruneLocked(notice.atMillis)
         recorded

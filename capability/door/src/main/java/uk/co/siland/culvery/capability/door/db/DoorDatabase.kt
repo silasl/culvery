@@ -8,7 +8,6 @@ import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
-import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /** One ring or motion (5 §3.1); its picture, when [hasSnapshot], is `files/door/<id>.jpg`. */
@@ -40,8 +39,15 @@ interface DoorDao {
     @Insert
     suspend fun insert(row: DoorEventEntity): Long
 
-    @Update
-    suspend fun update(row: DoorEventEntity)
+    @Query("SELECT * FROM door_event WHERE id = :id")
+    suspend fun byId(id: Long): DoorEventEntity
+
+    /** Targeted, so a repost never writes back a stale `seen`. */
+    @Query("UPDATE door_event SET device = :device, unrecognised = :unrecognised WHERE id = :id")
+    suspend fun updateNotice(id: Long, device: String, unrecognised: Boolean)
+
+    @Query("UPDATE door_event SET hasSnapshot = 1 WHERE id = :id")
+    suspend fun markHasSnapshot(id: Long)
 
     @Query("DELETE FROM door_event WHERE atMillis < :before")
     suspend fun deleteBefore(before: Long)

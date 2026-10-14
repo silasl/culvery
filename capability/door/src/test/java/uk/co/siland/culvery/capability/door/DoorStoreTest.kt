@@ -4,9 +4,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import java.io.IOException
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -135,8 +137,8 @@ class DoorStoreTest {
     /** The badge counts the days the tab shows: an unseen ring from the day before yesterday, still kept, doesn't count. */
     @Test
     fun unseenCountsOnlyTodayAndYesterday() = runTest {
-        store.record(ring(key = "old", at = sinceYesterday - 1))
-        store.record(ring(key = "yesterday", at = sinceYesterday))
+        store.record(ring(key = "old", at = sinceYesterday - 1, whenMillis = sinceYesterday - 1))
+        store.record(ring(key = "yesterday", at = sinceYesterday, whenMillis = sinceYesterday))
         assertThat(store.unseen(sinceYesterday).first()).isEqualTo(Unseen(rings = 1, motion = 0))
     }
 
@@ -145,6 +147,34 @@ class DoorStoreTest {
         store.record(ring(key = "a", at = NOW - 5_000))
         store.record(motion(at = NOW))
         assertThat(store.events.first().map { it.kind }).containsExactly(DoorKind.MOTION, DoorKind.RING).inOrder()
+    }
+
+    /** Got it or opening the tab landing while a repost's picture is being saved must stay marked. */
+    @Test
+    fun aRepostSavingItsPictureDoesNotUndoSeen() = runTest {
+        val first = store.record(ring())
+        val again = store.record(ring(snapshot = Snapshot { it.writeBytes(byteArrayOf(1)); runBlocking { store.markSeen(first.event.id) } }))
+        assertThat(again.event.seen).isTrue()
+        assertThat(store.events.first().single().seen).isTrue()
+    }
+
+    @Test
+    fun aNewEventSavingItsPictureDoesNotUndoMarkAllSeen() = runTest {
+        // The event isn't stored until the picture is saved, so mark the first event seen from inside the second's save.
+        val a = store.record(ring(key = "a")).event
+        val b = store.record(ring(key = "b", snapshot = Snapshot { it.writeBytes(byteArrayOf(1)); runBlocking { store.markAllSeen() } }))
+        assertThat(store.events.first().map { it.seen }).containsExactly(true, true)
+        assertThat(b.event.snapshot).isNotNull()
+        assertThat(a.id).isNotEqualTo(b.event.id)
+    }
+
+    /** The boundary is the household's local midnight the day before, not UTC and not today's. */
+    @Test
+    fun yesterdayStartsAtLocalMidnightAcrossTheClockChange() {
+        fun at(day: String) = startOfYesterday(LocalDate.parse(day), london)
+        assertThat(at("2026-10-14")).isEqualTo(Instant.parse("2026-10-12T23:00:00Z").toEpochMilli())
+        assertThat(at("2026-10-26")).isEqualTo(Instant.parse("2026-10-24T23:00:00Z").toEpochMilli())
+        assertThat(at("2026-10-27")).isEqualTo(Instant.parse("2026-10-26T00:00:00Z").toEpochMilli())
     }
 
     @Test
