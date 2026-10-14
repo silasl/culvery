@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import uk.co.siland.culvery.AndroidHomeApp
 import uk.co.siland.culvery.BuildConfig
+import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.AppVersion
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Capability
@@ -24,6 +25,7 @@ import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.shell.ShellAlerts
 import uk.co.siland.culvery.shell.ShellToasts
 import uk.co.siland.culvery.shell.ShellUserActivity
 
@@ -44,6 +46,9 @@ abstract class AppModule {
 
     @Binds
     abstract fun toaster(impl: ShellToasts): Toaster
+
+    @Binds
+    abstract fun alertHost(impl: ShellAlerts): AlertHost
 
     @Binds
     abstract fun userActivity(impl: ShellUserActivity): UserActivity

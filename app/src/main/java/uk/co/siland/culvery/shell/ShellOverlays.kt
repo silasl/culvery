@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.Toaster
 
@@ -40,6 +43,32 @@ class OverlayState : OverlayHost {
     override fun dismiss() {
         content = null
         edited = false
+    }
+}
+
+/** The app's [AlertHost]: the content the alert layer draws, and whether the screen it observes is resumed. */
+@Singleton
+class ShellAlerts @Inject constructor() : AlertHost, DefaultLifecycleObserver {
+    private val _content = MutableStateFlow<(@Composable () -> Unit)?>(null)
+    val content: StateFlow<(@Composable () -> Unit)?> = _content.asStateFlow()
+
+    private val _inFront = MutableStateFlow(false)
+    override val inFront: StateFlow<Boolean> = _inFront.asStateFlow()
+
+    override fun show(content: @Composable () -> Unit) {
+        _content.value = content
+    }
+
+    override fun dismiss() {
+        _content.value = null
+    }
+
+    override fun onResume(owner: LifecycleOwner) {
+        _inFront.value = true
+    }
+
+    override fun onPause(owner: LifecycleOwner) {
+        _inFront.value = false
     }
 }
 

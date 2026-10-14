@@ -43,6 +43,7 @@ import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.access.ui.PinPadHost
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.FirstDraw
+import uk.co.siland.culvery.core.plugin.LocalAlertHost
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
@@ -58,6 +59,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.shell.HomeAppRequest
 import uk.co.siland.culvery.shell.OverlayState
+import uk.co.siland.culvery.shell.ShellAlerts
 import uk.co.siland.culvery.shell.ShellToasts
 import uk.co.siland.culvery.shell.ShellUserActivity
 import uk.co.siland.culvery.shell.ShellViewModel
@@ -71,6 +73,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var pinPrompt: PinPromptController
     @Inject lateinit var capabilities: Set<@JvmSuppressWildcards Capability>
     @Inject lateinit var toasts: ShellToasts
+    @Inject lateinit var alerts: ShellAlerts
     @Inject lateinit var userActivity: ShellUserActivity
     @Inject lateinit var access: AccessControl
     @Inject lateinit var wallClock: WallClock
@@ -131,6 +134,7 @@ class MainActivity : ComponentActivity() {
         setupComplete = setupState.setupComplete.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
         isDeviceOwner = allowLockTaskIfOwner(this)
         lifecycle.addObserver(kiosk)
+        lifecycle.addObserver(alerts)
         lifecycle.addObserver(checksExpiryOnReturn(access))
         // TalkBack's gestures reach the app as accessibility events, not touches: they keep Settings and the sheets open too.
         findViewById<ViewGroup>(android.R.id.content).accessibilityDelegate = userActivity.accessibilityDelegate
@@ -165,6 +169,7 @@ class MainActivity : ComponentActivity() {
             // Read inside the clocks only: a minute's tick recomposes them, not the shell (4c §4.2).
             val now = shell.now.collectAsStateWithLifecycle()
             val toast by toasts.current.collectAsStateWithLifecycle()
+            val alert by alerts.content.collectAsStateWithLifecycle()
             val complete by setupComplete.collectAsStateWithLifecycle()
             val pinRequest by pinPrompt.request.collectAsStateWithLifecycle()
             val sessionEnds by access.expiresAt.collectAsStateWithLifecycle()
@@ -172,6 +177,7 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(
                 LocalShellNavigator provides navigator,
                 LocalOverlayHost provides overlay,
+                LocalAlertHost provides alerts,
                 LocalUserActivity provides userActivity,
             ) {
                 CulveryTheme(dark = state.dark) {
@@ -190,6 +196,7 @@ class MainActivity : ComponentActivity() {
                             settingsExpiresAt = if (state.settingsOpen) sessionEnds else null,
                             nowMillis = wallClock::nowMillis,
                             overlaysCloseWhenIdle = !counting,
+                            alert = alert,
                         ) {
                             AppContent(
                                 complete = complete,
