@@ -10,12 +10,16 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import uk.co.siland.culvery.capability.door.ui.DoorPage
+import uk.co.siland.culvery.capability.door.ui.DoorSettingsHost
 import uk.co.siland.culvery.capability.door.ui.DoorTabHost
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.RailBadge
+import uk.co.siland.culvery.core.plugin.SettingsPage
+import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.ui.Icons
 
 const val DOOR_ID = "door"
@@ -28,6 +32,9 @@ class DoorCapability @Inject constructor(
     providers: Set<@JvmSuppressWildcards DoorProvider>,
     private val clock: HouseholdClock,
     private val zone: HouseholdZone,
+    private val health: DoorHealth,
+    private val chime: Chime,
+    private val toaster: Toaster,
 ) : Capability {
     override val id = DOOR_ID
     override val label = "Door"
@@ -47,8 +54,14 @@ class DoorCapability @Inject constructor(
         .map(::badgeOf)
         .distinctUntilChanged()
 
+    private val pages: List<SettingsPage> = listOfNotNull(
+        provider?.let { p -> DoorPage { DoorSettingsHost(settings, health, p, chime, clock, zone.zone, toaster) } },
+    )
+
+    override fun settingsPages(): List<SettingsPage> = pages
+
     override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList())
 
     @Composable
-    override fun TabContent() = DoorTabHost(store, clock.today, zone.zone, status = flowOf(null))
+    override fun TabContent() = DoorTabHost(store, clock.today, zone.zone, status = health.status)
 }

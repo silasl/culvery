@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -40,7 +41,10 @@ class DoorCapabilityTest {
     private val settings by lazy { DoorSettings(doorSettingsStore(scope) { File(folder.root, "s.preferences_pb") }, scope) }
     private val clock by lazy { HouseholdClock(flowOf(ZoneId.of("Europe/London")), WallClock { NOW }, scope, flowOf(NOW)) }
 
-    private fun capability(providers: Set<DoorProvider>) = DoorCapability(store, settings, providers, clock, householdZone())
+    private fun capability(providers: Set<DoorProvider>) = DoorCapability(
+        store, settings, providers, clock, householdZone(),
+        DoorHealth(providers.firstOrNull(), settings, MutableStateFlow(true), MutableStateFlow(true), scope), FakeChime(), RecordingToaster(),
+    )
 
     @After
     fun tearDown() {
@@ -66,5 +70,13 @@ class DoorCapabilityTest {
         store.record(ring())
         door.badge.first { it != null }
         assertThat(door.badge.first()).isEqualTo(RailBadge.Count(1, "1 unseen ring"))
+    }
+
+    /** 5 §5.4: Settings › Door, admin-only like the rest of Settings, only where a doorbell provider is installed. Fails if the page is missing, mislabelled, misordered, or offered with no provider. */
+    @Test
+    fun settingsHasADoorPage() {
+        val page = capability(setOf(FakeDoorProvider())).settingsPages().single()
+        assertThat(listOf(page.id, page.title, page.order)).containsExactly("door", "Door", 500).inOrder()
+        assertThat(capability(emptySet()).settingsPages()).isEmpty()
     }
 }

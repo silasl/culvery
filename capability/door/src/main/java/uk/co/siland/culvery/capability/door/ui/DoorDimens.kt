@@ -33,4 +33,9 @@ internal object DoorDimens {
     // The full-size sheet's padding, as the calendar's sheets.
     val sheetPaddingH = 30.dp
     val sheetPaddingV = 28.dp
+
+    // Settings › Door: 16 between blocks, as Settings' other pages; quiet hours move 30 minutes a step; the volume in tenths.
+    val settingsGap = 16.dp
+    const val QUIET_STEP_MINUTES = 30L
+    const val VOLUME_STEPS = 9
 }
