@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.door.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
@@ -22,6 +23,7 @@ import uk.co.siland.culvery.capability.door.DoorEvent
 import uk.co.siland.culvery.capability.door.DoorKind
 import uk.co.siland.culvery.capability.door.NOW
 import uk.co.siland.culvery.capability.door.picture
+import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
 /** The tab in the content area beside the rail, as the shell gives it. */
@@ -33,7 +35,7 @@ class DoorTabScreenshotTest {
     private val london = ZoneId.of("Europe/London")
 
     private fun snap(name: String, dark: Boolean, days: DoorDays, status: String? = null) {
-        compose.setContent { CulveryTheme(dark = dark) { Box(Modifier.size(1116.dp, 690.dp)) { DoorTab(days, london, status, onOpenSnapshot = {}) } } }
+        compose.setContent { CulveryTheme(dark = dark) { Box(Modifier.size(1116.dp, 690.dp).background(Culvery.colors.bg)) { DoorTab(days, london, status, onOpenSnapshot = {}) } } }
         if (days.today.any { it.snapshot != null }) compose.waitUntil(5_000) { compose.waitForIdle(); compose.onAllNodesWithTag("door_thumb_image", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
     }

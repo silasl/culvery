@@ -23,6 +23,7 @@ internal object DoorDimens {
     val thumbWidth = 64.dp
     val thumbHeight = 36.dp
     val thumbRadius = 10.dp
+    val thumbTouchHeight = 48.dp
     const val THUMB_PX = 128
 
     // The status line: a 20 dp icon 8 from its words.

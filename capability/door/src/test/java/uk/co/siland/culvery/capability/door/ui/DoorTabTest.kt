@@ -6,6 +6,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -17,6 +18,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.compose.ui.unit.dp
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import java.time.LocalDate
@@ -133,8 +135,15 @@ class DoorTabTest {
     fun aThumbnailOpensTheSnapshot() {
         val withPicture = event(1, snapshot = File(folder.root, "1.jpg"))
         show(DoorDays(listOf(withPicture), emptyList()))
-        compose.onNodeWithTag("door_thumb_1").performClick()
+        compose.onNodeWithTag("door_thumb_1").assertHeightIsAtLeast(48.dp).performClick()
         assertThat(opened).containsExactly(withPicture)
+    }
+
+    /** Fails if a row with a snapshot thumbnail has an unlabelled or unnamed control, or the thumbnail's tap area is under 48 dp high. */
+    @Test
+    fun aRowWithAThumbnailIsAccessible() {
+        show(DoorDays(listOf(event(1, snapshot = File(folder.root, "1.jpg"))), emptyList()))
+        compose.assertAccessible()
     }
 
     /** Through the host: fails if the thumbnail does not put the full-size sheet in the overlay host. */

@@ -83,15 +83,25 @@ private fun DoorRow(event: DoorEvent, zone: ZoneId, onOpenSnapshot: (DoorEvent) 
         leading = { HhIcon(if (event.kind == DoorKind.MOTION) Icons.DIRECTIONS_WALK else Icons.DOORBELL, size = ListRowTokens.icon, tint = c.mute) },
         trailing = event.snapshot?.let { file ->
             {
+                // The tap area is 48 dp high around the 36 dp picture: on the SM-T510 Compose does not widen smaller targets.
                 Box(
-                    Modifier
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
                         .testTag("door_thumb_${event.id}")
-                        .size(DoorDimens.thumbWidth, DoorDimens.thumbHeight)
-                        .clip(RoundedCornerShape(DoorDimens.thumbRadius))
-                        .background(c.surf2)
+                        .size(DoorDimens.thumbWidth, DoorDimens.thumbTouchHeight)
                         .semantics { contentDescription = SNAPSHOT }
                         .hhClickable({ onOpenSnapshot(event) }, label = SHOW_FULL_SIZE),
-                ) { SnapshotImage(file, Modifier.fillMaxSize().testTag("door_thumb_image"), maxPx = DoorDimens.THUMB_PX) }
+                ) {
+                    SnapshotImage(
+                        file,
+                        Modifier
+                            .testTag("door_thumb_image")
+                            .size(DoorDimens.thumbWidth, DoorDimens.thumbHeight)
+                            .clip(RoundedCornerShape(DoorDimens.thumbRadius))
+                            .background(c.surf2),
+                        maxPx = DoorDimens.THUMB_PX,
+                    )
+                }
             }
         },
     )
