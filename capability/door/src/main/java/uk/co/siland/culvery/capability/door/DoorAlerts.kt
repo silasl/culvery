@@ -1,0 +1,109 @@
+package uk.co.siland.culvery.capability.door
+
+import java.time.ZoneId
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import uk.co.siland.culvery.capability.door.ui.DoorCardHost
+import uk.co.siland.culvery.capability.door.ui.DoorCardUi
+import uk.co.siland.culvery.core.household.HouseholdZone
+import uk.co.siland.culvery.core.plugin.AlertHost
+import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.WallClock
+
+/** A card closes by itself after this long (5 §2.9). */
+const val CARD_MS = 120_000L
+
+/** A chime waits this long after the last one (5 §4.6). */
+const val CHIME_GAP_MS = 10_000L
+
+data class ShowingRing(val eventId: Long, val card: DoorCardUi)
+
+/**
+ * The alert decision (5 §4.6–4.7). A new ring, or an unrecognised alert, while Culvery is in front raises the card or
+ * refreshes it, restarts its 2 minutes, and chimes unless it is quiet hours or the last chime was under 10 seconds ago.
+ * A re-post of the card's own ring updates the card only. Motion, and anything while Culvery isn't in front, is only
+ * stored. Every change to the card happens under one lock, so a close never takes a newer ring's card.
+ */
+@Singleton
+class DoorAlerts internal constructor(
+    private val host: AlertHost,
+    private val markSeen: suspend (Long) -> Unit,
+    private val prefs: () -> DoorPrefs,
+    private val chime: Chime,
+    private val zone: suspend () -> ZoneId,
+    private val clock: WallClock,
+    private val scope: CoroutineScope,
+) {
+    @Inject
+    constructor(
+        host: AlertHost,
+        store: DoorStore,
+        settings: DoorSettings,
+        chime: Chime,
+        zone: HouseholdZone,
+        clock: WallClock,
+        @ApplicationScope scope: CoroutineScope,
+    ) : this(host, store::markSeen, { settings.current.value }, chime, zone::current, clock, scope)
+
+    private val lock = Mutex()
+    private val _showing = MutableStateFlow<ShowingRing?>(null)
+    val showing: StateFlow<ShowingRing?> = _showing.asStateFlow()
+    private var closing: Job? = null
+    private var lastChimeMillis: Long? = null
+
+    suspend fun onRecorded(recorded: Recorded) = lock.withLock {
+        val event = recorded.event
+        if (event.kind != DoorKind.RING) return@withLock
+        val z = zone()
+        val card = DoorCardUi(event.unrecognised, event.device, clockTime(event.atMillis, z), event.snapshot)
+        if (!recorded.isNew) {
+            if (_showing.value?.eventId == event.id) _showing.value = ShowingRing(event.id, card)
+            return@withLock
+        }
+        if (!host.inFront.value) return@withLock
+        val alreadyShowing = _showing.value != null
+        _showing.value = ShowingRing(event.id, card)
+        if (!alreadyShowing) host.show { DoorCardHost(this@DoorAlerts) }
+        closing?.cancel()
+        closing = scope.launch {
+            delay(CARD_MS)
+            // A ring that came as the 2 minutes ended has replaced this job: only this job's card goes.
+            lock.withLock { if (closing === coroutineContext[Job]) close() }
+        }
+        val now = clock.nowMillis()
+        val p = prefs()
+        // A clock set back since the last chime counts as long ago.
+        val chimedRecently = lastChimeMillis?.let { now - it in 0 until CHIME_GAP_MS } == true
+        if (!quietAt(now, z, p) && !chimedRecently) {
+            lastChimeMillis = now
+            chime.play(p.volume)
+        }
+    }
+
+    /** Got it on [eventId]'s card: that ring counts as seen, and the card goes if it still shows that ring (5 §4.7). */
+    fun gotIt(eventId: Long) {
+        scope.launch {
+            lock.withLock {
+                if (_showing.value?.eventId == eventId) {
+                    closing?.cancel()
+                    close()
+                }
+            }
+            markSeen(eventId)
+        }
+    }
+
+    private fun close() {
+        _showing.value = null
+        host.dismiss()
+    }
+}

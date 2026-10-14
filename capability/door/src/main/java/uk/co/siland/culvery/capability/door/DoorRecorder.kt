@@ -27,8 +27,8 @@ class DoorRecorder internal constructor(
     private val alert: suspend (Recorded) -> Unit,
 ) : DoorEventSink {
     @Inject
-    constructor(store: DoorStore, settings: DoorSettings, @ApplicationScope scope: CoroutineScope, clock: WallClock) :
-        this(store, settings, scope, clock, {})
+    constructor(store: DoorStore, settings: DoorSettings, @ApplicationScope scope: CoroutineScope, clock: WallClock, alerts: DoorAlerts) :
+        this(store, settings, scope, clock, alerts::onRecorded)
 
     private val notices = Channel<DoorNotice>(Channel.UNLIMITED)
 

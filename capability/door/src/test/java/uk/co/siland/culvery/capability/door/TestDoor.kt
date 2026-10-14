@@ -2,13 +2,16 @@ package uk.co.siland.culvery.capability.door
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.compose.runtime.Composable
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
+import kotlinx.coroutines.flow.MutableStateFlow
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+import uk.co.siland.culvery.core.plugin.AlertHost
 
 internal fun doorDb(): DoorDatabase =
     Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), DoorDatabase::class.java)
@@ -43,3 +46,28 @@ internal val aPicture = Snapshot { it.writeBytes(byteArrayOf(1, 2, 3)) }
 internal fun picture(width: Int, height: Int): Bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GRAY) }
 
 internal fun File.names(): List<String> = listFiles()?.map { it.name }?.sorted().orEmpty()
+
+/** An alert host a test drives: whether Culvery is in front, and what was shown and dismissed. */
+internal class FakeAlertHost(inFront: Boolean = true) : AlertHost {
+    override val inFront = MutableStateFlow(inFront)
+    var shown = 0
+    var dismissed = 0
+    var content: (@Composable () -> Unit)? = null
+
+    override fun show(content: @Composable () -> Unit) {
+        shown++
+        this.content = content
+    }
+
+    override fun dismiss() {
+        dismissed++
+        content = null
+    }
+}
+
+internal class FakeChime : Chime {
+    val volumes = mutableListOf<Float>()
+    override fun play(volume: Float) {
+        volumes += volume
+    }
+}
