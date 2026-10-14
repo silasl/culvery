@@ -429,6 +429,15 @@ class CalendarStoreTest {
         assertThat(dao.outboxNow().map { it.id }).containsExactly(good)
     }
 
+    /** Pin: a row the current release queued, with no rule or zone keys, still reads, as a one-off. */
+    @Test
+    fun aRowQueuedBeforeRepeatsReadsWithoutARule() = runTest {
+        connect("s1")
+        val old = """{"title":"Pizza","start":{"date":"2026-09-27"},"end":{"date":"2026-09-28"},"forPerson":null,"createdBy":null,"forPersonColor":null}"""
+        db.calendarDao().insertOutbox(OutboxEntity(connectionId = "c1", sourceId = "s1", remoteId = null, kind = "CREATE", draftJson = old, attempts = 0, nextAttemptMillis = 0, createdMillis = 0))
+        assertThat(store.pendingNow().single().draft?.recurrence).isNull()
+    }
+
     @Test
     fun rescheduleAndDropChange() = runTest {
         connect("s1")
@@ -875,5 +884,18 @@ class CalendarStoreTest {
         store.addConnection(Connection("c9", "calendar.test", "Other", emptyMap()), emptyList(), emptyMap())
         store.setHealth("c9", ConnectionHealth.Offline, 0L)
         assertThat(store.connectionsNow().single { it.connection.id == "c9" }.health).isEqualTo(ConnectionHealth.Offline)
+    }
+
+    /** A queued new series keeps its rule and zone through the outbox, so the drain writes a series. */
+    @Test
+    fun aQueuedDraftKeepsItsRepeatRule() = runTest {
+        store.addConnection(Connection("c9", "calendar.test", "Other", emptyMap()), emptyList(), emptyMap())
+        val day = LocalDate.of(2026, 9, 27)
+        val draft = EventDraft(
+            "Swimming", EventTime.AllDay(day), EventTime.AllDay(day.plusDays(1)), "family", "alex",
+            recurrence = Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=1", ZoneId.of("Europe/London")),
+        )
+        store.enqueue(PendingChange(0, "c9", "s1", null, ChangeKind.CREATE, draft, 0, 0L, 0L, clientKey = "k1"))
+        assertThat(store.pendingNow().single().draft).isEqualTo(draft)
     }
 }

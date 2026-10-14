@@ -106,7 +106,8 @@ fun interface StoredSeries {
  * What the tablet asks a provider to write. [end] is exclusive, as in [RemoteEvent]. [forPerson] and [createdBy]
  * are household PersonId values ("family" allowed) that the provider stores with the event (Google:
  * extendedProperties.private). Names are never written. [forPersonColor] is that person's colour (ARGB), so the
- * provider can colour the event (Google: the nearest colorId); null for Family or untagged.
+ * provider can colour the event (Google: the nearest colorId); null for Family or untagged. [recurrence] makes a new
+ * event a series; only a create reads it.
  */
 data class EventDraft(
     val title: String,
@@ -115,6 +116,7 @@ data class EventDraft(
     val forPerson: String?,
     val createdBy: String?,
     val forPersonColor: Long? = null,
+    val recurrence: Recurrence? = null,
 )
 
 /** What an update changes (3a design C3): the title, the start and end together, or who the event is for. */

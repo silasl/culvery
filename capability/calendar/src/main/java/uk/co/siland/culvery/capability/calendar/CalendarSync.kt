@@ -271,7 +271,7 @@ class CalendarSync internal constructor(
         zone: ZoneId,
     ): WriteOutcome =
         try {
-            store.applyAcceptedWrite(change.kind, conn.id, source.id, change.remoteId, change.draft?.forPerson, accepted, zone, completing = change.id)
+            store.applyAcceptedWrite(change.kind, conn.id, source.id, change.remoteId, change.draft?.forPerson, accepted, zone, completing = change.id, series = change.draft?.recurrence != null)
             store.writeAccepted(conn.id, clock.nowMillis())
             accepted
         } catch (e: CancellationException) {

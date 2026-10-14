@@ -945,4 +945,34 @@ class CalendarEditorTest {
         assertThat(stored.needsSignInSinceMillis).isEqualTo(opened + testScheduler.currentTime)
         assertThat(store.pendingNow()).hasSize(1)
     }
+
+    /** The service returns the series itself, which a read never lists; the sync brings its occurrences. */
+    @Test
+    fun aNewSeriesIsLeftForTheSyncToBring() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val series = draft("Swimming", PersonId.FAMILY.value).copy(recurrence = Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=1", london))
+        assertThat(editor(access).create(series, "key-series")).isEqualTo(EditResult.Done)
+        assertThat(writer.drafts.single().recurrence).isEqualTo(series.recurrence)
+        assertThat(store.eventNow(ref("key-series"))).isNull()
+        assertThat(syncRequests).isAtLeast(1)
+        // A one-off is still mirrored at once.
+        assertThat(editor(access).create(draft("Pizza night", PersonId.FAMILY.value), "key-once")).isEqualTo(EditResult.Done)
+        assertThat(store.eventNow(ref("key-once"))).isNotNull()
+    }
+
+    /** The outbox's path: a queued series is sent, its row completed, and nothing mirrored before the sync. */
+    @Test
+    fun aQueuedNewSeriesDrainsWithoutAMirroredRow() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        writer.failWith = UnreachableException("offline")
+        val series = draft("Swimming", PersonId.FAMILY.value).copy(recurrence = Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=1", london))
+        assertThat(editor(access).create(series, "key-series")).isEqualTo(EditResult.Queued)
+        writer.failWith = null
+        drain(access, aheadMillis = OUTBOX_BACKOFF_MS.first()).syncAll()
+        assertThat(writer.created.keys).contains("key-series")
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(store.eventNow(ref("key-series"))).isNull()
+    }
 }

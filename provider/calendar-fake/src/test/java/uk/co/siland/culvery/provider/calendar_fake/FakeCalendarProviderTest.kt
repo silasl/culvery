@@ -13,6 +13,7 @@ import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.Recurrence
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
@@ -302,5 +303,16 @@ class FakeCalendarProviderTest {
             runBlocking { fake.create(conn, family, draft("Sleepover"), key) }
         }
         assertThat(fake.familyEvents().map { it.title }).doesNotContain("Sleepover")
+    }
+
+    @Test
+    fun aNewSeriesComesBackRepeatingWithItsRule() = runTest {
+        val provider = providerOn(today)
+        val start = EventTime.Timed(today.plusDays(1).atTime(18, 0).atZone(zone).toInstant())
+        val end = EventTime.Timed(today.plusDays(1).atTime(19, 0).atZone(zone).toInstant())
+        val made = provider.create(conn, family, EventDraft("Swimming", start, end, null, null,
+            recurrence = Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=1", zone)), "k-series")
+        assertThat(made.recurring).isTrue()
+        assertThat(made.recurrenceRule).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1")
     }
 }

@@ -430,6 +430,8 @@ private fun encodeDraft(d: EventDraft): String = JSONObject()
     .put("forPerson", d.forPerson ?: JSONObject.NULL)
     .put("createdBy", d.createdBy ?: JSONObject.NULL)
     .put("forPersonColor", d.forPersonColor ?: JSONObject.NULL)
+    .put("rule", d.recurrence?.rule ?: JSONObject.NULL)
+    .put("zone", d.recurrence?.zone?.id ?: JSONObject.NULL)
     .toString()
 
 private fun decodeDraft(json: String): EventDraft {
@@ -442,6 +444,8 @@ private fun decodeDraft(json: String): EventDraft {
         createdBy = o.stringOrNull("createdBy"),
         // A row from before v4 has no colour.
         forPersonColor = if (o.has("forPersonColor") && !o.isNull("forPersonColor")) o.getLong("forPersonColor") else null,
+        // A row queued before repeats has no rule.
+        recurrence = o.stringOrNull("rule")?.let { Recurrence(it, ZoneId.of(o.getString("zone"))) },
     )
 }
 

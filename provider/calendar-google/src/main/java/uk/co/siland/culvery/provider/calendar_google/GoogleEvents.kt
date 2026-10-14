@@ -3,11 +3,14 @@ package uk.co.siland.culvery.provider.calendar_google
 import android.util.Log
 import java.time.LocalDate
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventField
@@ -67,13 +70,14 @@ internal fun GoogleEvent.toRemoteEvent(rule: String?): RemoteEvent? {
 
 /**
  * events.insert (3a design §3.6): the client key as the id, the tags (a null one left out), and the colour. Timed
- * times go as UTC with no timeZone, so Google shows them in the calendar's own zone; all-day as dates.
+ * times go as UTC with no timeZone, so Google shows them in the calendar's own zone; all-day as dates. A series sends its rule, and its timed times also name the household zone, which Google
+ * needs to repeat them (5 §A.4).
  */
 internal fun insertBody(draft: EventDraft, clientKey: String): JsonObject = buildJsonObject {
     put("id", clientKey)
     put("summary", draft.title)
-    put("start", timeJson(draft.start, forPatch = false))
-    put("end", timeJson(draft.end, forPatch = false))
+    put("start", timeJson(draft.start, forPatch = false, zone = draft.recurrence?.zone))
+    put("end", timeJson(draft.end, forPatch = false, zone = draft.recurrence?.zone))
     putJsonObject("extendedProperties") {
         putJsonObject("private") {
             draft.forPerson?.let { put(PERSON_KEY, it) }
@@ -81,6 +85,7 @@ internal fun insertBody(draft: EventDraft, clientKey: String): JsonObject = buil
         }
     }
     draft.forPersonColor?.let { put("colorId", nearestColorId(it)) }
+    draft.recurrence?.let { r -> putJsonArray("recurrence") { add(r.rule) } }
 }
 
 /**
@@ -102,10 +107,11 @@ internal fun patchBody(draft: EventDraft, fields: Set<EventField>): JsonObject =
     }
 }
 
-private fun timeJson(time: EventTime, forPatch: Boolean): JsonObject = buildJsonObject {
+private fun timeJson(time: EventTime, forPatch: Boolean, zone: ZoneId? = null): JsonObject = buildJsonObject {
     when (time) {
         is EventTime.Timed -> {
             put("dateTime", time.instant.toString())
+            zone?.let { put("timeZone", it.id) }
             if (forPatch) put("date", JsonNull)
         }
         is EventTime.AllDay -> {

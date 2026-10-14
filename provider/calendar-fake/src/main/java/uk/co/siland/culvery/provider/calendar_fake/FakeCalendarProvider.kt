@@ -137,7 +137,10 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
             if (clientKey in deleted) throw WriteRejectedException(EVENT_GONE)
             // The key is the event's id, so a retried create returns the event it made (CalendarWriter contract).
             created.getOrPut(clientKey) {
-                RemoteEvent(clientKey, draft.title, draft.start, draft.end, recurring = false, draft.forPerson, draft.createdBy)
+                RemoteEvent(
+                    clientKey, draft.title, draft.start, draft.end, recurring = draft.recurrence != null, draft.forPerson, draft.createdBy,
+                    recurrenceRule = draft.recurrence?.rule,
+                )
             }
         }
 

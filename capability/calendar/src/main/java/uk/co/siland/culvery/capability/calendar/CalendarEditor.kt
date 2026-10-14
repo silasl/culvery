@@ -396,7 +396,7 @@ class CalendarEditor internal constructor(
         return when (outcome) {
             is WriteOutcome.Accepted -> {
                 try {
-                    store.applyAcceptedWrite(kind, to.connection.id, to.source.id, remoteId, draft?.forPerson, outcome, zone.current())
+                    store.applyAcceptedWrite(kind, to.connection.id, to.source.id, remoteId, draft?.forPerson, outcome, zone.current(), series = draft?.recurrence != null)
                     store.writeAccepted(to.connection.id, clock.nowMillis())
                 } catch (e: CancellationException) {
                     throw e

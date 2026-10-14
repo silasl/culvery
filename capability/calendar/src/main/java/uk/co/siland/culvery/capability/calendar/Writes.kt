@@ -115,7 +115,8 @@ internal suspend fun <T> callReader(io: CoroutineContext, timeoutMillis: Long, r
  * Puts a write the provider accepted into the mirror: the event it now holds; for a delete, the event removed; for a
  * series assign, [forPerson] on every occurrence held. [remoteId] is the event's (or series') id before the write,
  * needed for a delete and a series assign. [completing] is the outbox row the write came from, completed in the same
- * transaction.
+ * transaction. A new [series] isn't mirrored: the service returns the series itself, which a read never lists; the sync
+ * every write asks for brings its occurrences, and the outbox row it came from is completed.
  */
 internal suspend fun CalendarStore.applyAcceptedWrite(
     kind: ChangeKind,
@@ -126,9 +127,11 @@ internal suspend fun CalendarStore.applyAcceptedWrite(
     accepted: WriteOutcome.Accepted,
     zone: ZoneId,
     completing: Long? = null,
+    series: Boolean = false,
 ) {
     val event = accepted.event
     when {
+        kind == ChangeKind.CREATE && series -> completing?.let { dropChange(it) }
         kind == ChangeKind.ASSIGN_SERIES ->
             applySeriesAssigned(connectionId, sourceId, requireNotNull(remoteId) { "A series assign needs its series" }, forPerson, completing)
         event == null ->

@@ -10,7 +10,9 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.putJsonArray
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -25,6 +27,7 @@ import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
+import uk.co.siland.culvery.capability.calendar.Recurrence
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.core.plugin.Connection
@@ -327,5 +330,28 @@ class GoogleWriteTest {
         assertThat(failureOf { provider.create(conn, family, draft(), key) }).isInstanceOf(UnreachableException::class.java)
         // The two refusals and the 503.
         assertLogsHoldNoPersonalData(minLines = 3)
+    }
+
+    /** Google repeats a timed series in the zone it is given, and needs one. */
+    @Test
+    fun aTimedSeriesInsertSendsItsRuleAndTheHouseholdZone() = runTest {
+        val rule = "RRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20261231T235959Z"
+        provider.create(conn, family, draft().copy(recurrence = Recurrence(rule, london)), key)
+        val sent = google.bodies.single()
+        assertThat(sent.getValue("recurrence").jsonArray.map { it.jsonPrimitive.content }).containsExactly(rule)
+        assertThat(sent.obj("start").text("timeZone")).isEqualTo("Europe/London")
+        assertThat(sent.obj("end").text("timeZone")).isEqualTo("Europe/London")
+        assertThat(sent.obj("start").text("dateTime")).isEqualTo("2026-09-23T15:00:00Z")
+    }
+
+    @Test
+    fun anAllDaySeriesSendsItsRuleAndDatesWithoutAZone() = runTest {
+        val day = LocalDate.of(2026, 9, 23)
+        val allDay = EventDraft("Bins", EventTime.AllDay(day), EventTime.AllDay(day.plusDays(1)), null, "sam-id",
+            recurrence = Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=1", london))
+        provider.create(conn, family, allDay, key)
+        val sent = google.bodies.single()
+        assertThat(sent.getValue("recurrence").jsonArray.map { it.jsonPrimitive.content }).containsExactly("RRULE:FREQ=WEEKLY;INTERVAL=1")
+        assertThat(sent.obj("start")["timeZone"]).isNull()
     }
 }
