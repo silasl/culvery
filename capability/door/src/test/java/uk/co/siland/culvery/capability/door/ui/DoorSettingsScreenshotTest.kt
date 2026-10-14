@@ -18,10 +18,10 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
-/** Settings › Door in Settings' page area, on a screen tall enough to show the whole page. */
+/** Settings › Door as Settings shows it: in the page area beside the 320 dp page list. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(qualifiers = "w1280dp-h1000dp-land-hdpi")
+@Config(qualifiers = "w1280dp-h800dp-land-hdpi")
 class DoorSettingsScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
@@ -36,7 +36,7 @@ class DoorSettingsScreenshotTest {
     private fun snap(name: String, dark: Boolean, ui: DoorSettingsUi) {
         compose.setContent {
             CulveryTheme(dark = dark) {
-                Box(Modifier.size(860.dp, 960.dp).background(Culvery.colors.bg)) { DoorSettingsScreen(ui, actions) }
+                Box(Modifier.size(960.dp, 800.dp).background(Culvery.colors.bg)) { InSettingsPane { DoorSettingsScreen(ui, actions) } }
             }
         }
         compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")

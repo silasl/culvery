@@ -75,10 +75,20 @@ class DoorSettingsPageTest {
         val health = DoorHealth(provider, settings, MutableStateFlow(true), MutableStateFlow(true), io)
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides navigator) {
-                CulveryTheme(dark = true) { DoorSettingsHost(settings, health, provider, chime, clock, flowOf(london), toaster) }
+                CulveryTheme(dark = true) {
+                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, clock, flowOf(london), toaster) }
+                }
             }
         }
         waitFor { shows("settings_door") }
+    }
+
+    /** Fails with "Vertically scrollable component was measured with an infinity maximum height" if the page nests a scroll of its own inside Settings'. */
+    @Test
+    fun thePageDrawsInsideSettingsScroll() {
+        showHost()
+        compose.onNodeWithTag("settings_door").assertExists()
+        compose.onNodeWithTag("door_capture").assertExists()
     }
 
     /** Fails if the app step isn't ticked when Ring is installed, or the access step is ticked while access is off. */
