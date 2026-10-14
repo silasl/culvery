@@ -25,7 +25,6 @@ import androidx.room.execSQL
 import androidx.room.useWriterConnection
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.CompletableDeferred
@@ -214,8 +213,7 @@ class EventEditorHostTest {
         compose.onNodeWithTag("day_2026-10-24").assertTextEquals("Today")
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { closed > 0 }
-        // Morning on the 25th, the day the clocks go back: 09:00 GMT.
-        assertThat(writer.drafts.single().start).isEqualTo(EventTime.Timed(Instant.parse("2026-10-25T09:00:00Z")))
+        assertThat(writer.drafts.single().start).isEqualTo(EventTime.AllDay(LocalDate.of(2026, 10, 25)))
     }
 
     @Test
@@ -336,6 +334,8 @@ class EventEditorHostTest {
         showEditor(EditorRequest.New(day = null))
         waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Parents evening")
+        compose.onNodeWithTag("time_pick").performClick()
+        compose.onNodeWithTag("picker_set").performClick()
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { writer.entered.isCompleted }
         compose.onNodeWithTag("editor_save").assertIsNotEnabled().performClick()
@@ -474,6 +474,8 @@ class EventEditorHostTest {
         showOverlay { showEditor(EditorRequest.New(day = null), day, repo, editor) }
         waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Half-typed")
+        compose.onNodeWithTag("time_pick").performClick()
+        compose.onNodeWithTag("picker_set").performClick()
         compose.onNodeWithTag("length_30").performClick()
         compose.runOnIdle { overlay.showEditor(EditorRequest.Edit(dinner), day, repo, editor) }
         waitForText("Change event")
@@ -483,7 +485,8 @@ class EventEditorHostTest {
         waitForText("Add event")
         compose.onNodeWithTag("editor_title").assertIsFocused()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
-        compose.onNodeWithTag("length_60").assertIsSelected()
+        compose.onNodeWithTag("time_all_day").assertIsSelected()
+        compose.onNodeWithTag("length_30").assertDoesNotExist()
     }
 
     @Test

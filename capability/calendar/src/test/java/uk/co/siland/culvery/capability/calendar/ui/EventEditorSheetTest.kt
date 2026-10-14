@@ -44,8 +44,8 @@ import uk.co.siland.culvery.capability.calendar.EditableEvent
 import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.TimeChoice
-import uk.co.siland.culvery.capability.calendar.TimeSlot
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.couldNotSave
 import uk.co.siland.culvery.capability.calendar.saveFailedBody
@@ -110,7 +110,7 @@ class EventEditorSheetTest {
     fun aNewEventSaysNewEventAndOffersNoDelete() {
         show(newForm())
         compose.onAllNodesWithText("Add event").filterToOne(isHeading()).assertExists()
-        compose.onNodeWithTag("editor_summary").assertTextEquals("Today · 14:00–15:00 · Family")
+        compose.onNodeWithTag("editor_summary").assertTextEquals("Today · All day · Family")
         compose.onNodeWithTag("editor_save").assertTextEquals("Add event")
         compose.onNodeWithTag("editor_delete").assertDoesNotExist()
         compose.onNodeWithText("What’s happening?").assertExists()
@@ -150,8 +150,12 @@ class EventEditorSheetTest {
     @Test
     fun chipsChangeTheFormAndTheSummary() {
         show(newForm())
+        // Today, the picker opens on 12:00 for a sheet opened at 11:54; two hours up is 14:00.
+        compose.onNodeWithTag("time_pick").performClick()
+        compose.onNodeWithTag("hour_up").performClick()
+        compose.onNodeWithTag("hour_up").performClick()
+        compose.onNodeWithTag("picker_set").performClick()
         compose.onNodeWithTag("day_${SampleUi.TODAY.plusDays(1)}").performClick()
-        compose.onNodeWithTag("time_Afternoon").performClick()
         compose.onNodeWithTag("who_Mia").performClick()
         compose.onNodeWithTag("editor_summary").assertTextEquals("Tomorrow · 14:00–15:00 · Mia")
         compose.onNodeWithTag("length_120").performClick()
@@ -159,8 +163,11 @@ class EventEditorSheetTest {
     }
 
     @Test
-    fun lengthIsHiddenForAllDay() {
+    fun lengthShowsOnlyForAPickedTime() {
         show(newForm())
+        compose.onNodeWithTag("length_60").assertDoesNotExist()
+        compose.onNodeWithTag("time_pick").performClick()
+        compose.onNodeWithTag("picker_set").performClick()
         compose.onNodeWithTag("length_60").assertExists()
         compose.onNodeWithTag("time_all_day").performClick()
         compose.onNodeWithTag("length_60").assertDoesNotExist()
@@ -227,26 +234,43 @@ class EventEditorSheetTest {
         val form = newForm()
         show(form)
         compose.onNodeWithTag("time_pick").performClick()
-        compose.onNodeWithTag("hour_value").assertTextEquals("14")
+        compose.onNodeWithTag("hour_value").assertTextEquals("12")
         compose.onNodeWithTag("hour_up").performClick()
         compose.onNodeWithTag("minute_up").performClick()
         compose.onNodeWithTag("picker_set").performClick()
-        assertThat(form.time).isEqualTo(TimeChoice.Custom(LocalTime.of(15, 15)))
-        compose.onNodeWithTag("time_pick").assertTextEquals("15:15").assertIsSelected()
+        assertThat(form.time).isEqualTo(TimeChoice.Custom(LocalTime.of(13, 15)))
+        compose.onNodeWithTag("time_pick").assertTextEquals("13:15").assertIsSelected()
+    }
+
+    /** 5 §A.4: All day and Pick time… only; Repeats on a new event, Ends only once it repeats. */
+    @Test
+    fun aNewEventOffersRepeatsAndEndsOnlyWhenItRepeats() {
+        show(newForm())
+        compose.onNodeWithTag("time_all_day").assertIsSelected()
+        compose.onNodeWithTag("time_Morning").assertDoesNotExist()
+        compose.onNodeWithTag("repeat_Never").assertIsSelected()
+        compose.onNodeWithTag("ends_never").assertDoesNotExist()
+        compose.onNodeWithTag("repeat_Weekly").performClick()
+        compose.onNodeWithTag("ends_never").assertIsSelected()
+        compose.onNodeWithTag("ends_pick").performClick()
+        assertThat(calls).contains("picker:EndDate")
     }
 
     @Test
-    fun aPickedSlotTimeSelectsTheSlotChip() {
+    fun anEditHasNoRepeats() {
+        show(dinner())
+        compose.onNodeWithTag("repeat_Never").assertDoesNotExist()
+    }
+
+    @Test
+    fun anEndBeforeTheDaySaysSoAndSaveWaits() {
         val form = newForm()
+        form.updateTitle("Swimming")
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseEnd(SampleUi.TODAY.minusDays(1))
         show(form)
-        compose.onNodeWithTag("time_pick").performClick()
-        compose.onNodeWithTag("hour_up").performClick()
-        compose.onNodeWithTag("hour_up").performClick()
-        compose.onNodeWithTag("hour_up").performClick()
-        compose.onNodeWithTag("hour_up").performClick()
-        compose.onNodeWithTag("picker_set").performClick()
-        assertThat(form.time).isEqualTo(TimeChoice.Slot(TimeSlot.Evening))
-        compose.onNodeWithTag("time_Evening").assertIsSelected()
+        compose.onNodeWithTag("ends_error").assertTextEquals("The end date is before the event’s day. Pick a later one.")
+        compose.onNodeWithTag("editor_save").assertIsNotEnabled()
     }
 
     @Test
@@ -274,7 +298,7 @@ class EventEditorSheetTest {
     @Test
     fun openingAPickerClosesTheKeyboardButAChipDoesNot() {
         show(newForm(), focus = true)
-        compose.onNodeWithTag("time_Evening").performClick()
+        compose.onNodeWithTag("day_${SampleUi.TODAY.plusDays(1)}").performClick()
         compose.onNodeWithTag("editor_title").assertIsFocused()
         compose.onNodeWithTag("day_pick").performClick()
         // The picker hides the sheet from TalkBack, so the focus is read from the unmerged tree.

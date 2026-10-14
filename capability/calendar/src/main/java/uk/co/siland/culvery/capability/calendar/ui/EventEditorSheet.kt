@@ -45,8 +45,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.HOURS_MINUTES
+import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.SHORT_DAY
 import uk.co.siland.culvery.capability.calendar.TimeChoice
-import uk.co.siland.culvery.capability.calendar.TimeSlot
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.couldNotSave
@@ -63,6 +64,7 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhMessageLine
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhTextField
@@ -72,6 +74,10 @@ import uk.co.siland.culvery.core.ui.ShellTokens
 
 /** A save that failed: where it was going ([service]) and why ([problem]); the card says both. */
 data class SaveFailure(val service: String, val problem: WriteProblem)
+
+internal const val REPEATS = "Repeats"
+internal const val ENDS = "Ends"
+internal const val ENDS_TOO_EARLY = "The end date is before the event’s day. Pick a later one."
 
 /**
  * Hand-off §7 "Sheet 2 — Quick-add / edit" (2b-2 design §4.2). Stateless apart from the [form] it edits: the host
@@ -157,6 +163,15 @@ fun EventEditorSheet(
                             onPicker(EditorPicker.Time)
                         }
                         if (form.time != TimeChoice.AllDay) LengthSection(form, busy)
+                        if (form.canRepeat) {
+                            RepeatsSection(form, busy)
+                            if (form.repeat != RepeatChoice.Never) {
+                                EndsSection(form, busy) {
+                                    closeKeyboard()
+                                    onPicker(EditorPicker.EndDate)
+                                }
+                            }
+                        }
                     }
                 }
                 if (failure != null) FailureCard(failure)
@@ -193,6 +208,17 @@ fun EventEditorSheet(
                     initial = form.pickerTime,
                     onSet = {
                         form.chooseTime(TimeChoice.Custom(it))
+                        onPicker(EditorPicker.None)
+                    },
+                    onCancel = { onPicker(EditorPicker.None) },
+                )
+            }
+            EditorPicker.EndDate -> PickerLayer(onDismiss = { onPicker(EditorPicker.None) }) {
+                DatePickerCard(
+                    today = form.today,
+                    selected = form.endsOn ?: form.day,
+                    onPick = {
+                        form.chooseEnd(it)
                         onPicker(EditorPicker.None)
                     },
                     onCancel = { onPicker(EditorPicker.None) },
@@ -321,15 +347,6 @@ private fun DaySection(form: EventForm, busy: Boolean, onPickDate: () -> Unit) {
 private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit) {
     Section("Time") {
         HhChoiceChip("All day", form.time == TimeChoice.AllDay, "time_all_day", onClick = { if (!busy) form.chooseTime(TimeChoice.AllDay) })
-        TimeSlot.entries.forEach { slot ->
-            HhChoiceChip(
-                label = slot.label,
-                selected = form.time == TimeChoice.Slot(slot),
-                tag = "time_${slot.name}",
-                secondary = slot.time.format(HOURS_MINUTES),
-                onClick = { if (!busy) form.chooseTime(TimeChoice.Slot(slot)) },
-            )
-        }
         val custom = form.time as? TimeChoice.Custom
         HhChoiceChip(
             label = custom?.time?.format(HOURS_MINUTES) ?: "Pick time…",
@@ -348,6 +365,35 @@ private fun LengthSection(form: EventForm, busy: Boolean) {
         form.lengths.forEach { length ->
             HhChoiceChip(lengthLabel(length), form.length == length, "length_${length.toMinutes()}", onClick = { if (!busy) form.chooseLength(length) })
         }
+    }
+}
+
+@Composable
+private fun RepeatsSection(form: EventForm, busy: Boolean) {
+    Section(REPEATS) {
+        RepeatChoice.entries.forEach { choice ->
+            HhChoiceChip(choice.label, form.repeat == choice, "repeat_${choice.name}", onClick = { if (!busy) form.chooseRepeat(choice) })
+        }
+    }
+}
+
+/** Never, or a date from the date picker; a line under them while the date is before the event's day. */
+@Composable
+private fun EndsSection(form: EventForm, busy: Boolean, onPickEnd: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
+        Section(ENDS) {
+            HhChoiceChip("Never", form.endsOn == null, "ends_never", onClick = { if (!busy) form.chooseEnd(null) })
+            val end = form.endsOn
+            HhChoiceChip(
+                label = end?.format(SHORT_DAY) ?: "On a date…",
+                selected = end != null,
+                tag = "ends_pick",
+                role = Role.Button,
+                leading = { ink -> HhIcon(Icons.CALENDAR_MONTH, size = ControlTokens.chipIcon, tint = ink) },
+                onClick = { if (!busy) onPickEnd() },
+            )
+        }
+        HhMessageLine(ENDS_TOO_EARLY.takeIf { form.endsBeforeStart }, CalendarType.noteBody, Culvery.colors.danger, "ends_error")
     }
 }
 

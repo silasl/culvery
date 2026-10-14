@@ -40,41 +40,15 @@ class EventFormTest {
 
     private fun EventForm.summary() = summary { names.getValue(it) }
 
-    private fun slot(s: TimeSlot) = TimeChoice.Slot(s)
-
+    /** 5 §A.4: All day is the default, today or any other day; the slots are gone. */
     @Test
-    fun theDefaultTimeIsTheNextSlotStillToComeToday() {
-        val expected = mapOf(
-            "08:59" to slot(TimeSlot.Morning),
-            "09:00" to slot(TimeSlot.Afternoon),
-            "13:59" to slot(TimeSlot.Afternoon),
-            "14:00" to slot(TimeSlot.Evening),
-            "17:59" to slot(TimeSlot.Evening),
-            "18:00" to TimeChoice.AllDay,
-            "23:30" to TimeChoice.AllDay,
-        )
-        expected.forEach { (now, time) -> assertThat(new(now).time).isEqualTo(time) }
-    }
-
-    @Test
-    fun aLaterDayDefaultsToMorningAndAWeekColumnPresetsIt() {
+    fun aNewEventStartsAllDayAndAWeekColumnPresetsItsDay() {
+        assertThat(new(now = "08:00").time).isEqualTo(TimeChoice.AllDay)
         val form = new(now = "20:00", day = today.plusDays(2))
         assertThat(form.day).isEqualTo(today.plusDays(2))
-        assertThat(form.time).isEqualTo(slot(TimeSlot.Morning))
-        assertThat(form.length).isEqualTo(Duration.ofHours(1))
-    }
-
-    @Test
-    fun changingTheDayReappliesTheDefaultUntilTimeIsTouched() {
-        val form = new(now = "20:00")
         assertThat(form.time).isEqualTo(TimeChoice.AllDay)
-        form.chooseDay(today.plusDays(1))
-        assertThat(form.time).isEqualTo(slot(TimeSlot.Morning))
         form.chooseDay(today)
         assertThat(form.time).isEqualTo(TimeChoice.AllDay)
-        form.chooseTime(slot(TimeSlot.Evening))
-        form.chooseDay(today.plusDays(1))
-        assertThat(form.time).isEqualTo(slot(TimeSlot.Evening))
     }
 
     @Test
@@ -83,20 +57,12 @@ class EventFormTest {
         assertThat(new().who).isEqualTo(PersonId.FAMILY)
     }
 
+    /** The picker opens on the chosen time; with none, the next whole hour today, 09:00 another day. */
     @Test
-    fun aPickedTimeThatIsASlotsTimeSelectsThatSlot() {
-        val form = new()
-        form.chooseTime(TimeChoice.Custom(LocalTime.of(14, 0)))
-        assertThat(form.time).isEqualTo(slot(TimeSlot.Afternoon))
-        form.chooseTime(TimeChoice.Custom(LocalTime.of(16, 15)))
-        assertThat(form.time).isEqualTo(TimeChoice.Custom(LocalTime.of(16, 15)))
-    }
-
-    @Test
-    fun thePickerOpensOnTheChosenTimeOrTheDefaultSlotsTime() {
-        assertThat(new(now = "10:54").pickerTime).isEqualTo(LocalTime.of(14, 0))
-        // All day is the default from 18:00; the picker then opens on Evening's time.
-        assertThat(new(now = "20:00").pickerTime).isEqualTo(LocalTime.of(18, 0))
+    fun thePickerOpensOnTheChosenTimeOrTheNextHour() {
+        assertThat(new(now = "10:54").pickerTime).isEqualTo(LocalTime.of(11, 0))
+        assertThat(new(now = "23:30").pickerTime).isEqualTo(LocalTime.of(23, 0))
+        assertThat(new(now = "10:54", day = today.plusDays(1)).pickerTime).isEqualTo(LocalTime.of(9, 0))
         val custom = new()
         custom.chooseTime(TimeChoice.Custom(LocalTime.of(16, 15)))
         assertThat(custom.pickerTime).isEqualTo(LocalTime.of(16, 15))
@@ -116,9 +82,9 @@ class EventFormTest {
     }
 
     @Test
-    fun anEditStartingOnASlotSelectsItAndAddsNoLengthChip() {
+    fun anEditOnTheHourIsAPickedTimeAndAddsNoLengthChip() {
         val form = editTimed(today.atTime(18, 0), 60)
-        assertThat(form.time).isEqualTo(slot(TimeSlot.Evening))
+        assertThat(form.time).isEqualTo(TimeChoice.Custom(LocalTime.of(18, 0)))
         assertThat(form.lengths).isEqualTo(LENGTH_CHOICES)
     }
 
@@ -223,9 +189,9 @@ class EventFormTest {
     @Test
     fun theSummaryReadsLikeTheWhenRowWithThePerson() {
         val form = new(now = "10:54")
-        assertThat(form.summary()).isEqualTo("Today · 14:00–15:00 · Family")
+        assertThat(form.summary()).isEqualTo("Today · All day · Family")
         form.chooseDay(today.plusDays(1))
-        form.chooseTime(slot(TimeSlot.Afternoon))
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(14, 0)))
         form.chooseWho(mia)
         assertThat(form.summary()).isEqualTo("Tomorrow · 14:00–15:00 · Mia")
         form.chooseDay(LocalDate.of(2026, 9, 26))
@@ -246,6 +212,7 @@ class EventFormTest {
     @Test
     fun aTimedDraftIsInTheHouseholdZone() {
         val form = new(now = "10:54")
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(14, 0)))
         form.chooseLength(Duration.ofMinutes(30))
         val draft = form.draft(createdBy = null)
         // 14:00 BST is 13:00Z.
@@ -258,7 +225,7 @@ class EventFormTest {
         val form = new(now = "10:00", on = LocalDate.of(2026, 10, 24))
         form.updateTitle("Bonfire")
         form.chooseDay(LocalDate.of(2026, 10, 25))
-        form.chooseTime(slot(TimeSlot.Evening))
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
         // 18:00 on 25 October is after the clocks go back: GMT.
         val evening = form.draft(createdBy = null)
         assertThat(evening.start).isEqualTo(EventTime.Timed(Instant.parse("2026-10-25T18:00:00Z")))
@@ -320,9 +287,9 @@ class EventFormTest {
         form.updateTitle("Bonfire")
         form.chooseDay(form.dayChoices[1])
         assertThat(form.day).isEqualTo(LocalDate.of(2026, 10, 25))
-        assertThat(form.time).isEqualTo(slot(TimeSlot.Morning))
-        // The draft depends only on the chosen date: 09:00 GMT on the 25th, the clock-change day.
-        assertThat(form.draft(createdBy = null).start).isEqualTo(EventTime.Timed(Instant.parse("2026-10-25T09:00:00Z")))
+        assertThat(form.time).isEqualTo(TimeChoice.AllDay)
+        // The draft depends only on the chosen date: the 25th, the clock-change day.
+        assertThat(form.draft(createdBy = null).start).isEqualTo(EventTime.AllDay(LocalDate.of(2026, 10, 25)))
     }
 
     @Test
@@ -417,6 +384,7 @@ class EventFormTest {
         // Pacific/Auckland is far from Europe/London, the gate machine's JVM default; NZ's DST hasn't started yet.
         val auckland = ZoneId.of("Pacific/Auckland")
         val form = EventForm(EventForm.Mode.New, today, LocalTime.of(10, 54), auckland, signedIn = null, preselectedDay = null)
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(14, 0)))
         val draft = form.draft(createdBy = null)
         // 14:00 NZST (UTC+12) is 02:00Z, not 13:00Z as it would be in London.
         assertThat(draft.start).isEqualTo(EventTime.Timed(Instant.parse("2026-09-23T02:00:00Z")))
@@ -477,6 +445,70 @@ class EventFormTest {
         form.updateTitle("")
         form.chooseLength(Duration.ofHours(2))
         form.chooseLength(Duration.ofHours(1))
+        assertThat(form.edited).isFalse()
+    }
+
+    /** 5 §A.4: Repeats is Never by default, and only a new event has it. */
+    @Test
+    fun onlyANewEventRepeatsAndNeverIsTheDefault() {
+        val form = new()
+        assertThat(form.canRepeat).isTrue()
+        assertThat(form.repeat).isEqualTo(RepeatChoice.Never)
+        assertThat(form.draft(createdBy = null).recurrence).isNull()
+        val edit = editTimed(today.atTime(19, 30), 90)
+        assertThat(edit.canRepeat).isFalse()
+        edit.chooseRepeat(RepeatChoice.Weekly)
+        assertThat(edit.repeat).isEqualTo(RepeatChoice.Never)
+    }
+
+    @Test
+    fun aRepeatingDraftCarriesItsRuleAndTheHouseholdZone() {
+        val form = new()
+        form.updateTitle("Swimming")
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        form.chooseRepeat(RepeatChoice.Fortnightly)
+        form.chooseEnd(LocalDate.of(2026, 12, 31))
+        assertThat(form.draft(createdBy = null).recurrence)
+            .isEqualTo(Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=2;UNTIL=20261231T235959Z", london))
+        form.chooseTime(TimeChoice.AllDay)
+        assertThat(form.draft(createdBy = null).recurrence?.rule).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=2;UNTIL=20261231")
+    }
+
+    /** Ends only matters while it repeats: back to Never, the end date goes. */
+    @Test
+    fun choosingNeverDropsTheEndDate() {
+        val form = new()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseEnd(today.plusDays(30))
+        form.chooseRepeat(RepeatChoice.Never)
+        assertThat(form.endsOn).isNull()
+    }
+
+    /** 5 §A.4: an end before the event's day can't be saved, however it came about. */
+    @Test
+    fun anEndDateBeforeTheEventsDayIsRefused() {
+        val form = new()
+        form.updateTitle("Swimming")
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseEnd(today.minusDays(1))
+        assertThat(form.endsBeforeStart).isTrue()
+        assertThat(form.canSave).isFalse()
+        form.chooseEnd(today)
+        assertThat(form.canSave).isTrue()
+        form.chooseDay(today.plusDays(1))
+        assertThat(form.endsBeforeStart).isTrue()
+        assertThat(form.canSave).isFalse()
+    }
+
+    @Test
+    fun aRepeatOrAnEndMakesTheSheetEdited() {
+        val form = new()
+        form.chooseRepeat(RepeatChoice.Daily)
+        assertThat(form.edited).isTrue()
+        form.chooseEnd(today.plusDays(30))
+        assertThat(form.edited).isTrue()
+        form.chooseRepeat(RepeatChoice.Never)
+        assertThat(form.endsOn).isNull()
         assertThat(form.edited).isFalse()
     }
 }

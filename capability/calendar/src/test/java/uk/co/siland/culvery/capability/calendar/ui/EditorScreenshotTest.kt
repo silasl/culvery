@@ -24,8 +24,8 @@ import uk.co.siland.culvery.capability.calendar.EditableEvent
 import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.TimeChoice
-import uk.co.siland.culvery.capability.calendar.TimeSlot
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.Culvery
@@ -88,7 +88,7 @@ class EditorScreenshotTest {
     /** Hand-off 10: "Parents evening" at 18:00, the sheet as tall as the space above the keyboard. */
     private fun keyboard() = newForm().apply {
         updateTitle("Parents evening")
-        chooseTime(TimeChoice.Slot(TimeSlot.Evening))
+        chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
     }
 
     /** Hand-off 11: no title yet, Saturday, All day. */
@@ -101,7 +101,7 @@ class EditorScreenshotTest {
     private fun child() = newForm(signedIn = SampleUi.mia.id).apply {
         updateTitle("Sleepover at Ava's")
         chooseDay(SampleUi.TODAY.plusDays(4))
-        chooseTime(TimeChoice.Slot(TimeSlot.Evening))
+        chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
     }
 
     /** Hand-off 13: dinner at 19:30 for 2 h; the 19:30 start shows on Pick time… (2b-2 design D3). */
@@ -121,14 +121,14 @@ class EditorScreenshotTest {
     private fun failed() = newForm(signedIn = SampleUi.alex.id).apply {
         updateTitle("Car MOT")
         chooseDay(SampleUi.TODAY.plusDays(2))
-        chooseTime(TimeChoice.Slot(TimeSlot.Morning))
+        chooseTime(TimeChoice.Custom(LocalTime.of(9, 0)))
     }
 
     /** Hand-off 15: a half-term trip on Monday 5 October, with the date picker open. */
     private fun datePicker() = newForm().apply {
         updateTitle("Half-term trip")
         chooseDay(LocalDate.of(2026, 10, 5))
-        chooseTime(TimeChoice.Slot(TimeSlot.Evening))
+        chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
     }
 
     /** Hand-off 16: a haircut at 16:15 today, with the time picker open. */
@@ -146,6 +146,13 @@ class EditorScreenshotTest {
         return EventForm(EventForm.Mode.Edit(visit), SampleUi.TODAY, LocalTime.of(11, 54), london, null, null)
     }
 
+    private fun repeats() = newForm().apply {
+        updateTitle("Swimming")
+        chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        chooseRepeat(RepeatChoice.Weekly)
+        chooseEnd(SampleUi.TODAY.plusWeeks(10))
+    }
+
     private val failure = SaveFailure("Sample calendar", WriteProblem.Refused("calendar is full"))
 
     @Test fun keyboardDark() = snap("editor_keyboard_dark", true, keyboard(), height = ABOVE_THE_KEYBOARD)
@@ -154,6 +161,8 @@ class EditorScreenshotTest {
     @Test fun emptyLight() = snap("editor_empty_light", false, empty())
     @Test fun childDark() = snap("editor_child_dark", true, child(), childOnly = SampleUi.mia.id)
     @Test fun childLight() = snap("editor_child_light", false, child(), childOnly = SampleUi.mia.id)
+    @Test fun repeatsDark() = snap("editor_repeats_dark", true, repeats())
+    @Test fun repeatsLight() = snap("editor_repeats_light", false, repeats())
     @Test fun editDark() = snap("editor_edit_dark", true, edit())
     @Test fun editLight() = snap("editor_edit_light", false, edit())
     @Test fun ownLengthDark() = snap("editor_own_length_dark", true, ownLength())

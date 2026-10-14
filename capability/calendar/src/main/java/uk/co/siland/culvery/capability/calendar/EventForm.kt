@@ -13,17 +13,9 @@ import java.util.Locale
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.plural
 
-/** Hand-off §7 Time chips. */
-enum class TimeSlot(val label: String, val time: LocalTime) {
-    Morning("Morning", LocalTime.of(9, 0)),
-    Afternoon("Afternoon", LocalTime.of(14, 0)),
-    Evening("Evening", LocalTime.of(18, 0)),
-}
-
-/** What the Time chips choose: all day, a slot, or a time from Pick time…. */
+/** What the Time chips choose: all day, or a time from Pick time…. */
 sealed interface TimeChoice {
     data object AllDay : TimeChoice
-    data class Slot(val slot: TimeSlot) : TimeChoice
     data class Custom(val time: LocalTime) : TimeChoice
 }
 
@@ -36,6 +28,8 @@ val LENGTH_CHOICES: List<Duration> = listOf(Duration.ofMinutes(30), Duration.ofH
 private val DEFAULT_LENGTH: Duration = Duration.ofHours(1)
 private const val MINUTES_PER_HOUR = 60L
 private const val DAYS_SHOWN = 7L
+private val MORNING: LocalTime = LocalTime.of(9, 0)
+private const val LAST_HOUR = 23
 private val DAY_AND_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d", Locale.ENGLISH)
 
 /** "30 minutes", "1 hour", "1 hour 30 minutes": full words, singular at one. */
@@ -48,14 +42,6 @@ fun lengthLabel(length: Duration): String {
         else -> "${plural(hours, "hour")} ${plural(minutes, "minute")}"
     }
 }
-
-/** On [today], the next slot still to come ([now] before its time), All day once Evening has begun; Morning on any other day. */
-internal fun defaultTime(day: LocalDate, today: LocalDate, now: LocalTime): TimeChoice =
-    if (day != today) {
-        TimeChoice.Slot(TimeSlot.Morning)
-    } else {
-        TimeSlot.entries.firstOrNull { now < it.time }?.let { TimeChoice.Slot(it) } ?: TimeChoice.AllDay
-    }
 
 /**
  * The add/edit sheet's state (2b-2 design §3.1): plain Kotlin with Compose state, so the sheet recomposes as it
@@ -92,23 +78,41 @@ class EventForm(
     var day: LocalDate by mutableStateOf(original?.let { startDate(it.start, zone) } ?: preselectedDay ?: today)
         private set
 
-    var time: TimeChoice by mutableStateOf(original?.let { timeOf(it.start, zone) } ?: defaultTime(preselectedDay ?: today, today, now))
+    var time: TimeChoice by mutableStateOf(original?.let { timeOf(it.start, zone) } ?: TimeChoice.AllDay)
         private set
 
     var length: Duration by mutableStateOf(original?.let(::lengthOf) ?: DEFAULT_LENGTH)
         private set
 
-    private data class Answers(val title: String, val who: PersonId, val day: LocalDate, val time: TimeChoice, val length: Duration)
+    /** Only a new event repeats here; a series' time or title is changed on a phone (5 §A.4). */
+    val canRepeat: Boolean = mode == Mode.New
 
-    private val opening = Answers(title, who, day, time, length)
+    var repeat: RepeatChoice by mutableStateOf(RepeatChoice.Never)
+        private set
+
+    /** The day the series ends, or null for Never. */
+    var endsOn: LocalDate? by mutableStateOf(null)
+        private set
+
+    /** The end is before the event's day, so Save waits (5 §A.4). */
+    val endsBeforeStart: Boolean get() = endsOn?.let { it < day } ?: false
+
+    private data class Answers(
+        val title: String,
+        val who: PersonId,
+        val day: LocalDate,
+        val time: TimeChoice,
+        val length: Duration,
+        val repeat: RepeatChoice,
+        val endsOn: LocalDate?,
+    )
+
+    private val opening = Answers(title, who, day, time, length, repeat, endsOn)
 
     /** Any field differs from how the sheet opened: closing it now would lose something (4d-2 §6.3). Changed back, it isn't. */
-    val edited: Boolean get() = Answers(title, who, day, time, length) != opening
+    val edited: Boolean get() = Answers(title, who, day, time, length, repeat, endsOn) != opening
 
     private var whoTouched = false
-
-    // Until a Time chip is touched, changing the day re-applies the default (a new event only).
-    private var timeTouched = original != null
 
     // Until Day, Time or Length is touched, an edit keeps the event's own start and end.
     private var whenTouched = false
@@ -119,7 +123,7 @@ class EventForm(
     /** Today and the six days after it: the Day chips before Pick date…. */
     val dayChoices: List<LocalDate> = (0 until DAYS_SHOWN).map { today.plusDays(it) }
 
-    val canSave: Boolean get() = title.trim().isNotEmpty()
+    val canSave: Boolean get() = title.trim().isNotEmpty() && !endsBeforeStart
 
     /** Typing past [MAX_TITLE_LENGTH] is ignored; shortening is always allowed, even an edited title already over it. */
     fun updateTitle(value: String) {
@@ -138,19 +142,12 @@ class EventForm(
         if (date == day) return
         day = date
         whenTouched = true
-        if (!timeTouched) time = defaultTime(date, today, now)
     }
 
-    /** A picked time that is a slot's time selects that slot's chip. Re-choosing the time already chosen changes nothing. */
+    /** Re-choosing the time already chosen changes nothing. */
     fun chooseTime(choice: TimeChoice) {
-        val normalized = if (choice is TimeChoice.Custom) {
-            TimeSlot.entries.firstOrNull { it.time == choice.time }?.let { TimeChoice.Slot(it) } ?: choice
-        } else {
-            choice
-        }
-        if (normalized == time) return
-        time = normalized
-        timeTouched = true
+        if (choice == time) return
+        time = choice
         whenTouched = true
     }
 
@@ -161,17 +158,27 @@ class EventForm(
         whenTouched = true
     }
 
+    /** Back to Never drops the end date: Ends only shows while the event repeats. */
+    fun chooseRepeat(choice: RepeatChoice) {
+        if (!canRepeat || choice == repeat) return
+        repeat = choice
+        if (choice == RepeatChoice.Never) endsOn = null
+    }
+
+    fun chooseEnd(date: LocalDate?) {
+        if (canRepeat) endsOn = date
+    }
+
     /** The start time a timed choice gives; null for All day. */
     val startTime: LocalTime?
         get() = when (val t = time) {
             TimeChoice.AllDay -> null
-            is TimeChoice.Slot -> t.slot.time
             is TimeChoice.Custom -> t.time
         }
 
-    /** Where the time picker opens: the chosen start; otherwise today's default slot, or Evening's time if that default is itself All day. */
+    /** Where the time picker opens: the chosen start; with none, the next whole hour today (23:00 at the latest), else 09:00. */
     val pickerTime: LocalTime
-        get() = startTime ?: (defaultTime(day, today, now) as? TimeChoice.Slot)?.slot?.time ?: TimeSlot.Evening.time
+        get() = startTime ?: if (day != today) MORNING else if (now.hour >= LAST_HOUR) LocalTime.of(LAST_HOUR, 0) else LocalTime.of(now.hour + 1, 0)
 
     /** Pick date…'s label: the chosen date, e.g. "Mon 5 Oct", when it isn't one of the seven Day chips. */
     val pickedDateLabel: String?
@@ -190,7 +197,7 @@ class EventForm(
     /**
      * What Save sends. All day is one whole date. A timed event starts at the chosen local time in the household zone
      * (in a spring-forward gap it moves forward; an ambiguous autumn time takes the earlier offset) and lasts
-     * [length] of real time, but ends at the next midnight at the latest, since new events can't span days (D3). A
+     * [length] of real time, but ends at the next midnight at the latest, since new events can't span days (D3). A new event that repeats carries its rule (5 §A.4). A
      * locked edit, or one whose Day, Time and Length weren't touched and whose own span was valid (all-day, or a
      * positive length), keeps its own start and end: rebuilt from the chips, an event in the autumn's repeated hour
      * would move. A zero- or negative-length original (bad provider data) is always rebuilt from the chips, so Save
@@ -204,13 +211,16 @@ class EventForm(
         if (o != null && keepsOwnSpan) return EventDraft(title.trim(), o.start, o.end, forPerson, createdBy)
         val start = startTime
         return if (start == null) {
-            EventDraft(title.trim(), EventTime.AllDay(day), EventTime.AllDay(day.plusDays(1)), forPerson, createdBy)
+            EventDraft(title.trim(), EventTime.AllDay(day), EventTime.AllDay(day.plusDays(1)), forPerson, createdBy, recurrence = recurrence(allDay = true))
         } else {
             val from = ZonedDateTime.of(day, start, zone).toInstant()
             val midnight = day.plusDays(1).atStartOfDay(zone).toInstant()
-            EventDraft(title.trim(), EventTime.Timed(from), EventTime.Timed(minOf(from.plus(length), midnight)), forPerson, createdBy)
+            EventDraft(title.trim(), EventTime.Timed(from), EventTime.Timed(minOf(from.plus(length), midnight)), forPerson, createdBy, recurrence = recurrence(allDay = false))
         }
     }
+
+    private fun recurrence(allDay: Boolean): Recurrence? =
+        recurrenceRule(repeat, endsOn, allDay, zone)?.let { Recurrence(it, zone) }
 
     /**
      * What an edit changed from the event as it opened (3a design C3): the fields its update sends, so a change made
@@ -249,10 +259,7 @@ private fun startDate(start: EventTime, zone: ZoneId): LocalDate = when (start) 
 
 private fun timeOf(start: EventTime, zone: ZoneId): TimeChoice = when (start) {
     is EventTime.AllDay -> TimeChoice.AllDay
-    is EventTime.Timed -> {
-        val t = start.instant.atZone(zone).toLocalTime()
-        TimeSlot.entries.firstOrNull { it.time == t }?.let { TimeChoice.Slot(it) } ?: TimeChoice.Custom(t)
-    }
+    is EventTime.Timed -> TimeChoice.Custom(start.instant.atZone(zone).toLocalTime())
 }
 
 /** A timed event's length in real time; null for an all-day event, or one whose end isn't after its start (bad provider data). */

@@ -64,7 +64,7 @@ import uk.co.siland.culvery.core.ui.quietFill
 import uk.co.siland.culvery.core.ui.readAsOne
 
 /** Which picker is drawn over the add/edit sheet. */
-enum class EditorPicker { None, Date, Time }
+enum class EditorPicker { None, Date, Time, EndDate }
 
 /** A date-picker page is 5 weeks (2b-2 design D10). */
 internal const val PICKER_WEEKS = 5

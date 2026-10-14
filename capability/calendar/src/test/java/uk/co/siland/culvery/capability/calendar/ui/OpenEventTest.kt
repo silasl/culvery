@@ -186,7 +186,7 @@ class OpenEventTest {
         compose.onNodeWithTag("today_add").performClick()
         waitForTag("editor_sheet")
         assertAddMode()
-        compose.onNodeWithTag("editor_summary").assertTextEquals("Today · 14:00–15:00 · Family")
+        compose.onNodeWithTag("editor_summary").assertTextEquals("Today · All day · Family")
     }
 
     @Test
@@ -197,7 +197,7 @@ class OpenEventTest {
         compose.onNodeWithTag("week_add_event").performClick()
         waitForTag("editor_sheet")
         assertAddMode()
-        compose.onNodeWithTag("editor_summary").assertTextEquals("Today · 14:00–15:00 · Family")
+        compose.onNodeWithTag("editor_summary").assertTextEquals("Today · All day · Family")
     }
 
     @Test
@@ -209,8 +209,7 @@ class OpenEventTest {
         compose.onNodeWithTag("week_add_$friday", useUnmergedTree = true).performClick()
         waitForTag("editor_sheet")
         assertAddMode()
-        // A later day starts on Morning.
-        compose.onNodeWithTag("editor_summary").assertTextEquals("Fri 25 Sep · 09:00–10:00 · Family")
+        compose.onNodeWithTag("editor_summary").assertTextEquals("Fri 25 Sep · All day · Family")
     }
 
     @Test
