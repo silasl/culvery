@@ -16,9 +16,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,10 +28,12 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.door.DoorDays
 import uk.co.siland.culvery.capability.door.DoorEvent
 import uk.co.siland.culvery.capability.door.DoorKind
@@ -43,7 +45,6 @@ import uk.co.siland.culvery.capability.door.TODAY
 import uk.co.siland.culvery.capability.door.YESTERDAY
 import uk.co.siland.culvery.capability.door.doorDays
 import uk.co.siland.culvery.capability.door.eventLine
-import uk.co.siland.culvery.capability.door.startOfYesterday
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCloseButton
@@ -134,12 +135,11 @@ internal fun DoorTabHost(store: DoorStore, today: Flow<LocalDate>, zone: Flow<Zo
     val householdZone by zone.collectAsStateWithLifecycle(null)
     val problem by status.collectAsStateWithLifecycle(null)
     val overlay = LocalOverlayHost.current
+    // Seen on opening or coming back to the tab (5 §4.7); a ring that arrives while it stays open keeps its badge.
+    val scope = rememberCoroutineScope()
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { store.markAllSeen() } }
     val d = day ?: return
     val z = householdZone ?: return
-    // The badge's days (5 §4.8), and seen only while someone can see it: a tab left open behind another app is not seen.
-    val since = startOfYesterday(d, z)
-    val unseen by remember(since) { store.unseen(since) }.collectAsStateWithLifecycle(null, minActiveState = Lifecycle.State.RESUMED)
-    LaunchedEffect(unseen) { unseen?.let { if (it.rings + it.motion > 0) store.markAllSeen() } }
     val days = remember(events, d, z) { doorDays(events, d, z) }
     DoorTab(days, z, problem, onOpenSnapshot = { event -> overlay.show { SnapshotSheet(event, z, onClose = overlay::dismiss) } })
 }

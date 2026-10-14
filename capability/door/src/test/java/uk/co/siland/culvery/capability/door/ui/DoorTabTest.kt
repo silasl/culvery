@@ -164,6 +164,17 @@ class DoorTabTest {
         waitFor { unseenRings() == 0 }
     }
 
+    /** 5 §4.7: fails if a ring arriving while the tab is already open is marked seen at once, so it never badges. */
+    @Test
+    fun aRingArrivingWhileTheTabIsOpenStaysUnseen() {
+        compose.setContent { CulveryTheme(dark = true) { host(flowOf(october14)) } }
+        compose.waitForIdle()
+        runBlocking { store.record(ring()) }
+        waitFor { compose.onAllNodesWithTag("door_row_1").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        assertThat(unseenRings()).isEqualTo(1)
+    }
+
     /** Fails if a tab merely STARTED (behind another app) marks events seen, or if it never marks them once RESUMED. */
     @Test
     fun aTabLeftOpenBehindAnotherAppMarksNothingUntilItIsBack() {
