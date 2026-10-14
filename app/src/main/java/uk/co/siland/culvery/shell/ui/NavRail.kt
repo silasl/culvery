@@ -40,8 +40,10 @@ import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.TabItem
 
 private val HomeTab = TabItem(HOME_TAB_ID, "Home", Icons.HOME)
-private val MARK_WIDTH = 48.dp
-private val MARK_GAP = 8.dp
+internal val RAIL_WIDTH = 108.dp
+internal val MARK_WIDTH = 48.dp
+// The mark sits in the status bar above the rail; this is the clear space between its bottom and the first tab.
+internal val MARK_TAB_GAP = 24.dp
 
 // 5 §5.3: a 20 dp count bubble or a 10 dp dot at the icon's top end, in `danger`; past 9, "9+".
 private val BADGE_SIZE = 20.dp
@@ -64,14 +66,13 @@ fun NavRail(
         modifier = Modifier
             .readAsOne()
             .fillMaxHeight()
-            .width(108.dp)
+            .width(RAIL_WIDTH)
             .drawBehind {
                 val x = size.width - 0.5.dp.toPx()
                 drawLine(c.line, Offset(x, 0f), Offset(x, size.height), 1.dp.toPx())
             }
-            .padding(top = 16.dp, bottom = 20.dp),
+            .padding(top = MARK_TAB_GAP, bottom = 20.dp),
     ) {
-        CulveryMark(MARK_WIDTH, Modifier.testTag("rail_mark").padding(bottom = MARK_GAP))
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),

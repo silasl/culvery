@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.shell.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,8 +18,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
@@ -29,7 +28,6 @@ import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 import uk.co.siland.culvery.shell.SessionUi
 
-private val TIME = DateTimeFormatter.ofPattern("HH:mm")
 // A control's whole tap area: on the SM-T510 Compose didn't widen smaller targets, so a touch just outside missed (4e).
 private val STATUS_BAR_MIN_HEIGHT = 48.dp
 
@@ -39,12 +37,11 @@ private const val PREVIEW_DAY = "preview the day theme"
 private const val BACK_TO_AUTOMATIC = "go back to the automatic theme"
 
 /**
- * Hand-off status bar, plus §7's signed-in indicator: `account_circle` · "{name} · {role}" · "Sign out". The bar and its
+ * Hand-off status bar: the Culvery mark over the rail column on the left, then §7's signed-in indicator: `account_circle` · "{name} · {role}" · "Sign out". The bar and its
  * two controls are [STATUS_BAR_MIN_HEIGHT] tall, more if the text grows.
  */
 @Composable
 fun StatusBar(
-    now: () -> LocalDateTime,
     dark: Boolean,
     previewing: Boolean,
     session: SessionUi?,
@@ -64,9 +61,12 @@ fun StatusBar(
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.testTag("status_bar").fillMaxWidth().heightIn(min = STATUS_BAR_MIN_HEIGHT).padding(horizontal = 20.dp),
+        modifier = Modifier.testTag("status_bar").fillMaxWidth().heightIn(min = STATUS_BAR_MIN_HEIGHT).padding(end = 20.dp),
     ) {
-        Text(now().format(TIME), style = HhType.status, color = c.mute)
+        // Centred in the rail's width so it shares the tab icons' centre line.
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.width(RAIL_WIDTH)) {
+            CulveryMark(MARK_WIDTH, Modifier.testTag("culvery_mark"))
+        }
         Spacer(Modifier.weight(1f))
         if (session != null) {
             Row(

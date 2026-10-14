@@ -25,7 +25,7 @@ fun CulveryShell(
     tabContent: @Composable (String) -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
-        StatusBar(now, state.dark, state.previewing, state.session, onSignOut, onToggleThemePreview)
+        StatusBar(state.dark, state.previewing, state.session, onSignOut, onToggleThemePreview)
         Row(Modifier.weight(1f)) {
             NavRail(state.tabs, state.selectedTabId, onSelectTab, onOpenSettings)
             Box(Modifier.weight(1f).padding(start = 28.dp, end = 28.dp, top = 24.dp, bottom = 22.dp)) {

@@ -51,6 +51,7 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.isReadAsOne
@@ -58,6 +59,7 @@ import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.SessionUi
 import uk.co.siland.culvery.shell.ShellUiState
+import uk.co.siland.culvery.shell.TabItem
 
 /** Needs real text metrics: legacy Robolectric graphics fakes glyph widths and font ascents. */
 @RunWith(AndroidJUnit4::class)
@@ -117,7 +119,50 @@ class ShellLayoutTest {
     }
 
     private fun statusBar(session: SessionUi?, onSignOut: () -> Unit = {}) = compose.setContent {
-        CulveryTheme(dark = true) { StatusBar({ at }, dark = true, previewing = false, session = session, onSignOut = onSignOut, onToggleThemePreview = {}) }
+        CulveryTheme(dark = true) { StatusBar(dark = true, previewing = false, session = session, onSignOut = onSignOut, onToggleThemePreview = {}) }
+    }
+
+    private fun shell() = compose.setContent {
+        CulveryTheme(dark = true) {
+            CulveryShell(
+                ShellUiState(tabs = listOf(TabItem("calendar", "Calendar", Icons.CALENDAR_MONTH)), session = SessionUi("Alex", "Admin")), { at },
+                onSelectTab = {}, onOpenSettings = {}, onSignOut = {}, onToggleThemePreview = {},
+            ) {}
+        }
+    }
+
+    /** The mark is the app's logo: in the top-left corner, on the tab icons' centre line, and a picture TalkBack skips. */
+    @Test
+    fun theMarkSitsInTheTopCornerOnTheTabIconsCentreLine() {
+        shell()
+        val mark = compose.onNodeWithTag("culvery_mark", useUnmergedTree = true)
+        mark.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+        mark.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
+        val bounds = mark.getUnclippedBoundsInRoot()
+        val bar = compose.onNodeWithTag("status_bar").getUnclippedBoundsInRoot()
+        assertThat(bounds.width.value).isWithin(0.5f).of(48f)
+        assertThat(bounds.top.value).isAtLeast(bar.top.value)
+        assertThat(bounds.bottom.value).isAtMost(bar.bottom.value)
+        listOf("rail_home", "rail_calendar").forEach {
+            val tab = compose.onNodeWithTag(it).getUnclippedBoundsInRoot()
+            assertWithMessage(it).that((bounds.left + bounds.right).value / 2).isWithin(1f).of((tab.left + tab.right).value / 2)
+        }
+    }
+
+    @Test
+    fun theMarkIsAtLeast24DpClearOfTheFirstTab() {
+        shell()
+        val mark = compose.onNodeWithTag("culvery_mark", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val home = compose.onNodeWithTag("rail_home").getUnclippedBoundsInRoot()
+        assertThat((home.top - mark.bottom).value).isAtLeast(24f)
+    }
+
+    @Test
+    fun theStatusBarShowsNoTime() {
+        statusBar(SessionUi("Alex", "Admin"))
+        val clock = Regex("""\d{1,2}:\d\d""")
+        val clockLike = SemanticsMatcher("shows a time") { node -> SemanticsProperties.Text in node.config && node.config[SemanticsProperties.Text].any { text -> clock.matches(text.text) } }
+        compose.onAllNodes(clockLike, useUnmergedTree = true).assertCountEquals(0)
     }
 
     @Test
@@ -152,7 +197,7 @@ class ShellLayoutTest {
         compose.setContent {
             CulveryTheme(dark = true) {
                 WithFontScale(1.5f) {
-                    StatusBar({ at }, dark = true, previewing = false, session = SessionUi("Alex", "Admin"), onSignOut = {}, onToggleThemePreview = {})
+                    StatusBar(dark = true, previewing = false, session = SessionUi("Alex", "Admin"), onSignOut = {}, onToggleThemePreview = {})
                 }
             }
         }
@@ -202,7 +247,7 @@ class ShellLayoutTest {
 
     private fun themeToggle(dark: Boolean, previewing: Boolean): Pair<String, String?> {
         compose.setContent {
-            CulveryTheme(dark = dark) { StatusBar({ at }, dark = dark, previewing = previewing, session = null, onSignOut = {}, onToggleThemePreview = {}) }
+            CulveryTheme(dark = dark) { StatusBar(dark = dark, previewing = previewing, session = null, onSignOut = {}, onToggleThemePreview = {}) }
         }
         val node = compose.onNodeWithTag("status_theme").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         val config = node.fetchSemanticsNode().config
@@ -229,7 +274,7 @@ class ShellLayoutTest {
     fun theThemeToggleWorksFromTalkBack() {
         var toggles = 0
         compose.setContent {
-            CulveryTheme(dark = false) { StatusBar({ at }, dark = false, previewing = false, session = null, onSignOut = {}, onToggleThemePreview = { toggles++ }) }
+            CulveryTheme(dark = false) { StatusBar(dark = false, previewing = false, session = null, onSignOut = {}, onToggleThemePreview = { toggles++ }) }
         }
         compose.onNodeWithTag("status_theme").performSemanticsAction(SemanticsActions.OnClick)
         assertThat(toggles).isEqualTo(1)
