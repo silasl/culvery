@@ -486,7 +486,9 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_title").assertIsFocused()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
         compose.onNodeWithTag("time_all_day").assertIsSelected()
-        compose.onNodeWithTag("length_30").assertDoesNotExist()
+        compose.onNodeWithTag("time_pick").performClick()
+        compose.onNodeWithTag("picker_set").performClick()
+        compose.onNodeWithTag("length_60").assertIsSelected()
     }
 
     @Test
