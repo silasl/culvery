@@ -97,7 +97,7 @@ Layout and copy are provisional until the user's end-of-v1 design walk-through.
 
 ### 5.1 The door card
 
-On the alert layer, top centre, about half the screen wide: the doorbell icon, **Someone's at the door** (an unrecognised alert: **Ring alert**), the device name as Ring gives it, the time, the snapshot if any, and one button, **Got it**. TalkBack announces it as urgent. The card doesn't count as a touch for the sheet or Settings beneath, so their own timeouts run on; touching the card doesn't reach them. The PIN pad draws above it.
+On the alert layer, centred on the screen, about half the screen wide: the doorbell icon, **Someone's at the door** (an unrecognised alert: **Ring alert**), the device name as Ring gives it, the time, the snapshot if any, and one button, **Got it**. TalkBack announces it as urgent. The card doesn't count as a touch for the sheet or Settings beneath, so their own timeouts run on; touching the card doesn't reach them. The PIN pad draws above it.
 
 ### 5.2 The Door tab
 

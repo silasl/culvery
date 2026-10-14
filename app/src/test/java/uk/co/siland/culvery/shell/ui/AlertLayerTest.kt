@@ -161,7 +161,7 @@ class AlertLayerTest {
         pinShowing = true
         settle()
         assertThat(open("card")).isFalse()
-        compose.onNodeWithTag("pad").performTouchInput { click(Offset(centerX, 60f)) }
+        compose.onNodeWithTag("pad").performTouchInput { click(Offset(centerX, centerY)) }
         settle()
         assertThat(padTaps).isEqualTo(1)
         // The pad's touches still count, as before.

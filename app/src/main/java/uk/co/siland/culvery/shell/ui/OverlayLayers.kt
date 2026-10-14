@@ -100,16 +100,15 @@ private fun Modifier.countsTouches(touched: () -> Unit): Modifier = pointerInput
     }
 }
 
-// 5 §5.1: top centre, about half the screen wide, 24 below the top.
-private val ALERT_TOP = 24.dp
+// 5 §5.1: centred on the screen, about half the screen wide.
 private const val ALERT_WIDTH = 0.5f
 
 /** The alert layer: no scrim, so the screen around the alert stays usable; the alert swallows its own taps. */
 @Composable
 internal fun AlertLayer(content: @Composable () -> Unit, hidden: Boolean) {
     Box(
-        Modifier.fillMaxSize().then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier).padding(top = ALERT_TOP),
-        contentAlignment = Alignment.TopCenter,
+        Modifier.fillMaxSize().then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier),
+        contentAlignment = Alignment.Center,
     ) {
         // Swallows a tap on any part of the alert, padding and gaps included, so none falls through to the sheet's scrim.
         Box(Modifier.testTag("alert_layer").fillMaxWidth(ALERT_WIDTH).pointerInput(Unit) { detectTapGestures {} }) { content() }
