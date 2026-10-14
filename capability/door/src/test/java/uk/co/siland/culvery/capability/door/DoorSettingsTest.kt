@@ -2,7 +2,6 @@ package uk.co.siland.culvery.capability.door
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import java.io.File
 import java.time.LocalTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +19,7 @@ import org.junit.runner.RunWith
 class DoorSettingsTest {
     @get:Rule val folder = TemporaryFolder()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val settings by lazy { DoorSettings(doorSettingsStore(scope) { File(folder.root, "door_settings.preferences_pb") }, scope) }
+    private val settings by lazy { doorSettings(folder.root, scope) }
 
     @After
     fun tearDown() = scope.cancel()

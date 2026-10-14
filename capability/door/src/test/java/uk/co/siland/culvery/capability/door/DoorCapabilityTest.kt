@@ -38,7 +38,7 @@ class DoorCapabilityTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val db = doorDb()
     private val store by lazy { DoorStore(db, File(folder.root, "door")) }
-    private val settings by lazy { DoorSettings(doorSettingsStore(scope) { File(folder.root, "s.preferences_pb") }, scope) }
+    private val settings by lazy { doorSettings(folder.root, scope) }
     private val clock by lazy { HouseholdClock(flowOf(ZoneId.of("Europe/London")), WallClock { NOW }, scope, flowOf(NOW)) }
 
     private fun capability(providers: Set<DoorProvider>) = DoorCapability(

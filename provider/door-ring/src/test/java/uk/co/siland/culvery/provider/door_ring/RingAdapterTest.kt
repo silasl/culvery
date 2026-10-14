@@ -94,15 +94,6 @@ class RingAdapterTest {
         assertThat(picture.height).isEqualTo(1)
     }
 
-    /** Fails if an extreme aspect ratio scales a side to 0 px and the read throws. */
-    @Test
-    @Config(sdk = [34])
-    fun anExtremelyWideIconPictureStillReads() {
-        val post = iconPost(10_000, 1)
-        assertThat(post.picture).isNotNull()
-        assertThat(post.picture!!.height).isAtLeast(1)
-    }
-
     @Test
     fun ongoingAndBundleSummariesAreFlagged() {
         val ongoing = ringPost(RING_PACKAGE, "k1", 5L, builder().setOngoing(true).build(), context)

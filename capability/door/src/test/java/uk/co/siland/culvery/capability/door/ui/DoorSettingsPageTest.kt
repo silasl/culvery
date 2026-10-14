@@ -13,7 +13,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import java.io.File
 import java.time.LocalTime
 import java.time.ZoneId
 import kotlinx.coroutines.CoroutineScope
@@ -32,13 +31,12 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.door.CAPTURE_MS
 import uk.co.siland.culvery.capability.door.DoorHealth
 import uk.co.siland.culvery.capability.door.DoorPrefs
-import uk.co.siland.culvery.capability.door.DoorSettings
 import uk.co.siland.culvery.capability.door.FakeChime
 import uk.co.siland.culvery.capability.door.FakeDoorProvider
 import uk.co.siland.culvery.capability.door.NOTIFICATION_ACCESS_MISSING
 import uk.co.siland.culvery.capability.door.NOW
 import uk.co.siland.culvery.capability.door.RecordingToaster
-import uk.co.siland.culvery.capability.door.doorSettingsStore
+import uk.co.siland.culvery.capability.door.doorSettings
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -53,7 +51,7 @@ class DoorSettingsPageTest {
     @get:Rule val folder = TemporaryFolder()
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val london = ZoneId.of("Europe/London")
-    private val settings by lazy { DoorSettings(doorSettingsStore(io) { File(folder.root, "s.preferences_pb") }, io) }
+    private val settings by lazy { doorSettings(folder.root, io) }
     private val provider = FakeDoorProvider(installed = true, access = false)
     private val chime = FakeChime()
     private val toaster = RecordingToaster()

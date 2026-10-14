@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -24,6 +25,9 @@ internal fun householdZone(): HouseholdZone = HouseholdZone(
         Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), HouseholdDatabase::class.java).allowMainThreadQueries().build(),
     ),
 )
+
+internal fun doorSettings(dir: File, scope: CoroutineScope) =
+    DoorSettings(doorSettingsStore(scope) { File(dir, "door_settings.preferences_pb") }, scope)
 
 /** Wednesday 14 October 2026, 14:02 in London (13:02 UTC). */
 internal const val NOW = 1_791_982_920_000L

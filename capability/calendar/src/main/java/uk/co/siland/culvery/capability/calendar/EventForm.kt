@@ -197,7 +197,7 @@ class EventForm(
     /**
      * What Save sends. All day is one whole date. A timed event starts at the chosen local time in the household zone
      * (in a spring-forward gap it moves forward; an ambiguous autumn time takes the earlier offset) and lasts
-     * [length] of real time, but ends at the next midnight at the latest, since new events can't span days (D3). A new event that repeats carries its rule (5 §A.4). A
+     * [length] of real time, but ends at the next midnight at the latest, since new events can't span days. A new event that repeats carries its rule (5 §A.4). A
      * locked edit, or one whose Day, Time and Length weren't touched and whose own span was valid (all-day, or a
      * positive length), keeps its own start and end: rebuilt from the chips, an event in the autumn's repeated hour
      * would move. A zero- or negative-length original (bad provider data) is always rebuilt from the chips, so Save

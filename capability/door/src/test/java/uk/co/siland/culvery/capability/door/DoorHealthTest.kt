@@ -2,7 +2,6 @@ package uk.co.siland.culvery.capability.door
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,7 +26,7 @@ import org.junit.runner.RunWith
 class DoorHealthTest {
     @get:Rule val folder = TemporaryFolder()
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val settings by lazy { DoorSettings(doorSettingsStore(io) { File(folder.root, "s.preferences_pb") }, io) }
+    private val settings by lazy { doorSettings(folder.root, io) }
     private val provider = FakeDoorProvider()
     private val bound = MutableStateFlow<Boolean?>(null)
     private val inFront = MutableStateFlow(true)

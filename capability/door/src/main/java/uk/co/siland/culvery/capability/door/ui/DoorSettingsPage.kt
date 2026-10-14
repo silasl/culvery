@@ -257,7 +257,7 @@ internal fun DoorSettingsHost(
             lastHeard = lastHeard(service, p.lastHeardMillis, z),
             appInstalled = checks?.appInstalled == true,
             accessAllowed = checks?.accessAllowed == true,
-            capturing = p.captureUntilMillis - now in 1..CAPTURE_MS,
+            capturing = p.capturingAt(now),
         ),
         DoorSettingsActions(
             onVolume = { v -> change { settings.setVolume(v) } },

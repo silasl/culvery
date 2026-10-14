@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
 import kotlinx.coroutines.flow.Flow
+import uk.co.siland.culvery.capability.door.Unseen
 
 /** One ring or motion (5 §3.1); its picture, when [hasSnapshot], is `files/door/<id>.jpg`. */
 @Entity(tableName = "door_event", indices = [Index("noticeKey")])
@@ -25,8 +26,6 @@ data class DoorEventEntity(
     val hasSnapshot: Boolean,
     val seen: Boolean,
 )
-
-data class UnseenRow(val rings: Int, val motion: Int)
 
 @Dao
 interface DoorDao {
@@ -65,7 +64,7 @@ interface DoorDao {
         "SELECT COALESCE(SUM(kind = 'RING'), 0) AS rings, COALESCE(SUM(kind = 'MOTION'), 0) AS motion " +
             "FROM door_event WHERE seen = 0 AND atMillis >= :since",
     )
-    fun unseen(since: Long): Flow<UnseenRow>
+    fun unseen(since: Long): Flow<Unseen>
 }
 
 /** v1. A later version ships a hand-written Migration, as the calendar's do. */

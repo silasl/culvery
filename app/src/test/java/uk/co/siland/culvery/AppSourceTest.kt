@@ -4,7 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import java.io.File
 import org.junit.Test
 
-/** 4b design D6, §9: `:app` wires the weather and door capabilities through Hilt alone and never names it in its own code. */
+/** `:app` wires the weather and door capabilities through Hilt alone and never names them in its own code. */
 class AppSourceTest {
     @Test
     fun theAppsOwnCodeNeverNamesTheWeatherOrDoorCapability() {

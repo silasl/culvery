@@ -3,7 +3,7 @@ package uk.co.siland.culvery.provider.door_ring
 /**
  * BEST GUESSES at the Ring app's notifications, not captures (5 §2.12): the tablet's captures replace every one of these
  * (5 §8.3). The words follow what Ring is known to show; the channels and categories are guesses. "Front Door" is a
- * placeholder device; captures use [device] and [person].
+ * placeholder device.
  */
 internal object RingFixtures {
     private const val POSTED = 1_791_982_920_000L
@@ -15,12 +15,13 @@ internal object RingFixtures {
         text: String?,
         channel: String? = "ding",
         category: String? = null,
-        bigText: String? = null,
-        picture: Boolean = false,
         ongoing: Boolean = false,
         summary: Boolean = false,
         posted: Long = POSTED,
-    ) = RingNotice(RING_PACKAGE, "0|$RING_PACKAGE|$id|null|10123", channel, category, title, text, bigText, picture, posted, posted, ongoing, summary)
+    ) = RingNotice(
+        RING_PACKAGE, "0|$RING_PACKAGE|$id|null|10123", channel, category, title, text, bigText = null,
+        hasPicture = false, postTime = posted, ongoing = ongoing, groupSummary = summary,
+    )
 
     val ring = notice(101, "Front Door", RING_WORDS)
 

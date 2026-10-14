@@ -1,5 +1,7 @@
 package uk.co.siland.culvery.capability.door
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.File
@@ -7,13 +9,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -28,7 +28,7 @@ class DoorRecorderTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val db = doorDb()
     private val store by lazy { DoorStore(db, File(folder.root, "door")) }
-    private val settings by lazy { DoorSettings(doorSettingsStore(scope) { File(folder.root, "s.preferences_pb") }, scope) }
+    private val settings by lazy { doorSettings(folder.root, scope) }
     private var now = NOW
 
     // Each record reaches the alert decision last, after the store and the count: the tests wait on it.

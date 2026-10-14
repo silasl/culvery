@@ -40,7 +40,6 @@ import uk.co.siland.culvery.capability.door.NO_RINGS_TODAY
 import uk.co.siland.culvery.capability.door.SHOW_FULL_SIZE
 import uk.co.siland.culvery.capability.door.SNAPSHOT
 import uk.co.siland.culvery.capability.door.TODAY
-import uk.co.siland.culvery.capability.door.Unseen
 import uk.co.siland.culvery.capability.door.YESTERDAY
 import uk.co.siland.culvery.capability.door.doorDays
 import uk.co.siland.culvery.capability.door.eventLine
@@ -139,7 +138,8 @@ internal fun DoorTabHost(store: DoorStore, today: Flow<LocalDate>, zone: Flow<Zo
     val z = householdZone ?: return
     // The badge's days (5 §4.8), and seen only while someone can see it: a tab left open behind another app is not seen.
     val since = startOfYesterday(d, z)
-    val unseen by remember(since) { store.unseen(since) }.collectAsStateWithLifecycle(Unseen(0, 0), minActiveState = Lifecycle.State.RESUMED)
-    LaunchedEffect(unseen) { if (unseen.rings + unseen.motion > 0) store.markAllSeen() }
-    DoorTab(doorDays(events, d, z), z, problem, onOpenSnapshot = { event -> overlay.show { SnapshotSheet(event, z, onClose = overlay::dismiss) } })
+    val unseen by remember(since) { store.unseen(since) }.collectAsStateWithLifecycle(null, minActiveState = Lifecycle.State.RESUMED)
+    LaunchedEffect(unseen) { unseen?.let { if (it.rings + it.motion > 0) store.markAllSeen() } }
+    val days = remember(events, d, z) { doorDays(events, d, z) }
+    DoorTab(days, z, problem, onOpenSnapshot = { event -> overlay.show { SnapshotSheet(event, z, onClose = overlay::dismiss) } })
 }

@@ -24,10 +24,14 @@ class RingReader @Inject constructor(private val sink: DoorEventSink) {
         try {
             read(read())
         } catch (e: Exception) {
-            Log.w(TAG_RING, "Couldn't read a Ring notice (${e::class.simpleName})")
+            dropped(e)
         } catch (e: OutOfMemoryError) {
-            Log.w(TAG_RING, "Couldn't read a Ring notice (${e::class.simpleName})")
+            dropped(e)
         }
+    }
+
+    private fun dropped(e: Throwable) {
+        Log.w(TAG_RING, "Couldn't read a Ring notice (${e::class.simpleName})")
     }
 
     fun read(post: RingPost) {

@@ -55,7 +55,7 @@ class DoorStore internal constructor(
     val events: Flow<List<DoorEvent>> = dao.events().map { rows -> rows.map { it.toEvent() } }
 
     /** Unseen rings (unrecognised ones included) and unseen motion since [sinceMillis] (5 §4.8): the days the tab shows. */
-    fun unseen(sinceMillis: Long): Flow<Unseen> = dao.unseen(sinceMillis).map { Unseen(it.rings, it.motion) }.distinctUntilChanged()
+    fun unseen(sinceMillis: Long): Flow<Unseen> = dao.unseen(sinceMillis).distinctUntilChanged()
 
     /**
      * Records [notice] (5 §4.3–4.5): the same notification (key and time) within [MERGE_MS] of its event updates that
