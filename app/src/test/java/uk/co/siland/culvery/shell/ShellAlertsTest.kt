@@ -34,4 +34,23 @@ class ShellAlertsTest {
         controller.pause()
         assertThat(alerts.inFront.value).isFalse()
     }
+
+    /** Fails if an instance that hands over to the home task in onResume still writes inFront. */
+    @Test
+    fun anInstanceThatHandsOverInOnResumeWritesNothing() {
+        val alerts = ShellAlerts()
+        var handedOver = false
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java)
+        val lifecycle = controller.get().lifecycle
+        lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+            override fun onResume(owner: androidx.lifecycle.LifecycleOwner) {
+                handedOver = true
+            }
+        })
+        lifecycle.addObserver(alerts.unlessHandedOver { handedOver })
+        controller.setup()
+        assertThat(alerts.inFront.value).isFalse()
+        controller.pause()
+        assertThat(alerts.inFront.value).isFalse()
+    }
 }

@@ -167,4 +167,19 @@ class AlertLayerTest {
         // The pad's touches still count, as before.
         assertThat(activity.touches.value).isEqualTo(1L)
     }
+
+    /** Fails if a tap on a part of the alert with no handler of its own reaches the sheet's scrim or counts as a touch. */
+    @Test
+    fun aTapOnABareAlertDoesNotReachTheSheetBeneath() {
+        show()
+        overlay.show(content = sheet)
+        overlay.markEdited(true)
+        alert = { Box(Modifier.fillMaxWidth().height(200.dp).testTag("bare")) }
+        settle()
+        compose.onNodeWithTag("bare").performClick()
+        settle()
+        assertThat(overlay.content).isSameInstanceAs(sheet)
+        assertThat(overlay.edited).isTrue()
+        assertThat(activity.touches.value).isEqualTo(0L)
+    }
 }

@@ -111,7 +111,8 @@ internal fun AlertLayer(content: @Composable () -> Unit, hidden: Boolean) {
         Modifier.fillMaxSize().then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier).padding(top = ALERT_TOP),
         contentAlignment = Alignment.TopCenter,
     ) {
-        Box(Modifier.testTag("alert_layer").fillMaxWidth(ALERT_WIDTH)) { content() }
+        // Swallows a tap on any part of the alert, padding and gaps included, so none falls through to the sheet's scrim.
+        Box(Modifier.testTag("alert_layer").fillMaxWidth(ALERT_WIDTH).pointerInput(Unit) { detectTapGestures {} }) { content() }
     }
 }
 

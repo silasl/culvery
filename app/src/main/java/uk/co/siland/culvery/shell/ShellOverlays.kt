@@ -63,6 +63,17 @@ class ShellAlerts @Inject constructor() : AlertHost, DefaultLifecycleObserver {
         _content.value = null
     }
 
+    /** This host as an observer that writes nothing once [handedOver] is true: an instance giving way to the home task is not in front. */
+    fun unlessHandedOver(handedOver: () -> Boolean): DefaultLifecycleObserver = object : DefaultLifecycleObserver {
+        override fun onResume(owner: LifecycleOwner) {
+            if (!handedOver()) this@ShellAlerts.onResume(owner)
+        }
+
+        override fun onPause(owner: LifecycleOwner) {
+            if (!handedOver()) this@ShellAlerts.onPause(owner)
+        }
+    }
+
     override fun onResume(owner: LifecycleOwner) {
         _inFront.value = true
     }
