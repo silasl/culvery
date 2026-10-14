@@ -139,10 +139,9 @@ class ShellLayoutTest {
         mark.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
         mark.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
         val bounds = mark.getUnclippedBoundsInRoot()
-        val bar = compose.onNodeWithTag("status_bar").getUnclippedBoundsInRoot()
         assertThat(bounds.width.value).isWithin(0.5f).of(48f)
-        assertThat(bounds.top.value).isAtLeast(bar.top.value)
-        assertThat(bounds.bottom.value).isAtMost(bar.bottom.value)
+        assertThat(bounds.top.value).isAtLeast(12f)
+        assertThat(bounds.left.value).isAtLeast(0f)
         listOf("rail_home", "rail_calendar").forEach {
             val tab = compose.onNodeWithTag(it).getUnclippedBoundsInRoot()
             assertWithMessage(it).that((bounds.left + bounds.right).value / 2).isWithin(1f).of((tab.left + tab.right).value / 2)
@@ -150,11 +149,18 @@ class ShellLayoutTest {
     }
 
     @Test
-    fun theMarkIsAtLeast24DpClearOfTheFirstTab() {
+    fun theMarkIsAtLeast48DpClearOfTheFirstTab() {
         shell()
         val mark = compose.onNodeWithTag("culvery_mark", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val home = compose.onNodeWithTag("rail_home").getUnclippedBoundsInRoot()
-        assertThat((home.top - mark.bottom).value).isAtLeast(24f)
+        assertThat((home.top - mark.bottom).value).isAtLeast(48f)
+    }
+
+    /** The first tab sits where it did with the old rail mark: 48 dp bar + 16 dp padding + 43.6 dp mark + 8 dp gap. */
+    @Test
+    fun theHomeTabIsWhereItWasBeforeTheMarkMoved() {
+        shell()
+        assertThat(compose.onNodeWithTag("rail_home").getUnclippedBoundsInRoot().top.value).isWithin(1f).of(48f + 16f + 43.56f + 8f)
     }
 
     @Test
