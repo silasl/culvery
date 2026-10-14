@@ -139,7 +139,9 @@ After 4e and before the v1 release. Taste calls only; each line names its audit 
 - W5 Today card's empty space below "Nothing on today" (L4; the copy part is D39).
 - W6 Connect step rebuild: StepTitle, one 60 dp button, a connection row; drop the connected card (S10, S11, F:4a).
 - W7 Condition-tinted forecast and header icons; `clear_night` vs `bedtime` (S33, F:4c, 4b amber).
-- Branding inside the app (the user, 2026-10-13, 4e): the Culvery name or mark shows only on the splash; place it somewhere on Home or the rail.
+- Branding inside the app (the user, 2026-10-13, 4e): the Culvery name or mark shows only on the splash; place it somewhere on Home or the rail. On day one of the family week the user asked again for the Culvery logo in the app.
+- Home's clock slightly smaller, to give the cards more room (the user, 2026-10-14, 4e day one).
+- Larger events on Home's Today card (the user, 2026-10-14, 4e day one).
 - W8 Launcher icon: the bird's size, and the gap in the themed layer (S37, F:4c).
 - W9 Splash dark flash in the day theme: crossfade, or keep it (S38, hL1; device check E3).
 - W10 Status bar: "Auto" vs "Night"/"Day"; a preview cue (hS1).
@@ -275,6 +277,10 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 ## Feature ideas (2026-10-02, after v1)
 
 **Each its own spec → plan cycle; not in 4c, 4d or 4e**
-- Sleep and wake: dim the screen when nobody is there and wake on a tap. Start with a schedule or sunset (4b's sun times) and the ambient light sensor; camera presence (CameraX at about one frame a second, on-device motion or face detection, nothing stored or sent, and the app says when the camera is on, as Android 11 shows no indicator) is optional on top. Measure its power use against plain dimming on the SM-T510. v1 §14 had screensaver and night dimming out of scope.
+- Sleep and wake: dim the screen when nobody is there and wake on a tap. Start with a schedule or sunset (4b's sun times) and the ambient light sensor; camera presence (CameraX at about one frame a second, on-device motion or face detection, nothing stored or sent, and the app says when the camera is on, as Android 11 shows no indicator) is optional on top. Measure its power use against plain dimming on the SM-T510. v1 §14 had screensaver and night dimming out of scope. On day one of the family week (2026-10-14) the user asked to revisit when the screen turns on, turns off and dims.
 - Bin collections from Mid Sussex District Council: no iCal feed, only a per-property tracker page (`mop.php?Track=…`). A read-only scraper provider fetching daily, mapped to Family, with "can't read" shown on the calendar's row (4c's per-calendar health), since the page can change without notice. The `Track` value identifies the property: store it as connection config and keep it out of logs. Check UKBinCollectionData's Mid Sussex scraper as a reference. Stopgap: repeating events in the family's Google calendar.
 - Ring doorbell (2026-10-13): show "someone’s at the door" over the calendar. Ring has no official third-party API; the likely route is the Ring app on the tablet with Culvery reading its notifications (notification access, no Ring credentials in Culvery), versus an unofficial Ring login (fragile, more credentials on the wall). Its own spec; the tablet is shared, so the Ring app’s sign-in is the household’s call.
+- Making repeating events on the tablet (the user, 2026-10-14, 4e day one; reverses 4e's "times and titles still on a phone"). The add-event form gets time chips: **All day** (chosen by default) and **Pick time**, with the length set from there. Its own spec → plan cycle **after the Ring plan and before the end-of-v1 design walk-through**, so the walk-through sees the new form.
+- Sonos (the user, 2026-10-14): its own spec; no detail yet.
+- Philips Hue (the user, 2026-10-14): its own spec; no detail yet. Holiday mode drives it.
+- Holiday mode (the user, 2026-10-14): saves power (puts the tablet to sleep) and drives other services while the family is away: Hue lights to their holiday setting, Arlo's settings, the thermostat to eco. Needs the Hue, Arlo and thermostat links first, and Sleep and wake for the tablet's part.
