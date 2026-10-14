@@ -53,8 +53,8 @@ data class DoorPrefs(
     /** New unrecognised alerts since the last recognised one: three in a row mean Ring's words changed (5 §6). */
     val unrecognisedRun: Int = 0,
 ) {
-    /** Check Ring's notifications is on at [nowMillis]. */
-    fun capturingAt(nowMillis: Long): Boolean = nowMillis < captureUntilMillis
+    /** Check Ring's notifications is on at [nowMillis]; a clock set back past its 30 minutes turns it off rather than stretching it (5 §5.4). */
+    fun capturingAt(nowMillis: Long): Boolean = (captureUntilMillis - nowMillis) in 1..CAPTURE_MS
 }
 
 /** The settings file's store; one that can't be read is replaced by an empty one, the defaults. */

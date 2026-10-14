@@ -66,6 +66,14 @@ class DoorSettingsTest {
         assertThat(DoorPrefs().capturingAt(NOW)).isFalse()
     }
 
+    /** A clock set back past the 30 minutes leaves the end time further off than a capture can run: off, not stretched. */
+    @Test
+    fun theCaptureIsOffWhenTheClockWentBackPastItsWindow() {
+        val prefs = DoorPrefs(captureUntilMillis = NOW + CAPTURE_MS)
+        assertThat(prefs.capturingAt(NOW)).isTrue()
+        assertThat(prefs.capturingAt(NOW - 1)).isFalse()
+    }
+
     @Test
     fun aVolumeOutOfRangeIsHeldToIt() = runTest {
         settings.setVolume(1.5f)

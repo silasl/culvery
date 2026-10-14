@@ -81,11 +81,15 @@ internal object LogHygiene {
     /**
      * Qualified ids and fixed words a message may interpolate (plan review 10: never a bare local, whose meaning the
      * line can't show): never a name, email, place, PIN, coordinates or zone.
+     *
+     * `post.captureLine` is Check Ring's notifications (`RingReader.kt`), the spec's one exception (5 §6): off by default,
+     * on for 30 minutes at most.
      */
     val ALLOWED = setOf(
         "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",
         "step.id", "stored.connection.id", "this.id", "this.kind", "kind.name", "this.failedDrains", "this.reason",
         "answer.reason", "what.label", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
+        "post.captureLine", "reading.outcome",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|wtf|println)\(""")

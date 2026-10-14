@@ -12,7 +12,9 @@ import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
 import javax.inject.Singleton
 import uk.co.siland.culvery.capability.door.DoorCapability
+import uk.co.siland.culvery.capability.door.DoorEventSink
 import uk.co.siland.culvery.capability.door.DoorProvider
+import uk.co.siland.culvery.capability.door.DoorRecorder
 import uk.co.siland.culvery.capability.door.DoorPruneLoop
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
 import uk.co.siland.culvery.core.plugin.Capability
@@ -28,6 +30,9 @@ abstract class DoorModule {
     @Binds
     @IntoSet
     abstract fun capability(impl: DoorCapability): Capability
+
+    @Binds
+    abstract fun sink(impl: DoorRecorder): DoorEventSink
 
     @Binds
     @IntoSet
