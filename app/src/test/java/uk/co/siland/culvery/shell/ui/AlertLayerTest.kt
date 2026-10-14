@@ -2,6 +2,7 @@ package uk.co.siland.culvery.shell.ui
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,9 +17,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
@@ -181,5 +184,31 @@ class AlertLayerTest {
         assertThat(overlay.content).isSameInstanceAs(sheet)
         assertThat(overlay.edited).isTrue()
         assertThat(activity.touches.value).isEqualTo(0L)
+    }
+
+    private fun layer(keyboard: WindowInsets) {
+        compose.setContent {
+            CulveryTheme(dark = true) { AlertLayer({ Box(Modifier.fillMaxWidth().height(200.dp).testTag("card")) }, hidden = false, keyboard = keyboard) }
+        }
+    }
+
+    /** Fails if the layer centres the card on the whole window: with the keyboard up, its bottom edge (Got it) sits under the keys. */
+    @Test
+    fun theCardStaysAboveTheKeyboardAndCentresInTheSpaceLeft() {
+        val keyboard = 200.dp
+        layer(WindowInsets(bottom = keyboard))
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        val card = compose.onNodeWithTag("card").getUnclippedBoundsInRoot()
+        assertThat(card.bottom.value).isAtMost((screen.bottom - keyboard).value + 0.5f)
+        assertThat(card.top.value).isWithin(0.5f).of(((screen.bottom - keyboard).value - (card.bottom - card.top).value) / 2f)
+    }
+
+    /** Pin: with no keyboard the card is centred on the screen. */
+    @Test
+    fun theCardCentresOnTheScreenWithoutAKeyboard() {
+        layer(WindowInsets(0))
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        val card = compose.onNodeWithTag("card").getUnclippedBoundsInRoot()
+        assertThat(card.top.value).isWithin(0.5f).of((screen.bottom.value - (card.bottom - card.top).value) / 2f)
     }
 }

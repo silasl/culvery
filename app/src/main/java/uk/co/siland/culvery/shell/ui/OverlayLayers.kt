@@ -103,11 +103,14 @@ private fun Modifier.countsTouches(touched: () -> Unit): Modifier = pointerInput
 // 5 §5.1: centred on the screen, about half the screen wide.
 private const val ALERT_WIDTH = 0.5f
 
-/** The alert layer: no scrim, so the screen around the alert stays usable; the alert swallows its own taps. */
+/** The alert layer: no scrim, so the screen around the alert stays usable; the alert swallows its own taps and centres above the keyboard. */
 @Composable
-internal fun AlertLayer(content: @Composable () -> Unit, hidden: Boolean) {
+internal fun AlertLayer(content: @Composable () -> Unit, hidden: Boolean, keyboard: WindowInsets = WindowInsets.ime) {
     Box(
-        Modifier.fillMaxSize().then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier),
+        Modifier
+            .fillMaxSize()
+            .then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier)
+            .windowInsetsPadding(keyboard.only(WindowInsetsSides.Bottom)),
         contentAlignment = Alignment.Center,
     ) {
         // Swallows a tap on any part of the alert, padding and gaps included, so none falls through to the sheet's scrim.
