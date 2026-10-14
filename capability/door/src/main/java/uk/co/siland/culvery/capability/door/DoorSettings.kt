@@ -43,7 +43,7 @@ const val CAPTURE_MS = 30 * 60 * 1_000L
 data class DoorPrefs(
     /** Both connect steps were done: the Door tab shows (5 §5.5). */
     val connected: Boolean = false,
-    val volume: Float = 0.7f,
+    val volume: Float = 1.0f,
     val quietOn: Boolean = true,
     val quietFrom: LocalTime = LocalTime.of(21, 0),
     val quietUntil: LocalTime = LocalTime.of(7, 0),

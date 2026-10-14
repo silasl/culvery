@@ -28,7 +28,7 @@ class DoorSettingsScreenshotTest {
     private val actions = DoorSettingsActions({}, {}, { _, _, _ -> }, {}, {})
 
     private val connected = DoorSettingsUi(
-        service = "Ring", hint = "Sign in as a Ring Shared User, and turn off the Ring app’s notification sound.", volume = 0.7f,
+        service = "Ring", hint = "Sign in as a Ring Shared User, and turn off the Ring app’s notification sound.", volume = 1.0f,
         quietOn = true, quietFrom = LocalTime.of(21, 0), quietUntil = LocalTime.of(7, 0), status = null,
         lastHeard = "Last heard from Ring: Wednesday 14:02", appInstalled = true, accessAllowed = true, capturing = false,
     )

@@ -125,7 +125,7 @@ class DoorSettingsPageTest {
     fun theVolumeIsSavedWhenTheSliderIsLetGo() {
         showHost()
         compose.onNodeWithTag("door_volume").performSemanticsAction(SemanticsActions.SetProgress) { it(0.3f) }
-        waitFor { prefs().volume != 0.7f }
+        waitFor { prefs().volume != 1.0f }
         assertThat(prefs().volume).isEqualTo(0.3f)
     }
 

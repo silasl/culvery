@@ -24,11 +24,11 @@ class DoorSettingsTest {
     @After
     fun tearDown() = scope.cancel()
 
-    /** 5 §2.6, §4.1, §5.4: 70 %, quiet 21:00–07:00 on, the capture off, not connected. */
+    /** 5 §2.6, §4.1, §5.4: 100 %, quiet 21:00–07:00 on, the capture off, not connected. */
     @Test
     fun theDefaults() = runTest {
         assertThat(settings.prefs.first()).isEqualTo(
-            DoorPrefs(connected = false, volume = 0.7f, quietOn = true, quietFrom = LocalTime.of(21, 0), quietUntil = LocalTime.of(7, 0),
+            DoorPrefs(connected = false, volume = 1.0f, quietOn = true, quietFrom = LocalTime.of(21, 0), quietUntil = LocalTime.of(7, 0),
                 captureUntilMillis = 0L, lastHeardMillis = null, unrecognisedRun = 0),
         )
     }

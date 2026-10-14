@@ -85,7 +85,7 @@ Two additions every later capability can use:
 
 ### 4.1 The chime
 
-A short bundled sound played with `AudioAttributes.USAGE_NOTIFICATION_EVENT`. Culvery's volume setting (default 70 %) scales it within the tablet's notification volume, so the tablet's own volume and Do Not Disturb still apply. Quiet hours use the household's time zone and may cross midnight (From 21:00, Until 07:00 means 21:00–06:59).
+A short bundled sound played with `AudioAttributes.USAGE_NOTIFICATION_EVENT`. Culvery's volume setting (default 100 %) scales it within the tablet's notification volume, so the tablet's own volume and Do Not Disturb still apply. Quiet hours use the household's time zone and may cross midnight (From 21:00, Until 07:00 means 21:00–06:59).
 
 ### 4.2 Last heard
 
