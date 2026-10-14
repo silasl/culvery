@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,19 +25,29 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.readAsOne
+import uk.co.siland.culvery.core.ui.shownNotSpoken
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.TabItem
 
 private val HomeTab = TabItem(HOME_TAB_ID, "Home", Icons.HOME)
 private val MARK_WIDTH = 48.dp
 private val MARK_GAP = 8.dp
+
+// 5 §5.3: a 20 dp count bubble or a 10 dp dot at the icon's top end, in `danger`; past 9, "9+".
+private val BADGE_SIZE = 20.dp
+private val BADGE_DOT = 10.dp
+private val BADGE_PADDING_H = 5.dp
+private const val BADGE_MAX = 9
 
 /** Who is signed in now shows in the status bar (hand-off §7), not here. */
 @Composable
@@ -95,19 +107,43 @@ private fun RailItem(tab: TabItem, selected: Boolean, onClick: () -> Unit) {
             .testTag("rail_${tab.id}")
             .width(88.dp)
             .clip(RoundedCornerShape(16.dp))
+            .then(tab.badge?.let { badge -> Modifier.semantics { contentDescription = "${tab.label}, ${badge.spoken}" } } ?: Modifier)
             .selectable(selected = selected, role = Role.Tab, onClick = onClick)
             .padding(vertical = 8.dp),
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(width = 64.dp, height = 38.dp)
-                .clip(RoundedCornerShape(19.dp))
-                .background(if (selected) c.accentSoft else Color.Transparent),
-        ) {
-            HhIcon(tab.icon, size = 26.dp, filled = selected, tint = if (selected) c.ink else c.mute)
+        Box {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(width = 64.dp, height = 38.dp)
+                    .clip(RoundedCornerShape(19.dp))
+                    .background(if (selected) c.accentSoft else Color.Transparent),
+            ) {
+                HhIcon(tab.icon, size = 26.dp, filled = selected, tint = if (selected) c.ink else c.mute)
+            }
+            tab.badge?.let { RailBadgeMark(it, Modifier.align(Alignment.TopEnd).testTag("rail_${tab.id}_badge")) }
         }
         Spacer(Modifier.height(6.dp))
-        Text(tab.label, style = HhType.label, color = if (selected) c.ink else c.mute)
+        // A badged tab is read by its description, which already starts with the label.
+        Text(tab.label, style = HhType.label, color = if (selected) c.ink else c.mute, modifier = if (tab.badge != null) Modifier.shownNotSpoken() else Modifier)
+    }
+}
+
+@Composable
+private fun RailBadgeMark(badge: RailBadge, modifier: Modifier) {
+    val c = Culvery.colors
+    when (badge) {
+        is RailBadge.Count -> Box(
+            contentAlignment = Alignment.Center,
+            modifier = modifier
+                .defaultMinSize(BADGE_SIZE, BADGE_SIZE)
+                .shownNotSpoken()
+                .clip(CircleShape)
+                .background(c.danger)
+                .padding(horizontal = BADGE_PADDING_H),
+        ) {
+            Text(if (badge.count > BADGE_MAX) "$BADGE_MAX+" else badge.count.toString(), style = HhType.labelSmall, color = c.dangerInk)
+        }
+        is RailBadge.Dot -> Box(modifier.size(BADGE_DOT).clip(CircleShape).background(c.danger))
     }
 }

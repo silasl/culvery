@@ -89,10 +89,13 @@ class ShellViewModel @Inject constructor(
         } else {
             combine(
                 ordered.map { cap ->
-                    // onStart after the retry: a retry must not hide a tab that was showing.
-                    cap.hasTab.retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read whether it has a tab (${it::class.simpleName}); retrying") }
-                        .onStart { emit(false) }
-                        .map { shown -> if (shown) TabItem(cap.id, cap.label, cap.icon) else null }
+                    combine(
+                        // onStart after the retry: a retry must not hide a tab that was showing.
+                        cap.hasTab.retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read whether it has a tab (${it::class.simpleName}); retrying") }
+                            .onStart { emit(false) },
+                        cap.badge.retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its badge (${it::class.simpleName}); retrying") }
+                            .onStart { emit(null) },
+                    ) { shown, badge -> if (shown) TabItem(cap.id, cap.label, cap.icon, badge) else null }
                 },
             ) {
                 it.filterNotNull()

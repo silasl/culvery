@@ -38,6 +38,7 @@ import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
@@ -188,6 +189,12 @@ class ShellScreenshotTest {
 
     @Test
     fun homeWithCalendarLight() = snap("home_calendar_light", dark = false, state = calendarHome(dark = false))
+
+    @Test
+    fun homeRailBadgeDark() = snap(
+        "home_rail_badge_dark", dark = true,
+        state = calendarHome(dark = true).copy(tabs = listOf(TabItem("calendar", "Calendar", "calendar_month", RailBadge.Count(2, "2 unseen rings")))),
+    )
 
     @Test
     fun homeWithWeatherDark() = snap("home_weather_dark", dark = true, state = weatherHome(dark = true))

@@ -9,8 +9,11 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onChild
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
@@ -20,6 +23,7 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.test.assertAccessible
@@ -70,5 +74,29 @@ class NavRailTest {
         val bounds = mark.getUnclippedBoundsInRoot()
         assertThat(bounds.width.value).isWithin(0.5f).of(48f)
         assertThat(bounds.bottom.value).isAtMost(compose.onNodeWithTag("rail_home").getUnclippedBoundsInRoot().top.value)
+    }
+
+    /** 5 §5.3: a count or a dot on the icon, and its words after the tab's name. */
+    @Test
+    fun aBadgeIsDrawnAndAddsItsWordsToTheTabsName() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                NavRail(
+                    listOf(
+                        TabItem("door", "Door", Icons.CALENDAR_MONTH, RailBadge.Count(2, "2 unseen rings")),
+                        TabItem("lights", "Lights", Icons.HOME, RailBadge.Dot("new motion")),
+                        TabItem("music", "Music", Icons.HOME, RailBadge.Count(12, "12 unseen rings")),
+                    ),
+                    HOME_TAB_ID, onSelect = {}, onOpenSettings = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("rail_door").assert(hasContentDescription("Door, 2 unseen rings"))
+        compose.onNodeWithTag("rail_door_badge", useUnmergedTree = true).onChild().assertTextEquals("2")
+        compose.onNodeWithTag("rail_lights").assert(hasContentDescription("Lights, new motion"))
+        compose.onNodeWithTag("rail_lights_badge", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("rail_music_badge", useUnmergedTree = true).onChild().assertTextEquals("9+")
+        compose.onNodeWithTag("rail_home").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ContentDescription))
+        compose.assertAccessible()
     }
 }

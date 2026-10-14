@@ -35,6 +35,7 @@ import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.HouseholdClock
+import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.SettingsPageIds
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.SunTimes
@@ -516,6 +517,20 @@ class ShellViewModelTest {
         }
         vm(setOf(FakeCapability("calendar", order = 10, shown = true), NeverEmittingCapability("lights", order = 20))).uiState.test {
             assertThat(expectMostRecentItem().cardsLoaded).isFalse()
+        }
+    }
+
+    /** 5 §3.3: any capability can mark its tab; the shell passes the mark to the rail as it changes. */
+    @Test
+    fun aTabCarriesItsCapabilitysBadge() = runTest {
+        val door = FakeCapability("door", order = 50, shown = true)
+        val vm = vm(setOf(door))
+        vm.uiState.test {
+            assertThat(expectMostRecentItem().tabs.single().badge).isNull()
+            door.badgeFlow.value = RailBadge.Count(2, "2 unseen rings")
+            assertThat(awaitItem().tabs.single().badge).isEqualTo(RailBadge.Count(2, "2 unseen rings"))
+            door.badgeFlow.value = RailBadge.Dot("new motion")
+            assertThat(awaitItem().tabs.single().badge).isEqualTo(RailBadge.Dot("new motion"))
         }
     }
 }

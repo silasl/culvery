@@ -15,6 +15,7 @@ import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
+import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.SunTimes
 
 class FakeCapability(
@@ -28,6 +29,8 @@ class FakeCapability(
     override val icon = "star"
     val shownFlow = MutableStateFlow(shown)
     override val hasTab: Flow<Boolean> = shownFlow
+    val badgeFlow = MutableStateFlow<RailBadge?>(null)
+    override val badge: Flow<RailBadge?> = badgeFlow
     override fun cards(): Flow<List<HomeCard>> = flowOf(cardList)
     override fun headerItems(): Flow<List<HeaderItem>> = flowOf(headerList)
     @Composable override fun TabContent() {}

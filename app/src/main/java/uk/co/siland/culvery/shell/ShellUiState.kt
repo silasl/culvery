@@ -2,10 +2,11 @@ package uk.co.siland.culvery.shell
 
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomePlacement
+import uk.co.siland.culvery.core.plugin.RailBadge
 
 const val HOME_TAB_ID = "home"
 
-data class TabItem(val id: String, val label: String, val icon: String)
+data class TabItem(val id: String, val label: String, val icon: String, val badge: RailBadge? = null)
 
 /** The status bar's "{name} · {role}". */
 data class SessionUi(val name: String, val role: String)
