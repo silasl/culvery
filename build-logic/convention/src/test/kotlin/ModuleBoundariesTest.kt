@@ -68,6 +68,19 @@ class ModuleBoundariesTest {
     }
 
     @Test
+    fun theDoorModulesFollowTheRules() {
+        allowed(":capability:door", ":core:plugin", "api")
+        allowed(":capability:door", ":core:ui")
+        allowed(":provider:door-ring", ":capability:door")
+        allowed(":app", ":provider:door-ring")
+        banned(":capability:door", ":provider:door-ring")
+        banned(":capability:door", ":provider:door-ring", "testImplementation")
+        banned(":capability:door", ":capability:calendar")
+        banned(":provider:door-ring", ":capability:weather")
+        banned(":provider:calendar-google", ":capability:door")
+    }
+
+    @Test
     fun appMayDependOnAnything() = allowed(":app", ":provider:calendar-fake", "debugImplementation")
 
     @Test
