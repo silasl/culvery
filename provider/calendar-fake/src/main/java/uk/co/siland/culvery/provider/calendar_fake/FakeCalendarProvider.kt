@@ -125,7 +125,12 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
             val samples = SampleEvents.forSource(source.id, today, range.zone, idsByName)
                 .filterNot { it.remoteId in deleted }
                 .map { changed[it.remoteId] ?: it.withSeriesPerson() }
-            val written = if (source.id == SOURCE_FAMILY) created.values.toList() else emptyList()
+            val written = if (source.id == SOURCE_FAMILY) {
+                val lastDay = range.endExclusive.minusDays(1)
+                created.values.flatMap { RecurrenceExpander.expand(it, range.zone, lastDay) }.filterNot { it.remoteId in deleted }
+            } else {
+                emptyList()
+            }
             current to samples + written
         }
         return SyncResult(events.filter { range.overlaps(it.start, it.end) }, emptyList(), current, fullReplace = true)
@@ -164,7 +169,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     }
 
     override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) = write(source) {
-        // Deleting something already gone succeeds (CalendarWriter contract).
+        // Deleting something already gone succeeds (CalendarWriter contract). An occurrence id hides just that day.
         created.remove(remoteId)
         changed.remove(remoteId)
         deleted += remoteId
@@ -190,7 +195,13 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
         in deleted -> null
         in created -> created[remoteId]
         in changed -> changed[remoteId]
-        else -> familySamples().firstOrNull { it.remoteId == remoteId }?.withSeriesPerson()
+        else -> createdOccurrence(remoteId) ?: familySamples().firstOrNull { it.remoteId == remoteId }?.withSeriesPerson()
+    }
+
+    /** An occurrence of a series made here, from its id ("{series}-{date}"). Called under [lock]. */
+    private fun createdOccurrence(remoteId: String): RemoteEvent? = created.values.firstNotNullOfOrNull { series ->
+        val date = remoteId.removePrefix("${series.remoteId}-").takeIf { it != remoteId }?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        date?.let { RecurrenceExpander.expand(series, zone, it).firstOrNull { occurrence -> occurrence.remoteId == remoteId } }
     }
 
     /** The Family calendar's samples as of today. Called under [lock]. */

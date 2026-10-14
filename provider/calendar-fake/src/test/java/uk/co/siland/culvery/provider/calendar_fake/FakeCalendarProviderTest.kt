@@ -14,11 +14,13 @@ import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.Recurrence
+import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.instantIn
 import uk.co.siland.culvery.capability.calendar.newClientKey
+import uk.co.siland.culvery.capability.calendar.recurrenceRule
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 
@@ -314,5 +316,93 @@ class FakeCalendarProviderTest {
             recurrence = Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=1", zone)), "k-series")
         assertThat(made.recurring).isTrue()
         assertThat(made.recurrenceRule).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1")
+    }
+
+    private fun timedSeries(rule: String) = EventDraft(
+        "Choir",
+        EventTime.Timed(today.atTime(18, 0).atZone(zone).toInstant()),
+        EventTime.Timed(today.atTime(19, 0).atZone(zone).toInstant()),
+        null, null, recurrence = Recurrence(rule, zone),
+    )
+
+    private fun allDaySeries(rule: String) = EventDraft(
+        "Bins", EventTime.AllDay(today), EventTime.AllDay(today.plusDays(1)), null, null, recurrence = Recurrence(rule, zone),
+    )
+
+    private suspend fun FakeCalendarProvider.choirDays(): List<LocalDate> =
+        familyEvents().filter { it.title == "Choir" }.map { time(it.start).toLocalDate() }
+
+    @Test
+    fun aWeeklySeriesShowsOnEachWeekInTheRange() = runTest {
+        val fake = providerOn(today)
+        fake.create(conn, family, timedSeries("RRULE:FREQ=WEEKLY;INTERVAL=1"), "k-choir")
+        assertThat(fake.choirDays()).containsExactly(today, today.plusDays(7), today.plusDays(14)).inOrder()
+        val first = fake.familyEvents().first { it.title == "Choir" }
+        assertThat(first.remoteId).isEqualTo("k-choir-$today")
+        assertThat(first.seriesId).isEqualTo("k-choir")
+        assertThat(first.recurring).isTrue()
+        assertThat(first.recurrenceRule).isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1")
+        assertThat(time(first.start).format(hm) + "–" + time(first.end).format(hm)).isEqualTo("18:00–19:00")
+    }
+
+    @Test
+    fun everyTwoWeeksSkipsAWeek() = runTest {
+        val fake = providerOn(today)
+        fake.create(conn, family, timedSeries("RRULE:FREQ=WEEKLY;INTERVAL=2"), "k-choir")
+        assertThat(fake.choirDays()).containsExactly(today, today.plusDays(14)).inOrder()
+    }
+
+    @Test
+    fun anIntervalOfDaysStepsByThatMany() = runTest {
+        val fake = providerOn(today)
+        fake.create(conn, family, timedSeries("RRULE:FREQ=DAILY;INTERVAL=5"), "k-choir")
+        assertThat(fake.choirDays()).containsExactly(today, today.plusDays(5), today.plusDays(10)).inOrder()
+    }
+
+    @Test
+    fun aTimedUntilInUtcEndsTheSeriesOnThatDayInclusive() = runTest {
+        val fake = providerOn(today)
+        val rule = recurrenceRule(RepeatChoice.Weekly, today.plusDays(7), allDay = false, zone = zone)!!
+        fake.create(conn, family, timedSeries(rule), "k-choir")
+        assertThat(fake.choirDays()).containsExactly(today, today.plusDays(7)).inOrder()
+    }
+
+    @Test
+    fun anAllDayUntilDateEndsTheSeriesOnThatDayInclusive() = runTest {
+        val fake = providerOn(today)
+        val rule = recurrenceRule(RepeatChoice.Daily, today.plusDays(2), allDay = true, zone = zone)!!
+        fake.create(conn, family, allDaySeries(rule), "k-bins")
+        val bins = fake.familyEvents().filter { it.title == "Bins" }
+        assertThat(bins.map { (it.start as EventTime.AllDay).date }).containsExactly(today, today.plusDays(1), today.plusDays(2)).inOrder()
+        assertThat(bins.map { (it.end as EventTime.AllDay).date.toEpochDay() - (it.start as EventTime.AllDay).date.toEpochDay() }.toSet())
+            .containsExactly(1L)
+    }
+
+    @Test
+    fun anAllDayWeeklySeriesShowsNextWeekToo() = runTest {
+        val fake = providerOn(today)
+        fake.create(conn, family, allDaySeries("RRULE:FREQ=WEEKLY;INTERVAL=1"), "k-bins")
+        val days = fake.familyEvents().filter { it.title == "Bins" }.map { (it.start as EventTime.AllDay).date }
+        assertThat(days).containsAtLeast(today, today.plusDays(7))
+    }
+
+    @Test
+    fun deletingOneOccurrenceLeavesTheRestAndDeletingTheSeriesRemovesAll() = runTest {
+        val fake = providerOn(today)
+        fake.create(conn, family, timedSeries("RRULE:FREQ=WEEKLY;INTERVAL=1"), "k-choir")
+        fake.delete(conn, family, "k-choir-${today.plusDays(7)}")
+        assertThat(fake.choirDays()).containsExactly(today, today.plusDays(14)).inOrder()
+        fake.delete(conn, family, "k-choir")
+        assertThat(fake.choirDays()).isEmpty()
+    }
+
+    @Test
+    fun anOccurrenceOfANewSeriesCantBeChanged() = runTest {
+        val fake = providerOn(today)
+        fake.create(conn, family, timedSeries("RRULE:FREQ=WEEKLY;INTERVAL=1"), "k-choir")
+        val occurrence = fake.familyEvents().first { it.title == "Choir" }
+        assertThrows(WriteRejectedException::class.java) {
+            runBlocking { fake.update(conn, family, occurrence.remoteId, timedSeries("RRULE:FREQ=WEEKLY"), setOf(EventField.TITLE)) }
+        }
     }
 }
