@@ -59,6 +59,7 @@ dependencies {
     implementation(project(":capability:weather"))
     // Wired by Hilt alone, as the weather (5 §3).
     implementation(project(":capability:door"))
+    implementation(project(":provider:door-ring"))
     implementation(project(":provider:calendar-google"))
     implementation(project(":provider:weather-openmeteo"))
     // Sample data only, in debug builds.
