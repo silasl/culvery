@@ -29,7 +29,7 @@ data class ShowingRing(val eventId: Long, val card: DoorCardUi)
 
 /**
  * The alert decision (5 §4.6–4.7). A new ring, or an unrecognised alert, while Culvery is in front raises the card or
- * refreshes it, restarts its 2 minutes, and chimes unless it is quiet hours or the last chime was under 10 seconds ago.
+ * refreshes it, restarts its 2 minutes, and chimes unless it is quiet hours or the last chime that played was under 10 seconds ago.
  * A re-post of the card's own ring updates the card only. Motion, and anything while Culvery isn't in front, is only
  * stored. Every change to the card happens under one lock, so a close never takes a newer ring's card.
  */
@@ -83,10 +83,7 @@ class DoorAlerts internal constructor(
         val p = prefs()
         // A clock set back since the last chime counts as long ago.
         val chimedRecently = lastChimeMillis?.let { now - it in 0 until CHIME_GAP_MS } == true
-        if (!quietAt(now, z, p) && !chimedRecently) {
-            lastChimeMillis = now
-            chime.play(p.volume)
-        }
+        if (!quietAt(now, z, p) && !chimedRecently && chime.play(p.volume)) lastChimeMillis = now
     }
 
     /** Got it on [eventId]'s card: that ring counts as seen, and the card goes if it still shows that ring (5 §4.7). */

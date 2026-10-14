@@ -48,6 +48,21 @@ class DoorAlertsTest {
         assertThat(chime.volumes).isEmpty()
     }
 
+    /** 5 §4.6: the 10 seconds run from a chime that played. Fails if a chime that failed to start holds back the next ring's. */
+    @Test
+    fun aChimeThatFailedToStartDoesNotHoldBackTheNextOne() = runTest {
+        val alerts = alerts()
+        chime.starts = false
+        alerts.onRecorded(rung(1))
+        chime.starts = true
+        advanceTimeBy(1)
+        alerts.onRecorded(rung(2))
+        assertThat(chime.volumes).hasSize(2)
+        advanceTimeBy(CHIME_GAP_MS - 1)
+        alerts.onRecorded(rung(3))
+        assertThat(chime.volumes).hasSize(2)
+    }
+
     @Test
     fun anUnrecognisedAlertShowsAsARingAlertAndChimes() = runTest {
         val alerts = alerts()

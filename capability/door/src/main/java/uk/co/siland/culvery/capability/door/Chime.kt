@@ -10,8 +10,8 @@ import java.util.Collections
 import javax.inject.Inject
 
 fun interface Chime {
-    /** [volume] 0–1 scales the sound within the tablet's own notification volume. */
-    fun play(volume: Float)
+    /** [volume] 0–1 scales the sound within the tablet's own notification volume. True when the chime started. */
+    fun play(volume: Float): Boolean
 }
 
 /** A notification event, so the tablet's notification volume and Do Not Disturb still apply (5 §4.1). */
@@ -24,20 +24,27 @@ internal val CHIME_ATTRIBUTES: AudioAttributes = AudioAttributes.Builder()
 class MediaPlayerChime @Inject constructor(@ApplicationContext private val context: Context) : Chime {
     internal val live: MutableSet<MediaPlayer> = Collections.synchronizedSet(mutableSetOf())
 
-    override fun play(volume: Float) {
+    override fun play(volume: Float): Boolean {
         val player = MediaPlayer.create(context, R.raw.door_chime, CHIME_ATTRIBUTES, AudioManager.AUDIO_SESSION_ID_GENERATE)
         if (player == null) {
             Log.w(TAG, "The door chime couldn't be loaded")
-            return
+            return false
         }
         live += player
-        player.setVolume(volume, volume)
-        player.setOnCompletionListener { finish(it) }
-        player.setOnErrorListener { mp, _, _ ->
-            finish(mp)
-            true
+        try {
+            player.setVolume(volume, volume)
+            player.setOnCompletionListener { finish(it) }
+            player.setOnErrorListener { mp, _, _ ->
+                finish(mp)
+                true
+            }
+            player.start()
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "The door chime couldn't start (${e::class.simpleName})")
+            finish(player)
+            return false
         }
-        player.start()
+        return true
     }
 
     private fun finish(player: MediaPlayer) {
