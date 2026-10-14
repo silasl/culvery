@@ -158,7 +158,7 @@ fun WeekView(
                             if (updating) UPDATING else weekLine(state.sync, state.nowMillis),
                             style = CalendarType.subtitle,
                             color = if (failing && !updating) c.danger else c.mute,
-                            maxLines = 1,
+                            maxLines = 3,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false).testTag("week_subtitle").semantics { liveRegion = LiveRegionMode.Polite },
                         )

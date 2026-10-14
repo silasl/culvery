@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
 import org.junit.Rule
 import org.junit.Test
@@ -57,7 +60,7 @@ class WeekScreenshotTest {
 
     private val fresh = SyncStatusUi(now - 2 * 60_000, emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false)
     private val stale = fresh.copy(lastSyncMillis = now - 45 * 60_000)
-    private val needsSignIn = fresh.copy(needsSignIn = listOf("Google Calendar"))
+    private val needsSignIn = fresh.copy(needsSignIn = listOf("Google Calendar"), problem = SyncProblem.SignIn("Google Calendar"))
 
     @Test fun weekFontScale15() = snap("week_fs15", false, fresh, canAdd = true, fontScale = 1.5f)
     @Test fun weekDark() = snap("week_dark", true, fresh, canAdd = true)
@@ -66,6 +69,13 @@ class WeekScreenshotTest {
     @Test fun weekStaleLight() = snap("week_stale_light", false, stale)
     @Test fun weekOfflineDark() = snap("week_offline_dark", true, stale.copy(problem = SyncProblem.Offline))
     @Test fun weekNeedsSignInDark() = snap("week_needs_sign_in_dark", true, needsSignIn)
+    /** 5 §A.3: at the largest font scale the sign-in line still reaches "Reconnect in Settings › Calendars." (text is measured for real only in this graphics mode). */
+    @Test fun weekNeedsSignInFontScale15() {
+        snap("week_needs_sign_in_fs15", true, needsSignIn, canAdd = true, fontScale = 1.5f)
+        val layout = mutableListOf<TextLayoutResult>()
+        compose.runOnUiThread { compose.onNodeWithTag("week_subtitle").fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(layout) }
+        assertThat(layout.single().hasVisualOverflow).isFalse()
+    }
     @Test fun weekSyncingDark() = snap("week_syncing_dark", true, fresh, SampleUi.weekWithSyncing)
     @Test fun weekNextLight() = snap("week_next_light", false, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
     @Test fun weekNextDark() = snap("week_next_dark", true, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
