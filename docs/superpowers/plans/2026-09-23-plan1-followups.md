@@ -283,4 +283,5 @@ E5, One UI's home-app menu name, is already under Plan 4c's 4e list above.
 - Making repeating events on the tablet (the user, 2026-10-14, 4e day one; reverses 4e's "times and titles still on a phone"). The add-event form gets time chips: **All day** (chosen by default) and **Pick time**, with the length set from there. Its own spec → plan cycle **after the Ring plan and before the end-of-v1 design walk-through**, so the walk-through sees the new form.
 - Sonos (the user, 2026-10-14): its own spec; no detail yet.
 - Philips Hue (the user, 2026-10-14): its own spec; no detail yet. Holiday mode drives it.
+- Shopping list (the user, 2026-10-14): its own spec; no detail yet.
 - Holiday mode (the user, 2026-10-14): saves power (puts the tablet to sleep) and drives other services while the family is away: Hue lights to their holiday setting, Arlo's settings, the thermostat to eco. Needs the Hue, Arlo and thermostat links first, and Sleep and wake for the tablet's part.
