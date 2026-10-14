@@ -35,9 +35,10 @@ private fun style(size: Int, weight: FontWeight, tabular: Boolean = false) = Tex
 )
 
 object HhType {
-    val clock = style(104, FontWeight.W600, tabular = true).copy(
-        letterSpacing = (-4).sp,
-        lineHeight = 93.6.sp,
+    // 88 sp since 5 §A.2; the hand-off's −4 tracking and 0.9 line height at 104 sp, scaled.
+    val clock = style(88, FontWeight.W600, tabular = true).copy(
+        letterSpacing = (-3.4).sp,
+        lineHeight = 79.2.sp,
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
     )
     val date = style(21, FontWeight.W400)

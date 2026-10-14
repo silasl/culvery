@@ -108,11 +108,11 @@ private fun TodayRow(event: EventUi, onOpen: (EventRef) -> Unit) {
         ColourBar(Color(event.person.color), width = CalendarDimens.todayBarWidth)
         Spacer(Modifier.width(CalendarDimens.todayBarGap))
         Column(Modifier.weight(1f).shownNotSpoken()) {
-            Text(event.title, style = HhType.rowTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(event.title, style = CalendarType.todayTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(CalendarDimens.todayTimeTop))
             Text(
                 "${event.timeLabel} · ${event.person.name}",
-                style = HhType.secondary,
+                style = CalendarType.todayTime,
                 color = c.mute,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

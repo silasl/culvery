@@ -41,6 +41,12 @@ internal object CalendarType {
     /** 17 sp / 600: info-row values. */
     val infoValue = HhType.rowTitle
 
+    /** 20 sp / 600: Today's event titles on Home (5 §A.2); other rows keep HhType.rowTitle. */
+    val todayTitle = HhType.rowTitle.copy(fontSize = 20.sp)
+
+    /** 16 sp / 400: Today's time and person line. */
+    val todayTime = HhType.secondary.copy(fontSize = 16.sp)
+
     /** 13 sp / 700: "Saving to …". */
     val syncingPill = HhType.label.copy(fontWeight = FontWeight.W700)
 

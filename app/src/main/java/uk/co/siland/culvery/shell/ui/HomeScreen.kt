@@ -35,8 +35,8 @@ import uk.co.siland.culvery.core.ui.readAsOne
 private val CLOCK = DateTimeFormatter.ofPattern("HH:mm")
 private val DATE = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.UK)
 
-// Hand-off CSS: clock line-height 0.9 (11 px below its baseline) + 12 px margin + the date's 21 px ascent.
-private val CLOCK_TO_DATE_BASELINES = 44.dp
+// Hand-off CSS: clock line-height 0.9 (9 px below its baseline at 88 sp) + 12 px margin + the date's 21 px ascent.
+private val CLOCK_TO_DATE_BASELINES = 42.dp
 
 // Hand-off §1: header items 28 apart, a 1 × 48 `line` divider between two, their row 4 above the date's bottom.
 private val HEADER_ITEM_GAP = 28.dp

@@ -33,6 +33,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -65,7 +66,7 @@ class ShellLayoutTest {
     private val at = LocalDateTime.of(2026, 9, 23, 11, 54)
 
     @Test
-    fun dateBaselineSits44dpBelowClockBaseline() {
+    fun dateBaselineSits42dpBelowClockBaseline() {
         compose.setContent {
             CulveryTheme(dark = true) { HomeScreen({ at }, emptyList(), emptyList()) }
         }
@@ -73,15 +74,23 @@ class ShellLayoutTest {
         val date = compose.onNodeWithTag("home_date")
         val clockBaseline = clock.getUnclippedBoundsInRoot().top + clock.getAlignmentLinePosition(LastBaseline)
         val dateBaseline = date.getUnclippedBoundsInRoot().top + date.getAlignmentLinePosition(FirstBaseline)
-        assertThat((dateBaseline - clockBaseline).value).isWithin(1f).of(44f)
+        assertThat((dateBaseline - clockBaseline).value).isWithin(1f).of(42f)
     }
 
-    /** Hand-off: the clock's line box is 0.9 × 104 sp. The text alone measures 135 dp; `lineBox` makes the box the line height. */
+    /** Hand-off: the clock's line box is 0.9 × its size, 88 sp since 5 §A.2. The text alone is taller; `lineBox` makes the box the line height. */
     @Test
     fun theClockBoxIsItsLineHeight() {
         compose.setContent { CulveryTheme(dark = true) { HomeScreen({ at }, emptyList(), emptyList()) } }
         val clock = compose.onNodeWithTag("home_clock").getUnclippedBoundsInRoot()
-        assertThat(clock.height.value).isWithin(1f).of(94f)
+        assertThat(clock.height.value).isWithin(1f).of(79f)
+    }
+
+    /** 5 §A.2: the clock went from 104 to 88 sp; the date is unchanged. */
+    @Test
+    fun theClockIs88spAndTheDate21() {
+        compose.setContent { CulveryTheme(dark = true) { HomeScreen({ at }, emptyList(), emptyList()) } }
+        assertThat(compose.onNodeWithTag("home_clock").textLayout().layoutInput.style.fontSize).isEqualTo(88.sp)
+        assertThat(compose.onNodeWithTag("home_date").textLayout().layoutInput.style.fontSize).isEqualTo(21.sp)
     }
 
     /** The weather, then a wide item after it (a future Climate): together they'd run onto the date without a budget. */

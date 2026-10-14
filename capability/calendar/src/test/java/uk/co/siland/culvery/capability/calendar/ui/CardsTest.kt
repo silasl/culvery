@@ -26,6 +26,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -47,6 +48,14 @@ class CardsTest {
     @get:Rule val compose = createComposeRule()
     private val navigator = RecordingNavigator()
     private val isButton = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
+
+    /** 5 §A.2: Today's titles 20 sp and their time line 16 sp; other cards' rows keep their sizes. */
+    @Test
+    fun todaysRowsUseTheLargerSizes() {
+        show { TodayCard(SampleUi.today) }
+        assertThat(compose.onNodeWithText("School run", useUnmergedTree = true).textLayout().layoutInput.style.fontSize).isEqualTo(20.sp)
+        assertThat(compose.onNodeWithText("07:45–08:30 · Sam", useUnmergedTree = true).textLayout().layoutInput.style.fontSize).isEqualTo(16.sp)
+    }
 
     private fun show(content: @Composable () -> Unit) = compose.setContent {
         CompositionLocalProvider(LocalShellNavigator provides navigator) {
