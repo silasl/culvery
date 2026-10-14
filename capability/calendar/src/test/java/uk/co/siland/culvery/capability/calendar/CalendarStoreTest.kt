@@ -869,4 +869,11 @@ class CalendarStoreTest {
         assertThat(EventRef("a", "b", "c/d").listKey).isNotEqualTo(EventRef("a", "b/c", "d").listKey)
         assertThat(EventRef("ab", "c", "d").listKey).isNotEqualTo(EventRef("a", "bc", "d").listKey)
     }
+
+    @Test
+    fun offlineHealthIsStoredAsItself() = runTest {
+        store.addConnection(Connection("c9", "calendar.test", "Other", emptyMap()), emptyList(), emptyMap())
+        store.setHealth("c9", ConnectionHealth.Offline, 0L)
+        assertThat(store.connectionsNow().single { it.connection.id == "c9" }.health).isEqualTo(ConnectionHealth.Offline)
+    }
 }

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
+import java.net.UnknownHostException
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
@@ -35,6 +36,9 @@ import uk.co.siland.culvery.core.ui.Icons
 private val ConnectScreenButtonGap = 12.dp
 
 private const val OFFLINE_MESSAGE = "Sample calendar is offline"
+
+/** As OkHttp fails with no network: the sync records the tablet as offline (5 §A.3). */
+private fun offline() = UnreachableException(OFFLINE_MESSAGE, UnknownHostException(OFFLINE_MESSAGE))
 
 /**
  * Debug-only sample data matching the design hand-off, generated relative to today so it never goes stale.
@@ -170,7 +174,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     }
 
     override suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent? = synchronized(lock) {
-        if (offline) throw UnreachableException(OFFLINE_MESSAGE)
+        if (offline) throw offline()
         if (unreachableNext) {
             unreachableNext = false
             throw UnreachableException(OFFLINE_MESSAGE)
@@ -195,7 +199,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
         seriesId?.takeIf { it in seriesFor }?.let { copy(forPerson = seriesFor[it]) } ?: this
 
     private inline fun <T> write(source: CalendarSource, block: () -> T): T = synchronized(lock) {
-        if (offline) throw UnreachableException(OFFLINE_MESSAGE)
+        if (offline) throw offline()
         if (unreachableNext) {
             unreachableNext = false
             throw UnreachableException(OFFLINE_MESSAGE)
@@ -209,7 +213,7 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
     }
 
     private fun throwIfFailing() {
-        if (offline) throw UnreachableException(OFFLINE_MESSAGE)
+        if (offline) throw offline()
         failNext?.let {
             failNext = null
             throw it

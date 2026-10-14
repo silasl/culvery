@@ -391,6 +391,7 @@ data class SourcesRefreshed(val masterCleared: Boolean, val droppedChanges: Int)
 internal fun ConnectionHealth.code(): String = when (this) {
     ConnectionHealth.Ok -> "OK"
     ConnectionHealth.Unreachable -> "UNREACHABLE"
+    ConnectionHealth.Offline -> "OFFLINE"
     ConnectionHealth.NeedsSignIn -> "NEEDS_SIGN_IN"
     is ConnectionHealth.Error -> "ERROR"
 }
@@ -399,6 +400,7 @@ internal fun ConnectionHealth.code(): String = when (this) {
 internal fun healthOf(code: String, message: String?): ConnectionHealth = when (code) {
     "OK" -> ConnectionHealth.Ok
     "UNREACHABLE" -> ConnectionHealth.Unreachable
+    "OFFLINE" -> ConnectionHealth.Offline
     "NEEDS_SIGN_IN" -> ConnectionHealth.NeedsSignIn
     "ERROR" -> ConnectionHealth.Error(message ?: "Unknown error")
     else -> ConnectionHealth.Error("Unknown health code $code")

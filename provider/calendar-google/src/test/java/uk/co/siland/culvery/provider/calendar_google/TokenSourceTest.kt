@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
+import uk.co.siland.culvery.capability.calendar.OfflineException
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 
 // Robolectric for PendingIntent.
@@ -62,5 +63,12 @@ class TokenSourceTest {
     fun invalidatingClearsTheTokenInPlayServices() = runTest {
         tokens.invalidate("t1")
         assertThat(authorizer.cleared).containsExactly("t1")
+    }
+
+    /** 5 §A.3: Play services saying there is no network is the tablet offline, not Google not answering. */
+    @Test
+    fun playServicesWithNoNetworkIsOffline() {
+        assertThat(authorizationFailure(CommonStatusCodes.NETWORK_ERROR)).isInstanceOf(OfflineException::class.java)
+        assertThat(authorizationFailure(CommonStatusCodes.INTERNAL_ERROR)).isInstanceOf(PlayServicesStatusException::class.java)
     }
 }

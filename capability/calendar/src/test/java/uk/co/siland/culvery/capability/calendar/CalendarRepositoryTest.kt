@@ -288,6 +288,21 @@ class CalendarRepositoryTest {
         assertThat(status.isStaleAt(5_000L)).isTrue()
     }
 
+    /** 5 §A.3: the line says what the family can do; signing in first, as only they can fix it. */
+    @Test
+    fun theProblemIsSignInThenOfflineThenNoAnswer() = runTest {
+        store.addConnection(Connection("c2", "calendar.test", "School", emptyMap()), emptyList(), emptyMap())
+        store.setHealth("c1", ConnectionHealth.Unreachable, 0L)
+        assertThat(repo.syncStatus.first().problem).isEqualTo(SyncProblem.NoAnswer("Google"))
+        store.setHealth("c2", ConnectionHealth.Offline, 0L)
+        assertThat(repo.syncStatus.first().problem).isEqualTo(SyncProblem.Offline)
+        store.setHealth("c1", ConnectionHealth.NeedsSignIn, 0L)
+        assertThat(repo.syncStatus.first().problem).isEqualTo(SyncProblem.SignIn("Google"))
+        store.markSynced("c1", 1L)
+        store.markSynced("c2", 1L)
+        assertThat(repo.syncStatus.first().problem).isNull()
+    }
+
     private fun ref(id: String, source: String = "s-family") = EventRef("c1", source, id)
 
     private val key = "0123456789abcdef0123456789abcdef"

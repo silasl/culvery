@@ -4,6 +4,8 @@ import androidx.room.execSQL
 import androidx.room.useWriterConnection
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.net.ConnectException
+import java.net.UnknownHostException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -1081,5 +1083,23 @@ class CalendarSyncTest {
 
     private companion object {
         const val SAM_COLOR = 0xFF3A7BD5
+    }
+
+    /** 5 §A.3: no address looked up or reached is the tablet's own connection, not the service. */
+    @Test
+    fun aPassThatFoundNoAddressIsOfflineAndOneThatGotNoAnswerIsUnreachable() = runTest {
+        connect("c1", "calendar.a", s1)
+        connect("c2", "calendar.b", s1)
+        a.failWith = UnreachableException("Couldn't reach", UnknownHostException("no address"))
+        b.failWith = UnreachableException("Google Calendar answered 503")
+        engine().syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Offline)
+        assertThat(health("c2")).isEqualTo(ConnectionHealth.Unreachable)
+        a.failWith = UnreachableException("Couldn't reach", ConnectException("refused"))
+        engine().syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Offline)
+        a.failWith = OfflineException("Play services found no network")
+        engine().syncAll()
+        assertThat(health("c1")).isEqualTo(ConnectionHealth.Offline)
     }
 }

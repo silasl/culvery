@@ -17,6 +17,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
+import uk.co.siland.culvery.capability.calendar.OfflineException
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 
 /** Short-lived access tokens for a Google account (3a design D2). Culvery stores none. */
@@ -70,12 +71,11 @@ internal class PlayServicesStatusException(val statusCode: Int, cause: Throwable
  * A Play services failure (3a design §3.2, D2): NeedsSignIn only for a status that says the user must act; any other
  * is Unreachable during a sync, and "Couldn't connect" when connecting.
  */
-internal fun authorizationFailure(statusCode: Int, cause: Throwable? = null): Exception =
-    if (statusCode in NEEDS_USER_STATUSES) {
-        NeedsSignInException("Play services needs the user to sign in (status $statusCode)", cause)
-    } else {
-        PlayServicesStatusException(statusCode, cause)
-    }
+internal fun authorizationFailure(statusCode: Int, cause: Throwable? = null): Exception = when (statusCode) {
+    in NEEDS_USER_STATUSES -> NeedsSignInException("Play services needs the user to sign in (status $statusCode)", cause)
+    CommonStatusCodes.NETWORK_ERROR -> OfflineException("Play services found no network (status $statusCode)", cause)
+    else -> PlayServicesStatusException(statusCode, cause)
+}
 
 /** The person backed out of Play services' screens: the connect flow stops without a word. */
 internal fun Throwable.isUserCancel(): Boolean = this is PlayServicesStatusException && statusCode == CommonStatusCodes.CANCELED

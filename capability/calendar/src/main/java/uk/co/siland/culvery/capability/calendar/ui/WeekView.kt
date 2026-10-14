@@ -150,18 +150,19 @@ fun WeekView(
                         }
                     }
                     Spacer(Modifier.height(CalendarDimens.subtitleTop))
-                    val stale = state.sync.isStaleAt(state.nowMillis)
+                    // A failed pass shows as soon as it happens, not only once the week is out of date (5 §A.3).
+                    val failing = state.sync.isStaleAt(state.nowMillis) || state.sync.problem != null
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.staleIconGap)) {
-                        if (stale && !updating) HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.staleIcon, tint = c.danger, modifier = Modifier.testTag("week_out_of_date"))
+                        if (failing && !updating) HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.staleIcon, tint = c.danger, modifier = Modifier.testTag("week_out_of_date"))
                         Text(
                             if (updating) UPDATING else weekLine(state.sync, state.nowMillis),
                             style = CalendarType.subtitle,
-                            color = if (stale && !updating) c.danger else c.mute,
+                            color = if (failing && !updating) c.danger else c.mute,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false).testTag("week_subtitle").semantics { liveRegion = LiveRegionMode.Polite },
                         )
-                        if (stale && !updating) {
+                        if (failing && !updating) {
                             HhButton(
                                 UPDATE_NOW,
                                 {

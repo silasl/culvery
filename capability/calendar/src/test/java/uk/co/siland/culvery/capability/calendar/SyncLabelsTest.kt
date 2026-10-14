@@ -76,4 +76,25 @@ class SyncLabelsTest {
         assertThat(status.isStaleAt(now)).isTrue()
         assertThat(status.copy(failingBeforeFirstSync = false).isStaleAt(now)).isFalse()
     }
+
+    private fun status(agoMinutes: Long, problem: SyncProblem?) =
+        SyncStatusUi(minutesAgo(agoMinutes), emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false, problem = problem)
+
+    /** 5 §A.3's table, verbatim but for the service's name. */
+    @Test
+    fun aStaleWeekWithAProblemSaysWhatWentWrongAndWhatToDo() {
+        assertThat(weekLine(status(45, SyncProblem.Offline), now)).isEqualTo("The tablet is offline. Check the Wi-Fi, then Update now.")
+        assertThat(weekLine(status(45, SyncProblem.NoAnswer("Google Calendar")), now))
+            .isEqualTo("Google Calendar didn’t answer. Try Update now in a few minutes.")
+        assertThat(weekLine(status(45, SyncProblem.SignIn("Google Calendar")), now))
+            .isEqualTo("Google Calendar needs you to sign in again. Reconnect in Settings › Calendars.")
+    }
+
+    /** 5 §A.3: the last pass failed, so the line says so however recent the last good one was. */
+    @Test
+    fun aProblemShowsEvenWhileTheWeekIsFreshAndNoProblemShowsTheAge() {
+        assertThat(weekLine(status(2, SyncProblem.Offline), now)).isEqualTo("The tablet is offline. Check the Wi-Fi, then Update now.")
+        assertThat(weekLine(status(2, null), now)).isEqualTo("Updated from Google Calendar 2 minutes ago")
+        assertThat(weekLine(status(45, null), now)).isEqualTo("Out of date — updated from Google Calendar 45 minutes ago")
+    }
 }

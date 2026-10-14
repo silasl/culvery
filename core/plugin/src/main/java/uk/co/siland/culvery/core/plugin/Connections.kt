@@ -29,6 +29,10 @@ data class Connection(
 sealed interface ConnectionHealth {
     data object Ok : ConnectionHealth
     data object Unreachable : ConnectionHealth
+
+    /** The tablet itself couldn't look up or reach any address: its Wi-Fi, not the service (5 §A.3). */
+    data object Offline : ConnectionHealth
+
     data object NeedsSignIn : ConnectionHealth
     data class Error(val message: String) : ConnectionHealth
 }

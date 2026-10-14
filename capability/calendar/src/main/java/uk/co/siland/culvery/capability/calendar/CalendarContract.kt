@@ -129,6 +129,9 @@ class NeedsSignInException(message: String? = null, cause: Throwable? = null) : 
  */
 open class UnreachableException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
 
+/** The tablet itself has no network (5 §A.3): what a provider throws when it knows, rather than leaving it to a cause. */
+class OfflineException(message: String? = null, cause: Throwable? = null) : UnreachableException(message, cause)
+
 /**
  * The source isn't there any more (Google: 404, or a 403 that isn't a rate limit, on events.list). The engine
  * records it as unreachable and refreshes the connection's sources on the next pass, which removes it if it has gone.

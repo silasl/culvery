@@ -19,6 +19,7 @@ class HealthWordsTest {
     fun eachHealthSaysWhatIsWrongAndWhatToDo() {
         assertThat(words(ConnectionHealth.Ok)).isEqualTo("Updated 2 minutes ago")
         assertThat(words(ConnectionHealth.Unreachable)).isEqualTo("Can’t reach Google Calendar — check the tablet’s Wi-Fi.")
+        assertThat(words(ConnectionHealth.Offline)).isEqualTo("The tablet is offline — check the Wi-Fi.")
         assertThat(words(ConnectionHealth.NeedsSignIn)).isEqualTo("Needs reconnecting")
         assertThat(words(ConnectionHealth.Error("boom"))).isEqualTo("Stopped updating — disconnect and connect again.")
     }

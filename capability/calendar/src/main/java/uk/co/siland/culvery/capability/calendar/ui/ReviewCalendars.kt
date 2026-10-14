@@ -84,6 +84,7 @@ private const val TAG = "ReviewCalendars"
 internal fun healthWords(row: CalendarRow, nowMillis: Long): String = when (row.health) {
     ConnectionHealth.Ok -> updatedLabel(row.lastSyncMillis, nowMillis)
     ConnectionHealth.Unreachable -> "Can’t reach ${row.service} — check the tablet’s Wi-Fi."
+    ConnectionHealth.Offline -> "The tablet is offline — check the Wi-Fi."
     ConnectionHealth.NeedsSignIn -> NEEDS_RECONNECTING
     is ConnectionHealth.Error -> STOPPED_UPDATING
 }

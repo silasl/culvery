@@ -51,6 +51,7 @@ class CalendarRepository @Inject constructor(
             serviceNames = connections.map(service),
             failingBeforeFirstSync = connections.any { it.lastSyncMillis == null && it.health != ConnectionHealth.Ok },
             reconnect = connections.firstOrNull { it.health == ConnectionHealth.NeedsSignIn }?.connection,
+            problem = problemOf(connections, service),
         )
     }.distinctUntilChanged()
 
@@ -131,3 +132,9 @@ class CalendarRepository @Inject constructor(
         const val ZONE_MARGIN_MS = 2 * 86_400_000L
     }
 }
+
+/** Signing in first (only the family can fix it), then the tablet offline, then a service that didn't answer. */
+internal fun problemOf(connections: List<StoredConnection>, service: (StoredConnection) -> String): SyncProblem? =
+    connections.firstOrNull { it.health == ConnectionHealth.NeedsSignIn }?.let { SyncProblem.SignIn(service(it)) }
+        ?: SyncProblem.Offline.takeIf { connections.any { it.health == ConnectionHealth.Offline } }
+        ?: connections.firstOrNull { it.health == ConnectionHealth.Unreachable }?.let { SyncProblem.NoAnswer(service(it)) }

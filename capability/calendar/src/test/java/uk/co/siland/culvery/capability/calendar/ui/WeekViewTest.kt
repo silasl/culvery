@@ -44,6 +44,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
+import uk.co.siland.culvery.capability.calendar.SyncProblem
 import uk.co.siland.culvery.capability.calendar.weekTitle
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
@@ -467,5 +468,22 @@ class WeekViewTest {
         compose.onNodeWithContentDescription("Today, Wednesday 23 September").assert(isHeading()).onChildren().assertCountEquals(0)
         compose.onNodeWithContentDescription("Thursday 24 September").assert(isHeading())
         compose.onNodeWithText("This week").assert(isHeading())
+    }
+
+    /** 5 §A.3: the reason in the week's line, with Update now still beside it. */
+    @Test
+    fun aFailedUpdateSaysWhyAndKeepsUpdateNow() {
+        show { WeekView(state(sync(agoMinutes = 45, connections = listOf("Google Calendar")).copy(problem = SyncProblem.Offline))) }
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("The tablet is offline. Check the Wi-Fi, then Update now.")
+        compose.onNodeWithTag("week_update_now").assertExists()
+        compose.onNodeWithTag("week_out_of_date", useUnmergedTree = true).assertExists()
+    }
+
+    /** 5 §A.3: a failed pass shows at once, with Update now, before the week counts as out of date. */
+    @Test
+    fun aFreshWeekWithAProblemStillSaysWhyAndOffersUpdateNow() {
+        show { WeekView(state(sync(agoMinutes = 2, connections = listOf("Google Calendar")).copy(problem = SyncProblem.NoAnswer("Google Calendar")))) }
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("Google Calendar didn’t answer. Try Update now in a few minutes.")
+        compose.onNodeWithTag("week_update_now").assertExists()
     }
 }

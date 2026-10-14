@@ -66,6 +66,15 @@ data class DayUi(val date: LocalDate, val events: List<EventUi>)
 /** [people] is the legend: household members in order, then Family. */
 data class WeekUi(val start: LocalDate, val days: List<DayUi>, val people: List<Person>)
 
+/** Why the last pass failed, by what the family can do about it (5 §A.3). */
+sealed interface SyncProblem {
+    data object Offline : SyncProblem
+
+    data class NoAnswer(val service: String) : SyncProblem
+
+    data class SignIn(val service: String) : SyncProblem
+}
+
 /**
  * [lastSyncMillis] is the oldest successful update across connections, so one failing calendar can't hide.
  * [serviceNames] names every connection's service (4d-2 Decision 12). [failingBeforeFirstSync] is true when a
@@ -78,6 +87,8 @@ data class SyncStatusUi(
     val failingBeforeFirstSync: Boolean,
     /** The first connection that needs signing in again: what the reconnect chip reconnects (3a design §4.3). */
     val reconnect: Connection? = null,
+    /** The worst connection's problem; null when every connection is Ok. */
+    val problem: SyncProblem? = null,
 )
 
 /** Hand-off §7 chip and row badges, in the order they show; [spoken] follows the row's words (", repeats"). */
@@ -122,10 +133,21 @@ fun SyncStatusUi.isStaleAt(nowMillis: Long): Boolean =
 fun weekSubtitle(sync: SyncStatusUi, nowMillis: Long): String =
     updatedLabel(sync.lastSyncMillis, nowMillis, sync.serviceNames.distinct().singleOrNull())
 
-/** The week's line with its state in words as well as colour: "Out of date — updated from Google Calendar 3 hours ago". */
+/**
+ * The week's line with its state in words as well as colour: after a failed pass, what went wrong and what to do
+ * (5 §A.3); otherwise its age, "Out of date — …" once the week is stale.
+ */
 fun weekLine(sync: SyncStatusUi, nowMillis: Long): String {
+    sync.problem?.let { return problemLine(it) }
     val line = weekSubtitle(sync, nowMillis)
     return if (sync.isStaleAt(nowMillis)) "Out of date — ${line.replaceFirstChar { it.lowercase() }}" else line
+}
+
+/** 5 §A.3's table; Update now stays beside it. */
+fun problemLine(problem: SyncProblem): String = when (problem) {
+    SyncProblem.Offline -> "The tablet is offline. Check the Wi-Fi, then Update now."
+    is SyncProblem.NoAnswer -> "${problem.service} didn’t answer. Try Update now in a few minutes."
+    is SyncProblem.SignIn -> "${problem.service} needs you to sign in again. Reconnect in Settings › Calendars."
 }
 
 /** A tag naming a real person (or Family) wins; otherwise the source's person; otherwise Family. */

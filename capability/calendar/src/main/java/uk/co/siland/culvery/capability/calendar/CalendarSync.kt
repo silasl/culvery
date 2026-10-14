@@ -1,6 +1,9 @@
 package uk.co.siland.culvery.capability.calendar
 
 import android.util.Log
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.UnknownHostException
 import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
@@ -306,7 +309,7 @@ class CalendarSync internal constructor(
             }
             if (health.severity() > worst.severity()) worst = health
             // E3: the connection itself failed; its other calendars would fail the same way, each costing a timeout.
-            if (health == ConnectionHealth.Unreachable || health == ConnectionHealth.NeedsSignIn) break
+            if (health == ConnectionHealth.Unreachable || health == ConnectionHealth.Offline || health == ConnectionHealth.NeedsSignIn) break
         }
         // Every calendar refused: the service answers, but nothing was read, so this isn't a sync (plan review 11).
         if (visible.isNotEmpty() && refused == visible.size) worst = ConnectionHealth.Unreachable
@@ -357,7 +360,7 @@ class CalendarSync internal constructor(
         }
         is UnreachableException -> {
             Log.w(TAG, "${conn.id}: a source is unreachable (${e::class.simpleName})")
-            ConnectionHealth.Unreachable
+            if (e.isOffline()) ConnectionHealth.Offline else ConnectionHealth.Unreachable
         }
         else -> {
             Log.e(TAG, "${conn.id}: a source failed (${e::class.simpleName})")
@@ -367,7 +370,7 @@ class CalendarSync internal constructor(
 
     private fun ConnectionHealth.severity(): Int = when (this) {
         ConnectionHealth.NeedsSignIn -> 3
-        ConnectionHealth.Unreachable -> 2
+        ConnectionHealth.Unreachable, ConnectionHealth.Offline -> 2
         is ConnectionHealth.Error -> 1
         ConnectionHealth.Ok -> 0
     }
@@ -379,3 +382,7 @@ class CalendarSync internal constructor(
         const val REMOVED_CALENDAR = "a removed calendar"
     }
 }
+
+/** No address looked up or reached: the tablet's own connection (5 §A.3). OkHttp keeps the cause the provider wraps. */
+internal fun Throwable.isOffline(): Boolean = generateSequence(this) { it.cause }
+    .any { it is OfflineException || it is UnknownHostException || it is ConnectException || it is NoRouteToHostException }
