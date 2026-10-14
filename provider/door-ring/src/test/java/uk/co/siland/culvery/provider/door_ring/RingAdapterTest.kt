@@ -47,6 +47,16 @@ class RingAdapterTest {
         assertThat(post.picture?.width).isEqualTo(extra?.width)
     }
 
+    /** Fails if an out-of-memory picture read drops the notice or leaves it claiming a picture. */
+    @Test
+    fun aPictureThatRunsOutOfMemoryLeavesTheNoticeWithoutIt() {
+        val notification = builder().setContentTitle("Front Door").build()
+        val post = ringPost(RING_PACKAGE, "k1", 5L, notification, context) { _, _ -> throw OutOfMemoryError() }
+        assertThat(post.picture).isNull()
+        assertThat(post.notice.hasPicture).isFalse()
+        assertThat(post.notice.title).isEqualTo("Front Door")
+    }
+
     private fun iconPost(width: Int, height: Int): RingPost {
         val icon = Icon.createWithBitmap(Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888))
         val notification = builder().setStyle(Notification.BigPictureStyle().bigPicture(icon)).build()

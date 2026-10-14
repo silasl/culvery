@@ -18,9 +18,24 @@ class RingPost(val notice: RingNotice, val picture: Bitmap?, val extraKeys: Set<
 }
 
 /** Reads [notification] (5 §3.2): its words, channel, category and time, the picture, and the flags the parser needs. */
-fun ringPost(packageName: String, key: String, postTime: Long, notification: Notification, context: Context): RingPost {
+fun ringPost(packageName: String, key: String, postTime: Long, notification: Notification, context: Context): RingPost =
+    ringPost(packageName, key, postTime, notification, context, ::readPicture)
+
+/** [pictureOf] runs out of memory on a large image: the notice is then kept without it. */
+internal fun ringPost(
+    packageName: String,
+    key: String,
+    postTime: Long,
+    notification: Notification,
+    context: Context,
+    pictureOf: (Bundle, Context) -> Bitmap?,
+): RingPost {
     val extras = notification.extras
-    val picture = BundleCompat.getParcelable(extras, Notification.EXTRA_PICTURE, Bitmap::class.java) ?: pictureIcon(extras, context)
+    val picture = try {
+        pictureOf(extras, context)
+    } catch (_: OutOfMemoryError) {
+        null
+    }
     val notice = RingNotice(
         packageName = packageName,
         key = key,
@@ -37,6 +52,9 @@ fun ringPost(packageName: String, key: String, postTime: Long, notification: Not
     )
     return RingPost(notice, picture, extras.keySet().toSet())
 }
+
+private fun readPicture(extras: Bundle, context: Context): Bitmap? =
+    BundleCompat.getParcelable(extras, Notification.EXTRA_PICTURE, Bitmap::class.java) ?: pictureIcon(extras, context)
 
 /** From Android 12 a picture that isn't a bitmap comes as an Icon; it is drawn no larger than a kept picture. */
 internal fun pictureIcon(extras: Bundle, context: Context): Bitmap? {

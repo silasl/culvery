@@ -7,6 +7,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -84,6 +88,24 @@ class DoorRecorderTest {
         assertThat(recorder.capturing).isFalse()
         now = NOW - 1
         assertThat(recorder.capturing).isFalse()
+    }
+
+    /** Fails if a non-IO failure while counting ends the queue, so later notices are never recorded. */
+    @Test
+    fun aFailureWhileCountingDoesNotStopLaterNotices() = runTest {
+        val real = doorSettingsStore(scope) { File(folder.root, "f.preferences_pb") }
+        var failures = 1
+        val flaky = object : DataStore<Preferences> by real {
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                if (failures-- > 0) throw IllegalStateException("once")
+                return real.updateData(transform)
+            }
+        }
+        val flakyRecorder = DoorRecorder(store, DoorSettings(flaky, scope), scope, WallClock { now }) { alerted.send(it) }
+        flakyRecorder.post(ring(key = "a"))
+        flakyRecorder.post(ring(key = "b"))
+        withContext(Dispatchers.Default) { withTimeout(5_000) { repeat(2) { alerted.receive() } } }
+        assertThat(store.events.first().map { it.device }).hasSize(2)
     }
 
     @Test

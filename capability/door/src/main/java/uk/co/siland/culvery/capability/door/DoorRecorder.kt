@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.capability.door
 
 import android.util.Log
-import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -46,7 +45,9 @@ class DoorRecorder internal constructor(
         scope.launch {
             try {
                 settings.heard(atMillis)
-            } catch (e: IOException) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 Log.w(TAG, "Couldn't keep when Ring was last heard (${e::class.simpleName})")
             }
         }
@@ -75,7 +76,9 @@ class DoorRecorder internal constructor(
         if (recorded.isNew) {
             try {
                 settings.countAlert(recognised = !notice.unrecognised)
-            } catch (e: IOException) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 Log.w(TAG, "Couldn't count an alert (${e::class.simpleName})")
             }
         }
