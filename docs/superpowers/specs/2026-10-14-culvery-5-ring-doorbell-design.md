@@ -1,12 +1,14 @@
 # Culvery 5: the Ring doorbell
 
-Brainstormed 2026-10-14, during 4e's family week. The first outside service after the calendar and the weather, and the test of how later ones (Sonos, Hue, Arlo, the thermostat, Holiday mode) plug in. Follow-ups file: `docs/superpowers/plans/2026-09-23-plan1-followups.md` ("Feature ideas", the Ring line).
+Brainstormed 2026-10-14. The first outside service after the calendar and the weather, and the test of how later ones (Sonos, Hue, Arlo, the thermostat, Holiday mode) plug in. Follow-ups file: `docs/superpowers/plans/2026-09-23-plan1-followups.md` ("Feature ideas", the Ring line).
+
+The user ended 4e's family week early the same day: 4e merged to main, and four pending changes fold into this plan, built before Ring (§A). There are no fixed test periods any more: the tablet runs the latest release, and its logs are read whenever it is plugged in while work is under way.
 
 ## 1. Purpose and outcome
 
 When someone presses the Ring doorbell, the wall tablet tells the room: a card over whatever is showing, with Ring's snapshot when it sends one, and a chime. A Door tab keeps today's and yesterday's rings and motion, with a badge for what nobody has looked at yet.
 
-Done means: a press reaches the wall within a few seconds of Ring's own notification, while the tablet is pinned; motion is recorded without interrupting; the parser is fixed from real captures on the SM-T510 (§8.3); a few days of family use; a final review and a local merge.
+Done means: a press reaches the wall within a few seconds of Ring's own notification, while the tablet is pinned; motion is recorded without interrupting; the parser is fixed from real captures on the SM-T510 (§8.3); the four additions in §A built; a final review, a local merge, and the whole build installed on the tablet.
 
 ## 2. Decisions (the user, 2026-10-14)
 
@@ -65,7 +67,7 @@ Two additions every later capability can use:
 
 ### 3.5 Backup
 
-`door.db` and `files/door/` sit in the `database` and `file` domains, which 4e's data extraction rules (on `plan-4e-device-beta`) exclude from cloud backup and device transfer. No new rule. 4e merges first; if this plan's build starts earlier, it merges main once 4e lands, before the emulator walk-through.
+`door.db` and `files/door/` sit in the `database` and `file` domains, which 4e's data extraction rules (merged to main 2026-10-14) exclude from cloud backup and device transfer. No new rule.
 
 ## 4. Data flow
 
@@ -155,7 +157,7 @@ On a **second AVD**. The current emulator holds a release build with the househo
 
 ### 8.2 Before the tablet
 
-Only after 4e's close-out, and with the household's yes. 4e's tablet rules apply: save and restore every setting, never touch other apps' data, install signed releases with `install -r`, never uninstall Culvery.
+With the household's yes for the Ring app. 4e's tablet rules apply: save and restore every setting, never touch other apps' data, install signed releases with `install -r`, never uninstall Culvery.
 
 ### 8.3 On the tablet
 
@@ -163,7 +165,44 @@ Only after 4e's close-out, and with the household's yes. 4e's tablet rules apply
 2. Install the release build; connect Ring in Settings › Door.
 3. Turn on **Check Ring's notifications**; the user presses the bell and walks past the camera. Read the captures over the cable. Anything copied to a file uses placeholders ([device], [person]) and passes the names check first.
 4. Fix the parser and its fixtures from the captures; rebuild and install.
-5. A few days of family use, then the final review and a local merge.
+5. From then on, the tablet's logs are read whenever it is plugged in while work is under way.
+
+## A. Additions folded into Plan 5
+
+Built first, before Ring; small and independent of it. Sizes and wording are starting values to judge on the wall.
+
+### A.1 The logo on the rail
+
+The bird mark, about 48 dp, above the Home tab. Not a button; TalkBack skips it.
+
+### A.2 Home: a smaller clock, larger Today events
+
+- The clock from 104 to 88 sp; the date unchanged; the header shrinks to match.
+- Today's rows: the title from 17 to 20 sp (`HhType.rowTitle` or a Today-only style, whichever keeps other rows as they are), the time line from 14 to 16 sp.
+
+### A.3 A failed Update now says why
+
+After a failed pass the week's line says what went wrong and what to do, from the outcome the sync pass already reports:
+
+| Outcome | The line says |
+|---|---|
+| Offline | "The tablet is offline. Check the Wi-Fi, then Update now." |
+| Google didn't answer | "Google didn't answer. Try Update now in a few minutes." |
+| Sign-in needed | "Google needs you to sign in again. Reconnect in Settings › Calendars." (the Reconnect chip shows as now) |
+
+Update now stays beside it. No new network code.
+
+### A.4 Repeating events on the tablet
+
+New events only.
+
+- **Time:** chips **All day** (default) and **Pick time…**; a picked time shows the Length chips. The Morning, Afternoon and Evening slots go.
+- **Repeats:** Never (default), Every day, Every week, Every 2 weeks, Every month, Every year.
+- **Ends** (only when it repeats): Never, or On a date (date picker; not before the event's day).
+- **Save** writes `RRULE:FREQ=…;INTERVAL=n` plus `UNTIL` for an end date: a date (`UNTIL=20261231`) for an all-day series, the end of that day in the household zone as UTC (`UNTIL=20261231T235959Z` in GMT; an hour earlier in BST) for a timed one. What it writes reads back through `repeatsLabel` as a simple label, never "Yes".
+- Editing an existing series' time or title stays on a phone; the detail sheet's line about it stays.
+
+Tests: the RRULE for each choice and both UNTIL forms; round trip through `repeatsLabel`; the chips' defaults; Ends hidden for Never; an end date before the event's day refused.
 
 ## 9. Not in this plan
 
@@ -171,4 +210,5 @@ Only after 4e's close-out, and with the household's yes. 4e's tablet rules apply
 - Arlo, Sonos, Hue, the thermostat, Holiday mode (each its own plan; Arlo would be a second provider under Door).
 - A Ring login in Culvery (approach B).
 - Drawing over other apps.
+- Editing a repeating series' time or title on the tablet (§A.4).
 - Per-device settings (which Ring devices alert); every Ring doorbell alerts and every camera's motion is recorded.
