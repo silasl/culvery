@@ -1,0 +1,41 @@
+package uk.co.siland.culvery.capability.door.ui
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.unit.dp
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.takahirom.roborazzi.captureRoboImage
+import java.io.File
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
+import uk.co.siland.culvery.capability.door.BitmapSnapshot
+import uk.co.siland.culvery.capability.door.picture
+import uk.co.siland.culvery.core.ui.CulveryTheme
+
+/** The card at half the 1280 dp screen, as the alert layer places it. */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class DoorCardScreenshotTest {
+    @get:Rule val compose = createComposeRule()
+    @get:Rule val folder = TemporaryFolder()
+
+    private fun snap(name: String, dark: Boolean, card: DoorCardUi) {
+        compose.setContent { CulveryTheme(dark = dark) { Box(Modifier.width(640.dp)) { DoorCard(card, onGotIt = {}) } } }
+        if (card.snapshot != null) compose.waitUntil(5_000) { compose.onAllNodesWithTag("door_snapshot").fetchSemanticsNodes().isNotEmpty() }
+        compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
+    }
+
+    private val ring = DoorCardUi(unrecognised = false, device = "Front Door", time = "14:02", snapshot = null)
+
+    @Test fun cardDark() = snap("door_card_dark", true, ring)
+    @Test fun cardLight() = snap("door_card_light", false, ring)
+    @Test fun cardSnapshotDark() = snap("door_card_snapshot_dark", true, ring.copy(snapshot = File(folder.root, "1.jpg").also { BitmapSnapshot(picture(640, 360)).saveTo(it) }))
+    @Test fun cardUnrecognisedDark() = snap("door_card_unrecognised_dark", true, ring.copy(unrecognised = true))
+}
