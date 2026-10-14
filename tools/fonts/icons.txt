@@ -19,6 +19,8 @@ dark_mode
 date_range
 delete
 delete_forever
+directions_walk
+doorbell
 edit
 edit_note
 event

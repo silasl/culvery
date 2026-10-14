@@ -24,6 +24,8 @@ object Icons {
     const val DATE_RANGE = "date_range"
     const val DELETE = "delete"
     const val DELETE_FOREVER = "delete_forever"
+    const val DIRECTIONS_WALK = "directions_walk"
+    const val DOORBELL = "doorbell"
     const val EDIT = "edit"
     const val EDIT_NOTE = "edit_note"
     const val EVENT = "event"
