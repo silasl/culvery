@@ -39,11 +39,11 @@ fun ringPost(packageName: String, key: String, postTime: Long, notification: Not
 }
 
 /** From Android 12 a picture that isn't a bitmap comes as an Icon; it is drawn no larger than a kept picture. */
-private fun pictureIcon(extras: Bundle, context: Context): Bitmap? {
+internal fun pictureIcon(extras: Bundle, context: Context): Bitmap? {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
     val drawable = BundleCompat.getParcelable(extras, Notification.EXTRA_PICTURE_ICON, Icon::class.java)?.loadDrawable(context) ?: return null
     val (w, h) = drawable.intrinsicWidth to drawable.intrinsicHeight
     if (w <= 0 || h <= 0) return drawable.toBitmap(MAX_SNAPSHOT_PX, MAX_SNAPSHOT_PX)
     val scale = fitScale(w, h)
-    return drawable.toBitmap((w * scale).toInt(), (h * scale).toInt())
+    return drawable.toBitmap((w * scale).toInt().coerceAtLeast(1), (h * scale).toInt().coerceAtLeast(1))
 }
