@@ -26,8 +26,15 @@ class RingParserTest {
     fun anythingElseFromRingIsAnUnknownAlert() =
         assertThat(RingParser.read(RingFixtures.unknown)).isEqualTo(RingReading.UnknownRingAlert("Front Door"))
 
+    /** Ring may post a press as an ongoing, call-style alert; the words still decide. */
     @Test
-    fun anOngoingNoticeIsIgnoredEvenWithARingsWords() = assertThat(RingParser.read(RingFixtures.liveView)).isEqualTo(RingReading.Ignore)
+    fun anOngoingNoticeWithARingsWordsIsARing() = assertThat(RingParser.read(RingFixtures.ongoingRing)).isEqualTo(RingReading.Ring("Front Door"))
+
+    @Test
+    fun anOngoingNoticeWithNoRingsWordsIsIgnored() = assertThat(RingParser.read(RingFixtures.ongoingStatus)).isEqualTo(RingReading.Ignore)
+
+    @Test
+    fun liveViewIsIgnoredByItsWords() = assertThat(RingParser.read(RingFixtures.liveView)).isEqualTo(RingReading.Ignore)
 
     @Test
     fun aBundleSummaryIsIgnoredEvenWithARingsWords() = assertThat(RingParser.read(RingFixtures.bundle)).isEqualTo(RingReading.Ignore)

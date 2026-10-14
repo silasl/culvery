@@ -22,8 +22,9 @@ val RingReading.outcome: String
 
 /**
  * Places a Ring notice (5 §3.2). Best guesses until the tablet's captures (5 §8.3): Ring's live-view, bundle, app,
- * account, offer and battery notices are ignored; motion when the words say motion; a ring when they say someone is at
- * the door or the bell rang; anything else from Ring is an unknown alert, which still rings.
+ * account, offer and battery notices, and ongoing ones that don't say a ring, are ignored; motion when the words say
+ * motion; a ring when they say someone is at the door or the bell rang; anything else from Ring is an unknown alert,
+ * which still rings.
  */
 object RingParser {
     // Android's Notification.CATEGORY_* values as text, so the parser runs without Android.
@@ -35,7 +36,8 @@ object RingParser {
 
     fun read(notice: RingNotice): RingReading {
         val words = listOfNotNull(notice.title, notice.text, notice.bigText).joinToString(" ")
-        if (notice.ongoing || notice.groupSummary || notice.category in IGNORED_CATEGORIES || IGNORED_WORDS.containsMatchIn(words)) {
+        // An ongoing notice is a ring if its words say so: Ring may post a press as a call-style alert.
+        if ((notice.ongoing && !RING.containsMatchIn(words)) || notice.groupSummary || notice.category in IGNORED_CATEGORIES || IGNORED_WORDS.containsMatchIn(words)) {
             return RingReading.Ignore
         }
         val device = deviceOf(notice)

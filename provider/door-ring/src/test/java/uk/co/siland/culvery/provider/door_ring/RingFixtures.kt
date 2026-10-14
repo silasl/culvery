@@ -33,8 +33,12 @@ internal object RingFixtures {
     val motion = notice(102, "Front Door", "There is motion at your Front Door", channel = "motion")
     val unknown = notice(103, "Front Door", "New event at your Front Door", channel = "alerts")
 
-    // One per ignore rule, each with a ring's words, so the rule alone is what ignores it.
-    val liveView = notice(104, "Front Door", RING_WORDS, channel = "live_view", ongoing = true)
+    // One per ignore rule; all but the live-view and ongoing ones carry a ring's words, so the rule alone is what ignores it.
+    val liveView = notice(104, "Front Door", "Live view: someone is at your Front Door", channel = "live_view", ongoing = true)
+    val ongoingStatus = notice(108, "Ring", "Streaming from your Front Door", channel = "general", ongoing = true)
+
+    /** A ring Ring posts as an ongoing, call-style alert. */
+    val ongoingRing = notice(109, "Front Door", "Someone is at your Front Door", ongoing = true)
     val bundle = notice(105, "Ring", RING_WORDS, summary = true)
     val promo = notice(106, "Ring", RING_WORDS, channel = "marketing", category = "promo")
     val appUpdate = notice(107, "Ring", "Update Ring to see when someone is at your Front Door", channel = "general")
