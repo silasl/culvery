@@ -1,12 +1,18 @@
 package uk.co.siland.culvery.capability.door
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.io.File
+import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
@@ -53,7 +59,28 @@ class DoorHealthTest {
     fun bothStepsDoneConnectsRing() = runTest {
         // The health runs on a real dispatcher here: the save goes through DataStore's, which the test scheduler doesn't drive.
         DoorHealth(provider, settings, bound, inFront, io)
-        withContext(Dispatchers.Default) { withTimeout(5_000) { settings.prefs.first { it.connected } } }
+        withContext(Dispatchers.Default) { withTimeout(5_000) { settings.current.first { it.connected } } }
+    }
+
+    /** A save that failed is tried again on the next refresh, though the checks are unchanged. Fails if only a change in the checks retries it. */
+    @Test
+    fun aConnectionThatFailedToSaveIsSavedOnTheNextRefresh() = runTest {
+        val real = doorSettingsStore(io) { File(folder.root, "flaky.preferences_pb") }
+        val attempts = AtomicInteger()
+        val flaky = object : DataStore<Preferences> by real {
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                if (attempts.getAndIncrement() == 0) throw IOException("disk full")
+                return real.updateData(transform)
+            }
+        }
+        val flakySettings = DoorSettings(flaky, io)
+        val health = DoorHealth(provider, flakySettings, bound, MutableStateFlow(false), io)
+        withContext(Dispatchers.Default) {
+            withTimeout(5_000) { while (attempts.get() == 0) delay(10) }
+            assertThat(flakySettings.current.value.connected).isFalse()
+            health.refresh()
+            withTimeout(5_000) { flakySettings.current.first { it.connected } }
+        }
     }
 
     /** 5 §5.5: turning access off later leaves the connection; the status says so instead. Fails if access off clears the connection. */

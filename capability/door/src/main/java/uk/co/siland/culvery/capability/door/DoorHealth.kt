@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
@@ -50,13 +51,16 @@ class DoorHealth internal constructor(
     private val _checks = MutableStateFlow<Checks?>(null)
     val checks: StateFlow<Checks?> = _checks.asStateFlow()
 
+    /** Counts every check, so a save that failed is tried again by the next one though [Checks] are equal and a StateFlow drops them. */
+    private val checked = MutableStateFlow(0)
+
     init {
         scope.launch {
-            _checks.value = checkNow()
-            merge(inFront.filter { it }, bound.filterNotNull()).collect { _checks.value = checkNow() }
+            check()
+            merge(inFront.filter { it }, bound.filterNotNull()).collect { check() }
         }
         scope.launch {
-            combine(checks.filterNotNull(), settings.prefs) { c, prefs -> c.appInstalled && c.accessAllowed && !prefs.connected }
+            combine(checks.filterNotNull(), settings.prefs, checked) { c, prefs, _ -> c.appInstalled && c.accessAllowed && !prefs.connected }
                 .filter { it }
                 .collect { connect() }
         }
@@ -64,7 +68,12 @@ class DoorHealth internal constructor(
 
     /** Settings › Door asks again as it opens: the household may have just installed Ring or allowed access. */
     fun refresh() {
-        scope.launch { _checks.value = checkNow() }
+        scope.launch { check() }
+    }
+
+    private fun check() {
+        _checks.value = checkNow()
+        checked.update { it + 1 }
     }
 
     private fun checkNow() = Checks(provider?.appInstalled() == true, provider?.accessAllowed() == true)
