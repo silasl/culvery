@@ -40,6 +40,7 @@ import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
+import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.shell.SessionUi
@@ -134,7 +135,7 @@ class ShellScreenshotTest {
         overlay: @Composable () -> Unit = {},
     ) {
         compose.setContent {
-            CompositionLocalProvider(LocalShellNavigator provides NoNavigation) {
+            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
                 CulveryTheme(dark = dark) {
                     WithFontScale(fontScale) {
                         Box(Modifier.fillMaxSize()) {

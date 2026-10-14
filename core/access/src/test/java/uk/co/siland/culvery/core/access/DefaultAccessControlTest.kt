@@ -409,7 +409,7 @@ class DefaultAccessControlTest {
         answerPins("1234")
         access.authorise(CorePermissions.SETTINGS_MANAGE)
         val request = firstPromptFor(access, CorePermissions.CONNECTIONS_MANAGE)
-        assertThat(request.label).isEqualTo("Connect calendars")
+        assertThat(request.label).isEqualTo("Connect calendars and services")
     }
 
     @Test

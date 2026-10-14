@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.shell
 
+import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
@@ -292,6 +293,25 @@ class ShellViewModelTest {
         }
         assertThat(access.requested.last()).containsExactly(CorePermissions.SETTINGS_MANAGE)
         assertThat(access.session.value).isNotNull()
+        assertThat(vm.kioskExited).isFalse()
+    }
+
+    /** Android's screen leaves Culvery unpinned, another way out of the kiosk: a fresh Admin PIN first; a cancelled pad opens nothing. */
+    @Test
+    fun aSystemScreenAsksAFreshPinAndACancelledPadOpensNothing() = runTest {
+        val vm = vm()
+        val screens = listOf(Intent("detail"), Intent("list"))
+        vm.systemScreenRequests.test {
+            access.result = null
+            vm.openSystemScreen(screens, "missing")
+            runCurrent()
+            expectNoEvents()
+            assertThat(access.requested.last()).containsExactly(CorePermissions.CONNECTIONS_MANAGE)
+            access.result = admin
+            vm.openSystemScreen(screens, "missing")
+            assertThat(awaitItem()).isEqualTo(SystemScreenRequest(screens, "missing"))
+        }
+        // Unlike Use other apps, Culvery pins again when it is back in front.
         assertThat(vm.kioskExited).isFalse()
     }
 

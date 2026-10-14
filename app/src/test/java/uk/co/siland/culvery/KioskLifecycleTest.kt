@@ -6,6 +6,7 @@ import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -130,7 +131,7 @@ class KioskLifecycleTest {
     fun whenNoHomeAppScreenOpensItPinsAgainAndSaysSo() {
         exited = true
         window.calls.clear()
-        kiosk.openHomeAppScreen(HOME_APP_NOT_SET) { throw ActivityNotFoundException() }
+        kiosk.openSystemScreen(HOME_APP_NOT_SET) { throw ActivityNotFoundException() }
         assertThat(window.calls).containsExactly("unpin", "pin").inOrder()
         assertThat(exited).isFalse()
         assertThat(said).containsExactly(HOME_APP_NOT_SET)
@@ -140,7 +141,7 @@ class KioskLifecycleTest {
     @Test
     fun whenTheHomeAppSettingIsMissingChangeSaysWhereToChangeIt() {
         window.calls.clear()
-        kiosk.openHomeAppScreen(HOME_APP_SCREEN_MISSING) { throw ActivityNotFoundException() }
+        kiosk.openSystemScreen(HOME_APP_SCREEN_MISSING) { throw ActivityNotFoundException() }
         assertThat(window.calls).containsExactly("unpin", "pin").inOrder()
         assertThat(said).containsExactly(HOME_APP_SCREEN_MISSING)
         assertThat(HOME_APP_SCREEN_MISSING).isEqualTo("Culvery can’t open the home app setting.")
@@ -154,9 +155,31 @@ class KioskLifecycleTest {
     @Test
     fun aScreenThatOpensIsLeftToPinOnTheNextResume() {
         window.calls.clear()
-        kiosk.openHomeAppScreen(HOME_APP_NOT_SET) { }
+        kiosk.openSystemScreen(HOME_APP_NOT_SET) { }
         assertThat(window.calls).containsExactly("unpin")
         assertThat(said).isEmpty()
+        controller.pause().resume()
+        assertThat(window.calls.last()).isEqualTo("pin")
+    }
+
+    /** Android may refuse a screen to Culvery rather than lack it: the same as no screen. */
+    @Test
+    fun aScreenThatRefusesCulveryPinsAgainAndSaysSo() {
+        window.calls.clear()
+        kiosk.openSystemScreen(HOME_APP_SCREEN_MISSING) { throw SecurityException() }
+        assertThat(window.calls).containsExactly("unpin", "pin").inOrder()
+        assertThat(said).containsExactly(HOME_APP_SCREEN_MISSING)
+    }
+
+    /** Notification access: Culvery's own toggle first, then the list, before saying there is none. */
+    @Test
+    fun startFirstFallsThroughToTheNextScreen() {
+        val started = mutableListOf<String?>()
+        val detail = Intent("detail")
+        val list = Intent("list")
+        startFirst(listOf(detail, list)) { if (it == detail) throw ActivityNotFoundException() else started += it.action }
+        assertThat(started).containsExactly("list")
+        assertThrows(SecurityException::class.java) { startFirst(listOf(detail, list)) { throw SecurityException() } }
     }
 
     @Test
@@ -269,7 +292,7 @@ class KioskLifecycleTest {
         window.calls.clear()
         controller.resume()
         kiosk.returnToPinning()
-        kiosk.openHomeAppScreen(HOME_APP_NOT_SET) { throw ActivityNotFoundException() }
+        kiosk.openSystemScreen(HOME_APP_NOT_SET) { throw ActivityNotFoundException() }
         assertThat(window.calls).isEmpty()
     }
 

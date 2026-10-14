@@ -15,5 +15,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.androidx.activity.compose)
     testImplementation(project(":capability:calendar-testkit"))
+    testImplementation(testFixtures(project(":core:plugin")))
     testImplementation(libs.okhttp.mockwebserver)
 }

@@ -42,32 +42,6 @@ class StillPage(override val id: String, override val title: String, override va
     override fun Content() = content()
 }
 
-class RecordingNavigator : ShellNavigator {
-    var kioskExits = 0
-    var homeAppChoices = 0
-    var homeAppChanges = 0
-
-    override fun openTab(id: String) = Unit
-
-    override fun openSettings(page: String?) = Unit
-
-    override fun exitKiosk() {
-        kioskExits++
-    }
-
-    override fun chooseHomeApp() {
-        homeAppChoices++
-    }
-
-    override fun changeHomeApp() {
-        homeAppChanges++
-    }
-
-    override fun leavePinning() = Unit
-
-    override fun returnToPinning() = Unit
-}
-
 class FakeHomeApp(default: Boolean = false) : HomeApp {
     override val isDefault = MutableStateFlow(default)
 }

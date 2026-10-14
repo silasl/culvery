@@ -59,13 +59,14 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
+import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
 /** settings.manage's name on the PIN pad. */
 private const val SETTINGS_LABEL = "Change settings"
 
 /** connections.manage's name on the PIN pad: every connect and reconnect asks for it (4c design D5). */
-private const val CONNECT_LABEL = "Connect calendars"
+private const val CONNECT_LABEL = "Connect calendars and services"
 
 /** The connecting card over real access rules, setup and store; PIN pads are answered from a queue. */
 @RunWith(AndroidJUnit4::class)

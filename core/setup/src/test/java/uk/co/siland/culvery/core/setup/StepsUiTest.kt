@@ -33,6 +33,7 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.setup.steps.DoneStep
 import uk.co.siland.culvery.core.setup.steps.WelcomeStep
 import uk.co.siland.culvery.core.setup.steps.YouStep

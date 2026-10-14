@@ -8,6 +8,7 @@ plugins {
 
 dependencies {
     testImplementation(testFixtures(project(":core:ui")))
+    testImplementation(testFixtures(project(":core:plugin")))
     // Capability, HeaderItem, Daylight, SunTimes and ProviderDescriptor appear in this module's public API.
     api(project(":core:plugin"))
     // HomeLocation and HouseholdZone appear in this module's public API (weatherView, WeatherRepository).

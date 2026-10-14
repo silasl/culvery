@@ -22,6 +22,7 @@ import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.couldNotConnect
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 
 @RunWith(AndroidJUnit4::class)
 class GoogleConnectScreenTest {

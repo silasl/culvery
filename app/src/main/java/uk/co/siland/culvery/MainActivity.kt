@@ -154,6 +154,7 @@ class MainActivity : ComponentActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { shell.kioskExit.collect { kiosk.exitKiosk() } }
                 launch { shell.homeAppRequests.collect(::openHomeAppScreen) }
+                launch { shell.systemScreenRequests.collect { r -> kiosk.openSystemScreen(r.missing) { startFirst(r.intents) { startActivity(it) } } } }
             }
         }
         lifecycleScope.launch {
@@ -235,12 +236,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openHomeAppScreen(request: HomeAppRequest) = when (request) {
-        HomeAppRequest.CHOOSE -> kiosk.openHomeAppScreen(HOME_APP_NOT_SET) {
+        HomeAppRequest.CHOOSE -> kiosk.openSystemScreen(HOME_APP_NOT_SET) {
             val roles = getSystemService(RoleManager::class.java)
             if (roles == null || !roles.isRoleAvailable(RoleManager.ROLE_HOME)) throw ActivityNotFoundException("No home role")
             askHomeRole.launch(roles.createRequestRoleIntent(RoleManager.ROLE_HOME))
         }
-        HomeAppRequest.CHANGE -> kiosk.openHomeAppScreen(HOME_APP_SCREEN_MISSING) {
+        HomeAppRequest.CHANGE -> kiosk.openSystemScreen(HOME_APP_SCREEN_MISSING) {
             startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
         }
     }

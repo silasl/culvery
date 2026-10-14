@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.plugin
 
+import android.content.Intent
 import androidx.compose.runtime.staticCompositionLocalOf
 
 /** Lets capability UI move the shell without depending on :app. */
@@ -29,6 +30,13 @@ interface ShellNavigator {
 
     /** The system screen ended or never opened: restores what [leavePinning] gave up, if Culvery is already in front. */
     fun returnToPinning()
+
+    /**
+     * Opens the first of [intents] the tablet has, one of Android's own screens such as notification access (5 §3.4),
+     * after a fresh Admin PIN: Culvery unpins while it shows and pins again when back in front; when none opens, it pins
+     * again at once and says [missing].
+     */
+    fun openSystemScreen(intents: List<Intent>, missing: String)
 }
 
 /** Settings' page ids, so a capability can open a page without depending on `:core:setup` (4d-2 §7.6). */

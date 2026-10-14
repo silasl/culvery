@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.shell
 
+import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -40,6 +41,9 @@ import uk.co.siland.culvery.core.plugin.retryWithBackoff
 /** What Settings › Tablet lock or the Done step asked of Android (4c §5.1). */
 enum class HomeAppRequest { CHOOSE, CHANGE }
 
+/** One of Android's screens asked for through [ShellNavigator.openSystemScreen], after the PIN. */
+data class SystemScreenRequest(val intents: List<Intent>, val missing: String)
+
 @HiltViewModel
 class ShellViewModel @Inject constructor(
     capabilities: Set<@JvmSuppressWildcards Capability>,
@@ -61,6 +65,10 @@ class ShellViewModel @Inject constructor(
 
     /** Each request to Android about the home app; MainActivity unpins first, as nothing opens over a pinned app. */
     val homeAppRequests: Flow<HomeAppRequest> = homeAppEvents.receiveAsFlow()
+    private val systemScreenEvents = Channel<SystemScreenRequest>(Channel.BUFFERED)
+
+    /** Each system screen allowed; MainActivity unpins and opens it. */
+    val systemScreenRequests: Flow<SystemScreenRequest> = systemScreenEvents.receiveAsFlow()
 
     /**
      * Use other apps or Change home app, and Culvery not back in front since (4c K2). A field, not saved state: a
@@ -197,6 +205,14 @@ class ShellViewModel @Inject constructor(
             access.authorise(CorePermissions.KIOSK_EXIT) ?: return@launch
             leaveKiosk()
             homeAppEvents.send(HomeAppRequest.CHANGE)
+        }
+    }
+
+    /** Leaving Culvery unpinned is a way out of the kiosk: a fresh Admin PIN, as Change home app asks; nothing opens without it. */
+    override fun openSystemScreen(intents: List<Intent>, missing: String) {
+        viewModelScope.launch {
+            access.authorise(CorePermissions.CONNECTIONS_MANAGE) ?: return@launch
+            systemScreenEvents.send(SystemScreenRequest(intents, missing))
         }
     }
 

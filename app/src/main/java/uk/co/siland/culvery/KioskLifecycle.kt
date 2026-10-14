@@ -134,16 +134,18 @@ internal class KioskLifecycle(
     }
 
     /**
-     * Android's screens can't open over a pinned app, so unpin, then [launch] one. When there is none, pin again at
-     * once (nothing pauses Culvery, so nothing else would) and say [missing].
+     * Android's screens can't open over a pinned app (5 §3.4): unpin, then [launch] one; the next resume pins again. When
+     * there is none, or Android refuses it to Culvery, pin again at once (nothing pauses Culvery, so nothing else would)
+     * and say [missing].
      */
-    fun openHomeAppScreen(missing: String, launch: () -> Unit) {
+    fun openSystemScreen(missing: String, launch: () -> Unit) {
         if (handedOver) return
         window.unpin()
         try {
             launch()
-        } catch (e: ActivityNotFoundException) {
-            Log.w(TAG, "No screen to change the home app on this tablet (${e::class.simpleName})")
+        } catch (e: RuntimeException) {
+            if (e !is ActivityNotFoundException && e !is SecurityException) throw e
+            Log.w(TAG, "No system screen opened on this tablet (${e::class.simpleName})")
             returnedToFront()
             if (shouldPin(setupComplete(), kioskExited())) window.pin()
             say(missing)
@@ -183,4 +185,20 @@ internal class KioskLifecycle(
     private companion object {
         const val TAG = "Culvery"
     }
+}
+
+/** Starts the first of [intents] the tablet will open; when none will, throws what the last one threw. */
+internal fun startFirst(intents: List<Intent>, start: (Intent) -> Unit) {
+    var failure: RuntimeException = ActivityNotFoundException("No screen to open")
+    for (intent in intents) {
+        try {
+            start(intent)
+            return
+        } catch (e: ActivityNotFoundException) {
+            failure = e
+        } catch (e: SecurityException) {
+            failure = e
+        }
+    }
+    throw failure
 }
