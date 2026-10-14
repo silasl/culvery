@@ -353,8 +353,8 @@ class GoogleCalendarProvider @Inject constructor(
         if (!answer.isSuccessful) throw answer.refusal(what)
         val event = answer.decode(GoogleEvent.serializer(), GoogleCall.EVENT_GET).takeUnless { it.isGone } ?: return null
         if ((event.recurrence != null) != series) {
-            val now = if (series) "is no longer" else "has become"
-            Log.w(TAG, "${what.label}: it $now a repeating event in Google Calendar, so the tablet leaves it alone")
+            if (series) Log.w(TAG, "${what.label}: it is no longer a repeating event in Google Calendar, so the tablet leaves it alone")
+            else Log.w(TAG, "${what.label}: it has become a repeating event in Google Calendar, so the tablet leaves it alone")
             throw WriteRejectedException()
         }
         return event
