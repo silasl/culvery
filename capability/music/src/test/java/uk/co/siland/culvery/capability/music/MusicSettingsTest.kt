@@ -2,27 +2,17 @@ package uk.co.siland.culvery.capability.music
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MusicSettingsTest {
-    @get:Rule val folder = TemporaryFolder()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val settings by lazy { musicSettings(folder.root, scope) }
+    @get:Rule val music = MusicFixture()
+    private val settings get() = music.settings
     private val home = MusicLink("Sonos_home", "192.168.1.20:1400")
-
-    @After
-    fun tearDown() = scope.cancel()
 
     /** 6 §2.3, §5.4: not connected, no usual room, 20 %. */
     @Test

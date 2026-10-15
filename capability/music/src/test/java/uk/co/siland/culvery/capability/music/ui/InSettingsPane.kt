@@ -14,8 +14,8 @@ import androidx.compose.ui.unit.dp
 
 /** Hosts a page as SettingsScreen does: inside a vertical scroll, in a column 720 dp wide. Add no scroll of the page's own. */
 @Composable
-internal fun InSettingsPane(modifier: Modifier = Modifier.fillMaxWidth().fillMaxHeight(), page: @Composable () -> Unit) {
-    Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = 48.dp, vertical = 40.dp)) {
+internal fun InSettingsPane(page: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth().fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 48.dp, vertical = 40.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.widthIn(max = 720.dp)) { page() }
     }
 }

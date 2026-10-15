@@ -1,20 +1,13 @@
 package uk.co.siland.culvery.capability.music.ui
 
-import android.graphics.Bitmap
-import android.graphics.Color
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,8 +20,6 @@ import uk.co.siland.culvery.capability.music.PlayState
 import uk.co.siland.culvery.capability.music.SONG
 import uk.co.siland.culvery.capability.music.STATION
 import uk.co.siland.culvery.capability.music.group
-import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.CulveryTheme
 
 /** The tab in the shell's content area on the 1280×800 canvas; the sheet against the right edge, as the shell places it. */
 @RunWith(AndroidJUnit4::class)
@@ -36,23 +27,13 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 @Config(qualifiers = "w1280dp-h800dp-land-hdpi")
 class MusicTabScreenshotTest {
     @get:Rule val compose = createComposeRule()
-    private val grey = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GRAY) }.asImageBitmap()
     private val groups = listOf(
         group("l", "Lounge", "Dining room", state = PlayState.PLAYING, nowPlaying = STATION, volume = 40, artUrl = "art"),
         group("k", "Kitchen", state = PlayState.PAUSED, nowPlaying = SONG, volume = 30, artUrl = "art"),
         group("b", "Bedroom"),
     )
 
-    private fun snap(name: String, dark: Boolean, content: @Composable () -> Unit) {
-        compose.setContent {
-            CulveryTheme(dark = dark) {
-                CompositionLocalProvider(LocalArtSource provides ArtSource { grey }) {
-                    Box(Modifier.size(1_116.dp, 700.dp).background(Culvery.colors.bg)) { content() }
-                }
-            }
-        }
-        compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
-    }
+    private fun snap(name: String, dark: Boolean, content: @Composable () -> Unit) = compose.snap(name, dark, Modifier.size(1_116.dp, 700.dp), content)
 
     private fun tab(name: String, dark: Boolean, status: String? = null, roomsShown: Set<String> = emptySet()) =
         snap(name, dark) { MusicTab(groups, status, emptyMap(), roomsShown, {}, GroupActions.None) }

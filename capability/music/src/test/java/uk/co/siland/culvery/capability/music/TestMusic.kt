@@ -1,13 +1,28 @@
 package uk.co.siland.culvery.capability.music
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import org.junit.rules.TemporaryFolder
+import org.junit.rules.TestRule
+import org.junit.runner.Description
+import org.junit.runners.model.Statement
 import uk.co.siland.culvery.capability.music.ui.GroupActions
 import uk.co.siland.culvery.core.plugin.Feature
+import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.ui.Icons
@@ -40,6 +55,50 @@ internal fun recordingGroupActions(calls: MutableList<String>) = GroupActions(
 
 internal fun musicSettings(dir: File, scope: CoroutineScope) =
     MusicSettings(musicSettingsStore(scope) { File(dir, "music_settings.preferences_pb") }, scope)
+
+/** A test's folder, a scope on Dispatchers.IO cancelled after the test, and [settings] kept in that folder. */
+class MusicFixture : TestRule {
+    private val folder = TemporaryFolder()
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val settings by lazy { musicSettings(folder.root, scope) }
+
+    override fun apply(base: Statement, description: Description): Statement = folder.apply(
+        object : Statement() {
+            override fun evaluate() = try {
+                base.evaluate()
+            } finally {
+                scope.cancel()
+            }
+        },
+        description,
+    )
+}
+
+/** [block] on a real dispatcher, as DataStore's writes need, failing after 5 s. */
+internal suspend fun <T> soon(block: suspend CoroutineScope.() -> T): T = withContext(Dispatchers.Default) { withTimeout(5_000, block) }
+
+/** Waits up to 5 s for [condition], letting the main looper run between looks. */
+internal fun ComposeContentTestRule.waitFor(condition: () -> Boolean) = waitUntil(5_000) {
+    waitForIdle()
+    condition()
+}
+
+/** An overlay host that keeps the sheet it was asked to show, for the test to draw, and counts each show. */
+internal class TestOverlay : OverlayHost {
+    var content by mutableStateOf<(@Composable () -> Unit)?>(null)
+    var shown = 0
+
+    override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) {
+        shown++
+        this.content = content
+    }
+
+    override fun markEdited(edited: Boolean) = Unit
+
+    override fun dismiss() {
+        content = null
+    }
+}
 
 /** A music system a test drives: its groups and problem, the calls made of it in order, and calls that fail or wait. */
 internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : MusicSystem {

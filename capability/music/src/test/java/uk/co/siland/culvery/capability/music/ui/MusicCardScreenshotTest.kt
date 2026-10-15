@@ -1,23 +1,16 @@
 package uk.co.siland.culvery.capability.music.ui
 
-import android.graphics.Bitmap
-import android.graphics.Color
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.takahirom.roborazzi.captureRoboImage
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
@@ -30,7 +23,6 @@ import uk.co.siland.culvery.capability.music.SONG
 import uk.co.siland.culvery.capability.music.STATION
 import uk.co.siland.culvery.capability.music.group
 import uk.co.siland.culvery.core.ui.ButtonSurface
-import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
 /** The Home card in a REGULAR cell as the grid gives it on the 1280×800 canvas (the forecast's 345 × 279). */
@@ -39,20 +31,10 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 @Config(qualifiers = "w1280dp-h800dp-land-hdpi")
 class MusicCardScreenshotTest {
     @get:Rule val compose = createComposeRule()
-    private val grey = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GRAY) }.asImageBitmap()
     private val kitchen = group("k", "Kitchen", state = PlayState.PLAYING, nowPlaying = SONG, volume = 30, artUrl = "art")
 
-    private fun snap(name: String, dark: Boolean, pick: HomePick?, status: String? = null) {
-        compose.setContent {
-            CulveryTheme(dark = dark) {
-                CompositionLocalProvider(LocalArtSource provides ArtSource { grey }) {
-                    Box(Modifier.background(Culvery.colors.bg).padding(16.dp)) {
-                        Box(Modifier.size(345.dp, 279.dp)) { MusicCard(pick, status, null, GroupActions.None) }
-                    }
-                }
-            }
-        }
-        compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
+    private fun snap(name: String, dark: Boolean, pick: HomePick?, status: String? = null) = compose.snap(name, dark, Modifier.padding(16.dp)) {
+        Box(Modifier.size(345.dp, 279.dp)) { MusicCard(pick, status, null, GroupActions.None) }
     }
 
     @Test fun playingDark() = snap("music_card_playing_dark", true, HomePick(kitchen, false))

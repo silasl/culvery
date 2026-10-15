@@ -3,31 +3,20 @@ package uk.co.siland.culvery.capability.music
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MusicViewTest {
-    @get:Rule val folder = TemporaryFolder()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @get:Rule val music = MusicFixture()
+    private val scope = music.scope
     private val kitchen = group("k", "Kitchen")
     private val bedroom = group("b", "Bedroom")
-
-    @After
-    fun tearDown() = scope.cancel()
 
     /**
      * 6 §2.2: Home's memory outlives the card (Settings over Home, another tab, then back): the card's
@@ -36,28 +25,26 @@ class MusicViewTest {
      */
     @Test
     fun theRoomPausedFromHomeSurvivesTheCardLeaving() = runTest {
-        val settings = musicSettings(folder.root, scope)
+        val settings = music.settings
         val provider = TestMusicProvider()
         val speakers = Speakers(setOf(provider), settings, scope)
         settings.connect("music.sonos", MusicLink("Sonos_home", "192.168.1.20:1400"))
         settings.setUsualRoom("Kitchen-id")
         // The work runs on Dispatchers.IO, which the test scheduler's virtual time doesn't wait for.
-        withContext(Dispatchers.Default) { withTimeout(5_000) { speakers.system.first { it != null } } }
+        soon { speakers.system.first { it != null } }
         val system = provider.systems.single()
         val view = MusicView(speakers, settings, scope)
         val paused = bedroom.copy(state = PlayState.PAUSED, nowPlaying = SONG)
         system.groups.value = listOf(kitchen, bedroom.copy(state = PlayState.PLAYING, nowPlaying = SONG))
-        withContext(Dispatchers.Default) {
-            withTimeout(5_000) {
-                view.home.takeWhile { it?.group?.state != PlayState.PAUSED }.collect { pick ->
-                    if (pick?.group?.id == "b") system.groups.value = listOf(kitchen, paused)
-                }
+        soon {
+            view.home.takeWhile { it?.group?.state != PlayState.PAUSED }.collect { pick ->
+                if (pick?.group?.id == "b") system.groups.value = listOf(kitchen, paused)
             }
         }
         // While the card is away a check reads a new volume, so the card's return can't be answered from a cached pick.
         val turned = paused.copy(volume = 40)
         system.groups.value = listOf(kitchen, turned)
-        val back = withContext(Dispatchers.Default) { withTimeout(5_000) { view.home.first { it?.group in system.groups.value } } }
+        val back = soon { view.home.first { it?.group in system.groups.value } }
         assertThat(back).isEqualTo(HomePick(turned, nothingPlaying = false))
     }
 

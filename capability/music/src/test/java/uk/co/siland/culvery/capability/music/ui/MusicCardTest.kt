@@ -25,19 +25,15 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.music.HomePick
 import uk.co.siland.culvery.capability.music.MusicActions
 import uk.co.siland.culvery.capability.music.MusicChecks
+import uk.co.siland.culvery.capability.music.MusicFixture
 import uk.co.siland.culvery.capability.music.MusicLink
 import uk.co.siland.culvery.capability.music.MusicView
 import uk.co.siland.culvery.capability.music.PlayState
@@ -46,8 +42,8 @@ import uk.co.siland.culvery.capability.music.STATION
 import uk.co.siland.culvery.capability.music.Speakers
 import uk.co.siland.culvery.capability.music.TestMusicProvider
 import uk.co.siland.culvery.capability.music.group
-import uk.co.siland.culvery.capability.music.musicSettings
 import uk.co.siland.culvery.capability.music.recordingGroupActions
+import uk.co.siland.culvery.capability.music.waitFor
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
@@ -55,7 +51,7 @@ import uk.co.siland.culvery.core.ui.test.assertAccessible
 @RunWith(AndroidJUnit4::class)
 class MusicCardTest {
     @get:Rule val compose = createComposeRule()
-    @get:Rule val folder = TemporaryFolder()
+    @get:Rule val music = MusicFixture()
     private val calls = mutableListOf<String>()
     private val actions = recordingGroupActions(calls)
     private val playing = group("k", "Kitchen", state = PlayState.PLAYING, nowPlaying = SONG, volume = 30)
@@ -163,26 +159,19 @@ class MusicCardTest {
     /** 6 §4.2: the speakers are checked while the card shows, and not once it has gone. Fails if the watch outlives the card. */
     @Test
     fun theCardWatchesOnlyWhileItShows() {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        try {
-            val settings = musicSettings(folder.root, scope)
-            val provider = TestMusicProvider()
-            val speakers = Speakers(setOf(provider), settings, scope)
-            runBlocking { settings.connect("music.sonos", MusicLink("Sonos_home", "192.168.1.20:1400")) }
-            val view = MusicView(speakers, settings, scope)
-            val checks = MusicChecks(speakers.system, MutableStateFlow(true), scope).also { it.start() }
-            var shown by mutableStateOf(true)
-            compose.setContent { CulveryTheme(dark = true) { if (shown) MusicCardHost(view, MusicActions({ null }, scope), checks) } }
-            compose.waitUntil(5_000) {
-                compose.waitForIdle()
-                provider.systems.singleOrNull()?.calls?.contains("checkLayout") == true
-            }
-            assertThat(checks.watching).isEqualTo(1)
-            shown = false
-            compose.waitForIdle()
-            assertThat(checks.watching).isEqualTo(0)
-        } finally {
-            scope.cancel()
-        }
+        val scope = music.scope
+        val settings = music.settings
+        val provider = TestMusicProvider()
+        val speakers = Speakers(setOf(provider), settings, scope)
+        runBlocking { settings.connect("music.sonos", MusicLink("Sonos_home", "192.168.1.20:1400")) }
+        val view = MusicView(speakers, settings, scope)
+        val checks = MusicChecks(speakers.system, MutableStateFlow(true), scope).also { it.start() }
+        var shown by mutableStateOf(true)
+        compose.setContent { CulveryTheme(dark = true) { if (shown) MusicCardHost(view, MusicActions({ null }, scope), checks) } }
+        compose.waitFor { provider.systems.singleOrNull()?.calls?.contains("checkLayout") == true }
+        assertThat(checks.watching).isEqualTo(1)
+        shown = false
+        compose.waitForIdle()
+        assertThat(checks.watching).isEqualTo(0)
     }
 }

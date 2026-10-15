@@ -9,8 +9,10 @@ import com.google.common.truth.Truth.assertThat
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -43,6 +45,9 @@ class ShellAlertsTest {
 
     private val nothing: @Composable () -> Unit = {}
 
+    /** Asks quieted() and runs what is due: the job is complete once quieted() has returned. */
+    private fun TestScope.askQuieted(alerts: ShellAlerts): Job = launch { alerts.quieted() }.also { runCurrent() }
+
     /** Fails if show keeps the old content, or dismiss leaves one behind. */
     @Test
     fun anAlertReplacesTheLastAndDismissClearsIt() {
@@ -64,18 +69,13 @@ class ShellAlertsTest {
         val second = RecordingQuieter("second", log)
         val alerts = alerts(first, second, scope = backgroundScope)
         alerts.show(loud = true, content = nothing)
-        var quieted = false
-        launch {
-            alerts.quieted()
-            quieted = true
-        }
-        runCurrent()
+        val quieted = askQuieted(alerts)
         // The second ran while the first was still held.
         assertThat(log).containsExactly("first quiet", "second quiet", "second quieted").inOrder()
-        assertThat(quieted).isFalse()
+        assertThat(quieted.isCompleted).isFalse()
         first.gate!!.complete(Unit)
         runCurrent()
-        assertThat(quieted).isTrue()
+        assertThat(quieted.isCompleted).isTrue()
     }
 
     /** 6 §3.3: a hung quieter holds the chime back 500 ms at most. Fails at 499 if the cap is shorter, at 500 if longer. */
@@ -140,13 +140,8 @@ class ShellAlertsTest {
         runCurrent()
         alerts.show(loud = true, content = nothing)
         runCurrent()
-        var quieted = false
-        launch {
-            alerts.quieted()
-            quieted = true
-        }
-        runCurrent()
-        assertThat(quieted).isTrue()
+        val quieted = askQuieted(alerts)
+        assertThat(quieted.isCompleted).isTrue()
         alerts.dismiss()
         runCurrent()
         assertThat(log).containsExactly("music quiet", "music quieted", "music restore").inOrder()
@@ -158,15 +153,10 @@ class ShellAlertsTest {
         val log = mutableListOf<String>()
         val alerts = alerts(RecordingQuieter("music", log), scope = backgroundScope)
         alerts.show(content = nothing)
-        var quieted = false
-        launch {
-            alerts.quieted()
-            quieted = true
-        }
-        runCurrent()
+        val quieted = askQuieted(alerts)
         alerts.dismiss()
         runCurrent()
-        assertThat(quieted).isTrue()
+        assertThat(quieted.isCompleted).isTrue()
         assertThat(log).isEmpty()
     }
 
@@ -204,13 +194,8 @@ class ShellAlertsTest {
         val log = mutableListOf<String>()
         val alerts = alerts(RecordingQuieter("gone", log).apply { fails = true }, RecordingQuieter("music", log), scope = backgroundScope)
         alerts.show(loud = true, content = nothing)
-        var quieted = false
-        launch {
-            alerts.quieted()
-            quieted = true
-        }
-        runCurrent()
-        assertThat(quieted).isTrue()
+        val quieted = askQuieted(alerts)
+        assertThat(quieted.isCompleted).isTrue()
         assertThat(log).containsExactly("gone quiet", "music quiet", "music quieted")
         alerts.dismiss()
         runCurrent()

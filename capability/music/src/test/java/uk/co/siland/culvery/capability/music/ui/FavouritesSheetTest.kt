@@ -22,6 +22,7 @@ import uk.co.siland.culvery.capability.music.MusicActions
 import uk.co.siland.culvery.capability.music.MusicRefusedException
 import uk.co.siland.culvery.capability.music.TestMusicSystem
 import uk.co.siland.culvery.capability.music.group
+import uk.co.siland.culvery.capability.music.waitFor
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
 /** 6 §5.3, §6: the household's Favourites; a tap plays one in the row's group and closes; one that can't play says so. */
@@ -45,15 +46,9 @@ class FavouritesSheetTest {
     @Test
     fun aTapPlaysTheFavouriteInTheGroupAndCloses() {
         host()
-        compose.waitUntil(5_000) {
-            compose.waitForIdle()
-            "favourites" in system.calls
-        }
+        compose.waitFor { "favourites" in system.calls }
         compose.onNodeWithText("Culvery FM").performClick()
-        compose.waitUntil(5_000) {
-            compose.waitForIdle()
-            closed == 1
-        }
+        compose.waitFor { closed == 1 }
         assertThat(system.calls).contains("playFavourite k FV:2/1")
     }
 
@@ -62,15 +57,9 @@ class FavouritesSheetTest {
     fun oneThatCanNotPlayHereSaysSoAndStays() {
         system.failures["playFavourite k FV:2/2"] = MusicRefusedException(714)
         host()
-        compose.waitUntil(5_000) {
-            compose.waitForIdle()
-            "favourites" in system.calls
-        }
+        compose.waitFor { "favourites" in system.calls }
         compose.onNodeWithText("Sunday morning").performClick()
-        compose.waitUntil(5_000) {
-            compose.waitForIdle()
-            "playFavourite k FV:2/2" in system.calls
-        }
+        compose.waitFor { "playFavourite k FV:2/2" in system.calls }
         compose.waitForIdle()
         compose.onNodeWithTag("favourites_line").assertTextEquals("Sonos couldn’t play this here.")
         assertThat(closed).isEqualTo(0)

@@ -18,22 +18,17 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.music.MusicActions
 import uk.co.siland.culvery.capability.music.MusicChecks
+import uk.co.siland.culvery.capability.music.MusicFixture
 import uk.co.siland.culvery.capability.music.MusicLink
 import uk.co.siland.culvery.capability.music.MusicView
 import uk.co.siland.culvery.capability.music.PlayState
@@ -41,11 +36,11 @@ import uk.co.siland.culvery.capability.music.SONG
 import uk.co.siland.culvery.capability.music.STATION
 import uk.co.siland.culvery.capability.music.Speakers
 import uk.co.siland.culvery.capability.music.TestMusicProvider
+import uk.co.siland.culvery.capability.music.TestOverlay
 import uk.co.siland.culvery.capability.music.group
-import uk.co.siland.culvery.capability.music.musicSettings
 import uk.co.siland.culvery.capability.music.recordingGroupActions
+import uk.co.siland.culvery.capability.music.waitFor
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
-import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
@@ -53,15 +48,12 @@ import uk.co.siland.culvery.core.ui.test.assertAccessible
 @RunWith(AndroidJUnit4::class)
 class MusicTabTest {
     @get:Rule val compose = createComposeRule()
-    @get:Rule val folder = TemporaryFolder()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @get:Rule val music = MusicFixture()
+    private val scope = music.scope
     private val calls = mutableListOf<String>()
     private val actions = recordingGroupActions(calls)
     private val lounge = group("l", "Lounge", "Dining room", state = PlayState.PLAYING, nowPlaying = STATION, volume = 40)
     private val kitchen = group("k", "Kitchen", state = PlayState.PAUSED, nowPlaying = SONG)
-
-    @After
-    fun tearDown() = scope.cancel()
 
     private fun showTab(status: String? = null, lines: Map<String, String> = emptyMap()) = compose.setContent {
         var shown by remember { mutableStateOf(emptySet<String>()) }
@@ -124,7 +116,7 @@ class MusicTabTest {
      */
     @Test
     fun theTabReadsTheLayoutAsItOpensOrdersAndOpensFavourites() {
-        val settings = musicSettings(folder.root, scope)
+        val settings = music.settings
         val provider = TestMusicProvider()
         val speakers = Speakers(setOf(provider), settings, scope)
         runBlocking {
@@ -137,7 +129,7 @@ class MusicTabTest {
         checks.watch()
         runBlocking { withTimeout(5_000) { while ("checkLayout" !in system.calls) delay(10) } }
         system.calls.clear()
-        val overlay = RecordingOverlay()
+        val overlay = TestOverlay()
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
@@ -145,31 +137,12 @@ class MusicTabTest {
                 }
             }
         }
-        compose.waitUntil(5_000) {
-            compose.waitForIdle()
-            "checkLayout" in system.calls
-        }
+        compose.waitFor { "checkLayout" in system.calls }
         assertThat(checks.watching).isEqualTo(2)
         val loungeTop = compose.onNodeWithTag("music_row_l").getUnclippedBoundsInRoot().top
         val kitchenTop = compose.onNodeWithTag("music_row_k").getUnclippedBoundsInRoot().top
         assertThat(loungeTop).isLessThan(kitchenTop)
         compose.onNodeWithTag("music_row_k_favourites").performClick()
         assertThat(overlay.shown).isEqualTo(1)
-    }
-}
-
-/** An overlay host that counts what it was asked to show. */
-internal class RecordingOverlay : OverlayHost {
-    var shown = 0
-    var dismissed = 0
-
-    override fun show(closesWhenIdle: Boolean, content: @androidx.compose.runtime.Composable () -> Unit) {
-        shown++
-    }
-
-    override fun markEdited(edited: Boolean) = Unit
-
-    override fun dismiss() {
-        dismissed++
     }
 }

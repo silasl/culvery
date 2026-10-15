@@ -1,10 +1,6 @@
 package uk.co.siland.culvery.capability.music.ui
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -22,25 +18,19 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.music.MusicConnect
+import uk.co.siland.culvery.capability.music.MusicFixture
 import uk.co.siland.culvery.capability.music.MusicLink
 import uk.co.siland.culvery.capability.music.MusicView
 import uk.co.siland.culvery.capability.music.RecordingToaster
-import uk.co.siland.culvery.capability.music.SpeakerRoom
 import uk.co.siland.culvery.capability.music.Speakers
 import uk.co.siland.culvery.capability.music.TestMusicProvider
-import uk.co.siland.culvery.capability.music.musicSettings
+import uk.co.siland.culvery.capability.music.TestOverlay
+import uk.co.siland.culvery.capability.music.waitFor
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
-import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
@@ -48,8 +38,7 @@ import uk.co.siland.culvery.core.ui.test.assertAccessible
 @RunWith(AndroidJUnit4::class)
 class MusicSettingsPageTest {
     @get:Rule val compose = createComposeRule()
-    @get:Rule val folder = TemporaryFolder()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @get:Rule val music = MusicFixture()
     private val calls = mutableListOf<String>()
     private val actions = MusicSettingsActions(
         onFind = { calls += "find" },
@@ -57,13 +46,7 @@ class MusicSettingsPageTest {
         onUsualRoom = { calls += "usual $it" },
         onLowerTo = { calls += "lower $it" },
     )
-    private val rooms = listOf(SpeakerRoom("RINCON_A", "Kitchen", 30), SpeakerRoom("RINCON_B", "Lounge", 40))
-    private val connected = MusicSettingsUi(
-        connected = true, status = null, findLine = null, finding = false, rooms = rooms, usualRoomId = "RINCON_A", lowerTo = 20,
-    )
-
-    @After
-    fun tearDown() = scope.cancel()
+    private val connected = connectedSettings
 
     private fun show(ui: MusicSettingsUi) = compose.setContent { CulveryTheme(dark = true) { InSettingsPane { MusicSettingsScreen(ui, actions) } } }
 
@@ -134,10 +117,7 @@ class MusicSettingsPageTest {
         compose.onNodeWithTag("music_address_connect").assertIsNotEnabled()
         compose.onNodeWithTag("music_address_field").performTextInput("192.168.1.20:1400")
         compose.onNodeWithTag("music_address_connect").performClick()
-        compose.waitUntil(5_000) {
-            compose.waitForIdle()
-            sent.isNotEmpty()
-        }
+        compose.waitFor { sent.isNotEmpty() }
         compose.onNodeWithTag("music_address_line").assertTextEquals("Type the address as four numbers, like 192.168.1.20.")
         assertThat(sent).containsExactly("192.168.1.20:1400")
     }
@@ -145,11 +125,12 @@ class MusicSettingsPageTest {
     /** A Find that found nothing stops being the page's line once a typed address connects. */
     @Test
     fun connectingByAddressClearsTheFindLine() {
-        val settings = musicSettings(folder.root, scope)
+        val settings = music.settings
+        val scope = music.scope
         val sonos = TestMusicProvider().apply { speakers["192.168.1.20"] = MusicLink("Sonos_home", "192.168.1.20:1400") }
         val speakers = Speakers(setOf(sonos), settings, scope)
         val toaster = RecordingToaster()
-        val overlay = ShowingOverlay()
+        val overlay = TestOverlay()
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
@@ -160,39 +141,15 @@ class MusicSettingsPageTest {
                 }
             }
         }
-        compose.waitUntil(5_000) {
-            compose.waitForIdle()
-            compose.onAllNodesWithTag("music_find").fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.waitFor { compose.onAllNodesWithTag("music_find").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("music_find").performClick()
-        compose.waitUntil(5_000) {
-            compose.waitForIdle()
-            compose.onAllNodesWithText("No Sonos speakers answered. Check they’re on, or enter a speaker’s address.").fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.waitFor { compose.onAllNodesWithText("No Sonos speakers answered. Check they’re on, or enter a speaker’s address.").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("music_address").performClick()
         compose.onNodeWithTag("music_address_field").performTextInput("192.168.1.20")
         compose.onNodeWithTag("music_address_connect").performClick()
-        compose.waitUntil(5_000) {
-            compose.waitForIdle()
-            compose.onAllNodesWithText("Connected.").fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.waitFor { compose.onAllNodesWithText("Connected.").fetchSemanticsNodes().isNotEmpty() }
         assertThat(toaster.shown).containsExactly("Connected to Sonos.")
         assertThat(overlay.content).isNull()
         compose.onNodeWithTag("music_find_line").assertTextEquals("")
-    }
-}
-
-/** An overlay host whose sheet the test draws. */
-private class ShowingOverlay : OverlayHost {
-    var content by mutableStateOf<(@Composable () -> Unit)?>(null)
-
-    override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) {
-        this.content = content
-    }
-
-    override fun markEdited(edited: Boolean) = Unit
-
-    override fun dismiss() {
-        content = null
     }
 }

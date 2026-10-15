@@ -1,24 +1,18 @@
 package uk.co.siland.culvery.capability.music.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import uk.co.siland.culvery.capability.music.SpeakerRoom
-import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.CulveryTheme
 
 /** Settings › Music as Settings shows it, beside the 320 dp page list; the address sheet at the right edge. */
 @RunWith(AndroidJUnit4::class)
@@ -27,16 +21,9 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 class MusicSettingsScreenshotTest {
     @get:Rule val compose = createComposeRule()
     private val actions = MusicSettingsActions({}, {}, {}, {})
-    private val connected = MusicSettingsUi(
-        connected = true, status = null, findLine = null, finding = false,
-        rooms = listOf(SpeakerRoom("RINCON_A", "Kitchen", 30), SpeakerRoom("RINCON_B", "Lounge", 40), SpeakerRoom("RINCON_C", "Dining room", 35)),
-        usualRoomId = "RINCON_A", lowerTo = 20,
-    )
+    private val connected = connectedSettings
 
-    private fun snap(name: String, dark: Boolean, content: @Composable () -> Unit) {
-        compose.setContent { CulveryTheme(dark = dark) { Box(Modifier.size(960.dp, 800.dp).background(Culvery.colors.bg)) { content() } } }
-        compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
-    }
+    private fun snap(name: String, dark: Boolean, content: @Composable () -> Unit) = compose.snap(name, dark, Modifier.size(960.dp, 800.dp), content)
 
     @Test fun musicDark() = snap("settings_music_dark", true) { InSettingsPane { MusicSettingsScreen(connected, actions) } }
 

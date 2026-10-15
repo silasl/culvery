@@ -2,35 +2,23 @@ package uk.co.siland.culvery.capability.music
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SpeakersTest {
-    @get:Rule val folder = TemporaryFolder()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val settings by lazy { musicSettings(folder.root, scope) }
+    @get:Rule val music = MusicFixture()
+    private val scope = music.scope
+    private val settings get() = music.settings
     private val sonos = TestMusicProvider()
     private val home = MusicLink("Sonos_home", "192.168.1.20:1400")
     private val other = MusicLink("Sonos_other", "192.168.1.40:1400")
 
-    @After
-    fun tearDown() = scope.cancel()
-
     // On a real dispatcher: the opening follows DataStore's writes, which the test scheduler doesn't drive.
-    private suspend fun Speakers.opensAnother(than: MusicSystem?) =
-        withContext(Dispatchers.Default) { withTimeout(5_000) { system.first { it != null && it !== than } } }
+    private suspend fun Speakers.opensAnother(than: MusicSystem?) = soon { system.first { it != null && it !== than } }
 
     @Test
     fun noConnectionOpensNothingUntilOneIsSaved() = runTest {

@@ -2,19 +2,11 @@ package uk.co.siland.culvery.capability.music
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.music.ui.ArtCache
 import uk.co.siland.culvery.core.plugin.HomeCardSize
@@ -22,12 +14,9 @@ import uk.co.siland.culvery.core.ui.Icons
 
 @RunWith(AndroidJUnit4::class)
 class MusicCapabilityTest {
-    @get:Rule val folder = TemporaryFolder()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val settings by lazy { musicSettings(folder.root, scope) }
-
-    @After
-    fun tearDown() = scope.cancel()
+    @get:Rule val music = MusicFixture()
+    private val scope = music.scope
+    private val settings get() = music.settings
 
     private fun capability(speakers: Speakers) = MusicCapability(
         speakers, MusicView(speakers, settings, scope), MusicActions({ speakers.system.value }, scope),
@@ -48,7 +37,7 @@ class MusicCapabilityTest {
         val music = capability(Speakers(setOf(TestMusicProvider()), settings, scope))
         assertThat(music.hasTab.first()).isFalse()
         settings.connect("music.sonos", MusicLink("Sonos_home", "192.168.1.20:1400"))
-        withContext(Dispatchers.Default) { withTimeout(5_000) { music.hasTab.first { it } } }
+        soon { music.hasTab.first { it } }
     }
 
     /** 6 §5.1: REGULAR, after the forecast (40), only once connected. */
@@ -57,7 +46,7 @@ class MusicCapabilityTest {
         val music = capability(Speakers(setOf(TestMusicProvider()), settings, scope))
         assertThat(music.cards().first()).isEmpty()
         settings.connect("music.sonos", MusicLink("Sonos_home", "192.168.1.20:1400"))
-        val card = withContext(Dispatchers.Default) { withTimeout(5_000) { music.cards().first { it.isNotEmpty() } } }.single()
+        val card = soon { music.cards().first { it.isNotEmpty() } }.single()
         assertThat(listOf(card.id, card.size, card.priority)).containsExactly("music.now", HomeCardSize.REGULAR, 30).inOrder()
     }
 
