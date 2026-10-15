@@ -70,9 +70,9 @@ internal object SonosFixtures {
         """<item id="-1" parentID="-1" restricted="true"><res protocolInfo="x-rincon-mp3radio:*:*:*">x-rincon-mp3radio://radio.example/stream</res>""" +
         """<r:streamContent>${escape(stream)}</r:streamContent><upnp:class>object.item</upnp:class></item></DIDL-Lite>"""
 
-    /** An answer wrapped in [depth] elements around its body's value. */
-    fun nested(depth: Int) = soap("GetHouseholdID", "CurrentHouseholdID" to HOUSEHOLD).replace(
-        "<CurrentHouseholdID>", "<a>".repeat(depth) + "<CurrentHouseholdID>",
+    /** An answer wrapped in [depth] [open] elements around its body's value. */
+    fun nested(depth: Int, open: String = "<a>") = soap("GetHouseholdID", "CurrentHouseholdID" to HOUSEHOLD).replace(
+        "<CurrentHouseholdID>", open.repeat(depth) + "<CurrentHouseholdID>",
     ).replace("</CurrentHouseholdID>", "</CurrentHouseholdID>" + "</a>".repeat(depth))
 
     const val RADIO_STATION = DIDL_OPEN +

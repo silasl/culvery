@@ -161,6 +161,12 @@ class SonosXmlTest {
         assertThat(SonosXml.householdId(SonosFixtures.nested(28))).isEqualTo(SonosFixtures.HOUSEHOLD)
         assertThrows(SonosXmlException::class.java) { SonosXml.householdId(SonosFixtures.nested(29)) }
         assertThrows(SonosXmlException::class.java) { SonosXml.householdId(SonosFixtures.nested(100_000)) }
+        // A "/>" or ">" inside an attribute's quotes doesn't end the tag.
+        listOf("<a x=\"/>\">", "<a x='/>'>").forEach { open ->
+            assertThat(SonosXml.householdId(SonosFixtures.nested(28, open))).isEqualTo(SonosFixtures.HOUSEHOLD)
+            assertThrows(SonosXmlException::class.java) { SonosXml.householdId(SonosFixtures.nested(29, open)) }
+            assertThrows(SonosXmlException::class.java) { SonosXml.householdId(SonosFixtures.nested(100_000, open)) }
+        }
     }
 
     /** 6 §8.2: a capture keeps the shape; no room, title, link, id, household or address survives. */

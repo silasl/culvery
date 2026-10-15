@@ -157,7 +157,8 @@ internal object SonosXml {
     }
 
     private val DECLARATIONS = Regex("""<!(DOCTYPE|ENTITY)""", RegexOption.IGNORE_CASE)
-    private val TAG = Regex("""<(/?)[A-Za-z_][^<>]*?(/?)>""")
+    // Quoted attribute values are skipped whole: a "/>" or ">" inside them doesn't end the tag.
+    private val TAG = Regex("""<(/?)[A-Za-z_](?:[^<>"']|"[^"]*"|'[^']*')*?(/?)>""")
 
     /** Whether [xml] nests deeper than any answer does; checked before the tree is built, as a deep one overflows the stack. */
     private fun tooDeep(xml: String): Boolean {
