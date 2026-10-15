@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.capability.music.ui.ArtCache
 import uk.co.siland.culvery.capability.music.ui.LocalArtSource
 import uk.co.siland.culvery.capability.music.ui.MusicCardHost
+import uk.co.siland.culvery.capability.music.ui.MusicTabHost
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
@@ -47,5 +48,5 @@ class MusicCapability @Inject constructor(
     override fun cards(): Flow<List<HomeCard>> = hasTab.map { if (it) listOf(card) else emptyList() }
 
     @Composable
-    override fun TabContent() = Unit
+    override fun TabContent() = CompositionLocalProvider(LocalArtSource provides art) { MusicTabHost(view, actions, checks, art) }
 }

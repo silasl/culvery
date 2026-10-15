@@ -53,3 +53,15 @@ fun shuffleSpoken(name: String) = "$SHUFFLE_EVERYTHING in $name"
 fun volumeName(name: String) = "$name volume"
 
 fun percentWords(percent: Int) = "$percent percent"
+
+internal const val FAVOURITES_LABEL = "Favourites"
+internal const val ROOMS = "Rooms"
+internal const val NO_FAVOURITES = "No Sonos Favourites yet. Add them in the Sonos app."
+internal const val GETTING_FAVOURITES = "Getting your Favourites…"
+
+fun favouritesSpoken(name: String) = "$FAVOURITES_LABEL for $name"
+
+/** What a tap on the Rooms chip does, for TalkBack. */
+fun roomsAction(shown: Boolean) = if (shown) "hide each room’s volume" else "show each room’s volume"
+
+fun playInAction(name: String) = "play in $name"
