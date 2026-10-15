@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.provider.music_sonos
 
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -74,7 +75,7 @@ internal class SonosClient(
             .header("SOAPACTION", soapAction(service, action))
             .post(envelope(service, action, args.toList()).toRequestBody(SOAP_TYPE))
             .build()
-        val answer = http.newCall(request).await(MAX_ANSWER_BYTES)
+        val answer = send(request, MAX_ANSWER_BYTES, retry = action.startsWith("Get") || action == "Browse")
         return withContext(Dispatchers.Default) {
             val text = answer.text
             capture(action, text)
@@ -83,11 +84,22 @@ internal class SonosClient(
         }
     }
 
+    /**
+     * A busy network drops the odd connection, so a read ([retry]) is asked once more after a dropped connection. Never a
+     * command (ruling 26), a timeout (a dead speaker would take twice the 3 s) or an answer too large to be Sonos's.
+     */
+    private suspend fun send(request: Request, maxBytes: Long, retry: Boolean): Answer = try {
+        http.newCall(request).await(maxBytes)
+    } catch (e: IOException) {
+        if (!retry || e is InterruptedIOException || e is BodyTooLarge) throw e
+        http.newCall(request).await(maxBytes)
+    }
+
     /** The picture at [url], http or https only, no redirect; null for anything else or any failure. Which URLs may be asked is the caller's rule (6 §4.2). */
     suspend fun bytes(url: String): ByteArray? {
         if (!url.startsWith("http://") && !url.startsWith("https://")) return null
         return try {
-            http.newCall(Request.Builder().url(url).build()).await(MAX_ART_BYTES).takeIf { it.code in 200..299 }?.bytes
+            send(Request.Builder().url(url).build(), MAX_ART_BYTES, retry = true).takeIf { it.code in 200..299 }?.bytes
         } catch (e: IOException) {
             null
         } catch (e: IllegalArgumentException) {

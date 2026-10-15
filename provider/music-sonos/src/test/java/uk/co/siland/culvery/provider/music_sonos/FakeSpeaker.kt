@@ -32,6 +32,7 @@ internal class FakeSpeaker : AutoCloseable {
 
     private val server = MockWebServer()
     private val answers = ConcurrentHashMap<String, MockResponse>()
+    private val dropOnce = ConcurrentHashMap.newKeySet<String>()
     val received = CopyOnWriteArrayList<Received>()
 
     /** True: every request goes unanswered, so the call times out. */
@@ -44,6 +45,7 @@ internal class FakeSpeaker : AutoCloseable {
                 val action = soapAction.trim('"').substringAfter('#')
                 received += Received(request.path.orEmpty(), soapAction, action, request.body.readUtf8())
                 if (silent) return MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
+                if (dropOnce.remove(action)) return MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)
                 return answers[action] ?: MockResponse().setResponseCode(500).setBody(SonosFixtures.fault(401))
             }
         }
@@ -62,6 +64,11 @@ internal class FakeSpeaker : AutoCloseable {
     /** Answers [action], then closes the connection without saying so, as a speaker drops an idle keep-alive. */
     fun answerThenHangUp(action: String, body: String) {
         answers[action] = MockResponse().setBody(body).setSocketPolicy(SocketPolicy.DISCONNECT_AT_END)
+    }
+
+    /** The next request for [action] is read and then its connection dropped with no answer, as a busy network drops one. */
+    fun dropNext(action: String) {
+        dropOnce += action
     }
 
     /** Answers [action] only after [millis], so a test can look while the command is on its way. */

@@ -164,6 +164,39 @@ class SonosClientTest {
         repeat(2) { assertThat(sonos.householdId(speaker.address)).isEqualTo(SonosFixtures.HOUSEHOLD) }
     }
 
+    /** A busy network drops the odd connection: a read whose connection drops is asked once more, so a check doesn't fail as unreachable. */
+    @Test
+    fun aReadWhoseConnectionDropsIsAskedOnceMore() = runTest {
+        val a = speaker.address
+        speaker.answer("GetTransportInfo", SonosFixtures.transport("PLAYING"))
+        speaker.answer("Browse", SonosFixtures.library(total = 5))
+        speaker.answer("", "picture")
+        speaker.dropNext("GetTransportInfo")
+        speaker.dropNext("Browse")
+        speaker.dropNext("")
+        assertThat(client.transportInfo(a)).isEqualTo(PlayState.PLAYING)
+        assertThat(client.browse(a, LIBRARY, 0, 1).total).isEqualTo(5)
+        assertThat(client.bytes("http://$a/getaa?s=1")).isEqualTo("picture".toByteArray())
+        assertThat(speaker.actions()).containsExactly("GetTransportInfo", "GetTransportInfo", "Browse", "Browse", "", "").inOrder()
+    }
+
+    /** Ruling 26: a command is never sent twice, even when its connection drops before the answer. */
+    @Test
+    fun aCommandWhoseConnectionDropsIsNotSentAgain() = runTest {
+        speaker.acceptCommands()
+        speaker.dropNext("Next")
+        throws<IOException> { client.next(speaker.address) }
+        assertThat(speaker.actions()).containsExactly("Next")
+    }
+
+    /** A read that times out isn't asked again, so a dead speaker still fails within the 3 s. */
+    @Test
+    fun aReadThatTimesOutIsNotAskedAgain() = runTest {
+        speaker.silent = true
+        throws<IOException> { client.transportInfo(speaker.address) }
+        assertThat(speaker.actions()).containsExactly("GetTransportInfo")
+    }
+
     /** 6 §6 privacy: an address off the home network, or on the wrong port, is refused before anything is sent. */
     @Test
     fun anAddressOffTheHomeNetworkIsNeverContacted() = runTest {
