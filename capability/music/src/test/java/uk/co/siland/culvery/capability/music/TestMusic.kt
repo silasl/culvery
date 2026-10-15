@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import uk.co.siland.culvery.capability.music.ui.GroupActions
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
+import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.ui.Icons
 
 internal val SONG = NowPlaying.Track("Song", "Artist", "Album")
@@ -147,5 +148,13 @@ internal class TestMusicProvider(id: String = "music.sonos") : MusicProvider {
         opened += link
         this.onMoved = onMoved
         return TestMusicSystem().also { systems += it }
+    }
+}
+
+internal class RecordingToaster : Toaster {
+    val shown = mutableListOf<String>()
+
+    override fun show(message: String, icon: String, urgent: Boolean) {
+        shown += message
     }
 }

@@ -111,7 +111,8 @@ internal fun ShuffleButton(group: SpeakerGroup, tag: String, on: ButtonSurface, 
 
 /**
  * A value in [range], sent when let go rather than at each step of a drag, so one group's commands can't arrive out of
- * order. Spoken "[spokenName], [spokenState]": "Kitchen volume, 30 percent" by default (6 §5.5).
+ * order; [onChange] hears each step of the drag. Spoken "[spokenName], [spokenState]": "Kitchen volume, 30 percent" by
+ * default (6 §5.5).
  */
 @Composable
 internal fun VolumeSlider(
@@ -123,6 +124,7 @@ internal fun VolumeSlider(
     steps: Int = 0,
     spokenName: String = volumeName(name),
     spokenState: (Int) -> String = ::percentWords,
+    onChange: (Int) -> Unit = {},
     onVolume: (Int) -> Unit,
 ) {
     val c = Culvery.colors
@@ -132,7 +134,10 @@ internal fun VolumeSlider(
     val shown = dragging ?: sent ?: volume.toFloat()
     Slider(
         value = shown,
-        onValueChange = { dragging = it },
+        onValueChange = {
+            dragging = it
+            onChange(it.roundToInt())
+        },
         onValueChangeFinished = {
             dragging?.let {
                 sent = it

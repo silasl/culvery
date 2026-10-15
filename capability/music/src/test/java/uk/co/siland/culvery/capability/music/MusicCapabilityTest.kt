@@ -32,6 +32,7 @@ class MusicCapabilityTest {
     private fun capability(speakers: Speakers) = MusicCapability(
         speakers, MusicView(speakers, settings, scope), MusicActions({ speakers.system.value }, scope),
         MusicChecks(speakers.system, MutableStateFlow(true), scope), ArtCache { null },
+        settings, MusicConnect(speakers.providers.firstOrNull()) { id, link -> settings.connect(id, link) }, RecordingToaster(),
     )
 
     /** 6 §3.1: rail slot 30, "Music", `speaker`. */
@@ -58,5 +59,13 @@ class MusicCapabilityTest {
         settings.connect("music.sonos", MusicLink("Sonos_home", "192.168.1.20:1400"))
         val card = withContext(Dispatchers.Default) { withTimeout(5_000) { music.cards().first { it.isNotEmpty() } } }.single()
         assertThat(listOf(card.id, card.size, card.priority)).containsExactly("music.now", HomeCardSize.REGULAR, 30).inOrder()
+    }
+
+    /** 6 §5.4: Settings › Music after Calendars (400), before Door (500); none in a build with no provider. */
+    @Test
+    fun theSettingsPageIsMusicAt450() {
+        val page = capability(Speakers(setOf(TestMusicProvider()), settings, scope)).settingsPages().single()
+        assertThat(listOf(page.id, page.title, page.order)).containsExactly("music", "Music", 450).inOrder()
+        assertThat(capability(Speakers(emptySet(), settings, scope)).settingsPages()).isEmpty()
     }
 }

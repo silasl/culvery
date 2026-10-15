@@ -10,10 +10,14 @@ import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.capability.music.ui.ArtCache
 import uk.co.siland.culvery.capability.music.ui.LocalArtSource
 import uk.co.siland.culvery.capability.music.ui.MusicCardHost
+import uk.co.siland.culvery.capability.music.ui.MusicPage
+import uk.co.siland.culvery.capability.music.ui.MusicSettingsHost
 import uk.co.siland.culvery.capability.music.ui.MusicTabHost
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.SettingsPage
+import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.ui.Icons
 
 const val MUSIC_ID = "music"
@@ -31,6 +35,9 @@ class MusicCapability @Inject constructor(
     private val actions: MusicActions,
     private val checks: MusicChecks,
     private val art: ArtCache,
+    private val settings: MusicSettings,
+    private val connect: MusicConnect,
+    private val toaster: Toaster,
 ) : Capability {
     override val id = MUSIC_ID
     override val label = MUSIC
@@ -49,4 +56,9 @@ class MusicCapability @Inject constructor(
 
     @Composable
     override fun TabContent() = CompositionLocalProvider(LocalArtSource provides art) { MusicTabHost(view, actions, checks, art) }
+
+    private val pages: List<SettingsPage> =
+        if (speakers.providers.isEmpty()) emptyList() else listOf(MusicPage { MusicSettingsHost(settings, speakers, view, connect, toaster) })
+
+    override fun settingsPages(): List<SettingsPage> = pages
 }
