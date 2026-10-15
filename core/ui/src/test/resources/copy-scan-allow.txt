@@ -5,3 +5,4 @@ core/plugin/ShellNavigator.kt | kiosk | the Tablet lock page's id, never shown (
 provider/music-sonos/Soap.kt | <?xml version=\"1.0\" encoding=\"utf-8\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body> | SOAP's envelope, sent to the speakers, never shown
 provider/music-sonos/Soap.kt | <u:$action xmlns:u=\"\"> | a SOAP action's element, sent to the speakers, never shown
 provider/music-sonos/SonosClient.kt | Master | RenderingControl's channel name, sent to the speakers, never shown
+provider/music-sonos/SonosDiscovery.kt | M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\nST: urn:schemas-upnp-org:device:ZonePlayer:1\r\n\r\n | SSDP's search, sent on the Wi-Fi, never shown

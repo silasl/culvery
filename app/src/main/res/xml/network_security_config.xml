@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 6 §3.2: the speakers answer plain HTTP on port 1400 at whatever address the router gives them, which this file can't
+     name; the internet services Culvery uses stay HTTPS-only. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">google.com</domain>
+        <domain includeSubdomains="true">open-meteo.com</domain>
+    </domain-config>
+</network-security-config>

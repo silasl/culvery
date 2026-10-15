@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 6 §3.2: SOAP to the speakers on port 1400, and art. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 6 §6: "The tablet is offline" is Android saying it has no network. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 6 §3.2: the scan's multicast lock. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+</manifest>
