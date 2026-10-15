@@ -16,7 +16,7 @@ Done means: a press reaches the wall within a few seconds of Ring's own notifica
 2. **Events:** a ring raises the card and the chime; motion goes into the history only.
 3. **Sound:** Culvery plays its own chime, with a volume in Settings. The Ring app's own notification sound on the tablet is turned off at setup so the two don't double up.
 4. **History:** a Door tab on the rail (slot 50, reserved for Security), today and yesterday.
-5. **Badge:** unseen rings as a count, unseen motion alone as a dot; both clear when someone opens the Door tab; a ring whose card was dismissed with Got it counts as seen. The badge is a general rail feature any capability can use.
+5. **Badge:** unseen rings as a count, unseen motion alone as a dot; both clear when someone opens the Door tab or taps it again while it is open; a ring whose card was dismissed with Got it counts as seen. The badge is a general rail feature any capability can use.
 6. **Night:** quiet hours in Settings, 21:00–07:00 by default, fixed times rather than sunset. In quiet hours the card and badge still show; no chime.
 7. **Culvery not in front** (the son using other apps): record only. No card, no chime, no "display over other apps" permission.
 8. **Snapshots:** on the card and in the history, kept 48 hours in Culvery's private storage, then deleted with their entry.
@@ -80,12 +80,12 @@ Two additions every later capability can use:
    - the card shows (or refreshes, if one is up: new time, device and snapshot) and its 2-minute timer restarts;
    - the chime plays unless it is quiet hours, or the chime played less than 10 seconds ago.
    While Culvery is not resumed the event is only stored. `MOTION` never alerts.
-7. **Seen.** Opening the Door tab marks every event seen. Got it marks the card's ring seen. The 2-minute close leaves it unseen.
+7. **Seen.** Opening the Door tab, or tapping it again while it is open, marks every event seen. Got it marks the card's ring seen. The 2-minute close leaves it unseen.
 8. **Badge.** Unseen rings (unrecognised ones included) → `Count(n)`; no unseen rings but unseen motion → `Dot`; else none.
 
 ### 4.1 The chime
 
-A short bundled sound played with `AudioAttributes.USAGE_NOTIFICATION_EVENT`. Culvery's volume setting (default 100 %) scales it within the tablet's notification volume, so the tablet's own volume and Do Not Disturb still apply. Quiet hours use the household's time zone and may cross midnight (From 21:00, Until 07:00 means 21:00–06:59).
+A short bundled ding-dong, struck twice with a brighter tone, played with `AudioAttributes.USAGE_NOTIFICATION_EVENT`. Culvery's volume setting (default 100 %) scales it within the tablet's notification volume, so the tablet's own volume and Do Not Disturb still apply. Quiet hours use the household's time zone and may cross midnight (From 21:00, Until 07:00 means 21:00–06:59).
 
 ### 4.2 Last heard
 
@@ -97,7 +97,7 @@ Layout and copy are provisional until the user's end-of-v1 design walk-through.
 
 ### 5.1 The door card
 
-On the alert layer, centred on the screen, about half the screen wide: the doorbell icon, **Someone's at the door** (an unrecognised alert: **Ring alert**), the device name as Ring gives it, the time, the snapshot if any, and one button, **Got it**. TalkBack announces it as urgent. The card doesn't count as a touch for the sheet or Settings beneath, so their own timeouts run on; touching the card doesn't reach them. The PIN pad draws above it.
+On the alert layer, centred on the screen and above the keyboard when one is up, about half the screen wide: the doorbell icon, **Someone's at the door** (an unrecognised alert: **Ring alert**), the device name as Ring gives it, the time, the snapshot if any (which shrinks to the room left, so **Got it** is always in full view), and one button, **Got it**. TalkBack announces it as urgent. The card doesn't count as a touch for the sheet or Settings beneath, so their own timeouts run on; touching the card doesn't reach them. The PIN pad draws above it.
 
 ### 5.2 The Door tab
 
@@ -173,7 +173,7 @@ Built first, before Ring; small and independent of it. Sizes and wording are sta
 
 ### A.1 The logo on the rail
 
-The bird mark, about 48 dp, above the Home tab. Not a button; TalkBack skips it.
+The bird mark, about 48 dp, in the top-left corner, centred on the rail icons and clear of the tabs, so Home keeps its place. The status bar's small clock is removed; Home shows the time. Not a button; TalkBack skips it.
 
 ### A.2 Home: a smaller clock, larger Today events
 
