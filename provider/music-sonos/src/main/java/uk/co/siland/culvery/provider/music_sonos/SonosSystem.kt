@@ -39,6 +39,9 @@ internal fun kindOf(item: DidlItem): FavouriteKind {
     return if (container) FavouriteKind.QUEUED else FavouriteKind.STREAM
 }
 
+/** A group's GetMediaInfo, read again only when its track or transport state changes (6 §4.2). */
+private data class Media(val trackUri: String?, val state: PlayState, val info: MediaInfo)
+
 private data class Playback(val state: PlayState, val nowPlaying: NowPlaying?, val artUrl: String?, val canSkip: Boolean, val volume: Int)
 
 /**
@@ -77,6 +80,7 @@ internal class SonosSystem(
     private val playback = HashMap<String, Playback>()
     private val roomVolumes = HashMap<String, Int>()
     private val started = HashMap<String, Long>()
+    private val media = HashMap<String, Media>()
 
     override suspend fun checkLayout() {
         refusing { reaching { readLayout(link.address) } }
@@ -102,10 +106,7 @@ internal class SonosSystem(
         return _groups.value.filter { it.id in playing }
     }
 
-    override suspend fun roomVolume(room: SpeakerRoom): Int {
-        sameHousehold()
-        return refusing { reaching { client.volume(memberAddress(room.id)) } }
-    }
+    override suspend fun roomVolume(room: SpeakerRoom): Int = toRooms { client.volume(memberAddress(room.id)) }
 
     override suspend fun play(group: SpeakerGroup) = command(group.id, { it.copy(state = PlayState.PLAYING) }) { client.play(it.leaderAddress()) }
 
@@ -119,9 +120,9 @@ internal class SonosSystem(
     }
 
     override suspend fun setRoomVolume(room: SpeakerRoom, percent: Int) {
-        sameHousehold()
         val volume = percent.coerceIn(0, 100)
-        val groupId = layout.firstOrNull { g -> g.members.any { it.uuid == room.id } }?.id ?: throw MusicRefusedException()
+        // Through toRooms, so a different household (whose layout is empty) is said rather than refused.
+        val groupId = layout.firstOrNull { g -> g.members.any { it.uuid == room.id } }?.id ?: return toRooms { throw MusicRefusedException() }
         change { roomVolumes[room.id] = volume }
         command(groupId, { it }) { g -> client.setVolume(g.members.firstOrNull { it.uuid == room.id }?.address ?: throw GoneFromLayout(), volume) }
     }
@@ -138,8 +139,7 @@ internal class SonosSystem(
     }
 
     override suspend fun favourites(): List<Favourite> {
-        sameHousehold()
-        val items = refusing { reaching { client.browse(link.address, FAVOURITES, 0, FAVOURITES_PAGE).items } }
+        val items = toRooms { client.browse(link.address, FAVOURITES, 0, FAVOURITES_PAGE).items }
         favouriteItems = items.associateBy { it.id }
         return items.map { Favourite(it.id, it.title, artUrl(it.artUri, link.address), kindOf(it)) }
     }
@@ -173,33 +173,34 @@ internal class SonosSystem(
      * so the screen shows what the speaker did.
      */
     private suspend fun command(groupId: String, shown: (Playback) -> Playback, send: suspend (ZoneGroupInfo) -> Unit) {
-        sameHousehold()
         change { playback[groupId]?.let { record(groupId, shown(it)) } }
         try {
-            refusing { reaching { send(infoOf(groupId)) } }
+            toRooms { send(infoOf(groupId)) }
         } finally {
             withContext(NonCancellable) { quietly { readGroup(infoOf(groupId)) } }
         }
     }
 
     /**
+     * Every read of, or command to, the household's rooms. While a different household answers, nothing is read from or
+     * sent to it until the saved one answers again; the layout checks don't come here, as they are how it answers again.
+     */
+    private suspend fun <T> toRooms(block: suspend () -> T): T {
+        if (_problem.value == MusicProblem.OTHER_HOUSEHOLD) throw MusicUnreachableException(MusicProblem.OTHER_HOUSEHOLD)
+        return refusing { reaching(block = block) }
+    }
+
+    /**
      * Runs [block]; when no speaker answers, finds the household again and runs it once more. Offline, or still nothing,
      * is reported only then (6 §4.1, §6). A group still missing after the layout is read again is refused.
      */
-    private suspend fun <T> reaching(block: suspend () -> T): T {
-        try {
-            return block().also { reached() }
-        } catch (e: IOException) {
-            if (!online()) fail(MusicProblem.OFFLINE)
-            if (!recover()) fail(if (_problem.value == MusicProblem.OTHER_HOUSEHOLD) MusicProblem.OTHER_HOUSEHOLD else MusicProblem.UNREACHABLE)
-        }
-        return try {
-            block().also { reached() }
-        } catch (e: GoneFromLayout) {
-            throw MusicRefusedException()
-        } catch (e: IOException) {
-            fail(if (online()) MusicProblem.UNREACHABLE else MusicProblem.OFFLINE)
-        }
+    private suspend fun <T> reaching(again: Boolean = true, block: suspend () -> T): T = try {
+        block().also { reached() }
+    } catch (e: IOException) {
+        if (!again && e is GoneFromLayout) throw MusicRefusedException()
+        if (!online()) fail(MusicProblem.OFFLINE)
+        if (!again || !recover()) fail(if (_problem.value == MusicProblem.OTHER_HOUSEHOLD) MusicProblem.OTHER_HOUSEHOLD else MusicProblem.UNREACHABLE)
+        reaching(again = false, block)
     }
 
     /** The layout from the saved speaker again; failing that, a scan, keeping the first speaker of this household. */
@@ -215,14 +216,10 @@ internal class SonosSystem(
     }
 
     private suspend fun findHousehold(): String? {
-        var other = false
-        for (address in scan()) {
-            val household = client.householdAt(address) ?: continue
-            if (household == link.householdId) return address
-            other = true
-        }
+        val heard = client.householdsAt(scan())
+        heard.firstOrNull { it.second == link.householdId }?.let { return it.first }
         // The old rooms' addresses may now be the other household's (6 §6).
-        if (other) otherHousehold()
+        if (heard.isNotEmpty()) otherHousehold()
         return null
     }
 
@@ -243,6 +240,7 @@ internal class SonosSystem(
             volumes.forEach { (id, volume) -> if (volume != null) roomVolumes[id] = volume }
             playback.keys.retainAll(ids)
             started.keys.retainAll(ids)
+            media.keys.retainAll(ids)
         }
         return true
     }
@@ -252,17 +250,18 @@ internal class SonosSystem(
         val address = group.leaderAddress()
         val state = async { client.transportInfo(address) }
         val track = async { client.positionInfo(address) }
-        val media = async { client.mediaInfo(address) }
         val volume = async { client.groupVolume(address) }
         val t = track.await()
-        val m = media.await()
+        val s = state.await()
+        val known = synchronized(lock) { media[group.id] }?.takeIf { it.trackUri == t.uri && it.state == s }
+        val m = known?.info ?: client.mediaInfo(address).also { synchronized(lock) { media[group.id] = Media(t.uri, s, it) } }
         val fromQueue = m.uri?.startsWith(QUEUE_PREFIX) == true
         val nowPlaying = if (fromQueue) {
             t.title?.let { NowPlaying.Track(it, t.artist, t.album) }
         } else {
             (m.title ?: t.title?.takeUnless { it == t.uri })?.let { NowPlaying.Radio(it, t.programme) }
         }
-        val read = Playback(state.await(), nowPlaying, artUrl(t.artUri ?: m.artUri, address), fromQueue, volume.await())
+        val read = Playback(s, nowPlaying, artUrl(t.artUri ?: m.artUri, address), fromQueue, volume.await())
         change { record(group.id, read) }
     }
 
@@ -301,12 +300,8 @@ internal class SonosSystem(
         change {
             layout = emptyList()
             playback.clear()
+            media.clear()
         }
-    }
-
-    /** While a different household answers, nothing is read from or sent to it until the saved one answers again. */
-    private fun sameHousehold() {
-        if (_problem.value == MusicProblem.OTHER_HOUSEHOLD) throw MusicUnreachableException(MusicProblem.OTHER_HOUSEHOLD)
     }
 
     private fun reached() {

@@ -5,12 +5,11 @@ import com.google.common.truth.Truth.assertThat
 import java.io.IOException
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.music.PlayState
 
-private const val AV = "urn:schemas-upnp-org:service:AVTransport:1"
+private val AV = SonosService.AV_TRANSPORT.urn
 
 /** 6 §3.2, §7: each command's path, SOAPACTION and body; faults; the 3-second timeouts; the capture. */
 @RunWith(AndroidJUnit4::class)
@@ -108,36 +107,22 @@ class SonosClientTest {
     @Test
     fun aFaultIsASonosFaultWithItsCode() = runTest {
         speaker.refuse("Pause", 701)
-        try {
-            client.pause(speaker.address)
-            fail("expected a fault")
-        } catch (e: SonosFault) {
-            assertThat(e.code).isEqualTo(701)
-        }
+        assertThat(throws<SonosFault> { client.pause(speaker.address) }.code).isEqualTo(701)
     }
 
     /** 6 §6: an HTTP error without a UPnP fault is still a refusal, with no code. Pin: it already is. */
     @Test
     fun anErrorWithoutAFaultIsAFaultWithNoCode() = runTest {
         speaker.refuseWithoutFault("Pause", 503)
-        try {
-            client.pause(speaker.address)
-            fail("expected a fault")
-        } catch (e: SonosFault) {
-            assertThat(e.code).isNull()
-        }
+        assertThat(throws<SonosFault> { client.pause(speaker.address) }.code).isNull()
     }
 
     /** Past 4 MB isn't a Sonos answer and past 2 MB isn't art: each is a failed call. Pin: the caps are already kept. */
     @Test
     fun anAnswerOrArtOverItsCapFails() = runTest {
         speaker.answer("GetHouseholdID", "x".repeat(MAX_ANSWER_BYTES.toInt() + 1))
-        try {
-            client.householdId(speaker.address)
-            fail("expected a failed call")
-        } catch (e: BodyTooLarge) {
-            // An IOException, so it leads to a rescan.
-        }
+        // An IOException, so it leads to a rescan.
+        throws<BodyTooLarge> { client.householdId(speaker.address) }
         val art = "http://${speaker.address}/getaa?s=1"
         speaker.answer("", "x".repeat(MAX_ART_BYTES.toInt()))
         assertThat(client.bytes(art)).hasLength(MAX_ART_BYTES.toInt())
@@ -151,12 +136,7 @@ class SonosClientTest {
         val threads = mutableListOf<String>()
         val watched = SonosClient(http, onThisMachine) { _, _ -> threads += Thread.currentThread().name }
         speaker.refuse("Pause", 701)
-        try {
-            watched.pause(speaker.address)
-            fail("expected a fault")
-        } catch (e: SonosFault) {
-            // Read off the caller's thread too.
-        }
+        throws<SonosFault> { watched.pause(speaker.address) }
         assertThat(threads.single()).startsWith("DefaultDispatcher-worker")
     }
 
@@ -164,36 +144,23 @@ class SonosClientTest {
     @Test
     fun aSilentSpeakerFailsAsIo() = runTest {
         speaker.silent = true
-        try {
-            client.transportInfo(speaker.address)
-            fail("expected a timeout")
-        } catch (e: IOException) {
-            // The rescan's trigger.
-        }
+        // The rescan's trigger.
+        throws<IOException> { client.transportInfo(speaker.address) }
     }
 
-    /** 6 §6: "Checks or commands time out (3 s)"; no redirect, which could lead off the home network. */
+    /** 6 §6: "Checks or commands time out (3 s)". The client refuses redirects itself (aRedirectIsNotFollowed). */
     @Test
-    fun theSpeakersClientGivesUpAfterThreeSecondsAndFollowsNoRedirect() {
+    fun theSpeakersClientGivesUpAfterThreeSeconds() {
         val sonos = sonosHttp()
         assertThat(listOf(sonos.connectTimeoutMillis, sonos.readTimeoutMillis, sonos.callTimeoutMillis)).containsExactly(3_000, 3_000, 3_000)
         assertThat(sonos.retryOnConnectionFailure).isFalse()
-        assertThat(sonos.followRedirects).isFalse()
-        assertThat(sonos.followSslRedirects).isFalse()
     }
 
     /** 6 §6 privacy: an address off the home network, or on the wrong port, is refused before anything is sent. */
     @Test
     fun anAddressOffTheHomeNetworkIsNeverContacted() = runTest {
         val strict = SonosClient(http) { _, _ -> }
-        listOf("8.8.8.8:1400", "192.168.1.20:80", speaker.address).forEach { address ->
-            try {
-                strict.householdId(address)
-                fail("expected a refusal for $address")
-            } catch (e: NotASpeaker) {
-                // As ruled.
-            }
-        }
+        listOf("8.8.8.8:1400", "192.168.1.20:80", speaker.address).forEach { address -> throws<NotASpeaker> { strict.householdId(address) } }
         assertThat(speaker.received).isEmpty()
         assertThat(strict.householdAt("8.8.8.8:1400")).isNull()
     }

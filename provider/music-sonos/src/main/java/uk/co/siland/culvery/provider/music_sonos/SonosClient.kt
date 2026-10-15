@@ -3,6 +3,9 @@ package uk.co.siland.culvery.provider.music_sonos
 import java.io.IOException
 import java.time.Duration
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -42,9 +45,6 @@ internal fun sonosHttp(): OkHttpClient = OkHttpClient.Builder()
     .readTimeout(Duration.ofMillis(SONOS_TIMEOUT_MS))
     .callTimeout(Duration.ofMillis(SONOS_TIMEOUT_MS))
     .retryOnConnectionFailure(false)
-    // A redirect could lead off the home network.
-    .followRedirects(false)
-    .followSslRedirects(false)
     .build()
 
 /**
@@ -60,7 +60,7 @@ internal class SonosClient(
     // Whatever client it is given: a redirect could lead off the home network.
     private val http = http.newBuilder().followRedirects(false).followSslRedirects(false).build()
 
-    suspend fun call(address: String, service: SonosService, action: String, vararg args: Pair<String, String>): String {
+    private suspend fun <T> call(address: String, service: SonosService, action: String, vararg args: Pair<String, String>, parse: (String) -> T): T {
         if (!isSpeakerAddress(address, accept)) throw NotASpeaker()
         val request = Request.Builder()
             .url("http://$address${service.path}")
@@ -72,7 +72,7 @@ internal class SonosClient(
             val text = answer.text
             capture(action, text)
             if (answer.code !in 200..299) throw SonosFault(SonosXml.faultCode(text))
-            text
+            parse(text)
         }
     }
 
@@ -94,11 +94,11 @@ internal class SonosClient(
 
     suspend fun next(address: String) = av(address, "Next")
 
-    suspend fun transportInfo(address: String): PlayState = read(av(address, "GetTransportInfo"), SonosXml::transportState)
+    suspend fun transportInfo(address: String): PlayState = av(address, "GetTransportInfo", parse = SonosXml::transportState)
 
-    suspend fun positionInfo(address: String): TrackInfo = read(av(address, "GetPositionInfo"), SonosXml::position)
+    suspend fun positionInfo(address: String): TrackInfo = av(address, "GetPositionInfo", parse = SonosXml::position)
 
-    suspend fun mediaInfo(address: String): MediaInfo = read(av(address, "GetMediaInfo"), SonosXml::media)
+    suspend fun mediaInfo(address: String): MediaInfo = av(address, "GetMediaInfo", parse = SonosXml::media)
 
     suspend fun removeAllTracks(address: String) = av(address, "RemoveAllTracksFromQueue")
 
@@ -111,39 +111,37 @@ internal class SonosClient(
         av(address, "SetAVTransportURI", "CurrentURI" to uri, "CurrentURIMetaData" to metadata)
 
     suspend fun groupVolume(address: String): Int =
-        read(call(address, SonosService.GROUP_RENDERING, "GetGroupVolume", INSTANCE to "0"), SonosXml::volume)
+        call(address, SonosService.GROUP_RENDERING, "GetGroupVolume", INSTANCE to "0", parse = SonosXml::volume)
 
     /** The group slider's: a snapshot first, so the rooms keep their ratio. */
     suspend fun setGroupVolume(address: String, percent: Int) {
-        call(address, SonosService.GROUP_RENDERING, "SnapshotGroupVolume", INSTANCE to "0")
-        call(address, SonosService.GROUP_RENDERING, "SetGroupVolume", INSTANCE to "0", "DesiredVolume" to "$percent")
+        call(address, SonosService.GROUP_RENDERING, "SnapshotGroupVolume", INSTANCE to "0") {}
+        call(address, SonosService.GROUP_RENDERING, "SetGroupVolume", INSTANCE to "0", "DesiredVolume" to "$percent") {}
     }
 
     suspend fun volume(address: String): Int =
-        read(call(address, SonosService.RENDERING, "GetVolume", INSTANCE to "0", "Channel" to CHANNEL), SonosXml::volume)
+        call(address, SonosService.RENDERING, "GetVolume", INSTANCE to "0", "Channel" to CHANNEL, parse = SonosXml::volume)
 
     suspend fun setVolume(address: String, percent: Int) {
-        call(address, SonosService.RENDERING, "SetVolume", INSTANCE to "0", "Channel" to CHANNEL, "DesiredVolume" to "$percent")
+        call(address, SonosService.RENDERING, "SetVolume", INSTANCE to "0", "Channel" to CHANNEL, "DesiredVolume" to "$percent") {}
     }
 
     suspend fun zoneGroups(address: String): List<ZoneGroupInfo> =
-        read(call(address, SonosService.TOPOLOGY, "GetZoneGroupState")) { SonosXml.zoneGroups(it, accept) }
+        call(address, SonosService.TOPOLOGY, "GetZoneGroupState") { SonosXml.zoneGroups(it, accept) }
 
-    suspend fun householdId(address: String): String = read(call(address, SonosService.DEVICE, "GetHouseholdID"), SonosXml::householdId)
+    suspend fun householdId(address: String): String = call(address, SonosService.DEVICE, "GetHouseholdID", parse = SonosXml::householdId)
 
-    suspend fun browse(address: String, objectId: String, start: Int, count: Int): BrowseResult = read(
-        call(
-            address, SonosService.CONTENT, "Browse",
-            "ObjectID" to objectId, "BrowseFlag" to "BrowseDirectChildren", "Filter" to "*",
-            "StartingIndex" to "$start", "RequestedCount" to "$count", "SortCriteria" to "",
-        ),
-        SonosXml::browse,
+    suspend fun browse(address: String, objectId: String, start: Int, count: Int): BrowseResult = call(
+        address, SonosService.CONTENT, "Browse",
+        "ObjectID" to objectId, "BrowseFlag" to "BrowseDirectChildren", "Filter" to "*",
+        "StartingIndex" to "$start", "RequestedCount" to "$count", "SortCriteria" to "",
+        parse = SonosXml::browse,
     )
 
-    private suspend fun av(address: String, action: String, vararg args: Pair<String, String>): String =
-        call(address, SonosService.AV_TRANSPORT, action, INSTANCE to "0", *args)
+    private suspend fun <T> av(address: String, action: String, vararg args: Pair<String, String>, parse: (String) -> T): T =
+        call(address, SonosService.AV_TRANSPORT, action, INSTANCE to "0", *args, parse = parse)
 
-    private suspend fun <T> read(text: String, parse: (String) -> T): T = withContext(Dispatchers.Default) { parse(text) }
+    private suspend fun av(address: String, action: String, vararg args: Pair<String, String>) = av(address, action, *args) {}
 }
 
 /** [block]'s answer, or null when the speaker didn't answer, refused, or answered in a shape that isn't Sonos's. */
@@ -159,3 +157,8 @@ internal inline fun <T> quietly(block: () -> T): T? = try {
 
 /** The household of the speaker at [address], or null when nothing there answers as a Sonos speaker on the home network. */
 internal suspend fun SonosClient.householdAt(address: String): String? = quietly { householdId(address) }
+
+/** Each of [addresses] that answers as a speaker, with its household: all asked at once, kept in the given order. */
+internal suspend fun SonosClient.householdsAt(addresses: List<String>): List<Pair<String, String>> = coroutineScope {
+    addresses.map { address -> async { householdAt(address)?.let { address to it } } }.awaitAll().filterNotNull()
+}

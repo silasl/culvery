@@ -9,7 +9,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.After
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -84,15 +83,7 @@ class SonosSystemTest {
         checkPlayback()
     }
 
-    private suspend fun unreachable(block: suspend () -> Unit): MusicProblem {
-        try {
-            block()
-        } catch (e: MusicUnreachableException) {
-            return e.problem
-        }
-        fail("expected the speakers to be unreachable")
-        error("unreachable")
-    }
+    private fun unreachable(block: suspend () -> Unit): MusicProblem = throws<MusicUnreachableException>(block).problem
 
     @Test
     fun theLayoutGivesEachGroupItsRoomsAndTheirVolumes() = runTest {
@@ -131,6 +122,20 @@ class SonosSystemTest {
         now += 2_000
         s.checkPlayback()
         assertThat(s.groups.value.map { it.startedAtMillis }).containsExactly(1_000_000L, started).inOrder()
+    }
+
+    /**
+     * 6 §4.2: GetMediaInfo is asked again only when the track or the transport state changes. Fails if each check asks
+     * it, or if a new track keeps the old one's.
+     */
+    @Test
+    fun mediaIsReadAgainOnlyWhenTheTrackChanges() = runTest {
+        val s = checked()
+        s.checkPlayback()
+        assertThat(kitchen.actions().count { it == "GetMediaInfo" }).isEqualTo(1)
+        kitchen.answer("GetPositionInfo", SonosFixtures.position(SonosFixtures.RADIO_URI, SonosFixtures.RADIO_TRACK))
+        s.checkPlayback()
+        assertThat(kitchen.actions().count { it == "GetMediaInfo" }).isEqualTo(2)
     }
 
     /** 6 §4.3: to the leader, and that group checked at once. Fails if the Dining room gets the command. */
@@ -195,12 +200,7 @@ class SonosSystemTest {
     fun anEmptyLibraryStopsBeforeTheQueue() = runTest {
         val s = checked()
         kitchen.answer("Browse", SonosFixtures.library(total = 0))
-        try {
-            s.shuffleEverything(s.groups.value[0])
-            fail("expected no library")
-        } catch (e: NoLibraryException) {
-            // As §6 says.
-        }
+        throws<NoLibraryException> { s.shuffleEverything(s.groups.value[0]) }
         assertThat(kitchen.actions()).doesNotContain("RemoveAllTracksFromQueue")
     }
 
@@ -234,12 +234,7 @@ class SonosSystemTest {
         val s = checked()
         kitchen.refuse("Pause", 701)
         kitchen.received.clear()
-        try {
-            s.pause(s.groups.value[0])
-            fail("expected a refusal")
-        } catch (e: MusicRefusedException) {
-            assertThat(e.code).isEqualTo(701)
-        }
+        assertThat(throws<MusicRefusedException> { s.pause(s.groups.value[0]) }.code).isEqualTo(701)
         assertThat(kitchen.actions()).contains("GetTransportInfo")
         assertThat(s.problem.value).isNull()
     }
@@ -248,12 +243,8 @@ class SonosSystemTest {
     @Test
     fun aGroupGoneFromTheLayoutIsRefused() = runTest {
         val s = checked()
-        try {
-            s.pause(s.groups.value[0].copy(id = "RINCON_000E58EEEEEE01400:9"))
-            fail("expected a refusal")
-        } catch (e: MusicRefusedException) {
-            // The next layout check redraws the rows.
-        }
+        // The next layout check redraws the rows.
+        throws<MusicRefusedException> { s.pause(s.groups.value[0].copy(id = "RINCON_000E58EEEEEE01400:9")) }
         assertThat(s.problem.value).isNull()
         // Reading the layout again was enough: no scan.
         assertThat(scans).isEqualTo(0)
@@ -420,12 +411,7 @@ class SonosSystemTest {
     fun anAnswerThatIsNotSonossIsRefused() = runTest {
         val s = checked()
         dining.answer("GetVolume", "<html>router</html>")
-        try {
-            s.roomVolume(SpeakerRoom(DINING, "Dining room", 35))
-            fail("expected a refusal")
-        } catch (e: MusicRefusedException) {
-            assertThat(e.code).isNull()
-        }
+        assertThat(throws<MusicRefusedException> { s.roomVolume(SpeakerRoom(DINING, "Dining room", 35)) }.code).isNull()
     }
 
     @Test

@@ -9,6 +9,7 @@ import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import java.net.SocketTimeoutException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
@@ -73,24 +74,28 @@ internal class SonosDiscovery(
                     socket.soTimeout = RECEIVE_MS
                     val search = M_SEARCH.toByteArray(Charsets.US_ASCII)
                     repeat(SEARCHES) { socket.send(DatagramPacket(search, search.size, target)) }
-                    val until = System.nanoTime() + listenMillis * NANOS_PER_MILLI
-                    val buffer = ByteArray(ANSWER_BYTES)
-                    while (System.nanoTime() < until) {
-                        ensureActive()
-                        val packet = DatagramPacket(buffer, buffer.size)
-                        val heard = try {
-                            socket.receive(packet)
-                            true
-                        } catch (e: SocketTimeoutException) {
-                            false
-                        }
-                        if (heard) answers += SsdpAnswer(packet.address.hostAddress.orEmpty(), String(packet.data, packet.offset, packet.length, Charsets.US_ASCII))
-                    }
+                    listen(socket, answers)
                 }
             }
         } catch (e: IOException) {
             Log.w(TAG, "The speaker scan stopped (${e::class.simpleName})")
         }
         ssdpAddresses(answers, accept)
+    }
+
+    /** Adds each answer heard on [socket] to [answers] until [listenMillis] have passed. */
+    private suspend fun listen(socket: DatagramSocket, answers: MutableList<SsdpAnswer>) {
+        val until = System.nanoTime() + listenMillis * NANOS_PER_MILLI
+        val buffer = ByteArray(ANSWER_BYTES)
+        while (System.nanoTime() < until) {
+            currentCoroutineContext().ensureActive()
+            val packet = DatagramPacket(buffer, buffer.size)
+            try {
+                socket.receive(packet)
+            } catch (e: SocketTimeoutException) {
+                continue
+            }
+            answers += SsdpAnswer(packet.address.hostAddress.orEmpty(), String(packet.data, packet.offset, packet.length, Charsets.US_ASCII))
+        }
     }
 }

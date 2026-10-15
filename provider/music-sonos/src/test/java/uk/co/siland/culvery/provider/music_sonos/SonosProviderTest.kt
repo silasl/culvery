@@ -4,7 +4,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.music.MusicLink
@@ -52,12 +51,7 @@ class SonosProviderTest {
     @Test
     fun offlineSaysSoWithoutScanning() = runTest {
         online = false
-        try {
-            provider().find()
-            fail("expected offline")
-        } catch (e: MusicUnreachableException) {
-            assertThat(e.problem).isEqualTo(MusicProblem.OFFLINE)
-        }
+        assertThat(throws<MusicUnreachableException> { provider().find() }.problem).isEqualTo(MusicProblem.OFFLINE)
         assertThat(scans).isEqualTo(0)
     }
 

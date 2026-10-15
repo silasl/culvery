@@ -33,8 +33,7 @@ class SonosProvider internal constructor(
 
     override suspend fun find(): MusicLink? {
         if (!online()) throw MusicUnreachableException(MusicProblem.OFFLINE)
-        for (address in scan()) client.householdAt(address)?.let { return MusicLink(it, address) }
-        return null
+        return client.householdsAt(scan()).firstOrNull()?.let { (address, household) -> MusicLink(household, address) }
     }
 
     override suspend fun check(address: String): MusicLink? {

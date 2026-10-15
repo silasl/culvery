@@ -4,6 +4,7 @@ import java.io.IOException
 import java.io.StringReader
 import java.net.URI
 import java.net.URISyntaxException
+import javax.xml.parsers.DocumentBuilder
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.parsers.ParserConfigurationException
 import org.w3c.dom.Element
@@ -142,11 +143,11 @@ internal object SonosXml {
         return show ?: stream
     }
 
-    private fun didlItem(didl: String?): Element? = didl?.let(::parse)?.let { it.all("item").firstOrNull() ?: it.all("container").firstOrNull() }
+    private fun didlItem(didl: String?): Element? = didl?.let(::parse)?.let { it.first("item") ?: it.first("container") }
 
     private fun text(answer: String, name: String): String = parse(answer).text(name) ?: throw SonosXmlException()
 
-    private fun factory(): DocumentBuilderFactory = DocumentBuilderFactory.newInstance().apply {
+    private val FACTORY: DocumentBuilderFactory = DocumentBuilderFactory.newInstance().apply {
         isNamespaceAware = true
         isExpandEntityReferences = false
         try {
@@ -155,6 +156,9 @@ internal object SonosXml {
             // Android's parser refuses the feature; it never fetches a DOCTYPE's outside parts anyway.
         }
     }
+
+    // A builder isn't thread-safe, and neither is the factory that makes one.
+    private val BUILDER: ThreadLocal<DocumentBuilder> = ThreadLocal.withInitial { synchronized(FACTORY) { FACTORY.newDocumentBuilder() } }
 
     private val DECLARATIONS = Regex("""<!(DOCTYPE|ENTITY)""", RegexOption.IGNORE_CASE)
     private val SKIPPED = listOf("<!--" to "-->", "<![CDATA[" to "]]>", "<?" to "?>", "<!" to ">")
@@ -205,7 +209,7 @@ internal object SonosXml {
     private fun parse(xml: String): Element {
         if (DECLARATIONS.containsMatchIn(xml) || tooDeep(xml)) throw SonosXmlException()
         return try {
-            factory().newDocumentBuilder().parse(InputSource(StringReader(xml))).documentElement
+            BUILDER.get().apply { reset() }.parse(InputSource(StringReader(xml))).documentElement
         } catch (e: SAXException) {
             throw SonosXmlException()
         } catch (e: IOException) {
@@ -216,10 +220,12 @@ internal object SonosXml {
     private fun Element.all(localName: String): List<Element> =
         getElementsByTagNameNS("*", localName).let { nodes -> (0 until nodes.length).map { nodes.item(it) as Element } }
 
+    private fun Element.first(localName: String): Element? = getElementsByTagNameNS("*", localName).item(0) as Element?
+
     private fun Element.children(localName: String): List<Element> =
         (0 until childNodes.length).map(childNodes::item).filterIsInstance<Element>().filter { it.localName == localName }
 
     /** The first [localName]'s text, trimmed; null when missing, empty or Sonos's NOT_IMPLEMENTED. */
     private fun Element.text(localName: String): String? =
-        all(localName).firstOrNull()?.textContent?.trim()?.takeIf { it.isNotEmpty() && it != NOTHING }
+        first(localName)?.textContent?.trim()?.takeIf { it.isNotEmpty() && it != NOTHING }
 }

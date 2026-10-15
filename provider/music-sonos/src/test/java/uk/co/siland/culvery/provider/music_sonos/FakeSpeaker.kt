@@ -5,18 +5,23 @@ import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.mockwebserver.SocketPolicy
+import org.junit.Assert.assertThrows
 
 /** The tests' accept rule: speakers on this machine, on whatever port MockWebServer took. */
 internal val onThisMachine: (String, Int) -> Boolean = { host, _ -> host == "localhost" || host == "127.0.0.1" }
 
 private const val LOOPBACK_HOST = "127.0.0.1"
 private val LOOPBACK: InetAddress = InetAddress.getByName(LOOPBACK_HOST)
+
+/** assertThrows for a suspending [block]. */
+internal inline fun <reified T : Throwable> throws(noinline block: suspend () -> Unit): T = assertThrows(T::class.java) { runBlocking { block() } }
 
 /** The tests' client: gives up after 500 ms and never retries, so a silent speaker fails fast. */
 internal fun testHttp(): OkHttpClient = OkHttpClient.Builder().callTimeout(Duration.ofMillis(500)).retryOnConnectionFailure(false).build()
