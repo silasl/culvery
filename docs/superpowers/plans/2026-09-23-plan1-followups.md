@@ -167,9 +167,8 @@ After 4e and before the v1 release. Taste calls only; each line names its audit 
 - W33 Week legend: wrap it or drop it now chips carry names (A33, layout part).
 - W34 Wizard and Settings padding, and the other 4a/4b/4c provisional choices not named above (F:4a, F:4b, F:4c).
 - Dim the screen behind the door card while it shows (offered, undecided; Plan 5 walk-through).
-- The door card's look and the chime's sound; the badge colours; the dovecote mark above the Home tab's house icon reads alike (Plan 5, provisional).
+- The door card's look and the chime's sound; the badge colours (Plan 5, provisional).
 - The week's reconnect chip and the sign-in line both name the service ("Google Calendar needs reconnecting" and "… Reconnect in Settings › Calendars"); keep both or shorten the line (Plan 5 §A.3).
-- A Door tab left selected marks each ring seen as it opens, so the badge never shows; there is no return to Home on idle (a shell question, Plan 5).
 
 **For Plan 4e (the device)**
 
