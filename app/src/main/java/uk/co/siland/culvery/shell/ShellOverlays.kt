@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.shell
 
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -9,12 +10,24 @@ import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.plugin.AlertHost
+import uk.co.siland.culvery.core.plugin.AlertQuieter
+import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.OverlayHost
+import uk.co.siland.culvery.core.plugin.QUIET_CAP_MS
 import uk.co.siland.culvery.core.plugin.Toaster
 
 /** The one sheet the shell shows above the rail and content; remembered by MainActivity. */
@@ -46,21 +59,82 @@ class OverlayState : OverlayHost {
     }
 }
 
-/** The app's [AlertHost]: the content the alert layer draws, and whether the screen it observes is resumed. */
+/**
+ * The app's [AlertHost]: the content the alert layer draws, whether the screen it observes is resumed, and the quieters
+ * a loud alert runs (6 §3.3). Each quiet or restore pass starts after the one before, so a restore never overtakes the
+ * quiet it undoes.
+ */
 @Singleton
-class ShellAlerts @Inject constructor() : AlertHost, DefaultLifecycleObserver {
+class ShellAlerts @Inject constructor(
+    private val quieters: Set<@JvmSuppressWildcards AlertQuieter>,
+    @ApplicationScope private val scope: CoroutineScope,
+) : AlertHost, DefaultLifecycleObserver {
     private val _content = MutableStateFlow<(@Composable () -> Unit)?>(null)
     val content: StateFlow<(@Composable () -> Unit)?> = _content.asStateFlow()
 
     private val _inFront = MutableStateFlow(false)
     override val inFront: StateFlow<Boolean> = _inFront.asStateFlow()
 
-    override fun show(content: @Composable () -> Unit) {
-        _content.value = content
+    private val lock = Any()
+    private var loud = false
+    private var lastPass: Job = Job().apply { complete() }
+    private var quietened: Deferred<Unit> = CompletableDeferred(Unit)
+
+    override fun show(loud: Boolean, content: @Composable () -> Unit) {
+        synchronized(lock) {
+            _content.value = content
+            if (loud && !this.loud) startQuiet() else if (!loud && this.loud) startRestore()
+            this.loud = loud
+        }
+    }
+
+    override suspend fun quieted() {
+        synchronized(lock) { quietened }.await()
     }
 
     override fun dismiss() {
-        _content.value = null
+        synchronized(lock) {
+            _content.value = null
+            if (loud) startRestore()
+            loud = false
+        }
+    }
+
+    private fun startQuiet() {
+        val before = lastPass
+        val pass = scope.launch {
+            before.join()
+            runAll { it.quiet() }
+        }
+        lastPass = pass
+        quietened = scope.async {
+            withTimeoutOrNull(QUIET_CAP_MS) { pass.join() }
+            Unit
+        }
+    }
+
+    private fun startRestore() {
+        val before = lastPass
+        lastPass = scope.launch {
+            before.join()
+            runAll { it.restore() }
+        }
+        quietened = CompletableDeferred(Unit)
+    }
+
+    /** Every quieter at once; one that fails is logged and the others go on. */
+    private suspend fun runAll(step: suspend (AlertQuieter) -> Unit) = coroutineScope {
+        quieters.forEach { quieter ->
+            launch {
+                try {
+                    step(quieter)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "A quieter failed (${e::class.simpleName})")
+                }
+            }
+        }
     }
 
     /** This host as an observer that writes nothing once [handedOver] is true: an instance giving way to the home task is not in front. */
@@ -80,6 +154,10 @@ class ShellAlerts @Inject constructor() : AlertHost, DefaultLifecycleObserver {
 
     override fun onPause(owner: LifecycleOwner) {
         _inFront.value = false
+    }
+
+    private companion object {
+        const val TAG = "ShellAlerts"
     }
 }
 

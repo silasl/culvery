@@ -16,6 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 import uk.co.siland.culvery.AndroidHomeApp
 import uk.co.siland.culvery.BuildConfig
 import uk.co.siland.culvery.core.plugin.AlertHost
+import uk.co.siland.culvery.core.plugin.AlertQuieter
 import uk.co.siland.culvery.core.plugin.AppVersion
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Capability
@@ -43,6 +44,10 @@ abstract class AppModule {
 
     @Multibinds
     abstract fun startables(): Set<Startable>
+
+    /** Bound by a capability with something to turn down for a loud alert, e.g. Music (6 §3.3). */
+    @Multibinds
+    abstract fun quieters(): Set<AlertQuieter>
 
     @Binds
     abstract fun toaster(impl: ShellToasts): Toaster

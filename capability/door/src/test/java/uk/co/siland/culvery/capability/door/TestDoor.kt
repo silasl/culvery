@@ -58,10 +58,12 @@ internal class FakeAlertHost(inFront: Boolean = true) : AlertHost {
     var dismissed = 0
     var content: (@Composable () -> Unit)? = null
 
-    override fun show(content: @Composable () -> Unit) {
+    override fun show(loud: Boolean, content: @Composable () -> Unit) {
         shown++
         this.content = content
     }
+
+    override suspend fun quieted() = Unit
 
     override fun dismiss() {
         dismissed++
