@@ -157,19 +157,45 @@ internal object SonosXml {
     }
 
     private val DECLARATIONS = Regex("""<!(DOCTYPE|ENTITY)""", RegexOption.IGNORE_CASE)
-    // Quoted attribute values are skipped whole: a "/>" or ">" inside them doesn't end the tag.
-    private val TAG = Regex("""<(/?)[A-Za-z_](?:[^<>"']|"[^"]*"|'[^']*')*?(/?)>""")
+    private val SKIPPED = listOf("<!--" to "-->", "<![CDATA[" to "]]>", "<?" to "?>", "<!" to ">")
 
-    /** Whether [xml] nests deeper than any answer does; checked before the tree is built, as a deep one overflows the stack. */
+    /**
+     * Whether [xml] nests deeper than any answer does; checked before the tree is built, as a deep one overflows the stack.
+     * One loop, no regex: java.util.regex recurses per character of a long tag.
+     */
     private fun tooDeep(xml: String): Boolean {
         var depth = 0
-        for (tag in TAG.findAll(xml)) {
-            when {
-                tag.groupValues[1].isNotEmpty() -> depth--
-                tag.groupValues[2].isEmpty() -> if (++depth > MAX_DEPTH) return true
+        var i = xml.indexOf('<')
+        while (i >= 0) {
+            val skip = SKIPPED.firstOrNull { xml.startsWith(it.first, i) }
+            i = when {
+                skip != null -> xml.indexOf(skip.second, i).let { if (it < 0) return false else it + skip.second.length }
+                xml.startsWith("</", i) -> { depth--; xml.indexOf('>', i) }
+                else -> {
+                    val close = tagEnd(xml, i)
+                    if (close < 0) return false
+                    if (xml[close - 1] != '/' && ++depth > MAX_DEPTH) return true
+                    close
+                }
             }
+            if (i < 0) return false
+            i = xml.indexOf('<', i)
         }
         return false
+    }
+
+    /** The index of the `>` ending the tag at [start], skipping quoted attribute values; -1 if it never ends. */
+    private fun tagEnd(xml: String, start: Int): Int {
+        var quote: Char? = null
+        for (j in start + 1 until xml.length) {
+            val c = xml[j]
+            when {
+                quote != null -> if (c == quote) quote = null
+                c == '"' || c == '\'' -> quote = c
+                c == '>' -> return j
+            }
+        }
+        return -1
     }
 
     /**

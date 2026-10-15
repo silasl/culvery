@@ -169,6 +169,19 @@ class SonosXmlTest {
         }
     }
 
+    /** A long tag or an unterminated quote is read or refused as an answer, never overflowing the stack while it is measured. */
+    @Test
+    fun aLongTagIsMeasuredWithoutOverflowing() {
+        fun withValueTag(tag: String) = SonosFixtures.household().replace("<CurrentHouseholdID>", tag)
+        val longValue = "x".repeat(100_000)
+        assertThat(SonosXml.householdId(withValueTag("<CurrentHouseholdID x=\"$longValue\">"))).isEqualTo(SonosFixtures.HOUSEHOLD)
+        assertThat(SonosXml.householdId(withValueTag("<CurrentHouseholdID x='$longValue'>"))).isEqualTo(SonosFixtures.HOUSEHOLD)
+        assertThrows(SonosXmlException::class.java) { SonosXml.householdId(withValueTag("<a " + "x".repeat(5_000) + ">")) }
+        assertThrows(SonosXmlException::class.java) {
+            SonosXml.householdId(withValueTag("<CurrentHouseholdID x=\"" + "x".repeat(4_000_000)))
+        }
+    }
+
     /** 6 §8.2: a capture keeps the shape; no room, title, link, id, household or address survives. */
     @Test
     fun theCaptureShapeReplacesNamesTitlesLinksIdsAndAddresses() {
