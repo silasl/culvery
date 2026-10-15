@@ -2,11 +2,13 @@ package uk.co.siland.culvery.provider.music_sonos
 
 import java.io.IOException
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import okhttp3.ConnectionPool
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -57,8 +59,13 @@ internal class SonosClient(
     private val accept: (String, Int) -> Boolean = ::isSpeakerAuthority,
     private val capture: (String, String) -> Unit = SonosCapture::log,
 ) {
-    // Whatever client it is given: a redirect could lead off the home network.
-    private val http = http.newBuilder().followRedirects(false).followSslRedirects(false).build()
+    // Whatever client it is given: a redirect could lead off the home network. No idle connection is kept: a speaker
+    // drops idle keep-alives within seconds, and with no retry (a command is never sent twice) a dropped one fails the call.
+    private val http = http.newBuilder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .connectionPool(ConnectionPool(0, 1, TimeUnit.SECONDS))
+        .build()
 
     private suspend fun <T> call(address: String, service: SonosService, action: String, vararg args: Pair<String, String>, parse: (String) -> T): T {
         if (!isSpeakerAddress(address, accept)) throw NotASpeaker()

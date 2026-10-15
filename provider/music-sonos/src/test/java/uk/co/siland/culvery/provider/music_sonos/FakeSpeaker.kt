@@ -59,6 +59,11 @@ internal class FakeSpeaker : AutoCloseable {
         answers[action] = MockResponse().setBody(body)
     }
 
+    /** Answers [action], then closes the connection without saying so, as a speaker drops an idle keep-alive. */
+    fun answerThenHangUp(action: String, body: String) {
+        answers[action] = MockResponse().setBody(body).setSocketPolicy(SocketPolicy.DISCONNECT_AT_END)
+    }
+
     /** Answers [action] only after [millis], so a test can look while the command is on its way. */
     fun answerAfter(action: String, body: String, millis: Long) {
         answers[action] = MockResponse().setBody(body).setBodyDelay(millis, TimeUnit.MILLISECONDS)

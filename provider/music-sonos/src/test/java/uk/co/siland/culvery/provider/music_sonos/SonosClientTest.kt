@@ -156,6 +156,14 @@ class SonosClientTest {
         assertThat(sonos.retryOnConnectionFailure).isFalse()
     }
 
+    /** Fails if a call reuses a connection the speaker has closed: with no retry (a command is never sent twice), it would fail as unreachable. */
+    @Test
+    fun eachCallOpensAFreshConnection() = runTest {
+        val sonos = SonosClient(sonosHttp(), onThisMachine) { _, _ -> }
+        speaker.answerThenHangUp("GetHouseholdID", SonosFixtures.household())
+        repeat(2) { assertThat(sonos.householdId(speaker.address)).isEqualTo(SonosFixtures.HOUSEHOLD) }
+    }
+
     /** 6 §6 privacy: an address off the home network, or on the wrong port, is refused before anything is sent. */
     @Test
     fun anAddressOffTheHomeNetworkIsNeverContacted() = runTest {
