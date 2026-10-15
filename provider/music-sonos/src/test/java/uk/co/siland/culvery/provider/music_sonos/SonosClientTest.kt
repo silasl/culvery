@@ -116,6 +116,50 @@ class SonosClientTest {
         }
     }
 
+    /** 6 §6: an HTTP error without a UPnP fault is still a refusal, with no code. Pin: it already is. */
+    @Test
+    fun anErrorWithoutAFaultIsAFaultWithNoCode() = runTest {
+        speaker.refuseWithoutFault("Pause", 503)
+        try {
+            client.pause(speaker.address)
+            fail("expected a fault")
+        } catch (e: SonosFault) {
+            assertThat(e.code).isNull()
+        }
+    }
+
+    /** Past 4 MB isn't a Sonos answer and past 2 MB isn't art: each is a failed call. Pin: the caps are already kept. */
+    @Test
+    fun anAnswerOrArtOverItsCapFails() = runTest {
+        speaker.answer("GetHouseholdID", "x".repeat(MAX_ANSWER_BYTES.toInt() + 1))
+        try {
+            client.householdId(speaker.address)
+            fail("expected a failed call")
+        } catch (e: BodyTooLarge) {
+            // An IOException, so it leads to a rescan.
+        }
+        val art = "http://${speaker.address}/getaa?s=1"
+        speaker.answer("", "x".repeat(MAX_ART_BYTES.toInt()))
+        assertThat(client.bytes(art)).hasLength(MAX_ART_BYTES.toInt())
+        speaker.answer("", "x".repeat(MAX_ART_BYTES.toInt() + 1))
+        assertThat(client.bytes(art)).isNull()
+    }
+
+    /** The answer is decoded, captured and checked for a fault off the caller's thread, which may be the main one. */
+    @Test
+    fun theAnswerIsReadOffTheCallersThread() = runTest {
+        val threads = mutableListOf<String>()
+        val watched = SonosClient(http, onThisMachine) { _, _ -> threads += Thread.currentThread().name }
+        speaker.refuse("Pause", 701)
+        try {
+            watched.pause(speaker.address)
+            fail("expected a fault")
+        } catch (e: SonosFault) {
+            // Read off the caller's thread too.
+        }
+        assertThat(threads.single()).startsWith("DefaultDispatcher-worker")
+    }
+
     /** Fails if a silent speaker hangs a check instead of failing as I/O, which starts the rescan (6 §6). */
     @Test
     fun aSilentSpeakerFailsAsIo() = runTest {
@@ -154,14 +198,15 @@ class SonosClientTest {
         assertThat(strict.householdAt("8.8.8.8:1400")).isNull()
     }
 
-    /** Art that redirects elsewhere is no art. */
+    /** Art that redirects elsewhere is no art, even from a client built to follow redirects. */
     @Test
     fun aRedirectIsNotFollowed() = runTest {
         val elsewhere = FakeSpeaker()
         try {
             elsewhere.answer("", "picture")
             speaker.redirect("", "http://${elsewhere.address}/art.jpg")
-            assertThat(SonosClient(sonosHttp(), onThisMachine) { _, _ -> }.bytes("http://${speaker.address}/getaa?s=1")).isNull()
+            assertThat(http.followRedirects).isTrue()
+            assertThat(client.bytes("http://${speaker.address}/getaa?s=1")).isNull()
             assertThat(elsewhere.received).isEmpty()
         } finally {
             elsewhere.close()

@@ -67,6 +67,11 @@ internal class FakeSpeaker : AutoCloseable {
         answers[action] = MockResponse().setResponseCode(500).setBody(SonosFixtures.fault(code))
     }
 
+    /** Answers [action] with HTTP [status] and no body: an error with no UPnP fault. */
+    fun refuseWithoutFault(action: String, status: Int) {
+        answers[action] = MockResponse().setResponseCode(status)
+    }
+
     /** Every command that changes something answers with an empty answer. */
     fun acceptCommands() {
         listOf(

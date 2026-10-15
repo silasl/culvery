@@ -50,13 +50,16 @@ internal fun sonosHttp(): OkHttpClient = OkHttpClient.Builder()
 /**
  * SOAP to one speaker at `host:port` (6 §3.2), only where [accept] allows: a speaker on the home network, on port 1400.
  * Each call throws IOException when the speaker doesn't answer (or isn't allowed), [SonosFault] when it refuses, and
- * [SonosXmlException] when the answer isn't the shape asked for. Answers are parsed off the main thread.
+ * [SonosXmlException] when the answer isn't the shape asked for. Answers are decoded and parsed off the main thread.
  */
 internal class SonosClient(
-    private val http: OkHttpClient,
+    http: OkHttpClient,
     private val accept: (String, Int) -> Boolean = ::isSpeakerAuthority,
     private val capture: (String, String) -> Unit = SonosCapture::log,
 ) {
+    // Whatever client it is given: a redirect could lead off the home network.
+    private val http = http.newBuilder().followRedirects(false).followSslRedirects(false).build()
+
     suspend fun call(address: String, service: SonosService, action: String, vararg args: Pair<String, String>): String {
         if (!isSpeakerAddress(address, accept)) throw NotASpeaker()
         val request = Request.Builder()
@@ -65,10 +68,12 @@ internal class SonosClient(
             .post(envelope(service, action, args.toList()).toRequestBody(SOAP_TYPE))
             .build()
         val answer = http.newCall(request).await(MAX_ANSWER_BYTES)
-        val text = answer.text
-        capture(action, text)
-        if (answer.code !in 200..299) throw SonosFault(read(text, SonosXml::faultCode))
-        return text
+        return withContext(Dispatchers.Default) {
+            val text = answer.text
+            capture(action, text)
+            if (answer.code !in 200..299) throw SonosFault(SonosXml.faultCode(text))
+            text
+        }
     }
 
     /** The picture at [url], http or https only, no redirect; null for anything else or any failure. Which URLs may be asked is the caller's rule (6 §4.2). */
