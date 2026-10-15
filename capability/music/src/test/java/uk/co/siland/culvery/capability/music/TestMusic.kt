@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.music
 
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -35,17 +36,19 @@ internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : Music
     /** Written from whatever thread a check runs on; read by the test. */
     val calls: MutableList<String> = CopyOnWriteArrayList()
 
+    // The maps are written from groups lowered in parallel, so each is concurrent.
+
     /** Each room's volume as its speaker holds it, by room id; a room not here answers its [SpeakerRoom.volume]. */
-    val roomVolumes = mutableMapOf<String, Int>()
+    val roomVolumes: MutableMap<String, Int> = ConcurrentHashMap()
 
     /** What a call throws, by its name as [calls] writes it ("roomVolume Kitchen-id"), every time. */
-    val failures = mutableMapOf<String, Exception>()
+    val failures: MutableMap<String, Exception> = ConcurrentHashMap()
 
     /** What a call throws the first time only. */
-    val failOnce = mutableMapOf<String, Exception>()
+    val failOnce: MutableMap<String, Exception> = ConcurrentHashMap()
 
     /** Holds a call, by its name, until completed. */
-    val gates = mutableMapOf<String, CompletableDeferred<Unit>>()
+    val gates: MutableMap<String, CompletableDeferred<Unit>> = ConcurrentHashMap()
 
     /** What playingNow() answers; null answers the playing ones of [groups]. */
     var playingNowAnswer: List<SpeakerGroup>? = null

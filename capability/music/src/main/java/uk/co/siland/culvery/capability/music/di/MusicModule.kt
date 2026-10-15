@@ -9,6 +9,8 @@ import dagger.multibindings.Multibinds
 import uk.co.siland.culvery.capability.music.MusicCapability
 import uk.co.siland.culvery.capability.music.MusicChecks
 import uk.co.siland.culvery.capability.music.MusicProvider
+import uk.co.siland.culvery.capability.music.MusicQuieter
+import uk.co.siland.culvery.core.plugin.AlertQuieter
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
 
@@ -26,4 +28,8 @@ abstract class MusicModule {
     @Binds
     @IntoSet
     abstract fun checks(impl: MusicChecks): Startable
+
+    @Binds
+    @IntoSet
+    abstract fun quieter(impl: MusicQuieter): AlertQuieter
 }
