@@ -88,6 +88,28 @@ class MusicCardTest {
         assertThat(calls.single()).startsWith("volume k ")
     }
 
+    /**
+     * A check that reads a new group volume mid-drag doesn't take the drag away: letting go sends where the finger is.
+     * Fails if the drag is reset with the volume, so the release sends nothing.
+     */
+    @Test
+    fun aVolumeReadMidDragKeepsTheDrag() {
+        var pick by mutableStateOf(HomePick(playing, nothingPlaying = false))
+        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { MusicCard(pick, null, null, actions) } } }
+        val volume = compose.onNodeWithTag("music_card_volume")
+        volume.performTouchInput {
+            down(Offset(width * 0.1f, centerY))
+            repeat(10) { moveBy(Offset(width * 0.05f, 0f)) }
+        }
+        compose.waitForIdle()
+        pick = HomePick(playing.copy(volume = 31), nothingPlaying = false)
+        compose.waitForIdle()
+        volume.performTouchInput { up() }
+        compose.waitForIdle()
+        assertThat(calls).hasSize(1)
+        assertThat(calls.single()).isNotEqualTo("volume k 31")
+    }
+
     /** The thumb stays where it was let go until the group's volume changes, then follows it. Fails if it jumps back to 30. */
     @Test
     fun theVolumeLetGoStaysUntilTheGroupsVolumeChanges() {

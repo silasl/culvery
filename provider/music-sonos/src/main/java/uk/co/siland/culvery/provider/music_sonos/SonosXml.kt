@@ -157,7 +157,8 @@ internal object SonosXml {
         }
     }
 
-    // A builder isn't thread-safe, and neither is the factory that makes one.
+    // A builder isn't thread-safe, and neither is the factory that makes one. Never reset(): Android's turns namespace
+    // awareness off, and nothing here sets a resolver or handler that would need clearing.
     private val BUILDER: ThreadLocal<DocumentBuilder> = ThreadLocal.withInitial { synchronized(FACTORY) { FACTORY.newDocumentBuilder() } }
 
     private val DECLARATIONS = Regex("""<!(DOCTYPE|ENTITY)""", RegexOption.IGNORE_CASE)
@@ -209,7 +210,7 @@ internal object SonosXml {
     private fun parse(xml: String): Element {
         if (DECLARATIONS.containsMatchIn(xml) || tooDeep(xml)) throw SonosXmlException()
         return try {
-            BUILDER.get().apply { reset() }.parse(InputSource(StringReader(xml))).documentElement
+            BUILDER.get().parse(InputSource(StringReader(xml))).documentElement
         } catch (e: SAXException) {
             throw SonosXmlException()
         } catch (e: IOException) {

@@ -128,13 +128,21 @@ internal fun VolumeSlider(
     onVolume: (Int) -> Unit,
 ) {
     val c = Culvery.colors
-    // Dragged or let go, it stays until [volume] changes, so the thumb doesn't jump back while the command is on its way.
+    // A check mid-drag can re-read [volume]; the drag is kept apart so it survives that.
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    // The value let go stays until [volume] changes, so the thumb doesn't jump back while the command is on its way.
     var held by remember(volume) { mutableStateOf<Float?>(null) }
-    val shown = held ?: volume.toFloat()
+    val shown = dragging ?: held ?: volume.toFloat()
     Slider(
         value = shown,
-        onValueChange = { held = it },
-        onValueChangeFinished = { held?.let { onVolume(it.roundToInt()) } },
+        onValueChange = { dragging = it },
+        onValueChangeFinished = {
+            dragging?.let {
+                held = it
+                onVolume(it.roundToInt())
+            }
+            dragging = null
+        },
         valueRange = range.first.toFloat()..range.last.toFloat(),
         steps = steps,
         colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.surf3),

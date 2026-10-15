@@ -4,10 +4,13 @@ import java.io.IOException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -173,6 +176,7 @@ internal class SonosSystem(
      * so the screen shows what the speaker did.
      */
     private suspend fun command(groupId: String, shown: (Playback) -> Playback, send: suspend (ZoneGroupInfo) -> Unit) {
+        sameHousehold()
         change { playback[groupId]?.let { record(groupId, shown(it)) } }
         try {
             toRooms { send(infoOf(groupId)) }
@@ -186,8 +190,12 @@ internal class SonosSystem(
      * sent to it until the saved one answers again; the layout checks don't come here, as they are how it answers again.
      */
     private suspend fun <T> toRooms(block: suspend () -> T): T {
-        if (_problem.value == MusicProblem.OTHER_HOUSEHOLD) throw MusicUnreachableException(MusicProblem.OTHER_HOUSEHOLD)
+        sameHousehold()
         return refusing { reaching(block = block) }
+    }
+
+    private fun sameHousehold() {
+        if (_problem.value == MusicProblem.OTHER_HOUSEHOLD) throw MusicUnreachableException(MusicProblem.OTHER_HOUSEHOLD)
     }
 
     /**
@@ -215,12 +223,26 @@ internal class SonosSystem(
         quietly { readLayout(address) } == true
     }
 
+    /** Every scanned address asked at once; the first of this household to answer ends the rest (6 §4.1, §6). */
     private suspend fun findHousehold(): String? {
-        val heard = client.householdsAt(scan())
-        heard.firstOrNull { it.second == link.householdId }?.let { return it.first }
+        val addresses = scan()
+        var other = false
+        val found = coroutineScope {
+            val answers = Channel<Pair<String, String?>>(Channel.UNLIMITED)
+            addresses.forEach { address -> launch { answers.send(address to client.householdAt(address)) } }
+            repeat(addresses.size) {
+                val (address, household) = answers.receive()
+                if (household == link.householdId) {
+                    coroutineContext.cancelChildren()
+                    return@coroutineScope address
+                }
+                if (household != null) other = true
+            }
+            null
+        }
         // The old rooms' addresses may now be the other household's (6 §6).
-        if (heard.isNotEmpty()) otherHousehold()
-        return null
+        if (found == null && other) otherHousehold()
+        return found
     }
 
     /** False when [address] answers for another household, whose rooms are never shown or sent to (6 §6). */

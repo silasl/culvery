@@ -31,6 +31,18 @@ class SonosXmlTest {
         assertThat(SonosXml.zoneGroups(odd).first().members.single().name).isEqualTo("Tom & Jo’s <den>")
     }
 
+    /**
+     * One builder per thread is reused: a second answer on the same thread is read as the first was. Pin: on the JVM it
+     * already is; it guards against a reuse step that drops namespace awareness, as Android's reset() does.
+     */
+    @Test
+    fun aReusedBuilderStillReadsNamespacedAnswers() {
+        repeat(2) {
+            assertThat(SonosXml.householdId(SonosFixtures.household())).isEqualTo(SonosFixtures.HOUSEHOLD)
+            assertThat(SonosXml.position(SonosFixtures.position()).title).isEqualTo("Song")
+        }
+    }
+
     @Test
     fun theHouseholdId() {
         assertThat(SonosXml.householdId(SonosFixtures.household())).isEqualTo(SonosFixtures.HOUSEHOLD)
