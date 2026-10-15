@@ -21,16 +21,18 @@ val RingReading.outcome: String
     }
 
 /**
- * Places a Ring notice (5 §3.2). Best guesses until the tablet's captures (5 §8.3): Ring's live-view, bundle, app,
- * account, offer and battery notices, and ongoing ones that don't say a ring, are ignored; motion when the words say
- * motion; a ring when they say someone is at the door or the bell rang; anything else from Ring is an unknown alert,
- * which still rings.
+ * Places a Ring notice (5 §3.2) from what the tablet captured on 2026-10-15. Live-view, group, app, account, offer and
+ * battery notices, and ongoing ones that don't say a ring, are ignored. Otherwise the channel decides: Ring's
+ * "ding_channel…" is a ring and "motion_channel…" is motion (the number after the prefix varies per install). On any
+ * other channel the words decide, and anything else from Ring is an unknown alert, which still rings.
  */
 object RingParser {
     // Android's Notification.CATEGORY_* values as text, so the parser runs without Android.
     private val IGNORED_CATEGORIES = setOf("promo", "recommendation", "status", "progress", "service", "sys", "transport", "err")
+    private const val DING_CHANNEL = "ding_channel"
+    private const val MOTION_CHANNEL = "motion_channel"
     private val IGNORED_WORDS = Regex("""(?i)\b(update|upgrade|subscription|protect|offer|sign in|signed out|password|account|battery|offline|firmware|live view)\b""")
-    private val MOTION = Regex("""(?i)\bmotion\b""")
+    private val MOTION = Regex("""(?i)\bmotion\b|\b(?:a|an) (?:person|package|parcel|vehicle|car|animal|pet)\b""")
     private val RING = Regex("""(?i)\b(ding|rang|ringing|doorbell (?:press|ring)\w*|someone(?: is|['’]s)? at)\b""")
     private val AT_DEVICE = Regex("""(?i)\bat (?:your |the )?(.+?)[.!]?$""")
 
@@ -41,16 +43,19 @@ object RingParser {
             return RingReading.Ignore
         }
         val device = deviceOf(notice)
+        val channel = notice.channelId.orEmpty()
         return when {
+            channel.startsWith(DING_CHANNEL, ignoreCase = true) -> RingReading.Ring(device)
+            channel.startsWith(MOTION_CHANNEL, ignoreCase = true) -> RingReading.Motion(device)
             MOTION.containsMatchIn(words) -> RingReading.Motion(device)
             RING.containsMatchIn(words) -> RingReading.Ring(device)
             else -> RingReading.UnknownRingAlert(device)
         }
     }
 
-    /** The title, unless it is the app's own name; then what follows "at your" in the text. */
+    /** The title, unless it is empty or the app's own name; then what follows "at your" in the text, less any leading emoji. */
     private fun deviceOf(notice: RingNotice): String =
         notice.title?.trim()?.takeIf { it.isNotEmpty() && !it.equals("Ring", ignoreCase = true) }
-            ?: notice.text?.trim()?.let { AT_DEVICE.find(it)?.groupValues?.get(1)?.trim() }
+            ?: notice.text?.dropWhile { !it.isLetterOrDigit() }?.trim()?.let { AT_DEVICE.find(it)?.groupValues?.get(1)?.trim() }
             ?: ""
 }
