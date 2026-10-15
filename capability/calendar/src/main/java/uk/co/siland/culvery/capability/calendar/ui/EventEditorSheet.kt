@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -269,8 +271,8 @@ private fun TitleField(form: EventForm, focus: FocusRequester, readOnly: Boolean
 }
 
 @Composable
-private fun Section(label: String, chips: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
+private fun Section(label: String, modifier: Modifier = Modifier, chips: @Composable () -> Unit) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
         HhSectionLabel(label)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
@@ -380,8 +382,13 @@ private fun RepeatsSection(form: EventForm, busy: Boolean) {
 /** Never, or a date from the date picker; a line under them while the date is before the event's day. */
 @Composable
 private fun EndsSection(form: EventForm, busy: Boolean, onPickEnd: () -> Unit) {
+    val endsInView = remember { BringIntoViewRequester() }
+    val errorInView = remember { BringIntoViewRequester() }
+    // Ends appears below the fold when a repeat is chosen, and so can its error line.
+    LaunchedEffect(Unit) { endsInView.bringIntoView() }
+    LaunchedEffect(form.endsBeforeStart) { if (form.endsBeforeStart) errorInView.bringIntoView() }
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
-        Section(ENDS) {
+        Section(ENDS, Modifier.bringIntoViewRequester(endsInView)) {
             HhChoiceChip("Never", form.endsOn == null, "ends_never", onClick = { if (!busy) form.chooseEnd(null) })
             val end = form.endsOn
             HhChoiceChip(
@@ -393,7 +400,9 @@ private fun EndsSection(form: EventForm, busy: Boolean, onPickEnd: () -> Unit) {
                 onClick = { if (!busy) onPickEnd() },
             )
         }
-        HhMessageLine(ENDS_TOO_EARLY.takeIf { form.endsBeforeStart }, CalendarType.noteBody, Culvery.colors.danger, "ends_error")
+        Box(Modifier.bringIntoViewRequester(errorInView)) {
+            HhMessageLine(ENDS_TOO_EARLY.takeIf { form.endsBeforeStart }, CalendarType.noteBody, Culvery.colors.danger, "ends_error")
+        }
     }
 }
 

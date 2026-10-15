@@ -29,6 +29,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
@@ -254,6 +255,36 @@ class EventEditorSheetTest {
         compose.onNodeWithTag("ends_never").assertIsSelected()
         compose.onNodeWithTag("ends_pick").performClick()
         assertThat(calls).contains("picker:EndDate")
+    }
+
+    /** A sheet short enough that the Ends row starts below the fold. */
+    private fun showShort(form: EventForm) = compose.setContent {
+        CulveryTheme(dark = true) {
+            Box(Modifier.size(ShellTokens.sheetWidth, 520.dp)) {
+                EventEditorSheet(
+                    form = form, people = SampleUi.household, service = "Google Calendar", childOnly = null, busy = false,
+                    failure = null, picker = EditorPicker.None, onClose = {}, onSave = {}, onDelete = {}, onRefusedWho = {},
+                    onPicker = {}, focusTitleOnOpen = false,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun choosingARepeatScrollsEndsIntoView() {
+        showShort(newForm())
+        compose.onNodeWithTag("repeat_Weekly").performScrollTo().performClick()
+        compose.onNodeWithTag("ends_never").assertIsDisplayed()
+    }
+
+    @Test
+    fun anEndBeforeTheDayScrollsItsLineIntoView() {
+        val form = newForm()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        showShort(form)
+        compose.onNodeWithTag("ends_never").performScrollTo()
+        compose.runOnIdle { form.chooseEnd(SampleUi.TODAY.minusDays(1)) }
+        compose.onNodeWithTag("ends_error").assertIsDisplayed()
     }
 
     @Test
