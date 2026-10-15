@@ -1,72 +1,76 @@
 # Culvery — Plan 6: Sonos Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tasks 1–15 are subagent tasks; Task 16 is the controller on the `culvery-5` AVD with the user; Task 17 needs the user, the household's speakers and the son's SM-T510.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tasks 1–15 are subagent tasks; Task 16 is the controller on the `culvery-5` AVD with the user and a real speaker; Task 17 needs the user, the household's speakers and the son's SM-T510.
 
 **Goal:** Each Sonos room is a remote on a Music tab; Home shows the room that's playing with Play/Pause, Next and its volume; Shuffle everything and the household's Sonos Favourites start music in a group; and while the door card shows, every playing group goes quieter and comes back afterwards.
 
-**Architecture:** `:core:plugin` gains `AlertQuieter` (a Hilt multibinding) and a loud alert (`AlertHost.show(loud = true)`, `quieted()`), run by the shell's `ShellAlerts`; Door marks its card loud and waits for `quieted()` before the chime. A new capability `:capability:music` owns the `MusicSystem` seam, the saved connection (DataStore `music_settings`), the Home-room rule, the 2-second checks, the doorbell lowering (`MusicQuieter`), the Home card, the Music tab, the Favourites sheet and Settings › Music. A new provider `:provider:music-sonos` finds the speakers by SSDP under a multicast lock and talks SOAP to port 1400 over OkHttp, reading answers with a plain-JVM `SonosXml`; a debug-only `:provider:music-fake` gives sample speakers. Music and Door never see each other: the shell runs the quieters.
+**Architecture:** `:core:plugin` gains `AlertQuieter` (a Hilt multibinding) and a loud alert (`AlertHost.show(loud = true)`, `quieted()`), run by the shell's `ShellAlerts`; Door marks its card loud and waits for `quieted()` before the chime. A new capability `:capability:music` owns the `MusicSystem` seam, the saved connection (DataStore `music_settings`), the Home-room rule, the 2-second checks, the doorbell lowering (`MusicQuieter`, room by room), the Home card, the Music tab, the Favourites sheet and Settings › Music. A new provider `:provider:music-sonos` finds the speakers by SSDP under a multicast lock and talks SOAP to port 1400 over OkHttp, reading answers with a plain-JVM `SonosXml`; it contacts nothing but a private IPv4 address on port 1400 and HTTPS stream art. There are no sample speakers (6 §3.4): tests use a test `MusicSystem`, walk-throughs the household's speakers. Music and Door never see each other: the shell runs the quieters.
 
 **Tech Stack:** Kotlin 2.2.20, Jetpack Compose (BOM 2025.09.00), Hilt 2.57.1, DataStore 1.2.1, Coroutines 1.10.2, OkHttp 4.12.0 (+ MockWebServer 4.12.0, already in the catalogue), `javax.xml.parsers` DOM, `java.net.DatagramSocket`, `WifiManager.MulticastLock`, `ConnectivityManager.activeNetwork`, `BitmapFactory` + `android.util.LruCache`; JUnit4 + Robolectric 4.16 + Truth + Turbine, Roborazzi 1.46.1. **No new dependency**: MockWebServer is already `libs.okhttp.mockwebserver`, and there is no image library (ruling 15).
 
-**Spec:** `docs/superpowers/specs/2026-10-15-culvery-6-sonos-design.md` (§1–§9). Read it with this plan.
+**Spec:** `docs/superpowers/specs/2026-10-15-culvery-6-sonos-design.md` at 1352ad9 (§1–§9, with the plan review's rulings in §2.2, §3.4, §4.4–§4.6, §8.1). Read it with this plan.
 **Previous plan (format, patterns):** `docs/superpowers/plans/2026-10-14-culvery-05-ring-doorbell.md`. **Follow-ups:** `docs/superpowers/plans/2026-09-23-plan1-followups.md` (Tasks 16–17 update it).
 
 **Plan series:** 1 · 2a · 2b-1 · 2b-2 · 3a · 4a · 4b · 4c · 4d-1 · 4d-2 · 4e · 5 the Ring doorbell (done, not yet merged) · **6 Sonos (this plan)**.
 
-**Builds on:** branch `plan-6-sonos` at 4cc46c4 (the spec), cut from `plan-5-ring-doorbell`, in the worktree `C:\Users\si\code\siland\culvery-sonos`. Work only there; never touch `C:\Users\si\code\siland\culvery` or `C:\Users\si\code\siland\culvery-ring`. Never push. Rebased onto `main` once Plan 5 merges (the controller does that between tasks, not a subagent). File and line references were read at 4cc46c4.
+**Builds on:** branch `plan-6-sonos` at 1352ad9 (the spec after the plan review), cut from `plan-5-ring-doorbell`, in the worktree `C:\Users\si\code\siland\culvery-sonos`. Work only there; never touch `C:\Users\si\code\siland\culvery` or `C:\Users\si\code\siland\culvery-ring`. Never push. Rebased onto `main` once Plan 5 merges (the controller does that between tasks, not a subagent). File and line references were read at 4cc46c4 (the code is unchanged since).
 
 | # | Task | Review |
 |---|---|---|
 | 1 | Music's icons in the icon font | sonnet |
 | 2 | Loud alerts: `AlertQuieter`, `show(loud)`, `quieted()`, the shell runs and restores the quieters | **opus** (concurrency, timers) |
 | 3 | Door: the card is loud and the chime waits for `quieted()` | sonnet |
-| 4 | `:capability:music`: the contract, the saved connection, `Speakers`, the capability and its tab rule | **opus** (the seam every later task uses) |
-| 5 | The Home-room rule, the tab order, and the checks (`MusicChecks`) | **opus** (timers) |
-| 6 | `MusicQuieter`: lowering for the doorbell | **opus** (state across two calls) |
+| 4 | `:capability:music`: the contract, the home-network rule, the saved connection, `Speakers`, the capability and its tab rule | **opus** (the seam every later task uses) |
+| 5 | The Home-room rule (held on the application scope), the tab order, and the checks (`MusicChecks`) | **opus** (timers) |
+| 6 | `MusicQuieter`: lowering for the doorbell, room by room | **opus** (state across two calls) |
 | 7 | `MusicActions`: commands, the row lines, Favourites, the §6 words | sonnet |
-| 8 | `:provider:music-sonos` 1: `SonosXml` and the documented fixtures | sonnet |
+| 8 | `:provider:music-sonos` 1: `SonosXml`, the speaker-address rule, and the documented fixtures | sonnet |
 | 9 | `:provider:music-sonos` 2: SOAP, `SonosClient`, the debug capture | sonnet |
-| 10 | `:provider:music-sonos` 3: `SonosSystem` (layout, checks, commands, Shuffle everything, Favourites, the rescan, the household) | **opus** (the protocol, recovery) |
+| 10 | `:provider:music-sonos` 3: `SonosSystem` (layout, checks, commands, Shuffle everything, Favourites, art, the rescan, the household) | **opus** (the protocol, recovery) |
 | 11 | `:provider:music-sonos` 4: SSDP, `SonosProvider`, the network check, cleartext, wiring into the app | **opus** (a system service, the network policy) |
-| 12 | `:provider:music-fake` (debug only) | sonnet |
-| 13 | Art, the shared controls and the Home card | sonnet |
-| 14 | The Music tab and the Favourites sheet | sonnet |
-| 15 | Settings › Music: Find Sonos, a speaker's address, the usual room, the doorbell share | **opus** (connecting, saving) |
-| 16 | The emulator walk-through on `culvery-5`: sample speakers, then a real speaker by address; the captures | controller + user |
-| 17 | On the tablet: fixtures from the captures, release `install -r`, Find Sonos by scan, final review, local merge, install | controller + user, **needs the SM-T510 and the speakers** |
+| 12 | Art, the shared controls and the Home card | sonnet |
+| 13 | The Music tab and the Favourites sheet | sonnet |
+| 14 | Connecting: a typed address and `MusicConnect` | **opus** (what may be contacted, saving) |
+| 15 | Settings › Music: the page, the address sheet, the usual room, the doorbell share | sonnet |
+| 16 | The emulator walk-through on `culvery-5` with a real speaker by address; the protocol checks; the captures | controller + user |
+| 17 | On the tablet: fixtures from the captures, release `install -r`, Find Sonos by scan, the lowering timed, final review, local merge, install | controller + user, **needs the SM-T510 and the speakers** |
 
-**Task order and why:** the shell's seam first (2) and Door's one-argument change on it (3), so Door's tests guard the alert layer before Music binds a quieter. Music then goes bottom-up: the contract (4) before the logic that only needs a test double (5–7); the provider's parser (8) before the client that uses it (9), the system that uses the client (10), and the discovery and wiring that put it in the app (11). The fake (12) before the screens, which are tested against plain values and screenshotted with it in mind (13–15). The emulator (16) before the tablet (17), whose fixtures come from the emulator's captures.
+**Task order and why:** the shell's seam first (2) and Door's one-argument change on it (3), so Door's tests guard the alert layer before Music binds a quieter. Music then goes bottom-up: the contract (4) before the logic that only needs a test double (5–7); the provider's parser (8) before the client that uses it (9), the system that uses the client (10), and the discovery and wiring that put it in the app (11). The screens are tested against plain values and a test system (12–13); connecting gets its own reviewer (14) before the page that uses it (15). The emulator (16) before the tablet (17), whose fixtures come from the emulator's captures.
 
 ## Rulings against the code
 
-Where the spec leaves a choice open, or doesn't fit the code at 4cc46c4:
+Where the spec leaves a choice open, or doesn't fit the code at 4cc46c4. The user's plan-review rulings (2026-10-15) are folded in: the shuffle order (12), the paused room on Home (8), per-room lowering (10, 30), no sample speakers (19).
 
 1. **`AlertHost.show(loud: Boolean = false, content)`**: `loud` comes first so every `host.show { … }` keeps compiling with a trailing lambda; the spec writes `show(content, loud = false)`. **`quieted()` is an interface member** (`suspend fun quieted()`), so a test host can hold it; the spec writes it as an extension.
 2. **The 500 ms run from the `show` that started quieting**, not from each `quieted()` call: a second ring's `quieted()` while the first card shows returns at once. **A quiet alert that replaces a loud one restores**, as a dismiss does. **Each quiet or restore pass waits for the one before**, so a dismiss while a quieter is still lowering (a slow speaker) restores after it finishes rather than before.
-3. **Door awaits `quieted()` only when it is about to chime.** In quiet hours, or within 10 seconds of the last chime, the card is still loud (§2.3 "in quiet hours too") but nothing waits.
-4. **`MusicSystem` carries more than the spec's list:** `problem: StateFlow<MusicProblem?>` (the §6 line), `checkLayout()`, `checkPlayback()` (the capability decides when, §4.2; the provider does the reading), `playingNow()` and `groupVolume(group)` (fresh reads for the lowering, ruling 10), and `art(url)` (ruling 15). `groups` is a `StateFlow`. **A second seam, `MusicProvider`** (`descriptor`, `find()`, `check(address)`, `open(link, onMoved)`), lets Settings › Music, which the capability owns, find speakers without knowing Sonos.
+3. **Door awaits `quieted()` only when it is about to chime.** In quiet hours, or within 10 seconds of the last chime, the card is still loud (§2.3 "in quiet hours too") but nothing waits. **It awaits inside its lock**, so a Got it tap during those 500 ms waits for them.
+4. **`MusicSystem` carries more than the spec's list:** `problem: StateFlow<MusicProblem?>` (the §6 line), `checkLayout()`, `checkPlayback()` (the capability decides when, §4.2; the provider does the reading), `playingNow()` and `roomVolume(room)` (fresh reads for the lowering, rulings 10 and 30), and `art(url)` (ruling 15). `groups` is a `StateFlow`. **A second seam, `MusicProvider`** (`descriptor`, `find()`, `check(address)`, `open(link, onMoved)`), lets Settings › Music, which the capability owns, find speakers without knowing Sonos.
 5. **The connection is a DataStore file `music_settings`** (provider id, household id, address, usual room id, the doorbell share), as Door's `door_settings` (Plan 5 rulings 8–9): no `Connection` table exists to put it in. It sits under `files/datastore/`, already excluded from backup and transfer (§3.5). The usual room is kept by its Sonos id (`RINCON_…`), never its name; the rooms list stays in memory. `ProviderDescriptor("music.sonos", "Sonos", …)`.
 6. **The household id comes from `DeviceProperties#GetHouseholdID`**: `ZoneGroupTopology` doesn't carry it. It is asked of the saved speaker at each layout check, so a reset system shows at the next one (§6).
 7. **What's playing reads four things per group each check** (transport, position, media and group volume, in parallel): the station's name is only in `GetMediaInfo`'s `CurrentURIMetaData`. A group plays from its queue when its media URI starts `x-rincon-queue:`; then it shows title and artist and `canSkip` is true; anything else (a station, line-in, TV) is radio: the station (`GetMediaInfo`'s title) and the programme (`r:radioShowMd`, else `r:streamContent` unless it is a `ZPSTR_` placeholder), Next greyed.
-8. **Home keeps the group it showed playing while that group is paused**, so Pause then Play on Home resumes the same room; when it stops (or another starts) the spec's rule applies. Without this, pausing the only playing group would swap the card to the usual room and Play would start a different room. Such a card shows the track with "paused"; the spec's "Nothing playing" card is the usual room's when nothing was showing. *(For the user's plan review: say if Home should switch at once instead.)*
+8. **A room paused from Home stays on Home** until it stops or another room plays (§2.2 since the plan review), so Pause then Play resumes it; such a card shows the track with "paused". The spec's "Nothing playing" card is the usual room's when nothing was showing. **The memory lives in `MusicView.home`, a `StateFlow` on the application scope**, so it survives the card leaving composition (Settings over Home, another tab and back).
 9. **"Home or the Music tab shows" means the Home card or the Music tab is composed**, read through `DisposableEffect`; with `AlertHost.inFront` for "Culvery is in front". A sheet or Settings drawn over Home doesn't stop the checks. Settings › Music reads the layout once as it opens, for its room picker.
 10. **The lowering reads afresh which groups are playing** (`playingNow()`: one `GetTransportInfo` per group) instead of trusting the last check: on the Calendar or Door tab no checks run, and the bell must still lower the music.
 11. **The automatic rescan runs at most once every 30 seconds.** §4.1's "scans once by itself" happens on the first failure; while the speakers stay unreachable, later checks report at once rather than scanning (5 s) every 2 s; the next scan after 30 s still finds a speaker that came back at a new address. Before scanning, the system re-reads the layout from the saved speaker, which is all a regrouped or moved leader needs.
-12. **Shuffle everything adds `x-rincon-playlist:<leader id>#A:TRACKS` with empty metadata**, and its library check browses `A:TRACKS` with `RequestedCount` 1 and reads `TotalMatches`. Both are from SoCo's and node-sonos's use of the local API, not Sonos documentation: Task 16 confirms them on the household's speakers before anything else.
+12. **Shuffle everything (§4.4 since the plan review): `RemoveAllTracksFromQueue`, `AddURIToQueue`, `SetAVTransportURI` to the queue, `SetPlayMode SHUFFLE_NOREPEAT`, `Play`**: Sonos refuses a play mode (UPnP 712) while the source is a stream. It adds `x-rincon-playlist:<leader id>#A:TRACKS` with empty metadata, and its library check browses `A:TRACKS` with `RequestedCount` 1 and reads `TotalMatches`. These request shapes, and `SnapshotGroupVolume` before `SetGroupVolume` (14), come from SoCo's and node-sonos's use of the local API, not Sonos documentation: the tests pin them until Task 16 confirms them on the household's speakers and records the outcome.
 13. **A Favourite's kind comes from its `r:resMD` class**: a container (`object.container…`) or a `x-rincon-cpcontainer:`/`x-rincon-playlist:` URI is `QUEUED`; anything else, a single track included, is `STREAM` (set as the transport, as a station is).
-14. **`SetGroupVolume` is preceded by `SnapshotGroupVolume`**, as Sonos asks, so the rooms keep their ratio.
-15. **No image library.** Art comes as bytes through `MusicSystem.art(url)` on the provider's OkHttp client, is decoded off the main thread with `BitmapFactory` sampled to about 256 px, and up to 24 are kept in an `LruCache` in memory (§4.2). A relative `/getaa…` art path is the leader's `http://<address>…`.
-16. **Cleartext:** the speakers answer plain HTTP on port 1400 at whatever address the router gives them, and Android's network security config can't name an address range. The app gets `res/xml/network_security_config.xml` allowing cleartext in its base config and forbidding it for `googleapis.com`, `google.com` and `open-meteo.com`, the internet services Culvery uses.
+14. **`SetGroupVolume` (the group slider) is preceded by `SnapshotGroupVolume`**, as Sonos asks, so the rooms keep their ratio. The lowering doesn't use it (ruling 30).
+15. **No image library.** Art comes as bytes through `MusicSystem.art(url)` on the provider's OkHttp client, is decoded off the main thread with `BitmapFactory` sampled to about 256 px, and up to 24 are kept in an `LruCache` in memory (§4.2). **Only two kinds of art are fetched:** a leader's own `http://<leader>:1400/getaa…` (a relative `/getaa…` path is made the leader's), and a stream's `https://` art. Any other `http://` art is no art. No redirect is followed.
+16. **Cleartext:** the speakers answer plain HTTP on port 1400 at whatever address the router gives them, and Android's network security config can't name an address range. The app gets `res/xml/network_security_config.xml` allowing cleartext in its base config and forbidding it for `googleapis.com`, `google.com` and `open-meteo.com`, the internet services Culvery uses. **`InternetHttpsTest` keeps every literal URL in main sources HTTPS** (XML namespace names excepted), so the base config can't silently cover a future client.
 17. **A typed address is four numbers in a private range** (10/8, 172.16/12, 192.168/16, 169.254/16), so the wall never contacts anything off the home network by mistake (§6 privacy); leading zeros are dropped and the provider adds `:1400`. Anything else says how to type it.
 18. **The capture switch (§8.2) is a log property:** `adb shell setprop log.tag.SonosCapture DEBUG` turns it on, `… INFO` off. `SonosCapture` exists in `src/debug` (redacts with `SonosXml.redact`, logs at debug) and `src/release` (does nothing); `SonosCaptureSourceTest` keeps the release one empty, as `FakeRingsSourceTest` does.
-19. **The sample speakers are chosen in Settings › Music:** debug builds show **Use sample speakers** when a provider with `userConnectable = false` is bound; it saves a `music.fake` connection. **Find Sonos** and **Enter a speaker's address** always use the connectable provider.
-20. **"Two rooms and a group of two" (§3.4) is three rows:** Kitchen, Bedroom, and Lounge + Dining room.
+19. **No sample speakers** (§3.4 since the plan review): no `:provider:music-fake`, no **Use sample speakers**. Find Sonos and Enter a speaker's address use the bound provider (Sonos); screenshots and tests use plain values and `TestMusicSystem`.
+20. **One rule decides what may be contacted: `isHomeNetworkHost(host)`** (Task 4, the capability: a private IPv4 literal) and, in the provider, **`isSpeakerAuthority(host, port)`** (that, and port 1400). `SonosClient` refuses any other address before it sends anything (a `NotASpeaker` I/O failure, so a bad saved address leads to a rescan, never a request); topology members whose `Location` fails it are dropped; an SSDP answer counts only when its `LOCATION` host is the packet's sender and passes it. Tests that run speakers on localhost pass their own accept rule.
 21. **Logs:** `MusicActions` logs `"${command.name} failed (${e::class.simpleName})"` with an enum `MusicCommand`; `LogHygiene.ALLOWED` gains `command.name`. Nothing logs a room, a title, a Favourite or an address (§6).
-22. **Copy-scan allowlist:** three protocol literals with straight quotes (the SOAP envelope, the action element, SSDP's search) go in `core/ui/src/test/resources/copy-scan-allow.txt`, each "sent to the speakers, never shown".
+22. **Copy-scan allowlist:** three protocol literals with straight quotes (the SOAP envelope, the action element, SSDP's search) and RenderingControl's channel name `Master` go in `core/ui/src/test/resources/copy-scan-allow.txt`, each "sent to the speakers, never shown". No raw string in main code ends in a run of four quotes (`CopyScan` closes a raw string at the first `"""`): a closing quote inside a regex is written `["]`.
 23. **Offline is Android's answer when a call fails:** `ConnectivityManager.activeNetwork == null` (`ACCESS_NETWORK_STATE`) gives "The tablet is offline. Check the Wi-Fi." without a rescan.
 24. **Settings › Music is page id `music`, order 450** (Calendars 400, Door 500). **The Home card is `music.now`, REGULAR, priority 30**: after Today (100), Coming up (50) and the forecast (40), so it takes row 2, column 3.
 25. **The room picker and the doorbell slider save when let go**, as Door's chime volume does; the share moves in 5 % steps (0, 5 … 50).
-26. **Timeouts:** OkHttp connect, read and whole-call 3 s (§6), no retry on connection failure; an answer over 4 MB (art 2 MB) is a failed call.
+26. **Timeouts:** OkHttp connect, read and whole-call 3 s (§6), no retry on connection failure, no redirects; an answer over 4 MB (art 2 MB) is a failed call.
+27. **XML with a `<!DOCTYPE` or `<!ENTITY` is refused before parsing**, every time, the escaped DIDL that is parsed a second time included: a speaker never needs either.
+28. **Answers are parsed on `Dispatchers.Default`**: Favourites and Settings call from composition scopes on the main thread.
+29. **Restoring tolerates a step of 1** (Sonos may round a volume it was given), and a failed restore is tried once more (§4.6).
+30. **The lowering is per room (§4.6 since the plan review):** each room of each playing group is read, remembered as `(v, set)` before its command goes, and set with `SetVolume` on that room; restore puts each room back the same way. A group whose rooms can't all be read is left alone. A two-room group keeps its balance, even from 0 %.
 
 Nothing in this plan needs a deprecated API. Flagged and avoided: `ConnectivityManager.getActiveNetworkInfo()`/`NetworkInfo` (use `activeNetwork`), `RequestBody.create(MediaType, String)` and `MediaType.parse` (use `toRequestBody`, `toMediaType`), `androidx.compose.ui.platform.LocalLifecycleOwner` (not needed), `Modifier.semantics { invisibleToUser() }` (use `hideFromAccessibility()`). If the compiler shows a deprecation warning on a line you wrote, **stop and ask**.
 
@@ -74,32 +78,33 @@ Nothing in this plan needs a deprecated API. Flagged and avoided: `ConnectivityM
 
 **From the spec, verbatim:**
 
-- §2.2 "Home shows the playing room; with several playing, the usual room if it's one of them, else the one that started most recently; with none playing, the usual room." (with ruling 8)
+- §2.2 "Home shows the playing room; with several playing, the usual room if it's one of them, else the one that started most recently; with none playing, the usual room. A room paused from Home stays on Home until it stops or another room plays, so Pause then Play resumes it."
 - §2.3 "every playing group drops to a share of its volume (Settings, default 20 %) while the door card shows, in quiet hours too, and goes back when the card closes. A group someone changed meanwhile is left as they set it."
 - §2.4 "shown as Sonos groups them, one row each, with a group volume and each room's own. Grouping and ungrouping stay in the Sonos app."
 - §2.6 "everyone can use the controls … Settings › Music is admin-only like the rest of Settings."
 - §2.7 "Culvery talks to the speakers directly on the home Wi-Fi … No Sonos sign-in, nothing secret stored."
 - §3.1 "`id = "music"`, label "Music", icon `speaker`, rail order 30. `hasTab` is true once a `music.sonos` connection exists."
 - §3.3 "When a loud alert shows, the shell runs every quieter's `quiet()` at once. `quieted()` returns when they have all finished, or after 500 ms, whichever comes first. When the alert is dismissed, the shell runs every `restore()`. A loud alert that replaces a loud one runs nothing again." "Door never sees Music."
+- §3.4 "tests and screenshots use plain values and a test `MusicSystem`, and walk-throughs use the household's real speakers by address".
 - §4.1 "When the saved address stops answering, Culvery scans once by itself, keeps the first speaker of the same household, and saves its address. Only then does it report a problem." (with ruling 11)
 - §4.2 "While Culvery is in front and Home or the Music tab shows: each group's coordinator every **2 seconds** … Group layout … every **30 seconds**, and when the Music tab opens. After a command: that group at once. Not in front, or neither screen showing: no checks. Art … cached in memory only."
 - §4.3 "Each goes to the group's coordinator. The screen changes at once and the next check corrects it if the speaker disagrees. Next is greyed out when `canSkip` is false (radio streams)."
-- §4.4 the five steps in order; "An empty library browse stops before step 1."
-- §4.5 "A `STREAM` favourite … is set as the group's transport URI with its metadata and played. A `QUEUED` one … replaces the queue, as in §4.4 steps 1, 2, 4 and 5, without changing the play mode."
-- §4.6 "set it to `round(v × share)` (share from Settings, 0–50 %, default 20 %), and remember `(v, set)`. Groups are lowered in parallel. A group that fails is skipped. If groups are already lowered, it does nothing." "If it still equals `set`, put it back to `v`; otherwise leave it. Then forget them all." "Kept in memory only."
+- §4.4 "`RemoveAllTracksFromQueue`; `AddURIToQueue` with the library container (`A:TRACKS`); `SetAVTransportURI` to the group's queue (`x-rincon-queue:<coordinator>#0`); `SetPlayMode SHUFFLE_NOREPEAT`; `Play`." "An empty library browse stops before step 1."
+- §4.5 "A `STREAM` favourite … is set as the group's transport URI with its metadata and played. A `QUEUED` one … replaces the queue, as in §4.4 steps 1, 2, 3 and 5, without changing the play mode."
+- §4.6 "for each group playing at that moment, and each room in it, read the room's volume `v`, remember `(v, set)` with `set = round(v × share)` … then set it. Rooms are remembered before the command goes … Groups are lowered in parallel. A group that fails is skipped. If groups are already lowered, it does nothing." "room by room, read its volume. If it is within 1 of `set`, put it back to `v`; otherwise leave it. A failed restore is tried once more. Then forget them all." "Kept in memory only."
 - §5.1 "**Shuffle everything**, only while that group is stopped or paused".
 - §5.2 "One row per group, playing groups first, then the rest in Sonos's order." "Open to everyone, no PIN. No rail badge."
-- §6 privacy: "Logs carry the command and its outcome only: no room names …, track titles, favourites or addresses. The rooms list is kept in memory, not stored."
+- §6 privacy: "Only speakers on the home network are contacted; nothing goes to the internet except art for a stream that names its own URL. Logs carry the command and its outcome only: no room names …, track titles, favourites or addresses. The rooms list is kept in memory, not stored."
 - §3.5 "No new rule." (backup)
 
 **Copy, verbatim from the spec (curly apostrophes in code):** "Music", "Nothing playing", "Shuffle everything", "Favourites", "Rooms", "No Sonos Favourites yet. Add them in the Sonos app.", "Sonos", "Find Sonos", "Enter a speaker’s address", "Usual room", "When the doorbell rings, lower music to", "Culvery can’t reach Sonos. Check the speakers are on and the tablet is on the home Wi-Fi.", "The tablet is offline. Check the Wi-Fi.", "Sonos didn’t do that. Try again.", "Sonos couldn’t play this here.", "Sonos has no music library. Add it in the Sonos app.", "Culvery found a different Sonos system. Find Sonos again in Settings › Music."; TalkBack "Kitchen, playing Song by Artist", "Kitchen, paused", "Kitchen, nothing playing", "Pause Kitchen", "Play Kitchen", "Next track in Kitchen", "Shuffle everything in Kitchen", "Kitchen volume, 30 percent".
-**Not in the spec, written here** (for the end-of-v1 design walk-through): "Looking for the speakers…", "Getting your Favourites…", "Favourites for Kitchen" (spoken), "show each room’s volume"/"hide each room’s volume" (the Rooms chip's action), "play in Kitchen" (a Favourite's action), "Use sample speakers", "Looking for Sonos…", "Not connected yet. Find Sonos, or enter a speaker’s address.", "Connected.", "Found Sonos." and "Connected to Sonos." (toasts), "No Sonos speakers answered. Check they’re on, or enter a speaker’s address.", "Shown in the Sonos app under About My System.", "Speaker’s address", "192.168.1.20" (placeholder), "Connect to this speaker", "Checking…", "Type the address as four numbers, like 192.168.1.20.", "No Sonos speaker answered at that address. Check it in the Sonos app under About My System.", "The rooms appear here once Sonos is found.", "Doorbell", "20 % of its volume", "0 % (muted)", "Radio station, programme" as the spoken form of radio ("Kitchen, playing Culvery FM, The Breakfast Show").
+**Not in the spec, written here** (for the end-of-v1 design walk-through): "Looking for the speakers…", "Getting your Favourites…", "Favourites for Kitchen" (spoken), "show each room’s volume"/"hide each room’s volume" (the Rooms chip's action), "play in Kitchen" (a Favourite's action), "Looking for Sonos…", "Not connected yet. Find Sonos, or enter a speaker’s address.", "Connected.", "Found Sonos." and "Connected to Sonos." (toasts), "No Sonos speakers answered. Check they’re on, or enter a speaker’s address.", "Shown in the Sonos app under About My System.", "Speaker’s address", "192.168.1.20" (placeholder), "Connect to this speaker", "Checking…", "Type the address as four numbers, like 192.168.1.20.", "No Sonos speaker answered at that address. Check it in the Sonos app under About My System.", "The rooms appear here once Sonos is found.", "Doorbell", "20 % of its volume", "0 % (muted)", "Radio station, programme" as the spoken form of radio ("Kitchen, playing Culvery FM, The Breakfast Show").
 
 **From the house rules:**
 
 - Package root `uk.co.siland.culvery`. `minSdk 29`, `compileSdk 35`, `targetSdk 35`, JDK 17, landscape only. **No new library; never change a version.** New modules use libraries already in `gradle/libs.versions.toml`.
 - **Deprecated APIs:** none without asking (see above).
-- **Test gate:** `./gradlew testDebugUnitTest verifyRoborazziDebug` (Git Bash) or `.\gradlew.bat testDebugUnitTest verifyRoborazziDebug` (PowerShell). Never plain `test`, `check` or `build`, except the JVM-only `build-logic` build: `./gradlew -p build-logic :convention:test` (Tasks 4, 7 and 12 change its tests). A task runs its module's tests while working (`./gradlew :capability:music:testDebugUnitTest --tests '*MusicQuieterTest*'`); every task ends with the full gate before its commit.
+- **Test gate:** `./gradlew testDebugUnitTest verifyRoborazziDebug` (Git Bash) or `.\gradlew.bat testDebugUnitTest verifyRoborazziDebug` (PowerShell). Never plain `test`, `check` or `build`, except the JVM-only `build-logic` build: `./gradlew -p build-logic :convention:test` (Tasks 4 and 7 change its tests). A task runs its module's tests while working (`./gradlew :capability:music:testDebugUnitTest --tests '*MusicQuieterTest*'`); every task ends with the full gate before its commit.
 - **Tests that can fail:** every new test fails before its change, and its step says why ("Fails today: …"); a "Fails if" line names the mutation it catches. A test that passes before its change is labelled **pin**, with what it pins. Timer tests use a fake clock (`TestScope`'s scheduler) and never sleep; each checks 1 ms before its boundary and at it. Network tests use MockWebServer on localhost with short client timeouts; none touches a real speaker.
 - **Screenshots:** baselines in `<module>/src/test/screenshots/`. Before re-recording, `./gradlew <module>:compareRoborazziDebug --tests "<class pattern>"`, open each `*_compare.png` under `<module>/build/outputs/roborazzi/`, and check each difference against the step's list; then `./gradlew <module>:recordRoborazziDebug --tests "<class pattern>"`. Open every new image (the Read tool shows it). **The baseline check:** write the step's expected names one per line to `$TMP/expected-baselines.txt`, then
 ```bash
@@ -114,7 +119,7 @@ Both lists must be empty; anything in either is a stop and report.
 - **Icons** come from `Icons` (`core/ui/.../Icons.kt`); a new one is added there, to `tools/fonts/icons.txt`, and to the subset font (`tools/fonts/README.md`).
 - **Comments say what the code can't**, one line by default; spec references as `(6 §4.6)`. No comment names this plan's task or ruling numbers: cite the spec's section or give the reason. No marketing words.
 - **Robolectric and waiting:** never `runBlocking { flow.first { … } }` right after `setContent` or a click: the main looper only runs while the test idles. Wait as `compose.waitUntil(5_000) { compose.waitForIdle(); condition() }`. A test that reaches `android.util.Log` runs under Robolectric (`@RunWith(AndroidJUnit4::class)`); `SonosXmlTest` deliberately doesn't (§3.2 "Plain JVM").
-- **No personal data in files:** the fixtures use generic rooms (Kitchen, Lounge, Dining room, Bedroom) until the captures, then `[room]` and `[person]`; never the household's names, its addresses or its household id.
+- **No personal data in files:** the fixtures use generic rooms (Kitchen, Lounge, Dining room, Bedroom) until the captures, then `[room n]` and `[person]`; never the household's names, its addresses or its household id.
 - **Write every file as UTF-8.**
 - **Commit messages contain only the message** — no `Co-Authored-By`, `Signed-off-by` or any attribution trailer. Commit on `plan-6-sonos`; never push. **Never** `git checkout -- .` or `git restore .`; to undo your own change, restore only the files you changed, after `git diff --name-only`.
 
@@ -122,70 +127,70 @@ Both lists must be empty; anything in either is a stop and report.
 
 The five failure modes the spec implies, most likely to bite the household, that the spec's own test list doesn't cover; each is pinned by a test in its owning task:
 
-1. **Pause on Home, then Play.** Expected: Play resumes the room just paused, not the usual room (ruling 8); once that room is stopped, Home falls back to the spec's rule.
-   - Task 5 `HomePickTest.aPausedGroupHomeShowedStaysUntilItStops` and `MusicViewTest.pausingTheShownGroupKeepsItOnHome`.
+1. **Pause on Home, open Settings or another tab, come back, then Play.** Expected: Play resumes the room just paused, not the usual room (ruling 8); once that room is stopped, Home falls back to the spec's rule.
+   - Task 5 `HomePickTest.aPausedGroupHomeShowedStaysUntilItStops`, `MusicViewTest.pausingTheShownGroupKeepsItOnHome` and `MusicViewTest.theRoomPausedFromHomeSurvivesTheCardLeaving`.
 2. **The bell rings while the Calendar or Door tab is open and music plays** (no checks running, so the last-known state is stale or empty). Expected: the playing groups still go quieter.
    - Task 6 `MusicQuieterTest.lowersWhatIsPlayingNowNotWhatTheLastCheckSaw`; Task 10 `SonosSystemTest.playingNowAsksEachLeaderAfresh`.
 3. **The router gives the speakers new addresses overnight.** Expected: the next check finds the household again by scan, saves the new address, and no status line ever shows.
    - Task 10 `SonosSystemTest.aMovedSpeakerIsFoundAndSavedWithoutAProblem`; Task 4 `SpeakersTest.aNewAddressForTheSameHouseholdKeepsTheOpenSystem`.
-4. **A typed address that isn't a home-network speaker** ("192.168.1.20:1400", "sonos.local", "8.8.8.8", " 192.168.1.20 "). Expected: a line saying how to type it, nothing contacted off the home network; spaces trimmed.
-   - Task 15 `SpeakerAddressTest.onlyFourNumbersInAPrivateRangeAreASpeakerAddress` and `MusicConnectTest.aMistypedAddressContactsNothing`.
+4. **Something on the network that isn't a home speaker** (a typed "192.168.1.20:1400", "sonos.local" or "8.8.8.8"; a topology or SSDP answer naming an internet address; a speaker's art pointing off the network). Expected: a line saying how to type it, and nothing contacted off the home network.
+   - Task 14 `SpeakerAddressTest.onlyFourNumbersInAPrivateRangeAreASpeakerAddress` and `MusicConnectTest.aMistypedAddressContactsNothing`; Task 8 `SonosXmlTest.aMemberOffTheHomeNetworkIsDropped`; Task 9 `SonosClientTest.anAddressOffTheHomeNetworkIsNeverContacted`; Task 10 `SonosSystemTest.onlyALeadersOwnArtOrHttpsArtIsFetched`; Task 11 `SsdpTest.anAnswerPointingElsewhereIsDropped`.
 5. **The door card closes while a quieter is still lowering a slow speaker.** Expected: the restore runs after that lowering finishes, so the music comes back instead of staying low.
    - Task 2 `ShellAlertsTest.aDismissDuringASlowQuietRestoresAfterIt`; Task 6 `MusicQuieterTest.aRestoreWaitsForTheQuietItUndoes`.
 
-The spec's own tests (§7) each have their task: the Sonos XML fixtures (8), each command's SOAP body and header, Shuffle everything's order, stream and queued Favourites, the rescan, a different household (9, 10), the Home-room rule (5), the lowering (6), the checks (5), the UI with its screenshots and TalkBack words (13–15), the alert layer (2) and Door's wait (3). Also pinned: escaped room and Favourite names (8), the 3-second timeouts (9), offline without a scan (10), the 30-second rescan gap (10), the capture's redaction (8, 9), cleartext only off the internet services (11).
+The spec's own tests (§7) each have their task: the Sonos XML fixtures (8), each command's SOAP body and header, Shuffle everything's order, stream and queued Favourites, the rescan, a different household (9, 10), the Home-room rule (5), the lowering with its balance, drift and retry (6), the checks (5, 12, 13), the UI with its screenshots and TalkBack words (12, 13, 15), the alert layer (2) and Door's wait (3). Also pinned: escaped room and Favourite names (8), DOCTYPE and entities refused (8), the 3-second timeouts and no redirects (9), offline without a scan (10), the 30-second rescan gap (10), the capture's redaction (8, 9), cleartext only off the internet services and HTTPS everywhere else (11).
 
 ---
 
 ## File Structure
 
 ```
-settings.gradle.kts                                              (Tasks 4, 8, 12: include the three modules)
+settings.gradle.kts                                              (Tasks 4, 8: include the two modules)
 gradle/libs.versions.toml                                        (unchanged)
-build-logic/convention/src/test/kotlin/ModuleBoundariesTest.kt   (Tasks 4, 8, 12: the music family, pins)
+build-logic/convention/src/test/kotlin/ModuleBoundariesTest.kt   (Task 4: the music family, pins)
 build-logic/convention/src/test/kotlin/LogHygieneTest.kt         (Task 7: ALLOWED gains command.name)
-core/ui/src/test/resources/copy-scan-allow.txt                   (Tasks 9, 11: three protocol literals)
+core/ui/src/test/resources/copy-scan-allow.txt                   (Tasks 9, 11: protocol literals and "Master")
 tools/fonts/icons.txt, core/ui/src/main/res/font/material_symbols_rounded.ttf, core/ui/.../Icons.kt   (Task 1)
 core/plugin/.../Alerts.kt                                        (Task 2: AlertQuieter, loud, quieted)
-app/build.gradle.kts                                             (Tasks 4, 11, 12)
+app/build.gradle.kts                                             (Tasks 4, 11)
 app/src/main/AndroidManifest.xml, app/src/main/res/xml/network_security_config.xml (create)   (Task 11)
 app/src/main/java/uk/co/siland/culvery/shell/ShellOverlays.kt (Task 2)   di/AppModule.kt (Task 2)
-app/src/test/... ShellAlertsTest (Task 2), AppSourceTest (Task 4), CleartextTest (create, Task 11)
+app/src/test/... ShellAlertsTest (Task 2), AppSourceTest (Task 4), CleartextTest, InternetHttpsTest (create, Task 11)
 capability/door/.../DoorAlerts.kt (Task 3)   capability/door/src/test/.../TestDoor.kt (Tasks 2, 3), DoorAlertsTest.kt (Task 3)
-capability/music/                                                (create, Tasks 4–7, 13–15)
+capability/music/                                                (create, Tasks 4–7, 12–15)
   build.gradle.kts   src/test/resources/robolectric.properties
   src/main/java/uk/co/siland/culvery/capability/music/
-    MusicContract.kt   MusicSettings.kt   Speakers.kt   MusicCapability.kt   MusicWords.kt   di/MusicModule.kt (Task 4)
+    MusicContract.kt   HomeNetwork.kt   MusicSettings.kt   Speakers.kt   MusicCapability.kt   MusicWords.kt   di/MusicModule.kt (Task 4)
     HomePick.kt   MusicView.kt   MusicChecks.kt (Task 5)
     MusicQuieter.kt (Task 6)
     MusicActions.kt (Task 7)
-    ui/MusicDimens.kt   ui/Art.kt   ui/MusicParts.kt   ui/MusicCard.kt (Task 13)
-    ui/MusicTab.kt   ui/FavouritesSheet.kt (Task 14)
-    SpeakerAddress.kt   MusicConnect.kt   ui/MusicSettingsPage.kt (Task 15)
+    ui/MusicDimens.kt   ui/Art.kt   ui/MusicParts.kt   ui/MusicCard.kt (Task 12)
+    ui/MusicTab.kt   ui/FavouritesSheet.kt (Task 13)
+    SpeakerAddress.kt   MusicConnect.kt (Task 14)
+    ui/MusicSettingsPage.kt (Task 15)
   src/test/java/uk/co/siland/culvery/capability/music/
-    TestMusic.kt   MusicSettingsTest.kt   SpeakersTest.kt   MusicCapabilityTest.kt (Task 4)
+    TestMusic.kt   HomeNetworkTest.kt   MusicSettingsTest.kt   SpeakersTest.kt   MusicCapabilityTest.kt (Task 4)
     HomePickTest.kt   MusicViewTest.kt   MusicChecksTest.kt (Task 5)   MusicQuieterTest.kt (Task 6)   MusicActionsTest.kt (Task 7)
-    MusicWordsTest.kt   ui/ArtCacheTest.kt   ui/MusicCardTest.kt   ui/MusicCardScreenshotTest.kt (Task 13)
-    ui/MusicTabTest.kt   ui/FavouritesSheetTest.kt   ui/MusicTabScreenshotTest.kt (Task 14)
-    SpeakerAddressTest.kt   MusicConnectTest.kt   ui/MusicSettingsPageTest.kt   ui/MusicSettingsScreenshotTest.kt   ui/InSettingsPane.kt (Task 15)
+    MusicWordsTest.kt   ui/ArtCacheTest.kt   ui/MusicCardTest.kt   ui/MusicCardScreenshotTest.kt (Task 12)
+    ui/MusicTabTest.kt   ui/FavouritesSheetTest.kt   ui/MusicTabScreenshotTest.kt (Task 13)
+    SpeakerAddressTest.kt   MusicConnectTest.kt (Task 14)
+    ui/InSettingsPane.kt   ui/MusicSettingsPageTest.kt   ui/MusicSettingsScreenshotTest.kt (Task 15)
 provider/music-sonos/                                            (create, Tasks 8–11)
   build.gradle.kts   src/main/AndroidManifest.xml (Task 11)
   src/main/java/uk/co/siland/culvery/provider/music_sonos/
-    SonosXml.kt (Task 8)   Http.kt   Soap.kt   SonosClient.kt (Task 9)   SonosSystem.kt (Task 10)
+    SpeakerAuthority.kt   SonosXml.kt (Task 8)   Http.kt   Soap.kt   SonosClient.kt (Task 9)   SonosSystem.kt (Task 10)
     SonosDiscovery.kt   Network.kt   SonosProvider.kt   di/SonosModule.kt (Task 11)
   src/debug/java/.../SonosCapture.kt   src/release/java/.../SonosCapture.kt (Task 9)
   src/test/java/.../SonosFixtures.kt   SonosXmlTest.kt (Task 8)   FakeSpeaker.kt   SonosClientTest.kt   SonosCaptureSourceTest.kt (Task 9)
     SonosSystemTest.kt (Task 10)   SsdpTest.kt   SonosDiscoveryTest.kt   SonosProviderTest.kt (Task 11)
   src/testDebug/java/.../SonosCaptureTest.kt (Task 9)
-provider/music-fake/                                             (create, Task 12)
-  build.gradle.kts   src/main/java/uk/co/siland/culvery/provider/music_fake/FakeMusicProvider.kt   FakeMusicSystem.kt   di/FakeMusicModule.kt
-  src/test/java/.../FakeMusicSystemTest.kt
 docs/superpowers/plans/2026-09-23-plan1-followups.md            (Tasks 16, 17)
 ```
 
 `…` stands for the module's package directory (`src/main/java/uk/co/siland/culvery/<module path>`); each step spells out the full path the first time it names a file.
 
 ---
+
 ### Task 1: Music's icons (§3.1, §5; the icon font)
 
 **Review:** sonnet.
@@ -302,13 +307,13 @@ class ShellAlertsTest {
         assertThat(alerts.content.value).isNull()
     }
 
-    /** 6 §3.3. Fails if a quieter is skipped, or quieted() returns before the slowest one finished. */
+    /** 6 §3.3 "at once". Fails if a quieter is skipped, waits for the one before it, or quieted() returns before the slowest finished. */
     @Test
-    fun aLoudAlertRunsEveryQuieterAndQuietedWaitsForThem() = runTest {
+    fun aLoudAlertRunsEveryQuieterAtOnceAndQuietedWaitsForThem() = runTest {
         val log = mutableListOf<String>()
-        val music = RecordingQuieter("music", log)
-        val other = RecordingQuieter("other", log).apply { gate = CompletableDeferred() }
-        val alerts = alerts(music, other, scope = backgroundScope)
+        val first = RecordingQuieter("first", log).apply { gate = CompletableDeferred() }
+        val second = RecordingQuieter("second", log)
+        val alerts = alerts(first, second, scope = backgroundScope)
         alerts.show(loud = true, content = nothing)
         var quieted = false
         launch {
@@ -316,9 +321,10 @@ class ShellAlertsTest {
             quieted = true
         }
         runCurrent()
-        assertThat(log).containsExactly("music quiet", "music quieted", "other quiet")
+        // The second ran while the first was still held.
+        assertThat(log).containsExactly("first quiet", "second quiet", "second quieted").inOrder()
         assertThat(quieted).isFalse()
-        other.gate!!.complete(Unit)
+        first.gate!!.complete(Unit)
         runCurrent()
         assertThat(quieted).isTrue()
     }
@@ -335,6 +341,27 @@ class ShellAlertsTest {
             returnedAt = testScheduler.currentTime
         }
         advanceTimeBy(QUIET_CAP_MS - 1)
+        runCurrent()
+        assertThat(returnedAt).isNull()
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(returnedAt).isEqualTo(QUIET_CAP_MS)
+    }
+
+    /** Ruling: the 500 ms run from the show, not from each call. Fails if a quieted() asked 300 ms in waits until 800. */
+    @Test
+    fun theCapRunsFromTheShowNotFromTheCall() = runTest {
+        val hung = RecordingQuieter("hung", mutableListOf()).apply { gate = CompletableDeferred() }
+        val alerts = alerts(hung, scope = backgroundScope)
+        alerts.show(loud = true, content = nothing)
+        advanceTimeBy(300)
+        runCurrent()
+        var returnedAt: Long? = null
+        launch {
+            alerts.quieted()
+            returnedAt = testScheduler.currentTime
+        }
+        advanceTimeBy(QUIET_CAP_MS - 300 - 1)
         runCurrent()
         assertThat(returnedAt).isNull()
         advanceTimeBy(1)
@@ -475,7 +502,7 @@ class ShellAlertsTest {
 }
 ```
 Fails today: `ShellAlerts` takes no quieters, `AlertQuieter`, `QUIET_CAP_MS` and `show(loud = …)` don't exist (doesn't compile).
-Fails if: a quieter is skipped; quieted() ignores the cap or waits for a quiet alert; a loud-over-loud re-quietens; a restore overtakes its quiet; a throwing quieter cancels its siblings.
+Fails if: a quieter is skipped or waits for another; quieted() ignores the cap, measures it from the call, or waits for a quiet alert; a loud-over-loud re-quietens; a restore overtakes its quiet; a throwing quieter cancels its siblings.
 
 - [ ] **Step 2: Run them to see them fail**
 
@@ -725,9 +752,21 @@ Add to `DoorAlertsTest.kt` (imports `kotlinx.coroutines.CompletableDeferred`, `j
         assertThat(host.quietedCalls).isEqualTo(0)
         assertThat(chime.volumes).isEmpty()
     }
+
+    /** 6 §4.6: a ring within 10 seconds of the last chime plays none, so nothing waits for the music. */
+    @Test
+    fun aRingWithinTenSecondsOfTheLastChimeDoesNotWait() = runTest {
+        val alerts = alerts()
+        alerts.onRecorded(rung(1))
+        assertThat(host.quietedCalls).isEqualTo(1)
+        advanceTimeBy(CHIME_GAP_MS - 1)
+        alerts.onRecorded(rung(2))
+        assertThat(host.quietedCalls).isEqualTo(1)
+        assertThat(chime.volumes).hasSize(1)
+    }
 ```
 Fails today: `onRecorded` shows a quiet alert (`loud` is false) and never calls `quieted()`, so the first test's chime plays at once.
-Fails if: the card isn't loud; the chime doesn't wait; quiet hours skip the lowering or wait anyway.
+Fails if: the card isn't loud; the chime doesn't wait; quiet hours or the 10-second gap skip the lowering or wait anyway.
 
 - [ ] **Step 2: Run them to see them fail**
 
@@ -747,7 +786,7 @@ and the chime's last lines to:
         host.quieted()
         if (chime.play(p.volume)) lastChimeMillis = now
 ```
-Extend the class KDoc's first sentence: "…raises the card or refreshes it (a loud alert: the shell turns music down while it shows, 6 §3.3), restarts its 2 minutes, and chimes …".
+Extend the class KDoc's first sentence: "…raises the card or refreshes it (a loud alert: the shell turns music down while it shows, 6 §3.3), restarts its 2 minutes, and chimes …", and add to the KDoc: "quieted() is awaited inside the lock, so a Got it tap in those 500 ms waits for them."
 
 - [ ] **Step 4: Run them to see them pass**
 
@@ -763,15 +802,15 @@ git commit -m "Make the door card a loud alert and chime once the music is lower
 ```
 
 ---
-### Task 4: `:capability:music`: the contract, the connection and the tab (§3.1, §3.5; rulings 4, 5, 24; Review Focus 3)
+### Task 4: `:capability:music`: the contract, the home-network rule, the connection and the tab (§3.1, §3.5, §6; rulings 4, 5, 19, 20, 24; Review Focus 3)
 
 **Review:** opus.
 
 **Files:**
 - Modify: `settings.gradle.kts` (`include(":capability:music")` after `include(":capability:door")`), `app/build.gradle.kts` (the module, by Hilt alone)
 - Create: `capability/music/build.gradle.kts`, `capability/music/src/test/resources/robolectric.properties`
-- Create (under `capability/music/src/main/java/uk/co/siland/culvery/capability/music/`): `MusicContract.kt`, `MusicSettings.kt`, `Speakers.kt`, `MusicCapability.kt`, `MusicWords.kt`, `di/MusicModule.kt`
-- Test (under `capability/music/src/test/java/uk/co/siland/culvery/capability/music/`): `TestMusic.kt`, `MusicSettingsTest.kt`, `SpeakersTest.kt`, `MusicCapabilityTest.kt`; `build-logic/convention/src/test/kotlin/ModuleBoundariesTest.kt`; `app/src/test/java/uk/co/siland/culvery/AppSourceTest.kt`
+- Create (under `capability/music/src/main/java/uk/co/siland/culvery/capability/music/`): `MusicContract.kt`, `HomeNetwork.kt`, `MusicSettings.kt`, `Speakers.kt`, `MusicCapability.kt`, `MusicWords.kt`, `di/MusicModule.kt`
+- Test (under `capability/music/src/test/java/uk/co/siland/culvery/capability/music/`): `TestMusic.kt`, `HomeNetworkTest.kt`, `MusicSettingsTest.kt`, `SpeakersTest.kt`, `MusicCapabilityTest.kt`; `build-logic/convention/src/test/kotlin/ModuleBoundariesTest.kt`; `app/src/test/java/uk/co/siland/culvery/AppSourceTest.kt`
 
 **Interfaces:**
 - Consumes: `Capability`, `HomeCard`, `ProviderDescriptor`, `Feature`, `ApplicationScope` (`:core:plugin`); `Icons.SPEAKER` (Task 1).
@@ -784,10 +823,11 @@ git commit -m "Make the door card a loud alert and chime once the music is lower
   - `enum class MusicProblem { UNREACHABLE, OFFLINE, OTHER_HOUSEHOLD }`
   - `class MusicRefusedException(val code: Int? = null) : Exception`; `class MusicUnreachableException(val problem: MusicProblem) : Exception`; `class NoLibraryException : Exception`
   - `data class MusicLink(val householdId: String, val address: String)`
-  - `interface MusicSystem` (below); `interface MusicProvider { val descriptor: ProviderDescriptor; suspend fun find(): MusicLink?; suspend fun check(address: String): MusicLink?; fun open(link: MusicLink, onMoved: suspend (MusicLink) -> Unit): MusicSystem }`
+  - `fun isHomeNetworkHost(host: String): Boolean` (`HomeNetwork.kt`: a private IPv4 literal as written; the one rule for what may be contacted, ruling 20)
+  - `interface MusicSystem` (below; `roomVolume(room)`, not a group volume, for the lowering); `interface MusicProvider { val descriptor: ProviderDescriptor; suspend fun find(): MusicLink?; suspend fun check(address: String): MusicLink?; fun open(link: MusicLink, onMoved: suspend (MusicLink) -> Unit): MusicSystem }`
   - `data class MusicPrefs(providerId: String?, householdId: String?, address: String?, usualRoomId: String?, lowerTo: Int = 20)` with `val link: MusicLink?`; `const val DEFAULT_LOWER_TO = 20`, `const val MAX_LOWER_TO = 50`
   - `class MusicSettings(store: DataStore<Preferences>, scope: CoroutineScope)`: `prefs`, `current`, `suspend fun connect(providerId: String, link: MusicLink)`, `suspend fun moved(link: MusicLink)`, `suspend fun setUsualRoom(roomId: String?)`, `suspend fun setLowerTo(percent: Int)`; `internal fun musicSettingsStore(scope, produceFile)`
-  - `class Speakers @Inject constructor(providers: Set<MusicProvider>, settings: MusicSettings, @ApplicationScope scope)`: `val providers: List<MusicProvider>` (connectable first), `val system: StateFlow<MusicSystem?>`
+  - `class Speakers @Inject constructor(providers: Set<MusicProvider>, settings: MusicSettings, @ApplicationScope scope)`: `val providers: List<MusicProvider>`, `val system: StateFlow<MusicSystem?>`
   - `const val MUSIC_ID = "music"`; `class MusicCapability`
   - Test doubles (`TestMusic.kt`): `TestMusicSystem`, `TestMusicProvider`, `group(…)`, `SONG`, `STATION`, `musicSettings(dir, scope)`
 
@@ -830,14 +870,13 @@ dependencies {
         allowed(":capability:music", ":core:plugin", "api")
         allowed(":capability:music", ":core:ui")
         allowed(":provider:music-sonos", ":capability:music")
-        allowed(":provider:music-fake", ":capability:music")
         allowed(":app", ":provider:music-sonos")
         banned(":capability:music", ":provider:music-sonos")
         banned(":capability:music", ":provider:music-sonos", "testImplementation")
         banned(":capability:music", ":capability:door")
         banned(":capability:door", ":capability:music")
         banned(":provider:music-sonos", ":capability:door")
-        banned(":provider:music-sonos", ":provider:music-fake")
+        banned(":provider:music-sonos", ":capability:calendar")
     }
 ```
 `AppSourceTest.kt`: rename the test `theAppsOwnCodeNeverNamesTheWeatherDoorOrMusicCapability`, its class KDoc to "`:app` wires the weather, door and music capabilities through Hilt alone and never names them in its own code.", and add (**pin**):
@@ -883,11 +922,14 @@ internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : Music
     /** Written from whatever thread a check runs on; read by the test. */
     val calls: MutableList<String> = CopyOnWriteArrayList()
 
-    /** Each group's volume as the speakers hold it, by group id; a group not here answers its [SpeakerGroup.volume]. */
-    val volumes = mutableMapOf<String, Int>()
+    /** Each room's volume as its speaker holds it, by room id; a room not here answers its [SpeakerRoom.volume]. */
+    val roomVolumes = mutableMapOf<String, Int>()
 
-    /** What a call throws, by its name as [calls] writes it ("groupVolume g2"). */
+    /** What a call throws, by its name as [calls] writes it ("roomVolume Kitchen-id"), every time. */
     val failures = mutableMapOf<String, Exception>()
+
+    /** What a call throws the first time only. */
+    val failOnce = mutableMapOf<String, Exception>()
 
     /** Holds a call, by its name, until completed. */
     val gates = mutableMapOf<String, CompletableDeferred<Unit>>()
@@ -900,6 +942,7 @@ internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : Music
         calls += call
         gates[call]?.await()
         failures[call]?.let { throw it }
+        failOnce.remove(call)?.let { throw it }
     }
 
     override suspend fun checkLayout() = record("checkLayout")
@@ -911,17 +954,18 @@ internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : Music
         return playingNowAnswer ?: groups.value.filter { it.isPlaying }
     }
 
-    override suspend fun groupVolume(group: SpeakerGroup): Int {
-        record("groupVolume ${group.id}")
-        return volumes[group.id] ?: group.volume
+    override suspend fun roomVolume(room: SpeakerRoom): Int {
+        record("roomVolume ${room.id}")
+        return roomVolumes[room.id] ?: room.volume
     }
 
-    override suspend fun setGroupVolume(group: SpeakerGroup, percent: Int) {
-        record("setGroupVolume ${group.id} $percent")
-        volumes[group.id] = percent
-    }
+    override suspend fun setGroupVolume(group: SpeakerGroup, percent: Int) = record("setGroupVolume ${group.id} $percent")
 
-    override suspend fun setRoomVolume(room: SpeakerRoom, percent: Int) = record("setRoomVolume ${room.id} $percent")
+    /** The speaker takes the volume before it answers, so a failure here is a command that took effect but whose answer was lost. */
+    override suspend fun setRoomVolume(room: SpeakerRoom, percent: Int) {
+        roomVolumes[room.id] = percent
+        record("setRoomVolume ${room.id} $percent")
+    }
 
     override suspend fun play(group: SpeakerGroup) = record("play ${group.id}")
 
@@ -945,8 +989,8 @@ internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : Music
 }
 
 /** A provider whose answers a test sets; it opens a [TestMusicSystem] and keeps each. */
-internal class TestMusicProvider(id: String = "music.sonos", connectable: Boolean = true) : MusicProvider {
-    override val descriptor = ProviderDescriptor(id, "Sonos", Icons.SPEAKER, setOf(Feature.READ, Feature.WRITE), userConnectable = connectable)
+internal class TestMusicProvider(id: String = "music.sonos") : MusicProvider {
+    override val descriptor = ProviderDescriptor(id, "Sonos", Icons.SPEAKER, setOf(Feature.READ, Feature.WRITE))
     var found: MusicLink? = null
 
     /** What check(address) answers, by address. */
@@ -1056,7 +1100,7 @@ class MusicSettingsTest {
     }
 }
 ```
-Create `SpeakersTest.kt`:
+Create `SpeakersTest.kt` (each test ends on a change the system must show, so a missed or extra open can't pass unseen):
 ```kotlin
 package uk.co.siland.culvery.capability.music
 
@@ -1081,32 +1125,22 @@ class SpeakersTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val settings by lazy { musicSettings(folder.root, scope) }
     private val sonos = TestMusicProvider()
-    private val sample = TestMusicProvider("music.fake", connectable = false)
     private val home = MusicLink("Sonos_home", "192.168.1.20:1400")
+    private val other = MusicLink("Sonos_other", "192.168.1.40:1400")
 
     @After
     fun tearDown() = scope.cancel()
 
-    @Test
-    fun theConnectableProviderComesFirst() {
-        assertThat(Speakers(setOf(sample, sonos), settings, scope).providers).containsExactly(sonos, sample).inOrder()
-    }
+    private suspend fun Speakers.opensAnother(than: MusicSystem?) = withTimeout(5_000) { system.first { it != null && it !== than } }
 
     @Test
-    fun noConnectionOpensNothing() = runTest {
+    fun noConnectionOpensNothingUntilOneIsSaved() = runTest {
         val speakers = Speakers(setOf(sonos), settings, scope)
         settings.prefs.first()
         assertThat(speakers.system.value).isNull()
-        assertThat(sonos.opened).isEmpty()
-    }
-
-    @Test
-    fun aSavedConnectionOpensItsProviderOnTheLink() = runTest {
         settings.connect("music.sonos", home)
-        val speakers = Speakers(setOf(sonos, sample), settings, scope)
-        withTimeout(5_000) { speakers.system.first { it != null } }
+        speakers.opensAnother(than = null)
         assertThat(sonos.opened).containsExactly(home)
-        assertThat(sample.opened).isEmpty()
     }
 
     /** Review Focus 3: the open system found the household at a new address itself; saving it must not reopen it. */
@@ -1114,32 +1148,44 @@ class SpeakersTest {
     fun aNewAddressForTheSameHouseholdKeepsTheOpenSystem() = runTest {
         settings.connect("music.sonos", home)
         val speakers = Speakers(setOf(sonos), settings, scope)
-        val first = withTimeout(5_000) { speakers.system.first { it != null } }
+        val first = speakers.opensAnother(than = null)
         sonos.onMoved!!(home.copy(address = "192.168.1.21:1400"))
         assertThat(settings.prefs.first().address).isEqualTo("192.168.1.21:1400")
-        settings.setLowerTo(10)
-        settings.current.first { it.lowerTo == 10 }
-        assertThat(speakers.system.value).isSameInstanceAs(first)
-        assertThat(sonos.opened).hasSize(1)
+        settings.connect("music.sonos", other)
+        speakers.opensAnother(than = first)
+        // Had the move reopened the system, home would be listed twice.
+        assertThat(sonos.opened).containsExactly(home, other).inOrder()
     }
 
-    @Test
-    fun anotherHouseholdOpensAgain() = runTest {
-        settings.connect("music.sonos", home)
-        val speakers = Speakers(setOf(sonos), settings, scope)
-        val first = withTimeout(5_000) { speakers.system.first { it != null } }
-        settings.connect("music.sonos", MusicLink("Sonos_other", "192.168.1.40:1400"))
-        withTimeout(5_000) { speakers.system.first { it !== first } }
-        assertThat(sonos.opened.map { it.householdId }).containsExactly("Sonos_home", "Sonos_other").inOrder()
-    }
-
-    /** A release build has no sample speakers: their saved connection opens nothing. */
+    /** A connection to a provider this build doesn't have opens nothing; a later Sonos one opens. */
     @Test
     fun aConnectionToAProviderNotInTheBuildOpensNothing() = runTest {
-        settings.connect("music.fake", MusicLink("sample-household", "sample"))
+        settings.connect("music.cloud", MusicLink("cloud-household", "cloud"))
         val speakers = Speakers(setOf(sonos), settings, scope)
-        settings.prefs.first { it.providerId == "music.fake" }
+        settings.prefs.first { it.providerId == "music.cloud" }
         assertThat(speakers.system.value).isNull()
+        settings.connect("music.sonos", home)
+        speakers.opensAnother(than = null)
+        assertThat(sonos.opened).containsExactly(home)
+    }
+}
+```
+Create `HomeNetworkTest.kt`:
+```kotlin
+package uk.co.siland.culvery.capability.music
+
+import com.google.common.truth.Truth.assertThat
+import org.junit.Test
+
+/** 6 §6 privacy: only the home network is contacted. Exactly as written; tidying a typed address is Settings' job. */
+class HomeNetworkTest {
+    @Test
+    fun privateIpv4LiteralsOnly() {
+        listOf("10.0.0.5", "172.16.4.2", "172.31.255.1", "192.168.1.20", "169.254.10.1").forEach { assertThat(isHomeNetworkHost(it)).isTrue() }
+        listOf(
+            "172.32.0.1", "8.8.8.8", "127.0.0.1", "192.168.1", "192.168.1.256", "192.168.001.020", " 192.168.1.20",
+            "sonos.local", "localhost", "", "::1", "192.168.1.2O",
+        ).forEach { assertThat(isHomeNetworkHost(it)).isFalse() }
     }
 }
 ```
@@ -1190,7 +1236,7 @@ class MusicCapabilityTest {
 }
 ```
 Fails today: the module has no sources (nothing compiles).
-Fails if: the household's usual room survives a new system; a moved address reopens the system; a sample connection opens in a build without the sample; the tab shows before a connection.
+Fails if: the household's usual room survives a new system; a moved address reopens the system; a connection to a provider not in the build opens anything; the tab shows before a connection; the home-network rule lets through a public, mistyped or padded address.
 
 - [ ] **Step 3: Run them to see them fail**
 
@@ -1282,8 +1328,8 @@ interface MusicSystem {
     /** The groups playing right now, read afresh rather than from the last check (for the doorbell, 6 §4.6). */
     suspend fun playingNow(): List<SpeakerGroup>
 
-    /** [group]'s volume as its leader holds it now. */
-    suspend fun groupVolume(group: SpeakerGroup): Int
+    /** [room]'s own volume as its speaker holds it now (the lowering works room by room, 6 §4.6). */
+    suspend fun roomVolume(room: SpeakerRoom): Int
 
     suspend fun play(group: SpeakerGroup)
 
@@ -1321,6 +1367,29 @@ interface MusicProvider {
 ```
 (import `kotlinx.coroutines.flow.StateFlow`.)
 
+Create `HomeNetwork.kt`:
+```kotlin
+package uk.co.siland.culvery.capability.music
+
+private const val PARTS = 4
+private const val MAX_PART = 255
+
+/**
+ * Whether [host] is on the home network as written: four numbers 0–255 without leading zeros, in a private range
+ * (10/8, 172.16/12, 192.168/16, 169.254/16). The one rule for what Music may contact (6 §6 privacy); the provider adds
+ * its port to it.
+ */
+fun isHomeNetworkHost(host: String): Boolean {
+    val parts = host.split('.')
+    if (parts.size != PARTS) return false
+    val n = parts.map { part ->
+        val plain = part.length in 1..3 && part.all { it in '0'..'9' } && (part.length == 1 || part[0] != '0')
+        if (plain) part.toInt() else return false
+    }
+    if (n.any { it > MAX_PART }) return false
+    return n[0] == 10 || (n[0] == 172 && n[1] in 16..31) || (n[0] == 192 && n[1] == 168) || (n[0] == 169 && n[1] == 254)
+}
+```
 Create `MusicSettings.kt`:
 ```kotlin
 package uk.co.siland.culvery.capability.music
@@ -1461,8 +1530,8 @@ class Speakers @Inject constructor(
     private val settings: MusicSettings,
     @ApplicationScope scope: CoroutineScope,
 ) {
-    /** Those the household connects first: Find Sonos uses the first; debug builds add the sample speakers after it. */
-    val providers: List<MusicProvider> = providers.sortedBy { !it.descriptor.userConnectable }
+    /** Find Sonos and a typed address use the first (Sonos, the only one bound, 6 §3.4). */
+    val providers: List<MusicProvider> = providers.toList()
 
     private data class Opening(val providerId: String, val link: MusicLink)
 
@@ -1580,9 +1649,9 @@ git commit -m "Add the Music capability's contract, its saved connection and its
   - `fun homePick(groups: List<SpeakerGroup>, usualRoomId: String?, keptId: String?): HomePick?`
   - `fun homePicks(groups: Flow<List<SpeakerGroup>>, usualRoomId: Flow<String?>): Flow<HomePick?>`
   - `fun tabOrder(groups: List<SpeakerGroup>): List<SpeakerGroup>`
-  - `class MusicView @Inject constructor(speakers: Speakers, settings: MusicSettings)`: `val groups: Flow<List<SpeakerGroup>>`, `val problem: Flow<MusicProblem?>`, `val home: Flow<HomePick?>`
+  - `class MusicView @Inject constructor(speakers: Speakers, settings: MusicSettings, @ApplicationScope scope: CoroutineScope)`: `val groups: Flow<List<SpeakerGroup>>`, `val problem: Flow<MusicProblem?>`, `val home: StateFlow<HomePick?>` (held on the application scope, ruling 8)
   - `const val PLAYBACK_CHECK_MS = 2_000L`, `const val LAYOUT_CHECK_MS = 30_000L`
-  - `class MusicChecks internal constructor(system: StateFlow<MusicSystem?>, inFront: StateFlow<Boolean>, scope: CoroutineScope) : Startable`, `@Inject constructor(speakers: Speakers, host: AlertHost, @ApplicationScope scope)`; `fun watch(layoutNow: Boolean = false): () -> Unit`
+  - `class MusicChecks internal constructor(system: StateFlow<MusicSystem?>, inFront: StateFlow<Boolean>, scope: CoroutineScope) : Startable`, `@Inject constructor(speakers: Speakers, host: AlertHost, @ApplicationScope scope)`; `fun watch(layoutNow: Boolean = false): () -> Unit`; `internal val watching: Int`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1663,15 +1732,54 @@ Create `MusicViewTest.kt`:
 ```kotlin
 package uk.co.siland.culvery.capability.music
 
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
+import org.junit.After
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
 
+@RunWith(AndroidJUnit4::class)
 class MusicViewTest {
+    @get:Rule val folder = TemporaryFolder()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val kitchen = group("k", "Kitchen")
     private val bedroom = group("b", "Bedroom")
+
+    @After
+    fun tearDown() = scope.cancel()
+
+    /**
+     * Review Focus 1, ruling 8: Home's memory outlives the card (Settings over Home, another tab, then back): a second
+     * collector still sees the paused room. Fails if `home` is a cold flow that starts its memory afresh.
+     */
+    @Test
+    fun theRoomPausedFromHomeSurvivesTheCardLeaving() = runTest {
+        val settings = musicSettings(folder.root, scope)
+        val provider = TestMusicProvider()
+        val speakers = Speakers(setOf(provider), settings, scope)
+        settings.connect("music.sonos", MusicLink("Sonos_home", "192.168.1.20:1400"))
+        settings.setUsualRoom("Kitchen-id")
+        withTimeout(5_000) { speakers.system.first { it != null } }
+        val system = provider.systems.single()
+        val view = MusicView(speakers, settings, scope)
+        system.groups.value = listOf(kitchen, bedroom.copy(state = PlayState.PLAYING, nowPlaying = SONG))
+        withTimeout(5_000) { view.home.first { it?.group?.id == "b" } }
+        val paused = bedroom.copy(state = PlayState.PAUSED, nowPlaying = SONG)
+        system.groups.value = listOf(kitchen, paused)
+        withTimeout(5_000) { view.home.first { it?.group?.state == PlayState.PAUSED } }
+        assertThat(view.home.first()).isEqualTo(HomePick(paused, nothingPlaying = false))
+    }
 
     /** Review Focus 1: Pause on Home, then Play, is the same room. Fails if homePicks forgets what it showed. */
     @Test
@@ -1826,7 +1934,7 @@ class MusicChecksTest {
 }
 ```
 Fails today: `homePick`, `homePicks`, `tabOrder`, `MusicChecks` and the constants don't exist (nothing compiles).
-Fails if: the Home rule picks the earlier start, ignores the usual room, forgets a paused group it showed or keeps a stopped one; checks run unwatched or behind another app, or at the wrong pace; one failure stops them.
+Fails if: the Home rule picks the earlier start, ignores the usual room, forgets a paused group it showed (also when the card leaves and comes back) or keeps a stopped one; checks run unwatched or behind another app, or at the wrong pace; one failure stops them.
 
 - [ ] **Step 2: Run them to see them fail**
 
@@ -1883,20 +1991,28 @@ package uk.co.siland.culvery.capability.music
 
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import uk.co.siland.culvery.core.plugin.ApplicationScope
 
 /** What the screens show: the open system's groups and problem, and Home's pick (6 §2.2). */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
-class MusicView @Inject constructor(speakers: Speakers, settings: MusicSettings) {
+class MusicView @Inject constructor(speakers: Speakers, settings: MusicSettings, @ApplicationScope scope: CoroutineScope) {
     val groups: Flow<List<SpeakerGroup>> = speakers.system.flatMapLatest { it?.groups ?: flowOf(emptyList()) }
     val problem: Flow<MusicProblem?> = speakers.system.flatMapLatest { it?.problem ?: flowOf(null) }
-    val home: Flow<HomePick?> = homePicks(groups, settings.prefs.map { it.usualRoomId }.distinctUntilChanged())
+
+    /** Held on the application scope, so a room paused from Home is remembered while the card is away (6 §2.2). */
+    val home: StateFlow<HomePick?> = homePicks(groups, settings.prefs.map { it.usualRoomId }.distinctUntilChanged())
+        .stateIn(scope, SharingStarted.Eagerly, null)
 }
 ```
 
@@ -1951,6 +2067,9 @@ class MusicChecks internal constructor(
 
     private val watchers = MutableStateFlow(0)
     private val layoutAsked = Channel<Unit>(Channel.CONFLATED)
+
+    /** How many music screens are on, for the screens' tests. */
+    internal val watching: Int get() = watchers.value
 
     /** A music screen is on; call the result when it goes. [layoutNow] for the Music tab opening (6 §4.2). */
     fun watch(layoutNow: Boolean = false): () -> Unit {
@@ -2018,7 +2137,7 @@ git commit -m "Choose Home's room and check the speakers only while a music scre
 ```
 
 ---
-### Task 6: `MusicQuieter`: lowering for the doorbell (§2.3, §4.6; ruling 10; Review Focus 2, 5)
+### Task 6: `MusicQuieter`: lowering for the doorbell, room by room (§2.3, §4.6; rulings 10, 29, 30; Review Focus 2, 5)
 
 **Review:** opus.
 
@@ -2028,8 +2147,8 @@ git commit -m "Choose Home's room and check the speakers only while a music scre
 - Test: `capability/music/src/test/java/uk/co/siland/culvery/capability/music/MusicQuieterTest.kt`
 
 **Interfaces:**
-- Consumes: `AlertQuieter` (Task 2); `MusicSystem.playingNow()`, `groupVolume()`, `setGroupVolume()`, `Speakers.system`, `MusicSettings.current` (Task 4).
-- Produces: `class MusicQuieter internal constructor(system: () -> MusicSystem?, share: () -> Int) : AlertQuieter`, `@Inject constructor(speakers: Speakers, settings: MusicSettings)`.
+- Consumes: `AlertQuieter` (Task 2); `MusicSystem.playingNow()`, `roomVolume()`, `setRoomVolume()`, `Speakers.system`, `MusicSettings.current` (Task 4); `TestMusicSystem.roomVolumes`, `failures`, `failOnce`, `gates`, `playingNowAnswer` (Task 4's `TestMusic.kt`).
+- Produces: `class MusicQuieter internal constructor(system: () -> MusicSystem?, share: () -> Int) : AlertQuieter`, `@Inject constructor(speakers: Speakers, settings: MusicSettings)`; `internal const val RESTORE_DRIFT = 1`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2047,61 +2166,118 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** 6 §4.6: playing groups only, the share, in parallel, restore only if unchanged, a second ring, a failing group. */
+/**
+ * 6 §4.6: each room of each playing group, remembered before it is set; groups in parallel; restore within 1 of what was
+ * set, tried twice; a second ring; a group that can't be read. Kitchen plays alone at 50; Lounge (40) leads Dining room
+ * (25), playing; Bedroom is paused.
+ */
 @RunWith(AndroidJUnit4::class)
 class MusicQuieterTest {
     private val kitchen = group("k", "Kitchen", state = PlayState.PLAYING, nowPlaying = SONG, volume = 50)
     private val lounge = group("l", "Lounge", "Dining room", state = PlayState.PLAYING, nowPlaying = STATION, volume = 40)
     private val bedroom = group("b", "Bedroom", state = PlayState.PAUSED, nowPlaying = SONG, volume = 30)
-    private val system = TestMusicSystem(listOf(kitchen, lounge, bedroom))
+    private val system = TestMusicSystem(listOf(kitchen, lounge, bedroom)).apply { roomVolumes["Dining room-id"] = 25 }
     private var share = 20
 
     private fun quieter(s: MusicSystem? = system) = MusicQuieter({ s }, { share })
 
-    private fun sets() = system.calls.filter { it.startsWith("setGroupVolume") }
+    private fun sets() = system.calls.filter { it.startsWith("setRoomVolume") }
 
     @Test
-    fun onlyPlayingGroupsDropToTheirShare() = runTest {
+    fun eachRoomOfEachPlayingGroupDropsToItsShare() = runTest {
         quieter().quiet()
-        assertThat(sets()).containsExactly("setGroupVolume k 10", "setGroupVolume l 8")
+        assertThat(sets()).containsExactly("setRoomVolume Kitchen-id 10", "setRoomVolume Lounge-id 8", "setRoomVolume Dining room-id 5")
     }
 
-    /** round(v × share): 33 × 20 % is 6.6, so 7. 0 % mutes (6 §5.4). */
+    /** round(v × share): 33 × 20 % is 6.6, so 7. */
     @Test
-    fun theShareRoundsAndNothingMutes() = runTest {
-        system.volumes["k"] = 33
+    fun theShareRounds() = runTest {
+        system.roomVolumes["Kitchen-id"] = 33
         system.groups.value = listOf(kitchen)
         quieter().quiet()
-        assertThat(sets()).containsExactly("setGroupVolume k 7")
-        share = 0
-        val muted = TestMusicSystem(listOf(kitchen))
-        MusicQuieter({ muted }, { share }).quiet()
-        assertThat(muted.calls).contains("setGroupVolume k 0")
+        assertThat(sets()).containsExactly("setRoomVolume Kitchen-id 7")
     }
 
-    /** Fails if one group is lowered only after the last finished. */
+    /** 6 §4.6: room by room keeps a group's balance, even from 0 % (a group volume of 0 would lose it). */
+    @Test
+    fun aTwoRoomGroupComesBackWithItsBalanceEvenFromNothing() = runTest {
+        system.groups.value = listOf(lounge)
+        share = 0
+        val q = quieter()
+        q.quiet()
+        assertThat(sets()).containsExactly("setRoomVolume Lounge-id 0", "setRoomVolume Dining room-id 0")
+        system.calls.clear()
+        q.restore()
+        assertThat(sets()).containsExactly("setRoomVolume Lounge-id 40", "setRoomVolume Dining room-id 25")
+        share = 20
+        system.calls.clear()
+        q.quiet()
+        q.restore()
+        assertThat(sets()).containsExactly(
+            "setRoomVolume Lounge-id 8", "setRoomVolume Dining room-id 5", "setRoomVolume Lounge-id 40", "setRoomVolume Dining room-id 25",
+        )
+    }
+
+    /** Fails if one group is lowered only after another finished. */
     @Test
     fun groupsAreLoweredInParallel() = runTest {
         val slow = CompletableDeferred<Unit>()
-        system.gates["groupVolume k"] = slow
+        system.gates["roomVolume Kitchen-id"] = slow
         val q = quieter()
         val quieting = launch { q.quiet() }
         runCurrent()
-        assertThat(sets()).containsExactly("setGroupVolume l 8")
+        assertThat(sets()).containsExactly("setRoomVolume Lounge-id 8", "setRoomVolume Dining room-id 5")
         slow.complete(Unit)
         quieting.join()
-        assertThat(sets()).containsExactly("setGroupVolume l 8", "setGroupVolume k 10")
+        assertThat(sets()).contains("setRoomVolume Kitchen-id 10")
     }
 
-    /** 6 §2.3: someone changed the Lounge in the Sonos app while the card showed; it stays as they set it. */
+    /** 6 §2.3: someone turned the Dining room up while the card showed; it stays as they set it. */
     @Test
-    fun restorePutsBackOnlyGroupsNobodyChanged() = runTest {
+    fun restorePutsBackOnlyRoomsNobodyChanged() = runTest {
         val q = quieter()
         q.quiet()
-        system.volumes["l"] = 25
+        system.roomVolumes["Dining room-id"] = 15
         system.calls.clear()
         q.restore()
-        assertThat(sets()).containsExactly("setGroupVolume k 50")
+        assertThat(sets()).containsExactly("setRoomVolume Kitchen-id 50", "setRoomVolume Lounge-id 40")
+    }
+
+    /** 6 §4.6: within 1 of what was set still restores (Sonos may round); 2 away is someone's change. */
+    @Test
+    fun aDriftOfOneStillRestores() = runTest {
+        val q = quieter()
+        q.quiet()
+        system.roomVolumes["Kitchen-id"] = 11
+        system.roomVolumes["Lounge-id"] = 10
+        system.calls.clear()
+        q.restore()
+        assertThat(sets()).contains("setRoomVolume Kitchen-id 50")
+        assertThat(sets()).doesNotContain("setRoomVolume Lounge-id 40")
+    }
+
+    /** 6 §4.6: the speaker took the volume but its answer was lost. Fails if a room is remembered only once its command returns. */
+    @Test
+    fun aCommandThatTookEffectButTimedOutIsStillRestored() = runTest {
+        system.failures["setRoomVolume Kitchen-id 10"] = MusicUnreachableException(MusicProblem.UNREACHABLE)
+        val q = quieter()
+        q.quiet()
+        system.failures.clear()
+        system.calls.clear()
+        q.restore()
+        assertThat(sets()).contains("setRoomVolume Kitchen-id 50")
+    }
+
+    /** 6 §4.6: a failed restore is tried once more. */
+    @Test
+    fun aFailedRestoreIsTriedOnceMore() = runTest {
+        val q = quieter()
+        q.quiet()
+        system.failOnce["roomVolume Kitchen-id"] = MusicUnreachableException(MusicProblem.UNREACHABLE)
+        system.calls.clear()
+        q.restore()
+        assertThat(system.calls.count { it == "roomVolume Kitchen-id" }).isEqualTo(2)
+        assertThat(sets()).contains("setRoomVolume Kitchen-id 50")
     }
 
     /** 6 §4.6: a second ring while lowered does nothing; after the restore the next ring lowers again. */
@@ -2110,24 +2286,24 @@ class MusicQuieterTest {
         val q = quieter()
         q.quiet()
         q.quiet()
-        assertThat(sets()).hasSize(2)
+        assertThat(sets()).hasSize(3)
         q.restore()
         system.calls.clear()
         q.quiet()
-        assertThat(sets()).hasSize(2)
+        assertThat(sets()).hasSize(3)
     }
 
-    /** A group whose speaker fails is left as it is; the others still drop and come back (6 §6). */
+    /** A group one of whose rooms can't be read is left as it is (6 §6); the others still drop and come back. */
     @Test
-    fun aFailingGroupIsSkipped() = runTest {
-        system.failures["groupVolume l"] = MusicUnreachableException(MusicProblem.UNREACHABLE)
+    fun aGroupThatCantBeReadIsSkipped() = runTest {
+        system.failures["roomVolume Dining room-id"] = MusicUnreachableException(MusicProblem.UNREACHABLE)
         val q = quieter()
         q.quiet()
-        assertThat(sets()).containsExactly("setGroupVolume k 10")
+        assertThat(sets()).containsExactly("setRoomVolume Kitchen-id 10")
         system.failures.clear()
         system.calls.clear()
         q.restore()
-        assertThat(sets()).containsExactly("setGroupVolume k 50")
+        assertThat(sets()).containsExactly("setRoomVolume Kitchen-id 50")
     }
 
     /** Review Focus 2: on the Calendar tab no checks run, so the last-known state says nothing plays. */
@@ -2136,24 +2312,24 @@ class MusicQuieterTest {
         system.groups.value = listOf(kitchen.copy(state = PlayState.STOPPED))
         system.playingNowAnswer = listOf(kitchen)
         quieter().quiet()
-        assertThat(sets()).containsExactly("setGroupVolume k 10")
+        assertThat(sets()).containsExactly("setRoomVolume Kitchen-id 10")
     }
 
     /** Review Focus 5: a restore asked while the quiet is still lowering waits for it, then puts everything back. */
     @Test
     fun aRestoreWaitsForTheQuietItUndoes() = runTest {
         val slow = CompletableDeferred<Unit>()
-        system.gates["setGroupVolume k 10"] = slow
+        system.gates["setRoomVolume Kitchen-id 10"] = slow
         val q = quieter()
         val quieting = launch { q.quiet() }
         runCurrent()
         val restoring = launch { q.restore() }
         runCurrent()
-        assertThat(sets()).containsExactly("setGroupVolume k 10", "setGroupVolume l 8")
+        assertThat(sets()).containsExactly("setRoomVolume Kitchen-id 10", "setRoomVolume Lounge-id 8", "setRoomVolume Dining room-id 5")
         slow.complete(Unit)
         quieting.join()
         restoring.join()
-        assertThat(sets()).containsAtLeast("setGroupVolume k 50", "setGroupVolume l 40")
+        assertThat(sets()).containsAtLeast("setRoomVolume Kitchen-id 50", "setRoomVolume Lounge-id 40", "setRoomVolume Dining room-id 25")
     }
 
     /** Neither a missing system nor a failed read of what plays throws into the shell. */
@@ -2169,7 +2345,7 @@ class MusicQuieterTest {
 }
 ```
 Fails today: `MusicQuieter` doesn't exist.
-Fails if: a paused group drops; the share is truncated instead of rounded; groups are lowered one after another; a changed group is put back; a second ring lowers again; one failure stops the rest; the lowering trusts the last check; a restore overtakes its quiet.
+Fails if: a paused group drops; the lowering works on the group volume (the balance test); the share is truncated; groups are lowered one after another; a changed room is put back, or a drift of 1 isn't; a room is remembered only after its command returns; a failed restore isn't retried; a second ring lowers again; a half-read group is half-lowered; the lowering trusts the last check; a restore overtakes its quiet.
 
 - [ ] **Step 2: Run them to see them fail**
 
@@ -2183,12 +2359,12 @@ Create `MusicQuieter.kt`:
 package uk.co.siland.culvery.capability.music
 
 import android.util.Log
+import java.util.Collections
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -2197,17 +2373,20 @@ import uk.co.siland.culvery.core.plugin.AlertQuieter
 
 private const val TAG = "MusicQuieter"
 
+/** Sonos may round a volume it was given; a room this close to what was set is still ours to put back (6 §4.6). */
+internal const val RESTORE_DRIFT = 1
+
 /**
- * Music's [AlertQuieter] (6 §4.6): each group playing as the bell rings drops to [share] percent of its volume, and goes
- * back afterwards unless someone changed it meanwhile. One lock keeps a restore behind the quiet it undoes. Held in
- * memory only: a restart while lowered leaves those groups low.
+ * Music's [AlertQuieter] (6 §4.6): each room of each group playing as the bell rings drops to [share] percent of its
+ * volume, and goes back afterwards unless someone changed it meanwhile. Room by room, so a group keeps its balance. One
+ * lock keeps a restore behind the quiet it undoes. Held in memory only: a restart while lowered leaves those rooms low.
  */
 @Singleton
 class MusicQuieter internal constructor(private val system: () -> MusicSystem?, private val share: () -> Int) : AlertQuieter {
     @Inject
     constructor(speakers: Speakers, settings: MusicSettings) : this({ speakers.system.value }, { settings.current.value.lowerTo })
 
-    private class Lowered(val group: SpeakerGroup, val was: Int, val set: Int)
+    private class Lowered(val room: SpeakerRoom, val was: Int, val set: Int)
 
     private val lock = Mutex()
     private var lowered: Pair<MusicSystem, List<Lowered>>? = null
@@ -2217,33 +2396,38 @@ class MusicQuieter internal constructor(private val system: () -> MusicSystem?, 
         val s = system() ?: return@withLock
         val percent = share()
         val playing = attempt { s.playingNow() } ?: return@withLock
-        lowered = s to coroutineScope {
-            playing.map { g -> async { attempt { lower(s, g, percent) } } }.awaitAll().filterNotNull()
-        }
+        val rooms: MutableList<Lowered> = Collections.synchronizedList(mutableListOf())
+        lowered = s to rooms
+        coroutineScope { playing.forEach { group -> launch { lowerGroup(s, group, percent, rooms) } } }
     }
 
     override suspend fun restore() = lock.withLock {
-        val (s, groups) = lowered ?: return@withLock
+        val (s, rooms) = lowered ?: return@withLock
         lowered = null
         coroutineScope {
-            groups.forEach { l -> launch { attempt { if (s.groupVolume(l.group) == l.set) s.setGroupVolume(l.group, l.was) } } }
+            rooms.toList().forEach { room -> launch { if (attempt { putBack(s, room) } == null) attempt { putBack(s, room) } } }
         }
     }
 
-    private suspend fun lower(s: MusicSystem, group: SpeakerGroup, percent: Int): Lowered {
-        val was = s.groupVolume(group)
-        val set = (was * percent / 100.0).roundToInt()
-        s.setGroupVolume(group, set)
-        return Lowered(group, was, set)
+    /** All the group's rooms are read first; a group that can't be read is left as it is (6 §4.6). */
+    private suspend fun lowerGroup(s: MusicSystem, group: SpeakerGroup, percent: Int, rooms: MutableList<Lowered>) {
+        val read = attempt { group.rooms.map { it to s.roomVolume(it) } } ?: return
+        val mine = read.map { (room, was) -> Lowered(room, was, (was * percent / 100.0).roundToInt()) }
+        // Remembered before the commands go, so one that took effect but timed out is still put back.
+        rooms += mine
+        mine.forEach { attempt { s.setRoomVolume(it.room, it.set) } }
     }
 
-    /** A group that fails is left as it is (6 §6). */
+    private suspend fun putBack(s: MusicSystem, room: Lowered) {
+        if (abs(s.roomVolume(room.room) - room.set) <= RESTORE_DRIFT) s.setRoomVolume(room.room, room.was)
+    }
+
     private suspend fun <T> attempt(step: suspend () -> T): T? = try {
         step()
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        Log.w(TAG, "Couldn't change a group's volume for the doorbell (${e::class.simpleName})")
+        Log.w(TAG, "Couldn't change a room's volume for the doorbell (${e::class.simpleName})")
         null
     }
 }
@@ -2265,7 +2449,7 @@ Expected: PASS.
 Run: `./gradlew testDebugUnitTest verifyRoborazziDebug` — Expected: BUILD SUCCESSFUL.
 ```bash
 git add capability/music/src
-git commit -m "Lower the playing groups while the door card shows and put back the ones nobody changed"
+git commit -m "Lower each playing room while the door card shows and put back the ones nobody changed"
 ```
 
 ---
@@ -2563,26 +2747,27 @@ git commit -m "Send the music commands and say on the row when Sonos refuses one
 ```
 
 ---
-### Task 8: `:provider:music-sonos` 1: `SonosXml` and the documented fixtures (§3.2, §7, §8.2; rulings 6, 7, 13)
+### Task 8: `:provider:music-sonos` 1: `SonosXml`, the speaker-address rule and the documented fixtures (§3.2, §6, §7, §8.2; rulings 6, 7, 13, 20, 22, 27; Review Focus 4)
 
 **Review:** sonnet.
 
 **Files:**
 - Modify: `settings.gradle.kts` (`include(":provider:music-sonos")` after `include(":provider:door-ring")`)
 - Create: `provider/music-sonos/build.gradle.kts`
-- Create: `provider/music-sonos/src/main/java/uk/co/siland/culvery/provider/music_sonos/SonosXml.kt`
+- Create (under `provider/music-sonos/src/main/java/uk/co/siland/culvery/provider/music_sonos/`): `SpeakerAuthority.kt`, `SonosXml.kt`
 - Test: `provider/music-sonos/src/test/java/uk/co/siland/culvery/provider/music_sonos/SonosFixtures.kt`, `SonosXmlTest.kt`
 
 **Interfaces:**
-- Consumes: `PlayState` (Task 4).
+- Consumes: `PlayState`, `isHomeNetworkHost` (Task 4).
 - Produces (package `uk.co.siland.culvery.provider.music_sonos`, all `internal`):
+  - `SpeakerAuthority.kt`: `const val SONOS_PORT = 1400`; `fun isSpeakerAuthority(host: String, port: Int): Boolean`; `fun isSpeakerAddress(address: String, accept: (String, Int) -> Boolean = ::isSpeakerAuthority): Boolean`
   - `data class ZoneMember(val uuid: String, val name: String, val address: String)`; `data class ZoneGroupInfo(val id: String, val coordinator: String, val members: List<ZoneMember>)` (leader first)
   - `data class TrackInfo(val uri: String?, val title: String?, val artist: String?, val album: String?, val artUri: String?, val programme: String?)`
   - `data class MediaInfo(val uri: String?, val title: String?, val artUri: String?)`
   - `data class DidlItem(val id: String, val title: String, val artUri: String?, val uri: String?, val metadata: String?, val metadataClass: String?)`; `data class BrowseResult(val items: List<DidlItem>, val total: Int)`
   - `class SonosXmlException : Exception`
-  - `fun authorityOf(url: String): String?`
-  - `object SonosXml { zoneGroups, householdId, transportState, position, media, volume, browse, faultCode, redact }`
+  - `fun hostAndPort(url: String): Pair<String, Int>?`
+  - `object SonosXml { zoneGroups(answer, accept: (String, Int) -> Boolean = ::isSpeakerAuthority), householdId, transportState, position, media, volume, browse, faultCode, redact }`
   - Tests: `SonosFixtures` (constants and builders below)
 
 - [ ] **Step 1: The module**
@@ -2650,6 +2835,11 @@ internal object SonosFixtures {
 
     fun household(id: String = HOUSEHOLD) = soap("GetHouseholdID", "CurrentHouseholdID" to id)
 
+    /** An answer that declares an entity: no speaker sends one, so it is refused before parsing. */
+    const val HOUSEHOLD_WITH_ENTITY =
+        """<?xml version="1.0"?><!DOCTYPE s:Envelope [<!ENTITY room "Kitchen">]><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>""" +
+            """<u:GetHouseholdIDResponse xmlns:u="urn:schemas-upnp-org:service:DeviceProperties:1"><CurrentHouseholdID>&room;</CurrentHouseholdID></u:GetHouseholdIDResponse></s:Body></s:Envelope>"""
+
     fun transport(state: String) = soap("GetTransportInfo", "CurrentTransportState" to state, "CurrentTransportStatus" to "OK", "CurrentSpeed" to "1")
 
     fun volume(volume: Int) = soap("GetVolume", "CurrentVolume" to "$volume")
@@ -2691,7 +2881,7 @@ internal object SonosFixtures {
     val favourites = browse(
         total = 3,
         """<item id="FV:2/5" parentID="FV:2" restricted="false"><dc:title>Culvery FM</dc:title><upnp:class>object.itemobject.item.sonos-favorite</upnp:class>""" +
-            """<upnp:albumArtURI>https://art.example/station.png</upnp:albumArtURI><r:type>instantPlay</r:type><res protocolInfo="x-rincon-mp3radio:*:*:*">$RADIO_URI</res>""" +
+            """<upnp:albumArtURI>https://art.example/station.png</upnp:albumArtURI><r:type>instantPlay</r:type><res protocolInfo="x-rincon-mp3radio:*:*:*">${escape(RADIO_URI)}</res>""" +
             """<r:resMD>${escape(RADIO_STATION)}</r:resMD></item>""",
         """<item id="FV:2/9" parentID="FV:2" restricted="false"><dc:title>Sunday &amp; slow</dc:title><upnp:class>object.itemobject.item.sonos-favorite</upnp:class>""" +
             """<upnp:albumArtURI>/getaa?s=1&amp;u=x-rincon-playlist</upnp:albumArtURI><r:type>instantPlay</r:type><res protocolInfo="file:*:audio/mpegurl:*">file:///jffs/settings/savedqueues.rsq#3</res>""" +
@@ -2829,10 +3019,35 @@ class SonosXmlTest {
     }
 
     @Test
-    fun anAuthorityFromALocation() {
-        assertThat(authorityOf("http://192.168.1.20:1400/xml/device_description.xml")).isEqualTo("192.168.1.20:1400")
-        assertThat(authorityOf("not a url")).isNull()
-        assertThat(authorityOf("http://192.168.1.20/xml")).isNull()
+    fun aHostAndPortFromALocation() {
+        assertThat(hostAndPort("http://192.168.1.20:1400/xml/device_description.xml")).isEqualTo("192.168.1.20" to 1400)
+        assertThat(hostAndPort("not a url")).isNull()
+        assertThat(hostAndPort("http://192.168.1.20/xml")).isNull()
+    }
+
+    /** 6 §6 privacy, ruling 20: a speaker on the home network, on Sonos's port, and nothing else. */
+    @Test
+    fun onlyAHomeSpeakerOnItsPortMayBeContacted() {
+        assertThat(isSpeakerAuthority("192.168.1.20", 1400)).isTrue()
+        assertThat(isSpeakerAuthority("192.168.1.20", 80)).isFalse()
+        assertThat(isSpeakerAuthority("8.8.8.8", 1400)).isFalse()
+        assertThat(isSpeakerAddress("192.168.1.20:1400")).isTrue()
+        listOf("192.168.1.20", "localhost:1400", "8.8.8.8:1400", ":1400", "192.168.1.20:port").forEach { assertThat(isSpeakerAddress(it)).isFalse() }
+    }
+
+    /** Review Focus 4: a topology naming an internet address. Fails if the member is kept; a group whose leader goes, goes. */
+    @Test
+    fun aMemberOffTheHomeNetworkIsDropped() {
+        val groups = SonosXml.zoneGroups(SonosFixtures.topology("192.168.1.20:1400", "8.8.8.8:80", "192.168.1.22:1400"))
+        assertThat(groups.map { it.coordinator }).containsExactly(KITCHEN)
+    }
+
+    /** Ruling 27: a DOCTYPE or an entity is refused before parsing, in the answer or in the DIDL inside it. */
+    @Test
+    fun aDoctypeOrAnEntityIsRefused() {
+        assertThrows(SonosXmlException::class.java) { SonosXml.householdId(SonosFixtures.HOUSEHOLD_WITH_ENTITY) }
+        val inner = """<!DOCTYPE d [<!ENTITY t "x">]>""" + SonosFixtures.LIBRARY_TRACK
+        assertThrows(SonosXmlException::class.java) { SonosXml.position(SonosFixtures.position(metadata = inner)) }
     }
 
     /** 6 §8.2: a capture keeps the shape; no room, title, link, id, household or address survives. */
@@ -2854,15 +3069,33 @@ class SonosXmlTest {
 }
 ```
 Fails today: `SonosXml` and its types don't exist.
-Fails if: a hidden or bonded speaker shows as a room; the leader isn't first; escaped names come out wrong; PAUSED_PLAYBACK isn't PAUSED; the programme keeps its id or a `ZPSTR_` placeholder shows; a Favourite's class is the Favourite's own rather than its metadata's; a malformed answer throws something that could carry its text; the capture keeps a name.
+Fails if: a hidden or bonded speaker, or one off the home network, shows as a room; a DOCTYPE or entity is parsed; the leader isn't first; escaped names come out wrong; PAUSED_PLAYBACK isn't PAUSED; the programme keeps its id or a `ZPSTR_` placeholder shows; a Favourite's class is the Favourite's own rather than its metadata's; a malformed answer throws something that could carry its text; the capture keeps a name.
 
 - [ ] **Step 4: Run them to see them fail**
 
 Run: `./gradlew :provider:music-sonos:testDebugUnitTest --tests '*SonosXmlTest*'`
 Expected: FAIL to compile.
 
-- [ ] **Step 5: The parser**
+- [ ] **Step 5: The address rule and the parser**
 
+Create `provider/music-sonos/src/main/java/uk/co/siland/culvery/provider/music_sonos/SpeakerAuthority.kt`:
+```kotlin
+package uk.co.siland.culvery.provider.music_sonos
+
+import uk.co.siland.culvery.capability.music.isHomeNetworkHost
+
+internal const val SONOS_PORT = 1400
+
+/** Whether Culvery may contact [host]:[port]: a speaker on the home network, on Sonos's port (6 §6 privacy). */
+internal fun isSpeakerAuthority(host: String, port: Int): Boolean = port == SONOS_PORT && isHomeNetworkHost(host)
+
+/** The same for "host:port"; tests that run speakers on this machine pass their own [accept]. */
+internal fun isSpeakerAddress(address: String, accept: (String, Int) -> Boolean = ::isSpeakerAuthority): Boolean {
+    val host = address.substringBeforeLast(':', "")
+    val port = address.substringAfterLast(':', "").toIntOrNull() ?: return false
+    return host.isNotEmpty() && accept(host, port)
+}
+```
 Create `provider/music-sonos/src/main/java/uk/co/siland/culvery/provider/music_sonos/SonosXml.kt`:
 ```kotlin
 package uk.co.siland.culvery.provider.music_sonos
@@ -2895,9 +3128,9 @@ internal data class BrowseResult(val items: List<DidlItem>, val total: Int)
 /** An answer that isn't the shape asked for. No cause and no text: either could quote the answer. */
 internal class SonosXmlException : Exception("A Sonos answer couldn't be read")
 
-/** "192.168.1.20:1400" from a speaker's description URL; null without a host and port. */
-internal fun authorityOf(url: String): String? = try {
-    URI(url).takeIf { it.host != null && it.port > 0 }?.let { "${it.host}:${it.port}" }
+/** ("192.168.1.20", 1400) from a speaker's description URL; null without a host and port. */
+internal fun hostAndPort(url: String): Pair<String, Int>? = try {
+    URI(url).takeIf { it.host != null && it.port > 0 }?.let { it.host to it.port }
 } catch (e: URISyntaxException) {
     null
 }
@@ -2908,14 +3141,20 @@ internal object SonosXml {
     private const val PLACEHOLDER = "ZPSTR_"
     private const val UNESCAPE_DEPTH = 3
 
-    fun zoneGroups(answer: String): List<ZoneGroupInfo> = parse(text(answer, "ZoneGroupState")).all("ZoneGroup").mapNotNull { group ->
-        val leader = group.getAttribute("Coordinator")
-        val members = group.children("ZoneGroupMember")
-            .filter { it.getAttribute("Invisible") != "1" && it.getAttribute("IsZoneBridge") != "1" }
-            .mapNotNull { m -> authorityOf(m.getAttribute("Location"))?.let { ZoneMember(m.getAttribute("UUID"), m.getAttribute("ZoneName"), it) } }
-            .sortedBy { it.uuid != leader }
-        if (members.isEmpty()) null else ZoneGroupInfo(group.getAttribute("ID"), leader, members)
-    }
+    /** Each group's visible rooms, leader first; a member [accept] refuses is dropped, and so is a group without its leader (6 §6). */
+    fun zoneGroups(answer: String, accept: (String, Int) -> Boolean = ::isSpeakerAuthority): List<ZoneGroupInfo> =
+        parse(text(answer, "ZoneGroupState")).all("ZoneGroup").mapNotNull { group ->
+            val leader = group.getAttribute("Coordinator")
+            val members = group.children("ZoneGroupMember")
+                .filter { it.getAttribute("Invisible") != "1" && it.getAttribute("IsZoneBridge") != "1" }
+                .mapNotNull { m ->
+                    hostAndPort(m.getAttribute("Location"))
+                        ?.takeIf { (host, port) -> accept(host, port) }
+                        ?.let { (host, port) -> ZoneMember(m.getAttribute("UUID"), m.getAttribute("ZoneName"), "$host:$port") }
+                }
+                .sortedBy { it.uuid != leader }
+            if (members.none { it.uuid == leader }) null else ZoneGroupInfo(group.getAttribute("ID"), leader, members)
+        }
 
     fun householdId(answer: String): String = text(answer, "CurrentHouseholdID")
 
@@ -2969,8 +3208,9 @@ internal object SonosXml {
         """<((?:\w+:)?(?:title|creator|album|artist|albumArtist|streamContent|radioShowMd|description|albumArtURI|res|""" +
             """CurrentURI|NextURI|TrackURI|AVTransportURI|NextAVTransportURI|EnqueuedTransportURI))(\s[^>]*)?>[^<]*</\1>""",
     )
-    private val NAME_ATTRIBUTE = Regex("""(\w*Name)="[^"]*"""")
-    private val LOCATION_ATTRIBUTE = Regex("""(Location)="[^"]*"""")
+    // A closing quote is ["]: a raw string ending in four quotes would end early for the copy scan.
+    private val NAME_ATTRIBUTE = Regex("""(\w*Name)="[^"]*["]""")
+    private val LOCATION_ATTRIBUTE = Regex("""(Location)="[^"]*["]""")
     private val HOUSEHOLD = Regex("""Sonos_[A-Za-z0-9._-]+""")
     private val SPEAKER_ID = Regex("""RINCON_[0-9A-Fa-f]+""")
     private val IPV4 = Regex("""\b\d{1,3}(?:\.\d{1,3}){3}\b""")
@@ -3012,12 +3252,18 @@ internal object SonosXml {
         }
     }
 
-    private fun parse(xml: String): Element = try {
-        factory().newDocumentBuilder().parse(InputSource(StringReader(xml))).documentElement
-    } catch (e: SAXException) {
-        throw SonosXmlException()
-    } catch (e: IOException) {
-        throw SonosXmlException()
+    private val DECLARATIONS = Regex("""<!(DOCTYPE|ENTITY)""", RegexOption.IGNORE_CASE)
+
+    /** Refuses a DOCTYPE or an entity before parsing (no speaker sends one), here and in the DIDL parsed a second time. */
+    private fun parse(xml: String): Element {
+        if (DECLARATIONS.containsMatchIn(xml)) throw SonosXmlException()
+        return try {
+            factory().newDocumentBuilder().parse(InputSource(StringReader(xml))).documentElement
+        } catch (e: SAXException) {
+            throw SonosXmlException()
+        } catch (e: IOException) {
+            throw SonosXmlException()
+        }
     }
 
     private fun Element.all(localName: String): List<Element> =
@@ -3047,24 +3293,24 @@ git commit -m "Read Sonos's answers and their DIDL-Lite, from documented example
 
 ---
 
-### Task 9: `:provider:music-sonos` 2: SOAP, `SonosClient` and the debug capture (§3.2, §6, §8.2; rulings 14, 18, 22, 26)
+### Task 9: `:provider:music-sonos` 2: SOAP, `SonosClient` and the debug capture (§3.2, §6, §8.2; rulings 12, 14, 18, 20, 22, 26, 28; Review Focus 4)
 
 **Review:** sonnet.
 
 **Files:**
 - Create (under `provider/music-sonos/src/main/java/uk/co/siland/culvery/provider/music_sonos/`): `Http.kt`, `Soap.kt`, `SonosClient.kt`
 - Create: `provider/music-sonos/src/debug/java/uk/co/siland/culvery/provider/music_sonos/SonosCapture.kt`, `provider/music-sonos/src/release/java/uk/co/siland/culvery/provider/music_sonos/SonosCapture.kt`
-- Modify: `core/ui/src/test/resources/copy-scan-allow.txt` (two SOAP literals)
+- Modify: `core/ui/src/test/resources/copy-scan-allow.txt` (two SOAP literals and `Master`)
 - Test: `provider/music-sonos/src/test/java/uk/co/siland/culvery/provider/music_sonos/FakeSpeaker.kt`, `SonosClientTest.kt`, `SonosCaptureSourceTest.kt`; `provider/music-sonos/src/testDebug/java/uk/co/siland/culvery/provider/music_sonos/SonosCaptureTest.kt`
 
 **Interfaces:**
-- Consumes: `SonosXml`, `BrowseResult`, `TrackInfo`, `MediaInfo`, `ZoneGroupInfo`, `SonosXmlException` (Task 8); `PlayState` (Task 4).
+- Consumes: `SonosXml`, `BrowseResult`, `TrackInfo`, `MediaInfo`, `ZoneGroupInfo`, `SonosXmlException`, `isSpeakerAuthority`, `isSpeakerAddress` (Task 8); `PlayState` (Task 4).
 - Produces (all `internal`):
   - `Http.kt`: `class Answer(val code: Int, val bytes: ByteArray) { val text: String }`, `class BodyTooLarge : IOException`, `class ReadFailed : IOException`, `suspend fun Call.await(maxBytes: Long): Answer`
   - `Soap.kt`: `enum class SonosService(val path: String, val urn: String) { AV_TRANSPORT, RENDERING, GROUP_RENDERING, TOPOLOGY, DEVICE, CONTENT }`, `fun envelope(service, action: String, args: List<Pair<String, String>>): String`, `fun soapAction(service, action: String): String`, `fun escapeXml(text: String): String`
-  - `SonosClient.kt`: `const val SONOS_PORT = 1400`, `SONOS_TIMEOUT_MS = 3_000L`, `MAX_ANSWER_BYTES`, `MAX_ART_BYTES`, `LIBRARY = "A:TRACKS"`, `FAVOURITES = "FV:2"`, `FAVOURITES_PAGE = 100`, `SHUFFLE_NOREPEAT`, `QUEUE_PREFIX = "x-rincon-queue:"`, `LIBRARY_PREFIX = "x-rincon-playlist:"`, `fun queueUri(leader: String): String`; `class SonosFault(val code: Int?) : Exception`; `fun sonosHttp(): OkHttpClient`; `class SonosClient(http: OkHttpClient, capture: (String, String) -> Unit = SonosCapture::log)` with `call(…)`, `bytes(url)`, `play`, `pause`, `next`, `transportInfo`, `positionInfo`, `mediaInfo`, `removeAllTracks`, `addToQueue(address, uri, metadata)`, `setPlayMode(address, mode)`, `setTransportUri(address, uri, metadata)`, `groupVolume`, `setGroupVolume(address, percent)`, `volume`, `setVolume(address, percent)`, `zoneGroups`, `householdId`, `browse(address, objectId, start, count)`; `suspend fun SonosClient.householdAt(address: String): String?`
+  - `SonosClient.kt`: `const val SONOS_TIMEOUT_MS = 3_000L`, `MAX_ANSWER_BYTES`, `MAX_ART_BYTES`, `LIBRARY = "A:TRACKS"`, `FAVOURITES = "FV:2"`, `FAVOURITES_PAGE = 100`, `SHUFFLE_NOREPEAT`, `QUEUE_PREFIX = "x-rincon-queue:"`, `LIBRARY_PREFIX = "x-rincon-playlist:"`, `fun queueUri(leader: String): String`; `class SonosFault(val code: Int?) : Exception`; `class NotASpeaker : IOException`; `fun sonosHttp(): OkHttpClient` (3 s, no retries, no redirects); `class SonosClient(http: OkHttpClient, accept: (String, Int) -> Boolean = ::isSpeakerAuthority, capture: (String, String) -> Unit = SonosCapture::log)` with `call(…)`, `bytes(url)`, `play`, `pause`, `next`, `transportInfo`, `positionInfo`, `mediaInfo`, `removeAllTracks`, `addToQueue(address, uri, metadata)`, `setPlayMode(address, mode)`, `setTransportUri(address, uri, metadata)`, `groupVolume`, `setGroupVolume(address, percent)`, `volume`, `setVolume(address, percent)`, `zoneGroups`, `householdId`, `browse(address, objectId, start, count)`; `suspend fun SonosClient.householdAt(address: String): String?`
   - `object SonosCapture { fun log(action: String, answer: String) }` (debug and release)
-  - Tests: `FakeSpeaker`
+  - Tests: `FakeSpeaker` (`host`, `port`, `address`), `val onThisMachine: (String, Int) -> Boolean` (the tests' accept rule for speakers on localhost)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3080,6 +3326,9 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.mockwebserver.SocketPolicy
+
+/** The tests' accept rule: speakers on this machine, on whatever port MockWebServer took. */
+internal val onThisMachine: (String, Int) -> Boolean = { host, _ -> host == "localhost" || host == "127.0.0.1" }
 
 /** One Sonos speaker on localhost: answers by SOAP action, records each request; an action it wasn't given is fault 401. */
 internal class FakeSpeaker : AutoCloseable {
@@ -3116,6 +3365,11 @@ internal class FakeSpeaker : AutoCloseable {
     /** Answers [action] only after [millis], so a test can look while the command is on its way. */
     fun answerAfter(action: String, body: String, millis: Long) {
         answers[action] = MockResponse().setBody(body).setBodyDelay(millis, TimeUnit.MILLISECONDS)
+    }
+
+    /** Answers [action] (a GET for art has none: "") with a redirect to [location]. */
+    fun redirect(action: String, location: String) {
+        answers[action] = MockResponse().setResponseCode(302).setHeader("Location", location)
     }
 
     fun refuse(action: String, code: Int) {
@@ -3161,7 +3415,7 @@ class SonosClientTest {
     private val speaker = FakeSpeaker()
     private val captured = mutableListOf<Pair<String, String>>()
     private val http = OkHttpClient.Builder().callTimeout(Duration.ofMillis(500)).retryOnConnectionFailure(false).build()
-    private val client = SonosClient(http) { action, answer -> captured += action to answer }
+    private val client = SonosClient(http, onThisMachine) { action, answer -> captured += action to answer }
 
     @After
     fun tearDown() = speaker.close()
@@ -3201,7 +3455,7 @@ class SonosClientTest {
         assertThat(sent("SetVolume").path).isEqualTo("/MediaRenderer/RenderingControl/Control")
     }
 
-    /** Sonos asks for a snapshot first, so the rooms keep their ratio. */
+    /** Sonos asks for a snapshot first, so the rooms keep their ratio. Pins ruling 12's guessed request shape until the walk-through. */
     @Test
     fun setGroupVolumeSnapshotsTheGroupFirst() = runTest {
         speaker.acceptCommands()
@@ -3268,12 +3522,44 @@ class SonosClientTest {
         }
     }
 
-    /** 6 §6: "Checks or commands time out (3 s)". */
+    /** 6 §6: "Checks or commands time out (3 s)"; no redirect, which could lead off the home network. */
     @Test
-    fun theSpeakersClientGivesUpAfterThreeSeconds() {
+    fun theSpeakersClientGivesUpAfterThreeSecondsAndFollowsNoRedirect() {
         val sonos = sonosHttp()
         assertThat(listOf(sonos.connectTimeoutMillis, sonos.readTimeoutMillis, sonos.callTimeoutMillis)).containsExactly(3_000, 3_000, 3_000)
         assertThat(sonos.retryOnConnectionFailure).isFalse()
+        assertThat(sonos.followRedirects).isFalse()
+        assertThat(sonos.followSslRedirects).isFalse()
+    }
+
+    /** Review Focus 4, ruling 20: an address off the home network, or on the wrong port, is refused before anything is sent. */
+    @Test
+    fun anAddressOffTheHomeNetworkIsNeverContacted() = runTest {
+        val strict = SonosClient(http) { _, _ -> }
+        listOf("8.8.8.8:1400", "192.168.1.20:80", speaker.address).forEach { address ->
+            try {
+                strict.householdId(address)
+                fail("expected a refusal for $address")
+            } catch (e: NotASpeaker) {
+                // As ruled.
+            }
+        }
+        assertThat(speaker.received).isEmpty()
+        assertThat(strict.householdAt("8.8.8.8:1400")).isNull()
+    }
+
+    /** Art that redirects elsewhere is no art. */
+    @Test
+    fun aRedirectIsNotFollowed() = runTest {
+        val elsewhere = FakeSpeaker()
+        try {
+            elsewhere.answer("", "picture")
+            speaker.redirect("", "http://${elsewhere.address}/art.jpg")
+            assertThat(SonosClient(sonosHttp(), onThisMachine) { _, _ -> }.bytes("http://${speaker.address}/getaa?s=1")).isNull()
+            assertThat(elsewhere.received).isEmpty()
+        } finally {
+            elsewhere.close()
+        }
     }
 
     @Test
@@ -3362,7 +3648,7 @@ class SonosCaptureTest {
 }
 ```
 Fails today: none of the classes exist.
-Fails if: a command's path, header, argument order or escaping is wrong; the group volume isn't snapshotted first; a fault loses its code; a silent speaker hangs; the timeouts aren't 3 s; the release capture logs.
+Fails if: a command's path, header, argument order or escaping is wrong; the group volume isn't snapshotted first; a fault loses its code; a silent speaker hangs; the timeouts aren't 3 s; a redirect is followed; an address off the home network is contacted; the release capture logs.
 
 - [ ] **Step 2: Run them to see them fail**
 
@@ -3474,8 +3760,9 @@ Add to `core/ui/src/test/resources/copy-scan-allow.txt`:
 ```
 provider/music-sonos/Soap.kt | <?xml version=\"1.0\" encoding=\"utf-8\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body> | SOAP's envelope, sent to the speakers, never shown
 provider/music-sonos/Soap.kt | <u:$action xmlns:u=\"\"> | a SOAP action's element, sent to the speakers, never shown
+provider/music-sonos/SonosClient.kt | Master | RenderingControl's channel name, sent to the speakers, never shown
 ```
-(If `CopyScanTest` names a Soap.kt literal written differently, copy its text from the finding into the allowlist; any other finding is a stop.)
+(If `CopyScanTest` names a Soap.kt or SonosClient.kt protocol literal written differently, copy its text from the finding into the allowlist; any other finding is a stop.)
 
 - [ ] **Step 4: The client and the capture**
 
@@ -3485,13 +3772,13 @@ package uk.co.siland.culvery.provider.music_sonos
 
 import java.io.IOException
 import java.time.Duration
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import uk.co.siland.culvery.capability.music.PlayState
-
-internal const val SONOS_PORT = 1400
 
 /** A check or command gives up after this (6 §6). */
 internal const val SONOS_TIMEOUT_MS = 3_000L
@@ -3511,24 +3798,37 @@ internal const val LIBRARY_PREFIX = "x-rincon-playlist:"
 internal fun queueUri(leader: String) = "$QUEUE_PREFIX$leader#0"
 
 private const val INSTANCE = "InstanceID"
+private const val CHANNEL = "Master"
 private val SOAP_TYPE = "text/xml; charset=utf-8".toMediaType()
 
 /** Sonos answered with a fault, or an HTTP error: [code] is UPnP's when given. */
 internal class SonosFault(val code: Int?) : Exception("Sonos answered with a fault (${code ?: "no code"})")
+
+/** An address that isn't a speaker on the home network: refused before anything is sent (6 §6). I/O, so it leads to a rescan. */
+internal class NotASpeaker : IOException("Not a speaker on the home network")
 
 internal fun sonosHttp(): OkHttpClient = OkHttpClient.Builder()
     .connectTimeout(Duration.ofMillis(SONOS_TIMEOUT_MS))
     .readTimeout(Duration.ofMillis(SONOS_TIMEOUT_MS))
     .callTimeout(Duration.ofMillis(SONOS_TIMEOUT_MS))
     .retryOnConnectionFailure(false)
+    // A redirect could lead off the home network.
+    .followRedirects(false)
+    .followSslRedirects(false)
     .build()
 
 /**
- * SOAP to one speaker at `host:port` (6 §3.2). Each call throws IOException when the speaker doesn't answer, [SonosFault]
- * when it refuses, and [SonosXmlException] when the answer isn't the shape asked for.
+ * SOAP to one speaker at `host:port` (6 §3.2), only where [accept] allows: a speaker on the home network, on port 1400.
+ * Each call throws IOException when the speaker doesn't answer (or isn't allowed), [SonosFault] when it refuses, and
+ * [SonosXmlException] when the answer isn't the shape asked for. Answers are parsed off the main thread.
  */
-internal class SonosClient(private val http: OkHttpClient, private val capture: (String, String) -> Unit = SonosCapture::log) {
+internal class SonosClient(
+    private val http: OkHttpClient,
+    private val accept: (String, Int) -> Boolean = ::isSpeakerAuthority,
+    private val capture: (String, String) -> Unit = SonosCapture::log,
+) {
     suspend fun call(address: String, service: SonosService, action: String, vararg args: Pair<String, String>): String {
+        if (!isSpeakerAddress(address, accept)) throw NotASpeaker()
         val request = Request.Builder()
             .url("http://$address${service.path}")
             .header("SOAPACTION", soapAction(service, action))
@@ -3537,11 +3837,11 @@ internal class SonosClient(private val http: OkHttpClient, private val capture: 
         val answer = http.newCall(request).await(MAX_ANSWER_BYTES)
         val text = answer.text
         capture(action, text)
-        if (answer.code !in 200..299) throw SonosFault(SonosXml.faultCode(text))
+        if (answer.code !in 200..299) throw SonosFault(read(text, SonosXml::faultCode))
         return text
     }
 
-    /** Art from the speaker or the stream's own URL; null for anything else or any failure (6 §4.2). */
+    /** The picture at [url], http or https only, no redirect; null for anything else or any failure. Which URLs may be asked is the caller's rule (6 §4.2). */
     suspend fun bytes(url: String): ByteArray? {
         if (!url.startsWith("http://") && !url.startsWith("https://")) return null
         return try {
@@ -3559,11 +3859,11 @@ internal class SonosClient(private val http: OkHttpClient, private val capture: 
 
     suspend fun next(address: String) = av(address, "Next")
 
-    suspend fun transportInfo(address: String): PlayState = SonosXml.transportState(av(address, "GetTransportInfo"))
+    suspend fun transportInfo(address: String): PlayState = read(av(address, "GetTransportInfo"), SonosXml::transportState)
 
-    suspend fun positionInfo(address: String): TrackInfo = SonosXml.position(av(address, "GetPositionInfo"))
+    suspend fun positionInfo(address: String): TrackInfo = read(av(address, "GetPositionInfo"), SonosXml::position)
 
-    suspend fun mediaInfo(address: String): MediaInfo = SonosXml.media(av(address, "GetMediaInfo"))
+    suspend fun mediaInfo(address: String): MediaInfo = read(av(address, "GetMediaInfo"), SonosXml::media)
 
     suspend fun removeAllTracks(address: String) = av(address, "RemoveAllTracksFromQueue")
 
@@ -3575,36 +3875,43 @@ internal class SonosClient(private val http: OkHttpClient, private val capture: 
     suspend fun setTransportUri(address: String, uri: String, metadata: String) =
         av(address, "SetAVTransportURI", "CurrentURI" to uri, "CurrentURIMetaData" to metadata)
 
-    suspend fun groupVolume(address: String): Int = SonosXml.volume(call(address, SonosService.GROUP_RENDERING, "GetGroupVolume", INSTANCE to "0"))
+    suspend fun groupVolume(address: String): Int =
+        read(call(address, SonosService.GROUP_RENDERING, "GetGroupVolume", INSTANCE to "0"), SonosXml::volume)
 
+    /** The group slider's: a snapshot first, so the rooms keep their ratio. */
     suspend fun setGroupVolume(address: String, percent: Int) {
         call(address, SonosService.GROUP_RENDERING, "SnapshotGroupVolume", INSTANCE to "0")
         call(address, SonosService.GROUP_RENDERING, "SetGroupVolume", INSTANCE to "0", "DesiredVolume" to "$percent")
     }
 
-    suspend fun volume(address: String): Int = SonosXml.volume(call(address, SonosService.RENDERING, "GetVolume", INSTANCE to "0", "Channel" to "Master"))
+    suspend fun volume(address: String): Int =
+        read(call(address, SonosService.RENDERING, "GetVolume", INSTANCE to "0", "Channel" to CHANNEL), SonosXml::volume)
 
     suspend fun setVolume(address: String, percent: Int) {
-        call(address, SonosService.RENDERING, "SetVolume", INSTANCE to "0", "Channel" to "Master", "DesiredVolume" to "$percent")
+        call(address, SonosService.RENDERING, "SetVolume", INSTANCE to "0", "Channel" to CHANNEL, "DesiredVolume" to "$percent")
     }
 
-    suspend fun zoneGroups(address: String): List<ZoneGroupInfo> = SonosXml.zoneGroups(call(address, SonosService.TOPOLOGY, "GetZoneGroupState"))
+    suspend fun zoneGroups(address: String): List<ZoneGroupInfo> =
+        read(call(address, SonosService.TOPOLOGY, "GetZoneGroupState")) { SonosXml.zoneGroups(it, accept) }
 
-    suspend fun householdId(address: String): String = SonosXml.householdId(call(address, SonosService.DEVICE, "GetHouseholdID"))
+    suspend fun householdId(address: String): String = read(call(address, SonosService.DEVICE, "GetHouseholdID"), SonosXml::householdId)
 
-    suspend fun browse(address: String, objectId: String, start: Int, count: Int): BrowseResult = SonosXml.browse(
+    suspend fun browse(address: String, objectId: String, start: Int, count: Int): BrowseResult = read(
         call(
             address, SonosService.CONTENT, "Browse",
             "ObjectID" to objectId, "BrowseFlag" to "BrowseDirectChildren", "Filter" to "*",
             "StartingIndex" to "$start", "RequestedCount" to "$count", "SortCriteria" to "",
         ),
+        SonosXml::browse,
     )
 
     private suspend fun av(address: String, action: String, vararg args: Pair<String, String>): String =
         call(address, SonosService.AV_TRANSPORT, action, INSTANCE to "0", *args)
+
+    private suspend fun <T> read(text: String, parse: (String) -> T): T = withContext(Dispatchers.Default) { parse(text) }
 }
 
-/** The household of the speaker at [address], or null when nothing there answers as a Sonos speaker. */
+/** The household of the speaker at [address], or null when nothing there answers as a Sonos speaker on the home network. */
 internal suspend fun SonosClient.householdAt(address: String): String? = try {
     householdId(address)
 } catch (e: IOException) {
@@ -3661,7 +3968,7 @@ git commit -m "Talk SOAP to a Sonos speaker, with a debug-only capture of each a
 ```
 
 ---
-### Task 10: `:provider:music-sonos` 3: `SonosSystem` (§4.1–4.5, §6; rulings 6, 7, 11–15; Review Focus 2, 3)
+### Task 10: `:provider:music-sonos` 3: `SonosSystem` (§4.1–4.6, §6; rulings 6, 7, 11–15, 20; Review Focus 2, 3, 4)
 
 **Review:** opus.
 
@@ -3670,8 +3977,8 @@ git commit -m "Talk SOAP to a Sonos speaker, with a debug-only capture of each a
 - Test: `provider/music-sonos/src/test/java/uk/co/siland/culvery/provider/music_sonos/SonosSystemTest.kt`
 
 **Interfaces:**
-- Consumes: `SonosClient` and its constants, `householdAt`, `SonosFault`, `queueUri` (Task 9); `SonosXml` types (Task 8); `MusicSystem`, `SpeakerGroup`, `SpeakerRoom`, `NowPlaying`, `Favourite`, `FavouriteKind`, `MusicProblem`, the exceptions, `MusicLink` (Task 4); `WallClock` (`:core:plugin`).
-- Produces (all `internal`): `const val RESCAN_GAP_MS = 30_000L`; `class GoneFromLayout : IOException`; `fun kindOf(item: DidlItem): FavouriteKind`; `class SonosSystem(client: SonosClient, scan: suspend () -> List<String>, online: () -> Boolean, link: MusicLink, onMoved: suspend (MusicLink) -> Unit, clock: WallClock) : MusicSystem`.
+- Consumes: `SonosClient` and its constants, `householdAt`, `SonosFault`, `NotASpeaker`, `queueUri`, `FakeSpeaker`, `onThisMachine` (Task 9); `SonosXml` types (Task 8); `MusicSystem`, `SpeakerGroup`, `SpeakerRoom`, `NowPlaying`, `Favourite`, `FavouriteKind`, `MusicProblem`, the exceptions, `MusicLink` (Task 4); `WallClock` (`:core:plugin`).
+- Produces (all `internal`): `const val RESCAN_GAP_MS = 30_000L`; `class GoneFromLayout : IOException`; `fun kindOf(item: DidlItem): FavouriteKind`; `class SonosSystem(client: SonosClient, scan: suspend () -> List<String>, online: () -> Boolean, link: MusicLink, onMoved: suspend (MusicLink) -> Unit, clock: WallClock) : MusicSystem` (with `roomVolume(room)` and the art rule).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3715,7 +4022,7 @@ class SonosSystemTest {
     private val kitchen = FakeSpeaker()
     private val lounge = FakeSpeaker()
     private val dining = FakeSpeaker()
-    private val client = SonosClient(OkHttpClient.Builder().callTimeout(Duration.ofMillis(500)).retryOnConnectionFailure(false).build()) { _, _ -> }
+    private val client = SonosClient(OkHttpClient.Builder().callTimeout(Duration.ofMillis(500)).retryOnConnectionFailure(false).build(), onThisMachine) { _, _ -> }
     private var now = 1_000_000L
     private var online = true
     private var heard = listOf<String>()
@@ -3843,21 +4150,25 @@ class SonosSystemTest {
         assertThat(s.groups.value[1].rooms[1].volume).isEqualTo(20)
         s.setGroupVolume(s.groups.value[1], 150)
         assertThat(lounge.bodyOf("SetGroupVolume")).contains("<DesiredVolume>100</DesiredVolume>")
-        assertThat(s.groupVolume(s.groups.value[1])).isEqualTo(38)
+        assertThat(s.roomVolume(SpeakerRoom(LOUNGE, "Lounge", 0))).isEqualTo(40)
     }
 
-    /** 6 §4.4: the library checked, then its five steps in order, on the leader, with its own queue. */
+    /**
+     * 6 §4.4: the library checked, then its five steps in order, on the leader, with its own queue; the queue before the
+     * play mode, which Sonos refuses (UPnP 712) while a stream is the source. The URI, its empty metadata and the browse
+     * of one pin ruling 12's guessed request shapes until the walk-through.
+     */
     @Test
     fun shuffleEverythingRunsItsStepsInOrder() = runTest {
         val s = checked()
         kitchen.received.clear()
         s.shuffleEverything(s.groups.value[0])
         assertThat(kitchen.actions().take(6)).containsExactly(
-            "Browse", "RemoveAllTracksFromQueue", "AddURIToQueue", "SetPlayMode", "SetAVTransportURI", "Play",
+            "Browse", "RemoveAllTracksFromQueue", "AddURIToQueue", "SetAVTransportURI", "SetPlayMode", "Play",
         ).inOrder()
         assertThat(kitchen.bodyOf("Browse")).contains("<ObjectID>A:TRACKS</ObjectID>")
         assertThat(kitchen.bodyOf("Browse")).contains("<RequestedCount>1</RequestedCount>")
-        assertThat(kitchen.bodyOf("AddURIToQueue")).contains("<EnqueuedURI>x-rincon-playlist:$KITCHEN#A:TRACKS</EnqueuedURI>")
+        assertThat(kitchen.bodyOf("AddURIToQueue")).contains("<EnqueuedURI>x-rincon-playlist:$KITCHEN#A:TRACKS</EnqueuedURI><EnqueuedURIMetaData></EnqueuedURIMetaData>")
         assertThat(kitchen.bodyOf("SetPlayMode")).contains("<NewPlayMode>SHUFFLE_NOREPEAT</NewPlayMode>")
         assertThat(kitchen.bodyOf("SetAVTransportURI")).contains("<CurrentURI>x-rincon-queue:$KITCHEN#0</CurrentURI>")
     }
@@ -3927,6 +4238,31 @@ class SonosSystemTest {
             // The next layout check redraws the rows.
         }
         assertThat(s.problem.value).isNull()
+        // Reading the layout again was enough: no scan.
+        assertThat(scans).isEqualTo(0)
+    }
+
+    /** Review Focus 4, 6 §4.2: a member's own /getaa art, or https; never another http address or path. */
+    @Test
+    fun onlyALeadersOwnArtOrHttpsArtIsFetched() = runTest {
+        val s = checked()
+        kitchen.answer("", "picture")
+        assertThat(s.art("http://${kitchen.address}/getaa?s=1&u=x")).isEqualTo("picture".toByteArray())
+        kitchen.received.clear()
+        assertThat(s.art("http://${kitchen.address}/elsewhere.jpg")).isNull()
+        assertThat(s.art("http://8.8.8.8/art.jpg")).isNull()
+        assertThat(s.art("ftp://art.example/x.jpg")).isNull()
+        assertThat(kitchen.received).isEmpty()
+    }
+
+    /** Ruling 20: a saved address that isn't a home speaker is never asked; the scan finds the household instead. */
+    @Test
+    fun aSavedAddressOffTheHomeNetworkIsNeverContacted() = runTest {
+        heard = listOf(lounge.address)
+        val s = system(MusicLink(HOUSEHOLD, "8.8.8.8:1400"))
+        s.checkLayout()
+        assertThat(moved).containsExactly(MusicLink(HOUSEHOLD, lounge.address))
+        assertThat(s.groups.value).hasSize(2)
     }
 
     /** Review Focus 3: the router moved the speakers; one scan finds the household, saves it, and nothing is reported. */
@@ -4018,7 +4354,7 @@ class SonosSystemTest {
 }
 ```
 Fails today: `SonosSystem`, `RESCAN_GAP_MS` don't exist.
-Fails if: a command goes to a member, or isn't followed by a check; the optimistic change is missing or sticks; Shuffle everything's order changes or touches the queue with no library; a queued Favourite changes the play mode; a moved speaker is reported; a rescan runs offline or more than once per 30 s; another household's rooms show; the lowering trusts the last check.
+Fails if: a command goes to a member, or isn't followed by a check; art is fetched from anywhere but a member's /getaa or https; a saved address off the home network is asked; the optimistic change is missing or sticks; Shuffle everything sets the play mode before the queue, or touches the queue with no library; a queued Favourite changes the play mode; a moved speaker is reported; a rescan runs offline or more than once per 30 s; another household's rooms show; the lowering trusts the last check.
 
 - [ ] **Step 2: Run them to see them fail**
 
@@ -4127,7 +4463,7 @@ internal class SonosSystem(
         return _groups.value.filter { it.id in playing }
     }
 
-    override suspend fun groupVolume(group: SpeakerGroup): Int = refusing { reaching { client.groupVolume(infoOf(group.id).leaderAddress()) } }
+    override suspend fun roomVolume(room: SpeakerRoom): Int = refusing { reaching { client.volume(memberAddress(room.id)) } }
 
     override suspend fun play(group: SpeakerGroup) = command(group.id, { it.copy(state = PlayState.PLAYING) }) { client.play(it.leaderAddress()) }
 
@@ -4148,14 +4484,14 @@ internal class SonosSystem(
         command(groupId, { it }) { g -> client.setVolume(g.members.firstOrNull { it.uuid == room.id }?.address ?: throw GoneFromLayout(), volume) }
     }
 
-    /** 6 §4.4: the library checked first, then its five steps, which replace the group's queue. */
+    /** 6 §4.4: the library checked first, then its five steps; the queue is the source before the play mode, which a stream refuses. */
     override suspend fun shuffleEverything(group: SpeakerGroup) = command(group.id, { it }) { g ->
         val leader = g.leader()
         if (client.browse(leader.address, LIBRARY, 0, 1).total == 0) throw NoLibraryException()
         client.removeAllTracks(leader.address)
         client.addToQueue(leader.address, "$LIBRARY_PREFIX${leader.uuid}#$LIBRARY", "")
-        client.setPlayMode(leader.address, SHUFFLE_NOREPEAT)
         client.setTransportUri(leader.address, queueUri(leader.uuid), "")
+        client.setPlayMode(leader.address, SHUFFLE_NOREPEAT)
         client.play(leader.address)
     }
 
@@ -4166,7 +4502,7 @@ internal class SonosSystem(
         return items.map { Favourite(it.id, it.title, artUrl(it.artUri, link.address), kindOf(it)) }
     }
 
-    /** 6 §4.5: a station is set and played; a playlist or album replaces the queue, leaving the play mode. */
+    /** 6 §4.5: a station is set and played; a playlist or album replaces the queue (§4.4 steps 1, 2, 3 and 5), leaving the play mode. */
     override suspend fun playFavourite(group: SpeakerGroup, favourite: Favourite) {
         val item = favouriteItems[favourite.id] ?: favourites().let { favouriteItems[favourite.id] } ?: throw MusicRefusedException()
         val uri = item.uri ?: throw MusicRefusedException()
@@ -4184,7 +4520,11 @@ internal class SonosSystem(
         }
     }
 
-    override suspend fun art(url: String): ByteArray? = client.bytes(url)
+    /** Only a member's own /getaa art on the home network, or a stream's https art (6 §4.2, §6). */
+    override suspend fun art(url: String): ByteArray? = if (artAllowed(url)) client.bytes(url) else null
+
+    private fun artAllowed(url: String): Boolean =
+        url.startsWith("https://") || layout.any { g -> g.members.any { url.startsWith("http://${it.address}/getaa") } }
 
     /**
      * Shows [shown] at once (6 §4.3), sends the command to the group's leader, and reads that group again whatever happened,
@@ -4323,11 +4663,14 @@ internal class SonosSystem(
 
     private fun ZoneGroupInfo.leaderAddress(): String = leader().address
 
-    /** A relative art path is the speaker's; a stream's own URL stays; anything else is no art (6 §4.2). */
+    private fun memberAddress(roomId: String): String =
+        layout.firstNotNullOfOrNull { g -> g.members.firstOrNull { it.uuid == roomId } }?.address ?: throw GoneFromLayout()
+
+    /** A relative art path is the speaker's; a stream's own https URL stays; anything else is no art (6 §4.2, §6). */
     private fun artUrl(uri: String?, address: String): String? = when {
         uri.isNullOrBlank() -> null
         uri.startsWith("/") -> "http://$address$uri"
-        uri.startsWith("http://") || uri.startsWith("https://") -> uri
+        uri.startsWith("https://") -> uri
         else -> null
     }
 
@@ -4364,7 +4707,7 @@ git commit -m "Keep a Sonos household's groups up to date, send its commands, an
 
 ---
 
-### Task 11: `:provider:music-sonos` 4: SSDP, `SonosProvider`, cleartext and the app (§3.2, §4.1, §6; rulings 16, 22, 23)
+### Task 11: `:provider:music-sonos` 4: SSDP, `SonosProvider`, cleartext and the app (§3.2, §4.1, §6; rulings 16, 20, 22, 23; Review Focus 4)
 
 **Review:** opus.
 
@@ -4373,12 +4716,12 @@ git commit -m "Keep a Sonos household's groups up to date, send its commands, an
 - Create: `provider/music-sonos/src/main/AndroidManifest.xml`
 - Create: `app/src/main/res/xml/network_security_config.xml`
 - Modify: `app/src/main/AndroidManifest.xml` (`android:networkSecurityConfig`), `app/build.gradle.kts` (the provider), `core/ui/src/test/resources/copy-scan-allow.txt` (SSDP's search)
-- Test: `provider/music-sonos/src/test/java/uk/co/siland/culvery/provider/music_sonos/SsdpTest.kt`, `SonosDiscoveryTest.kt`, `SonosProviderTest.kt`; `app/src/test/java/uk/co/siland/culvery/CleartextTest.kt`
+- Test: `provider/music-sonos/src/test/java/uk/co/siland/culvery/provider/music_sonos/SsdpTest.kt`, `SonosDiscoveryTest.kt`, `SonosProviderTest.kt`; `app/src/test/java/uk/co/siland/culvery/CleartextTest.kt`, `InternetHttpsTest.kt`
 
 **Interfaces:**
-- Consumes: `SonosClient`, `sonosHttp()`, `householdAt`, `SONOS_PORT` (Task 9); `SonosSystem` (Task 10); `authorityOf` (Task 8); `MusicProvider`, `MusicLink`, `MusicUnreachableException`, `MusicProblem` (Task 4); `WallClock` (`:core:plugin`); `Icons.SPEAKER` (Task 1).
+- Consumes: `SonosClient`, `sonosHttp()`, `householdAt`, `FakeSpeaker`, `onThisMachine` (Task 9); `SonosSystem` (Task 10); `hostAndPort`, `isSpeakerAuthority`, `SONOS_PORT` (Task 8); `MusicProvider`, `MusicLink`, `MusicUnreachableException`, `MusicProblem` (Task 4); `WallClock` (`:core:plugin`); `Icons.SPEAKER` (Task 1).
 - Produces:
-  - `internal fun ssdpAddresses(answers: List<String>): List<String>`; `internal fun multicastLock(context: Context): () -> AutoCloseable`; `internal class SonosDiscovery(lock: () -> AutoCloseable, target: InetSocketAddress = …, listenMillis: Long = SCAN_MS) { suspend fun scan(): List<String> }`; `internal const val SCAN_MS = 5_000L`
+  - `internal data class SsdpAnswer(val from: String, val text: String)`; `internal fun ssdpAddresses(answers: List<SsdpAnswer>, accept: (String, Int) -> Boolean = ::isSpeakerAuthority): List<String>`; `internal fun multicastLock(context: Context): () -> AutoCloseable`; `internal class SonosDiscovery(lock: () -> AutoCloseable, target: InetSocketAddress = …, listenMillis: Long = SCAN_MS, accept: (String, Int) -> Boolean = ::isSpeakerAuthority) { suspend fun scan(): List<String> }`; `internal const val SCAN_MS = 5_000L`
   - `internal class AndroidNetwork(context: Context) { fun online(): Boolean }`
   - `const val SONOS_PROVIDER_ID = "music.sonos"`; `class SonosProvider internal constructor(client, scan, online, clock, port: Int = SONOS_PORT) : MusicProvider`, `@Inject constructor(@ApplicationContext context: Context, clock: WallClock)`
 
@@ -4391,13 +4734,15 @@ package uk.co.siland.culvery.provider.music_sonos
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
-/** 6 §3.2: the speakers' addresses from SSDP's answers. */
+/** 6 §3.2, §6: the speakers' addresses from SSDP's answers, only for speakers on the home network that sent them. */
 class SsdpTest {
     private val zonePlayer = "urn:schemas-upnp-org:device:ZonePlayer:1"
 
-    private fun answer(st: String, location: String, case: (String) -> String = { it }) =
+    private fun answer(from: String, st: String, location: String, case: (String) -> String = { it }) = SsdpAnswer(
+        from,
         "HTTP/1.1 200 OK\r\nCACHE-CONTROL: max-age = 1800\r\nEXT:\r\n${case("LOCATION")}: $location\r\n" +
-            "SERVER: Linux UPnP/1.0 Sonos/80.1-55014 (ZPS9)\r\n${case("ST")}: $st\r\nUSN: uuid:RINCON_000E58AAAAAA01400::$st\r\n\r\n"
+            "SERVER: Linux UPnP/1.0 Sonos/80.1-55014 (ZPS9)\r\n${case("ST")}: $st\r\nUSN: uuid:RINCON_000E58AAAAAA01400::$st\r\n\r\n",
+    )
 
     /** Fails if a router's answer counts, a speaker is listed twice, or the order heard is lost. */
     @Test
@@ -4405,11 +4750,11 @@ class SsdpTest {
         assertThat(
             ssdpAddresses(
                 listOf(
-                    answer(zonePlayer, "http://192.168.1.21:1400/xml/device_description.xml"),
-                    answer("urn:schemas-upnp-org:device:InternetGatewayDevice:1", "http://192.168.1.1:5000/rootDesc.xml"),
-                    answer(zonePlayer, "http://192.168.1.20:1400/xml/device_description.xml"),
-                    answer(zonePlayer, "http://192.168.1.21:1400/xml/device_description.xml"),
-                    "not an answer",
+                    answer("192.168.1.21", zonePlayer, "http://192.168.1.21:1400/xml/device_description.xml"),
+                    answer("192.168.1.1", "urn:schemas-upnp-org:device:InternetGatewayDevice:1", "http://192.168.1.1:5000/rootDesc.xml"),
+                    answer("192.168.1.20", zonePlayer, "http://192.168.1.20:1400/xml/device_description.xml"),
+                    answer("192.168.1.21", zonePlayer, "http://192.168.1.21:1400/xml/device_description.xml"),
+                    SsdpAnswer("192.168.1.30", "not an answer"),
                 ),
             ),
         ).containsExactly("192.168.1.21:1400", "192.168.1.20:1400").inOrder()
@@ -4417,8 +4762,22 @@ class SsdpTest {
 
     @Test
     fun headersAreReadWhateverTheirCase() {
-        assertThat(ssdpAddresses(listOf(answer(zonePlayer, "http://192.168.1.20:1400/xml/device_description.xml") { it.lowercase() })))
+        assertThat(ssdpAddresses(listOf(answer("192.168.1.20", zonePlayer, "http://192.168.1.20:1400/xml/device_description.xml") { it.lowercase() })))
             .containsExactly("192.168.1.20:1400")
+    }
+
+    /** Review Focus 4, ruling 20: an answer whose LOCATION is off the home network, or isn't its sender, is dropped. */
+    @Test
+    fun anAnswerPointingElsewhereIsDropped() {
+        assertThat(
+            ssdpAddresses(
+                listOf(
+                    answer("192.168.1.20", zonePlayer, "http://8.8.8.8:1400/xml/device_description.xml"),
+                    answer("192.168.1.20", zonePlayer, "http://192.168.1.99:1400/xml/device_description.xml"),
+                    answer("192.168.1.20", zonePlayer, "http://192.168.1.20:80/xml/device_description.xml"),
+                ),
+            ),
+        ).isEmpty()
     }
 }
 ```
@@ -4450,7 +4809,7 @@ class SonosDiscoveryTest {
                 val packet = DatagramPacket(ByteArray(2_048), 2_048)
                 speaker.receive(packet)
                 search = String(packet.data, 0, packet.length, Charsets.US_ASCII)
-                val answer = ("HTTP/1.1 200 OK\r\nLOCATION: http://192.168.1.20:1400/xml/device_description.xml\r\n" +
+                val answer = ("HTTP/1.1 200 OK\r\nLOCATION: http://127.0.0.1:1400/xml/device_description.xml\r\n" +
                     "ST: urn:schemas-upnp-org:device:ZonePlayer:1\r\n\r\n").toByteArray(Charsets.US_ASCII)
                 speaker.send(DatagramPacket(answer, answer.size, packet.socketAddress))
             }
@@ -4462,10 +4821,11 @@ class SonosDiscoveryTest {
                 },
                 target = InetSocketAddress(InetAddress.getLoopbackAddress(), speaker.localPort),
                 listenMillis = 1_000,
+                accept = onThisMachine,
             )
             val found = withContext(Dispatchers.IO) { discovery.scan() }
             answering.join()
-            assertThat(found).containsExactly("192.168.1.20:1400")
+            assertThat(found).containsExactly("127.0.0.1:1400")
             assertThat(search).startsWith("M-SEARCH * HTTP/1.1\r\n")
             assertThat(search).contains("MAN: \"ssdp:discover\"\r\n")
             assertThat(search).contains("ST: urn:schemas-upnp-org:device:ZonePlayer:1\r\n")
@@ -4496,7 +4856,7 @@ import uk.co.siland.culvery.core.plugin.WallClock
 class SonosProviderTest {
     private val speaker = FakeSpeaker()
     private val printer = FakeSpeaker()
-    private val client = SonosClient(OkHttpClient.Builder().callTimeout(Duration.ofMillis(500)).build()) { _, _ -> }
+    private val client = SonosClient(OkHttpClient.Builder().callTimeout(Duration.ofMillis(500)).build(), onThisMachine) { _, _ -> }
     private var online = true
     private var heard = listOf<String>()
     private var scans = 0
@@ -4547,6 +4907,8 @@ class SonosProviderTest {
         speaker.answer("GetHouseholdID", SonosFixtures.household())
         assertThat(provider().check(speaker.host)).isEqualTo(MusicLink(SonosFixtures.HOUSEHOLD, "${speaker.host}:${speaker.port}"))
         assertThat(provider(port = printer.port).check(printer.host)).isNull()
+        // Not a speaker on this test's rule, so never asked.
+        assertThat(provider().check("8.8.8.8")).isNull()
     }
 }
 ```
@@ -4588,13 +4950,54 @@ class CleartextTest {
     }
 }
 ```
+Create `app/src/test/java/uk/co/siland/culvery/InternetHttpsTest.kt`:
+```kotlin
+package uk.co.siland.culvery
+
+import com.google.common.truth.Truth.assertWithMessage
+import java.io.File
+import org.junit.Test
+
+/**
+ * 6 §3.2: the network security config allows plain HTTP in general (for speakers at any home address), so every URL
+ * written in the app's main sources must be HTTPS: a future internet client can't fall under the base config unseen.
+ * A speaker's address is built at run time (`http://$address…`); XML names are never fetched.
+ */
+class InternetHttpsTest {
+    // Unit tests run in the module's directory; the repo is one up.
+    private val repo = File("..")
+
+    private val plainUrl = Regex(""""http://([A-Za-z0-9.-]+)""")
+
+    /** XML namespace and feature names: identifiers that look like URLs. */
+    private val names = setOf("schemas.xmlsoap.org", "apache.org", "schemas.android.com", "purl.org")
+
+    @Test
+    fun everyUrlInMainSourcesIsHttps() {
+        val main = "${File.separator}src${File.separator}main${File.separator}"
+        val found = repo.walkTopDown()
+            .onEnter { it.name !in setOf("build", ".gradle", ".git", "build-logic") }
+            .filter { it.isFile && it.extension == "kt" && main in it.path }
+            .flatMap { file -> plainUrl.findAll(file.readText(Charsets.UTF_8)).map { file.name to it.groupValues[1] } }
+            .filterNot { (_, host) -> host in names }
+            .toList()
+        assertWithMessage("plain-HTTP URLs in main sources").that(found).isEmpty()
+    }
+
+    @Test
+    fun theScanSeesTheInternetClients() {
+        val sources = repo.walkTopDown().onEnter { it.name !in setOf("build", ".gradle", ".git") }.filter { it.isFile && it.extension == "kt" }
+        assertWithMessage("the forecast's base URL").that(sources.any { "\"https://api.open-meteo.com" in it.readText(Charsets.UTF_8) }).isTrue()
+    }
+}
+```
 Fails today: none of these classes or files exist.
-Fails if: a router's SSDP answer is taken for a speaker; the search isn't ZonePlayer's; the lock isn't released; offline scans anyway; a typed address isn't asked on port 1400; cleartext is open to the internet services or closed to the speakers.
+Fails if: a router's SSDP answer, or one whose LOCATION is off the home network or not its sender, is taken for a speaker; the search isn't ZonePlayer's; a URL in main sources is plain HTTP; the lock isn't released; offline scans anyway; a typed address isn't asked on port 1400; cleartext is open to the internet services or closed to the speakers.
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `./gradlew :provider:music-sonos:testDebugUnitTest` and `./gradlew :app:testDebugUnitTest --tests '*CleartextTest*'`
-Expected: FAIL to compile (provider); `CleartextTest` FAILS (no config).
+Run: `./gradlew :provider:music-sonos:testDebugUnitTest` and `./gradlew :app:testDebugUnitTest --tests '*CleartextTest*' --tests '*InternetHttpsTest*'`
+Expected: FAIL to compile (provider); `CleartextTest` FAILS (no config); `InternetHttpsTest` PASSES (**pin**: today every URL is HTTPS; it keeps them so).
 
 - [ ] **Step 3: Discovery and the network**
 
@@ -4631,11 +5034,20 @@ private const val ANSWER_BYTES = 2_048
 private const val NANOS_PER_MILLI = 1_000_000L
 private const val LOCK_TAG = "Culvery:SonosScan"
 
-/** Each ZonePlayer's address from SSDP's answers (its LOCATION as host:port), once each, in the order heard. */
-internal fun ssdpAddresses(answers: List<String>): List<String> = answers
-    .filter { answer -> answer.lineSequence().any { it.startsWith("ST:", ignoreCase = true) && ZONE_PLAYER in it } }
+/** One SSDP answer: the address of the machine that sent it, and its text. */
+internal data class SsdpAnswer(val from: String, val text: String)
+
+/**
+ * Each ZonePlayer's address from SSDP's answers, once each, in the order heard: its LOCATION's host and port, only when
+ * that host is the answer's sender and [accept] allows it (6 §6), so an answer can't point Culvery elsewhere.
+ */
+internal fun ssdpAddresses(answers: List<SsdpAnswer>, accept: (String, Int) -> Boolean = ::isSpeakerAuthority): List<String> = answers
+    .filter { answer -> answer.text.lineSequence().any { it.startsWith("ST:", ignoreCase = true) && ZONE_PLAYER in it } }
     .mapNotNull { answer ->
-        answer.lineSequence().firstOrNull { it.startsWith("LOCATION:", ignoreCase = true) }?.substringAfter(':')?.trim()?.let(::authorityOf)
+        answer.text.lineSequence().firstOrNull { it.startsWith("LOCATION:", ignoreCase = true) }
+            ?.substringAfter(':')?.trim()?.let(::hostAndPort)
+            ?.takeIf { (host, port) -> host == answer.from && accept(host, port) }
+            ?.let { (host, port) -> "$host:$port" }
     }
     .distinct()
 
@@ -4656,9 +5068,10 @@ internal class SonosDiscovery(
     private val lock: () -> AutoCloseable,
     private val target: InetSocketAddress = InetSocketAddress(SSDP_HOST, SSDP_PORT),
     private val listenMillis: Long = SCAN_MS,
+    private val accept: (String, Int) -> Boolean = ::isSpeakerAuthority,
 ) {
     suspend fun scan(): List<String> = withContext(Dispatchers.IO) {
-        val answers = mutableListOf<String>()
+        val answers = mutableListOf<SsdpAnswer>()
         try {
             lock().use {
                 DatagramSocket().use { socket ->
@@ -4676,14 +5089,14 @@ internal class SonosDiscovery(
                         } catch (e: SocketTimeoutException) {
                             false
                         }
-                        if (heard) answers += String(packet.data, packet.offset, packet.length, Charsets.US_ASCII)
+                        if (heard) answers += SsdpAnswer(packet.address.hostAddress.orEmpty(), String(packet.data, packet.offset, packet.length, Charsets.US_ASCII))
                     }
                 }
             }
         } catch (e: IOException) {
             Log.w(TAG, "The speaker scan stopped (${e::class.simpleName})")
         }
-        ssdpAddresses(answers)
+        ssdpAddresses(answers, accept)
     }
 }
 ```
@@ -4815,303 +5228,19 @@ In `app/build.gradle.kts`, after the music capability line:
 
 - [ ] **Step 5: Run them to see them pass**
 
-Run: `./gradlew :provider:music-sonos:testDebugUnitTest`, `./gradlew :app:testDebugUnitTest --tests '*CleartextTest*'` and `./gradlew :core:ui:testDebugUnitTest --tests '*CopyScanTest*'`
+Run: `./gradlew :provider:music-sonos:testDebugUnitTest`, `./gradlew :app:testDebugUnitTest --tests '*CleartextTest*' --tests '*InternetHttpsTest*'` and `./gradlew :core:ui:testDebugUnitTest --tests '*CopyScanTest*'`
 Expected: PASS.
 
 - [ ] **Step 6: The gate and commit**
 
 Run: `./gradlew testDebugUnitTest verifyRoborazziDebug` and `./gradlew -p build-logic :convention:test` — Expected: BUILD SUCCESSFUL. Also `./gradlew :app:assembleDebug` (Hilt wires `SonosProvider`): BUILD SUCCESSFUL.
 ```bash
-git add provider/music-sonos app/src/main/AndroidManifest.xml app/src/main/res/xml/network_security_config.xml app/build.gradle.kts app/src/test/java/uk/co/siland/culvery/CleartextTest.kt core/ui/src/test/resources/copy-scan-allow.txt
+git add provider/music-sonos app/src/main/AndroidManifest.xml app/src/main/res/xml/network_security_config.xml app/build.gradle.kts app/src/test/java/uk/co/siland/culvery/CleartextTest.kt app/src/test/java/uk/co/siland/culvery/InternetHttpsTest.kt core/ui/src/test/resources/copy-scan-allow.txt
 git commit -m "Find Sonos speakers by SSDP and connect the Sonos provider, with plain HTTP allowed only off the internet services"
 ```
 
 ---
-### Task 12: `:provider:music-fake`, debug only (§3.4; rulings 19, 20)
-
-**Review:** sonnet.
-
-**Files:**
-- Modify: `settings.gradle.kts` (`include(":provider:music-fake")` after `include(":provider:calendar-google")`), `app/build.gradle.kts` (`debugImplementation`)
-- Create: `provider/music-fake/build.gradle.kts`
-- Create (under `provider/music-fake/src/main/java/uk/co/siland/culvery/provider/music_fake/`): `FakeMusicProvider.kt`, `FakeMusicSystem.kt`, `di/FakeMusicModule.kt`
-- Test: `provider/music-fake/src/test/java/uk/co/siland/culvery/provider/music_fake/FakeMusicSystemTest.kt`; `build-logic/convention/src/test/kotlin/ModuleBoundariesTest.kt`
-
-**Interfaces:**
-- Consumes: `MusicProvider`, `MusicSystem`, `MusicLink`, `SpeakerGroup`, `SpeakerRoom`, `NowPlaying`, `PlayState`, `Favourite`, `FavouriteKind` (Task 4); `WallClock`, `ProviderDescriptor` (`:core:plugin`); `Icons.SPEAKER` (Task 1).
-- Produces: `const val FAKE_MUSIC_ID = "music.fake"`; `class FakeMusicProvider @Inject constructor(clock: WallClock) : MusicProvider` (`userConnectable = false`, "Sample speakers (debug)"); `class FakeMusicSystem(clock: WallClock) : MusicSystem`.
-
-- [ ] **Step 1: The module**
-
-Create `provider/music-fake/build.gradle.kts`:
-```kotlin
-plugins {
-    id("culvery.android.library")
-    id("culvery.hilt")
-}
-
-dependencies {
-    implementation(project(":capability:music"))
-    implementation(project(":core:ui"))
-}
-```
-`settings.gradle.kts`: `include(":provider:music-fake")` after `include(":provider:calendar-google")`. `app/build.gradle.kts`, after the calendar sample:
-```kotlin
-    debugImplementation(project(":provider:music-fake"))
-```
-(The comment above it, "Sample data only, in debug builds.", now covers both.)
-
-- [ ] **Step 2: Write the failing tests**
-
-`ModuleBoundariesTest.kt`, in `theMusicModulesFollowTheRules` (**pin**):
-```kotlin
-        allowed(":app", ":provider:music-fake", "debugImplementation")
-        banned(":provider:music-fake", ":provider:music-sonos")
-        banned(":provider:music-fake", ":capability:calendar")
-```
-Create `FakeMusicSystemTest.kt`:
-```kotlin
-package uk.co.siland.culvery.provider.music_fake
-
-import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.test.runTest
-import org.junit.Test
-import uk.co.siland.culvery.capability.music.FavouriteKind
-import uk.co.siland.culvery.capability.music.MusicLink
-import uk.co.siland.culvery.capability.music.NowPlaying
-import uk.co.siland.culvery.capability.music.PlayState
-import uk.co.siland.culvery.core.plugin.WallClock
-
-/** 6 §3.4: two rooms and a group of two, fixed tracks, a station, three Favourites; commands change what shows. */
-class FakeMusicSystemTest {
-    private val system = FakeMusicSystem(WallClock { 5_000L })
-
-    @Test
-    fun theSampleHouse() {
-        val groups = system.groups.value
-        assertThat(groups.map { it.name }).containsExactly("Kitchen", "Lounge + Dining room", "Bedroom").inOrder()
-        assertThat(groups.map { it.state }).containsExactly(PlayState.PLAYING, PlayState.PAUSED, PlayState.STOPPED).inOrder()
-        assertThat(groups[0].nowPlaying).isInstanceOf(NowPlaying.Track::class.java)
-        assertThat(groups[1].nowPlaying).isInstanceOf(NowPlaying.Radio::class.java)
-        assertThat(groups[1].canSkip).isFalse()
-        assertThat(groups[2].nowPlaying).isNull()
-    }
-
-    @Test
-    fun commandsChangeWhatShows() = runTest {
-        val kitchen = system.groups.value[0]
-        system.pause(kitchen)
-        assertThat(system.groups.value[0].state).isEqualTo(PlayState.PAUSED)
-        system.next(system.groups.value[0])
-        assertThat(system.groups.value[0].nowPlaying).isNotEqualTo(kitchen.nowPlaying)
-        system.setGroupVolume(system.groups.value[0], 12)
-        assertThat(system.groupVolume(system.groups.value[0])).isEqualTo(12)
-        val bedroom = system.groups.value[2]
-        system.shuffleEverything(bedroom)
-        assertThat(system.groups.value[2].state).isEqualTo(PlayState.PLAYING)
-        assertThat(system.playingNow().map { it.name }).containsExactly("Bedroom")
-    }
-
-    @Test
-    fun threeFavouritesAndTheyPlay() = runTest {
-        val favourites = system.favourites()
-        assertThat(favourites.map { it.kind }).containsExactly(FavouriteKind.STREAM, FavouriteKind.QUEUED, FavouriteKind.QUEUED).inOrder()
-        system.playFavourite(system.groups.value[2], favourites[0])
-        assertThat(system.groups.value[2].nowPlaying).isEqualTo(NowPlaying.Radio(favourites[0].name, null))
-        assertThat(system.groups.value[2].canSkip).isFalse()
-    }
-
-    @Test
-    fun theProviderIsTheDebugSampleNobodyConnectsByHand() = runTest {
-        val provider = FakeMusicProvider(WallClock { 0L })
-        assertThat(provider.descriptor.id).isEqualTo("music.fake")
-        assertThat(provider.descriptor.userConnectable).isFalse()
-        val link = provider.find()!!
-        assertThat(provider.check("192.168.1.20")).isEqualTo(link)
-        assertThat(provider.open(link) {}.groups.value).hasSize(3)
-        assertThat(link).isEqualTo(MusicLink("sample-household", "sample"))
-    }
-}
-```
-Fails today: the module has no sources.
-Fails if: the sample house loses its grouped row or its station; a command doesn't change what shows; the provider can be connected by hand.
-
-- [ ] **Step 3: Run them to see them fail**
-
-Run: `./gradlew :provider:music-fake:testDebugUnitTest`
-Expected: FAIL to compile.
-
-- [ ] **Step 4: The fake**
-
-Create `FakeMusicSystem.kt`:
-```kotlin
-package uk.co.siland.culvery.provider.music_fake
-
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import uk.co.siland.culvery.capability.music.Favourite
-import uk.co.siland.culvery.capability.music.FavouriteKind
-import uk.co.siland.culvery.capability.music.MusicProblem
-import uk.co.siland.culvery.capability.music.MusicSystem
-import uk.co.siland.culvery.capability.music.NowPlaying
-import uk.co.siland.culvery.capability.music.PlayState
-import uk.co.siland.culvery.capability.music.SpeakerGroup
-import uk.co.siland.culvery.capability.music.SpeakerRoom
-import uk.co.siland.culvery.core.plugin.WallClock
-
-private val TRACKS = listOf(
-    NowPlaying.Track("Morning Light", "The Tablets", "Wall Songs"),
-    NowPlaying.Track("Kettle On", "The Tablets", "Wall Songs"),
-    NowPlaying.Track("Front Door Blues", "Hallway", "Rooms"),
-)
-private val STATION = NowPlaying.Radio("Culvery FM", "The Breakfast Show")
-private val SHUFFLED = NowPlaying.Track("Shuffled song", "Various", null)
-
-private val FAVOURITES = listOf(
-    Favourite("FV:2/1", "Culvery FM", null, FavouriteKind.STREAM),
-    Favourite("FV:2/2", "Sunday morning", null, FavouriteKind.QUEUED),
-    Favourite("FV:2/3", "Party mix", null, FavouriteKind.QUEUED),
-)
-
-/**
- * The sample speakers (6 §3.4), in memory: Kitchen playing, Lounge + Dining room paused on a station, Bedroom stopped.
- * Commands change what shows at once; there is nothing to check and never a problem.
- */
-class FakeMusicSystem(private val clock: WallClock) : MusicSystem {
-    private val _groups = MutableStateFlow(
-        listOf(
-            sample("kitchen", listOf("Kitchen" to 30), PlayState.PLAYING, TRACKS[0], clock.nowMillis()),
-            sample("lounge", listOf("Lounge" to 40, "Dining room" to 35), PlayState.PAUSED, STATION, null),
-            sample("bedroom", listOf("Bedroom" to 20), PlayState.STOPPED, null, null),
-        ),
-    )
-    override val groups: StateFlow<List<SpeakerGroup>> = _groups.asStateFlow()
-    override val problem: StateFlow<MusicProblem?> = MutableStateFlow(null)
-
-    override suspend fun checkLayout() = Unit
-
-    override suspend fun checkPlayback() = Unit
-
-    override suspend fun playingNow(): List<SpeakerGroup> = groups.value.filter { it.isPlaying }
-
-    override suspend fun groupVolume(group: SpeakerGroup): Int = current(group).volume
-
-    override suspend fun play(group: SpeakerGroup) = change(group) {
-        it.copy(state = PlayState.PLAYING, nowPlaying = it.nowPlaying ?: TRACKS[0], canSkip = it.nowPlaying !is NowPlaying.Radio, startedAtMillis = clock.nowMillis())
-    }
-
-    override suspend fun pause(group: SpeakerGroup) = change(group) { it.copy(state = PlayState.PAUSED) }
-
-    override suspend fun next(group: SpeakerGroup) = change(group) { g ->
-        val at = TRACKS.indexOf(g.nowPlaying)
-        g.copy(nowPlaying = TRACKS[(at + 1) % TRACKS.size])
-    }
-
-    override suspend fun setGroupVolume(group: SpeakerGroup, percent: Int) = change(group) { it.copy(volume = percent.coerceIn(0, 100)) }
-
-    override suspend fun setRoomVolume(room: SpeakerRoom, percent: Int) = _groups.update { groups ->
-        groups.map { g -> g.copy(rooms = g.rooms.map { if (it.id == room.id) it.copy(volume = percent.coerceIn(0, 100)) else it }) }
-    }
-
-    override suspend fun favourites(): List<Favourite> = FAVOURITES
-
-    override suspend fun playFavourite(group: SpeakerGroup, favourite: Favourite) = change(group) {
-        val playing = if (favourite.kind == FavouriteKind.STREAM) NowPlaying.Radio(favourite.name, null) else NowPlaying.Track("First of ${favourite.name}", "Various", null)
-        it.copy(state = PlayState.PLAYING, nowPlaying = playing, canSkip = playing !is NowPlaying.Radio, startedAtMillis = clock.nowMillis())
-    }
-
-    override suspend fun shuffleEverything(group: SpeakerGroup) = change(group) {
-        it.copy(state = PlayState.PLAYING, nowPlaying = SHUFFLED, canSkip = true, startedAtMillis = clock.nowMillis())
-    }
-
-    override suspend fun art(url: String): ByteArray? = null
-
-    private fun current(group: SpeakerGroup) = groups.value.first { it.id == group.id }
-
-    private fun change(group: SpeakerGroup, how: (SpeakerGroup) -> SpeakerGroup) = _groups.update { groups ->
-        groups.map { if (it.id == group.id) how(it) else it }
-    }
-
-    private fun sample(id: String, rooms: List<Pair<String, Int>>, state: PlayState, playing: NowPlaying?, startedAt: Long?) = SpeakerGroup(
-        id = id,
-        rooms = rooms.map { (name, volume) -> SpeakerRoom("$id-${name.lowercase()}", name, volume) },
-        coordinatorId = "$id-${rooms.first().first.lowercase()}",
-        state = state,
-        nowPlaying = playing,
-        artUrl = null,
-        canSkip = playing !is NowPlaying.Radio,
-        volume = rooms.first().second,
-        startedAtMillis = startedAt,
-    )
-}
-```
-Create `FakeMusicProvider.kt`:
-```kotlin
-package uk.co.siland.culvery.provider.music_fake
-
-import javax.inject.Inject
-import javax.inject.Singleton
-import uk.co.siland.culvery.capability.music.MusicLink
-import uk.co.siland.culvery.capability.music.MusicProvider
-import uk.co.siland.culvery.capability.music.MusicSystem
-import uk.co.siland.culvery.core.plugin.Feature
-import uk.co.siland.culvery.core.plugin.ProviderDescriptor
-import uk.co.siland.culvery.core.plugin.WallClock
-import uk.co.siland.culvery.core.ui.Icons
-
-const val FAKE_MUSIC_ID = "music.fake"
-private val SAMPLE = MusicLink("sample-household", "sample")
-
-/** Debug builds only (6 §3.4): sample speakers for screenshots and walk-throughs, chosen in Settings › Music. */
-@Singleton
-class FakeMusicProvider @Inject constructor(private val clock: WallClock) : MusicProvider {
-    override val descriptor = ProviderDescriptor(FAKE_MUSIC_ID, "Sample speakers (debug)", Icons.SPEAKER, setOf(Feature.READ, Feature.WRITE), userConnectable = false)
-
-    override suspend fun find(): MusicLink = SAMPLE
-
-    override suspend fun check(address: String): MusicLink = SAMPLE
-
-    override fun open(link: MusicLink, onMoved: suspend (MusicLink) -> Unit): MusicSystem = FakeMusicSystem(clock)
-}
-```
-Create `di/FakeMusicModule.kt`:
-```kotlin
-package uk.co.siland.culvery.provider.music_fake.di
-
-import dagger.Binds
-import dagger.Module
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
-import dagger.multibindings.IntoSet
-import uk.co.siland.culvery.capability.music.MusicProvider
-import uk.co.siland.culvery.provider.music_fake.FakeMusicProvider
-
-@Module
-@InstallIn(SingletonComponent::class)
-abstract class FakeMusicModule {
-    @Binds
-    @IntoSet
-    abstract fun provider(impl: FakeMusicProvider): MusicProvider
-}
-```
-
-- [ ] **Step 5: Run them to see them pass**
-
-Run: `./gradlew :provider:music-fake:testDebugUnitTest` and `./gradlew -p build-logic :convention:test`
-Expected: PASS.
-
-- [ ] **Step 6: The gate and commit**
-
-Run: `./gradlew testDebugUnitTest verifyRoborazziDebug` and `./gradlew :app:assembleDebug` (Hilt wires both providers) — Expected: BUILD SUCCESSFUL. A release build has no `music-fake`; Task 17 builds one.
-```bash
-git add settings.gradle.kts app/build.gradle.kts provider/music-fake build-logic/convention/src/test/kotlin/ModuleBoundariesTest.kt
-git commit -m "Add sample speakers for debug builds"
-```
-
----
-### Task 13: Art, the shared controls and the Home card (§4.2, §5.1, §5.5; rulings 8, 9, 15, 24)
+### Task 12: Art, the shared controls and the Home card (§4.2, §5.1, §5.5; rulings 8, 9, 15, 24)
 
 **Review:** sonnet.
 
@@ -5122,7 +5251,7 @@ git commit -m "Add sample speakers for debug builds"
 - Baselines (new, 7): `music_card_playing_dark`, `music_card_playing_light`, `music_card_radio_dark`, `music_card_paused_dark`, `music_card_nothing_dark`, `music_card_problem_dark`, `music_card_looking_dark`.
 
 **Interfaces:**
-- Consumes: `HomePick`, `MusicView`, `MusicChecks.watch()` (Task 5); `MusicActions`, `problemLine` (Task 7); `Speakers`, `SpeakerGroup` (Task 4); `HhCard`, `HhButton`, `HhIcon`, `HhType`, `ShellTokens`, `quietFill`, `hhClickable`, `Icons` (`:core:ui`).
+- Consumes: `HomePick`, `MusicView`, `MusicChecks.watch()`, `MusicChecks.watching` (Task 5); `MusicActions`, `problemLine` (Task 7); `Speakers`, `SpeakerGroup` (Task 4); `HhCard`, `HhButton`, `HhIcon`, `HhType`, `ShellTokens`, `quietFill`, `hhClickable`, `Icons` (`:core:ui`).
 - Produces (package `uk.co.siland.culvery.capability.music.ui` unless said):
   - `fun interface ArtSource { suspend fun load(url: String): ImageBitmap? }`; `val LocalArtSource`; `class ArtCache internal constructor(bytes: suspend (String) -> ByteArray?) : ArtSource`, `@Inject constructor(speakers: Speakers)`; `internal fun decodeArt(data: ByteArray, px: Int): ImageBitmap?`; `internal const val ART_PX = 256`; `@Composable internal fun ArtImage(url: String?, size: Dp, modifier: Modifier = Modifier)`
   - `class GroupActions(onPlay, onPause, onNext, onGroupVolume: (SpeakerGroup, Int) -> Unit, onRoomVolume: (SpeakerGroup, SpeakerRoom, Int) -> Unit, onShuffle, onFavourites)`; `internal fun MusicActions.forGroups(onFavourites: (SpeakerGroup) -> Unit): GroupActions`
@@ -5251,21 +5380,37 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.music.HomePick
+import uk.co.siland.culvery.capability.music.MusicActions
+import uk.co.siland.culvery.capability.music.MusicChecks
+import uk.co.siland.culvery.capability.music.MusicView
 import uk.co.siland.culvery.capability.music.PlayState
 import uk.co.siland.culvery.capability.music.SONG
 import uk.co.siland.culvery.capability.music.STATION
+import uk.co.siland.culvery.capability.music.Speakers
+import uk.co.siland.culvery.capability.music.TestMusicProvider
 import uk.co.siland.culvery.capability.music.group
+import uk.co.siland.culvery.capability.music.musicSettings
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
-/** 6 §5.1, §5.5: the Home card's states, its controls and their words. */
+/** 6 §5.1, §5.5: the Home card's states, its controls and their words; it watches the speakers while it shows. */
 @RunWith(AndroidJUnit4::class)
 class MusicCardTest {
     @get:Rule val compose = createComposeRule()
+    @get:Rule val folder = TemporaryFolder()
     private val calls = mutableListOf<String>()
     private val actions = GroupActions(
         onPlay = { calls += "play ${it.id}" },
@@ -5349,6 +5494,27 @@ class MusicCardTest {
         show(null)
         compose.onNodeWithText("Looking for the speakers…").assertExists()
     }
+
+    /** 6 §4.2: the speakers are checked while the card shows, and not once it has gone. Fails if the watch outlives the card. */
+    @Test
+    fun theCardWatchesOnlyWhileItShows() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            val settings = musicSettings(folder.root, scope)
+            val speakers = Speakers(setOf(TestMusicProvider()), settings, scope)
+            val view = MusicView(speakers, settings, scope)
+            val checks = MusicChecks(speakers.system, MutableStateFlow(true), scope)
+            var shown by mutableStateOf(true)
+            compose.setContent { CulveryTheme(dark = true) { if (shown) MusicCardHost(view, MusicActions({ null }, scope), checks) } }
+            compose.waitForIdle()
+            assertThat(checks.watching).isEqualTo(1)
+            shown = false
+            compose.waitForIdle()
+            assertThat(checks.watching).isEqualTo(0)
+        } finally {
+            scope.cancel()
+        }
+    }
 }
 ```
 Create `ui/MusicCardScreenshotTest.kt`:
@@ -5424,7 +5590,7 @@ class MusicCardScreenshotTest {
 In `MusicCapabilityTest.kt`, replace the construction with a helper and add the card's test:
 ```kotlin
     private fun capability(speakers: Speakers) = MusicCapability(
-        speakers, MusicView(speakers, settings), MusicActions({ speakers.system.value }, scope),
+        speakers, MusicView(speakers, settings, scope), MusicActions({ speakers.system.value }, scope),
         MusicChecks(speakers.system, MutableStateFlow(true), scope), ArtCache { null },
     )
 
@@ -5441,7 +5607,7 @@ In `MusicCapabilityTest.kt`, replace the construction with a helper and add the 
 (and `MusicCapability(Speakers(…))` in the other two tests becomes `capability(Speakers(…))`; imports `kotlinx.coroutines.flow.MutableStateFlow`, `uk.co.siland.culvery.capability.music.ui.ArtCache`, `uk.co.siland.culvery.core.plugin.HomeCardSize`.)
 The block of art, name and lines is one TalkBack sentence (`clearAndSetSemantics`), so the tests find it by its words, not its text; the screenshots show the text.
 Fails today: none of the UI exists; `MusicCapability` takes one argument and has no card.
-Fails if: the spoken words drift from §5.5; Shuffle everything shows mid-song on Home; Next is live for radio; a problem leaves the controls; art is fetched twice or decoded at full size; the card shows before a connection or above the forecast.
+Fails if: the card's watch outlives it; the spoken words drift from §5.5; Shuffle everything shows mid-song on Home; Next is live for radio; a problem leaves the controls; art is fetched twice or decoded at full size; the card shows before a connection or above the forecast.
 
 - [ ] **Step 2: Run them to see them fail**
 
@@ -5925,7 +6091,7 @@ git commit -m "Show the playing room on Home with Play/Pause, Next, its volume a
 ```
 
 ---
-### Task 14: The Music tab and the Favourites sheet (§2.4, §2.5, §4.2, §5.2, §5.3, §5.5)
+### Task 13: The Music tab and the Favourites sheet (§2.4, §2.5, §4.2, §5.2, §5.3, §5.5)
 
 **Review:** sonnet.
 
@@ -5936,7 +6102,7 @@ git commit -m "Show the playing room on Home with Play/Pause, Next, its volume a
 - Baselines (new, 6): `music_tab_dark`, `music_tab_light`, `music_tab_rooms_dark`, `music_tab_status_dark`, `favourites_sheet_dark`, `favourites_sheet_empty_dark`.
 
 **Interfaces:**
-- Consumes: `GroupActions`, `forGroups`, `PlayPauseButton`, `NextButton`, `ShuffleButton`, `VolumeSlider`, `NowPlayingBlock`, `MusicStatusLine`, `ArtImage`, `LocalArtSource`, `ArtSource`, `MusicDimens` (Task 13); `tabOrder`, `MusicView`, `MusicChecks.watch(layoutNow = true)` (Task 5); `MusicActions.favourites()`, `playFavourite()`, `FavouritesLoad` (Task 7); `LocalOverlayHost` (`:core:plugin`); `HhChoiceChip`, `HhListRow`, `HhSheet`, `HhCloseButton`, `HhMessageLine` (`:core:ui`).
+- Consumes: `GroupActions`, `forGroups`, `PlayPauseButton`, `NextButton`, `ShuffleButton`, `VolumeSlider`, `NowPlayingBlock`, `MusicStatusLine`, `ArtImage`, `LocalArtSource`, `ArtSource`, `MusicDimens` (Task 12); `tabOrder`, `MusicView`, `MusicChecks.watch(layoutNow = true)` (Task 5); `MusicActions.favourites()`, `playFavourite()`, `FavouritesLoad` (Task 7); `LocalOverlayHost` (`:core:plugin`); `HhChoiceChip`, `HhListRow`, `HhSheet`, `HhCloseButton`, `HhMessageLine` (`:core:ui`).
 - Produces:
   - `@Composable fun MusicTab(groups: List<SpeakerGroup>, status: String?, lines: Map<String, String>, roomsShown: Set<String>, onRooms: (String) -> Unit, actions: GroupActions, modifier: Modifier = Modifier)`; `@Composable internal fun MusicTabHost(view, actions, checks, art: ArtSource)`
   - `@Composable fun FavouritesSheet(groupName: String, load: FavouritesLoad?, line: String?, onPick: (Favourite) -> Unit, onClose: () -> Unit)`; `@Composable internal fun FavouritesSheetHost(group: SpeakerGroup, actions: MusicActions, onClose: () -> Unit)`
@@ -5970,6 +6136,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -6072,9 +6239,12 @@ class MusicTabTest {
         compose.onNodeWithTag("music_row_l_line").assertDoesNotExist()
     }
 
-    /** 6 §4.2, §5.2: the tab orders playing first, reads the layout as it opens, and opens Favourites on the sheet. */
+    /**
+     * 6 §4.2, §5.2: with Home already watching (its layout read, the next not due for 30 s), opening the tab reads the
+     * layout at once; the tab orders playing first and opens Favourites on the sheet.
+     */
     @Test
-    fun theTabOrdersReadsTheLayoutAndOpensFavourites() {
+    fun theTabReadsTheLayoutAsItOpensOrdersAndOpensFavourites() {
         val settings = musicSettings(folder.root, scope)
         val provider = TestMusicProvider()
         val speakers = Speakers(setOf(provider), settings, scope)
@@ -6085,11 +6255,14 @@ class MusicTabTest {
         val system = provider.systems.single()
         system.groups.value = listOf(kitchen, lounge)
         val checks = MusicChecks(speakers.system, MutableStateFlow(true), scope).also { it.start() }
+        checks.watch()
+        runBlocking { withTimeout(5_000) { while ("checkLayout" !in system.calls) delay(10) } }
+        system.calls.clear()
         val overlay = RecordingOverlay()
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
-                    MusicTabHost(MusicView(speakers, settings), MusicActions({ system }, scope), checks, ArtSource { null })
+                    MusicTabHost(MusicView(speakers, settings, scope), MusicActions({ system }, scope), checks, ArtSource { null })
                 }
             }
         }
@@ -6304,7 +6477,7 @@ class MusicTabScreenshotTest {
 }
 ```
 Fails today: `MusicTab`, `MusicTabHost`, `FavouritesSheet` and `FavouritesSheetHost` don't exist.
-Fails if: a single room gets a Rooms chip; a room's slider sends the group's volume; Next is live on a station row; Shuffle everything hides on a playing row; the status line shows while all is well; the tab doesn't read the layout as it opens; a Favourite that can't play closes the sheet.
+Fails if: opening the tab waits for the 30-second layout check; a single room gets a Rooms chip; a room's slider sends the group's volume; Next is live on a station row; Shuffle everything hides on a playing row; the status line shows while all is well; the tab doesn't read the layout as it opens; a Favourite that can't play closes the sheet.
 
 - [ ] **Step 2: Run them to see them fail**
 
@@ -6589,7 +6762,7 @@ Expected: PASS.
 
 - [ ] **Step 7: Screenshots**
 
-Run `./gradlew :capability:music:recordRoborazziDebug --tests '*MusicTabScreenshotTest*'`, write the 6 names to `$TMP/expected-baselines.txt`, run the baseline check (Task 13's 7 stay unchanged), and open every one. Check: the playing Lounge + Dining room row first with Next greyed and a Rooms chip, Kitchen paused, Bedroom "Nothing playing"; Favourites and Shuffle everything on every row; `music_tab_rooms_dark` shows the Lounge's and the Dining room's own sliders under the row; the status line above the rows; the sheet 600 dp at the right edge with three Favourites (two with grey art, one with the note), and the empty one's sentence.
+Run `./gradlew :capability:music:recordRoborazziDebug --tests '*MusicTabScreenshotTest*'`, write the 6 names to `$TMP/expected-baselines.txt`, run the baseline check (Task 12's 7 stay unchanged), and open every one. Check: the playing Lounge + Dining room row first with Next greyed and a Rooms chip, Kitchen paused, Bedroom "Nothing playing"; Favourites and Shuffle everything on every row; `music_tab_rooms_dark` shows the Lounge's and the Dining room's own sliders under the row; the status line above the rows; the sheet 600 dp at the right edge with three Favourites (two with grey art, one with the note), and the empty one's sentence.
 
 - [ ] **Step 8: The gate and commit**
 
@@ -6600,36 +6773,25 @@ git commit -m "Add the Music tab with a row per Sonos group and the Favourites s
 ```
 
 ---
-### Task 15: Settings › Music (§4.1, §5.4, §6; rulings 9, 17, 19, 24, 25; Review Focus 4)
+### Task 14: Connecting: a typed address and `MusicConnect` (§4.1, §6; rulings 17, 19, 20; Review Focus 4)
 
 **Review:** opus.
 
 **Files:**
-- Create (under `capability/music/src/main/java/uk/co/siland/culvery/capability/music/`): `SpeakerAddress.kt`, `MusicConnect.kt`, `ui/MusicSettingsPage.kt`
-- Modify: `MusicWords.kt` (Settings' words), `MusicCapability.kt` (`settingsPages`), `src/test/.../TestMusic.kt` (`RecordingToaster`)
-- Test (under `capability/music/src/test/java/uk/co/siland/culvery/capability/music/`): `SpeakerAddressTest.kt`, `MusicConnectTest.kt`, `ui/InSettingsPane.kt`, `ui/MusicSettingsPageTest.kt`, `ui/MusicSettingsScreenshotTest.kt`, `MusicCapabilityTest.kt`
-- Baselines (new, 4): `settings_music_dark`, `settings_music_light`, `settings_music_unconnected_dark`, `music_address_sheet_dark`.
+- Create (under `capability/music/src/main/java/uk/co/siland/culvery/capability/music/`): `SpeakerAddress.kt`, `MusicConnect.kt`
+- Modify: `MusicWords.kt` (connecting's lines)
+- Test (under `capability/music/src/test/java/uk/co/siland/culvery/capability/music/`): `SpeakerAddressTest.kt`, `MusicConnectTest.kt`
 
 **Interfaces:**
-- Consumes: `MusicProvider`, `MusicLink`, `MusicSettings.connect/setUsualRoom/setLowerTo`, `Speakers.providers/system`, `MAX_LOWER_TO` (Task 4); `MusicView` (Task 5); `problemLine` (Task 7); `MusicStatusLine`, `MusicDimens` (Task 13); `COULD_NOT_SAVE`, `SettingsPage`, `Toaster`, `LocalOverlayHost` (`:core:plugin`); `HhTextField`, `HhMessageLine`, `HhChoiceChip`, `HhSectionLabel`, `HhSheet`, `HhCloseButton` (`:core:ui`).
+- Consumes: `MusicProvider`, `MusicLink`, `MusicUnreachableException`, `isHomeNetworkHost`, `MusicSettings.connect`, `Speakers.providers` (Task 4); `problemLine` (Task 7); `COULD_NOT_SAVE` (`:core:plugin`); `TestMusicProvider` (`found`, `speakers`, `failure`, `asked`).
 - Produces:
   - `fun speakerHost(typed: String): String?`
-  - `sealed interface ConnectOutcome { data object Connected; data class Failed(val line: String) }`; `class MusicConnect internal constructor(providers: List<MusicProvider>, save: suspend (String, MusicLink) -> Unit)`, `@Inject constructor(speakers: Speakers, settings: MusicSettings)`: `val offersSample: Boolean`, `suspend fun find()`, `suspend fun enterAddress(typed: String)`, `suspend fun useSample()`
-  - `const val MUSIC_PAGE_ID = "music"`; `class MusicPage`; `data class MusicSettingsUi(connected, status, findLine, finding, rooms: List<SpeakerRoom>, usualRoomId, lowerTo, offersSample)`; `class MusicSettingsActions(onFind, onEnterAddress, onUseSample, onUsualRoom: (String) -> Unit, onLowerTo: (Int) -> Unit)`; `@Composable fun MusicSettingsScreen(ui, actions)`; `@Composable internal fun AddressSheet(onConnect: suspend (String) -> String?, onEdited: (Boolean) -> Unit, onClose: () -> Unit)`; `@Composable internal fun MusicSettingsHost(settings, speakers, view, connect, toaster)`
-  - `MusicWords.kt`: Settings' words (below), `fun lowerToWords(percent: Int): String`
+  - `sealed interface ConnectOutcome { data object Connected; data class Failed(val line: String) }`
+  - `class MusicConnect internal constructor(provider: MusicProvider?, save: suspend (String, MusicLink) -> Unit)`, `@Inject constructor(speakers: Speakers, settings: MusicSettings)`: `suspend fun find(): ConnectOutcome`, `suspend fun enterAddress(typed: String): ConnectOutcome`
+  - `MusicWords.kt`: `NOTHING_ANSWERED`, `TYPE_FOUR_NUMBERS`, `NO_SPEAKER_THERE`
 
 - [ ] **Step 1: Write the failing tests**
 
-Add to `TestMusic.kt` (imports `uk.co.siland.culvery.core.plugin.Toaster`):
-```kotlin
-internal class RecordingToaster : Toaster {
-    val shown = mutableListOf<String>()
-
-    override fun show(message: String, icon: String, urgent: Boolean) {
-        shown += message
-    }
-}
-```
 Create `SpeakerAddressTest.kt`:
 ```kotlin
 package uk.co.siland.culvery.capability.music
@@ -6637,9 +6799,9 @@ package uk.co.siland.culvery.capability.music
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
-/** 6 §4.1, §6: a typed address is four numbers on the home network, or nothing is contacted. */
+/** 6 §4.1, §6: a typed address is four numbers on the home network, tidied; anything else contacts nothing. */
 class SpeakerAddressTest {
-    /** Review Focus 4. Fails if a port, a name, a public address or a fifth number gets through, or spaces don't. */
+    /** Review Focus 4. Fails if a port, a name, a public address or a fifth number gets through, or spaces and leading zeros don't. */
     @Test
     fun onlyFourNumbersInAPrivateRangeAreASpeakerAddress() {
         assertThat(speakerHost("192.168.1.20")).isEqualTo("192.168.1.20")
@@ -6651,7 +6813,7 @@ class SpeakerAddressTest {
         assertThat(speakerHost("169.254.10.1")).isEqualTo("169.254.10.1")
         listOf(
             "172.32.0.1", "8.8.8.8", "192.168.1", "192.168.1.20.1", "192.168.1.256", "192.168.1.20:1400", "sonos.local",
-            "", "192.168.1.2O", "１９２.168.1.20", "192.168..20",
+            "", "192.168.1.2O", "１９２.168.1.20", "192.168..20", "192.168.1.0020",
         ).forEach { assertThat(speakerHost(it)).isNull() }
     }
 }
@@ -6667,15 +6829,14 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** 6 §4.1, §5.4, §6: Find Sonos, a typed address, the sample speakers, and what each says when it can't. */
+/** 6 §4.1, §6: Find Sonos and a typed address, and what each says when it can't. */
 @RunWith(AndroidJUnit4::class)
 class MusicConnectTest {
     private val sonos = TestMusicProvider()
-    private val sample = TestMusicProvider("music.fake", connectable = false)
     private val saved = mutableListOf<Pair<String, MusicLink>>()
     private val home = MusicLink("Sonos_home", "192.168.1.20:1400")
 
-    private fun connect(vararg providers: TestMusicProvider, failSave: Boolean = false) = MusicConnect(providers.toList()) { id, link ->
+    private fun connect(provider: MusicProvider? = sonos, failSave: Boolean = false) = MusicConnect(provider) { id, link ->
         if (failSave) throw IOException("disk full")
         saved += id to link
     }
@@ -6683,26 +6844,26 @@ class MusicConnectTest {
     @Test
     fun findSavesWhatItFinds() = runTest {
         sonos.found = home
-        assertThat(connect(sonos, sample).find()).isEqualTo(ConnectOutcome.Connected)
+        assertThat(connect().find()).isEqualTo(ConnectOutcome.Connected)
         assertThat(saved).containsExactly("music.sonos" to home)
     }
 
     @Test
     fun nothingFoundSaysWhatToDo() = runTest {
-        assertThat(connect(sonos).find()).isEqualTo(ConnectOutcome.Failed("No Sonos speakers answered. Check they’re on, or enter a speaker’s address."))
+        assertThat(connect().find()).isEqualTo(ConnectOutcome.Failed("No Sonos speakers answered. Check they’re on, or enter a speaker’s address."))
         assertThat(saved).isEmpty()
     }
 
     @Test
     fun offlineSaysSo() = runTest {
         sonos.failure = MusicUnreachableException(MusicProblem.OFFLINE)
-        assertThat(connect(sonos).find()).isEqualTo(ConnectOutcome.Failed("The tablet is offline. Check the Wi-Fi."))
+        assertThat(connect().find()).isEqualTo(ConnectOutcome.Failed("The tablet is offline. Check the Wi-Fi."))
     }
 
     @Test
-    fun aTypedAddressIsCheckedAndSaved() = runTest {
+    fun aTypedAddressIsTidiedCheckedAndSaved() = runTest {
         sonos.speakers["192.168.1.20"] = home
-        assertThat(connect(sonos).enterAddress(" 192.168.1.20 ")).isEqualTo(ConnectOutcome.Connected)
+        assertThat(connect().enterAddress(" 192.168.001.020 ")).isEqualTo(ConnectOutcome.Connected)
         assertThat(sonos.asked).containsExactly("check 192.168.1.20")
         assertThat(saved).containsExactly("music.sonos" to home)
     }
@@ -6710,7 +6871,7 @@ class MusicConnectTest {
     /** Review Focus 4: nothing is asked of a mistyped or off-network address. */
     @Test
     fun aMistypedAddressContactsNothing() = runTest {
-        val music = connect(sonos)
+        val music = connect()
         val howToType = ConnectOutcome.Failed("Type the address as four numbers, like 192.168.1.20.")
         assertThat(music.enterAddress("192.168.1.20:1400")).isEqualTo(howToType)
         assertThat(music.enterAddress("8.8.8.8")).isEqualTo(howToType)
@@ -6720,26 +6881,150 @@ class MusicConnectTest {
 
     @Test
     fun anAddressWithNoSpeakerSaysSo() = runTest {
-        assertThat(connect(sonos).enterAddress("192.168.1.99"))
+        assertThat(connect().enterAddress("192.168.1.99"))
             .isEqualTo(ConnectOutcome.Failed("No Sonos speaker answered at that address. Check it in the Sonos app under About My System."))
     }
 
-    /** 6 §3.4: the sample only where it is built, and never by Find Sonos. */
+    /** A build with no music provider finds nothing rather than failing. */
     @Test
-    fun theSampleSpeakersAreOfferedOnlyWhereBuilt() = runTest {
-        assertThat(connect(sonos).offersSample).isFalse()
-        sample.found = MusicLink("sample-household", "sample")
-        val music = connect(sonos, sample)
-        assertThat(music.offersSample).isTrue()
-        assertThat(music.useSample()).isEqualTo(ConnectOutcome.Connected)
-        assertThat(saved.single().first).isEqualTo("music.fake")
-        assertThat(sonos.asked).isEmpty()
+    fun noProviderFindsNothing() = runTest {
+        assertThat(connect(provider = null).find()).isEqualTo(ConnectOutcome.Failed("No Sonos speakers answered. Check they’re on, or enter a speaker’s address."))
     }
 
     @Test
     fun aSaveThatFailsSaysSo() = runTest {
         sonos.found = home
-        assertThat(connect(sonos, failSave = true).find()).isEqualTo(ConnectOutcome.Failed("Couldn’t save that change — try again."))
+        assertThat(connect(failSave = true).find()).isEqualTo(ConnectOutcome.Failed("Couldn’t save that change — try again."))
+    }
+}
+```
+Fails today: `speakerHost`, `MusicConnect` and `ConnectOutcome` don't exist.
+Fails if: an off-network or mistyped address is asked; spaces or leading zeros aren't tidied; nothing found or offline says the wrong thing; a failed save is silent.
+
+- [ ] **Step 2: Run them to see them fail**
+
+Run: `./gradlew :capability:music:testDebugUnitTest --tests '*SpeakerAddressTest*' --tests '*MusicConnectTest*'`
+Expected: FAIL to compile.
+
+- [ ] **Step 3: The lines, the address and connecting**
+
+Append to `MusicWords.kt`:
+```kotlin
+internal const val NOTHING_ANSWERED = "No Sonos speakers answered. Check they’re on, or enter a speaker’s address."
+internal const val TYPE_FOUR_NUMBERS = "Type the address as four numbers, like 192.168.1.20."
+internal const val NO_SPEAKER_THERE = "No Sonos speaker answered at that address. Check it in the Sonos app under About My System."
+```
+Create `SpeakerAddress.kt`:
+```kotlin
+package uk.co.siland.culvery.capability.music
+
+private const val PARTS = 4
+private const val MAX_DIGITS = 3
+
+/**
+ * A typed speaker address (6 §4.1) as four plain numbers, or null: spaces round it and leading zeros go, then it must be
+ * on the home network ([isHomeNetworkHost]), so the wall never contacts anything off it by mistake (6 §6).
+ */
+fun speakerHost(typed: String): String? {
+    val parts = typed.trim().split('.')
+    if (parts.size != PARTS || parts.any { p -> p.isEmpty() || p.length > MAX_DIGITS || p.any { it !in '0'..'9' } }) return null
+    return parts.joinToString(".") { it.toInt().toString() }.takeIf(::isHomeNetworkHost)
+}
+```
+Create `MusicConnect.kt`:
+```kotlin
+package uk.co.siland.culvery.capability.music
+
+import android.util.Log
+import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Singleton
+import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
+
+private const val TAG = "MusicConnect"
+
+sealed interface ConnectOutcome {
+    data object Connected : ConnectOutcome
+
+    data class Failed(val line: String) : ConnectOutcome
+}
+
+/**
+ * Settings › Music's ways to the speakers (6 §4.1): Find Sonos and a typed address, through the bound provider (Sonos,
+ * 6 §3.4). What is found is saved as the connection, and the Music tab appears.
+ */
+@Singleton
+class MusicConnect internal constructor(private val provider: MusicProvider?, private val save: suspend (String, MusicLink) -> Unit) {
+    @Inject
+    constructor(speakers: Speakers, settings: MusicSettings) : this(speakers.providers.firstOrNull(), settings::connect)
+
+    suspend fun find(): ConnectOutcome = connect { it.find() } ?: ConnectOutcome.Failed(NOTHING_ANSWERED)
+
+    suspend fun enterAddress(typed: String): ConnectOutcome {
+        val host = speakerHost(typed) ?: return ConnectOutcome.Failed(TYPE_FOUR_NUMBERS)
+        return connect { it.check(host) } ?: ConnectOutcome.Failed(NO_SPEAKER_THERE)
+    }
+
+    /** Null when [look] found nothing. */
+    private suspend fun connect(look: suspend (MusicProvider) -> MusicLink?): ConnectOutcome? {
+        val p = provider ?: return null
+        val link = try {
+            look(p)
+        } catch (e: MusicUnreachableException) {
+            return ConnectOutcome.Failed(problemLine(e.problem))
+        } ?: return null
+        return try {
+            save(p.descriptor.id, link)
+            ConnectOutcome.Connected
+        } catch (e: IOException) {
+            Log.w(TAG, "Couldn't save the speakers (${e::class.simpleName})")
+            ConnectOutcome.Failed(COULD_NOT_SAVE)
+        }
+    }
+}
+```
+
+- [ ] **Step 4: Run them to see them pass**
+
+Run: `./gradlew :capability:music:testDebugUnitTest --tests '*SpeakerAddressTest*' --tests '*MusicConnectTest*'`
+Expected: PASS.
+
+- [ ] **Step 5: The gate and commit**
+
+Run: `./gradlew testDebugUnitTest verifyRoborazziDebug` — Expected: BUILD SUCCESSFUL.
+```bash
+git add capability/music/src
+git commit -m "Connect to Sonos by scan or by a typed home-network address, and say why not"
+```
+
+---
+
+### Task 15: Settings › Music: the page, the address sheet, the usual room and the doorbell share (§4.1, §5.4, §6; rulings 9, 19, 24, 25)
+
+**Review:** sonnet.
+
+**Files:**
+- Create: `capability/music/src/main/java/uk/co/siland/culvery/capability/music/ui/MusicSettingsPage.kt`
+- Modify: `MusicWords.kt` (Settings' words), `MusicCapability.kt` (`settingsPages`), `src/test/.../TestMusic.kt` (`RecordingToaster`)
+- Test (under `capability/music/src/test/java/uk/co/siland/culvery/capability/music/`): `ui/InSettingsPane.kt`, `ui/MusicSettingsPageTest.kt`, `ui/MusicSettingsScreenshotTest.kt`, `MusicCapabilityTest.kt`
+- Baselines (new, 4): `settings_music_dark`, `settings_music_light`, `settings_music_unconnected_dark`, `music_address_sheet_dark`.
+
+**Interfaces:**
+- Consumes: `MusicSettings.setUsualRoom/setLowerTo`, `Speakers.providers/system`, `MAX_LOWER_TO`, `SpeakerRoom` (Task 4); `MusicView` (Task 5); `problemLine` (Task 7); `MusicStatusLine`, `MusicDimens` (Task 12); `MusicConnect`, `ConnectOutcome` (Task 14); `COULD_NOT_SAVE`, `SettingsPage`, `Toaster`, `LocalOverlayHost` (`:core:plugin`); `HhTextField`, `HhMessageLine`, `HhChoiceChip`, `HhSectionLabel`, `HhSheet`, `HhCloseButton` (`:core:ui`).
+- Produces:
+  - `const val MUSIC_PAGE_ID = "music"`; `class MusicPage`; `data class MusicSettingsUi(connected, status, findLine, finding, rooms: List<SpeakerRoom>, usualRoomId, lowerTo)`; `class MusicSettingsActions(onFind, onEnterAddress, onUsualRoom: (String) -> Unit, onLowerTo: (Int) -> Unit)`; `@Composable fun MusicSettingsScreen(ui, actions)`; `@Composable internal fun AddressSheet(onConnect: suspend (String) -> String?, onEdited: (Boolean) -> Unit, onClose: () -> Unit)`; `@Composable internal fun MusicSettingsHost(settings, speakers, view, connect, toaster)`
+  - `MusicWords.kt`: Settings' words (below; the usual room's label is `USUAL_ROOM_LABEL`), `fun lowerToWords(percent: Int): String`
+  - Tests: `RecordingToaster` (`TestMusic.kt`)
+
+- [ ] **Step 1: Write the failing tests**
+
+Add to `TestMusic.kt` (imports `uk.co.siland.culvery.core.plugin.Toaster`):
+```kotlin
+internal class RecordingToaster : Toaster {
+    val shown = mutableListOf<String>()
+
+    override fun show(message: String, icon: String, urgent: Boolean) {
+        shown += message
     }
 }
 ```
@@ -6800,13 +7085,12 @@ class MusicSettingsPageTest {
     private val actions = MusicSettingsActions(
         onFind = { calls += "find" },
         onEnterAddress = { calls += "address" },
-        onUseSample = { calls += "sample" },
         onUsualRoom = { calls += "usual $it" },
         onLowerTo = { calls += "lower $it" },
     )
     private val rooms = listOf(SpeakerRoom("RINCON_A", "Kitchen", 30), SpeakerRoom("RINCON_B", "Lounge", 40))
     private val connected = MusicSettingsUi(
-        connected = true, status = null, findLine = null, finding = false, rooms = rooms, usualRoomId = "RINCON_A", lowerTo = 20, offersSample = false,
+        connected = true, status = null, findLine = null, finding = false, rooms = rooms, usualRoomId = "RINCON_A", lowerTo = 20,
     )
 
     private fun show(ui: MusicSettingsUi) = compose.setContent { CulveryTheme(dark = true) { InSettingsPane { MusicSettingsScreen(ui, actions) } } }
@@ -6822,7 +7106,6 @@ class MusicSettingsPageTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "20 % of its volume"))
             .performSemanticsAction(SemanticsActions.SetProgress) { it(0f) }
         assertThat(calls).containsExactly("usual RINCON_B", "lower 0").inOrder()
-        compose.onNodeWithTag("music_sample").assertDoesNotExist()
         compose.assertAccessible()
     }
 
@@ -6835,13 +7118,12 @@ class MusicSettingsPageTest {
 
     @Test
     fun notConnectedSaysWhatToDo() {
-        show(connected.copy(connected = false, rooms = emptyList(), usualRoomId = null, offersSample = true))
+        show(connected.copy(connected = false, rooms = emptyList(), usualRoomId = null))
         compose.onNodeWithTag("music_connection").assertTextEquals("Not connected yet. Find Sonos, or enter a speaker’s address.")
         compose.onNodeWithText("The rooms appear here once Sonos is found.").assertExists()
         compose.onNodeWithTag("music_find").performClick()
         compose.onNodeWithTag("music_address").performClick()
-        compose.onNodeWithTag("music_sample").performClick()
-        assertThat(calls).containsExactly("find", "address", "sample").inOrder()
+        assertThat(calls).containsExactly("find", "address").inOrder()
     }
 
     @Test
@@ -6918,11 +7200,11 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 @Config(qualifiers = "w1280dp-h800dp-land-hdpi")
 class MusicSettingsScreenshotTest {
     @get:Rule val compose = createComposeRule()
-    private val actions = MusicSettingsActions({}, {}, {}, {}, {})
+    private val actions = MusicSettingsActions({}, {}, {}, {})
     private val connected = MusicSettingsUi(
         connected = true, status = null, findLine = null, finding = false,
         rooms = listOf(SpeakerRoom("RINCON_A", "Kitchen", 30), SpeakerRoom("RINCON_B", "Lounge", 40), SpeakerRoom("RINCON_C", "Dining room", 35)),
-        usualRoomId = "RINCON_A", lowerTo = 20, offersSample = false,
+        usualRoomId = "RINCON_A", lowerTo = 20,
     )
 
     private fun snap(name: String, dark: Boolean, content: @Composable () -> Unit) {
@@ -6938,7 +7220,7 @@ class MusicSettingsScreenshotTest {
     fun unconnectedDark() = snap("settings_music_unconnected_dark", true) {
         InSettingsPane {
             MusicSettingsScreen(
-                connected.copy(connected = false, rooms = emptyList(), usualRoomId = null, offersSample = true,
+                connected.copy(connected = false, rooms = emptyList(), usualRoomId = null,
                     findLine = "No Sonos speakers answered. Check they’re on, or enter a speaker’s address."),
                 actions,
             )
@@ -6954,9 +7236,9 @@ class MusicSettingsScreenshotTest {
 In `MusicCapabilityTest.kt`, extend the helper and add:
 ```kotlin
     private fun capability(speakers: Speakers) = MusicCapability(
-        speakers, MusicView(speakers, settings), MusicActions({ speakers.system.value }, scope),
+        speakers, MusicView(speakers, settings, scope), MusicActions({ speakers.system.value }, scope),
         MusicChecks(speakers.system, MutableStateFlow(true), scope), ArtCache { null },
-        settings, MusicConnect(speakers.providers) { id, link -> settings.connect(id, link) }, RecordingToaster(),
+        settings, MusicConnect(speakers.providers.firstOrNull()) { id, link -> settings.connect(id, link) }, RecordingToaster(),
     )
 
     /** 6 §5.4: Settings › Music after Calendars (400), before Door (500); none in a build with no provider. */
@@ -6967,16 +7249,19 @@ In `MusicCapabilityTest.kt`, extend the helper and add:
         assertThat(capability(Speakers(emptySet(), settings, scope)).settingsPages()).isEmpty()
     }
 ```
-(`MusicConnect`'s internal constructor takes the providers and a save; `RecordingToaster` is in `TestMusic.kt`.)
+(`MusicConnect`'s internal constructor takes the provider and a save; `RecordingToaster` is in `TestMusic.kt`.)
 Fails today: `speakerHost`, `MusicConnect`, the page and the sheet don't exist; `MusicCapability` has no page.
 Fails if: an off-network or mistyped address is asked; nothing found or offline says the wrong thing; the sample is offered in a build without it, or Find Sonos picks it; a failed save is silent; the share's words or 0 % drift; the page sits elsewhere in Settings.
 
+Fails today: the page and the sheet don't exist; `MusicCapability` has no page.
+Fails if: the share's words or 0 % drift; the usual room or the share isn't sent when chosen; the problem line doesn't take the connection line's place; the sheet sends an empty field or hides the line it gets back; the page sits elsewhere in Settings.
+
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `./gradlew :capability:music:testDebugUnitTest --tests '*SpeakerAddressTest*' --tests '*MusicConnectTest*' --tests '*MusicSettingsPageTest*' --tests '*MusicCapabilityTest*'`
+Run: `./gradlew :capability:music:testDebugUnitTest --tests '*MusicSettingsPageTest*' --tests '*MusicCapabilityTest*'`
 Expected: FAIL to compile.
 
-- [ ] **Step 3: The words, the address and connecting**
+- [ ] **Step 3: The words**
 
 Append to `MusicWords.kt`:
 ```kotlin
@@ -6984,106 +7269,22 @@ internal const val SONOS = "Sonos"
 internal const val FIND_SONOS = "Find Sonos"
 internal const val LOOKING_FOR_SONOS = "Looking for Sonos…"
 internal const val ENTER_ADDRESS = "Enter a speaker’s address"
-internal const val USE_SAMPLE = "Use sample speakers"
 internal const val NOT_CONNECTED = "Not connected yet. Find Sonos, or enter a speaker’s address."
 internal const val CONNECTED = "Connected."
 internal const val FOUND_SONOS = "Found Sonos."
 internal const val CONNECTED_TO_SONOS = "Connected to Sonos."
-internal const val NOTHING_ANSWERED = "No Sonos speakers answered. Check they’re on, or enter a speaker’s address."
 internal const val ADDRESS_HINT = "Shown in the Sonos app under About My System."
 internal const val SPEAKER_ADDRESS = "Speaker’s address"
 internal const val ADDRESS_EXAMPLE = "192.168.1.20"
 internal const val CONNECT_TO_SPEAKER = "Connect to this speaker"
 internal const val CHECKING = "Checking…"
-internal const val TYPE_FOUR_NUMBERS = "Type the address as four numbers, like 192.168.1.20."
-internal const val NO_SPEAKER_THERE = "No Sonos speaker answered at that address. Check it in the Sonos app under About My System."
-internal const val USUAL_ROOM = "Usual room"
+internal const val USUAL_ROOM_LABEL = "Usual room"
 internal const val ROOMS_AFTER_FIND = "The rooms appear here once Sonos is found."
 internal const val DOORBELL = "Doorbell"
 internal const val LOWER_MUSIC_TO = "When the doorbell rings, lower music to"
 
 /** The doorbell's share, said as what it does: 0 % mutes (6 §5.4). */
 fun lowerToWords(percent: Int): String = if (percent == 0) "0 % (muted)" else "$percent % of its volume"
-```
-Create `SpeakerAddress.kt`:
-```kotlin
-package uk.co.siland.culvery.capability.music
-
-private const val PARTS = 4
-private const val MAX_PART = 255
-
-/**
- * A typed speaker address (6 §4.1) as four plain numbers, or null: only an address in one of the home network's private
- * ranges, so the wall never contacts anything off it by mistake (6 §6). Spaces round it and leading zeros go.
- */
-fun speakerHost(typed: String): String? {
-    val parts = typed.trim().split('.')
-    if (parts.size != PARTS) return null
-    val n = parts.map { part -> if (part.length in 1..3 && part.all { it in '0'..'9' }) part.toInt() else return null }
-    if (n.any { it > MAX_PART }) return null
-    val private = n[0] == 10 || (n[0] == 172 && n[1] in 16..31) || (n[0] == 192 && n[1] == 168) || (n[0] == 169 && n[1] == 254)
-    return if (private) n.joinToString(".") else null
-}
-```
-Create `MusicConnect.kt`:
-```kotlin
-package uk.co.siland.culvery.capability.music
-
-import android.util.Log
-import java.io.IOException
-import javax.inject.Inject
-import javax.inject.Singleton
-import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
-
-private const val TAG = "MusicConnect"
-
-sealed interface ConnectOutcome {
-    data object Connected : ConnectOutcome
-
-    data class Failed(val line: String) : ConnectOutcome
-}
-
-/**
- * Settings › Music's ways to the speakers (6 §4.1, §5.4): Find Sonos and a typed address use the provider the household
- * connects; Use sample speakers the debug one. What is found is saved as the connection, and the Music tab appears.
- */
-@Singleton
-class MusicConnect internal constructor(private val providers: List<MusicProvider>, private val save: suspend (String, MusicLink) -> Unit) {
-    @Inject
-    constructor(speakers: Speakers, settings: MusicSettings) : this(speakers.providers, settings::connect)
-
-    private val household: MusicProvider? get() = providers.firstOrNull { it.descriptor.userConnectable }
-    private val sample: MusicProvider? get() = providers.firstOrNull { !it.descriptor.userConnectable }
-
-    /** Debug builds bind the sample speakers (6 §3.4). */
-    val offersSample: Boolean get() = sample != null
-
-    suspend fun find(): ConnectOutcome = connect(household) { it.find() } ?: ConnectOutcome.Failed(NOTHING_ANSWERED)
-
-    suspend fun enterAddress(typed: String): ConnectOutcome {
-        val host = speakerHost(typed) ?: return ConnectOutcome.Failed(TYPE_FOUR_NUMBERS)
-        return connect(household) { it.check(host) } ?: ConnectOutcome.Failed(NO_SPEAKER_THERE)
-    }
-
-    suspend fun useSample(): ConnectOutcome = connect(sample) { it.find() } ?: ConnectOutcome.Failed(NOTHING_ANSWERED)
-
-    /** Null when [look] found nothing. */
-    private suspend fun connect(provider: MusicProvider?, look: suspend (MusicProvider) -> MusicLink?): ConnectOutcome? {
-        val p = provider ?: return null
-        val link = try {
-            look(p)
-        } catch (e: MusicUnreachableException) {
-            return ConnectOutcome.Failed(problemLine(e.problem))
-        } ?: return null
-        return try {
-            save(p.descriptor.id, link)
-            ConnectOutcome.Connected
-        } catch (e: IOException) {
-            Log.w(TAG, "Couldn't save the speakers (${e::class.simpleName})")
-            ConnectOutcome.Failed(COULD_NOT_SAVE)
-        }
-    }
-}
 ```
 
 - [ ] **Step 4: The page**
@@ -7147,8 +7348,7 @@ import uk.co.siland.culvery.capability.music.SONOS
 import uk.co.siland.culvery.capability.music.SPEAKER_ADDRESS
 import uk.co.siland.culvery.capability.music.SpeakerRoom
 import uk.co.siland.culvery.capability.music.Speakers
-import uk.co.siland.culvery.capability.music.USE_SAMPLE
-import uk.co.siland.culvery.capability.music.USUAL_ROOM
+import uk.co.siland.culvery.capability.music.USUAL_ROOM_LABEL
 import uk.co.siland.culvery.capability.music.lowerToWords
 import uk.co.siland.culvery.capability.music.problemLine
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
@@ -7193,13 +7393,11 @@ data class MusicSettingsUi(
     val rooms: List<SpeakerRoom>,
     val usualRoomId: String?,
     val lowerTo: Int,
-    val offersSample: Boolean,
 )
 
 class MusicSettingsActions(
     val onFind: () -> Unit,
     val onEnterAddress: () -> Unit,
-    val onUseSample: () -> Unit,
     val onUsualRoom: (String) -> Unit,
     val onLowerTo: (Int) -> Unit,
 )
@@ -7221,10 +7419,9 @@ fun MusicSettingsScreen(ui: MusicSettingsUi, actions: MusicSettingsActions) {
                 tone = if (ui.connected) ButtonTone.Quiet else ButtonTone.Primary, icon = Icons.SEARCH, enabled = !ui.finding, on = ButtonSurface.Bg,
             )
             HhButton(ENTER_ADDRESS, actions.onEnterAddress, Modifier.testTag("music_address"), on = ButtonSurface.Bg)
-            if (ui.offersSample) HhButton(USE_SAMPLE, actions.onUseSample, Modifier.testTag("music_sample"), on = ButtonSurface.Bg)
         }
         HhMessageLine(ui.findLine, HhType.body, c.danger, "music_find_line")
-        HhSectionLabel(USUAL_ROOM)
+        HhSectionLabel(USUAL_ROOM_LABEL)
         if (ui.rooms.isEmpty()) {
             Text(ROOMS_AFTER_FIND, style = HhType.body, color = c.mute)
         } else {
@@ -7342,7 +7539,6 @@ internal fun MusicSettingsHost(settings: MusicSettings, speakers: Speakers, view
             rooms = groups.flatMap { it.rooms },
             usualRoomId = p.usualRoomId,
             lowerTo = p.lowerTo,
-            offersSample = connect.offersSample,
         ),
         MusicSettingsActions(
             onFind = {
@@ -7362,7 +7558,6 @@ internal fun MusicSettingsHost(settings: MusicSettings, speakers: Speakers, view
                     )
                 }
             },
-            onUseSample = { scope.launch { findLine = said(connect.useSample(), FOUND_SONOS) } },
             onUsualRoom = { id -> scope.launch { save(toaster) { settings.setUsualRoom(id) } } },
             onLowerTo = { percent -> scope.launch { save(toaster) { settings.setLowerTo(percent) } } },
         ),
@@ -7399,6 +7594,7 @@ In `MusicCapability.kt`, the constructor gains `private val settings: MusicSetti
 ```
 (imports `uk.co.siland.culvery.core.plugin.SettingsPage`, `uk.co.siland.culvery.core.plugin.Toaster`, `…ui.MusicPage`, `…ui.MusicSettingsHost`.)
 
+
 - [ ] **Step 5: Run them to see them pass**
 
 Run: `./gradlew :capability:music:testDebugUnitTest`
@@ -7406,7 +7602,7 @@ Expected: PASS. (`MusicSettingsScreenshotTest` fails `verify` until recorded.)
 
 - [ ] **Step 6: Screenshots**
 
-Run `./gradlew :capability:music:recordRoborazziDebug --tests '*MusicSettingsScreenshotTest*'`, write the 4 names to `$TMP/expected-baselines.txt`, run the baseline check, and open every one. Check: "Music", the SONOS label, "Connected." in mute, Find Sonos (quiet when connected, primary when not) with Enter a speaker's address beside it; the three room chips with Kitchen chosen; the DOORBELL label, the slider at 20 with "20 % of its volume"; unconnected: the danger line under the buttons, Use sample speakers, the rooms sentence; the sheet with its field, hint and a disabled Connect to this speaker.
+Run `./gradlew :capability:music:recordRoborazziDebug --tests '*MusicSettingsScreenshotTest*'`, write the 4 names to `$TMP/expected-baselines.txt`, run the baseline check, and open every one. Check: "Music", the SONOS label, "Connected." in mute, Find Sonos (quiet when connected, primary when not) with Enter a speaker's address beside it; the three room chips with Kitchen chosen; the DOORBELL label, the slider at 20 with "20 % of its volume"; unconnected: the danger line under the buttons and the rooms sentence; the sheet with its field, hint and a disabled Connect to this speaker.
 
 - [ ] **Step 7: The gate and commit**
 
@@ -7417,7 +7613,8 @@ git commit -m "Add Settings › Music: find Sonos or enter a speaker's address, 
 ```
 
 ---
-### Task 16: The emulator walk-through on `culvery-5`, then a real speaker by address; the captures (§8.1, §8.2)
+
+### Task 16: The emulator walk-through on `culvery-5` with a real speaker by address; the protocol checks; the captures (§8.1, §8.2)
 
 **Review:** the controller, with the user at the emulator. (The workflow runs `simplify` over the branch separately, before this task.)
 
@@ -7444,34 +7641,28 @@ adb -s "$S" install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 The test household from Plan 5's walk-through is still there; if not, the user runs the wizard with a test household.
 
-- [ ] **Step 3: The sample speakers**
+- [ ] **Step 3: Connecting**
 
-Fake rings are posted from the adb shell as in Plan 5 (`ring() { adb -s "$S" shell "cmd notification post -t 'Front Door' culvery-fake-ring '$1'"; }`). Tick each item with one line of what was seen; anything unexpected goes to Step 6.
-1. Settings › Music (Admin PIN) sits between Calendars and Door: "Not connected yet. …", Find Sonos, Enter a speaker's address, **Use sample speakers**. Use sample speakers: a "Found Sonos." toast; "Connected."; the room chips Kitchen, Lounge, Dining room, Bedroom.
-2. The rail shows Music at slot 30, between Calendar and Door, no badge.
-3. Home: the Music card at row 2, column 3: Kitchen, "Morning Light", "The Tablets", Pause, Next, the volume; no Shuffle everything.
-4. Pause on Home: the card stays on Kitchen with Play and Shuffle everything (ruling 8). Play: Kitchen plays again.
-5. Music tab: three rows, Kitchen first (playing); Lounge + Dining room with Next greyed and a Rooms chip; Rooms shows two sliders; Bedroom "Nothing playing".
-6. Favourites on Bedroom: the sheet with three; Culvery FM plays in Bedroom and the sheet closes; Bedroom moves above the paused rows.
-7. Shuffle everything on the Lounge row: it plays "Shuffled song".
-8. Settings › Music: choose Bedroom as the usual room; pause everything on the tab: Home shows Bedroom, "Nothing playing", Play and Shuffle everything.
-9. Doorbell share: move to 0 %: "0 % (muted)"; back to 20 %.
-10. With Kitchen playing at 30, `ring 'Someone is at your Front Door'`: the card and the chime; the tab (behind the card) shows Kitchen's slider at 6; Got it: 30 again. Ring again, drag Kitchen to 50 on the tab while the card shows, Got it: Kitchen stays at 50.
-11. TalkBack (short, with the user's yes, as Plan 5 did it): the card says "Kitchen, playing Morning Light by The Tablets"; Pause "Pause Kitchen"; the slider "Kitchen volume, 30 percent"; Next on the Lounge row unavailable.
+There are no sample speakers (§3.4): everything is checked on the household's speakers, by address. Fake rings are posted from the adb shell as in Plan 5 (`ring() { adb -s "$S" shell "cmd notification post -t 'Front Door' culvery-fake-ring '$1'"; }`). Tick each item with one line of what was seen (no room names); anything unexpected goes to Step 6. Ask the user before anything changes what a group is playing, its queue or its volume, and put each back.
+1. Settings › Music (Admin PIN) sits between Calendars and Door: "Not connected yet. …", Find Sonos, Enter a speaker's address.
+2. Find Sonos on the emulator: "No Sonos speakers answered. …" (its SSDP can't reach the home network, §8.1).
+3. Enter a speaker's address: a mistyped one ("192.168.1") and a port ("…:1400") each say how to type it. The user reads one speaker's address from the Sonos app (Settings › System › About My System) and types it; the address goes nowhere but the field. "Connected to Sonos.", the sheet closes, the room chips are the household's. **Protocol check 1:** if the rooms never come, or the status line shows, read `adb -s "$S" logcat -d -s MusicChecks:W` and stop: `GetZoneGroupState` or `GetHouseholdID` may not answer on this firmware.
+4. The rail shows Music at slot 30, between Calendar and Door, no badge; the Music tab's rows match the Sonos app's groups, playing first.
 
-- [ ] **Step 4: A real speaker by address**
+- [ ] **Step 4: The controls, Shuffle everything, Favourites and the doorbell**
 
-The user reads one speaker's address from the Sonos app (Settings › System › About My System) and types it; the address goes nowhere but the field.
-12. Find Sonos on the emulator: "No Sonos speakers answered. …" (its SSDP can't reach the home network, §8.1).
-13. Enter a speaker's address: a mistyped one ("192.168.1") says how to type it; the real one: "Connected to Sonos.", the sheet closes, the Music tab shows the household's real groups and rooms. **First check of the protocol:** if the tab stays on "Looking for the speakers…" or shows the status line, read `adb -s "$S" logcat -d -s MusicChecks:W` and stop: `GetZoneGroupState` or `GetHouseholdID` may not answer on this firmware.
-14. Play, Pause, Next and the group volume on a group the household isn't listening to (ask first); the Sonos app on a phone agrees within 2 seconds; a change made in the Sonos app shows on the wall within 2 seconds.
-15. A radio favourite (BBC Sounds) from the sheet: it plays, the row shows the station and the programme, Next greyed.
-16. A playlist favourite: it replaces that group's queue (ask first) and plays; the Sonos app's play mode didn't change.
-17. Shuffle everything on a group (ask first): the whole library, shuffled. **Second check of the protocol:** if Sonos refuses it ("Sonos didn't do that. Try again."), stop and report: the `x-rincon-playlist:<leader>#A:TRACKS` URI (ruling 12) needs changing before anything else.
-18. A Favourite the wall can't play (if the household has one, e.g. a service signed in only on a phone): "Sonos couldn’t play this here.", the sheet stays.
-19. The doorbell with real music playing: the group drops to its 20 % within about half a second, then the chime; Got it: back to where it was. A second ring while the card shows: no second lowering.
-20. `adb -s "$S" shell svc wifi disable` and `svc data disable` (the emulator's network): within a check or two the tab says "The tablet is offline. Check the Wi-Fi."; enable both: the line goes.
-21. Settings › Music with the real speakers: the rooms are the household's; choose the usual room the household names.
+5. Home: the Music card at row 2, column 3 on the playing group, with Pause, Next and the volume, and no Shuffle everything while it plays.
+6. Play, Pause, Next and the group slider on a group (ask first); the Sonos app agrees within 2 seconds; a change made in the Sonos app shows on the wall within 2 seconds. **Protocol check 2:** the group slider (`SnapshotGroupVolume`, then `SetGroupVolume`) keeps the rooms' ratio, as the Sonos app's own slider does.
+7. Pause on Home, open Settings and close it, go to Calendar and back to Home: the card still shows the paused room with Play (ruling 8); Play resumes it.
+8. A grouped row's Rooms chip: each room's slider moves only that room.
+9. A radio favourite (BBC Sounds) from the sheet: it plays, the row shows the station and the programme, Next greyed.
+10. A playlist favourite: it replaces that group's queue (ask first) and plays; the Sonos app's play mode didn't change.
+11. Shuffle everything on a group paused on a radio station (ask first): the whole library, shuffled. **Protocol check 3:** if Sonos refuses it ("Sonos didn't do that. Try again."), stop and report: `x-rincon-playlist:<leader>#A:TRACKS` with empty metadata, the one-item browse, or the step order (ruling 12) needs changing before anything else.
+12. A Favourite the wall can't play (if the household has one, e.g. a service signed in only on a phone): "Sonos couldn’t play this here.", the sheet stays.
+13. Settings › Music: choose the usual room the household names; stop everything on the tab: Home shows that room, "Nothing playing", Play and Shuffle everything. Doorbell share: 0 % reads "0 % (muted)"; back to 20 %.
+14. With a two-room group playing, `ring 'Someone is at your Front Door'`: the card and the chime; each room drops to about a fifth (the Rooms chip shows both); Got it: both back, the balance as it was. Ring again and drag one room in the Sonos app while the card shows; Got it: that room stays where it was dragged, the other comes back. A second ring while the card shows: no second lowering. Set the share to 0 % and ring: silence, then both rooms back with their balance.
+15. `adb -s "$S" shell svc wifi disable` and `svc data disable` (the emulator's network): within a check or two the tab says "The tablet is offline. Check the Wi-Fi."; enable both: the line goes.
+16. TalkBack (short, with the user's yes, as Plan 5 did it): the card says "<room>, playing <title> by <artist>"; Pause "Pause <room>"; the slider "<room> volume, <n> percent"; Next on a radio row unavailable.
 
 - [ ] **Step 5: The captures (§8.2)**
 
@@ -7493,15 +7684,15 @@ Each fault: write it as a failing test in its owning module, fix it in that task
 
 - [ ] **Step 7: Record and close**
 
-Add to `docs/superpowers/plans/2026-09-23-plan1-followups.md`, under a new "Plan 6" heading: the checklist's outcome in a few lines (whether `GetZoneGroupState`, `GetHouseholdID` and the `A:TRACKS` URI worked as ruled), each fault and its commit, and taste notes for the end-of-v1 design walk-through (the card's layout, the row's density, the copy written here). No room names, addresses or household id. Put back the Sonos volumes and queues as the household had them. Close the AVD (`adb -s "$S" emu kill`). Commit:
+Add to `docs/superpowers/plans/2026-09-23-plan1-followups.md`, under a new "Plan 6" heading: the checklist's outcome in a few lines, and **the three protocol checks' outcomes** (`GetZoneGroupState` and `GetHouseholdID`; the group snapshot; Shuffle everything's URI, empty metadata, one-item browse and order: as ruled, or what had to change, so the tests' pins of ruling 12 can be relabelled as confirmed), each fault and its commit, and taste notes for the end-of-v1 design walk-through (the card's layout, the row's density, the copy written here). No room names, addresses or household id. Put back the Sonos volumes and queues as the household had them. Close the AVD (`adb -s "$S" emu kill`). Commit:
 ```bash
 git add docs/superpowers/plans/2026-09-23-plan1-followups.md
-git commit -m "Record Plan 6's emulator walk-through with the sample and the household's speakers"
+git commit -m "Record Plan 6's emulator walk-through on the household's speakers"
 ```
 
 ---
 
-### Task 17: On the tablet: fixtures from the captures, Find Sonos by scan, final review, merge and install (§7, §8.2, §8.3)
+### Task 17: On the tablet: fixtures from the captures, Find Sonos by scan, the lowering timed, final review, merge and install (§7, §8.2, §8.3)
 
 **Review:** the controller with the user; an opus final review of the whole branch. **Needs the son's SM-T510 on the cable, the household's speakers on, and the household's yes.**
 
@@ -7535,13 +7726,13 @@ If Plan 5 has merged into `main` by now, the controller rebases `plan-6-sonos` o
 1. Settings › Music (Admin PIN) › **Find Sonos**: within about 5 seconds "Found Sonos." and the household's rooms (§8.3: the scan's real test; SSDP under the multicast lock). If nothing answers, read `adb -s "$S" logcat -d -s SonosDiscovery:W` and stop.
 2. The user chooses the usual room.
 3. Home follows the playing room; the Music tab's rows match the Sonos app.
-4. The bell, rung for real with music playing: the group drops, the chime plays, Got it puts it back.
+4. The bell, rung for real with music playing: the rooms drop, the chime plays, Got it puts them back. **Time it** (ruling 3: `quieted()` waits up to 500 ms, inside Door's lock): with `adb -s "$S" logcat -v threadtime` running and the user listening, note whether the music had dropped before the chime began and how long the card took to chime after it appeared (a phone's stopwatch or a slow-motion video is enough); ring three times. Record the times in the follow-ups file; a chime that lags past about a second, or music still loud when it starts, is a fault for Step 5's review.
 5. Read the tablet's logs: `adb -s "$S" logcat -d | grep -E "MusicActions|MusicChecks|MusicQuieter|SonosDiscovery|ShellAlerts|MusicConnect"`: commands and outcomes only, no room, title, Favourite or address.
 From here on, the tablet's logs are read whenever it is plugged in while work is under way (§8.3). Restore anything changed under the 4e rules; leave Culvery pinned in front.
 
 - [ ] **Step 5: Final review, merge, install**
 
-Update the follow-ups file (what the captures showed and the tablet did, in words without names; anything left for later, e.g. the design walk-through notes). Commit. Then the opus final review of the whole branch against the spec, one fix round, and `superpowers:finishing-a-development-branch` (the user has always chosen to merge locally; never push). Build the release from the merged `main`, `install -r` it on the tablet, and check Home's card and the bell once more.
+Update the follow-ups file (what the captures showed, the lowering's timings, and what the tablet did, in words without names; anything left for later, e.g. the design walk-through notes). Commit. Then the opus final review of the whole branch against the spec, one fix round, and `superpowers:finishing-a-development-branch` (the user has always chosen to merge locally; never push). Build the release from the merged `main`, `install -r` it on the tablet, and check Home's card and the bell once more.
 
 ---
 
@@ -7550,32 +7741,32 @@ Update the follow-ups file (what the captures showed and the tablet did, in word
 | Spec | Task |
 |---|---|
 | §1 outcome; done on the emulator and the tablet | 16, 17 |
-| §2.1 job: rooms, starting music, the doorbell | 5–7, 10, 13–15 |
-| §2.2 Home follows the playing room; the usual room | 4 (stored), 5, 13, 15 |
+| §2.1 job: rooms, starting music, the doorbell | 5–7, 10, 12–15 |
+| §2.2 Home follows the playing room; the usual room; a paused room stays | 4 (stored), 5, 12, 15 |
 | §2.3 the doorbell share, quiet hours too, left if changed | 2, 3, 6, 15 |
-| §2.4 groups as Sonos groups them; room volumes | 10, 14 |
-| §2.5 Favourites | 7, 10, 14 |
-| §2.6 no limits; Settings admin-only | 14, 15 (Settings is admin-only already) |
-| §2.7 local API, nothing secret | 4, 9–11 |
+| §2.4 groups as Sonos groups them; room volumes | 10, 13 |
+| §2.5 Favourites | 7, 10, 13 |
+| §2.6 no limits; Settings admin-only | 13, 15 (Settings is admin-only already) |
+| §2.7 local API, nothing secret | 4, 8–11 |
 | §3.1 `:capability:music`, `MusicSystem`, `SpeakerGroup`, `Favourite` | 4 |
 | §3.2 `SonosDiscovery`, `SonosClient`, `SonosXml`, `music.sonos` | 8–11 |
 | §3.3 `AlertQuieter`, `show(loud)`, `quieted()`, Door's one change | 2, 3 |
-| §3.4 `:provider:music-fake` | 12 |
+| §3.4 no sample speakers | none: tests use `TestMusicSystem` (4), walk-throughs the real speakers (16) |
 | §3.5 backup: no new rule | Global Constraints (DataStore under `files/datastore/`) |
-| §4.1 Find Sonos, a speaker's address, the automatic rescan | 10, 11, 15 |
-| §4.2 checks: 2 s, 30 s, the tab opening, after a command, art in memory | 5, 10, 13, 14 |
-| §4.3 commands to the leader, at once, Next greyed | 7, 10, 13 |
-| §4.4 Shuffle everything | 9, 10 |
+| §4.1 Find Sonos, a speaker's address, the automatic rescan | 10, 11, 14, 15 |
+| §4.2 checks: 2 s, 30 s, the tab opening, after a command, art in memory | 5, 10, 12, 13 |
+| §4.3 commands to the leader, at once, Next greyed | 7, 10, 12 |
+| §4.4 Shuffle everything, queue before play mode | 9, 10, 16 |
 | §4.5 Favourites by kind | 10 |
-| §4.6 lowering for the doorbell | 6 |
-| §5.1 the Home card | 13 |
-| §5.2 the Music tab | 14 |
-| §5.3 the Favourites sheet | 14 |
-| §5.4 Settings › Music | 15 |
-| §5.5 TalkBack | 13, 14, 15 |
-| §6 when things go wrong; privacy | 7, 10, 11, 13–15 |
+| §4.6 lowering room by room, remembered first, restore within 1, retried | 6, 10 |
+| §5.1 the Home card | 12 |
+| §5.2 the Music tab | 13 |
+| §5.3 the Favourites sheet | 13 |
+| §5.4 Settings › Music | 14, 15 |
+| §5.5 TalkBack | 12, 13, 15 |
+| §6 when things go wrong; privacy (home network only, https art, logs) | 7, 8–11, 12–15 |
 | §7 tests | every task |
-| §8.1 emulator | 16 |
+| §8.1 emulator, by address | 16 |
 | §8.2 captures | 9, 16, 17 |
 | §8.3 tablet | 17 |
 | §9 not in this plan | none |
