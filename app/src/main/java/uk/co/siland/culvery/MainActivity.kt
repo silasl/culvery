@@ -45,6 +45,7 @@ import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.FirstDraw
 import uk.co.siland.culvery.core.plugin.LocalAlertHost
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.plugin.LocalTabReselected
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.plugin.SettingsPage
@@ -178,6 +179,7 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(
                 LocalShellNavigator provides navigator,
                 LocalOverlayHost provides overlay,
+                LocalTabReselected provides shell.tabReselected,
                 LocalAlertHost provides alerts,
                 LocalUserActivity provides userActivity,
             ) {

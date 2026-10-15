@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,6 +47,7 @@ import uk.co.siland.culvery.capability.door.YESTERDAY
 import uk.co.siland.culvery.capability.door.doorDays
 import uk.co.siland.culvery.capability.door.eventLine
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.plugin.LocalTabReselected
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhIcon
@@ -135,9 +137,11 @@ internal fun DoorTabHost(store: DoorStore, today: Flow<LocalDate>, zone: Flow<Zo
     val householdZone by zone.collectAsStateWithLifecycle(null)
     val problem by status.collectAsStateWithLifecycle(null)
     val overlay = LocalOverlayHost.current
-    // Seen on opening or coming back to the tab (5 §4.7); a ring that arrives while it stays open keeps its badge.
+    // Seen on opening, coming back to the tab, or tapping it again (5 §4.7); a ring that arrives while it stays open keeps its badge.
     val scope = rememberCoroutineScope()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { store.markAllSeen() } }
+    val reselected = LocalTabReselected.current
+    LaunchedEffect(reselected) { reselected.collect { store.markAllSeen() } }
     val d = day ?: return
     val z = householdZone ?: return
     val days = remember(events, d, z) { doorDays(events, d, z) }

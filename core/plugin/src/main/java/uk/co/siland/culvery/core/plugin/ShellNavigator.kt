@@ -2,6 +2,8 @@ package uk.co.siland.culvery.core.plugin
 
 import android.content.Intent
 import androidx.compose.runtime.staticCompositionLocalOf
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 /** Lets capability UI move the shell without depending on :app. */
 interface ShellNavigator {
@@ -48,6 +50,9 @@ object SettingsPageIds {
     /** Tablet lock's; stored nowhere, so the old name costs nothing. */
     const val TABLET_LOCK = "kiosk"
 }
+
+/** Fires when the rail tab that is already open is tapped again. Only the open tab is composed, so a collector there is the one tapped. */
+val LocalTabReselected = staticCompositionLocalOf<Flow<Unit>> { emptyFlow() }
 
 val LocalShellNavigator = staticCompositionLocalOf<ShellNavigator> {
     error("LocalShellNavigator not provided: wrap the content in CompositionLocalProvider(LocalShellNavigator provides …)")

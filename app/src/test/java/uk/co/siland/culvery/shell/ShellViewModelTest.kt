@@ -122,6 +122,20 @@ class ShellViewModelTest {
         }
     }
 
+    /** Fails if tapping the open tab says nothing, or tapping another tab (which opens it) also counts as a tap on the open one. */
+    @Test
+    fun tappingTheOpenTabSignalsOnceAndOpeningAnotherDoesNot() = runTest {
+        val vm = vm(setOf(FakeCapability("calendar", order = 10, shown = true), FakeCapability("lights", order = 20, shown = true)))
+        vm.tabReselected.test {
+            vm.selectTab("calendar")
+            vm.selectTab("lights")
+            expectNoEvents()
+            vm.selectTab("lights")
+            awaitItem()
+            expectNoEvents()
+        }
+    }
+
     @Test
     fun homeCardsArePlacedFromAllCapabilities() = runTest {
         val today = HomeCard("today", HomeCardSize.TALL, 100) {}

@@ -25,6 +25,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -44,6 +45,7 @@ import uk.co.siland.culvery.capability.door.doorDb
 import uk.co.siland.culvery.capability.door.ring
 import uk.co.siland.culvery.capability.door.startOfYesterday
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.plugin.LocalTabReselected
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
@@ -173,6 +175,20 @@ class DoorTabTest {
         waitFor { compose.onAllNodesWithTag("door_row_1").fetchSemanticsNodes().isNotEmpty() }
         compose.waitForIdle()
         assertThat(unseenRings()).isEqualTo(1)
+    }
+
+    /** 5 §4.7: fails if tapping the Door tab again while it is open leaves a ring that arrived meanwhile unseen. */
+    @Test
+    fun tappingTheOpenTabAgainMarksEverythingSeen() {
+        val reselected = MutableSharedFlow<Unit>()
+        compose.setContent { CulveryTheme(dark = true) { CompositionLocalProvider(LocalTabReselected provides reselected) { host(flowOf(october14)) } } }
+        compose.waitForIdle()
+        runBlocking { store.record(ring()) }
+        waitFor { compose.onAllNodesWithTag("door_row_1").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        assertThat(unseenRings()).isEqualTo(1)
+        runBlocking { reselected.emit(Unit) }
+        waitFor { unseenRings() == 0 }
     }
 
     /** Fails if a tab merely STARTED (behind another app) marks events seen, or if it never marks them once RESUMED. */
