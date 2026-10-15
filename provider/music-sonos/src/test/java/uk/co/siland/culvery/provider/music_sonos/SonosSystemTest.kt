@@ -368,6 +368,66 @@ class SonosSystemTest {
         assertThat(s.groups.value).hasSize(2)
     }
 
+    /**
+     * 6 §6: once a different household answers, a row still on screen sends nothing and doesn't bring that household's
+     * rooms back; Favourites and a room's volume aren't read from it either.
+     */
+    @Test
+    fun nothingIsSentToADifferentHousehold() = runTest {
+        val s = checked()
+        val stale = s.groups.value
+        kitchen.answer("GetHouseholdID", SonosFixtures.household("Sonos_someoneElse"))
+        s.checkLayout()
+        listOf(kitchen, lounge, dining).forEach { it.received.clear() }
+        assertThat(unreachable { s.pause(stale[1]) }).isEqualTo(MusicProblem.OTHER_HOUSEHOLD)
+        assertThat(unreachable { s.favourites() }).isEqualTo(MusicProblem.OTHER_HOUSEHOLD)
+        assertThat(unreachable { s.roomVolume(stale[1].rooms[0]) }).isEqualTo(MusicProblem.OTHER_HOUSEHOLD)
+        assertThat(s.groups.value).isEmpty()
+        assertThat(listOf(kitchen, lounge, dining).flatMap { it.actions() }).isEmpty()
+    }
+
+    /**
+     * 6 §6: a scan that heard only another household says so until the saved one answers again. Pin: the layout check
+     * already clears it; this keeps that true once the household is checked wherever the layout is read.
+     */
+    @Test
+    fun theSavedHouseholdAnsweringAgainClearsADifferentHousehold() = runTest {
+        lounge.answer("GetHouseholdID", SonosFixtures.household("Sonos_someoneElse"))
+        heard = listOf(lounge.address)
+        val link = MusicLink(HOUSEHOLD, kitchen.address)
+        kitchen.silent = true
+        val s = system(link)
+        assertThat(unreachable { s.checkLayout() }).isEqualTo(MusicProblem.OTHER_HOUSEHOLD)
+        kitchen.silent = false
+        s.checkLayout()
+        assertThat(s.problem.value).isNull()
+        assertThat(s.groups.value).hasSize(2)
+    }
+
+    /** 6 §4.2: one leader's fault skips that group; the others are still read and the check throws nothing. */
+    @Test
+    fun oneLeadersFaultLeavesTheOtherGroupsRead() = runTest {
+        val s = system()
+        s.checkLayout()
+        lounge.refuse("GetTransportInfo", 701)
+        s.checkPlayback()
+        assertThat(s.groups.value.map { it.state }).containsExactly(PlayState.PLAYING, PlayState.STOPPED).inOrder()
+        assertThat(s.problem.value).isNull()
+    }
+
+    /** The contract's exceptions only: an answer that isn't Sonos's is a refusal. */
+    @Test
+    fun anAnswerThatIsNotSonossIsRefused() = runTest {
+        val s = checked()
+        dining.answer("GetVolume", "<html>router</html>")
+        try {
+            s.roomVolume(SpeakerRoom(DINING, "Dining room", 35))
+            fail("expected a refusal")
+        } catch (e: MusicRefusedException) {
+            assertThat(e.code).isNull()
+        }
+    }
+
     @Test
     fun aScanThatHearsOnlyAnotherHouseholdSaysSo() = runTest {
         lounge.answer("GetHouseholdID", SonosFixtures.household("Sonos_someoneElse"))

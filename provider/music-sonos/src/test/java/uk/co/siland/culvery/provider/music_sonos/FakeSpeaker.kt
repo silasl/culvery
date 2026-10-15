@@ -15,7 +15,8 @@ import okhttp3.mockwebserver.SocketPolicy
 /** The tests' accept rule: speakers on this machine, on whatever port MockWebServer took. */
 internal val onThisMachine: (String, Int) -> Boolean = { host, _ -> host == "localhost" || host == "127.0.0.1" }
 
-private val LOOPBACK: InetAddress = InetAddress.getByName("127.0.0.1")
+private const val LOOPBACK_HOST = "127.0.0.1"
+private val LOOPBACK: InetAddress = InetAddress.getByName(LOOPBACK_HOST)
 
 /** The tests' client: gives up after 500 ms and never retries, so a silent speaker fails fast. */
 internal fun testHttp(): OkHttpClient = OkHttpClient.Builder().callTimeout(Duration.ofMillis(500)).retryOnConnectionFailure(false).build()
@@ -45,7 +46,7 @@ internal class FakeSpeaker : AutoCloseable {
     }
 
     // Not server.hostName: on Windows that resolves to the machine's name, which onThisMachine refuses.
-    val host: String = LOOPBACK.hostAddress
+    val host: String = LOOPBACK_HOST
     val port: Int = server.port
     val address: String = "$host:$port"
 

@@ -78,18 +78,14 @@ internal class SonosSystem(
     private val roomVolumes = HashMap<String, Int>()
     private val started = HashMap<String, Long>()
 
-    override suspend fun checkLayout() = reaching {
-        if (client.householdId(link.address) != link.householdId) {
-            otherHousehold()
-        } else {
-            if (_problem.value == MusicProblem.OTHER_HOUSEHOLD) _problem.value = null
-            readLayout(link.address)
-        }
+    override suspend fun checkLayout() {
+        refusing { reaching { readLayout(link.address) } }
     }
 
+    /** A leader that refuses, or answers in a shape that isn't Sonos's, leaves its group as it was; the others are read. */
     override suspend fun checkPlayback() {
         if (layout.isEmpty()) checkLayout()
-        reaching { coroutineScope { layout.map { g -> async { readGroup(g) } }.awaitAll() } }
+        reaching { coroutineScope { layout.map { g -> async { skippingRefusal { readGroup(g) } } }.awaitAll() } }
     }
 
     override suspend fun playingNow(): List<SpeakerGroup> {
@@ -106,7 +102,10 @@ internal class SonosSystem(
         return _groups.value.filter { it.id in playing }
     }
 
-    override suspend fun roomVolume(room: SpeakerRoom): Int = refusing { reaching { client.volume(memberAddress(room.id)) } }
+    override suspend fun roomVolume(room: SpeakerRoom): Int {
+        sameHousehold()
+        return refusing { reaching { client.volume(memberAddress(room.id)) } }
+    }
 
     override suspend fun play(group: SpeakerGroup) = command(group.id, { it.copy(state = PlayState.PLAYING) }) { client.play(it.leaderAddress()) }
 
@@ -120,6 +119,7 @@ internal class SonosSystem(
     }
 
     override suspend fun setRoomVolume(room: SpeakerRoom, percent: Int) {
+        sameHousehold()
         val volume = percent.coerceIn(0, 100)
         val groupId = layout.firstOrNull { g -> g.members.any { it.uuid == room.id } }?.id ?: throw MusicRefusedException()
         change { roomVolumes[room.id] = volume }
@@ -138,6 +138,7 @@ internal class SonosSystem(
     }
 
     override suspend fun favourites(): List<Favourite> {
+        sameHousehold()
         val items = refusing { reaching { client.browse(link.address, FAVOURITES, 0, FAVOURITES_PAGE).items } }
         favouriteItems = items.associateBy { it.id }
         return items.map { Favourite(it.id, it.title, artUrl(it.artUri, link.address), kindOf(it)) }
@@ -172,6 +173,7 @@ internal class SonosSystem(
      * so the screen shows what the speaker did.
      */
     private suspend fun command(groupId: String, shown: (Playback) -> Playback, send: suspend (ZoneGroupInfo) -> Unit) {
+        sameHousehold()
         change { playback[groupId]?.let { record(groupId, shown(it)) } }
         try {
             refusing { reaching { send(infoOf(groupId)) } }
@@ -202,14 +204,14 @@ internal class SonosSystem(
 
     /** The layout from the saved speaker again; failing that, a scan, keeping the first speaker of this household. */
     private suspend fun recover(): Boolean = recovering.withLock {
-        if (quietly { readLayout(link.address) } != null) return@withLock true
+        quietly { readLayout(link.address) }?.let { return@withLock it }
         val now = clock.nowMillis()
         if (lastScanMillis?.let { now - it in 0 until RESCAN_GAP_MS } == true) return@withLock false
         lastScanMillis = now
         val address = findHousehold() ?: return@withLock false
         link = MusicLink(link.householdId, address)
         onMoved(link)
-        quietly { readLayout(address) } != null
+        quietly { readLayout(address) } == true
     }
 
     private suspend fun findHousehold(): String? {
@@ -223,7 +225,13 @@ internal class SonosSystem(
         return null
     }
 
-    private suspend fun readLayout(address: String) {
+    /** False when [address] answers for another household, whose rooms are never shown or sent to (6 §6). */
+    private suspend fun readLayout(address: String): Boolean {
+        if (client.householdId(address) != link.householdId) {
+            otherHousehold()
+            return false
+        }
+        if (_problem.value == MusicProblem.OTHER_HOUSEHOLD) _problem.value = null
         val groups = client.zoneGroups(address)
         val volumes = coroutineScope {
             groups.flatMap { it.members }.map { m -> async { m.uuid to quietly { client.volume(m.address) } } }.awaitAll()
@@ -235,6 +243,7 @@ internal class SonosSystem(
             playback.keys.retainAll(ids)
             started.keys.retainAll(ids)
         }
+        return true
     }
 
     /** 6 §3.1: what plays, from the queue (title and artist, Next) or a stream (the station and its programme). */
@@ -294,6 +303,11 @@ internal class SonosSystem(
         }
     }
 
+    /** While a different household answers, nothing is read from or sent to it until the saved one answers again. */
+    private fun sameHousehold() {
+        if (_problem.value == MusicProblem.OTHER_HOUSEHOLD) throw MusicUnreachableException(MusicProblem.OTHER_HOUSEHOLD)
+    }
+
     private fun reached() {
         if (_problem.value == MusicProblem.UNREACHABLE || _problem.value == MusicProblem.OFFLINE) _problem.value = null
     }
@@ -324,5 +338,15 @@ internal class SonosSystem(
         block()
     } catch (e: SonosFault) {
         throw MusicRefusedException(e.code)
+    } catch (e: SonosXmlException) {
+        throw MusicRefusedException()
+    }
+
+    private suspend fun skippingRefusal(read: suspend () -> Unit) = try {
+        read()
+    } catch (e: SonosFault) {
+        // Left as it was.
+    } catch (e: SonosXmlException) {
+        // Left as it was.
     }
 }
