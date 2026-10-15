@@ -167,6 +167,7 @@ After 4e and before the v1 release. Taste calls only; each line names its audit 
 - W33 Week legend: wrap it or drop it now chips carry names (A33, layout part).
 - W34 Wizard and Settings padding, and the other 4a/4b/4c provisional choices not named above (F:4a, F:4b, F:4c).
 - Dim the screen behind the door card while it shows (offered, undecided; Plan 5 walk-through).
+- The Culvery mark's top padding: match the space above it to the space at its sides (the user, 2026-10-15).
 - The door card's look and the chime's sound; the badge colours (Plan 5, provisional).
 - The week's reconnect chip and the sign-in line both name the service ("Google Calendar needs reconnecting" and "… Reconnect in Settings › Calendars"); keep both or shorten the line (Plan 5 §A.3).
 
@@ -329,4 +330,6 @@ From the final review's triage (51 follow-ups); the accepted ones and those fixe
 - Sonos (the user, 2026-10-14): its own spec; no detail yet.
 - Philips Hue (the user, 2026-10-14): its own spec; no detail yet. Holiday mode drives it.
 - Shopping list (the user, 2026-10-14): its own spec; no detail yet.
+- Doorbell ring tones (the user, 2026-10-15): a list of chimes to choose from in Settings › Door, perhaps switching itself for Christmas and Halloween.
+- Sound buttons (the user, 2026-10-15): buttons that play a short sound on the wall, such as the Imperial March or a sad trombone ("wah wah wahhh").
 - Holiday mode (the user, 2026-10-14): saves power (puts the tablet to sleep) and drives other services while the family is away: Hue lights to their holiday setting, Arlo's settings, the thermostat to eco. Needs the Hue, Arlo and thermostat links first, and Sleep and wake for the tablet's part.
