@@ -213,13 +213,18 @@ internal fun MusicSettingsHost(settings: MusicSettings, speakers: Speakers, view
     var findLine by remember { mutableStateOf<String?>(null) }
     val overlay = LocalOverlayHost.current
     val scope = rememberCoroutineScope()
-    LaunchedEffect(system) { system?.let { readRooms(it) } }
+    LaunchedEffect(system) {
+        val s = system ?: return@LaunchedEffect
+        findLine = null
+        readRooms(s)
+    }
     val p = prefs ?: return
     fun change(write: suspend () -> Unit) {
         scope.launch { save(toaster, write) }
     }
     fun said(outcome: ConnectOutcome, done: String): String? = when (outcome) {
         ConnectOutcome.Connected -> {
+            findLine = null
             toaster.show(done)
             null
         }
