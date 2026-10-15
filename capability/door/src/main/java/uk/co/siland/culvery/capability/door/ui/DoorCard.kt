@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.door.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -67,10 +68,13 @@ fun DoorCard(card: DoorCardUi, onGotIt: () -> Unit, modifier: Modifier = Modifie
             }
         }
         card.snapshot?.let {
-            SnapshotImage(
-                it,
-                Modifier.testTag("door_snapshot").fillMaxWidth().aspectRatio(DoorDimens.SNAPSHOT_RATIO).clip(RoundedCornerShape(DoorDimens.snapshotRadius)),
-            )
+            // Takes what height the words and Got it leave, so a short window (the keyboard up) shrinks the picture, not the button.
+            Box(Modifier.weight(1f, fill = false).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                SnapshotImage(
+                    it,
+                    Modifier.testTag("door_snapshot").fillMaxWidth().aspectRatio(DoorDimens.SNAPSHOT_RATIO).clip(RoundedCornerShape(DoorDimens.snapshotRadius)),
+                )
+            }
         }
         HhButton(GOT_IT, onGotIt, Modifier.fillMaxWidth().testTag("door_got_it"), tone = ButtonTone.Primary, size = ButtonSize.Large, on = ButtonSurface.Surf)
     }
