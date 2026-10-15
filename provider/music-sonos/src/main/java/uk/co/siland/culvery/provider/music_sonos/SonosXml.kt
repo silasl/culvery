@@ -40,6 +40,7 @@ internal object SonosXml {
     private const val NOTHING = "NOT_IMPLEMENTED"
     private const val PLACEHOLDER = "ZPSTR_"
     private const val UNESCAPE_DEPTH = 3
+    private const val MAX_DEPTH = 32
 
     /** Each group's visible rooms, leader first; a member [accept] refuses is dropped, and so is a group without its leader (6 §6). */
     fun zoneGroups(answer: String, accept: (String, Int) -> Boolean = ::isSpeakerAuthority): List<ZoneGroupInfo> =
@@ -105,19 +106,21 @@ internal object SonosXml {
 
     private val ENTITIES = listOf("&lt;" to "<", "&gt;" to ">", "&quot;" to "\"", "&apos;" to "'", "&amp;" to "&")
     private val SPOKEN_TEXT = Regex(
-        """<((?:\w+:)?(?:title|creator|album|artist|albumArtist|streamContent|radioShowMd|description|albumArtURI|res|""" +
+        """<((?:\w+:)?(?:title|creator|album|artist|albumArtist|streamContent|radioShowMd|description|desc|albumArtURI|res|""" +
             """CurrentURI|NextURI|TrackURI|AVTransportURI|NextAVTransportURI|EnqueuedTransportURI))(\s[^>]*)?>[^<]*</\1>""",
     )
     // A closing quote is ["]: a raw string ending in four quotes would end early for the copy scan.
     private val NAME_ATTRIBUTE = Regex("""(\w*Name)="[^"]*["]""")
     private val LOCATION_ATTRIBUTE = Regex("""(Location)="[^"]*["]""")
+    // A library item's id is its file's path; Sonos's own ids (FV:2/5, A:TRACKS, SQ:3) have no "://" or "%".
+    private val PATH_ID = Regex("""(?<![\w:])(id|parentID)="[^"]*(?:://|%)[^"]*["]""")
     private val HOUSEHOLD = Regex("""Sonos_[A-Za-z0-9._-]+""")
     private val SPEAKER_ID = Regex("""RINCON_[0-9A-Fa-f]+""")
     private val IPV4 = Regex("""\b\d{1,3}(?:\.\d{1,3}){3}\b""")
 
     /**
      * An answer's shape for a capture (6 §8.2): unescaped down to its DIDL, then every room name, title, artist, link,
-     * speaker id, household and address replaced.
+     * service descriptor, file path, speaker id, household and address replaced.
      */
     fun redact(answer: String): String {
         var text = answer
@@ -126,6 +129,7 @@ internal object SonosXml {
             .replace(SPOKEN_TEXT) { "<${it.groupValues[1]}${it.groupValues[2]}>[text]</${it.groupValues[1]}>" }
             .replace(NAME_ATTRIBUTE) { "${it.groupValues[1]}=\"[room]\"" }
             .replace(LOCATION_ATTRIBUTE) { "${it.groupValues[1]}=\"[address]\"" }
+            .replace(PATH_ID) { "${it.groupValues[1]}=\"[path]\"" }
             .replace(HOUSEHOLD, "Sonos_[household]")
             .replace(SPEAKER_ID, "RINCON_[id]")
             .replace(IPV4, "[address]")
@@ -153,10 +157,26 @@ internal object SonosXml {
     }
 
     private val DECLARATIONS = Regex("""<!(DOCTYPE|ENTITY)""", RegexOption.IGNORE_CASE)
+    private val TAG = Regex("""<(/?)[A-Za-z_][^<>]*?(/?)>""")
 
-    /** Refuses a DOCTYPE or an entity before parsing (no speaker sends one), here and in the DIDL parsed a second time. */
+    /** Whether [xml] nests deeper than any answer does; checked before the tree is built, as a deep one overflows the stack. */
+    private fun tooDeep(xml: String): Boolean {
+        var depth = 0
+        for (tag in TAG.findAll(xml)) {
+            when {
+                tag.groupValues[1].isNotEmpty() -> depth--
+                tag.groupValues[2].isEmpty() -> if (++depth > MAX_DEPTH) return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * Refuses a DOCTYPE or an entity (no speaker sends one) and a too-deep answer before parsing, here and in the DIDL
+     * parsed a second time.
+     */
     private fun parse(xml: String): Element {
-        if (DECLARATIONS.containsMatchIn(xml)) throw SonosXmlException()
+        if (DECLARATIONS.containsMatchIn(xml) || tooDeep(xml)) throw SonosXmlException()
         return try {
             factory().newDocumentBuilder().parse(InputSource(StringReader(xml))).documentElement
         } catch (e: SAXException) {

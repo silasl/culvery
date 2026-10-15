@@ -65,6 +65,16 @@ internal object SonosFixtures {
         """<upnp:albumArtURI>https://art.example/p0abc123.jpg</upnp:albumArtURI><dc:title>x-sonosapi-hls:stations%7eBBC6%7eBBC6?sid=325&amp;flags=8224&amp;sn=1</dc:title>""" +
         """<upnp:class>object.item</upnp:class></item></DIDL-Lite>"""
 
+    /** A stream that names no programme: [stream] is its only words, a ZPSTR_ placeholder while it connects. */
+    fun radioStream(stream: String) = DIDL_OPEN +
+        """<item id="-1" parentID="-1" restricted="true"><res protocolInfo="x-rincon-mp3radio:*:*:*">x-rincon-mp3radio://radio.example/stream</res>""" +
+        """<r:streamContent>${escape(stream)}</r:streamContent><upnp:class>object.item</upnp:class></item></DIDL-Lite>"""
+
+    /** An answer wrapped in [depth] elements around its body's value. */
+    fun nested(depth: Int) = soap("GetHouseholdID", "CurrentHouseholdID" to HOUSEHOLD).replace(
+        "<CurrentHouseholdID>", "<a>".repeat(depth) + "<CurrentHouseholdID>",
+    ).replace("</CurrentHouseholdID>", "</CurrentHouseholdID>" + "</a>".repeat(depth))
+
     const val RADIO_STATION = DIDL_OPEN +
         """<item id="-1" parentID="-1" restricted="true"><dc:title>Culvery FM</dc:title><upnp:class>object.item.audioItem.audioBroadcast</upnp:class>""" +
         """<desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">SA_RINCON83207_</desc></item></DIDL-Lite>"""

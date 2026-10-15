@@ -63,6 +63,14 @@ class SonosXmlTest {
             .isEqualTo(MediaInfo(SonosFixtures.RADIO_URI, "Culvery FM", null))
     }
 
+    /** Without a radioShowMd the stream's own words are the programme, unless they are a ZPSTR_ placeholder. */
+    @Test
+    fun aStreamsWordsAreTheProgrammeUnlessAPlaceholder() {
+        fun programme(stream: String) = SonosXml.position(SonosFixtures.position(SonosFixtures.RADIO_URI, SonosFixtures.radioStream(stream))).programme
+        assertThat(programme("ZPSTR_CONNECTING")).isNull()
+        assertThat(programme("Artist - Song")).isEqualTo("Artist - Song")
+    }
+
     @Test
     fun stoppedWithNothingLoaded() {
         assertThat(SonosXml.position(SonosFixtures.emptyPosition)).isEqualTo(TrackInfo(null, null, null, null, null, null))
@@ -140,20 +148,36 @@ class SonosXmlTest {
         assertThrows(SonosXmlException::class.java) { SonosXml.position(SonosFixtures.position(metadata = inner)) }
     }
 
+    /** An `<!ENTITY` the parser would accept (in a comment, in the DIDL) is still refused: the check doesn't rely on the parser. */
+    @Test
+    fun anEntityDeclarationTheParserWouldAcceptIsRefused() {
+        val inner = """<!-- <!ENTITY t "x"> -->""" + SonosFixtures.LIBRARY_TRACK
+        assertThrows(SonosXmlException::class.java) { SonosXml.position(SonosFixtures.position(metadata = inner)) }
+    }
+
+    /** No answer nests deeper than a few levels; a deeper one is refused before the tree is built, so it can't overflow the stack. */
+    @Test
+    fun aDeeplyNestedAnswerIsRefused() {
+        assertThat(SonosXml.householdId(SonosFixtures.nested(28))).isEqualTo(SonosFixtures.HOUSEHOLD)
+        assertThrows(SonosXmlException::class.java) { SonosXml.householdId(SonosFixtures.nested(29)) }
+        assertThrows(SonosXmlException::class.java) { SonosXml.householdId(SonosFixtures.nested(100_000)) }
+    }
+
     /** 6 §8.2: a capture keeps the shape; no room, title, link, id, household or address survives. */
     @Test
     fun theCaptureShapeReplacesNamesTitlesLinksIdsAndAddresses() {
         val answers = listOf(
             topology, SonosFixtures.household(), SonosFixtures.position(), SonosFixtures.favourites,
-            SonosFixtures.media(SonosFixtures.RADIO_URI, SonosFixtures.RADIO_STATION),
+            SonosFixtures.media(SonosFixtures.RADIO_URI, SonosFixtures.RADIO_STATION), SonosFixtures.library(total = 1),
         )
         val shapes = answers.joinToString("\n", transform = SonosXml::redact)
         listOf("Kitchen", "Lounge", "Dining room", "Song", "Artist", "Album", "Culvery FM", "Sunday", "One song",
-            "192.168.1.2", "AAAAAA", SonosFixtures.HOUSEHOLD, "x-file-cifs://nas", "art.example").forEach {
+            "192.168.1.2", "AAAAAA", SonosFixtures.HOUSEHOLD, "x-file-cifs://nas", "art.example", "S://nas", "nas/music", "SA_RINCON").forEach {
             assertThat(shapes).doesNotContain(it)
         }
         assertThat(shapes).contains("ZoneName=\"[room]\"")
         assertThat(shapes).contains("<dc:title>[text]</dc:title>")
         assertThat(shapes).contains("RINCON_[id]")
+        assertThat(shapes).contains("id=\"FV:2/5\"")
     }
 }
