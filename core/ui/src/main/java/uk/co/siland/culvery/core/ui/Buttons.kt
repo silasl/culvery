@@ -25,6 +25,9 @@ object ButtonTokens {
     val regularIconPaddingStart = 14.dp
     val regularIconGap = 6.dp
 
+    // A Regular button in a crowded row (the Home music card's controls).
+    val compactPaddingH = 10.dp
+
     val largeHeight = 60.dp
     val largePaddingH = 26.dp
     val largeIconGap = 8.dp
@@ -71,7 +74,8 @@ val SpokenNameKey = SemanticsPropertyKey<String>("SpokenName")
 /**
  * The one button (4d-1 §4.1): a pill at least [size]'s height, a one-line label, an optional icon before it. Disabled,
  * every [tone] is the quiet fill with a `mute` label and does nothing. [spokenName] names a button whose label repeats
- * along a list: it starts with [text] and adds the subject ("Disconnect Google Calendar, alex@example.com").
+ * along a list: it starts with [text] and adds the subject ("Disconnect Google Calendar, alex@example.com"). [compact]
+ * narrows a Regular button's side padding so its label fits a crowded row.
  */
 @Composable
 fun HhButton(
@@ -84,12 +88,19 @@ fun HhButton(
     enabled: Boolean = true,
     on: ButtonSurface,
     spokenName: String? = null,
+    compact: Boolean = false,
 ) {
     val (fill, ink) = buttonColors(tone, enabled, on, Culvery.colors)
     val large = size == ButtonSize.Large
     val start = when {
         large -> ButtonTokens.largePaddingH
+        compact -> ButtonTokens.compactPaddingH
         icon != null -> ButtonTokens.regularIconPaddingStart
+        else -> ButtonTokens.regularPaddingH
+    }
+    val end = when {
+        large -> ButtonTokens.largePaddingH
+        compact -> ButtonTokens.compactPaddingH
         else -> ButtonTokens.regularPaddingH
     }
     Row(
@@ -113,7 +124,7 @@ fun HhButton(
                 },
             )
             .hhClickable(onClick, enabled = enabled)
-            .padding(start = start, end = if (large) ButtonTokens.largePaddingH else ButtonTokens.regularPaddingH),
+            .padding(start = start, end = end),
     ) {
         if (icon != null) HhIcon(icon, size = ButtonTokens.icon, tint = ink)
         Text(

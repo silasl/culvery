@@ -4,16 +4,21 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,6 +29,7 @@ import uk.co.siland.culvery.capability.music.PlayState
 import uk.co.siland.culvery.capability.music.SONG
 import uk.co.siland.culvery.capability.music.STATION
 import uk.co.siland.culvery.capability.music.group
+import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
@@ -64,4 +70,21 @@ class MusicCardScreenshotTest {
     fun problemDark() = snap("music_card_problem_dark", true, null, status = "Culvery can’t reach Sonos. Check the speakers are on and the tablet is on the home Wi-Fi.")
 
     @Test fun lookingDark() = snap("music_card_looking_dark", true, null)
+
+    /** At 345 dp, Play, Next and Shuffle everything share one row with the label whole. Fails if the row squeezes Shuffle. */
+    @Test
+    fun shuffleEverythingFitsBesidePlayAndNext() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                Column {
+                    Box(Modifier.size(345.dp, 279.dp)) { MusicCard(HomePick(kitchen.copy(state = PlayState.PAUSED), false), null, null, GroupActions.None) }
+                    Box(Modifier.wrapContentSize()) { ShuffleButton(kitchen, "free", ButtonSurface.Surf, GroupActions.None, compact = true) }
+                }
+            }
+        }
+        val inCard = compose.onNodeWithTag("music_card_shuffle").getUnclippedBoundsInRoot()
+        val free = compose.onNodeWithTag("free_shuffle").getUnclippedBoundsInRoot()
+        assertThat((inCard.right - inCard.left).value).isWithin(0.01f).of((free.right - free.left).value)
+        assertThat((inCard.bottom - inCard.top).value).isAtLeast(48f)
+    }
 }

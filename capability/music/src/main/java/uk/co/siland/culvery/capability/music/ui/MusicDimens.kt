@@ -12,6 +12,9 @@ internal object MusicDimens {
     val artRadius = 12.dp
     val controlsGap = 10.dp
 
+    // Narrower on the card, so Play, Next and a compact Shuffle everything fit 345 dp.
+    val cardControlsGap = 6.dp
+
     // Round controls are the 48 dp touch target, with a 28 dp icon.
     val button = 48.dp
     val buttonIcon = 28.dp

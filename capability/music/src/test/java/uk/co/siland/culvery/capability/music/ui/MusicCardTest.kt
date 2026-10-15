@@ -92,6 +92,18 @@ class MusicCardTest {
         assertThat(calls.single()).startsWith("volume k ")
     }
 
+    /** The thumb stays where it was let go until the group's volume changes, then follows it. Fails if it jumps back to 30. */
+    @Test
+    fun theVolumeLetGoStaysUntilTheGroupsVolumeChanges() {
+        var pick by mutableStateOf(HomePick(playing, nothingPlaying = false))
+        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { MusicCard(pick, null, null, actions) } } }
+        val volume = compose.onNodeWithTag("music_card_volume")
+        volume.performSemanticsAction(SemanticsActions.SetProgress) { it(45f) }
+        volume.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "45 percent"))
+        pick = HomePick(playing.copy(volume = 50), nothingPlaying = false)
+        volume.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "50 percent"))
+    }
+
     /** 6 §5.1: a tap mid-song can't replace the queue. Fails if Shuffle everything shows while playing. */
     @Test
     fun shuffleEverythingIsHiddenWhilePlaying() {
@@ -112,6 +124,7 @@ class MusicCardTest {
     fun nothingPlayingOffersPlayAndShuffle() {
         show(HomePick(group("k", "Kitchen", state = PlayState.PAUSED, nowPlaying = SONG), nothingPlaying = true))
         compose.onNodeWithContentDescription("Kitchen, nothing playing").assertExists()
+        compose.onNodeWithTag("music_card_next").assertDoesNotExist()
         compose.onNodeWithTag("music_card_play").assertContentDescriptionEquals("Play Kitchen").performClick()
         compose.onNodeWithTag("music_card_shuffle").assertContentDescriptionEquals("Shuffle everything in Kitchen").performClick()
         assertThat(calls).containsExactly("play k", "shuffle k").inOrder()

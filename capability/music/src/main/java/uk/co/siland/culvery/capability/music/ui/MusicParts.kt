@@ -104,9 +104,9 @@ internal fun NextButton(group: SpeakerGroup, tag: String, actions: GroupActions)
     RoundButton(Icons.SKIP_NEXT, nextSpoken(group.name), "${tag}_next", enabled = group.canSkip) { actions.onNext(group) }
 
 @Composable
-internal fun ShuffleButton(group: SpeakerGroup, tag: String, on: ButtonSurface, actions: GroupActions) = HhButton(
+internal fun ShuffleButton(group: SpeakerGroup, tag: String, on: ButtonSurface, actions: GroupActions, compact: Boolean = false) = HhButton(
     SHUFFLE_EVERYTHING, { actions.onShuffle(group) }, Modifier.testTag("${tag}_shuffle"),
-    icon = Icons.SHUFFLE, on = on, spokenName = shuffleSpoken(group.name),
+    icon = Icons.SHUFFLE, on = on, spokenName = shuffleSpoken(group.name), compact = compact,
 )
 
 /**
@@ -127,12 +127,17 @@ internal fun VolumeSlider(
 ) {
     val c = Culvery.colors
     var dragging by remember { mutableStateOf<Float?>(null) }
-    val shown = dragging ?: volume.toFloat()
+    // The value let go stays until [volume] changes, so the thumb doesn't jump back while the command is on its way.
+    var sent by remember(volume) { mutableStateOf<Float?>(null) }
+    val shown = dragging ?: sent ?: volume.toFloat()
     Slider(
         value = shown,
         onValueChange = { dragging = it },
         onValueChangeFinished = {
-            dragging?.let { onVolume(it.roundToInt()) }
+            dragging?.let {
+                sent = it
+                onVolume(it.roundToInt())
+            }
             dragging = null
         },
         valueRange = range.first.toFloat()..range.last.toFloat(),

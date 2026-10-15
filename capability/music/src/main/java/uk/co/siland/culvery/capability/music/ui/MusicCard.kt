@@ -33,7 +33,8 @@ import uk.co.siland.culvery.core.ui.ShellTokens
 
 /**
  * The REGULAR Home card (6 §5.1): the room Home follows and what it plays, Play/Pause, Next and the group's volume;
- * Shuffle everything only while that group isn't playing, so a tap mid-song can't replace the queue. With a problem,
+ * Shuffle everything only while that group isn't playing, so a tap mid-song can't replace the queue, and no Next
+ * when nothing plays. With a problem,
  * the §6 line and no controls; before the first check, that it is looking.
  */
 @Composable
@@ -53,10 +54,10 @@ fun MusicCard(pick: HomePick?, status: String?, line: String?, actions: GroupAct
         val group = pick.group
         NowPlayingBlock(group, pick.nothingPlaying, MusicDimens.cardArt, HhType.cardTitle, "music_card_now")
         Spacer(Modifier.weight(1f))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.controlsGap)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.cardControlsGap)) {
             PlayPauseButton(group, "music_card", actions)
-            NextButton(group, "music_card", actions)
-            if (!group.isPlaying) ShuffleButton(group, "music_card", ButtonSurface.Surf, actions)
+            if (!pick.nothingPlaying) NextButton(group, "music_card", actions)
+            if (!group.isPlaying) ShuffleButton(group, "music_card", ButtonSurface.Surf, actions, compact = true)
         }
         VolumeSlider(group.name, group.volume, "music_card_volume", Modifier.fillMaxWidth()) { actions.onGroupVolume(group, it) }
         if (line != null) Text(line, style = HhType.secondary, color = c.danger, maxLines = 2, modifier = Modifier.testTag("music_card_line"))
