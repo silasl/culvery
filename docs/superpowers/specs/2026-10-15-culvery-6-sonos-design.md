@@ -19,7 +19,7 @@ Done means: all of the above works against the household's real speakers, from t
 ## 2. Decisions (the user, 2026-10-15)
 
 1. **Job:** a remote for each room, plus starting music (Shuffle everything, Favourites), plus the doorbell link.
-2. **Home follows the room that's playing.** Settings › Music has a usual room. Home shows the playing room; with several playing, the usual room if it's one of them, else the one that started most recently; with none playing, the usual room.
+2. **Home follows the room that's playing.** Settings › Music has a usual room. Home shows the playing room; with several playing, the usual room if it's one of them, else the one that started most recently; with none playing, the usual room. A room paused from Home stays on Home until it stops or another room plays, so Pause then Play resumes it (plan review, 2026-10-15).
 3. **Doorbell:** every playing group drops to a share of its volume (Settings, default 20 %) while the door card shows, in quiet hours too, and goes back when the card closes. A group someone changed meanwhile is left as they set it.
 4. **Groups:** shown as Sonos groups them, one row each, with a group volume and each room's own. Grouping and ungrouping stay in the Sonos app.
 5. **Favourites:** in. Each Music row has a Favourites button listing the household's Sonos Favourites; tapping one plays it in that group.
@@ -67,9 +67,9 @@ The capability: `id = "music"`, label "Music", icon `speaker`, rail order 30. `h
   - A loud alert that replaces a loud one runs nothing again.
 - Door: `DoorAlerts` passes `loud = true` and awaits `quieted()` before the chime. No other Door change; Door never sees Music.
 
-### 3.4 `:provider:music-fake` (debug only)
+### 3.4 No sample speakers
 
-Like `calendar-fake`: two rooms and a group of two, fixed tracks, a radio station, three Favourites. For screenshots and walk-throughs without speakers.
+Dropped at the plan review (2026-10-15): tests and screenshots use plain values and a test `MusicSystem`, and walk-throughs use the household's real speakers by address (§8.1).
 
 ### 3.5 Backup
 
@@ -103,22 +103,24 @@ In the chosen group:
 
 1. `RemoveAllTracksFromQueue`;
 2. `AddURIToQueue` with the library container (`A:TRACKS`);
-3. `SetPlayMode SHUFFLE_NOREPEAT`;
-4. `SetAVTransportURI` to the group's queue (`x-rincon-queue:<coordinator>#0`);
+3. `SetAVTransportURI` to the group's queue (`x-rincon-queue:<coordinator>#0`);
+4. `SetPlayMode SHUFFLE_NOREPEAT`;
 5. `Play`.
+
+The queue comes before shuffle because Sonos refuses a play mode while the current source is a stream, such as a paused BBC station (plan review, 2026-10-15).
 
 It replaces that group's queue. Sonos holds at most 40,000 tracks in a queue; a larger library gets the first 40,000, shuffled. An empty library browse stops before step 1 (§6).
 
 ### 4.5 Favourites
 
-Read from `FV:2` each time the sheet opens. A `STREAM` favourite (a radio station) is set as the group's transport URI with its metadata and played. A `QUEUED` one (a playlist, an album) replaces the queue, as in §4.4 steps 1, 2, 4 and 5, without changing the play mode.
+Read from `FV:2` each time the sheet opens. A `STREAM` favourite (a radio station) is set as the group's transport URI with its metadata and played. A `QUEUED` one (a playlist, an album) replaces the queue, as in §4.4 steps 1, 2, 3 and 5, without changing the play mode.
 
 ### 4.6 Lowering for the doorbell
 
 `MusicQuieter` is Music's `AlertQuieter`.
 
-- **quiet():** for each group playing at that moment, read its group volume `v`, set it to `round(v × share)` (share from Settings, 0–50 %, default 20 %), and remember `(v, set)`. Groups are lowered in parallel. A group that fails is skipped. If groups are already lowered, it does nothing.
-- **restore():** for each remembered group, read its volume. If it still equals `set`, put it back to `v`; otherwise leave it. Then forget them all.
+- **quiet():** for each group playing at that moment, and each room in it, read the room's volume `v`, remember `(v, set)` with `set = round(v × share)` (share from Settings, 0–50 %, default 20 %), then set it. Rooms are remembered before the command goes, so a command that times out but took effect is still restored. Groups are lowered in parallel. A group that fails is skipped. If groups are already lowered, it does nothing.
+- **restore():** room by room, read its volume. If it is within 1 of `set`, put it back to `v`; otherwise leave it. A failed restore is tried once more. Then forget them all. Restoring room by room keeps a group's balance, even from 0 %.
 - Kept in memory only. A restart while lowered leaves those groups low.
 
 ## 5. Screens
@@ -193,7 +195,7 @@ The Music tab's status line, the Home card's line and Settings › Music show th
 
 ### 8.1 Emulator
 
-On the `culvery-5` AVD (debug build): first with `music-fake`, then with **Enter a speaker's address** pointed at a real speaker. The emulator's ordinary connections reach the home network through the PC, though its SSDP scan won't, so commands, Shuffle everything, Favourites and the doorbell lowering (with a fake ring) get tested on the real system.
+On the `culvery-5` AVD (debug build), with **Enter a speaker's address** pointed at a real speaker. The emulator's ordinary connections reach the home network through the PC, though its SSDP scan won't, so commands, Shuffle everything, Favourites and the doorbell lowering (with a fake ring) get tested on the real system.
 
 ### 8.2 Captures
 
