@@ -81,6 +81,20 @@ class ModuleBoundariesTest {
     }
 
     @Test
+    fun theMusicModulesFollowTheRules() {
+        allowed(":capability:music", ":core:plugin", "api")
+        allowed(":capability:music", ":core:ui")
+        allowed(":provider:music-sonos", ":capability:music")
+        allowed(":app", ":provider:music-sonos")
+        banned(":capability:music", ":provider:music-sonos")
+        banned(":capability:music", ":provider:music-sonos", "testImplementation")
+        banned(":capability:music", ":capability:door")
+        banned(":capability:door", ":capability:music")
+        banned(":provider:music-sonos", ":capability:door")
+        banned(":provider:music-sonos", ":capability:calendar")
+    }
+
+    @Test
     fun appMayDependOnAnything() = allowed(":app", ":provider:calendar-fake", "debugImplementation")
 
     @Test
