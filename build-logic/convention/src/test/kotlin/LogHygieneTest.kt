@@ -84,12 +84,14 @@ internal object LogHygiene {
      *
      * `post.captureLine` is Check Ring's notifications (`RingReader.kt`), the spec's one exception (5 §6): off by default,
      * on for 30 minutes at most.
+     *
+     * `command.name` is a music command's name (`MusicCommand`, 6 §6: the command and its outcome only).
      */
     val ALLOWED = setOf(
         "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",
         "step.id", "stored.connection.id", "this.id", "this.kind", "kind.name", "this.failedDrains", "this.reason",
         "answer.reason", "what.label", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
-        "post.captureLine", "reading.outcome",
+        "post.captureLine", "reading.outcome", "command.name",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|wtf|println)\(""")
