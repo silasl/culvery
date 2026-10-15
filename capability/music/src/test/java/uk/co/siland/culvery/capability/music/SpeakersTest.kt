@@ -42,7 +42,7 @@ class SpeakersTest {
         assertThat(sonos.opened).containsExactly(home)
     }
 
-    /** Review Focus 3: the open system found the household at a new address itself; saving it must not reopen it. */
+    /** 6 §4.1: the open system found the household at a new address itself; saving it must not reopen it. */
     @Test
     fun aNewAddressForTheSameHouseholdKeepsTheOpenSystem() = runTest {
         settings.connect("music.sonos", home)

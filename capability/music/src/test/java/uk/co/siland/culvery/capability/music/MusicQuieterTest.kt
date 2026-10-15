@@ -150,7 +150,7 @@ class MusicQuieterTest {
         assertThat(sets()).containsExactly("setRoomVolume Kitchen-id 50")
     }
 
-    /** Review Focus 2: on the Calendar tab no checks run, so the last-known state says nothing plays. */
+    /** 6 §4.6: on the Calendar tab no checks run, so the last-known state says nothing plays. */
     @Test
     fun lowersWhatIsPlayingNowNotWhatTheLastCheckSaw() = runTest {
         system.groups.value = listOf(kitchen.copy(state = PlayState.STOPPED))
@@ -159,7 +159,7 @@ class MusicQuieterTest {
         assertThat(sets()).containsExactly("setRoomVolume Kitchen-id 10")
     }
 
-    /** Review Focus 5: a restore asked while the quiet is still lowering waits for it, then puts everything back. */
+    /** 6 §4.6: a restore asked while the quiet is still lowering waits for it, then puts everything back. */
     @Test
     fun aRestoreWaitsForTheQuietItUndoes() = runTest {
         val slow = CompletableDeferred<Unit>()

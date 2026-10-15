@@ -30,7 +30,7 @@ class MusicViewTest {
     fun tearDown() = scope.cancel()
 
     /**
-     * Review Focus 1 (6 §2.2): Home's memory outlives the card (Settings over Home, another tab, then back): the card's
+     * 6 §2.2: Home's memory outlives the card (Settings over Home, another tab, then back): the card's
      * second collection still sees the room it paused. Fails if `home`'s memory starts afresh when nothing collects it
      * (a cold flow, or one shared only while subscribed).
      */
@@ -61,7 +61,7 @@ class MusicViewTest {
         assertThat(back).isEqualTo(HomePick(turned, nothingPlaying = false))
     }
 
-    /** Review Focus 1: Pause on Home, then Play, is the same room. Fails if homePicks forgets what it showed. */
+    /** 6 §2.2: Pause on Home, then Play, is the same room. Fails if homePicks forgets what it showed. */
     @Test
     fun pausingTheShownGroupKeepsItOnHome() = runTest {
         val groups = MutableStateFlow(listOf(kitchen, bedroom.copy(state = PlayState.PLAYING, nowPlaying = SONG)))

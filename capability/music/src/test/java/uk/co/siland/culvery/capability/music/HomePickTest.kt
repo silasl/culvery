@@ -48,7 +48,7 @@ class HomePickTest {
         assertThat(homePick(all.with("b", PlayState.TRANSITIONING), "Kitchen-id", null)?.group?.id).isEqualTo("b")
     }
 
-    /** Review Focus 1. Fails if a paused group Home showed is swapped for the usual room, or a stopped one is kept. */
+    /** 6 §2.2. Fails if a paused group Home showed is swapped for the usual room, or a stopped one is kept. */
     @Test
     fun aPausedGroupHomeShowedStaysUntilItStops() {
         assertThat(homePick(all.with("b", PlayState.PAUSED), "Kitchen-id", keptId = "b")).isEqualTo(HomePick(all.with("b", PlayState.PAUSED)[2], false))

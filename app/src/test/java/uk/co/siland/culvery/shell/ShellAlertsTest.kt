@@ -97,7 +97,7 @@ class ShellAlertsTest {
         assertThat(returnedAt).isEqualTo(QUIET_CAP_MS)
     }
 
-    /** Ruling: the 500 ms run from the show, not from each call. Fails if a quieted() asked 300 ms in waits until 800. */
+    /** 6 §3.3: the 500 ms run from the show, not from each call. Fails if a quieted() asked 300 ms in waits until 800. */
     @Test
     fun theCapRunsFromTheShowNotFromTheCall() = runTest {
         val hung = RecordingQuieter("hung", mutableListOf()).apply { gate = CompletableDeferred() }
@@ -170,7 +170,7 @@ class ShellAlertsTest {
         assertThat(log).isEmpty()
     }
 
-    /** Ruling: a quiet alert replacing a loud one ends the loud one, so the music comes back. */
+    /** 6 §3.3: a quiet alert replacing a loud one ends the loud one, so the music comes back. */
     @Test
     fun aQuietAlertReplacingALoudOneRestores() = runTest {
         val log = mutableListOf<String>()
@@ -182,7 +182,7 @@ class ShellAlertsTest {
         assertThat(log).containsExactly("music quiet", "music quieted", "music restore").inOrder()
     }
 
-    /** Review Focus 5. Fails if restore runs while the slow quiet() is still lowering: the music would stay low. */
+    /** 6 §3.3, §4.6: fails if restore runs while the slow quiet() is still lowering: the music would stay low. */
     @Test
     fun aDismissDuringASlowQuietRestoresAfterIt() = runTest {
         val log = mutableListOf<String>()
