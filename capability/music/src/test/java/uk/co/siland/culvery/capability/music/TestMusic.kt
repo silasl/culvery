@@ -6,6 +6,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import uk.co.siland.culvery.capability.music.ui.GroupActions
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.ui.Icons
@@ -24,6 +25,17 @@ internal fun group(
     canSkip: Boolean = nowPlaying !is NowPlaying.Radio,
     artUrl: String? = null,
 ) = SpeakerGroup(id, rooms.map { SpeakerRoom("$it-id", it, volume) }, "${rooms.first()}-id", state, nowPlaying, artUrl, canSkip, volume, startedAt)
+
+/** Controls that write each tap to [calls]: "play k", "volume k 45", "room Kitchen-id 20", "favourites k". */
+internal fun recordingGroupActions(calls: MutableList<String>) = GroupActions(
+    onPlay = { calls += "play ${it.id}" },
+    onPause = { calls += "pause ${it.id}" },
+    onNext = { calls += "next ${it.id}" },
+    onGroupVolume = { g, v -> calls += "volume ${g.id} $v" },
+    onRoomVolume = { _, r, v -> calls += "room ${r.id} $v" },
+    onShuffle = { calls += "shuffle ${it.id}" },
+    onFavourites = { calls += "favourites ${it.id}" },
+)
 
 internal fun musicSettings(dir: File, scope: CoroutineScope) =
     MusicSettings(musicSettingsStore(scope) { File(dir, "music_settings.preferences_pb") }, scope)
