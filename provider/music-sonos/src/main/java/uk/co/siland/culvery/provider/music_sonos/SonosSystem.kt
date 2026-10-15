@@ -221,7 +221,8 @@ internal class SonosSystem(
             if (household == link.householdId) return address
             other = true
         }
-        if (other) _problem.value = MusicProblem.OTHER_HOUSEHOLD
+        // The old rooms' addresses may now be the other household's (6 §6).
+        if (other) otherHousehold()
         return null
     }
 

@@ -436,6 +436,26 @@ class SonosSystemTest {
         assertThat(moved).isEmpty()
     }
 
+    /**
+     * 6 §6: when the saved speaker goes silent and the scan hears only another household, the old rooms go too: their
+     * addresses may now be that household's, so neither a check nor art reaches them.
+     */
+    @Test
+    fun aScanThatHearsAnotherHouseholdForgetsTheOldRooms() = runTest {
+        val s = checked()
+        val art = s.groups.value[0].artUrl!!
+        kitchen.silent = true
+        lounge.answer("GetHouseholdID", SonosFixtures.household("Sonos_someoneElse"))
+        heard = listOf(lounge.address)
+        assertThat(unreachable { s.checkLayout() }).isEqualTo(MusicProblem.OTHER_HOUSEHOLD)
+        assertThat(s.groups.value).isEmpty()
+        listOf(kitchen, lounge, dining).forEach { it.received.clear() }
+        assertThat(s.art(art)).isNull()
+        assertThat(unreachable { s.checkPlayback() }).isEqualTo(MusicProblem.OTHER_HOUSEHOLD)
+        assertThat(listOf(lounge, dining).flatMap { it.actions() }).isEmpty()
+        assertThat(kitchen.received.map { it.path }.filter { it.startsWith("/getaa") }).isEmpty()
+    }
+
     /** 6 §4.6: the bell asks each leader what plays now, not the last check. */
     @Test
     fun playingNowAsksEachLeaderAfresh() = runTest {
