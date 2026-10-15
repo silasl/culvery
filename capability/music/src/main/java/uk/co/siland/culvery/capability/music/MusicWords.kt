@@ -65,3 +65,7 @@ fun favouritesSpoken(name: String) = "$FAVOURITES_LABEL for $name"
 fun roomsAction(shown: Boolean) = if (shown) "hide each room’s volume" else "show each room’s volume"
 
 fun playInAction(name: String) = "play in $name"
+
+internal const val NOTHING_ANSWERED = "No Sonos speakers answered. Check they’re on, or enter a speaker’s address."
+internal const val TYPE_FOUR_NUMBERS = "Type the address as four numbers, like 192.168.1.20."
+internal const val NO_SPEAKER_THERE = "No Sonos speaker answered at that address. Check it in the Sonos app under About My System."
