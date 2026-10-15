@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import uk.co.siland.culvery.capability.door.db.DoorDatabase
@@ -58,12 +59,23 @@ internal class FakeAlertHost(inFront: Boolean = true) : AlertHost {
     var dismissed = 0
     var content: (@Composable () -> Unit)? = null
 
+    /** Whether the last show was loud. */
+    var loud: Boolean? = null
+
+    /** Holds quieted() until completed; null returns at once. */
+    var quietedGate: CompletableDeferred<Unit>? = null
+    var quietedCalls = 0
+
     override fun show(loud: Boolean, content: @Composable () -> Unit) {
         shown++
+        this.loud = loud
         this.content = content
     }
 
-    override suspend fun quieted() = Unit
+    override suspend fun quieted() {
+        quietedCalls++
+        quietedGate?.await()
+    }
 
     override fun dismiss() {
         dismissed++

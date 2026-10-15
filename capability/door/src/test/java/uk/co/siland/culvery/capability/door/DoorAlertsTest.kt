@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.door
 
 import com.google.common.truth.Truth.assertThat
 import java.io.File
+import java.time.LocalTime
 import java.time.ZoneId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
@@ -197,5 +198,44 @@ class DoorAlertsTest {
         advanceTimeBy(1)
         runCurrent()
         assertThat(alerts.showing.value).isNull()
+    }
+
+    /** 6 §3.3: the card is loud, and the chime waits until the music is lower. Fails if the chime plays before quieted() returns. */
+    @Test
+    fun theCardIsLoudAndTheChimeWaitsForTheMusicToQuieten() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        host.quietedGate = gate
+        val alerts = alerts()
+        val ringing = launch { alerts.onRecorded(rung(1)) }
+        runCurrent()
+        assertThat(host.loud).isTrue()
+        assertThat(chime.volumes).isEmpty()
+        gate.complete(Unit)
+        ringing.join()
+        assertThat(chime.volumes).hasSize(1)
+    }
+
+    /** 6 §2.3: in quiet hours the card still lowers the music, and with no chime nothing waits. */
+    @Test
+    fun inQuietHoursTheCardIsStillLoudAndNothingWaits() = runTest {
+        prefs = DoorPrefs(quietFrom = LocalTime.of(14, 0), quietUntil = LocalTime.of(15, 0))
+        host.quietedGate = CompletableDeferred()
+        val alerts = alerts()
+        alerts.onRecorded(rung(1))
+        assertThat(host.loud).isTrue()
+        assertThat(host.quietedCalls).isEqualTo(0)
+        assertThat(chime.volumes).isEmpty()
+    }
+
+    /** 6 §4.6: a ring within 10 seconds of the last chime plays none, so nothing waits for the music. */
+    @Test
+    fun aRingWithinTenSecondsOfTheLastChimeDoesNotWait() = runTest {
+        val alerts = alerts()
+        alerts.onRecorded(rung(1))
+        assertThat(host.quietedCalls).isEqualTo(1)
+        advanceTimeBy(CHIME_GAP_MS - 1)
+        alerts.onRecorded(rung(2))
+        assertThat(host.quietedCalls).isEqualTo(1)
+        assertThat(chime.volumes).hasSize(1)
     }
 }

@@ -29,9 +29,10 @@ data class ShowingRing(val eventId: Long, val card: DoorCardUi)
 
 /**
  * The alert decision (5 §4.6–4.7). A new ring, or an unrecognised alert, while Culvery is in front raises the card or
- * refreshes it, restarts its 2 minutes, and chimes unless it is quiet hours or the last chime that played was under 10 seconds ago.
+ * refreshes it (a loud alert: the shell turns music down while it shows, 6 §3.3), restarts its 2 minutes, and chimes unless it is quiet hours or the last chime that played was under 10 seconds ago.
  * A re-post of the card's own ring updates the card only. Motion, and anything while Culvery isn't in front, is only
  * stored. Every change to the card happens under one lock, so a close never takes a newer ring's card.
+ * quieted() is awaited inside the lock, so a Got it tap in those 500 ms waits for them.
  */
 @Singleton
 class DoorAlerts internal constructor(
@@ -72,7 +73,7 @@ class DoorAlerts internal constructor(
         if (!host.inFront.value) return@withLock
         val alreadyShowing = _showing.value != null
         _showing.value = ShowingRing(event.id, card)
-        if (!alreadyShowing) host.show { DoorCardHost(this@DoorAlerts) }
+        if (!alreadyShowing) host.show(loud = true) { DoorCardHost(this@DoorAlerts) }
         closing?.cancel()
         closing = scope.launch {
             delay(CARD_MS)
@@ -83,7 +84,10 @@ class DoorAlerts internal constructor(
         val p = prefs()
         // A clock set back since the last chime counts as long ago.
         val chimedRecently = lastChimeMillis?.let { now - it in 0 until CHIME_GAP_MS } == true
-        if (!quietAt(now, z, p) && !chimedRecently && chime.play(p.volume)) lastChimeMillis = now
+        if (quietAt(now, z, p) || chimedRecently) return@withLock
+        // Music and the like go quieter first, for half a second at most (6 §3.3).
+        host.quieted()
+        if (chime.play(p.volume)) lastChimeMillis = now
     }
 
     /** Got it on [eventId]'s card: that ring counts as seen, and the card goes if it still shows that ring (5 §4.7). */
