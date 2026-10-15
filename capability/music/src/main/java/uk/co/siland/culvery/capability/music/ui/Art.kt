@@ -19,9 +19,14 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.capability.music.Speakers
 import uk.co.siland.culvery.core.ui.Culvery
@@ -46,9 +51,29 @@ class ArtCache internal constructor(private val bytes: suspend (String) -> ByteA
     constructor(speakers: Speakers) : this({ url -> speakers.system.value?.art(url) })
 
     private val cache = LruCache<String, ImageBitmap>(ART_KEPT)
+    private val loading = ConcurrentHashMap<String, CompletableDeferred<ImageBitmap?>>()
 
+    /** Two screens asking for the same picture at once share one fetch; if the one fetching stops, the other asks again. */
     override suspend fun load(url: String): ImageBitmap? {
         cache.get(url)?.let { return it }
+        val mine = CompletableDeferred<ImageBitmap?>()
+        loading.putIfAbsent(url, mine)?.let { other ->
+            return try {
+                other.await()
+            } catch (e: CancellationException) {
+                currentCoroutineContext().ensureActive()
+                load(url)
+            }
+        }
+        return try {
+            fetch(url).also { mine.complete(it) }
+        } finally {
+            loading.remove(url, mine)
+            mine.cancel()
+        }
+    }
+
+    private suspend fun fetch(url: String): ImageBitmap? {
         val data = bytes(url) ?: return null
         val image = withContext(Dispatchers.Default) { decodeArt(data, ART_PX) } ?: return null
         cache.put(url, image)

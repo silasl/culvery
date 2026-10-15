@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.core.plugin
 
 import androidx.compose.runtime.Composable
+import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
@@ -9,6 +10,16 @@ const val NEXT_LABEL = "Next"
 
 /** 4a design §5, 4d-2 §7.2: a setting that didn't save; nothing changed. */
 const val COULD_NOT_SAVE = "Couldn’t save that change — try again."
+
+/** Runs [write]; a setting that didn't save is [log]ged and says [COULD_NOT_SAVE], and nothing changed. */
+suspend fun Toaster.save(write: suspend () -> Unit, log: (IOException) -> Unit) {
+    try {
+        write()
+    } catch (e: IOException) {
+        log(e)
+        show(COULD_NOT_SAVE, urgent = true)
+    }
+}
 
 /** The button that closes a confirmation and changes nothing. */
 const val KEEP = "Keep"

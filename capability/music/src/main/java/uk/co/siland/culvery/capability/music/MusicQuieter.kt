@@ -6,12 +6,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.core.plugin.AlertQuieter
+import uk.co.siland.culvery.core.plugin.attempt
 
 private const val TAG = "MusicQuieter"
 
@@ -37,7 +39,7 @@ class MusicQuieter internal constructor(private val system: () -> MusicSystem?, 
         if (lowered != null) return@withLock
         val s = system() ?: return@withLock
         val percent = share()
-        val playing = attempt { s.playingNow() } ?: return@withLock
+        val playing = tried { s.playingNow() } ?: return@withLock
         val rooms: MutableList<Lowered> = Collections.synchronizedList(mutableListOf())
         lowered = s to rooms
         coroutineScope { playing.forEach { group -> launch { lowerGroup(s, group, percent, rooms) } } }
@@ -47,28 +49,24 @@ class MusicQuieter internal constructor(private val system: () -> MusicSystem?, 
         val (s, rooms) = lowered ?: return@withLock
         lowered = null
         coroutineScope {
-            rooms.toList().forEach { room -> launch { attempt { putBack(s, room) } ?: attempt { putBack(s, room) } } }
+            rooms.toList().forEach { room -> launch { tried { putBack(s, room) } ?: tried { putBack(s, room) } } }
         }
     }
 
-    /** All the group's rooms are read first; a group that can't be read is left as it is (6 §4.6). */
+    /** All the group's rooms are read first, at once; a group that can't be read is left as it is (6 §4.6). */
     private suspend fun lowerGroup(s: MusicSystem, group: SpeakerGroup, percent: Int, rooms: MutableList<Lowered>) {
-        val read = attempt { group.rooms.map { it to s.roomVolume(it) } } ?: return
+        val read = tried { coroutineScope { group.rooms.map { async { it to s.roomVolume(it) } }.awaitAll() } } ?: return
         val mine = read.map { (room, was) -> Lowered(room, was, (was * percent / 100.0).roundToInt()) }
         // Remembered before the commands go, so one that took effect but timed out is still put back.
         rooms += mine
-        mine.forEach { attempt { s.setRoomVolume(it.room, it.set) } }
+        coroutineScope { mine.forEach { launch { tried { s.setRoomVolume(it.room, it.set) } } } }
     }
 
     private suspend fun putBack(s: MusicSystem, room: Lowered) {
         if (abs(s.roomVolume(room.room) - room.set) <= RESTORE_DRIFT) s.setRoomVolume(room.room, room.was)
     }
 
-    private suspend fun <T> attempt(step: suspend () -> T): T? = try {
-        step()
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
+    private inline fun <T> tried(step: () -> T): T? = attempt(step) { e ->
         Log.w(TAG, "Couldn't change a room's volume for the doorbell (${e::class.simpleName})")
         null
     }

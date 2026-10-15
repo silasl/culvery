@@ -60,15 +60,15 @@ class GroupActions(
     val onGroupVolume: (SpeakerGroup, Int) -> Unit,
     val onRoomVolume: (SpeakerGroup, SpeakerRoom, Int) -> Unit,
     val onShuffle: (SpeakerGroup) -> Unit,
-    val onFavourites: (SpeakerGroup) -> Unit,
+    val onFavourites: (SpeakerGroup) -> Unit = {},
 ) {
     companion object {
         /** For screenshots: nothing happens. */
-        val None = GroupActions({}, {}, {}, { _, _ -> }, { _, _, _ -> }, {}, {})
+        val None = GroupActions({}, {}, {}, { _, _ -> }, { _, _, _ -> }, {})
     }
 }
 
-internal fun MusicActions.forGroups(onFavourites: (SpeakerGroup) -> Unit) =
+internal fun MusicActions.forGroups(onFavourites: (SpeakerGroup) -> Unit = {}) =
     GroupActions(this::play, this::pause, this::next, this::setGroupVolume, this::setRoomVolume, this::shuffleEverything, onFavourites)
 
 /** A round 48 dp control named by [spoken]; disabled, its icon is `mute` and TalkBack hears it as unavailable. */
@@ -111,8 +111,8 @@ internal fun ShuffleButton(group: SpeakerGroup, tag: String, on: ButtonSurface, 
 
 /**
  * A value in [range], sent when let go rather than at each step of a drag, so one group's commands can't arrive out of
- * order; [onChange] hears each step of the drag. Spoken "[spokenName], [spokenState]": "Kitchen volume, 30 percent" by
- * default (6 §5.5).
+ * order; [label], beside it, shows the value under the thumb. Spoken "[spokenName], [spokenState]": "Kitchen volume,
+ * 30 percent" by default (6 §5.5).
  */
 @Composable
 internal fun VolumeSlider(
@@ -124,27 +124,17 @@ internal fun VolumeSlider(
     steps: Int = 0,
     spokenName: String = volumeName(name),
     spokenState: (Int) -> String = ::percentWords,
-    onChange: (Int) -> Unit = {},
+    label: (@Composable (Int) -> Unit)? = null,
     onVolume: (Int) -> Unit,
 ) {
     val c = Culvery.colors
-    var dragging by remember { mutableStateOf<Float?>(null) }
-    // The value let go stays until [volume] changes, so the thumb doesn't jump back while the command is on its way.
-    var sent by remember(volume) { mutableStateOf<Float?>(null) }
-    val shown = dragging ?: sent ?: volume.toFloat()
+    // Dragged or let go, it stays until [volume] changes, so the thumb doesn't jump back while the command is on its way.
+    var held by remember(volume) { mutableStateOf<Float?>(null) }
+    val shown = held ?: volume.toFloat()
     Slider(
         value = shown,
-        onValueChange = {
-            dragging = it
-            onChange(it.roundToInt())
-        },
-        onValueChangeFinished = {
-            dragging?.let {
-                sent = it
-                onVolume(it.roundToInt())
-            }
-            dragging = null
-        },
+        onValueChange = { held = it },
+        onValueChangeFinished = { held?.let { onVolume(it.roundToInt()) } },
         valueRange = range.first.toFloat()..range.last.toFloat(),
         steps = steps,
         colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.surf3),
@@ -153,6 +143,7 @@ internal fun VolumeSlider(
             stateDescription = spokenState(shown.roundToInt())
         },
     )
+    label?.invoke(shown.roundToInt())
 }
 
 /** Art, the group's name, and what it plays, read by TalkBack as one sentence (6 §5.5). */

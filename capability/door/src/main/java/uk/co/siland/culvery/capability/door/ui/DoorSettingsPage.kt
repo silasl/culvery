@@ -29,7 +29,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import java.io.IOException
 import java.time.LocalTime
 import java.time.ZoneId
 import kotlin.math.roundToInt
@@ -61,12 +60,12 @@ import uk.co.siland.culvery.capability.door.checkNotifications
 import uk.co.siland.culvery.capability.door.clockText
 import uk.co.siland.culvery.capability.door.lastHeard
 import uk.co.siland.culvery.capability.door.quietHoursLine
-import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
+import uk.co.siland.culvery.core.plugin.save
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
@@ -239,7 +238,7 @@ internal fun DoorSettingsHost(
     val p = prefs ?: return
     val z = householdZone ?: return
     fun change(write: suspend () -> Unit) {
-        scope.launch { save(toaster, write) }
+        scope.launch { toaster.save(write) { Log.w(TAG, "Couldn't save a door setting (${it::class.simpleName})") } }
     }
     val service = provider.descriptor.displayName
     DoorSettingsScreen(
@@ -264,14 +263,4 @@ internal fun DoorSettingsHost(
             onCapture = { on -> change { settings.setCapture(if (on) clock.nowMillis() + CAPTURE_MS else 0L) } },
         ),
     )
-}
-
-/** A setting that didn't save says so; nothing changed. */
-private suspend fun save(toaster: Toaster, write: suspend () -> Unit) {
-    try {
-        write()
-    } catch (e: IOException) {
-        Log.w(TAG, "Couldn't save a door setting (${e::class.simpleName})")
-        toaster.show(COULD_NOT_SAVE, urgent = true)
-    }
 }

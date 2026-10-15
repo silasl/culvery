@@ -5,6 +5,9 @@ import android.graphics.Color
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,6 +43,20 @@ class ArtCacheTest {
         }
         assertThat(cache.load("http://speaker/getaa?s=1")).isNotNull()
         assertThat(cache.load("http://speaker/getaa?s=1")).isNotNull()
+        assertThat(fetches).isEqualTo(1)
+    }
+
+    /** Fails if two screens asking for the same picture at once fetch it twice. */
+    @Test
+    fun twoLoadsAtOnceFetchOnce() = runTest {
+        var fetches = 0
+        val cache = ArtCache {
+            fetches++
+            delay(100)
+            png(64, 64)
+        }
+        val both = List(2) { async { cache.load("http://speaker/getaa?s=1") } }.awaitAll()
+        assertThat(both.all { it != null }).isTrue()
         assertThat(fetches).isEqualTo(1)
     }
 

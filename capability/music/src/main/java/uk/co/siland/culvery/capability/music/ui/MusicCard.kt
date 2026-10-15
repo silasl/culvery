@@ -74,6 +74,6 @@ internal fun MusicCardHost(view: MusicView, actions: MusicActions, checks: Music
     val pick by view.home.collectAsStateWithLifecycle()
     val problem by view.problem.collectAsStateWithLifecycle(null)
     val lines by actions.lines.collectAsStateWithLifecycle()
-    val groupActions = remember(actions) { actions.forGroups(onFavourites = {}) }
+    val groupActions = remember(actions) { actions.forGroups() }
     MusicCard(pick, problem?.let(::problemLine), pick?.let { lines[it.group.id] }, groupActions)
 }

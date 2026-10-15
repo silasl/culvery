@@ -55,7 +55,7 @@ class MusicCapability @Inject constructor(
     override fun cards(): Flow<List<HomeCard>> = hasTab.map { if (it) listOf(card) else emptyList() }
 
     @Composable
-    override fun TabContent() = CompositionLocalProvider(LocalArtSource provides art) { MusicTabHost(view, actions, checks, art) }
+    override fun TabContent() = CompositionLocalProvider(LocalArtSource provides art) { MusicTabHost(view, actions, checks) }
 
     private val pages: List<SettingsPage> =
         if (speakers.providers.isEmpty()) emptyList() else listOf(MusicPage { MusicSettingsHost(settings, speakers, view, connect, toaster) })

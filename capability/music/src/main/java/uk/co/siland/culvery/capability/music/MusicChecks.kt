@@ -4,7 +4,6 @@ import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -20,6 +19,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Startable
+import uk.co.siland.culvery.core.plugin.attempt
 
 /** What plays, and the group volumes, while a music screen shows (6 §4.2). */
 const val PLAYBACK_CHECK_MS = 2_000L
@@ -83,13 +83,7 @@ class MusicChecks internal constructor(
     }
 
     /** A failed check shows in the system's problem; the next one tries again. */
-    private suspend fun safely(check: suspend () -> Unit) {
-        try {
-            check()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.w(TAG, "A music check failed (${e::class.simpleName})")
-        }
+    private suspend fun safely(check: suspend () -> Unit) = attempt({ check() }) { e ->
+        Log.w(TAG, "A music check failed (${e::class.simpleName})")
     }
 }

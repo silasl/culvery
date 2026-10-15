@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.core.plugin
 
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -14,6 +15,15 @@ import kotlinx.coroutines.launch
 private const val FIRST_RETRY_MS = 1_000L
 private const val LAST_RETRY_MS = 60_000L
 private const val MAX_DOUBLINGS = 6L
+
+/** [block]'s result, or [orElse]'s for what it threw, which is where it is logged. Cancellation is never caught. */
+inline fun <T> attempt(block: () -> T, orElse: (Exception) -> T): T = try {
+    block()
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Exception) {
+    orElse(e)
+}
 
 /** The wait before retrying after failure number [attempt] (from 0): 1 s, doubling each time, at most 60 s. */
 fun retryDelayMillis(attempt: Long): Long =

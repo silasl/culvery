@@ -16,11 +16,7 @@ data class HomePick(val group: SpeakerGroup, val nothingPlaying: Boolean)
 fun homePick(groups: List<SpeakerGroup>, usualRoomId: String?, keptId: String?): HomePick? {
     fun SpeakerGroup.hasUsualRoom() = rooms.any { it.id == usualRoomId }
     val playing = groups.filter { it.isPlaying }
-    val shown = when (playing.size) {
-        0 -> null
-        1 -> playing.single()
-        else -> playing.firstOrNull { it.hasUsualRoom() } ?: playing.maxByOrNull { it.startedAtMillis ?: Long.MIN_VALUE }
-    }
+    val shown = playing.firstOrNull { it.hasUsualRoom() } ?: playing.maxByOrNull { it.startedAtMillis ?: Long.MIN_VALUE }
     if (shown != null) return HomePick(shown, nothingPlaying = false)
     groups.firstOrNull { it.id == keptId && it.state == PlayState.PAUSED }?.let { return HomePick(it, nothingPlaying = false) }
     val fallback = groups.firstOrNull { it.hasUsualRoom() } ?: groups.firstOrNull() ?: return null

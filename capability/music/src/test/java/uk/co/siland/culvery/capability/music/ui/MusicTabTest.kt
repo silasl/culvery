@@ -141,7 +141,7 @@ class MusicTabTest {
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
-                    MusicTabHost(MusicView(speakers, settings, scope), MusicActions({ system }, scope), checks, ArtSource { null })
+                    MusicTabHost(MusicView(speakers, settings, scope), MusicActions({ system }, scope), checks)
                 }
             }
         }

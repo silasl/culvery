@@ -114,7 +114,7 @@ private fun MusicRow(group: SpeakerGroup, line: String?, roomsShown: Boolean, on
 
 /** The tab over the view; while it shows the speakers are checked, the layout at once (6 §4.2). */
 @Composable
-internal fun MusicTabHost(view: MusicView, actions: MusicActions, checks: MusicChecks, art: ArtSource) {
+internal fun MusicTabHost(view: MusicView, actions: MusicActions, checks: MusicChecks) {
     DisposableEffect(checks) {
         val stop = checks.watch(layoutNow = true)
         onDispose { stop() }
@@ -124,13 +124,16 @@ internal fun MusicTabHost(view: MusicView, actions: MusicActions, checks: MusicC
     val lines by actions.lines.collectAsStateWithLifecycle()
     var roomsShown by remember { mutableStateOf(emptySet<String>()) }
     val overlay = LocalOverlayHost.current
+    // The sheet is drawn outside the tab, so it is given the tab's art.
+    val art = LocalArtSource.current
     val groupActions = remember(actions, overlay, art) {
         actions.forGroups { group ->
             overlay.show { CompositionLocalProvider(LocalArtSource provides art) { FavouritesSheetHost(group, actions, onClose = overlay::dismiss) } }
         }
     }
+    val ordered = remember(groups) { tabOrder(groups) }
     MusicTab(
-        tabOrder(groups), problem?.let(::problemLine), lines, roomsShown,
+        ordered, problem?.let(::problemLine), lines, roomsShown,
         onRooms = { id -> roomsShown = if (id in roomsShown) roomsShown - id else roomsShown + id },
         actions = groupActions,
     )

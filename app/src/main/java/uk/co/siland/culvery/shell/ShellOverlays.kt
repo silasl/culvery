@@ -10,7 +10,6 @@ import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -29,6 +28,7 @@ import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.QUIET_CAP_MS
 import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.plugin.attempt
 
 /** The one sheet the shell shows above the rail and content; remembered by MainActivity. */
 class OverlayState : OverlayHost {
@@ -125,15 +125,7 @@ class ShellAlerts @Inject constructor(
     /** Every quieter at once; one that fails is logged and the others go on. */
     private suspend fun runAll(step: suspend (AlertQuieter) -> Unit) = coroutineScope {
         quieters.forEach { quieter ->
-            launch {
-                try {
-                    step(quieter)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.w(TAG, "A quieter failed (${e::class.simpleName})")
-                }
-            }
+            launch { attempt({ step(quieter) }) { e -> Log.w(TAG, "A quieter failed (${e::class.simpleName})") } }
         }
     }
 

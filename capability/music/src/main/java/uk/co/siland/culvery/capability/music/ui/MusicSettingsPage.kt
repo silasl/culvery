@@ -10,7 +10,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -23,8 +22,6 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import java.io.IOException
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.music.ADDRESS_EXAMPLE
 import uk.co.siland.culvery.capability.music.ADDRESS_HINT
@@ -54,10 +51,11 @@ import uk.co.siland.culvery.capability.music.Speakers
 import uk.co.siland.culvery.capability.music.USUAL_ROOM_LABEL
 import uk.co.siland.culvery.capability.music.lowerToWords
 import uk.co.siland.culvery.capability.music.problemLine
-import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.plugin.attempt
+import uk.co.siland.culvery.core.plugin.save
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
@@ -143,16 +141,14 @@ fun MusicSettingsScreen(ui: MusicSettingsUi, actions: MusicSettingsActions) {
 @Composable
 private fun LowerToRow(lowerTo: Int, onLowerTo: (Int) -> Unit) {
     val c = Culvery.colors
-    var shown by remember(lowerTo) { mutableIntStateOf(lowerTo) }
     Column(verticalArrangement = Arrangement.spacedBy(ListRowTokens.lineGap)) {
         Text(LOWER_MUSIC_TO, style = HhType.rowTitle, color = c.ink)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ListRowTokens.trailingGap)) {
             VolumeSlider(
                 LOWER_MUSIC_TO, lowerTo, "music_lower_to", Modifier.weight(1f),
                 range = 0..MAX_LOWER_TO, steps = MusicDimens.LOWER_STEPS, spokenName = LOWER_MUSIC_TO, spokenState = ::lowerToWords,
-                onChange = { shown = it }, onVolume = onLowerTo,
+                label = { Text(lowerToWords(it), style = HhType.body, color = c.mute) }, onVolume = onLowerTo,
             )
-            Text(lowerToWords(shown), style = HhType.body, color = c.mute)
         }
     }
 }
@@ -220,7 +216,7 @@ internal fun MusicSettingsHost(settings: MusicSettings, speakers: Speakers, view
     }
     val p = prefs ?: return
     fun change(write: suspend () -> Unit) {
-        scope.launch { save(toaster, write) }
+        scope.launch { toaster.save(write) { Log.w(TAG, "Couldn't save a music setting (${it::class.simpleName})") } }
     }
     fun said(outcome: ConnectOutcome, done: String): String? = when (outcome) {
         ConnectOutcome.Connected -> {
@@ -265,22 +261,6 @@ internal fun MusicSettingsHost(settings: MusicSettings, speakers: Speakers, view
 }
 
 /** No check runs while only Settings shows, and the picker needs the rooms. */
-private suspend fun readRooms(system: MusicSystem) {
-    try {
-        system.checkLayout()
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        Log.w(TAG, "Couldn't read the rooms for Settings (${e::class.simpleName})")
-    }
-}
-
-/** A setting that didn't save says so; nothing changed. */
-private suspend fun save(toaster: Toaster, write: suspend () -> Unit) {
-    try {
-        write()
-    } catch (e: IOException) {
-        Log.w(TAG, "Couldn't save a music setting (${e::class.simpleName})")
-        toaster.show(COULD_NOT_SAVE, urgent = true)
-    }
+private suspend fun readRooms(system: MusicSystem) = attempt({ system.checkLayout() }) { e ->
+    Log.w(TAG, "Couldn't read the rooms for Settings (${e::class.simpleName})")
 }

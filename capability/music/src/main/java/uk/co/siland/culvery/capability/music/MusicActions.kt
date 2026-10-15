@@ -3,7 +3,6 @@ package uk.co.siland.culvery.capability.music
 import android.util.Log
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.attempt
 
 private const val TAG = "MusicActions"
 
@@ -53,11 +53,7 @@ class MusicActions internal constructor(private val system: () -> MusicSystem?, 
     /** Read each time the sheet opens (6 §4.5). */
     suspend fun favourites(): FavouritesLoad {
         val s = system() ?: return FavouritesLoad.Failed(CANT_REACH_SONOS)
-        return try {
-            FavouritesLoad.Ready(s.favourites())
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
+        return attempt({ FavouritesLoad.Ready(s.favourites()) }) { e ->
             logFailure(MusicCommand.FAVOURITES, e)
             FavouritesLoad.Failed(sheetLine(e, SONOS_REFUSED))
         }
@@ -66,12 +62,10 @@ class MusicActions internal constructor(private val system: () -> MusicSystem?, 
     /** Plays [favourite] in [group]: null when it played, else the line the sheet shows as it stays open (6 §5.3, §6). */
     suspend fun playFavourite(group: SpeakerGroup, favourite: Favourite): String? {
         val s = system() ?: return CANT_REACH_SONOS
-        return try {
+        return attempt({
             s.playFavourite(group, favourite)
             null
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
+        }) { e ->
             logFailure(MusicCommand.FAVOURITE, e)
             sheetLine(e, CANT_PLAY_HERE)
         }
@@ -81,11 +75,7 @@ class MusicActions internal constructor(private val system: () -> MusicSystem?, 
         _lines.update { it - group.id }
         val s = system() ?: return
         scope.launch {
-            try {
-                step(s)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
+            attempt({ step(s) }) { e ->
                 logFailure(command, e)
                 rowLine(e)?.let { line -> _lines.update { it + (group.id to line) } }
             }
