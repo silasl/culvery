@@ -24,9 +24,9 @@ Done means: all of the above works against the household's real bridge, from the
 3. **The main-room button** toggles the room. On brings back how it was last lit (Hue's own behaviour). A › on the button opens that room on the Lights tab.
 4. **Each room on the Lights tab:** an on/off switch, a brightness slider and the room's Hue scenes as chips. No colour picker, no bulb-by-bulb control.
 5. **All lights off** covers every room; Settings › Lights can leave rooms out (a garden, a sleeping child's room). By default nothing is left out.
-6. **Holiday mode on:** All lights off, then the Hue automations chosen in Settings › Lights (for example Mimic presence) are switched on. **Off:** those automations are switched off and the lights are left as they are. While on, the Holiday mode button shows "On".
-7. **If the bridge won't let Culvery start an automation:** Holiday mode still turns the lights off and says it couldn't start the automation, so use the Hue app for that (§6). Revisit later.
-8. **Who:** the lights are free for everyone, as with a light switch. Holiday mode, both ways, needs an **Adult or Admin PIN**. Settings › Lights is admin-only like the rest of Settings.
+6. **Holiday mode on:** All lights off, then the Hue automations chosen in Settings › Lights (for example Mimic presence) are switched on. **Off:** the automations Culvery switched on are switched off and the lights are left as they are. While on, the Holiday mode button shows "On"; while it is being turned on or off, "Turning on…" or "Turning off…", and further taps are ignored (plan review, 2026-10-16).
+7. **If an automation doesn't start:** Holiday mode still turns the lights off and says it couldn't start the automation, so use the Hue app for that (§6). Since the bridge check (§8.2 check 1, confirmed), this covers only a start the read-back can't confirm: Mimic presence does start from the wall.
+8. **Who:** the lights are free for everyone, as with a light switch. Holiday mode, both ways, needs a **fresh Adult or Admin PIN**: asked every time, even within a signed-in session (plan review, 2026-10-16). Settings › Lights is admin-only like the rest of Settings.
 9. **Route:** Culvery talks to the Hue Bridge directly on the home network (approach A below). No Hue account. Pairing is one press of the bridge's button.
 
 ### Approaches weighed
@@ -48,18 +48,18 @@ The capability: `id = "lights"`, label "Lights", a light-bulb icon (add it to th
 - `LightsSystem`, what a provider implements:
   - `rooms: Flow<List<LightRoom>>`;
   - `setOn(room, on)`, `setBrightness(room, percent)`, `recallScene(room, scene)`;
-  - `automations(): List<Automation>`, `setAutomation(automation, enabled): AutomationResult` (started, or couldn't start).
+  - `automations(): List<Automation>`, `setAutomation(automation, on): AutomationResult` (confirmed by the read-back, or not).
 - `LightRoom`: id, name, on (any light in it on), brightness (0–100), scenes (id, name), the active scene if Hue reports one, and whether it has any lights it can dim.
-- `Automation`: id, name, enabled.
+- `Automation`: id, name, and whether it is on (Mimic presence by its `pm_state`, others by `enabled`, §4.5).
 - **All lights off** and **Holiday mode** as functions of the capability, not of the screens, so the later whole-app Holiday mode can call them.
 - The Home card, the Lights tab and Settings › Lights.
-- A permission `lights.holiday`, "Turn Holiday mode on and off", default roles Admin and Adult, no fresh PIN.
+- A permission `lights.holiday`, "Turn Holiday mode on and off", default roles Admin and Adult, **fresh PIN** (plan review, 2026-10-16).
 
 ### 3.2 `:provider:lights-hue`
 
-- `HueDiscovery`: an mDNS search for `_hue._tcp` with Android's `NsdManager` (under a multicast lock if needed), about 5 seconds. No use of Hue's cloud discovery (`discovery.meethue.com`). *(My call: keeps everything on the home network.)*
-- `HueClient`: CLIP v2 over OkHttp to `https://<bridge>/clip/v2/resource/…` with the `hue-application-key` header. Resources used: `room`, `grouped_light`, `scene`, `behavior_instance`, `bridge`.
-- TLS: the bridge's certificate is checked against Signify's Hue root CA, bundled in the app, and its common name against the bridge id. If the household's bridge doesn't chain to that CA (protocol check 3), Culvery instead pins the certificate it saw at pairing and refuses any other afterwards. No trust-all route either way. *(My call; Hue's developer docs describe the CA check. The builder confirms the CA file and the name rule there.)*
+- `HueDiscovery`: an mDNS search for `_hue._tcp` with Android's `NsdManager` (under a multicast lock if needed), about 5 seconds. Each service found is resolved with `registerServiceInfoCallback` on Android 14 (API 34) and later, and below it with `resolveService` (deprecated in API 34, the only call there; the tablet runs Android 11), one at a time from a queue, as it refuses a second while one runs (plan review, 2026-10-16). No use of Hue's cloud discovery (`discovery.meethue.com`). *(My call: keeps everything on the home network.)*
+- `HueClient`: CLIP v2 over OkHttp, reading answers through a shared `:core:net` module (the helper and network check Sonos has, moved there; plan review, 2026-10-16), to `https://<bridge>/clip/v2/resource/…` with the `hue-application-key` header. Resources used: `room`, `grouped_light`, `scene`, `behavior_instance`, `bridge`.
+- TLS: the bridge's certificate is checked against Signify's Hue root CA, bundled in the app, and its common name against the bridge id. No other route, and no trust-all route. **Confirmed on the household's bridge (2026-10-16; BSB002, software 1978418030, API 1.78):** it presents one leaf certificate issued by `C=NL, O=Philips Hue, CN=root-bridge`, whose common name is the bridge id (16 lower-case hex characters). The pin-at-pairing fallback is dropped.
 - The bridge id before pairing comes from an unauthenticated source: the mDNS record's `bridgeid`, or `GET /api/config` for a typed address. *(My call.)*
 - Pairing: `POST https://<bridge>/api` with a `devicetype` of `culvery#tablet` and `generateclientkey: true` after the link button is pressed. The answer's `username` is the application key.
 - `HueJson`: parses responses. Plain JVM, no Android.
@@ -67,7 +67,7 @@ The capability: `id = "lights"`, label "Lights", a light-bulb icon (add it to th
 
 ### 3.3 Settings stored
 
-In Lights' own settings store: the main room id, the ids of rooms All lights off leaves out, the ids of the Holiday mode automations, and whether Holiday mode is on. Room and automation **ids**, not names.
+In Lights' own settings store: the main room id, the ids of rooms All lights off leaves out, the ids of the Holiday mode automations, whether Holiday mode is on, and the ids of the automations Culvery switched on for it (§4.5). Room and automation **ids**, not names.
 
 ### 3.4 Backup
 
@@ -97,23 +97,27 @@ When the saved address stops answering, Culvery searches once by itself, keeps t
 ### 4.3 Commands
 
 - A room on or off: its `grouped_light` `on`. On with no other setting brings back how it was last lit.
-- Brightness: its `grouped_light` `dimming.brightness`. While the slider is dragged, at most one command every 300 ms, and one on release. Moving the slider of a room that's off turns it on at that brightness, as in the Hue app. *(My calls.)*
+- Brightness: its `grouped_light` `dimming.brightness`. While the slider is dragged, at most one command every 300 ms, and one on release; the pacing below may send fewer, always the latest value. Moving the slider of a room that's off turns it on at that brightness, as in the Hue app. *(My calls.)*
 - A scene: the scene's `recall` with `action: active`.
 
-The screen changes at once and the stream or the next read corrects it if the bridge disagrees. Hue asks apps to send group commands at about one a second; the builder paces commands to Hue's published guidance.
+The screen changes at once and the stream or the next read corrects it if the bridge disagrees. Hue asks apps to send group commands at about one a second and light commands at about ten a second; Culvery paces to that, and a command waiting its turn is replaced by a newer one for the same room or light (plan review, 2026-10-16).
 
 ### 4.4 All lights off
 
 - Nothing left out: the bridge's whole-home `grouped_light` (the one under the `bridge_home` resource), off.
-- Rooms left out: each included room's `grouped_light`, off, plus each light that is in no room (only in a zone, or nowhere), off, paced as in §4.3, so leaving the garden out leaves only the garden on. The screen shows them all off at once. *(My call: "every light except the rooms left out".)*
+- Rooms left out (ignoring any no longer on the bridge; if none is left, as nothing left out): each included room's `grouped_light`, off, plus each light that is in no room (only in a zone, or nowhere), off, paced as in §4.3, so leaving the garden out leaves only the garden on. The screen shows them all off at once. *(My call: "every light except the rooms left out".)*
 - A room whose command fails: the others still go; the §6 line names how many didn't.
 
 ### 4.5 Holiday mode
 
-- **On** (Adult or Admin PIN): All lights off (§4.4), then each chosen automation's `behavior_instance` is enabled. Holiday mode is saved as on, and the Home card and the Lights tab show it.
-- **Off** (the same PIN rule): each chosen automation is disabled; lights are left as they are; saved as off.
-- **Started?** After enabling, Culvery reads each automation back. If it hasn't started within about 5 seconds, Holiday mode stays on with the §6 message naming that automation. How "started" shows (the instance's `status`, or a script-specific state such as Mimic presence's `pm_state`) is protocol check 1 (§8.2).
-- **The bridge can't be reached** when turning it on or off: nothing changes, Holiday mode stays as it was, and the §6 "can't reach" line shows. Reached but some rooms didn't turn off, or an automation didn't start: Holiday mode is on, with the §6 line. The capability's function returns which of these happened, for the later whole-app Holiday mode. *(My call.)*
+Revised from the bridge check and the plan review (2026-10-16).
+
+- **What an automation is.** Mimic presence (Hue's script named `PM`) stays `enabled: true` and `status: running` whether or not it is on; its real state is `state.pm_state`, `started` or `stopped`. It starts with `PUT behavior_instance/<id>` `{"trigger":{"start":true}}` and stops with `{"trigger":{"stop":true}}`. Any other automation (a `Schedule`, say) is switched by `enabled` true or false and read back by `enabled`; its `status` stays `running` either way. The bridge answers 200 to a trigger it doesn't understand and does nothing, so **the read-back is the only proof**.
+- **On** (fresh Adult or Admin PIN): All lights off (§4.4). As soon as that has gone, Holiday mode is saved as on. Then each chosen automation that is **off** is switched on and read back; each one confirmed is saved as one Culvery started. One already on is left alone and not recorded.
+- **Off** (the same PIN rule): exactly the automations Culvery started are switched off and read back, whatever the ticks say now; lights are left as they are; saved as off at the end.
+- **Started?** Read back about every second for about 5 seconds. Not confirmed: Holiday mode stays on with the §6 message naming that automation (by the name last read from the bridge; "an automation" if none is known).
+- **One at a time.** While Holiday mode or All lights off is running, further taps on either are ignored and the Holiday mode button says "Turning on…" or "Turning off…". Whether a tap turns it on or off is decided from Culvery's saved record when the run starts.
+- **The bridge can't be reached** before All lights off has gone: nothing changes, Holiday mode stays as it was, and the §6 "can't reach" line shows. Reached but some rooms didn't turn off, or an automation didn't start: Holiday mode is on, with the §6 line. The capability's function returns which of these happened, for the later whole-app Holiday mode, and takes the caller's PIN check as an argument. *(My call.)*
 - **No automations chosen:** Holiday mode is only All lights off and the "On" marker; Settings › Lights says so under the automations list.
 - Holiday mode's on/off is Culvery's own record. If someone stops the automation in the Hue app, Culvery still shows Holiday mode on until someone turns it off on the wall. *(My call: simple, and honest about whose switch it is.)*
 
@@ -123,11 +127,11 @@ Layout, sizes and copy are starting values for the user's end-of-v1 design walk-
 
 ### 5.1 The Home card
 
-A `REGULAR`-size `HomeCard`, placed after Music; the existing placer drops it when it doesn't fit.
+A `REGULAR`-size `HomeCard`. When every card wants to show (Today, Coming up, the forecast, Music and Lights), the forecast gives way to Lights: Lights' priority sits between the forecast's and Coming up's (plan review, 2026-10-16).
 
 - **The main room**, a large button: its name and "On · 70%" or "Off". A tap toggles it; a › on its right opens the Lights tab scrolled to that room.
 - **All lights off.**
-- **Holiday mode**, with "On" or "Off" under it, lit in the accent while on. A tap asks for a PIN (§2.8), then turns it on or off.
+- **Holiday mode**, with "On" or "Off" under it ("Turning on…" or "Turning off…" while it runs), lit in the accent while on. A tap asks for a fresh PIN (§2.8), then turns it on or off.
 - No main room chosen yet: the first room Hue lists.
 - Bridge unreachable: the §6 line, no controls.
 
@@ -147,7 +151,7 @@ Admin-only. Placed after Settings › Music (order 470).
 
 - **Hue Bridge:** the status (§6), **Find Hue Bridge**, **Enter the bridge's address**.
 - **Main room:** a picker from the rooms found.
-- **All lights off leaves out:** a tick list of rooms, none ticked by default.
+- **All lights off leaves out:** a tick list of rooms, none ticked by default. Left-out rooms no longer on the bridge are dropped, with a line saying how many.
 - **Holiday mode switches on:** a tick list of the bridge's automations by name, none ticked by default. Empty: "No Hue automations yet. Set one up in the Hue app, such as Mimic presence."
 
 ### 5.4 TalkBack
@@ -169,7 +173,7 @@ The Lights tab's status line, the Home card's line and Settings › Lights show 
 | The bridge refuses a command | An error in the answer | On that row: "Hue didn't do that. Try again." |
 | Some rooms didn't turn off | Commands fail during §4.4 | "2 rooms didn't turn off. Try again." |
 | An automation won't start | §4.5 read-back | "Lights are off, but Culvery couldn't start [automation]. Start it in the Hue app." |
-| A chosen automation or room is gone | Its id isn't on the bridge | Settings › Lights drops it from the list; Holiday mode carries on with the rest |
+| A chosen automation or room is gone | Its id isn't on the bridge | Settings › Lights drops it from the list (for left-out rooms, saying how many); Holiday mode and All lights off carry on with the rest |
 
 **Privacy.** Only the bridge on the home network is contacted. Logs carry the command and its outcome only: no room, scene or automation names (a room can be named after a person), no addresses, and never the application key. `LogHygieneTest` covers the new modules.
 
@@ -187,19 +191,21 @@ The Lights tab's status line, the Home card's line and Settings › Lights show 
 
 On the `culvery-5` AVD (debug build), with **Enter the bridge's address** pointed at the real bridge: pairing, the rooms, commands, All lights off, Holiday mode. The emulator's mDNS search won't reach the home network.
 
+The household's network (2026-10-16): the bridge sits on the broadband router's subnet, the Wi-Fi (and so the tablet) on the mesh's, a different one. By address the bridge answers across them; mDNS probably doesn't cross. So both walk-throughs pair by the typed address first and record whether the search finds the bridge. No address goes into a committed file (`[bridge address]`).
+
 ### 8.2 Protocol checks and captures
 
 On the real bridge, during §8.1:
 
-1. **Automations:** does enabling a `behavior_instance` start Mimic presence (or the household's chosen automation), and what shows that it started? A forum report says Mimic presence's `pm_state` follows only the Hue app. If so, ruling 7 applies and the message in §6 is what the household sees.
+1. **Automations (confirmed 2026-10-16 from the PC):** Mimic presence starts and stops by its trigger and shows it in `pm_state`; it stayed started for 10 seconds and stopped on the stop trigger; the Hue app's own start changes only `pm_state`. A `Schedule` switches by `enabled` and reads back by it (§4.5). Re-checked from the wall in §8.1.
 2. **The whole-home group** turns every light off in one command.
-3. **TLS:** the bridge's certificate chains to the bundled Hue CA and names the bridge id; if not, the pin-at-pairing route in §3.2 applies.
+3. **TLS (confirmed 2026-10-16):** the bridge's certificate chains to the Hue CA and names the bridge id (§3.2).
 
 A debug-only switch logs the shape of each Hue response, with names and addresses replaced. The fixtures come from these after the names check, using placeholders ([room], [person]).
 
 ### 8.3 On the tablet
 
-A release `install -r`; never uninstall. Find Hue Bridge on the tablet (the search's real test), pair, choose the main room, use All lights off and Holiday mode. From then on, the tablet's logs are read whenever it's plugged in while work is under way.
+A release `install -r`; never uninstall. Pair by the typed address first (§8.1's network note), then try Find Hue Bridge and record whether the search finds the bridge across the subnets; pair, choose the main room, use All lights off and Holiday mode. From then on, the tablet's logs are read whenever it's plugged in while work is under way.
 
 ## 9. Not in this plan
 
