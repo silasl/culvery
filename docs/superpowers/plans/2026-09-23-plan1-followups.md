@@ -331,6 +331,11 @@ On `culvery-5` (debug build, sample household) against the household's real spea
 - Moved to the tablet: Find Sonos by scan, the Home card and Music tab on live groups, Play/Pause/Next and both volume sliders against the Sonos app, the paused room staying on Home, the Rooms chip, a radio and a playlist Favourite, Shuffle everything from a paused station, the doorbell lowering (two-room group, Got it, a room dragged meanwhile, a second ring, 0 %), offline, TalkBack, and the captures for the fixtures.
 - For the end-of-v1 design walk-through: the Music tab's unselected Rooms chip blends into its row; empty message lines leave gaps in Settings › Music and the address sheet; the Home card's buttons are tight to fit Shuffle everything; the tab keeps Next on a row with nothing playing while the Home card drops it.
 
+## From Plan 6
+
+- Move `MusicSettings` and `DoorSettings` onto `retryWithBackoff`, so one DataStore read failure doesn't end their flow.
+- Throttle the "A music check failed" log line while Sonos stays unreachable.
+
 ## Feature ideas (2026-10-02, after v1)
 
 **Each its own spec → plan cycle; not in 4c, 4d or 4e**
