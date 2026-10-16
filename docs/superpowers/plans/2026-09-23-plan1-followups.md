@@ -347,6 +347,11 @@ Release builds installed with `install -r` over Plan 5's (the household kept); C
 ## From Plan 7
 
 - `Bridges`, `LightsFollow` and `LightsConnect` mirror Music's `Speakers`, `MusicChecks` and `MusicConnect`: a generic later.
+- A `HomeCardPriority` scale in `:core:plugin`, so a card states its rank without renumbering the others (and the hand-kept rail-order comment goes).
+- Generic `AppSourceTest` and `ModuleBoundariesTest` rules instead of a line per capability.
+- One `HueCapture` in main guarded by `BuildConfig.DEBUG` instead of debug and release source sets (Sonos uses the same split).
+- `HueSystem` copies its map on every stream event and scans the scenes on every publish; `LightRoom`'s `List` is unstable for Compose.
+- The `RecordingToaster` copies left in calendar, door, access and setup onto `:core:plugin`'s test fixture; Door's `VolumeRow` onto `HhPercentSlider`.
 
 ## Feature ideas (2026-10-02, after v1)
 
