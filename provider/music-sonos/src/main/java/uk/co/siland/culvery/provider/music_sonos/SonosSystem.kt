@@ -1,6 +1,8 @@
 package uk.co.siland.culvery.provider.music_sonos
 
 import java.io.IOException
+import java.net.ConnectException
+import java.net.NoRouteToHostException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -115,7 +117,7 @@ internal class SonosSystem(
 
     override suspend fun pause(group: SpeakerGroup) = command(group.id, { it.copy(state = PlayState.PAUSED) }) { client.pause(it.leaderAddress()) }
 
-    override suspend fun next(group: SpeakerGroup) = command(group.id, { it }) { client.next(it.leaderAddress()) }
+    override suspend fun next(group: SpeakerGroup) = command(group.id, { it }, resend = false) { client.next(it.leaderAddress()) }
 
     override suspend fun setGroupVolume(group: SpeakerGroup, percent: Int) {
         val volume = percent.coerceIn(0, 100)
@@ -168,6 +170,10 @@ internal class SonosSystem(
     /** Only a speaker's own /getaa art on the home network, or a stream's https art (6 §4.2, §6). */
     override suspend fun art(url: String): ByteArray? = if (artAllowed(url)) client.bytes(url) else null
 
+    override fun useAddress(address: String) {
+        link = link.copy(address = address)
+    }
+
     private fun artAllowed(url: String): Boolean =
         url.startsWith("https://") || layout.any { g -> g.members.any { url.startsWith("http://${it.address}/getaa") } }
 
@@ -175,11 +181,16 @@ internal class SonosSystem(
      * Shows [shown] at once (6 §4.3), sends the command to the group's leader, and reads that group again whatever happened,
      * so the screen shows what the speaker did.
      */
-    private suspend fun command(groupId: String, shown: (Playback) -> Playback, send: suspend (ZoneGroupInfo) -> Unit) {
+    private suspend fun command(
+        groupId: String,
+        shown: (Playback) -> Playback,
+        resend: Boolean = true,
+        send: suspend (ZoneGroupInfo) -> Unit,
+    ) {
         sameHousehold()
         change { playback[groupId]?.let { record(groupId, shown(it)) } }
         try {
-            toRooms { send(infoOf(groupId)) }
+            toRooms(resend) { send(infoOf(groupId)) }
         } finally {
             withContext(NonCancellable) { quietly { readGroup(infoOf(groupId)) } }
         }
@@ -189,9 +200,9 @@ internal class SonosSystem(
      * Every read of, or command to, the household's rooms. While a different household answers, nothing is read from or
      * sent to it until the saved one answers again; the layout checks don't come here, as they are how it answers again.
      */
-    private suspend fun <T> toRooms(block: suspend () -> T): T {
+    private suspend fun <T> toRooms(resend: Boolean = true, block: suspend () -> T): T {
         sameHousehold()
-        return refusing { reaching(block = block) }
+        return refusing { reaching(resend = resend, block = block) }
     }
 
     private fun sameHousehold() {
@@ -200,16 +211,22 @@ internal class SonosSystem(
 
     /**
      * Runs [block]; when no speaker answers, finds the household again and runs it once more. Offline, or still nothing,
-     * is reported only then (6 §4.1, §6). A group still missing after the layout is read again is refused.
+     * is reported only then (6 §4.1, §6). A group still missing after the layout is read again is refused. Unless
+     * [resend], [block] runs again only when it failed before reaching a speaker: a Next whose answer was lost may have skipped.
      */
-    private suspend fun <T> reaching(again: Boolean = true, block: suspend () -> T): T = try {
+    private suspend fun <T> reaching(again: Boolean = true, resend: Boolean = true, block: suspend () -> T): T = try {
         block().also { reached() }
     } catch (e: IOException) {
         if (!again && e is GoneFromLayout) throw MusicRefusedException()
         if (!online()) fail(MusicProblem.OFFLINE)
+        // It may have reached the speaker, so it fails this command only; the next check says whether the speakers answer.
+        if (!resend && !neverReached(e)) throw MusicUnreachableException(MusicProblem.UNREACHABLE)
         if (!again || !recover()) fail(if (_problem.value == MusicProblem.OTHER_HOUSEHOLD) MusicProblem.OTHER_HOUSEHOLD else MusicProblem.UNREACHABLE)
-        reaching(again = false, block)
+        reaching(again = false, block = block)
     }
+
+    private fun neverReached(e: IOException) =
+        e is ConnectException || e is NoRouteToHostException || e is NotASpeaker || e is GoneFromLayout
 
     /** The layout from the saved speaker again; failing that, a scan, keeping the first speaker of this household. */
     private suspend fun recover(): Boolean = recovering.withLock {

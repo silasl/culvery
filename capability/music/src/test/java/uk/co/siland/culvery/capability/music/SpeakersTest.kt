@@ -44,6 +44,18 @@ class SpeakersTest {
         assertThat(sonos.opened).containsExactly(home, other).inOrder()
     }
 
+    /** 6 §4.1: the speakers moved and the scan missed them; the address typed for the same household is the one used next. */
+    @Test
+    fun aTypedAddressForTheSameHouseholdIsUsedByTheOpenSystem() = runTest {
+        settings.connect("music.sonos", home)
+        val speakers = Speakers(setOf(sonos), settings, scope)
+        speakers.opensAnother(than = null)
+        sonos.speakers["192.168.1.30"] = home.copy(address = "192.168.1.30:1400")
+        assertThat(MusicConnect(speakers, settings).enterAddress("192.168.1.30")).isEqualTo(ConnectOutcome.Connected)
+        assertThat(soon { sonos.systems.single().addresses.first { it.isNotEmpty() } }).containsExactly("192.168.1.30:1400")
+        assertThat(sonos.opened).containsExactly(home)
+    }
+
     /** A connection to a provider this build doesn't have opens nothing; a later Sonos one opens. */
     @Test
     fun aConnectionToAProviderNotInTheBuildOpensNothing() = runTest {

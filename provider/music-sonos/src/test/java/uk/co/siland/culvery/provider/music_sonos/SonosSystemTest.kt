@@ -303,6 +303,28 @@ class SonosSystemTest {
         assertThat(scans).isEqualTo(1)
     }
 
+    /** 6 §4.1: the scan missed the moved speakers; the address typed in Settings › Music is where the next check goes. */
+    @Test
+    fun aTypedAddressIsWhereTheNextCheckGoes() = runTest {
+        val s = system(gone)
+        unreachable { s.checkLayout() }
+        s.useAddress(lounge.address)
+        s.checkLayout()
+        assertThat(s.groups.value).hasSize(2)
+        assertThat(s.problem.value).isNull()
+        assertThat(lounge.actions()).contains("GetZoneGroupState")
+    }
+
+    /** A Next that reached the speaker but lost its answer may have skipped already; sent again it would skip two tracks. */
+    @Test
+    fun aNextWhoseAnswerIsLostIsNotSentAgain() = runTest {
+        val s = checked()
+        kitchen.dropNext("Next")
+        unreachable { s.next(s.groups.value[0]) }
+        assertThat(kitchen.actions().count { it == "Next" }).isEqualTo(1)
+        assertThat(s.problem.value).isNull()
+    }
+
     /** 6 §4.1: report only after one rescan. */
     @Test
     fun noSpeakerAfterTheRescanIsUnreachable() = runTest {

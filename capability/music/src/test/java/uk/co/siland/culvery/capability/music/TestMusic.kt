@@ -170,6 +170,13 @@ internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : Music
 
     override suspend fun shuffleEverything(group: SpeakerGroup) = record("shuffleEverything ${group.id}")
 
+    /** Each address the system was told to use, in order. */
+    val addresses = MutableStateFlow<List<String>>(emptyList())
+
+    override fun useAddress(address: String) {
+        addresses.value += address
+    }
+
     override suspend fun art(url: String): ByteArray? {
         record("art $url")
         return null

@@ -101,6 +101,9 @@ interface MusicSystem {
 
     /** The picture at [url], or null when it can't be had. */
     suspend fun art(url: String): ByteArray?
+
+    /** Reads and commands go to the speaker at [address] from now on: one typed for this household (6 §4.1). */
+    fun useAddress(address: String)
 }
 
 /** A way to the household's speakers (6 §3.2), for Settings › Music: find them, check an address, open the system. */
