@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -35,16 +36,6 @@ internal data class HueScene(val id: String, val name: String, val roomId: Strin
 internal data class HueBehavior(val id: String, val name: String?, val scriptId: String, val enabled: Boolean, val pmState: String?) {
     val isMimic: Boolean get() = pmState != null
     val on: Boolean get() = if (isMimic) pmState == "started" else enabled
-}
-
-internal data class HueConfig(val bridgeId: String)
-
-internal sealed interface PairAnswer {
-    data class Paired(val key: String) : PairAnswer
-
-    data object ButtonNotPressed : PairAnswer
-
-    data class Failed(val type: Int?) : PairAnswer
 }
 
 /** What the stream says changed; a null [GroupedLight.on] or [GroupedLight.brightness] was not in the update. */
@@ -96,19 +87,13 @@ private class BehaviorWire(
 )
 
 @Serializable
-private class BridgeWire(@SerialName("bridge_id") val bridgeId: String)
-
-@Serializable
 private class ConfigWire(@SerialName("bridgeid") val bridgeId: String)
 
 @Serializable
-private class PairWire(val success: PairSuccess? = null, val error: PairError? = null)
+private class PairWire(val success: PairSuccess? = null, val error: JsonObject? = null)
 
 @Serializable
 private class PairSuccess(val username: String)
-
-@Serializable
-private class PairError(val type: Int? = null)
 
 @Serializable
 private class ChangeSet(val type: String, val data: List<Change> = emptyList())
@@ -122,74 +107,66 @@ private class Change(
     val status: JsonElement? = null,
 )
 
-/** The Hue Bridge's CLIP v2 answers and the bodies sent to it (7 §3.2). Plain JVM: no Android, so its tests need no emulator. */
+/**
+ * The Hue Bridge's CLIP v2 answers and the bodies sent to it (7 §3.2). An answer is parsed once, by [tree], and each
+ * reader takes that tree, null when the answer wasn't JSON. Plain JVM: no Android, so its tests need no emulator.
+ */
 internal object HueJson {
     private val JSON = Json { ignoreUnknownKeys = true }
 
     private const val PM_STATE = "pm_state"
-    private const val BUTTON_NOT_PRESSED = 101
     private const val NOT_AUTHORISED = 1
 
-    fun rooms(text: String): List<HueRoom> = page<RoomWire>(text).mapNotNull { room ->
+    /** [text] as JSON; null when it isn't. */
+    fun tree(text: String): JsonElement? = try {
+        JSON.parseToJsonElement(text)
+    } catch (e: SerializationException) {
+        null
+    }
+
+    fun rooms(root: JsonElement?): List<HueRoom> = page<RoomWire>(root).mapNotNull { room ->
         val group = room.services.firstOrNull { it.rtype == "grouped_light" } ?: return@mapNotNull null
         HueRoom(room.id, room.metadata.name ?: throw HueJsonException(), room.children.filter { it.rtype == "device" }.map { it.rid }, group.rid)
     }
 
-    fun groupedLights(text: String): List<HueGroupedLight> = page<GroupedLightWire>(text).map {
+    fun groupedLights(root: JsonElement?): List<HueGroupedLight> = page<GroupedLightWire>(root).map {
         HueGroupedLight(it.id, it.owner.rid, it.owner.rtype, it.on?.on ?: false, it.dimming?.brightness)
     }
 
-    fun lights(text: String): List<HueLight> =
-        page<LightWire>(text).map { HueLight(it.id, it.owner.rid, it.dimming != null && it.dimming !is JsonNull) }
+    fun lights(root: JsonElement?): List<HueLight> =
+        page<LightWire>(root).map { HueLight(it.id, it.owner.rid, it.dimming != null && it.dimming !is JsonNull) }
 
-    fun scenes(text: String): List<HueScene> = page<SceneWire>(text).map {
+    fun scenes(root: JsonElement?): List<HueScene> = page<SceneWire>(root).map {
         HueScene(it.id, it.metadata.name ?: throw HueJsonException(), it.group.rid, it.status.isActive())
     }
 
-    fun behaviors(text: String): List<HueBehavior> = page<BehaviorWire>(text).map {
+    fun behaviors(root: JsonElement?): List<HueBehavior> = page<BehaviorWire>(root).map {
         val pmState = (it.state?.get(PM_STATE) as? JsonPrimitive)?.takeIf { value -> value.isString }?.content
         HueBehavior(it.id, it.metadata?.name, it.scriptId, it.enabled, pmState)
     }
 
-    /** The bridge id from the `bridge` resource, lower case. */
-    fun bridgeId(text: String): String = page<BridgeWire>(text).firstOrNull()?.bridgeId?.lowercase() ?: throw HueJsonException()
-
     /** The bridge id from `/api/config`, lower case. */
-    fun config(text: String): HueConfig = HueConfig(decode<ConfigWire>(text).bridgeId.lowercase())
+    fun config(root: JsonElement?): String = decode<ConfigWire>(root).bridgeId.lowercase()
 
-    fun pair(text: String): PairAnswer {
-        val first = decode<List<PairWire>>(text).firstOrNull() ?: throw HueJsonException()
-        first.success?.let { return PairAnswer.Paired(it.username) }
-        val error = first.error ?: throw HueJsonException()
-        return if (error.type == BUTTON_NOT_PRESSED) PairAnswer.ButtonNotPressed else PairAnswer.Failed(error.type)
+    /** The application key; null when the bridge answered with an error, such as its button not pressed. */
+    fun pair(root: JsonElement?): String? {
+        val first = decode<List<PairWire>>(root).firstOrNull() ?: throw HueJsonException()
+        first.success?.let { return it.username }
+        return if (first.error != null) null else throw HueJsonException()
     }
 
-    /** True for a v1 error of type 1 or a v2 error saying unauthorized; false for anything else, unparseable text included. */
-    fun isUnauthorised(text: String): Boolean {
-        val root = try {
-            JSON.parseToJsonElement(text)
-        } catch (e: SerializationException) {
-            return false
+    /** True for a v1 error of type 1 or a v2 error saying unauthorized; false for anything else, an answer that isn't JSON included. */
+    fun isUnauthorised(root: JsonElement?): Boolean = when (root) {
+        is JsonArray -> root.any { ((it as? JsonObject)?.get("error") as? JsonObject)?.get("type").asInt() == NOT_AUTHORISED }
+        is JsonObject -> (root["errors"] as? JsonArray).orEmpty().any {
+            ((it as? JsonObject)?.get("description") as? JsonPrimitive)?.takeIf { d -> d.isString }?.content
+                ?.contains("unauthorized", ignoreCase = true) == true
         }
-        return when (root) {
-            is JsonArray -> root.any { ((it as? JsonObject)?.get("error") as? JsonObject)?.get("type").asInt() == NOT_AUTHORISED }
-            is JsonObject -> (root["errors"] as? JsonArray).orEmpty().any {
-                ((it as? JsonObject)?.get("description") as? JsonPrimitive)?.takeIf { d -> d.isString }?.content
-                    ?.contains("unauthorized", ignoreCase = true) == true
-            }
-            else -> false
-        }
+        else -> false
     }
 
     /** True when a CLIP v2 answer lists any error, whatever its status: the bridge didn't do all it was asked. */
-    fun hasErrors(text: String): Boolean {
-        val root = try {
-            JSON.parseToJsonElement(text)
-        } catch (e: SerializationException) {
-            return false
-        }
-        return ((root as? JsonObject)?.get("errors") as? JsonArray).orEmpty().isNotEmpty()
-    }
+    fun hasErrors(root: JsonElement?): Boolean = ((root as? JsonObject)?.get("errors") as? JsonArray).orEmpty().isNotEmpty()
 
     private fun JsonElement?.asInt(): Int? = (this as? JsonPrimitive)?.intOrNull
 
@@ -200,7 +177,7 @@ internal object HueJson {
     /** The changes in one stream payload; an add, a delete or a room update asks for a full read, once. */
     fun events(data: String): List<HueEvent> {
         val events = mutableListOf<HueEvent>()
-        for (set in decode<List<ChangeSet>>(data)) {
+        for (set in decode<List<ChangeSet>>(tree(data))) {
             if (set.type == "add" || set.type == "delete") {
                 events.add(HueEvent.Reread)
                 continue
@@ -266,7 +243,7 @@ internal object HueJson {
         .replace(BRIDGE_ID_SHAPE, "[bridge id]")
         .replace(IPV4, "[address]")
 
-    private inline fun <reified T> page(text: String): List<T> = decode<Page<T>>(text).data
+    private inline fun <reified T> page(root: JsonElement?): List<T> = decode<Page<T>>(root).data
 
     private fun SceneStatus?.isActive() = this != null && active != "inactive"
 
@@ -274,8 +251,8 @@ internal object HueJson {
     private fun sceneActive(status: JsonElement?): Boolean? =
         ((status as? JsonObject)?.get("active") as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { it != "inactive" }
 
-    private inline fun <reified T> decode(text: String): T = try {
-        JSON.decodeFromString<T>(text)
+    private inline fun <reified T> decode(root: JsonElement?): T = try {
+        JSON.decodeFromJsonElement<T>(root ?: throw HueJsonException())
     } catch (e: SerializationException) {
         throw HueJsonException()
     } catch (e: IllegalArgumentException) {

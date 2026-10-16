@@ -65,17 +65,18 @@ class HueProviderTest {
         assertThat(asked.key).isNull()
     }
 
-    /** Fails if a pairing that succeeds doesn't give the bridge's id, its address and the key it answered. */
+    /** Fails if a pairing that succeeds doesn't give the bridge's id, its address and the key it answered, or asks the config again. */
     @Test
-    fun pairingSavesTheKey() = runBlocking {
+    fun pairingSavesTheKey(): Unit = runBlocking {
         val link = provider().pair(BridgeFound(BRIDGE_ID, bridge.address))
 
         assertThat(link).isEqualTo(LightsLink(BRIDGE_ID, bridge.address, KEY))
         assertThat(link?.key).isEqualTo(KEY)
         assertThat(bridge.posts().single().body).contains("culvery#tablet")
+        assertThat(bridge.received.map { it.path }).containsExactly("/api")
     }
 
-    /** Fails if the key is asked of a bridge whose certificate names another id than its config. */
+    /** Fails if the key is asked of a bridge whose certificate names another id than the one found. */
     @Test
     fun aConfigNamingAnotherBridgeIsNotPaired() = runBlocking {
         val other = fake("other")

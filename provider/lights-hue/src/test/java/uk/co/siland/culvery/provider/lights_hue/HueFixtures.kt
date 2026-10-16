@@ -117,11 +117,6 @@ internal object HueFixtures {
         ]}
     """.trimIndent()
 
-    val BRIDGE = """
-        {"errors":[],"data":[{"id":"aaaaaaaa-aaaa-4bbb-8ccc-000000000001","bridge_id":"$BRIDGE_ID",
-          "time_zone":{"time_zone":"Europe/London"},"type":"bridge"}]}
-    """.trimIndent()
-
     val CONFIG = """
         {"name":"Hue Bridge","datastoreversion":"172","swversion":"1978418030","apiversion":"1.78.0",
          "mac":"00:17:88:a1:b2:c3","bridgeid":"$BRIDGE_ID","factorynew":false,"replacesbridgeid":"ecb5fafffe9a1b2c",

@@ -13,7 +13,8 @@ class HueDiscoveryTest {
     private class Asked(val service: NsdServiceInfo, val onDone: (MdnsAnswer?) -> Unit, val onBusy: () -> Unit)
 
     private val asked = mutableListOf<Asked>()
-    private val queue = ResolveQueue { service, onDone, onBusy -> asked += Asked(service, onDone, onBusy) }
+    private val heard = mutableListOf<MdnsAnswer>()
+    private val queue = ResolveQueue(onAnswer = { heard += it }) { service, onDone, onBusy -> asked += Asked(service, onDone, onBusy) }
 
     private fun service(name: String) = NsdServiceInfo().apply { serviceName = name }
 
@@ -47,7 +48,7 @@ class HueDiscoveryTest {
         assertThat(bridgesFrom(answers)).isEmpty()
     }
 
-    /** Fails if a second resolve starts before the first has finished. */
+    /** Fails if a second resolve starts before the first has finished, or an answer kept isn't heard as it comes. */
     @Test
     fun resolvesRunOneAtATime() {
         queue.add(service("a"))
@@ -65,6 +66,17 @@ class HueDiscoveryTest {
             MdnsAnswer("001788fffe00a1b2", "192.168.1.30"),
             MdnsAnswer("001788fffe00c3d4", "192.168.1.31"),
         ).inOrder()
+        assertThat(heard).isEqualTo(queue.answers())
+    }
+
+    /** Fails if an answer that comes after the search closed is kept or heard, so a search could end on it. */
+    @Test
+    fun anAnswerAfterCloseIsIgnored() {
+        queue.add(service("a"))
+        queue.close()
+        asked[0].onDone(MdnsAnswer("001788fffe00a1b2", "192.168.1.30"))
+        assertThat(queue.answers()).isEmpty()
+        assertThat(heard).isEmpty()
     }
 
     /** Fails if a resolve refused as busy is dropped, or asked again before the services waiting behind it. */

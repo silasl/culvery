@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.provider.music_sonos
 
 import uk.co.siland.culvery.core.plugin.isHomeNetworkHost
+import uk.co.siland.culvery.core.plugin.splitAuthority
 
 internal const val SONOS_PORT = 1400
 
@@ -8,8 +9,5 @@ internal const val SONOS_PORT = 1400
 internal fun isSpeakerAuthority(host: String, port: Int): Boolean = port == SONOS_PORT && isHomeNetworkHost(host)
 
 /** The same for "host:port"; tests that run speakers on this machine pass their own [accept]. */
-internal fun isSpeakerAddress(address: String, accept: (String, Int) -> Boolean = ::isSpeakerAuthority): Boolean {
-    val host = address.substringBeforeLast(':', "")
-    val port = address.substringAfterLast(':', "").toIntOrNull() ?: return false
-    return host.isNotEmpty() && accept(host, port)
-}
+internal fun isSpeakerAddress(address: String, accept: (String, Int) -> Boolean = ::isSpeakerAuthority): Boolean =
+    splitAuthority(address, defaultPort = null)?.let { (host, port) -> accept(host, port) } ?: false

@@ -1,13 +1,31 @@
 package uk.co.siland.culvery.core.net
 
 import java.io.IOException
+import java.time.Duration
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.ConnectionPool
+import okhttp3.OkHttpClient
 import okhttp3.Response
 import okhttp3.ResponseBody
+
+/**
+ * A client for a device on the home network: every timeout [timeoutMs], no redirect (one could lead off the home
+ * network) and no retry (a command could be sent twice). [pool] is OkHttp's default when null.
+ */
+fun homeHttpClient(timeoutMs: Long, pool: ConnectionPool? = null): OkHttpClient = OkHttpClient.Builder()
+    .connectTimeout(Duration.ofMillis(timeoutMs))
+    .readTimeout(Duration.ofMillis(timeoutMs))
+    .writeTimeout(Duration.ofMillis(timeoutMs))
+    .callTimeout(Duration.ofMillis(timeoutMs))
+    .followRedirects(false)
+    .followSslRedirects(false)
+    .retryOnConnectionFailure(false)
+    .apply { if (pool != null) connectionPool(pool) }
+    .build()
 
 /** A finished HTTP answer: its status [code] and whole body. */
 class Answer(val code: Int, val bytes: ByteArray) {

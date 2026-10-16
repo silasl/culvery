@@ -2,7 +2,6 @@ package uk.co.siland.culvery.provider.music_sonos
 
 import java.io.IOException
 import java.io.InterruptedIOException
-import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -18,6 +17,7 @@ import uk.co.siland.culvery.capability.music.PlayState
 import uk.co.siland.culvery.core.net.Answer
 import uk.co.siland.culvery.core.net.BodyTooLarge
 import uk.co.siland.culvery.core.net.await
+import uk.co.siland.culvery.core.net.homeHttpClient
 
 /** A check or command gives up after this (6 §6). */
 internal const val SONOS_TIMEOUT_MS = 3_000L
@@ -46,12 +46,7 @@ internal class SonosFault(val code: Int?) : Exception("Sonos answered with a fau
 /** An address that isn't a speaker on the home network: refused before anything is sent (6 §6). I/O, so it leads to a rescan. */
 internal class NotASpeaker : IOException("Not a speaker on the home network")
 
-internal fun sonosHttp(): OkHttpClient = OkHttpClient.Builder()
-    .connectTimeout(Duration.ofMillis(SONOS_TIMEOUT_MS))
-    .readTimeout(Duration.ofMillis(SONOS_TIMEOUT_MS))
-    .callTimeout(Duration.ofMillis(SONOS_TIMEOUT_MS))
-    .retryOnConnectionFailure(false)
-    .build()
+internal fun sonosHttp(): OkHttpClient = homeHttpClient(SONOS_TIMEOUT_MS)
 
 /**
  * SOAP to one speaker at `host:port` (6 §3.2), only where [accept] allows: a speaker on the home network, on port 1400.

@@ -15,8 +15,11 @@ import javax.security.auth.x500.X500Principal
 internal class WrongBridgeCertificate : CertificateException("The certificate names another bridge")
 
 /** TLS to a Hue Bridge: the chain must reach a bundled Hue root, and a paired bridge's certificate must carry its id (7 §3.2). */
-internal class HueTrust(private val roots: List<X509Certificate> = bundledRoots()) {
-    constructor(ca: X509Certificate) : this(listOf(ca))
+internal class HueTrust(roots: () -> List<X509Certificate> = ::bundledRoots) {
+    constructor(ca: X509Certificate) : this({ listOf(ca) })
+
+    // Read at the first connection, not when Hilt builds the provider.
+    private val roots by lazy(roots)
 
     /** Each client is built for one bridge, so its trust manager checks the name and the host name is not used. */
     val hostnames = HostnameVerifier { _, _ -> true }
@@ -56,10 +59,13 @@ internal fun bundledRoots(): List<X509Certificate> {
         .map { it as X509Certificate }
 }
 
+private val UNESCAPED_SEPARATOR = Regex("""(?<!\\)[,+]""")
+private val ESCAPED = Regex("""\\(.)""")
+
 /** The subject's CN, or null when it has none; RFC 2253 escapes commas and plus signs inside values. */
 internal fun commonName(cert: X509Certificate): String? =
     cert.subjectX500Principal.getName(X500Principal.RFC2253)
-        .split(Regex("""(?<!\\)[,+]"""))
+        .split(UNESCAPED_SEPARATOR)
         .firstOrNull { it.startsWith("CN=", ignoreCase = true) }
         ?.substring(3)
-        ?.replace(Regex("""\\(.)"""), "$1")
+        ?.replace(ESCAPED, "$1")

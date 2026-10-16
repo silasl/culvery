@@ -31,3 +31,10 @@ fun isHomeNetworkHost(host: String): Boolean {
  */
 fun homeNetworkHost(typed: String): String? =
     ipv4Parts(typed.trim(), leadingZeros = true)?.joinToString(".")?.takeIf(::isHomeNetworkHost)
+
+/** "host:port" as its host and port, or "host" with [defaultPort] when that is given; null for any other shape. */
+fun splitAuthority(address: String, defaultPort: Int?): Pair<String, Int>? {
+    val host = address.substringBeforeLast(':')
+    val port = if (':' in address) address.substringAfterLast(':').toIntOrNull() else defaultPort
+    return if (port == null || host.isEmpty() || ':' in host) null else host to port
+}

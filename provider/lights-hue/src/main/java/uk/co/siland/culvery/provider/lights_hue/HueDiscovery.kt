@@ -9,7 +9,8 @@ import java.net.Inet4Address
 import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.capability.lights.BridgeFound
 
 /** How long a search listens (7 §3.2). */
@@ -35,9 +36,10 @@ internal fun bridgesFrom(answers: List<MdnsAnswer>, accept: (String, Int) -> Boo
 
 /**
  * Resolves services one at a time, as Android allows: each waits until the one before has answered, and one refused as
- * busy goes to the back of the queue. A service is resolved once however often it is heard.
+ * busy goes to the back of the queue. A service is resolved once however often it is heard; [onAnswer] hears each answer kept.
  */
 internal class ResolveQueue(
+    private val onAnswer: (MdnsAnswer) -> Unit = {},
     private val resolve: (service: NsdServiceInfo, onDone: (MdnsAnswer?) -> Unit, onBusy: () -> Unit) -> Unit,
 ) {
     private val lock = Any()
@@ -69,46 +71,41 @@ internal class ResolveQueue(
             waiting.removeFirstOrNull()?.also { resolving = true } ?: return
         }
         val settled = AtomicBoolean(false)
-        resolve(
-            service,
-            { answer ->
-                if (settled.compareAndSet(false, true)) {
-                    synchronized(lock) {
-                        if (!closed && answer != null) answers += answer
-                        resolving = false
-                    }
-                    next()
-                }
-            },
-            {
-                if (settled.compareAndSet(false, true)) {
-                    synchronized(lock) {
-                        if (!closed) waiting.addLast(service)
-                        resolving = false
-                    }
-                    next()
-                }
-            },
-        )
+        fun settle(requeue: Boolean, answer: MdnsAnswer?) {
+            if (!settled.compareAndSet(false, true)) return
+            val kept = synchronized(lock) {
+                if (!closed && requeue) waiting.addLast(service)
+                val kept = answer?.takeIf { !closed }?.also { answers += it }
+                resolving = false
+                kept
+            }
+            kept?.let(onAnswer)
+            next()
+        }
+        resolve(service, { answer -> settle(requeue = false, answer) }, { settle(requeue = true, answer = null) })
     }
 }
 
 /**
  * Finds Hue Bridges on the home Wi-Fi by mDNS (7 §3.2), never through Hue's cloud: `_hue._tcp` for [SEARCH_MS] under
- * the multicast [lock], each service resolved for its `bridgeid` record and IPv4 address. Finds nothing rather than
- * failing; the caller says nothing answered.
+ * the multicast [lock], each service resolved for its `bridgeid` record and IPv4 address, ending early once the
+ * `wanted` bridge is heard. Finds nothing rather than failing; the caller says nothing answered.
  */
 internal class HueDiscovery(
     private val nsd: NsdManager,
     private val lock: () -> AutoCloseable,
     private val sdk: Int = Build.VERSION.SDK_INT,
 ) {
-    suspend fun search(): List<BridgeFound> = lock().use {
+    suspend fun search(wanted: String? = null): List<BridgeFound> = lock().use {
         val callbacks = ConcurrentHashMap.newKeySet<NsdManager.ServiceInfoCallback>()
+        val heard = CompletableDeferred<Unit>()
+        val onAnswer = { answer: MdnsAnswer ->
+            if (bridgesFrom(listOf(answer)).any { it.bridgeId.equals(wanted, ignoreCase = true) }) heard.complete(Unit)
+        }
         val queue = if (sdk >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            ResolveQueue { service, onDone, onBusy -> resolveByCallback(service, callbacks, onDone, onBusy) }
+            ResolveQueue(onAnswer) { service, onDone, onBusy -> resolveByCallback(service, callbacks, onDone, onBusy) }
         } else {
-            ResolveQueue(::resolveOnce)
+            ResolveQueue(onAnswer, ::resolveOnce)
         }
         val listener = object : NsdManager.DiscoveryListener {
             override fun onServiceFound(service: NsdServiceInfo) = queue.add(service)
@@ -127,7 +124,7 @@ internal class HueDiscovery(
         }
         nsd.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener)
         try {
-            delay(SEARCH_MS)
+            withTimeoutOrNull(SEARCH_MS) { heard.await() }
         } finally {
             queue.close()
             try {

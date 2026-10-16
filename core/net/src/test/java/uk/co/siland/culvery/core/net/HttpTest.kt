@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.mockwebserver.MockResponse
@@ -28,6 +29,19 @@ class HttpTest {
     fun stop() = server.shutdown()
 
     private fun call() = client.newCall(Request.Builder().url(server.url("/")).build())
+
+    /** Fails if a timeout is left at OkHttp's default, a redirect is followed, a failed call is retried or the pool given is not used. */
+    @Test
+    fun aHomeNetworkClientHasOneTimeoutNoRedirectAndNoRetry() {
+        val pool = ConnectionPool(2, 5, TimeUnit.SECONDS)
+        val home = homeHttpClient(timeoutMs = 1_234, pool = pool)
+        assertThat(listOf(home.connectTimeoutMillis, home.readTimeoutMillis, home.writeTimeoutMillis, home.callTimeoutMillis))
+            .containsExactly(1_234, 1_234, 1_234, 1_234)
+        assertThat(home.followRedirects).isFalse()
+        assertThat(home.followSslRedirects).isFalse()
+        assertThat(home.retryOnConnectionFailure).isFalse()
+        assertThat(home.connectionPool).isSameInstanceAs(pool)
+    }
 
     /** Fails if the code or the whole body is lost on the way to the caller. */
     @Test

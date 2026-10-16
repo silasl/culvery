@@ -47,7 +47,7 @@ private const val BRIDGE_HOME = "bridge_home"
  */
 internal class HueSystem(
     private val client: HueClient,
-    private val search: suspend () -> List<BridgeFound>,
+    private val search: suspend (wanted: String?) -> List<BridgeFound>,
     private val online: () -> Boolean,
     link: LightsLink,
     private val onMoved: suspend (LightsLink) -> Unit,
@@ -79,15 +79,15 @@ internal class HueSystem(
     // Guarded by recovering.
     private var lastSearchMillis: Long? = null
 
-    override suspend fun readAll() = refusing { reaching { read(it) } }
+    // A move is saved only after a full read at the new address, so that read needn't run again.
+    override suspend fun readAll() = onBridge(movedResult = Unit) { read(it) }
 
+    /** Every call trusts only a certificate naming [BridgeCall.bridgeId], so another bridge fails as [WrongBridge]. */
     private suspend fun read(call: BridgeCall) = coroutineScope {
         val roomsRead = async { client.rooms(call) }
         val groupsRead = async { client.groupedLights(call) }
         val lightsRead = async { client.lights(call) }
         val scenesRead = async { client.scenes(call) }
-        val bridgeId = async { client.bridgeId(call) }
-        if (!bridgeId.await().equals(call.bridgeId, ignoreCase = true)) throw WrongBridge()
         val read = roomsRead.await()
         val groupsNow = groupsRead.await()
         val lightsNow = lightsRead.await()
@@ -137,28 +137,24 @@ internal class HueSystem(
      */
     override suspend fun allOff(leaveOut: Set<String>): AllOffResult {
         client.dropWaiting()
-        try {
+        return try {
             if (synchronized(lock) { groups.isEmpty() }) readAll()
+            val (included, home, lights) = synchronized(lock) {
+                val left = leaveOut.filter { id -> hueRooms.any { it.id == id } }.toSet()
+                val home = groups.values.firstOrNull { it.ownerType == BRIDGE_HOME }?.takeIf { left.isEmpty() }
+                Triple(hueRooms.filter { it.id !in left }, home, unroomedLights)
+            }
+            if (home != null) wholeHomeOff(home) else roomsOff(included, lights)
         } catch (e: LightsRefusedException) {
-            return AllOffResult.Refused
+            AllOffResult.Refused
         } catch (e: LightsUnreachableException) {
-            return AllOffResult.CantReach(e.problem)
+            AllOffResult.CantReach(e.problem)
         }
-        val (included, home, lights) = synchronized(lock) {
-            val left = leaveOut.filter { id -> hueRooms.any { it.id == id } }.toSet()
-            val home = groups.values.firstOrNull { it.ownerType == BRIDGE_HOME }?.takeIf { left.isEmpty() }
-            Triple(hueRooms.filter { it.id !in left }, home, unroomedLights)
-        }
-        return if (home != null) wholeHomeOff(home) else roomsOff(included, lights)
     }
 
-    private suspend fun wholeHomeOff(home: HueGroupedLight): AllOffResult = try {
+    private suspend fun wholeHomeOff(home: HueGroupedLight): AllOffResult {
         showThenSend({ groups.replaceAll { _, g -> g.copy(on = false) } }) { call -> client.setOn(call, home.id, false) }
-        AllOffResult.Done
-    } catch (e: LightsRefusedException) {
-        AllOffResult.Refused
-    } catch (e: LightsUnreachableException) {
-        AllOffResult.CantReach(e.problem)
+        return AllOffResult.Done
     }
 
     /** Every room's command goes whatever the others do; the lights in no room count as one room when any fails. */
@@ -183,27 +179,22 @@ internal class HueSystem(
     override suspend fun automations(): List<Automation> =
         readBehaviors().mapNotNull { b -> b.name?.let { Automation(b.id, it, b.on) } }
 
-    /**
-     * Mimic presence by its trigger, any other by `enabled`. The bridge answers 200 even to a trigger it ignores, so only
-     * the read-back confirms it (7 §4.5).
-     */
+    /** The bridge answers 200 even to a trigger it ignores, so only the read-back confirms it (7 §4.5). */
     override suspend fun setAutomation(automation: Automation, on: Boolean): AutomationResult {
         val behavior = behaviors[automation.id]
             ?: readBehaviors().firstOrNull { it.id == automation.id }
             ?: throw LightsRefusedException()
-        val sent = refusing {
-            reaching { call -> if (behavior.isMimic) client.trigger(call, behavior.id, on) else client.setEnabled(call, behavior.id, on) }
-        }
+        val sent = onBridge { call -> client.setBehavior(call, behavior.id, behavior.isMimic, on) }
         if (!sent) return AutomationResult.NOT_CONFIRMED
         repeat(READ_BACK_TRIES) {
             delay(readBackMs)
-            if (readBehaviors().firstOrNull { it.id == behavior.id }?.on == on) return AutomationResult.CONFIRMED
+            if (onBridge { client.behavior(it, behavior.id) }?.on == on) return AutomationResult.CONFIRMED
         }
         return AutomationResult.NOT_CONFIRMED
     }
 
     private suspend fun readBehaviors(): List<HueBehavior> =
-        refusing { reaching { client.behaviors(it) } }.also { list -> behaviors = list.associateBy { it.id } }
+        onBridge { client.behaviors(it) }.also { list -> behaviors = list.associateBy { it.id } }
 
     override fun useAddress(address: String) {
         link = link.copy(address = address)
@@ -228,7 +219,7 @@ internal class HueSystem(
     private suspend fun showThenSend(shown: () -> Unit, send: suspend (BridgeCall) -> Boolean) {
         val before = show(shown)
         try {
-            refusing { reaching(block = send) }
+            onBridge(block = send)
         } catch (e: LightsRefusedException) {
             rereadQuietly()
             throw e
@@ -240,7 +231,7 @@ internal class HueSystem(
 
     /** Null once sent; otherwise why it wasn't. */
     private suspend fun attempt(send: suspend (BridgeCall) -> Boolean): Exception? = try {
-        refusing { reaching(block = send) }
+        onBridge(block = send)
         null
     } catch (e: LightsRefusedException) {
         e
@@ -328,53 +319,47 @@ internal class HueSystem(
         }
     }
 
-    /** A bridge that answered but didn't do what was asked, or answered in a shape that isn't Hue's (7 §6). */
-    private suspend fun <T> refusing(block: suspend () -> T): T = try {
-        block()
-    } catch (e: HueRefused) {
-        throw LightsRefusedException()
-    } catch (e: HueJsonException) {
-        throw LightsRefusedException()
-    }
-
     /**
-     * Runs [block] on the saved bridge. A success clears the problem. No answer, or another bridge's, searches for the
-     * bridge and, once it is found at a new address, runs [block] there; only then is a problem set (7 §4.1, §6). Offline
-     * or not paired, it isn't searched for.
+     * Runs [block] on the saved bridge. A success clears the problem. An answer that refuses, or isn't one of Hue's
+     * shapes, is [LightsRefusedException] (7 §6). No answer, or another bridge's, searches for the bridge and, once it is
+     * found at a new address, runs [block] there, or returns [movedResult] when given, as the search's full read there
+     * did [block]'s work; only then is a problem set (7 §4.1, §6). Offline or not paired, it isn't searched for.
      */
-    private suspend fun <T> reaching(again: Boolean = true, block: suspend (BridgeCall) -> T): T {
+    private suspend fun <T> onBridge(again: Boolean = true, movedResult: T? = null, block: suspend (BridgeCall) -> T): T {
         val call = call()
         return try {
             block(call).also { _problem.value = null }
+        } catch (e: HueRefused) {
+            throw LightsRefusedException()
         } catch (e: HueJsonException) {
-            // An answer, though not one of Hue's shapes: refused, not unreachable.
-            throw e
+            throw LightsRefusedException()
         } catch (e: HueUnauthorised) {
             fail(LightsProblem.UNPAIRED)
         } catch (e: IOException) {
             if (!online()) fail(LightsProblem.OFFLINE)
             when (if (again) recover(call) else Found.NOTHING) {
-                Found.MOVED -> reaching(again = false, block = block)
+                Found.MOVED -> movedResult?.also { _problem.value = null } ?: onBridge(again = false, block = block)
+                Found.ELSEWHERE -> onBridge(again = false, block = block)
                 Found.OTHER -> fail(LightsProblem.OTHER_BRIDGE)
                 Found.NOTHING -> fail(if (e is WrongBridge) LightsProblem.OTHER_BRIDGE else LightsProblem.UNREACHABLE)
             }
         }
     }
 
-    private enum class Found { MOVED, OTHER, NOTHING }
+    /** [MOVED]: this search read everything at the new address; [ELSEWHERE]: the address changed while this call waited. */
+    private enum class Found { MOVED, ELSEWHERE, OTHER, NOTHING }
 
     /**
      * Searches for the bridge [failed] went to. One with the same id counts as moved only once a full read at its address,
      * trusting only a certificate naming that id, has succeeded; only then is its address saved, with the key (7 §4.1).
      */
     private suspend fun recover(failed: BridgeCall): Found = recovering.withLock {
-        // Another call found it while this one waited.
-        if (link.address != failed.address) return@withLock Found.MOVED
+        if (link.address != failed.address) return@withLock Found.ELSEWHERE
         val now = clock.nowMillis()
         if (lastSearchMillis?.let { now - it in 0 until SEARCH_GAP_MS } == true) return@withLock Found.NOTHING
         lastSearchMillis = now
         val candidates = try {
-            search()
+            search(failed.bridgeId)
         } catch (e: LightsUnreachableException) {
             emptyList()
         } catch (e: IOException) {

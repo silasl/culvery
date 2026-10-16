@@ -74,7 +74,7 @@ class HueSystemTest {
 
     private fun TestScope.system(
         address: String = bridge.address,
-        search: suspend () -> List<BridgeFound> = { emptyList() },
+        search: suspend (String?) -> List<BridgeFound> = { emptyList() },
         online: () -> Boolean = { true },
         onMoved: suspend (LightsLink) -> Unit = {},
         timeoutMs: Long = HUE_TIMEOUT_MS,
@@ -100,7 +100,7 @@ class HueSystemTest {
 
     private fun FakeBridge.puts() = received.filter { it.method == "PUT" }.map { it.path to it.body }
 
-    private fun FakeBridge.behaviorReads() = received.filter { it.method == "GET" && it.path == "$RESOURCE/behavior_instance" }
+    private fun FakeBridge.behaviorReads() = received.filter { it.method == "GET" && it.path.startsWith("$RESOURCE/behavior_instance") }
 
     /** The problem [block] failed with as unreachable; null when it didn't. */
     private suspend fun failure(block: suspend () -> Unit): LightsProblem? =
@@ -118,7 +118,7 @@ class HueSystemTest {
             LightRoom(KITCHEN, "Kitchen", on = false, brightness = 0, emptyList(), null, dimmable = true),
             LightRoom(GARDEN, "Garden", on = true, brightness = 0, emptyList(), null, dimmable = false),
         ).inOrder()
-        assertThat(bridge.reads()).containsExactly("room", "grouped_light", "light", "scene", "bridge")
+        assertThat(bridge.reads()).containsExactly("room", "grouped_light", "light", "scene")
         assertThat(s.problem.value).isNull()
     }
 
@@ -382,13 +382,15 @@ class HueSystemTest {
         val mimic = s.automations().single { it.id == PM_STOPPED }
         bridge.received.clear()
         bridge.onRequest = {
-            if (it.path == "$RESOURCE/behavior_instance" && bridge.behaviorReads().size == 2) {
+            if (it.path == "$RESOURCE/behavior_instance/$PM_STOPPED" && bridge.behaviorReads().size == 2) {
                 bridge.resources["behavior_instance"] = PM_ALL_STARTED
             }
         }
         assertThat(s.setAutomation(mimic, true)).isEqualTo(AutomationResult.CONFIRMED)
         assertThat(bridge.puts()).containsExactly("$RESOURCE/behavior_instance/$PM_STOPPED" to """{"trigger":{"start":true}}""")
-        assertThat(bridge.behaviorReads()).hasSize(2)
+        assertThat(bridge.behaviorReads().map { it.path }).containsExactly(
+            "$RESOURCE/behavior_instance/$PM_STOPPED", "$RESOURCE/behavior_instance/$PM_STOPPED",
+        )
 
         bridge.received.clear()
         bridge.onRequest = { if (it.method == "PUT") bridge.resources["behavior_instance"] = PM_ALL_STOPPED }
@@ -444,21 +446,9 @@ class HueSystemTest {
         assertThat(searches).isEqualTo(0)
     }
 
-    /** Fails if another bridge id at a full read is shown as these rooms, or isn't searched past (7 §6). */
-    @Test
-    fun aDifferentBridgeIdAtAFullReadIsOtherBridge() = runTest {
-        var searches = 0
-        val s = system(search = { searches++; emptyList() })
-        bridge.resources["bridge"] = HueFixtures.BRIDGE.replace(BRIDGE_ID, ANOTHER_ID)
-        assertThat(failure { s.readAll() }).isEqualTo(LightsProblem.OTHER_BRIDGE)
-        assertThat(s.problem.value).isEqualTo(LightsProblem.OTHER_BRIDGE)
-        assertThat(s.rooms.value).isEmpty()
-        assertThat(searches).isEqualTo(1)
-    }
-
     /**
-     * Fails if a moved bridge's address is saved before a verified read there, the key is lost, a problem shows, or a
-     * bridge the search heard with another id is asked (7 §4.1).
+     * Fails if a moved bridge's address is saved before a verified read there, the key is lost, a problem shows, a
+     * bridge the search heard with another id is asked, the search isn't for the saved id, or everything is read twice (7 §4.1).
      */
     @Test
     fun aMovedBridgeIsSavedOnlyAfterAVerifiedRead() = runTest {
@@ -467,9 +457,13 @@ class HueSystemTest {
         bridge.delayMs = 400
         var saved: LightsLink? = null
         var answeredBeforeSaved = 0
+        var wanted: String? = null
         val s = system(
             timeoutMs = 200,
-            search = { listOf(BridgeFound(ANOTHER_ID, another.address), BridgeFound(BRIDGE_ID.uppercase(), moved.address)) },
+            search = {
+                wanted = it
+                listOf(BridgeFound(ANOTHER_ID, another.address), BridgeFound(BRIDGE_ID.uppercase(), moved.address))
+            },
             onMoved = {
                 saved = it
                 answeredBeforeSaved = moved.reads().size
@@ -478,7 +472,9 @@ class HueSystemTest {
         s.readAll()
         assertThat(saved).isEqualTo(LightsLink(BRIDGE_ID, moved.address, KEY))
         assertThat(saved?.key).isEqualTo(KEY)
-        assertThat(answeredBeforeSaved).isAtLeast(5)
+        assertThat(answeredBeforeSaved).isEqualTo(4)
+        assertThat(moved.reads()).containsExactly("room", "grouped_light", "light", "scene")
+        assertThat(wanted).isEqualTo(BRIDGE_ID)
         assertThat(s.problem.value).isNull()
         assertThat(s.rooms.value).hasSize(3)
         assertThat(another.received).isEmpty()

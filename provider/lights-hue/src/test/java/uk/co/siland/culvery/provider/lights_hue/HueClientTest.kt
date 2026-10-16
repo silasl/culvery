@@ -42,7 +42,7 @@ class HueClientTest {
     @After
     fun tearDown() = bridges.forEach { it.close() }
 
-    /** Fails if a read goes to the wrong resource, leaves out the key, or isn't parsed as its resource. */
+    /** Fails if a read goes to the wrong resource, leaves out the key, isn't parsed as its resource, or a gone automation isn't null. */
     @Test
     fun eachReadIsItsResourcesPathWithTheKey() = runTest {
         assertThat(client.rooms(call).map { it.name }).containsExactly("Lounge", "Kitchen", "Garden").inOrder()
@@ -50,14 +50,16 @@ class HueClientTest {
         assertThat(client.lights(call)).hasSize(5)
         assertThat(client.scenes(call).map { it.name }).containsExactly("Relax", "Bright")
         assertThat(client.behaviors(call)).hasSize(6)
-        assertThat(client.bridgeId(call)).isEqualTo(BRIDGE_ID)
+        assertThat(client.behavior(call, HueFixtures.PM_STARTED)?.on).isTrue()
+        assertThat(client.behavior(call, "gone")).isNull()
         assertThat(bridge.received.map { it.method to it.path }).containsExactly(
             "GET" to "/clip/v2/resource/room",
             "GET" to "/clip/v2/resource/grouped_light",
             "GET" to "/clip/v2/resource/light",
             "GET" to "/clip/v2/resource/scene",
             "GET" to "/clip/v2/resource/behavior_instance",
-            "GET" to "/clip/v2/resource/bridge",
+            "GET" to "/clip/v2/resource/behavior_instance/${HueFixtures.PM_STARTED}",
+            "GET" to "/clip/v2/resource/behavior_instance/gone",
         ).inOrder()
         assertThat(bridge.received.map { it.key }.distinct()).containsExactly(KEY)
     }
@@ -70,9 +72,9 @@ class HueClientTest {
         assertThat(client.setBrightness(call, HueFixtures.KITCHEN_GROUP, 55, turnOn = false)).isTrue()
         assertThat(client.recall(call, HueFixtures.RELAX)).isTrue()
         assertThat(client.setLightOn(call, "light-1", false)).isTrue()
-        assertThat(client.setEnabled(call, HueFixtures.SCHEDULE_OFF, true)).isTrue()
-        assertThat(client.trigger(call, HueFixtures.PM_STOPPED, start = true)).isTrue()
-        assertThat(client.trigger(call, HueFixtures.PM_STARTED, start = false)).isTrue()
+        assertThat(client.setBehavior(call, HueFixtures.SCHEDULE_OFF, mimic = false, on = true)).isTrue()
+        assertThat(client.setBehavior(call, HueFixtures.PM_STOPPED, mimic = true, on = true)).isTrue()
+        assertThat(client.setBehavior(call, HueFixtures.PM_STARTED, mimic = true, on = false)).isTrue()
         val resource = "/clip/v2/resource"
         assertThat(bridge.received.map { Triple(it.method, it.path, it.body) }).containsExactly(
             Triple("PUT", "$resource/grouped_light/${HueFixtures.LOUNGE_GROUP}", """{"on":{"on":true}}"""),
@@ -90,9 +92,9 @@ class HueClientTest {
     /** Fails if pairing sends a key, the wrong body or path, or misreads the bridge's answer (7 §3.2). */
     @Test
     fun pairingPostsTheDeviceType() = runTest {
-        assertThat(client.pair(bridge.address, BRIDGE_ID)).isEqualTo(PairAnswer.Paired(KEY))
+        assertThat(client.pair(bridge.address, BRIDGE_ID)).isEqualTo(KEY)
         bridge.buttonPressed = false
-        assertThat(client.pair(bridge.address, BRIDGE_ID)).isEqualTo(PairAnswer.ButtonNotPressed)
+        assertThat(client.pair(bridge.address, BRIDGE_ID)).isNull()
         val sent = bridge.received.first()
         assertThat(sent.method to sent.path).isEqualTo("POST" to "/api")
         assertThat(sent.body).isEqualTo("""{"devicetype":"culvery#tablet","generateclientkey":true}""")
@@ -102,8 +104,8 @@ class HueClientTest {
     /** Fails if config sends a key, or trusts the answer's id without the certificate's name or the expected id agreeing. */
     @Test
     fun configNeedsNoKeyAndChecksTheName() = runTest {
-        assertThat(client.config(bridge.address)).isEqualTo(HueConfig(BRIDGE_ID))
-        assertThat(client.config(bridge.address, expectedId = BRIDGE_ID.uppercase())).isEqualTo(HueConfig(BRIDGE_ID))
+        assertThat(client.config(bridge.address)).isEqualTo(BRIDGE_ID)
+        assertThat(client.config(bridge.address, expectedId = BRIDGE_ID.uppercase())).isEqualTo(BRIDGE_ID)
         assertThat(bridge.received.map { it.method to it.path }.distinct()).containsExactly("GET" to "/api/config")
         assertThat(bridge.received.map { it.key }.distinct()).containsExactly(null)
         throws<WrongBridge> { client.config(bridge.address, expectedId = "001788fffe00c3d4") }
@@ -150,8 +152,8 @@ class HueClientTest {
     fun enablingAndTriggeringOneAutomationAreBothSent(): Unit = runBlocking {
         val paced = client(pacer = HuePacer(now = System::currentTimeMillis, groupGapMs = 0, lightGapMs = 300))
         paced.setLightOn(call, "light-1", true)
-        val enabled = async { paced.setEnabled(call, HueFixtures.PM_STOPPED, true) }
-        val triggered = async { paced.trigger(call, HueFixtures.PM_STOPPED, start = true) }
+        val enabled = async { paced.setBehavior(call, HueFixtures.PM_STOPPED, mimic = false, on = true) }
+        val triggered = async { paced.setBehavior(call, HueFixtures.PM_STOPPED, mimic = true, on = true) }
         assertThat(enabled.await()).isTrue()
         assertThat(triggered.await()).isTrue()
         assertThat(bridge.received.map { it.body }).containsAtLeast("""{"enabled":true}""", """{"trigger":{"start":true}}""")

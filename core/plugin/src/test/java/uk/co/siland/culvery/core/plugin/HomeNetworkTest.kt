@@ -30,4 +30,14 @@ class HomeNetworkTest {
             "", "192.168.1.2O", "１９２.168.1.20", "192.168..20", "192.168.1.0020",
         ).forEach { assertThat(homeNetworkHost(it)).isNull() }
     }
+
+    /** Fails if a missing port isn't defaulted only when a default is given, or a bad port, an empty host or an IPv6 literal gets through. */
+    @Test
+    fun anAuthoritySplitsIntoHostAndPort() {
+        assertThat(splitAuthority("192.168.1.20:1400", defaultPort = null)).isEqualTo("192.168.1.20" to 1400)
+        assertThat(splitAuthority("192.168.1.30", defaultPort = 443)).isEqualTo("192.168.1.30" to 443)
+        assertThat(splitAuthority("192.168.1.30:8443", defaultPort = 443)).isEqualTo("192.168.1.30" to 8443)
+        assertThat(splitAuthority("192.168.1.20", defaultPort = null)).isNull()
+        listOf(":1400", "192.168.1.20:port", "::1:443", "192.168.1.20:").forEach { assertThat(splitAuthority(it, defaultPort = 443)).isNull() }
+    }
 }

@@ -7,6 +7,12 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -120,9 +126,23 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
             "/api" -> MockResponse().setBody(if (buttonPressed) HueFixtures.PAIRED else HueFixtures.NOT_PRESSED)
             "/api/config" -> MockResponse().setBody(HueFixtures.CONFIG)
             "/eventstream/clip/v2" -> stream()
-            else -> resources[path.removePrefix("/clip/v2/resource/")]?.let { MockResponse().setBody(it) }
+            else -> resource(path.removePrefix("/clip/v2/resource/"))?.let { MockResponse().setBody(it) }
                 ?: MockResponse().setResponseCode(404).setBody("""{"errors":[{"description":"not found"}]}""")
         }
+    }
+
+    /** A resource type's page, or `type/id`'s page of that one; null when there is none. */
+    private fun resource(path: String): String? {
+        val page = resources[path.substringBefore('/')] ?: return null
+        if ('/' !in path) return page
+        val id = path.substringAfter('/')
+        val one = Json.parseToJsonElement(page).jsonObject.getValue("data").jsonArray
+            .filter { it.jsonObject["id"]?.jsonPrimitive?.content == id }
+            .ifEmpty { return null }
+        return buildJsonObject {
+            put("errors", JsonArray(emptyList()))
+            put("data", JsonArray(one))
+        }.toString()
     }
 
     private fun stream(): MockResponse {
@@ -147,7 +167,6 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
             "light" to HueFixtures.LIGHTS,
             "scene" to HueFixtures.SCENES,
             "behavior_instance" to HueFixtures.BEHAVIORS,
-            "bridge" to HueFixtures.BRIDGE,
         )
     }
 }
