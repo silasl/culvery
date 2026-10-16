@@ -331,6 +331,13 @@ On `culvery-5` (debug build, sample household) against the household's real spea
 - Moved to the tablet: Find Sonos by scan, the Home card and Music tab on live groups, Play/Pause/Next and both volume sliders against the Sonos app, the paused room staying on Home, the Rooms chip, a radio and a playlist Favourite, Shuffle everything from a paused station, the doorbell lowering (two-room group, Got it, a room dragged meanwhile, a second ring, 0 %), offline, TalkBack, and the captures for the fixtures.
 - For the end-of-v1 design walk-through: the Music tab's unselected Rooms chip blends into its row; empty message lines leave gaps in Settings › Music and the address sheet; the Home card's buttons are tight to fit Shuffle everything; the tab keeps Next on a row with nothing playing while the Home card drops it.
 
+## Plan 6 (Sonos): on the tablet (2026-10-16)
+
+Release builds installed with `install -r` over Plan 5's (the household kept); Culvery pinned again once in front.
+- Passed: Find Sonos by scan (the SSDP search under the multicast lock found the household within seconds); the usual room; no "can't reach Sonos" at all (the emulator's flicker was the emulator); the Home card and the Music tab on live groups; Play, Pause, Next and the volume, both ways with the Sonos app within about 2 seconds; the group slider keeps the rooms' balance (protocol check 2 passed: `SnapshotGroupVolume` then `SetGroupVolume`); the Rooms chip moves one room; the real bell with a two-room group: both rooms dropped before the chime, Got it brought both back; nothing in the log from the lowering or the restore.
+- Fault: a regrouping in the Sonos app showed only at the 30-second layout check, and a slider on the old row was refused. The user's ruling: each 2-second check asks every room which group it's in (`GetZoneGroupAttributes`) and re-reads the layout at once on a change (0f967f8, reviewed). On the household's speakers that answer's group id matches the room list's exactly, so a still system isn't re-read every check. Grouping now shows straight away.
+- Not tried on the tablet (the user will raise a bug if one shows in use): the paused room staying on Home, radio and playlist Favourites (they need Sonos Favourites set up in the Sonos app), Shuffle everything (protocol check 3, its library URI, empty metadata, one-item browse and order, stays unconfirmed and pinned as such in the tests), the "Nothing playing" card, offline, TalkBack, and the captures (the fixtures stay the documented examples; the release build has no capture).
+
 ## From Plan 6
 
 - Move `MusicSettings` and `DoorSettings` onto `retryWithBackoff`, so one DataStore read failure doesn't end their flow.
