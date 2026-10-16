@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 7 §3.2: HTTPS to the bridge on the home network. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 7 §6: "The tablet is offline" is Android saying it has no network. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 7 §3.2: the mDNS search's multicast lock. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+</manifest>
