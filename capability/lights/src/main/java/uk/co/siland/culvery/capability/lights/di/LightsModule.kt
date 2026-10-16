@@ -7,10 +7,12 @@ import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
 import uk.co.siland.culvery.capability.lights.LightsCapability
+import uk.co.siland.culvery.capability.lights.LightsFollow
 import uk.co.siland.culvery.capability.lights.LightsPermissionSource
 import uk.co.siland.culvery.capability.lights.LightsProvider
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.plugin.Capability
+import uk.co.siland.culvery.core.plugin.Startable
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -26,4 +28,8 @@ abstract class LightsModule {
     @Binds
     @IntoSet
     abstract fun permissions(impl: LightsPermissionSource): PermissionSource
+
+    @Binds
+    @IntoSet
+    abstract fun follow(impl: LightsFollow): Startable
 }
