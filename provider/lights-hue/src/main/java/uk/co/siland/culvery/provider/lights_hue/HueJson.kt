@@ -181,6 +181,16 @@ internal object HueJson {
         }
     }
 
+    /** True when a CLIP v2 answer lists any error, whatever its status: the bridge didn't do all it was asked. */
+    fun hasErrors(text: String): Boolean {
+        val root = try {
+            JSON.parseToJsonElement(text)
+        } catch (e: SerializationException) {
+            return false
+        }
+        return ((root as? JsonObject)?.get("errors") as? JsonArray).orEmpty().isNotEmpty()
+    }
+
     private fun JsonElement?.asInt(): Int? = (this as? JsonPrimitive)?.intOrNull
 
     /** The `data:` payloads of a server-sent stream, one per line; comment, `id:` and other lines are skipped. */

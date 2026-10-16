@@ -4,12 +4,14 @@ import java.io.IOException
 import java.security.cert.X509Certificate
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.ConnectionPool
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -19,6 +21,10 @@ import uk.co.siland.culvery.core.net.await
 
 /** A read or command gives up after this (7 §6). */
 internal const val HUE_TIMEOUT_MS = 3_000L
+
+/** Idle connections are kept this long only: well under any bridge's idle timeout, as no call is retried. */
+internal const val IDLE_CONNECTIONS = 2
+internal const val KEEP_ALIVE_MS = 5_000L
 
 /** A whole bridge's rooms, lights and scenes run to tens of KB; past this isn't a bridge's answer. */
 internal const val MAX_ANSWER_BYTES = 4L * 1024 * 1024
@@ -58,8 +64,10 @@ internal class HueClient(
     timeoutMs: Long = HUE_TIMEOUT_MS,
     private val capture: (String, String) -> Unit = HueCapture::log,
 ) {
-    // A redirect could lead off the home network, and a retried command could be sent twice. Idle connections are kept:
-    // over HTTP/2 a pool that keeps none can close a connection a new call has already taken.
+    // Over HTTP/2 a pool that keeps no idle connection can close one a new call has already taken.
+    internal val pool = ConnectionPool(IDLE_CONNECTIONS, KEEP_ALIVE_MS, TimeUnit.MILLISECONDS)
+
+    // A redirect could lead off the home network, and a retried command could be sent twice.
     private val base = OkHttpClient.Builder()
         .connectTimeout(Duration.ofMillis(timeoutMs))
         .readTimeout(Duration.ofMillis(timeoutMs))
@@ -69,6 +77,7 @@ internal class HueClient(
         .followSslRedirects(false)
         .retryOnConnectionFailure(false)
         .hostnameVerifier(trust.hostnames)
+        .connectionPool(pool)
         .build()
 
     private val named = ConcurrentHashMap<String, OkHttpClient>()
@@ -146,10 +155,10 @@ internal class HueClient(
         command(call, "scene", sceneId, PaceKind.GROUP, HueJson.recallBody())
 
     suspend fun setEnabled(call: BridgeCall, behaviorId: String, enabled: Boolean): Boolean =
-        command(call, "behavior_instance", behaviorId, PaceKind.LIGHT, HueJson.enabledBody(enabled))
+        command(call, "behavior_instance", behaviorId, PaceKind.LIGHT, HueJson.enabledBody(enabled), "$behaviorId:enabled")
 
     suspend fun trigger(call: BridgeCall, behaviorId: String, start: Boolean): Boolean =
-        command(call, "behavior_instance", behaviorId, PaceKind.LIGHT, HueJson.triggerBody(start))
+        command(call, "behavior_instance", behaviorId, PaceKind.LIGHT, HueJson.triggerBody(start), "$behaviorId:trigger")
 
     /** Drops every command still waiting its turn (7 §4.4). */
     fun dropWaiting() = pacer.dropWaiting()
@@ -185,10 +194,11 @@ internal class HueClient(
     private suspend fun <T> read(call: BridgeCall, type: String, parse: (String) -> T): T =
         send(named(call.bridgeId), keyed(call, url(call.address, "clip", "v2", "resource", type)).build(), type, parse)
 
-    private suspend fun command(call: BridgeCall, type: String, id: String, kind: PaceKind, body: String): Boolean {
+    /** [target] is what a newer command replaces: one setting of one resource. */
+    private suspend fun command(call: BridgeCall, type: String, id: String, kind: PaceKind, body: String, target: String = id): Boolean {
         val request = keyed(call, url(call.address, "clip", "v2", "resource", type, id)).put(body.toRequestBody(JSON_TYPE)).build()
         val client = named(call.bridgeId)
-        return pacer.send(id, kind) { send(client, request, "PUT $type") {} }
+        return pacer.send(target, kind) { send(client, request, "PUT $type") {} }
     }
 
     private fun keyed(call: BridgeCall, url: HttpUrl): Request.Builder = Request.Builder().url(url).header(KEY_HEADER, call.key)
@@ -209,7 +219,7 @@ internal class HueClient(
 
     private fun check(code: Int, text: String) {
         if (code == HTTP_FORBIDDEN || HueJson.isUnauthorised(text)) throw HueUnauthorised()
-        if (code !in 200..299) throw HueRefused(code)
+        if (code !in 200..299 || HueJson.hasErrors(text)) throw HueRefused(code)
     }
 
     /** `https://host:port/segments…`, only for an address [accept] allows; anything else is [NotABridge]. */

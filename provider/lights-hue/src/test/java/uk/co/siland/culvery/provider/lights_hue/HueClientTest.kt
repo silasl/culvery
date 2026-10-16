@@ -2,9 +2,11 @@ package uk.co.siland.culvery.provider.lights_hue
 
 import com.google.common.truth.Truth.assertThat
 import java.io.InterruptedIOException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Test
@@ -26,9 +28,12 @@ class HueClientTest {
 
     private fun fake(keystore: String = "bridge") = FakeBridge(keystore).also { bridges += it }
 
-    private fun client(accept: (String, Int) -> Boolean = onThisMachine) = HueClient(
+    private fun client(
+        accept: (String, Int) -> Boolean = onThisMachine,
+        pacer: HuePacer = HuePacer(now = System::currentTimeMillis, groupGapMs = 0, lightGapMs = 0),
+    ) = HueClient(
         HueTrust(TestCerts.testCa()),
-        HuePacer(now = System::currentTimeMillis, groupGapMs = 0, lightGapMs = 0),
+        pacer,
         accept = accept,
         timeoutMs = TIMEOUT_MS,
         capture = { what, answer -> captured += what to answer },
@@ -130,6 +135,35 @@ class HueClientTest {
         bridge.failing = true
         assertThat(throws<HueRefused> { client.setOn(call, HueFixtures.LOUNGE_GROUP, true) }.code).isEqualTo(500)
         assertThat(throws<HueRefused> { client.rooms(call) }.code).isEqualTo(500)
+    }
+
+    /** Fails if a 2xx answer listing an error counts as done, so a room shows on when the bridge did nothing (7 §6). */
+    @Test
+    fun anAnswerListingAnErrorIsRefused() = runTest {
+        bridge.answersWithErrors = true
+        assertThat(throws<HueRefused> { client.setOn(call, HueFixtures.LOUNGE_GROUP, true) }.code).isEqualTo(200)
+        assertThat(throws<HueRefused> { client.setBrightness(call, HueFixtures.LOUNGE_GROUP, 40, turnOn = true) }.code).isEqualTo(200)
+    }
+
+    /** Fails if switching an automation and triggering it share one pace target, so one replaces the other. */
+    @Test
+    fun enablingAndTriggeringOneAutomationAreBothSent(): Unit = runBlocking {
+        val paced = client(pacer = HuePacer(now = System::currentTimeMillis, groupGapMs = 0, lightGapMs = 300))
+        paced.setLightOn(call, "light-1", true)
+        val enabled = async { paced.setEnabled(call, HueFixtures.PM_STOPPED, true) }
+        val triggered = async { paced.trigger(call, HueFixtures.PM_STOPPED, start = true) }
+        assertThat(enabled.await()).isTrue()
+        assertThat(triggered.await()).isTrue()
+        assertThat(bridge.received.map { it.body }).containsAtLeast("""{"enabled":true}""", """{"trigger":{"start":true}}""")
+    }
+
+    /** Fails if idle connections aren't kept, which races HTTP/2, or are kept long enough to outlive the bridge's idle timeout. */
+    @Test
+    fun idleConnectionsAreKeptBriefly() = runTest {
+        assertThat(IDLE_CONNECTIONS).isEqualTo(2)
+        assertThat(KEEP_ALIVE_MS).isEqualTo(5_000L)
+        client.rooms(call)
+        assertThat(client.pool.idleConnectionCount()).isEqualTo(1)
     }
 
     /** Fails if the injected timeout isn't used, so a dead bridge hangs a call instead of failing as I/O (7 §6). */

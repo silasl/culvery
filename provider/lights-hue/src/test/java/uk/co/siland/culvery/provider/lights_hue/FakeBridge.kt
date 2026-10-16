@@ -38,6 +38,9 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
     /** Each answer is a 500. */
     @Volatile var failing = false
 
+    /** Each answer is a 200 that lists an error, as when a command reaches a light that is soft off. */
+    @Volatile var answersWithErrors = false
+
     /** Each answer's headers come only after this many milliseconds. */
     @Volatile var delayMs = 0L
 
@@ -78,6 +81,7 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
         if (forbidden) return MockResponse().setResponseCode(403)
         if (v1Unauthorised) return MockResponse().setBody(HueFixtures.UNAUTHORISED_V1)
         if (failing) return MockResponse().setResponseCode(500).setBody("""{"errors":[{"description":"internal error"}]}""")
+        if (answersWithErrors) return MockResponse().setBody("""{"data":[],"errors":[{"description":"command may not have effect"}]}""")
         if (method == "PUT") return MockResponse().setBody("""{"data":[{"rid":"${path.substringAfterLast('/')}"}],"errors":[]}""")
         return when (path) {
             "/api" -> MockResponse().setBody(if (buttonPressed) HueFixtures.PAIRED else HueFixtures.NOT_PRESSED)
