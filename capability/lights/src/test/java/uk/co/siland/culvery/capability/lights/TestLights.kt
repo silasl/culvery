@@ -80,6 +80,7 @@ internal class TestLightsSystem(rooms: List<LightRoom> = emptyList()) : LightsSy
     /** Holds a call, by its name, until completed. */
     val gates: MutableMap<String, CompletableDeferred<Unit>> = ConcurrentHashMap()
 
+    @Volatile
     var automationList: List<Automation> = listOf(MIMIC, AWAY)
 
     /** What setAutomation answers, by automation id; one not here is confirmed. */
@@ -105,6 +106,7 @@ internal class TestLightsSystem(rooms: List<LightRoom> = emptyList()) : LightsSy
         calls += "stream"
         val ended = CompletableDeferred<Unit>().also { streams += it }
         try {
+            emit(Unit)
             ended.await()
         } finally {
             calls += "stream closed"

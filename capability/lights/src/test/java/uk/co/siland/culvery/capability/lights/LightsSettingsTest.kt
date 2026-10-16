@@ -82,11 +82,13 @@ class LightsSettingsTest {
         assertThat(soon { settings.prefs.first { it.mainRoomId == "Lounge-id" } }.address).isEqualTo("192.168.1.40")
     }
 
-    /** Fails if the application key can be read out of a log line. */
+    /** Fails if the application key or the bridge's address can be read out of a log line. */
     @Test
     fun theKeyIsNeverInToString() {
         val secret = "secret-key-value"
         assertThat(link(key = secret).toString()).doesNotContain(secret)
-        assertThat(LightsPrefs(key = secret).toString()).doesNotContain(secret)
+        assertThat(LightsPrefs(key = secret, address = "192.168.1.30").toString()).doesNotContain(secret)
+        assertThat(LightsPrefs(key = secret, address = "192.168.1.30").toString()).doesNotContain("192.168.1.30")
+        assertThat(link(key = secret).toString()).doesNotContain("192.168.1.30")
     }
 }

@@ -31,7 +31,7 @@ import uk.co.siland.culvery.core.plugin.retryWithBackoff
 private const val FILE = "lights_settings"
 private const val TAG = "LightsSettings"
 
-/** The bridge, its key and the choices made for it (7 §3.3): ids only, no names; [toString] leaves the key out. */
+/** The bridge, its key and the choices made for it (7 §3.3): ids only, no names; [toString] leaves out the key and the address. */
 data class LightsPrefs(
     val providerId: String? = null,
     val bridgeId: String? = null,
@@ -48,7 +48,7 @@ data class LightsPrefs(
     val link: LightsLink? get() = if (bridgeId != null && address != null && key != null) LightsLink(bridgeId, address, key) else null
 
     override fun toString() =
-        "LightsPrefs(providerId=$providerId, bridgeId=$bridgeId, address=$address, mainRoomId=$mainRoomId, leftOut=$leftOut, " +
+        "LightsPrefs(providerId=$providerId, bridgeId=$bridgeId, mainRoomId=$mainRoomId, leftOut=$leftOut, " +
             "holidayAutomations=$holidayAutomations, holidayOn=$holidayOn, holidayStarted=$holidayStarted)"
 }
 
