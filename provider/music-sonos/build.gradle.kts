@@ -6,6 +6,6 @@ plugins {
 dependencies {
     implementation(project(":capability:music"))
     implementation(project(":core:ui"))
-    implementation(libs.okhttp)
+    implementation(project(":core:net"))
     testImplementation(libs.okhttp.mockwebserver)
 }

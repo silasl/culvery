@@ -1,7 +1,5 @@
 package uk.co.siland.culvery.provider.music_sonos
 
-import android.content.Context
-import android.net.wifi.WifiManager
 import android.util.Log
 import java.io.IOException
 import java.net.DatagramPacket
@@ -28,7 +26,7 @@ private const val SEARCHES = 2
 private const val RECEIVE_MS = 250
 private const val ANSWER_BYTES = 2_048
 private const val NANOS_PER_MILLI = 1_000_000L
-private const val LOCK_TAG = "Culvery:SonosScan"
+internal const val LOCK_TAG = "Culvery:SonosScan"
 
 /** One SSDP answer: the address of the machine that sent it, and its text. */
 internal data class SsdpAnswer(val from: String, val text: String)
@@ -46,15 +44,6 @@ internal fun ssdpAddresses(answers: List<SsdpAnswer>, accept: (String, Int) -> B
             ?.let { (host, port) -> "$host:$port" }
     }
     .distinct()
-
-/** Held for one scan: without it some Wi-Fi drivers drop multicast traffic to save power (6 §3.2). */
-internal fun multicastLock(context: Context): () -> AutoCloseable = {
-    val lock = context.applicationContext.getSystemService(WifiManager::class.java)?.createMulticastLock(LOCK_TAG)?.apply {
-        setReferenceCounted(false)
-        acquire()
-    }
-    AutoCloseable { lock?.release() }
-}
 
 /**
  * Finds Sonos speakers on the home Wi-Fi (6 §4.1): SSDP's search for ZonePlayers, then about 5 seconds of answers. A

@@ -342,6 +342,7 @@ Release builds installed with `install -r` over Plan 5's (the household kept); C
 
 - Move `MusicSettings` and `DoorSettings` onto `retryWithBackoff`, so one DataStore read failure doesn't end their flow.
 - Throttle the "A music check failed" log line while Sonos stays unreachable.
+- Move the weather and Google Calendar clients onto `:core:net`'s `Call.await` and `AndroidNetwork`.
 
 ## Feature ideas (2026-10-02, after v1)
 

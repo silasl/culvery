@@ -9,6 +9,8 @@ import uk.co.siland.culvery.capability.music.MusicProblem
 import uk.co.siland.culvery.capability.music.MusicProvider
 import uk.co.siland.culvery.capability.music.MusicSystem
 import uk.co.siland.culvery.capability.music.MusicUnreachableException
+import uk.co.siland.culvery.core.net.AndroidNetwork
+import uk.co.siland.culvery.core.net.multicastLock
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -27,7 +29,7 @@ class SonosProvider internal constructor(
 ) : MusicProvider {
     @Inject
     constructor(@ApplicationContext context: Context, clock: WallClock) :
-        this(SonosClient(sonosHttp()), SonosDiscovery(multicastLock(context))::scan, AndroidNetwork(context)::online, clock)
+        this(SonosClient(sonosHttp()), SonosDiscovery(multicastLock(context, LOCK_TAG))::scan, AndroidNetwork(context)::online, clock)
 
     override val descriptor = ProviderDescriptor(SONOS_PROVIDER_ID, "Sonos", Icons.SPEAKER, setOf(Feature.READ, Feature.WRITE))
 

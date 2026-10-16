@@ -8,6 +8,7 @@ import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.music.PlayState
+import uk.co.siland.culvery.core.net.BodyTooLarge
 import uk.co.siland.culvery.provider.music_sonos.SonosFixtures.KITCHEN
 
 private val AV = SonosService.AV_TRANSPORT.urn

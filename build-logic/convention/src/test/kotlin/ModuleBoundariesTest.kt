@@ -95,6 +95,13 @@ class ModuleBoundariesTest {
     }
 
     @Test
+    fun theNetworkModuleIsCore() {
+        allowed(":provider:music-sonos", ":core:net")
+        allowed(":provider:lights-hue", ":core:net")
+        banned(":core:net", ":capability:music")
+    }
+
+    @Test
     fun appMayDependOnAnything() = allowed(":app", ":provider:calendar-fake", "debugImplementation")
 
     @Test
