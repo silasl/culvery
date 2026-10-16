@@ -209,7 +209,7 @@ class LightsActionsTest {
         val access = TestAccess(Role.ADULT)
         val actions = actions(access)
         val open = CompletableDeferred<Unit>().also { system.gates["allOff []"] = it }
-        val run = async { house.toggleHoliday(adult()) }
+        val run = async { house.setHoliday(null, adult()) }
         waitFor("allOff []")
         actions.toggleHoliday()
         runCurrent()

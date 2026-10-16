@@ -25,7 +25,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
@@ -35,6 +37,7 @@ import uk.co.siland.culvery.capability.lights.BridgeFound
 import uk.co.siland.culvery.capability.lights.Bridges
 import uk.co.siland.culvery.capability.lights.LightsConnect
 import uk.co.siland.culvery.capability.lights.LightsFixture
+import uk.co.siland.culvery.capability.lights.LightsPrefs
 import uk.co.siland.culvery.capability.lights.LightsProblem
 import uk.co.siland.culvery.capability.lights.LightsProvider
 import uk.co.siland.culvery.capability.lights.LightsSettings
@@ -256,7 +259,10 @@ class LightsSettingsPageTest {
     }
 
     private inner class Host(store: DataStore<Preferences>? = null, pairFails: Boolean = false) {
-        val settings = store?.let { LightsSettings(it, lights.scope) } ?: lights.settings
+        val settings = store?.let { LightsSettings(it) } ?: lights.settings
+
+        /** The saved choices as they come, for a check that can't wait on the flow. */
+        val saved = settings.prefs.stateIn(lights.scope, SharingStarted.Eagerly, LightsPrefs())
         val hue = TestLightsProvider()
         val bridges = Bridges(setOf(hue), settings, lights.scope)
         val view = LightsView(bridges, settings, lights.scope)
@@ -381,12 +387,12 @@ class LightsSettingsPageTest {
         compose.waitFor { appeared("lights_gone_line") }
         compose.onNodeWithTag("lights_gone_line").assertTextEquals("1 room left out is no longer on the bridge.")
         compose.onNodeWithTag("lights_left_out_Kitchen-id").performClick()
-        compose.waitFor { h.settings.current.value.leftOut == setOf("Garden-id", "Kitchen-id") }
+        compose.waitFor { h.saved.value.leftOut == setOf("Garden-id", "Kitchen-id") }
         compose.onNodeWithTag("lights_main_Garden-id").performClick()
-        compose.waitFor { h.settings.current.value.mainRoomId == "Garden-id" }
+        compose.waitFor { h.saved.value.mainRoomId == "Garden-id" }
         compose.waitFor { appeared("lights_automation_away-id") }
         compose.onNodeWithTag("lights_automation_away-id").performClick()
-        compose.waitFor { h.settings.current.value.holidayAutomations == setOf("away-id") }
+        compose.waitFor { h.saved.value.holidayAutomations == setOf("away-id") }
     }
 
     /** Fails if a choice that couldn't be saved says nothing, or says anything but the standard line. */

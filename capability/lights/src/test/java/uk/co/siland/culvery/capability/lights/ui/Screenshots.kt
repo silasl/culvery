@@ -10,6 +10,10 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
+/** For screenshots: nothing happens. */
+internal val NO_HOUSE_ACTIONS = HouseActions({}, {})
+internal val NO_MAIN_ROOM_ACTIONS = MainRoomActions({}, {})
+
 /** Draws [content] on the theme's background and compares it with [name]'s baseline. */
 internal fun ComposeContentTestRule.snap(name: String, dark: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     setContent {

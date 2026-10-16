@@ -215,9 +215,9 @@ class LightsHouseTest {
     fun aSecondTapDuringTheReadBackIsIgnored() = runTest {
         choose("mimic-id")
         val open = gate("setAutomation mimic-id true")
-        val first = async { house.toggleHoliday(adult()) }
+        val first = async { house.setHoliday(null, adult()) }
         waitFor("setAutomation mimic-id true")
-        assertThat(house.toggleHoliday(adult())).isEqualTo(HolidayResult.Busy)
+        assertThat(house.setHoliday(null, adult())).isEqualTo(HolidayResult.Busy)
         assertThat(house.allOff()).isNull()
         assertThat(house.running.value).isEqualTo(HouseRun.TURNING_ON)
         open.complete(Unit)
@@ -230,10 +230,10 @@ class LightsHouseTest {
     @Test
     fun theToggleIsDecidedFromTheSavedRecord() = runTest {
         choose("mimic-id")
-        assertThat(house.toggleHoliday(adult())).isEqualTo(HolidayResult.Done)
+        assertThat(house.setHoliday(null, adult())).isEqualTo(HolidayResult.Done)
         assertThat(prefs().holidayOn).isTrue()
         system.calls.clear()
-        assertThat(house.toggleHoliday(adult())).isEqualTo(HolidayResult.Done)
+        assertThat(house.setHoliday(null, adult())).isEqualTo(HolidayResult.Done)
         assertThat(prefs().holidayOn).isFalse()
         assertThat(system.calls).containsExactly("automations", "setAutomation mimic-id false").inOrder()
     }
@@ -242,7 +242,7 @@ class LightsHouseTest {
     @Test
     fun aCallWithoutTheHolidayPermissionIsRefusedOutright() = runTest {
         assertThat(runCatching { house.setHoliday(true, nobody()) }.exceptionOrNull()).isInstanceOf(IllegalArgumentException::class.java)
-        assertThat(runCatching { house.toggleHoliday(nobody()) }.exceptionOrNull()).isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(runCatching { house.setHoliday(null, nobody()) }.exceptionOrNull()).isInstanceOf(IllegalArgumentException::class.java)
         assertThat(system.calls).isEmpty()
         assertThat(prefs().holidayOn).isFalse()
     }
@@ -258,7 +258,7 @@ class LightsHouseTest {
         assertThat(prefs.holidayOn).isTrue()
         assertThat(prefs.holidayStarted).containsExactly("mimic-id")
         system.calls.clear()
-        assertThat(house.toggleHoliday(adult())).isEqualTo(HolidayResult.Done)
+        assertThat(house.setHoliday(null, adult())).isEqualTo(HolidayResult.Done)
         assertThat(system.calls).containsExactly("automations")
         assertThat(prefs().holidayOn).isFalse()
     }

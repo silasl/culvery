@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -45,7 +44,8 @@ fun LightsCard(
     run: HouseRun?,
     status: String?,
     line: String?,
-    actions: HouseActions,
+    mainRoom: MainRoomActions,
+    house: HouseActions,
     modifier: Modifier = Modifier,
 ) {
     val c = Culvery.colors
@@ -61,13 +61,13 @@ fun LightsCard(
             return@HhCard
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LightsDimens.blockGap)) {
-            MainRoomButton(main, actions.onToggle, Modifier.weight(1f))
-            OpenRoomButton(main, actions.onOpen)
+            MainRoomButton(main, mainRoom.onToggle, Modifier.weight(1f))
+            OpenRoomButton(main, mainRoom.onOpen)
         }
         Spacer(Modifier.weight(1f))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(LightsDimens.buttonGap)) {
-            AllOffButton(actions.onAllOff, Modifier.weight(1f))
-            HolidayButton(holidayOn, run, actions.onHoliday)
+            AllOffButton(house.onAllOff, Modifier.weight(1f))
+            HolidayButton(holidayOn, run, house.onHoliday)
         }
         if (line != null) {
             Spacer(Modifier.height(LightsDimens.lineGap))
@@ -79,10 +79,7 @@ fun LightsCard(
 /** The card over the view; while it shows, the rooms are followed (7 §4.2). */
 @Composable
 internal fun LightsCardHost(view: LightsView, actions: LightsActions, house: LightsHouse, follow: LightsFollow) {
-    DisposableEffect(follow) {
-        val stop = follow.watch()
-        onDispose { stop() }
-    }
+    FollowWhileShown(follow)
     val navigator = LocalShellNavigator.current
     val main by view.main.collectAsStateWithLifecycle()
     val holidayOn by view.holidayOn.collectAsStateWithLifecycle(false)
@@ -91,16 +88,15 @@ internal fun LightsCardHost(view: LightsView, actions: LightsActions, house: Lig
     val roomLines by actions.lines.collectAsStateWithLifecycle()
     val houseLine by actions.houseLine.collectAsStateWithLifecycle()
     val room = main
-    val houseActions = remember(room, actions, view, navigator) {
-        HouseActions(
+    val mainRoom = remember(room, actions, view, navigator) {
+        MainRoomActions(
             onToggle = { room?.let(actions::toggle) },
             onOpen = {
                 room?.let { view.focus.value = it.id }
                 navigator.openTab(LIGHTS_ID)
             },
-            onAllOff = actions::allOff,
-            onHoliday = actions::toggleHoliday,
         )
     }
-    LightsCard(room, holidayOn, run, problem?.let(::problemLine), room?.let { roomLines[it.id] } ?: houseLine, houseActions)
+    val houseActions = remember(actions) { HouseActions(onAllOff = actions::allOff, onHoliday = actions::toggleHoliday) }
+    LightsCard(room, holidayOn, run, problem?.let(::problemLine), room?.let { roomLines[it.id] } ?: houseLine, mainRoom, houseActions)
 }

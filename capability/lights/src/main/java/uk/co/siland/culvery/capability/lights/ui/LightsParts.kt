@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +26,7 @@ import uk.co.siland.culvery.capability.lights.ALL_LIGHTS_OFF
 import uk.co.siland.culvery.capability.lights.HOLIDAY_MODE
 import uk.co.siland.culvery.capability.lights.HouseRun
 import uk.co.siland.culvery.capability.lights.LightRoom
+import uk.co.siland.culvery.capability.lights.LightsFollow
 import uk.co.siland.culvery.capability.lights.TURN_ALL_OFF
 import uk.co.siland.culvery.capability.lights.holidayNamed
 import uk.co.siland.culvery.capability.lights.holidaySpoken
@@ -42,16 +44,18 @@ import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.quietFill
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
-/** What the Home card's controls do. */
-class HouseActions(
-    val onToggle: () -> Unit,
-    val onOpen: () -> Unit,
-    val onAllOff: () -> Unit,
-    val onHoliday: () -> Unit,
-) {
-    companion object {
-        /** For screenshots: nothing happens. */
-        val None = HouseActions({}, {}, {}, {})
+/** What All lights off and Holiday mode do, on the card and the tab. */
+class HouseActions(val onAllOff: () -> Unit, val onHoliday: () -> Unit)
+
+/** What the Home card's main room does: its toggle, and its › to the tab. */
+class MainRoomActions(val onToggle: () -> Unit, val onOpen: () -> Unit)
+
+/** While this shows, the rooms are followed (7 §4.2). */
+@Composable
+internal fun FollowWhileShown(follow: LightsFollow) {
+    DisposableEffect(follow) {
+        val stop = follow.watch()
+        onDispose { stop() }
     }
 }
 

@@ -33,6 +33,7 @@ import uk.co.siland.culvery.capability.lights.BRIDGE_ADDRESS_HINT
 import uk.co.siland.culvery.capability.lights.BridgeFound
 import uk.co.siland.culvery.capability.lights.Bridges
 import uk.co.siland.culvery.capability.lights.CHECKING
+import uk.co.siland.culvery.capability.lights.ConnectFailed
 import uk.co.siland.culvery.capability.lights.ENTER_BRIDGE_ADDRESS
 import uk.co.siland.culvery.capability.lights.FIND_HUE_BRIDGE
 import uk.co.siland.culvery.capability.lights.FindOutcome
@@ -49,7 +50,6 @@ import uk.co.siland.culvery.capability.lights.LightsSystem
 import uk.co.siland.culvery.capability.lights.LightsView
 import uk.co.siland.culvery.capability.lights.MAIN_ROOM
 import uk.co.siland.culvery.capability.lights.NOT_PAIRED
-import uk.co.siland.culvery.capability.lights.NOT_PRESSED_IN_TIME
 import uk.co.siland.culvery.capability.lights.NO_AUTOMATIONS
 import uk.co.siland.culvery.capability.lights.PAIRED
 import uk.co.siland.culvery.capability.lights.PAIRED_WITH_BRIDGE
@@ -319,9 +319,8 @@ internal fun LightsSettingsHost(
                     toaster.show(PAIRED_WITH_BRIDGE)
                     dismissPairing()
                 }
-                is PairOutcome.Failed -> if (outcome.line == NOT_PRESSED_IN_TIME) {
-                    showPairing(PairingState.NOT_IN_TIME, idle = true) { pairWith(bridge) }
-                } else {
+                PairOutcome.NotInTime -> showPairing(PairingState.NOT_IN_TIME, idle = true) { pairWith(bridge) }
+                is ConnectFailed -> {
                     findLine = outcome.line
                     dismissPairing()
                 }
@@ -348,7 +347,7 @@ internal fun LightsSettingsHost(
                 findLine = null
                 when (val outcome = connect.find()) {
                     is FindOutcome.Found -> pairWith(outcome.bridge)
-                    is FindOutcome.Failed -> findLine = outcome.line
+                    is ConnectFailed -> findLine = outcome.line
                 }
                 finding = false
             }
@@ -363,7 +362,7 @@ internal fun LightsSettingsHost(
                                     pairWith(outcome.bridge)
                                     null
                                 }
-                                is FindOutcome.Failed -> outcome.line
+                                is ConnectFailed -> outcome.line
                             }
                         },
                         onEdited = overlay::markEdited,

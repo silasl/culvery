@@ -58,12 +58,7 @@ class LightsTabTest {
     @get:Rule val compose = createComposeRule()
     @get:Rule val lights = LightsFixture()
     private val calls = mutableListOf<String>()
-    private val house = HouseActions(
-        onToggle = {},
-        onOpen = {},
-        onAllOff = { calls += "all off" },
-        onHoliday = { calls += "holiday" },
-    )
+    private val house = HouseActions(onAllOff = { calls += "all off" }, onHoliday = { calls += "holiday" })
     private val roomActions = RoomActions(
         onOn = { r, on -> calls += "${r.name} ${if (on) "on" else "off"}" },
         onDrag = { r, p -> calls += "drag ${r.name} $p" },

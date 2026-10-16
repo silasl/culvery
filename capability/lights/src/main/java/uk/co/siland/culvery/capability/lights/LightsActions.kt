@@ -71,7 +71,7 @@ class LightsActions internal constructor(
         if (house.running.value != null) return
         scope.launch {
             val by = access.authorise(LightsPermissions.HOLIDAY, refusal = Refusal.InPad) ?: return@launch
-            val result = house.toggleHoliday(by)
+            val result = house.setHoliday(null, by)
             if (result != HolidayResult.Busy) _houseLine.value = houseLine(result, house::nameOf)
         }
     }
@@ -83,9 +83,7 @@ class LightsActions internal constructor(
     fun recallScene(room: LightRoom, scene: LightScene) = send(room, LightsCommand.SCENE) { it.recallScene(room, scene) }
 
     /** The slider is moving: sends now when the room has had no command for [DRAG_GAP_MS], else the newest value when the gap is up. */
-    fun dragBrightness(room: LightRoom, percent: Int) {
-        _lines.update { it - room.id }
-        val s = system() ?: return
+    fun dragBrightness(room: LightRoom, percent: Int) = withSystem(room) { s ->
         synchronized(drags) {
             val drag = drags.getOrPut(room.id) { Drag() }
             drag.waiting = percent
@@ -106,9 +104,7 @@ class LightsActions internal constructor(
     }
 
     /** The slider is let go at [percent]: any value waiting is dropped and this one goes at once. */
-    fun letGoBrightness(room: LightRoom, percent: Int) {
-        _lines.update { it - room.id }
-        val s = system() ?: return
+    fun letGoBrightness(room: LightRoom, percent: Int) = withSystem(room) { s ->
         synchronized(drags) {
             val drag = drags.getOrPut(room.id) { Drag() }
             drag.job?.cancel()
@@ -125,10 +121,14 @@ class LightsActions internal constructor(
         launchCommand(room, LightsCommand.BRIGHTNESS) { s.setBrightness(room, percent) }
     }
 
-    private fun send(room: LightRoom, command: LightsCommand, step: suspend (LightsSystem) -> Unit) {
-        _lines.update { it - room.id }
-        val s = system() ?: return
+    private fun send(room: LightRoom, command: LightsCommand, step: suspend (LightsSystem) -> Unit) = withSystem(room) { s ->
         launchCommand(room, command) { step(s) }
+    }
+
+    /** A new command clears its room's line, then runs [block] when a system is open. */
+    private inline fun withSystem(room: LightRoom, block: (LightsSystem) -> Unit) {
+        if (room.id in _lines.value) _lines.update { it - room.id }
+        block(system() ?: return)
     }
 
     private fun launchCommand(room: LightRoom, command: LightsCommand, step: suspend () -> Unit) {

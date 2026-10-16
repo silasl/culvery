@@ -55,32 +55,23 @@ class LightsHouse internal constructor(
     fun nameOf(automationId: String): String? = lastList.firstOrNull { it.id == automationId }?.name
 
     /** Every room off except those Settings › Lights leaves out; null when another run holds the house. */
-    suspend fun allOff(): AllOffResult? = holding({ HouseRun.ALL_OFF }) { offExcept(it.leftOut) }
+    suspend fun allOff(): AllOffResult? = holding({ HouseRun.ALL_OFF }) { prefs, _ -> offExcept(prefs.leftOut) }
 
-    /** Turns Holiday mode the other way from the saved record, as read once this run holds the house. */
-    suspend fun toggleHoliday(by: Authorised): HolidayResult {
-        requireHoliday(by)
-        return holding({ if (it.holidayOn) HouseRun.TURNING_OFF else HouseRun.TURNING_ON }) { prefs ->
-            if (prefs.holidayOn) turnOff(prefs) else turnOn(prefs)
-        } ?: HolidayResult.Busy
-    }
-
-    suspend fun setHoliday(on: Boolean, by: Authorised): HolidayResult {
-        requireHoliday(by)
-        return holding({ if (on) HouseRun.TURNING_ON else HouseRun.TURNING_OFF }) { prefs ->
-            if (on) turnOn(prefs) else turnOff(prefs)
-        } ?: HolidayResult.Busy
-    }
-
-    private fun requireHoliday(by: Authorised) =
+    /** Turns Holiday mode [on] or off; null turns it the other way from the saved record, as read once this run holds the house. */
+    suspend fun setHoliday(on: Boolean?, by: Authorised): HolidayResult {
         require(LightsPermissions.HOLIDAY in by.granted) { "Holiday mode needs ${LightsPermissions.HOLIDAY}" }
+        return holding({ if (on ?: !it.holidayOn) HouseRun.TURNING_ON else HouseRun.TURNING_OFF }) { prefs, run ->
+            if (run == HouseRun.TURNING_ON) turnOn(prefs) else turnOff(prefs)
+        } ?: HolidayResult.Busy
+    }
 
-    private suspend fun <T> holding(run: (LightsPrefs) -> HouseRun, block: suspend (LightsPrefs) -> T): T? {
+    private suspend fun <T> holding(run: (LightsPrefs) -> HouseRun, block: suspend (LightsPrefs, HouseRun) -> T): T? {
         if (!mutex.tryLock()) return null
         try {
             val prefs = settings.prefs.first()
-            _running.value = run(prefs)
-            return block(prefs)
+            val running = run(prefs)
+            _running.value = running
+            return block(prefs, running)
         } finally {
             _running.value = null
             mutex.unlock()

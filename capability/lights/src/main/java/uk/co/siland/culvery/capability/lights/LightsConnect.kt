@@ -16,15 +16,17 @@ const val PAIR_FOR_MS = 30_000L
 
 sealed interface FindOutcome {
     data class Found(val bridge: BridgeFound) : FindOutcome
-
-    data class Failed(val line: String) : FindOutcome
 }
 
 sealed interface PairOutcome {
     data object Paired : PairOutcome
 
-    data class Failed(val line: String) : PairOutcome
+    /** The button wasn't pressed in [PAIR_FOR_MS]: the sheet offers another go. */
+    data object NotInTime : PairOutcome
 }
+
+/** Finding or pairing went wrong: [line] says what and how to fix it. */
+data class ConnectFailed(val line: String) : FindOutcome, PairOutcome
 
 /**
  * Settings › Lights' ways to the bridge (7 §4.1): Find Hue Bridge or a typed address give the bridge, and pairing asks
@@ -38,12 +40,12 @@ class LightsConnect internal constructor(private val provider: LightsProvider?, 
     suspend fun find(): FindOutcome = look(NO_BRIDGE_ANSWERED) { it.find() }
 
     suspend fun enterAddress(typed: String): FindOutcome {
-        val host = homeNetworkHost(typed) ?: return FindOutcome.Failed(TYPE_FOUR_NUMBERS)
+        val host = homeNetworkHost(typed) ?: return ConnectFailed(TYPE_FOUR_NUMBERS)
         return look(NO_BRIDGE_THERE) { it.check(host) }
     }
 
     suspend fun pair(bridge: BridgeFound): PairOutcome {
-        val p = provider ?: return PairOutcome.Failed(NOT_PRESSED_IN_TIME)
+        val p = provider ?: return PairOutcome.NotInTime
         val link = try {
             withTimeoutOrNull(PAIR_FOR_MS) {
                 var pressed: LightsLink? = null
@@ -54,24 +56,24 @@ class LightsConnect internal constructor(private val provider: LightsProvider?, 
                 pressed
             }
         } catch (e: LightsUnreachableException) {
-            return PairOutcome.Failed(problemLine(e.problem))
-        } ?: return PairOutcome.Failed(NOT_PRESSED_IN_TIME)
+            return ConnectFailed(problemLine(e.problem))
+        } ?: return PairOutcome.NotInTime
         return try {
             save(p.descriptor.id, link)
             PairOutcome.Paired
         } catch (e: IOException) {
             Log.w(TAG, "Couldn't save the bridge (${e::class.simpleName})")
-            PairOutcome.Failed(COULD_NOT_SAVE)
+            ConnectFailed(COULD_NOT_SAVE)
         }
     }
 
     private suspend fun look(nothing: String, ask: suspend (LightsProvider) -> BridgeFound?): FindOutcome {
-        val p = provider ?: return FindOutcome.Failed(nothing)
+        val p = provider ?: return ConnectFailed(nothing)
         val bridge = try {
             ask(p)
         } catch (e: LightsUnreachableException) {
-            return FindOutcome.Failed(problemLine(e.problem))
+            return ConnectFailed(problemLine(e.problem))
         }
-        return bridge?.let(FindOutcome::Found) ?: FindOutcome.Failed(nothing)
+        return bridge?.let(FindOutcome::Found) ?: ConnectFailed(nothing)
     }
 }

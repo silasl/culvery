@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -169,10 +168,7 @@ private fun RoomRow(room: LightRoom, line: String?, actions: RoomActions) {
 /** The tab over the view; while it shows, the rooms are followed (7 §4.2). */
 @Composable
 internal fun LightsTabHost(view: LightsView, actions: LightsActions, house: LightsHouse, follow: LightsFollow) {
-    DisposableEffect(follow) {
-        val stop = follow.watch()
-        onDispose { stop() }
-    }
+    FollowWhileShown(follow)
     val rooms by view.rooms.collectAsStateWithLifecycle(emptyList())
     val holidayOn by view.holidayOn.collectAsStateWithLifecycle(false)
     val problem by view.problem.collectAsStateWithLifecycle(null)
@@ -180,7 +176,7 @@ internal fun LightsTabHost(view: LightsView, actions: LightsActions, house: Ligh
     val run by house.running.collectAsStateWithLifecycle()
     val lines by actions.lines.collectAsStateWithLifecycle()
     val houseLine by actions.houseLine.collectAsStateWithLifecycle()
-    val houseActions = remember(actions) { HouseActions(onToggle = {}, onOpen = {}, onAllOff = actions::allOff, onHoliday = actions::toggleHoliday) }
+    val houseActions = remember(actions) { HouseActions(onAllOff = actions::allOff, onHoliday = actions::toggleHoliday) }
     val roomActions = remember(actions) { RoomActions(actions::setOn, actions::dragBrightness, actions::letGoBrightness, actions::recallScene) }
     LightsTab(
         rooms, holidayOn, run, problem?.let(::problemLine), houseLine, lines, focus,

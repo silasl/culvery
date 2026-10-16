@@ -35,7 +35,7 @@ class LightsCardScreenshotTest {
         status: String? = null,
         line: String? = null,
     ) = compose.snap(name, dark, Modifier.padding(16.dp)) {
-        Box(Modifier.size(345.dp, 279.dp)) { LightsCard(main, holidayOn, run, status, line, HouseActions.None) }
+        Box(Modifier.size(345.dp, 279.dp)) { LightsCard(main, holidayOn, run, status, line, NO_MAIN_ROOM_ACTIONS, NO_HOUSE_ACTIONS) }
     }
 
     @Test fun onDark() = snap("lights_card_on_dark", true)

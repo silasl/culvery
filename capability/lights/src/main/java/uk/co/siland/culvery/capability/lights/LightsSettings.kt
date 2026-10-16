@@ -20,12 +20,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
 private const val FILE = "lights_settings"
@@ -58,17 +54,14 @@ internal fun lightsSettingsStore(scope: CoroutineScope = CoroutineScope(Supervis
 
 /** A small DataStore file under `files/datastore/`, which backup and transfer already leave alone. Writes throw `IOException`. */
 @Singleton
-class LightsSettings(private val store: DataStore<Preferences>, scope: CoroutineScope) {
+class LightsSettings(private val store: DataStore<Preferences>) {
     @Inject
-    constructor(@ApplicationContext context: Context, @ApplicationScope scope: CoroutineScope) :
-        this(lightsSettingsStore { context.preferencesDataStoreFile(FILE) }, scope)
+    constructor(@ApplicationContext context: Context) : this(lightsSettingsStore { context.preferencesDataStoreFile(FILE) })
 
     val prefs: Flow<LightsPrefs> = store.data
         .retryWithBackoff { Log.w(TAG, "Couldn't read the lights' settings (${it::class.simpleName}); retrying") }
         .map { it.toPrefs() }
         .distinctUntilChanged()
-
-    val current: StateFlow<LightsPrefs> = prefs.stateIn(scope, SharingStarted.Eagerly, LightsPrefs())
 
     /** Pairing or a typed address found [link]; another bridge's choices aren't this one's, and Holiday mode starts off. */
     suspend fun connect(providerId: String, link: LightsLink) {

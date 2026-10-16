@@ -55,12 +55,8 @@ class LightsCardTest {
     @get:Rule val compose = createComposeRule()
     @get:Rule val lights = LightsFixture()
     private val calls = mutableListOf<String>()
-    private val actions = HouseActions(
-        onToggle = { calls += "toggle" },
-        onOpen = { calls += "open" },
-        onAllOff = { calls += "all off" },
-        onHoliday = { calls += "holiday" },
-    )
+    private val mainRoom = MainRoomActions(onToggle = { calls += "toggle" }, onOpen = { calls += "open" })
+    private val house = HouseActions(onAllOff = { calls += "all off" }, onHoliday = { calls += "holiday" })
     private val lounge = room("Lounge", on = true, brightness = 70)
 
     private fun show(
@@ -70,7 +66,7 @@ class LightsCardTest {
         status: String? = null,
         line: String? = null,
     ) = compose.setContent {
-        CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { LightsCard(main, holidayOn, run, status, line, actions) } }
+        CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { LightsCard(main, holidayOn, run, status, line, mainRoom, house) } }
     }
 
     private fun clickLabelIs(label: String) = SemanticsMatcher("click label is $label") {
@@ -132,7 +128,7 @@ class LightsCardTest {
     @Test
     fun whileItRunsTheButtonSaysTurningOn() {
         var run by mutableStateOf<HouseRun?>(HouseRun.TURNING_ON)
-        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { LightsCard(lounge, false, run, null, null, actions) } } }
+        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { LightsCard(lounge, false, run, null, null, mainRoom, house) } } }
         compose.onNodeWithText("Turning on…", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("lights_card_holiday").assertContentDescriptionEquals("Holiday mode, turning on")
         compose.assertAccessible()

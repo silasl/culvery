@@ -58,7 +58,7 @@ internal fun link(bridgeId: String = "001788fffe00a1b2", address: String = "192.
     LightsLink(bridgeId, address, key)
 
 internal fun lightsSettings(dir: File, scope: CoroutineScope) =
-    LightsSettings(lightsSettingsStore(scope) { File(dir, "lights_settings.preferences_pb") }, scope)
+    LightsSettings(lightsSettingsStore(scope) { File(dir, "lights_settings.preferences_pb") })
 
 /** A test's folder, a scope on Dispatchers.IO cancelled after the test, and [settings] kept in that folder. */
 class LightsFixture : TestRule {

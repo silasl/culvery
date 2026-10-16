@@ -39,7 +39,7 @@ class LightsConnectTest {
     @Test
     fun nothingFoundSaysWhatToDo() = runTest {
         assertThat(connect().find())
-            .isEqualTo(FindOutcome.Failed("No Hue Bridge answered. Check it’s plugged in, or enter the bridge’s address."))
+            .isEqualTo(ConnectFailed("No Hue Bridge answered. Check it’s plugged in, or enter the bridge’s address."))
     }
 
     /** Fails if a typed address isn't tidied before it is checked, or the bridge answering isn't returned. */
@@ -54,7 +54,7 @@ class LightsConnectTest {
     @Test
     fun aMistypedAddressContactsNothing() = runTest {
         val hueConnect = connect()
-        val howToType = FindOutcome.Failed("Type the address as four numbers, like 192.168.1.30.")
+        val howToType = ConnectFailed("Type the address as four numbers, like 192.168.1.30.")
         for (typed in listOf("192.168.1.30:443", "hue.local", "8.8.8.8", "192.168.1")) {
             assertThat(hueConnect.enterAddress(typed)).isEqualTo(howToType)
         }
@@ -65,7 +65,7 @@ class LightsConnectTest {
     @Test
     fun anAddressWithNoBridgeSaysSo() = runTest {
         assertThat(connect().enterAddress("192.168.1.99"))
-            .isEqualTo(FindOutcome.Failed("No Hue Bridge answered at that address. Check it in the Hue app."))
+            .isEqualTo(ConnectFailed("No Hue Bridge answered at that address. Check it in the Hue app."))
     }
 
     /** Fails if pairing doesn't ask at 0, 2 000 ... 28 000 ms (15 times, none at 1 999), or doesn't give up at 30 000 ms. */
@@ -92,7 +92,7 @@ class LightsConnectTest {
         assertThat(outcome.isCompleted).isFalse()
         advanceTimeBy(1)
         runCurrent()
-        assertThat(outcome.await()).isEqualTo(PairOutcome.Failed("The button wasn’t pressed in time. Try again."))
+        assertThat(outcome.await()).isEqualTo(PairOutcome.NotInTime)
         assertThat(asks).isEqualTo((0L..28_000L step 2_000L).toList())
         assertThat(asks).hasSize(15)
         assertThat(saved).isEmpty()
@@ -112,7 +112,7 @@ class LightsConnectTest {
     @Test
     fun offlineSaysSoAndStops() = runTest {
         hue.failure = LightsUnreachableException(LightsProblem.OFFLINE)
-        assertThat(connect().pair(bridge)).isEqualTo(PairOutcome.Failed("The tablet is offline. Check the Wi-Fi."))
+        assertThat(connect().pair(bridge)).isEqualTo(ConnectFailed("The tablet is offline. Check the Wi-Fi."))
         assertThat(hue.asked).containsExactly("pair")
         assertThat(saved).isEmpty()
     }
@@ -121,6 +121,6 @@ class LightsConnectTest {
     @Test
     fun aSaveThatFailsSaysSo() = runTest {
         hue.pairAnswers += link
-        assertThat(connect(failSave = true).pair(bridge)).isEqualTo(PairOutcome.Failed("Couldn’t save that change — try again."))
+        assertThat(connect(failSave = true).pair(bridge)).isEqualTo(ConnectFailed("Couldn’t save that change — try again."))
     }
 }
