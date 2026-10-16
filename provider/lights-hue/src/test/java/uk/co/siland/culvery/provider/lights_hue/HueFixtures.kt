@@ -111,7 +111,8 @@ internal object HueFixtures {
         {"name":"Hue Bridge","datastoreversion":"172","swversion":"1978418030","apiversion":"1.78.0",
          "mac":"00:17:88:a1:b2:c3","bridgeid":"$BRIDGE_ID","factorynew":false,"replacesbridgeid":"ecb5fafffe9a1b2c",
          "modelid":"BSB002","ipaddress":"192.168.1.30","gateway":"192.168.1.1","netmask":"255.255.255.0",
-         "proxyaddress":"none"}
+         "proxyaddress":"none",
+         "whitelist":{"$KEY":{"last use date":"2026-10-16T10:00:00","create date":"2026-10-01T09:00:00","name":"culvery#tablet"}}}
     """.trimIndent()
 
     val PAIRED = """[{"success":{"username":"$KEY","clientkey":"0123456789ABCDEF0123456789ABCDEF"}}]"""

@@ -119,7 +119,7 @@ private class Change(
     val type: String = "",
     val on: OnState? = null,
     val dimming: Dimming? = null,
-    val status: SceneStatus? = null,
+    val status: JsonElement? = null,
 )
 
 /** The Hue Bridge's CLIP v2 answers and the bodies sent to it (7 §3.2). Plain JVM: no Android, so its tests need no emulator. */
@@ -201,7 +201,7 @@ internal object HueJson {
                     "grouped_light" -> if (change.on != null || change.dimming?.brightness != null) {
                         events.add(HueEvent.GroupedLight(change.id, change.on?.on, change.dimming?.brightness))
                     }
-                    "scene" -> change.status?.let { events.add(HueEvent.Scene(change.id, it.isActive())) }
+                    "scene" -> sceneActive(change.status)?.let { events.add(HueEvent.Scene(change.id, it)) }
                     "room" -> events.add(HueEvent.Reread)
                 }
             }
@@ -234,6 +234,8 @@ internal object HueJson {
         "gateway", "netmask", "proxyaddress",
     ).joinToString("|")
     private val KEYED_VALUE = Regex("\"($VALUE_KEYS)\"\\s*:\\s*\"(?:[^\"\\\\]|\\\\.)*\"")
+    // The bridge's whitelist is an object keyed by application keys.
+    private val WHITELIST = Regex("\"whitelist\"\\s*:\\s*\\{(?:[^{}]|\\{[^{}]*\\})*\\}")
     private val MAC = Regex("""(?:[0-9A-Fa-f]{2}:){5,7}[0-9A-Fa-f]{2}""")
     private val BRIDGE_ID_SHAPE = Regex("""(?<![0-9A-Za-z])[0-9A-Fa-f]{16}(?![0-9A-Za-z])""")
     private val IPV4 = Regex("""\b\d{1,3}(?:\.\d{1,3}){3}\b""")
@@ -248,6 +250,7 @@ internal object HueJson {
      * a network address replaced, and by shape anywhere a bridge id, a MAC address or an IPv4 address. Resource ids stay.
      */
     fun redact(text: String): String = text
+        .replace(WHITELIST, "\"whitelist\":{}")
         .replace(KEYED_VALUE) { "\"${it.groupValues[1]}\":\"${PLACEHOLDERS[it.groupValues[1]] ?: "[address]"}\"" }
         .replace(MAC, "[mac]")
         .replace(BRIDGE_ID_SHAPE, "[bridge id]")
@@ -256,6 +259,10 @@ internal object HueJson {
     private inline fun <reified T> page(text: String): List<T> = decode<Page<T>>(text).data
 
     private fun SceneStatus?.isActive() = this != null && active != "inactive"
+
+    /** Only a scene's `status` object with an `active` says anything; other resources send `status` as a word. */
+    private fun sceneActive(status: JsonElement?): Boolean? =
+        ((status as? JsonObject)?.get("active") as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { it != "inactive" }
 
     private inline fun <reified T> decode(text: String): T = try {
         JSON.decodeFromString<T>(text)

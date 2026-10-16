@@ -125,6 +125,21 @@ class HueJsonTest {
         assertThat(HueJson.events("""[{"type":"delete","data":[{"id":"r","type":"scene"}]}]""")).containsExactly(HueEvent.Reread)
     }
 
+    /** Fails if a string `status` on another resource, or a scene update without `active`, loses the whole payload. */
+    @Test
+    fun statusesOfOtherResourcesDoNotSpoilAPayload() {
+        val payload = """[{"type":"update","data":[
+            {"id":"z","type":"zigbee_connectivity","status":"connected"},
+            {"id":"b","type":"behavior_instance","status":"running","state":{"pm_state":"started"}},
+            {"id":"s1","type":"scene","last_recall":"2026-10-16T10:00:00Z"},
+            {"id":"g","type":"grouped_light","on":{"on":true}},
+            {"id":"s2","type":"scene","status":{"active":"dynamic_palette"}}]}]"""
+        assertThat(HueJson.events(payload)).containsExactly(
+            HueEvent.GroupedLight("g", on = true, brightness = null),
+            HueEvent.Scene("s2", active = true),
+        ).inOrder()
+    }
+
     /** Fails if a wrong shape escapes as another exception type, or the exception carries the answer's text. */
     @Test
     fun aWrongShapeIsAHueJsonException() {
@@ -175,6 +190,8 @@ class HueJsonTest {
         val config = HueJson.redact(F.CONFIG)
         assertThat(config).contains("\"replacesbridgeid\":\"[bridge id]\"")
         assertThat(config).contains("\"proxyaddress\":\"[address]\"")
+        assertThat(config).contains("\"whitelist\":{}")
+        assertThat(config).doesNotContain("culvery#tablet")
         assertThat(config).contains("\"apiversion\":\"1.78.0\"")
         assertThat(HueJson.config(config)).isEqualTo(HueConfig("[bridge id]"))
 
