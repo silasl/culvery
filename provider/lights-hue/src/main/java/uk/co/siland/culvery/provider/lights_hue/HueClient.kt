@@ -163,14 +163,15 @@ internal class HueClient(
     /** Drops every command still waiting its turn (7 §4.4). */
     fun dropWaiting() = pacer.dropWaiting()
 
-    /** The bridge's event stream (7 §4.2): each payload's changes as they come; ends when the bridge closes it. */
-    fun events(call: BridgeCall): Flow<List<HueEvent>> = channelFlow {
+    /** The bridge's event stream (7 §4.2): each payload's changes as they come, after [opened]; ends when the bridge closes it. */
+    fun events(call: BridgeCall, opened: suspend () -> Unit = {}): Flow<List<HueEvent>> = channelFlow {
         val request = keyed(call, url(call.address, "eventstream", "clip", "v2")).header("Accept", "text/event-stream").build()
         val http = stream(call.bridgeId).newCall(request)
         val reader = launch(Dispatchers.IO) {
             try {
                 http.execute().use {
                     if (!it.isSuccessful) check(it.code, it.peekBody(MAX_ANSWER_BYTES).string())
+                    opened()
                     val source = it.body?.source() ?: return@use
                     HueJson.sse(generateSequence { source.readUtf8Line() }).forEach { data ->
                         capture("event", data)

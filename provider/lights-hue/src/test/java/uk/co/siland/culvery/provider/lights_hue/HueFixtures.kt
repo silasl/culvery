@@ -11,8 +11,10 @@ internal object HueFixtures {
 
     const val LOUNGE = "11111111-aaaa-4bbb-8ccc-000000000001"
     const val KITCHEN = "11111111-aaaa-4bbb-8ccc-000000000002"
+    const val GARDEN = "11111111-aaaa-4bbb-8ccc-000000000003"
     const val LOUNGE_GROUP = "22222222-aaaa-4bbb-8ccc-000000000001"
     const val KITCHEN_GROUP = "22222222-aaaa-4bbb-8ccc-000000000002"
+    const val GARDEN_GROUP = "22222222-aaaa-4bbb-8ccc-000000000003"
     const val HOME_GROUP = "22222222-aaaa-4bbb-8ccc-000000000009"
     const val LOUNGE_LAMP_DEVICE = "33333333-aaaa-4bbb-8ccc-000000000001"
     const val LOUNGE_STRIP_DEVICE = "33333333-aaaa-4bbb-8ccc-000000000002"
@@ -39,7 +41,11 @@ internal object HueFixtures {
           {"id":"$KITCHEN","id_v1":"/groups/2",
            "children":[{"rid":"$KITCHEN_SPOT_DEVICE","rtype":"device"}],
            "services":[{"rid":"$KITCHEN_GROUP","rtype":"grouped_light"}],
-           "metadata":{"name":"Kitchen","archetype":"kitchen"},"type":"room"}
+           "metadata":{"name":"Kitchen","archetype":"kitchen"},"type":"room"},
+          {"id":"$GARDEN","id_v1":"/groups/3",
+           "children":[{"rid":"$GARDEN_PLUG_DEVICE","rtype":"device"}],
+           "services":[{"rid":"$GARDEN_GROUP","rtype":"grouped_light"}],
+           "metadata":{"name":"Garden","archetype":"garden"},"type":"room"}
         ]}
     """.trimIndent()
 
@@ -50,6 +56,8 @@ internal object HueFixtures {
            "type":"grouped_light"},
           {"id":"$KITCHEN_GROUP","id_v1":"/groups/2","owner":{"rid":"$KITCHEN","rtype":"room"},
            "on":{"on":false},"dimming":{"brightness":0.0},"dimming_delta":{},"type":"grouped_light"},
+          {"id":"$GARDEN_GROUP","id_v1":"/groups/3","owner":{"rid":"$GARDEN","rtype":"room"},
+           "on":{"on":true},"type":"grouped_light"},
           {"id":"$HOME_GROUP","id_v1":"/groups/0","owner":{"rid":"77777777-aaaa-4bbb-8ccc-000000000001","rtype":"bridge_home"},
            "on":{"on":true},"type":"grouped_light"}
         ]}
@@ -64,7 +72,8 @@ internal object HueFixtures {
            "metadata":{"name":"Lounge strip","archetype":"hue_lightstrip"},"on":{"on":true},
            "dimming":{"brightness":70.4,"min_dim_level":0.2},"type":"light"},
           {"id":"88888888-aaaa-4bbb-8ccc-000000000003","id_v1":"/lights/3","owner":{"rid":"$KITCHEN_SPOT_DEVICE","rtype":"device"},
-           "metadata":{"name":"Kitchen spot","archetype":"recessed_ceiling"},"on":{"on":false},"type":"light"},
+           "metadata":{"name":"Kitchen spot","archetype":"recessed_ceiling"},"on":{"on":false},
+           "dimming":{"brightness":45.0,"min_dim_level":0.2},"type":"light"},
           {"id":"88888888-aaaa-4bbb-8ccc-000000000004","id_v1":"/lights/4","owner":{"rid":"$GARDEN_PLUG_DEVICE","rtype":"device"},
            "metadata":{"name":"Garden plug","archetype":"plug"},"on":{"on":true},"type":"light"}
         ]}

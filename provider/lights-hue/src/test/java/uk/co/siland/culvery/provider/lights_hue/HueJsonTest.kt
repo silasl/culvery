@@ -12,6 +12,7 @@ class HueJsonTest {
         assertThat(HueJson.rooms(F.ROOMS)).containsExactly(
             HueRoom(F.LOUNGE, "Lounge", listOf(F.LOUNGE_LAMP_DEVICE, F.LOUNGE_STRIP_DEVICE), F.LOUNGE_GROUP),
             HueRoom(F.KITCHEN, "Kitchen", listOf(F.KITCHEN_SPOT_DEVICE), F.KITCHEN_GROUP),
+            HueRoom(F.GARDEN, "Garden", listOf(F.GARDEN_PLUG_DEVICE), F.GARDEN_GROUP),
         ).inOrder()
     }
 
@@ -21,6 +22,7 @@ class HueJsonTest {
         assertThat(HueJson.groupedLights(F.GROUPED_LIGHTS)).containsExactly(
             HueGroupedLight(F.LOUNGE_GROUP, F.LOUNGE, "room", on = true, brightness = 70.4),
             HueGroupedLight(F.KITCHEN_GROUP, F.KITCHEN, "room", on = false, brightness = 0.0),
+            HueGroupedLight(F.GARDEN_GROUP, F.GARDEN, "room", on = true, brightness = null),
             HueGroupedLight(F.HOME_GROUP, "77777777-aaaa-4bbb-8ccc-000000000001", "bridge_home", on = true, brightness = null),
         ).inOrder()
     }
@@ -32,7 +34,7 @@ class HueJsonTest {
         assertThat(lights.map { it.deviceId }).containsExactly(
             F.LOUNGE_LAMP_DEVICE, F.LOUNGE_STRIP_DEVICE, F.KITCHEN_SPOT_DEVICE, F.GARDEN_PLUG_DEVICE,
         ).inOrder()
-        assertThat(lights.map { it.dimmable }).containsExactly(true, true, false, false).inOrder()
+        assertThat(lights.map { it.dimmable }).containsExactly(true, true, true, false).inOrder()
     }
 
     /** Fails if `inactive` reads as active, or a scene loses its room. */
@@ -200,8 +202,8 @@ class HueJsonTest {
         assertThat(inside).doesNotContain("10.0.0.7")
         assertThat(inside).contains("was not found")
 
-        assertThat(HueJson.rooms(HueJson.redact(F.ROOMS)).map { it.name }).containsExactly("[name]", "[name]")
-        assertThat(HueJson.groupedLights(HueJson.redact(F.GROUPED_LIGHTS))).hasSize(3)
+        assertThat(HueJson.rooms(HueJson.redact(F.ROOMS)).map { it.name }).containsExactly("[name]", "[name]", "[name]")
+        assertThat(HueJson.groupedLights(HueJson.redact(F.GROUPED_LIGHTS))).hasSize(4)
         assertThat(HueJson.lights(HueJson.redact(F.LIGHTS))).hasSize(4)
         assertThat(HueJson.scenes(HueJson.redact(F.SCENES))).hasSize(2)
         assertThat(HueJson.behaviors(HueJson.redact(F.BEHAVIORS)).map { it.on }).containsExactly(false, true, true, false, true, true).inOrder()

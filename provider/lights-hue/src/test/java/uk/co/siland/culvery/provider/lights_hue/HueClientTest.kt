@@ -45,8 +45,8 @@ class HueClientTest {
     /** Fails if a read goes to the wrong resource, leaves out the key, or isn't parsed as its resource. */
     @Test
     fun eachReadIsItsResourcesPathWithTheKey() = runTest {
-        assertThat(client.rooms(call).map { it.name }).containsExactly("Lounge", "Kitchen").inOrder()
-        assertThat(client.groupedLights(call)).hasSize(3)
+        assertThat(client.rooms(call).map { it.name }).containsExactly("Lounge", "Kitchen", "Garden").inOrder()
+        assertThat(client.groupedLights(call)).hasSize(4)
         assertThat(client.lights(call)).hasSize(4)
         assertThat(client.scenes(call).map { it.name }).containsExactly("Relax", "Bright")
         assertThat(client.behaviors(call)).hasSize(6)
@@ -170,7 +170,7 @@ class HueClientTest {
     @Test
     fun aSlowAnswerTimesOut() = runTest {
         bridge.delayMs = 50
-        assertThat(client.rooms(call)).hasSize(2)
+        assertThat(client.rooms(call)).hasSize(3)
         assertThat(client.setOn(call, HueFixtures.LOUNGE_GROUP, true)).isTrue()
         bridge.delayMs = 400
         throws<InterruptedIOException> { client.rooms(call) }

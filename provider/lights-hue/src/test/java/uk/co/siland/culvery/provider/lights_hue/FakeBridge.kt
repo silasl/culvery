@@ -1,7 +1,10 @@
 package uk.co.siland.culvery.provider.lights_hue
 
 import java.net.InetAddress
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.Dispatcher
@@ -41,6 +44,16 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
     /** Each answer is a 200 that lists an error, as when a command reaches a light that is soft off. */
     @Volatile var answersWithErrors = false
 
+    /** Each command is answered 200 with an error listed, while reads answer as usual. */
+    @Volatile var refusingCommands = false
+
+    /** While set, each command's answer waits for it to open; [held] gets a permit as each one starts waiting. */
+    @Volatile var holdCommands: CountDownLatch? = null
+    val held = Semaphore(0)
+
+    /** What each resource read answers, by resource type; a test may change one. */
+    val resources: MutableMap<String, String> = ConcurrentHashMap(RESOURCES)
+
     /** Each answer's headers come only after this many milliseconds. */
     @Volatile var delayMs = 0L
 
@@ -49,6 +62,9 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
 
     /** Pairing answers "link button not pressed". */
     @Volatile var buttonPressed = true
+
+    /** The stream's body: comment, `id:` and `data:` lines. */
+    @Volatile var events: String = HueFixtures.EVENTS
 
     /** The stream's events come only after this many milliseconds. */
     @Volatile var streamDelayMs = 0L
@@ -65,6 +81,10 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
                     request.method.orEmpty(), path, request.body.readUtf8(), request.getHeader("hue-application-key"),
                     request.getHeader("Accept"),
                 )
+                if (request.method == "PUT") holdCommands?.let { hold ->
+                    held.release()
+                    hold.await(HOLD_LIMIT_S, TimeUnit.SECONDS)
+                }
                 return answer(request.method.orEmpty(), path).setHeadersDelay(delayMs, TimeUnit.MILLISECONDS)
             }
         }
@@ -82,30 +102,32 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
         if (v1Unauthorised) return MockResponse().setBody(HueFixtures.UNAUTHORISED_V1)
         if (failing) return MockResponse().setResponseCode(500).setBody("""{"errors":[{"description":"internal error"}]}""")
         if (answersWithErrors) return MockResponse().setBody("""{"data":[],"errors":[{"description":"command may not have effect"}]}""")
+        if (method == "PUT" && refusingCommands) return MockResponse().setBody("""{"data":[],"errors":[{"description":"device (grouped_light) is soft off"}]}""")
         if (method == "PUT") return MockResponse().setBody("""{"data":[{"rid":"${path.substringAfterLast('/')}"}],"errors":[]}""")
         return when (path) {
             "/api" -> MockResponse().setBody(if (buttonPressed) HueFixtures.PAIRED else HueFixtures.NOT_PRESSED)
             "/api/config" -> MockResponse().setBody(HueFixtures.CONFIG)
             "/eventstream/clip/v2" -> stream()
-            else -> RESOURCES[path.removePrefix("/clip/v2/resource/")]?.let { MockResponse().setBody(it) }
+            else -> resources[path.removePrefix("/clip/v2/resource/")]?.let { MockResponse().setBody(it) }
                 ?: MockResponse().setResponseCode(404).setBody("""{"errors":[{"description":"not found"}]}""")
         }
     }
 
     private fun stream(): MockResponse {
-        val events = HueFixtures.EVENTS + "\n\n"
+        val sent = events + "\n\n"
         val response = MockResponse().setHeader("Content-Type", "text/event-stream")
             .setBodyDelay(streamDelayMs, TimeUnit.MILLISECONDS)
-        if (!streamHeld) return response.setBody(events)
+        if (!streamHeld) return response.setBody(sent)
         // The events, then a keep-alive comment only after the hold: the bridge looks open until then.
-        val body = events + ": keep\n"
-        return response.setBody(body).throttleBody(events.toByteArray().size.toLong(), STREAM_HOLD_MS, TimeUnit.MILLISECONDS)
+        val body = sent + ": keep\n"
+        return response.setBody(body).throttleBody(sent.toByteArray().size.toLong(), STREAM_HOLD_MS, TimeUnit.MILLISECONDS)
     }
 
     override fun close() = server.shutdown()
 
     companion object {
         const val STREAM_HOLD_MS = 2_000L
+        private const val HOLD_LIMIT_S = 5L
 
         private val RESOURCES = mapOf(
             "room" to HueFixtures.ROOMS,
