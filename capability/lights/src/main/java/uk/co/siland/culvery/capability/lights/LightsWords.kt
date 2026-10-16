@@ -15,6 +15,11 @@ internal const val OTHER_BRIDGE = "Culvery found a different Hue Bridge. Find Hu
 internal const val TURN_ALL_OFF = "Turn all lights off"
 internal const val LOOKING_FOR_LIGHTS = "Looking for the lights…"
 private const val AN_AUTOMATION = "an automation"
+internal const val NO_BRIDGE_ANSWERED = "No Hue Bridge answered. Check it’s plugged in, or enter the bridge’s address."
+internal const val TYPE_FOUR_NUMBERS = "Type the address as four numbers, like 192.168.1.30."
+internal const val NO_BRIDGE_THERE = "No Hue Bridge answered at that address. Check it in the Hue app."
+internal const val PRESS_THE_BUTTON = "Press the round button on top of the Hue Bridge"
+internal const val NOT_PRESSED_IN_TIME = "The button wasn’t pressed in time. Try again."
 
 /** What a room's button shows under its name: "On · 70%", "Off", or "On" for a room that can't dim (7 §5.1). */
 internal fun roomState(room: LightRoom): String = when {
