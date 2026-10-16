@@ -39,6 +39,37 @@ internal object SonosFixtures {
             """</ZoneGroups><VanishedDevices/></ZoneGroupState>""",
     )
 
+    private fun member(uuid: String, address: String, name: String) =
+        """<ZoneGroupMember UUID="$uuid" Location="http://$address/xml/device_description.xml" ZoneName="$name"/>"""
+
+    private fun zoneGroupState(groups: String) =
+        soap("GetZoneGroupState", "ZoneGroupState" to "<ZoneGroupState><ZoneGroups>$groups</ZoneGroups><VanishedDevices/></ZoneGroupState>")
+
+    /** The Kitchen joined to the Lounge's group in the Sonos app. */
+    fun grouped(kitchen: String, lounge: String, dining: String) = zoneGroupState(
+        """<ZoneGroup Coordinator="$LOUNGE" ID="$LOUNGE:34">""" + member(LOUNGE, lounge, "Lounge") + member(DINING, dining, "Dining room") +
+            member(KITCHEN, kitchen, "Kitchen") + "</ZoneGroup>",
+    )
+
+    /** The Dining room taken out of the Lounge's group: every room on its own. */
+    fun apart(kitchen: String, lounge: String, dining: String) = zoneGroupState(
+        """<ZoneGroup Coordinator="$KITCHEN" ID="$KITCHEN:12">""" + member(KITCHEN, kitchen, "Kitchen") + "</ZoneGroup>" +
+            """<ZoneGroup Coordinator="$LOUNGE" ID="$LOUNGE:34">""" + member(LOUNGE, lounge, "Lounge") + "</ZoneGroup>" +
+            """<ZoneGroup Coordinator="$DINING" ID="$DINING:56">""" + member(DINING, dining, "Dining room") + "</ZoneGroup>",
+    )
+
+    /**
+     * GetZoneGroupAttributes as ZoneGroupTopology documents it: the group the asked speaker is in, and every player in it
+     * (hidden ones too), comma-separated.
+     */
+    fun groupAttributes(groupId: String, vararg players: String, name: String = "Kitchen") = soap(
+        "GetZoneGroupAttributes",
+        "CurrentZoneGroupName" to name,
+        "CurrentZoneGroupID" to groupId,
+        "CurrentZonePlayerUUIDsInGroup" to players.joinToString(","),
+        "CurrentMuseHouseholdId" to HOUSEHOLD,
+    )
+
     fun household(id: String = HOUSEHOLD) = soap("GetHouseholdID", "CurrentHouseholdID" to id)
 
     /** An answer that declares an entity: no speaker sends one, so it is refused before parsing. */

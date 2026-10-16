@@ -149,6 +149,9 @@ internal class SonosClient(
     suspend fun zoneGroups(address: String): List<ZoneGroupInfo> =
         call(address, SonosService.TOPOLOGY, "GetZoneGroupState") { SonosXml.zoneGroups(it, accept) }
 
+    suspend fun groupAttributes(address: String): GroupAttributes =
+        call(address, SonosService.TOPOLOGY, "GetZoneGroupAttributes", parse = SonosXml::groupAttributes)
+
     suspend fun householdId(address: String): String = call(address, SonosService.DEVICE, "GetHouseholdID", parse = SonosXml::householdId)
 
     suspend fun browse(address: String, objectId: String, start: Int, count: Int): BrowseResult = call(

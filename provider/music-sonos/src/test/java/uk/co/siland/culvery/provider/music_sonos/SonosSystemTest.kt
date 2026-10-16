@@ -26,6 +26,7 @@ import uk.co.siland.culvery.provider.music_sonos.SonosFixtures.DINING
 import uk.co.siland.culvery.provider.music_sonos.SonosFixtures.HOUSEHOLD
 import uk.co.siland.culvery.provider.music_sonos.SonosFixtures.KITCHEN
 import uk.co.siland.culvery.provider.music_sonos.SonosFixtures.LOUNGE
+import uk.co.siland.culvery.provider.music_sonos.SonosFixtures.SUB
 
 /**
  * 6 §4, §6, §7: three speakers on localhost. Kitchen plays a library track on its own; the Lounge leads the Dining room,
@@ -136,6 +137,79 @@ class SonosSystemTest {
         kitchen.answer("GetPositionInfo", SonosFixtures.position(SonosFixtures.RADIO_URI, SonosFixtures.RADIO_TRACK))
         s.checkPlayback()
         assertThat(kitchen.actions().count { it == "GetMediaInfo" }).isEqualTo(2)
+    }
+
+    private val speakers get() = listOf(kitchen, lounge, dining)
+
+    private fun layoutReads() = speakers.sumOf { s -> s.actions().count { it == "GetZoneGroupState" } }
+
+    /** Each speaker says it is in the group the setUp layout shows; the Lounge's hidden sub is among its players. */
+    private fun asShown() {
+        kitchen.answer("GetZoneGroupAttributes", SonosFixtures.groupAttributes("$KITCHEN:12", KITCHEN))
+        lounge.answer("GetZoneGroupAttributes", SonosFixtures.groupAttributes("$LOUNGE:34", LOUNGE, DINING, SUB))
+        dining.answer("GetZoneGroupAttributes", SonosFixtures.groupAttributes("$LOUNGE:34", LOUNGE, DINING, SUB))
+    }
+
+    private fun layoutIs(topology: String) = speakers.forEach { it.answer("GetZoneGroupState", topology) }
+
+    /**
+     * 6 §4.2 (tablet walk-through, 2026-10-16): rooms grouped in the Sonos app show as one row in the next playback check,
+     * not 30 s later. Fails if the layout waits for its own check, so a slider on the old row is refused.
+     */
+    @Test
+    fun aGroupingInTheSonosAppShowsInTheNextPlaybackCheck() = runTest {
+        val s = checked()
+        layoutIs(SonosFixtures.grouped(kitchen.address, lounge.address, dining.address))
+        speakers.forEach { it.answer("GetZoneGroupAttributes", SonosFixtures.groupAttributes("$LOUNGE:34", LOUNGE, DINING, KITCHEN, SUB)) }
+        val before = layoutReads()
+        s.checkPlayback()
+        assertThat(layoutReads()).isEqualTo(before + 1)
+        assertThat(s.groups.value.map { g -> g.rooms.map { it.id } }).containsExactly(listOf(LOUNGE, DINING, KITCHEN))
+        assertThat(s.groups.value.single().state).isEqualTo(PlayState.PAUSED)
+        s.setGroupVolume(s.groups.value.single(), 25)
+        assertThat(lounge.bodyOf("SetGroupVolume")).contains("<DesiredVolume>25</DesiredVolume>")
+    }
+
+    /** Fails if a check whose speakers all answer as the screen shows reads the layout too. */
+    @Test
+    fun speakersInTheGroupsShownLeaveTheLayoutUnread() = runTest {
+        val s = checked()
+        asShown()
+        speakers.forEach { it.received.clear() }
+        s.checkPlayback()
+        assertThat(layoutReads()).isEqualTo(0)
+        speakers.forEach { assertThat(it.actions()).contains("GetZoneGroupAttributes") }
+    }
+
+    /** A room taken out of a group is its own row in the same check, with what it plays read then too. */
+    @Test
+    fun anUngroupingShowsInTheNextPlaybackCheck() = runTest {
+        val s = checked()
+        layoutIs(SonosFixtures.apart(kitchen.address, lounge.address, dining.address))
+        asShown()
+        lounge.answer("GetZoneGroupAttributes", SonosFixtures.groupAttributes("$LOUNGE:34", LOUNGE, SUB))
+        dining.answer("GetZoneGroupAttributes", SonosFixtures.groupAttributes("$DINING:56", DINING))
+        dining.answer("GetTransportInfo", SonosFixtures.transport("PLAYING"))
+        dining.answer("GetPositionInfo", SonosFixtures.position())
+        dining.answer("GetMediaInfo", SonosFixtures.media(SonosFixtures.queue(DINING)))
+        dining.answer("GetGroupVolume", SonosFixtures.groupVolume(35))
+        s.checkPlayback()
+        assertThat(s.groups.value.map { it.id }).containsExactly("$KITCHEN:12", "$LOUNGE:34", "$DINING:56").inOrder()
+        assertThat(s.groups.value[2].state).isEqualTo(PlayState.PLAYING)
+    }
+
+    /** A speaker that can't say which group it is in is left out of that check; the 30 s layout check still reads it. */
+    @Test
+    fun aSpeakerThatFailsToSayItsGroupIsLeftOut() = runTest {
+        val s = checked()
+        layoutIs(SonosFixtures.grouped(kitchen.address, lounge.address, dining.address))
+        asShown()
+        kitchen.refuse("GetZoneGroupAttributes", 401)
+        speakers.forEach { it.received.clear() }
+        s.checkPlayback()
+        assertThat(layoutReads()).isEqualTo(0)
+        assertThat(s.groups.value).hasSize(2)
+        assertThat(s.problem.value).isNull()
     }
 
     /** 6 §4.3: to the leader, and that group checked at once. Fails if the Dining room gets the command. */

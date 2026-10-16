@@ -88,7 +88,7 @@ When the saved address stops answering, Culvery scans once by itself, keeps the 
 Culvery checks the speakers on a timer rather than subscribing to UPnP events, which would need an HTTP server on the tablet.
 
 - While Culvery is in front and Home or the Music tab shows: each group's coordinator every **2 seconds** (transport info, position info, group volume).
-- Group layout (rooms, groups, room volumes): every **30 seconds**, and when the Music tab opens.
+- Group layout (rooms, groups, room volumes): grouping changes are noticed within a check, as each check also asks every speaker which group it is in (ZoneGroupTopology `GetZoneGroupAttributes`) and reads the layout at once when one differs from the screen; the full layout is still read every **30 seconds**, and when the Music tab opens (tablet walk-through, 2026-10-16).
 - After a command: that group at once.
 - Not in front, or neither screen showing: no checks.
 - Art: from the speaker's `/getaa` URL (or the stream's own art URL), cached in memory only.

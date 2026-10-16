@@ -8,6 +8,7 @@ import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.music.PlayState
+import uk.co.siland.culvery.provider.music_sonos.SonosFixtures.KITCHEN
 
 private val AV = SonosService.AV_TRANSPORT.urn
 
@@ -79,12 +80,15 @@ class SonosClientTest {
         speaker.answer("GetHouseholdID", SonosFixtures.household())
         speaker.answer("GetZoneGroupState", SonosFixtures.topology(a, a, a))
         speaker.answer("Browse", SonosFixtures.library(total = 5))
+        speaker.answer("GetZoneGroupAttributes", SonosFixtures.groupAttributes("$KITCHEN:12", KITCHEN))
         assertThat(client.transportInfo(a)).isEqualTo(PlayState.PAUSED)
         assertThat(client.groupVolume(a)).isEqualTo(44)
         assertThat(client.volume(a)).isEqualTo(21)
         assertThat(client.householdId(a)).isEqualTo(SonosFixtures.HOUSEHOLD)
         assertThat(client.zoneGroups(a)).hasSize(2)
         assertThat(client.browse(a, LIBRARY, 0, 1).total).isEqualTo(5)
+        assertThat(client.groupAttributes(a)).isEqualTo(GroupAttributes("$KITCHEN:12", setOf(KITCHEN)))
+        assertThat(sent("GetZoneGroupAttributes").path).isEqualTo("/ZoneGroupTopology/Control")
         assertThat(sent("GetHouseholdID").path).isEqualTo("/DeviceProperties/Control")
         assertThat(sent("GetZoneGroupState").path).isEqualTo("/ZoneGroupTopology/Control")
         assertThat(sent("Browse").path).isEqualTo("/MediaServer/ContentDirectory/Control")

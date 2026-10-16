@@ -43,6 +43,14 @@ class SonosXmlTest {
         }
     }
 
+    /** Fails if the players are kept as one string, or a speaker in no group (Sonos leaves both empty) reads as one. */
+    @Test
+    fun theGroupASpeakerSaysItIsIn() {
+        assertThat(SonosXml.groupAttributes(SonosFixtures.groupAttributes("$LOUNGE:34", LOUNGE, DINING)))
+            .isEqualTo(GroupAttributes("$LOUNGE:34", setOf(LOUNGE, DINING)))
+        assertThrows(SonosXmlException::class.java) { SonosXml.groupAttributes(SonosFixtures.groupAttributes("")) }
+    }
+
     @Test
     fun theHouseholdId() {
         assertThat(SonosXml.householdId(SonosFixtures.household())).isEqualTo(SonosFixtures.HOUSEHOLD)
@@ -200,6 +208,7 @@ class SonosXmlTest {
         val answers = listOf(
             topology, SonosFixtures.household(), SonosFixtures.position(), SonosFixtures.favourites,
             SonosFixtures.media(SonosFixtures.RADIO_URI, SonosFixtures.RADIO_STATION), SonosFixtures.library(total = 1),
+            SonosFixtures.groupAttributes("$KITCHEN:12", KITCHEN),
         )
         val shapes = answers.joinToString("\n", transform = SonosXml::redact)
         listOf("Kitchen", "Lounge", "Dining room", "Song", "Artist", "Album", "Culvery FM", "Sunday", "One song",

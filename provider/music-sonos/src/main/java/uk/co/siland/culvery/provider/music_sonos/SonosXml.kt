@@ -17,6 +17,9 @@ internal data class ZoneMember(val uuid: String, val name: String, val address: 
 /** A Sonos group: its id, its leader's id, and its visible rooms with the leader first. */
 internal data class ZoneGroupInfo(val id: String, val coordinator: String, val members: List<ZoneMember>)
 
+/** The group a speaker says it is in, and every player in it, hidden ones too. */
+internal data class GroupAttributes(val groupId: String, val players: Set<String>)
+
 internal data class TrackInfo(val uri: String?, val title: String?, val artist: String?, val album: String?, val artUri: String?, val programme: String?)
 
 internal data class MediaInfo(val uri: String?, val title: String?, val artUri: String?)
@@ -59,6 +62,13 @@ internal object SonosXml {
         }
 
     fun householdId(answer: String): String = text(answer, "CurrentHouseholdID")
+
+    fun groupAttributes(answer: String): GroupAttributes {
+        val root = parse(answer)
+        val id = root.text("CurrentZoneGroupID") ?: throw SonosXmlException()
+        val players = root.text("CurrentZonePlayerUUIDsInGroup") ?: throw SonosXmlException()
+        return GroupAttributes(id, players.split(',').map(String::trim).toSet())
+    }
 
     fun transportState(answer: String): PlayState = when (text(answer, "CurrentTransportState")) {
         "PLAYING" -> PlayState.PLAYING
@@ -108,7 +118,7 @@ internal object SonosXml {
     private val ENTITIES = listOf("&lt;" to "<", "&gt;" to ">", "&quot;" to "\"", "&apos;" to "'", "&amp;" to "&")
     private val SPOKEN_TEXT = Regex(
         """<((?:\w+:)?(?:title|creator|album|artist|albumArtist|streamContent|radioShowMd|description|desc|albumArtURI|res|""" +
-            """CurrentURI|NextURI|TrackURI|AVTransportURI|NextAVTransportURI|EnqueuedTransportURI))(\s[^>]*)?>[^<]*</\1>""",
+            """CurrentURI|NextURI|TrackURI|AVTransportURI|NextAVTransportURI|EnqueuedTransportURI|CurrentZoneGroupName))(\s[^>]*)?>[^<]*</\1>""",
     )
     // A closing quote is ["]: a raw string ending in four quotes would end early for the copy scan.
     private val NAME_ATTRIBUTE = Regex("""(\w*Name)="[^"]*["]""")

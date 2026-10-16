@@ -91,10 +91,38 @@ internal class SonosSystem(
         refusing { reaching { readLayout(link.address) } }
     }
 
-    /** A leader that refuses, or answers in a shape that isn't Sonos's, leaves its group as it was; the others are read. */
+    /**
+     * A leader that refuses, or answers in a shape that isn't Sonos's, leaves its group as it was; the others are read.
+     * Every room is also asked which group it is in, and a regrouping in the Sonos app reads the layout at once, then the
+     * playback of any group new in it (6 §4.2).
+     */
     override suspend fun checkPlayback() {
         if (layout.isEmpty()) checkLayout()
-        reaching { coroutineScope { layout.map { g -> async { skippingRefusal { readGroup(g) } } }.awaitAll() } }
+        reaching {
+            coroutineScope {
+                val shown = layout
+                val regrouped = async { regrouped(shown) }
+                shown.map { g -> async { skippingRefusal { readGroup(g) } } }.awaitAll()
+                if (regrouped.await() && skippingRefusal { readLayout(link.address) } == true) {
+                    val known = shown.map { it.id }.toSet()
+                    layout.filter { it.id !in known }.map { g -> async { skippingRefusal { readGroup(g) } } }.awaitAll()
+                }
+            }
+        }
+    }
+
+    /** Whether any room says it is in a group other than [shown]'s; one that doesn't say is left out. Hidden players aren't rooms. */
+    private suspend fun regrouped(shown: List<ZoneGroupInfo>): Boolean = coroutineScope {
+        val rooms = shown.flatMap { g -> g.members.map { it.uuid } }.toSet()
+        shown.flatMap { g ->
+            val members = g.members.map { it.uuid }.toSet()
+            g.members.map { m ->
+                async {
+                    val said = quietly { client.groupAttributes(m.address) }
+                    said != null && (said.groupId != g.id || said.players.intersect(rooms) != members)
+                }
+            }
+        }.awaitAll().any { it }
     }
 
     override suspend fun playingNow(): List<SpeakerGroup> {
@@ -377,11 +405,11 @@ internal class SonosSystem(
         throw MusicRefusedException()
     }
 
-    private suspend fun skippingRefusal(read: suspend () -> Unit) = try {
+    private suspend fun <T> skippingRefusal(read: suspend () -> T): T? = try {
         read()
     } catch (e: SonosFault) {
-        // Left as it was.
+        null // Left as it was.
     } catch (e: SonosXmlException) {
-        // Left as it was.
+        null
     }
 }
