@@ -63,6 +63,8 @@ dependencies {
     // Wired by Hilt alone, as the door (6 §3).
     implementation(project(":capability:music"))
     implementation(project(":provider:music-sonos"))
+    // Wired by Hilt alone, as the door and music (7 §3).
+    implementation(project(":capability:lights"))
     implementation(project(":provider:calendar-google"))
     implementation(project(":provider:weather-openmeteo"))
     // Sample data only, in debug builds.

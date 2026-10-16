@@ -94,6 +94,20 @@ class ModuleBoundariesTest {
         banned(":provider:music-sonos", ":capability:calendar")
     }
 
+    /** Pin: the Lights modules follow the same rules as Music's. */
+    @Test
+    fun theLightsModulesFollowTheRules() {
+        allowed(":capability:lights", ":core:plugin", "api")
+        allowed(":capability:lights", ":core:access")
+        allowed(":provider:lights-hue", ":capability:lights")
+        allowed(":app", ":provider:lights-hue")
+        banned(":capability:lights", ":provider:lights-hue")
+        banned(":capability:lights", ":capability:music")
+        banned(":capability:music", ":capability:lights")
+        banned(":provider:lights-hue", ":capability:music")
+        banned(":provider:lights-hue", ":provider:music-sonos")
+    }
+
     @Test
     fun theNetworkModuleIsCore() {
         allowed(":provider:music-sonos", ":core:net")
