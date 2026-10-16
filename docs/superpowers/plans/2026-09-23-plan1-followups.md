@@ -360,4 +360,5 @@ Release builds installed with `install -r` over Plan 5's (the household kept); C
 - Event celebrations (the user, 2026-10-16): family birthdays and other occasions marked on the wall, with a sound or something like it. Its own spec; no detail yet.
 - Voice control (the user, 2026-10-16, a question): its own spec; no detail yet.
 - Party mode (the user, 2026-10-15): one switch that sets the house up for a party: music on (Sonos), chosen smart plugs on, and so on. Like Holiday mode, it drives other services, so it needs their links first (Sonos from Plan 6; smart plugs have no link yet). Its own spec; no detail yet.
+- Eufy robot vacuum (the user, 2026-10-16): start the Eufy robovac from the wall. Its own spec; no detail yet.
 - A home hub on the NAS (the user, 2026-10-15): running one (for example Home Assistant) is possible if it helps. It could bridge Sonos, Hue, Arlo, the thermostat and smart plugs, with Culvery's providers talking to the hub instead of each device. Weigh it in each service's brainstorm; not needed for Sonos (Plan 6 talks to the speakers directly).
