@@ -46,7 +46,7 @@ class WeatherCapabilityTest {
         val card = capability.cards().first().single()
         assertThat(card.id).isEqualTo("weather.forecast")
         assertThat(card.size).isEqualTo(HomeCardSize.REGULAR)
-        assertThat(card.priority).isEqualTo(40)
+        assertThat(card.priority).isEqualTo(25)
     }
 
     @Test

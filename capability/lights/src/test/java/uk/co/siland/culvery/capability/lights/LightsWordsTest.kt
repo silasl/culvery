@@ -63,4 +63,39 @@ class LightsWordsTest {
         assertThat(houseLine(HolidayResult.Partly(0, listOf("mimic-id", "gone-id")), names::get))
             .isEqualTo("Lights are off, but Culvery couldn’t start Mimic presence and an automation. Start it in the Hue app.")
     }
+
+    /** Fails if a room that can't dim shows a percentage, or an off room shows its brightness. */
+    @Test
+    fun aRoomsStateAndHowItIsSpoken() {
+        assertThat(roomState(room("Lounge", on = true, brightness = 70))).isEqualTo("On · 70%")
+        assertThat(roomState(room("Lounge"))).isEqualTo("Off")
+        assertThat(roomState(room("Hall", on = true, dimmable = false))).isEqualTo("On")
+        assertThat(roomSpoken(room("Lounge", on = true, brightness = 70))).isEqualTo("Lounge, on, 70 percent")
+        assertThat(roomSpoken(room("Lounge"))).isEqualTo("Lounge, off")
+        assertThat(roomSpoken(room("Hall", on = true, dimmable = false))).isEqualTo("Hall, on")
+    }
+
+    /** Fails if an action names the wrong state, or the chevron's words differ from the spec's. */
+    @Test
+    fun whatEachControlDoes() {
+        assertThat(turnSpoken(room("Lounge"), true)).isEqualTo("Turn the Lounge on")
+        assertThat(turnSpoken(room("Lounge"), false)).isEqualTo("Turn the Lounge off")
+        assertThat(TURN_ALL_OFF).isEqualTo("Turn all lights off")
+        assertThat(holidaySpoken(true)).isEqualTo("Turn Holiday mode on")
+        assertThat(holidaySpoken(false)).isEqualTo("Turn Holiday mode off")
+        assertThat(openRoomSpoken(room("Lounge"))).isEqualTo("Open the Lounge on the Lights tab")
+        assertThat(LOOKING_FOR_LIGHTS).isEqualTo("Looking for the lights…")
+    }
+
+    /** Fails if a run doesn't replace Holiday mode's record with "Turning on…" or "Turning off…", or All lights off hides it. */
+    @Test
+    fun holidayModesStateWhileItRuns() {
+        assertThat(holidayState(false, null)).isEqualTo("Off")
+        assertThat(holidayState(true, null)).isEqualTo("On")
+        assertThat(holidayState(false, HouseRun.TURNING_ON)).isEqualTo("Turning on…")
+        assertThat(holidayState(true, HouseRun.TURNING_OFF)).isEqualTo("Turning off…")
+        assertThat(holidayState(true, HouseRun.ALL_OFF)).isEqualTo("On")
+        assertThat(holidayNamed(false, null)).isEqualTo("Holiday mode, off")
+        assertThat(holidayNamed(false, HouseRun.TURNING_ON)).isEqualTo("Holiday mode, turning on")
+    }
 }

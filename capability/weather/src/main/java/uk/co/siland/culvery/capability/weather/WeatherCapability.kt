@@ -18,8 +18,8 @@ import uk.co.siland.culvery.core.ui.Icons
 private const val WEATHER_ID = "weather"
 private const val FORECAST_CARD_ID = "weather.forecast"
 
-/** After Today (100) and Coming up (50): row 2, col 2 (§4.2). */
-private const val FORECAST_PRIORITY = 40
+/** After Today (100), Coming up (50), Lights (35) and Music (30): placed only when a cell is left (§4.2). */
+private const val FORECAST_PRIORITY = 25
 private const val HEADER_ITEM_ID = "weather"
 private const val HEADER_ITEM_ORDER = 10
 

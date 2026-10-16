@@ -24,7 +24,7 @@ const val MUSIC_ID = "music"
 
 private const val MUSIC_CARD_ID = "music.now"
 
-/** After Today (100), Coming up (50) and the forecast (40): row 2, column 3. */
+/** After Today (100), Coming up (50) and Lights (35): row 2, column 3. */
 private const val MUSIC_CARD_PRIORITY = 30
 
 /** Sonos on the wall (6 §3.1): rail slot 30, open to everyone, no badge. */

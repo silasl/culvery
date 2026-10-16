@@ -1,0 +1,28 @@
+package uk.co.siland.culvery.capability.lights.ui
+
+import androidx.compose.ui.unit.dp
+
+/** Lights' layout values (7 §5); provisional until the end-of-v1 design walk-through. */
+internal object LightsDimens {
+    // The Home card: padding 20 × 22 as the forecast's and Music's.
+    val cardPaddingV = 20.dp
+    val cardPaddingH = 22.dp
+    val blockGap = 12.dp
+    val bulb = 32.dp
+
+    // The chevron is a 48 dp touch target with a 28 dp glyph.
+    val chevron = 48.dp
+    val chevronIcon = 28.dp
+
+    // All lights off and Holiday mode side by side in 301 dp: Holiday mode keeps its width, All lights off takes the rest.
+    val buttonGap = 8.dp
+    val buttonHeight = 60.dp
+    val buttonPaddingStart = 10.dp
+    val buttonPaddingEnd = 12.dp
+    val buttonIcon = 24.dp
+    val buttonIconGap = 4.dp
+    val lineGap = 10.dp
+
+    val statusIcon = 20.dp
+    val statusGap = 8.dp
+}
