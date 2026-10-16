@@ -24,10 +24,13 @@ import uk.co.siland.culvery.capability.music.MUSIC
 import uk.co.siland.culvery.capability.music.MusicActions
 import uk.co.siland.culvery.capability.music.MusicChecks
 import uk.co.siland.culvery.capability.music.MusicView
+import uk.co.siland.culvery.capability.music.percentWords
 import uk.co.siland.culvery.capability.music.problemLine
+import uk.co.siland.culvery.capability.music.volumeName
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
+import uk.co.siland.culvery.core.ui.HhPercentSlider
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.ShellTokens
 
@@ -59,7 +62,10 @@ fun MusicCard(pick: HomePick?, status: String?, line: String?, actions: GroupAct
             if (!pick.nothingPlaying) NextButton(group, "music_card", actions)
             if (!group.isPlaying) ShuffleButton(group, "music_card", ButtonSurface.Surf, actions, compact = true)
         }
-        VolumeSlider(group.name, group.volume, "music_card_volume", Modifier.fillMaxWidth()) { actions.onGroupVolume(group, it) }
+        HhPercentSlider(
+            group.name, group.volume, "music_card_volume", Modifier.fillMaxWidth(),
+            spokenName = volumeName(group.name), spokenState = ::percentWords,
+        ) { actions.onGroupVolume(group, it) }
         if (line != null) Text(line, style = HhType.secondary, color = c.danger, maxLines = 2, modifier = Modifier.testTag("music_card_line"))
     }
 }

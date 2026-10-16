@@ -34,14 +34,17 @@ import uk.co.siland.culvery.capability.music.MusicView
 import uk.co.siland.culvery.capability.music.ROOMS
 import uk.co.siland.culvery.capability.music.SpeakerGroup
 import uk.co.siland.culvery.capability.music.favouritesSpoken
+import uk.co.siland.culvery.capability.music.percentWords
 import uk.co.siland.culvery.capability.music.problemLine
 import uk.co.siland.culvery.capability.music.roomsAction
 import uk.co.siland.culvery.capability.music.tabOrder
+import uk.co.siland.culvery.capability.music.volumeName
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
+import uk.co.siland.culvery.core.ui.HhPercentSlider
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
@@ -86,7 +89,10 @@ private fun MusicRow(group: SpeakerGroup, line: String?, roomsShown: Boolean, on
             NowPlayingBlock(group, nothingPlaying = false, MusicDimens.rowArt, HhType.rowTitle, "${tag}_now", Modifier.weight(1f))
             PlayPauseButton(group, tag, actions)
             NextButton(group, tag, actions)
-            VolumeSlider(group.name, group.volume, "${tag}_volume", Modifier.width(MusicDimens.rowSlider)) { actions.onGroupVolume(group, it) }
+            HhPercentSlider(
+                group.name, group.volume, "${tag}_volume", Modifier.width(MusicDimens.rowSlider),
+                spokenName = volumeName(group.name), spokenState = ::percentWords,
+            ) { actions.onGroupVolume(group, it) }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.controlsGap)) {
             if (group.rooms.size > 1) {
@@ -102,9 +108,10 @@ private fun MusicRow(group: SpeakerGroup, line: String?, roomsShown: Boolean, on
             group.rooms.forEach { room ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.controlsGap)) {
                     Text(room.name, style = HhType.body, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    VolumeSlider(room.name, room.volume, "${tag}_room_${room.id}_volume", Modifier.width(MusicDimens.roomSlider)) {
-                        actions.onRoomVolume(group, room, it)
-                    }
+                    HhPercentSlider(
+                        room.name, room.volume, "${tag}_room_${room.id}_volume", Modifier.width(MusicDimens.roomSlider),
+                        spokenName = volumeName(room.name), spokenState = ::percentWords,
+                    ) { actions.onRoomVolume(group, room, it) }
                 }
             }
         }

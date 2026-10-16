@@ -32,7 +32,9 @@ foggy
 home
 info
 light_mode
+lightbulb
 lock
+luggage
 mobile
 music_note
 partly_cloudy_day
@@ -40,6 +42,7 @@ partly_cloudy_night
 pause
 person
 play_arrow
+power_settings_new
 rainy
 rainy_heavy
 rainy_light

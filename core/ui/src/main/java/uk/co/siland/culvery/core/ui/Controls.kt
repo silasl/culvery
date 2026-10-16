@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -55,6 +57,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 
 /** Control values from the hand-off (§7 chips, the title field, person chips) and 4a's colour swatches. */
 object ControlTokens {
@@ -116,7 +119,7 @@ object ControlType {
 /**
  * Hand-off §7 chip: at least 48 dp; a long label takes two lines, then ends in …; padding 0 18, radius 24,
  * 16 sp / 600; `surf`/`ink`, or [selectedColor]/[selectedInk] when selected. One of a radio group by default ([role]);
- * a chip that opens something is `Role.Button`. A disabled chip is drawn at 38% but stays tappable, so a tap can
+ * a chip that opens something is `Role.Button`. [spokenName] is what TalkBack reads when that isn't the label. A disabled chip is drawn at 38% but stays tappable, so a tap can
  * explain why: TalkBack hears "not available" and "double-tap to find out why".
  */
 @Composable
@@ -133,6 +136,7 @@ fun HhChoiceChip(
     clickLabel: String? = null,
     stateDescription: String? = null,
     leading: (@Composable (ink: Color) -> Unit)? = null,
+    spokenName: String? = null,
 ) {
     val c = Culvery.colors
     val ink = if (selected) selectedInk else c.ink
@@ -146,6 +150,7 @@ fun HhChoiceChip(
                 // A button chip that isn't holding a value says nothing about selection.
                 if (role != Role.Button || selected) this.selected = selected
                 if (state != null) this.stateDescription = state
+                if (spokenName != null) contentDescription = spokenName
             }
             .alpha(if (enabled) 1f else ControlTokens.DISABLED_ALPHA)
             .heightIn(min = ControlTokens.chipHeight)
@@ -401,3 +406,53 @@ fun HhSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, tag: Strin
         ),
     )
 }
+
+/**
+ * A value in [range], reported as it moves ([onDrag]) and again when let go ([onLetGo]); [label], beside it, shows the
+ * value under the thumb. Spoken "[spokenName], [spokenState]": "Kitchen volume, 30 percent".
+ */
+@Composable
+fun HhPercentSlider(
+    name: String,
+    percent: Int,
+    tag: String,
+    modifier: Modifier = Modifier,
+    range: IntRange = 0..PERCENT_MAX,
+    steps: Int = 0,
+    spokenName: String = name,
+    spokenState: (Int) -> String = { "$it percent" },
+    label: (@Composable (Int) -> Unit)? = null,
+    onDrag: ((Int) -> Unit)? = null,
+    onLetGo: (Int) -> Unit,
+) {
+    val c = Culvery.colors
+    // A check mid-drag can re-read [percent]; the drag is kept apart so it survives that.
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    // The value let go stays until [percent] changes, so the thumb doesn't jump back while the command is on its way.
+    var held by remember(percent) { mutableStateOf<Float?>(null) }
+    val shown = dragging ?: held ?: percent.toFloat()
+    Slider(
+        value = shown,
+        onValueChange = {
+            dragging = it
+            onDrag?.invoke(it.roundToInt())
+        },
+        onValueChangeFinished = {
+            dragging?.let {
+                held = it
+                onLetGo(it.roundToInt())
+            }
+            dragging = null
+        },
+        valueRange = range.first.toFloat()..range.last.toFloat(),
+        steps = steps,
+        colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.surf3),
+        modifier = modifier.testTag(tag).semantics {
+            contentDescription = spokenName
+            stateDescription = spokenState(shown.roundToInt())
+        },
+    )
+    label?.invoke(shown.roundToInt())
+}
+
+private const val PERCENT_MAX = 100

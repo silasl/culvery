@@ -7,14 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,11 +18,9 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import kotlin.math.roundToInt
 import uk.co.siland.culvery.capability.music.MusicActions
 import uk.co.siland.culvery.capability.music.SHUFFLE_EVERYTHING
 import uk.co.siland.culvery.capability.music.SpeakerGroup
@@ -37,10 +29,8 @@ import uk.co.siland.culvery.capability.music.groupSpoken
 import uk.co.siland.culvery.capability.music.nextSpoken
 import uk.co.siland.culvery.capability.music.nowPlayingLines
 import uk.co.siland.culvery.capability.music.pauseSpoken
-import uk.co.siland.culvery.capability.music.percentWords
 import uk.co.siland.culvery.capability.music.playSpoken
 import uk.co.siland.culvery.capability.music.shuffleSpoken
-import uk.co.siland.culvery.capability.music.volumeName
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
@@ -49,8 +39,6 @@ import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.quietFill
-
-private const val MAX_VOLUME = 100
 
 /** What a group's controls do; the Home card and the tab's rows share them. */
 class GroupActions(
@@ -108,51 +96,6 @@ internal fun ShuffleButton(group: SpeakerGroup, tag: String, on: ButtonSurface, 
     SHUFFLE_EVERYTHING, { actions.onShuffle(group) }, Modifier.testTag("${tag}_shuffle"),
     icon = Icons.SHUFFLE, on = on, spokenName = shuffleSpoken(group.name), compact = compact,
 )
-
-/**
- * A value in [range], sent when let go rather than at each step of a drag, so one group's commands can't arrive out of
- * order; [label], beside it, shows the value under the thumb. Spoken "[spokenName], [spokenState]": "Kitchen volume,
- * 30 percent" by default (6 §5.5).
- */
-@Composable
-internal fun VolumeSlider(
-    name: String,
-    volume: Int,
-    tag: String,
-    modifier: Modifier = Modifier,
-    range: IntRange = 0..MAX_VOLUME,
-    steps: Int = 0,
-    spokenName: String = volumeName(name),
-    spokenState: (Int) -> String = ::percentWords,
-    label: (@Composable (Int) -> Unit)? = null,
-    onVolume: (Int) -> Unit,
-) {
-    val c = Culvery.colors
-    // A check mid-drag can re-read [volume]; the drag is kept apart so it survives that.
-    var dragging by remember { mutableStateOf<Float?>(null) }
-    // The value let go stays until [volume] changes, so the thumb doesn't jump back while the command is on its way.
-    var held by remember(volume) { mutableStateOf<Float?>(null) }
-    val shown = dragging ?: held ?: volume.toFloat()
-    Slider(
-        value = shown,
-        onValueChange = { dragging = it },
-        onValueChangeFinished = {
-            dragging?.let {
-                held = it
-                onVolume(it.roundToInt())
-            }
-            dragging = null
-        },
-        valueRange = range.first.toFloat()..range.last.toFloat(),
-        steps = steps,
-        colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.surf3),
-        modifier = modifier.testTag(tag).semantics {
-            contentDescription = spokenName
-            stateDescription = spokenState(shown.roundToInt())
-        },
-    )
-    label?.invoke(shown.roundToInt())
-}
 
 /** Art, the group's name, and what it plays, read by TalkBack as one sentence (6 §5.5). */
 @Composable

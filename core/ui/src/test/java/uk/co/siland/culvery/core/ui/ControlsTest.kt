@@ -100,6 +100,15 @@ class ControlsTest {
         compose.onNodeWithTag("adult").assertIsNotSelected()
     }
 
+    /** Fails if [spokenName] doesn't replace the chip's label for TalkBack, or costs the chip its selection. */
+    @Test
+    fun aChipCanBeSpokenOtherThanItsLabel() {
+        show { HhChoiceChip("Relax", selected = true, tag = "c", onClick = {}, spokenName = "Relax scene in the Lounge") }
+        compose.onNodeWithTag("c")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Relax scene in the Lounge")))
+            .assertIsSelected()
+    }
+
     @Test
     fun aSelectedChipsSecondaryTextIsAtFullStrength() {
         show { HhChoiceChip("Morning", selected = true, tag = "slot", onClick = {}, secondary = "09:00") }

@@ -1,6 +1,6 @@
 package uk.co.siland.culvery.provider.music_sonos
 
-import uk.co.siland.culvery.capability.music.isHomeNetworkHost
+import uk.co.siland.culvery.core.plugin.isHomeNetworkHost
 
 internal const val SONOS_PORT = 1400
 

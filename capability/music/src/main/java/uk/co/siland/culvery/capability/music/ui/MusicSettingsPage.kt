@@ -63,6 +63,7 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhMessageLine
+import uk.co.siland.culvery.core.ui.HhPercentSlider
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhTextField
@@ -144,10 +145,10 @@ private fun LowerToRow(lowerTo: Int, onLowerTo: (Int) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(ListRowTokens.lineGap)) {
         Text(LOWER_MUSIC_TO, style = HhType.rowTitle, color = c.ink)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ListRowTokens.trailingGap)) {
-            VolumeSlider(
+            HhPercentSlider(
                 LOWER_MUSIC_TO, lowerTo, "music_lower_to", Modifier.weight(1f),
                 range = 0..MAX_LOWER_TO, steps = MusicDimens.LOWER_STEPS, spokenName = LOWER_MUSIC_TO, spokenState = ::lowerToWords,
-                label = { Text(lowerToWords(it), style = HhType.body, color = c.mute) }, onVolume = onLowerTo,
+                label = { Text(lowerToWords(it), style = HhType.body, color = c.mute) }, onLetGo = onLowerTo,
             )
         }
     }
