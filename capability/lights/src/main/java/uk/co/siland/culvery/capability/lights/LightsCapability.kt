@@ -6,11 +6,16 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.capability.lights.ui.LightsCardHost
+import uk.co.siland.culvery.capability.lights.ui.LightsPage
+import uk.co.siland.culvery.capability.lights.ui.LightsSettingsHost
 import uk.co.siland.culvery.capability.lights.ui.LightsTabHost
+import uk.co.siland.culvery.core.access.AccessControl
+import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.SettingsPage
+import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.ui.Icons
 
 const val LIGHTS_ID = "lights"
@@ -28,6 +33,10 @@ class LightsCapability @Inject constructor(
     private val actions: LightsActions,
     private val house: LightsHouse,
     private val follow: LightsFollow,
+    private val settings: LightsSettings,
+    private val connect: LightsConnect,
+    private val access: AccessControl,
+    private val toaster: Toaster,
 ) : Capability {
     override val id = LIGHTS_ID
     override val label = LIGHTS
@@ -44,4 +53,9 @@ class LightsCapability @Inject constructor(
 
     @Composable
     override fun TabContent() = LightsTabHost(view, actions, house, follow)
+
+    private val pages: List<SettingsPage> =
+        if (bridges.providers.isEmpty()) emptyList() else listOf(LightsPage { LightsSettingsHost(settings, bridges, view, connect, access, toaster) })
+
+    override fun settingsPages(): List<SettingsPage> = pages
 }

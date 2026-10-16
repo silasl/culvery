@@ -19,13 +19,14 @@ class LightsCapabilityTest {
     private val scope = lights.scope
     private val settings get() = lights.settings
 
-    private fun capability(): LightsCapability {
-        val bridges = Bridges(setOf(TestLightsProvider()), settings, scope)
+    private fun capability(providers: Set<LightsProvider> = setOf(TestLightsProvider())): LightsCapability {
+        val bridges = Bridges(providers, settings, scope)
         val house = LightsHouse(bridges, settings)
         return LightsCapability(
             bridges, LightsView(bridges, settings, scope),
             LightsActions({ bridges.system.value }, scope, System::currentTimeMillis, house, TestAccess(null)),
             house, LightsFollow(bridges.system, MutableStateFlow(true), scope),
+            settings, LightsConnect(bridges.providers.firstOrNull(), settings::connect), TestAccess(null), RecordingToaster(),
         )
     }
 
@@ -34,6 +35,20 @@ class LightsCapabilityTest {
     fun itIsLightsAtSlotForty() {
         val lights = capability()
         assertThat(listOf(lights.id, lights.label, lights.icon, lights.order)).containsExactly("lights", "Lights", Icons.LIGHTBULB, 40).inOrder()
+    }
+
+    /** 7 §5.3: one Lights page at 470, after Music (450). Fails if the id, title or order differs. */
+    @Test
+    fun thePageSitsAfterMusic() {
+        val page = capability().settingsPages().single()
+        assertThat(listOf(page.id, page.title, page.order)).containsExactly("lights", "Lights", 470).inOrder()
+        assertThat(page.order).isGreaterThan(450)
+    }
+
+    /** 7 §3.1: with no provider in the build there is nothing to connect. Fails if the page shows anyway. */
+    @Test
+    fun noProviderNoPage() {
+        assertThat(capability(emptySet()).settingsPages()).isEmpty()
     }
 
     /** 7 §3.1: the tab once a bridge is paired. Fails if the tab shows before Find Hue Bridge, or not after. */

@@ -1,5 +1,10 @@
 package uk.co.siland.culvery.capability.lights
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -29,7 +34,9 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Feature
+import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
+import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.ui.Icons
 
 internal val RELAX = LightScene("relax-id", "Relax")
@@ -234,4 +241,34 @@ internal class TestAccess(var role: Role?) : AccessControl {
     override fun checkExpiry() = Unit
 
     override fun lock() = Unit
+}
+
+internal class RecordingToaster : Toaster {
+    val shown = CopyOnWriteArrayList<String>()
+
+    override fun show(message: String, icon: String, urgent: Boolean) {
+        shown += message
+    }
+}
+
+/** An overlay host that keeps the sheet it was asked to show, for the test to draw; [closesWhenIdle] is that of the last show. */
+internal class TestOverlay : OverlayHost {
+    var content by mutableStateOf<(@Composable () -> Unit)?>(null)
+    var closesWhenIdle = true
+
+    override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) {
+        this.closesWhenIdle = closesWhenIdle
+        this.content = content
+    }
+
+    override fun markEdited(edited: Boolean) = Unit
+
+    override fun dismiss() {
+        content = null
+    }
+}
+
+internal fun ComposeContentTestRule.waitFor(condition: () -> Boolean) = waitUntil(5_000) {
+    waitForIdle()
+    condition()
 }

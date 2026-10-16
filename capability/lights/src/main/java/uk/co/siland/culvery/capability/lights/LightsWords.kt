@@ -92,3 +92,28 @@ internal fun houseLine(result: HolidayResult, nameOf: (String) -> String?): Stri
         result.notStarted.takeIf { it.isNotEmpty() }?.let { ids -> notStartedLine(ids.map(nameOf)) },
     ).joinToString(" ").ifEmpty { null }
 }
+
+internal const val HUE_BRIDGE = "Hue Bridge"
+internal const val FIND_HUE_BRIDGE = "Find Hue Bridge"
+internal const val LOOKING_FOR_BRIDGE = "Looking for the Hue Bridge…"
+internal const val ENTER_BRIDGE_ADDRESS = "Enter the bridge’s address"
+internal const val BRIDGE_ADDRESS = "Bridge’s address"
+internal const val BRIDGE_ADDRESS_HINT = "Shown in the Hue app under Settings › My Hue system, on the bridge."
+internal const val BRIDGE_ADDRESS_EXAMPLE = "192.168.1.30"
+internal const val PAIR_WITH_BRIDGE = "Pair with this bridge"
+internal const val CHECKING = "Checking…"
+internal const val WAITING_FOR_BUTTON = "Waiting for the button…"
+internal const val TRY_AGAIN = "Try again"
+internal const val PAIRED = "Paired."
+internal const val PAIRED_WITH_BRIDGE = "Paired with the Hue Bridge."
+internal const val NOT_PAIRED = "Not paired yet. Find Hue Bridge, or enter the bridge’s address."
+internal const val MAIN_ROOM = "Main room"
+internal const val LEFT_OUT_LABEL = "All lights off leaves out"
+internal const val HOLIDAY_SWITCHES_ON = "Holiday mode switches on"
+internal const val ROOMS_AFTER_PAIRING = "The rooms appear here once the bridge is paired."
+internal const val NO_AUTOMATIONS = "No Hue automations yet. Set one up in the Hue app, such as Mimic presence."
+internal const val HOLIDAY_JUST_LIGHTS = "Holiday mode turns all lights off and shows On."
+
+/** "1 room left out is no longer on the bridge." (7 §4.4) */
+internal fun goneLeftOutLine(count: Int): String =
+    if (count == 1) "1 room left out is no longer on the bridge." else "$count rooms left out are no longer on the bridge."

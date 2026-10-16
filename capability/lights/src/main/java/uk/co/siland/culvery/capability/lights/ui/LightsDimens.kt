@@ -30,4 +30,10 @@ internal object LightsDimens {
     val tabGap = 10.dp
     val rowInnerGap = 12.dp
     val chipGap = 8.dp
+
+    // Settings › Lights: as Settings' other pages; the sheets as the calendar's.
+    val settingsGap = 16.dp
+    val settingsButtonGap = 12.dp
+    val sheetPaddingH = 30.dp
+    val sheetPaddingV = 28.dp
 }

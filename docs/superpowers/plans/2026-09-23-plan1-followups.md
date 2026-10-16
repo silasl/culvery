@@ -344,6 +344,10 @@ Release builds installed with `install -r` over Plan 5's (the household kept); C
 - Throttle the "A music check failed" log line while Sonos stays unreachable.
 - Move the weather and Google Calendar clients onto `:core:net`'s `Call.await` and `AndroidNetwork`.
 
+## From Plan 7
+
+- `Bridges`, `LightsFollow` and `LightsConnect` mirror Music's `Speakers`, `MusicChecks` and `MusicConnect`: a generic later.
+
 ## Feature ideas (2026-10-02, after v1)
 
 **Each its own spec → plan cycle; not in 4c, 4d or 4e**
