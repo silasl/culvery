@@ -347,5 +347,9 @@ On `culvery-5` (debug build, sample household) against the household's real spea
 - Doorbell ring tones (the user, 2026-10-15): a list of chimes to choose from in Settings › Door, perhaps switching itself for Christmas and Halloween.
 - Sound buttons (the user, 2026-10-15): buttons that play a short sound on the wall, such as the Imperial March or a sad trombone ("wah wah wahhh").
 - Holiday mode (the user, 2026-10-14): saves power (puts the tablet to sleep) and drives other services while the family is away: Hue lights to their holiday setting, Arlo's settings, the thermostat to eco. Needs the Hue, Arlo and thermostat links first, and Sleep and wake for the tablet's part.
+- Reminders (the user, 2026-10-16): its own spec; no detail yet.
+- Family slideshow (the user, 2026-10-16): its own spec; no detail yet.
+- Event celebrations (the user, 2026-10-16): family birthdays and other occasions marked on the wall, with a sound or something like it. Its own spec; no detail yet.
+- Voice control (the user, 2026-10-16, a question): its own spec; no detail yet.
 - Party mode (the user, 2026-10-15): one switch that sets the house up for a party: music on (Sonos), chosen smart plugs on, and so on. Like Holiday mode, it drives other services, so it needs their links first (Sonos from Plan 6; smart plugs have no link yet). Its own spec; no detail yet.
 - A home hub on the NAS (the user, 2026-10-15): running one (for example Home Assistant) is possible if it helps. It could bridge Sonos, Hue, Arlo, the thermostat and smart plugs, with Culvery's providers talking to the hub instead of each device. Weigh it in each service's brainstorm; not needed for Sonos (Plan 6 talks to the speakers directly).
