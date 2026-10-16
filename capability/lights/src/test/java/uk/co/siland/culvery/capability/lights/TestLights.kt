@@ -256,14 +256,26 @@ internal class TestOverlay : OverlayHost {
     var content by mutableStateOf<(@Composable () -> Unit)?>(null)
     var closesWhenIdle = true
 
+    /** As the shell's: reset by each show and dismiss. */
+    var edited = false
+
     override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) {
         this.closesWhenIdle = closesWhenIdle
+        edited = false
         this.content = content
     }
 
-    override fun markEdited(edited: Boolean) = Unit
+    override fun markEdited(edited: Boolean) {
+        this.edited = edited
+    }
 
     override fun dismiss() {
+        content = null
+        edited = false
+    }
+
+    /** The shell closing the sheet by itself (a scrim tap, the idle timer), without a dismiss from the sheet's owner. */
+    fun closedByHost() {
         content = null
     }
 }

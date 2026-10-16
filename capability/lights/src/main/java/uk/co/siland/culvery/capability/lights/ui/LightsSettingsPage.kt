@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,8 +59,6 @@ import uk.co.siland.culvery.capability.lights.ROOMS_AFTER_PAIRING
 import uk.co.siland.culvery.capability.lights.goneLeftOutLine
 import uk.co.siland.culvery.capability.lights.mainRoom
 import uk.co.siland.culvery.capability.lights.problemLine
-import uk.co.siland.culvery.core.access.AccessControl
-import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
@@ -260,7 +259,6 @@ internal fun LightsSettingsHost(
     bridges: Bridges,
     view: LightsView,
     connect: LightsConnect,
-    access: AccessControl,
     toaster: Toaster,
 ) {
     val prefs by settings.prefs.collectAsStateWithLifecycle(null)
@@ -270,7 +268,7 @@ internal fun LightsSettingsHost(
     var automations by remember { mutableStateOf<List<Automation>?>(null) }
     var finding by remember { mutableStateOf(false) }
     var findLine by remember { mutableStateOf<String?>(null) }
-    val pairing = remember { arrayOfNulls<Job>(1) }
+    val pairing = remember { PairingRun() }
     val overlay = LocalOverlayHost.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(system) {
@@ -285,26 +283,47 @@ internal fun LightsSettingsHost(
     fun change(write: suspend () -> Unit) {
         scope.launch { toaster.save(write) { Log.w(TAG, "Couldn't save a lights setting (${it::class.simpleName})") } }
     }
-    suspend fun mayConnect() = access.authorise(CorePermissions.CONNECTIONS_MANAGE) != null
     fun closePairing() {
-        pairing[0]?.cancel()
+        pairing.job?.cancel()
+        pairing.sheet = null
+        overlay.dismiss()
+    }
+    fun showPairing(state: PairingState, idle: Boolean, onTryAgain: () -> Unit) {
+        val sheet = Any()
+        pairing.sheet = sheet
+        overlay.show(closesWhenIdle = idle) {
+            // The host closing this sheet by itself ends the run; a sheet replaced by ours is no longer current.
+            DisposableEffect(sheet) {
+                onDispose {
+                    if (pairing.sheet === sheet) {
+                        pairing.sheet = null
+                        pairing.job?.cancel()
+                    }
+                }
+            }
+            PairingSheet(state, onTryAgain, ::closePairing)
+        }
+    }
+    fun dismissPairing() {
+        if (pairing.sheet == null) return
+        pairing.sheet = null
         overlay.dismiss()
     }
     fun pairWith(bridge: BridgeFound) {
-        pairing[0]?.cancel()
-        pairing[0] = scope.launch {
-            overlay.show(closesWhenIdle = false) { PairingSheet(PairingState.WAITING, onTryAgain = {}, onClose = ::closePairing) }
+        pairing.job?.cancel()
+        pairing.job = scope.launch {
+            showPairing(PairingState.WAITING, idle = false, onTryAgain = {})
             when (val outcome = connect.pair(bridge)) {
                 PairOutcome.Paired -> {
                     findLine = null
-                    overlay.dismiss()
                     toaster.show(PAIRED_WITH_BRIDGE)
+                    dismissPairing()
                 }
                 is PairOutcome.Failed -> if (outcome.line == NOT_PRESSED_IN_TIME) {
-                    overlay.show { PairingSheet(PairingState.NOT_IN_TIME, onTryAgain = { pairWith(bridge) }, onClose = ::closePairing) }
+                    showPairing(PairingState.NOT_IN_TIME, idle = true) { pairWith(bridge) }
                 } else {
                     findLine = outcome.line
-                    overlay.dismiss()
+                    dismissPairing()
                 }
             }
         }
@@ -325,7 +344,6 @@ internal fun LightsSettingsHost(
         ),
         onFind = {
             scope.launch {
-                if (!mayConnect()) return@launch
                 finding = true
                 findLine = null
                 when (val outcome = connect.find()) {
@@ -337,7 +355,6 @@ internal fun LightsSettingsHost(
         },
         onEnterAddress = {
             scope.launch {
-                if (!mayConnect()) return@launch
                 overlay.show {
                     AddressSheet(
                         onConnect = { typed ->
@@ -368,4 +385,10 @@ private suspend fun readBridge(system: LightsSystem): List<Automation>? = attemp
 }) { e ->
     Log.w(TAG, "Couldn't read the bridge for Settings (${e::class.simpleName})")
     null
+}
+
+/** The pairing in progress: its job, and the sheet that is its own (null once closed or replaced). */
+private class PairingRun {
+    var job: Job? = null
+    var sheet: Any? = null
 }

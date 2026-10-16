@@ -26,7 +26,7 @@ class LightsCapabilityTest {
             bridges, LightsView(bridges, settings, scope),
             LightsActions({ bridges.system.value }, scope, System::currentTimeMillis, house, TestAccess(null)),
             house, LightsFollow(bridges.system, MutableStateFlow(true), scope),
-            settings, LightsConnect(bridges.providers.firstOrNull(), settings::connect), TestAccess(null), RecordingToaster(),
+            settings, LightsConnect(bridges.providers.firstOrNull(), settings::connect), RecordingToaster(),
         )
     }
 

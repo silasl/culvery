@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.lights.ui
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -41,14 +42,12 @@ import uk.co.siland.culvery.capability.lights.LightsUnreachableException
 import uk.co.siland.culvery.capability.lights.LightsView
 import uk.co.siland.culvery.capability.lights.MIMIC
 import uk.co.siland.culvery.capability.lights.RecordingToaster
-import uk.co.siland.culvery.capability.lights.TestAccess
 import uk.co.siland.culvery.capability.lights.TestLightsProvider
 import uk.co.siland.culvery.capability.lights.TestOverlay
 import uk.co.siland.culvery.capability.lights.link
 import uk.co.siland.culvery.capability.lights.problemLine
 import uk.co.siland.culvery.capability.lights.room
 import uk.co.siland.culvery.capability.lights.waitFor
-import uk.co.siland.culvery.core.household.Role as HouseholdRole
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
@@ -261,7 +260,6 @@ class LightsSettingsPageTest {
         val hue = TestLightsProvider()
         val bridges = Bridges(setOf(hue), settings, lights.scope)
         val view = LightsView(bridges, settings, lights.scope)
-        val access = TestAccess(HouseholdRole.ADMIN)
         val toaster = RecordingToaster()
         val overlay = TestOverlay()
         val connect = LightsConnect(if (pairFails) unreachableOnPair(hue) else hue) { id, link -> settings.connect(id, link) }
@@ -285,7 +283,7 @@ class LightsSettingsPageTest {
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides h.overlay) {
-                    InSettingsPane { LightsSettingsHost(h.settings, h.bridges, h.view, h.connect, h.access, h.toaster) }
+                    InSettingsPane { LightsSettingsHost(h.settings, h.bridges, h.view, h.connect, h.toaster) }
                     h.overlay.content?.invoke()
                 }
             }
@@ -295,29 +293,36 @@ class LightsSettingsPageTest {
 
     private fun appeared(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
 
-    /** Fails if Find Hue Bridge reaches the bridge before the fresh Admin PIN, or goes on without it. */
+    /** Fails if the pairing goes on after the shell closed its sheet, or then closes whatever sheet is showing. */
     @Test
-    fun findAsksForTheAdminPinBeforeLookingAndStopsWithoutIt() {
-        val h = Host().apply { access.role = null; hue.found = FOUND }
+    fun theShellClosingThePairingSheetEndsThePairing() {
+        val h = Host().apply { hue.found = FOUND }
         showHost(h)
         compose.onNodeWithTag("lights_find").performClick()
-        compose.waitFor { h.access.asked.isNotEmpty() }
+        compose.waitFor { appeared("lights_pairing_sheet") }
+        h.overlay.closedByHost()
+        h.overlay.show { androidx.compose.material3.Text("Another sheet", modifier = androidx.compose.ui.Modifier.testTag("other_sheet")) }
+        h.hue.pairAnswers += link()
         compose.waitForIdle()
-        assertThat(h.access.asked).containsExactly(listOf("connections.manage"))
-        assertThat(h.hue.asked).isEmpty()
-        assertThat(h.overlay.content).isNull()
+        // a run still going asks again within 2 s and would save the link
+        runCatching { compose.waitUntil(3_000) { h.toaster.shown.isNotEmpty() } }
+        assertThat(h.toaster.shown).isEmpty()
+        assertThat(h.hue.pairAnswers).hasSize(1)
+        assertThat(appeared("other_sheet")).isTrue()
     }
 
-    /** Fails if the address sheet opens without the fresh Admin PIN. */
+    /** Fails if what was typed in the address field leaves the pairing sheet marked as having unsaved changes. */
     @Test
-    fun theAddressSheetNeedsThePinToo() {
-        val h = Host().apply { access.role = null }
+    fun thePairingSheetStartsWithNothingToDiscard() {
+        val h = Host().apply { hue.bridges["192.168.1.30"] = FOUND }
         showHost(h)
         compose.onNodeWithTag("lights_address").performClick()
-        compose.waitFor { h.access.asked.isNotEmpty() }
-        compose.waitForIdle()
-        assertThat(h.access.asked).containsExactly(listOf("connections.manage"))
-        assertThat(h.overlay.content).isNull()
+        compose.waitFor { appeared("lights_address_field") }
+        compose.onNodeWithTag("lights_address_field").performTextInput("192.168.1.30")
+        assertThat(h.overlay.edited).isTrue()
+        compose.onNodeWithTag("lights_address_pair").performClick()
+        compose.waitFor { appeared("lights_pairing_sheet") }
+        assertThat(h.overlay.edited).isFalse()
     }
 
     /** Fails if pairing doesn't close the sheet, save the link, say so, or show Paired. */
@@ -330,7 +335,6 @@ class LightsSettingsPageTest {
         assertThat(h.toaster.shown).containsExactly("Paired with the Hue Bridge.")
         assertThat(h.overlay.content).isNull()
         assertThat(h.hue.asked.take(2)).containsExactly("find", "pair").inOrder()
-        assertThat(h.access.asked).containsExactly(listOf("connections.manage"))
         compose.waitFor { appeared("lights_connection") }
         compose.onNodeWithTag("lights_connection").assertTextEquals("Paired.")
     }
