@@ -4,12 +4,16 @@ import java.io.IOException
 import kotlin.math.roundToInt
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.capability.lights.AllOffResult
 import uk.co.siland.culvery.capability.lights.Automation
@@ -27,10 +31,19 @@ import uk.co.siland.culvery.core.plugin.WallClock
 /** An automation is read back this long after it was switched, and after each read that didn't show it yet (7 §4.5). */
 internal const val READ_BACK_MS = 1_000L
 
+/** About five seconds of read-back, then the switch counts as not done (7 §4.5). */
+internal const val READ_BACK_TRIES = 6
+
+/** The bridge is searched for by itself at most this often (7 §4.1). */
+internal const val SEARCH_GAP_MS = 30_000L
+
+private const val BRIDGE_HOME = "bridge_home"
+
 /**
- * The household's Hue rooms through the bridge's CLIP v2 API (7 §4.2, §4.3): a full read builds them in Hue's order,
+ * The household's Hue rooms through the bridge's CLIP v2 API (7 §4.2–§4.5): a full read builds them in Hue's order,
  * the stream keeps them up to date, and a command shows at once. Every call is built from the saved bridge id, so only
- * a certificate naming it is trusted. Every change to what the screen shows is made, and [rooms] published, under one lock.
+ * a certificate naming it is trusted; when the saved address fails, a search finds the bridge again (7 §4.1). Every
+ * change to what the screen shows is made, and [rooms] published, under one lock.
  */
 internal class HueSystem(
     private val client: HueClient,
@@ -56,11 +69,19 @@ internal class HueSystem(
     private val groups = HashMap<String, HueGroupedLight>()
     private var scenes: List<HueScene> = emptyList()
     private var dimmingDevices: Set<String> = emptySet()
+    private var unroomedLights: List<String> = emptyList()
 
-    override suspend fun readAll() = refusing { reaching { read() } }
+    /** The automations as last read, by id: whether each is Mimic presence decides how it is switched. */
+    @Volatile private var behaviors: Map<String, HueBehavior> = emptyMap()
 
-    private suspend fun read() = coroutineScope {
-        val call = call()
+    private val recovering = Mutex()
+
+    // Guarded by recovering.
+    private var lastSearchMillis: Long? = null
+
+    override suspend fun readAll() = refusing { reaching { read(it) } }
+
+    private suspend fun read(call: BridgeCall) = coroutineScope {
         val roomsRead = async { client.rooms(call) }
         val groupsRead = async { client.groupedLights(call) }
         val lightsRead = async { client.lights(call) }
@@ -69,14 +90,16 @@ internal class HueSystem(
         if (!bridgeId.await().equals(call.bridgeId, ignoreCase = true)) throw WrongBridge()
         val read = roomsRead.await()
         val groupsNow = groupsRead.await()
-        val dimming = lightsRead.await().filter { it.dimmable }.map { it.deviceId }.toSet()
+        val lightsNow = lightsRead.await()
         val scenesNow = scenesRead.await()
+        val roomed = read.flatMap { it.deviceIds }.toSet()
         change {
             hueRooms = read
             groups.clear()
             groupsNow.forEach { groups[it.id] = it }
             scenes = scenesNow
-            dimmingDevices = dimming
+            dimmingDevices = lightsNow.filter { it.dimmable }.map { it.deviceId }.toSet()
+            unroomedLights = lightsNow.filter { it.deviceId !in roomed }.map { it.id }
         }
     }
 
@@ -91,8 +114,10 @@ internal class HueSystem(
         client.setOn(call, hue.groupedLightId, on)
     }
 
+    /** At 0 the room is turned off: Hue would take 0 as its lowest brightness, with the lights still on. */
     override suspend fun setBrightness(room: LightRoom, percent: Int) {
         val brightness = percent.coerceIn(0, 100)
+        if (brightness == 0) return setOn(room, false)
         command(room, { group(it) { g -> g.copy(on = true, brightness = brightness.toDouble()) } }) { call, hue ->
             client.setBrightness(call, hue.groupedLightId, brightness, turnOn = true)
         }
@@ -106,11 +131,79 @@ internal class HueSystem(
         },
     ) { call, _ -> client.recall(call, scene.id) }
 
-    override suspend fun allOff(leaveOut: Set<String>): AllOffResult = throw UnsupportedOperationException()
+    /**
+     * Drops every room command still waiting, so none turns a room back on, then turns everything off (7 §4.4): the
+     * whole home's group when no room still on the bridge is left out, else each other room's group and each light in no room.
+     */
+    override suspend fun allOff(leaveOut: Set<String>): AllOffResult {
+        client.dropWaiting()
+        try {
+            if (synchronized(lock) { groups.isEmpty() }) readAll()
+        } catch (e: LightsRefusedException) {
+            return AllOffResult.Refused
+        } catch (e: LightsUnreachableException) {
+            return AllOffResult.CantReach(e.problem)
+        }
+        val (included, home, lights) = synchronized(lock) {
+            val left = leaveOut.filter { id -> hueRooms.any { it.id == id } }.toSet()
+            val home = groups.values.firstOrNull { it.ownerType == BRIDGE_HOME }?.takeIf { left.isEmpty() }
+            Triple(hueRooms.filter { it.id !in left }, home, unroomedLights)
+        }
+        return if (home != null) wholeHomeOff(home) else roomsOff(included, lights)
+    }
 
-    override suspend fun automations(): List<Automation> = throw UnsupportedOperationException()
+    private suspend fun wholeHomeOff(home: HueGroupedLight): AllOffResult = try {
+        showThenSend({ groups.replaceAll { _, g -> g.copy(on = false) } }) { call -> client.setOn(call, home.id, false) }
+        AllOffResult.Done
+    } catch (e: LightsRefusedException) {
+        AllOffResult.Refused
+    } catch (e: LightsUnreachableException) {
+        AllOffResult.CantReach(e.problem)
+    }
 
-    override suspend fun setAutomation(automation: Automation, on: Boolean): AutomationResult = throw UnsupportedOperationException()
+    /** Every room's command goes whatever the others do; the lights in no room count as one room when any fails. */
+    private suspend fun roomsOff(rooms: List<HueRoom>, lights: List<String>): AllOffResult {
+        val before = show { rooms.forEach { room -> group(room) { it.copy(on = false) } } }
+        val (roomFailures, lightFailures) = coroutineScope {
+            val roomSends = rooms.map { room -> async { attempt { client.setOn(it, room.groupedLightId, false) } } }
+            val lightSends = lights.map { id -> async { attempt { client.setLightOn(it, id, false) } } }
+            roomSends.awaitAll() to lightSends.awaitAll()
+        }
+        val failures = (roomFailures + lightFailures).filterNotNull()
+        if (failures.isEmpty()) return AllOffResult.Done
+        undo(before, rooms.zip(roomFailures).filter { it.second != null }.map { it.first.groupedLightId }.toSet())
+        if (failures.size == rooms.size + lights.size && failures.all { it is LightsUnreachableException }) {
+            return AllOffResult.CantReach((failures.first() as LightsUnreachableException).problem)
+        }
+        if (failures.any { it is LightsRefusedException }) rereadQuietly()
+        val lightsLeftOn = if (lightFailures.any { it != null }) 1 else 0
+        return AllOffResult.RoomsLeftOn(roomFailures.count { it != null } + lightsLeftOn)
+    }
+
+    override suspend fun automations(): List<Automation> =
+        readBehaviors().mapNotNull { b -> b.name?.let { Automation(b.id, it, b.on) } }
+
+    /**
+     * Mimic presence by its trigger, any other by `enabled`. The bridge answers 200 even to a trigger it ignores, so only
+     * the read-back confirms it (7 §4.5).
+     */
+    override suspend fun setAutomation(automation: Automation, on: Boolean): AutomationResult {
+        val behavior = behaviors[automation.id]
+            ?: readBehaviors().firstOrNull { it.id == automation.id }
+            ?: throw LightsRefusedException()
+        val sent = refusing {
+            reaching { call -> if (behavior.isMimic) client.trigger(call, behavior.id, on) else client.setEnabled(call, behavior.id, on) }
+        }
+        if (!sent) return AutomationResult.NOT_CONFIRMED
+        repeat(READ_BACK_TRIES) {
+            delay(readBackMs)
+            if (readBehaviors().firstOrNull { it.id == behavior.id }?.on == on) return AutomationResult.CONFIRMED
+        }
+        return AutomationResult.NOT_CONFIRMED
+    }
+
+    private suspend fun readBehaviors(): List<HueBehavior> =
+        refusing { reaching { client.behaviors(it) } }.also { list -> behaviors = list.associateBy { it.id } }
 
     override fun useAddress(address: String) {
         link = link.copy(address = address)
@@ -118,26 +211,50 @@ internal class HueSystem(
 
     private fun call(): BridgeCall = link.let { BridgeCall(it.address, it.bridgeId, it.key) }
 
-    /**
-     * Shows [shown] at once (7 §4.3), then sends; a command replaced while waiting its turn returns quietly, as the newer
-     * one shows its own value. A refusal reads everything again, so the room shows what the bridge did.
-     */
+    /** A command replaced while waiting its turn returns quietly, as the newer one shows its own value. */
     private suspend fun command(room: LightRoom, shown: (HueRoom) -> Unit, send: suspend (BridgeCall, HueRoom) -> Boolean) {
+        val hue = synchronized(lock) { hueRooms.firstOrNull { it.id == room.id } }
+        if (hue == null) {
+            rereadQuietly()
+            throw LightsRefusedException()
+        }
+        showThenSend({ shown(hue) }) { call -> send(call, hue) }
+    }
+
+    /**
+     * Shows [shown] at once (7 §4.3), then sends. A refusal reads everything again, so the screen shows what the bridge
+     * did; a bridge that can't be reached got nothing, so the screen goes back to how it was.
+     */
+    private suspend fun showThenSend(shown: () -> Unit, send: suspend (BridgeCall) -> Boolean) {
+        val before = show(shown)
         try {
-            val hue = synchronized(lock) { hueRooms.firstOrNull { it.id == room.id } } ?: throw LightsRefusedException()
-            change { shown(hue) }
-            refusing { reaching { send(call(), hue) } }
+            refusing { reaching(block = send) }
         } catch (e: LightsRefusedException) {
-            withContext(NonCancellable) {
-                try {
-                    readAll()
-                } catch (read: LightsRefusedException) {
-                    // Left as shown; the next full read corrects it.
-                } catch (read: LightsUnreachableException) {
-                    // The problem is now set.
-                }
-            }
+            rereadQuietly()
             throw e
+        } catch (e: LightsUnreachableException) {
+            undo(before)
+            throw e
+        }
+    }
+
+    /** Null once sent; otherwise why it wasn't. */
+    private suspend fun attempt(send: suspend (BridgeCall) -> Boolean): Exception? = try {
+        refusing { reaching(block = send) }
+        null
+    } catch (e: LightsRefusedException) {
+        e
+    } catch (e: LightsUnreachableException) {
+        e
+    }
+
+    private suspend fun rereadQuietly() = withContext(NonCancellable) {
+        try {
+            readAll()
+        } catch (read: LightsRefusedException) {
+            // Left as shown; the next full read corrects it.
+        } catch (read: LightsUnreachableException) {
+            // The problem is now set.
         }
     }
 
@@ -145,6 +262,26 @@ internal class HueSystem(
     private inline fun change(block: () -> Unit) = synchronized(lock) {
         block()
         publish()
+    }
+
+    /** The groups and scenes a change replaced, as they were before it. */
+    private class Before(val groups: Map<String, HueGroupedLight>, val scenes: List<HueScene>)
+
+    private inline fun show(block: () -> Unit): Before = synchronized(lock) {
+        val groupsBefore = HashMap(groups)
+        val scenesBefore = scenes
+        block()
+        publish()
+        Before(groupsBefore.filter { (id, g) -> groups[id] != g }, scenesBefore.filter { it !in scenes })
+    }
+
+    /** Puts back what [before] replaced: only [groupIds]' groups when given, else every group and scene. */
+    private fun undo(before: Before, groupIds: Set<String>? = null) = change {
+        before.groups.forEach { (id, g) -> if (groupIds == null || id in groupIds) groups[id] = g }
+        if (groupIds == null) {
+            val old = before.scenes.associateBy { it.id }
+            scenes = scenes.map { old[it.id] ?: it }
+        }
     }
 
     // Under lock.
@@ -200,18 +337,67 @@ internal class HueSystem(
         throw LightsRefusedException()
     }
 
-    /** A call that succeeds clears the problem; one the bridge doesn't answer, or answers as not paired, sets it (7 §6). */
-    private suspend fun <T> reaching(block: suspend () -> T): T = try {
-        block().also { _problem.value = null }
-    } catch (e: HueJsonException) {
-        // An answer, though not one of Hue's shapes: refused, not unreachable.
-        throw e
-    } catch (e: HueUnauthorised) {
-        fail(LightsProblem.UNPAIRED)
-    } catch (e: WrongBridge) {
-        fail(LightsProblem.OTHER_BRIDGE)
-    } catch (e: IOException) {
-        fail(if (online()) LightsProblem.UNREACHABLE else LightsProblem.OFFLINE)
+    /**
+     * Runs [block] on the saved bridge. A success clears the problem. No answer, or another bridge's, searches for the
+     * bridge and, once it is found at a new address, runs [block] there; only then is a problem set (7 §4.1, §6). Offline
+     * or not paired, it isn't searched for.
+     */
+    private suspend fun <T> reaching(again: Boolean = true, block: suspend (BridgeCall) -> T): T {
+        val call = call()
+        return try {
+            block(call).also { _problem.value = null }
+        } catch (e: HueJsonException) {
+            // An answer, though not one of Hue's shapes: refused, not unreachable.
+            throw e
+        } catch (e: HueUnauthorised) {
+            fail(LightsProblem.UNPAIRED)
+        } catch (e: IOException) {
+            if (!online()) fail(LightsProblem.OFFLINE)
+            when (if (again) recover(call) else Found.NOTHING) {
+                Found.MOVED -> reaching(again = false, block = block)
+                Found.OTHER -> fail(LightsProblem.OTHER_BRIDGE)
+                Found.NOTHING -> fail(if (e is WrongBridge) LightsProblem.OTHER_BRIDGE else LightsProblem.UNREACHABLE)
+            }
+        }
+    }
+
+    private enum class Found { MOVED, OTHER, NOTHING }
+
+    /**
+     * Searches for the bridge [failed] went to. One with the same id counts as moved only once a full read at its address,
+     * trusting only a certificate naming that id, has succeeded; only then is its address saved, with the key (7 §4.1).
+     */
+    private suspend fun recover(failed: BridgeCall): Found = recovering.withLock {
+        // Another call found it while this one waited.
+        if (link.address != failed.address) return@withLock Found.MOVED
+        val now = clock.nowMillis()
+        if (lastSearchMillis?.let { now - it in 0 until SEARCH_GAP_MS } == true) return@withLock Found.NOTHING
+        lastSearchMillis = now
+        val candidates = try {
+            search()
+        } catch (e: LightsUnreachableException) {
+            emptyList()
+        } catch (e: IOException) {
+            emptyList()
+        }
+        var other = false
+        for (found in candidates) {
+            if (!found.bridgeId.equals(failed.bridgeId, ignoreCase = true) || found.address == failed.address) continue
+            try {
+                read(failed.copy(address = found.address))
+            } catch (e: WrongBridge) {
+                other = true
+                continue
+            } catch (e: IOException) {
+                continue
+            } catch (e: HueRefused) {
+                continue
+            }
+            link = link.copy(address = found.address)
+            onMoved(link)
+            return@withLock Found.MOVED
+        }
+        if (other) Found.OTHER else Found.NOTHING
     }
 
     private fun fail(problem: LightsProblem): Nothing {

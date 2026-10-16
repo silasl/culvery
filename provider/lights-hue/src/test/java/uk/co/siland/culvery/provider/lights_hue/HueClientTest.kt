@@ -47,7 +47,7 @@ class HueClientTest {
     fun eachReadIsItsResourcesPathWithTheKey() = runTest {
         assertThat(client.rooms(call).map { it.name }).containsExactly("Lounge", "Kitchen", "Garden").inOrder()
         assertThat(client.groupedLights(call)).hasSize(4)
-        assertThat(client.lights(call)).hasSize(4)
+        assertThat(client.lights(call)).hasSize(5)
         assertThat(client.scenes(call).map { it.name }).containsExactly("Relax", "Bright")
         assertThat(client.behaviors(call)).hasSize(6)
         assertThat(client.bridgeId(call)).isEqualTo(BRIDGE_ID)

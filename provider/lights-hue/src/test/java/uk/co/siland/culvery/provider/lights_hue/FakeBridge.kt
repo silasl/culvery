@@ -27,7 +27,8 @@ private const val LOOPBACK_HOST = "127.0.0.1"
  * `other` another bridge): answers from [HueFixtures], records each request, and has switches for each failure.
  */
 internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
-    class Received(val method: String, val path: String, val body: String, val key: String?, val accept: String?)
+    /** [at] is [now] when the request arrived. */
+    class Received(val method: String, val path: String, val body: String, val key: String?, val accept: String?, val at: Long)
 
     private val server = MockWebServer()
     val received = CopyOnWriteArrayList<Received>()
@@ -46,6 +47,15 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
 
     /** Each command is answered 200 with an error listed, while reads answer as usual. */
     @Volatile var refusingCommands = false
+
+    /** Commands to these resource ids are answered 200 with an error listed. */
+    @Volatile var refusedIds: Set<String> = emptySet()
+
+    /** Called with each request before it is answered, as the bridge acting on it: a test may change [resources] here. */
+    @Volatile var onRequest: (Received) -> Unit = {}
+
+    /** The time stamped on each request; a test passes its scheduler's. */
+    @Volatile var now: () -> Long = { 0L }
 
     /** While set, each command's answer waits for it to open; [held] gets a permit as each one starts waiting. */
     @Volatile var holdCommands: CountDownLatch? = null
@@ -77,10 +87,12 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val path = request.path.orEmpty()
-                received += Received(
+                val got = Received(
                     request.method.orEmpty(), path, request.body.readUtf8(), request.getHeader("hue-application-key"),
-                    request.getHeader("Accept"),
+                    request.getHeader("Accept"), now(),
                 )
+                received += got
+                onRequest(got)
                 if (request.method == "PUT") holdCommands?.let { hold ->
                     held.release()
                     hold.await(HOLD_LIMIT_S, TimeUnit.SECONDS)
@@ -102,7 +114,7 @@ internal class FakeBridge(keystore: String = "bridge") : AutoCloseable {
         if (v1Unauthorised) return MockResponse().setBody(HueFixtures.UNAUTHORISED_V1)
         if (failing) return MockResponse().setResponseCode(500).setBody("""{"errors":[{"description":"internal error"}]}""")
         if (answersWithErrors) return MockResponse().setBody("""{"data":[],"errors":[{"description":"command may not have effect"}]}""")
-        if (method == "PUT" && refusingCommands) return MockResponse().setBody("""{"data":[],"errors":[{"description":"device (grouped_light) is soft off"}]}""")
+        if (method == "PUT" && (refusingCommands || path.substringAfterLast('/') in refusedIds)) return MockResponse().setBody("""{"data":[],"errors":[{"description":"device (grouped_light) is soft off"}]}""")
         if (method == "PUT") return MockResponse().setBody("""{"data":[{"rid":"${path.substringAfterLast('/')}"}],"errors":[]}""")
         return when (path) {
             "/api" -> MockResponse().setBody(if (buttonPressed) HueFixtures.PAIRED else HueFixtures.NOT_PRESSED)

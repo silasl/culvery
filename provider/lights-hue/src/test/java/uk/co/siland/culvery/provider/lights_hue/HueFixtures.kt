@@ -20,6 +20,8 @@ internal object HueFixtures {
     const val LOUNGE_STRIP_DEVICE = "33333333-aaaa-4bbb-8ccc-000000000002"
     const val KITCHEN_SPOT_DEVICE = "33333333-aaaa-4bbb-8ccc-000000000003"
     const val GARDEN_PLUG_DEVICE = "33333333-aaaa-4bbb-8ccc-000000000004"
+    const val SHED_LIGHT_DEVICE = "33333333-aaaa-4bbb-8ccc-000000000005"
+    const val SHED_LIGHT = "88888888-aaaa-4bbb-8ccc-000000000005"
     const val RELAX = "44444444-aaaa-4bbb-8ccc-000000000001"
     const val BRIGHT = "44444444-aaaa-4bbb-8ccc-000000000002"
     const val PM_STOPPED = "55555555-aaaa-4bbb-8ccc-000000000001"
@@ -63,6 +65,7 @@ internal object HueFixtures {
         ]}
     """.trimIndent()
 
+    /** The shed light is in no room. */
     val LIGHTS = """
         {"errors":[],"data":[
           {"id":"88888888-aaaa-4bbb-8ccc-000000000001","id_v1":"/lights/1","owner":{"rid":"$LOUNGE_LAMP_DEVICE","rtype":"device"},
@@ -75,7 +78,10 @@ internal object HueFixtures {
            "metadata":{"name":"Kitchen spot","archetype":"recessed_ceiling"},"on":{"on":false},
            "dimming":{"brightness":45.0,"min_dim_level":0.2},"type":"light"},
           {"id":"88888888-aaaa-4bbb-8ccc-000000000004","id_v1":"/lights/4","owner":{"rid":"$GARDEN_PLUG_DEVICE","rtype":"device"},
-           "metadata":{"name":"Garden plug","archetype":"plug"},"on":{"on":true},"type":"light"}
+           "metadata":{"name":"Garden plug","archetype":"plug"},"on":{"on":true},"type":"light"},
+          {"id":"$SHED_LIGHT","id_v1":"/lights/5","owner":{"rid":"$SHED_LIGHT_DEVICE","rtype":"device"},
+           "metadata":{"name":"Shed light","archetype":"classic_bulb"},"on":{"on":true},
+           "dimming":{"brightness":100.0,"min_dim_level":0.2},"type":"light"}
         ]}
     """.trimIndent()
 

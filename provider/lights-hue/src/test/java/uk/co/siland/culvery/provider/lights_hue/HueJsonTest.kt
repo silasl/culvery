@@ -32,9 +32,9 @@ class HueJsonTest {
     fun lightsSayWhetherTheyDim() {
         val lights = HueJson.lights(F.LIGHTS)
         assertThat(lights.map { it.deviceId }).containsExactly(
-            F.LOUNGE_LAMP_DEVICE, F.LOUNGE_STRIP_DEVICE, F.KITCHEN_SPOT_DEVICE, F.GARDEN_PLUG_DEVICE,
+            F.LOUNGE_LAMP_DEVICE, F.LOUNGE_STRIP_DEVICE, F.KITCHEN_SPOT_DEVICE, F.GARDEN_PLUG_DEVICE, F.SHED_LIGHT_DEVICE,
         ).inOrder()
-        assertThat(lights.map { it.dimmable }).containsExactly(true, true, true, false).inOrder()
+        assertThat(lights.map { it.dimmable }).containsExactly(true, true, true, false, true).inOrder()
     }
 
     /** Fails if `inactive` reads as active, or a scene loses its room. */
@@ -204,7 +204,7 @@ class HueJsonTest {
 
         assertThat(HueJson.rooms(HueJson.redact(F.ROOMS)).map { it.name }).containsExactly("[name]", "[name]", "[name]")
         assertThat(HueJson.groupedLights(HueJson.redact(F.GROUPED_LIGHTS))).hasSize(4)
-        assertThat(HueJson.lights(HueJson.redact(F.LIGHTS))).hasSize(4)
+        assertThat(HueJson.lights(HueJson.redact(F.LIGHTS))).hasSize(5)
         assertThat(HueJson.scenes(HueJson.redact(F.SCENES))).hasSize(2)
         assertThat(HueJson.behaviors(HueJson.redact(F.BEHAVIORS)).map { it.on }).containsExactly(false, true, true, false, true, true).inOrder()
         assertThat(HueJson.bridgeId(HueJson.redact(F.BRIDGE))).isEqualTo("[bridge id]")
