@@ -91,6 +91,10 @@ object ControlTokens {
     val swatch = 44.dp
     val swatchGap = 12.dp
     val swatchRing = 3.dp
+
+    // A status line: a 20 dp info icon 8 from its words.
+    val statusIcon = 20.dp
+    val statusGap = 8.dp
     val swatchRingGap = 3.dp
     val swatchStrike = 2.dp
 
@@ -262,6 +266,20 @@ fun HhMessageLine(
             if (spoken != null && spoken != message) contentDescription = spoken
         },
     )
+}
+
+/** The one line saying what is wrong and how to fix it, in `danger` with an info icon; TalkBack hears it appear. */
+@Composable
+fun HhStatusLine(text: String, tag: String) {
+    val c = Culvery.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ControlTokens.statusGap),
+        modifier = Modifier.testTag(tag).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+    ) {
+        HhIcon(Icons.INFO, size = ControlTokens.statusIcon, tint = c.danger)
+        Text(text, style = HhType.body, color = c.danger)
+    }
 }
 
 /** Hand-off §7 person chip: a chip's size and shape, `surf`, a 12 dp dot in the person's [color] 8 from their [name]. */

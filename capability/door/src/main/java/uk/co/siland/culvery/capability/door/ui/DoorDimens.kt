@@ -25,9 +25,6 @@ internal object DoorDimens {
     val thumbTouchHeight = 48.dp
     const val THUMB_PX = 128
 
-    val statusIcon = 20.dp
-    val statusGap = 8.dp
-
     // The full-size sheet's padding, as the calendar's sheets.
     val sheetPaddingH = 30.dp
     val sheetPaddingV = 28.dp

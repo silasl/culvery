@@ -11,6 +11,8 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.test.RecordingToaster
+import uk.co.siland.culvery.core.plugin.test.soon
 import uk.co.siland.culvery.core.ui.Icons
 
 @RunWith(AndroidJUnit4::class)

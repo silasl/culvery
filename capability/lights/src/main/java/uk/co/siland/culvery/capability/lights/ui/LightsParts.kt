@@ -17,9 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.lights.ALL_LIGHTS_OFF
@@ -38,6 +36,7 @@ import uk.co.siland.culvery.capability.lights.turnSpoken
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
@@ -151,14 +150,4 @@ internal fun HolidayButton(on: Boolean, run: HouseRun?, onClick: () -> Unit, mod
 
 /** The one line saying what is wrong and how to fix it (7 §6). */
 @Composable
-internal fun LightsStatusLine(text: String) {
-    val c = Culvery.colors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LightsDimens.statusGap),
-        modifier = Modifier.testTag("lights_status").semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
-    ) {
-        HhIcon(Icons.INFO, size = LightsDimens.statusIcon, tint = c.danger)
-        Text(text, style = HhType.body, color = c.danger)
-    }
-}
+internal fun LightsStatusLine(text: String) = HhStatusLine(text, "lights_status")

@@ -36,13 +36,13 @@ import uk.co.siland.culvery.capability.music.SONG
 import uk.co.siland.culvery.capability.music.STATION
 import uk.co.siland.culvery.capability.music.Speakers
 import uk.co.siland.culvery.capability.music.TestMusicProvider
-import uk.co.siland.culvery.capability.music.TestOverlay
 import uk.co.siland.culvery.capability.music.group
 import uk.co.siland.culvery.capability.music.recordingGroupActions
-import uk.co.siland.culvery.capability.music.waitFor
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.waitFor
 
 /** 6 §5.2, §5.5: one row per group, playing first; the Rooms chip; the status line; Favourites; the tab reads the layout. */
 @RunWith(AndroidJUnit4::class)

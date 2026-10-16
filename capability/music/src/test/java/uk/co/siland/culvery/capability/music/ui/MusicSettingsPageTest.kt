@@ -25,14 +25,14 @@ import uk.co.siland.culvery.capability.music.MusicConnect
 import uk.co.siland.culvery.capability.music.MusicFixture
 import uk.co.siland.culvery.capability.music.MusicLink
 import uk.co.siland.culvery.capability.music.MusicView
-import uk.co.siland.culvery.capability.music.RecordingToaster
 import uk.co.siland.culvery.capability.music.Speakers
 import uk.co.siland.culvery.capability.music.TestMusicProvider
-import uk.co.siland.culvery.capability.music.TestOverlay
-import uk.co.siland.culvery.capability.music.waitFor
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.plugin.test.RecordingToaster
+import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.waitFor
 
 /** 6 §5.4: Sonos, the usual room and the doorbell's share. */
 @RunWith(AndroidJUnit4::class)

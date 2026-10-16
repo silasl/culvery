@@ -17,6 +17,7 @@ import uk.co.siland.culvery.capability.lights.LightRoom
 import uk.co.siland.culvery.capability.lights.LightsProblem
 import uk.co.siland.culvery.capability.lights.problemLine
 import uk.co.siland.culvery.capability.lights.room
+import uk.co.siland.culvery.core.ui.test.snap
 
 /** The Home card in a REGULAR cell as the grid gives it on the 1280×800 canvas (the forecast's 345 × 279). */
 @RunWith(AndroidJUnit4::class)

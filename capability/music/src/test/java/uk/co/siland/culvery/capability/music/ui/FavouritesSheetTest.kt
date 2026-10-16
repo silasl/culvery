@@ -22,8 +22,8 @@ import uk.co.siland.culvery.capability.music.MusicActions
 import uk.co.siland.culvery.capability.music.MusicRefusedException
 import uk.co.siland.culvery.capability.music.TestMusicSystem
 import uk.co.siland.culvery.capability.music.group
-import uk.co.siland.culvery.capability.music.waitFor
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.waitFor
 
 /** 6 §5.3, §6: the household's Favourites; a tap plays one in the row's group and closes; one that can't play says so. */
 @RunWith(AndroidJUnit4::class)

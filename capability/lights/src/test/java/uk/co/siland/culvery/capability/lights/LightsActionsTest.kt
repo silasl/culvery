@@ -17,6 +17,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.household.Role
+import uk.co.siland.culvery.core.plugin.test.soon
+import uk.co.siland.culvery.core.ui.test.waitFor
 
 /** 7 §2.8, §4.3, §6: commands to the system, the paced slider, the row's line when Hue refuses, the PIN for Holiday mode. */
 @OptIn(ExperimentalCoroutinesApi::class)

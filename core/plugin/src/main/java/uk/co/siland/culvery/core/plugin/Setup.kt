@@ -11,6 +11,15 @@ const val NEXT_LABEL = "Next"
 /** 4a design §5, 4d-2 §7.2: a setting that didn't save; nothing changed. */
 const val COULD_NOT_SAVE = "Couldn’t save that change — try again."
 
+/** A device on the home network can't be reached because the tablet has no network. */
+const val TABLET_OFFLINE = "The tablet is offline. Check the Wi-Fi."
+
+/** A typed address's button while the address is checked. */
+const val CHECKING = "Checking…"
+
+/** A typed address that isn't four numbers on the home network; [example] is the field's placeholder. */
+fun typeFourNumbers(example: String): String = "Type the address as four numbers, like $example."
+
 /** Runs [write]; a setting that didn't save is [log]ged and says [COULD_NOT_SAVE], and nothing changed. */
 suspend fun Toaster.save(write: suspend () -> Unit, log: (IOException) -> Unit) {
     try {

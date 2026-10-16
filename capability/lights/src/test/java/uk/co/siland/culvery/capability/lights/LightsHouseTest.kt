@@ -10,6 +10,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.plugin.test.soon
+import uk.co.siland.culvery.core.ui.test.waitFor
 
 /** 7 §4.4, §4.5: All lights off and Holiday mode, one run at a time, stopping only what Culvery started. */
 @RunWith(AndroidJUnit4::class)

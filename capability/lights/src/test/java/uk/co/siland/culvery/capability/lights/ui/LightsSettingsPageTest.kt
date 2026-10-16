@@ -44,16 +44,16 @@ import uk.co.siland.culvery.capability.lights.LightsSettings
 import uk.co.siland.culvery.capability.lights.LightsUnreachableException
 import uk.co.siland.culvery.capability.lights.LightsView
 import uk.co.siland.culvery.capability.lights.MIMIC
-import uk.co.siland.culvery.capability.lights.RecordingToaster
 import uk.co.siland.culvery.capability.lights.TestLightsProvider
-import uk.co.siland.culvery.capability.lights.TestOverlay
 import uk.co.siland.culvery.capability.lights.link
 import uk.co.siland.culvery.capability.lights.problemLine
 import uk.co.siland.culvery.capability.lights.room
-import uk.co.siland.culvery.capability.lights.waitFor
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.plugin.test.RecordingToaster
+import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.waitFor
 
 private val SEEN = listOf(room("Lounge"), room("Kitchen"), room("Garden"))
 private val FOUND = BridgeFound("001788fffe00a1b2", "192.168.1.30")

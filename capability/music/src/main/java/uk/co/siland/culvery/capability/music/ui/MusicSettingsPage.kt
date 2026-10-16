@@ -18,14 +18,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.music.ADDRESS_EXAMPLE
 import uk.co.siland.culvery.capability.music.ADDRESS_HINT
-import uk.co.siland.culvery.capability.music.CHECKING
 import uk.co.siland.culvery.capability.music.CONNECTED
 import uk.co.siland.culvery.capability.music.CONNECTED_TO_SONOS
 import uk.co.siland.culvery.capability.music.CONNECT_TO_SPEAKER
@@ -51,22 +48,22 @@ import uk.co.siland.culvery.capability.music.Speakers
 import uk.co.siland.culvery.capability.music.USUAL_ROOM_LABEL
 import uk.co.siland.culvery.capability.music.lowerToWords
 import uk.co.siland.culvery.capability.music.problemLine
+import uk.co.siland.culvery.core.plugin.CHECKING
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.attempt
 import uk.co.siland.culvery.core.plugin.save
+import uk.co.siland.culvery.core.ui.AddressSheetWords
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhAddressSheet
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
-import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhMessageLine
 import uk.co.siland.culvery.core.ui.HhPercentSlider
 import uk.co.siland.culvery.core.ui.HhSectionLabel
-import uk.co.siland.culvery.core.ui.HhSheet
-import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
@@ -156,48 +153,12 @@ private fun LowerToRow(lowerTo: Int, onLowerTo: (Int) -> Unit) {
 
 /** Enter a speaker's address (6 §4.1): [onConnect] answers null when connected, else the line to show. */
 @Composable
-internal fun AddressSheet(onConnect: suspend (String) -> String?, onEdited: (Boolean) -> Unit, onClose: () -> Unit) {
-    val c = Culvery.colors
-    var typed by remember { mutableStateOf("") }
-    var line by remember { mutableStateOf<String?>(null) }
-    var checking by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    fun connect() {
-        if (checking || typed.isBlank()) return
-        scope.launch {
-            checking = true
-            line = onConnect(typed)
-            checking = false
-        }
-    }
-    HhSheet(
-        padding = PaddingValues(horizontal = MusicDimens.sheetPaddingH, vertical = MusicDimens.sheetPaddingV),
-        modifier = Modifier.testTag("music_address_sheet").semantics { paneTitle = ENTER_ADDRESS },
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(ENTER_ADDRESS, style = HhType.sectionTitle, color = c.ink, modifier = Modifier.semantics { heading() })
-                Text(ADDRESS_HINT, style = HhType.body, color = c.mute)
-            }
-            HhCloseButton(onClose)
-        }
-        HhTextField(
-            typed,
-            {
-                typed = it
-                line = null
-                onEdited(it.isNotEmpty())
-            },
-            placeholder = ADDRESS_EXAMPLE, label = SPEAKER_ADDRESS, tag = "music_address_field",
-            capitalization = KeyboardCapitalization.None, error = line, onDone = ::connect,
-        )
-        HhMessageLine(line, HhType.body, c.danger, "music_address_line", fieldError = line)
-        HhButton(
-            if (checking) CHECKING else CONNECT_TO_SPEAKER, ::connect, Modifier.testTag("music_address_connect"),
-            tone = ButtonTone.Primary, enabled = !checking && typed.isNotBlank(), on = ButtonSurface.Bg,
-        )
-    }
-}
+internal fun AddressSheet(onConnect: suspend (String) -> String?, onEdited: (Boolean) -> Unit, onClose: () -> Unit) = HhAddressSheet(
+    AddressSheetWords(ENTER_ADDRESS, ADDRESS_HINT, SPEAKER_ADDRESS, ADDRESS_EXAMPLE, CONNECT_TO_SPEAKER, CHECKING),
+    tag = "music_address", buttonTag = "music_address_connect",
+    padding = PaddingValues(horizontal = MusicDimens.sheetPaddingH, vertical = MusicDimens.sheetPaddingV),
+    onConnect = onConnect, onEdited = onEdited, onClose = onClose,
+)
 
 /** Settings › Music with its data; reads the layout once as it opens, for the room picker. */
 @Composable

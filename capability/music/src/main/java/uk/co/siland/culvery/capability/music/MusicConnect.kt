@@ -6,6 +6,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.homeNetworkHost
+import uk.co.siland.culvery.core.plugin.typeFourNumbers
 
 private const val TAG = "MusicConnect"
 
@@ -27,7 +28,7 @@ class MusicConnect internal constructor(private val provider: MusicProvider?, pr
     suspend fun find(): ConnectOutcome = connect { it.find() } ?: ConnectOutcome.Failed(NOTHING_ANSWERED)
 
     suspend fun enterAddress(typed: String): ConnectOutcome {
-        val host = homeNetworkHost(typed) ?: return ConnectOutcome.Failed(TYPE_FOUR_NUMBERS)
+        val host = homeNetworkHost(typed) ?: return ConnectOutcome.Failed(typeFourNumbers(ADDRESS_EXAMPLE))
         return connect { it.check(host) } ?: ConnectOutcome.Failed(NO_SPEAKER_THERE)
     }
 

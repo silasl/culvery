@@ -8,6 +8,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.homeNetworkHost
+import uk.co.siland.culvery.core.plugin.typeFourNumbers
 
 private const val TAG = "LightsConnect"
 
@@ -40,7 +41,7 @@ class LightsConnect internal constructor(private val provider: LightsProvider?, 
     suspend fun find(): FindOutcome = look(NO_BRIDGE_ANSWERED) { it.find() }
 
     suspend fun enterAddress(typed: String): FindOutcome {
-        val host = homeNetworkHost(typed) ?: return ConnectFailed(TYPE_FOUR_NUMBERS)
+        val host = homeNetworkHost(typed) ?: return ConnectFailed(typeFourNumbers(BRIDGE_ADDRESS_EXAMPLE))
         return look(NO_BRIDGE_THERE) { it.check(host) }
     }
 

@@ -18,8 +18,6 @@ internal object MusicDimens {
     // Round controls are the 48 dp touch target, with a 28 dp icon.
     val button = 48.dp
     val buttonIcon = 28.dp
-    val statusIcon = 20.dp
-    val statusGap = 8.dp
 
     // The tab's rows: art, the group slider, and each room's slider under the Rooms chip.
     val rowArt = 64.dp

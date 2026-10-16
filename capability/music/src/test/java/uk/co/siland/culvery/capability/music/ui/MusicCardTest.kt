@@ -43,9 +43,9 @@ import uk.co.siland.culvery.capability.music.Speakers
 import uk.co.siland.culvery.capability.music.TestMusicProvider
 import uk.co.siland.culvery.capability.music.group
 import uk.co.siland.culvery.capability.music.recordingGroupActions
-import uk.co.siland.culvery.capability.music.waitFor
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.waitFor
 
 /** 6 §5.1, §5.5: the Home card's states, its controls and their words; it watches the speakers while it shows. */
 @RunWith(AndroidJUnit4::class)

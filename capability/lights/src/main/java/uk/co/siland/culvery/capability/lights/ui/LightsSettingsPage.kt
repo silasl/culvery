@@ -15,14 +15,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -32,7 +29,6 @@ import uk.co.siland.culvery.capability.lights.BRIDGE_ADDRESS_EXAMPLE
 import uk.co.siland.culvery.capability.lights.BRIDGE_ADDRESS_HINT
 import uk.co.siland.culvery.capability.lights.BridgeFound
 import uk.co.siland.culvery.capability.lights.Bridges
-import uk.co.siland.culvery.capability.lights.CHECKING
 import uk.co.siland.culvery.capability.lights.ConnectFailed
 import uk.co.siland.culvery.capability.lights.ENTER_BRIDGE_ADDRESS
 import uk.co.siland.culvery.capability.lights.FIND_HUE_BRIDGE
@@ -59,21 +55,21 @@ import uk.co.siland.culvery.capability.lights.ROOMS_AFTER_PAIRING
 import uk.co.siland.culvery.capability.lights.goneLeftOutLine
 import uk.co.siland.culvery.capability.lights.mainRoom
 import uk.co.siland.culvery.capability.lights.problemLine
+import uk.co.siland.culvery.core.plugin.CHECKING
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.attempt
 import uk.co.siland.culvery.core.plugin.save
+import uk.co.siland.culvery.core.ui.AddressSheetWords
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhAddressSheet
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
-import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhMessageLine
 import uk.co.siland.culvery.core.ui.HhSectionLabel
-import uk.co.siland.culvery.core.ui.HhSheet
-import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 
@@ -209,48 +205,12 @@ private fun ChipFlow(content: @Composable () -> Unit) = FlowRow(
 
 /** Type the bridge's address (7 §4.1): [onConnect] answers null when the bridge answered, else the line to show. */
 @Composable
-internal fun AddressSheet(onConnect: suspend (String) -> String?, onEdited: (Boolean) -> Unit, onClose: () -> Unit) {
-    val c = Culvery.colors
-    var typed by remember { mutableStateOf("") }
-    var line by remember { mutableStateOf<String?>(null) }
-    var checking by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    fun connect() {
-        if (checking || typed.isBlank()) return
-        scope.launch {
-            checking = true
-            line = onConnect(typed)
-            checking = false
-        }
-    }
-    HhSheet(
-        padding = PaddingValues(horizontal = LightsDimens.sheetPaddingH, vertical = LightsDimens.sheetPaddingV),
-        modifier = Modifier.testTag("lights_address_sheet").semantics { paneTitle = ENTER_BRIDGE_ADDRESS },
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(ENTER_BRIDGE_ADDRESS, style = HhType.sectionTitle, color = c.ink, modifier = Modifier.semantics { heading() })
-                Text(BRIDGE_ADDRESS_HINT, style = HhType.body, color = c.mute)
-            }
-            HhCloseButton(onClose)
-        }
-        HhTextField(
-            typed,
-            {
-                typed = it
-                line = null
-                onEdited(it.isNotEmpty())
-            },
-            placeholder = BRIDGE_ADDRESS_EXAMPLE, label = BRIDGE_ADDRESS, tag = "lights_address_field",
-            capitalization = KeyboardCapitalization.None, error = line, onDone = ::connect,
-        )
-        HhMessageLine(line, HhType.body, c.danger, "lights_address_line", fieldError = line)
-        HhButton(
-            if (checking) CHECKING else PAIR_WITH_BRIDGE, ::connect, Modifier.testTag("lights_address_pair"),
-            tone = ButtonTone.Primary, enabled = !checking && typed.isNotBlank(), on = ButtonSurface.Bg,
-        )
-    }
-}
+internal fun AddressSheet(onConnect: suspend (String) -> String?, onEdited: (Boolean) -> Unit, onClose: () -> Unit) = HhAddressSheet(
+    AddressSheetWords(ENTER_BRIDGE_ADDRESS, BRIDGE_ADDRESS_HINT, BRIDGE_ADDRESS, BRIDGE_ADDRESS_EXAMPLE, PAIR_WITH_BRIDGE, CHECKING),
+    tag = "lights_address", buttonTag = "lights_address_pair",
+    padding = PaddingValues(horizontal = LightsDimens.sheetPaddingH, vertical = LightsDimens.sheetPaddingV),
+    onConnect = onConnect, onEdited = onEdited, onClose = onClose,
+)
 
 /** Settings › Lights with its data; reads the rooms and the automations once as it opens, for the choices. */
 @Composable

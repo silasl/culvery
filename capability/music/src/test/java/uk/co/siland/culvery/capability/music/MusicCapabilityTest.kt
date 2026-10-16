@@ -10,6 +10,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.music.ui.ArtCache
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.test.RecordingToaster
+import uk.co.siland.culvery.core.plugin.test.soon
 import uk.co.siland.culvery.core.ui.Icons
 
 @RunWith(AndroidJUnit4::class)

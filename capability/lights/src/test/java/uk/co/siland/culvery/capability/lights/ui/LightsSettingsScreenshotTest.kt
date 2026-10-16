@@ -16,6 +16,7 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.lights.AWAY
 import uk.co.siland.culvery.capability.lights.MIMIC
 import uk.co.siland.culvery.capability.lights.room
+import uk.co.siland.culvery.core.ui.test.snap
 
 /** Settings › Lights as Settings shows it, beside the 320 dp page list; the sheets at the right edge. */
 @RunWith(AndroidJUnit4::class)

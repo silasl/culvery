@@ -13,10 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,6 +33,7 @@ import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
@@ -120,14 +119,4 @@ internal fun NowPlayingBlock(group: SpeakerGroup, nothingPlaying: Boolean, artSi
 
 /** The one line saying what is wrong and how to fix it (6 §6), on the card, the tab and Settings › Music. */
 @Composable
-internal fun MusicStatusLine(text: String) {
-    val c = Culvery.colors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(MusicDimens.statusGap),
-        modifier = Modifier.testTag("music_status").semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
-    ) {
-        HhIcon(Icons.INFO, size = MusicDimens.statusIcon, tint = c.danger)
-        Text(text, style = HhType.body, color = c.danger)
-    }
-}
+internal fun MusicStatusLine(text: String) = HhStatusLine(text, "music_status")

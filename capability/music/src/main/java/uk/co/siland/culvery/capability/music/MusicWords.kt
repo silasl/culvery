@@ -1,8 +1,9 @@
 package uk.co.siland.culvery.capability.music
 
+import uk.co.siland.culvery.core.plugin.TABLET_OFFLINE
+
 internal const val MUSIC = "Music"
 internal const val CANT_REACH_SONOS = "Culvery can’t reach Sonos. Check the speakers are on and the tablet is on the home Wi-Fi."
-internal const val TABLET_OFFLINE = "The tablet is offline. Check the Wi-Fi."
 internal const val OTHER_SONOS = "Culvery found a different Sonos system. Find Sonos again in Settings › Music."
 internal const val SONOS_REFUSED = "Sonos didn’t do that. Try again."
 internal const val CANT_PLAY_HERE = "Sonos couldn’t play this here."
@@ -67,7 +68,6 @@ fun roomsAction(shown: Boolean) = if (shown) "hide each room’s volume" else "s
 fun playInAction(name: String) = "play in $name"
 
 internal const val NOTHING_ANSWERED = "No Sonos speakers answered. Check they’re on, or enter a speaker’s address."
-internal const val TYPE_FOUR_NUMBERS = "Type the address as four numbers, like 192.168.1.20."
 internal const val NO_SPEAKER_THERE = "No Sonos speaker answered at that address. Check it in the Sonos app under About My System."
 
 internal const val SONOS = "Sonos"
@@ -82,7 +82,6 @@ internal const val ADDRESS_HINT = "Shown in the Sonos app under About My System.
 internal const val SPEAKER_ADDRESS = "Speaker’s address"
 internal const val ADDRESS_EXAMPLE = "192.168.1.20"
 internal const val CONNECT_TO_SPEAKER = "Connect to this speaker"
-internal const val CHECKING = "Checking…"
 internal const val USUAL_ROOM_LABEL = "Usual room"
 internal const val ROOMS_AFTER_FIND = "The rooms appear here once Sonos is found."
 internal const val DOORBELL = "Doorbell"

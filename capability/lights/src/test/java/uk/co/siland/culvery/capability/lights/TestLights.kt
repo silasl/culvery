@@ -1,10 +1,5 @@
 package uk.co.siland.culvery.capability.lights
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -17,8 +12,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import org.junit.rules.TemporaryFolder
 import org.junit.rules.TestRule
 import org.junit.runner.Description
@@ -34,9 +27,7 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Feature
-import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
-import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.ui.Icons
 
 internal val RELAX = LightScene("relax-id", "Relax")
@@ -77,9 +68,6 @@ class LightsFixture : TestRule {
         description,
     )
 }
-
-/** [block] on a real dispatcher, as DataStore's writes need, failing after 5 s. */
-internal suspend fun <T> soon(block: suspend CoroutineScope.() -> T): T = withContext(Dispatchers.Default) { withTimeout(5_000, block) }
 
 /** A lights system a test drives: its rooms and problem, the calls made of it in order, and calls that fail or wait. */
 internal class TestLightsSystem(rooms: List<LightRoom> = emptyList()) : LightsSystem {
@@ -243,44 +231,5 @@ internal class TestAccess(var role: Role?) : AccessControl {
     override fun lock() = Unit
 }
 
-internal class RecordingToaster : Toaster {
-    val shown = CopyOnWriteArrayList<String>()
 
-    override fun show(message: String, icon: String, urgent: Boolean) {
-        shown += message
-    }
-}
 
-/** An overlay host that keeps the sheet it was asked to show, for the test to draw; [closesWhenIdle] is that of the last show. */
-internal class TestOverlay : OverlayHost {
-    var content by mutableStateOf<(@Composable () -> Unit)?>(null)
-    var closesWhenIdle = true
-
-    /** As the shell's: reset by each show and dismiss. */
-    var edited = false
-
-    override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) {
-        this.closesWhenIdle = closesWhenIdle
-        edited = false
-        this.content = content
-    }
-
-    override fun markEdited(edited: Boolean) {
-        this.edited = edited
-    }
-
-    override fun dismiss() {
-        content = null
-        edited = false
-    }
-
-    /** The shell closing the sheet by itself (a scrim tap, the idle timer), without a dismiss from the sheet's owner. */
-    fun closedByHost() {
-        content = null
-    }
-}
-
-internal fun ComposeContentTestRule.waitFor(condition: () -> Boolean) = waitUntil(5_000) {
-    waitForIdle()
-    condition()
-}

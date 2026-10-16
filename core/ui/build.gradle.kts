@@ -18,6 +18,9 @@ dependencies {
     testImplementation(libs.roborazzi.compose)
     testFixturesImplementation(platform(libs.androidx.compose.bom))
     testFixturesImplementation(libs.androidx.compose.ui.test.junit4)
+    // snap, the screenshot helper every module's screenshot tests call.
+    testFixturesImplementation(libs.roborazzi.core)
+    testFixturesImplementation(libs.androidx.compose.foundation)
 }
 
 // IconFontTest reads tools/fonts/icons.txt and every module's main sources.
