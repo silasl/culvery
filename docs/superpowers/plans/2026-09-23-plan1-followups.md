@@ -322,6 +322,15 @@ From the final review's triage (51 follow-ups); the accepted ones and those fixe
 - `FakeCalendarProvider`'s top-level `offline()` shadows a private Boolean; `AlertLayer` could be private; `CulveryMark` bounds are hand-rounded.
 - `RingFixtures`: dangling `[device]`/`[person]` KDoc links, an unused `picture` parameter on `notice()`, and the wording "Check Ring's notifications' one line"; the card's "device · time" line is built apart from `cardWords`.
 
+## Plan 6 (Sonos): emulator walk-through (2026-10-15)
+
+On `culvery-5` (debug build, sample household) against the household's real speakers, by typed address; the rest moved to the tablet at the user's call.
+- Passed: Settings › Music between Calendars and Door; Find Sonos on the emulator says no speakers answered (its scan can't reach the home network); a mistyped address and one with `:1400` each say how to type it; the typed address connects and reads the household's rooms.
+- Protocol check 1 passed: `GetZoneGroupState` and `GetHouseholdID` answer on the household's firmware (Sonos 86.10). Checks 2 (the group snapshot) and 3 (Shuffle everything's URI, empty metadata, one-item browse and order) move to the tablet; the tests' pins of ruling 12 stay marked as unconfirmed until then.
+- Fault: checks failed now and then as "can't reach Sonos". The speakers answer every call in full from the PC; inside the emulator the larger answers (`GetPositionInfo`, `GetZoneGroupState`, about 1.6 KB) sometimes arrive cut short ("unexpected end of stream"), from the emulator's network layer with Sonos closing each connection straight after answering. Two commits harden Culvery for a busy network all the same: a fresh connection per call, and one retry for a read whose connection fails (commands are never sent twice). The flicker's real test is the tablet, which has no such layer.
+- Moved to the tablet: Find Sonos by scan, the Home card and Music tab on live groups, Play/Pause/Next and both volume sliders against the Sonos app, the paused room staying on Home, the Rooms chip, a radio and a playlist Favourite, Shuffle everything from a paused station, the doorbell lowering (two-room group, Got it, a room dragged meanwhile, a second ring, 0 %), offline, TalkBack, and the captures for the fixtures.
+- For the end-of-v1 design walk-through: the Music tab's unselected Rooms chip blends into its row; empty message lines leave gaps in Settings › Music and the address sheet; the Home card's buttons are tight to fit Shuffle everything; the tab keeps Next on a row with nothing playing while the Home card drops it.
+
 ## Feature ideas (2026-10-02, after v1)
 
 **Each its own spec → plan cycle; not in 4c, 4d or 4e**
