@@ -16,5 +16,7 @@ docs/design/house_hub_handoff/*.dc.html
 # Local-only files and secrets
 .superpowers/
 *.p12
+# Test keystores with a published password, made for the TLS tests
+!provider/lights-hue/src/test/resources/tls/*.p12
 .env
 google-services.json
