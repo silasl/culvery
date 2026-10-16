@@ -66,6 +66,7 @@ interface LightsSystem {
 
     suspend fun setOn(room: LightRoom, on: Boolean)
 
+    /** Also turns [room] on, in the same command, so an off room comes on at [percent] (7 §4.3). */
     suspend fun setBrightness(room: LightRoom, percent: Int)
 
     suspend fun recallScene(room: LightRoom, scene: LightScene)
