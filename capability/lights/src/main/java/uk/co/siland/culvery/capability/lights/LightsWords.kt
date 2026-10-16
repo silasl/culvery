@@ -36,6 +36,12 @@ internal fun turnSpoken(room: LightRoom, on: Boolean): String = "Turn the ${room
 /** What tapping Holiday mode does: "Turn Holiday mode on" when [on] is the state it turns to. */
 internal fun holidaySpoken(on: Boolean): String = "Turn $HOLIDAY_MODE ${if (on) "on" else "off"}"
 
+/** "Lounge brightness": the slider's name; its state is the percent (7 §5.4). */
+internal fun brightnessName(room: LightRoom): String = "${room.name} brightness"
+
+/** "Relax scene in the Lounge" (7 §5.4). */
+internal fun sceneSpoken(scene: LightScene, room: LightRoom): String = "${scene.name} scene in the ${room.name}"
+
 internal fun openRoomSpoken(room: LightRoom): String = "Open the ${room.name} on the Lights tab"
 
 /** Holiday mode's state under its name: its record, or what the run is doing (7 §2.6). */

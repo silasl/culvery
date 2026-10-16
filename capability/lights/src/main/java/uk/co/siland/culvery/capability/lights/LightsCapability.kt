@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.capability.lights.ui.LightsCardHost
+import uk.co.siland.culvery.capability.lights.ui.LightsTabHost
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
 import uk.co.siland.culvery.core.ui.Icons
@@ -42,5 +43,5 @@ class LightsCapability @Inject constructor(
     override fun cards(): Flow<List<HomeCard>> = hasTab.map { if (it) listOf(card) else emptyList() }
 
     @Composable
-    override fun TabContent() = Unit
+    override fun TabContent() = LightsTabHost(view, actions, house, follow)
 }
