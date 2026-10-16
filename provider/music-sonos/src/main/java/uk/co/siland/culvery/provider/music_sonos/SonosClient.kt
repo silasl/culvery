@@ -86,7 +86,8 @@ internal class SonosClient(
 
     /**
      * A busy network drops the odd connection, so a read ([retry]) is asked once more after a dropped connection. Never a
-     * command (ruling 26), a timeout (a dead speaker would take twice the 3 s) or an answer too large to be Sonos's.
+     * command (it may have taken effect before its answer was lost), a timeout (a dead speaker would take twice the 3 s)
+     * or an answer too large to be Sonos's.
      */
     private suspend fun send(request: Request, maxBytes: Long, retry: Boolean): Answer = try {
         http.newCall(request).await(maxBytes)

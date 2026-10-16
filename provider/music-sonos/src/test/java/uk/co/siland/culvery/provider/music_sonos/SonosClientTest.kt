@@ -180,7 +180,7 @@ class SonosClientTest {
         assertThat(speaker.actions()).containsExactly("GetTransportInfo", "GetTransportInfo", "Browse", "Browse", "", "").inOrder()
     }
 
-    /** Ruling 26: a command is never sent twice, even when its connection drops before the answer. */
+    /** A command is never sent twice, even when its connection drops before the answer: it may already have taken effect. */
     @Test
     fun aCommandWhoseConnectionDropsIsNotSentAgain() = runTest {
         speaker.acceptCommands()
