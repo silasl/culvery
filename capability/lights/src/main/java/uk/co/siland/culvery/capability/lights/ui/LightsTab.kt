@@ -21,10 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import uk.co.siland.culvery.capability.lights.HouseRun
 import uk.co.siland.culvery.capability.lights.LOOKING_FOR_LIGHTS
 import uk.co.siland.culvery.capability.lights.LightRoom
 import uk.co.siland.culvery.capability.lights.LightScene
@@ -32,7 +31,6 @@ import uk.co.siland.culvery.capability.lights.LightsActions
 import uk.co.siland.culvery.capability.lights.LightsFollow
 import uk.co.siland.culvery.capability.lights.LightsHouse
 import uk.co.siland.culvery.capability.lights.LightsView
-import uk.co.siland.culvery.capability.lights.HouseRun
 import uk.co.siland.culvery.capability.lights.brightnessName
 import uk.co.siland.culvery.capability.lights.problemLine
 import uk.co.siland.culvery.capability.lights.roomSpoken
@@ -129,8 +127,7 @@ private fun RoomRow(room: LightRoom, line: String?, actions: RoomActions) {
                     .fillMaxWidth()
                     .heightIn(min = LightsDimens.chevron)
                     .testTag("${tag}_switch")
-                    .semantics { contentDescription = roomSpoken(room) }
-                    .hhClickable({ actions.onOn(room, !room.on) }, label = turnSpoken(room, !room.on), role = Role.Switch),
+                    .hhClickable({ actions.onOn(room, !room.on) }, label = turnSpoken(room, !room.on), role = Role.Switch, spoken = roomSpoken(room)),
             ) {
                 HhIcon(Icons.LIGHTBULB, size = LightsDimens.bulb, filled = room.on, tint = if (room.on) c.accent else c.mute)
                 Column(Modifier.weight(1f).shownNotSpoken()) {

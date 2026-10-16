@@ -154,14 +154,13 @@ fun HhChoiceChip(
                 // A button chip that isn't holding a value says nothing about selection.
                 if (role != Role.Button || selected) this.selected = selected
                 if (state != null) this.stateDescription = state
-                if (spokenName != null) contentDescription = spokenName
             }
             .alpha(if (enabled) 1f else ControlTokens.DISABLED_ALPHA)
             .heightIn(min = ControlTokens.chipHeight)
             .clip(RoundedCornerShape(ControlTokens.chipRadius))
             .background(if (selected) selectedColor else c.surf)
             // Never `enabled = false`: that would stop the explaining tap.
-            .hhClickable(onClick, label = clickLabel ?: FIND_OUT_WHY.takeIf { !enabled }, role = role)
+            .hhClickable(onClick, label = clickLabel ?: FIND_OUT_WHY.takeIf { !enabled }, role = role, spoken = spokenName)
             .padding(horizontal = ControlTokens.chipPaddingH),
     ) {
         leading?.invoke(ink)

@@ -2,6 +2,7 @@ package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -75,7 +76,9 @@ val SpokenNameKey = SemanticsPropertyKey<String>("SpokenName")
  * The one button (4d-1 §4.1): a pill at least [size]'s height, a one-line label, an optional icon before it. Disabled,
  * every [tone] is the quiet fill with a `mute` label and does nothing. [spokenName] names a button whose label repeats
  * along a list: it starts with [text] and adds the subject ("Disconnect Google Calendar, alex@example.com"). [compact]
- * narrows a Regular button's side padding so its label fits a crowded row.
+ * narrows a Regular button's side padding so its label fits a crowded row. [clickLabel] is what TalkBack offers when
+ * the name doesn't say what a tap does; [secondLine] shows a state under the label ("Holiday mode", "Off"), and
+ * [spokenName] then reads both as one ("Holiday mode, off").
  */
 @Composable
 fun HhButton(
@@ -89,6 +92,8 @@ fun HhButton(
     on: ButtonSurface,
     spokenName: String? = null,
     compact: Boolean = false,
+    clickLabel: String? = null,
+    secondLine: String? = null,
 ) {
     val (fill, ink) = buttonColors(tone, enabled, on, Culvery.colors)
     val large = size == ButtonSize.Large
@@ -117,23 +122,26 @@ fun HhButton(
                 if (spokenName != null) {
                     Modifier.semantics {
                         contentDescription = spokenName
-                        this[SpokenNameKey] = spokenName
+                        // Two lines are spoken as one sentence ("Holiday mode, off"), not as the label then the line.
+                        if (secondLine == null) this[SpokenNameKey] = spokenName
                     }
                 } else {
                     Modifier
                 },
             )
-            .hhClickable(onClick, enabled = enabled)
+            .hhClickable(onClick, label = clickLabel, enabled = enabled)
             .padding(start = start, end = end),
     ) {
         if (icon != null) HhIcon(icon, size = ButtonTokens.icon, tint = ink)
-        Text(
-            text,
-            style = if (large) ControlType.button else HhType.buttonLabel,
-            color = ink,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false).then(if (spokenName != null) Modifier.shownNotSpoken() else Modifier),
-        )
+        val shown = Modifier.weight(1f, fill = false).then(if (spokenName != null) Modifier.shownNotSpoken() else Modifier)
+        val style = if (large) ControlType.button else HhType.buttonLabel
+        if (secondLine == null) {
+            Text(text, style = style, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = shown)
+        } else {
+            Column(shown) {
+                Text(text, style = style, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(secondLine, style = HhType.secondary, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }

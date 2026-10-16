@@ -16,11 +16,6 @@ internal object LightsDimens {
 
     // All lights off and Holiday mode side by side in 301 dp: Holiday mode keeps its width, All lights off takes the rest.
     val buttonGap = 8.dp
-    val buttonHeight = 60.dp
-    val buttonPaddingStart = 10.dp
-    val buttonPaddingEnd = 12.dp
-    val buttonIcon = 24.dp
-    val buttonIconGap = 4.dp
     val lineGap = 10.dp
 
     // The tab: rows 10 apart as lists are; inside a row, 12 between its lines and 8 between chips.
