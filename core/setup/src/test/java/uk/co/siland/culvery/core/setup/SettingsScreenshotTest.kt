@@ -19,6 +19,7 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.setup.pages.KioskPage
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -48,7 +49,7 @@ class SettingsScreenshotTest {
         KioskPage(FakeHomeApp(default = false)),
     )
 
-    private fun snap(name: String, dark: Boolean, pageId: String) {
+    private fun snap(name: String, dark: Boolean, pageId: String, pages: List<SettingsPage> = this.pages) {
         compose.setContent {
             CulveryTheme(dark = dark) {
                 CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
@@ -66,4 +67,16 @@ class SettingsScreenshotTest {
     @Test fun peopleLight() = snap("settings_people_light", false, "people")
     @Test fun kioskDark() = snap("settings_kiosk_dark", true, "kiosk")
     @Test fun kioskLight() = snap("settings_kiosk_light", false, "kiosk")
+
+    /** The left list as an Admin sees it with every capability set up, in the pages' own order. */
+    @Test
+    fun allPagesDark() {
+        val all = pages + listOf(
+            StillPage("display", "Display", 440) { StepTitle("Display") },
+            StillPage("music", "Music", 450) { StepTitle("Music") },
+            StillPage("lights", "Lights", 470) { StepTitle("Lights") },
+            StillPage("door", "Door", 500) { StepTitle("Door") },
+        )
+        snap("settings_all_pages_dark", true, "location", all.sortedBy { it.order })
+    }
 }

@@ -1,10 +1,13 @@
 package uk.co.siland.culvery.shell.ui
 
+import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -21,6 +24,25 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ui.ComingUpCard
 import uk.co.siland.culvery.capability.calendar.ui.TodayCard
+import uk.co.siland.culvery.capability.door.ui.DoorCard
+import uk.co.siland.culvery.capability.door.ui.DoorCardUi
+import uk.co.siland.culvery.capability.lights.LightRoom
+import uk.co.siland.culvery.capability.lights.LightScene
+import uk.co.siland.culvery.capability.lights.ui.HouseActions
+import uk.co.siland.culvery.capability.lights.ui.LightsCard
+import uk.co.siland.culvery.capability.lights.ui.LightsTab
+import uk.co.siland.culvery.capability.lights.ui.MainRoomActions
+import uk.co.siland.culvery.capability.lights.ui.RoomActions
+import uk.co.siland.culvery.capability.music.HomePick
+import uk.co.siland.culvery.capability.music.NowPlaying
+import uk.co.siland.culvery.capability.music.PlayState
+import uk.co.siland.culvery.capability.music.SpeakerGroup
+import uk.co.siland.culvery.capability.music.SpeakerRoom
+import uk.co.siland.culvery.capability.music.ui.ArtSource
+import uk.co.siland.culvery.capability.music.ui.GroupActions
+import uk.co.siland.culvery.capability.music.ui.LocalArtSource
+import uk.co.siland.culvery.capability.music.ui.MusicCard
+import uk.co.siland.culvery.capability.music.ui.MusicTab
 import uk.co.siland.culvery.capability.weather.Condition
 import uk.co.siland.culvery.capability.weather.DailyWeather
 import uk.co.siland.culvery.capability.weather.HeaderWeather
@@ -42,6 +64,7 @@ import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.shell.SessionUi
 import uk.co.siland.culvery.shell.ShellUiState
@@ -127,15 +150,67 @@ class ShellScreenshotTest {
         ),
     )
 
+    private val relax = LightScene("relax", "Relax")
+    private val bright = LightScene("bright", "Bright")
+    private val rooms = listOf(
+        LightRoom("lounge", "Lounge", on = true, brightness = 70, scenes = listOf(relax, bright), activeSceneId = relax.id, dimmable = true),
+        LightRoom("kitchen", "Kitchen", on = false, brightness = 70, scenes = listOf(relax, bright), activeSceneId = null, dimmable = true),
+        LightRoom("hall", "Hall", on = true, brightness = 100, scenes = emptyList(), activeSceneId = null, dimmable = false),
+        LightRoom("garden", "Garden", on = true, brightness = 30, scenes = emptyList(), activeSceneId = null, dimmable = true),
+    )
+    private val noHouse = HouseActions({}, {})
+
+    private fun speakers(id: String, vararg names: String, state: PlayState, nowPlaying: NowPlaying?, volume: Int) = SpeakerGroup(
+        id, names.map { SpeakerRoom("$it-id", it, volume) }, "${names.first()}-id", state, nowPlaying,
+        artUrl = nowPlaying?.let { "art" }, canSkip = nowPlaying !is NowPlaying.Radio, volume = volume, startedAtMillis = null,
+    )
+
+    private val groups = listOf(
+        speakers("l", "Lounge", "Dining room", state = PlayState.PLAYING, nowPlaying = NowPlaying.Radio("Culvery FM", "The Breakfast Show"), volume = 40),
+        speakers("k", "Kitchen", state = PlayState.PAUSED, nowPlaying = NowPlaying.Track("Song", "Artist", "Album"), volume = 30),
+        speakers("b", "Bedroom", state = PlayState.STOPPED, nowPlaying = null, volume = 30),
+    )
+
+    // In capability order, as the rail lists them once each is set up.
+    private val allTabs = listOf(
+        TabItem("calendar", "Calendar", Icons.CALENDAR_MONTH),
+        TabItem("music", "Music", Icons.SPEAKER),
+        TabItem("lights", "Lights", Icons.LIGHTBULB),
+        TabItem("door", "Door", Icons.DOORBELL),
+    )
+
+    /** Every card wanting to show, at the capabilities' sizes and priorities: Lights (35) and Music (30) take the REGULAR cells, the forecast (25) gives way. */
+    private fun fullHome(dark: Boolean) = weatherHome(dark).copy(
+        tabs = allTabs,
+        homeCards = HomeCardPlacer.place(
+            listOf(
+                HomeCard("calendar.today", HomeCardSize.TALL, 100) { TodayCard(today) },
+                HomeCard("calendar.comingUp", HomeCardSize.WIDE, 50) { ComingUpCard(comingUp) },
+                HomeCard("lights.card", HomeCardSize.REGULAR, 35) {
+                    LightsCard(rooms[0], holidayOn = false, allOffLit = true, run = null, status = null, line = null, MainRoomActions({}, {}), noHouse)
+                },
+                HomeCard("music.card", HomeCardSize.REGULAR, 30) { MusicCard(HomePick(groups[0], nothingPlaying = false), null, null, GroupActions.None) },
+                HomeCard("weather.forecast", HomeCardSize.REGULAR, 25) {
+                    ForecastCard(
+                        WeatherView.Ready(HourlyWeather(at.withMinute(0), Condition.PARTLY_CLOUDY, 17.0), forecastDays[0], forecastDays, 0L),
+                        nowMillis = 0L,
+                    )
+                },
+            ),
+        ),
+    )
+
     private fun snap(
         name: String,
         dark: Boolean,
         state: ShellUiState = ShellUiState(dark = dark),
         fontScale: Float = 1f,
+        tabContent: @Composable (String) -> Unit = {},
         overlay: @Composable () -> Unit = {},
     ) {
+        val grey = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GRAY) }.asImageBitmap()
         compose.setContent {
-            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
+            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalArtSource provides ArtSource { grey }) {
                 CulveryTheme(dark = dark) {
                     WithFontScale(fontScale) {
                         Box(Modifier.fillMaxSize()) {
@@ -146,7 +221,7 @@ class ShellScreenshotTest {
                                 onOpenSettings = {},
                                 onSignOut = {},
                                 onToggleThemePreview = {},
-                                tabContent = {},
+                                tabContent = tabContent,
                             )
                             overlay()
                         }
@@ -225,4 +300,39 @@ class ShellScreenshotTest {
     fun pinPadFontScale15() = snap("pin_pad_fs15", dark = false, fontScale = 1.5f) {
         PinPadSheet("Change settings", PinReason.Generic, error = PinError.WrongPin, lockedUntilMillis = null, onSubmit = {}, onCancel = {})
     }
+
+    @Test
+    fun homeFullDark() = snap("home_full_dark", dark = true, state = fullHome(dark = true))
+
+    @Test
+    fun homeFullLight() = snap("home_full_light", dark = false, state = fullHome(dark = false))
+
+    @Test
+    fun doorCardOverHomeDark() = snap("home_door_card_dark", dark = true, state = fullHome(dark = true)) {
+        AlertLayer({ DoorCard(DoorCardUi(unrecognised = false, device = "Front Door", time = "11:54", snapshot = null), onGotIt = {}) }, hidden = false)
+    }
+
+    @Test
+    fun pinPadLockedDark() {
+        // The countdown ticks each second; hold the clock so it still reads its first value.
+        compose.mainClock.autoAdvance = false
+        snap("pin_pad_locked_dark", dark = true) {
+            PinPadSheet(
+                "Change settings", PinReason.Generic, error = PinError.WrongPin, lockedUntilMillis = 30_000L,
+                onSubmit = {}, onCancel = {}, nowMillis = { 0L },
+            )
+        }
+    }
+
+    @Test
+    fun musicTabLight() = snap(
+        "tab_music_light", dark = false, state = fullHome(dark = false).copy(selectedTabId = "music"),
+        tabContent = { MusicTab(groups, null, emptyMap(), emptySet(), {}, GroupActions.None) },
+    )
+
+    @Test
+    fun lightsTabLight() = snap(
+        "tab_lights_light", dark = false, state = fullHome(dark = false).copy(selectedTabId = "lights"),
+        tabContent = { LightsTab(rooms, false, allOffLit = true, null, null, null, emptyMap(), null, {}, noHouse, RoomActions.None) },
+    )
 }
