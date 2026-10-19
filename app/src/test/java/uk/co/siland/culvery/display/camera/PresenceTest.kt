@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
+import uk.co.siland.culvery.display.Screen
 
 /** A camera the test opens, feeds and fails by hand; its close records whether the mark was still showing. */
 private class FakeFrameSource : FrameSource {
@@ -51,7 +52,9 @@ private class Rig(
 ) {
     val source = FakeFrameSource()
     var moves = 0
-    val presence = Presence(source, { test.currentTime }, seen, { moves++ }, test.backgroundScope)
+    val screen = MutableStateFlow(Screen.AWAKE)
+    var clock: () -> Long = { test.currentTime }
+    val presence = Presence(source, { clock() }, seen, screen, { moves++ }, test.backgroundScope)
 
     val running: Boolean get() = presence.running.value
 
@@ -75,6 +78,11 @@ private class Rig(
     fun frameAt(ms: Long, luma: Luma) {
         at(ms)
         source.frame(luma)
+        test.runCurrent()
+    }
+
+    fun screen(to: Screen) {
+        screen.value = to
         test.runCurrent()
     }
 
@@ -283,5 +291,34 @@ class PresenceTest {
         rig.at(600_000)
         assertThat(rig.source.opens).isEqualTo(2)
         assertThat(rig.logs()).isEmpty()
+    }
+
+    /** Fails if the frame lit by the screen before it went dark is kept, so the first dark frame compared against it wakes the wall. */
+    @Test
+    fun goingToSleepForgetsTheLitFrame() = runTest {
+        val rig = Rig(this)
+        rig.want(true)
+        rig.frameAt(0, block(4))
+        rig.screen(Screen.ASLEEP)
+        rig.frameAt(1_000, block(10))
+        assertThat(rig.moves).isEqualTo(0)
+        assertThat(rig.source.isOpen).isTrue()
+        rig.frameAt(2_000, block(4))
+        assertThat(rig.moves).isEqualTo(1)
+    }
+
+    /** Fails if a frame under LOOK_EVERY_MS after going dark is looked at, when the backlight and exposure are still settling, or one at exactly 1 000 ms is not. */
+    @Test
+    fun goingToSleepWaitsALookBeforeTheNextFrame() = runTest {
+        val rig = Rig(this)
+        rig.want(true)
+        rig.frameAt(0, block(4))
+        rig.at(1_500)
+        rig.screen(Screen.ASLEEP)
+        val reads = rig.source.reads
+        rig.frameAt(2_499, block(10))
+        assertThat(rig.source.reads).isEqualTo(reads)
+        rig.frameAt(2_500, block(10))
+        assertThat(rig.source.reads).isEqualTo(reads + 1)
     }
 }

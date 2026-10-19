@@ -14,6 +14,7 @@ import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.display.DisplayState
+import uk.co.siland.culvery.display.Screen
 
 private const val TAG = "Presence"
 
@@ -41,13 +42,14 @@ internal class Presence internal constructor(
     private val frames: FrameSource,
     private val clock: WallClock,
     private val wanted: StateFlow<Boolean>,
+    private val screen: StateFlow<Screen>,
     private val moved: () -> Unit,
     private val scope: CoroutineScope,
     private val diff: FrameDiff = FrameDiff(),
 ) : Startable {
     @Inject
     constructor(frames: FrameSource, clock: WallClock, display: DisplayState, @ApplicationScope scope: CoroutineScope) :
-        this(frames, clock, display.cameraWanted, display::moved, scope)
+        this(frames, clock, display.cameraWanted, display.screen, display::moved, scope)
 
     // Opening, closing and failures take [turning]; the frame state shared with the camera's thread takes [looking].
     private val turning = Any()
@@ -64,6 +66,15 @@ internal class Presence internal constructor(
 
     override fun start() {
         scope.launch { wanted.collect { if (it) open() else stop() } }
+        scope.launch { screen.collect { if (it == Screen.ASLEEP) darkened() } }
+    }
+
+    /** The backlight just dropped: a lit frame isn't compared with a dark one, and the next look waits for the light to settle. */
+    private fun darkened() {
+        synchronized(looking) {
+            diff.reset()
+            lastLook = clock.nowMillis()
+        }
     }
 
     private fun open() {
