@@ -391,4 +391,5 @@ The release from a40fbd6 installed with `install -r` over Plan 6's (the househol
 - Eufy robot vacuum (the user, 2026-10-16): start the Eufy robovac from the wall. Its own spec; no detail yet.
 - Multi-day events (the user, 2026-10-16, a calendar tweak): easier to create on the wall, and more recognisable on the week view and Home (for example one bar across the days rather than a chip per day). Builds on "Adding events, later" under Plan 2b-2 (the Until… chip). Its own spec.
 - Seasonal themes (the user, 2026-10-19): its own spec; no detail yet. Doorbell ring tones already note switching for Christmas and Halloween.
+- Sonos room grouping (the user, 2026-10-19): group and ungroup Sonos rooms from the wall (Plan 6 left grouping in the Sonos app). Its own spec; no detail yet.
 - A home hub on the NAS (the user, 2026-10-15): running one (for example Home Assistant) is possible if it helps. It could bridge Sonos, Hue, Arlo, the thermostat and smart plugs, with Culvery's providers talking to the hub instead of each device. Weigh it in each service's brainstorm; not needed for Sonos (Plan 6 talks to the speakers directly).
