@@ -23,6 +23,7 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.display.Screen
 import uk.co.siland.culvery.display.ui.SleepLayer
@@ -35,8 +36,8 @@ import uk.co.siland.culvery.watchingPill
 
 /**
  * While the camera runs exactly one mark is in TalkBack's tree, wherever the household is: the top bar's pill on Home, the
- * overlay mark wherever the bar is covered or absent (9 §6.7). The layers are wired as MainActivity wires them, and the
- * nodes are counted in the tree TalkBack reads, where what a layer covers is gone.
+ * overlay mark wherever the bar is covered or absent (9 §6.7). The layers are wired as MainActivity wires them. A hidden
+ * pill has no description, so the unmerged count is what is painted.
  */
 @RunWith(AndroidJUnit4::class)
 class CameraMarksTest {
@@ -50,10 +51,11 @@ class CameraMarksTest {
     private var pinShowing by mutableStateOf(false)
     private var alert by mutableStateOf<(@Composable () -> Unit)?>(null)
     private var screen by mutableStateOf(Screen.AWAKE)
+    private var fontScale by mutableStateOf(1f)
 
     private fun show() = compose.setContent {
         CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
-            CulveryTheme(dark = true) {
+            CulveryTheme(dark = true) { WithFontScale(fontScale) {
                 val spot = remember { CameraMarkSpot() }
                 ShellLayers(
                     overlay = overlay,
@@ -81,7 +83,7 @@ class CameraMarksTest {
                                 onOpenSettings = {},
                                 onSignOut = {},
                                 onToggleThemePreview = {},
-                                watching = watchingPill(running, pinShowing, alert != null),
+                                watching = watchingPill(running, screen != Screen.AWAKE, complete, settingsOpen, overlay.isShowing, pinShowing, alert != null),
                                 pillSpot = spot,
                                 tabContent = {},
                             )
@@ -90,13 +92,13 @@ class CameraMarksTest {
                         onHomeDrawn = {},
                     )
                 }
-            }
+            } }
         }
     }
 
     private fun marks(): Int {
         compose.waitForIdle()
-        return compose.onAllNodesWithContentDescription(THE_CAMERA_IS_ON).fetchSemanticsNodes().size
+        return compose.onAllNodesWithContentDescription(THE_CAMERA_IS_ON, useUnmergedTree = true).fetchSemanticsNodes().size
     }
 
     /** One mark with the camera running and none without, in the state [set] puts the app in. */
@@ -133,18 +135,15 @@ class CameraMarksTest {
     @Test
     fun theDarkScreenShowsOneMark() = oneMarkWhileTheCameraRuns("asleep") { screen = Screen.ASLEEP }
 
-    /** Fails if the pill and the overlay mark can both be seen over an uncovered bar, or neither: the rule is one or the other. */
+    /** Fails if any combination shows the pill and the overlay mark together, or neither while the camera runs. */
     @Test
     fun theRuleGivesThePillOrTheMarkNeverBothAndNeverNeither() {
-        for (settings in listOf(false, true)) for (sheet in listOf(false, true)) for (pin in listOf(false, true)) for (alert in listOf(false, true)) {
-            // Over a sheet or Settings the bar is covered, so its pill doesn't count as seen.
-            val pillSeen = watchingPill(true, pin, alert) && !settings && !sheet
-            val markSeen = overlayCameraMark(true, false, true, settings, sheet, pin, alert)
-            assertThat(pillSeen != markSeen).isTrue()
-            assertThat(overlayCameraMark(false, false, true, settings, sheet, pin, alert)).isFalse()
-            assertThat(watchingPill(false, pin, alert)).isFalse()
-        }
-        assertThat(overlayCameraMark(true, true, true, false, false, false, false)).isTrue()
-        assertThat(overlayCameraMark(true, false, false, false, false, false, false)).isTrue()
+        val flags = listOf(false, true)
+        for (running in flags) for (sleeping in flags) for (complete in listOf(true, false, null))
+            for (settings in flags) for (sheet in flags) for (pin in flags) for (alert in flags) {
+                val pill = watchingPill(running, sleeping, complete, settings, sheet, pin, alert)
+                val mark = overlayCameraMark(running, sleeping, complete, settings, sheet, pin, alert)
+                assertThat(listOf(pill, mark).count { it }).isEqualTo(if (running) 1 else 0)
+            }
     }
 }

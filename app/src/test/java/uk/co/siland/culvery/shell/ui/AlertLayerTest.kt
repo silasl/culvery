@@ -89,6 +89,9 @@ class AlertLayerTest {
         compose.mainClock.advanceTimeByFrame()
     }
 
+    /** Still composed, whether or not TalkBack can reach it. */
+    private fun drawn(tag: String) = compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
     private fun open(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
 
     /** Fails if the alert is drawn inside the touch-counting box: the touch count becomes 1 and the sheet lives 2 more minutes. */
@@ -105,10 +108,10 @@ class AlertLayerTest {
         settle()
         assertThat(activity.touches.value).isEqualTo(0L)
         compose.mainClock.advanceTimeBy(opened + OVERLAY_IDLE_MS - compose.mainClock.currentTime - 3 * FRAME_MS)
-        assertThat(overlay.isShowing).isTrue()
+        assertThat(drawn("sheet")).isTrue()
         compose.mainClock.advanceTimeBy(3 * FRAME_MS)
         compose.mainClock.advanceTimeByFrame()
-        assertThat(overlay.isShowing).isFalse()
+        assertThat(drawn("sheet")).isFalse()
     }
 
     /** Fails if a tap on the card resets or shortens an edited sheet's EDIT_HOLD_MS timer, or ends the edits. */
@@ -126,10 +129,10 @@ class AlertLayerTest {
         assertThat(activity.touches.value).isEqualTo(0L)
         assertThat(overlay.edited).isTrue()
         compose.mainClock.advanceTimeBy(opened + EDIT_HOLD_MS - compose.mainClock.currentTime - 3 * FRAME_MS)
-        assertThat(overlay.isShowing).isTrue()
+        assertThat(drawn("sheet")).isTrue()
         compose.mainClock.advanceTimeBy(3 * FRAME_MS)
         compose.mainClock.advanceTimeByFrame()
-        assertThat(overlay.isShowing).isFalse()
+        assertThat(drawn("sheet")).isFalse()
     }
 
     /** Fails if raising or removing the alert replaces or closes the open sheet, or clears its edits. */

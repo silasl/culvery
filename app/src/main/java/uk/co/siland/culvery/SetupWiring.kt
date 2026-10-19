@@ -48,8 +48,16 @@ internal const val SPLASH_MAX_MS = 2_000L
 internal fun holdSplash(complete: Boolean?, cardsLoaded: Boolean, shownMillis: Long): Boolean =
     shownMillis < SPLASH_MAX_MS && (complete == null || (complete && !cardsLoaded))
 
-/** 9 §6.7: the top bar's Watching pill shows while the camera runs, unless the PIN pad or the door card's scrim covers the bar. */
-internal fun watchingPill(running: Boolean, pinShowing: Boolean, alertShowing: Boolean): Boolean = running && !pinShowing && !alertShowing
+/** 9 §6.7: the top bar's Watching pill shows while the camera runs and nothing covers the bar or the screen is dark. */
+internal fun watchingPill(
+    running: Boolean,
+    sleeping: Boolean,
+    complete: Boolean?,
+    settingsOpen: Boolean,
+    sheetShowing: Boolean,
+    pinShowing: Boolean,
+    alertShowing: Boolean,
+): Boolean = running && !sleeping && complete == true && !settingsOpen && !sheetShowing && !pinShowing && !alertShowing
 
 /**
  * 9 §6.7: the small overlay mark shows while the camera runs and the top bar's pill doesn't: the bar is covered or absent

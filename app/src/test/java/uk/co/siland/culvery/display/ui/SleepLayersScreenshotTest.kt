@@ -58,7 +58,10 @@ class SleepLayersScreenshotTest {
                                 onOpenSettings = {},
                                 onSignOut = {},
                                 onToggleThemePreview = {},
-                                watching = watchingPill(mark, pinShowing = false, alertShowing = false),
+                                watching = watchingPill(
+                                    mark, screen != Screen.AWAKE, complete = true, settingsOpen = false,
+                                    sheetShowing = false, pinShowing = false, alertShowing = false,
+                                ),
                                 tabContent = {},
                             )
                         }

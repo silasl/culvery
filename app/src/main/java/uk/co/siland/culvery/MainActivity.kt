@@ -247,7 +247,9 @@ class MainActivity : ComponentActivity() {
                                         onOpenSettings = shell::openSettings,
                                         onSignOut = shell::signOut,
                                         onToggleThemePreview = shell::toggleThemePreview,
-                                        watching = watchingPill(running, pinRequest != null, alert != null),
+                                        watching = watchingPill(
+                                            running, screen != Screen.AWAKE, complete, state.settingsOpen, overlay.isShowing, pinRequest != null, alert != null,
+                                        ),
                                         pillSpot = spot,
                                         tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
                                     )
