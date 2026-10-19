@@ -371,6 +371,16 @@ The release from a40fbd6 installed with `install -r` over Plan 6's (the househol
 - `HueSystem` copies its map on every stream event and scans the scenes on every publish; `LightRoom`'s `List` is unstable for Compose.
 - The `RecordingToaster` copies left in calendar, door, access and setup onto `:core:plugin`'s test fixture; Door's `VolumeRow` onto `HhPercentSlider`.
 
+## From Plan 8
+
+- Not done, and why: skipping `moved()` while awake would be wrong, since movement while awake must restart the sleep wait.
+- One `capture()` a second instead of the camera's repeating request: a bigger change; the tablet's power runs will show whether it's needed.
+- Not composing the shell while asleep: it would lose state and recompose everything on waking; measure first.
+- `AlertHost` holding alerts back at night for every capability, not only Door; overlays exposing whether they hold the wall awake, in place of `SetupWiring`'s `holding(…)` of five booleans; `UserActivity`'s touches as an event flow.
+- A `SettingsTokens.pageGap` shared by every settings page (Display's `settingsGap` is another 16 dp); one `HhSliderRow` for Display's brightness rows and Music's.
+- `ShellLayers` taking one `screen` (or a list of layers) instead of `sleeping`, the sleep slot and the camera mark.
+- `SetupState`'s `setupStore` onto `:core:plugin`'s `settingsDataStore`, as the four settings files now are.
+
 ## Feature ideas (2026-10-02, after v1)
 
 **Each its own spec → plan cycle; not in 4c, 4d or 4e**
