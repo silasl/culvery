@@ -31,6 +31,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.DISABLED_INK_ALPHA
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
@@ -74,7 +75,7 @@ class EventDetailSheetTest {
         compose.onNodeWithTag("detail_edit").assert(isButton).assertHeightIsEqualTo(60.dp)
         compose.onNodeWithTag("detail_delete").assert(isButton).assertHeightIsEqualTo(60.dp).assertIsNotEnabled()
         val label = compose.onNode(hasText("Delete") and hasAnyAncestor(hasTestTag("detail_delete")), useUnmergedTree = true).textLayout()
-        assertThat(label.layoutInput.style.color).isEqualTo(DarkColors.mute)
+        assertThat(label.layoutInput.style.color).isEqualTo(DarkColors.mute.copy(alpha = DISABLED_INK_ALPHA))
     }
 
     @Test

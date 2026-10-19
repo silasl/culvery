@@ -65,7 +65,7 @@ class ButtonsTest {
                         val label = compose.onNode(hasText("Save") and hasAnyAncestor(hasTestTag(t)), useUnmergedTree = true)
                             .textLayout().layoutInput.style.color
                         assertWithMessage("$t label").that(label).isEqualTo(buttonColors(tone, enabled, on, LightColors).ink)
-                        if (!enabled) assertWithMessage("$t disabled label").that(label).isEqualTo(LightColors.mute)
+                        if (!enabled) assertWithMessage("$t disabled label").that(label).isEqualTo(LightColors.mute.copy(alpha = DISABLED_INK_ALPHA))
                     }
                 }
             }

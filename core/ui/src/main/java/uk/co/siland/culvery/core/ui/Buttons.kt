@@ -57,10 +57,13 @@ fun quietFill(on: ButtonSurface, colors: HhColors): Color = when (on) {
 
 internal data class ButtonColors(val fill: Color, val ink: Color)
 
-/** A button's fill and label colour. Disabled, every tone is the quiet fill with a `mute` label (4d-1 Decision 8). */
+/** Opacity of a disabled button's `mute` label and icon. */
+const val DISABLED_INK_ALPHA = 0.5f
+
+/** A button's fill and label colour. Disabled, every tone is the quiet fill with a `mute` label and icon at [DISABLED_INK_ALPHA]. */
 internal fun buttonColors(tone: ButtonTone, enabled: Boolean, on: ButtonSurface, colors: HhColors): ButtonColors {
     val quiet = quietFill(on, colors)
-    if (!enabled) return ButtonColors(quiet, colors.mute)
+    if (!enabled) return ButtonColors(quiet, colors.mute.copy(alpha = DISABLED_INK_ALPHA))
     return when (tone) {
         ButtonTone.Primary -> ButtonColors(colors.accent, colors.accentInk)
         ButtonTone.Danger -> ButtonColors(quiet, colors.danger)
@@ -74,7 +77,7 @@ val SpokenNameKey = SemanticsPropertyKey<String>("SpokenName")
 
 /**
  * The one button (4d-1 §4.1): a pill at least [size]'s height, a one-line label, an optional icon before it. Disabled,
- * every [tone] is the quiet fill with a `mute` label and does nothing. [spokenName] names a button whose label repeats
+ * every [tone] is the quiet fill with a faded `mute` label and does nothing. [spokenName] names a button whose label repeats
  * along a list: it starts with [text] and adds the subject ("Disconnect Google Calendar, alex@example.com"). [compact]
  * narrows a Regular button's side padding so its label fits a crowded row. [clickLabel] is what TalkBack offers when
  * the name doesn't say what a tap does; [secondLine] shows a state under the label ("Holiday mode", "Off"), and
