@@ -46,6 +46,7 @@ object Icons {
     const val PARTLY_CLOUDY_NIGHT = "partly_cloudy_night"
     const val PAUSE = "pause"
     const val PERSON = "person"
+    const val PHOTO_CAMERA = "photo_camera"
     const val PLAY_ARROW = "play_arrow"
     const val POWER_SETTINGS_NEW = "power_settings_new"
     const val RAINY = "rainy"

@@ -41,6 +41,7 @@ partly_cloudy_day
 partly_cloudy_night
 pause
 person
+photo_camera
 play_arrow
 power_settings_new
 rainy
