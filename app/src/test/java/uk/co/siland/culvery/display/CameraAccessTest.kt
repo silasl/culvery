@@ -7,13 +7,21 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+
+/** The first value matching [predicate], or a timeout failure after 5 s of real time instead of a hang. */
+private suspend fun <T> Flow<T>.firstWithin(predicate: (T) -> Boolean = { true }): T =
+    // Off the test's scheduler, whose virtual time would reach the timeout while the saving thread is still at work.
+    withContext(Dispatchers.Default) { withTimeout(5_000) { first(predicate) } }
 
 @RunWith(AndroidJUnit4::class)
 class CameraAccessTest {
@@ -61,8 +69,8 @@ class CameraAccessTest {
     fun answeredSavesThatCulveryAsked() = runTest {
         val camera = access()
         camera.answered(granted = false, rationale = false)
-        camera.state.first { it == CameraState.REFUSED }
-        assertThat(settings.prefs.first().cameraAsked).isTrue()
+        camera.state.firstWithin { it == CameraState.REFUSED }
+        assertThat(settings.prefs.firstWithin().cameraAsked).isTrue()
     }
 
     /** Fails if a permission taken away in Android's settings keeps reading ALLOWED after a resume, or reads NOT_ASKED. */
@@ -71,9 +79,9 @@ class CameraAccessTest {
         granted = true
         val camera = access()
         camera.answered(granted = true, rationale = false)
-        camera.state.first { it == CameraState.ALLOWED }
+        camera.state.firstWithin { it == CameraState.ALLOWED }
         granted = false
         camera.refresh(rationale = false)
-        camera.state.first { it == CameraState.REFUSED }
+        camera.state.firstWithin { it == CameraState.REFUSED }
     }
 }
