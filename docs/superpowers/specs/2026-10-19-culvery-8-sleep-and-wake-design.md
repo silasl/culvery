@@ -70,6 +70,7 @@ The builder settles names and placement; these are the pieces.
 - A tap that wakes the screen only wakes it: it is not passed on to whatever lies under it. *(My call: a sleepy tap shouldn't press a button.)*
 - While Culvery is not in front (the son using other apps), none of this runs: no camera, Android's own screen timeout and brightness apply.
 - The PIN pad, an open sheet, the door card, Settings and the setup wizard keep the wall awake. They follow their own existing timeouts. *(Settings and the wizard are my call: an Admin mid-edit shouldn't lose the screen, and Settings already closes itself when left.)*
+- A toast that arrives while Asleep or on the NightClock waits and shows when the screen next wakes. Nothing draws over the dark screen or the night clock except the camera mark (§4.3). *(The user's ruling at plan review, 2026-10-19.)*
 
 ### 4.2 Dark, not off
 
