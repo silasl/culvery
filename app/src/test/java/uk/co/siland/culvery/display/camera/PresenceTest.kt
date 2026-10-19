@@ -321,4 +321,16 @@ class PresenceTest {
         rig.frameAt(2_500, block(10))
         assertThat(rig.source.reads).isEqualTo(reads + 1)
     }
+
+    /** Fails if the clock going backwards stops the camera looking until it catches up again. */
+    @Test
+    fun aClockGoingBackwardsStillLooks() = runTest {
+        val rig = Rig(this)
+        rig.want(true)
+        rig.frameAt(5_000, block(4))
+        rig.clock = { 1_000 }
+        rig.frameAt(6_000, block(10))
+        assertThat(rig.source.reads).isEqualTo(2)
+        assertThat(rig.moves).isEqualTo(1)
+    }
 }

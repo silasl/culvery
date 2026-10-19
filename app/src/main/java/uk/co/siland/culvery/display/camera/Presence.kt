@@ -128,7 +128,8 @@ internal class Presence internal constructor(
         val now = clock.nowMillis()
         val moving = synchronized(looking) {
             if (mine != session) return
-            lastLook?.let { if (now - it < LOOK_EVERY_MS) return }
+            // A clock set backwards counts as due, so the camera doesn't stop looking until it catches up.
+            lastLook?.let { if (now - it in 0 until LOOK_EVERY_MS) return }
             lastLook = now
             diff.moved(read())
         }
