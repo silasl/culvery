@@ -83,13 +83,20 @@ class LightsSettingsTest {
         assertThat(soon { settings.prefs.first { it.mainRoomId == "Lounge-id" } }.address).isEqualTo("192.168.1.40")
     }
 
-    /** Fails if the application key or the bridge's address can be read out of a log line. */
+    /** Fails if the application key, the bridge's address, or a bridge, room or automation id can be read out of a log line. */
     @Test
     fun theKeyIsNeverInToString() {
         val secret = "secret-key-value"
-        assertThat(link(key = secret).toString()).doesNotContain(secret)
-        assertThat(LightsPrefs(key = secret, address = "192.168.1.30").toString()).doesNotContain(secret)
-        assertThat(LightsPrefs(key = secret, address = "192.168.1.30").toString()).doesNotContain("192.168.1.30")
-        assertThat(link(key = secret).toString()).doesNotContain("192.168.1.30")
+        val linked = link(key = secret).toString()
+        assertThat(linked).doesNotContain(secret)
+        assertThat(linked).doesNotContain("192.168.1.30")
+        assertThat(linked).doesNotContain("001788fffe00a1b2")
+        val prefs = LightsPrefs(
+            bridgeId = "001788fffe00a1b2", address = "192.168.1.30", key = secret, mainRoomId = "Lounge-id",
+            leftOut = setOf("Garden-id"), holidayAutomations = setOf("mimic-id"), holidayStarted = setOf("away-id"),
+        ).toString()
+        listOf(secret, "192.168.1.30", "001788fffe00a1b2", "Lounge-id", "Garden-id", "mimic-id", "away-id").forEach {
+            assertThat(prefs).doesNotContain(it)
+        }
     }
 }

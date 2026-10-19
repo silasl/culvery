@@ -45,9 +45,9 @@ class LightsUnreachableException(val problem: LightsProblem) : Exception("The br
 
 data class BridgeFound(val bridgeId: String, val address: String)
 
-/** A paired bridge and its application key; [toString] leaves out the key and the address. */
+/** A paired bridge and its application key; [toString] leaves out the key, the address and the bridge id. */
 data class LightsLink(val bridgeId: String, val address: String, val key: String) {
-    override fun toString() = "LightsLink(bridgeId=$bridgeId)"
+    override fun toString() = "LightsLink"
 }
 
 /**
