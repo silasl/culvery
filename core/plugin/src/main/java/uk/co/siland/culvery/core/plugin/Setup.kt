@@ -63,7 +63,7 @@ interface SetupStep {
     fun Content(onNext: () -> Unit)
 }
 
-/** One section of Settings (4a design §3.2, §4.6): Home location 0, People 100, Calendars 400, Kiosk 900. */
+/** One section of Settings (4a design §3.2, §4.6): Home location 0, People 100, Calendars 400, Display 440, Music 450, Lights 470, Door 500, Tablet lock 900. */
 interface SettingsPage {
     val id: String
 

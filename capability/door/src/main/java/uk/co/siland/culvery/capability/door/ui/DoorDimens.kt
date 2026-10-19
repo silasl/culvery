@@ -31,6 +31,5 @@ internal object DoorDimens {
 
     // Settings › Door: blocks spaced as Settings' other pages; the volume in tenths.
     val settingsGap = 16.dp
-    const val QUIET_STEP_MINUTES = 30L
     const val VOLUME_STEPS = 9
 }

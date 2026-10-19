@@ -1,14 +1,9 @@
 package uk.co.siland.culvery.capability.door.ui
 
 import android.util.Log
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -21,9 +16,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -46,9 +39,7 @@ import uk.co.siland.culvery.capability.door.DOOR
 import uk.co.siland.culvery.capability.door.DoorHealth
 import uk.co.siland.culvery.capability.door.DoorProvider
 import uk.co.siland.culvery.capability.door.DoorSettings
-import uk.co.siland.culvery.capability.door.EARLIER
 import uk.co.siland.culvery.capability.door.FROM
-import uk.co.siland.culvery.capability.door.LATER
 import uk.co.siland.culvery.capability.door.NOTIFICATION_ACCESS_MISSING
 import uk.co.siland.culvery.capability.door.NOT_DONE_YET
 import uk.co.siland.culvery.capability.door.OPEN_NOTIFICATION_ACCESS
@@ -57,7 +48,6 @@ import uk.co.siland.culvery.capability.door.QUIET_HOURS
 import uk.co.siland.culvery.capability.door.UNTIL
 import uk.co.siland.culvery.capability.door.appStep
 import uk.co.siland.culvery.capability.door.checkNotifications
-import uk.co.siland.culvery.capability.door.clockText
 import uk.co.siland.culvery.capability.door.lastHeard
 import uk.co.siland.culvery.capability.door.quietHoursLine
 import uk.co.siland.culvery.core.plugin.HouseholdClock
@@ -72,7 +62,8 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhSectionLabel
-import uk.co.siland.culvery.core.ui.HhSwitch
+import uk.co.siland.culvery.core.ui.HhSwitchRow
+import uk.co.siland.culvery.core.ui.HhTimeStepperRow
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
@@ -125,15 +116,15 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
         VolumeRow(ui.volume, actions.onVolume)
         HhButton(PLAY_CHIME, actions.onPlayChime, Modifier.testTag("door_play_chime"), icon = Icons.DOORBELL, on = ButtonSurface.Bg)
         HhSectionLabel(QUIET_HOURS)
-        SwitchRow(QUIET_HOURS, quietHoursLine(ui.quietFrom, ui.quietUntil), ui.quietOn, "door_quiet") { actions.onQuietHours(it, ui.quietFrom, ui.quietUntil) }
-        StepperRow(FROM, "quiet hours start", ui.quietFrom, "door_from") { actions.onQuietHours(ui.quietOn, it, ui.quietUntil) }
-        StepperRow(UNTIL, "quiet hours end", ui.quietUntil, "door_until") { actions.onQuietHours(ui.quietOn, ui.quietFrom, it) }
+        HhSwitchRow(QUIET_HOURS, quietHoursLine(ui.quietFrom, ui.quietUntil), ui.quietOn, "door_quiet") { actions.onQuietHours(it, ui.quietFrom, ui.quietUntil) }
+        HhTimeStepperRow(FROM, "quiet hours start", ui.quietFrom, "door_from") { actions.onQuietHours(ui.quietOn, it, ui.quietUntil) }
+        HhTimeStepperRow(UNTIL, "quiet hours end", ui.quietUntil, "door_until") { actions.onQuietHours(ui.quietOn, ui.quietFrom, it) }
         HhSectionLabel(ui.service)
         ui.status?.let { DoorStatusLine(it) }
         Text(ui.lastHeard, style = HhType.body, color = c.mute, modifier = Modifier.testTag("door_last_heard"))
         StepRow(appStep(ui.service), ui.hint, done = ui.appInstalled, tag = "door_step_app")
         StepRow(ACCESS_STEP, ACCESS_STEP_LINE, done = ui.accessAllowed, tag = "door_step_access", onClick = actions.onAllowAccess)
-        SwitchRow(checkNotifications(ui.service), CAPTURE_LINE, ui.capturing, "door_capture", actions.onCapture)
+        HhSwitchRow(checkNotifications(ui.service), CAPTURE_LINE, ui.capturing, "door_capture", actions.onCapture)
     }
 }
 
@@ -158,41 +149,6 @@ private fun VolumeRow(volume: Float, onVolume: (Float) -> Unit) {
         )
         Text("${(shown * 100).roundToInt()} %", style = HhType.body, color = c.mute)
     }
-}
-
-/** One switch for TalkBack and the finger; [HhSwitch] only draws. */
-@Composable
-private fun SwitchRow(title: String, line: String?, checked: Boolean, tag: String, onChange: (Boolean) -> Unit) {
-    val c = Culvery.colors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(ListRowTokens.radius))
-            .background(c.surf)
-            .testTag(tag)
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
-            .padding(horizontal = ListRowTokens.paddingH, vertical = ListRowTokens.paddingV),
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = HhType.rowTitle, color = c.ink)
-            if (line != null) Text(line, style = HhType.secondary, color = c.mute)
-        }
-        HhSwitch(checked, onCheckedChange = null, tag = "${tag}_switch")
-    }
-}
-
-@Composable
-private fun StepperRow(label: String, subject: String, time: LocalTime, tag: String, onTime: (LocalTime) -> Unit) {
-    HhListRow(
-        title = label,
-        subtitle = clockText(time),
-        modifier = Modifier.testTag(tag),
-        trailing = {
-            HhButton(EARLIER, { onTime(time.minusMinutes(DoorDimens.QUIET_STEP_MINUTES)) }, Modifier.testTag("${tag}_earlier"), on = ButtonSurface.Surf, spokenName = "$EARLIER, $subject")
-            HhButton(LATER, { onTime(time.plusMinutes(DoorDimens.QUIET_STEP_MINUTES)) }, Modifier.testTag("${tag}_later"), on = ButtonSurface.Surf, spokenName = "$LATER, $subject")
-        },
-    )
 }
 
 /** A connect step (5 §5.5), ticked when done. */

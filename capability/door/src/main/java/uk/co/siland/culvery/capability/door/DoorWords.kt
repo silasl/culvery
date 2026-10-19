@@ -6,6 +6,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import uk.co.siland.culvery.core.plugin.RailBadge
+import uk.co.siland.culvery.core.ui.clockText
 import uk.co.siland.culvery.core.ui.plural
 
 /** 5 §5.3: "Door, new motion". */
@@ -21,10 +22,6 @@ fun badgeOf(unseen: Unseen): RailBadge? = when {
 internal const val SOMEONE_AT_THE_DOOR = "Someone’s at the door"
 internal const val RING_ALERT = "Ring alert"
 internal const val GOT_IT = "Got it"
-
-private val CLOCK: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
-
-fun clockText(time: LocalTime): String = time.format(CLOCK)
 
 /** "14:02" on the household's clock. */
 fun clockTime(atMillis: Long, zone: ZoneId): String = clockText(Instant.ofEpochMilli(atMillis).atZone(zone).toLocalTime())
@@ -55,8 +52,6 @@ internal const val PLAY_CHIME = "Play chime"
 internal const val QUIET_HOURS = "Quiet hours"
 internal const val FROM = "From"
 internal const val UNTIL = "Until"
-internal const val EARLIER = "Earlier"
-internal const val LATER = "Later"
 internal const val ACCESS_STEP = "Allow notification access"
 internal const val ACCESS_STEP_LINE = "Opens Android’s notification access, where you allow Culvery."
 internal const val OPEN_NOTIFICATION_ACCESS = "open notification access"
