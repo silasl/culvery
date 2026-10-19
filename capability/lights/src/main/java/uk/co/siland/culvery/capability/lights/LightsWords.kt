@@ -75,18 +75,17 @@ internal fun notStartedLine(names: List<String?>): String {
     return "Lights are off, but Culvery couldn’t start $joined. Start it in the Hue app."
 }
 
+/** Can't reach has no line of its own: the status line says it, and clears once the bridge is back. */
 internal fun houseLine(result: AllOffResult): String? = when (result) {
-    AllOffResult.Done -> null
+    AllOffResult.Done, is AllOffResult.CantReach -> null
     is AllOffResult.RoomsLeftOn -> roomsLeftOnLine(result.count)
     AllOffResult.Refused -> HUE_REFUSED
-    is AllOffResult.CantReach -> problemLine(result.problem)
 }
 
 /** [nameOf] gives an automation's name from its id. */
 internal fun houseLine(result: HolidayResult, nameOf: (String) -> String?): String? = when (result) {
-    HolidayResult.Done, HolidayResult.Busy -> null
+    HolidayResult.Done, HolidayResult.Busy, is HolidayResult.CantReach -> null
     HolidayResult.Refused -> HUE_REFUSED
-    is HolidayResult.CantReach -> problemLine(result.problem)
     is HolidayResult.Partly -> listOfNotNull(
         result.roomsLeftOn.takeIf { it > 0 }?.let(::roomsLeftOnLine),
         result.notStarted.takeIf { it.isNotEmpty() }?.let { ids -> notStartedLine(ids.map(nameOf)) },

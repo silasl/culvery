@@ -41,24 +41,25 @@ class LightsWordsTest {
             .isEqualTo("Lights are off, but Culvery couldn’t start an automation. Start it in the Hue app.")
     }
 
-    /** Fails if a result that went well shows a line, or one that didn't shows the wrong one. */
+    /** Fails if a result that went well shows a line, one that didn't shows the wrong one, or can't reach outlasts the bridge's return. */
     @Test
     fun allOffLines() {
         assertThat(houseLine(AllOffResult.Done)).isNull()
         assertThat(houseLine(AllOffResult.RoomsLeftOn(2))).isEqualTo("2 rooms didn’t turn off. Try again.")
         assertThat(houseLine(AllOffResult.Refused)).isEqualTo("Hue didn’t do that. Try again.")
-        assertThat(houseLine(AllOffResult.CantReach(LightsProblem.OFFLINE))).isEqualTo("The tablet is offline. Check the Wi-Fi.")
+        assertThat(houseLine(AllOffResult.CantReach(LightsProblem.OFFLINE))).isNull()
+        assertThat(houseLine(AllOffResult.CantReach(LightsProblem.UNREACHABLE))).isNull()
     }
 
-    /** Fails if a Holiday mode result's line is missing, wrong, or shown for a run that went well or was ignored. */
+    /** Fails if a Holiday mode result's line is missing, wrong, or shown for a run that went well, was ignored or couldn't reach the bridge. */
     @Test
     fun holidayLines() {
         val names = mapOf("mimic-id" to "Mimic presence")
         assertThat(houseLine(HolidayResult.Done, names::get)).isNull()
         assertThat(houseLine(HolidayResult.Busy, names::get)).isNull()
         assertThat(houseLine(HolidayResult.Refused, names::get)).isEqualTo("Hue didn’t do that. Try again.")
-        assertThat(houseLine(HolidayResult.CantReach(LightsProblem.UNPAIRED), names::get))
-            .isEqualTo("The Hue Bridge no longer knows Culvery. Pair it again in Settings › Lights.")
+        assertThat(houseLine(HolidayResult.CantReach(LightsProblem.UNPAIRED), names::get)).isNull()
+        assertThat(houseLine(HolidayResult.CantReach(LightsProblem.UNREACHABLE), names::get)).isNull()
         assertThat(houseLine(HolidayResult.Partly(1, emptyList()), names::get)).isEqualTo("1 room didn’t turn off. Try again.")
         assertThat(houseLine(HolidayResult.Partly(0, listOf("mimic-id", "gone-id")), names::get))
             .isEqualTo("Lights are off, but Culvery couldn’t start Mimic presence and an automation. Start it in the Hue app.")
