@@ -38,6 +38,7 @@ import uk.co.siland.culvery.core.ui.HhToast
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.toastMillis
+import uk.co.siland.culvery.display.ui.CameraMark
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ToastMessage
 
@@ -45,13 +46,15 @@ internal const val SETTINGS_CLOSING = "Settings closes in 20 seconds. Touch the 
 internal const val SHEET_CLOSING = "This closes in 20 seconds. Touch the screen to keep your changes."
 
 /**
- * The shell with its overlay layers stacked over it: sheet, then [alert], then [pinPad], then toasts over everything.
+ * The shell with its overlay layers stacked over it: sheet, then [alert], then [sleep], then [pinPad], then toasts, then
+ * the camera mark over everything when [cameraMark].
  * The layers need a parent with its own graphics layer: removing a node redraws only its nearest layered ancestor,
  * and the composition root has none, so a layer closed with no other animation running (a scrim tap, a toast timing
  * out) would get a layout pass but no new frame and stay on screen. Every finger down on the shell, a sheet or the PIN
  * pad goes to [onTouch] before anything handles it; one on the alert doesn't (5 §5.1). The session hears of it from
  * [UserActivity] a moment later.
- * While a sheet or the PIN pad shows, what it covers is hidden from TalkBack; the toasts never are.
+ * While a sheet or the PIN pad shows, what it covers is hidden from TalkBack; the toasts never are. While [sleeping], the
+ * shell, the sheet and the alert are hidden too, and no toast or warning is drawn: each waits for the screen to wake.
  * [settingsExpiresAt] is the session's end while Settings is open; 20 seconds before it, or before an edited sheet outside
  * Settings closes, a spoken warning shows over everything. [overlaysCloseWhenIdle] is false while Settings or the wizard
  * shows: a sheet closing by itself would move TalkBack's focus, which counts as a touch and would stretch the session.
@@ -69,6 +72,9 @@ fun ShellLayers(
     nowMillis: () -> Long = System::currentTimeMillis,
     overlaysCloseWhenIdle: Boolean = true,
     alert: (@Composable () -> Unit)? = null,
+    sleeping: Boolean = false,
+    sleep: @Composable () -> Unit = {},
+    cameraMark: Boolean = false,
     shell: @Composable () -> Unit,
 ) {
     val touched by rememberUpdatedState(onTouch)
@@ -77,18 +83,24 @@ fun ShellLayers(
     Box(Modifier.fillMaxSize().graphicsLayer {}) {
         Box(Modifier.fillMaxSize().countsTouches { touched() }) {
             // A TalkBack double-tap is an action, not a touch, so a scrim can't stop it: what is covered leaves the tree.
-            Box(Modifier.fillMaxSize().then(if (overlay.isShowing || pinShowing) Modifier.clearAndSetSemantics {} else Modifier)) { shell() }
-            OverlayLayer(overlay, hidden = pinShowing)
+            Box(Modifier.fillMaxSize().then(if (overlay.isShowing || pinShowing || sleeping) Modifier.clearAndSetSemantics {} else Modifier)) { shell() }
+            OverlayLayer(overlay, hidden = pinShowing || sleeping)
         }
         // Outside the counting box: a ring's card is not someone using the sheet or Settings beneath.
-        if (alert != null) AlertLayer(alert, hidden = pinShowing)
+        if (alert != null) AlertLayer(alert, hidden = pinShowing || sleeping)
+        // Outside the counting box too: the waking tap only wakes the screen (8 §4.1).
+        sleep()
         Box(Modifier.fillMaxSize().then(if (pinShowing) Modifier.countsTouches { touched() } else Modifier)) { pinPad() }
-        ToastLayer(toast, activity, onHidden = onToastHidden)
-        // One warning at a time, and Settings' first: Settings closing takes any open sheet with it.
-        when {
-            settingsClosingSoon -> ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning")
-            sheetClosingSoon -> ClosingWarningLayer(SHEET_CLOSING, "sheet_warning")
+        // Held while asleep, not dropped: a toast's timer starts only once it is drawn.
+        if (!sleeping) {
+            ToastLayer(toast, activity, onHidden = onToastHidden)
+            // One warning at a time, and Settings' first: Settings closing takes any open sheet with it.
+            when {
+                settingsClosingSoon -> ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning")
+                sheetClosingSoon -> ClosingWarningLayer(SHEET_CLOSING, "sheet_warning")
+            }
         }
+        if (cameraMark) CameraMark()
     }
 }
 
