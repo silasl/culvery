@@ -39,9 +39,7 @@ class DoorAlertsInjectedTest {
         householdZone(),
         WallClock { NOW },
         scope,
-        object : NightHours {
-            override fun isNight() = night
-        },
+        NightHours { night },
     )
 
     /** Fails if a ring just after a restart, when the night hours aren't known yet, raises a card or a chime. */

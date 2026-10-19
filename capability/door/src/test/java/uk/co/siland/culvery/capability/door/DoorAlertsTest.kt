@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import uk.co.siland.culvery.capability.door.ui.DoorCardUi
+import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.WallClock
 
 /** 5 §4.6–4.7: card and chime for a new ring in front; record only otherwise; 2 minutes, Got it, quiet hours, 10 seconds. */
@@ -28,7 +29,7 @@ class DoorAlertsTest {
     private var night = false
 
     private fun TestScope.alerts() =
-        DoorAlerts(host, { seen += it }, { prefs }, chime, { london }, WallClock { start + testScheduler.currentTime }, backgroundScope, { night })
+        DoorAlerts(host, { seen += it }, { prefs }, chime, { london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { night })
 
     private fun TestScope.rung(id: Long, isNew: Boolean = true, device: String = "Front Door", unrecognised: Boolean = false, snapshot: File? = null) =
         Recorded(DoorEvent(id, start + testScheduler.currentTime, DoorKind.RING, device, unrecognised, snapshot, seen = false), isNew)
@@ -122,7 +123,7 @@ class DoorAlertsTest {
     @Test
     fun aRingHoldingTheLockAsTheTwoMinutesEndKeepsItsCard() = runTest {
         var gate: CompletableDeferred<Unit>? = null
-        val alerts = DoorAlerts(host, { seen += it }, { prefs }, chime, { gate?.await(); london }, WallClock { start + testScheduler.currentTime }, backgroundScope)
+        val alerts = DoorAlerts(host, { seen += it }, { prefs }, chime, { gate?.await(); london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { false })
         alerts.onRecorded(rung(1))
         advanceTimeBy(CARD_MS - 1_000)
         gate = CompletableDeferred()

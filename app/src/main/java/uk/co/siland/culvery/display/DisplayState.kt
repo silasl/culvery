@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -111,8 +110,8 @@ class DisplayState internal constructor(
     private val state = MutableStateFlow(next(START, prefs.value, now.value, inFront.value))
     private val activity = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
-    private val _screen = MutableStateFlow(state.value.screen)
-    val screen: StateFlow<Screen> = _screen.asStateFlow()
+    val screen: StateFlow<Screen> = state.map { it.screen }.distinctUntilChanged()
+        .stateIn(scope, SharingStarted.Eagerly, state.value.screen)
 
     val cameraWanted: StateFlow<Boolean> = combine(state, camera) { display, access -> display.wantsCamera(access) }
         .stateIn(scope, SharingStarted.Eagerly, state.value.wantsCamera(camera.value))
@@ -159,7 +158,6 @@ class DisplayState internal constructor(
             val before = state.value
             val after = step(before)
             state.value = after
-            _screen.value = after.screen
             // A wait the collector never saw end (a hold on and off between its runs) is restarted here.
             if (after.waiting() != before.waiting()) activity.tryEmit(Unit)
             if (after.screen != before.screen) Log.i(TAG, "Screen ${after.screen.name}")

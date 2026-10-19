@@ -54,7 +54,7 @@ internal const val SHEET_CLOSING = "This closes in 20 seconds. Touch the screen 
  * pad goes to [onTouch] before anything handles it; one on the alert doesn't (5 §5.1). The session hears of it from
  * [UserActivity] a moment later.
  * While a sheet or the PIN pad shows, what it covers is hidden from TalkBack; the toasts never are. While [sleeping], the
- * shell, the sheet and the alert are hidden too, and no toast or warning is drawn: each waits for the screen to wake.
+ * shell, the sheet and the alert are hidden too, and no toast is drawn: it waits for the screen to wake.
  * [settingsExpiresAt] is the session's end while Settings is open; 20 seconds before it, or before an edited sheet outside
  * Settings closes, a spoken warning shows over everything. [overlaysCloseWhenIdle] is false while Settings or the wizard
  * shows: a sheet closing by itself would move TalkBack's focus, which counts as a touch and would stretch the session.
@@ -92,13 +92,11 @@ fun ShellLayers(
         sleep()
         Box(Modifier.fillMaxSize().then(if (pinShowing) Modifier.countsTouches { touched() } else Modifier)) { pinPad() }
         // Held while asleep, not dropped: a toast's timer starts only once it is drawn.
-        if (!sleeping) {
-            ToastLayer(toast, activity, onHidden = onToastHidden)
-            // One warning at a time, and Settings' first: Settings closing takes any open sheet with it.
-            when {
-                settingsClosingSoon -> ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning")
-                sheetClosingSoon -> ClosingWarningLayer(SHEET_CLOSING, "sheet_warning")
-            }
+        if (!sleeping) ToastLayer(toast, activity, onHidden = onToastHidden)
+        // One warning at a time, and Settings' first: Settings closing takes any open sheet with it. Both keep the wall awake.
+        when {
+            settingsClosingSoon -> ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning")
+            sheetClosingSoon -> ClosingWarningLayer(SHEET_CLOSING, "sheet_warning")
         }
         if (cameraMark) CameraMark()
     }

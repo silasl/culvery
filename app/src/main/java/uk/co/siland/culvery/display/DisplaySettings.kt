@@ -64,7 +64,7 @@ class DisplaySettings(private val store: DataStore<Preferences>, scope: Coroutin
     val read: StateFlow<DisplayPrefs?> = prefs.stateIn(scope, SharingStarted.Eagerly, null)
 
     /** The defaults until the file is first read. */
-    val current: StateFlow<DisplayPrefs> = prefs.stateIn(scope, SharingStarted.Eagerly, DisplayPrefs())
+    val current: StateFlow<DisplayPrefs> = read.map { it ?: DisplayPrefs() }.stateIn(scope, SharingStarted.Eagerly, DisplayPrefs())
 
     suspend fun setNight(from: LocalTime, until: LocalTime) {
         store.edit {

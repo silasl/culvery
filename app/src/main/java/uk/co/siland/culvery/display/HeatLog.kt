@@ -26,10 +26,10 @@ private const val PERCENT = 100
 data class HeatReading(val status: Int, val batteryTenths: Int?, val batteryPercent: Int?)
 
 internal fun readingOf(status: Int, battery: Intent?): HeatReading {
-    val tenths = battery?.takeIf { it.hasExtra(BatteryManager.EXTRA_TEMPERATURE) }
-        ?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)
-    val level = battery?.takeIf { it.hasExtra(BatteryManager.EXTRA_LEVEL) }?.getIntExtra(BatteryManager.EXTRA_LEVEL, 0)
-    val scale = battery?.takeIf { it.hasExtra(BatteryManager.EXTRA_SCALE) }?.getIntExtra(BatteryManager.EXTRA_SCALE, 0)
+    fun Intent.extra(key: String): Int? = if (hasExtra(key)) getIntExtra(key, 0) else null
+    val tenths = battery?.extra(BatteryManager.EXTRA_TEMPERATURE)
+    val level = battery?.extra(BatteryManager.EXTRA_LEVEL)
+    val scale = battery?.extra(BatteryManager.EXTRA_SCALE)
     val percent = if (level != null && scale != null && scale > 0) level * PERCENT / scale else null
     return HeatReading(status, tenths, percent)
 }
@@ -37,8 +37,8 @@ internal fun readingOf(status: Int, battery: Intent?): HeatReading {
 interface TabletHeat {
     fun reading(): HeatReading
 
-    /** Calls [listener] on each thermal status change, and once on registration, until the handle is closed. */
-    fun onStatusChange(listener: () -> Unit): AutoCloseable
+    /** Calls [listener] on each thermal status change, and once on registration, for the life of the app. */
+    fun onStatusChange(listener: () -> Unit)
 }
 
 @Singleton
@@ -53,10 +53,8 @@ class AndroidTabletHeat @Inject constructor(@ApplicationContext private val cont
         return readingOf(power.currentThermalStatus, battery)
     }
 
-    override fun onStatusChange(listener: () -> Unit): AutoCloseable {
-        val callback = PowerManager.OnThermalStatusChangedListener { listener() }
-        power.addThermalStatusListener(ContextCompat.getMainExecutor(context), callback)
-        return AutoCloseable { power.removeThermalStatusListener(callback) }
+    override fun onStatusChange(listener: () -> Unit) {
+        power.addThermalStatusListener(ContextCompat.getMainExecutor(context)) { listener() }
     }
 }
 
@@ -68,11 +66,10 @@ class HeatLog @Inject internal constructor(
 ) : Startable {
     // The platform repeats the current status on registration; only a different one is a change.
     private var lastStatus: Int? = null
-    private var registration: AutoCloseable? = null
 
     override fun start() {
         log(onlyIfChanged = false)
-        registration = tablet.onStatusChange { log(onlyIfChanged = true) }
+        tablet.onStatusChange { log(onlyIfChanged = true) }
         scope.launch {
             while (true) {
                 delay(HEAT_EVERY_MS)

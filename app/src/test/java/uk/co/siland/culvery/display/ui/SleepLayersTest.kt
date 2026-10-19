@@ -31,7 +31,6 @@ import java.time.LocalDateTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import uk.co.siland.culvery.core.plugin.CLOSING_WARNING_MS
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -54,7 +53,6 @@ class SleepLayersTest {
     private var alert by mutableStateOf<(@Composable () -> Unit)?>(null)
     private var pinShowing by mutableStateOf(false)
     private var cameraMark by mutableStateOf(false)
-    private var expiresAt by mutableStateOf<Long?>(null)
     private var presses = 0
     private var touches = 0
     private var alertPresses = 0
@@ -78,7 +76,6 @@ class SleepLayersTest {
                     },
                     activity = activity,
                     onTouch = { touches++ },
-                    settingsExpiresAt = expiresAt,
                     nowMillis = { compose.mainClock.currentTime },
                     alert = alert,
                     sleeping = screen != Screen.AWAKE,
@@ -256,19 +253,6 @@ class SleepLayersTest {
         assertThat(toast?.id).isEqualTo(2L)
         exactly(1)
         assertThat(toast).isNull()
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    /** Fails if a closing warning draws over the dark screen, or doesn't show once it wakes. */
-    @Test
-    fun aClosingWarningWaitsForTheScreenToWake() {
-        show(Screen.ASLEEP)
-        expiresAt = compose.mainClock.currentTime + CLOSING_WARNING_MS
-        settle()
-        assertThat(shown("settings_warning")).isFalse()
-        tap()
-        settle()
-        assertThat(shown("settings_warning")).isTrue()
         compose.assertClickablesHaveRoleAndLabel()
     }
 

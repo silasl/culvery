@@ -44,7 +44,7 @@ class DoorAlerts internal constructor(
     private val zone: suspend () -> ZoneId,
     private val clock: WallClock,
     private val scope: CoroutineScope,
-    private val night: () -> Boolean = { false },
+    private val night: NightHours,
 ) {
     @Inject
     constructor(
@@ -56,7 +56,7 @@ class DoorAlerts internal constructor(
         clock: WallClock,
         @ApplicationScope scope: CoroutineScope,
         night: NightHours,
-    ) : this(host, store::markSeen, { settings.current.value }, chime, zone::current, clock, scope, { night.isNight() != false })
+    ) : this(host, store::markSeen, { settings.current.value }, chime, zone::current, clock, scope, night)
 
     private val lock = Mutex()
     private val _showing = MutableStateFlow<ShowingRing?>(null)
@@ -73,7 +73,8 @@ class DoorAlerts internal constructor(
             if (_showing.value?.eventId == event.id) _showing.value = ShowingRing(event.id, card)
             return@withLock
         }
-        if (!host.inFront.value || night()) return@withLock
+        // Not known yet counts as night, so a ring just after a restart at night stays quiet.
+        if (!host.inFront.value || night.isNight() != false) return@withLock
         val alreadyShowing = _showing.value != null
         _showing.value = ShowingRing(event.id, card)
         if (!alreadyShowing) host.show(loud = true) { DoorCardHost(this@DoorAlerts) }

@@ -47,12 +47,17 @@ class CameraAccess internal constructor(
         scope,
     )
 
-    private val permission = MutableStateFlow(permissionGranted() to false)
+    private val frontCamera by lazy(hasFrontCamera)
+
+    // Null until first read, in the scope rather than on the main thread at start-up: both checks ask the system.
+    private val permission = MutableStateFlow<Pair<Boolean, Boolean>?>(null)
     private val asks = Channel<Unit>(Channel.CONFLATED)
 
-    val state: StateFlow<CameraState> = combine(settings.current, permission) { prefs, (isGranted, rationale) ->
-        cameraState(hasFrontCamera(), isGranted, prefs.cameraAsked, rationale)
-    }.stateIn(scope, SharingStarted.Eagerly, cameraState(hasFrontCamera(), permissionGranted(), asked = false, rationale = false))
+    /** [CameraState.NOT_ASKED] for the moment before the first reading. */
+    val state: StateFlow<CameraState> = combine(settings.current, permission) { prefs, answer ->
+        val (isGranted, rationale) = answer ?: (permissionGranted() to false)
+        cameraState(frontCamera, isGranted, prefs.cameraAsked, rationale)
+    }.stateIn(scope, SharingStarted.Eagerly, CameraState.NOT_ASKED)
 
     /** The activity shows Android's camera prompt for each item. */
     val requests: Flow<Unit> = asks.receiveAsFlow()

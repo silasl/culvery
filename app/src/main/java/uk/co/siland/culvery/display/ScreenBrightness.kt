@@ -15,8 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChangedBy
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.runningFold
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
@@ -50,6 +49,8 @@ fun targetBrightness(screen: Screen, inFront: Boolean, night: Boolean, evening: 
 
 /** Sets the level on Culvery's own window only; Android's brightness setting is never touched (8 §4.4). */
 fun applyBrightness(window: Window, level: Float) {
+    // Setting the attributes lays the window out again, so an unchanged level isn't set.
+    if (window.attributes.screenBrightness == level) return
     window.attributes = window.attributes.apply { screenBrightness = level }
 }
 
@@ -89,9 +90,9 @@ class ScreenBrightness internal constructor(
             Inputs(s, front, night() ?: true, time != null && isEvening(time.toLocalTime(), sunTimes), p)
         }
         scope.launch {
+            var last: Inputs? = null
             inputs
-                .runningFold(null as Step?) { last, next -> Step(next, fades = last != null && last.inputs.switchesEvening(next)) }
-                .filterNotNull()
+                .map { next -> Step(next, fades = last?.switchesEvening(next) == true).also { last = next } }
                 .distinctUntilChangedBy { it.inputs.target }
                 .collectLatest { step ->
                     if (step.fades) fade(step.inputs.target) else _level.value = step.inputs.target
@@ -102,12 +103,10 @@ class ScreenBrightness internal constructor(
     private suspend fun fade(to: Float) {
         val from = _level.value
         val steps = (FADE_MS / FADE_STEP_MS).toInt()
-        for (i in 1 until steps) {
+        for (i in 1..steps) {
             delay(FADE_STEP_MS)
-            _level.value = from + (to - from) * i / steps
+            _level.value = if (i == steps) to else from + (to - from) * i / steps
         }
-        delay(FADE_STEP_MS)
-        _level.value = to
     }
 
     private fun Inputs.switchesEvening(next: Inputs): Boolean =

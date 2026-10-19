@@ -18,9 +18,8 @@ private class FakeTabletHeat(var heat: HeatReading) : TabletHeat {
 
     override fun reading() = heat
 
-    override fun onStatusChange(listener: () -> Unit): AutoCloseable {
+    override fun onStatusChange(listener: () -> Unit) {
         this.listener = listener
-        return AutoCloseable { this.listener = {} }
     }
 
     fun changeTo(next: HeatReading) {
