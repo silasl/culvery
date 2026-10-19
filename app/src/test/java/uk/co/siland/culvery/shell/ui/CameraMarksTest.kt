@@ -52,47 +52,51 @@ class CameraMarksTest {
     private var alert by mutableStateOf<(@Composable () -> Unit)?>(null)
     private var screen by mutableStateOf(Screen.AWAKE)
     private var fontScale by mutableStateOf(1f)
+    private var previewing by mutableStateOf(false)
+    private var name by mutableStateOf("Alex")
 
     private fun show() = compose.setContent {
         CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
-            CulveryTheme(dark = true) { WithFontScale(fontScale) {
-                val spot = remember { CameraMarkSpot() }
-                ShellLayers(
-                    overlay = overlay,
-                    toast = null,
-                    onToastHidden = {},
-                    pinShowing = pinShowing,
-                    pinPad = { if (pinShowing) Box(Modifier.fillMaxSize()) },
-                    activity = FakeUserActivity(),
-                    onTouch = {},
-                    alert = alert,
-                    sleeping = screen != Screen.AWAKE,
-                    sleep = { SleepLayer(screen, { at }) {} },
-                    cameraMark = overlayCameraMark(running, screen != Screen.AWAKE, complete, settingsOpen, overlay.isShowing, pinShowing, alert != null),
-                ) {
-                    AppContent(
-                        complete = complete,
-                        settingsOpen = settingsOpen,
+            CulveryTheme(dark = true) {
+                WithFontScale(fontScale) {
+                    val spot = remember { CameraMarkSpot() }
+                    ShellLayers(
                         overlay = overlay,
-                        wizard = { Box(Modifier.fillMaxSize()) { Text("Welcome") } },
-                        shell = {
-                            CulveryShell(
-                                state = ShellUiState(session = SessionUi("Alex", "Admin")),
-                                now = { at },
-                                onSelectTab = {},
-                                onOpenSettings = {},
-                                onSignOut = {},
-                                onToggleThemePreview = {},
-                                watching = watchingPill(running, screen != Screen.AWAKE, complete, settingsOpen, overlay.isShowing, pinShowing, alert != null),
-                                pillSpot = spot,
-                                tabContent = {},
-                            )
-                        },
-                        settings = { Box(Modifier.fillMaxSize()) { Text("Settings") } },
-                        onHomeDrawn = {},
-                    )
+                        toast = null,
+                        onToastHidden = {},
+                        pinShowing = pinShowing,
+                        pinPad = { if (pinShowing) Box(Modifier.fillMaxSize()) },
+                        activity = FakeUserActivity(),
+                        onTouch = {},
+                        alert = alert,
+                        sleeping = screen != Screen.AWAKE,
+                        sleep = { SleepLayer(screen, { at }) {} },
+                        cameraMark = overlayCameraMark(running, screen != Screen.AWAKE, complete, settingsOpen, overlay.isShowing, pinShowing, alert != null),
+                    ) {
+                        AppContent(
+                            complete = complete,
+                            settingsOpen = settingsOpen,
+                            overlay = overlay,
+                            wizard = { Box(Modifier.fillMaxSize()) { Text("Welcome") } },
+                            shell = {
+                                CulveryShell(
+                                    state = ShellUiState(previewing = previewing, session = SessionUi(name, "Admin")),
+                                    now = { at },
+                                    onSelectTab = {},
+                                    onOpenSettings = {},
+                                    onSignOut = {},
+                                    onToggleThemePreview = {},
+                                    watching = watchingPill(running, screen != Screen.AWAKE, complete, settingsOpen, overlay.isShowing, pinShowing, alert != null),
+                                    pillSpot = spot,
+                                    tabContent = {},
+                                )
+                            },
+                            settings = { Box(Modifier.fillMaxSize()) { Text("Settings") } },
+                            onHomeDrawn = {},
+                        )
+                    }
                 }
-            } }
+            }
         }
     }
 
@@ -134,6 +138,15 @@ class CameraMarksTest {
 
     @Test
     fun theDarkScreenShowsOneMark() = oneMarkWhileTheCameraRuns("asleep") { screen = Screen.ASLEEP }
+
+    /** The pill pushed under a sheet's scrim by a large font, a long name and "Night · Preview" must not paint beside the overlay mark. */
+    @Test
+    fun aSheetAtFontScale15StillShowsOneMark() = oneMarkWhileTheCameraRuns("a sheet at 1.5") {
+        fontScale = 1.5f
+        previewing = true
+        name = "Alexandra-Marguerite"
+        overlay.show { Text("Sheet") }
+    }
 
     /** Fails if any combination shows the pill and the overlay mark together, or neither while the camera runs. */
     @Test
