@@ -53,9 +53,9 @@ internal fun checksExpiryOnReturn(access: AccessControl): LifecycleEventObserver
     if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_RESUME) access.checkExpiry()
 }
 
-/** 8 §4.1: the PIN pad, a sheet, the door card, Settings and the wizard keep the wall awake, as does setup not read yet. */
+/** 8 §4.1: the PIN pad, a sheet, the door card, Settings and the wizard keep the wall awake; setup still being read is under the splash. */
 internal fun holding(pinShowing: Boolean, sheetShowing: Boolean, alertShowing: Boolean, settingsOpen: Boolean, complete: Boolean?): Boolean =
-    pinShowing || sheetShowing || alertShowing || settingsOpen || complete != true
+    pinShowing || sheetShowing || alertShowing || settingsOpen || complete == false
 
 /** 4a design D5, D9: whether touches restart the session: while Settings is open or the wizard shows (the setup session's ten minutes). */
 internal fun countsTouches(complete: Boolean?, settingsOpen: Boolean): Boolean = complete == false || (complete == true && settingsOpen)

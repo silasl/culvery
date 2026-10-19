@@ -8,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import dagger.multibindings.IntoSet
 import java.lang.reflect.Method
+import java.time.LocalDateTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -67,7 +68,7 @@ class DisplayWiringTest {
     @After
     fun tearDown() = scope.cancel()
 
-    /** Fails if any of the PIN pad, a sheet, the door card, Settings, the wizard or setup still being read lets the wall sleep, or if nothing shown holds it. */
+    /** Fails if any of the PIN pad, a sheet, the door card, Settings or the wizard lets the wall sleep, or if nothing shown, setup still being read included, holds it. */
     @Test
     fun eachShownThingHoldsTheScreen() {
         fun held(pin: Boolean = false, sheet: Boolean = false, alert: Boolean = false, settings: Boolean = false, complete: Boolean? = true) =
@@ -78,7 +79,28 @@ class DisplayWiringTest {
         assertThat(held(alert = true)).isTrue()
         assertThat(held(settings = true)).isTrue()
         assertThat(held(complete = false)).isTrue()
-        assertThat(held(complete = null)).isTrue()
+        assertThat(held(complete = null)).isFalse()
+    }
+
+    /** Fails if setup still being read at a restart in the night wakes the clock and keeps the wall awake for a minute. */
+    @Test
+    fun aRestartAtNightKeepsTheClockWhileSetupIsRead() = runTest {
+        val display = DisplayState(
+            MutableStateFlow(DisplayPrefs()),
+            MutableStateFlow(LocalDateTime.of(2026, 10, 19, 23, 0)),
+            MutableStateFlow(0L),
+            MutableStateFlow(true),
+            MutableStateFlow(CameraState.ALLOWED),
+            backgroundScope,
+        )
+        runCurrent()
+        assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
+        display.held(holding(pinShowing = false, sheetShowing = false, alertShowing = false, settingsOpen = false, complete = null))
+        runCurrent()
+        assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
+        advanceTimeBy(NIGHT_AWAKE_MS)
+        runCurrent()
+        assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
     }
 
     /** Fails if the prompt doesn't go through the system screen's unpinning with its own missing line, or if the answer doesn't save the ask before pinning again exactly once. */
