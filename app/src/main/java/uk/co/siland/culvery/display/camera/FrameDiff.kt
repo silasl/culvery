@@ -20,18 +20,18 @@ private fun Luma.mean(): Float = values.indices.sumOf { level(it) }.toFloat() / 
 
 /** Whether something moved between one looked-at frame and the next, ignoring the whole frame getting lighter or darker. */
 internal class FrameDiff {
-    private var last: Luma? = null
-    private var lastMean = 0f
+    // The frame and its mean are one value, so a reset can't leave either behind.
+    private class Seen(val frame: Luma, val mean: Float)
+
+    private var last: Seen? = null
 
     fun moved(frame: Luma): Boolean {
+        val seen = Seen(frame, frame.mean())
         val before = last
-        val beforeMean = lastMean
-        val mean = frame.mean()
-        last = frame
-        lastMean = mean
-        if (before == null || before.width != frame.width || before.height != frame.height) return false
-        val shift = mean - beforeMean
-        val changed = frame.values.indices.count { abs(frame.level(it) - before.level(it) - shift) > PIXEL_DELTA }
+        last = seen
+        if (before == null || before.frame.width != frame.width || before.frame.height != frame.height) return false
+        val shift = seen.mean - before.mean
+        val changed = frame.values.indices.count { abs(frame.level(it) - before.frame.level(it) - shift) > PIXEL_DELTA }
         return changed >= CHANGED_SHARE * frame.values.size
     }
 
