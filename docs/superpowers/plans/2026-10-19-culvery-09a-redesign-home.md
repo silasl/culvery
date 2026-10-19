@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tasks 1–14 are subagent tasks, except Task 1 Step 1 (the controller reads the tablet's density); Task 15 is the controller on the `culvery-5` AVD with the user; Tasks 16–17 need the user and the son's SM-T510.
 
-> **Needs the user's OK: nothing yet; two possible stops.** No new library and no version change. No deprecated API is planned. Flagged and avoided: `SliderDefaults.Track(sliderPositions = …)` and `Slider(…, thumb, track)` overloads taking `SliderPositions` (deprecated); `Modifier.dropShadow` is not used (`Modifier.shadow` is). **Stop and ask** if (a) giving `HhPercentSlider` its 20 dp track needs `@OptIn(ExperimentalMaterial3Api::class)` (`SliderState`, `SliderDefaults.Track(sliderState = …)`): the fallback is Material's own track height with the theme's colours, and the user chooses; (b) a new icon is missing from the font at 608ce00: Google's current font is a download (name the file, source and size). If the compiler shows a deprecation or opt-in warning on a line you wrote, **stop and ask**.
+> **Needs the user's OK: approved 2026-10-19 (U1).** `HhPercentSlider` in `:core:ui` is built on Material 3's `SliderState` and `SliderDefaults.Track(sliderState = …)` under `@OptIn(ExperimentalMaterial3Api::class)`, for the 20 dp Lights track and the 9 dp volume track; **no other file opts in**. No new library and no version change; no deprecated API. Flagged and avoided: the `SliderPositions` overloads of `Slider` and `SliderDefaults.Track` (deprecated); `Modifier.dropShadow` (`Modifier.shadow` is used). **One possible stop:** a new icon missing from the font at 608ce00 means Google's current font, a download (name the file, source and size). If the compiler shows any other deprecation or opt-in warning on a line you wrote, **stop and ask**.
 
 **Goal:** Home and the frame around every tab look as the October redesign draws them: the rail and a top bar with a Watching pill, the forecast in Home's header, Today always five rows with Lights above Music beside it, the bigger door card over a scrim that closes after 60 seconds, the PIN pad's lockout countdown, the larger night clock, toasts that stay long enough to read, a countdown ring on the closing warning, and one outlined disabled button.
 
@@ -41,30 +41,30 @@
 
 ## Shared components 9b and 9c reuse
 
-Named here so their implementers don't build them again: `HhColors.border`, `HhColors.rain` and `HhCard`'s edge (Task 2); `ShellTokens.cardScrim` (Task 2); the outlined disabled `HhButton` and `HhButton(trailingIcon = …)` (Task 3: 9c's wizard Next arrow and Add event footer); `HhToast(countdownMs = …)` and `HhCountdownRing` (Task 4); `HhBottomFade` and the pinned-pill pattern (Task 8: 9b's Lights grid "N more rooms"); `HhPercentSlider(enabled = false, trackHeight = …)` with the off look (Task 9: 9b's room cards); `VolumePill` and `RoundButton(primary = …)` (Task 10: 9b's Music tab); `ButtonTokens.touchMin` (Task 3).
+Named here so their implementers don't build them again: `HhColors.border`, `HhColors.rain` and `HhCard`'s edge (Task 2); `ShellTokens.cardScrim` (Task 2); the outlined disabled `HhButton`, `HhButton(trailingIcon = …)` and `HhRoundButton` (Task 3: 9c's wizard Next arrow and Add event footer, 9b's room and music controls); `HhToast(countdown = …)` (Task 4); `HhBottomFade` and the pinned-pill pattern (Task 8: 9b's Lights grid "N more rooms"); `HhPercentSlider(enabled = false, trackHeight = …)` with the off look (Task 9: 9b's room cards); `VolumePill` (Task 10: 9b's Music tab); `CameraMarkSpot` (Task 5).
 
 ## Rulings against the code
 
 Where the spec leaves a choice open, or doesn't fit the code at 9ab4218. Each is the plan's call unless it cites the spec.
 
 1. **Units.** The handoff's px are converted once, at dp = px ÷ 1.5 (spec §3), rounding to whole dp and sp; the values are in **Units** below and each task uses them. Every 2 px edge becomes 1 dp (1.33 rounds down); Task 15/16 look at whether they read. The SM-T510's density is read first (Task 1 Step 1); the screenshot tests already draw at 1280 × 800 dp, `hdpi` (every module's `robolectric.properties`).
-2. **Touch targets stay 48 dp** (4e: on the SM-T510 Compose didn't widen smaller targets). A control the handoff draws at 64–68 px (43–45 dp) is 48 dp; a pill drawn smaller than 48 dp (Sign out's 29 dp) keeps its look inside a 48 dp tap height. `ButtonTokens.touchMin = 48.dp`.
+2. **Touch targets stay 48 dp** (4e: on the SM-T510 Compose didn't widen smaller targets). A control the handoff draws at 64–68 px (43–45 dp) is 48 dp; a pill drawn smaller than 48 dp (Sign out's 29 dp) keeps its look inside a 48 dp tap height. The 48 dp is `ButtonTokens.regularHeight`.
 3. **`HomeLayout` replaces the 3 × 2 grid** (spec §4.2, §6.1): left, the highest-priority TALL card; right, the REGULAR cards by priority, at most 2, the first on top (Lights 35 above Music 30), splitting the column's height equally with a 15 dp gap; with none, the highest-priority WIDE card (Coming up) takes the right column; with one, it takes the full column. Ties go by id, as today.
 4. **The Forecast card is deleted** with its tests and baselines. Weather's header shows: the current weather and the 3-day strip when ready with an hour for now; the "Add home location for weather" pill with no location (it opens Settings › Home location); and, because the card that said so is gone, the existing `NO_FORECAST` line in `mute` when the fetch failed with nothing stored. Waiting and Expired show nothing, as today. **Rain colours:** drizzle, rain, showers and thunder icons are `rain`; the rest `weather` (spec §4.2's "rain icons blue, sun amber").
-5. **Today's fill** (spec §4.2): the counted rule picks the rows (n > 5 scroll; n = 5 those; n < 5 today's then 5 − n from tomorrow; n = 0 "Nothing on today" then 5 from tomorrow), then the card measures them: if they don't fit, tomorrow's rows go from the end, the TOMORROW divider with the last; if today's rows alone don't fit, the scroll treatment. In the scroll, the pill reads `"${n − min(k, 4)} more today · Open calendar"`, k being today's rows wholly above the pill at the top of the list: the handoff's n − 4 at its sizes, more when rows are taller. With n = 0 the TOMORROW divider shows under "Nothing on today", so outlined rows are always labelled. "See the week" hides while the pill shows. "Nothing on today. Tap + to add something." becomes the handoff's "Nothing on today".
+5. **Today's fill** (spec §4.2): the counted rule picks the rows (n > 5 scroll; n = 5 those; n < 5 today's then 5 − n from tomorrow; n = 0 "Nothing on today" then 5 from tomorrow), then the card measures them: if they don't fit, tomorrow's rows go from the end, the TOMORROW divider with the last; if today's rows alone don't fit, the scroll treatment. In the scroll, the pill reads `"${n − min(k, 4)} more today · Open calendar"`, k being today's rows wholly above the pill at the top of the list: the handoff's n − 4 at its sizes, more when rows are taller. With n = 0 the TOMORROW divider shows under "Nothing on today", so outlined rows are always labelled. "See the week" hides while the pill shows. "Nothing on today. Tap + to add something." becomes the handoff's "Nothing on today". Tomorrow's candidates leave out events already in today's list, so an event spanning midnight shows once, as today; when no tomorrow row fits, neither the divider nor the scroll shows.
 6. **The pinned pill** is an `HhButton` (quiet, on `surf`, `calendar_month` before, `arrow_forward` after), 48 dp, 21 dp from the card's sides and 20 dp from its foot, `Modifier.shadow(8.dp, pill)`; the fade is 133 dp, transparent to `surf`; the list gets 73 dp of bottom padding.
 7. **The Lights card's status** is `cardStatus(room)`: "On · 70% · Relax", "On · 70%" with no active scene, "On · Relax" for a room that can't dim, "Off". The middle slider shows only for a dimmable main room; off, it is disabled at the remembered level and reads "Off" (spec §2.5). The bottom row keeps Plan 7's All lights off and Holiday mode buttons (spec §6.2). Card padding is Today's (20 × 21 dp); a 15 dp gap above the bottom row; the rest of the height goes between the top row and the slider (spec §4.2).
 8. **The Music card's row:** Play/Pause (primary, round), Next (quiet, round; hidden when nothing plays), then the volume pill filling the rest. **Shuffle everything** takes Next's place when nothing is playing, and is otherwise left to the Music tab, so the row keeps three items; paused with a queue, the row is Play, Next, volume. The pill shows its number (note 27).
-9. **"Music lowered"** (spec §6.3): `AlertQuieter.quiet()` returns true when it turned something down; Music's is true when at least one room's volume command went through to a lower volume. `AlertHost.lowered` is true from the first quieter that said so until the loud alert goes; a ring replacing a ring keeps it.
-10. **The door card's scrim** swallows taps and does nothing with them: the card goes by Got it, Door history or its 60 seconds (spec §2.4). The alert layer no longer sets the alert's width; the door card is 747 dp wide at most. **Door history** marks the ring seen (as Got it does) and opens the Door tab. Its "›" is the trailing `chevron_right` icon, so TalkBack reads "Door history". The subtitle stays "Front Door · 11:54" (the handoff's "· just now" is left out: the time already says it). The card's shadow is `Modifier.shadow(27.dp, shape)` (0 40 120 px). Without a snapshot the card is shorter; no placeholder.
-11. **The Watching pill and the marks** (spec §6.7): the top bar's pill shows while `Presence.running`. The overlay mark (Plan 8's, top centre) shows only while the camera runs, the screen is awake and the top bar is covered or absent: Settings, the wizard, a sheet, the PIN pad or the door card. While asleep, the sleep layers draw the bare glyph (`#2E3331`) at the pill's spot, the top bar's right end. So the camera is marked exactly once at any moment.
+9. **"Music lowered"** (spec §6.3): `AlertQuieter.quiet()` returns true when it turned something down; Music's is true when at least one room's volume command went through to a lower volume. `AlertHost.lowered` turns false as each quiet pass starts, true from the first quieter of that pass that said so, and false when the loud alert goes; an answer from an earlier pass is ignored; a ring replacing a ring keeps it. Music's early exits answer false (no system, the read failed, nothing playing), or its earlier answer while still lowered.
+10. **The door card's scrim** swallows taps and does nothing with them: the card goes by Got it, Door history or its 60 seconds (spec §2.4). The alert layer no longer sets the alert's width; the door card is 747 dp wide at most. While it shows, TalkBack can't reach what it covers. **Door history** closes Settings and any sheet, closes the card **without** marking the ring seen, and opens the Door tab, which marks its rings seen (Plan 5). Its "›" is the trailing `chevron_right` icon, so TalkBack reads "Door history". The subtitle is the handoff's "Front Door · 11:54 · just now". The card's shadow is `Modifier.shadow(27.dp, shape)` (0 40 120 px). Without a snapshot the card is shorter; no placeholder.
+11. **The Watching pill and the marks** (spec §6.7): the top bar's pill shows while `Presence.running`, except while the PIN pad or the door card's scrim covers it. The overlay mark (Plan 8's, top centre) shows while the camera runs and the top bar is covered or absent (Settings, the wizard, a sheet, the PIN pad, the door card) and, until Task 14 adds the glyph, while asleep. From Task 14 the sleep layers draw the bare glyph (`#2E3331`) where the Watching pill sits (handoff 4c, note 38), and the overlay mark leaves the sleep layers to it. So the camera is marked exactly once at every commit.
 12. **The theme control** reads `"${shown} · ${mode}"`: shown "Night" or "Day" (the theme on screen), mode "Auto" or "Preview". Spoken "Theme: Night · Auto"; its click labels stay Plan 4's.
 13. **Toast timing** (spec §6.10): `toastMillis(message) = min(6_000 + 1_000 × (words / 10), 12_000)`, words being the message's whitespace-separated words (integer division). `urgent` stays for TalkBack's assertive reading only.
-14. **The countdown ring** draws in place of the warning's `schedule` icon, full when the warning appears and empty at `CLOSING_WARNING_MS`, on both closing warnings (Settings' and an edited sheet's: one pill). Its words stay fixed.
-15. **The PIN pad** takes the 4b card for both states (620 px wide, 2 px `surf3` edge, radius 44, the .64 scrim, 116 px keys) so nothing moves between them. Locked: the `dangerSoft` circle with a filled `lock_clock` in `danger`, "Too many tries", "Wait a moment, then try your PIN again.", the countdown `m:ss` and a bar draining from the lock's first value to 0 (fill `danger` on `surf3`), every digit, 0 and backspace at 30 %, Cancel at full strength. The dots and message and the countdown and bar are both laid out, one invisible and cleared from TalkBack, so the keys keep their place. TalkBack still hears `tooManyTries(firstSeconds)` once.
+14. **The countdown ring** draws in place of the warning's `schedule` icon from the time left (`endsAt − nowMillis()` of `CLOSING_WARNING_MS`), so screenshots and advanced clocks draw what is really left; on both closing warnings (Settings' and an edited sheet's: one pill). Its words stay fixed. The ring is private to `HhToast`.
+15. **The PIN pad** takes the 4b card for both states (620 px wide, 2 px `surf3` edge, radius 44, the .64 scrim, 116 px keys) so nothing moves between them. Locked: the `dangerSoft` circle with a filled `lock_clock` in `danger`, "Too many tries", "Wait a moment, then try your PIN again.", the countdown `m:ss` and a bar draining from the lock's first value to 0 (fill `danger` on `surf3`), every digit, 0 and backspace at 30 %, Cancel at full strength. The dots and message and the countdown and bar are both laid out, one invisible and cleared from TalkBack, so the keys keep their place; only the drawn countdown and bar are cleared from TalkBack. The spoken message (`pin_message`) stays outside them, always in the tree: `tooManyTries(firstSeconds)` while locked, said once, then `TRY_AGAIN`.
 16. **Large buttons keep `ControlType.button` (17 sp)**; the handoff's 28 px footer labels (19 sp) are 9c's, with the footers. The door card's buttons are `ButtonSize.Large` (60 dp; 88 px is 59).
 17. **The disabled outline** is 1 dp `surf3` around a transparent fill with a full-strength `mute` label and icon (spec §6.4, note 36); the reason line above it is 9c's. `DISABLED_INK_ALPHA` goes.
-18. **The night clock** is 200 sp, −8 sp tracking, tabular, `#5A5A5A` (spec §4.10, provisional for the dark room). The glyph is the filled `photo_camera` at 20 dp, vertically centred on the top bar's 48 dp, 28 dp from the right edge.
+18. **The night clock** is 200 sp, −8 sp tracking, tabular, `#5A5A5A` (spec §4.10, provisional for the dark room). The glyph is the filled `photo_camera` at 20 dp, centred where the Watching pill's icon sits (the top bar reports it through `CameraMarkSpot`; the bar's right end when it never drew).
 
 ## Units (converted once, px ÷ 1.5)
 
@@ -98,7 +98,7 @@ Names are the plan's; each task puts its values in its module's dimens object.
 | Door card | 1120 wide, 2 px `s3`, r 44, padding 36, gap 26; circle 88, bell 50; 46/700, 25; chip 52; snapshot r 28; buttons 88 | 747, 1, r 29, 24, 17; 59, 33; 31 sp W700, 17 sp; chip 35 (icon 20, 15 sp W600); r 19; Large 60 |
 | Scrims | rgba(0,0,0,.64) | `Color(0xA3000000)` |
 | PIN card | 620 wide, 2 px `s3`, r 44; circle 88; 40/700; 23; countdown 44/700; bar 260 × 8; keys 116 at 30 % | 413, 1, r 29; 59 (icon 33); 27 sp W700; 15 sp; 29 sp W700 tabular; 173 × 5; 77, alpha .3 |
-| Night clock | 300/600, ls −12 | 200 sp W600, ls −8 sp, tabular |
+| Night clock | 300/600, ls −12; glyph in the pill's spot | 200 sp W600, ls −8 sp, tabular; glyph 20 |
 | Countdown ring | (the toast's 22 icon) | 22, stroke 3 |
 
 ## Global Constraints
@@ -119,20 +119,25 @@ Names are the plan's; each task puts its values in its module's dimens object.
 - §6.7 "Plan 8's privacy rule stands: a mark shows whenever the camera is running. The top bar's pill shows while the camera runs (`Presence.running`); on screens without the top bar (Settings, sheets, the wizard) the small overlay mark stays".
 - §7 "Every changed screen's Roborazzi baselines are re-recorded and each new image looked at against the handoff". "Copy changes go through CopyScanTest; TalkBack labels follow the new copy."
 
-**Copy** (the handoff's, verbatim, curly apostrophes in code): "Watching", "Sign out", "Night · Auto", "Day · Auto", "Night · Preview", "Day · Preview", "Add home location for weather", "Today", "See the week", "Nothing on today", "Tomorrow" (drawn TOMORROW), "{n} more today · Open calendar", "All lights off", "Holiday mode", "Got it", "Door history", "Music lowered", "Too many tries", "Wait a moment, then try your PIN again.". **The plan's, for the end-of-v1 design walk-through:** the pill and glyph's TalkBack name stays "The camera is on"; status "On · 70% · Relax".
+**Copy** (the handoff's, verbatim, curly apostrophes in code): "Watching", "Sign out", "Night · Auto", "Day · Auto", "Night · Preview", "Day · Preview", "Add home location for weather", "Today", "See the week", "Nothing on today", "Tomorrow" (drawn TOMORROW), "{n} more today · Open calendar", "All lights off", "Holiday mode", "Got it", "Door history", "Music lowered", "just now", "Too many tries", "Wait a moment, then try your PIN again.". **The plan's, for the end-of-v1 design walk-through:** the pill and glyph's TalkBack name stays "The camera is on"; status "On · 70% · Relax".
 
 **From the house rules:**
 
 - Package root `uk.co.siland.culvery`. `minSdk 29`, `compileSdk 35`, `targetSdk 35`, JDK 17, landscape only. **No new library; never change a version.**
 - **Test gate:** `./gradlew testDebugUnitTest verifyRoborazziDebug` (or `.\gradlew.bat …`). Never plain `test`, `check` or `build`. A task runs its module's tests while working; every task ends with the full gate before its commit. **Never run a Gradle `install…` task**, and no subagent touches a device.
-- **Tests that can fail:** every new test fails before its change, and its step says why; a "Fails if" line names the mutation it catches where it isn't plain. A test that passes before its change is labelled **pin**. Timer tests run on virtual time (`TestScope`'s scheduler, or `compose.mainClock` with `autoAdvance = false`) and never sleep; each checks 1 ms before its boundary and at it. Code reaching `android.util.Log` runs under Robolectric.
+- **Tests that can fail:** every new test fails before its change, and its step says why; a "Fails if" line names the mutation it catches where it isn't plain. A test that passes before its change is labelled **pin**. Timer tests run on virtual time (`TestScope`'s scheduler, or `compose.mainClock` with `autoAdvance = false`) and never sleep; each checks 1 ms before its boundary and at it. **UI timers under `compose.mainClock`** are checked one frame before the boundary and at the boundary plus one frame; exact-millisecond checks stay in the pure tests. Code reaching `android.util.Log` runs under Robolectric.
 - **Screenshots:** baselines in `<module>/src/test/screenshots/`. Before re-recording, `./gradlew <module>:compareRoborazziDebug --tests "<pattern>"` and open each `*_compare.png` under `<module>/build/outputs/roborazzi/`; then `recordRoborazziDebug`. **Open every new image and look at it against the handoff's section for that screen** (sizes, colours, copy) and the rulings above. **The baseline check** (Plan 6): the step's expected names, one per line, in `$TMP/expected-baselines.txt`, then
 ```bash
 git status --porcelain -- "*.png" | sed 's#.*/##; s#\.png$##' | sort -u > "$TMP/changed.txt"
 echo "changed but not listed:"; comm -23 "$TMP/changed.txt" <(sort -u "$TMP/expected-baselines.txt")
 echo "listed but unchanged:"; comm -13 "$TMP/changed.txt" <(sort -u "$TMP/expected-baselines.txt")
 ```
-Both lists empty, or stop and report. Where a shared value changes many screens (Tasks 2, 3, 5, 7), the expected list is every image `compareRoborazziDebug` reports changed across all modules, each looked at and named in the commit's report.
+Both lists empty, or stop and report. **Where a task changes shared parts, it predicts changed baselines by name prefix** in `$TMP/expected-prefixes.txt`, checked as:
+```bash
+echo "changed but not predicted:"; grep -v -f <(sed 's/^/^/' "$TMP/expected-prefixes.txt") "$TMP/changed.txt"
+echo "predicted but unchanged:"; while read -r p; do grep -q "^$p" "$TMP/changed.txt" || echo "$p"; done < "$TMP/expected-prefixes.txt"
+```
+**Looking:** Tasks 2–11 look at the `home_*` compare diffs and their own new images; Task 12 Step 4 looks at every image Tasks 2–12 changed against the handoff, once; Tasks 13 and 14 look at their own.
 - **Copy** names what the user does; an action keeps its name through its flow; errors say what went wrong and how to fix it; curly quotes and apostrophes; "·", "›", "…", "—" as written. `CopyScanTest` must pass; a protocol word never shown goes in `core/ui/src/test/resources/copy-scan-allow.txt`. Sentences end with a full stop; labels don't.
 - **Accessibility:** every changed screen's test runs `compose.assertClickablesHaveRoleAndLabel()`; TalkBack names follow the new copy.
 - **Icons** come from `Icons`; a new one also goes in `tools/fonts/icons.txt` and the subset font rebuilt from the full font at 608ce00 (`tools/fonts/README.md`).
@@ -147,15 +152,15 @@ Both lists empty, or stop and report. Where a shared value changes many screens 
 The five inputs the spec implies, most likely to bite the household, that its own test list doesn't cover; each is pinned in its owning task:
 
 1. **A large font or long titles on a five-event day** (font scale 1.5, two-line titles). Expected: the scroll and pinned pill, nothing cut mid-row, no tomorrow rows behind the pill.
-   - Task 8 `TodayCardTest.atFontScale15FiveRowsScrollWithThePill`, `TodayFillTest.aLongTitleDropsTomorrowRowsFirst`.
+   - Task 8 `CardsTest.aLargeFontTurnsFiveRowsIntoTheScroll`, `TodayFillTest.aLongTitleDropsTomorrowRowsFirst`.
 2. **Midnight while Home shows tomorrow's top-ups.** Expected: tomorrow's events become today's rows, the divider and outlined rows go, and the new tomorrow tops up.
    - Task 8 `CardHostsMidnightRolloverTest.tomorrowsTopUpsBecomeTodayAtMidnight`.
 3. **The camera running behind Settings, a sheet, the PIN pad, the door card, the wizard or the dark screen.** Expected: exactly one mark visible at every moment (pill, overlay mark or glyph), never none.
-   - Task 5 `DisplayWiringTest.theCameraIsMarkedExactlyOnce`; Task 14 `SleepLayersTest.theBareGlyphShowsWhileTheCameraRuns`.
+   - Task 5 `CameraMarksTest` (every state rendered, one mark while the camera runs); Task 14 `SleepLayersTest.theBareGlyphShowsWhileTheCameraRuns` and `CameraMarksTest`'s night states.
 4. **The forecast failing now the Forecast card is gone** (no Wi-Fi at first start). Expected: the header says there's no forecast and why, not an empty header.
    - Task 6 `WeatherViewTest.aFailedFetchSaysSoInTheHeader`, `WeatherHeaderItemTest.noForecastSaysWhy`.
 5. **The lockout ending with TalkBack on.** Expected: the countdown isn't read every second, the keys come back at 0:00 without moving, and "You can try again." is said.
-   - Task 13 `PinPadTest.theCountdownIsSpokenOnce`, `theKeypadDoesNotMoveWhenTheLockEnds`.
+   - Task 13 `PinPadTest.thePinPadsLinesAreSentencesInFullWords` and `theEndOfALockSaysYouCanTryAgainAndClearsTheDotsError`, both extended.
 
 The spec's own tests (§7) each have their task: Today's fill at 0, 1–4, 5, 6+ and measured overflow (8); the off-room slider (9; the scene chip turning a room on is 9b's tab); the door card at 60 s (12); the PIN countdown and keys at 0:00 (13); toast duration by word count (4); the theme control's preview copy and the Watching pill (5); the three Home layouts (7). The Lights grid at 4, 6 and 9 rooms is 9b's.
 
@@ -166,7 +171,7 @@ The spec's own tests (§7) each have their task: Today's fill at 0, 1–4, 5, 6+
 ```
 core/ui/.../Icons.kt, tools/fonts/icons.txt, core/ui/src/main/res/font/material_symbols_rounded.ttf (Task 1)
 core/ui/.../Colors.kt, Theme.kt, Components.kt (HhCard edge), Shell.kt (homeCardRadius, cardScrim) (Task 2)
-core/ui/.../Buttons.kt (Task 3)   Shell.kt (toastMillis, HhToast, HhCountdownRing) (Task 4)
+core/ui/.../Buttons.kt (Task 3)   Shell.kt (toastMillis, HhToast and its ring) (Task 4)   Buttons.kt (HhRoundButton, Task 3)
 core/ui/.../Fades.kt (create, Task 8)   Controls.kt (HhPercentSlider, Task 9)   Type.kt (clock, date, Task 7)
 core/plugin/.../HomeCardPlacer.kt, HomeCard.kt (Task 7)   Alerts.kt (Task 11)
 core/access/.../ui/PinPad.kt, ui/PinPadDimens.kt (Task 13)
@@ -176,7 +181,7 @@ capability/lights/.../ui/LightsCard.kt, ui/LightsParts.kt, ui/LightsDimens.kt, L
 capability/music/.../ui/MusicCard.kt, ui/MusicParts.kt, ui/MusicDimens.kt (Task 10)   MusicQuieter.kt (Task 11)
 capability/door/.../DoorAlerts.kt, DoorWords.kt, ui/DoorCard.kt, ui/DoorCardHost.kt, ui/DoorDimens.kt (Task 12)
 app/src/main/java/uk/co/siland/culvery/
-  shell/ui/ShellDimens.kt (create), NavRail.kt, StatusBar.kt, CulveryShell.kt, SetupWiring.kt (overlayCameraMark), MainActivity.kt (Task 5)
+  shell/ui/ShellDimens.kt (create), CameraMarksTest (create, test), NavRail.kt, StatusBar.kt, CulveryShell.kt, SetupWiring.kt (overlayCameraMark), MainActivity.kt (Task 5)
   shell/ui/HomeScreen.kt, HomeGrid.kt, shell/ShellUiState.kt, shell/ShellViewModel.kt (Task 7)
   shell/ui/OverlayLayers.kt (Task 4: toasts, ring; Task 12: the alert's scrim)   shell/ShellOverlays.kt (Task 11)
   display/ui/SleepLayers.kt, display/ui/DisplayDimens.kt, MainActivity.kt (Task 14)
@@ -221,7 +226,7 @@ git commit -m "Add the icons the redesign draws: arrows, brightness, the lockout
 
 - [ ] **Step 1: The failing tests** — `ThemeTest.theCardEdgeIsLightOnly` (`DarkColors.border == Color.Transparent`, `LightColors.border == Color(0xFFD5DCD8)`); `ThemeTest.rainIsBlueInBothThemes` (the two values); `ContrastTest.rainIconsReadOnTheirSurfaces` (`rain` against `bg` and `surf`, both themes, ≥ 3:1, as the weather icons' check). Run: `./gradlew :core:ui:testDebugUnitTest --tests '*ThemeTest*' --tests '*ContrastTest*'` — Expected: FAIL to compile.
 - [ ] **Step 2: Implement** — the two fields after `weather`; `HhCard` adds `.border(CardTokens.edge, Culvery.colors.border, shape)` after the clip; `cardScrim`'s KDoc: "rgba(0,0,0,.64) behind the door card and the PIN pad (9 §4.3, §4.9). The same in both themes."
-- [ ] **Step 3: Run them, then compare** — `./gradlew compareRoborazziDebug`: every light image with a card gains the edge; every Home card's corner and every PIN pad or picker scrim changes. **Re-record** (`recordRoborazziDebug`), **open each new image and look at it against the handoff** (light theme, note 8: a hairline edge, no shadow; dark: no edge). The expected list is the compare report; nothing else may change.
+- [ ] **Step 3: Compare, check, re-record** — predicted prefixes: every `_light` image with a card (`home_`, `today_`, `coming_up_`, `lights_`, `music_`, `door_`, `settings_`, `people_`, `review_`, `week_`, `header_`, `forecast_`), the dark images with a Home card's corner, and every PIN pad or picker scrim (`pin_pad_`, `detail_pin_`, `editor_date_picker_`, `editor_time_picker_`, `calendar-sheets/`); refine the list from the compare report before re-recording, and stop on anything outside it. Look at the `home_*` diffs (note 8: a hairline edge in light, none in dark); re-record; the baseline check by prefix.
 - [ ] **Step 4: The gate and commit**
 ```bash
 git add core capability app
@@ -230,28 +235,29 @@ git commit -m "Add the light theme's card edge and the rain colour, and round ca
 
 ---
 
-### Task 3: One disabled button (the outline) and a trailing icon (spec §6.4; ruling 17)
+### Task 3: One disabled button (the outline), a trailing icon, one round button (spec §6.4; ruling 17)
 
 **Review:** sonnet.
 
 **Files:**
-- Modify: `core/ui/.../Buttons.kt`
+- Modify: `core/ui/.../Buttons.kt`; `capability/music/.../ui/MusicParts.kt` (its `RoundButton` goes), `capability/lights/.../ui/LightsParts.kt` (`OpenRoomButton`'s box goes), `capability/calendar/.../ui/TodayCard.kt` (`AddCircle` goes)
 - Test: `core/ui/src/test/.../ButtonsTest.kt`, `ContrastTest.kt`, `ButtonScreenshotTest.kt`; `capability/calendar/src/test/.../ui/EventDetailSheetTest.kt` (its `DISABLED_INK_ALPHA` assertion becomes `mute`)
 
 **Interfaces:**
-- Produces: `internal data class ButtonColors(val fill: Color, val ink: Color, val outline: Color?)`; disabled: `ButtonColors(Color.Transparent, colors.mute, colors.surf3)`; `ButtonTokens.disabledOutline = 1.dp`, `ButtonTokens.touchMin = 48.dp`; `fun surfaceOf(on: ButtonSurface, colors: HhColors): Color` (`bg`, `surf`, `dangerSoft`); `HhButton(…, trailingIcon: String? = null)` drawn after the label at `ButtonTokens.icon` in the label's colour; with a trailing icon the end padding is `regularIconPaddingStart` (Regular). `DISABLED_INK_ALPHA` removed.
+- Produces: `internal data class ButtonColors(val fill: Color, val ink: Color, val outline: Color?)`; disabled: `ButtonColors(Color.Transparent, colors.mute, colors.surf3)`; `ButtonTokens.disabledOutline = 1.dp`; `HhButton(…, trailingIcon: String? = null)` drawn after the label at `ButtonTokens.icon` in the label's colour (end padding `regularIconPaddingStart`); `@Composable fun HhRoundButton(icon: String, spoken: String, onClick: () -> Unit, modifier: Modifier = Modifier, tone: ButtonTone = ButtonTone.Quiet, enabled: Boolean = true, on: ButtonSurface, size: Dp = ButtonTokens.regularHeight, iconSize: Dp = 28.dp)` (a circle in `buttonColors`, the outline when disabled, named by `spoken`). `DISABLED_INK_ALPHA` removed. 48 dp targets use `ButtonTokens.regularHeight`.
 
 - [ ] **Step 1: The failing tests**
-- `ButtonsTest.aDisabledButtonIsAnOutlineWithAMutedLabel`: for every tone and surface, both themes: `buttonColors(tone, enabled = false, on, c) == ButtonColors(Color.Transparent, c.mute, c.surf3)`; a disabled `HhButton` click does nothing and is `assertIsNotEnabled()`. Fails if any tone keeps a fill.
-- `ButtonsTest.aTrailingIconSitsAfterTheLabel`: `HhButton("Door history", …, trailingIcon = Icons.CHEVRON_RIGHT, on = ButtonSurface.Surf)`: the icon's left ≥ the label's right; the node's name is "Door history" (the icon is unspoken).
-- `ContrastTest`'s disabled check: `t.mute` against `surfaceOf(on, t)` ≥ `DISABLED_TEXT_MIN`, every surface, both themes.
+- `ButtonsTest.aDisabledButtonIsAnOutlineWithAMutedLabel`: for every tone and surface, both themes: `buttonColors(tone, enabled = false, on, c) == ButtonColors(Color.Transparent, c.mute, c.surf3)`; a disabled `HhButton` and a disabled `HhRoundButton` are `assertIsNotEnabled()` and a click does nothing. Fails if any tone keeps a fill.
+- `ButtonsTest.aTrailingIconSitsAfterTheLabel`: `HhButton("Door history", …, trailingIcon = Icons.CHEVRON_RIGHT, on = ButtonSurface.Surf)`: the icon's left ≥ the label's right; the node's name is "Door history".
+- `ButtonsTest.aRoundButtonIsNamedAndPrimaryIsAccent`: `HhRoundButton(Icons.PAUSE, "Pause Kitchen", tone = Primary, …)` is a 48 dp `Role.Button` named "Pause Kitchen"; `buttonColors(Primary, true, Surf, c).fill == c.accent`.
+- `ContrastTest`'s disabled check: `t.mute` against the surface the button sits on (a private `surfaceOf(on, t)` in the test: `bg`, `surf`, `dangerSoft`) ≥ `DISABLED_TEXT_MIN`, every surface, both themes.
 Run: `./gradlew :core:ui:testDebugUnitTest --tests '*ButtonsTest*' --tests '*ContrastTest*'` — Expected: FAIL to compile.
-- [ ] **Step 2: Implement** — `HhButton` adds `.border(ButtonTokens.disabledOutline, outline, pill)` when `outline != null`, before the click; the KDoc's "Disabled, every tone is the quiet fill with a faded `mute` label" becomes "Disabled, every tone is an outline with a `mute` label (9 §6.4)".
-- [ ] **Step 3: Run them; compare; re-record** — `./gradlew compareRoborazziDebug`: `button_matrix_*` and every image with a disabled `HhButton` (All lights off with nothing on, sheet footers before a title, …). **Re-record, open each new image and look at it against the handoff** (note 36: a thin outline, a muted label, no fill). The expected list is the compare report.
+- [ ] **Step 2: Implement** — `HhButton` adds `.border(ButtonTokens.disabledOutline, outline, pill)` when `outline != null`; its KDoc's disabled sentence becomes "Disabled, every tone is an outline with a `mute` label (9 §6.4)". Music's Play/Pause/Next, Lights' › and Today's + become `HhRoundButton` with their tags, names and colours unchanged (Today's + is `Primary`).
+- [ ] **Step 3: Compare, check, re-record** — predicted prefixes: `button_matrix_`, and any image with a disabled button (`lights_card_off`, `editor_empty_`, `calendar-sheets/11-`, `detail_`, `settings_`). Look at the `home_*` diffs only (the full look is Task 12's). Re-record; the baseline check by prefix.
 - [ ] **Step 4: The gate and commit**
 ```bash
 git add core capability
-git commit -m "Draw every disabled button as an outline with a muted label, and let a button end with an icon"
+git commit -m "Draw every disabled button as an outline with a muted label, let a button end with an icon, and share one round button"
 ```
 
 ---
@@ -261,11 +267,12 @@ git commit -m "Draw every disabled button as an outline with a muted label, and 
 **Review:** sonnet.
 
 **Files:**
-- Modify: `core/ui/.../Shell.kt`; `app/.../shell/ui/OverlayLayers.kt` (`ToastLayer`, `ClosingWarningLayer`)
-- Test: `core/ui/src/test/.../ToastMillisTest.kt`, `ShellPartsTest.kt`; `app/src/test/.../shell/ui/ShellLayersTimeoutTest.kt`, `ShellLayersRedrawTest.kt`, `ShellScreenshotTest.kt`
+- Modify: `core/ui/.../Shell.kt`; `app/.../shell/ui/OverlayLayers.kt` (`ToastLayer`, `ClosingWarningLayer`, `rememberClosingSoon`, `rememberSheetClosingSoon` return when their countdown ends)
+- Test: `core/ui/src/test/.../ToastMillisTest.kt` (rewritten), `ShellPartsTest.kt`; `app/src/test/.../shell/ui/ShellLayersTimeoutTest.kt`, `ShellLayersRedrawTest.kt` (its `toastMillis(…, urgent = false)` call), `ShellScreenshotTest.kt` (the two warning snaps' new arguments)
 
 **Interfaces:**
-- Produces (`core.ui`): `const val TOAST_MIN_MS = 6_000L`, `TOAST_MAX_MS = 12_000L`, `TOAST_MS_PER_TEN_WORDS = 1_000L`; `fun toastMillis(message: String): Long`; `internal fun ringLeft(elapsedMs: Long, totalMs: Long): Float` (1 at 0, linear, 0 at and after `totalMs`); `@Composable fun HhCountdownRing(totalMs: Long, color: Color, modifier: Modifier = Modifier)` (`ShellTokens.ringSize = 22.dp`, `ringStroke = 3.dp`; the drained part in `color` at 30 %; starts full on first composition, drains on the frame clock); `HhToast(message, icon, modifier, urgent, countdownMs: Long? = null)` (a ring in `bg` in place of the icon when set).
+- Produces (`core.ui`): `const val TOAST_MIN_MS = 6_000L`, `TOAST_MAX_MS = 12_000L`, `TOAST_MS_PER_TEN_WORDS = 1_000L`; `fun toastMillis(message: String): Long`; `class Countdown(val endsAt: Long, val totalMs: Long, val nowMillis: () -> Long)`; `HhToast(message, icon, modifier, urgent, countdown: Countdown? = null)` (with a countdown, a private ring in `bg` replaces the icon, `ShellTokens.ringSize = 22.dp`, `ringStroke = 3.dp`, the spent part at 30 %); `internal fun ringLeft(remainingMs: Long, totalMs: Long): Float` (clamped to 0..1).
+- Produces (`app`): `ClosingWarningLayer(text, tag, endsAt: Long, nowMillis: () -> Long, keyboard = …)`: Settings' `endsAt` is `settingsExpiresAt`; the sheet's is the moment its warning started plus `CLOSING_WARNING_MS`.
 
 - [ ] **Step 1: The failing tests**
 ```kotlin
@@ -281,12 +288,11 @@ fun aToastStaysSixSecondsPlusOneForEveryTenWords() {
     assertThat(toastMillis("  two   words  ")).isEqualTo(6_000L)
 }
 ```
-- `ShellPartsTest.theRingRunsDownOverItsTime`: `ringLeft(0, 20_000) == 1f`, `(10_000, …) == 0.5f`, `(20_000, …) == 0f`, `(25_000, …) == 0f`.
-- `ShellLayersTimeoutTest.aToastShowsForItsReadingTime` (`mainClock.autoAdvance = false`): a 12-word toast is on screen at 6 999 ms and gone at 7 000 ms. Fails today: the old rule hides it at 4 000.
-`ShellLayersRedrawTest`'s `toastMillis("Event deleted", urgent = false)` becomes `toastMillis("Event deleted")`.
+- `ShellPartsTest.theRingShowsTheTimeLeft`: `ringLeft(20_000, 20_000) == 1f`, `(10_000, …) == 0.5f`, `(0, …) == 0f`, `(-5_000, …) == 0f`.
+- `ShellLayersTimeoutTest.aToastShowsForItsReadingTime` (`mainClock.autoAdvance = false`): a 12-word toast is on screen one frame before 7 000 ms and gone one frame after. Fails today: the old rule hides it at 4 000.
 Run: `./gradlew :core:ui:testDebugUnitTest --tests '*ToastMillisTest*' --tests '*ShellPartsTest*'` and `./gradlew :app:testDebugUnitTest --tests '*ShellLayers*'` — Expected: FAIL to compile.
-- [ ] **Step 2: Implement** — words by `message.split(Regex("\\s+")).count { it.isNotEmpty() }`; `ToastLayer` calls `toastMillis(t.message)`; `ClosingWarningLayer` passes `countdownMs = CLOSING_WARNING_MS`; the ring is drawn with `drawArc` from 12 o'clock, clockwise, from an `Animatable(1f)` animated to 0 with `tween(totalMs.toInt(), easing = LinearEasing)`. The toast KDoc's "4 s, 6 s for an error…" becomes the new rule (9 §6.10).
-- [ ] **Step 3: Screenshots** — `settings_warning_dark` and `sheet_warning_dark` re-recorded (a full ring); a new `settings_warning_half_dark` (`autoAdvance = false`, advanced 10 000 ms: half a ring). Re-record, **open each new image and look at it against the handoff** ("Interactions": a ring that runs down). Expected list: those three.
+- [ ] **Step 2: Implement** — words by `message.split(Regex("\\s+")).count { it.isNotEmpty() }`; `ToastLayer` calls `toastMillis(t.message)`. The ring reads `ringLeft(endsAt − nowMillis(), totalMs)` on every frame (`withFrameMillis` in a `LaunchedEffect` loop driving a frame counter), drawn with `drawArc` from 12 o'clock, so a screenshot or an advanced clock draws the time actually left. The toast KDoc's "4 s, 6 s for an error…" becomes the new rule (9 §6.10).
+- [ ] **Step 3: Screenshots** — predicted: `settings_warning_dark`, `sheet_warning_dark` (a full ring), new `settings_warning_half_dark` (`nowMillis` 10 000 ms before `endsAt`). Open the three; the baseline check by name.
 - [ ] **Step 4: The gate and commit**
 ```bash
 git add core/ui app
@@ -300,25 +306,27 @@ git commit -m "Keep toasts up six seconds plus one for every ten words, and show
 **Review:** opus.
 
 **Files:**
-- Create: `app/.../shell/ui/ShellDimens.kt`
-- Modify: `shell/ui/CulveryShell.kt` (the rail full height with the mark inside it; the top bar and the page in the main area), `NavRail.kt`, `StatusBar.kt` (the top bar), `CulveryMark.kt` (none expected), `SetupWiring.kt` (`overlayCameraMark`), `MainActivity.kt`
-- Test: `app/src/test/.../shell/ui/ShellLayoutTest.kt`, `NavRailTest.kt`, `ShellScreenshotTest.kt`; `display/DisplayWiringTest.kt`; `display/ui/SleepLayersScreenshotTest.kt` (`camera_mark_dark`/`_light` now show the pill)
+- Create: `app/.../shell/ui/ShellDimens.kt`; test `app/src/test/.../shell/ui/CameraMarksTest.kt`
+- Modify: `shell/ui/CulveryShell.kt` (the rail full height with the mark inside it; the top bar and the page in the main area), `NavRail.kt`, `StatusBar.kt` (the top bar), `OverlayLayers.kt` (`ShellLayers` clears the shell and sheet from TalkBack while an alert shows), `SetupWiring.kt`, `MainActivity.kt`
+- Test: `ShellLayoutTest.kt`, `NavRailTest.kt`, `AlertLayerTest.kt`, `ShellScreenshotTest.kt`; `display/DisplayWiringTest.kt`; `display/ui/SleepLayersScreenshotTest.kt` (`camera_mark_dark`/`_light` now show the pill)
 
 **Interfaces:**
-- Consumes: `ButtonTokens.touchMin` (Task 3); `Presence.running` (Plan 8).
-- Produces: `object ShellDimens` (the frame rows of Units, incl. `topBarHeight = 48.dp`, `mainPaddingEnd = 28.dp`); `RAIL_WIDTH = 107.dp`, `MARK_WIDTH = 56.dp`; `internal fun themeLabel(dark: Boolean, previewing: Boolean): String`; `internal const val WATCHING = "Watching"`; `StatusBar(dark, previewing, session, watching: Boolean, onSignOut, onToggleThemePreview)`; `CulveryShell(state, now, watching: Boolean, onSelectTab, onOpenSettings, onSignOut, onToggleThemePreview, tabContent)`; `internal fun overlayCameraMark(running: Boolean, sleeping: Boolean, complete: Boolean?, settingsOpen: Boolean, sheetShowing: Boolean, pinShowing: Boolean, alertShowing: Boolean): Boolean` = `running && !sleeping && !(complete == true && !settingsOpen && !sheetShowing && !pinShowing && !alertShowing)`.
+- Consumes: `Presence.running` (Plan 8).
+- Produces: `object ShellDimens` (the frame rows of Units, incl. `topBarHeight = 48.dp`); `RAIL_WIDTH = 107.dp`, `MARK_WIDTH = 56.dp`; `internal fun themeLabel(dark: Boolean, previewing: Boolean): String`; `internal const val WATCHING = "Watching"`; `StatusBar(dark, previewing, session, watching: Boolean = false, onSignOut, onToggleThemePreview, pillSpot: CameraMarkSpot? = null)`; `CulveryShell(state, now, onSelectTab, onOpenSettings, onSignOut, onToggleThemePreview, tabContent, watching: Boolean = false, pillSpot: CameraMarkSpot? = null)`; `class CameraMarkSpot { var centre: Offset? by mutableStateOf(null) }` (the pill's icon centre in the root, where it is or would be: the top bar lays the pill's slot out even while hidden, so the other items never move); in `SetupWiring.kt`: `internal fun watchingPill(running: Boolean, pinShowing: Boolean, alertShowing: Boolean): Boolean = running && !pinShowing && !alertShowing` and `internal fun overlayCameraMark(running: Boolean, sleeping: Boolean, complete: Boolean?, settingsOpen: Boolean, sheetShowing: Boolean, pinShowing: Boolean, alertShowing: Boolean): Boolean = running && (sleeping || !(complete == true && !settingsOpen && !sheetShowing && !pinShowing && !alertShowing))` (Task 14 drops `sleeping ||`).
 
 - [ ] **Step 1: The failing tests** (each UI test ends with `assertClickablesHaveRoleAndLabel()`)
-- `ShellLayoutTest.theThemeControlSaysWhatItIs` (§4.1): `themeLabel(dark = true, previewing = false) == "Night · Auto"`, `(false, false) == "Day · Auto"`, `(true, true) == "Night · Preview"`, `(false, true) == "Day · Preview"`; on screen the control's name is "Theme: Day · Preview" and its click label "go back to the automatic theme".
-- `ShellLayoutTest.theWatchingPillShowsOnlyWhileTheCameraRuns` (§6.7): `watching = true` → "Watching" shown, named "The camera is on"; false → no such node.
-- `ShellLayoutTest.theMarkHasEqualSpaceAboveAndBeside` (note 6): the mark's top inside the rail equals `(RAIL_WIDTH − MARK_WIDTH) / 2` within 0.5 dp, and equals its left inset. Replaces `theMarkSitsInTheTopCornerOnTheTabIconsCentreLine` and `theMarkIsAtLeast48DpClearOfTheFirstTab`; `theHomeTabIsWhereItWasBeforeTheMarkMoved` goes (the rail moved).
-- `ShellLayoutTest.theTopBarSitsInTheMainArea`: its left ≥ 107 dp, its height 48 dp; the page's top is at the bar's bottom; the page's right edge is 28 dp from the screen's.
-- `ShellLayoutTest.signOutIsAQuietPill`: drawn 29 dp tall, tapped anywhere in its 48 dp height it locks (the existing `inTheShellSignOutAndTheThemeTakeATouchJustBelowThem` keeps passing).
-- `NavRailTest.theDoorBadgeIsAPillWithABackgroundRing`: `rail_door_badge` at least 19 dp tall and 23 dp wide (19 + the 2 dp ring each side), text "2".
-- `DisplayWiringTest.theCameraIsMarkedExactlyOnce` (Review Focus 3): over every combination of the six other inputs, with `running = true` exactly one of these is true, and with `running = false` none: the pill in plain view (`!sleeping && complete == true && !settingsOpen && !sheetShowing && !pinShowing && !alertShowing`), the overlay mark (`overlayCameraMark(…)`), the glyph (`sleeping`). Fails if a sheet, the PIN pad or the wizard leaves the camera unmarked, or the mark doubles over the pill.
-Run: `./gradlew :app:testDebugUnitTest --tests '*ShellLayoutTest*' --tests '*NavRailTest*' --tests '*DisplayWiringTest*'` — Expected: FAIL to compile.
-- [ ] **Step 2: Implement** — the Units' frame rows. `CulveryShell`: `Row { NavRail (full height, the mark at its top) ; Column(main padding) { StatusBar ; page } }`. The top bar: right-aligned, 19 dp gaps, in order the Watching pill (a 7 dp `accent` dot, filled `photo_camera`, "Watching"; `contentDescription = THE_CAMERA_IS_ON`), the signed-in block (`account_circle`, "Alex · Admin" in `ink`, the Sign out pill, the 1 × 19 dp `surf3` divider), the theme control. The badge: `danger` pill with a 2 dp `bg` ring (`background(c.bg, pill).padding(2.dp)` then the pill). `MainActivity`: `CulveryShell(…, watching = running, …)` and `ShellLayers(…, cameraMark = overlayCameraMark(running, screen != Screen.AWAKE, complete, state.settingsOpen, overlay.isShowing, pinRequest != null, alert != null))`. Task 14 removes the overlay mark from over the sleep layer; until then it shows there as today.
-- [ ] **Step 3: Run them; compare; re-record** — every `ShellScreenshotTest` image and `camera_mark_dark`/`_light` change; new `home_watching_dark`, `home_watching_light` (pill, signed in) and `home_preview_light` ("Day · Preview"). **Re-record, open each new image and look at it against the handoff's "Shared frame"** (the mark's equal padding, the badge's ring, the bar's order, one line). The expected list is the compare report plus the three new names.
+- `ShellLayoutTest.theThemeControlSaysWhatItIs` (§4.1): `themeLabel(true, false) == "Night · Auto"`, `(false, false) == "Day · Auto"`, `(true, true) == "Night · Preview"`, `(false, true) == "Day · Preview"`; on screen named "Theme: Day · Preview", click label "go back to the automatic theme". It replaces the label halves of `theThemeToggleOnAutoByDayOffersTheNightTheme`, `…ByNight…`, `theThemeTogglePreviewingOffersTheWayBack` and `theThemeToggleWorksFromTalkBack` (their click labels stay).
+- `ShellLayoutTest.theWatchingPillShowsOnlyWhileTheCameraRuns` (§6.7): `watching = true` → "Watching", named "The camera is on"; false → none, and the theme control's position is the same both ways.
+- `ShellLayoutTest.theMarkHasEqualSpaceAboveAndBeside` (note 6): the mark's top inset equals its left inset, `(RAIL_WIDTH − MARK_WIDTH) / 2`, within 0.5 dp. It replaces `theMarkSitsInTheTopCornerOnTheTabIconsCentreLine`, `theMarkIsAtLeast48DpClearOfTheFirstTab` and `theHomeTabIsWhereItWasBeforeTheMarkMoved`; `NavRailTest.theRailNoLongerDrawsTheMark` becomes `theRailDrawsTheMark`.
+- `ShellLayoutTest.theTopBarSitsInTheMainArea`: its left ≥ 107 dp, its height 48 dp; the page starts at its bottom; the page's right edge 28 dp from the screen's. `atFontScale15TheStatusBarGrowsToHoldItsText` and `theStatusBarIs48DpTallAndItsControlsTakeItsHeight` are re-measured in the new place.
+- `ShellLayoutTest.signOutIsAQuietPill`: drawn 29 dp tall, a tap anywhere in its 48 dp height locks (`inTheShellSignOutAndTheThemeTakeATouchJustBelowThem` keeps passing).
+- `NavRailTest.theDoorBadgeIsAPillWithABackgroundRing`: `rail_door_badge` at least 23 dp tall (19 + the 2 dp ring each side), text "2".
+- `AlertLayerTest.whatTheDoorCardCoversIsHiddenFromTalkBack`: with an alert up, no "Sign out" node in the tree; without, one.
+- `CameraMarksTest` (Review Focus 3; Robolectric, `ShellLayers` over `CulveryShell` wired as `MainActivity` wires them, with `watchingPill` and `overlayCameraMark`): for each of Home, Settings open, a sheet, the PIN pad, the door card, the wizard (`complete = false`) and asleep, the count of unmerged nodes named "The camera is on" is 1 with the camera running and 0 without. Fails if a sheet or the PIN pad leaves the camera unmarked, or the pill and the mark both show.
+`DisplayWiringTest` keeps its `holding` cases.
+Run: `./gradlew :app:testDebugUnitTest --tests '*ShellLayoutTest*' --tests '*NavRailTest*' --tests '*AlertLayerTest*' --tests '*CameraMarksTest*'` — Expected: FAIL to compile.
+- [ ] **Step 2: Implement** — the Units' frame rows. `CulveryShell`: `Row { NavRail (full height, the mark at its top); Column(main padding) { StatusBar; page } }`. The top bar, right-aligned with 19 dp gaps: the Watching pill (a 7 dp `accent` dot, filled `photo_camera`, "Watching", named `THE_CAMERA_IS_ON`), the signed-in block (`account_circle`, "Alex · Admin" in `ink`, the Sign out pill, the 1 × 19 dp `surf3` divider), the theme control. The badge: the `danger` pill inside a 2 dp `bg` ring. `ShellLayers` adds `alert != null` to the conditions that clear the shell and the sheet from TalkBack. `MainActivity`: `CulveryShell(…, watching = watchingPill(running, pinRequest != null, alert != null), pillSpot = spot)` with `val spot = remember { CameraMarkSpot() }`, and `cameraMark = overlayCameraMark(running, screen != Screen.AWAKE, complete, state.settingsOpen, overlay.isShowing, pinRequest != null, alert != null)`.
+- [ ] **Step 3: Compare, check, re-record** — predicted prefixes: `home_`, `tab_`, `pin_pad_`, `settings_warning`, `sheet_warning`, `camera_mark_`; new `home_watching_dark`, `home_watching_light`, `home_preview_light`. Look at the `home_*` diffs and the three new images; re-record; the baseline check by prefix.
 - [ ] **Step 4: The gate and commit**
 ```bash
 git add app
@@ -334,20 +342,20 @@ git commit -m "Redraw the rail and the top bar: the mark evenly placed, the Door
 **Files:**
 - Modify: `capability/weather/.../WeatherView.kt`, `WeatherWords.kt`, `WeatherCapability.kt`, `WeatherRepository.kt` (its `header` flow's type), `ui/WeatherHeaderItem.kt`, `ui/WeatherDimens.kt`
 - Delete: `ui/ForecastCard.kt` (and `ForecastCardHost`), its tests, the `forecast_*` baselines; words only it used
-- Test: `WeatherViewTest.kt`, `WeatherWordsTest.kt`, `WeatherCapabilityTest.kt`, `ui/WeatherHeaderItemTest.kt`, `ui/WeatherScreenshotTest.kt`; `app/.../shell/ui/ShellScreenshotTest.kt` (`weatherHome` loses the Forecast card)
+- Test: `WeatherViewTest.kt` (its `HeaderWeather(…)` constructor case), `WeatherWordsTest.kt`, `WeatherCapabilityTest.kt`, `ui/WeatherHeaderItemTest.kt` (its constructor), `ui/WeatherScreenshotTest.kt` (its `day` value); `app/.../shell/ui/ShellScreenshotTest.kt` (`weatherHome` loses the Forecast card)
 
 **Interfaces:**
 - Consumes: `HhColors.rain` (Task 2).
-- Produces: `sealed interface HeaderWeather { data class Now(val condition: Condition, val night: Boolean, val temperature: Double, val high: Double, val low: Double, val days: List<DailyWeather>) : HeaderWeather; data object AddLocation : HeaderWeather; data object NoForecast : HeaderWeather }`; `fun headerWeather(view: WeatherView, now: LocalDateTime): HeaderWeather?`; `internal fun weatherTint(condition: Condition, colors: HhColors): Color`; `internal fun conditionLabel(condition: Condition): String` ("Partly cloudy"); `internal const val ADD_HOME_LOCATION_FOR_WEATHER = "Add home location for weather"`; `WeatherCapability.cards()` emits an empty list.
+- Produces: `sealed interface HeaderWeather { data class Now(val condition: Condition, val night: Boolean, val temperature: Double, val high: Double, val low: Double, val days: List<DailyWeather>) : HeaderWeather; data object AddLocation : HeaderWeather; data object NoForecast : HeaderWeather }`; `fun headerWeather(view: WeatherView, now: LocalDateTime): HeaderWeather?`; `internal fun weatherTint(condition: Condition, colors: HhColors): Color`; `internal const val ADD_HOME_LOCATION_FOR_WEATHER = "Add home location for weather"`; the condition under the temperature is `conditionWords(c).replaceFirstChar { it.uppercase() }`; `WeatherCapability.cards()` emits an empty list.
 
 - [ ] **Step 1: The failing tests**
 - `WeatherViewTest.noLocationAsksForOne` (`NoLocation` → `AddLocation`); `aFailedFetchSaysSoInTheHeader` (Review Focus 4: `Failed` → `NoForecast`); `readyCarriesTheThreeDays` (`Now.days` = today and the next two); `waitingAndExpiredShowNothing` (**pin**, null).
-- `WeatherWordsTest.rainIsBlueAndSunIsAmber`: DRIZZLE, RAIN, SHOWERS, THUNDER → `colors.rain`; CLEAR, PARTLY_CLOUDY, CLOUDY, FOG, SNOW → `colors.weather`; both themes. `conditionLabel(PARTLY_CLOUDY) == "Partly cloudy"`.
-- `WeatherHeaderItemTest` (Robolectric, a fake `ShellNavigator`): `theCurrentWeatherIsOneItem` (named by `headerDescription`; the icon 56 dp, the temperature 43 sp); `theStripReadsTodayThenTwoDays` (Wednesday 2026-10-21: "Today", "Thu", "Fri", each one item named by `rowDescription`); `theNoLocationPillOpensHomeLocation` ("Add home location for weather" → `openSettings(SettingsPageIds.LOCATION)`); `noForecastSaysWhy` (the `NO_FORECAST` sentence shows). Each ends with `assertClickablesHaveRoleAndLabel()`.
-- `WeatherCapabilityTest.weatherHasNoHomeCard` (`cards().first()` empty); `theHeaderItemShowsWithoutALocation`. The old card tests go with the card.
+- `WeatherWordsTest.rainIsBlueAndSunIsAmber`: DRIZZLE, RAIN, SHOWERS, THUNDER → `colors.rain`; CLEAR, PARTLY_CLOUDY, CLOUDY, FOG, SNOW → `colors.weather`; both themes.
+- `WeatherHeaderItemTest` (Robolectric, a fake `ShellNavigator`): `theCurrentWeatherIsOneItem` (named by `headerDescription`; "Partly cloudy" drawn; the icon 56 dp, the temperature 43 sp); `theStripReadsTodayThenTwoDays` (Wednesday 2026-10-21: "Today", "Thu", "Fri", each one item named by `rowDescription`); `theNoLocationPillOpensHomeLocation` (→ `openSettings(SettingsPageIds.LOCATION)`); `noForecastSaysWhy` (the `NO_FORECAST` sentence). Each ends with `assertClickablesHaveRoleAndLabel()`.
+- `WeatherCapabilityTest.weatherHasNoHomeCard`; `theHeaderItemShowsWithoutALocation`. The card's tests go with it.
 Run: `./gradlew :capability:weather:testDebugUnitTest` — Expected: FAIL to compile.
-- [ ] **Step 2: Implement** — `headerItems()` maps every non-null `HeaderWeather`; the block: icon, then a `Column` of temperature over `conditionLabel`, the divider, then the strip (`Row` of three: label, icon at 28 dp in `weatherTint`, high and low as one line). The pill is an `HhButton` (quiet, `ButtonSurface.Bg`). Delete what nothing uses after the card goes (`FORECAST_TITLE`, `GETTING_FORECAST`, `NO_FORECAST_YET`, `ADD_LOCATION`, `ADD_HOME_LOCATION`, `updatedAgo`, `STALE_AFTER_MS` if unused; the compiler and the tests say which).
-- [ ] **Step 3: Screenshots** — re-recorded: `header_day_*`, `header_night_*`, `header_clear_night_*`, `home_weather_*`, `home_full_*`, `home_fs15`; new: `header_rain_dark`, `header_rain_light`, `header_no_location_dark`, `header_no_location_light`, `header_no_forecast_dark`; deleted: every `forecast_*`. **Open each new image and look at it against the handoff's Home header** (note 1: current weather, a divider, three days; blue rain, amber sun). The baseline check with those names (deletions show as changed).
+- [ ] **Step 2: Implement** — `headerItems()` maps every non-null `HeaderWeather`; the block: icon, the temperature over the condition, the divider, the strip (three of: label, a 28 dp icon in `weatherTint`, high and low on one line). The pill is an `HhButton` (quiet, `ButtonSurface.Bg`). Delete what nothing uses once the card goes (the compiler and the tests say which).
+- [ ] **Step 3: Compare, check, re-record** — predicted prefixes: `header_`, `home_`, deleted `forecast_`; new `header_rain_dark`, `header_rain_light`, `header_no_location_dark`, `header_no_location_light`, `header_no_forecast_dark`. Look at the `home_*` diffs; re-record; the baseline check by prefix (deletions count as changed).
 - [ ] **Step 4: The gate and commit**
 ```bash
 git add capability/weather app
@@ -362,20 +370,19 @@ git commit -m "Move the forecast into Home's header with a three-day strip, ask 
 
 **Files:**
 - Modify: `core/plugin/.../HomeCardPlacer.kt` (`HomePlacement` gone), `HomeCard.kt` (the sizes' KDoc); `core/ui/.../Type.kt` (`clock`, `date`); `app/.../shell/ShellUiState.kt`, `ShellViewModel.kt`, `shell/ui/HomeGrid.kt`, `HomeScreen.kt`
-- Test: `core/plugin/src/test/.../HomeCardPlacerTest.kt` (rewritten); `capability/lights/src/test/.../LightsCapabilityTest.kt` (its placement case); `app/src/test/.../shell/ShellViewModelTest.kt`; create `app/src/test/.../shell/ui/HomeGridTest.kt`; `ShellLayoutTest.kt`; `ShellScreenshotTest.kt`; `core/ui/src/test/.../TypeTest.kt`
+- Test: `core/plugin/src/test/.../HomeCardPlacerTest.kt` (rewritten); `capability/lights/src/test/.../LightsCapabilityTest.kt` (its placement case); `app/src/test/.../shell/ShellViewModelTest.kt` (its placement cases); create `app/src/test/.../shell/ui/HomeGridTest.kt`; `ShellLayoutTest.kt` (`theClockBoxIsItsLineHeight` 79 → 86, `theClockIs88spAndTheDate21`, `dateBaselineSits42dpBelowClockBaseline`, and its `HomeScreen(…, emptyList(), …)` calls → `HomeLayout.Empty`); `ShellScreenshotTest.kt`; `core/ui/src/test/.../TypeTest.kt`
 
 **Interfaces:**
 - Produces (`core.plugin`): `data class HomeLayout(val left: HomeCard?, val right: List<HomeCard>) { companion object { val Empty = HomeLayout(null, emptyList()) } }`; `HomeCardPlacer.RIGHT_CARDS = 2`; `HomeCardPlacer.place(cards: List<HomeCard>): HomeLayout`. KDoc on `HomeCardSize`: TALL is Home's left column; REGULAR shares the right column, two at most; WIDE fills the right column only when no REGULAR card shows (9 §6.1).
 - Produces (`app`): `ShellUiState.homeCards: HomeLayout = HomeLayout.Empty`; `HomeGrid(layout: HomeLayout, modifier)`; `HomeScreen(now, layout: HomeLayout, headerItems)`; `ShellDimens.gridGap = 15.dp`, `leftColumn = 400.dp`, `clockToDate = 15.dp`; `HhType.clock` 100 sp / W600 / tabular / −3.3 sp / line height 86 sp; `HhType.date` 23 sp.
 
 - [ ] **Step 1: The failing tests**
-- `HomeCardPlacerTest`: `emptyIsEmpty`; `theHighestTallCardTakesTheLeft`; `lightsSitAboveMusic` (REGULAR 35 and 30 → `right == [lights, music]`); `atMostTwoOnTheRight` (three REGULAR → the two highest, ties by id); `comingUpOnlyWithoutLightsOrMusic` (TALL + WIDE + one REGULAR → `right == [regular]`; TALL + WIDE → `right == [wide]`); `aSecondWideCardIsDropped`.
-- `HomeGridTest` (Robolectric, 1280 × 800 minus the frame): `theLeftColumnIs400Dp`; `twoRightCardsShareTheColumn` (each `(h − 15) / 2` within 1 dp, Lights on top); `oneRightCardTakesTheColumn`; `comingUpTakesTheColumnAlone`. It pins the left card's size and a right half's as literals, `todayCardSize` and `rightHalfSize` (about 400 × 582 and 701 × 283 dp: whatever it measures), and Tasks 8–10's card tests use the same literals, so a frame change that moves them fails here first.
-- `ShellLayoutTest.theClockIs100spAndTheDate23` (replaces `theClockIs88spAndTheDate21`); `theDateSits15dpBelowTheClock` (replaces `dateBaselineSits42dpBelowClockBaseline`).
-- `LightsCapabilityTest`'s placement case: with Today, Coming up, Music and Lights, `right` is Lights then Music. `ShellViewModelTest`'s placement cases read `homeCards.left`/`right`.
+- `HomeCardPlacerTest`: `emptyIsEmpty`; `theHighestTallCardTakesTheLeft`; `lightsSitAboveMusic` (REGULAR 35 and 30 → `right == [lights, music]`); `atMostTwoOnTheRight` (three REGULAR → the two highest, ties by id); `comingUpOnlyWithoutLightsOrMusic` (TALL + WIDE + one REGULAR → `[regular]`; TALL + WIDE → `[wide]`); `aSecondWideCardIsDropped`.
+- `HomeGridTest` (Robolectric, the shell at 1280 × 800): `theLeftColumnIs400Dp`; `twoRightCardsShareTheColumn` (each `(h − 15) / 2` within 1 dp, Lights on top); `oneRightCardTakesTheColumn`; `comingUpTakesTheColumnAlone`. It pins the left card's size and a right half's as literals, `todayCardSize` and `rightHalfSize` (about 400 × 582 and 701 × 283 dp: whatever it measures); Tasks 8–10's card tests use the same literals, so a frame change that moves them fails here first.
+- `ShellLayoutTest.theClockIs100spAndTheDate23`; `theDateSits15dpBelowTheClock`; `theClockBoxIsItsLineHeight` at 86.
 Run: `./gradlew :core:plugin:testDebugUnitTest :app:testDebugUnitTest --tests '*HomeGridTest*' --tests '*ShellLayoutTest*' --tests '*ShellViewModelTest*'` — Expected: FAIL to compile.
-- [ ] **Step 2: Implement** — `HomeGrid`: a `Row` with 15 dp between the 400 dp left and the rest; the right a `Column` with 15 dp gaps, each card `weight(1f)`. The header places the date 15 dp below the clock's line box; the header items keep their place relative to the date. Coming up keeps its parts, restyled by Task 2's tokens.
-- [ ] **Step 3: Screenshots** — re-recorded: every `home_*`, `tab_*`, `pin_pad_*` and `camera_mark_*` image in `ShellScreenshotTest`/`SleepLayersScreenshotTest` (the header's clock moves); new `home_coming_up_dark` (Today and Coming up), `home_lights_only_dark` (Today and Lights, full column), `home_lights_music_dark` (spec §6.1's three layouts). **Open each and look at it against the handoff's 1a/1c** (a 400 dp Today column; Lights above Music, half each; the clock's size). The expected list is the compare report plus the three new names.
+- [ ] **Step 2: Implement** — `HomeGrid`: a `Row` with 15 dp between the 400 dp left and the rest; the right a `Column` with 15 dp gaps, each card `weight(1f)`. The date 15 dp below the clock's line box; the header items keep their place relative to the date. Coming up keeps its parts, restyled by Task 2's tokens.
+- [ ] **Step 3: Compare, check, re-record** — predicted prefixes: `home_`, `tab_`, `pin_pad_`, `camera_mark_`, `settings_warning`, `sheet_warning`; new `home_coming_up_dark`, `home_lights_only_dark`, `home_lights_music_dark` (spec §6.1's three layouts). Look at the `home_*` diffs; re-record; the baseline check by prefix.
 - [ ] **Step 4: The gate and commit**
 ```bash
 git add core app capability/lights
@@ -391,47 +398,43 @@ git commit -m "Lay Home out in two columns: Today on the left, Lights above Musi
 **Files:**
 - Create: `capability/calendar/.../ui/TodayFill.kt`; `core/ui/.../Fades.kt`
 - Modify: `capability/calendar/.../ui/TodayCard.kt`, `ui/CardHosts.kt` (`TodayCardHost` reads `repo.days(today, 2)`), `ui/CalendarType.kt` (the Today rows of Units)
-- Test: create `capability/calendar/src/test/.../ui/TodayFillTest.kt`; `ui/CardsTest.kt`, `ui/CardHostsMidnightRolloverTest.kt`, `ui/CardScreenshotTest.kt`
+- Test: create `capability/calendar/src/test/.../ui/TodayFillTest.kt`; `ui/CardsTest.kt` (its "Nothing on today. Tap + to add something." case), `ui/CardHostsMidnightRolloverTest.kt`, `ui/CardScreenshotTest.kt`
 
 **Interfaces:**
-- Consumes: `HhButton(trailingIcon = …)` (Task 3); `Icons.ARROW_FORWARD` (Task 1); `todayCardSize` (Task 7's `HomeGridTest`).
+- Consumes: `HhButton(trailingIcon = …)`, `HhRoundButton` (Task 3); `Icons.ARROW_FORWARD` (Task 1); `todayCardSize` (Task 7).
 - Produces (`core.ui`): `@Composable fun HhBottomFade(color: Color, height: Dp, modifier: Modifier = Modifier)` (a vertical gradient, transparent to `color`, ignoring touches).
-- Produces (`capability.calendar.ui`):
-  - `const val TODAY_ROWS = 5`; `const val PILL_ROWS_SHOWN = 4`
-  - `data class TodayRows(val today: List<EventUi>, val tomorrow: List<EventUi>)`; `fun todayRows(today: List<EventUi>, tomorrow: List<EventUi>): TodayRows` (tomorrow is `tomorrow.take(TODAY_ROWS − today.size)` when `today.size < TODAY_ROWS`, else empty)
-  - `data class TodayFit(val tomorrowShown: Int, val scroll: Boolean, val more: Int)`; `internal fun fitToday(today: List<Int>, tomorrow: List<Int>, nothing: Int, divider: Int, gap: Int, available: Int, pillSpace: Int): TodayFit` (heights in px: each of today's rows, each candidate tomorrow row, the "Nothing on today" line, the TOMORROW divider)
-  - `fun moreToday(count: Int): String = "$count more today · Open calendar"`; `const val NOTHING_ON_TODAY = "Nothing on today"`, `const val TOMORROW = "Tomorrow"`
-  - `TodayCard(events: List<EventUi>?, tomorrow: List<EventUi>?, modifier: Modifier = Modifier, onOpen: (EventRef) -> Unit = {}, onAdd: (() -> Unit)? = null)`
+- Produces (`capability.calendar.ui`): `const val TODAY_ROWS = 5`, `PILL_ROWS_SHOWN = 4`; `data class TodayFit(val tomorrowShown: Int, val scroll: Boolean, val more: Int)`; `internal fun fitToday(today: List<Int>, tomorrow: List<Int>, nothing: Int, divider: Int, gap: Int, available: Int, pillSpace: Int): TodayFit` (heights in px: each of today's rows, each tomorrow candidate, the "Nothing on today" line, the TOMORROW divider); `fun moreToday(count: Int): String = "$count more today · Open calendar"`; `const val NOTHING_ON_TODAY = "Nothing on today"`, `TOMORROW = "Tomorrow"`; `TodayCard(events: List<EventUi>?, modifier, onOpen, onAdd, tomorrow: List<EventUi> = emptyList())` (the default keeps today's callers compiling). The card's tomorrow candidates are `tomorrow.filter { it.ref !in today's refs }.take(TODAY_ROWS − n)` when n < 5, else none: an event spanning midnight shows once, as today.
 
 `fitToday`'s rule (ruling 5), the one algorithm the signature doesn't decide:
 ```kotlin
-// Stack height of today's rows (or the nothing line), then the divider and t tomorrow rows, gaps between items.
+// Stack: today's rows (or the nothing line), then, when t > 0, the divider and t tomorrow rows; gaps between items.
 // today.size > TODAY_ROWS -> scroll. Else the largest t <= tomorrow.size whose stack fits available -> no scroll.
-// If none fits and today is not empty -> scroll; if today is empty -> t = the largest that fits, at least 0.
+// If none fits: today empty -> t = 0, no scroll; otherwise scroll.
 // Scrolling: k = today's rows whose bottom (stacked from 0 with gaps) <= available - pillSpace;
 // more = today.size - min(k, PILL_ROWS_SHOWN); tomorrowShown = 0.
 ```
 
 - [ ] **Step 1: The failing tests**
 `TodayFillTest.kt` (plain JVM; rows of 80 px, gap 9, divider 30, nothing line 30, available 480, pillSpace 68 unless said):
-- `moreThanFiveScrollsWithNMinusFour` (7 rows → `TodayFit(0, true, 3)`); `tallRowsCountMoreThanNMinusFour` (7 rows of 120 → k = 3 → more 4).
+- `moreThanFiveScrollsWithNMinusFour` (7 rows → `TodayFit(0, true, 3)`); `sixScrollsWithTwoMore` (6 → more 2); `tallRowsCountMoreThanNMinusFour` (7 of 120 → k = 3 → more 4).
 - `exactlyFiveIsJustThose` (5 rows → `TodayFit(0, false, 0)`).
-- `fewerThanFiveTopUpFromTomorrow`: for n in 1..4, `todayRows` gives `5 − n` tomorrow candidates, and `fitToday` shows them all at 60 px each.
-- `nothingTodayShowsFiveFromTomorrow` (n = 0, five 60 px candidates → 5, no scroll).
-- `aLongTitleDropsTomorrowRowsFirst` (Review Focus 1: today 110, 110, 110; two tomorrow of 60 → `tomorrowShown == 1`, no scroll).
+- `fewerThanFiveTopUpFromTomorrow`: n in 1..4 with `5 − n` candidates of 60 → all shown.
+- `nothingTodayShowsFiveFromTomorrow` (n = 0, five of 60 → 5).
+- `aLongTitleDropsTomorrowRowsFirst` (Review Focus 1: today 110, 110, 110; two tomorrow of 60 → 1, no scroll).
+- `noTomorrowRowFittingLeavesNoDividerAndNoScroll` (today 150, 150, 150; one tomorrow of 60 → `TodayFit(0, false, 0)`).
 - `todayAloneOverflowingScrolls` (four of 140 → scroll, k = 2, more 2).
-- `aShortTomorrowListTopsUpWhatItHas` (n = 2, tomorrow has 1 → 1).
 `CardsTest.kt` (Robolectric, the card at `todayCardSize`, a fake `ShellNavigator`; each ends with `assertClickablesHaveRoleAndLabel()`):
-- `sevenTodayScrollsBehindThePill`: "3 more today · Open calendar" shown; no "See the week"; a click → `openTab("calendar")`.
-- `fiveTodayShowsFiveAndNoPill`: no "Tomorrow"; "See the week" shown, a click → `openTab("calendar")`.
-- `twoTodayAddsThreeFromTomorrow`: the "Tomorrow" heading (drawn TOMORROW, spoken "Tomorrow"), three tomorrow rows named by `eventOnDay(event, tomorrow)`, their titles one line.
-- `nothingTodaySaysSoAndShowsFiveFromTomorrow`: "Nothing on today", then the heading and five rows.
-- `atFontScale15FiveRowsScrollWithThePill` (Review Focus 1): `WithFontScale(1.5f)`, five events with two-line titles → the pill shows, "See the week" hides.
+- `sevenTodayScrollsBehindThePill`: "3 more today · Open calendar"; no "See the week"; a click → `openTab("calendar")`.
+- `fiveTodayShowsFiveAndNoPill`: no "Tomorrow"; "See the week" → `openTab("calendar")`.
+- `twoTodayAddsThreeFromTomorrow`: the "Tomorrow" heading (drawn TOMORROW), three rows named by `eventOnDay(event, tomorrow)`, one-line titles; `aShortTomorrowTopsUpWhatItHas` (2 today, 1 tomorrow → 1).
+- `nothingTodaySaysSoAndShowsFiveFromTomorrow`: "Nothing on today", the heading, five rows.
+- `anEventSpanningMidnightShowsOnceAsToday`: the same `ref` in both lists → one row, a today row.
+- `aLargeFontTurnsFiveRowsIntoTheScroll` (Review Focus 1): the same five one-line events: no pill at font scale 1.0; `WithFontScale(1.5f)` → the pill, "See the week" hidden.
 - `todayTitlesWrapToTwoLines` (**pin**: `maxLines == 2`, ellipsis); `tomorrowRowsOpenTheirEvent`.
-`CardHostsMidnightRolloverTest.tomorrowsTopUpsBecomeTodayAtMidnight` (Review Focus 2): one event tomorrow → before midnight it shows under "Tomorrow"; the clock passes midnight → it is a today row and "Tomorrow" is gone unless the new tomorrow has events. Fails today: the host reads only today.
+`CardHostsMidnightRolloverTest.tomorrowsTopUpsBecomeTodayAtMidnight` (Review Focus 2): one event tomorrow shows under "Tomorrow"; past midnight it is a today row and "Tomorrow" is gone. Fails today: the host reads only today.
 Run: `./gradlew :capability:calendar:testDebugUnitTest --tests '*TodayFillTest*' --tests '*CardsTest*' --tests '*CardHostsMidnightRolloverTest*'` — Expected: FAIL to compile.
-- [ ] **Step 2: Implement** — `TodayCard` lists through a `SubcomposeLayout`: subcompose each candidate row, the nothing line and the divider at the list's width to measure them, call `fitToday`, then subcompose the result: the rows in a `Column`, or a `LazyColumn` (no scrollbar) of today's rows with `contentPadding(bottom = 73.dp)`, `HhBottomFade(c.surf, 133.dp)` at its foot and the pill (ruling 6) pinned. Today rows: `surf2`, 2-line titles; tomorrow rows: transparent with a 1 dp `surf2` edge, the bar at alpha 0.75, one-line titles. The divider: `TOMORROW.uppercase()` with a 1 dp `surf3` rule to its right, a heading spoken "Tomorrow". The header hides "See the week" while scrolling. `TodayCardHost`: `repo.days(today, 2)` → `TodayCard(days[0].events, days[1].events, …)`.
-- [ ] **Step 3: Screenshots** — re-recorded: `today_dark`, `today_light`, `today_empty_dark`, `today_badges_dark`, and the app's `home_*`; new: `today_scroll_dark`, `today_scroll_light` (the fade into white), `today_topped_up_dark` (2 + 3), `today_nothing_today_dark` (0 + 5), `today_fs15`. **Open each and look at it against the handoff's Today card** (notes 9, 21: outlined smaller tomorrow rows, the fade into the pill, nothing cut mid-row). The expected list is those names plus the app's compare report.
+- [ ] **Step 2: Implement** — the list through a `SubcomposeLayout`: measure each candidate row, the nothing line and the divider at the list's width, call `fitToday`, then subcompose the result: a `Column` of rows, or a `LazyColumn` (no scrollbar) of today's rows with `contentPadding(bottom = 73.dp)`, `HhBottomFade(c.surf, 133.dp)` at its foot and the pill (ruling 6). Today rows `surf2` with 2-line titles; tomorrow rows transparent with a 1 dp `surf2` edge, the bar at alpha 0.75, one-line titles; the divider `TOMORROW.uppercase()` with a 1 dp `surf3` rule, a heading spoken "Tomorrow". "See the week" hides while scrolling. `TodayCardHost`: `repo.days(today, 2)`.
+- [ ] **Step 3: Compare, check, re-record** — predicted prefixes: `today_`, `home_`; new `today_scroll_dark`, `today_scroll_light`, `today_topped_up_dark`, `today_nothing_today_dark`, `today_fs15`. Look at the `home_*` diffs and the new images; re-record; the baseline check by prefix.
 - [ ] **Step 4: The gate and commit**
 ```bash
 git add core/ui capability/calendar app
@@ -440,26 +443,26 @@ git commit -m "Fill Today to five rows: scroll behind an Open calendar pill when
 
 ---
 
-### Task 9: The Lights card and the off slider (spec §2.3, §2.5, §4.2, §6.2; ruling 7)
+### Task 9: The Lights card and the off slider (spec §2.3, §2.5, §4.2, §6.2; ruling 7; U1)
 
 **Review:** sonnet.
 
 **Files:**
 - Modify: `core/ui/.../Controls.kt` (`HhPercentSlider`); `capability/lights/.../ui/LightsCard.kt`, `ui/LightsParts.kt` (`MainRoomActions`), `ui/LightsDimens.kt`, `LightsWords.kt`
-- Test: `core/ui/src/test/.../PercentSliderTest.kt`; `capability/lights/src/test/.../ui/LightsCardTest.kt`, `ui/LightsCardScreenshotTest.kt`, `LightsWordsTest.kt`
+- Test: `core/ui/src/test/.../PercentSliderTest.kt`; `capability/lights/src/test/.../ui/LightsCardTest.kt` (its `MainRoomActions(…)` calls: the new parameters default to `{}`), `ui/LightsCardScreenshotTest.kt`, `LightsWordsTest.kt`
 
 **Interfaces:**
 - Consumes: `Icons.BRIGHTNESS_LOW`, `BRIGHTNESS_HIGH` (Task 1); `rightHalfSize` (Task 7).
-- Produces (`core.ui`): `HhPercentSlider(…, enabled: Boolean = true, trackHeight: Dp? = null, …)`; disabled, it ignores drags and taps, keeps `percent`, and draws an `surf2` track with an `surf3` fill and thumb (note 18); `spokenState` is the caller's ("Off").
-- Produces (`capability.lights`): `internal fun cardStatus(room: LightRoom): String`; `class MainRoomActions(val onToggle: () -> Unit, val onOpen: () -> Unit, val onDrag: (Int) -> Unit, val onLetGo: (Int) -> Unit)`; `LightsDimens` card rows of Units (`trackHeight = 20.dp`).
+- Produces (`core.ui`): `HhPercentSlider(…, enabled: Boolean = true, trackHeight: Dp? = null, …)`, built on Material 3's `SliderState` and `SliderDefaults.Track(sliderState = …)` under `@OptIn(ExperimentalMaterial3Api::class)` (U1: the one opt-in in the app); disabled, it has no `SetProgress` action, ignores drags and taps, keeps `percent` as its `ProgressBarRangeInfo.current`, and draws a `surf2` track with a `surf3` fill and thumb (note 18); `spokenState` is the caller's ("Off").
+- Produces (`capability.lights`): `internal fun cardStatus(room: LightRoom): String`; `class MainRoomActions(val onToggle: () -> Unit, val onOpen: () -> Unit, val onDrag: (Int) -> Unit = {}, val onLetGo: (Int) -> Unit = {})`; `LightsDimens` card rows of Units (`trackHeight = 20.dp`).
 
 - [ ] **Step 1: The failing tests**
-- `PercentSliderTest.aDisabledSliderIgnoresDragsAndKeepsItsLevel`: `enabled = false`, `percent = 40` → `assertIsNotEnabled()`, a swipe calls neither `onDrag` nor `onLetGo`, the state reads the caller's `spokenState`.
+- `PercentSliderTest.aDisabledSliderKeepsItsLevelAndCantBeMoved`: `enabled = false`, `percent = 40` → `assertIsNotEnabled()`, no `SemanticsActions.SetProgress` (or invoking it changes nothing), `ProgressBarRangeInfo.current == 40f`, a swipe calls neither `onDrag` nor `onLetGo`.
 - `LightsWordsTest.theCardStatusNamesTheScene`: on 70 with Relax active → "On · 70% · Relax"; on 70, no scene → "On · 70%"; on, can't dim, Relax → "On · Relax"; off → "Off".
-- `LightsCardTest` (at `rightHalfSize`; each ends with `assertClickablesHaveRoleAndLabel()`): `theSliderIsDisabledWhileTheRoomIsOff` (§2.5: `lights_card_brightness` not enabled, spoken "Lounge brightness, Off"); `movingTheSliderSendsTheBrightness` (on → a swipe → `onLetGo` with a value in 0..100); `aRoomThatCantDimHasNoSlider`; `theBottomRowIsAllLightsOffAndHolidayMode` (**pin**, §6.2).
+- `LightsCardTest` (at `rightHalfSize`; each ends with `assertClickablesHaveRoleAndLabel()`): `theSliderIsDisabledWhileTheRoomIsOff` (§2.5: spoken "Lounge brightness, Off"); `aSwipeOnAnOffRoomSendsNothing` (the host over fake `LightsActions`: no `dragBrightness`, `letGoBrightness` or `toggle`); `movingTheSliderSendsTheBrightness` (on → a swipe → `letGoBrightness` with a value in 0..100); `aRoomThatCantDimHasNoSlider`; `holidayModeAsksForTheFreshPin` (the host's Holiday mode reaches `toggleHoliday`, whose `authorise(LightsPermissions.HOLIDAY, …)` the fake access records; §2.3, §6.2).
 Run: `./gradlew :core:ui:testDebugUnitTest --tests '*PercentSliderTest*'` and `./gradlew :capability:lights:testDebugUnitTest --tests '*LightsCardTest*' --tests '*LightsWordsTest*'` — Expected: FAIL to compile.
-- [ ] **Step 2: Implement** — the card: the top row (bulb 31 dp, filled `accent` on, outline `mute` off; name; `cardStatus`; the 48 dp ›), `Spacer(Modifier.weight(1f))`, the slider row (`brightness_low`, `HhPercentSlider(enabled = room.on, trackHeight = 20.dp)`, `brightness_high`), 15 dp, the bottom row. The host wires `onDrag`/`onLetGo` to `actions.dragBrightness(room, it)`/`letGoBrightness(room, it)`. If the 20 dp track needs an opt-in: **stop and ask** (header). The tab's sliders are unchanged until 9b.
-- [ ] **Step 3: Screenshots** — re-recorded at `rightHalfSize`: every `lights_card_*` and the app's `home_full_*`, `home_lights_*`. **Open each and look at it against the handoff's Lights card** (note 3: the slider fills the middle; the off look of note 18). The expected list: those names.
+- [ ] **Step 2: Implement** — the card: the top row (bulb 31 dp, filled `accent` on, outline `mute` off; name; `cardStatus`; the 48 dp `HhRoundButton` ›), `Spacer(Modifier.weight(1f))`, the slider row (`brightness_low`, `HhPercentSlider(enabled = room.on, trackHeight = 20.dp)`, `brightness_high`), 15 dp, the bottom row. The host wires `onDrag`/`onLetGo` to `dragBrightness`/`letGoBrightness`. The tab's sliders are unchanged until 9b.
+- [ ] **Step 3: Compare, check, re-record** — predicted prefixes: `lights_card_`, `home_`, and, as `HhPercentSlider` is shared, `lights_tab_`, `tab_lights_`, `music_`, `settings_display_`, `settings_door`, `settings_music`. Look at the `home_*` diffs; re-record; the baseline check by prefix.
 - [ ] **Step 4: The gate and commit**
 ```bash
 git add core/ui capability/lights app
@@ -474,20 +477,20 @@ git commit -m "Give Home's Lights card the main room's brightness slider, off wh
 
 **Files:**
 - Modify: `capability/music/.../ui/MusicCard.kt`, `ui/MusicParts.kt`, `ui/MusicDimens.kt`
-- Test: `capability/music/src/test/.../ui/MusicCardTest.kt`, `ui/MusicCardScreenshotTest.kt`
+- Test: `capability/music/src/test/.../ui/MusicCardTest.kt` (`aPausedGroupHomeKeptSaysPaused` and the Shuffle cases follow ruling 8), `ui/MusicCardScreenshotTest.kt`
 
 **Interfaces:**
-- Consumes: `Icons.VOLUME_UP` (Task 1); `HhPercentSlider(trackHeight = …)` (Task 9); `rightHalfSize` (Task 7).
-- Produces: `RoundButton(icon, spoken, tag, enabled = true, primary: Boolean = false, onClick)` (primary: `accent` fill, `accentInk` icon); `@Composable internal fun VolumePill(group: SpeakerGroup, tag: String, onLetGo: (Int) -> Unit, modifier: Modifier = Modifier)` (a 48 dp `surf2` pill: `volume_up`, a 9 dp track, the number at 15 sp W600; spoken `volumeName(group.name)`, `percentWords`); `MusicDimens` card rows of Units.
+- Consumes: `Icons.VOLUME_UP` (Task 1); `HhPercentSlider(trackHeight = …)` (Task 9); `HhRoundButton` (Task 3); `rightHalfSize` (Task 7).
+- Produces: `@Composable internal fun VolumePill(group: SpeakerGroup, tag: String, onLetGo: (Int) -> Unit, modifier: Modifier = Modifier)` (a 48 dp `surf2` pill: `volume_up`, a 9 dp track, the number at 15 sp W600; spoken `volumeName(group.name)`, `percentWords`); `MusicDimens` card rows of Units.
 
 - [ ] **Step 1: The failing tests** (`MusicCardTest`, at `rightHalfSize`; each ends with `assertClickablesHaveRoleAndLabel()`)
 - `oneControlRow`: playing → `music_card_pause`, `music_card_next`, `music_card_volume` share a vertical centre within 1 dp.
 - `theVolumePillHasTheSpeakerAndTheNumber`: "30" shown; spoken "Kitchen volume, 30 percent"; letting go calls `onGroupVolume`.
-- `nothingPlayingHidesNextAndOffersShuffleInItsPlace`; `pausedShowsPlayAndNextAndNoShuffle`.
+- `nothingPlayingHidesNextAndOffersShuffleInItsPlace` (replaces `nothingPlayingOffersPlayAndShuffle`); `pausedShowsPlayAndNextAndNoShuffle`.
 - `theArtIs88Dp`.
 Run: `./gradlew :capability:music:testDebugUnitTest --tests '*MusicCardTest*'` — Expected: FAIL.
-- [ ] **Step 2: Implement** — the card: `NowPlayingBlock` at 88 dp art (the name 20 sp W700, the track 17 sp, the artist 14 sp `mute`), `Spacer(weight(1f))`, the row (Play/Pause primary, Next or Shuffle, `VolumePill` `weight(1f)`).
-- [ ] **Step 3: Screenshots** — re-recorded: every `music_card_*` and the app's `home_full_*`, `home_lights_music_dark`. **Open each and look at it against the handoff's Music card** (notes 4, 27: bigger art, one row, a labelled volume). The expected list: those names.
+- [ ] **Step 2: Implement** — `NowPlayingBlock` at 88 dp art (the name 20 sp W700, the track 17 sp, the artist 14 sp `mute`), `Spacer(weight(1f))`, the row (Play/Pause `Primary`, Next or Shuffle, `VolumePill` `weight(1f)`).
+- [ ] **Step 3: Compare, check, re-record** — predicted prefixes: `music_card_`, `home_`, `music_tab_`, `tab_music_` (the shared round button). Look at the `home_*` diffs; re-record; the baseline check by prefix.
 - [ ] **Step 4: The gate and commit**
 ```bash
 git add capability/music app
@@ -505,15 +508,16 @@ git commit -m "Put the Music card's controls on one row with a labelled volume p
 - Test: `app/src/test/.../shell/ShellAlertsTest.kt`; `capability/music/src/test/.../MusicQuieterTest.kt`
 
 **Interfaces:**
-- Produces: `interface AlertQuieter { suspend fun quiet(): Boolean; suspend fun restore() }` (KDoc: true when it turned something down); `AlertHost.lowered: StateFlow<Boolean>` (true from the first quieter that answered true until the loud alert goes).
+- Produces: `interface AlertQuieter { suspend fun quiet(): Boolean; suspend fun restore() }` (KDoc: true when it turned something down); `AlertHost.lowered: StateFlow<Boolean>` (false at each quiet pass's start; true once a quieter of the current pass answered true; false when the loud alert goes).
 
 - [ ] **Step 1: The failing tests**
-- `ShellAlertsTest.loweredOnlyWhenAQuieterTurnedSomethingDown`: two quieters answering false → `lowered` false after `quieted()`; one answering true → true; `dismiss()` → false.
-- `ShellAlertsTest.aFailingQuieterIsNotLowered` (throws → false, the other's true still counts).
+- `ShellAlertsTest.loweredOnlyWhenAQuieterTurnedSomethingDown`: quieters answering false → false after `quieted()`; one true → true; `dismiss()` → false.
+- `ShellAlertsTest.aFailingQuieterIsNotLowered` (throws → false; another's true still counts).
 - `ShellAlertsTest.aRingReplacingARingKeepsLowered` (a loud `show` over a loud one: stays true, no second quiet).
-- `MusicQuieterTest.quietSaysWhetherItLoweredARoom`: nothing playing → false; a playing room at 40 with share 30 → true; the set command failing → false; share 100 → false (40 stays 40).
+- `ShellAlertsTest.aLateAnswerFromAnEarlierRingIsIgnored`: ring, dismiss, ring again; the first pass's quieter answers true after the second pass started (a `CompletableDeferred`) → `lowered` stays the second pass's answer.
+- `MusicQuieterTest.quietSaysWhetherItLoweredARoom`: no system → false; `playingNow` failing → false; nothing playing → false; a playing room at 40 with share 30 → true; the set command failing → false; share 100 → false (40 stays 40); a second `quiet()` while lowered → the first's answer.
 Run: `./gradlew :app:testDebugUnitTest --tests '*ShellAlertsTest*'` and `./gradlew :capability:music:testDebugUnitTest --tests '*MusicQuieterTest*'` — Expected: FAIL to compile.
-- [ ] **Step 2: Implement** — `ShellAlerts` sets a `MutableStateFlow` from inside its `runAll` (a quieter's `true` sets it); `startRestore` and a non-loud replacement clear it. `MusicQuieter` counts rooms whose `setRoomVolume` returned and whose set is below was.
+- [ ] **Step 2: Implement** — `ShellAlerts` keeps a pass number: `startQuiet` increments it and sets `lowered` false; a quieter's `true` sets `lowered` only if its pass is still current; `startRestore` and a non-loud replacement set it false. `MusicQuieter` remembers its answer: rooms whose `setRoomVolume` returned with `set < was`.
 - [ ] **Step 3: The gate and commit** — Expected: PASS, **no image changed**.
 ```bash
 git add core/plugin app capability
@@ -522,26 +526,29 @@ git commit -m "Let the doorbell know whether music was actually turned down"
 
 ---
 
-### Task 12: The door card: scrim, size, Door history, 60 seconds (spec §2.4, §4.3; rulings 10, 16)
+### Task 12: The door card: scrim, size, Door history, 60 seconds; the look against the handoff (spec §2.4, §4.3; rulings 10, 16)
 
 **Review:** sonnet.
 
 **Files:**
-- Modify: `capability/door/.../DoorAlerts.kt` (`CARD_MS`, KDoc), `DoorWords.kt`, `ui/DoorCard.kt`, `ui/DoorCardHost.kt`, `ui/DoorDimens.kt`; `app/.../shell/ui/OverlayLayers.kt` (`AlertLayer`)
-- Test: `capability/door/src/test/.../DoorAlertsTest.kt`, `ui/DoorCardTest.kt`, `ui/DoorCardScreenshotTest.kt`; `app/src/test/.../shell/ui/AlertLayerTest.kt`, `DoorCardAboveKeyboardTest.kt`, `ShellScreenshotTest.kt`
+- Modify: `capability/door/.../DoorAlerts.kt` (`CARD_MS`, `close(eventId)`, KDoc), `DoorWords.kt`, `ui/DoorCard.kt`, `ui/DoorCardHost.kt`, `ui/DoorDimens.kt`; `app/.../shell/ui/OverlayLayers.kt` (`AlertLayer`), `shell/ShellViewModel.kt` (`openTab` closes Settings)
+- Test: `capability/door/src/test/.../DoorAlertsTest.kt`, `ui/DoorCardTest.kt` (its `DoorCard(…)` calls: the new parameters default), `ui/DoorCardScreenshotTest.kt`; `app/src/test/.../shell/ui/AlertLayerTest.kt` (`theCardCentres…`, `theCardStaysAboveTheKeyboard…` read the card's own width), `DoorCardAboveKeyboardTest.kt`, `ShellViewModelTest.kt`, `ShellScreenshotTest.kt`
 
 **Interfaces:**
 - Consumes: `AlertHost.lowered` (Task 11); `ShellTokens.cardScrim` (Task 2); `HhButton(trailingIcon = …)` (Task 3); `Icons.VOLUME_DOWN` (Task 1).
-- Produces: `const val CARD_MS = 60_000L`; `internal const val DOOR_HISTORY = "Door history"`, `internal const val MUSIC_LOWERED = "Music lowered"`; `DoorCard(card: DoorCardUi, lowered: Boolean, onGotIt: () -> Unit, onHistory: () -> Unit, modifier: Modifier = Modifier)`; `DoorDimens` card rows of Units (`cardWidth = 747.dp`); `AlertLayer(content, hidden, keyboard)` draws the scrim and centres the alert at its own width.
+- Produces: `const val CARD_MS = 60_000L`; `fun DoorAlerts.close(eventId: Long)` (the card goes if it still shows that ring; nothing is marked seen); `internal const val DOOR_HISTORY = "Door history"`, `MUSIC_LOWERED = "Music lowered"`, `JUST_NOW = "just now"`; `DoorCard(card: DoorCardUi, onGotIt: () -> Unit, modifier: Modifier = Modifier, lowered: Boolean = false, onHistory: () -> Unit = {})`; `DoorDimens` card rows of Units (`cardWidth = 747.dp`); `AlertLayer(content, hidden, keyboard)` draws the scrim and centres the alert at its own width; `ShellViewModel.openTab(id)` closes Settings, then selects the tab.
 
 - [ ] **Step 1: The failing tests**
-- `DoorAlertsTest.theCardClosesAfterSixtySecondsAndItsRingStaysUnseen` (§2.4, renamed): showing at `CARD_MS − 1` (59 999 ms), gone at 60 000. Its two neighbours' `CARD_MS` arithmetic is unchanged.
-- `DoorCardTest`: `musicLoweredShowsOnlyWhenLowered` (§6.3); `doorHistoryIsQuietAndGotItPrimary` (both 60 dp tall, Got it twice Door history's width within 2 dp); `doorHistoryOpensTheDoorTabAndMarksTheRingSeen` (the host with a fake navigator and `DoorAlerts`: `openTab("door")`, the ring seen, the card gone); `theSnapshotFillsTheCardsWidth` (16:9). Each ends with `assertClickablesHaveRoleAndLabel()`.
-- `AlertLayerTest.aTapOnTheScrimPressesNothingBeneath`: a button under the scrim's empty part is not pressed, and the tap isn't a touch; `thePinPadDrawsAboveTheAlert` (**pin**) still passes; `theCardCentresOnTheScreenWithoutAKeyboard` and `theCardStaysAboveTheKeyboard…` read the card's own width.
-Run: `./gradlew :capability:door:testDebugUnitTest --tests '*DoorAlertsTest*' --tests '*DoorCardTest*'` and `./gradlew :app:testDebugUnitTest --tests '*AlertLayerTest*' --tests '*DoorCardAboveKeyboardTest*'` — Expected: FAIL.
-- [ ] **Step 2: Implement** — the card: `widthIn(max = 747.dp)`, `surf`, a 1 dp `surf3` edge, radius 29, padding 24, 17 dp gaps, `Modifier.shadow(27.dp, shape)`; the header (the 59 dp `accentSoft` circle with a filled 33 dp `doorbell`, the title 31 sp W700, the line 17 sp `mute`, then the "Music lowered" chip while `lowered`); the snapshot; the buttons row (Got it primary `weight(2f)`, Door history quiet with `trailingIcon = Icons.CHEVRON_RIGHT`, `weight(1f)`, both Large). The host: `lowered` from `LocalAlertHost.current.lowered`; `onHistory = { alerts.gotIt(ring.eventId); navigator.openTab(DOOR_ID) }`. `AlertLayer`: a full-screen `cardScrim` box taking every tap (`detectTapGestures {}`), the alert centred above the keyboard; `ALERT_WIDTH` goes. The DoorAlerts KDoc's "2 minutes" becomes "60 seconds (9 §2.4)".
-- [ ] **Step 3: Screenshots** — re-recorded: `door_card_dark`, `door_card_light`, `door_card_snapshot_dark`, `door_card_unrecognised_dark`, `home_door_card_dark`; new `door_card_lowered_dark`. **Open each and look at it against the handoff's 2a** (note 16: everything behind dimmed, the edge and shadow, the picture full width, Got it the big one). The baseline check with those names.
-- [ ] **Step 4: The gate and commit**
+- `DoorAlertsTest.theCardClosesAfterSixtySecondsAndItsRingStaysUnseen` (§2.4, renamed): `assertThat(CARD_MS).isEqualTo(60_000L)`; `advanceTimeBy(59_999)` → showing; `advanceTimeBy(1)` → gone, unseen.
+- `DoorAlertsTest.closeLeavesTheRingUnseen`.
+- `DoorCardTest`: `musicLoweredShowsOnlyWhenLowered` (§6.3); `theLineSaysJustNow` ("Front Door · 11:54 · just now", spoken too); `doorHistoryIsQuietAndGotItPrimary` (both 60 dp tall; Got it twice Door history's width within 2 dp); `theSnapshotFillsTheCardsWidth` (16:9); `doorHistoryClosesTheCardAndOpensTheTab` (the host with a fake navigator, a fake `OverlayHost` and `DoorAlerts`: the sheet dismissed, `close(eventId)` not `gotIt`, `openTab("door")`). Each ends with `assertClickablesHaveRoleAndLabel()`.
+- `ShellViewModelTest.openingATabClosesSettings` (Door history over Settings lands on the Door tab).
+- `AlertLayerTest.aTapOnTheScrimPressesNothingBeneath`: a button under the scrim isn't pressed and the tap isn't a touch; `thePinPadDrawsAboveTheAlert` (**pin**).
+Run: `./gradlew :capability:door:testDebugUnitTest --tests '*DoorAlertsTest*' --tests '*DoorCardTest*'` and `./gradlew :app:testDebugUnitTest --tests '*AlertLayerTest*' --tests '*DoorCardAboveKeyboardTest*' --tests '*ShellViewModelTest*'` — Expected: FAIL.
+- [ ] **Step 2: Implement** — the card: `widthIn(max = 747.dp)`, `surf`, a 1 dp `surf3` edge, radius 29, padding 24, 17 dp gaps, `Modifier.shadow(27.dp, shape)`; the header (the 59 dp `accentSoft` circle with a filled 33 dp `doorbell`, the title 31 sp W700, the line `device · time · just now` 17 sp `mute`, the "Music lowered" chip while `lowered`); the snapshot; Got it (primary, `weight(2f)`) and Door history (quiet, `trailingIcon = Icons.CHEVRON_RIGHT`, `weight(1f)`), both Large. `cardWords` gains the `JUST_NOW` part. The host: `lowered` from `LocalAlertHost.current.lowered`; `onHistory = { overlay.dismiss(); alerts.close(ring.eventId); navigator.openTab(DOOR_ID) }` (the Door tab marks its rings seen, Plan 5). `AlertLayer`: a full-screen `cardScrim` taking every tap, the alert centred above the keyboard; `ALERT_WIDTH` goes. DoorAlerts' KDoc says "60 seconds (9 §2.4)".
+- [ ] **Step 3: Compare, check, re-record** — predicted prefixes: `door_card_`, `home_door_card_`; new `door_card_lowered_dark`. Re-record; the baseline check by prefix.
+- [ ] **Step 4: The look against the handoff** — open **every** image Tasks 2–12 re-recorded or added (`git diff --name-only <the commit before Task 2> -- "*.png"`), each against the handoff's section for its screen and the rulings above; a fault is a fix with its test, the gate, a commit, before Step 5. Name the images looked at in the task's report.
+- [ ] **Step 5: The gate and commit**
 ```bash
 git add capability/door app
 git commit -m "Show the door card larger over a dimmed screen, with Door history and a Music lowered chip, and close it after 60 seconds"
@@ -555,23 +562,22 @@ git commit -m "Show the door card larger over a dimmed screen, with Door history
 
 **Files:**
 - Modify: `core/access/.../ui/PinPad.kt`, `ui/PinPadDimens.kt`
-- Test: `core/access/src/test/.../ui/PinPadTest.kt`, `ChoosePinPadTest.kt` (sizes); `app/src/test/.../shell/ui/ShellScreenshotTest.kt` (`pin_pad_*`); `capability/calendar`'s `detail_pin_*`, `calendar-sheets/09-pin-pad-*` where they draw the pad
+- Test: `core/access/src/test/.../ui/PinPadTest.kt` (`keysAre76dpCirclesInA400dpCard`), `ChoosePinPadTest.kt` (sizes); `app/src/test/.../shell/ui/ShellScreenshotTest.kt`
 
 **Interfaces:**
 - Consumes: `Icons.LOCK_CLOCK` (Task 1); `ShellTokens.cardScrim` (Task 2).
-- Produces: `internal const val TOO_MANY_TRIES = "Too many tries"`, `internal const val WAIT_A_MOMENT = "Wait a moment, then try your PIN again."`; `internal fun countdownText(seconds: Int): String` (`m:ss`); `PinPadFrame(…, lock: PinLock? = null, …)` with `internal data class PinLock(val secondsLeft: Int, val firstSeconds: Int)`; `PinPadDimens` rows of Units (`cardWidth = 413.dp`, `key = 77.dp`, `DISABLED_KEY_ALPHA = 0.3f`).
+- Produces: `internal const val TOO_MANY_TRIES = "Too many tries"`, `WAIT_A_MOMENT = "Wait a moment, then try your PIN again."`; `internal fun countdownText(seconds: Int): String` (`m:ss`); `internal data class PinLock(val secondsLeft: Int, val firstSeconds: Int)`; `PinPadFrame(…, lock: PinLock? = null, …)`; `PinPadDimens` rows of Units (`cardWidth = 413.dp`, `key = 77.dp`, `barWidth = 173.dp`, `DISABLED_KEY_ALPHA = 0.3f`).
 
 - [ ] **Step 1: The failing tests** (`PinPadTest`, `compose.mainClock.autoAdvance = false`, `nowMillis = { 0L }`, locked until 27 000; each ends with `assertClickablesHaveRoleAndLabel()`)
-- `aLockShowsTheCountdownAndTheBar`: "Too many tries" (a heading), "Wait a moment, then try your PIN again.", "0:27"; after 1 000 ms, "0:26".
-- `everyKeyIsOffWhileLockedButCancel`: `pin_key_0`…`pin_key_9` and `pin_backspace` not enabled; `pin_cancel` enabled and answers null.
-- `theKeysComeBackAtZero`: at 26 999 ms `pin_key_1` not enabled; at 27 000 enabled, "You can try again." shown.
-- `theKeypadDoesNotMoveWhenTheLockEnds` (Review Focus 5): `pin_key_1`'s top at 0 ms equals its top at 27 000 ms.
-- `theCountdownIsSpokenOnce` (Review Focus 5): `pin_message`'s description is `tooManyTries(27)` at 0 and at 5 000 ms.
+- `aLockShowsTheCountdownAndTheBar`: "Too many tries" (a heading), "Wait a moment, then try your PIN again.", "0:27", the bar 173 dp wide; after 14 000 ms "0:13" and the bar `173 × 13 / 27` dp within 1 dp.
+- `everyKeyIsOffWhileLockedButCancel`: `pin_key_0`…`pin_key_9` and `pin_backspace` not enabled; `pin_cancel` enabled, answers null.
+- Extend `theEndOfALockSaysYouCanTryAgainAndClearsTheDotsError`: one frame before 27 000 ms `pin_key_1` is not enabled; one frame after, enabled, "You can try again." shown, and `pin_key_1`'s top equals its top at 0 ms (Review Focus 5: nothing moves).
+- Extend the spoken-text case (`thePinPadsLinesAreSentencesInFullWords`): `pin_message` exists and is described `tooManyTries(27)` at 0 and at 5 000 ms, and `TRY_AGAIN` after 27 000 (Review Focus 5); the drawn "0:27" and the bar are not in the tree.
 - `countdownText(27) == "0:27"`, `(65) == "1:05"`, `(600) == "10:00"`.
-- `keysAre76dpCirclesInA400dpCard` becomes `keysAre77dpCirclesInA413dpCard`; `aLockThatArrivesOnARetryDisablesTheKeys` and `keysAreDisabledWhileLocked` stay (**pin**).
+- `keysAre77dpCirclesInA413dpCard` replaces `keysAre76dpCirclesInA400dpCard`.
 Run: `./gradlew :core:access:testDebugUnitTest --tests '*PinPadTest*' --tests '*ChoosePinPadTest*'` — Expected: FAIL.
-- [ ] **Step 2: Implement** — `PinPadSheet` passes `PinLock(secondsLeft, firstSeconds)` while locked. The frame: the 4b card (413 dp, 1 dp `surf3` edge, radius 29) over `cardScrim`; the badge `dangerSoft`/`lock_clock` filled `danger` while locked; the dots-and-message block and the countdown-and-bar block in one `Box`, the unused one `alpha(0f)` and `clearAndSetSemantics {}`; keys and backspace `alpha(0.3f)` while locked; the bar's fill `secondsLeft / firstSeconds` of 173 dp.
-- [ ] **Step 3: Screenshots** — re-recorded: `pin_pad_dark`, `pin_pad_light`, `pin_pad_wrong_dark`, `pin_pad_fs15`, `pin_pad_locked_dark`, and every other image drawing the pad (`detail_pin_*`, `calendar-sheets/09-pin-pad-*`, the compare report); new `pin_pad_locked_light`. **Open each and look at it against the handoff's 4b** (note 37: the red lock, the countdown and bar, every key dimmed but Cancel, nothing moved). The expected list is the compare report plus the new name.
+- [ ] **Step 2: Implement** — `PinPadSheet` passes `PinLock` while locked. The frame: the 4b card (413 dp, 1 dp `surf3` edge, radius 29) over `cardScrim`; the badge `dangerSoft`/`lock_clock` filled `danger` while locked; the dots and the countdown-and-bar laid out in one `Box`, the unused one `alpha(0f)`; `clearAndSetSemantics {}` only on the countdown text and the bar; `pin_message` stays outside that box and always in the tree; keys and backspace `alpha(0.3f)` while locked.
+- [ ] **Step 3: Screenshots** — predicted prefixes: `pin_pad_`, `detail_pin_`, `home_` (any drawing the pad); new `pin_pad_locked_light`. Open each new image against the handoff's 4b (note 37); re-record; the baseline check by prefix.
 - [ ] **Step 4: The gate and commit**
 ```bash
 git add core/access app capability
@@ -585,20 +591,21 @@ git commit -m "Show a locked PIN pad's wait as a countdown with a draining bar, 
 **Review:** sonnet.
 
 **Files:**
-- Modify: `app/.../display/ui/SleepLayers.kt`, `display/ui/DisplayDimens.kt`, `MainActivity.kt`
-- Test: `app/src/test/.../display/ui/SleepLayersTest.kt`, `SleepLayersScreenshotTest.kt`
+- Modify: `app/.../display/ui/SleepLayers.kt`, `display/ui/DisplayDimens.kt`, `SetupWiring.kt` (`overlayCameraMark` drops `sleeping ||`), `MainActivity.kt`
+- Test: `app/src/test/.../display/ui/SleepLayersTest.kt` (its `SleepLayer(…)` calls), `SleepLayersScreenshotTest.kt`; `shell/ui/CameraMarksTest.kt`
 
 **Interfaces:**
-- Consumes: `ShellDimens.topBarHeight`, `mainPaddingEnd`, `overlayCameraMark` (Task 5).
-- Produces: `NightClockTokens.size = 200.sp`, `NightClockTokens.tracking = (-8).sp`, `NightClockTokens.glyph = Color(0xFF2E3331)`; `SleepLayer(screen: Screen, time: () -> LocalDateTime, cameraRunning: Boolean, onWake: () -> Unit)`.
+- Consumes: `CameraMarkSpot`, `overlayCameraMark` (Task 5).
+- Produces: `NightClockTokens.size = 200.sp`, `tracking = (-8).sp`, `glyph = Color(0xFF2E3331)`; `SleepLayer(screen: Screen, time: () -> LocalDateTime, onWake: () -> Unit, cameraRunning: Boolean = false, glyphAt: Offset? = null)` (the glyph centred on `glyphAt`, the pill's spot from `CameraMarkSpot`; top right of the top bar when unknown).
 
 - [ ] **Step 1: The failing tests** (`SleepLayersTest`; each ends with `assertClickablesHaveRoleAndLabel()`)
 - `theNightClockIs200spTabularAndTight`: the time's layout input has `fontSize == 200.sp`, `letterSpacing == (-8).sp`, `fontFeatureSettings == "tnum"`, colour `#5A5A5A`.
-- `theBareGlyphShowsWhileTheCameraRuns` (Review Focus 3): ASLEEP with `cameraRunning = true` → one "The camera is on" node, top-right (its right edge 28 dp from the screen's, its centre 24 dp from the top); NIGHT_CLOCK the same; `cameraRunning = false` → none; it isn't clickable.
-- `theNightClockShowsOnlyTheTime` (**pin**) and the wake tests keep passing with the new parameter.
-Run: `./gradlew :app:testDebugUnitTest --tests '*SleepLayersTest*'` — Expected: FAIL to compile.
-- [ ] **Step 2: Implement** — the glyph inside both waking layers, outside their merged node's text so the clock's name stays the time; `MainActivity` passes `cameraRunning = running`; `overlayCameraMark` already leaves the sleep layers to the glyph.
-- [ ] **Step 3: Screenshots** — re-recorded: `night_clock`, `night_clock_fs15`, `camera_mark_asleep`; new `night_clock_camera`. **Open each and look at it against the handoff's 4c** (notes 38, 39: a bigger, steadier clock; a glyph findable only if you look). The baseline check with those names.
+- `theBareGlyphShowsWhileTheCameraRuns` (Review Focus 3): ASLEEP and NIGHT_CLOCK with `cameraRunning = true` → one "The camera is on" node centred on `glyphAt` within 1 dp, not clickable; `cameraRunning = false` → none.
+- `CameraMarksTest` gains the night clock and asleep states with the glyph: still exactly 1 with the camera running, 0 without, and the glyph centred on the Watching pill's icon centre from Home (handoff 4c, note 38).
+- `theNightClockShowsOnlyTheTime` (**pin**) and the wake tests pass with the new parameters.
+Run: `./gradlew :app:testDebugUnitTest --tests '*SleepLayersTest*' --tests '*CameraMarksTest*'` — Expected: FAIL to compile.
+- [ ] **Step 2: Implement** — the glyph inside both waking layers, outside their merged node's text so the clock's name stays the time; `MainActivity` passes `cameraRunning = running`, `glyphAt = spot.centre`; `overlayCameraMark` becomes `running && !sleeping && !(complete == true && …)`.
+- [ ] **Step 3: Screenshots** — predicted: `night_clock`, `night_clock_fs15`, `camera_mark_asleep`; new `night_clock_camera`. Open each against the handoff's 4c (notes 38, 39); re-record; the baseline check by name.
 - [ ] **Step 4: The gate and commit**
 ```bash
 git add app
