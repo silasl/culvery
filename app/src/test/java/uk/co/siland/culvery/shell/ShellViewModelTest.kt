@@ -7,7 +7,6 @@ import com.google.common.truth.Truth.assertThat
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
-import java.util.Optional
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -56,12 +55,18 @@ class ShellViewModelTest {
     private val toasts = ShellToasts()
     private val london = ZoneId.of("Europe/London")
     private val clockScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+
+    // On the test's scheduler, so a retry of the sun times waits on virtual time.
+    private val sunScope = CoroutineScope(SupervisorJob() + main.dispatcher)
     private fun at(time: LocalDateTime): Long = time.atZone(london).toInstant().toEpochMilli()
     private val ticks = MutableStateFlow(at(noon))
     private val clock = HouseholdClock(flowOf(london), WallClock { ticks.value }, clockScope, ticks)
 
     @After
-    fun tearDown() = clockScope.cancel()
+    fun tearDown() {
+        clockScope.cancel()
+        sunScope.cancel()
+    }
 
     /** A tick that leaves the theme as it was doesn't re-emit [ShellViewModel.uiState], so read the current value. */
     private fun TestScope.darkNow(vm: ShellViewModel): Boolean {
@@ -70,7 +75,7 @@ class ShellViewModelTest {
     }
 
     private fun vm(caps: Set<Capability> = emptySet(), daylight: Daylight? = null) =
-        ShellViewModel(caps, clock, access, Optional.ofNullable(daylight), toasts)
+        ShellViewModel(caps, clock, access, SunToday(daylight, sunScope), toasts)
 
     @Test
     fun tabsShowOnlyCapabilitiesWithTabsInOrder() = runTest {
@@ -200,7 +205,7 @@ class ShellViewModelTest {
     @Test
     fun settingsNeverOpenWithoutSession() = runTest {
         val noSessionAccess = FakeAccessControl(result = admin, startsSession = false)
-        val vm = ShellViewModel(emptySet(), clock, noSessionAccess, Optional.empty(), toasts)
+        val vm = ShellViewModel(emptySet(), clock, noSessionAccess, SunToday(null, sunScope), toasts)
         vm.uiState.test {
             vm.openSettings()
             assertThat(expectMostRecentItem().settingsOpen).isFalse()

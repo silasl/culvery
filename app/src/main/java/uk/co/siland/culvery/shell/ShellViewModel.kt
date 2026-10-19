@@ -7,7 +7,6 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDateTime
 import java.time.LocalTime
-import java.util.Optional
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -35,7 +34,6 @@ import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomePlacement
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.ShellNavigator
-import uk.co.siland.culvery.core.plugin.SunTimes
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
@@ -50,7 +48,7 @@ class ShellViewModel @Inject constructor(
     capabilities: Set<@JvmSuppressWildcards Capability>,
     clock: HouseholdClock,
     private val access: AccessControl,
-    daylight: Optional<Daylight>,
+    sunToday: SunToday,
     private val toaster: Toaster,
 ) : ViewModel(), ShellNavigator {
     private val ordered = capabilities.sortedBy { it.order }
@@ -87,10 +85,8 @@ class ShellViewModel @Inject constructor(
         clock.minutes.stateIn(viewModelScope, SharingStarted.Eagerly, LocalDateTime.now())
 
     // Without Daylight, or until today's times are known, ThemeSchedule's 07:00 / 19:00 applies (4b design §3.8).
-    private val sunToday: Flow<SunTimes?> = sunToday(daylight)
-
     private val scheduledDark: StateFlow<Boolean> =
-        combine(now, sunToday) { time, sun -> ThemeSchedule.isDark(time.toLocalTime(), sun) }
+        combine(now, sunToday.times) { time, sun -> ThemeSchedule.isDark(time.toLocalTime(), sun) }
             .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeSchedule.isDark(LocalTime.now(), null))
 
     private val tabs: Flow<List<TabItem>> =

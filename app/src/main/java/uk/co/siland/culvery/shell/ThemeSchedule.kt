@@ -3,9 +3,14 @@ package uk.co.siland.culvery.shell
 import android.util.Log
 import java.time.LocalTime
 import java.util.Optional
-import kotlinx.coroutines.flow.Flow
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.stateIn
+import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.SunTimes
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
@@ -24,8 +29,14 @@ object ThemeSchedule {
     }
 }
 
-/** Today's sun times, null without Daylight or until they're known. */
-internal fun sunToday(daylight: Optional<Daylight>): Flow<SunTimes?> = daylight.orElse(null)?.today
-    ?.retryWithBackoff { Log.w(TAG, "Couldn't read today's sun times (${it::class.simpleName}); retrying") }
-    ?.onStart { emit(null) }
-    ?: flowOf(null)
+/** Today's sun times for the whole app, from one reader of Daylight; null without Daylight or until they're known. */
+@Singleton
+class SunToday(daylight: Daylight?, scope: CoroutineScope) {
+    @Inject
+    constructor(daylight: Optional<Daylight>, @ApplicationScope scope: CoroutineScope) : this(daylight.orElse(null), scope)
+
+    val times: StateFlow<SunTimes?> = (
+        daylight?.today?.retryWithBackoff { Log.w(TAG, "Couldn't read today's sun times (${it::class.simpleName}); retrying") }
+            ?: flowOf(null)
+        ).stateIn(scope, SharingStarted.Eagerly, null)
+}

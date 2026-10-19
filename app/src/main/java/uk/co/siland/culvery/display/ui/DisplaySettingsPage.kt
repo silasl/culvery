@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,9 +19,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalTime
-import java.util.Optional
 import javax.inject.Inject
-import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.ShellNavigator
@@ -71,7 +68,7 @@ import uk.co.siland.culvery.display.appDetailsIntents
 import uk.co.siland.culvery.display.minutes
 import uk.co.siland.culvery.display.nightClockLine
 import uk.co.siland.culvery.display.sleepAfter
-import uk.co.siland.culvery.shell.sunToday
+import uk.co.siland.culvery.shell.SunToday
 
 private const val TAG = "DisplaySettings"
 
@@ -81,7 +78,7 @@ const val DISPLAY_PAGE_ID = "display"
 class DisplayPage @Inject constructor(
     private val settings: DisplaySettings,
     private val access: CameraAccess,
-    private val daylight: Optional<Daylight>,
+    private val sunToday: SunToday,
     private val toaster: Toaster,
 ) : SettingsPage {
     override val id = DISPLAY_PAGE_ID
@@ -90,7 +87,7 @@ class DisplayPage @Inject constructor(
 
     @Composable
     override fun Content() {
-        DisplaySettingsHost(settings, access, daylight, toaster, LocalShellNavigator.current)
+        DisplaySettingsHost(settings, access, sunToday, toaster, LocalShellNavigator.current)
     }
 }
 
@@ -178,13 +175,13 @@ private fun CameraNote(text: String, button: (@Composable () -> Unit)? = null) {
 internal fun DisplaySettingsHost(
     settings: DisplaySettings,
     access: CameraAccess,
-    daylight: Optional<Daylight>,
+    sunToday: SunToday,
     toaster: Toaster,
     navigator: ShellNavigator,
 ) {
     val prefs by settings.read.collectAsStateWithLifecycle()
     val camera by access.state.collectAsStateWithLifecycle()
-    val sun by remember(daylight) { sunToday(daylight) }.collectAsStateWithLifecycle(null)
+    val sun by sunToday.times.collectAsStateWithLifecycle()
     val packageName = LocalContext.current.packageName
     val scope = rememberCoroutineScope()
     val p = prefs ?: return

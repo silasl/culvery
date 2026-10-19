@@ -4,7 +4,6 @@ import android.view.Window
 import android.view.WindowManager
 import java.time.LocalDateTime
 import java.time.LocalTime
-import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -21,11 +20,10 @@ import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
-import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.SunTimes
+import uk.co.siland.culvery.shell.SunToday
 import uk.co.siland.culvery.shell.ThemeSchedule
-import uk.co.siland.culvery.shell.sunToday
 
 /** The lowest the window can be while Culvery is in front; not off (8 §4.1). */
 const val LOWEST = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_OFF
@@ -77,10 +75,10 @@ class ScreenBrightness internal constructor(
         display: DisplayState,
         alerts: AlertHost,
         clock: HouseholdClock,
-        daylight: Optional<Daylight>,
+        sunToday: SunToday,
         settings: DisplaySettings,
         @ApplicationScope scope: CoroutineScope,
-    ) : this(display.screen, display::isNight, alerts.inFront, clock.now, sunToday(daylight), settings.current, scope)
+    ) : this(display.screen, display::isNight, alerts.inFront, clock.now, sunToday.times, settings.current, scope)
 
     private val _level = MutableStateFlow(ANDROIDS)
     val level: StateFlow<Float> = _level.asStateFlow()

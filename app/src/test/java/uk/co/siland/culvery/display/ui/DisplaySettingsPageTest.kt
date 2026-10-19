@@ -17,7 +17,6 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalTime
-import java.util.Optional
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -40,6 +39,7 @@ import uk.co.siland.culvery.display.CameraState
 import uk.co.siland.culvery.display.DisplayPrefs
 import uk.co.siland.culvery.display.appDetailsIntents
 import uk.co.siland.culvery.display.displaySettings
+import uk.co.siland.culvery.shell.SunToday
 
 /** 8 §4.3, §4.4, §4.6: Settings › Display, with what each control hands on. */
 @RunWith(AndroidJUnit4::class)
@@ -86,7 +86,7 @@ class DisplaySettingsPageTest {
     /** Fails if the page's id, name or place in Settings' list changes. */
     @Test
     fun itSitsBeforeMusic() {
-        val page = DisplayPage(displaySettings(folder.root, io), access(), Optional.empty(), RecordingToaster())
+        val page = DisplayPage(displaySettings(folder.root, io), access(), SunToday(null, io), RecordingToaster())
         assertThat(page.id).isEqualTo("display")
         assertThat(page.id).isEqualTo(DISPLAY_PAGE_ID)
         assertThat(page.title).isEqualTo("Display")
@@ -215,7 +215,7 @@ class DisplaySettingsPageTest {
         val navigator = RecordingNavigator()
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides navigator) {
-                CulveryTheme(dark = true) { InSettingsPane { DisplayPage(settings, access, Optional.empty(), RecordingToaster()).Content() } }
+                CulveryTheme(dark = true) { InSettingsPane { DisplayPage(settings, access, SunToday(null, io), RecordingToaster()).Content() } }
             }
         }
         compose.waitUntil(5_000) {
