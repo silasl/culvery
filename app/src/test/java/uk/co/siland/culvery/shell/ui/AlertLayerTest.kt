@@ -16,10 +16,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -34,6 +36,7 @@ import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
 import uk.co.siland.culvery.core.plugin.OVERLAY_IDLE_MS
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.shell.OverlayState
 
 /** 5 §2.10, §5.1: the alert layer over a sheet, under the PIN pad, and its touches its own. */
@@ -102,10 +105,10 @@ class AlertLayerTest {
         settle()
         assertThat(activity.touches.value).isEqualTo(0L)
         compose.mainClock.advanceTimeBy(opened + OVERLAY_IDLE_MS - compose.mainClock.currentTime - 3 * FRAME_MS)
-        assertThat(open("sheet")).isTrue()
+        assertThat(overlay.isShowing).isTrue()
         compose.mainClock.advanceTimeBy(3 * FRAME_MS)
         compose.mainClock.advanceTimeByFrame()
-        assertThat(open("sheet")).isFalse()
+        assertThat(overlay.isShowing).isFalse()
     }
 
     /** Fails if a tap on the card resets or shortens an edited sheet's EDIT_HOLD_MS timer, or ends the edits. */
@@ -123,10 +126,10 @@ class AlertLayerTest {
         assertThat(activity.touches.value).isEqualTo(0L)
         assertThat(overlay.edited).isTrue()
         compose.mainClock.advanceTimeBy(opened + EDIT_HOLD_MS - compose.mainClock.currentTime - 3 * FRAME_MS)
-        assertThat(open("sheet")).isTrue()
+        assertThat(overlay.isShowing).isTrue()
         compose.mainClock.advanceTimeBy(3 * FRAME_MS)
         compose.mainClock.advanceTimeByFrame()
-        assertThat(open("sheet")).isFalse()
+        assertThat(overlay.isShowing).isFalse()
     }
 
     /** Fails if raising or removing the alert replaces or closes the open sheet, or clears its edits. */
@@ -184,6 +187,33 @@ class AlertLayerTest {
         assertThat(overlay.content).isSameInstanceAs(sheet)
         assertThat(overlay.edited).isTrue()
         assertThat(activity.touches.value).isEqualTo(0L)
+    }
+
+    /** Fails if the shell or an open sheet stays in TalkBack's tree under the door card, which a scrim can't stop. */
+    @Test
+    fun whatTheDoorCardCoversIsHiddenFromTalkBack() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ShellLayers(
+                    overlay = overlay, toast = null, onToastHidden = {}, pinShowing = false, pinPad = {},
+                    activity = activity, onTouch = activity::touch, alert = alert,
+                ) { Text("Sign out") }
+            }
+        }
+        compose.waitForIdle()
+        compose.onAllNodesWithText("Sign out").assertCountEquals(1)
+        alert = card
+        compose.waitForIdle()
+        compose.onAllNodesWithText("Sign out").assertCountEquals(0)
+        compose.onAllNodesWithTag("card").assertCountEquals(1)
+        alert = null
+        overlay.show(content = { Text("Close the sheet") })
+        compose.waitForIdle()
+        compose.onAllNodesWithText("Close the sheet").assertCountEquals(1)
+        alert = card
+        compose.waitForIdle()
+        compose.onAllNodesWithText("Close the sheet").assertCountEquals(0)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     private fun layer(keyboard: WindowInsets) {

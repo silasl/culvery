@@ -73,22 +73,12 @@ object ShellTokens {
 
     /** Home's cards (9 §4.2). */
     val homeCardRadius = 24.dp
-
-    // Status-bar sign-in: account_circle 16 dp, 6 dp between items, 16 dp before the theme indicator.
-    val statusIcon = 16.dp
-    val statusGap = 6.dp
-    val statusGroupGap = 16.dp
-    val statusSignOutPaddingH = 10.dp
-    val statusSignOutPaddingV = 6.dp
 }
 
 /** Shell text styles, derived from HhType. */
 object ShellType {
     /** 16 sp / 600: toast text. */
     val toast = HhType.body.copy(fontWeight = FontWeight.W600)
-
-    /** 12 sp / 700: the status bar's "Sign out". */
-    val signOut = HhType.labelSmall
 }
 
 const val TOAST_MIN_MS = 6_000L

@@ -41,6 +41,7 @@ import uk.co.siland.culvery.display.di.DisplayModule
 import uk.co.siland.culvery.display.ui.DisplayPage
 import uk.co.siland.culvery.display.ui.THE_CAMERA_IS_ON
 import uk.co.siland.culvery.holding
+import uk.co.siland.culvery.overlayCameraMark
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ui.ShellLayers
 
@@ -137,7 +138,7 @@ class DisplayWiringTest {
         access.state.first { it == CameraState.ALLOWED }
     }
 
-    /** Fails if the mark is fed from anything but the presence code's `running`, so it could show with the camera closed or hide with it open. */
+    /** Fails if the mark, through the overlay rule, follows anything but the presence code's `running`, so it could show with the camera closed or hide with it open. */
     @Test
     fun theCameraMarkShowsWheneverTheCameraIsOpen() {
         val test = TestScope()
@@ -158,7 +159,10 @@ class DisplayWiringTest {
                     activity = FakeUserActivity(),
                     onTouch = {},
                     sleeping = true,
-                    cameraMark = running,
+                    cameraMark = overlayCameraMark(
+                        running, sleeping = true, complete = true, settingsOpen = false,
+                        sheetShowing = false, pinShowing = false, alertShowing = false,
+                    ),
                 ) {}
             }
         }

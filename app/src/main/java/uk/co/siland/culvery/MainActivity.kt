@@ -74,6 +74,7 @@ import uk.co.siland.culvery.shell.ShellAlerts
 import uk.co.siland.culvery.shell.ShellToasts
 import uk.co.siland.culvery.shell.ShellUserActivity
 import uk.co.siland.culvery.shell.ShellViewModel
+import uk.co.siland.culvery.shell.ui.CameraMarkSpot
 import uk.co.siland.culvery.shell.ui.CulveryShell
 import uk.co.siland.culvery.shell.ui.ShellLayers
 
@@ -200,6 +201,7 @@ class MainActivity : ComponentActivity() {
             val screen by display.screen.collectAsStateWithLifecycle()
             val running by presence.running.collectAsStateWithLifecycle()
             val overlay = remember { OverlayState() }
+            val spot = remember { CameraMarkSpot() }
             val held = holding(pinRequest != null, overlay.isShowing, alert != null, state.settingsOpen, complete)
             LaunchedEffect(held) { display.held(held) }
             CompositionLocalProvider(
@@ -228,7 +230,9 @@ class MainActivity : ComponentActivity() {
                             alert = alert,
                             sleeping = screen != Screen.AWAKE,
                             sleep = { SleepLayer(screen, { now.value }, display::tapped) },
-                            cameraMark = running,
+                            cameraMark = overlayCameraMark(
+                                running, screen != Screen.AWAKE, complete, state.settingsOpen, overlay.isShowing, pinRequest != null, alert != null,
+                            ),
                         ) {
                             AppContent(
                                 complete = complete,
@@ -243,6 +247,8 @@ class MainActivity : ComponentActivity() {
                                         onOpenSettings = shell::openSettings,
                                         onSignOut = shell::signOut,
                                         onToggleThemePreview = shell::toggleThemePreview,
+                                        watching = watchingPill(running, pinRequest != null, alert != null),
+                                        pillSpot = spot,
                                         tabContent = { id -> capabilities.firstOrNull { it.id == id }?.TabContent() },
                                     )
                                 },

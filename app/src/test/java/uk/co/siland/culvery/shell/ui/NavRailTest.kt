@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.onChild
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
@@ -24,6 +26,7 @@ import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.isReadAsOne
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.TabItem
@@ -62,9 +65,23 @@ class NavRailTest {
     }
 
     @Test
-    fun theRailNoLongerDrawsTheMark() {
+    fun theRailDrawsTheMark() {
         show()
-        compose.onNodeWithTag("culvery_mark", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("culvery_mark", useUnmergedTree = true).assertExists()
+    }
+
+    /** The count sits in a `danger` pill inside a 2 dp ring in the page colour: at least 19 dp and the ring (9 §4.1). */
+    @Test
+    fun theDoorBadgeIsAPillWithABackgroundRing() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                NavRail(listOf(TabItem("door", "Door", Icons.DOORBELL, RailBadge.Count(2, "2 unseen rings"))), HOME_TAB_ID, onSelect = {}, onOpenSettings = {})
+            }
+        }
+        val badge = compose.onNodeWithTag("rail_door_badge", useUnmergedTree = true)
+        badge.assertHeightIsAtLeast(23.dp)
+        badge.onChild().assertTextEquals("2")
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** 5 §5.3: a count or a dot on the icon, and its words after the tab's name. */

@@ -1,12 +1,14 @@
 package uk.co.siland.culvery.shell.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.LastBaseline
@@ -21,9 +23,13 @@ import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getAlignmentLinePosition
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
@@ -54,6 +60,7 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.isReadAsOne
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.OverlayState
@@ -118,8 +125,10 @@ class ShellLayoutTest {
         assertThat(highLow.isLineEllipsized(0)).isFalse()
     }
 
-    private fun statusBar(session: SessionUi?, onSignOut: () -> Unit = {}) = compose.setContent {
-        CulveryTheme(dark = true) { StatusBar(dark = true, previewing = false, session = session, onSignOut = onSignOut, onToggleThemePreview = {}) }
+    private fun statusBar(session: SessionUi?, watching: Boolean = false, onSignOut: () -> Unit = {}) = compose.setContent {
+        CulveryTheme(dark = true) {
+            StatusBar(dark = true, previewing = false, session = session, watching = watching, onSignOut = onSignOut, onToggleThemePreview = {})
+        }
     }
 
     private fun shell() = compose.setContent {
@@ -131,36 +140,45 @@ class ShellLayoutTest {
         }
     }
 
-    /** The mark is the app's logo: in the top-left corner, on the tab icons' centre line, and a picture TalkBack skips. */
+    /** The mark is the app's logo, a picture TalkBack skips, with as much room above it as beside it in the rail (9 §4.1). */
     @Test
-    fun theMarkSitsInTheTopCornerOnTheTabIconsCentreLine() {
+    fun theMarkHasEqualSpaceAboveAndBeside() {
         shell()
         val mark = compose.onNodeWithTag("culvery_mark", useUnmergedTree = true)
         mark.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
         mark.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
         val bounds = mark.getUnclippedBoundsInRoot()
-        assertThat(bounds.width.value).isWithin(0.5f).of(48f)
-        assertThat(bounds.top.value).isAtLeast(12f)
-        assertThat(bounds.left.value).isAtLeast(0f)
-        listOf("rail_home", "rail_calendar").forEach {
-            val tab = compose.onNodeWithTag(it).getUnclippedBoundsInRoot()
-            assertWithMessage(it).that((bounds.left + bounds.right).value / 2).isWithin(1f).of((tab.left + tab.right).value / 2)
+        val inset = ((RAIL_WIDTH - MARK_WIDTH) / 2).value
+        assertThat(bounds.width.value).isWithin(0.5f).of(MARK_WIDTH.value)
+        assertThat(bounds.left.value).isWithin(0.5f).of(inset)
+        assertThat(bounds.top.value).isWithin(0.5f).of(inset)
+        assertThat(bounds.top.value).isWithin(0.5f).of(bounds.left.value)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** The bar is in the main area, beside the full-height rail; the page starts under it and keeps 28 dp from the right edge. */
+    @Test
+    fun theTopBarSitsInTheMainArea() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CulveryShell(
+                    ShellUiState(tabs = listOf(TabItem("calendar", "Calendar", Icons.CALENDAR_MONTH)), selectedTabId = "calendar", session = SessionUi("Alex", "Admin")),
+                    { at }, onSelectTab = {}, onOpenSettings = {}, onSignOut = {}, onToggleThemePreview = {},
+                ) { Box(Modifier.fillMaxSize().testTag("page")) }
+            }
         }
-    }
-
-    @Test
-    fun theMarkIsAtLeast48DpClearOfTheFirstTab() {
-        shell()
-        val mark = compose.onNodeWithTag("culvery_mark", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val home = compose.onNodeWithTag("rail_home").getUnclippedBoundsInRoot()
-        assertThat((home.top - mark.bottom).value).isAtLeast(48f)
-    }
-
-    /** The first tab sits where it did with the old rail mark: 48 dp bar + 16 dp padding + 43.6 dp mark + 8 dp gap. */
-    @Test
-    fun theHomeTabIsWhereItWasBeforeTheMarkMoved() {
-        shell()
-        assertThat(compose.onNodeWithTag("rail_home").getUnclippedBoundsInRoot().top.value).isWithin(1f).of(48f + 16f + 43.56f + 8f)
+        val root = compose.onRoot().getUnclippedBoundsInRoot()
+        val bar = compose.onNodeWithTag("status_bar").getUnclippedBoundsInRoot()
+        val page = compose.onNodeWithTag("page").getUnclippedBoundsInRoot()
+        val rail = compose.onNodeWithTag("rail_home").getUnclippedBoundsInRoot()
+        assertThat(bar.left.value).isAtLeast(RAIL_WIDTH.value)
+        assertThat(rail.right.value).isAtMost(bar.left.value)
+        assertThat(bar.top.value).isWithin(0.5f).of(0f)
+        assertThat(bar.height.value).isWithin(0.5f).of(48f)
+        assertThat(page.top.value).isWithin(0.5f).of(bar.bottom.value)
+        assertThat((root.right - page.right).value).isWithin(0.5f).of(28f)
+        assertThat(bar.right.value).isWithin(0.5f).of(page.right.value)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -181,7 +199,7 @@ class ShellLayoutTest {
     @Test
     fun signOutLocks() {
         var signedOut = false
-        statusBar(SessionUi("Alex", "Admin")) { signedOut = true }
+        statusBar(SessionUi("Alex", "Admin"), onSignOut = { signedOut = true })
         compose.onNodeWithTag("status_sign_out").performClick()
         assertThat(signedOut).isTrue()
     }
@@ -203,11 +221,11 @@ class ShellLayoutTest {
         compose.setContent {
             CulveryTheme(dark = true) {
                 WithFontScale(1.5f) {
-                    StatusBar(dark = true, previewing = false, session = SessionUi("Alex", "Admin"), onSignOut = {}, onToggleThemePreview = {})
+                    StatusBar(dark = true, previewing = false, session = SessionUi("Alex", "Admin"), watching = true, onSignOut = {}, onToggleThemePreview = {})
                 }
             }
         }
-        listOf("Sign out", "Auto", "Alex · Admin").forEach {
+        listOf("Sign out", "Night · Auto", "Alex · Admin", WATCHING).forEach {
             val text = compose.onNodeWithText(it, useUnmergedTree = true).textLayout()
             assertWithMessage(it).that(text.didOverflowHeight || text.isLineEllipsized(text.lineCount - 1)).isFalse()
         }
@@ -262,17 +280,71 @@ class ShellLayoutTest {
 
     @Test
     fun theThemeToggleOnAutoByDayOffersTheNightTheme() {
-        assertThat(themeToggle(dark = false, previewing = false)).isEqualTo("Theme: Auto" to "preview the night theme")
+        assertThat(themeToggle(dark = false, previewing = false)).isEqualTo("Theme: Day · Auto" to "preview the night theme")
     }
 
     @Test
     fun theThemeToggleOnAutoByNightOffersTheDayTheme() {
-        assertThat(themeToggle(dark = true, previewing = false)).isEqualTo("Theme: Auto" to "preview the day theme")
+        assertThat(themeToggle(dark = true, previewing = false)).isEqualTo("Theme: Night · Auto" to "preview the day theme")
     }
 
     @Test
     fun theThemeTogglePreviewingOffersTheWayBack() {
-        assertThat(themeToggle(dark = true, previewing = true)).isEqualTo("Theme: Night" to "go back to the automatic theme")
+        assertThat(themeToggle(dark = true, previewing = true)).isEqualTo("Theme: Night · Preview" to "go back to the automatic theme")
+    }
+
+    /** The control says which theme is on screen and whether it follows the clock (9 §4.1). */
+    @Test
+    fun theThemeControlSaysWhatItIs() {
+        assertThat(themeLabel(dark = true, previewing = false)).isEqualTo("Night · Auto")
+        assertThat(themeLabel(dark = false, previewing = false)).isEqualTo("Day · Auto")
+        assertThat(themeLabel(dark = true, previewing = true)).isEqualTo("Night · Preview")
+        assertThat(themeLabel(dark = false, previewing = true)).isEqualTo("Day · Preview")
+        compose.setContent {
+            CulveryTheme(dark = false) { StatusBar(dark = false, previewing = true, session = null, onSignOut = {}, onToggleThemePreview = {}) }
+        }
+        compose.onNodeWithTag("status_theme").assert(hasContentDescription("Theme: Day · Preview"))
+        compose.onNodeWithText("Day · Preview", useUnmergedTree = true).assertExists()
+        val onClick = compose.onNodeWithTag("status_theme").fetchSemanticsNode().config[SemanticsActions.OnClick]
+        assertThat(onClick.label).isEqualTo("go back to the automatic theme")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** The pill shows only while the camera runs, is named for what it tells, and leaves the theme control where it was (9 §6.7). */
+    @Test
+    fun theWatchingPillShowsOnlyWhileTheCameraRuns() {
+        var watching by mutableStateOf(true)
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                StatusBar(dark = true, previewing = false, session = SessionUi("Alex", "Admin"), watching = watching, onSignOut = {}, onToggleThemePreview = {})
+            }
+        }
+        compose.onNodeWithText(WATCHING, useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("The camera is on").assertExists()
+        val theme = compose.onNodeWithTag("status_theme").getUnclippedBoundsInRoot()
+        val signOut = compose.onNodeWithTag("status_sign_out").getUnclippedBoundsInRoot()
+        compose.assertClickablesHaveRoleAndLabel()
+        watching = false
+        compose.waitForIdle()
+        // The hidden pill keeps its place but leaves TalkBack's tree.
+        compose.onAllNodesWithText(WATCHING).assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("The camera is on").assertCountEquals(0)
+        assertThat(compose.onNodeWithTag("status_theme").getUnclippedBoundsInRoot()).isEqualTo(theme)
+        assertThat(compose.onNodeWithTag("status_sign_out").getUnclippedBoundsInRoot()).isEqualTo(signOut)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Sign out is drawn as a 29 dp pill, but a touch anywhere in the bar's 48 dp height locks (9 §4.1). */
+    @Test
+    fun signOutIsAQuietPill() {
+        var signedOut = 0
+        statusBar(SessionUi("Alex", "Admin"), onSignOut = { signedOut++ })
+        compose.onNodeWithTag("status_sign_out_pill", useUnmergedTree = true).assertHeightIsEqualTo(29.dp)
+        compose.onNodeWithTag("status_sign_out").assertHeightIsEqualTo(48.dp)
+        compose.onNodeWithTag("status_sign_out").performTouchInput { click(Offset(centerX, 1.dp.toPx())) }
+        compose.onNodeWithTag("status_sign_out").performTouchInput { click(Offset(centerX, height - 1.dp.toPx())) }
+        assertThat(signedOut).isEqualTo(2)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** TalkBack's double-tap is the semantics action, not a touch: it must reach the same toggle. */

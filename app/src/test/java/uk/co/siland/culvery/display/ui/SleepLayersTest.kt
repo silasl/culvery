@@ -37,6 +37,7 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.display.Screen
+import uk.co.siland.culvery.overlayCameraMark
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ToastMessage
 import uk.co.siland.culvery.shell.ui.ShellLayers
@@ -52,7 +53,8 @@ class SleepLayersTest {
     private var toast by mutableStateOf<ToastMessage?>(null)
     private var alert by mutableStateOf<(@Composable () -> Unit)?>(null)
     private var pinShowing by mutableStateOf(false)
-    private var cameraMark by mutableStateOf(false)
+    private var running by mutableStateOf(false)
+    private var settingsOpen by mutableStateOf(false)
     private var presses = 0
     private var touches = 0
     private var alertPresses = 0
@@ -80,7 +82,10 @@ class SleepLayersTest {
                     alert = alert,
                     sleeping = screen != Screen.AWAKE,
                     sleep = { SleepLayer(screen, { at }) { screen = Screen.AWAKE } },
-                    cameraMark = cameraMark,
+                    cameraMark = overlayCameraMark(
+                        running, sleeping = screen != Screen.AWAKE, complete = true, settingsOpen = settingsOpen,
+                        sheetShowing = false, pinShowing = pinShowing, alertShowing = alert != null,
+                    ),
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         HhButton("Add event", { presses++ }, Modifier.testTag("button"), on = ButtonSurface.Bg)
@@ -256,18 +261,21 @@ class SleepLayersTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Fails if the mark is missing over the dark screen or Home while the camera runs, or shows when it doesn't. */
+    /** Fails if the mark is missing over the dark screen or Settings while the camera runs, shows over Home (the top bar's pill is its mark there), or shows when the camera doesn't run. */
     @Test
     fun theCameraMarkShowsWhileTheCameraRuns() {
-        cameraMark = true
+        running = true
         show(Screen.ASLEEP)
         val mark = compose.onNodeWithContentDescription("The camera is on")
         mark.assertExists()
         assertThat(mark.fetchSemanticsNode().config.getOrNull(SemanticsActions.OnClick)).isNull()
         screen = Screen.AWAKE
         settle()
+        compose.onNodeWithContentDescription("The camera is on").assertDoesNotExist()
+        settingsOpen = true
+        settle()
         compose.onNodeWithContentDescription("The camera is on").assertExists()
-        cameraMark = false
+        running = false
         settle()
         compose.onNodeWithContentDescription("The camera is on").assertDoesNotExist()
         compose.assertClickablesHaveRoleAndLabel()

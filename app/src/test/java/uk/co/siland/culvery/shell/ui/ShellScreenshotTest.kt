@@ -206,6 +206,7 @@ class ShellScreenshotTest {
         dark: Boolean,
         state: ShellUiState = ShellUiState(dark = dark),
         fontScale: Float = 1f,
+        watching: Boolean = false,
         tabContent: @Composable (String) -> Unit = {},
         overlay: @Composable () -> Unit = {},
     ) {
@@ -222,6 +223,7 @@ class ShellScreenshotTest {
                                 onOpenSettings = {},
                                 onSignOut = {},
                                 onToggleThemePreview = {},
+                                watching = watching,
                                 tabContent = tabContent,
                             )
                             overlay()
@@ -244,6 +246,26 @@ class ShellScreenshotTest {
         "home_session_dark",
         dark = true,
         state = ShellUiState(dark = true, session = SessionUi("Alex", "Admin")),
+    )
+
+    /** The camera running: the pill sits left of the signed-in block (9 §6.7). */
+    @Test
+    fun homeWatchingDark() = snap(
+        "home_watching_dark", dark = true, watching = true,
+        state = ShellUiState(dark = true, session = SessionUi("Alex", "Admin")),
+    )
+
+    @Test
+    fun homeWatchingLight() = snap(
+        "home_watching_light", dark = false, watching = true,
+        state = ShellUiState(dark = false, session = SessionUi("Alex", "Admin")),
+    )
+
+    /** Previewing the day theme by day's end: the control reads "Day · Preview" (9 §4.1). */
+    @Test
+    fun homePreviewLight() = snap(
+        "home_preview_light", dark = false,
+        state = ShellUiState(dark = false, previewing = true, session = SessionUi("Alex", "Admin")),
     )
 
     @Test

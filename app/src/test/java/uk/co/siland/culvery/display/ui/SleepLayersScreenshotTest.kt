@@ -16,10 +16,12 @@ import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.display.Screen
+import uk.co.siland.culvery.overlayCameraMark
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ShellUiState
 import uk.co.siland.culvery.shell.ui.CulveryShell
 import uk.co.siland.culvery.shell.ui.ShellLayers
+import uk.co.siland.culvery.watchingPill
 
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -28,7 +30,7 @@ class SleepLayersScreenshotTest {
 
     private val at = LocalDateTime.of(2026, 10, 19, 23, 41)
 
-    /** Home in the shell's layers, with [screen] over it and the camera mark when [mark]. */
+    /** Home in the shell's layers, with [screen] over it; the camera running ([mark]) shows as the top bar's pill on Home and as the overlay mark over the dark screen. */
     private fun snap(name: String, dark: Boolean, screen: Screen, mark: Boolean = false, fontScale: Float = 1f) {
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
@@ -44,7 +46,10 @@ class SleepLayersScreenshotTest {
                             onTouch = {},
                             sleeping = screen != Screen.AWAKE,
                             sleep = { SleepLayer(screen, { at }) {} },
-                            cameraMark = mark,
+                            cameraMark = overlayCameraMark(
+                                mark, screen != Screen.AWAKE, complete = true, settingsOpen = false,
+                                sheetShowing = false, pinShowing = false, alertShowing = false,
+                            ),
                         ) {
                             CulveryShell(
                                 state = ShellUiState(dark = dark),
@@ -53,6 +58,7 @@ class SleepLayersScreenshotTest {
                                 onOpenSettings = {},
                                 onSignOut = {},
                                 onToggleThemePreview = {},
+                                watching = watchingPill(mark, pinShowing = false, alertShowing = false),
                                 tabContent = {},
                             )
                         }

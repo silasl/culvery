@@ -54,7 +54,7 @@ internal const val SHEET_CLOSING = "This closes in 20 seconds. Touch the screen 
  * out) would get a layout pass but no new frame and stay on screen. Every finger down on the shell, a sheet or the PIN
  * pad goes to [onTouch] before anything handles it; one on the alert doesn't (5 §5.1). The session hears of it from
  * [UserActivity] a moment later.
- * While a sheet or the PIN pad shows, what it covers is hidden from TalkBack; the toasts never are. While [sleeping], the
+ * While a sheet, the PIN pad or [alert] shows, what it covers is hidden from TalkBack; the toasts never are. While [sleeping], the
  * shell, the sheet and the alert are hidden too, and no toast is drawn: it waits for the screen to wake.
  * [settingsExpiresAt] is the session's end while Settings is open; 20 seconds before it, or before an edited sheet outside
  * Settings closes, a spoken warning shows over everything. [overlaysCloseWhenIdle] is false while Settings or the wizard
@@ -84,8 +84,8 @@ fun ShellLayers(
     Box(Modifier.fillMaxSize().graphicsLayer {}) {
         Box(Modifier.fillMaxSize().countsTouches { touched() }) {
             // A TalkBack double-tap is an action, not a touch, so a scrim can't stop it: what is covered leaves the tree.
-            Box(Modifier.fillMaxSize().then(if (overlay.isShowing || pinShowing || sleeping) Modifier.clearAndSetSemantics {} else Modifier)) { shell() }
-            OverlayLayer(overlay, hidden = pinShowing || sleeping)
+            Box(Modifier.fillMaxSize().then(if (overlay.isShowing || pinShowing || sleeping || alert != null) Modifier.clearAndSetSemantics {} else Modifier)) { shell() }
+            OverlayLayer(overlay, hidden = pinShowing || sleeping || alert != null)
         }
         // Outside the counting box: a ring's card is not someone using the sheet or Settings beneath.
         if (alert != null) AlertLayer(alert, hidden = pinShowing || sleeping)

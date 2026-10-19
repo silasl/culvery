@@ -6,19 +6,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import java.time.LocalDateTime
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.ShellUiState
 
-private val MARK_TOP_MARGIN = 12.dp
-
+/**
+ * The frame around every tab (9 §4.1): the rail at full height with the mark at its top, and beside it the top bar over the
+ * page. [watching] shows the top bar's pill; [pillSpot] is told where its icon is.
+ */
 @Composable
 fun CulveryShell(
     state: ShellUiState,
@@ -27,25 +25,23 @@ fun CulveryShell(
     onOpenSettings: () -> Unit,
     onSignOut: () -> Unit,
     onToggleThemePreview: () -> Unit,
+    watching: Boolean = false,
+    pillSpot: CameraMarkSpot? = null,
     tabContent: @Composable (String) -> Unit,
 ) {
-    Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
-        Column(Modifier.fillMaxSize()) {
-            StatusBar(state.dark, state.previewing, state.session, onSignOut, onToggleThemePreview)
-            Row(Modifier.weight(1f)) {
-                NavRail(state.tabs, state.selectedTabId, onSelectTab, onOpenSettings)
-                Box(Modifier.weight(1f).padding(start = 28.dp, end = 28.dp, top = 24.dp, bottom = 22.dp)) {
-                    if (state.selectedTabId == HOME_TAB_ID) {
-                        HomeScreen(now, state.homeCards, state.headerItems)
-                    } else {
-                        tabContent(state.selectedTabId)
-                    }
+    Row(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
+        NavRail(state.tabs, state.selectedTabId, onSelectTab, onOpenSettings)
+        Column(
+            Modifier.weight(1f).padding(start = ShellDimens.mainStart, end = ShellDimens.mainEnd, bottom = ShellDimens.mainBottom),
+        ) {
+            StatusBar(state.dark, state.previewing, state.session, onSignOut, onToggleThemePreview, watching, pillSpot)
+            Box(Modifier.weight(1f)) {
+                if (state.selectedTabId == HOME_TAB_ID) {
+                    HomeScreen(now, state.homeCards, state.headerItems)
+                } else {
+                    tabContent(state.selectedTabId)
                 }
             }
-        }
-        // Over the rail's top-left, centred on the tab icons; it overlaps the status bar's empty left side and runs below it.
-        Box(Modifier.align(Alignment.TopStart).width(RAIL_WIDTH).padding(top = MARK_TOP_MARGIN), contentAlignment = Alignment.TopCenter) {
-            CulveryMark(MARK_WIDTH, Modifier.testTag("culvery_mark"))
         }
     }
 }
