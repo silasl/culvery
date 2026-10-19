@@ -371,6 +371,14 @@ The release from a40fbd6 installed with `install -r` over Plan 6's (the househol
 - `HueSystem` copies its map on every stream event and scans the scenes on every publish; `LightRoom`'s `List` is unstable for Compose.
 - The `RecordingToaster` copies left in calendar, door, access and setup onto `:core:plugin`'s test fixture; Door's `VolumeRow` onto `HhPercentSlider`.
 
+## Plan 8 (Sleep and wake): emulator walk-through (2026-10-19)
+
+On `culvery-5` (debug build, an emulated front camera given on the command line).
+- Passed: Settings › Display after Calendars; the camera prompt (deny, deny, the refused line, allowing it from Android's settings); the camera mark showing exactly while Android lists Culvery as the camera's client; asleep after 2 minutes with the mark; a tap only wakes, a quick second tap presses nothing; sheets, the PIN pad and Settings hold the wall awake and it sleeps 2 minutes after each closes; night set from 15:00: the night clock 1 minute after Settings closed (Settings holds it awake), the camera off and the window at its lowest at night; not in front: no mark, Android's brightness; the heat line (numbers only).
+- Fault: a restart at night showed the night clock, then the bright Home screen 0.14 s later, because setup-not-read-yet counted as the wizard holding the wall awake; now only the wizard showing holds (90262f1, reviewed). A process restart at night now stays on the clock.
+- Debug builds don't pin, so re-pinning after the camera prompt is checked on the tablet.
+- Not tried here (moved to the tablet, the user testing in use): the doorbell by day and at night, camera wake-up with a real room, a tap on the night clock and its evening level, the night's end, the "no front camera" line, TalkBack, and the power and heat measurement.
+
 ## From Plan 8
 
 - Not done, and why: skipping `moved()` while awake would be wrong, since movement while awake must restart the sleep wait.
