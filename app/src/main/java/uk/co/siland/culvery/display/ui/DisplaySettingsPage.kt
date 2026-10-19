@@ -22,15 +22,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalTime
 import java.util.Optional
 import javax.inject.Inject
-import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.Toaster
-import uk.co.siland.culvery.core.plugin.save
+import uk.co.siland.culvery.core.plugin.saving
 import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.FROM
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhPercentSlider
@@ -38,6 +39,7 @@ import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhTimeStepperRow
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.UNTIL
 import uk.co.siland.culvery.display.ALLOW_THE_CAMERA
 import uk.co.siland.culvery.display.BRIGHTNESS
 import uk.co.siland.culvery.display.BRIGHTNESS_RANGE
@@ -53,7 +55,6 @@ import uk.co.siland.culvery.display.DisplayPrefs
 import uk.co.siland.culvery.display.DisplaySettings
 import uk.co.siland.culvery.display.EVENING
 import uk.co.siland.culvery.display.EVENING_BRIGHTNESS
-import uk.co.siland.culvery.display.FROM
 import uk.co.siland.culvery.display.NIGHT_CLOCK
 import uk.co.siland.culvery.display.NIGHT_END
 import uk.co.siland.culvery.display.NIGHT_START
@@ -63,7 +64,6 @@ import uk.co.siland.culvery.display.OPEN_ANDROIDS_SETTINGS
 import uk.co.siland.culvery.display.SLEEP
 import uk.co.siland.culvery.display.SLEEP_CHOICES
 import uk.co.siland.culvery.display.SLEEP_WHEN_ALONE
-import uk.co.siland.culvery.display.UNTIL
 import uk.co.siland.culvery.display.WAKE_BY_CAMERA
 import uk.co.siland.culvery.display.WAKE_BY_CAMERA_DEFAULT
 import uk.co.siland.culvery.display.WAKE_BY_CAMERA_LINE
@@ -124,7 +124,7 @@ fun DisplaySettingsScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions
         }
         HhSectionLabel(SLEEP)
         Text(SLEEP_WHEN_ALONE, style = HhType.rowTitle, color = c.ink)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(DisplayDimens.chipGap), verticalArrangement = Arrangement.spacedBy(DisplayDimens.chipGap)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap), verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
             SLEEP_CHOICES.forEach { m ->
                 HhChoiceChip(minutes(m), prefs.sleepAfterMinutes == m, "display_sleep_$m", { actions.onSleepAfter(m) }, spokenName = sleepAfter(m))
             }
@@ -137,7 +137,7 @@ fun DisplaySettingsScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions
 @Composable
 private fun BrightnessRow(name: String, spokenName: String, percent: Int, tag: String, onLetGo: (Int) -> Unit) {
     val c = Culvery.colors
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DisplayDimens.chipGap)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
         Text(name, style = HhType.rowTitle, color = c.ink, modifier = Modifier.width(DisplayDimens.sliderNameWidth))
         HhPercentSlider(
             name, percent, tag, Modifier.weight(1f),
@@ -150,23 +150,26 @@ private fun BrightnessRow(name: String, spokenName: String, percent: Int, tag: S
 
 @Composable
 private fun CameraRow(ui: DisplaySettingsUi, actions: DisplaySettingsActions) {
-    val c = Culvery.colors
     when (ui.camera) {
         CameraState.ALLOWED -> HhSwitchRow(WAKE_BY_CAMERA, WAKE_BY_CAMERA_LINE, ui.prefs.wakeByCamera ?: WAKE_BY_CAMERA_DEFAULT, "display_camera", actions.onWakeByCamera)
-        CameraState.NOT_ASKED -> Column(verticalArrangement = Arrangement.spacedBy(DisplayDimens.chipGap)) {
-            Text(WAKE_BY_CAMERA, style = HhType.rowTitle, color = c.ink)
-            Text(CAMERA_NOT_ASKED, style = HhType.body, color = c.mute)
+        CameraState.NOT_ASKED -> CameraNote(CAMERA_NOT_ASKED) {
             HhButton(ALLOW_THE_CAMERA, actions.onAllowCamera, Modifier.testTag("display_allow_camera"), on = ButtonSurface.Bg)
         }
-        CameraState.REFUSED -> Column(verticalArrangement = Arrangement.spacedBy(DisplayDimens.chipGap)) {
-            Text(WAKE_BY_CAMERA, style = HhType.rowTitle, color = c.ink)
-            Text(CAMERA_REFUSED, style = HhType.body, color = c.mute)
+        CameraState.REFUSED -> CameraNote(CAMERA_REFUSED) {
             HhButton(OPEN_ANDROIDS_SETTINGS, actions.onOpenAndroidSettings, Modifier.testTag("display_open_settings"), on = ButtonSurface.Bg)
         }
-        CameraState.NO_CAMERA -> Column(verticalArrangement = Arrangement.spacedBy(DisplayDimens.chipGap)) {
-            Text(WAKE_BY_CAMERA, style = HhType.rowTitle, color = c.ink)
-            Text(NO_FRONT_CAMERA, style = HhType.body, color = c.mute)
-        }
+        CameraState.NO_CAMERA -> CameraNote(NO_FRONT_CAMERA)
+    }
+}
+
+/** Why the camera switch isn't offered, with what to do about it if anything. */
+@Composable
+private fun CameraNote(text: String, button: (@Composable () -> Unit)? = null) {
+    val c = Culvery.colors
+    Column(verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
+        Text(WAKE_BY_CAMERA, style = HhType.rowTitle, color = c.ink)
+        Text(text, style = HhType.body, color = c.mute)
+        button?.invoke()
     }
 }
 
@@ -185,9 +188,7 @@ internal fun DisplaySettingsHost(
     val packageName = LocalContext.current.packageName
     val scope = rememberCoroutineScope()
     val p = prefs ?: return
-    fun change(write: suspend () -> Unit) {
-        scope.launch { toaster.save(write) { Log.w(TAG, "Couldn't save a display setting (${it::class.simpleName})") } }
-    }
+    val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a display setting (${it::class.simpleName})") }
     DisplaySettingsScreen(
         DisplaySettingsUi(p, camera, sunKnown = sun != null),
         DisplaySettingsActions(

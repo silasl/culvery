@@ -16,6 +16,7 @@ import org.junit.runners.model.Statement
 import uk.co.siland.culvery.capability.music.ui.GroupActions
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
+import uk.co.siland.culvery.core.plugin.settingsDataStore
 import uk.co.siland.culvery.core.ui.Icons
 
 internal val SONG = NowPlaying.Track("Song", "Artist", "Album")
@@ -45,7 +46,7 @@ internal fun recordingGroupActions(calls: MutableList<String>) = GroupActions(
 )
 
 internal fun musicSettings(dir: File, scope: CoroutineScope) =
-    MusicSettings(musicSettingsStore(scope) { File(dir, "music_settings.preferences_pb") }, scope)
+    MusicSettings(settingsDataStore(scope) { File(dir, "music_settings.preferences_pb") }, scope)
 
 /** A test's folder, a scope on Dispatchers.IO cancelled after the test, and [settings] kept in that folder. */
 class MusicFixture : TestRule {

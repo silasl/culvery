@@ -26,7 +26,6 @@ import java.time.LocalTime
 import java.time.ZoneId
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.door.ACCESS_STEP
 import uk.co.siland.culvery.capability.door.ACCESS_STEP_LINE
 import uk.co.siland.culvery.capability.door.CAPTURE_LINE
@@ -39,13 +38,11 @@ import uk.co.siland.culvery.capability.door.DOOR
 import uk.co.siland.culvery.capability.door.DoorHealth
 import uk.co.siland.culvery.capability.door.DoorProvider
 import uk.co.siland.culvery.capability.door.DoorSettings
-import uk.co.siland.culvery.capability.door.FROM
 import uk.co.siland.culvery.capability.door.NOTIFICATION_ACCESS_MISSING
 import uk.co.siland.culvery.capability.door.NOT_DONE_YET
 import uk.co.siland.culvery.capability.door.OPEN_NOTIFICATION_ACCESS
 import uk.co.siland.culvery.capability.door.PLAY_CHIME
 import uk.co.siland.culvery.capability.door.QUIET_HOURS
-import uk.co.siland.culvery.capability.door.UNTIL
 import uk.co.siland.culvery.capability.door.appStep
 import uk.co.siland.culvery.capability.door.checkNotifications
 import uk.co.siland.culvery.capability.door.lastHeard
@@ -55,9 +52,10 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
-import uk.co.siland.culvery.core.plugin.save
+import uk.co.siland.culvery.core.plugin.saving
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.FROM
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
@@ -67,6 +65,7 @@ import uk.co.siland.culvery.core.ui.HhTimeStepperRow
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
+import uk.co.siland.culvery.core.ui.UNTIL
 
 private const val TAG = "DoorSettings"
 
@@ -193,9 +192,7 @@ internal fun DoorSettingsHost(
     LaunchedEffect(Unit) { health.refresh() }
     val p = prefs ?: return
     val z = householdZone ?: return
-    fun change(write: suspend () -> Unit) {
-        scope.launch { toaster.save(write) { Log.w(TAG, "Couldn't save a door setting (${it::class.simpleName})") } }
-    }
+    val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a door setting (${it::class.simpleName})") }
     val service = provider.descriptor.displayName
     DoorSettingsScreen(
         DoorSettingsUi(

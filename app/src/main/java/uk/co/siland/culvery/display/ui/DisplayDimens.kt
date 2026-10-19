@@ -15,7 +15,6 @@ object DisplayDimens {
     val markSize = 20.dp
     val markTop = 12.dp
     val settingsGap = 16.dp
-    val chipGap = 8.dp
     val sliderNameWidth = 200.dp
     val sliderValueWidth = 56.dp
 }

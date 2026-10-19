@@ -28,6 +28,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
+import uk.co.siland.culvery.core.plugin.settingsDataStore
 import uk.co.siland.culvery.core.ui.Icons
 
 internal val RELAX = LightScene("relax-id", "Relax")
@@ -49,7 +50,7 @@ internal fun link(bridgeId: String = "001788fffe00a1b2", address: String = "192.
     LightsLink(bridgeId, address, key)
 
 internal fun lightsSettings(dir: File, scope: CoroutineScope) =
-    LightsSettings(lightsSettingsStore(scope) { File(dir, "lights_settings.preferences_pb") })
+    LightsSettings(settingsDataStore(scope) { File(dir, "lights_settings.preferences_pb") })
 
 /** A test's folder, a scope on Dispatchers.IO cancelled after the test, and [settings] kept in that folder. */
 class LightsFixture : TestRule {

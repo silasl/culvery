@@ -25,6 +25,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.plugin.settingsDataStore
 
 /** 5 §5.5, §6: checked on each return to the front and whenever Android binds or unbinds the listener. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -65,7 +66,7 @@ class DoorHealthTest {
     /** A save that failed is tried again on the next refresh, though the checks are unchanged. Fails if only a change in the checks retries it. */
     @Test
     fun aConnectionThatFailedToSaveIsSavedOnTheNextRefresh() = runTest {
-        val real = doorSettingsStore(io) { File(folder.root, "flaky.preferences_pb") }
+        val real = settingsDataStore(io) { File(folder.root, "flaky.preferences_pb") }
         val attempts = AtomicInteger()
         val flaky = object : DataStore<Preferences> by real {
             override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {

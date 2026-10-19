@@ -10,8 +10,6 @@ internal const val DISPLAY = "Display"
 internal const val NIGHT_CLOCK = "Night clock"
 internal const val BRIGHTNESS = "Brightness"
 internal const val SLEEP = "Sleep"
-internal const val FROM = "From"
-internal const val UNTIL = "Until"
 internal const val NIGHT_START = "night clock start"
 internal const val NIGHT_END = "night clock end"
 

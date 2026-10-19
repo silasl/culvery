@@ -14,6 +14,7 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.AlertHost
+import uk.co.siland.culvery.core.plugin.settingsDataStore
 
 internal fun doorDb(): DoorDatabase =
     Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), DoorDatabase::class.java)
@@ -28,7 +29,7 @@ internal fun householdZone(): HouseholdZone = HouseholdZone(
 )
 
 internal fun doorSettings(dir: File, scope: CoroutineScope) =
-    DoorSettings(doorSettingsStore(scope) { File(dir, "door_settings.preferences_pb") }, scope)
+    DoorSettings(settingsDataStore(scope) { File(dir, "door_settings.preferences_pb") }, scope)
 
 /** Wednesday 14 October 2026, 14:02 in London (13:02 UTC). */
 internal const val NOW = 1_791_982_920_000L

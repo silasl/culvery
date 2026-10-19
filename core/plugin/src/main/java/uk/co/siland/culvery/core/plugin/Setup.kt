@@ -2,8 +2,10 @@ package uk.co.siland.culvery.core.plugin
 
 import androidx.compose.runtime.Composable
 import java.io.IOException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 
 /** The wizard's forward button, unless a step names its own. */
 const val NEXT_LABEL = "Next"
@@ -29,6 +31,10 @@ suspend fun Toaster.save(write: suspend () -> Unit, log: (IOException) -> Unit) 
         show(COULD_NOT_SAVE, urgent = true)
     }
 }
+
+/** A settings page's writer: each write runs in this scope through [Toaster.save]. */
+fun CoroutineScope.saving(toaster: Toaster, log: (IOException) -> Unit): (suspend () -> Unit) -> Unit =
+    { write -> launch { toaster.save(write, log) } }
 
 /** The button that closes a confirmation and changes nothing. */
 const val KEEP = "Keep"

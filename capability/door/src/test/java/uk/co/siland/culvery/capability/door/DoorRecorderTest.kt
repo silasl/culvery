@@ -20,6 +20,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.settingsDataStore
 
 /** 5 §3.1, §4.2: the sink records in the order notices arrive, keeps last heard and the unrecognised run. */
 @RunWith(AndroidJUnit4::class)
@@ -93,7 +94,7 @@ class DoorRecorderTest {
     /** Fails if a non-IO failure while counting ends the queue, so later notices are never recorded. */
     @Test
     fun aFailureWhileCountingDoesNotStopLaterNotices() = runTest {
-        val real = doorSettingsStore(scope) { File(folder.root, "f.preferences_pb") }
+        val real = settingsDataStore(scope) { File(folder.root, "f.preferences_pb") }
         var failures = 1
         val flaky = object : DataStore<Preferences> by real {
             override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {

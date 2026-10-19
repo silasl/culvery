@@ -18,6 +18,8 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+const val FROM = "From"
+const val UNTIL = "Until"
 const val EARLIER = "Earlier"
 const val LATER = "Later"
 const val TIME_STEP_MINUTES = 30L

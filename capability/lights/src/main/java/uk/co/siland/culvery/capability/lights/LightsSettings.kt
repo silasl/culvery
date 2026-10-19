@@ -3,26 +3,21 @@ package uk.co.siland.culvery.capability.lights
 import android.content.Context
 import android.util.Log
 import androidx.datastore.core.DataStore
-import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
+import uk.co.siland.culvery.core.plugin.settingsDataStore
 
 private const val FILE = "lights_settings"
 private const val TAG = "LightsSettings"
@@ -48,15 +43,11 @@ data class LightsPrefs(
             "holidayAutomations=${holidayAutomations.size}, holidayOn=$holidayOn, holidayStarted=${holidayStarted.size})"
 }
 
-/** The settings file's store; one that can't be read is replaced by an empty one, the defaults. */
-internal fun lightsSettingsStore(scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO), produceFile: () -> File): DataStore<Preferences> =
-    PreferenceDataStoreFactory.create(corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() }, scope = scope, produceFile = produceFile)
-
 /** A small DataStore file under `files/datastore/`, which backup and transfer already leave alone. Writes throw `IOException`. */
 @Singleton
 class LightsSettings(private val store: DataStore<Preferences>) {
     @Inject
-    constructor(@ApplicationContext context: Context) : this(lightsSettingsStore { context.preferencesDataStoreFile(FILE) })
+    constructor(@ApplicationContext context: Context) : this(settingsDataStore { context.preferencesDataStoreFile(FILE) })
 
     val prefs: Flow<LightsPrefs> = store.data
         .retryWithBackoff { Log.w(TAG, "Couldn't read the lights' settings (${it::class.simpleName}); retrying") }

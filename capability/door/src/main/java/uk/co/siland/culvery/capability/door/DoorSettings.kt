@@ -3,9 +3,7 @@ package uk.co.siland.culvery.capability.door
 import android.content.Context
 import android.util.Log
 import androidx.datastore.core.DataStore
-import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.MutablePreferences
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -15,14 +13,11 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.File
 import java.io.IOException
 import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +26,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.settingsDataStore
 
 private const val FILE = "door_settings"
 private const val TAG = "DoorSettings"
@@ -57,10 +53,6 @@ data class DoorPrefs(
     fun capturingAt(nowMillis: Long): Boolean = (captureUntilMillis - nowMillis) in 1..CAPTURE_MS
 }
 
-/** The settings file's store; one that can't be read is replaced by an empty one, the defaults. */
-internal fun doorSettingsStore(scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO), produceFile: () -> File): DataStore<Preferences> =
-    PreferenceDataStoreFactory.create(corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() }, scope = scope, produceFile = produceFile)
-
 /**
  * A small DataStore file of its own, as the setup flags are: `door.db` keeps its one table (5 §3.1). Writes throw
  * [IOException]; the caller says so or logs it.
@@ -69,7 +61,7 @@ internal fun doorSettingsStore(scope: CoroutineScope = CoroutineScope(Supervisor
 class DoorSettings(private val store: DataStore<Preferences>, scope: CoroutineScope) {
     @Inject
     constructor(@ApplicationContext context: Context, @ApplicationScope scope: CoroutineScope) :
-        this(doorSettingsStore { context.preferencesDataStoreFile(FILE) }, scope)
+        this(settingsDataStore { context.preferencesDataStoreFile(FILE) }, scope)
 
     val prefs: Flow<DoorPrefs> = store.data
         .catch { e ->

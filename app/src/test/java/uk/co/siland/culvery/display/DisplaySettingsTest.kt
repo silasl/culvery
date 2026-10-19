@@ -17,6 +17,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.plugin.settingsDataStore
 
 @RunWith(AndroidJUnit4::class)
 class DisplaySettingsTest {
@@ -39,7 +40,7 @@ class DisplaySettingsTest {
     @Test
     fun readIsNullUntilTheFileIsRead() = runTest {
         val own = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
-        val fresh = DisplaySettings(displaySettingsStore(own) { File(folder.root, FILE_NAME) }, own)
+        val fresh = DisplaySettings(settingsDataStore(own) { File(folder.root, FILE_NAME) }, own)
         assertThat(fresh.read.value).isNull()
         assertThat(fresh.current.value).isEqualTo(DisplayPrefs())
         assertThat(fresh.read.first { it != null }).isEqualTo(DisplayPrefs())

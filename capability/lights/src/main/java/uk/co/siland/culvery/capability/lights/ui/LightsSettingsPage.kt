@@ -60,7 +60,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.attempt
-import uk.co.siland.culvery.core.plugin.save
+import uk.co.siland.culvery.core.plugin.saving
 import uk.co.siland.culvery.core.ui.AddressSheetWords
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
@@ -240,9 +240,7 @@ internal fun LightsSettingsHost(
         }
     }
     val p = prefs ?: return
-    fun change(write: suspend () -> Unit) {
-        scope.launch { toaster.save(write) { Log.w(TAG, "Couldn't save a lights setting (${it::class.simpleName})") } }
-    }
+    val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a lights setting (${it::class.simpleName})") }
     fun closePairing() {
         pairing.job?.cancel()
         pairing.sheet = null
