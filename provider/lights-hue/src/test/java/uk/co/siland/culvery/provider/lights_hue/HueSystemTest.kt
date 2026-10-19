@@ -424,6 +424,43 @@ class HueSystemTest {
         assertThat(READ_BACK_TRIES).isEqualTo(6)
     }
 
+    /** Fails if a read-back read the bridge answers with an error ends the read-back, or searches for the bridge (7 §4.5). */
+    @Test
+    fun aRefusedReadBackReadIsReadAgain() = runTest {
+        var searches = 0
+        val s = system(search = { searches++; emptyList() })
+        val mimic = s.automations().single { it.id == PM_STOPPED }
+        bridge.received.clear()
+        bridge.onRequest = {
+            if (it.method == "GET") {
+                bridge.failing = bridge.behaviorReads().size == 1
+                if (bridge.behaviorReads().size == 2) bridge.resources["behavior_instance"] = PM_ALL_STARTED
+            }
+        }
+        assertThat(s.setAutomation(mimic, true)).isEqualTo(AutomationResult.CONFIRMED)
+        assertThat(bridge.behaviorReads()).hasSize(2)
+        assertThat(searches).isEqualTo(0)
+    }
+
+    /** Fails if a read-back read with no answer throws, or searches for the bridge, when the switch was already sent (7 §4.5). */
+    @Test
+    fun aReadBackReadWithNoAnswerIsReadAgain() = runTest {
+        var searches = 0
+        val s = system(search = { searches++; emptyList() }, timeoutMs = 200L)
+        val mimic = s.automations().single { it.id == PM_STOPPED }
+        bridge.received.clear()
+        bridge.onRequest = {
+            if (it.method == "GET") {
+                bridge.delayMs = if (bridge.behaviorReads().size == 1) 400L else 0L
+                if (bridge.behaviorReads().size == 2) bridge.resources["behavior_instance"] = PM_ALL_STARTED
+            }
+        }
+        assertThat(s.setAutomation(mimic, true)).isEqualTo(AutomationResult.CONFIRMED)
+        assertThat(bridge.behaviorReads()).hasSize(2)
+        assertThat(searches).isEqualTo(0)
+        assertThat(s.problem.value).isNull()
+    }
+
     /** Pin. Fails if the bridge's 200 to a trigger counts as the automation started: the read-back is the only proof (7 §4.5). */
     @Test
     fun anUnknownTriggerAnswered200IsNotConfirmed() = runTest {

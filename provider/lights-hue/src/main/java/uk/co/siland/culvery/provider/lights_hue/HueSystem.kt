@@ -188,9 +188,18 @@ internal class HueSystem(
         if (!sent) return AutomationResult.NOT_CONFIRMED
         repeat(READ_BACK_TRIES) {
             delay(readBackMs)
-            if (onBridge { client.behavior(it, behavior.id) }?.on == on) return AutomationResult.CONFIRMED
+            if (readBack(behavior.id) == on) return AutomationResult.CONFIRMED
         }
         return AutomationResult.NOT_CONFIRMED
+    }
+
+    /** Whether the automation reads on; null when it isn't there or the read failed, which counts as not yet, unsearched. */
+    private suspend fun readBack(id: String): Boolean? = try {
+        client.behavior(call(), id)?.on
+    } catch (e: IOException) {
+        null
+    } catch (e: HueRefused) {
+        null
     }
 
     private suspend fun readBehaviors(): List<HueBehavior> =
