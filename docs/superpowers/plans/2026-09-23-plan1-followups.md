@@ -380,6 +380,7 @@ The release from a40fbd6 installed with `install -r` over Plan 6's (the househol
 - A `SettingsTokens.pageGap` shared by every settings page (Display's `settingsGap` is another 16 dp); one `HhSliderRow` for Display's brightness rows and Music's.
 - `ShellLayers` taking one `screen` (or a list of layers) instead of `sleeping`, the sleep slot and the camera mark.
 - `SetupState`'s `setupStore` onto `:core:plugin`'s `settingsDataStore`, as the four settings files now are.
+- FLAG (pre-existing): `DoorTabTest` hit "connection pool has been closed" at teardown four times across Plans 7–8; it passes in isolation.
 
 ## Feature ideas (2026-10-02, after v1)
 
