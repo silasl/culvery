@@ -103,10 +103,10 @@ class OverlayLayersTest {
     }
 
     @Test
-    fun aPlainToastLastsFourSeconds() {
+    fun aPlainToastLastsSixSeconds() {
         showToasts()
         post(ToastMessage(1, "Event deleted.", "info"))
-        assertThat(shownAt(3_880, "Event deleted.")).isTrue()
+        assertThat(shownAt(5_880, "Event deleted.")).isTrue()
         assertThat(shownAt(120, "Event deleted.")).isFalse()
     }
 
@@ -127,7 +127,7 @@ class OverlayLayersTest {
         assertThat(shownAt(120, "Event deleted.")).isFalse()
     }
 
-    /** The plain toast that replaces an urgent one lasts its own 4 s and reads politely. */
+    /** The plain toast that replaces an urgent one lasts its own 6 s and reads politely. */
     @Test
     fun aPlainToastAfterAnUrgentOneKeepsItsOwnTimeAndPoliteness() {
         showToasts()
@@ -135,7 +135,7 @@ class OverlayLayersTest {
         compose.mainClock.advanceTimeBy(1_000)
         post(ToastMessage(2, "Event added.", "info"))
         compose.onNodeWithTag("toast").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
-        assertThat(shownAt(3_880, "Event added.")).isTrue()
+        assertThat(shownAt(5_880, "Event added.")).isTrue()
         assertThat(shownAt(120, "Event added.")).isFalse()
     }
 

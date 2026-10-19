@@ -33,6 +33,7 @@ import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.shell.OverlayState
+import uk.co.siland.culvery.shell.ToastMessage
 
 /** 4d-2 §6.2, §6.3 under the Compose test clock: what closes when, and the two warnings. */
 @RunWith(AndroidJUnit4::class)
@@ -113,6 +114,27 @@ class ShellLayersTimeoutTest {
         after(SESSION_TIMEOUT_MS - 20_000)
         assertThat(open("pad")).isTrue()
         compose.onNodeWithTag("settings_warning").assertTextEquals(SETTINGS_CLOSING)
+    }
+
+    @Test
+    fun aToastShowsForItsReadingTime() {
+        var toast by mutableStateOf<ToastMessage?>(null)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ShellLayers(
+                    overlay = overlay, toast = toast, onToastHidden = { toast = null }, pinShowing = false, pinPad = {},
+                    activity = activity, onTouch = activity::touch,
+                ) { Text("Home") }
+            }
+        }
+        // 12 words: 6 s plus 1 s.
+        toast = ToastMessage(1, List(12) { "word" }.joinToString(" "), "info")
+        settle()
+        after(7_000L - 48)
+        assertThat(open("toast")).isTrue()
+        after(48)
+        assertThat(open("toast")).isFalse()
     }
 
     @Test
@@ -246,9 +268,10 @@ class ShellLayersTimeoutTest {
         settle()
         pinShowing = false
         settle()
-        after(EDIT_HOLD_MS - 100)
+        // The warning's ring runs a frame loop, so the clock moves a frame at a time: a wider margin than the 100 ms elsewhere.
+        after(EDIT_HOLD_MS - 200)
         assertThat(open("sheet")).isTrue()
-        after(100)
+        after(200)
         assertThat(open("sheet")).isFalse()
     }
 

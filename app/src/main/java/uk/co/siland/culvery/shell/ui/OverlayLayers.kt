@@ -34,6 +34,7 @@ import uk.co.siland.culvery.core.plugin.CLOSING_WARNING_MS
 import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
 import uk.co.siland.culvery.core.plugin.OVERLAY_IDLE_MS
 import uk.co.siland.culvery.core.plugin.UserActivity
+import uk.co.siland.culvery.core.ui.Countdown
 import uk.co.siland.culvery.core.ui.HhToast
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
@@ -79,7 +80,7 @@ fun ShellLayers(
 ) {
     val touched by rememberUpdatedState(onTouch)
     val settingsClosingSoon = rememberClosingSoon(settingsExpiresAt, nowMillis)
-    val sheetClosingSoon = rememberSheetClosingSoon(overlay, activity, closes = overlaysCloseWhenIdle)
+    val sheetWarningEndsAt = rememberSheetClosingSoon(overlay, activity, closes = overlaysCloseWhenIdle, nowMillis)
     Box(Modifier.fillMaxSize().graphicsLayer {}) {
         Box(Modifier.fillMaxSize().countsTouches { touched() }) {
             // A TalkBack double-tap is an action, not a touch, so a scrim can't stop it: what is covered leaves the tree.
@@ -95,8 +96,9 @@ fun ShellLayers(
         if (!sleeping) ToastLayer(toast, activity, onHidden = onToastHidden)
         // One warning at a time, and Settings' first: Settings closing takes any open sheet with it. Both keep the wall awake.
         when {
-            settingsClosingSoon -> ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning")
-            sheetClosingSoon -> ClosingWarningLayer(SHEET_CLOSING, "sheet_warning")
+            settingsClosingSoon && settingsExpiresAt != null ->
+                ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning", settingsExpiresAt, nowMillis)
+            sheetWarningEndsAt != null -> ClosingWarningLayer(SHEET_CLOSING, "sheet_warning", sheetWarningEndsAt, nowMillis)
         }
         if (cameraMark) CameraMark()
     }
@@ -164,22 +166,22 @@ private fun rememberClosingSoon(expiresAt: Long?, nowMillis: () -> Long): Boolea
 
 /**
  * Closes the overlay after [OVERLAY_IDLE_MS] without a touch, or [EDIT_HOLD_MS] while it has unsaved changes, and is true
- * from [CLOSING_WARNING_MS] before an edited one goes (4d-2 §6.3). Any touch, a TalkBack gesture's included, starts it
+ * from [CLOSING_WARNING_MS] before an edited one goes (4d-2 §6.3); then it returns the moment the sheet goes, else null. Any touch, a TalkBack gesture's included, starts it
  * again; a card that waits on a screen outside the app, or any overlay while not [closes], stays.
  */
 @Composable
-private fun rememberSheetClosingSoon(overlay: OverlayState, activity: UserActivity, closes: Boolean): Boolean {
+private fun rememberSheetClosingSoon(overlay: OverlayState, activity: UserActivity, closes: Boolean, nowMillis: () -> Long): Long? {
     val content = overlay.content
     val edited = overlay.edited
-    var soon by remember(content, edited, closes) { mutableStateOf(false) }
+    var endsAt by remember(content, edited, closes) { mutableStateOf<Long?>(null) }
     LaunchedEffect(content, edited, overlay.closesWhenIdle, closes) {
         if (content == null || !overlay.closesWhenIdle || !closes) return@LaunchedEffect
         // Collected here rather than as state, so a touch restarts the wait without recomposing the shell.
         activity.touches.collectLatest {
-            soon = false
+            endsAt = null
             if (edited) {
                 delay(activity.timeout(EDIT_HOLD_MS) - CLOSING_WARNING_MS)
-                soon = true
+                endsAt = nowMillis() + CLOSING_WARNING_MS
                 delay(CLOSING_WARNING_MS)
             } else {
                 delay(activity.timeout(OVERLAY_IDLE_MS))
@@ -187,7 +189,7 @@ private fun rememberSheetClosingSoon(overlay: OverlayState, activity: UserActivi
             overlay.dismiss()
         }
     }
-    return soon
+    return endsAt
 }
 
 /** Where toasts and warnings sit: bottom-centre, 28 dp above the bottom or above the on-screen keyboard (hand-off §7). */
@@ -204,10 +206,12 @@ private fun ToastSlot(keyboard: WindowInsets, content: @Composable () -> Unit) {
     }
 }
 
-/** A warning pill where toasts sit (hand-off §7's toast, `schedule` icon), spoken at once; its words are fixed, never a countdown. */
+/** A warning pill where toasts sit (hand-off §7's toast), spoken at once; its words are fixed and a ring shows the time left until [endsAt]. */
 @Composable
-internal fun ClosingWarningLayer(text: String, tag: String, keyboard: WindowInsets = WindowInsets.ime) {
-    ToastSlot(keyboard) { HhToast(text, Icons.SCHEDULE, Modifier.testTag(tag), urgent = true) }
+internal fun ClosingWarningLayer(text: String, tag: String, endsAt: Long, nowMillis: () -> Long, keyboard: WindowInsets = WindowInsets.ime) {
+    ToastSlot(keyboard) {
+        HhToast(text, Icons.SCHEDULE, Modifier.testTag(tag), urgent = true, countdown = Countdown(endsAt, CLOSING_WARNING_MS, nowMillis))
+    }
 }
 
 /**
@@ -218,7 +222,7 @@ internal fun ClosingWarningLayer(text: String, tag: String, keyboard: WindowInse
 fun ToastLayer(toast: ToastMessage?, activity: UserActivity, keyboard: WindowInsets = WindowInsets.ime, onHidden: (Long) -> Unit) {
     val t = toast ?: return
     LaunchedEffect(t.id) {
-        delay(activity.timeout(toastMillis(t.message, t.urgent), hasControls = false))
+        delay(activity.timeout(toastMillis(t.message), hasControls = false))
         onHidden(t.id)
     }
     ToastSlot(keyboard) { HhToast(t.message, t.icon, urgent = t.urgent) }

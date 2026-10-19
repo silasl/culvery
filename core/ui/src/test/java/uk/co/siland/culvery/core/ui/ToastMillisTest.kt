@@ -5,11 +5,14 @@ import org.junit.Test
 
 class ToastMillisTest {
     @Test
-    fun aToastLastsLongEnoughToReadAndNoLonger() {
-        assertThat(toastMillis("Event added.", urgent = false)).isEqualTo(4_000L)
-        assertThat(toastMillis("x".repeat(30), urgent = true)).isEqualTo(6_000L)
-        assertThat(toastMillis("x".repeat(100), urgent = false)).isEqualTo(7_000L)
-        assertThat(toastMillis("x".repeat(200), urgent = false)).isEqualTo(8_000L)
-        assertThat(toastMillis("x".repeat(200), urgent = true)).isEqualTo(8_000L)
+    fun aToastStaysSixSecondsPlusOneForEveryTenWords() {
+        fun words(n: Int) = List(n) { "word" }.joinToString(" ")
+        assertThat(toastMillis("")).isEqualTo(6_000L)
+        assertThat(toastMillis(words(9))).isEqualTo(6_000L)
+        assertThat(toastMillis(words(10))).isEqualTo(7_000L)
+        assertThat(toastMillis(words(59))).isEqualTo(11_000L)
+        assertThat(toastMillis(words(60))).isEqualTo(12_000L)
+        assertThat(toastMillis(words(200))).isEqualTo(12_000L)
+        assertThat(toastMillis("  two   words  ")).isEqualTo(6_000L)
     }
 }

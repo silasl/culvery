@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -22,12 +23,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -57,6 +66,8 @@ object ShellTokens {
     val toastPaddingH = 22.dp
     val toastRadius = 26.dp
     val toastIcon = 22.dp
+    val ringSize = 22.dp
+    val ringStroke = 3.dp
     val toastIconGap = 10.dp
     val toastMaxWidth = 720.dp
 
@@ -80,12 +91,21 @@ object ShellType {
     val signOut = HhType.labelSmall
 }
 
-/** How long a toast shows (4d-2 §6.5): 4 s, 6 s for an error or refusal, longer for long text, at most 8 s. */
-fun toastMillis(message: String, urgent: Boolean): Long {
-    val base = if (urgent) 6_000L else 4_000L
-    // 50 ms a character is a slow reader's pace; 40 characters fit in the base time.
-    return minOf(base + 50L * (message.length - 40).coerceAtLeast(0), 8_000L)
+const val TOAST_MIN_MS = 6_000L
+const val TOAST_MAX_MS = 12_000L
+const val TOAST_MS_PER_TEN_WORDS = 1_000L
+
+/** How long a toast shows (9 §6.10): 6 s plus 1 s for every ten words, at most 12 s. */
+fun toastMillis(message: String): Long {
+    val words = message.split(Regex("\\s+")).count { it.isNotEmpty() }
+    return minOf(TOAST_MIN_MS + TOAST_MS_PER_TEN_WORDS * (words / 10), TOAST_MAX_MS)
 }
+
+/** A countdown that ends at [endsAt] on [nowMillis]'s clock, [totalMs] long from its start. */
+class Countdown(val endsAt: Long, val totalMs: Long, val nowMillis: () -> Long)
+
+/** The share of the countdown still to run, 0..1. */
+internal fun ringLeft(remainingMs: Long, totalMs: Long): Float = (remainingMs.toFloat() / totalMs).coerceIn(0f, 1f)
 
 /**
  * The hand-off's right-side sheet: 600 dp, full height, `bg`, 1 dp `line` left border, 16 dp between blocks.
@@ -134,9 +154,12 @@ fun HhCloseButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** The toast pill: `ink` background, `bg` text, 16 sp / 600, padding 14×22, radius 26. One spoken item, polite unless [urgent]. */
+/**
+ * The toast pill: `ink` background, `bg` text, 16 sp / 600, padding 14×22, radius 26. One spoken item, polite unless [urgent].
+ * With a [countdown], a ring of the time left replaces the icon (9 §4.13).
+ */
 @Composable
-fun HhToast(message: String, icon: String, modifier: Modifier = Modifier, urgent: Boolean = false) {
+fun HhToast(message: String, icon: String, modifier: Modifier = Modifier, urgent: Boolean = false, countdown: Countdown? = null) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -149,7 +172,28 @@ fun HhToast(message: String, icon: String, modifier: Modifier = Modifier, urgent
             .background(c.ink)
             .padding(horizontal = ShellTokens.toastPaddingH, vertical = ShellTokens.toastPaddingV),
     ) {
-        HhIcon(icon, size = ShellTokens.toastIcon, tint = c.bg)
+        if (countdown != null) CountdownRing(countdown, c.bg) else HhIcon(icon, size = ShellTokens.toastIcon, tint = c.bg)
         Text(message, style = ShellType.toast, color = c.bg)
     }
 }
+
+/** Redrawn every frame from the clock, so an advanced clock or a screenshot shows the time really left; the loop ends at 0. */
+@Composable
+private fun CountdownRing(countdown: Countdown, color: Color) {
+    var frame by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(countdown) {
+        while (countdown.endsAt - countdown.nowMillis() > 0) withFrameMillis { frame = it }
+        frame++
+    }
+    Canvas(Modifier.size(ShellTokens.ringSize)) {
+        frame
+        val stroke = ShellTokens.ringStroke.toPx()
+        val arc = Size(size.width - stroke, size.height - stroke)
+        val topLeft = Offset(stroke / 2, stroke / 2)
+        drawArc(color.copy(alpha = RING_SPENT_ALPHA), 0f, 360f, false, topLeft, arc, style = Stroke(stroke))
+        val left = ringLeft(countdown.endsAt - countdown.nowMillis(), countdown.totalMs)
+        drawArc(color, -90f, 360f * left, false, topLeft, arc, style = Stroke(stroke))
+    }
+}
+
+private const val RING_SPENT_ALPHA = 0.3f

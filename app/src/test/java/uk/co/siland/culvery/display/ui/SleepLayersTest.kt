@@ -228,7 +228,7 @@ class SleepLayersTest {
         // The frame that shows the screen awake starts the toast's time.
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("Event added.").assertExists()
-        exactly(3_999)
+        exactly(5_999)
         assertThat(toast).isNotNull()
         exactly(1)
         assertThat(toast).isNull()
@@ -249,7 +249,7 @@ class SleepLayersTest {
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("Event deleted.").assertExists()
         compose.onNodeWithText("Event added.").assertDoesNotExist()
-        exactly(3_999)
+        exactly(5_999)
         assertThat(toast?.id).isEqualTo(2L)
         exactly(1)
         assertThat(toast).isNull()

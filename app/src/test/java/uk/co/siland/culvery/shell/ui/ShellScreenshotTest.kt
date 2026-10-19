@@ -55,6 +55,7 @@ import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.ui.PinPadSheet
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.plugin.CLOSING_WARNING_MS
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
@@ -254,11 +255,20 @@ class ShellScreenshotTest {
         }
     }
 
-    @Test
-    fun settingsWarningDark() = snap("settings_warning_dark", dark = true) { ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning") }
+    /** A warning with [left] ms of its 20 s to go, on a clock that holds still so the capture shows exactly that. */
+    private fun warningSnap(name: String, text: String, tag: String, left: Long) {
+        compose.mainClock.autoAdvance = false
+        snap(name, dark = true) { ClosingWarningLayer(text, tag, endsAt = 100_000L + left, nowMillis = { 100_000L }) }
+    }
 
     @Test
-    fun sheetWarningDark() = snap("sheet_warning_dark", dark = true) { ClosingWarningLayer(SHEET_CLOSING, "sheet_warning") }
+    fun settingsWarningDark() = warningSnap("settings_warning_dark", SETTINGS_CLOSING, "settings_warning", CLOSING_WARNING_MS)
+
+    @Test
+    fun settingsWarningHalfDark() = warningSnap("settings_warning_half_dark", SETTINGS_CLOSING, "settings_warning", CLOSING_WARNING_MS / 2)
+
+    @Test
+    fun sheetWarningDark() = warningSnap("sheet_warning_dark", SHEET_CLOSING, "sheet_warning", CLOSING_WARNING_MS)
 
     @Test
     fun homeWithCalendarDark() = snap("home_calendar_dark", dark = true, state = calendarHome(dark = true))

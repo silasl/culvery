@@ -64,4 +64,13 @@ class ShellPartsTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Close")))
         assertThat(node.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isNull()
     }
+
+    @Test
+    fun theRingShowsTheTimeLeft() {
+        assertThat(ringLeft(20_000, 20_000)).isEqualTo(1f)
+        assertThat(ringLeft(10_000, 20_000)).isEqualTo(0.5f)
+        assertThat(ringLeft(0, 20_000)).isEqualTo(0f)
+        assertThat(ringLeft(-5_000, 20_000)).isEqualTo(0f)
+        assertThat(ringLeft(30_000, 20_000)).isEqualTo(1f)
+    }
 }

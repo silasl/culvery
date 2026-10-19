@@ -86,7 +86,7 @@ class ShellLayersRedrawTest {
         compose.onNodeWithText("Event deleted").assertExists()
         drawAndForgetInvalidations()
 
-        compose.mainClock.advanceTimeBy(toastMillis("Event deleted", urgent = false) + 100)
+        compose.mainClock.advanceTimeBy(toastMillis("Event deleted") + 100)
         compose.onNodeWithText("Event deleted").assertDoesNotExist()
 
         assertThat(wasInvalidated()).isTrue()
