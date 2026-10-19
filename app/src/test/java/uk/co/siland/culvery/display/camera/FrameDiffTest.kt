@@ -67,14 +67,14 @@ class FrameDiffTest {
         }
     }
 
-    /** Fails if CHANGED_SHARE is ignored or applied to the wrong count (31 of 768 pixels is the first above 4 %). */
+    /** Fails if CHANGED_SHARE is ignored or applied to the wrong count (30.72 of 768 pixels is 4 %: 30 is still, 31 is movement). */
     @Test
     fun aSmallChangeBelowTheShareIsNotMovement() {
         fun changed(count: Int) = frame { x, y -> if (y * DIFF_WIDTH + x < count) BACKGROUND + 100 else BACKGROUND }
 
         val few = FrameDiff()
         few.moved(changed(0))
-        assertThat(few.moved(changed(25))).isFalse()
+        assertThat(few.moved(changed(30))).isFalse()
 
         val enough = FrameDiff()
         enough.moved(changed(0))

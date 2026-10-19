@@ -3,6 +3,8 @@ package uk.co.siland.culvery.display.camera
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import java.io.File
+import java.lang.reflect.Member
+import java.lang.reflect.Modifier
 import org.junit.Test
 
 /** Nothing the camera sees can leave the presence code, and nothing outside its package can reach a frame (8 §4.3). */
@@ -18,7 +20,11 @@ class CameraSealTest {
     fun thePresenceCodeHasNoFileNetworkOrImagePath() {
         val files = cameraFiles() + File(main, "display/DisplayState.kt")
         assertThat(files.map { it.name }).containsAtLeast("FrameDiff.kt", "Presence.kt", "DisplayState.kt")
-        val found = files.flatMap { file -> BANNED.filter { it in file.readText() }.map { "${file.name}: $it" } }
+        val found = files.flatMap { file ->
+            val text = file.readText()
+            BANNED.filter { it in text }.map { "${file.name}: $it" } +
+                IMPORT_ALIAS.findAll(text).map { "${file.name}: ${it.value}" }
+        }
         assertWithMessage(found.joinToString("\n")).that(found).isEmpty()
     }
 
@@ -54,19 +60,49 @@ class CameraSealTest {
         assertWithMessage(visible.joinToString("\n")).that(visible).isEmpty()
     }
 
+    /** Fails if Presence shows more than start and running, or a frame or bytes appear outside FrameDiff and FrameSource. */
+    @Test
+    fun onlyTheFrameCodeHandlesFrames() {
+        fun Member.plainName() = name.substringBefore('$')
+        fun Member.shown() = !isSynthetic && !Modifier.isPrivate(modifiers)
+
+        val presence = Presence::class.java
+        assertThat(presence.declaredMethods.filter { it.shown() }.map { it.plainName() }).containsExactly("start", "getRunning")
+        // The Compose compiler adds a public `$stable` to every class in the module.
+        assertThat(presence.declaredFields.filter { it.shown() && it.name != "\$stable" }.map { it.name }).isEmpty()
+
+        val classes = listOf(presence, NoFrontCamera::class.java, CameraStopped::class.java, Class.forName("${presence.name}Kt"))
+        val found = classes.flatMap { type ->
+            val constructors = type.declaredConstructors.filterNot { it.isSynthetic }.map { it to it.genericParameterTypes.toList() }
+            // Presence's private frame callback is where a frame reaches FrameDiff; nothing it keeps may hold one.
+            val methods = type.declaredMethods.filter { it.shown() }
+                .map { it to it.genericParameterTypes.toList() + it.genericReturnType }
+            val fields = type.declaredFields.filterNot { it.isSynthetic }.map { it to listOf(it.genericType) }
+            (constructors + methods + fields)
+                .filter { (_, types) -> types.any { t -> FRAME_TYPES.any { it in t.typeName } } }
+                .map { (member, types) -> "${type.simpleName}.${member.name}: ${types.joinToString { it.typeName }}" }
+        }
+        assertWithMessage(found.joinToString("\n")).that(found).isEmpty()
+    }
+
     private companion object {
+        val FRAME_TYPES = listOf(Luma::class.java.name, "byte[]")
+
         val BANNED = listOf(
             "java.io", "java.nio.file", "java.net", "android.net", "okhttp", "writeBytes", "writeText", "contentResolver",
             "ParcelFileDescriptor", "Bitmap", "compress(", "YuvImage", "ImageFormat.JPEG", "MediaStore", "ImageWriter",
             "MediaRecorder", "openFileOutput", "cacheDir", "filesDir", "getExternal", "DataStore", "SharedPreferences",
-            "Socket", "Intent(", "sendBroadcast",
+            "Socket", "Intent(", "sendBroadcast", "println", "print(", "System.", "kotlin.io", "Clipboard",
         )
+
+        /** An aliased import, which would hide a banned name or a Log call from these scans. */
+        val IMPORT_ALIAS = Regex("""(?m)^import\s+\S+\s+as\s+\w+""")
         val SEALED = listOf("Luma", "FrameSource", "ImageReader", "CameraManager")
         val LOG_CALL = Regex("""\bLog\.\w+\(.*""")
 
         /** A column-0 declaration: its modifiers, its keyword and its name. */
         val DECLARATION = Regex(
-            """^(?:@\w+(?:\([^)]*\))?\s+)*((?:[a-z]+\s+)*?)(fun interface|class|interface|object|fun|val|var)\s+(?:\w+\.)?`?(\w+).*""",
+            """^(?:@\w+(?:\([^)]*\))?\s+)*((?:[a-z]+\s+)*?)(fun interface|typealias|class|interface|object|fun|val|var)\s+(?:\w+\.)?`?(\w+).*""",
         )
     }
 }

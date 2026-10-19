@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
@@ -39,11 +40,14 @@ private class FakeFrameSource : FrameSource {
 }
 
 /** A started presence over a fake camera, on the test's scheduler and clock. */
-private class Rig(private val test: TestScope) {
+private class Rig(
+    private val test: TestScope,
+    val wanted: MutableStateFlow<Boolean> = MutableStateFlow(false),
+    seen: StateFlow<Boolean> = wanted,
+) {
     val source = FakeFrameSource()
-    val wanted = MutableStateFlow(false)
     var moves = 0
-    val presence = Presence(source, { test.currentTime }, wanted, { moves++ }, test.backgroundScope)
+    val presence = Presence(source, { test.currentTime }, seen, { moves++ }, test.backgroundScope)
 
     val running: Boolean get() = presence.running.value
 
@@ -218,6 +222,35 @@ class PresenceTest {
         rig.want(false)
         rig.at(600_000)
         assertThat(rig.source.opens).isEqualTo(1)
+        assertThat(rig.running).isFalse()
+    }
+
+    /** Fails if the retry checks wanted outside the lock, so a stop landing between its check and its open leaves the camera on. */
+    @Test
+    fun aStopBetweenTheRetrysCheckAndItsOpenLeavesTheCameraClosed() = runTest {
+        val backing = MutableStateFlow(false)
+        var stopOnRead = false
+        val wanted = object : StateFlow<Boolean> by backing {
+            override val value: Boolean
+                get() {
+                    val read = backing.value
+                    if (stopOnRead) {
+                        stopOnRead = false
+                        backing.value = false
+                        testScheduler.runCurrent()
+                    }
+                    return read
+                }
+        }
+        val rig = Rig(this, backing, wanted)
+        rig.want(true)
+        rig.fail(CameraStopped())
+        rig.at(299_999)
+        stopOnRead = true
+        rig.at(300_000)
+        assertThat(stopOnRead).isFalse()
+        assertThat(rig.source.opens).isEqualTo(1)
+        assertThat(rig.source.isOpen).isFalse()
         assertThat(rig.running).isFalse()
     }
 

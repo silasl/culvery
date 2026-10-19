@@ -104,7 +104,10 @@ internal class Presence internal constructor(
             if (e !is NoFrontCamera) {
                 retry = scope.launch {
                     delay(CAMERA_RETRY_MS)
-                    if (wanted.value) open()
+                    // Past its delay a cancel can't stop it, so a stop that came first is seen as retry no longer being this job.
+                    synchronized(turning) {
+                        if (wanted.value && retry === coroutineContext[Job]) open()
+                    }
                 }
             }
         }
