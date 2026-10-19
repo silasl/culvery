@@ -35,7 +35,7 @@ internal const val CAMERA_NOT_ASKED = "Walking up can wake the screen once Culve
 internal const val ALLOW_THE_CAMERA = "Allow the camera"
 internal const val CAMERA_REFUSED = "The camera isn’t allowed, so only a tap wakes the screen. Allow it in Android’s settings for Culvery."
 internal const val OPEN_ANDROIDS_SETTINGS = "Open Android’s settings for Culvery"
-internal const val CANT_OPEN_ANDROIDS_SETTINGS = "Culvery can’t open Android’s settings for Culvery."
+internal const val CANT_OPEN_ANDROIDS_SETTINGS = "Culvery can’t open Android’s settings for Culvery. Allow the camera in Android’s Settings › Apps › Culvery › Permissions."
 internal const val NO_FRONT_CAMERA = "This tablet has no front camera, so a tap wakes the screen."
 
 /** Android's details screen for this app, where its permissions are; the first intent the tablet has opens. */

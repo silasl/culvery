@@ -1,6 +1,6 @@
 package uk.co.siland.culvery.display
 
-internal const val CAMERA_PROMPT_MISSING = "Culvery can’t ask for the camera on this tablet."
+internal const val CAMERA_PROMPT_MISSING = "Culvery can’t ask for the camera on this tablet. Allow the camera in Android’s Settings › Apps › Culvery › Permissions."
 
 /** Android's camera prompt, unpinned while it shows as Choose home app's dialog is (8 §4.3). */
 internal class CameraPrompt(

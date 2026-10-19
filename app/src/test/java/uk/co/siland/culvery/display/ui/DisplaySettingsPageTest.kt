@@ -33,7 +33,6 @@ import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
-import uk.co.siland.culvery.display.CANT_OPEN_ANDROIDS_SETTINGS
 import uk.co.siland.culvery.display.CameraAccess
 import uk.co.siland.culvery.display.CameraState
 import uk.co.siland.culvery.display.DisplayPrefs
@@ -230,6 +229,9 @@ class DisplaySettingsPageTest {
             shows("display_open_settings")
         }
         compose.onNodeWithTag("display_open_settings").performScrollTo().performClick()
-        assertThat(navigator.systemScreens).containsExactly(listOf("android.settings.APPLICATION_DETAILS_SETTINGS") to CANT_OPEN_ANDROIDS_SETTINGS)
+        assertThat(navigator.systemScreens).containsExactly(
+            listOf("android.settings.APPLICATION_DETAILS_SETTINGS") to
+                "Culvery can’t open Android’s settings for Culvery. Allow the camera in Android’s Settings › Apps › Culvery › Permissions.",
+        )
     }
 }

@@ -103,7 +103,9 @@ class DisplayWiringTest {
         )
 
         prompt.request { launched++ }
-        assertThat(missing).containsExactly(CAMERA_PROMPT_MISSING)
+        assertThat(missing).containsExactly(
+            "Culvery can’t ask for the camera on this tablet. Allow the camera in Android’s Settings › Apps › Culvery › Permissions.",
+        )
         assertThat(launched).isEqualTo(1)
         assertThat(pins).isEqualTo(0)
 
