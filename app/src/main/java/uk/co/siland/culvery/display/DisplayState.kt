@@ -41,31 +41,37 @@ const val NIGHT_AWAKE_MS = 60_000L
 internal fun nightAt(now: LocalDateTime?, prefs: DisplayPrefs?): Boolean? =
     if (now == null || prefs == null) null else inDailyWindow(now.toLocalTime(), prefs.nightFrom, prefs.nightUntil)
 
-/** What the state machine decides from: the screen, the hold, and the inputs as last seen. */
+/** What the state machine decides from: the screen, the hold, the inputs as last seen, and whether it was ever in front. */
 internal data class Display(
     val screen: Screen,
     val held: Boolean,
     val inFront: Boolean,
     val night: Boolean?,
     val prefs: DisplayPrefs?,
+    val seenFront: Boolean,
 )
 
 /** The idle wait running, if any: after [ms] with no activity the screen becomes [then]. */
 internal data class Wait(val ms: Long, val then: Screen)
 
-/** Before anything is known: awake in front, so night being found at once shows the clock. */
-internal val START = Display(Screen.AWAKE, held = false, inFront = true, night = null, prefs = null)
+/** Before anything is known and before the screen first resumes. */
+internal val START = Display(Screen.AWAKE, held = false, inFront = false, night = null, prefs = null, seenFront = false)
 
-/** [display] with new inputs: night starting shows the clock unless held; leaving or returning to the front, or night ending, wakes. */
+/**
+ * [display] with new inputs. Night starting, or the first arrival in front at night, shows the clock unless held; a
+ * later return from other apps, leaving the front, or night ending, wakes.
+ */
 internal fun next(display: Display, prefs: DisplayPrefs?, now: LocalDateTime?, inFront: Boolean): Display {
     val night = nightAt(now, prefs)
+    val starts = night == true && (display.night != true || !display.seenFront)
     val screen = when {
-        !inFront || !display.inFront || night == null -> Screen.AWAKE
-        night && display.night != true -> if (display.held) Screen.AWAKE else Screen.NIGHT_CLOCK
-        !night && display.night == true -> Screen.AWAKE
+        !inFront || night == null -> Screen.AWAKE
+        !display.inFront && display.seenFront -> Screen.AWAKE
+        starts -> if (display.held) Screen.AWAKE else Screen.NIGHT_CLOCK
+        night == false && display.night == true -> Screen.AWAKE
         else -> display.screen
     }
-    return display.copy(screen = screen, inFront = inFront, night = night, prefs = prefs)
+    return display.copy(screen = screen, inFront = inFront, night = night, prefs = prefs, seenFront = display.seenFront || inFront)
 }
 
 internal fun Display.waiting(): Wait? = when {

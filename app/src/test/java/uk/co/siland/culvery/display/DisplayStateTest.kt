@@ -8,6 +8,7 @@ import java.time.LocalTime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -113,12 +114,38 @@ class DisplayStateTest {
         assertThat(wall.display.isNight()).isFalse()
     }
 
-    /** Fails if the night clock waits for a collector, so a restart at night first shows the day screen. */
+    /** Fails if a restart at night, built before the screen resumes, shows the day screen for a minute on resuming. */
     @Test
     fun startsAsTheNightClockAtNight() = runTest {
-        val wall = wall(at = DAY.atTime(23, 0), settle = false)
-        assertThat(wall.screen).isEqualTo(NIGHT_CLOCK)
+        val wall = wall(at = DAY.atTime(23, 0), inFront = false, settle = false)
         assertThat(wall.display.isNight()).isTrue()
+        wall.front(true)
+        assertThat(currentTime).isEqualTo(0L)
+        assertThat(wall.screen).isEqualTo(NIGHT_CLOCK)
+
+        val builtInFront = wall(at = DAY.atTime(23, 0), settle = false)
+        assertThat(builtInFront.screen).isEqualTo(NIGHT_CLOCK)
+    }
+
+    /** Fails if the first arrival in front at night is awake first, covers a hold, or a later return skips the minute awake. */
+    @Test
+    fun theFirstArrivalInFrontAtNightShowsTheClockAtOnce() = runTest {
+        val wall = wall(at = DAY.atTime(23, 0), inFront = false)
+        wall.after(10_000)
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        wall.front(true)
+        assertThat(wall.screen).isEqualTo(NIGHT_CLOCK)
+        wall.front(false)
+        wall.front(true)
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        wall.changesAt(NIGHT_AWAKE_MS, AWAKE, NIGHT_CLOCK)
+
+        val held = wall(at = DAY.atTime(23, 0), inFront = false)
+        held.hold(true)
+        held.front(true)
+        assertThat(held.screen).isEqualTo(AWAKE)
+        held.hold(false)
+        held.changesAt(NIGHT_AWAKE_MS, AWAKE, NIGHT_CLOCK)
     }
 
     /** Fails if unread settings or an unknown clock count as day or night, or start anything but awake. */
