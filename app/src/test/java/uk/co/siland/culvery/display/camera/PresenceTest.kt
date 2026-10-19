@@ -20,10 +20,11 @@ private class FakeFrameSource : FrameSource {
     var isOpen = false
     var running: () -> Boolean = { false }
     val runningAtClose = mutableListOf<Boolean>()
-    private var onFrame: (Luma) -> Unit = {}
+    var reads = 0
+    private var onFrame: (() -> Luma) -> Unit = {}
     private var onFailed: (Exception) -> Unit = {}
 
-    override fun open(onFrame: (Luma) -> Unit, onFailed: (Exception) -> Unit): AutoCloseable {
+    override fun open(onFrame: (read: () -> Luma) -> Unit, onFailed: (Exception) -> Unit): AutoCloseable {
         opens++
         isOpen = true
         this.onFrame = onFrame
@@ -34,7 +35,10 @@ private class FakeFrameSource : FrameSource {
         }
     }
 
-    fun frame(luma: Luma) = onFrame(luma)
+    fun frame(luma: Luma) = onFrame {
+        reads++
+        luma
+    }
 
     fun fail(e: Exception) = onFailed(e)
 }
@@ -145,7 +149,7 @@ class PresenceTest {
         assertThat(rig.source.runningAtClose).containsExactly(true, true, true)
     }
 
-    /** Fails if a frame under LOOK_EVERY_MS after the last one looked at is diffed, or one at exactly 1 000 ms is dropped. */
+    /** Fails if a frame under LOOK_EVERY_MS after the last one looked at is decoded or diffed, or one at exactly 1 000 ms is dropped. */
     @Test
     fun onlyOneFrameASecondIsLookedAt() = runTest {
         val rig = Rig(this)
@@ -155,8 +159,10 @@ class PresenceTest {
         rig.frameAt(700, block(4))
         rig.frameAt(999, block(10))
         assertThat(rig.moves).isEqualTo(0)
+        assertThat(rig.source.reads).isEqualTo(1)
         rig.frameAt(1_000, block(10))
         assertThat(rig.moves).isEqualTo(1)
+        assertThat(rig.source.reads).isEqualTo(2)
     }
 
     /** Fails if one movement calls moved more than once, or not at all. */

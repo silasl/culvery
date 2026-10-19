@@ -25,11 +25,11 @@ internal class NoFrontCamera : Exception()
 internal class CameraStopped : Exception()
 
 /**
- * The front camera as small greyscale frames, given to `onFrame` on the camera's own thread until the returned handle is
- * closed. A failure closes the camera before `onFailed` is called.
+ * The front camera as small greyscale frames, offered to `onFrame` on the camera's own thread until the returned handle is
+ * closed; a frame is decoded only if `onFrame` calls its `read` then. A failure closes the camera before `onFailed` is called.
  */
 internal fun interface FrameSource {
-    fun open(onFrame: (Luma) -> Unit, onFailed: (Exception) -> Unit): AutoCloseable
+    fun open(onFrame: (read: () -> Luma) -> Unit, onFailed: (Exception) -> Unit): AutoCloseable
 }
 
 /**
@@ -113,13 +113,13 @@ internal class Presence internal constructor(
         }
     }
 
-    private fun look(mine: Int, frame: Luma) {
+    private fun look(mine: Int, read: () -> Luma) {
         val now = clock.nowMillis()
         val moving = synchronized(looking) {
             if (mine != session) return
             lastLook?.let { if (now - it < LOOK_EVERY_MS) return }
             lastLook = now
-            diff.moved(frame)
+            diff.moved(read())
         }
         if (moving) scope.launch { moved() }
     }

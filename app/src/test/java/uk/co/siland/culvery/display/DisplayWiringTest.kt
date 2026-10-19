@@ -48,7 +48,7 @@ private class OpenOrNot : FrameSource {
     var isOpen = false
     private var onFailed: (Exception) -> Unit = {}
 
-    override fun open(onFrame: (Luma) -> Unit, onFailed: (Exception) -> Unit): AutoCloseable {
+    override fun open(onFrame: (read: () -> Luma) -> Unit, onFailed: (Exception) -> Unit): AutoCloseable {
         isOpen = true
         this.onFailed = onFailed
         return AutoCloseable { isOpen = false }

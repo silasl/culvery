@@ -16,8 +16,8 @@ import android.util.Range
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
-import java.util.concurrent.Executors
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /** The smallest size by area that still fills the diff's [DIFF_WIDTH] × [DIFF_HEIGHT] (8 §4.3). */
 internal fun smallestSize(sizes: List<Pair<Int, Int>>): Pair<Int, Int> =
@@ -45,32 +45,37 @@ internal fun lumaOf(plane: ByteBuffer, rowStride: Int, pixelStride: Int, width: 
     return Luma(DIFF_WIDTH, DIFF_HEIGHT, values)
 }
 
-/** The front camera at its smallest size and slowest rate; frames arrive on a thread of its own (8 §4.3). */
+/** The front camera at its smallest size and slowest rate; frames arrive on a thread of its own, which runs only while it is open (8 §4.3). */
+@Singleton
 internal class Camera2Frames internal constructor(
     private val context: Context,
-    private val executor: Executor,
+    private val executorOf: (Handler) -> Executor,
 ) : FrameSource {
     @Inject
-    constructor(@ApplicationContext context: Context) : this(context, Executors.newSingleThreadExecutor())
+    constructor(@ApplicationContext context: Context) : this(context, { handler -> Executor { handler.post(it) } })
 
-    override fun open(onFrame: (Luma) -> Unit, onFailed: (Exception) -> Unit): AutoCloseable =
+    override fun open(onFrame: (read: () -> Luma) -> Unit, onFailed: (Exception) -> Unit): AutoCloseable =
         Opening(onFrame, onFailed).also { it.start() }
 
     private inner class Opening(
-        private val onFrame: (Luma) -> Unit,
+        private val onFrame: (read: () -> Luma) -> Unit,
         private val onFailed: (Exception) -> Unit,
-    ) : CameraDevice.StateCallback(), AutoCloseable {
+    ) : AutoCloseable {
         // Held while a frame is read, so close() can't free the reader under it.
         private val lock = Any()
         private var closed = false
-        private var characteristics: CameraCharacteristics? = null
+        private val thread = HandlerThread("CulveryPresence")
+        private lateinit var handler: Handler
+        private lateinit var executor: Executor
         private var device: CameraDevice? = null
         private var session: CameraCaptureSession? = null
         private var reader: ImageReader? = null
-        private var thread: HandlerThread? = null
 
         fun start() {
             try {
+                thread.start()
+                handler = Handler(thread.looper)
+                executor = executorOf(handler)
                 val manager = context.getSystemService(CameraManager::class.java)
                 val front = manager.cameraIdList.firstNotNullOfOrNull { id ->
                     manager.getCameraCharacteristics(id)
@@ -78,22 +83,35 @@ internal class Camera2Frames internal constructor(
                         ?.let { id to it }
                 }
                 if (front == null) return fail(NoFrontCamera())
-                characteristics = front.second
-                manager.openCamera(front.first, executor, this)
+                val (id, characteristics) = front
+                manager.openCamera(
+                    id,
+                    executor,
+                    object : CameraDevice.StateCallback() {
+                        override fun onOpened(camera: CameraDevice) = guarded(camera) {
+                            device = it
+                            configure(it, characteristics)
+                        }
+
+                        override fun onDisconnected(camera: CameraDevice) = lost(camera)
+
+                        override fun onError(camera: CameraDevice, error: Int) = lost(camera)
+                    },
+                )
             } catch (e: Exception) {
                 fail(e)
             }
         }
 
-        override fun onOpened(camera: CameraDevice) {
+        /** Runs [use] under the lock unless already closed, when [opened] is closed instead; what it throws fails the opening. */
+        private fun <T : AutoCloseable> guarded(opened: T, use: (T) -> Unit) {
             val failure = synchronized(lock) {
                 if (closed) {
-                    camera.close()
+                    opened.close()
                     return
                 }
-                device = camera
                 try {
-                    configure(camera)
+                    use(opened)
                     null
                 } catch (e: Exception) {
                     e
@@ -102,18 +120,12 @@ internal class Camera2Frames internal constructor(
             failure?.let(::fail)
         }
 
-        override fun onDisconnected(camera: CameraDevice) {
-            camera.close()
+        private fun lost(what: AutoCloseable) {
+            what.close()
             fail(CameraStopped())
         }
 
-        override fun onError(camera: CameraDevice, error: Int) {
-            camera.close()
-            fail(CameraStopped())
-        }
-
-        private fun configure(camera: CameraDevice) {
-            val chosen = checkNotNull(characteristics)
+        private fun configure(camera: CameraDevice, chosen: CameraCharacteristics) {
             val (width, height) = smallestSize(
                 checkNotNull(chosen.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP))
                     .getOutputSizes(ImageFormat.YUV_420_888).map { it.width to it.height },
@@ -121,35 +133,19 @@ internal class Camera2Frames internal constructor(
             val rates = slowestRange(
                 checkNotNull(chosen.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)).map { it.lower..it.upper },
             )
-            val looper = HandlerThread("CulveryPresence").also { thread = it; it.start() }.looper
             val images = ImageReader.newInstance(width, height, ImageFormat.YUV_420_888, 2).also { reader = it }
-            images.setOnImageAvailableListener({ frame(it) }, Handler(looper))
+            images.setOnImageAvailableListener({ frame(it) }, handler)
             val request = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
                 addTarget(images.surface)
                 set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(rates.first, rates.last))
             }.build()
             val sessionCallback = object : CameraCaptureSession.StateCallback() {
-                override fun onConfigured(configured: CameraCaptureSession) {
-                    val failure = synchronized(lock) {
-                        if (closed) {
-                            configured.close()
-                            return
-                        }
-                        session = configured
-                        try {
-                            configured.setRepeatingRequest(request, null, null)
-                            null
-                        } catch (e: Exception) {
-                            e
-                        }
-                    }
-                    failure?.let(::fail)
+                override fun onConfigured(configured: CameraCaptureSession) = guarded(configured) {
+                    session = it
+                    it.setRepeatingRequest(request, null, null)
                 }
 
-                override fun onConfigureFailed(failed: CameraCaptureSession) {
-                    failed.close()
-                    fail(CameraStopped())
-                }
+                override fun onConfigureFailed(failed: CameraCaptureSession) = lost(failed)
             }
             camera.createCaptureSession(
                 SessionConfiguration(
@@ -161,18 +157,20 @@ internal class Camera2Frames internal constructor(
             )
         }
 
+        /** Every frame is taken and closed; it is decoded only if [onFrame] reads it. */
         private fun frame(images: ImageReader) {
-            val luma = synchronized(lock) {
+            synchronized(lock) {
                 if (closed) return
                 val image = images.acquireLatestImage() ?: return
                 try {
-                    val y = image.planes[0]
-                    lumaOf(y.buffer, y.rowStride, y.pixelStride, image.width, image.height)
+                    onFrame {
+                        val y = image.planes[0]
+                        lumaOf(y.buffer, y.rowStride, y.pixelStride, image.width, image.height)
+                    }
                 } finally {
                     image.close()
                 }
             }
-            onFrame(luma)
         }
 
         private fun fail(e: Exception) {
@@ -191,11 +189,10 @@ internal class Camera2Frames internal constructor(
                 session?.close()
                 device?.close()
                 reader?.close()
-                thread?.quitSafely()
+                thread.quitSafely()
                 session = null
                 device = null
                 reader = null
-                thread = null
                 return true
             }
         }

@@ -47,7 +47,7 @@ class Camera2FramesTest {
         Shadow.extract<ShadowCameraManager>(manager).addCamera(id, characteristics)
     }
 
-    private fun Camera2Frames.start() = open({ frames += it }, { failures += it })
+    private fun Camera2Frames.start() = open({ frames += it() }, { failures += it })
 
     /** A plane with [width] × [height] samples [pixelStride] apart and rows [rowStride] apart, its padding at 99. */
     private fun plane(width: Int, height: Int, rowStride: Int, pixelStride: Int, level: (x: Int, y: Int) -> Int): ByteBuffer {
@@ -108,7 +108,7 @@ class Camera2FramesTest {
     fun noFrontCameraFailsAtOnce() {
         addCamera("0", CameraCharacteristics.LENS_FACING_BACK)
 
-        Camera2Frames(context) { it.run() }.start()
+        Camera2Frames(context) { Executor { it.run() } }.start()
 
         assertThat(failures.single()).isInstanceOf(NoFrontCamera::class.java)
         assertThat(frames).isEmpty()
@@ -121,7 +121,7 @@ class Camera2FramesTest {
         addCamera("1", CameraCharacteristics.LENS_FACING_FRONT)
         val executor = QueuedExecutor()
 
-        val handle = Camera2Frames(context, executor).start()
+        val handle = Camera2Frames(context) { executor }.start()
         handle.close()
         executor.runAll()
 
