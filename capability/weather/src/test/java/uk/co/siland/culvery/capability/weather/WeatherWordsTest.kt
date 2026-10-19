@@ -2,11 +2,11 @@ package uk.co.siland.culvery.capability.weather
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.LightColors
 
 class WeatherWordsTest {
-    private val hour = 3_600_000L
-
     @Test
     fun degreesAreWholeRoundedHalfUpAndNeverMinusZero() {
         assertThat(listOf(16.5, 16.49, 0.0, -0.4, -0.5, -1.5, -2.6).map(::degrees))
@@ -14,26 +14,9 @@ class WeatherWordsTest {
     }
 
     @Test
-    fun highAndLowReadAsTheHeaderLine() {
-        assertThat(highLow(19.2, 10.6)).isEqualTo("High 19° · Low 11°")
-    }
-
-    @Test
     fun theHeaderIsOneSentence() {
-        assertThat(headerDescription(HeaderWeather(Condition.PARTLY_CLOUDY, night = false, temperature = 17.2, high = 19.0, low = 10.6)))
+        assertThat(headerDescription(HeaderWeather.Now(Condition.PARTLY_CLOUDY, night = false, temperature = 17.2, high = 19.0, low = 10.6, days = emptyList())))
             .isEqualTo("Now 17°, partly cloudy, high 19°, low 11°")
-    }
-
-    @Test
-    fun theAgeLineAppearsOnlyPastTwoHours() {
-        val fetched = 1_000_000L
-        fun ago(age: Long) = updatedAgo(fetched, fetched + age)
-        assertThat(ago(2 * hour)).isNull()
-        assertThat(ago(2 * hour + 1)).isEqualTo("Updated 2 hours ago")
-        assertThat(ago(3 * hour)).isEqualTo("Updated 3 hours ago")
-        assertThat(ago(24 * hour - 1)).isEqualTo("Updated 23 hours ago")
-        assertThat(ago(24 * hour)).isEqualTo("Updated 1 day ago")
-        assertThat(ago(49 * hour)).isEqualTo("Updated 2 days ago")
     }
 
     @Test
@@ -67,5 +50,15 @@ class WeatherWordsTest {
             .isEqualTo("Friday, partly cloudy, high 17°, low 10°")
         assertThat(rowDescription(day(THU, Condition.THUNDER, high = 19.0, low = 11.0), isToday = true))
             .isEqualTo("Today, thunderstorms, high 19°, low 11°")
+    }
+
+    @Test
+    fun rainIsBlueAndSunIsAmber() {
+        for (colors in listOf(DarkColors, LightColors)) {
+            val wet = listOf(Condition.DRIZZLE, Condition.RAIN, Condition.SHOWERS, Condition.THUNDER)
+            val dry = listOf(Condition.CLEAR, Condition.PARTLY_CLOUDY, Condition.CLOUDY, Condition.FOG, Condition.SNOW)
+            assertThat(wet.map { weatherTint(it, colors) }).containsExactly(colors.rain, colors.rain, colors.rain, colors.rain)
+            assertThat(dry.map { weatherTint(it, colors) }).containsExactly(colors.weather, colors.weather, colors.weather, colors.weather, colors.weather)
+        }
     }
 }

@@ -125,28 +125,49 @@ class WeatherViewTest {
     }
 
     @Test
-    fun theHeaderShowsOnlyWhenReadyWithTheHourNow() {
-        assertThat(headerWeather(WeatherView.Waiting, thuMorning)).isNull()
-        assertThat(headerWeather(WeatherView.Expired, thuMorning)).isNull()
-        assertThat(headerWeather(WeatherView.NoLocation, thuMorning)).isNull()
-        assertThat(headerWeather(READY.copy(now = null), thuMorning)).isNull()
-        assertThat(headerWeather(READY, thuMorning))
-            .isEqualTo(HeaderWeather(Condition.PARTLY_CLOUDY, night = false, temperature = 17.0, high = 19.0, low = 11.0))
+    fun noLocationAsksForOne() {
+        assertThat(headerWeather(WeatherView.NoLocation, thuMorning)).isEqualTo(HeaderWeather.AddLocation)
     }
 
     @Test
+    fun aFailedFetchSaysSoInTheHeader() {
+        assertThat(headerWeather(WeatherView.Failed, thuMorning)).isEqualTo(HeaderWeather.NoForecast)
+    }
+
+    /** Pin: nothing shows while the first fetch is out, nor for data with no today, nor without an hour for now. */
+    @Test
+    fun waitingAndExpiredShowNothing() {
+        assertThat(headerWeather(WeatherView.Waiting, thuMorning)).isNull()
+        assertThat(headerWeather(WeatherView.Expired, thuMorning)).isNull()
+        assertThat(headerWeather(READY.copy(now = null), thuMorning)).isNull()
+    }
+
+    @Test
+    fun readyCarriesTheCurrentWeatherAndTheThreeDays() {
+        assertThat(headerWeather(READY, thuMorning))
+            .isEqualTo(HeaderWeather.Now(Condition.PARTLY_CLOUDY, night = false, temperature = 17.0, high = 19.0, low = 11.0, days = READY.days))
+    }
+
+    @Test
+    fun readyCarriesTheThreeDays() {
+        val view = weatherView(LONDON, stored(), thuMorning)
+        assertThat((headerWeather(view, thuMorning) as HeaderWeather.Now).days.map { it.date }).containsExactly(THU, FRI, SAT).inOrder()
+    }
+
+    private fun nowAt(hour: Int, minute: Int) = headerWeather(READY, THU.atTime(hour, minute)) as HeaderWeather.Now
+
+    @Test
     fun itIsNightBeforeSunriseAndFromSunset() {
-        fun nightAt(hour: Int, minute: Int) = headerWeather(READY, THU.atTime(hour, minute))!!.night
-        assertThat(nightAt(7, 0)).isTrue()
-        assertThat(nightAt(7, 1)).isFalse()
-        assertThat(nightAt(18, 37)).isFalse()
-        assertThat(nightAt(18, 38)).isTrue()
+        assertThat(nowAt(7, 0).night).isTrue()
+        assertThat(nowAt(7, 1).night).isFalse()
+        assertThat(nowAt(18, 37).night).isFalse()
+        assertThat(nowAt(18, 38).night).isTrue()
     }
 
     @Test
     fun withoutSunTimesTheHeaderUsesDayIcons() {
         val unknown = READY.copy(today = day(THU, sunrise = null, sunset = null))
-        assertThat(headerWeather(unknown, THU.atTime(23, 0))!!.night).isFalse()
+        assertThat((headerWeather(unknown, THU.atTime(23, 0)) as HeaderWeather.Now).night).isFalse()
     }
 
     @Test

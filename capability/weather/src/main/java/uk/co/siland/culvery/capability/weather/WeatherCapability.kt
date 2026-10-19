@@ -6,28 +6,21 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import uk.co.siland.culvery.capability.weather.ui.ForecastCardHost
 import uk.co.siland.culvery.capability.weather.ui.WeatherHeaderItem
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
-import uk.co.siland.culvery.core.plugin.HomeCardSize
-import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.ui.Icons
 
 private const val WEATHER_ID = "weather"
-private const val FORECAST_CARD_ID = "weather.forecast"
 
-/** After Today (100), Coming up (50), Lights (35) and Music (30): placed only when a cell is left (§4.2). */
-private const val FORECAST_PRIORITY = 25
 private const val HEADER_ITEM_ID = "weather"
 private const val HEADER_ITEM_ORDER = 10
 
-/** Weather on Home (4b design §3.1): no tab, no Settings page, no connection (D7); runs whenever a location is set. */
+/** Weather lives in Home's header (9 §4.2): no card, no tab, no Settings page, no connection (D7); runs whenever a location is set. */
 @Singleton
 class WeatherCapability @Inject constructor(
     private val repo: WeatherRepository,
-    private val clock: HouseholdClock,
 ) : Capability {
     override val id = WEATHER_ID
     override val label = "Weather"
@@ -37,11 +30,9 @@ class WeatherCapability @Inject constructor(
     override val order = 60
     override val hasTab: Flow<Boolean> = flowOf(false)
 
-    private val forecastCard = HomeCard(FORECAST_CARD_ID, HomeCardSize.REGULAR, FORECAST_PRIORITY) { ForecastCardHost(repo, clock) }
+    override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList<HomeCard>())
 
-    override fun cards(): Flow<List<HomeCard>> = flowOf(listOf(forecastCard))
-
-    // Present only while shown, so the shell never draws a divider beside an empty item (ruling 4).
+    // Present only while shown, so the shell never draws a divider beside an empty item.
     override fun headerItems(): Flow<List<HeaderItem>> = repo.header.map { weather ->
         listOfNotNull(weather?.let { HeaderItem(HEADER_ITEM_ID, HEADER_ITEM_ORDER) { WeatherHeaderItem(it) } })
     }

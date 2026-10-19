@@ -1,26 +1,29 @@
 package uk.co.siland.culvery.capability.weather.ui
 
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import uk.co.siland.culvery.core.ui.HhType
 
-/** Weather layout numbers (4b design §4); provisional, for the end-of-v1 design review. */
+/** Weather layout numbers in Home's header (9 §4.2). */
 internal object WeatherDimens {
-    // Card padding 20 × 22, as the calendar's cards; the radius is ShellTokens.homeCardRadius.
-    val cardPaddingV = 20.dp
-    val cardPaddingH = 22.dp
+    // The current weather: icon, then the temperature over the condition.
+    val nowIcon = 56.dp
+    val nowIconGap = 15.dp
+    val temperature: TextStyle = HhType.headerValue.copy(fontSize = 43.sp, fontWeight = FontWeight.W700)
+    val condition: TextStyle = HhType.secondary.copy(fontSize = 15.sp)
 
-    // Title → first row 10; rows at least 44 tall, so three and the age line fit the 279 dp REGULAR cell; a 30 dp icon
-    // (§4.2) 12 from the temperatures, each at least 44 wide, right-aligned, 8 apart so they never run together.
-    val titleGap = 10.dp
-    val rowHeight = 44.dp
-    val rowIcon = 30.dp
-    val rowIconGap = 12.dp
-    val temperatureWidth = 44.dp
-    val temperatureGap = 8.dp
+    // The strip: a divider, then three days 23 apart.
+    val dividerWidth = 1.dp
+    val dividerHeight = 67.dp
+    val stripGap = 23.dp
+    val dayIcon = 28.dp
+    val dayLabel: TextStyle = HhType.label
+    val dayHigh: TextStyle = HhType.secondary.copy(fontSize = 15.sp, fontWeight = FontWeight.W700)
+    val dayLow: TextStyle = HhType.secondary.copy(fontSize = 15.sp)
+    val dayTemperatureGap = 5.dp
 
-    // The prompt's pill 18 below its line, as the Connect card's.
-    val promptButtonTop = 18.dp
-
-    // Header item (hand-off §1): a 44 dp icon 12 dp from the temperatures.
-    val headerIcon = 44.dp
-    val headerIconGap = 12.dp
+    // The sentence for a failed fetch wraps rather than push the clock.
+    val noForecastMaxWidth = 360.dp
 }

@@ -75,9 +75,9 @@ class WeatherRepositoryTest {
     fun theHeaderTurnsToNightAtSunsetWithinTheHour() = runTest {
         now.value = THU.atTime(18, 37)
         repo.header.test {
-            assertThat(awaitItem()!!.night).isFalse()
+            assertThat((awaitItem() as HeaderWeather.Now).night).isFalse()
             now.value = THU.atTime(18, 38)
-            assertThat(awaitItem()!!.night).isTrue()
+            assertThat((awaitItem() as HeaderWeather.Now).night).isTrue()
             cancelAndIgnoreRemainingEvents()
         }
     }

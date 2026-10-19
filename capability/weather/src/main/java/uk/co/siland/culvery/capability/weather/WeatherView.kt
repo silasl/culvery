@@ -7,7 +7,7 @@ import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.zoneOrDevice
 import uk.co.siland.culvery.core.plugin.SunTimes
 
-/** The Forecast card's days: today and the next two (D1). */
+/** The header's days: today and the next two. */
 const val FORECAST_DAYS = 3
 
 /** Where a forecast is for: what a fetch records and matching compares (§3.5). The town's name is no part of it. */
@@ -33,7 +33,7 @@ data class StoredWeather(
 fun StoredWeather?.matching(location: HomeLocation?): StoredWeather? =
     this?.takeIf { location != null && it.place == WeatherPlace(location) }
 
-/** What the card and header read (§3.7). */
+/** What the header reads (§3.7). */
 sealed interface WeatherView {
     data object NoLocation : WeatherView
 
@@ -77,22 +77,35 @@ fun sunTimesOn(location: HomeLocation?, stored: StoredWeather?, date: LocalDate)
     return SunTimes(sunrise, sunset)
 }
 
-/** What the header item shows (§4.1). */
-data class HeaderWeather(
-    val condition: Condition,
-    val night: Boolean,
-    val temperature: Double,
-    val high: Double,
-    val low: Double,
-)
+/** What the header item shows (9 §4.2). */
+sealed interface HeaderWeather {
+    /** The weather now and [days]: today and the next two. */
+    data class Now(
+        val condition: Condition,
+        val night: Boolean,
+        val temperature: Double,
+        val high: Double,
+        val low: Double,
+        val days: List<DailyWeather>,
+    ) : HeaderWeather
 
-/** The header's weather, or null while it is hidden: shown only when [view] is Ready with an hour for now (§4.1). */
-fun headerWeather(view: WeatherView, now: LocalDateTime): HeaderWeather? {
-    val ready = view as? WeatherView.Ready ?: return null
-    val hour = ready.now ?: return null
-    val sunrise = ready.today.sunrise
-    val sunset = ready.today.sunset
-    val time = now.toLocalTime()
-    val night = sunrise != null && sunset != null && (time < sunrise || time >= sunset)
-    return HeaderWeather(hour.condition, night, hour.temperature, ready.today.high, ready.today.low)
+    /** No home location is set. */
+    data object AddLocation : HeaderWeather
+
+    /** The fetch failed and nothing matching is stored. */
+    data object NoForecast : HeaderWeather
+}
+
+/** The header's weather, or null while it is hidden: while waiting, with data that has no today, or with no hour for now. */
+fun headerWeather(view: WeatherView, now: LocalDateTime): HeaderWeather? = when (view) {
+    WeatherView.NoLocation -> HeaderWeather.AddLocation
+    WeatherView.Failed -> HeaderWeather.NoForecast
+    WeatherView.Waiting, WeatherView.Expired -> null
+    is WeatherView.Ready -> view.now?.let { hour ->
+        val sunrise = view.today.sunrise
+        val sunset = view.today.sunset
+        val time = now.toLocalTime()
+        val night = sunrise != null && sunset != null && (time < sunrise || time >= sunset)
+        HeaderWeather.Now(hour.condition, night, hour.temperature, view.today.high, view.today.low, view.days)
+    }
 }

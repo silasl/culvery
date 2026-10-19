@@ -107,7 +107,7 @@ class ShellLayoutTest {
     @Test
     fun atFontScale13HeaderItemsKeepClearOfTheClockAndDate() {
         val weather = HeaderItem("weather", 10) {
-            WeatherHeaderItem(HeaderWeather(Condition.PARTLY_CLOUDY, night = false, temperature = 17.0, high = 19.0, low = 11.0))
+            WeatherHeaderItem(HeaderWeather.Now(Condition.PARTLY_CLOUDY, night = false, temperature = 17.0, high = 19.0, low = 11.0, days = emptyList()))
         }
         val wide = HeaderItem("climate", 20) { Box(Modifier.size(800.dp, 60.dp)) }
         compose.setContent { CulveryTheme(dark = true) { WithFontScale(1.3f) { HomeScreen({ at }, emptyList(), listOf(weather, wide)) } } }
@@ -120,7 +120,7 @@ class ShellLayoutTest {
         val degrees = compose.onNodeWithText("17°", useUnmergedTree = true).textLayout()
         assertThat(degrees.lineCount).isEqualTo(1)
         assertThat(degrees.isLineEllipsized(0)).isFalse()
-        val highLow = compose.onNodeWithText("High 19° · Low 11°", useUnmergedTree = true).textLayout()
+        val highLow = compose.onNodeWithText("Partly cloudy", useUnmergedTree = true).textLayout()
         assertThat(highLow.lineCount).isEqualTo(1)
         assertThat(highLow.isLineEllipsized(0)).isFalse()
     }

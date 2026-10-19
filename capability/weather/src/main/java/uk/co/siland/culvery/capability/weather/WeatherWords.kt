@@ -1,40 +1,21 @@
 package uk.co.siland.culvery.capability.weather
 
+import androidx.compose.ui.graphics.Color
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
+import uk.co.siland.culvery.core.ui.HhColors
 import uk.co.siland.culvery.core.ui.Icons
 
-internal const val FORECAST_TITLE = "Forecast"
 internal const val TODAY = "Today"
-internal const val GETTING_FORECAST = "Getting the forecast…"
 internal const val NO_FORECAST = "No forecast — check the tablet’s Wi-Fi. Culvery will try again."
-internal const val NO_FORECAST_YET = "No forecast yet — check the tablet’s Wi-Fi. Culvery will try again."
-internal const val ADD_LOCATION = "Add your home location to see the weather."
-internal const val ADD_HOME_LOCATION = "Add home location"
-
-/** Past this the card says how old its data is (D3). */
-internal const val STALE_AFTER_MS = 2 * 60 * 60_000L
-private const val HOUR_MS = 60 * 60_000L
-private const val HOURS_IN_DAY = 24L
+internal const val ADD_HOME_LOCATION_FOR_WEATHER = "Add home location for weather"
 
 private val SHORT_DAY = DateTimeFormatter.ofPattern("EEE", Locale.UK)
 private val LONG_DAY = DateTimeFormatter.ofPattern("EEEE", Locale.UK)
 
 /** Whole degrees, half up; an Int has no "-0" (§4.2). */
 internal fun degrees(celsius: Double): String = "${celsius.roundToInt()}°"
-
-internal fun highLow(high: Double, low: Double): String = "High ${degrees(high)} · Low ${degrees(low)}"
-
-/** "Updated 3 hours ago" once the data is past [STALE_AFTER_MS] old, else null (§4.2). */
-internal fun updatedAgo(fetchedAtMillis: Long, nowMillis: Long): String? {
-    val age = nowMillis - fetchedAtMillis
-    if (age <= STALE_AFTER_MS) return null
-    val hours = age / HOUR_MS
-    if (hours < HOURS_IN_DAY) return "Updated $hours hours ago"
-    val days = hours / HOURS_IN_DAY
-    return if (days == 1L) "Updated 1 day ago" else "Updated $days days ago"
-}
 
 /** Material Symbols names (§4.2), each in the subset font (IconFontTest). */
 internal fun weatherIcon(condition: Condition, night: Boolean): String = when (condition) {
@@ -47,6 +28,12 @@ internal fun weatherIcon(condition: Condition, night: Boolean): String = when (c
     Condition.SHOWERS -> Icons.RAINY_HEAVY
     Condition.SNOW -> Icons.WEATHER_SNOWY
     Condition.THUNDER -> Icons.THUNDERSTORM
+}
+
+/** Rain icons are blue, the rest amber (9 §4.2). */
+internal fun weatherTint(condition: Condition, colors: HhColors): Color = when (condition) {
+    Condition.DRIZZLE, Condition.RAIN, Condition.SHOWERS, Condition.THUNDER -> colors.rain
+    else -> colors.weather
 }
 
 internal fun conditionWords(condition: Condition): String = when (condition) {
@@ -70,5 +57,5 @@ internal fun rowDescription(day: DailyWeather, isToday: Boolean): String {
 }
 
 /** The header's one TalkBack item: "Now 17°, partly cloudy, high 19°, low 11°" (TalkBack reads ° as "degrees"). */
-internal fun headerDescription(weather: HeaderWeather): String =
+internal fun headerDescription(weather: HeaderWeather.Now): String =
     "Now ${degrees(weather.temperature)}, ${conditionWords(weather.condition)}, high ${degrees(weather.high)}, low ${degrees(weather.low)}"

@@ -46,9 +46,6 @@ import uk.co.siland.culvery.capability.music.ui.MusicTab
 import uk.co.siland.culvery.capability.weather.Condition
 import uk.co.siland.culvery.capability.weather.DailyWeather
 import uk.co.siland.culvery.capability.weather.HeaderWeather
-import uk.co.siland.culvery.capability.weather.HourlyWeather
-import uk.co.siland.culvery.capability.weather.WeatherView
-import uk.co.siland.culvery.capability.weather.ui.ForecastCard
 import uk.co.siland.culvery.capability.weather.ui.WeatherHeaderItem
 import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.access.PinReason
@@ -132,22 +129,16 @@ class ShellScreenshotTest {
         DailyWeather(at.toLocalDate().plusDays(2), Condition.CLEAR, 21.0, 12.0, LocalTime.of(6, 53), LocalTime.of(18, 58)),
     )
 
-    /** The whole Home with Today, Coming up, Forecast and the header's weather (4b design §7). */
+    /** The whole Home with Today, Coming up and the weather in the header (9 §4.2). */
     private fun weatherHome(dark: Boolean) = calendarHome(dark).copy(
         homeCards = HomeCardPlacer.place(
             listOf(
                 HomeCard("calendar.today", HomeCardSize.TALL, 100) { TodayCard(today) },
                 HomeCard("calendar.comingUp", HomeCardSize.WIDE, 50) { ComingUpCard(comingUp) },
-                HomeCard("weather.forecast", HomeCardSize.REGULAR, 40) {
-                    ForecastCard(
-                        WeatherView.Ready(HourlyWeather(at.withMinute(0), Condition.PARTLY_CLOUDY, 17.0), forecastDays[0], forecastDays, 0L),
-                        nowMillis = 0L,
-                    )
-                },
             ),
         ),
         headerItems = listOf(
-            HeaderItem("weather", 10) { WeatherHeaderItem(HeaderWeather(Condition.PARTLY_CLOUDY, night = false, temperature = 17.0, high = 19.0, low = 11.0)) },
+            HeaderItem("weather", 10) { WeatherHeaderItem(HeaderWeather.Now(Condition.PARTLY_CLOUDY, night = false, temperature = 17.0, high = 19.0, low = 11.0, days = forecastDays)) },
         ),
     )
 
@@ -180,7 +171,7 @@ class ShellScreenshotTest {
         TabItem("door", "Door", Icons.DOORBELL),
     )
 
-    /** Every card wanting to show, at the capabilities' sizes and priorities: Lights (35) and Music (30) take the REGULAR cells, the forecast (25) gives way. */
+    /** Every card wanting to show, at the capabilities' sizes and priorities: Lights (35) and Music (30) take the REGULAR cells. */
     private fun fullHome(dark: Boolean) = weatherHome(dark).copy(
         tabs = allTabs,
         homeCards = HomeCardPlacer.place(
@@ -191,12 +182,6 @@ class ShellScreenshotTest {
                     LightsCard(rooms[0], holidayOn = false, allOffLit = true, run = null, status = null, line = null, MainRoomActions({}, {}), noHouse)
                 },
                 HomeCard("music.card", HomeCardSize.REGULAR, 30) { MusicCard(HomePick(groups[0], nothingPlaying = false), null, null, GroupActions.None) },
-                HomeCard("weather.forecast", HomeCardSize.REGULAR, 25) {
-                    ForecastCard(
-                        WeatherView.Ready(HourlyWeather(at.withMinute(0), Condition.PARTLY_CLOUDY, 17.0), forecastDays[0], forecastDays, 0L),
-                        nowMillis = 0L,
-                    )
-                },
             ),
         ),
     )
