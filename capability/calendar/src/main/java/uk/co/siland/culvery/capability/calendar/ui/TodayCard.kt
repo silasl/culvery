@@ -2,7 +2,6 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,10 +31,11 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhCard
-import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
@@ -58,7 +57,12 @@ fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier, onOpen: (Ev
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Today", style = HhType.cardTitle, color = c.ink, modifier = Modifier.weight(1f).semantics { heading() })
-            if (onAdd != null) AddCircle(onAdd)
+            if (onAdd != null) {
+                HhRoundButton(
+                    Icons.ADD, "Add event", onAdd, Modifier.testTag("today_add"),
+                    tone = ButtonTone.Primary, on = ButtonSurface.Surf, size = CalendarDimens.touchTarget, iconSize = CalendarDimens.todayAddIcon,
+                )
+            }
             HhButton("See the week", { navigator.openTab(CALENDAR_TAB_ID) }, on = ButtonSurface.Surf)
         }
         Spacer(Modifier.height(CalendarDimens.todayHeaderGap))
@@ -72,23 +76,6 @@ fun TodayCard(events: List<EventUi>?, modifier: Modifier = Modifier, onOpen: (Ev
                 items(events, key = { it.ref.listKey }) { TodayRow(it, onOpen) }
             }
         }
-    }
-}
-
-/** Hand-off §7: a 48 dp `accent` circle, a 26 dp `add` in `accentInk`. */
-@Composable
-private fun AddCircle(onClick: () -> Unit) {
-    val c = Culvery.colors
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .testTag("today_add")
-            .size(CalendarDimens.touchTarget)
-            .clip(CircleShape)
-            .background(c.accent)
-            .hhClickable(onClick),
-    ) {
-        HhIcon(Icons.ADD, size = CalendarDimens.todayAddIcon, tint = c.accentInk, contentDescription = "Add event")
     }
 }
 

@@ -23,11 +23,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.lights.room
-import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
-import uk.co.siland.culvery.core.ui.quietFill
 
 /** All lights off is lit in the accent, as Holiday mode is when on, while a light it would turn off is on. Real graphics: this reads pixels. */
 @RunWith(AndroidJUnit4::class)
@@ -69,10 +67,10 @@ class LightsAllOffLitTest {
         assertThat(fillOf(lit = true, onTab = false)).isEqualTo(DarkColors.accent.toArgb())
     }
 
-    /** Fails if the card's button isn't the shared disabled fill with nothing to turn off. */
+    /** Fails if the card's button keeps a fill, rather than the shared outline, with nothing to turn off. */
     @Test
-    fun theCardButtonIsQuietWhenNotLit() {
-        assertThat(fillOf(lit = false, onTab = false)).isEqualTo(quietFill(ButtonSurface.Surf, DarkColors).toArgb())
+    fun theCardButtonIsAnOutlineWhenNotLit() {
+        assertThat(fillOf(lit = false, onTab = false)).isEqualTo(DarkColors.surf.toArgb())
     }
 
     /** Fails if the tab's button isn't the accent while lit. */
@@ -81,10 +79,10 @@ class LightsAllOffLitTest {
         assertThat(fillOf(lit = true, onTab = true)).isEqualTo(DarkColors.accent.toArgb())
     }
 
-    /** Fails if the tab's button isn't the shared disabled fill with nothing to turn off. */
+    /** Fails if the tab's button keeps a fill, rather than the shared outline, with nothing to turn off. */
     @Test
-    fun theTabButtonIsQuietWhenNotLit() {
-        assertThat(fillOf(lit = false, onTab = true)).isEqualTo(quietFill(ButtonSurface.Surf, DarkColors).toArgb())
+    fun theTabButtonIsAnOutlineWhenNotLit() {
+        assertThat(fillOf(lit = false, onTab = true)).isEqualTo(DarkColors.bg.toArgb())
     }
 
     private fun tap(lit: Boolean, onTab: Boolean): List<String> {

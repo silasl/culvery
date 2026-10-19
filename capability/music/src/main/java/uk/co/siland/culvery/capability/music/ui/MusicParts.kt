@@ -1,21 +1,15 @@
 package uk.co.siland.culvery.capability.music.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -32,12 +26,10 @@ import uk.co.siland.culvery.capability.music.shuffleSpoken
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
-import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
-import uk.co.siland.culvery.core.ui.hhClickable
-import uk.co.siland.culvery.core.ui.quietFill
 
 /** What a group's controls do; the Home card and the tab's rows share them. */
 class GroupActions(
@@ -58,37 +50,22 @@ class GroupActions(
 internal fun MusicActions.forGroups(onFavourites: (SpeakerGroup) -> Unit = {}) =
     GroupActions(this::play, this::pause, this::next, this::setGroupVolume, this::setRoomVolume, this::shuffleEverything, onFavourites)
 
-/** A round 48 dp control named by [spoken]; disabled, its icon is `mute` and TalkBack hears it as unavailable. */
-@Composable
-internal fun RoundButton(icon: String, spoken: String, tag: String, enabled: Boolean = true, onClick: () -> Unit) {
-    val c = Culvery.colors
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .testTag(tag)
-            .size(MusicDimens.button)
-            .clip(CircleShape)
-            .background(quietFill(ButtonSurface.Surf, c))
-            .semantics { contentDescription = spoken }
-            .hhClickable(onClick, enabled = enabled),
-    ) {
-        HhIcon(icon, size = MusicDimens.buttonIcon, tint = if (enabled) c.ink else c.mute)
-    }
-}
-
 @Composable
 internal fun PlayPauseButton(group: SpeakerGroup, tag: String, actions: GroupActions) {
     if (group.isPlaying) {
-        RoundButton(Icons.PAUSE, pauseSpoken(group.name), "${tag}_pause") { actions.onPause(group) }
+        HhRoundButton(Icons.PAUSE, pauseSpoken(group.name), { actions.onPause(group) }, Modifier.testTag("${tag}_pause"), on = ButtonSurface.Surf)
     } else {
-        RoundButton(Icons.PLAY_ARROW, playSpoken(group.name), "${tag}_play") { actions.onPlay(group) }
+        HhRoundButton(Icons.PLAY_ARROW, playSpoken(group.name), { actions.onPlay(group) }, Modifier.testTag("${tag}_play"), on = ButtonSurface.Surf)
     }
 }
 
 /** Greyed for a stream (6 §4.3). */
 @Composable
 internal fun NextButton(group: SpeakerGroup, tag: String, actions: GroupActions) =
-    RoundButton(Icons.SKIP_NEXT, nextSpoken(group.name), "${tag}_next", enabled = group.canSkip) { actions.onNext(group) }
+    HhRoundButton(
+        Icons.SKIP_NEXT, nextSpoken(group.name), { actions.onNext(group) }, Modifier.testTag("${tag}_next"),
+        enabled = group.canSkip, on = ButtonSurface.Surf,
+    )
 
 @Composable
 internal fun ShuffleButton(group: SpeakerGroup, tag: String, on: ButtonSurface, actions: GroupActions, compact: Boolean = false) = HhButton(

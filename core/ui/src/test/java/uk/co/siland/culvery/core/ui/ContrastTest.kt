@@ -9,7 +9,7 @@ private const val QUIET_FILL_MIN = 1.1
 
 private const val TEXT = 4.5
 
-/** A disabled control is exempt from WCAG contrast; its faded label must still read as text. */
+/** A disabled control is exempt from WCAG contrast; its `mute` label must still read as text on the surface it sits on. */
 private const val DISABLED_TEXT_MIN = 1.8
 
 /** WCAG 2.x: large text (≥ 18.66 sp bold or 24 sp), icons and other meaningful parts. */
@@ -46,7 +46,7 @@ class ContrastTest {
                     ButtonSurface.entries.forEach { on ->
                         val (fill, ink) = buttonColors(tone, enabled, on, t)
                         if (enabled) check("$name $tone enabled on $on", ink, fill, TEXT)
-                        else check("$name $tone disabled on $on", t.mute.over(DISABLED_INK_ALPHA, fill), fill, DISABLED_TEXT_MIN)
+                        else check("$name $tone disabled on $on", ink, surfaceOf(on, t), DISABLED_TEXT_MIN)
                     }
                 }
             }

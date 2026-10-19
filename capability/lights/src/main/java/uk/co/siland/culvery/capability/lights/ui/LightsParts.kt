@@ -1,19 +1,15 @@
 package uk.co.siland.culvery.capability.lights.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.lights.ALL_LIGHTS_OFF
@@ -35,11 +31,11 @@ import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
-import uk.co.siland.culvery.core.ui.quietFill
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /** What All lights off and Holiday mode do, on the card and the tab. */
@@ -80,17 +76,10 @@ internal fun MainRoomButton(room: LightRoom, onToggle: () -> Unit, modifier: Mod
 /** The › beside the main room: opens that room on the Lights tab. */
 @Composable
 internal fun OpenRoomButton(room: LightRoom, onOpen: () -> Unit) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .testTag("lights_card_open")
-            .size(LightsDimens.chevron)
-            .clip(CircleShape)
-            .background(quietFill(ButtonSurface.Surf, Culvery.colors))
-            .hhClickable(onOpen, spoken = openRoomSpoken(room)),
-    ) {
-        HhIcon(Icons.CHEVRON_RIGHT, size = LightsDimens.chevronIcon)
-    }
+    HhRoundButton(
+        Icons.CHEVRON_RIGHT, openRoomSpoken(room), onOpen, Modifier.testTag("lights_card_open"),
+        on = ButtonSurface.Surf, size = LightsDimens.chevron, iconSize = LightsDimens.chevronIcon,
+    )
 }
 
 /** Accent while a room it would turn off is on; otherwise the shared disabled button, which does nothing. */

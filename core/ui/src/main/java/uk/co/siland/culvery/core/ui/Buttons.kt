@@ -1,11 +1,15 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +21,7 @@ import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /** Button values (hand-off §7; 4d-1 §4.1). Both sizes are pills: the radius is half the height. */
@@ -34,6 +39,7 @@ object ButtonTokens {
     val largeIconGap = 8.dp
 
     val icon = 24.dp
+    val disabledOutline = 1.dp
 }
 
 /**
@@ -55,20 +61,18 @@ fun quietFill(on: ButtonSurface, colors: HhColors): Color = when (on) {
     ButtonSurface.DangerSoft -> colors.surf
 }
 
-internal data class ButtonColors(val fill: Color, val ink: Color)
+/** [outline] is null for an enabled button. */
+internal data class ButtonColors(val fill: Color, val ink: Color, val outline: Color?)
 
-/** Opacity of a disabled button's `mute` label and icon. */
-const val DISABLED_INK_ALPHA = 0.5f
-
-/** A button's fill and label colour. Disabled, every tone is the quiet fill with a `mute` label and icon at [DISABLED_INK_ALPHA]. */
+/** A button's fill, label colour and outline. Disabled, every tone is an outline with a `mute` label and icon (9 §6.4). */
 internal fun buttonColors(tone: ButtonTone, enabled: Boolean, on: ButtonSurface, colors: HhColors): ButtonColors {
     val quiet = quietFill(on, colors)
-    if (!enabled) return ButtonColors(quiet, colors.mute.copy(alpha = DISABLED_INK_ALPHA))
+    if (!enabled) return ButtonColors(Color.Transparent, colors.mute, colors.surf3)
     return when (tone) {
-        ButtonTone.Primary -> ButtonColors(colors.accent, colors.accentInk)
-        ButtonTone.Danger -> ButtonColors(quiet, colors.danger)
-        ButtonTone.Destroy -> ButtonColors(colors.danger, colors.dangerInk)
-        ButtonTone.Quiet -> ButtonColors(quiet, colors.ink)
+        ButtonTone.Primary -> ButtonColors(colors.accent, colors.accentInk, null)
+        ButtonTone.Danger -> ButtonColors(quiet, colors.danger, null)
+        ButtonTone.Destroy -> ButtonColors(colors.danger, colors.dangerInk, null)
+        ButtonTone.Quiet -> ButtonColors(quiet, colors.ink, null)
     }
 }
 
@@ -76,8 +80,8 @@ internal fun buttonColors(tone: ButtonTone, enabled: Boolean, on: ButtonSurface,
 val SpokenNameKey = SemanticsPropertyKey<String>("SpokenName")
 
 /**
- * The one button (4d-1 §4.1): a pill at least [size]'s height, a one-line label, an optional icon before it. Disabled,
- * every [tone] is the quiet fill with a faded `mute` label and does nothing. [spokenName] names a button whose label repeats
+ * The one button (4d-1 §4.1): a pill at least [size]'s height, a one-line label, an optional icon before it and an optional
+ * [trailingIcon] after it ("Door history ›"). Disabled, every tone is an outline with a `mute` label (9 §6.4) and does nothing. [spokenName] names a button whose label repeats
  * along a list: it starts with [text] and adds the subject ("Disconnect Google Calendar, alex@example.com"). [compact]
  * narrows a Regular button's side padding so its label fits a crowded row. [clickLabel] is what TalkBack offers when
  * the name doesn't say what a tap does; [secondLine] shows a state under the label ("Holiday mode", "Off"), and
@@ -97,8 +101,9 @@ fun HhButton(
     compact: Boolean = false,
     clickLabel: String? = null,
     secondLine: String? = null,
+    trailingIcon: String? = null,
 ) {
-    val (fill, ink) = buttonColors(tone, enabled, on, Culvery.colors)
+    val (fill, ink, outline) = buttonColors(tone, enabled, on, Culvery.colors)
     val large = size == ButtonSize.Large
     val start = when {
         large -> ButtonTokens.largePaddingH
@@ -109,8 +114,10 @@ fun HhButton(
     val end = when {
         large -> ButtonTokens.largePaddingH
         compact -> ButtonTokens.compactPaddingH
+        trailingIcon != null -> ButtonTokens.regularIconPaddingStart
         else -> ButtonTokens.regularPaddingH
     }
+    val pill = RoundedCornerShape(percent = 50)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(
@@ -119,8 +126,9 @@ fun HhButton(
         ),
         modifier = modifier
             .heightIn(min = if (large) ButtonTokens.largeHeight else ButtonTokens.regularHeight)
-            .clip(RoundedCornerShape(percent = 50))
+            .clip(pill)
             .background(fill)
+            .then(if (outline != null) Modifier.border(ButtonTokens.disabledOutline, outline, pill) else Modifier)
             .then(
                 if (spokenName != null) {
                     Modifier.semantics {
@@ -146,5 +154,37 @@ fun HhButton(
                 Text(secondLine, style = HhType.secondary, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+        if (trailingIcon != null) HhIcon(trailingIcon, size = ButtonTokens.icon, tint = ink)
+    }
+}
+
+/**
+ * A round [size] button in [tone]'s colours, named by [spoken] (9 §6.4); disabled it is the outline and does nothing.
+ * Tag it through [modifier].
+ */
+@Composable
+fun HhRoundButton(
+    icon: String,
+    spoken: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tone: ButtonTone = ButtonTone.Quiet,
+    enabled: Boolean = true,
+    on: ButtonSurface,
+    size: Dp = ButtonTokens.regularHeight,
+    iconSize: Dp = 28.dp,
+) {
+    val (fill, ink, outline) = buttonColors(tone, enabled, on, Culvery.colors)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(fill)
+            .then(if (outline != null) Modifier.border(ButtonTokens.disabledOutline, outline, CircleShape) else Modifier)
+            .semantics { contentDescription = spoken }
+            .hhClickable(onClick, enabled = enabled),
+    ) {
+        HhIcon(icon, size = iconSize, tint = ink)
     }
 }
