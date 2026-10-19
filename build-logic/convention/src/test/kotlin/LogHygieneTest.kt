@@ -86,12 +86,14 @@ internal object LogHygiene {
      * on for 30 minutes at most.
      *
      * `command.name` is a music command's name (`MusicCommand`, 6 §6: the command and its outcome only).
+     *
+     * `heat.*` are the tablet's thermal status and battery numbers (8 §4.7).
      */
     val ALLOWED = setOf(
         "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",
         "step.id", "stored.connection.id", "this.id", "this.kind", "kind.name", "this.failedDrains", "this.reason",
         "answer.reason", "what.label", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
-        "post.captureLine", "reading.outcome", "command.name",
+        "post.captureLine", "reading.outcome", "command.name", "heat.status", "heat.batteryTenths", "heat.batteryPercent",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|wtf|println)\(""")
