@@ -87,10 +87,7 @@ class ShellViewModel @Inject constructor(
         clock.minutes.stateIn(viewModelScope, SharingStarted.Eagerly, LocalDateTime.now())
 
     // Without Daylight, or until today's times are known, ThemeSchedule's 07:00 / 19:00 applies (4b design §3.8).
-    private val sunToday: Flow<SunTimes?> = daylight.orElse(null)?.today
-        ?.retryWithBackoff { Log.w(TAG, "Couldn't read today's sun times (${it::class.simpleName}); retrying") }
-        ?.onStart { emit(null) }
-        ?: flowOf(null)
+    private val sunToday: Flow<SunTimes?> = sunToday(daylight)
 
     private val scheduledDark: StateFlow<Boolean> =
         combine(now, sunToday) { time, sun -> ThemeSchedule.isDark(time.toLocalTime(), sun) }

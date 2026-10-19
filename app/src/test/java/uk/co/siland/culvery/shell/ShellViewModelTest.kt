@@ -539,7 +539,7 @@ class ShellViewModelTest {
             advanceTimeBy(1_001)
             assertThat(expectMostRecentItem().dark).isFalse()
         }
-        val logs = ShadowLog.getLogs().filter { it.tag == "ShellViewModel" }
+        val logs = ShadowLog.getLogs().filter { it.tag == "ThemeSchedule" }
         assertThat(logs.map { it.msg }).containsExactly("Couldn't read today's sun times (IllegalStateException); retrying")
         assertThat(logs.single().throwable).isNull()
     }
