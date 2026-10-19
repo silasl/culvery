@@ -31,11 +31,12 @@ class HueClientTest {
     private fun client(
         accept: (String, Int) -> Boolean = onThisMachine,
         pacer: HuePacer = HuePacer(now = System::currentTimeMillis, groupGapMs = 0, lightGapMs = 0),
+        timeoutMs: Long = TIMEOUT_MS,
     ) = HueClient(
         HueTrust(TestCerts.testCa()),
         pacer,
         accept = accept,
-        timeoutMs = TIMEOUT_MS,
+        timeoutMs = timeoutMs,
         capture = { what, answer -> captured += what to answer },
     )
 
@@ -174,9 +175,10 @@ class HueClientTest {
         bridge.delayMs = 50
         assertThat(client.rooms(call)).hasSize(3)
         assertThat(client.setOn(call, HueFixtures.LOUNGE_GROUP, true)).isTrue()
-        bridge.delayMs = 400
-        throws<InterruptedIOException> { client.rooms(call) }
-        throws<InterruptedIOException> { client.setOn(call, HueFixtures.LOUNGE_GROUP, true) }
+        val short = client(timeoutMs = SHORT_TIMEOUT_MS)
+        bridge.delayMs = SLOW_ANSWER_MS
+        throws<InterruptedIOException> { short.rooms(call) }
+        throws<InterruptedIOException> { short.setOn(call, HueFixtures.LOUNGE_GROUP, true) }
     }
 
     /** Pin: 7 §6 "Reads or commands time out (3 s)". */
@@ -238,8 +240,8 @@ class HueClientTest {
     /** Fails if the stream keeps the read or call timeout, so a quiet bridge drops it (7 §4.2). */
     @Test
     fun theStreamWaitsLongerThanTheReadTimeout() = runTest {
-        bridge.streamDelayMs = 400
-        assertThat(client.events(call).first()).contains(HueEvent.Scene(HueFixtures.RELAX, true))
+        bridge.streamDelayMs = SLOW_ANSWER_MS
+        assertThat(client(timeoutMs = SHORT_TIMEOUT_MS).events(call).first()).contains(HueEvent.Scene(HueFixtures.RELAX, true))
     }
 
     /** Fails if leaving the stream waits for the bridge to send or close, so the stream stays open behind (7 §4.2). */
@@ -269,6 +271,11 @@ class HueClientTest {
     }
 
     private companion object {
-        const val TIMEOUT_MS = 200L
+        /** Long enough for the TLS handshake on a loaded machine. */
+        const val TIMEOUT_MS = 2_000L
+        const val SHORT_TIMEOUT_MS = 200L
+
+        /** Well past [SHORT_TIMEOUT_MS] and inside [HUE_TIMEOUT_MS], so only the injected timeout fails it. */
+        const val SLOW_ANSWER_MS = 1_000L
     }
 }
