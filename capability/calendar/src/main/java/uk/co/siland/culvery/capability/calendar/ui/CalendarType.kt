@@ -41,11 +41,24 @@ internal object CalendarType {
     /** 17 sp / 600: info-row values. */
     val infoValue = HhType.rowTitle
 
-    /** 20 sp / 600: Today's event titles on Home (5 §A.2); other rows keep HhType.rowTitle. */
-    val todayTitle = HhType.rowTitle.copy(fontSize = 20.sp)
+    /** 23 sp / 700: Today's "Today" (9 §4.2). */
+    val todayHeader = HhType.cardTitle.copy(fontSize = 23.sp)
+
+    /** 21 sp / 600: Today's event titles on Home; other rows keep HhType.rowTitle. */
+    val todayTitle = HhType.rowTitle.copy(fontSize = 21.sp)
 
     /** 16 sp / 400: Today's time and person line. */
     val todayTime = HhType.secondary.copy(fontSize = 16.sp)
+
+    /** 18 sp / 600 and 15 sp / 400: tomorrow's rows topping up Today. */
+    val tomorrowTitle = HhType.rowTitle.copy(fontSize = 18.sp)
+    val tomorrowTime = HhType.secondary.copy(fontSize = 15.sp)
+
+    /** 15 sp / 700, 1 sp tracking: the TOMORROW divider. */
+    val tomorrowDivider = HhType.label.copy(fontSize = 15.sp, fontWeight = FontWeight.W700, letterSpacing = 1.sp)
+
+    /** 19 sp / 400: "Nothing on today". */
+    val nothingToday = HhType.body.copy(fontSize = 19.sp)
 
     /** 13 sp / 700: "Saving to …". */
     val syncingPill = HhType.label.copy(fontWeight = FontWeight.W700)
@@ -98,14 +111,17 @@ internal object CalendarType {
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */
 internal object CalendarDimens {
-    // The reconnect chip and Today's +: 48 dp touch targets; the chip's radius half that.
+    // The reconnect chip: a 48 dp touch target, its radius half that.
     val touchTarget = 48.dp
     val pillRadius = 24.dp
     val pillPaddingH = 16.dp
 
-    // Today card: header→first row = 10 gap + 4 margin; row bar→text 14; time line 3 below the title.
+    // Today card (9 §4.2): padding 20 × 21; header→first row = 10 gap + 4 margin; rows 9 apart; row bar→text 14; time
+    // line 3 below the title.
+    val todayPaddingV = 20.dp
+    val todayPaddingH = 21.dp
     val todayHeaderGap = 14.dp
-    val todayRowGap = 10.dp
+    val todayRowGap = 9.dp
     val todayBarGap = 14.dp
     val todayTimeTop = 3.dp
     val todayBadge = 20.dp
@@ -113,11 +129,26 @@ internal object CalendarDimens {
     // Shared card radius (Today, Coming up, Connect): Home's, as the weather card's.
     val cardRadius = ShellTokens.homeCardRadius
 
-    // Today row: surf2 pill, radius 16, 14×12 padding, 4 dp person-colour bar.
-    val todayRowRadius = 16.dp
-    val todayRowPaddingH = 14.dp
-    val todayRowPaddingV = 12.dp
-    val todayBarWidth = 4.dp
+    // Today row: surf2 pill, radius 15, 13 × 15 padding, 5 dp person-colour bar.
+    val todayRowRadius = 15.dp
+    val todayRowPaddingH = 15.dp
+    val todayRowPaddingV = 13.dp
+    val todayBarWidth = 5.dp
+
+    // Tomorrow's rows: a 1 dp `surf2` edge, 11 × 13 padding, the bar at 75%. The divider's 1 dp rule starts 10 after
+    // TOMORROW (not in the handoff's numbers).
+    val tomorrowEdge = 1.dp
+    val tomorrowRowPaddingH = 13.dp
+    val tomorrowRowPaddingV = 11.dp
+    const val TOMORROW_BAR_ALPHA = 0.75f
+    val tomorrowRule = 1.dp
+    val tomorrowRuleGap = 10.dp
+
+    // Today's scroll: a 133 dp fade at the foot, 73 dp below the last row; the pill 20 above the card's foot (its sides
+    // are the card's), with an 8 dp shadow.
+    val todayFade = 133.dp
+    val todayScrollBottom = 73.dp
+    val todayPillShadow = 8.dp
 
     // Coming up card: padding 20 × 22, like the hand-off's WIDE Scenes card.
     val comingUpPaddingV = 20.dp
@@ -280,7 +311,7 @@ internal object CalendarDimens {
     // Footers: 10 between Delete and the main button.
     val footerGap = 10.dp
 
-    // Entry points (hand-off §7): Today's + (touchTarget) with a 26 dp add, 8 from Week. Each week column ends with a
+    // Entry points (hand-off §7): Today's 48 dp + with a 26 dp add, 8 from Week. Each week column ends with a
     // 24 dp add hint in at least 48 dp.
     val todayAddIcon = 26.dp
     val todayHeaderButtonGap = 8.dp

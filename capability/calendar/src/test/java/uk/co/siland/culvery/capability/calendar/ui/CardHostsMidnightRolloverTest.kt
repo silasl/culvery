@@ -1,9 +1,13 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -102,30 +106,52 @@ class CardHostsMidnightRolloverTest {
         return RemoteEvent(title, title, EventTime.Timed(start), EventTime.Timed(start.plusSeconds(3_600)), recurring = false)
     }
 
-    @Test
-    fun todayCardHostRollsOverAtMidnight() {
-        var now = LocalDateTime.of(2026, 9, 23, 23, 59, 50).atZone(london).toInstant().toEpochMilli()
-        val ticks = MutableStateFlow(now)
-        val clock = HouseholdClock(zone.zone, WallClock { now }, clockScope, ticks)
+    /** Today's card ten seconds before midnight on the 23rd; [ticks] moves the clock on. */
+    private fun showTodayCardBeforeMidnight(): MutableStateFlow<Long> {
+        val ticks = MutableStateFlow(LocalDateTime.of(2026, 9, 23, 23, 59, 50).atZone(london).toInstant().toEpochMilli())
+        val clock = HouseholdClock(zone.zone, WallClock { ticks.value }, clockScope, ticks)
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides RecordingOverlay()) {
                 CulveryTheme(dark = true) { rememberToday(clock)?.let { TodayCardHost(repo, editor, it) } }
             }
         }
+        return ticks
+    }
+
+    @Test
+    fun todayCardHostRollsOverAtMidnight() {
+        val ticks = showTodayCardBeforeMidnight()
         compose.waitUntil(timeoutMillis = 5_000) {
             compose.onAllNodesWithText("Twenty-third event").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Twenty-third event").assertExists()
-        compose.onNodeWithText("Twenty-fourth event").assertDoesNotExist()
 
-        now += 20_000 // 00:00:10 on the 24th
-        ticks.value = now
+        ticks.value += 20_000 // 00:00:10 on the 24th
         compose.waitUntil(timeoutMillis = 5_000) {
-            compose.onAllNodesWithText("Twenty-fourth event").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Twenty-third event").fetchSemanticsNodes().isEmpty()
         }
 
         compose.onNodeWithText("Twenty-fourth event").assertExists()
         compose.onNodeWithText("Twenty-third event").assertDoesNotExist()
+    }
+
+    /** 9 §4.2: the 24th's event tops up the 23rd under Tomorrow, then is one of today's rows once the 24th starts. */
+    @Test
+    fun tomorrowsTopUpsBecomeTodayAtMidnight() {
+        val ticks = showTodayCardBeforeMidnight()
+        val tomorrowRow = hasClickAction() and hasContentDescription("Twenty-fourth event, ", substring = true) and
+            hasContentDescription("Thursday", substring = true)
+        compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodes(tomorrowRow).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Tomorrow").assertExists()
+
+        ticks.value += 20_000 // 00:00:10 on the 24th
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithText("Twenty-third event").fetchSemanticsNodes().isEmpty()
+        }
+
+        compose.onAllNodes(tomorrowRow).assertCountEquals(0)
+        compose.onNode(hasClickAction() and hasContentDescription("Twenty-fourth event, ", substring = true)).assertExists()
+        compose.onNodeWithContentDescription("Tomorrow").assertDoesNotExist()
     }
 
     @Test

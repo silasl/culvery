@@ -22,12 +22,15 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.WithFontScale
 
 /** Card sizes as the Home grid gives them on the 1280×800 canvas. */
 private val TALL_W = 397.dp
 private val TALL_H = 572.dp
 private val WIDE_W = 705.dp
 private val WIDE_H = 279.dp
+private val TODAY_W = todayCardSize.width
+private val TODAY_H = todayCardSize.height
 
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -47,13 +50,27 @@ class CardScreenshotTest {
         compose.onNodeWithTag("shot").captureRoboImage("src/test/screenshots/$name.png")
     }
 
-    @Test fun todayDark() = snap("today_dark", true, TALL_W, TALL_H) { TodayCard(SampleUi.today, onAdd = {}) }
-    @Test fun todayLight() = snap("today_light", false, TALL_W, TALL_H) { TodayCard(SampleUi.today, onAdd = {}) }
-    @Test fun todayEmptyDark() = snap("today_empty_dark", true, TALL_W, TALL_H) { TodayCard(emptyList()) }
+    @Test fun todayDark() = snap("today_dark", true, TODAY_W, TODAY_H) { TodayCard(SampleUi.today, onAdd = {}) }
+    @Test fun todayLight() = snap("today_light", false, TODAY_W, TODAY_H) { TodayCard(SampleUi.today, onAdd = {}) }
+    @Test fun todayEmptyDark() = snap("today_empty_dark", true, TODAY_W, TODAY_H) { TodayCard(emptyList()) }
+    @Test fun todayScrollDark() = snap("today_scroll_dark", true, TODAY_W, TODAY_H) { TodayCard(SampleUi.todayBusy, onAdd = {}) }
+    @Test fun todayScrollLight() = snap("today_scroll_light", false, TODAY_W, TODAY_H) { TodayCard(SampleUi.todayBusy, onAdd = {}) }
+
+    @Test
+    fun todayToppedUpDark() = snap("today_topped_up_dark", true, TODAY_W, TODAY_H) {
+        TodayCard(SampleUi.today.take(2), onAdd = {}, tomorrow = SampleUi.tomorrow)
+    }
+
+    @Test
+    fun todayNothingTodayDark() = snap("today_nothing_today_dark", true, TODAY_W, TODAY_H) {
+        TodayCard(emptyList(), onAdd = {}, tomorrow = SampleUi.tomorrow)
+    }
+
+    @Test fun todayFs15() = snap("today_fs15", true, TODAY_W, TODAY_H) { WithFontScale(1.5f) { TodayCard(SampleUi.today, onAdd = {}) } }
     @Test fun comingUpDark() = snap("coming_up_dark", true, WIDE_W, WIDE_H) { ComingUpCard(SampleUi.comingUp) }
     @Test fun comingUpLight() = snap("coming_up_light", false, WIDE_W, WIDE_H) { ComingUpCard(SampleUi.comingUp) }
     @Test fun comingUpBusyDark() = snap("coming_up_busy_dark", true, WIDE_W, WIDE_H) { ComingUpCard(SampleUi.comingUpBusy) }
     @Test fun connectDark() = snap("connect_dark", true, TALL_W, TALL_H) { ConnectCalendarCard(connectService = "Google Calendar", onConnect = {}) }
     @Test fun connectLight() = snap("connect_light", false, TALL_W, TALL_H) { ConnectCalendarCard(connectService = "Google Calendar", onConnect = {}) }
-    @Test fun todayBadgesDark() = snap("today_badges_dark", true, TALL_W, TALL_H) { TodayCard(SampleUi.todayWithBadges) }
+    @Test fun todayBadgesDark() = snap("today_badges_dark", true, TODAY_W, TODAY_H) { TodayCard(SampleUi.todayWithBadges) }
 }

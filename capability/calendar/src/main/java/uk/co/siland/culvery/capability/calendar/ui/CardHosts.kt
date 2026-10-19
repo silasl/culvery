@@ -9,18 +9,20 @@ import java.time.LocalDate
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.DayUi
-import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.core.plugin.Connection
 
-/** Today's rows open their event; its + adds one today, when there is a writable master calendar to add to. */
+/**
+ * Today's rows, topped up from tomorrow's, open their event; its + adds one today, when there is a writable master
+ * calendar to add to.
+ */
 @Composable
 internal fun TodayCardHost(repo: CalendarRepository, editor: CalendarEditor, today: LocalDate) {
     val open = rememberEventOpener(repo, editor, today)
     val add = rememberEventAdder(repo, editor, today)
-    val events: List<EventUi>? by remember(today) { repo.day(today) }.collectAsState(initial = null)
-    TodayCard(events, onOpen = open, onAdd = add?.let { a -> { a(null) } })
+    val days: List<DayUi>? by remember(today) { repo.days(today, 2) }.collectAsState(initial = null)
+    TodayCard(days?.first()?.events, onOpen = open, onAdd = add?.let { a -> { a(null) } }, tomorrow = days?.last())
 }
 
 @Composable

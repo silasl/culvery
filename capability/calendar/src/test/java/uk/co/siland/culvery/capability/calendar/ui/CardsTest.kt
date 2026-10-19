@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -20,11 +23,14 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -34,13 +40,19 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
+import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 import uk.co.siland.culvery.core.ui.test.onClickableShowing
+
+// app's HomeGridTest pins the same size for Home's Today card.
+internal val todayCardSize = DpSize(400.dp, 586.dp)
 
 /** Native graphics: the sized tests check that rows fit the real card sizes, which needs real text metrics. */
 @RunWith(AndroidJUnit4::class)
@@ -50,11 +62,11 @@ class CardsTest {
     private val navigator = RecordingNavigator()
     private val isButton = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
 
-    /** 5 §A.2: Today's titles 20 sp and their time line 16 sp; other cards' rows keep their sizes. */
+    /** 9 §4.2: Today's titles 21 sp and their time line 16 sp; other cards' rows keep their sizes. */
     @Test
     fun todaysRowsUseTheLargerSizes() {
         show { TodayCard(SampleUi.today) }
-        assertThat(compose.onNodeWithText("School run", useUnmergedTree = true).textLayout().layoutInput.style.fontSize).isEqualTo(20.sp)
+        assertThat(compose.onNodeWithText("School run", useUnmergedTree = true).textLayout().layoutInput.style.fontSize).isEqualTo(21.sp)
         assertThat(compose.onNodeWithText("07:45–08:30 · Sam", useUnmergedTree = true).textLayout().layoutInput.style.fontSize).isEqualTo(16.sp)
     }
 
@@ -65,9 +77,15 @@ class CardsTest {
     }
 
     /** The card at the size the Home grid gives it on the 1280×800 canvas. */
-    private fun showSized(width: Int, height: Int, content: @Composable () -> Unit) = show {
-        Box(Modifier.size(width.dp, height.dp)) { content() }
+    private fun showSized(size: DpSize = todayCardSize, content: @Composable () -> Unit) = show {
+        Box(Modifier.size(size)) { content() }
     }
+
+    private val tomorrowDate = SampleUi.TODAY.plusDays(1)
+
+    private fun events(prefix: String, count: Int) = List(count) { SampleUi.event("$prefix ${it + 1}", "1$it:00–1$it:30", SampleUi.alex) }
+
+    private val pill = hasText("more today · Open calendar", substring = true)
 
     @Test
     fun todayRowShowsTimeAndPerson() {
@@ -76,10 +94,12 @@ class CardsTest {
         compose.onNodeWithText("07:45–08:30 · Sam").assertExists()
     }
 
+    /** 9 §4.2: the handoff's words, with or without the +. */
     @Test
-    fun anEmptyTodayWithAddSaysWhatToDo() {
+    fun anEmptyTodayWithAddSaysNothingOnToday() {
         show { TodayCard(emptyList(), onAdd = {}) }
-        compose.onNodeWithText("Nothing on today. Tap + to add something.").assertExists()
+        compose.onNodeWithText("Nothing on today").assertExists()
+        compose.onNodeWithText("Tap + to add something", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -109,7 +129,7 @@ class CardsTest {
 
     @Test
     fun todayShowsTheFourthRowInTheTallCard() {
-        showSized(397, 572) { TodayCard(SampleUi.today) }
+        showSized { TodayCard(SampleUi.today) }
         compose.onNodeWithText("Swimming").assertIsDisplayed()
     }
 
@@ -129,7 +149,7 @@ class CardsTest {
 
     @Test
     fun comingUpShowsTwoRowsAndAVisibleMoreInTheWideCard() {
-        showSized(705, 279) { ComingUpCard(SampleUi.comingUpBusy) }
+        showSized(DpSize(705.dp, 279.dp)) { ComingUpCard(SampleUi.comingUpBusy) }
         compose.onNodeWithText("Swim club").assertIsDisplayed()
         compose.onNodeWithText("Football").assertDoesNotExist()
         compose.onNodeWithText("+2 more in Calendar").assertIsDisplayed()
@@ -266,5 +286,104 @@ class CardsTest {
     fun theConnectCardsTitleIsAHeading() {
         show { ConnectCalendarCard(connectService = "Google Calendar", onConnect = {}) }
         compose.onNodeWithText("Connect a calendar").assert(isHeading())
+    }
+
+    @Test
+    fun sevenTodayScrollsBehindThePill() {
+        showSized { TodayCard(events("Event", 7)) }
+        compose.onNodeWithText("See the week").assertDoesNotExist()
+        compose.onNodeWithText("3 more today · Open calendar").assertIsDisplayed().performClick()
+        assertThat(navigator.tabs).containsExactly(CALENDAR_TAB_ID)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun fiveTodayShowsFiveAndNoPill() {
+        showSized { TodayCard(SampleUi.today) }
+        SampleUi.today.forEach { compose.onNodeWithText(it.title).assertIsDisplayed() }
+        compose.onNodeWithContentDescription("Tomorrow").assertDoesNotExist()
+        compose.onAllNodes(pill).assertCountEquals(0)
+        compose.onNodeWithText("See the week").performClick()
+        assertThat(navigator.tabs).containsExactly(CALENDAR_TAB_ID)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun twoTodayAddsThreeFromTomorrow() {
+        val later = events("Later", 4)
+        showSized { TodayCard(events("Event", 2), tomorrow = DayUi(tomorrowDate, later)) }
+        compose.onNodeWithContentDescription("Tomorrow").assert(isHeading()).assertIsDisplayed()
+        compose.onNodeWithText("TOMORROW", useUnmergedTree = true).assertExists()
+        later.take(3).forEach {
+            compose.onNodeWithContentDescription(eventOnDay(it, tomorrowDate)).assert(isButton).assertIsDisplayed()
+            assertThat(compose.onNodeWithText(it.title, useUnmergedTree = true).textLayout().layoutInput.maxLines).isEqualTo(1)
+        }
+        compose.onNodeWithText("Later 4", useUnmergedTree = true).assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aShortTomorrowTopsUpWhatItHas() {
+        val later = events("Later", 1)
+        showSized { TodayCard(events("Event", 2), tomorrow = DayUi(tomorrowDate, later)) }
+        compose.onNodeWithContentDescription("Tomorrow").assert(isHeading())
+        compose.onNodeWithContentDescription(eventOnDay(later.single(), tomorrowDate)).assertIsDisplayed()
+        compose.onAllNodes(hasText("Event ", substring = true), useUnmergedTree = true).assertCountEquals(2)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun nothingTodaySaysSoAndShowsFiveFromTomorrow() {
+        val later = events("Later", 6)
+        showSized { TodayCard(emptyList(), onAdd = {}, tomorrow = DayUi(tomorrowDate, later)) }
+        compose.onNodeWithText("Nothing on today").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Tomorrow").assert(isHeading()).assertIsDisplayed()
+        later.take(5).forEach { compose.onNodeWithContentDescription(eventOnDay(it, tomorrowDate)).assertIsDisplayed() }
+        compose.onNodeWithText("Later 6", useUnmergedTree = true).assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun anEventSpanningMidnightShowsOnceAsToday() {
+        val sleepover = SampleUi.event("Sleepover", "20:00–", SampleUi.mia)
+        showSized { TodayCard(listOf(sleepover), tomorrow = DayUi(tomorrowDate, listOf(sleepover.copy(timeLabel = "until 10:00")))) }
+        compose.onAllNodesWithText("Sleepover", useUnmergedTree = true).assertCountEquals(1)
+        compose.onNodeWithContentDescription(todayRowName(sleepover)).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Tomorrow").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Five one-line rows fit at the default font; at 1.5 they don't, so the card scrolls rather than cut one (9 §4.2). */
+    @Test
+    fun aLargeFontTurnsFiveRowsIntoTheScroll() {
+        var scale by mutableFloatStateOf(1f)
+        showSized { WithFontScale(scale) { TodayCard(SampleUi.today) } }
+        SampleUi.today.forEach { assertThat(compose.onNodeWithText(it.title, useUnmergedTree = true).textLayout().lineCount).isEqualTo(1) }
+        compose.onAllNodes(pill).assertCountEquals(0)
+        compose.onNodeWithText("See the week").assertIsDisplayed()
+
+        scale = 1.5f
+        compose.onNode(pill).assertIsDisplayed()
+        compose.onNodeWithText("See the week").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun todayTitlesWrapToTwoLines() {
+        showSized { TodayCard(SampleUi.today) }
+        val input = compose.onNodeWithText("School run", useUnmergedTree = true).textLayout().layoutInput
+        assertThat(input.maxLines).isEqualTo(2)
+        assertThat(input.overflow).isEqualTo(TextOverflow.Ellipsis)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun tomorrowRowsOpenTheirEvent() {
+        val opened = mutableListOf<EventRef>()
+        val later = events("Later", 3)
+        showSized { TodayCard(events("Event", 2), onOpen = { opened += it }, tomorrow = DayUi(tomorrowDate, later)) }
+        compose.onNodeWithContentDescription(eventOnDay(later[1], tomorrowDate)).performClick()
+        assertThat(opened).containsExactly(later[1].ref)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 }

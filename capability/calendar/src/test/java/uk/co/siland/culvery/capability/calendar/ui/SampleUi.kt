@@ -46,6 +46,24 @@ object SampleUi {
         event("Dinner with Jo & Priya", "19:30–21:00", alex),
     )
 
+    /** A busy Wednesday: seven rows, so Today scrolls. */
+    val todayBusy = today + listOf(
+        event("Homework club", "17:30–18:30", mia),
+        event("Bins out", "21:00–21:15", family),
+    )
+
+    /** Thursday, enough to top Today up to five from nothing. */
+    val tomorrow = DayUi(
+        TODAY.plusDays(1),
+        listOf(
+            event("Office day", "09:00–17:00", alex),
+            event("Dentist", "12:30–13:30", sam),
+            event("Swim club", "16:00–17:00", mia),
+            event("Football", "18:00–19:00", mia),
+            event("Parents' evening", "19:00–20:00", sam),
+        ),
+    )
+
     val comingUp = listOf(
         day(1, event("Office day", "09:00–17:00", alex), event("Football", "18:00–19:00", mia)),
         day(2, allDay("Bin day", family, recurring = true), event("Dentist", "12:30–13:30", sam)),
