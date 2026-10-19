@@ -379,6 +379,12 @@ On `culvery-5` (debug build, an emulated front camera given on the command line)
 - Debug builds don't pin, so re-pinning after the camera prompt is checked on the tablet.
 - Not tried here (moved to the tablet, the user testing in use): the doorbell by day and at night, camera wake-up with a real room, a tap on the night clock and its evening level, the night's end, the "no front camera" line, TalkBack, and the power and heat measurement.
 
+## Plan 8 (Sleep and wake): on the tablet (2026-10-19)
+
+The release from 25ee446 installed with `install -r` (the household kept); the user is testing it in use. Merged to main locally the same day at the user's request.
+- Not done yet: the power and heat measurement (runs A, B, C; decision 9's bar: a thermal status rise, a 3 °C larger temperature rise, or over 2 %/h more drain by the charge counter, against camera wake-up off). Until it's run, camera wake-up ships on by default.
+- Not tried yet on the tablet: re-pinning after the camera prompt, camera wake-up distance and speed, the night clock in the dark room, the doorbell by day and at night, TalkBack, whether Android repeats the thermal status at registration, whether BRIGHTNESS_OVERRIDE_OFF is minimum or off on this Samsung.
+
 ## From Plan 8
 
 - Not done, and why: skipping `moved()` while awake would be wrong, since movement while awake must restart the sleep wait.
