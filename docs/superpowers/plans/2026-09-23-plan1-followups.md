@@ -374,7 +374,7 @@ The release from a40fbd6 installed with `install -r` over Plan 6's (the househol
 ## Feature ideas (2026-10-02, after v1)
 
 **Each its own spec → plan cycle; not in 4c, 4d or 4e**
-- Sleep and wake: dim the screen when nobody is there and wake on a tap. Start with a schedule or sunset (4b's sun times) and the ambient light sensor; camera presence (CameraX at about one frame a second, on-device motion or face detection, nothing stored or sent, and the app says when the camera is on, as Android 11 shows no indicator) is optional on top. Measure its power use against plain dimming on the SM-T510. v1 §14 had screensaver and night dimming out of scope. On day one of the family week (2026-10-14) the user asked to revisit when the screen turns on, turns off and dims.
+- Sleep and wake: Plan 8, spec `docs/superpowers/specs/2026-10-19-culvery-8-sleep-and-wake-design.md` (night clock, camera wake-up in the day, brightness by the time of day — the SM-T510 has no light sensor — and heat logging).
 - Bin collections from Mid Sussex District Council: no iCal feed, only a per-property tracker page (`mop.php?Track=…`). A read-only scraper provider fetching daily, mapped to Family, with "can't read" shown on the calendar's row (4c's per-calendar health), since the page can change without notice. The `Track` value identifies the property: store it as connection config and keep it out of logs. Check UKBinCollectionData's Mid Sussex scraper as a reference. Stopgap: repeating events in the family's Google calendar.
 - Sonos (the user, 2026-10-14): Plan 6, spec `docs/superpowers/specs/2026-10-15-culvery-6-sonos-design.md`.
 - Philips Hue (the user, 2026-10-14): Plan 7, spec `docs/superpowers/specs/2026-10-16-culvery-7-hue-design.md`. Holiday mode drives it.
