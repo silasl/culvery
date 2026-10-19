@@ -25,8 +25,10 @@ class DoorAlertsTest {
     // NOW is 14:02 in London: not quiet.
     private var start = NOW
 
+    private var night = false
+
     private fun TestScope.alerts() =
-        DoorAlerts(host, { seen += it }, { prefs }, chime, { london }, WallClock { start + testScheduler.currentTime }, backgroundScope)
+        DoorAlerts(host, { seen += it }, { prefs }, chime, { london }, WallClock { start + testScheduler.currentTime }, backgroundScope, { night })
 
     private fun TestScope.rung(id: Long, isNew: Boolean = true, device: String = "Front Door", unrecognised: Boolean = false, snapshot: File? = null) =
         Recorded(DoorEvent(id, start + testScheduler.currentTime, DoorKind.RING, device, unrecognised, snapshot, seen = false), isNew)
@@ -236,6 +238,46 @@ class DoorAlertsTest {
         advanceTimeBy(CHIME_GAP_MS - 1)
         alerts.onRecorded(rung(2))
         assertThat(host.quietedCalls).isEqualTo(1)
+        assertThat(chime.volumes).hasSize(1)
+    }
+
+    /** 8 §2.7: Fails if a ring at night, with Culvery in front, raises a card or a chime, or counts as seen. */
+    @Test
+    fun aRingAtNightIsStoredWithoutACardOrAChime() = runTest {
+        night = true
+        val alerts = alerts()
+        alerts.onRecorded(rung(1))
+        assertThat(host.shown).isEqualTo(0)
+        assertThat(alerts.showing.value).isNull()
+        assertThat(chime.volumes).isEmpty()
+        assertThat(seen).isEmpty()
+    }
+
+    /** 8 §4.5: Fails if a card already showing is closed when night starts. */
+    @Test
+    fun aCardShowingWhenNightStartsStaysUntilItCloses() = runTest {
+        val alerts = alerts()
+        alerts.onRecorded(rung(1))
+        night = true
+        advanceTimeBy(CARD_MS - 1)
+        runCurrent()
+        assertThat(alerts.showing.value).isNotNull()
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(alerts.showing.value).isNull()
+        assertThat(host.dismissed).isEqualTo(1)
+    }
+
+    /** 8 §2.7: Fails if a ring after night ends is still held back. */
+    @Test
+    fun aRingAfterNightEndsAlertsAsUsual() = runTest {
+        night = true
+        val alerts = alerts()
+        alerts.onRecorded(rung(1))
+        night = false
+        alerts.onRecorded(rung(2))
+        assertThat(host.shown).isEqualTo(1)
+        assertThat(alerts.showing.value?.eventId).isEqualTo(2)
         assertThat(chime.volumes).hasSize(1)
     }
 }
