@@ -74,4 +74,8 @@ class SleepLayersScreenshotTest {
 
     @Test
     fun cameraMarkLight() = snap("camera_mark_light", dark = false, screen = Screen.AWAKE, mark = true)
+
+    /** By day the theme is light, so the mark over the dark screen is light `mute` on black. */
+    @Test
+    fun cameraMarkAsleep() = snap("camera_mark_asleep", dark = false, screen = Screen.ASLEEP, mark = true)
 }

@@ -59,15 +59,15 @@ fun SleepLayer(screen: Screen, time: () -> LocalDateTime, onWake: () -> Unit) {
             grace = false
         }
     }
-    when {
-        screen == Screen.ASLEEP -> WakingLayer(onWake, name = { contentDescription = SCREEN_ASLEEP })
-        screen == Screen.NIGHT_CLOCK -> WakingLayer(onWake) {
+    when (screen) {
+        Screen.ASLEEP -> WakingLayer(onWake, name = { contentDescription = SCREEN_ASLEEP })
+        Screen.NIGHT_CLOCK -> WakingLayer(onWake) {
             Text(
                 clockText(time().toLocalTime()),
                 style = HhType.clock.copy(fontSize = NightClockTokens.size, lineHeight = NightClockTokens.size, color = NightClockTokens.ink),
             )
         }
-        else -> Box(Modifier.sizedWhile { grace }.fillMaxSize().takesTaps {})
+        Screen.AWAKE -> Box(Modifier.sizedWhile { grace }.fillMaxSize().takesTaps {})
     }
 }
 
@@ -107,10 +107,10 @@ private fun Modifier.takesTaps(onDown: () -> Unit): Modifier = pointerInput(Unit
     }
 }
 
-/** The `photo_camera` mark in the top-right corner while the camera runs, on every screen (8 §4.3). Not clickable. */
+/** The `photo_camera` mark at the top edge's centre, clear of the status bar's items, while the camera runs, on every screen (8 §4.3). Not clickable. */
 @Composable
 fun CameraMark() {
-    Box(Modifier.fillMaxSize().padding(DisplayDimens.markInset), contentAlignment = Alignment.TopEnd) {
+    Box(Modifier.fillMaxSize().padding(top = DisplayDimens.markTop), contentAlignment = Alignment.TopCenter) {
         HhIcon(Icons.PHOTO_CAMERA, size = DisplayDimens.markSize, tint = Culvery.colors.mute, contentDescription = THE_CAMERA_IS_ON)
     }
 }

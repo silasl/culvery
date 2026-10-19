@@ -188,6 +188,22 @@ class SleepLayersTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** Fails if a tap swallowed by the grace counts as a touch on the shell, so it would keep the screen awake. */
+    @Test
+    fun aTapSwallowedByTheGraceIsNotATouch() {
+        show(Screen.ASLEEP)
+        tap()
+        compose.mainClock.advanceTimeByFrame()
+        exactly(300)
+        tap()
+        exactly(299)
+        tap()
+        assertThat(screen).isEqualTo(Screen.AWAKE)
+        assertThat(presses).isEqualTo(0)
+        assertThat(touches).isEqualTo(0)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     /** Fails if TalkBack can reach a control under the dark screen, or it stays hidden once awake. */
     @Test
     fun whatTheSleepLayerCoversIsHiddenFromTalkBack() {

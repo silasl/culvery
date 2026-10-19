@@ -10,8 +10,8 @@ object NightClockTokens {
     val ink = Color(0xFF5A5A5A)
 }
 
-/** The camera mark's size and its distance from the top-right corner (8 §4.3). */
+/** The camera mark's size and its distance from the top edge, where it sits centred (8 §4.3). */
 object DisplayDimens {
     val markSize = 20.dp
-    val markInset = 12.dp
+    val markTop = 12.dp
 }
