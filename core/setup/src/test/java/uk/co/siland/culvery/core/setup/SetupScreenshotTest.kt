@@ -70,7 +70,7 @@ class SetupScreenshotTest {
     private val mia = Member(Person(PersonId("mia"), "Mia", PersonPalette.colors[2]), Role.CHILD, hasPin = true)
 
     private fun people(name: String, dark: Boolean) = snap(name, dark) {
-        WizardFrame(6, 3, back = {}, forward = Forward.Next("Next", enabled = true), busy = false, onForward = {}, onSkip = {}) {
+        WizardFrame(7, 3, back = {}, forward = Forward.Next("Next", enabled = true), busy = false, onForward = {}, onSkip = {}) {
             StepTitle("Who else lives here?")
             PeopleList(listOf(alex, sam, mia), onEdit = {}, onAdd = {}, onMove = null)
         }
