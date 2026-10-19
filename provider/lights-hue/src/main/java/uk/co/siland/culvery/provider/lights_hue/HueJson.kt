@@ -218,7 +218,7 @@ internal object HueJson {
 
     private val VALUE_KEYS = listOf(
         "name", "username", "clientkey", "bridgeid", "bridge_id", "replacesbridgeid", "mac", "mac_address", "ipaddress",
-        "gateway", "netmask", "proxyaddress",
+        "gateway", "netmask", "proxyaddress", "archetype",
     ).joinToString("|")
     private val KEYED_VALUE = Regex("\"($VALUE_KEYS)\"\\s*:\\s*\"(?:[^\"\\\\]|\\\\.)*\"")
     // The bridge's whitelist is an object keyed by application keys.
@@ -230,10 +230,11 @@ internal object HueJson {
     private val PLACEHOLDERS = mapOf(
         "name" to "[name]", "username" to "[key]", "clientkey" to "[key]", "bridgeid" to "[bridge id]",
         "bridge_id" to "[bridge id]", "replacesbridgeid" to "[bridge id]", "mac" to "[mac]", "mac_address" to "[mac]",
+        "archetype" to "[kind]",
     )
 
     /**
-     * An answer's shape for a capture (7 §8.2): the values of the keys that name a person's things, the bridge, the key or
+     * An answer's shape for a capture (7 §8.2): the values of the keys that name or describe a person's things (names, room and light kinds), the bridge, the key or
      * a network address replaced, and by shape anywhere a bridge id, a MAC address or an IPv4 address. Resource ids stay.
      */
     fun redact(text: String): String = text

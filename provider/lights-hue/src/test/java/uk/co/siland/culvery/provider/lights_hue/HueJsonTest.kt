@@ -172,7 +172,7 @@ class HueJsonTest {
         assertThat(HueJson.pairBody()).isEqualTo("""{"devicetype":"culvery#tablet","generateclientkey":true}""")
     }
 
-    /** Fails if a name, key, bridge id, MAC or address survives in any fixture, a resource id is lost, or the output stops parsing. */
+    /** Fails if a name, room or light kind, key, bridge id, MAC or address survives in any fixture, a resource id is lost, or the output stops parsing. */
     @Test
     fun theCaptureShapeReplacesNamesKeysIdsAndAddresses() {
         val answers = listOf(
@@ -188,6 +188,9 @@ class HueJsonTest {
         listOf(F.LOUNGE, F.LOUNGE_GROUP, F.RELAX, F.PM_STOPPED, F.PM_SCRIPT, F.LOUNGE_LAMP_DEVICE).forEach {
             assertThat(shapes).contains(it)
         }
+
+        listOf("living_room", "\"kitchen\"", "\"garden\"", "table_shade", "recessed_ceiling").forEach { assertThat(shapes).doesNotContain(it) }
+        assertThat(HueJson.redact("""{"metadata":{"name":"Utility","archetype":"laundry_room"}}""")).isEqualTo("""{"metadata":{"name":"[name]","archetype":"[kind]"}}""")
 
         val config = HueJson.redact(F.CONFIG)
         assertThat(config).contains("\"replacesbridgeid\":\"[bridge id]\"")
