@@ -364,6 +364,7 @@ Release builds installed with `install -r` over Plan 5's (the household kept); C
 - Doorbell ring tones (the user, 2026-10-15): a list of chimes to choose from in Settings › Door, perhaps switching itself for Christmas and Halloween.
 - Sound buttons (the user, 2026-10-15): buttons that play a short sound on the wall, such as the Imperial March or a sad trombone ("wah wah wahhh").
 - Holiday mode (the user, 2026-10-14): saves power (puts the tablet to sleep) and drives other services while the family is away: Hue lights to their holiday setting, Arlo's settings, the thermostat to eco. Needs the Hue, Arlo and thermostat links first, and Sleep and wake for the tablet's part.
+- Thermostat, Nest (the user, 2026-10-19): its own spec; so far: if the last day of a holiday is in the calendar, override Nest's away mode (so the house is warm for the return). Holiday mode sets it to eco/away.
 - Reminders (the user, 2026-10-16): its own spec; no detail yet.
 - Family slideshow (the user, 2026-10-16): its own spec; no detail yet.
 - Event celebrations (the user, 2026-10-16): family birthdays and other occasions marked on the wall, with a sound or something like it. Its own spec; no detail yet.
