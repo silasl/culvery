@@ -87,7 +87,7 @@ class HueTrustTest {
         assertThat(commonName(TestCerts.testCa())).isEqualTo("root-bridge")
     }
 
-    /** Fails if the bundled file is missing, isn't Hue's self-signed roots, or loses the root-bridge CA (7 §3.2). */
+    /** Fails if the bundled file is missing, isn’t exactly Hue’s two self-signed roots, or loses one (7 §3.2). */
     @Test
     fun theBundledCaIsHuesRoot() {
         val roots = bundledRoots()
@@ -95,6 +95,7 @@ class HueTrustTest {
             root.verify(root.publicKey)
             assertThat(root.basicConstraints).isAtLeast(0)
         }
-        assertThat(roots.map { it.subjectX500Principal.name }).contains("CN=root-bridge,O=Philips Hue,C=NL")
+        assertThat(roots.map { it.subjectX500Principal.name })
+            .containsExactly("CN=root-bridge,O=Philips Hue,C=NL", "CN=Hue Root CA 01,O=Signify Hue,C=NL")
     }
 }

@@ -21,7 +21,10 @@ internal class HueTrust(roots: () -> List<X509Certificate> = ::bundledRoots) {
     // Read at the first connection, not when Hilt builds the provider.
     private val roots by lazy(roots)
 
-    /** Each client is built for one bridge, so its trust manager checks the name and the host name is not used. */
+    /**
+     * Ignores the host name, so it is safe only with [forBridge], whose trust manager checks the bridge's name, or with a
+     * caller that checks the name itself after [forAnyBridge].
+     */
     val hostnames = HostnameVerifier { _, _ -> true }
 
     fun forBridge(bridgeId: String): Pair<SSLSocketFactory, X509TrustManager> =
