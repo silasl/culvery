@@ -94,9 +94,9 @@ internal fun OpenRoomButton(room: LightRoom, onOpen: () -> Unit) {
 }
 
 @Composable
-internal fun AllOffButton(onClick: () -> Unit, modifier: Modifier = Modifier) = HhButton(
+internal fun AllOffButton(lit: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) = HhButton(
     ALL_LIGHTS_OFF, onClick, modifier.testTag("lights_card_all_off").heightIn(min = ButtonTokens.largeHeight),
-    icon = Icons.POWER_SETTINGS_NEW, on = ButtonSurface.Surf, compact = true, clickLabel = TURN_ALL_OFF,
+    tone = if (lit) ButtonTone.Primary else ButtonTone.Quiet, icon = Icons.POWER_SETTINGS_NEW, on = ButtonSurface.Surf, compact = true, clickLabel = TURN_ALL_OFF,
 )
 
 /** One button for both lines: TalkBack reads "Holiday mode, off" and offers [holidaySpoken] (7 §2.6, §5.4). */

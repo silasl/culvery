@@ -71,6 +71,7 @@ class RoomActions(
 fun LightsTab(
     rooms: List<LightRoom>,
     holidayOn: Boolean,
+    allOffLit: Boolean,
     run: HouseRun?,
     status: String?,
     houseLine: String?,
@@ -99,7 +100,7 @@ fun LightsTab(
             Column(verticalArrangement = Arrangement.spacedBy(LightsDimens.tabGap)) {
                 if (status != null) LightsStatusLine(status)
                 Row(horizontalArrangement = Arrangement.spacedBy(LightsDimens.buttonGap)) {
-                    AllOffButton(house.onAllOff)
+                    AllOffButton(allOffLit, house.onAllOff)
                     HolidayButton(holidayOn, run, house.onHoliday)
                 }
                 if (houseLine != null) Text(houseLine, style = HhType.secondary, color = c.danger, modifier = Modifier.testTag("lights_tab_line"))
@@ -168,6 +169,7 @@ internal fun LightsTabHost(view: LightsView, actions: LightsActions, house: Ligh
     FollowWhileShown(follow)
     val rooms by view.rooms.collectAsStateWithLifecycle(emptyList())
     val holidayOn by view.holidayOn.collectAsStateWithLifecycle(false)
+    val allOffLit by view.allOffLit.collectAsStateWithLifecycle(false)
     val problem by view.problem.collectAsStateWithLifecycle(null)
     val focus by view.focus.collectAsStateWithLifecycle()
     val run by house.running.collectAsStateWithLifecycle()
@@ -176,7 +178,7 @@ internal fun LightsTabHost(view: LightsView, actions: LightsActions, house: Ligh
     val houseActions = remember(actions) { HouseActions(onAllOff = actions::allOff, onHoliday = actions::toggleHoliday) }
     val roomActions = remember(actions) { RoomActions(actions::setOn, actions::dragBrightness, actions::letGoBrightness, actions::recallScene) }
     LightsTab(
-        rooms, holidayOn, run, problem?.let(::problemLine), houseLine, lines, focus,
+        rooms, holidayOn, allOffLit, run, problem?.let(::problemLine), houseLine, lines, focus,
         onFocused = { view.focus.value = null }, houseActions, roomActions,
     )
 }

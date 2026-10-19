@@ -82,7 +82,7 @@ class LightsTabTest {
     ) = compose.setContent {
         CulveryTheme(dark = true) {
             Box(Modifier.size(900.dp, height.dp)) {
-                LightsTab(rooms, holidayOn, run, status, houseLine, lines, focus, onFocused, house, roomActions)
+                LightsTab(rooms, holidayOn, false, run, status, houseLine, lines, focus, onFocused, house, roomActions)
             }
         }
     }
@@ -173,7 +173,7 @@ class LightsTabTest {
         var status by mutableStateOf<String?>(null)
         compose.setContent {
             CulveryTheme(dark = true) {
-                Box(Modifier.size(900.dp, 800.dp)) { LightsTab(listOf(lounge), false, null, status, null, emptyMap(), null, {}, house, roomActions) }
+                Box(Modifier.size(900.dp, 800.dp)) { LightsTab(listOf(lounge), false, false, null, status, null, emptyMap(), null, {}, house, roomActions) }
             }
         }
         compose.onNodeWithTag("lights_status").assertDoesNotExist()

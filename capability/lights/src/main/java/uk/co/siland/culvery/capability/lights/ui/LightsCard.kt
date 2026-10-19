@@ -41,6 +41,7 @@ import uk.co.siland.culvery.core.ui.ShellTokens
 fun LightsCard(
     main: LightRoom?,
     holidayOn: Boolean,
+    allOffLit: Boolean,
     run: HouseRun?,
     status: String?,
     line: String?,
@@ -66,7 +67,7 @@ fun LightsCard(
         }
         Spacer(Modifier.weight(1f))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(LightsDimens.buttonGap)) {
-            AllOffButton(house.onAllOff, Modifier.weight(1f))
+            AllOffButton(allOffLit, house.onAllOff, Modifier.weight(1f))
             HolidayButton(holidayOn, run, house.onHoliday)
         }
         if (line != null) {
@@ -83,6 +84,7 @@ internal fun LightsCardHost(view: LightsView, actions: LightsActions, house: Lig
     val navigator = LocalShellNavigator.current
     val main by view.main.collectAsStateWithLifecycle()
     val holidayOn by view.holidayOn.collectAsStateWithLifecycle(false)
+    val allOffLit by view.allOffLit.collectAsStateWithLifecycle(false)
     val problem by view.problem.collectAsStateWithLifecycle(null)
     val run by house.running.collectAsStateWithLifecycle()
     val roomLines by actions.lines.collectAsStateWithLifecycle()
@@ -98,5 +100,5 @@ internal fun LightsCardHost(view: LightsView, actions: LightsActions, house: Lig
         )
     }
     val houseActions = remember(actions) { HouseActions(onAllOff = actions::allOff, onHoliday = actions::toggleHoliday) }
-    LightsCard(room, holidayOn, run, problem?.let(::problemLine), room?.let { roomLines[it.id] } ?: houseLine, mainRoom, houseActions)
+    LightsCard(room, holidayOn, allOffLit, run, problem?.let(::problemLine), room?.let { roomLines[it.id] } ?: houseLine, mainRoom, houseActions)
 }

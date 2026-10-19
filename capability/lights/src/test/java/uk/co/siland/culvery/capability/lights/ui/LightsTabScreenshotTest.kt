@@ -36,7 +36,7 @@ class LightsTabScreenshotTest {
     private fun snap(name: String, dark: Boolean, rooms: List<LightRoom> = this.rooms, status: String? = null) =
         compose.snap(name, dark, Modifier.padding(16.dp)) {
             Box(Modifier.size(1100.dp, 780.dp)) {
-                LightsTab(rooms, false, null, status, null, emptyMap(), null, {}, NO_HOUSE_ACTIONS, RoomActions.None)
+                LightsTab(rooms, false, rooms.any { it.on }, null, status, null, emptyMap(), null, {}, NO_HOUSE_ACTIONS, RoomActions.None)
             }
         }
 
