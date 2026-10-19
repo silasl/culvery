@@ -45,6 +45,9 @@ internal fun lumaOf(plane: ByteBuffer, rowStride: Int, pixelStride: Int, width: 
     return Luma(DIFF_WIDTH, DIFF_HEIGHT, values)
 }
 
+/** Runs on [handler]'s thread; once that thread has stopped, inline, so a late onOpened still reaches the closed check and closes the camera. */
+internal fun handlerExecutor(handler: Handler): Executor = Executor { if (!handler.post(it)) it.run() }
+
 /** The front camera at its smallest size and slowest rate; frames arrive on a thread of its own, which runs only while it is open (8 §4.3). */
 @Singleton
 internal class Camera2Frames internal constructor(
@@ -52,7 +55,7 @@ internal class Camera2Frames internal constructor(
     private val executorOf: (Handler) -> Executor,
 ) : FrameSource {
     @Inject
-    constructor(@ApplicationContext context: Context) : this(context, { handler -> Executor { handler.post(it) } })
+    constructor(@ApplicationContext context: Context) : this(context, ::handlerExecutor)
 
     override fun open(onFrame: (read: () -> Luma) -> Unit, onFailed: (Exception) -> Unit): AutoCloseable =
         Opening(onFrame, onFailed).also { it.start() }

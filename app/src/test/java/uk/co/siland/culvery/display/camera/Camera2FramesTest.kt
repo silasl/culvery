@@ -4,6 +4,7 @@ import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
+import android.os.Handler
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -28,6 +29,10 @@ private class QueuedExecutor : Executor {
 
     fun runAll() {
         while (tasks.isNotEmpty()) tasks.removeFirst().run()
+    }
+
+    fun runAllOn(executor: Executor) {
+        while (tasks.isNotEmpty()) executor.execute(tasks.removeFirst())
     }
 }
 
@@ -133,4 +138,80 @@ class Camera2FramesTest {
         assertThat(failures).isEmpty()
         assertThat(frames).isEmpty()
     }
+
+    /** Fails if the camera thread's executor drops a callback posted after close() stopped the thread, leaving the camera on with the mark off. */
+    @Test
+    fun aCameraThatOpensAfterTheThreadStoppedIsClosed() {
+        addCamera("1", CameraCharacteristics.LENS_FACING_FRONT)
+        val late = QueuedExecutor()
+        lateinit var handler: Handler
+
+        val handle = Camera2Frames(context) { handler = it; late }.start()
+        handle.close()
+        assertThat(handler.post {}).isFalse()
+        late.runAllOn(handlerExecutor(handler))
+
+        assertThrows(IllegalStateException::class.java) { lastDevice().createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW) }
+        assertThat(failures).isEmpty()
+    }
+
+    /** Fails if onError leaves the device open, or a second report from the same camera reaches onFailed again. */
+    @Test
+    fun anErrorClosesTheCameraAndReportsOnce() {
+        val handler = openHeld()
+
+        lastCallback().onError(lastDevice(), CameraDevice.StateCallback.ERROR_CAMERA_DEVICE)
+        lastCallback().onError(lastDevice(), CameraDevice.StateCallback.ERROR_CAMERA_DEVICE)
+
+        assertThrows(IllegalStateException::class.java) { lastDevice().createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW) }
+        assertThat(failures.single()).isInstanceOf(CameraStopped::class.java)
+        assertThat(handler.post {}).isFalse()
+    }
+
+    /** Fails if a camera taken by another app is left open, or its loss reaches onFailed more than once. */
+    @Test
+    fun aDisconnectClosesTheCameraAndReportsOnce() {
+        val handler = openHeld()
+
+        lastCallback().onDisconnected(lastDevice())
+        lastCallback().onError(lastDevice(), CameraDevice.StateCallback.ERROR_CAMERA_SERVICE)
+
+        assertThrows(IllegalStateException::class.java) { lastDevice().createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW) }
+        assertThat(failures.single()).isInstanceOf(CameraStopped::class.java)
+        assertThat(handler.post {}).isFalse()
+    }
+
+    /** Fails if a SecurityException out of openCamera escapes open(), leaves the thread running, or is reported twice. */
+    @Test
+    fun aSecurityExceptionFromOpenCameraStopsAndReportsOnce() {
+        addCamera("1", CameraCharacteristics.LENS_FACING_FRONT)
+        lateinit var handler: Handler
+
+        var refused = false
+        val refusing = Executor {
+            if (!refused) {
+                refused = true
+                throw SecurityException()
+            }
+        }
+
+        val handle = Camera2Frames(context) { handler = it; refusing }.start()
+        handle.close()
+
+        assertThat(failures.single()).isInstanceOf(SecurityException::class.java)
+        assertThat(handler.post {}).isFalse()
+        assertThat(frames).isEmpty()
+    }
+
+    /** Opens the front camera with its callbacks held, so the test can call them; returns the camera thread's handler. */
+    private fun openHeld(): Handler {
+        addCamera("1", CameraCharacteristics.LENS_FACING_FRONT)
+        lateinit var handler: Handler
+        Camera2Frames(context) { handler = it; QueuedExecutor() }.start()
+        return handler
+    }
+
+    private fun lastDevice() = ReflectionHelpers.getStaticField<CameraDevice>(ShadowCameraManager::class.java, "lastDevice")
+
+    private fun lastCallback() = ReflectionHelpers.getStaticField<CameraDevice.StateCallback>(ShadowCameraManager::class.java, "lastCallback")
 }
