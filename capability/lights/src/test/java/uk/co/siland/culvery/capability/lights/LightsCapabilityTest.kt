@@ -78,18 +78,18 @@ class LightsCapabilityTest {
         assertThat(listOf(card.id, card.size, card.priority)).containsExactly("lights.home", HomeCardSize.REGULAR, 35).inOrder()
     }
 
-    /** 7 §5.1: with every card wanting to show, the forecast gives way to Lights. Fails if Lights ranks below Music or the forecast, so it is not placed. */
+    /** 9 §6.1: with every card wanting to show, Lights sits above Music and Coming up gives way. Fails if Lights ranks below Music or is not placed. */
     @Test
-    fun theCardTakesTheForecastsPlaceBesideTodayComingUpAndMusic() = runTest {
+    fun theCardSitsAboveMusicBesideToday() = runTest {
         val lights = capability()
         settings.connect("lights.hue", link())
         val card = soon { lights.cards().first { it.isNotEmpty() } }.single()
         val others = listOf(
             HomeCard("calendar.today", HomeCardSize.TALL, 100) {}, HomeCard("calendar.comingUp", HomeCardSize.WIDE, 50) {},
-            HomeCard("weather.forecast", HomeCardSize.REGULAR, 25) {}, HomeCard("music.now", HomeCardSize.REGULAR, 30) {},
+            HomeCard("music.now", HomeCardSize.REGULAR, 30) {},
         )
-        val placed = HomeCardPlacer.place(others + card).map { it.card.id }
-        assertThat(placed).containsExactly("calendar.today", "calendar.comingUp", "lights.home", "music.now")
-        assertThat(placed).doesNotContain("weather.forecast")
+        val layout = HomeCardPlacer.place(others + card)
+        assertThat(layout.left?.id).isEqualTo("calendar.today")
+        assertThat(layout.right.map { it.id }).containsExactly("lights.home", "music.now").inOrder()
     }
 }

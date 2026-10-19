@@ -34,6 +34,7 @@ import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.HomeLayout
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.SettingsPageIds
@@ -144,15 +145,17 @@ class ShellViewModelTest {
     @Test
     fun homeCardsArePlacedFromAllCapabilities() = runTest {
         val today = HomeCard("today", HomeCardSize.TALL, 100) {}
-        val forecast = HomeCard("forecast", HomeCardSize.WIDE, 10) {}
+        val music = HomeCard("music", HomeCardSize.REGULAR, 30) {}
         val vm = vm(
             setOf(
                 FakeCapability("calendar", 10, true, listOf(today)),
-                FakeCapability("weather", 90, false, listOf(forecast)),
+                FakeCapability("weather", 90, false, listOf(music)),
             ),
         )
         vm.uiState.test {
-            assertThat(expectMostRecentItem().homeCards.map { it.card.id }).containsExactly("today", "forecast")
+            val layout = expectMostRecentItem().homeCards
+            assertThat(layout.left?.id).isEqualTo("today")
+            assertThat(layout.right.map { it.id }).containsExactly("music")
         }
     }
 
@@ -400,7 +403,7 @@ class ShellViewModelTest {
         val normal = FakeCapability("calendar", order = 10, shown = true, listOf(today))
         val vm = vm(setOf(throwing, normal))
         vm.uiState.test {
-            assertThat(expectMostRecentItem().homeCards.map { it.card.id }).containsExactly("today")
+            assertThat(expectMostRecentItem().homeCards.left?.id).isEqualTo("today")
         }
     }
 
@@ -444,9 +447,9 @@ class ShellViewModelTest {
         val today = HomeCard("today", HomeCardSize.TALL, 100) {}
         val vm = vm(setOf(FlakyCardsCapability("calendar", order = 10, listOf(today))))
         vm.uiState.test {
-            assertThat(expectMostRecentItem().homeCards).isEmpty()
+            assertThat(expectMostRecentItem().homeCards).isEqualTo(HomeLayout.Empty)
             advanceTimeBy(1_001)
-            assertThat(expectMostRecentItem().homeCards.map { it.card.id }).containsExactly("today")
+            assertThat(expectMostRecentItem().homeCards.left?.id).isEqualTo("today")
         }
     }
 

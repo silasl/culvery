@@ -171,7 +171,7 @@ class ShellScreenshotTest {
         TabItem("door", "Door", Icons.DOORBELL),
     )
 
-    /** Every card wanting to show, at the capabilities' sizes and priorities: Lights (35) and Music (30) take the REGULAR cells. */
+    /** Every card wanting to show, at the capabilities' sizes and priorities: Lights (35) above Music (30) on the right. */
     private fun fullHome(dark: Boolean) = weatherHome(dark).copy(
         tabs = allTabs,
         homeCards = HomeCardPlacer.place(
@@ -182,6 +182,22 @@ class ShellScreenshotTest {
                     LightsCard(rooms[0], holidayOn = false, allOffLit = true, run = null, status = null, line = null, MainRoomActions({}, {}), noHouse)
                 },
                 HomeCard("music.card", HomeCardSize.REGULAR, 30) { MusicCard(HomePick(groups[0], nothingPlaying = false), null, null, GroupActions.None) },
+            ),
+        ),
+    )
+
+    private fun lightsHome(dark: Boolean, music: Boolean) = calendarHome(dark).copy(
+        tabs = allTabs,
+        homeCards = HomeCardPlacer.place(
+            listOfNotNull(
+                HomeCard("calendar.today", HomeCardSize.TALL, 100) { TodayCard(today) },
+                HomeCard("calendar.comingUp", HomeCardSize.WIDE, 50) { ComingUpCard(comingUp) },
+                HomeCard("lights.card", HomeCardSize.REGULAR, 35) {
+                    LightsCard(rooms[0], holidayOn = false, allOffLit = true, run = null, status = null, line = null, MainRoomActions({}, {}), noHouse)
+                },
+                HomeCard("music.card", HomeCardSize.REGULAR, 30) {
+                    MusicCard(HomePick(groups[0], nothingPlaying = false), null, null, GroupActions.None)
+                }.takeIf { music },
             ),
         ),
     )
@@ -277,8 +293,17 @@ class ShellScreenshotTest {
     @Test
     fun sheetWarningDark() = warningSnap("sheet_warning_dark", SHEET_CLOSING, "sheet_warning", CLOSING_WARNING_MS)
 
+    /** The wide card alone on the right, with neither Lights nor Music (9 §6.1). */
     @Test
-    fun homeWithCalendarDark() = snap("home_calendar_dark", dark = true, state = calendarHome(dark = true))
+    fun homeComingUpDark() = snap("home_coming_up_dark", dark = true, state = calendarHome(dark = true))
+
+    /** One REGULAR card takes the whole right column (9 §6.1). */
+    @Test
+    fun homeLightsOnlyDark() = snap("home_lights_only_dark", dark = true, state = lightsHome(dark = true, music = false))
+
+    /** Lights above Music, Coming up gone (9 §6.1). */
+    @Test
+    fun homeLightsMusicDark() = snap("home_lights_music_dark", dark = true, state = lightsHome(dark = true, music = true))
 
     @Test
     fun homeWithCalendarLight() = snap("home_calendar_light", dark = false, state = calendarHome(dark = false))

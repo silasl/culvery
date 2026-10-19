@@ -4,6 +4,7 @@ import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.FontListFontFamily
 import androidx.compose.ui.text.font.ResourceFont
 import org.junit.Assert.assertEquals
+import androidx.compose.ui.unit.sp
 import org.junit.Test
 
 class TypeTest {
@@ -17,5 +18,13 @@ class TypeTest {
             assertEquals("wght for ${font.weight}", listOf(font.weight.weight.toFloat()), wght)
         }
         assertEquals(listOf(400, 500, 600, 700), fonts.map { it.weight.weight })
+    }
+
+    @Test
+    fun theHomeClockIs100spTightAndTheDate23() {
+        assertEquals(100.sp, HhType.clock.fontSize)
+        assertEquals((-3.3).sp, HhType.clock.letterSpacing)
+        assertEquals(86.sp, HhType.clock.lineHeight)
+        assertEquals(23.sp, HhType.date.fontSize)
     }
 }

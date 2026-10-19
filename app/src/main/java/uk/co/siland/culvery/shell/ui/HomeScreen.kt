@@ -13,8 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.FirstBaseline
-import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
@@ -26,7 +24,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import uk.co.siland.culvery.core.plugin.HeaderItem
-import uk.co.siland.culvery.core.plugin.HomePlacement
+import uk.co.siland.culvery.core.plugin.HomeLayout
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.lineBox
@@ -35,9 +33,6 @@ import uk.co.siland.culvery.core.ui.readAsOne
 private val CLOCK = DateTimeFormatter.ofPattern("HH:mm")
 private val DATE = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.UK)
 
-// Hand-off CSS: clock line-height 0.9 (9 px below its baseline at 88 sp) + 12 px margin + the date's 21 px ascent.
-private val CLOCK_TO_DATE_BASELINES = 42.dp
-
 // Hand-off §1: header items 28 apart, a 1 × 48 `line` divider between two, their row 4 above the date's bottom.
 private val HEADER_ITEM_GAP = 28.dp
 private val HEADER_DIVIDER_WIDTH = 1.dp
@@ -45,15 +40,15 @@ private val HEADER_DIVIDER_HEIGHT = 48.dp
 private val HEADER_ITEMS_BOTTOM = 4.dp
 
 @Composable
-fun HomeScreen(now: () -> LocalDateTime, placements: List<HomePlacement>, headerItems: List<HeaderItem>) {
+fun HomeScreen(now: () -> LocalDateTime, layout: HomeLayout, headerItems: List<HeaderItem>) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxSize()) {
         HomeHeader(now, headerItems, Modifier.fillMaxWidth())
-        HomeGrid(placements, Modifier.fillMaxWidth().weight(1f))
+        HomeGrid(layout, Modifier.fillMaxWidth().weight(1f))
     }
 }
 
 /**
- * Clock and date, the date's baseline [CLOCK_TO_DATE_BASELINES] below the clock's, as the hand-off's CSS places it; the
+ * Clock and date, the date [ShellDimens.clockToDate] below the clock's line box (9 §4.2); the
  * capabilities' items at the right, in the width the clock and date leave less [HEADER_ITEM_GAP], their bottom
  * [HEADER_ITEMS_BOTTOM] above the date's (4b design §4.1, 4d-1 §6.2).
  */
@@ -77,7 +72,7 @@ fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modi
         val date = measurables[1].measure(loose)
         val budget = constraints.maxWidth - maxOf(clock.width, date.width) - HEADER_ITEM_GAP.roundToPx()
         val right = measurables[2].measure(loose.copy(maxWidth = budget.coerceAtLeast(0)))
-        val dateY = clock[LastBaseline] + CLOCK_TO_DATE_BASELINES.roundToPx() - date[FirstBaseline]
+        val dateY = clock.height + ShellDimens.clockToDate.roundToPx()
         val dateBottom = dateY + date.height
         val width = constraints.constrainWidth(maxOf(clock.width, date.width))
         val height = constraints.constrainHeight(maxOf(dateBottom, right.height))

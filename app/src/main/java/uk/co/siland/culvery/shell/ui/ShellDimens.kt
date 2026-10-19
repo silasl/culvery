@@ -57,6 +57,10 @@ internal object ShellDimens {
     val divider = 19.dp
     val dividerWidth = 1.dp
 
+    val gridGap = 15.dp
+    val leftColumn = 400.dp
+    val clockToDate = 15.dp
+
     val themeIcon = 20.dp
     val themeGap = 6.dp
 }

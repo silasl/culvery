@@ -31,7 +31,7 @@ import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
-import uk.co.siland.culvery.core.plugin.HomePlacement
+import uk.co.siland.culvery.core.plugin.HomeLayout
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.Toaster
@@ -108,11 +108,11 @@ class ShellViewModel @Inject constructor(
             }
         }
 
-    private class PlacedCards(val placements: List<HomePlacement>, val loaded: Boolean)
+    private class PlacedCards(val layout: HomeLayout, val loaded: Boolean)
 
     private val placements: Flow<PlacedCards> =
         if (ordered.isEmpty()) {
-            flowOf(PlacedCards(emptyList(), loaded = true))
+            flowOf(PlacedCards(HomeLayout.Empty, loaded = true))
         } else {
             combine(
                 ordered.map { cap ->
@@ -145,7 +145,7 @@ class ShellViewModel @Inject constructor(
                     tabs = tabs,
                     selectedTabId = if (sel == HOME_TAB_ID || tabs.any { it.id == sel }) sel else HOME_TAB_ID,
                     session = session?.let { SessionUi(it.person.name, roleLabel(it.role)) },
-                    homeCards = cards.placements,
+                    homeCards = cards.layout,
                     cardsLoaded = cards.loaded,
                     settingsOpen = settings != null && session != null,
                     settingsPage = settings?.page,

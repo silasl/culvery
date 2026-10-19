@@ -1,7 +1,7 @@
 package uk.co.siland.culvery.shell
 
 import uk.co.siland.culvery.core.plugin.HeaderItem
-import uk.co.siland.culvery.core.plugin.HomePlacement
+import uk.co.siland.culvery.core.plugin.HomeLayout
 import uk.co.siland.culvery.core.plugin.RailBadge
 
 const val HOME_TAB_ID = "home"
@@ -17,7 +17,7 @@ data class ShellUiState(
     val session: SessionUi? = null,
     val dark: Boolean = true,
     val previewing: Boolean = false,
-    val homeCards: List<HomePlacement> = emptyList(),
+    val homeCards: HomeLayout = HomeLayout.Empty,
     /** Home's header items, by order (4b design §3.8). */
     val headerItems: List<HeaderItem> = emptyList(),
     /** Every capability's Home cards have answered once: the splash can go (4c §4.1). */

@@ -10,8 +10,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.layout.FirstBaseline
-import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -22,7 +20,6 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
-import androidx.compose.ui.test.getAlignmentLinePosition
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -54,6 +51,7 @@ import uk.co.siland.culvery.capability.weather.DailyWeather
 import uk.co.siland.culvery.capability.weather.HeaderWeather
 import uk.co.siland.culvery.capability.weather.ui.WeatherHeaderItem
 import uk.co.siland.culvery.core.plugin.HeaderItem
+import uk.co.siland.culvery.core.plugin.HomeLayout
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
@@ -76,32 +74,30 @@ class ShellLayoutTest {
     @get:Rule val compose = createComposeRule()
     private val at = LocalDateTime.of(2026, 9, 23, 11, 54)
 
+    /** 9 §4.2: the date's box starts 15 dp under the clock's line box. */
     @Test
-    fun dateBaselineSits42dpBelowClockBaseline() {
+    fun theDateSits15dpBelowTheClock() {
         compose.setContent {
-            CulveryTheme(dark = true) { HomeScreen({ at }, emptyList(), emptyList()) }
+            CulveryTheme(dark = true) { HomeScreen({ at }, HomeLayout.Empty, emptyList()) }
         }
-        val clock = compose.onNodeWithTag("home_clock")
-        val date = compose.onNodeWithTag("home_date")
-        val clockBaseline = clock.getUnclippedBoundsInRoot().top + clock.getAlignmentLinePosition(LastBaseline)
-        val dateBaseline = date.getUnclippedBoundsInRoot().top + date.getAlignmentLinePosition(FirstBaseline)
-        assertThat((dateBaseline - clockBaseline).value).isWithin(1f).of(42f)
+        val clock = compose.onNodeWithTag("home_clock").getUnclippedBoundsInRoot()
+        val date = compose.onNodeWithTag("home_date").getUnclippedBoundsInRoot()
+        assertThat((date.top - clock.bottom).value).isWithin(1f).of(15f)
     }
 
-    /** Hand-off: the clock's line box is 0.9 × its size, 88 sp since 5 §A.2. The text alone is taller; `lineBox` makes the box the line height. */
+    /** The clock's line box is 86 sp (100 sp type); the text alone is taller, so `lineBox` makes the box the line height. */
     @Test
     fun theClockBoxIsItsLineHeight() {
-        compose.setContent { CulveryTheme(dark = true) { HomeScreen({ at }, emptyList(), emptyList()) } }
+        compose.setContent { CulveryTheme(dark = true) { HomeScreen({ at }, HomeLayout.Empty, emptyList()) } }
         val clock = compose.onNodeWithTag("home_clock").getUnclippedBoundsInRoot()
-        assertThat(clock.height.value).isWithin(1f).of(79f)
+        assertThat(clock.height.value).isWithin(1f).of(86f)
     }
 
-    /** 5 §A.2: the clock went from 104 to 88 sp; the date is unchanged. */
     @Test
-    fun theClockIs88spAndTheDate21() {
-        compose.setContent { CulveryTheme(dark = true) { HomeScreen({ at }, emptyList(), emptyList()) } }
-        assertThat(compose.onNodeWithTag("home_clock").textLayout().layoutInput.style.fontSize).isEqualTo(88.sp)
-        assertThat(compose.onNodeWithTag("home_date").textLayout().layoutInput.style.fontSize).isEqualTo(21.sp)
+    fun theClockIs100spAndTheDate23() {
+        compose.setContent { CulveryTheme(dark = true) { HomeScreen({ at }, HomeLayout.Empty, emptyList()) } }
+        assertThat(compose.onNodeWithTag("home_clock").textLayout().layoutInput.style.fontSize).isEqualTo(100.sp)
+        assertThat(compose.onNodeWithTag("home_date").textLayout().layoutInput.style.fontSize).isEqualTo(23.sp)
     }
 
     /** The weather, then a wide item after it (a future Climate): together they'd run onto the date without a budget. */
@@ -116,7 +112,7 @@ class ShellLayoutTest {
             WeatherHeaderItem(HeaderWeather.Now(Condition.PARTLY_CLOUDY, night = false, temperature = 17.0, high = 19.0, low = 11.0, days = threeDays))
         }
         val wide = HeaderItem("climate", 20) { Box(Modifier.size(800.dp, 60.dp)) }
-        compose.setContent { CulveryTheme(dark = true) { WithFontScale(1.3f) { HomeScreen({ at }, emptyList(), listOf(weather, wide)) } } }
+        compose.setContent { CulveryTheme(dark = true) { WithFontScale(1.3f) { HomeScreen({ at }, HomeLayout.Empty, listOf(weather, wide)) } } }
         val clock = compose.onNodeWithTag("home_clock").getUnclippedBoundsInRoot()
         val date = compose.onNodeWithTag("home_date").getUnclippedBoundsInRoot()
         val items = compose.onNodeWithTag("home_header_items").getUnclippedBoundsInRoot()
@@ -380,7 +376,7 @@ class ShellLayoutTest {
     private fun item(id: String, order: Int) = HeaderItem(id, order) { Box(Modifier.size(200.dp, 60.dp)) }
 
     private fun home(vararg items: HeaderItem) = compose.setContent {
-        CulveryTheme(dark = true) { HomeScreen({ at }, emptyList(), items.toList()) }
+        CulveryTheme(dark = true) { HomeScreen({ at }, HomeLayout.Empty, items.toList()) }
     }
 
     @Test

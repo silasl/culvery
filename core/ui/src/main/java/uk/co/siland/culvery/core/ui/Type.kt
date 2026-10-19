@@ -35,13 +35,12 @@ private fun style(size: Int, weight: FontWeight, tabular: Boolean = false) = Tex
 )
 
 object HhType {
-    // 88 sp since 5 §A.2; the hand-off's −4 tracking and 0.9 line height at 104 sp, scaled.
-    val clock = style(88, FontWeight.W600, tabular = true).copy(
-        letterSpacing = (-3.4).sp,
-        lineHeight = 79.2.sp,
+    val clock = style(100, FontWeight.W600, tabular = true).copy(
+        letterSpacing = (-3.3).sp,
+        lineHeight = 86.sp,
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
     )
-    val date = style(21, FontWeight.W400)
+    val date = style(23, FontWeight.W400)
     val screenTitle = style(34, FontWeight.W700)
     val headerValue = style(34, FontWeight.W600, tabular = true)
     val dateNumber = style(24, FontWeight.W700)
