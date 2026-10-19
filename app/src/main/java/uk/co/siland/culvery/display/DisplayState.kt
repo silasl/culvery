@@ -113,6 +113,10 @@ class DisplayState internal constructor(
     val screen: StateFlow<Screen> = state.map { it.screen }.distinctUntilChanged()
         .stateIn(scope, SharingStarted.Eagerly, state.value.screen)
 
+    /** Whether it is night as the state machine last saw it; null while not known yet. */
+    val night: StateFlow<Boolean?> = state.map { it.night }.distinctUntilChanged()
+        .stateIn(scope, SharingStarted.Eagerly, state.value.night)
+
     val cameraWanted: StateFlow<Boolean> = combine(state, camera) { display, access -> display.wantsCamera(access) }
         .stateIn(scope, SharingStarted.Eagerly, state.value.wantsCamera(camera.value))
 

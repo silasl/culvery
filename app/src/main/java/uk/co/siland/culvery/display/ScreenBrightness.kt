@@ -64,7 +64,7 @@ private class Step(val inputs: Inputs, val fades: Boolean)
 @Singleton
 class ScreenBrightness internal constructor(
     screen: StateFlow<Screen>,
-    night: () -> Boolean?,
+    night: Flow<Boolean?>,
     inFront: StateFlow<Boolean>,
     now: Flow<LocalDateTime?>,
     sun: Flow<SunTimes?>,
@@ -79,15 +79,16 @@ class ScreenBrightness internal constructor(
         sunToday: SunToday,
         settings: DisplaySettings,
         @ApplicationScope scope: CoroutineScope,
-    ) : this(display.screen, display::isNight, alerts.inFront, clock.now, sunToday.times, settings.current, scope)
+    ) : this(display.screen, display.night, alerts.inFront, clock.now, sunToday.times, settings.current, scope)
 
     private val _level = MutableStateFlow(ANDROIDS)
     val level: StateFlow<Float> = _level.asStateFlow()
 
     init {
-        val inputs = combine(screen, inFront, now, sun, prefs) { s, front, time, sunTimes, p ->
+        val evening = combine(now, sun) { time, sunTimes -> time != null && isEvening(time.toLocalTime(), sunTimes) }
+        val inputs = combine(screen, inFront, night, evening, prefs) { s, front, n, e, p ->
             // Not known yet counts as night, so a restart in the night doesn't dazzle.
-            Inputs(s, front, night() ?: true, time != null && isEvening(time.toLocalTime(), sunTimes), p)
+            Inputs(s, front, n ?: true, e, p)
         }
         scope.launch {
             var last: Inputs? = null

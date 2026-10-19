@@ -27,12 +27,12 @@ private const val EVENING = 0.25f
 /** A brightness over inputs the test sets, on the test's scheduler. */
 private class Room(private val test: TestScope, at: LocalDateTime?, night: Boolean?) {
     val screen = MutableStateFlow(AWAKE)
-    var night: Boolean? = night
+    val night = MutableStateFlow(night)
     val inFront = MutableStateFlow(true)
     val now = MutableStateFlow(at)
     val sun = MutableStateFlow<SunTimes?>(SUN)
     val prefs = MutableStateFlow(DisplayPrefs())
-    val brightness = ScreenBrightness(screen, { this.night }, inFront, now, sun, prefs, test.backgroundScope)
+    val brightness = ScreenBrightness(screen, this.night, inFront, now, sun, prefs, test.backgroundScope)
 
     val level: Float get() = brightness.level.value
 
@@ -110,6 +110,16 @@ class ScreenBrightnessTest {
 
         val noon = room(night = null)
         assertThat(noon.level).isEqualTo(EVENING)
+    }
+
+    /** Fails if night becoming known as day after a daytime restart waits for another input before the daytime level. */
+    @Test
+    fun nightBecomingKnownChangesTheLevelAtOnce() = runTest {
+        val room = room(night = null)
+        assertThat(room.level).isEqualTo(EVENING)
+
+        room.set(room.night, false)
+        assertThat(room.level).isEqualTo(DAYTIME)
     }
 
     /** Fails if the switch at sunset jumps, steps other than every 2 s, or ends a millisecond early or late. */
