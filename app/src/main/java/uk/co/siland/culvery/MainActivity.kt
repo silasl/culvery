@@ -1,5 +1,6 @@
 package uk.co.siland.culvery
 
+import android.Manifest
 import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -58,6 +60,14 @@ import uk.co.siland.culvery.core.setup.SetupState
 import uk.co.siland.culvery.core.setup.SetupWizard
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.display.CameraAccess
+import uk.co.siland.culvery.display.CameraPrompt
+import uk.co.siland.culvery.display.DisplayState
+import uk.co.siland.culvery.display.Screen
+import uk.co.siland.culvery.display.ScreenBrightness
+import uk.co.siland.culvery.display.applyBrightness
+import uk.co.siland.culvery.display.camera.Presence
+import uk.co.siland.culvery.display.ui.SleepLayer
 import uk.co.siland.culvery.shell.HomeAppRequest
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ShellAlerts
@@ -82,6 +92,10 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var gate: SetupSessionGate
     @Inject lateinit var firstDraw: FirstDraw
     @Inject lateinit var homeApp: AndroidHomeApp
+    @Inject lateinit var display: DisplayState
+    @Inject lateinit var brightness: ScreenBrightness
+    @Inject lateinit var camera: CameraAccess
+    @Inject internal lateinit var presence: Presence
     // Only read when the wizard or Settings shows.
     @Inject lateinit var coreSteps: Provider<Set<@JvmSuppressWildcards SetupStep>>
     @Inject lateinit var corePages: Provider<Set<@JvmSuppressWildcards SettingsPage>>
@@ -115,6 +129,12 @@ class MainActivity : ComponentActivity() {
             changingConfigurations = { isChangingConfigurations },
             say = toasts::show,
         )
+    }
+
+    private val prompt by lazy { CameraPrompt(camera, kiosk::openSystemScreen, kiosk::returnToPinning) }
+
+    private val askCamera = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        lifecycleScope.launch { prompt.answered(granted, shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) }
     }
 
     // Android's yes/no "make Culvery the home app?" dialog (4c §5.1). After a yes Android itself starts the home task's
@@ -156,6 +176,8 @@ class MainActivity : ComponentActivity() {
                 launch { shell.kioskExit.collect { kiosk.exitKiosk() } }
                 launch { shell.homeAppRequests.collect(::openHomeAppScreen) }
                 launch { shell.systemScreenRequests.collect { r -> kiosk.openSystemScreen(r.missing) { startFirst(r.intents) { startActivity(it) } } } }
+                launch { brightness.level.collect { applyBrightness(window, it) } }
+                launch { camera.requests.collect { prompt.request { askCamera.launch(Manifest.permission.CAMERA) } } }
             }
         }
         lifecycleScope.launch {
@@ -175,7 +197,11 @@ class MainActivity : ComponentActivity() {
             val complete by setupComplete.collectAsStateWithLifecycle()
             val pinRequest by pinPrompt.request.collectAsStateWithLifecycle()
             val sessionEnds by access.expiresAt.collectAsStateWithLifecycle()
+            val screen by display.screen.collectAsStateWithLifecycle()
+            val running by presence.running.collectAsStateWithLifecycle()
             val overlay = remember { OverlayState() }
+            val held = holding(pinRequest != null, overlay.isShowing, alert != null, state.settingsOpen, complete)
+            LaunchedEffect(held) { display.held(held) }
             CompositionLocalProvider(
                 LocalShellNavigator provides navigator,
                 LocalOverlayHost provides overlay,
@@ -200,6 +226,9 @@ class MainActivity : ComponentActivity() {
                             nowMillis = wallClock::nowMillis,
                             overlaysCloseWhenIdle = !counting,
                             alert = alert,
+                            sleeping = screen != Screen.AWAKE,
+                            sleep = { SleepLayer(screen, { now.value }, display::tapped) },
+                            cameraMark = running,
                         ) {
                             AppContent(
                                 complete = complete,
@@ -230,6 +259,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         homeApp.refresh()
+        camera.refresh(shouldShowRequestPermissionRationale(Manifest.permission.CAMERA))
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
