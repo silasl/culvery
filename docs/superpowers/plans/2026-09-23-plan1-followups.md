@@ -355,6 +355,13 @@ On `culvery-5` (debug build) against the household's Hue Bridge by its typed add
 - Captures: taken (names check clean after the kinds were blanked); the fixtures move to them in the tablet step.
 - For the end-of-v1 design walk-through: with Holiday mode on and a room on, both card buttons are accent and look alike; the card's empty middle; Settings › Lights spacing and colour-only selection; the pairing sheet's wrapped title.
 
+## Plan 7 (Hue): on the tablet (2026-10-19)
+
+The release from a40fbd6 installed with `install -r` over Plan 6's (the household kept); Culvery pinned again once in front.
+- Passed: paired by the typed address across the two home networks (the bridge on the router's, the tablet on the mesh's); the main room, rooms left out and Mimic presence chosen in Settings › Lights; Home's card (toggle, ›, All lights off, Holiday mode both ways with a fresh PIN, Mimic presence started and stopped); a wall change shown within about a second; nothing from Lights in the tablet's log.
+- Find Hue Bridge on the tablet: "No Hue Bridge answered." The mDNS search doesn't cross from the mesh's network to the router's, as expected; the typed address is the way in for this household. If the bridge moves to the mesh's network (or the mesh runs in access-point mode), try the search again.
+- Fixtures: reshaped on the household bridge's answers (a40fbd6); no parser change was needed. The capture held no bridge or config answers, so those keep their documented shape.
+
 ## From Plan 7
 
 - `Bridges`, `LightsFollow` and `LightsConnect` mirror Music's `Speakers`, `MusicChecks` and `MusicConnect`: a generic later.
