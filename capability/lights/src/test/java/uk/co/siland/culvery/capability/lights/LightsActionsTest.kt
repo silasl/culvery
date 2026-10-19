@@ -243,7 +243,7 @@ class LightsActionsTest {
         val actions = actions(TestAccess(Role.ADMIN))
         actions.toggleHoliday()
         assertThat(soon { actions.houseLine.first { it != null } }).isEqualTo(
-            "2 rooms didn’t turn off. Try again. Lights are off, but Culvery couldn’t start Mimic presence. Start it in the Hue app.",
+            "2 rooms didn’t turn off. Try again. Culvery couldn’t start Mimic presence. Start it in the Hue app.",
         )
     }
 }

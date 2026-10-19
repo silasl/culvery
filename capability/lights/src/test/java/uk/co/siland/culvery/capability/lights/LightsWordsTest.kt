@@ -65,6 +65,13 @@ class LightsWordsTest {
             .isEqualTo("Lights are off, but Culvery couldn’t start Mimic presence and an automation. Start it in the Hue app.")
     }
 
+    /** Fails if the line after rooms that didn't turn off still says the lights are off. */
+    @Test
+    fun roomsLeftOnAndNotStartedDontSayTheLightsAreOff() {
+        assertThat(houseLine(HolidayResult.Partly(2, listOf("mimic-id"))) { "Mimic presence" })
+            .isEqualTo("2 rooms didn’t turn off. Try again. Culvery couldn’t start Mimic presence. Start it in the Hue app.")
+    }
+
     /** Fails if a room that can't dim shows a percentage, or an off room shows its brightness. */
     @Test
     fun aRoomsStateAndHowItIsSpoken() {

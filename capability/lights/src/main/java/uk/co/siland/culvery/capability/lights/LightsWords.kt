@@ -68,11 +68,15 @@ internal fun problemLine(problem: LightsProblem): String = when (problem) {
 
 internal fun roomsLeftOnLine(count: Int): String = if (count == 1) "1 room didn’t turn off. Try again." else "$count rooms didn’t turn off. Try again."
 
-/** [names] by the last list read from the bridge; a null is one whose name isn't known (7 §4.5). */
-internal fun notStartedLine(names: List<String?>): String {
+/**
+ * [names] by the last list read from the bridge; a null is one whose name isn't known (7 §4.5). After rooms that didn't
+ * turn off, [lightsOff] is false and the line doesn't say the lights are off.
+ */
+internal fun notStartedLine(names: List<String?>, lightsOff: Boolean = true): String {
     val said = names.map { it ?: AN_AUTOMATION }.distinct()
     val joined = if (said.size == 1) said[0] else said.dropLast(1).joinToString(", ") + " and " + said.last()
-    return "Lights are off, but Culvery couldn’t start $joined. Start it in the Hue app."
+    val couldnt = "Culvery couldn’t start $joined. Start it in the Hue app."
+    return if (lightsOff) "Lights are off, but $couldnt" else couldnt
 }
 
 /** Can't reach has no line of its own: the status line says it, and clears once the bridge is back. */
@@ -88,7 +92,7 @@ internal fun houseLine(result: HolidayResult, nameOf: (String) -> String?): Stri
     HolidayResult.Refused -> HUE_REFUSED
     is HolidayResult.Partly -> listOfNotNull(
         result.roomsLeftOn.takeIf { it > 0 }?.let(::roomsLeftOnLine),
-        result.notStarted.takeIf { it.isNotEmpty() }?.let { ids -> notStartedLine(ids.map(nameOf)) },
+        result.notStarted.takeIf { it.isNotEmpty() }?.let { ids -> notStartedLine(ids.map(nameOf), lightsOff = result.roomsLeftOn == 0) },
     ).joinToString(" ").ifEmpty { null }
 }
 
