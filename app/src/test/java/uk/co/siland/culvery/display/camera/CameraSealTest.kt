@@ -19,7 +19,7 @@ class CameraSealTest {
     @Test
     fun thePresenceCodeHasNoFileNetworkOrImagePath() {
         val files = cameraFiles() + File(main, "display/DisplayState.kt")
-        assertThat(files.map { it.name }).containsAtLeast("FrameDiff.kt", "Presence.kt", "DisplayState.kt")
+        assertThat(files.map { it.name }).containsAtLeast("FrameDiff.kt", "Presence.kt", "Camera2Frames.kt", "DisplayState.kt")
         val found = files.flatMap { file ->
             val text = file.readText()
             BANNED.filter { it in text }.map { "${file.name}: $it" } +
