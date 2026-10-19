@@ -114,7 +114,7 @@ internal fun PickerLayer(onDismiss: () -> Unit, content: @Composable () -> Unit)
             Modifier
                 .fillMaxSize()
                 .testTag("picker_scrim")
-                .background(ShellTokens.pinScrim)
+                .background(ShellTokens.cardScrim)
                 // A gesture, not a clickable: TalkBack never lands on the scrim; the card has Cancel.
                 .pointerInput(Unit) { detectTapGestures { dismiss() } },
         )

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +27,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 
+object CardTokens {
+    /** The light theme's hairline edge, drawn in `border` (9 §4.1). */
+    val edge = 1.dp
+}
+
 @Composable
 fun HhCard(
     modifier: Modifier = Modifier,
@@ -34,10 +40,12 @@ fun HhCard(
     padding: PaddingValues = PaddingValues(22.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val shape = RoundedCornerShape(radius)
     Column(
         modifier = modifier
             .readAsOne()
-            .clip(RoundedCornerShape(radius))
+            .clip(shape)
+            .border(CardTokens.edge, Culvery.colors.border, shape)
             .background(color)
             .padding(padding),
         content = content,

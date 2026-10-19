@@ -90,6 +90,13 @@ class ContrastTest {
     }
 
     @Test
+    fun rainIconsReadOnTheirSurfaces() {
+        themes.forEach { (name, t) ->
+            listOf("bg" to t.bg, "surf" to t.surf).forEach { (surface, bg) -> check("$name rain on $surface", t.rain, bg, NON_TEXT) }
+        }
+    }
+
+    @Test
     fun aChipFilledWithAPersonsColourReadsOnEveryColour() {
         (PersonPalette.colors + FAMILY_VIOLET).forEach { colour ->
             check("chip ink on ${colour.toString(16)}", PersonChipInk, Color(colour), TEXT)

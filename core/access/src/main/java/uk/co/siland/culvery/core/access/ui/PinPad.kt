@@ -264,7 +264,7 @@ fun PinPadFrame(
                 .align(if (overSheet) Alignment.CenterEnd else Alignment.Center)
                 .then(if (overSheet) Modifier.fillMaxHeight().width(ShellTokens.sheetWidth) else Modifier.fillMaxSize())
                 .testTag("pin_area")
-                .then(if (drawScrim) Modifier.background(ShellTokens.pinScrim) else Modifier),
+                .then(if (drawScrim) Modifier.background(ShellTokens.cardScrim) else Modifier),
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

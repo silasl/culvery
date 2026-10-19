@@ -41,8 +41,8 @@ object ShellTokens {
     /** rgba(0,0,0,.55) behind sheets. The same in both themes, so not an HhColors token. */
     val sheetScrim = Color(0x8C000000)
 
-    /** rgba(0,0,0,.5) behind the PIN pad. The same in both themes. */
-    val pinScrim = Color(0x80000000)
+    /** rgba(0,0,0,.64) behind the door card and the PIN pad (9 §4.3, §4.9). The same in both themes. */
+    val cardScrim = Color(0xA3000000)
 
     // Right-side sheet: 600 dp, full height, bg, 1 dp left border `line`, 16 dp between blocks, 48 dp close button.
     val sheetWidth = 600.dp
@@ -60,8 +60,8 @@ object ShellTokens {
     val toastIconGap = 10.dp
     val toastMaxWidth = 720.dp
 
-    /** Home's cards (hand-off: Today's `border-radius: 26px`): the calendar's and the weather's. */
-    val homeCardRadius = 26.dp
+    /** Home's cards (9 §4.2). */
+    val homeCardRadius = 24.dp
 
     // Status-bar sign-in: account_circle 16 dp, 6 dp between items, 16 dp before the theme indicator.
     val statusIcon = 16.dp

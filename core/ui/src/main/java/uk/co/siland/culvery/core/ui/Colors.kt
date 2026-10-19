@@ -4,7 +4,10 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 
-/** The theme's colours. [weather] draws the weather icons: amber at night, a darker gold that reads on the day theme's surfaces. */
+/**
+ * The theme's colours. [weather] draws the weather icons: amber at night, a darker gold that reads on the day theme's surfaces.
+ * [rain] draws the rain icons; [border] is the cards' hairline edge, light only (9 §4.1).
+ */
 @Immutable
 data class HhColors(
     val bg: Color,
@@ -21,6 +24,8 @@ data class HhColors(
     val dangerSoft: Color,
     val dangerInk: Color,
     val weather: Color,
+    val rain: Color,
+    val border: Color,
 )
 
 val DarkColors = HhColors(
@@ -38,6 +43,8 @@ val DarkColors = HhColors(
     dangerSoft = Color(0xFF3A211D),
     dangerInk = Color(0xFF1A0906),
     weather = Color(0xFFE0B85B),
+    rain = Color(0xFF7FB2E5),
+    border = Color.Transparent,
 )
 
 val LightColors = HhColors(
@@ -55,6 +62,8 @@ val LightColors = HhColors(
     dangerSoft = Color(0xFFF7DFDA),
     dangerInk = Color(0xFFFFFFFF),
     weather = Color(0xFF8A6400),
+    rain = Color(0xFF2F6FAE),
+    border = Color(0xFFD5DCD8),
 )
 
 /** True for the day theme; while the theme fades, from whichever side `bg` has reached. */

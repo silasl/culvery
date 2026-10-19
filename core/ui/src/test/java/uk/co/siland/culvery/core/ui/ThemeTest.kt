@@ -38,6 +38,18 @@ class ThemeTest {
     }
 
     @Test
+    fun theCardEdgeIsLightOnly() {
+        assertThat(DarkColors.border).isEqualTo(Color.Transparent)
+        assertThat(LightColors.border).isEqualTo(Color(0xFFD5DCD8))
+    }
+
+    @Test
+    fun rainIsBlueInBothThemes() {
+        assertThat(DarkColors.rain).isEqualTo(Color(0xFF7FB2E5))
+        assertThat(LightColors.rain).isEqualTo(Color(0xFF2F6FAE))
+    }
+
+    @Test
     fun lightThemeProvidesLightTokens() {
         var seen: HhColors? = null
         compose.setContent { CulveryTheme(dark = false) { seen = Culvery.colors } }
