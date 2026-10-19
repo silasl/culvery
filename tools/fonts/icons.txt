@@ -3,9 +3,12 @@
 account_circle
 add
 arrow_downward
+arrow_forward
 arrow_upward
 backspace
 bedtime
+brightness_high
+brightness_low
 calendar_add_on
 calendar_month
 check
@@ -34,6 +37,7 @@ info
 light_mode
 lightbulb
 lock
+lock_clock
 luggage
 mobile
 music_note
@@ -59,4 +63,6 @@ star
 sunny
 sync_problem
 thunderstorm
+volume_down
+volume_up
 weather_snowy
