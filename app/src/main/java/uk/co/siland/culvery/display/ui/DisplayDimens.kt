@@ -10,8 +10,12 @@ object NightClockTokens {
     val ink = Color(0xFF5A5A5A)
 }
 
-/** The camera mark's size and its distance from the top edge, where it sits centred (8 §4.3). */
+/** The camera mark's size and its distance from the top edge, where it sits centred (8 §4.3), and Settings › Display's spacing. */
 object DisplayDimens {
     val markSize = 20.dp
     val markTop = 12.dp
+    val settingsGap = 16.dp
+    val chipGap = 8.dp
+    val sliderNameWidth = 200.dp
+    val sliderValueWidth = 56.dp
 }
