@@ -62,11 +62,12 @@ class LightsCardTest {
     private fun show(
         main: LightRoom? = lounge,
         holidayOn: Boolean = false,
+        allOffLit: Boolean = true,
         run: HouseRun? = null,
         status: String? = null,
         line: String? = null,
     ) = compose.setContent {
-        CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { LightsCard(main, holidayOn, false, run, status, line, mainRoom, house) } }
+        CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { LightsCard(main, holidayOn, allOffLit, run, status, line, mainRoom, house) } }
     }
 
     private fun clickLabelIs(label: String) = SemanticsMatcher("click label is $label") {
@@ -128,7 +129,7 @@ class LightsCardTest {
     @Test
     fun whileItRunsTheButtonSaysTurningOn() {
         var run by mutableStateOf<HouseRun?>(HouseRun.TURNING_ON)
-        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { LightsCard(lounge, false, false, run, null, null, mainRoom, house) } } }
+        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { LightsCard(lounge, false, true, run, null, null, mainRoom, house) } } }
         compose.onNodeWithText("Turning on…", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("lights_card_holiday").assertContentDescriptionEquals("Holiday mode, turning on")
         compose.assertAccessible()

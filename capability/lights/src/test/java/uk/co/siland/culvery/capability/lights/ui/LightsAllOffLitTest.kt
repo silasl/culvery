@@ -11,7 +11,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -66,7 +69,7 @@ class LightsAllOffLitTest {
         assertThat(fillOf(lit = true, onTab = false)).isEqualTo(DarkColors.accent.toArgb())
     }
 
-    /** Fails if the card's button stays lit with nothing to turn off. */
+    /** Fails if the card's button isn't the shared disabled fill with nothing to turn off. */
     @Test
     fun theCardButtonIsQuietWhenNotLit() {
         assertThat(fillOf(lit = false, onTab = false)).isEqualTo(quietFill(ButtonSurface.Surf, DarkColors).toArgb())
@@ -78,9 +81,46 @@ class LightsAllOffLitTest {
         assertThat(fillOf(lit = true, onTab = true)).isEqualTo(DarkColors.accent.toArgb())
     }
 
-    /** Fails if the tab's button stays lit with nothing to turn off. */
+    /** Fails if the tab's button isn't the shared disabled fill with nothing to turn off. */
     @Test
     fun theTabButtonIsQuietWhenNotLit() {
         assertThat(fillOf(lit = false, onTab = true)).isEqualTo(quietFill(ButtonSurface.Surf, DarkColors).toArgb())
+    }
+
+    private fun tap(lit: Boolean, onTab: Boolean): List<String> {
+        val calls = mutableListOf<String>()
+        val house = HouseActions(onAllOff = { calls += "all off" }, onHoliday = {})
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                if (onTab) {
+                    LightsTab(listOf(room("Lounge", on = lit)), false, lit, null, null, null, emptyMap(), null, {}, house, RoomActions.None)
+                } else {
+                    LightsCard(room("Lounge", on = lit), false, lit, null, null, null, NO_MAIN_ROOM_ACTIONS, house)
+                }
+            }
+        }
+        compose.onNodeWithTag("lights_card_all_off").performClick()
+        return calls
+    }
+
+    /** Fails if the card's button is enabled with nothing to turn off, or a tap on it sends All lights off. */
+    @Test
+    fun theCardButtonIsDisabledAndSendsNothingWhenNotLit() {
+        assertThat(tap(lit = false, onTab = false)).isEmpty()
+        compose.onNodeWithTag("lights_card_all_off").assertIsNotEnabled()
+    }
+
+    /** Fails if the tab's button is enabled with nothing to turn off, or a tap on it sends All lights off. */
+    @Test
+    fun theTabButtonIsDisabledAndSendsNothingWhenNotLit() {
+        assertThat(tap(lit = false, onTab = true)).isEmpty()
+        compose.onNodeWithTag("lights_card_all_off").assertIsNotEnabled()
+    }
+
+    /** Fails if a lit button is disabled or its tap doesn't send All lights off. */
+    @Test
+    fun aLitButtonIsEnabledAndSends() {
+        assertThat(tap(lit = true, onTab = false)).containsExactly("all off")
+        compose.onNodeWithTag("lights_card_all_off").assertIsEnabled()
     }
 }
