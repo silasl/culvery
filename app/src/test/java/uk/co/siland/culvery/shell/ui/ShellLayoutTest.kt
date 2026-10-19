@@ -50,6 +50,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.weather.Condition
+import uk.co.siland.culvery.capability.weather.DailyWeather
 import uk.co.siland.culvery.capability.weather.HeaderWeather
 import uk.co.siland.culvery.capability.weather.ui.WeatherHeaderItem
 import uk.co.siland.culvery.core.plugin.HeaderItem
@@ -106,8 +107,13 @@ class ShellLayoutTest {
     /** The weather, then a wide item after it (a future Climate): together they'd run onto the date without a budget. */
     @Test
     fun atFontScale13HeaderItemsKeepClearOfTheClockAndDate() {
+        val threeDays = listOf(
+            DailyWeather(at.toLocalDate(), Condition.PARTLY_CLOUDY, 19.0, 11.0, null, null),
+            DailyWeather(at.toLocalDate().plusDays(1), Condition.RAIN, 16.0, 10.0, null, null),
+            DailyWeather(at.toLocalDate().plusDays(2), Condition.CLEAR, 21.0, 12.0, null, null),
+        )
         val weather = HeaderItem("weather", 10) {
-            WeatherHeaderItem(HeaderWeather.Now(Condition.PARTLY_CLOUDY, night = false, temperature = 17.0, high = 19.0, low = 11.0, days = emptyList()))
+            WeatherHeaderItem(HeaderWeather.Now(Condition.PARTLY_CLOUDY, night = false, temperature = 17.0, high = 19.0, low = 11.0, days = threeDays))
         }
         val wide = HeaderItem("climate", 20) { Box(Modifier.size(800.dp, 60.dp)) }
         compose.setContent { CulveryTheme(dark = true) { WithFontScale(1.3f) { HomeScreen({ at }, emptyList(), listOf(weather, wide)) } } }
@@ -120,9 +126,13 @@ class ShellLayoutTest {
         val degrees = compose.onNodeWithText("17°", useUnmergedTree = true).textLayout()
         assertThat(degrees.lineCount).isEqualTo(1)
         assertThat(degrees.isLineEllipsized(0)).isFalse()
-        val highLow = compose.onNodeWithText("Partly cloudy", useUnmergedTree = true).textLayout()
-        assertThat(highLow.lineCount).isEqualTo(1)
-        assertThat(highLow.isLineEllipsized(0)).isFalse()
+        val condition = compose.onNodeWithText("Partly cloudy", useUnmergedTree = true).textLayout()
+        assertThat(condition.lineCount).isEqualTo(1)
+        assertThat(condition.isLineEllipsized(0)).isFalse()
+        // The strip's last high, the widest item's far end: whole and on one line.
+        val friday = compose.onNodeWithText("21°", useUnmergedTree = true).textLayout()
+        assertThat(friday.lineCount).isEqualTo(1)
+        assertThat(friday.isLineEllipsized(0)).isFalse()
     }
 
     private fun statusBar(session: SessionUi?, watching: Boolean = false, onSignOut: () -> Unit = {}) = compose.setContent {
