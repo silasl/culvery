@@ -344,6 +344,17 @@ Release builds installed with `install -r` over Plan 5's (the household kept); C
 - Throttle the "A music check failed" log line while Sonos stays unreachable.
 - Move the weather and Google Calendar clients onto `:core:net`'s `Call.await` and `AndroidNetwork`.
 
+## Plan 7 (Hue): emulator walk-through (2026-10-19)
+
+On `culvery-5` (debug build) against the household's Hue Bridge by its typed address ([bridge address]); the PC's VPN paused.
+- Passed: Settings › Lights after Music; the address sheet's typing lines; the 30 s pairing timeout and Try again; paired with the button; Lights on the rail; Find Hue Bridge says none answered (the emulator's search can't reach the home network). TLS against the bundled Philips root on Android 11 with nothing in the log (protocol check 3 from the wall).
+- Passed: the tab's rooms, sliders and scenes; commands both ways within about a second; 20 quick toggles and a 10 s slider sweep with no refusal (the pacing); a slider on an off room turns it on; Home with every card shows Lights and drops the forecast; All lights off in one command (protocol check 2) and with a room left out.
+- Passed: Holiday mode with Mimic presence and a schedule that was already on: a Child's PIN refused, a fresh PIN both ways, Turning on… then On, a second tap ignored, Mimic presence started then stopped from the wall (protocol check 1, seen in the capture), the schedule left on.
+- Changes from the walk-through: All lights off is lit in the accent while any room it would turn off is on, and disabled otherwise (04c6b03, de4ce59); disabled buttons everywhere fade their label and icon to half (b92e24b); the capture also blanks room and light kinds (d0a7840).
+- Not tried (the user's choice): offline, TalkBack.
+- Captures: taken (names check clean after the kinds were blanked); the fixtures move to them in the tablet step.
+- For the end-of-v1 design walk-through: with Holiday mode on and a room on, both card buttons are accent and look alike; the card's empty middle; Settings › Lights spacing and colour-only selection; the pairing sheet's wrapped title.
+
 ## From Plan 7
 
 - `Bridges`, `LightsFollow` and `LightsConnect` mirror Music's `Speakers`, `MusicChecks` and `MusicConnect`: a generic later.
