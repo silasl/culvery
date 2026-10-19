@@ -122,7 +122,7 @@ class LightsHouseTest {
         assertThat(system.calls).containsExactly("allOff []")
     }
 
-    /** Fails if a start the read-back didn't confirm is recorded, turns Holiday mode off, or loses its name. */
+    /** Fails if a start the read-back didn't confirm isn't recorded as sent, turns Holiday mode off, or loses its name. */
     @Test
     fun oneThatIsntConfirmedIsOnWithItsName() = runTest {
         choose("mimic-id")
@@ -130,9 +130,27 @@ class LightsHouseTest {
         assertThat(house.setHoliday(true, adult())).isEqualTo(HolidayResult.Partly(0, listOf("mimic-id")))
         val prefs = prefs()
         assertThat(prefs.holidayOn).isTrue()
-        assertThat(prefs.holidayStarted).isEmpty()
+        assertThat(prefs.holidayStarted).containsExactly("mimic-id")
         assertThat(house.nameOf("mimic-id")).isEqualTo("Mimic presence")
         assertThat(house.nameOf("gone-id")).isNull()
+    }
+
+    /** Fails if a start sent but never confirmed is left running when Holiday mode goes off, or one that reads off is stopped (7 §4.5). */
+    @Test
+    fun anUnconfirmedStartIsStillStoppedWhenHolidayModeGoesOff() = runTest {
+        choose("mimic-id", "away-id")
+        system.results["mimic-id"] = AutomationResult.NOT_CONFIRMED
+        system.results["away-id"] = AutomationResult.NOT_CONFIRMED
+        house.setHoliday(true, adult())
+        system.automationList = listOf(MIMIC.copy(on = true), AWAY)
+        system.results.clear()
+        system.calls.clear()
+        assertThat(house.setHoliday(false, adult())).isEqualTo(HolidayResult.Done)
+        assertThat(system.calls).containsExactly("automations", "setAutomation mimic-id false").inOrder()
+        assertThat(system.automationList.single { it.id == "mimic-id" }.on).isFalse()
+        val prefs = prefs()
+        assertThat(prefs.holidayOn).isFalse()
+        assertThat(prefs.holidayStarted).isEmpty()
     }
 
     /** Fails if a chosen automation no longer on the bridge is sent a command or counted as not started. */

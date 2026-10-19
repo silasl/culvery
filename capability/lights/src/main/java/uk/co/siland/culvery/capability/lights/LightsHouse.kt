@@ -103,7 +103,10 @@ class LightsHouse internal constructor(
         return if (roomsLeftOn == 0 && notStarted.isEmpty()) HolidayResult.Done else HolidayResult.Partly(roomsLeftOn, notStarted)
     }
 
-    /** Starts each chosen automation that is off, recording each one confirmed; returns the ids that didn't start. */
+    /**
+     * Starts each chosen automation that is off, recording each one once its start is sent, as it may yet start: Holiday
+     * mode off stops only those reading on. Returns the ids that didn't start.
+     */
     private suspend fun start(prefs: LightsPrefs): List<String> {
         val chosen = prefs.holidayAutomations
         val s = system() ?: return chosen.toList()
@@ -130,13 +133,10 @@ class LightsHouse internal constructor(
                 notStarted += toStart.drop(i).map { it.id }
                 break
             }
-            if (result == AutomationResult.CONFIRMED) {
-                started = started + automation.id
-                val record = started
-                save { settings.setHolidayStarted(record) }
-            } else {
-                notStarted += automation.id
-            }
+            started = started + automation.id
+            val record = started
+            save { settings.setHolidayStarted(record) }
+            if (result != AutomationResult.CONFIRMED) notStarted += automation.id
         }
         return notStarted
     }
