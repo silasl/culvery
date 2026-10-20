@@ -74,9 +74,9 @@ class DoorCardTest {
     }
 
     @Test
-    fun anUnrecognisedAlertSaysRingAlertAndAMissingDeviceIsLeftOut() {
+    fun anUnrecognisedAlertSaysNoticeFromRingAndAMissingDeviceIsLeftOut() {
         show(DoorCardUi(unrecognised = true, device = "", time = "14:02", snapshot = null))
-        compose.onNodeWithTag("door_card_words").assert(hasContentDescription("Ring alert, 14:02, just now"))
+        compose.onNodeWithTag("door_card_words").assert(hasContentDescription("Notice from Ring, 14:02, just now"))
     }
 
     @Test

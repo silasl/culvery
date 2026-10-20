@@ -28,14 +28,24 @@ internal object DoorDimens {
     // The full-size sheet's picture.
     val snapshotRadius = 16.dp
 
-    // The tab: its rows, a day's label, and the thumbnails, decoded at twice their width.
+    // The tab (handoff 3c): its rows, a day's label, the icon circle, the NEW tag, and the thumbnails, decoded at 1.5 px per dp.
     val rowGap = 10.dp
     val sectionTop = 18.dp
-    val thumbWidth = 64.dp
-    val thumbHeight = 36.dp
+    val rowRadius = 19.dp
+    val rowPaddingV = 15.dp
+    val rowPaddingH = 20.dp
+    val rowInnerGap = 15.dp
+    val rowLineGap = 2.dp
+    val rowCircle = 43.dp
+    val rowIcon = 24.dp
+    val rowTitleSize = 18.sp
+    val newTagHeight = 20.dp
+    val newTagPaddingH = 8.dp
+    val newTagTextSize = 11.sp
+    val thumbWidth = 107.dp
+    val thumbHeight = 60.dp
     val thumbRadius = 10.dp
-    val thumbTouchHeight = 48.dp
-    const val THUMB_PX = 128
+    const val THUMB_PX = 161
 
     // The full-size sheet's padding, as the calendar's sheets.
     val sheetPaddingH = 30.dp

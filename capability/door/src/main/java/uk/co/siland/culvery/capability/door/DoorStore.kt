@@ -85,7 +85,8 @@ class DoorStore internal constructor(
     /** Deletes events older than [KEEP_MS] before [nowMillis], their pictures, and pictures with no event (5 §4.5). */
     suspend fun prune(nowMillis: Long) = lock.withLock { pruneLocked(nowMillis) }
 
-    suspend fun markAllSeen() = dao.markAllSeen()
+    /** Marks every unseen event seen and returns their ids: the rings that are new on this visit to the tab (9 §6.8). */
+    suspend fun takeUnseen(): Set<Long> = dao.takeUnseen().toSet()
 
     suspend fun markSeen(id: Long) = dao.markSeen(id)
 

@@ -7,6 +7,8 @@ import java.io.IOException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -121,7 +123,7 @@ class DoorStoreTest {
         assertThat(store.events.first().map { it.atMillis }).containsExactly(NOW)
     }
 
-    /** 5 §4.7–4.8: unrecognised alerts count as rings; Got it marks one; opening the tab marks all. */
+    /** 5 §4.7–4.8: unrecognised alerts count as rings; Got it marks one; opening the tab takes them all. */
     @Test
     fun unseenCountsRingsAndMotionUntilSeen() = runTest {
         val a = store.record(ring(key = "a")).event
@@ -130,7 +132,7 @@ class DoorStoreTest {
         assertThat(store.unseen(sinceYesterday).first()).isEqualTo(Unseen(rings = 2, motion = 1))
         store.markSeen(a.id)
         assertThat(store.unseen(sinceYesterday).first()).isEqualTo(Unseen(rings = 1, motion = 1))
-        store.markAllSeen()
+        store.takeUnseen()
         assertThat(store.unseen(sinceYesterday).first()).isEqualTo(Unseen(rings = 0, motion = 0))
     }
 
@@ -159,13 +161,50 @@ class DoorStoreTest {
     }
 
     @Test
-    fun aNewEventSavingItsPictureDoesNotUndoMarkAllSeen() = runTest {
+    fun aNewEventSavingItsPictureDoesNotUndoTakingTheUnseen() = runTest {
         // The event isn't stored until the picture is saved, so mark the first event seen from inside the second's save.
         val a = store.record(ring(key = "a")).event
-        val b = store.record(ring(key = "b", snapshot = Snapshot { it.writeBytes(byteArrayOf(1)); runBlocking { store.markAllSeen() } }))
+        val b = store.record(ring(key = "b", snapshot = Snapshot { it.writeBytes(byteArrayOf(1)); runBlocking { store.takeUnseen() } }))
         assertThat(store.events.first().map { it.seen }).containsExactly(true, true)
         assertThat(b.event.snapshot).isNotNull()
         assertThat(a.id).isNotEqualTo(b.event.id)
+    }
+
+    /** 9 §6.8: fails if the take marks a ring it doesn't return, or returns one it doesn't mark. */
+    @Test
+    fun takeUnseenMarksExactlyWhatItReturns() = runTest {
+        val a = store.record(ring(key = "a")).event
+        val b = store.record(motion()).event
+        val c = store.record(ring(key = "c")).event
+        store.markSeen(c.id)
+        assertThat(store.takeUnseen()).containsExactly(a.id, b.id)
+        assertThat(store.unseen(sinceYesterday).first()).isEqualTo(Unseen(rings = 0, motion = 0))
+        assertThat(store.takeUnseen()).isEmpty()
+    }
+
+    /** 9 §6.8: a ring stored while the tab takes the unseen is either taken (so shown NEW) or left unseen, never seen unshown. */
+    @Test
+    fun aRingArrivingDuringTheMarkIsNotLost() = runBlocking {
+        val taken = mutableSetOf<Long>()
+        repeat(50) { round ->
+            val recording = async(Dispatchers.Default) { store.record(ring(key = "r$round", whenMillis = NOW + round)) }
+            val take = async(Dispatchers.Default) { store.takeUnseen() }
+            recording.await()
+            taken += take.await()
+        }
+        val events = store.events.first()
+        assertThat(events).hasSize(50)
+        events.forEach { assertThat(it.seen).isEqualTo(it.id in taken) }
+    }
+
+    /** Pin: a later notice for a seen ring, its picture, leaves it seen: the ring was already acknowledged. */
+    @Test
+    fun aPictureArrivingForASeenRingStaysSeen() = runTest {
+        val first = store.record(ring()).event
+        assertThat(store.takeUnseen()).containsExactly(first.id)
+        val again = store.record(ring(at = NOW + 1_000, snapshot = aPicture)).event
+        assertThat(again.snapshot).isNotNull()
+        assertThat(again.seen).isTrue()
     }
 
     /** The boundary is the household's local midnight the day before, not UTC and not today's. */

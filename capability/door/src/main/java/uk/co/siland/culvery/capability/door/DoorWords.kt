@@ -20,7 +20,6 @@ fun badgeOf(unseen: Unseen): RailBadge? = when {
 }
 
 internal const val SOMEONE_AT_THE_DOOR = "Someone’s at the door"
-internal const val RING_ALERT = "Ring alert"
 internal const val GOT_IT = "Got it"
 internal const val DOOR_HISTORY = "Door history"
 internal const val MUSIC_LOWERED = "Music lowered"
@@ -41,15 +40,38 @@ internal const val NO_RINGS_TODAY = "No rings or motion today."
 internal const val SNAPSHOT = "Snapshot"
 internal const val SHOW_FULL_SIZE = "show it full size"
 
-/** "Ring", "Motion", or "Ring alert" for one the parser couldn't place (5 §5.2). */
+internal const val SOMEONE_RANG = "Someone rang"
+internal const val MOVEMENT = "Movement"
+internal const val NOTICE_FROM_RING = "Notice from Ring"
+internal const val COULDNT_TELL = "Culvery couldn’t tell what this was"
+internal const val NEW = "NEW"
+internal const val NEW_SPOKEN = "new"
+
+/** A ring the parser couldn't place: shown and alerted as a ring, said as a notice (9 §4.6). */
+internal val DoorEvent.isNotice: Boolean get() = kind == DoorKind.RING && unrecognised
+
+/** "Someone rang", "Movement", or "Notice from Ring" for one the parser couldn't place (9 §4.6). */
 fun kindLabel(event: DoorEvent): String = when {
-    event.kind == DoorKind.MOTION -> "Motion"
-    event.unrecognised -> RING_ALERT
-    else -> "Ring"
+    event.kind == DoorKind.MOTION -> MOVEMENT
+    event.isNotice -> NOTICE_FROM_RING
+    else -> SOMEONE_RANG
 }
 
-/** "14:02 · Ring": a row's line and its sheet's heading. */
+/** "14:02 · Someone rang": a row's line and its sheet's heading. */
 fun eventLine(event: DoorEvent, zone: ZoneId): String = "${clockTime(event.atMillis, zone)} · ${kindLabel(event)}"
+
+/** The line under [eventLine]: the device, then for a notice that Culvery couldn't tell what it was; null when empty. */
+fun subLine(event: DoorEvent): String? =
+    listOfNotNull(event.device.ifEmpty { null }, COULDNT_TELL.takeIf { event.isNotice }).joinToString(" · ").ifEmpty { null }
+
+/** "1 new ring", "2 new rings". */
+fun newRings(count: Int): String = plural(count.toLong(), "new ring")
+
+/** "Front Door · Back Garden · 2 new rings": each device once in first-seen order, then the new rings if any; null when neither. */
+fun doorSubtitle(events: List<DoorEvent>, newCount: Int): String? {
+    val devices = events.map { it.device }.filter { it.isNotEmpty() }.distinct()
+    return (devices + listOfNotNull(newCount.takeIf { it > 0 }?.let(::newRings))).joinToString(" · ").ifEmpty { null }
+}
 
 internal const val DOOR = "Door"
 internal const val CHIME = "Chime"
@@ -70,7 +92,7 @@ private val DAY_AND_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE 
 /** 5 §6's three messages. */
 internal fun accessOff(service: String) = "Culvery can’t see $service’s notifications. Allow notification access in Settings › Door."
 internal fun appMissing(service: String) = "The $service app isn’t on this tablet. Install it and sign in, then check Settings › Door."
-internal fun cantFullyRead(service: String) = "Culvery can’t fully read $service’s notifications, so rings show as ‘$RING_ALERT’."
+internal fun cantFullyRead(service: String) = "Culvery can’t fully read $service’s notifications, so rings show as ‘$NOTICE_FROM_RING’."
 
 /** "Last heard from Ring: Tuesday 14:02" (5 §5.4), or that it hasn't been yet. */
 internal fun lastHeard(service: String, atMillis: Long?, zone: ZoneId): String =

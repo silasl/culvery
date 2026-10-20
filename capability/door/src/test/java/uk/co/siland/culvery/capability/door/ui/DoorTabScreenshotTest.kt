@@ -34,8 +34,10 @@ class DoorTabScreenshotTest {
     @get:Rule val folder = TemporaryFolder()
     private val london = ZoneId.of("Europe/London")
 
-    private fun snap(name: String, dark: Boolean, days: DoorDays, status: String? = null) {
-        compose.setContent { CulveryTheme(dark = dark) { Box(Modifier.size(1116.dp, 690.dp).background(Culvery.colors.bg)) { DoorTab(days, london, status, onOpenSnapshot = {}) } } }
+    private fun snap(name: String, dark: Boolean, days: DoorDays, status: String? = null, newIds: Set<Long> = emptySet()) {
+        compose.setContent {
+            CulveryTheme(dark = dark) { Box(Modifier.size(1116.dp, 690.dp).background(Culvery.colors.bg)) { DoorTab(days, london, status, onOpenSnapshot = {}, newIds = newIds) } }
+        }
         if (days.today.any { it.snapshot != null }) compose.waitUntil(5_000) { compose.waitForIdle(); compose.onAllNodesWithTag("door_thumb_image", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
     }
@@ -54,6 +56,13 @@ class DoorTabScreenshotTest {
 
     @Test fun tabDark() = snap("door_tab_dark", true, days())
     @Test fun tabLight() = snap("door_tab_light", false, days())
+    /** The visit after opening: everything seen, the rings unseen on opening still NEW and counted. */
+    @Test
+    fun tabNewDark() {
+        val seen = days().let { d -> DoorDays(d.today.map { it.copy(seen = true) }, d.yesterday) }
+        snap("door_tab_new_dark", true, seen, newIds = setOf(1, 3))
+    }
+
     @Test fun tabEmptyDark() = snap("door_tab_empty_dark", true, DoorDays(emptyList(), emptyList()))
     @Test fun tabStatusDark() = snap("door_tab_status_dark", true, DoorDays(emptyList(), emptyList()), status = "Culvery can’t see Ring’s notifications. Allow notification access in Settings › Door.")
 }

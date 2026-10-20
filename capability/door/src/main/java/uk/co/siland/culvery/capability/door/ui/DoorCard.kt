@@ -29,7 +29,7 @@ import java.io.File
 import uk.co.siland.culvery.capability.door.DOOR_HISTORY
 import uk.co.siland.culvery.capability.door.GOT_IT
 import uk.co.siland.culvery.capability.door.MUSIC_LOWERED
-import uk.co.siland.culvery.capability.door.RING_ALERT
+import uk.co.siland.culvery.capability.door.NOTICE_FROM_RING
 import uk.co.siland.culvery.capability.door.SOMEONE_AT_THE_DOOR
 import uk.co.siland.culvery.capability.door.cardLine
 import uk.co.siland.culvery.capability.door.cardWords
@@ -54,7 +54,7 @@ data class DoorCardUi(val unrecognised: Boolean, val device: String, val time: S
 fun DoorCard(card: DoorCardUi, onGotIt: () -> Unit, modifier: Modifier = Modifier, lowered: Boolean = false, onHistory: () -> Unit = {}) {
     val c = Culvery.colors
     val shape = RoundedCornerShape(DoorDimens.cardRadius)
-    val title = if (card.unrecognised) RING_ALERT else SOMEONE_AT_THE_DOOR
+    val title = if (card.unrecognised) NOTICE_FROM_RING else SOMEONE_AT_THE_DOOR
     Column(
         verticalArrangement = Arrangement.spacedBy(DoorDimens.cardGap),
         modifier = modifier

@@ -144,14 +144,14 @@ class DoorHealthTest {
 
     /** 5 §6: three unrecognised alerts in a row; a recognised one ends it. Fails if the limit isn't three or a recognised alert doesn't reset it. */
     @Test
-    fun threeUnrecognisedAlertsSayRingsShowAsRingAlert() = runTest {
+    fun threeUnrecognisedAlertsSayRingsShowAsNoticeFromRing() = runTest {
         settings.setConnected(true)
         val health = health()
         health.checks.first { it != null }
         repeat(2) { settings.countAlert(recognised = false) }
         assertThat(health.status.first()).isNull()
         settings.countAlert(recognised = false)
-        assertThat(health.status.first()).isEqualTo("Culvery can’t fully read Ring’s notifications, so rings show as ‘Ring alert’.")
+        assertThat(health.status.first()).isEqualTo("Culvery can’t fully read Ring’s notifications, so rings show as ‘Notice from Ring’.")
         settings.countAlert(recognised = true)
         assertThat(health.status.first()).isNull()
     }

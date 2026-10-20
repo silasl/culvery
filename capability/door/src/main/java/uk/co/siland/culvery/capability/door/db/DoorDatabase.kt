@@ -8,6 +8,7 @@ import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 import uk.co.siland.culvery.capability.door.Unseen
 
@@ -54,11 +55,22 @@ interface DoorDao {
     @Query("SELECT id FROM door_event WHERE hasSnapshot = 1")
     suspend fun withSnapshots(): List<Long>
 
-    @Query("UPDATE door_event SET seen = 1 WHERE seen = 0")
-    suspend fun markAllSeen()
-
     @Query("UPDATE door_event SET seen = 1 WHERE id = :id")
     suspend fun markSeen(id: Long)
+
+    @Query("SELECT id FROM door_event WHERE seen = 0")
+    suspend fun unseenIds(): List<Long>
+
+    @Query("UPDATE door_event SET seen = 1 WHERE id IN (:ids)")
+    suspend fun markSeen(ids: List<Long>)
+
+    /** The unseen ids, marked seen in the same transaction, so a ring stored meanwhile is either returned or stays unseen. */
+    @Transaction
+    suspend fun takeUnseen(): List<Long> {
+        val ids = unseenIds()
+        markSeen(ids)
+        return ids
+    }
 
     @Query(
         "SELECT COALESCE(SUM(kind = 'RING'), 0) AS rings, COALESCE(SUM(kind = 'MOTION'), 0) AS motion " +
