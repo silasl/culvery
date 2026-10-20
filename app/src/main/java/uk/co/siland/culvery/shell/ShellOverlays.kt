@@ -75,6 +75,11 @@ class ShellAlerts @Inject constructor(
     private val _inFront = MutableStateFlow(false)
     override val inFront: StateFlow<Boolean> = _inFront.asStateFlow()
 
+    private val _shown = MutableStateFlow(false)
+
+    /** True from the screen's start to its stop: a pause with Culvery still shown, as for a new intent, isn't leaving (8 §4.1). */
+    val shown: StateFlow<Boolean> = _shown.asStateFlow()
+
     private val _lowered = MutableStateFlow(false)
     override val lowered: StateFlow<Boolean> = _lowered.asStateFlow()
 
@@ -139,6 +144,14 @@ class ShellAlerts @Inject constructor(
 
     /** This host as an observer that writes nothing once [handedOver] is true: an instance giving way to the home task is not in front. */
     fun unlessHandedOver(handedOver: () -> Boolean): DefaultLifecycleObserver = object : DefaultLifecycleObserver {
+        override fun onStart(owner: LifecycleOwner) {
+            if (!handedOver()) this@ShellAlerts.onStart(owner)
+        }
+
+        override fun onStop(owner: LifecycleOwner) {
+            if (!handedOver()) this@ShellAlerts.onStop(owner)
+        }
+
         override fun onResume(owner: LifecycleOwner) {
             if (!handedOver()) this@ShellAlerts.onResume(owner)
         }
@@ -146,6 +159,14 @@ class ShellAlerts @Inject constructor(
         override fun onPause(owner: LifecycleOwner) {
             if (!handedOver()) this@ShellAlerts.onPause(owner)
         }
+    }
+
+    override fun onStart(owner: LifecycleOwner) {
+        _shown.value = true
+    }
+
+    override fun onStop(owner: LifecycleOwner) {
+        _shown.value = false
     }
 
     override fun onResume(owner: LifecycleOwner) {

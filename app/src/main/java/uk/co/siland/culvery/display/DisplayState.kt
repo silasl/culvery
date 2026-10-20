@@ -20,12 +20,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.plugin.inDailyWindow
+import uk.co.siland.culvery.shell.ShellAlerts
 
 private const val TAG = "DisplayState"
 private const val MS_PER_MINUTE = 60_000L
@@ -101,10 +101,10 @@ class DisplayState internal constructor(
         settings: DisplaySettings,
         clock: HouseholdClock,
         activity: UserActivity,
-        alerts: AlertHost,
+        alerts: ShellAlerts,
         camera: CameraAccess,
         @ApplicationScope scope: CoroutineScope,
-    ) : this(settings.read, clock.now, activity.touches, alerts.inFront, camera.state, scope)
+    ) : this(settings.read, clock.now, activity.touches, alerts.shown, camera.state, scope)
 
     private val lock = Any()
     private val state = MutableStateFlow(next(START, prefs.value, now.value, inFront.value))

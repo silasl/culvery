@@ -3,18 +3,23 @@ package uk.co.siland.culvery.display
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import dagger.multibindings.IntoSet
 import java.lang.reflect.Method
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -25,6 +30,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Startable
@@ -43,7 +49,10 @@ import uk.co.siland.culvery.display.ui.SleepLayer
 import uk.co.siland.culvery.display.ui.THE_CAMERA_IS_ON
 import uk.co.siland.culvery.holding
 import uk.co.siland.culvery.shell.OverlayState
+import uk.co.siland.culvery.shell.ShellAlerts
 import uk.co.siland.culvery.shell.ui.ShellLayers
+
+private val ELEVEN_PM = LocalDateTime.of(2026, 10, 19, 23, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
 
 /** A camera the test opens and fails by hand. */
 private class OpenOrNot : FrameSource {
@@ -100,6 +109,30 @@ class DisplayWiringTest {
         runCurrent()
         assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
         advanceTimeBy(NIGHT_AWAKE_MS)
+        runCurrent()
+        assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
+    }
+
+    /** Fails if a pause with Culvery still on screen, as a new intent to the home activity makes, wakes the night clock. */
+    @Test
+    fun aPauseWithoutLeavingKeepsTheNightClock() = runTest {
+        val alerts = ShellAlerts(emptySet(), backgroundScope)
+        val owner = object : LifecycleOwner {
+            val registry = LifecycleRegistry.createUnsafe(this)
+            override val lifecycle: Lifecycle get() = registry
+        }
+        owner.registry.addObserver(alerts.unlessHandedOver { false })
+        val settings = displaySettings(folder.root, backgroundScope)
+        val clock = HouseholdClock(flowOf(ZoneOffset.UTC), { 0L }, backgroundScope, flowOf(ELEVEN_PM))
+        val display = DisplayState(settings, clock, FakeUserActivity(), alerts, CameraAccess({ true }, { true }, settings, backgroundScope), backgroundScope)
+        display.night.first { it == true }
+        owner.registry.currentState = Lifecycle.State.RESUMED
+        runCurrent()
+        assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
+
+        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+        runCurrent()
+        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         runCurrent()
         assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
     }
