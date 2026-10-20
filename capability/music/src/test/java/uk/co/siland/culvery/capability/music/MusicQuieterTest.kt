@@ -41,6 +41,14 @@ class MusicQuieterTest {
         assertThat(sets()).containsExactly("setRoomVolume Office-id 10")
     }
 
+    /** A titled Bluetooth source plays through Sonos's speakers, so the doorbell lowers it though Home ignores it. */
+    @Test
+    fun aGroupPlayingATitledInputIsStillLowered() = runTest {
+        system.groups.value = listOf(group("o", "Office", state = PlayState.PLAYING, nowPlaying = SONG, volume = 50).copy(fromInput = true))
+        quieter().quiet()
+        assertThat(sets()).containsExactly("setRoomVolume Office-id 10")
+    }
+
     /** round(v × share): 33 × 20 % is 6.6, so 7. */
     @Test
     fun theShareRounds() = runTest {

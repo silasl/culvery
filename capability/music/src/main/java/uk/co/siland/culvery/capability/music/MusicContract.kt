@@ -39,11 +39,15 @@ data class SpeakerGroup(
     val canSkip: Boolean,
     val volume: Int,
     val startedAtMillis: Long?,
+    val fromInput: Boolean = false,
 ) {
     val isPlaying: Boolean get() = state.isPlaying
 
-    /** Playing something: an input with no track (idle Bluetooth, line-in) reports PLAYING but is not (Home and the Music tab). */
-    val isSounding: Boolean get() = isPlaying && nowPlaying !is NowPlaying.Input
+    /** Bluetooth or line-in is the source, whether or not it names a track: not coming through Sonos, so it never counts (Home and the Music tab). */
+    val isInput: Boolean get() = fromInput || nowPlaying is NowPlaying.Input
+
+    /** Playing something through Sonos. */
+    val isSounding: Boolean get() = isPlaying && !isInput
 
     /** "Kitchen + Lounge" (6 §5.2). */
     val name: String get() = rooms.joinToString(" + ") { it.name }

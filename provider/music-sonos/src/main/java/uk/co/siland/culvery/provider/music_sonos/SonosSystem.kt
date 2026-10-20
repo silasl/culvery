@@ -47,7 +47,7 @@ internal fun kindOf(item: DidlItem): FavouriteKind {
 /** A group's GetMediaInfo, read again only when its track or transport state changes (6 §4.2). */
 private data class Media(val trackUri: String?, val state: PlayState, val info: MediaInfo)
 
-private data class Playback(val state: PlayState, val nowPlaying: NowPlaying?, val artUrl: String?, val canSkip: Boolean, val volume: Int)
+private data class Playback(val state: PlayState, val nowPlaying: NowPlaying?, val artUrl: String?, val canSkip: Boolean, val volume: Int, val fromInput: Boolean)
 
 /**
  * One household's speakers through Sonos's local API (6 §3.2, §4): the layout from the saved speaker, each group's
@@ -132,7 +132,7 @@ internal class SonosSystem(
         }
         change {
             states.forEach { (id, state) ->
-                if (state != null) record(id, playback[id]?.copy(state = state) ?: Playback(state, null, null, false, 0))
+                if (state != null) record(id, playback[id]?.copy(state = state) ?: Playback(state, null, null, false, 0, false))
             }
         }
         val playing = states.filter { it.second?.isPlaying == true }.map { it.first }.toSet()
@@ -332,7 +332,7 @@ internal class SonosSystem(
         } else {
             (m.title ?: t.title?.takeUnless { it == t.uri })?.let { NowPlaying.Radio(it, t.programme) }
         }
-        val read = Playback(s, nowPlaying, artUrl(t.artUri ?: m.artUri, address), fromQueue, volume.await())
+        val read = Playback(s, nowPlaying, artUrl(t.artUri ?: m.artUri, address), fromQueue, volume.await(), fromInput)
         change { record(group.id, read) }
     }
 
@@ -361,6 +361,7 @@ internal class SonosSystem(
                 artUrl = p?.artUrl,
                 canSkip = p?.canSkip ?: false,
                 volume = p?.volume ?: 0,
+                fromInput = p?.fromInput ?: false,
                 startedAtMillis = started[g.id],
             )
         }

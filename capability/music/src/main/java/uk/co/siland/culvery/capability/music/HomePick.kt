@@ -24,7 +24,7 @@ fun homePick(groups: List<SpeakerGroup>, usualRoomId: String?, keptId: String?):
     return HomePick(fallback, nothingPlaying = !fallback.pausedWithSomethingLoaded())
 }
 
-internal fun SpeakerGroup.pausedWithSomethingLoaded() = state == PlayState.PAUSED && nowPlaying != null
+internal fun SpeakerGroup.pausedWithSomethingLoaded() = state == PlayState.PAUSED && nowPlaying != null && !isInput
 
 /** Nothing sounding and nothing paused with a track: Home says "Nothing playing", and so does the Music tab (9 §4.5). */
 internal fun SpeakerGroup.isQuiet() = !isSounding && !pausedWithSomethingLoaded()

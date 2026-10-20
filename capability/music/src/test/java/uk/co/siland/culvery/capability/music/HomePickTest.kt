@@ -133,4 +133,24 @@ class HomePickTest {
         assertThat(all.playing("b", SONG, PlayState.PAUSED).single { it.id == "b" }.isQuiet()).isFalse()
         assertThat(all.playing("b", SONG).single { it.id == "b" }.isQuiet()).isFalse()
     }
+
+    private fun List<SpeakerGroup>.titledBluetooth(id: String) =
+        map { if (it.id == id) it.copy(state = PlayState.PLAYING, nowPlaying = SONG, fromInput = true, startedAtMillis = 900) else it }
+
+    /** The Office fault: a Bluetooth source with a title still never takes Home's card or the Music tab's first place. */
+    @Test
+    fun aPlayingInputWithATitleLosesToTheUsualRoomAndIsNotFirstOnTheTab() {
+        val groups = all.titledBluetooth("b").playing("k", SONG, PlayState.PAUSED)
+        assertThat(homePick(groups, "Kitchen-id", null)).isEqualTo(HomePick(groups[0], nothingPlaying = false))
+        assertThat(tabOrder(all.titledBluetooth("b").with("l", PlayState.PLAYING)).map { it.id }).containsExactly("l", "k", "b").inOrder()
+        assertThat(tabOrder(groups).map { it.id }).containsExactly("k", "l", "b").inOrder()
+    }
+
+    /** An input source paused counts as quiet, titled or not. */
+    @Test
+    fun aPausedInputIsQuiet() {
+        val paused = all.titledBluetooth("b").map { it.copy(state = PlayState.PAUSED) }
+        assertThat(paused[2].isQuiet()).isTrue()
+        assertThat(homePick(paused, "Kitchen-id", keptId = "b")?.group?.id).isEqualTo("k")
+    }
 }

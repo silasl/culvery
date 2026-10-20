@@ -120,6 +120,7 @@ class SonosSystemTest {
         val k = checked().groups.value[0]
         assertThat(k.state).isEqualTo(PlayState.PLAYING)
         assertThat(k.nowPlaying).isEqualTo(NowPlaying.Input("Bluetooth"))
+        assertThat(k.fromInput).isTrue()
         assertThat(k.isSounding).isFalse()
     }
 
@@ -139,14 +140,15 @@ class SonosSystemTest {
         assertThat(checked().groups.value[0].nowPlaying).isEqualTo(NowPlaying.Input("Line-in"))
     }
 
-    /** A track title from an input is a real track. */
+    /** An input that names a track still shows the track, but is from an input and never sounds for Home. */
     @Test
-    fun anInputThatNamesATrackIsATrack() = runTest {
+    fun anInputThatNamesATrackIsReadAsFromAnInput() = runTest {
         kitchen.answer("GetPositionInfo", SonosFixtures.position(SonosFixtures.BLUETOOTH_URI))
         kitchen.answer("GetMediaInfo", SonosFixtures.media(SonosFixtures.BLUETOOTH_URI, SonosFixtures.inputItem("Bluetooth")))
         val k = checked().groups.value[0]
         assertThat(k.nowPlaying).isEqualTo(NowPlaying.Track("Song", "Artist", "Album"))
-        assertThat(k.isSounding).isTrue()
+        assertThat(k.fromInput).isTrue()
+        assertThat(k.isSounding).isFalse()
     }
 
     /** A soundbar playing TV audio is audible: it is not an input with no track. */
@@ -155,7 +157,9 @@ class SonosSystemTest {
         val uri = "x-sonos-htastream:RINCON_TEST:spdif"
         kitchen.answer("GetPositionInfo", SonosFixtures.position(uri, SonosFixtures.untitledTrack))
         kitchen.answer("GetMediaInfo", SonosFixtures.media(uri, SonosFixtures.inputItem("TV", "object.item")))
-        assertThat(checked().groups.value[0].nowPlaying).isNotInstanceOf(NowPlaying.Input::class.java)
+        val k = checked().groups.value[0]
+        assertThat(k.nowPlaying).isNotInstanceOf(NowPlaying.Input::class.java)
+        assertThat(k.fromInput).isFalse()
     }
 
     /** 6 §2.2: when a group last started playing. Fails if a group already playing gets a new time at each check. */
