@@ -21,9 +21,10 @@ private const val TAG = "MusicQuieter"
 internal const val RESTORE_DRIFT = 1
 
 /**
- * Music's [AlertQuieter] (6 §4.6; says whether a room was lowered, 9 §6.3): each room of each group playing as the bell rings drops to [share] percent of its
- * volume, and goes back afterwards unless someone changed it meanwhile. Room by room, so a group keeps its balance. One
- * lock keeps a restore behind the quiet it undoes. Held in memory only: a restart while lowered leaves those rooms low.
+ * Music's [AlertQuieter] (6 §4.6): each room of each group playing as the bell rings drops to [share] percent of its
+ * volume, and goes back afterwards unless someone changed it meanwhile; quiet() says whether any room went down (9 §6.3).
+ * Room by room, so a group keeps its balance. One lock keeps a restore behind the quiet it undoes. Held in memory only: a
+ * restart while lowered leaves those rooms low.
  */
 @Singleton
 class MusicQuieter internal constructor(private val system: () -> MusicSystem?, private val share: () -> Int) : AlertQuieter {
@@ -43,6 +44,8 @@ class MusicQuieter internal constructor(private val system: () -> MusicSystem?, 
         val playing = tried { s.playingNow() } ?: return@withLock false
         val rooms: MutableList<Lowered> = Collections.synchronizedList(mutableListOf())
         lowered = s to rooms
+        // Cancelled before the answer, a later quiet() mustn't repeat the last pass's.
+        turnedDown = false
         turnedDown = coroutineScope {
             playing.map { group -> async { lowerGroup(s, group, percent, rooms) } }.awaitAll().any { it }
         }

@@ -171,11 +171,13 @@ fun HhToast(message: String, icon: String, modifier: Modifier = Modifier, urgent
 @Composable
 private fun CountdownRing(countdown: Countdown, color: Color) {
     var frame by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(countdown) {
+    // A Countdown is rebuilt on each recomposition; its end and length are what restart the loop.
+    LaunchedEffect(countdown.endsAt, countdown.totalMs) {
         while (countdown.endsAt - countdown.nowMillis() > 0) withFrameMillis { frame = it }
         frame++
     }
     Canvas(Modifier.size(ShellTokens.ringSize)) {
+        // Read so each frame redraws the ring.
         frame
         val stroke = ShellTokens.ringStroke.toPx()
         val arc = Size(size.width - stroke, size.height - stroke)

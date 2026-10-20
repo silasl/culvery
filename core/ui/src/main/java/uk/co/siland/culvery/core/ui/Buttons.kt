@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -39,6 +40,7 @@ object ButtonTokens {
     val largeIconGap = 8.dp
 
     val icon = 24.dp
+    val roundIcon = 28.dp
     val disabledOutline = 1.dp
 }
 
@@ -126,9 +128,7 @@ fun HhButton(
         ),
         modifier = modifier
             .heightIn(min = if (large) ButtonTokens.largeHeight else ButtonTokens.regularHeight)
-            .clip(pill)
-            .background(fill)
-            .then(if (outline != null) Modifier.border(ButtonTokens.disabledOutline, outline, pill) else Modifier)
+            .buttonFill(fill, outline, pill)
             .then(
                 if (spokenName != null) {
                     Modifier.semantics {
@@ -172,19 +172,21 @@ fun HhRoundButton(
     enabled: Boolean = true,
     on: ButtonSurface,
     size: Dp = ButtonTokens.regularHeight,
-    iconSize: Dp = 28.dp,
+    iconSize: Dp = ButtonTokens.roundIcon,
 ) {
     val (fill, ink, outline) = buttonColors(tone, enabled, on, Culvery.colors)
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .size(size)
-            .clip(CircleShape)
-            .background(fill)
-            .then(if (outline != null) Modifier.border(ButtonTokens.disabledOutline, outline, CircleShape) else Modifier)
+            .buttonFill(fill, outline, CircleShape)
             .semantics { contentDescription = spoken }
             .hhClickable(onClick, enabled = enabled),
     ) {
         HhIcon(icon, size = iconSize, tint = ink)
     }
 }
+
+/** A button's [fill] in [shape], with the disabled [outline] when it has one. */
+private fun Modifier.buttonFill(fill: Color, outline: Color?, shape: Shape): Modifier =
+    clip(shape).background(fill).then(if (outline != null) Modifier.border(ButtonTokens.disabledOutline, outline, shape) else Modifier)

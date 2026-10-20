@@ -57,7 +57,7 @@ internal fun watchingPill(
     sheetShowing: Boolean,
     pinShowing: Boolean,
     alertShowing: Boolean,
-): Boolean = running && !sleeping && complete == true && !settingsOpen && !sheetShowing && !pinShowing && !alertShowing
+): Boolean = running && !sleeping && topBarInView(complete, settingsOpen, sheetShowing, pinShowing, alertShowing)
 
 /**
  * 9 §6.7: the small overlay mark shows while the camera runs and the top bar's pill doesn't: the bar is covered or absent
@@ -71,7 +71,10 @@ internal fun overlayCameraMark(
     sheetShowing: Boolean,
     pinShowing: Boolean,
     alertShowing: Boolean,
-): Boolean = running && !sleeping && !(complete == true && !settingsOpen && !sheetShowing && !pinShowing && !alertShowing)
+): Boolean = running && !sleeping && !topBarInView(complete, settingsOpen, sheetShowing, pinShowing, alertShowing)
+
+private fun topBarInView(complete: Boolean?, settingsOpen: Boolean, sheetShowing: Boolean, pinShowing: Boolean, alertShowing: Boolean): Boolean =
+    complete == true && !settingsOpen && !sheetShowing && !pinShowing && !alertShowing
 
 /** The session's timer stops while the tablet sleeps; its wall-clock end is checked on the way back, before any touch. */
 internal fun checksExpiryOnReturn(access: AccessControl): LifecycleEventObserver = LifecycleEventObserver { _, event ->

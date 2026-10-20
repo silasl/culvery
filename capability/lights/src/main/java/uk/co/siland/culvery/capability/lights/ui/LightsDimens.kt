@@ -17,9 +17,8 @@ internal object LightsDimens {
     val sliderIcon = 24.dp
     val bottomGap = 15.dp
 
-    // The chevron is a 48 dp touch target with a 28 dp glyph.
+    // A room's row is at least a touch target tall, as the card's › (HhRoundButton's 48 dp).
     val chevron = 48.dp
-    val chevronIcon = 28.dp
 
     // All lights off and Holiday mode side by side: Holiday mode keeps its width, All lights off takes the rest.
     val buttonGap = 8.dp

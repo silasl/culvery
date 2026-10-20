@@ -1,6 +1,10 @@
 package uk.co.siland.culvery.capability.music.ui
 
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import uk.co.siland.culvery.core.ui.HhType
 
 /** Music's layout values (6 §5); provisional until the end-of-v1 design walk-through. */
 internal object MusicDimens {
@@ -11,6 +15,8 @@ internal object MusicDimens {
     val artGap = 14.dp
     val artRadius = 12.dp
     val cardArtRadius = 13.dp
+    val cardName: TextStyle = HhType.cardTitle.copy(fontSize = 20.sp)
+    val cardTrack: TextStyle = HhType.rowTitle.copy(fontWeight = FontWeight.W400)
     val controlsGap = 10.dp
 
     // The card's one row: Play/Pause, Next or Shuffle everything, then the volume pill.
@@ -23,10 +29,7 @@ internal object MusicDimens {
     val pillGap = 10.dp
     val pillIcon = 24.dp
     val pillTrack = 9.dp
-
-    // Round controls are the 48 dp touch target, with a 28 dp icon.
-    val button = 48.dp
-    val buttonIcon = 28.dp
+    val pillNumber: TextStyle = HhType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.W600, fontFeatureSettings = "tnum")
 
     // The tab's rows: art, the group slider, and each room's slider under the Rooms chip.
     val rowArt = 64.dp

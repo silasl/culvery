@@ -51,7 +51,7 @@ internal fun themeLabel(dark: Boolean, previewing: Boolean): String =
     "${if (dark) "Night" else "Day"} · ${if (previewing) "Preview" else "Auto"}"
 
 /** Where the Watching pill's icon is, or would be, in the root's coordinates; null until the top bar has been laid out. */
-class CameraMarkSpot {
+internal class CameraMarkSpot {
     var centre: Offset? by mutableStateOf(null)
 }
 
@@ -61,7 +61,7 @@ class CameraMarkSpot {
  * Each control takes the bar's height as its tap area.
  */
 @Composable
-fun StatusBar(
+internal fun StatusBar(
     dark: Boolean,
     previewing: Boolean,
     session: SessionUi?,

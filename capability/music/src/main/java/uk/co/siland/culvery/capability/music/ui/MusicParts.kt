@@ -1,7 +1,7 @@
 package uk.co.siland.culvery.capability.music.ui
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
@@ -16,10 +16,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.sp
 import uk.co.siland.culvery.capability.music.MusicActions
 import uk.co.siland.culvery.capability.music.SHUFFLE_EVERYTHING
 import uk.co.siland.culvery.capability.music.SpeakerGroup
@@ -27,8 +25,8 @@ import uk.co.siland.culvery.capability.music.SpeakerRoom
 import uk.co.siland.culvery.capability.music.groupSpoken
 import uk.co.siland.culvery.capability.music.nextSpoken
 import uk.co.siland.culvery.capability.music.nowPlayingLines
-import uk.co.siland.culvery.capability.music.percentWords
 import uk.co.siland.culvery.capability.music.pauseSpoken
+import uk.co.siland.culvery.capability.music.percentWords
 import uk.co.siland.culvery.capability.music.playSpoken
 import uk.co.siland.culvery.capability.music.shuffleSpoken
 import uk.co.siland.culvery.capability.music.volumeName
@@ -36,9 +34,9 @@ import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
-import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPercentSlider
+import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
@@ -139,10 +137,8 @@ internal fun VolumePill(group: SpeakerGroup, tag: String, onLetGo: (Int) -> Unit
         HhPercentSlider(
             group.name, group.volume, "${tag}_slider", Modifier.weight(1f),
             spokenName = volumeName(group.name), spokenState = ::percentWords,
-            label = { Text("$it", style = VolumeNumber, color = c.ink, maxLines = 1, modifier = Modifier.shownNotSpoken()) },
+            label = { Text("$it", style = MusicDimens.pillNumber, color = c.ink, maxLines = 1, modifier = Modifier.shownNotSpoken()) },
             trackHeight = MusicDimens.pillTrack, onLetGo = onLetGo,
         )
     }
 }
-
-private val VolumeNumber = HhType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.W600, fontFeatureSettings = "tnum")

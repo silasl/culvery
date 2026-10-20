@@ -13,14 +13,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.lights.ALL_LIGHTS_OFF
-import uk.co.siland.culvery.capability.lights.OFF
 import uk.co.siland.culvery.capability.lights.HOLIDAY_MODE
 import uk.co.siland.culvery.capability.lights.HouseRun
 import uk.co.siland.culvery.capability.lights.LightRoom
 import uk.co.siland.culvery.capability.lights.LightsFollow
+import uk.co.siland.culvery.capability.lights.OFF
+import uk.co.siland.culvery.capability.lights.TURN_ALL_OFF
 import uk.co.siland.culvery.capability.lights.brightnessName
 import uk.co.siland.culvery.capability.lights.cardStatus
-import uk.co.siland.culvery.capability.lights.TURN_ALL_OFF
 import uk.co.siland.culvery.capability.lights.holidayNamed
 import uk.co.siland.culvery.capability.lights.holidaySpoken
 import uk.co.siland.culvery.capability.lights.holidayState
@@ -93,10 +93,7 @@ internal fun BrightnessRow(room: LightRoom, mainRoom: MainRoomActions) {
 /** The › beside the main room: opens that room on the Lights tab. */
 @Composable
 internal fun OpenRoomButton(room: LightRoom, onOpen: () -> Unit) {
-    HhRoundButton(
-        Icons.CHEVRON_RIGHT, openRoomSpoken(room), onOpen, Modifier.testTag("lights_card_open"),
-        on = ButtonSurface.Surf, size = LightsDimens.chevron, iconSize = LightsDimens.chevronIcon,
-    )
+    HhRoundButton(Icons.CHEVRON_RIGHT, openRoomSpoken(room), onOpen, Modifier.testTag("lights_card_open"), on = ButtonSurface.Surf)
 }
 
 /** Accent while a room it would turn off is on; otherwise the shared disabled button, which does nothing. */

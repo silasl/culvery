@@ -16,8 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uk.co.siland.culvery.capability.music.HomePick
 import uk.co.siland.culvery.capability.music.LOOKING_FOR_SPEAKERS
@@ -31,9 +29,6 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.ShellTokens
-
-private val CardName = HhType.cardTitle.copy(fontSize = 20.sp)
-private val CardTrack = HhType.rowTitle.copy(fontWeight = FontWeight.W400)
 
 /**
  * The REGULAR Home card (9 §4.2): the room Home follows and what it plays, then one row: Play/Pause, Next and the
@@ -56,8 +51,8 @@ fun MusicCard(pick: HomePick?, status: String?, line: String?, actions: GroupAct
         }
         val group = pick.group
         NowPlayingBlock(
-            group, pick.nothingPlaying, MusicDimens.cardArt, CardName, "music_card_now",
-            firstStyle = CardTrack, secondStyle = HhType.secondary, artRadius = MusicDimens.cardArtRadius,
+            group, pick.nothingPlaying, MusicDimens.cardArt, MusicDimens.cardName, "music_card_now",
+            firstStyle = MusicDimens.cardTrack, artRadius = MusicDimens.cardArtRadius,
         )
         Spacer(Modifier.weight(1f))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.cardControlsGap)) {

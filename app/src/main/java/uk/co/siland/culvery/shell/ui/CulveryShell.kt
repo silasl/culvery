@@ -18,7 +18,7 @@ import uk.co.siland.culvery.shell.ShellUiState
  * page. [watching] shows the top bar's pill; [pillSpot] is told where its icon is.
  */
 @Composable
-fun CulveryShell(
+internal fun CulveryShell(
     state: ShellUiState,
     now: () -> LocalDateTime,
     onSelectTab: (String) -> Unit,

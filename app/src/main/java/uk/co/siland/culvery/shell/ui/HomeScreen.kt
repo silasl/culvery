@@ -33,7 +33,7 @@ import uk.co.siland.culvery.core.ui.readAsOne
 private val CLOCK = DateTimeFormatter.ofPattern("HH:mm")
 private val DATE = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.UK)
 
-// Hand-off §1: header items 28 apart, a 1 × 48 `line` divider between two, their row 4 above the date's bottom.
+// Header items 28 apart, a 1 × 48 `line` divider between two, their row 4 above the date's bottom (4b design §4.1).
 private val HEADER_ITEM_GAP = 28.dp
 private val HEADER_DIVIDER_WIDTH = 1.dp
 private val HEADER_DIVIDER_HEIGHT = 48.dp
