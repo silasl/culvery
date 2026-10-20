@@ -15,7 +15,7 @@ data class HomePick(val group: SpeakerGroup, val nothingPlaying: Boolean)
  */
 fun homePick(groups: List<SpeakerGroup>, usualRoomId: String?, keptId: String?): HomePick? {
     fun SpeakerGroup.hasUsualRoom() = rooms.any { it.id == usualRoomId }
-    val playing = groups.filter { it.isPlaying }
+    val playing = groups.filter { it.isSounding }
     val shown = playing.firstOrNull { it.hasUsualRoom() } ?: playing.maxByOrNull { it.startedAtMillis ?: Long.MIN_VALUE }
     if (shown != null) return HomePick(shown, nothingPlaying = false)
     groups.firstOrNull { it.id == keptId && it.state == PlayState.PAUSED }?.let { return HomePick(it, nothingPlaying = false) }
@@ -32,4 +32,4 @@ fun homePicks(groups: Flow<List<SpeakerGroup>>, usualRoomId: Flow<String?>): Flo
         .drop(1)
 
 /** The Music tab's order (6 §5.2): playing groups first, then the rest, each in Sonos's order. */
-fun tabOrder(groups: List<SpeakerGroup>): List<SpeakerGroup> = groups.sortedBy { !it.isPlaying }
+fun tabOrder(groups: List<SpeakerGroup>): List<SpeakerGroup> = groups.sortedBy { !it.isSounding }

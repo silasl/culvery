@@ -25,6 +25,7 @@ fun nowPlayingLines(group: SpeakerGroup, nothingPlaying: Boolean): Pair<String, 
     null -> NOTHING_PLAYING to null
     is NowPlaying.Track -> n.title to n.artist
     is NowPlaying.Radio -> n.station to n.programme
+    is NowPlaying.Input -> n.name to null
 }
 
 /** 6 §5.5: "Kitchen, playing Song by Artist", "Kitchen, paused", "Kitchen, nothing playing". */
@@ -41,6 +42,7 @@ fun groupSpoken(group: SpeakerGroup, nothingPlaying: Boolean = false): String {
 private fun playingWords(n: NowPlaying): String = when (n) {
     is NowPlaying.Track -> listOfNotNull(n.title, n.artist).joinToString(" by ")
     is NowPlaying.Radio -> listOfNotNull(n.station, n.programme).joinToString(", ")
+    is NowPlaying.Input -> n.name
 }
 
 fun playSpoken(name: String) = "Play $name"

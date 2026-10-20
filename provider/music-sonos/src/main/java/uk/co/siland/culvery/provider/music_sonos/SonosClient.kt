@@ -33,6 +33,9 @@ internal const val SHUFFLE_NOREPEAT = "SHUFFLE_NOREPEAT"
 internal const val QUEUE_PREFIX = "x-rincon-queue:"
 internal const val LIBRARY_PREFIX = "x-rincon-playlist:"
 
+/** Line-in and Bluetooth (x-rincon-stream) and a TV's audio (x-sonos-htastream): sources with no track of their own. */
+internal val INPUT_PREFIXES = listOf("x-rincon-stream:", "x-sonos-htastream:")
+
 /** A group's own queue, played from its leader (6 §4.4). */
 internal fun queueUri(leader: String) = "$QUEUE_PREFIX$leader#0"
 

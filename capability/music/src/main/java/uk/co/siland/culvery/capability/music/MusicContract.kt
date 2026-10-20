@@ -15,11 +15,14 @@ enum class PlayState {
 
 data class SpeakerRoom(val id: String, val name: String, val volume: Int)
 
-/** What a group plays: a track from its queue, or a station (6 §3.1). */
+/** What a group plays: a track from its queue, a station, or an input with no track (6 §3.1). */
 sealed interface NowPlaying {
     data class Track(val title: String, val artist: String?, val album: String?) : NowPlaying
 
     data class Radio(val station: String, val programme: String?) : NowPlaying
+
+    /** Line-in or Bluetooth with no track: the speaker reports PLAYING whether or not anything sounds. */
+    data class Input(val name: String) : NowPlaying
 }
 
 /**
@@ -38,6 +41,9 @@ data class SpeakerGroup(
     val startedAtMillis: Long?,
 ) {
     val isPlaying: Boolean get() = state.isPlaying
+
+    /** Playing something: an input with no track (idle Bluetooth, line-in) reports PLAYING but is not (Home and the Music tab). */
+    val isSounding: Boolean get() = isPlaying && nowPlaying !is NowPlaying.Input
 
     /** "Kitchen + Lounge" (6 §5.2). */
     val name: String get() = rooms.joinToString(" + ") { it.name }

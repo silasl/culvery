@@ -110,6 +110,10 @@ internal object SonosFixtures {
         """<item id="-1" parentID="-1" restricted="true"><dc:title>Culvery FM</dc:title><upnp:class>object.item.audioItem.audioBroadcast</upnp:class>""" +
         """<desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">SA_RINCON83207_</desc></item></DIDL-Lite>"""
 
+    /** The item a speaker holds for an input it plays from: only the input's name. */
+    fun inputItem(name: String) = DIDL_OPEN +
+        """<item id="-1" parentID="-1" restricted="true"><dc:title>${escape(name)}</dc:title><upnp:class>object.item</upnp:class></item></DIDL-Lite>"""
+
     const val RADIO_URI = "x-sonosapi-hls:stations%7eBBC6%7eBBC6?sid=325&flags=8224&sn=1"
     const val TRACK_URI = "x-file-cifs://nas/music/Artist/Album/01%20Song.flac"
 

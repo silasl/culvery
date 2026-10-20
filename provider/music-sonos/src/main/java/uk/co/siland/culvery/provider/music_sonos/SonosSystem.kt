@@ -323,8 +323,10 @@ internal class SonosSystem(
         val known = synchronized(lock) { media[group.id] }?.takeIf { it.trackUri == t.uri && it.state == s }
         val m = known?.info ?: client.mediaInfo(address).also { synchronized(lock) { media[group.id] = Media(t.uri, s, it) } }
         val fromQueue = m.uri?.startsWith(QUEUE_PREFIX) == true
-        val nowPlaying = if (fromQueue) {
-            t.title?.let { NowPlaying.Track(it, t.artist, t.album) }
+        val fromInput = INPUT_PREFIXES.any { m.uri?.startsWith(it) == true }
+        val nowPlaying = if (fromQueue || fromInput) {
+            t.title?.takeUnless { it == t.uri }?.let { NowPlaying.Track(it, t.artist, t.album) }
+                ?: if (fromInput) NowPlaying.Input(m.title ?: t.title ?: "Line-in") else null
         } else {
             (m.title ?: t.title?.takeUnless { it == t.uri })?.let { NowPlaying.Radio(it, t.programme) }
         }

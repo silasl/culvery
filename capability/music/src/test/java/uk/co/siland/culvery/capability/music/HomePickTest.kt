@@ -67,4 +67,34 @@ class HomePickTest {
         val groups = all.with("b", PlayState.PLAYING).with("l", PlayState.PAUSED)
         assertThat(tabOrder(groups).map { it.id }).containsExactly("b", "k", "l").inOrder()
     }
+
+    private val bluetooth = NowPlaying.Input("Bluetooth")
+
+    private fun List<SpeakerGroup>.playing(id: String, nowPlaying: NowPlaying, state: PlayState = PlayState.PLAYING) =
+        map { if (it.id == id) it.copy(state = state, nowPlaying = nowPlaying) else it }
+
+    /** The Office fault: an idle Bluetooth input reports PLAYING and must not beat the usual room. */
+    @Test
+    fun aPlayingInputWithNoTrackLosesToTheUsualRoom() {
+        val groups = all.playing("b", bluetooth).playing("k", SONG, PlayState.PAUSED)
+        assertThat(homePick(groups, "Kitchen-id", null)).isEqualTo(HomePick(groups[0], nothingPlaying = true))
+    }
+
+    @Test
+    fun aPlayingInputWithNoTrackLosesToAnotherPlayingGroup() {
+        val groups = all.playing("b", bluetooth).playing("l", SONG)
+        assertThat(homePick(groups, "Bedroom-id", null)?.group?.id).isEqualTo("l")
+    }
+
+    @Test
+    fun aTrackOverAnInputStillPlays() {
+        val groups = all.playing("b", SONG)
+        assertThat(homePick(groups, "Kitchen-id", null)).isEqualTo(HomePick(groups[2], nothingPlaying = false))
+    }
+
+    @Test
+    fun theTabDoesNotPutAnIdleInputFirst() {
+        val groups = all.playing("b", bluetooth).playing("l", SONG)
+        assertThat(tabOrder(groups).map { it.id }).containsExactly("l", "k", "b").inOrder()
+    }
 }
