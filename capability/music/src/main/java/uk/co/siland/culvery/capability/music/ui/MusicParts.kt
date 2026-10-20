@@ -1,18 +1,25 @@
 package uk.co.siland.culvery.capability.music.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
 import uk.co.siland.culvery.capability.music.MusicActions
 import uk.co.siland.culvery.capability.music.SHUFFLE_EVERYTHING
 import uk.co.siland.culvery.capability.music.SpeakerGroup
@@ -20,16 +27,22 @@ import uk.co.siland.culvery.capability.music.SpeakerRoom
 import uk.co.siland.culvery.capability.music.groupSpoken
 import uk.co.siland.culvery.capability.music.nextSpoken
 import uk.co.siland.culvery.capability.music.nowPlayingLines
+import uk.co.siland.culvery.capability.music.percentWords
 import uk.co.siland.culvery.capability.music.pauseSpoken
 import uk.co.siland.culvery.capability.music.playSpoken
 import uk.co.siland.culvery.capability.music.shuffleSpoken
+import uk.co.siland.culvery.capability.music.volumeName
 import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhRoundButton
+import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhPercentSlider
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /** What a group's controls do; the Home card and the tab's rows share them. */
 class GroupActions(
@@ -53,9 +66,9 @@ internal fun MusicActions.forGroups(onFavourites: (SpeakerGroup) -> Unit = {}) =
 @Composable
 internal fun PlayPauseButton(group: SpeakerGroup, tag: String, actions: GroupActions) {
     if (group.isPlaying) {
-        HhRoundButton(Icons.PAUSE, pauseSpoken(group.name), { actions.onPause(group) }, Modifier.testTag("${tag}_pause"), on = ButtonSurface.Surf)
+        HhRoundButton(Icons.PAUSE, pauseSpoken(group.name), { actions.onPause(group) }, Modifier.testTag("${tag}_pause"), tone = ButtonTone.Primary, on = ButtonSurface.Surf)
     } else {
-        HhRoundButton(Icons.PLAY_ARROW, playSpoken(group.name), { actions.onPlay(group) }, Modifier.testTag("${tag}_play"), on = ButtonSurface.Surf)
+        HhRoundButton(Icons.PLAY_ARROW, playSpoken(group.name), { actions.onPlay(group) }, Modifier.testTag("${tag}_play"), tone = ButtonTone.Primary, on = ButtonSurface.Surf)
     }
 }
 
@@ -75,7 +88,17 @@ internal fun ShuffleButton(group: SpeakerGroup, tag: String, on: ButtonSurface, 
 
 /** Art, the group's name, and what it plays, read by TalkBack as one sentence (6 §5.5). */
 @Composable
-internal fun NowPlayingBlock(group: SpeakerGroup, nothingPlaying: Boolean, artSize: Dp, nameStyle: TextStyle, tag: String, modifier: Modifier = Modifier) {
+internal fun NowPlayingBlock(
+    group: SpeakerGroup,
+    nothingPlaying: Boolean,
+    artSize: Dp,
+    nameStyle: TextStyle,
+    tag: String,
+    modifier: Modifier = Modifier,
+    firstStyle: TextStyle = HhType.body,
+    secondStyle: TextStyle = HhType.secondary,
+    artRadius: Dp = MusicDimens.artRadius,
+) {
     val c = Culvery.colors
     val spoken = groupSpoken(group, nothingPlaying)
     val (first, second) = nowPlayingLines(group, nothingPlaying)
@@ -85,11 +108,11 @@ internal fun NowPlayingBlock(group: SpeakerGroup, nothingPlaying: Boolean, artSi
         horizontalArrangement = Arrangement.spacedBy(MusicDimens.artGap),
         modifier = modifier.testTag(tag).clearAndSetSemantics { contentDescription = spoken },
     ) {
-        ArtImage(group.artUrl.takeUnless { quiet }, artSize)
+        ArtImage(group.artUrl.takeUnless { quiet }, artSize, Modifier.testTag("${tag}_art"), artRadius)
         Column(Modifier.weight(1f)) {
             Text(group.name, style = nameStyle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(first, style = HhType.body, color = if (quiet) c.mute else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (second != null) Text(second, style = HhType.secondary, color = c.mute, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(first, style = firstStyle, color = if (quiet) c.mute else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (second != null) Text(second, style = secondStyle, color = c.mute, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -97,3 +120,29 @@ internal fun NowPlayingBlock(group: SpeakerGroup, nothingPlaying: Boolean, artSi
 /** The one line saying what is wrong and how to fix it (6 §6), on the card, the tab and Settings › Music. */
 @Composable
 internal fun MusicStatusLine(text: String) = HhStatusLine(text, "music_status")
+
+/** The group's volume in a 48 dp `surf2` pill: the speaker icon, a thick track and the number (9 §4.2). Tagged [tag]; the slider [tag]_slider. */
+@Composable
+internal fun VolumePill(group: SpeakerGroup, tag: String, onLetGo: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val c = Culvery.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(MusicDimens.pillGap),
+        modifier = modifier
+            .testTag(tag)
+            .height(MusicDimens.pillHeight)
+            .clip(CircleShape)
+            .background(c.surf2)
+            .padding(start = MusicDimens.pillPaddingStart, end = MusicDimens.pillPaddingEnd),
+    ) {
+        HhIcon(Icons.VOLUME_UP, size = MusicDimens.pillIcon, tint = c.mute, modifier = Modifier.shownNotSpoken())
+        HhPercentSlider(
+            group.name, group.volume, "${tag}_slider", Modifier.weight(1f),
+            spokenName = volumeName(group.name), spokenState = ::percentWords,
+            label = { Text("$it", style = VolumeNumber, color = c.ink, maxLines = 1, modifier = Modifier.shownNotSpoken()) },
+            trackHeight = MusicDimens.pillTrack, onLetGo = onLetGo,
+        )
+    }
+}
+
+private val VolumeNumber = HhType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.W600, fontFeatureSettings = "tnum")

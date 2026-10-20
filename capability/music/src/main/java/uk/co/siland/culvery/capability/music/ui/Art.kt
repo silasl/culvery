@@ -98,11 +98,11 @@ internal fun decodeArt(data: ByteArray, px: Int): ImageBitmap? {
 
 /** A group's or a Favourite's art, or a music note on `surf2` while there's none. Decorative: the words say what plays. */
 @Composable
-internal fun ArtImage(url: String?, size: Dp, modifier: Modifier = Modifier) {
+internal fun ArtImage(url: String?, size: Dp, modifier: Modifier = Modifier, radius: Dp = MusicDimens.artRadius) {
     val c = Culvery.colors
     val source = LocalArtSource.current
     val image by produceState<ImageBitmap?>(null, url, source) { value = url?.let { source.load(it) } }
-    Box(contentAlignment = Alignment.Center, modifier = modifier.size(size).clip(RoundedCornerShape(MusicDimens.artRadius)).background(c.surf2)) {
+    Box(contentAlignment = Alignment.Center, modifier = modifier.size(size).clip(RoundedCornerShape(radius)).background(c.surf2)) {
         val shown = image
         if (shown != null) {
             Image(shown, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())

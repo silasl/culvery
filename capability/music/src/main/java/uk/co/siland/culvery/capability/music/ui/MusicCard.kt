@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uk.co.siland.culvery.capability.music.HomePick
 import uk.co.siland.culvery.capability.music.LOOKING_FOR_SPEAKERS
@@ -24,21 +25,20 @@ import uk.co.siland.culvery.capability.music.MUSIC
 import uk.co.siland.culvery.capability.music.MusicActions
 import uk.co.siland.culvery.capability.music.MusicChecks
 import uk.co.siland.culvery.capability.music.MusicView
-import uk.co.siland.culvery.capability.music.percentWords
 import uk.co.siland.culvery.capability.music.problemLine
-import uk.co.siland.culvery.capability.music.volumeName
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
-import uk.co.siland.culvery.core.ui.HhPercentSlider
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.ShellTokens
 
+private val CardName = HhType.cardTitle.copy(fontSize = 20.sp)
+private val CardTrack = HhType.rowTitle.copy(fontWeight = FontWeight.W400)
+
 /**
- * The REGULAR Home card (6 §5.1): the room Home follows and what it plays, Play/Pause, Next and the group's volume;
- * Shuffle everything only while that group isn't playing, so a tap mid-song can't replace the queue, and no Next
- * when nothing plays. With a problem,
- * the §6 line and no controls; before the first check, that it is looking.
+ * The REGULAR Home card (9 §4.2): the room Home follows and what it plays, then one row: Play/Pause, Next and the
+ * group's volume pill. Shuffle everything takes Next's place only when nothing plays, so a tap mid-song can't replace
+ * the queue. With a problem, the §6 line and no controls; before the first check, that it is looking.
  */
 @Composable
 fun MusicCard(pick: HomePick?, status: String?, line: String?, actions: GroupActions, modifier: Modifier = Modifier) {
@@ -55,17 +55,16 @@ fun MusicCard(pick: HomePick?, status: String?, line: String?, actions: GroupAct
             return@HhCard
         }
         val group = pick.group
-        NowPlayingBlock(group, pick.nothingPlaying, MusicDimens.cardArt, HhType.cardTitle, "music_card_now")
+        NowPlayingBlock(
+            group, pick.nothingPlaying, MusicDimens.cardArt, CardName, "music_card_now",
+            firstStyle = CardTrack, secondStyle = HhType.secondary, artRadius = MusicDimens.cardArtRadius,
+        )
         Spacer(Modifier.weight(1f))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.cardControlsGap)) {
             PlayPauseButton(group, "music_card", actions)
-            if (!pick.nothingPlaying) NextButton(group, "music_card", actions)
-            if (!group.isPlaying) ShuffleButton(group, "music_card", ButtonSurface.Surf, actions, compact = true)
+            if (pick.nothingPlaying) ShuffleButton(group, "music_card", ButtonSurface.Surf, actions, compact = true) else NextButton(group, "music_card", actions)
+            VolumePill(group, "music_card_volume", { actions.onGroupVolume(group, it) }, Modifier.weight(1f))
         }
-        HhPercentSlider(
-            group.name, group.volume, "music_card_volume", Modifier.fillMaxWidth(),
-            spokenName = volumeName(group.name), spokenState = ::percentWords,
-        ) { actions.onGroupVolume(group, it) }
         if (line != null) Text(line, style = HhType.secondary, color = c.danger, maxLines = 2, modifier = Modifier.testTag("music_card_line"))
     }
 }

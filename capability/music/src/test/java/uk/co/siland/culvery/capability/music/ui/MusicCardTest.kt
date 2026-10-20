@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -22,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -45,6 +47,7 @@ import uk.co.siland.culvery.capability.music.group
 import uk.co.siland.culvery.capability.music.recordingGroupActions
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.waitFor
 
 /** 6 §5.1, §5.5: the Home card's states, its controls and their words; it watches the speakers while it shows. */
@@ -54,10 +57,12 @@ class MusicCardTest {
     @get:Rule val music = MusicFixture()
     private val calls = mutableListOf<String>()
     private val actions = recordingGroupActions(calls)
+    /** The right-hand Home cell; app's HomeGridTest pins the same size. */
+    private val rightHalfSize = DpSize(701.dp, 285.5.dp)
     private val playing = group("k", "Kitchen", state = PlayState.PLAYING, nowPlaying = SONG, volume = 30)
 
     private fun show(pick: HomePick?, status: String? = null, line: String? = null) = compose.setContent {
-        CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { MusicCard(pick, status, line, actions) } }
+        CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { MusicCard(pick, status, line, actions) } }
     }
 
     @Test
@@ -66,10 +71,10 @@ class MusicCardTest {
         compose.onNodeWithContentDescription("Kitchen, playing Song by Artist").assertExists()
         compose.onNodeWithTag("music_card_pause").assertContentDescriptionEquals("Pause Kitchen").performClick()
         compose.onNodeWithTag("music_card_next").assertIsEnabled().assertContentDescriptionEquals("Next track in Kitchen")
-        compose.onNodeWithTag("music_card_volume")
+        compose.onNodeWithTag("music_card_volume_slider")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Kitchen volume")))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "30 percent"))
-        compose.onNodeWithTag("music_card_volume").performSemanticsAction(SemanticsActions.SetProgress) { it(45f) }
+        compose.onNodeWithTag("music_card_volume_slider").performSemanticsAction(SemanticsActions.SetProgress) { it(45f) }
         assertThat(calls).containsExactly("pause k", "volume k 45").inOrder()
         compose.assertAccessible()
     }
@@ -78,7 +83,7 @@ class MusicCardTest {
     @Test
     fun aDragSendsTheVolumeOnceWhenLetGo() {
         show(HomePick(playing, nothingPlaying = false))
-        compose.onNodeWithTag("music_card_volume").performTouchInput {
+        compose.onNodeWithTag("music_card_volume_slider").performTouchInput {
             down(Offset(width * 0.1f, centerY))
             repeat(10) { moveBy(Offset(width * 0.05f, 0f)) }
             up()
@@ -95,8 +100,8 @@ class MusicCardTest {
     @Test
     fun aVolumeReadMidDragKeepsTheDrag() {
         var pick by mutableStateOf(HomePick(playing, nothingPlaying = false))
-        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { MusicCard(pick, null, null, actions) } } }
-        val volume = compose.onNodeWithTag("music_card_volume")
+        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { MusicCard(pick, null, null, actions) } } }
+        val volume = compose.onNodeWithTag("music_card_volume_slider")
         volume.performTouchInput {
             down(Offset(width * 0.1f, centerY))
             repeat(10) { moveBy(Offset(width * 0.05f, 0f)) }
@@ -114,8 +119,8 @@ class MusicCardTest {
     @Test
     fun theVolumeLetGoStaysUntilTheGroupsVolumeChanges() {
         var pick by mutableStateOf(HomePick(playing, nothingPlaying = false))
-        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { MusicCard(pick, null, null, actions) } } }
-        val volume = compose.onNodeWithTag("music_card_volume")
+        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { MusicCard(pick, null, null, actions) } } }
+        val volume = compose.onNodeWithTag("music_card_volume_slider")
         volume.performSemanticsAction(SemanticsActions.SetProgress) { it(45f) }
         volume.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "45 percent"))
         pick = HomePick(playing.copy(volume = 50), nothingPlaying = false)
@@ -137,15 +142,67 @@ class MusicCardTest {
         compose.onNodeWithContentDescription("Lounge, playing Culvery FM, The Breakfast Show").assertExists()
     }
 
-    /** 6 §5.1: nothing playing anywhere: the usual room, "Nothing playing", Play and Shuffle everything. */
+    /** 9 §4.2: with nothing playing Shuffle everything stands where Next would, and Next is hidden. */
     @Test
-    fun nothingPlayingOffersPlayAndShuffle() {
+    fun nothingPlayingHidesNextAndOffersShuffleInItsPlace() {
         show(HomePick(group("k", "Kitchen", state = PlayState.PAUSED, nowPlaying = SONG), nothingPlaying = true))
         compose.onNodeWithContentDescription("Kitchen, nothing playing").assertExists()
         compose.onNodeWithTag("music_card_next").assertDoesNotExist()
         compose.onNodeWithTag("music_card_play").assertContentDescriptionEquals("Play Kitchen").performClick()
         compose.onNodeWithTag("music_card_shuffle").assertContentDescriptionEquals("Shuffle everything in Kitchen").performClick()
         assertThat(calls).containsExactly("play k", "shuffle k").inOrder()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §4.2: paused with a queue the row is Play, Next, volume; no Shuffle. */
+    @Test
+    fun pausedShowsPlayAndNextAndNoShuffle() {
+        show(HomePick(playing.copy(state = PlayState.PAUSED), nothingPlaying = false))
+        compose.onNodeWithTag("music_card_play").assertExists()
+        compose.onNodeWithTag("music_card_next").assertExists()
+        compose.onNodeWithTag("music_card_shuffle").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §4.2: Pause, Next and the volume pill share one row. Fails while the volume sits on a row of its own. */
+    @Test
+    fun oneControlRow() {
+        show(HomePick(playing, nothingPlaying = false))
+        val centres = listOf("music_card_pause", "music_card_next", "music_card_volume").map {
+            val b = compose.onNodeWithTag(it).getUnclippedBoundsInRoot()
+            (b.top.value + b.bottom.value) / 2
+        }
+        assertThat(centres[1]).isWithin(1f).of(centres[0])
+        assertThat(centres[2]).isWithin(1f).of(centres[0])
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §4.2: the pill names the speaker, shows the number, and letting go sends the volume. */
+    @Test
+    fun theVolumePillHasTheSpeakerAndTheNumber() {
+        show(HomePick(playing, nothingPlaying = false))
+        compose.onNodeWithText("30").assertExists()
+        compose.onNodeWithTag("music_card_volume_slider")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Kitchen volume")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "30 percent"))
+        compose.onNodeWithTag("music_card_volume_slider").performTouchInput {
+            down(Offset(width * 0.1f, centerY))
+            moveBy(Offset(width * 0.4f, 0f))
+            up()
+        }
+        compose.waitForIdle()
+        assertThat(calls.single()).startsWith("volume k ")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §4.2: the art is 88 dp. */
+    @Test
+    fun theArtIs88Dp() {
+        show(HomePick(playing, nothingPlaying = false))
+        val art = compose.onNodeWithTag("music_card_now_art", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertThat((art.right - art.left).value).isWithin(0.01f).of(88f)
+        assertThat((art.bottom - art.top).value).isWithin(0.01f).of(88f)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** 6 §2.2: Home keeps the group it showed playing (its track shows: `music_card_paused_dark`), and offers Play. */
@@ -154,6 +211,7 @@ class MusicCardTest {
         show(HomePick(playing.copy(state = PlayState.PAUSED), nothingPlaying = false))
         compose.onNodeWithContentDescription("Kitchen, paused").assertExists()
         compose.onNodeWithTag("music_card_play").assertExists()
+        compose.onNodeWithTag("music_card_shuffle").assertDoesNotExist()
     }
 
     /** 6 §5.1: unreachable, the §6 line and no controls. */
@@ -163,6 +221,7 @@ class MusicCardTest {
         compose.onNodeWithText("The tablet is offline. Check the Wi-Fi.").assertExists()
         compose.onNodeWithTag("music_card_pause").assertDoesNotExist()
         compose.onNodeWithTag("music_card_volume").assertDoesNotExist()
+        compose.onNodeWithTag("music_card_volume_slider").assertDoesNotExist()
     }
 
     /** 6 §6: a refused command says so on the card. */

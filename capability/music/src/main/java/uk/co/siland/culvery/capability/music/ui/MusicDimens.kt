@@ -4,16 +4,25 @@ import androidx.compose.ui.unit.dp
 
 /** Music's layout values (6 §5); provisional until the end-of-v1 design walk-through. */
 internal object MusicDimens {
-    // The Home card: padding 20 × 22, as the forecast's; the radius is ShellTokens.homeCardRadius.
+    // The Home card: padding 20 × 21 as Today's, art 88 (9 §4.2); the radius is ShellTokens.homeCardRadius.
     val cardPaddingV = 20.dp
-    val cardPaddingH = 22.dp
-    val cardArt = 72.dp
+    val cardPaddingH = 21.dp
+    val cardArt = 88.dp
     val artGap = 14.dp
     val artRadius = 12.dp
+    val cardArtRadius = 13.dp
     val controlsGap = 10.dp
 
-    // Narrower on the card, so Play, Next and a compact Shuffle everything fit 345 dp.
-    val cardControlsGap = 6.dp
+    // The card's one row: Play/Pause, Next or Shuffle everything, then the volume pill.
+    val cardControlsGap = 10.dp
+
+    // The volume pill: 48 dp, the speaker icon, a 9 dp track, then the number.
+    val pillHeight = 48.dp
+    val pillPaddingStart = 14.dp
+    val pillPaddingEnd = 18.dp
+    val pillGap = 10.dp
+    val pillIcon = 24.dp
+    val pillTrack = 9.dp
 
     // Round controls are the 48 dp touch target, with a 28 dp icon.
     val button = 48.dp

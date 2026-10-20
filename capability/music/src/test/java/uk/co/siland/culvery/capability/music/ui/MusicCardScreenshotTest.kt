@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -25,16 +26,18 @@ import uk.co.siland.culvery.capability.music.group
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
-/** The Home card in a REGULAR cell as the grid gives it on the 1280×800 canvas (the forecast's 345 × 279). */
+/** The Home card in the right column's cell as the grid gives it on the 1280×800 canvas. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w1280dp-h800dp-land-hdpi")
 class MusicCardScreenshotTest {
+    /** The right-hand Home cell; app's HomeGridTest pins the same size. */
+    private val rightHalfSize = DpSize(701.dp, 285.5.dp)
     @get:Rule val compose = createComposeRule()
     private val kitchen = group("k", "Kitchen", state = PlayState.PLAYING, nowPlaying = SONG, volume = 30, artUrl = "art")
 
     private fun snap(name: String, dark: Boolean, pick: HomePick?, status: String? = null) = compose.snap(name, dark, Modifier.padding(16.dp)) {
-        Box(Modifier.size(345.dp, 279.dp)) { MusicCard(pick, status, null, GroupActions.None) }
+        Box(Modifier.size(rightHalfSize)) { MusicCard(pick, status, null, GroupActions.None) }
     }
 
     @Test fun playingDark() = snap("music_card_playing_dark", true, HomePick(kitchen, false))
@@ -53,13 +56,13 @@ class MusicCardScreenshotTest {
 
     @Test fun lookingDark() = snap("music_card_looking_dark", true, null)
 
-    /** At 345 dp, Play, Next and Shuffle everything share one row with the label whole. Fails if the row squeezes Shuffle. */
+    /** Play, Next and Shuffle everything share one row with the label whole. Fails if the row squeezes Shuffle. */
     @Test
     fun shuffleEverythingFitsBesidePlayAndNext() {
         compose.setContent {
             CulveryTheme(dark = true) {
                 Column {
-                    Box(Modifier.size(345.dp, 279.dp)) { MusicCard(HomePick(kitchen.copy(state = PlayState.PAUSED), false), null, null, GroupActions.None) }
+                    Box(Modifier.size(rightHalfSize)) { MusicCard(HomePick(kitchen.copy(state = PlayState.PAUSED), nothingPlaying = true), null, null, GroupActions.None) }
                     Box(Modifier.wrapContentSize()) { ShuffleButton(kitchen, "free", ButtonSurface.Surf, GroupActions.None, compact = true) }
                 }
             }
