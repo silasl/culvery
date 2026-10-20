@@ -299,26 +299,41 @@ class LightsTabTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** 9 §2.5. Fails if eight scenes at a large font wrap or are cut: the last is reached by scrolling the one row. */
+    /**
+     * 9 §2.5. Fails if eight scenes at a large font on six cards stay on one line, or a chip is cut: every chip wraps onto
+     * the card's lines and, where they outgrow the card, is reached by scrolling the chip area.
+     */
     @Test
-    fun manyScenesScrollAcrossNotClipped() {
+    fun manyScenesWrapAndScrollInTheCardNotClipped() {
         val scenes = (1..8).map { LightScene("s$it-id", "Scene number $it") }
+        val rooms = listOf("Lounge", "Kitchen", "Hall", "Garden", "Front Door", "Back Garden").map { room(it, on = true, scenes = scenes) }
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = 1.3f)) {
                 CulveryTheme(dark = true) {
                     Box(Modifier.size(900.dp, 800.dp)) {
-                        LightsTab(listOf(room("Lounge", on = true, scenes = scenes)), false, true, null, null, null, emptyMap(), null, {}, house, roomActions)
+                        LightsTab(rooms, false, true, null, null, null, emptyMap(), null, {}, house, roomActions)
                     }
                 }
             }
         }
-        val row = compose.onNodeWithTag("lights_room_Lounge-id_scenes")
-        row.performScrollToNode(hasTestTag("lights_room_Lounge-id_scene_s8-id"))
-        compose.onNodeWithText("Scene number 8", useUnmergedTree = true).assertIsDisplayed()
-        val chip = compose.onNodeWithTag("lights_room_Lounge-id_scene_s8-id").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val rowBounds = row.fetchSemanticsNode().boundsInRoot
-        assertThat(chip.top).isAtLeast(rowBounds.top)
-        assertThat(chip.bottom).isAtMost(rowBounds.bottom)
+        listOf("Lounge-id", "Back Garden-id").forEach { id ->
+            val area = compose.onNodeWithTag("lights_room_${id}_scenes")
+            val card = compose.onNodeWithTag("lights_room_$id").fetchSemanticsNode().boundsInRoot
+            val tops = scenes.map { scene ->
+                val tag = "lights_room_${id}_scene_${scene.id}"
+                area.performScrollToNode(hasTestTag(tag))
+                val chip = compose.onNodeWithTag(tag).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                val shown = area.fetchSemanticsNode().boundsInRoot
+                assertThat(chip.top).isAtLeast(shown.top - 0.5f)
+                assertThat(chip.bottom).isAtMost(shown.bottom + 0.5f)
+                assertThat(chip.left).isAtLeast(shown.left - 0.5f)
+                assertThat(chip.right).isAtMost(shown.right + 0.5f)
+                assertThat(shown.bottom).isAtMost(card.bottom)
+                // In the area's own coordinates, so a chip scrolled into view is placed where it sits in the flow.
+                chip.top - shown.top + (area.fetchSemanticsNode().config.getOrNull(SemanticsProperties.VerticalScrollAxisRange)?.value?.invoke() ?: 0f)
+            }
+            assertThat(tops.distinct().size).isGreaterThan(1)
+        }
         compose.assertClickablesHaveRoleAndLabel()
     }
 

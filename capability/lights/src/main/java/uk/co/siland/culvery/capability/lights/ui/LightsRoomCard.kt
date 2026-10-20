@@ -2,15 +2,17 @@ package uk.co.siland.culvery.capability.lights.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -32,9 +34,9 @@ import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /**
- * One room (9 §4.4): its bulb, name, [cardStatus] and switch; its brightness with the level; and its scenes in one row
- * that scrolls sideways, so a card of fixed height never cuts them. An off room has a disabled slider, and a scene chip turns
- * it on with that scene. [line] is the room's last refused command.
+ * One room (9 §4.4): its bulb, name, [cardStatus] and switch; its brightness with the level; and its scenes wrapping onto
+ * more lines, which scroll up and down inside the card when they outgrow it, so a card of fixed height never cuts them. An
+ * off room has a disabled slider, and a scene chip turns it on with that scene. [line] is the room's last refused command.
  */
 @Composable
 internal fun LightsRoomCard(room: LightRoom, line: String?, actions: RoomActions, modifier: Modifier = Modifier) {
@@ -72,17 +74,25 @@ internal fun LightsRoomCard(room: LightRoom, line: String?, actions: RoomActions
                 )
             }
             if (room.scenes.isNotEmpty()) {
-                LazyRow(
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(LightsDimens.chipGap),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().selectableGroup().testTag("${tag}_scenes"),
+                    verticalArrangement = Arrangement.spacedBy(LightsDimens.chipGap),
+                    itemVerticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .selectableGroup()
+                        .testTag("${tag}_scenes"),
                 ) {
-                    items(room.scenes, key = { it.id }) { scene ->
-                        HhChoiceChip(
-                            scene.name, selected = scene.id == room.activeSceneId, tag = "${tag}_scene_${scene.id}",
-                            onClick = { actions.onScene(room, scene) }, role = Role.RadioButton, spokenName = sceneSpoken(scene, room),
-                            unselectedFill = c.surf2,
-                        )
+                    room.scenes.forEach { scene ->
+                        key(scene.id) {
+                            HhChoiceChip(
+                                scene.name, selected = scene.id == room.activeSceneId, tag = "${tag}_scene_${scene.id}",
+                                onClick = { actions.onScene(room, scene) }, role = Role.RadioButton, spokenName = sceneSpoken(scene, room),
+                                unselectedFill = c.surf2,
+                            )
+                        }
                     }
                 }
             }

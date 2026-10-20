@@ -284,7 +284,7 @@ class LightsGridTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** 9 §2.5. Fails if, in rows that share a fixed height at a large font, a scene chip is cut or the last can't be reached. */
+    /** 9 §2.5. Fails if, in rows that share a fixed height at a large font, a scene chip is cut at the side or the last can't be reached. */
     @Test
     fun sceneChipsAreNotCutInTheSharedRows() {
         rooms = numbered(6, on = setOf(1, 2, 3), scenes = (1..8).map { LightScene("s$it-id", "Scene number $it") })
@@ -293,9 +293,9 @@ class LightsGridTest {
             val card = bounds(card(n))
             val row = bounds("${card(n)}_scenes")
             assertThat(row.bottom).isAtMost(card.bottom)
-            (1..8).map { "${card(n)}_scene_s$it-id" }.filter(::exists).forEach { chip ->
-                assertThat(bounds(chip).top).isAtLeast(row.top)
-                assertThat(bounds(chip).bottom).isAtMost(row.bottom)
+            (1..8).map { "${card(n)}_scene_s$it-id" }.forEach { chip ->
+                assertThat(unclipped(chip).left).isAtLeast(row.left)
+                assertThat(unclipped(chip).right).isAtMost(row.right)
             }
         }
         val last = "${card(6)}_scene_s8-id"
