@@ -14,20 +14,20 @@ internal object CalendarType {
     /** 12 sp / 400: compact times, "+N more". */
     val small12 = HhType.secondary.copy(fontSize = 12.sp)
 
-    /** 12 sp / 700: week-view chip times. */
-    val chipTime = HhType.labelSmall
+    /** 11 sp / 600: week-view chip times and names. */
+    val chipTime = HhType.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.W600)
 
     /** 14 sp / 600 at 1.25 line height: week-view chip titles. */
     val chipTitle = strong14.copy(lineHeight = 17.5.sp)
+
+    /** 23 sp / 700: a week column's date number. */
+    val weekDate = HhType.dateNumber.copy(fontSize = 23.sp)
 
     /** 34 sp / 700, −0.5 tracking: "This week". */
     val weekTitle = HhType.screenTitle.copy(letterSpacing = (-0.5).sp)
 
     /** 15 sp / 400: the week-view subtitle. */
     val subtitle = HhType.secondary.copy(fontSize = 15.sp)
-
-    /** 14 sp / 500: legend names. */
-    val legend = HhType.secondary.copy(fontWeight = FontWeight.W500)
 
     /** 14 sp / 600: the reconnect chip. */
     val pill = strong14
@@ -173,23 +173,13 @@ internal object CalendarDimens {
     val connectIconSize = 34.dp
     val connectButtonTop = 18.dp
 
-    // Week view header: subtitle 4 below the title; legend 18 between people, 7 dot→name, 24 to the
-    // right-hand button slot (2b's Add event); reconnect chip 8 below the subtitle.
-    val subtitleTop = 4.dp
-    val legendGap = 18.dp
-    val legendDotGap = 7.dp
-    val legendDot = 10.dp
-    val legendNameMax = 120.dp
-    val headerTrailingGap = 24.dp
+    // Week view header: the sync line sits where a subtitle would (4 below the title); reconnect chip 8 below it.
     val reconnectTop = 8.dp
     val reconnectIcon = 20.dp
     val staleIcon = 16.dp
     val staleIconGap = 6.dp
 
-    // Looking ahead (4c §6.6): ‹ › are the date picker's 48 dp round buttons, 8 apart and 16 before the title; the
-    // This week chip is a 44 dp `surf2` pill 16 after it. An arrow at its end shows at 30%.
-    val weekStepGap = 8.dp
-    val weekTitleGap = 16.dp
+    // The date picker's ‹ › still fade at an end (4c §6.6).
     const val DISABLED_ALPHA = 0.3f
 
     // Week columns: header inset 4 at the sides and bottom; chip title 2 below the time; badge 15.
@@ -199,18 +189,22 @@ internal object CalendarDimens {
     val chipBadge = 15.dp
     val badgeGap = 4.dp
 
-    // Week view layout: header→columns 18, between columns 10; column radius 22, today ring 2 dp inset;
-    // column padding 10×14; weekday label→date number 6; chip radius 12, chip padding 10×8; reconnect icon→label 8.
-    val weekHeaderGap = 18.dp
-    val weekColumnGap = 10.dp
-    val weekColumnRadius = 22.dp
+    // Week view layout (9 §4.7): header→columns 15, between columns 9; column radius 20, padding 12 above and 9 at
+    // the sides and foot; today's ring 2 dp wide, 2 dp in from the edge; weekday label→date number 6; chip radius
+    // 12, padding 9×8, a 7 dp person dot 5 before the time; reconnect icon→label 8.
+    val weekHeaderGap = 15.dp
+    val weekColumnGap = 9.dp
+    val weekColumnRadius = 20.dp
     val todayRingWidth = 2.dp
-    val weekColumnPaddingH = 10.dp
-    val weekColumnPaddingV = 14.dp
+    val todayRingInset = 2.dp
+    val weekColumnPaddingTop = 12.dp
+    val weekColumnPaddingSide = 9.dp
     val weekDayDateGap = 6.dp
     val chipRadius = 12.dp
-    val chipPaddingH = 10.dp
+    val chipPaddingH = 9.dp
     val chipPaddingV = 8.dp
+    val chipDot = 7.dp
+    val chipDotGap = 5.dp
     val reconnectIconGap = 8.dp
 
     // Event detail sheet (hand-off §7): padding 28×30×26; a 6 dp colour bar 14 dp from the title; close 12 dp away.

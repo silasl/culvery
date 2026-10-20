@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import java.time.LocalDate
-import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.capability.calendar.EventUi
@@ -9,9 +8,6 @@ import uk.co.siland.culvery.capability.calendar.FULL_DATE
 import uk.co.siland.culvery.capability.calendar.FULL_WEEKDAY
 import uk.co.siland.culvery.capability.calendar.badges
 import uk.co.siland.culvery.capability.calendar.spokenTime
-import uk.co.siland.culvery.core.household.Person
-import uk.co.siland.culvery.core.ui.FAMILY_COLOUR_NAME
-import uk.co.siland.culvery.core.ui.PersonPalette
 
 // What TalkBack says for the calendar's controls. Click labels follow "double-tap to", in lower case.
 
@@ -52,9 +48,3 @@ internal fun eventOnDay(event: EventUi, day: LocalDate): String =
 
 /** A Today row (the card is the day): "Swimming, Sam, 09:00 to 10:30", then its badges. */
 internal fun todayRowName(event: EventUi): String = "${event.title}, ${event.person.name}, ${spokenTime(event.timeLabel)}${event.badgeWords()}"
-
-/** "Colours: Alex, green; Sam, blue; Family, amber". */
-internal fun legendName(people: List<Person>): String = people.joinToString("; ", prefix = "Colours: ") { person ->
-    val colour = if (person.isFamily) FAMILY_COLOUR_NAME else PersonPalette.nameOf(person.color)
-    if (colour == null) person.name else "${person.name}, ${colour.lowercase(Locale.ENGLISH)}"
-}

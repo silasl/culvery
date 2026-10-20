@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -37,7 +35,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -57,19 +60,11 @@ import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WeekUi
-import uk.co.siland.culvery.capability.calendar.isStaleAt
-import uk.co.siland.culvery.capability.calendar.weekLine
-import uk.co.siland.culvery.capability.calendar.weekTitle
-import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
-import uk.co.siland.culvery.core.ui.ButtonSurface
-import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhAlpha
-import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.shownNotSpoken
@@ -88,13 +83,11 @@ internal fun reconnectLabel(services: List<String>): String =
     if (services.size == 1) "${services.single()} needs reconnecting" else "${services.size} accounts need reconnecting"
 
 /**
- * Hand-off §2 and §7: seven days, person-coloured chips and the sync state. ‹ › step a week at a time, from this week
- * (today and six days) to [MAX_WEEKS_AHEAD] weeks on, inside the synced window (4c D10), through [onWeeksAhead]; This
- * week jumps back. With [onAdd] (there is a writable master calendar), Add event sits right of the legend and adds on
- * the first day shown, and a tap on the space below a column's chips, or on its hint, adds on that column's day; chip
- * taps still open their event. Without it, the legend keeps a 24 dp gap to the right edge. The reconnect chip runs
- * [onReconnect] (3a design §4.3). While the week is out of date, Update now runs [onUpdateNow] and the line says
- * "Updating…" until the sync lands or [UPDATING_SHOWN_MS] passes (4e).
+ * Seven days with person-tinted chips and the sync state (9 §4.7). ‹ › step a week at a time, from this week (today and
+ * six days) to [MAX_WEEKS_AHEAD] weeks on, inside the synced window (4c D10), through [onWeeksAhead]; This week jumps
+ * back. With [onAdd] (there is a writable master calendar), Add event adds on the first day shown, and a tap on the
+ * space below a column's chips, or on its hint, adds on that column's day; chip taps still open their event. The
+ * reconnect chip runs [onReconnect] (3a design §4.3) and Update now runs [onUpdateNow] ([WeekHeader]).
  */
 @Composable
 fun WeekView(
@@ -106,98 +99,8 @@ fun WeekView(
     onReconnect: () -> Unit = {},
     onUpdateNow: () -> Unit = {},
 ) {
-    val c = Culvery.colors
-    // Reset by a sync landing (a new age), or after a while if it failed and the age stayed the same.
-    var updating by remember(state.sync.lastSyncMillis) { mutableStateOf(false) }
-    if (updating) LaunchedEffect(Unit) {
-        delay(UPDATING_SHOWN_MS)
-        updating = false
-    }
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.weekHeaderGap), modifier = modifier.fillMaxSize()) {
-        Column {
-            // The title+subtitle column and the legend share one bottom-aligned row, so the legend stays level
-            // with the subtitle whether or not the reconnect chip below adds height to the title column.
-            Row(
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(CalendarDimens.headerTrailingGap),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekStepGap)) {
-                            RoundButton(Icons.CHEVRON_LEFT, "Earlier week", "week_earlier", on = ButtonSurface.Bg, enabled = state.weeksAhead > 0) {
-                                onWeeksAhead(state.weeksAhead - 1)
-                            }
-                            RoundButton(Icons.CHEVRON_RIGHT, "Later week", "week_later", on = ButtonSurface.Bg, enabled = state.weeksAhead < MAX_WEEKS_AHEAD) {
-                                onWeeksAhead(state.weeksAhead + 1)
-                            }
-                        }
-                        Spacer(Modifier.width(CalendarDimens.weekTitleGap))
-                        Text(
-                            weekTitle(state.weeksAhead),
-                            style = CalendarType.weekTitle,
-                            color = c.ink,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false).testTag("week_title").semantics {
-                                heading()
-                                liveRegion = LiveRegionMode.Polite
-                            },
-                        )
-                        if (state.weeksAhead > 0) {
-                            Spacer(Modifier.width(CalendarDimens.weekTitleGap))
-                            HhButton("This week", { onWeeksAhead(0) }, Modifier.testTag("week_this_week"), on = ButtonSurface.Bg)
-                        }
-                    }
-                    Spacer(Modifier.height(CalendarDimens.subtitleTop))
-                    // A failed pass shows as soon as it happens, not only once the week is out of date (5 §A.3).
-                    val failing = state.sync.isStaleAt(state.nowMillis) || state.sync.problem != null
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.staleIconGap)) {
-                        if (failing && !updating) HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.staleIcon, tint = c.danger, modifier = Modifier.testTag("week_out_of_date"))
-                        Text(
-                            if (updating) UPDATING else weekLine(state.sync, state.nowMillis),
-                            style = CalendarType.subtitle,
-                            color = if (failing && !updating) c.danger else c.mute,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false).testTag("week_subtitle").semantics { liveRegion = LiveRegionMode.Polite },
-                        )
-                        if (failing && !updating) {
-                            HhButton(
-                                UPDATE_NOW,
-                                {
-                                    updating = true
-                                    onUpdateNow()
-                                },
-                                Modifier.testTag("week_update_now"),
-                                on = ButtonSurface.Bg,
-                            )
-                        }
-                    }
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(CalendarDimens.headerTrailingGap),
-                ) {
-                    Legend(
-                        state.week.people,
-                        Modifier
-                            .testTag("week_legend")
-                            .then(if (onAdd == null) Modifier.padding(end = CalendarDimens.headerTrailingGap) else Modifier),
-                    )
-                    if (onAdd != null) {
-                        HhButton(
-                            "Add event", { onAdd(state.week.start) }, Modifier.testTag("week_add_event"),
-                            tone = ButtonTone.Primary, icon = Icons.ADD, on = ButtonSurface.Bg,
-                        )
-                    }
-                }
-            }
-            if (state.sync.needsSignIn.isNotEmpty()) {
-                Spacer(Modifier.height(CalendarDimens.reconnectTop))
-                ReconnectChip(reconnectLabel(state.sync.needsSignIn), onClick = onReconnect)
-            }
-        }
+        WeekHeader(state, onWeeksAhead, onAdd, onReconnect, onUpdateNow)
         Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekColumnGap), modifier = Modifier.fillMaxWidth().weight(1f)) {
             state.week.days.forEach { day ->
                 DayColumn(
@@ -215,16 +118,20 @@ fun WeekView(
 @Composable
 private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, onAdd: (() -> Unit)?, modifier: Modifier) {
     val c = Culvery.colors
-    val shape = RoundedCornerShape(CalendarDimens.weekColumnRadius)
     val inset = CalendarDimens.columnHeaderInset
     val chips = rememberLazyListState()
     val currentOnAdd = rememberUpdatedState(onAdd)
     HhCard(
         modifier = modifier
             .testTag("week_day_${day.date}")
-            .then(if (isToday) Modifier.border(CalendarDimens.todayRingWidth, c.accent, shape) else Modifier),
+            .then(if (isToday) Modifier.todayRing(c.accent) else Modifier),
         radius = CalendarDimens.weekColumnRadius,
-        padding = PaddingValues(horizontal = CalendarDimens.weekColumnPaddingH, vertical = CalendarDimens.weekColumnPaddingV),
+        padding = PaddingValues(
+            start = CalendarDimens.weekColumnPaddingSide,
+            top = CalendarDimens.weekColumnPaddingTop,
+            end = CalendarDimens.weekColumnPaddingSide,
+            bottom = CalendarDimens.weekColumnPaddingSide,
+        ),
     ) {
         Row(
             Modifier
@@ -241,7 +148,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
                 modifier = Modifier.alignByBaseline(),
             )
             Spacer(Modifier.width(CalendarDimens.weekDayDateGap))
-            Text(day.date.dayOfMonth.toString(), style = HhType.dateNumber, color = c.ink, modifier = Modifier.alignByBaseline())
+            Text(day.date.dayOfMonth.toString(), style = CalendarType.weekDate, color = c.ink, modifier = Modifier.alignByBaseline())
         }
         Spacer(Modifier.height(CalendarDimens.columnGap))
         Box(
@@ -278,6 +185,20 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
     }
 }
 
+/** A ring drawn over the column, inside its edge, so the column keeps its size (9 §4.7). */
+private fun Modifier.todayRing(color: Color): Modifier = drawWithContent {
+    drawContent()
+    val width = CalendarDimens.todayRingWidth.toPx()
+    val inset = CalendarDimens.todayRingInset.toPx() + width / 2
+    drawRoundRect(
+        color,
+        topLeft = Offset(inset, inset),
+        size = Size(size.width - 2 * inset, size.height - 2 * inset),
+        cornerRadius = CornerRadius(CalendarDimens.weekColumnRadius.toPx() - inset),
+        style = Stroke(width),
+    )
+}
+
 /** Hand-off §7: an `add` in `mute` at the foot of each column, in a tap area at least 48 dp tall, named with its day. */
 @Composable
 private fun AddHint(date: LocalDate, onAdd: () -> Unit) {
@@ -306,7 +227,12 @@ private fun EventChip(event: EventUi, day: LocalDate, onOpen: (EventRef) -> Unit
             .hhClickable({ onOpen(event.ref) }, label = OPEN_EVENT_DETAILS)
             .padding(horizontal = CalendarDimens.chipPaddingH, vertical = CalendarDimens.chipPaddingV),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.shownNotSpoken()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(CalendarDimens.chipDotGap),
+            modifier = Modifier.shownNotSpoken(),
+        ) {
+            Box(Modifier.testTag("chip_dot").size(CalendarDimens.chipDot).clip(CircleShape).background(Color(event.person.color)))
             // One line, so a long name is cut before the time (4d-1 Decision 2).
             Text(
                 "${event.startLabel} · ${event.person.name}",
@@ -320,61 +246,8 @@ private fun EventChip(event: EventUi, day: LocalDate, onOpen: (EventRef) -> Unit
         }
         Spacer(Modifier.height(CalendarDimens.chipTitleTop))
         Text(
-            event.title, style = CalendarType.chipTitle, color = c.ink, maxLines = 3, overflow = TextOverflow.Ellipsis,
+            event.title, style = CalendarType.chipTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.shownNotSpoken(),
-        )
-    }
-}
-
-@Composable
-private fun Legend(people: List<Person>, modifier: Modifier = Modifier) {
-    val c = Culvery.colors
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.legendGap),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.clearAndSetSemantics { contentDescription = legendName(people) },
-    ) {
-        people.forEach { person ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(CalendarDimens.legendDotGap),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.size(CalendarDimens.legendDot).clip(CircleShape).background(Color(person.color)))
-                Text(
-                    person.name,
-                    style = CalendarType.legend,
-                    color = c.ink,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = CalendarDimens.legendNameMax),
-                )
-            }
-        }
-    }
-}
-
-/** One chip for every connection that needs signing in again: a `dangerSoft` pill, 48 dp, radius 24. */
-@Composable
-private fun ReconnectChip(label: String, onClick: () -> Unit) {
-    val c = Culvery.colors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.reconnectIconGap),
-        modifier = Modifier
-            .height(CalendarDimens.touchTarget)
-            .clip(RoundedCornerShape(CalendarDimens.pillRadius))
-            .background(c.dangerSoft)
-            .hhClickable(onClick, label = RECONNECT_ACTION)
-            .padding(horizontal = CalendarDimens.pillPaddingH),
-    ) {
-        HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.reconnectIcon, tint = c.danger)
-        Text(
-            label,
-            style = CalendarType.pill,
-            color = c.ink,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
         )
     }
 }
@@ -414,8 +287,3 @@ internal fun rememberWeekShown(today: LocalDate): WeekShown {
     }
     return shown
 }
-
-/** How long "Updating…" stands in for an out-of-date line before a failed sync shows it again. */
-internal const val UPDATING_SHOWN_MS = 30_000L
-private const val UPDATE_NOW = "Update now"
-private const val UPDATING = "Updating…"

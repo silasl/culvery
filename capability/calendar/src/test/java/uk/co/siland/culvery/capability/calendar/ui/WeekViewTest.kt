@@ -18,6 +18,7 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
@@ -26,6 +27,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -34,6 +36,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -52,6 +55,7 @@ import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 import uk.co.siland.culvery.core.ui.test.onClickableShowing
 
@@ -168,9 +172,69 @@ class WeekViewTest {
     }
 
     @Test
-    fun legendNamesEveryoneAndFamily() {
+    fun thereIsNoLegend() {
+        show { WeekView(state(), onAdd = {}) }
+        compose.onAllNodesWithTag("week_legend").assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("Colours:", substring = true).assertCountEquals(0)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theArrowsShareOnePillAndThisWeekSitsBetween() {
+        show { WeekView(state().copy(weeksAhead = 1), onAdd = {}) }
+        val pill = compose.onNodeWithTag("week_nav_pill").fetchSemanticsNode().boundsInRoot
+        listOf("week_earlier", "week_later").forEach {
+            compose.onNodeWithTag(it).assertWidthIsEqualTo(48.dp).assertHeightIsEqualTo(48.dp)
+            val arrow = compose.onNodeWithTag(it).fetchSemanticsNode().boundsInRoot
+            assertThat(arrow.left).isAtLeast(pill.left)
+            assertThat(arrow.right).isAtMost(pill.right)
+        }
+        val thisWeek = compose.onNodeWithTag("week_this_week").fetchSemanticsNode().boundsInRoot
+        val add = compose.onNodeWithTag("week_add_event").fetchSemanticsNode().boundsInRoot
+        assertThat(thisWeek.left).isAtLeast(pill.right)
+        assertThat(thisWeek.right).isAtMost(add.left)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: an arrow at its end is the shared disabled button, not a faded one. */
+    @Test
+    fun aDisabledArrowIsTheSharedDisabledLook() {
         show { WeekView(state()) }
-        compose.onNodeWithContentDescription("Colours: Alex, green; Sam, blue; Mia, pink; Family, violet").assertExists()
+        compose.onNodeWithTag("week_earlier").assertIsNotEnabled()
+        compose.onNodeWithTag("week_later").assertIsEnabled()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aSyncFailureShowsUnderTheNewTitle() {
+        show { WeekView(state(sync(agoMinutes = 45, connections = listOf("Google Calendar")).copy(problem = SyncProblem.Offline))) }
+        val title = compose.onNodeWithTag("week_title").fetchSemanticsNode().boundsInRoot
+        val line = compose.onNodeWithTag("week_subtitle").fetchSemanticsNode().boundsInRoot
+        val update = compose.onNodeWithTag("week_update_now").fetchSemanticsNode().boundsInRoot
+        assertThat(line.top).isAtLeast(title.bottom)
+        assertThat(update.top).isAtLeast(title.bottom)
+        compose.onNodeWithTag("week_out_of_date", useUnmergedTree = true).assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    private fun chipTitleLayout(): TextLayoutResult {
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.runOnUiThread {
+            compose.onAllNodes(hasText("Dinner with Jo & Priya"))[0].fetchSemanticsNode()
+                .config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+        }
+        return layouts.single()
+    }
+
+    @Test
+    fun aChipReadsTimeAndPersonWithADotAndTwoLines() {
+        show { WeekView(state()) }
+        compose.onAllNodes(hasText("19:30 · Alex")).assertCountEquals(1)
+        assertThat(compose.onAllNodesWithTag("chip_dot", useUnmergedTree = true).fetchSemanticsNodes()).isNotEmpty()
+        assertThat(chipTitleLayout().layoutInput.maxLines).isEqualTo(2)
+        compose.onNodeWithContentDescription("Dinner with Jo & Priya, Alex, Wednesday 19:30").assert(isButton)
+        compose.assertNothingReadTwice()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -196,22 +260,6 @@ class WeekViewTest {
         show { WeekView(state()) }
         compose.onNodeWithText("needs reconnecting", substring = true).assertDoesNotExist()
         compose.onNodeWithText("need reconnecting", substring = true).assertDoesNotExist()
-    }
-
-    @Test
-    fun legendStaysLevelWithTheSubtitleWhetherOrNotTheReconnectChipShows() {
-        val currentSync = mutableStateOf(sync())
-        show {
-            val s by currentSync
-            WeekView(state(s))
-        }
-        val withoutChip = compose.onNodeWithTag("week_legend").fetchSemanticsNode().boundsInRoot.top
-
-        currentSync.value = sync(agoMinutes = 0, needsSignIn = listOf("Google"))
-        compose.waitForIdle()
-        val withChip = compose.onNodeWithTag("week_legend").fetchSemanticsNode().boundsInRoot.top
-
-        assertThat(withChip).isEqualTo(withoutChip)
     }
 
     @Test
