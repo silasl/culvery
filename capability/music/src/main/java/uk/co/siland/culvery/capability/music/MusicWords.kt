@@ -16,6 +16,17 @@ fun problemLine(problem: MusicProblem): String = when (problem) {
     MusicProblem.OTHER_HOUSEHOLD -> OTHER_SONOS
 }
 
+/** The tab's subtitle: "4 rooms · 1 group · Sonos", "1 room · Sonos"; groups of one room aren't counted (9 §4.5). */
+fun musicSummary(groups: List<SpeakerGroup>): String {
+    val rooms = groups.sumOf { it.rooms.size }
+    val grouped = groups.count { it.rooms.size > 1 }
+    return listOfNotNull(
+        "$rooms ${if (rooms == 1) "room" else "rooms"}",
+        if (grouped > 0) "$grouped ${if (grouped == 1) "group" else "groups"}" else null,
+        SONOS,
+    ).joinToString(" · ")
+}
+
 internal const val NOTHING_PLAYING = "Nothing playing"
 internal const val LOOKING_FOR_SPEAKERS = "Looking for the speakers…"
 internal const val SHUFFLE_EVERYTHING = "Shuffle everything"

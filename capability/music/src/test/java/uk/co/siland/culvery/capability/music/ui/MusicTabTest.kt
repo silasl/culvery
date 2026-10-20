@@ -6,6 +6,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithText
+import uk.co.siland.culvery.capability.music.SpeakerGroup
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -16,6 +24,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.delay
@@ -55,10 +65,10 @@ class MusicTabTest {
     private val lounge = group("l", "Lounge", "Dining room", state = PlayState.PLAYING, nowPlaying = STATION, volume = 40)
     private val kitchen = group("k", "Kitchen", state = PlayState.PAUSED, nowPlaying = SONG)
 
-    private fun showTab(status: String? = null, lines: Map<String, String> = emptyMap()) = compose.setContent {
+    private fun showTab(status: String? = null, lines: Map<String, String> = emptyMap(), groups: List<SpeakerGroup> = listOf(lounge, kitchen)) = compose.setContent {
         var shown by remember { mutableStateOf(emptySet<String>()) }
         CulveryTheme(dark = true) {
-            MusicTab(listOf(lounge, kitchen), status, lines, shown, { id -> shown = if (id in shown) shown - id else shown + id }, actions)
+            MusicTab(groups, status, lines, shown, { id -> shown = if (id in shown) shown - id else shown + id }, actions)
         }
     }
 
@@ -85,10 +95,51 @@ class MusicTabTest {
         compose.onNodeWithTag("music_row_k_rooms").assertDoesNotExist()
         compose.onNodeWithTag("music_row_l_room_Dining room-id_volume").assertDoesNotExist()
         compose.onNodeWithTag("music_row_l_rooms").performClick()
-        compose.onNodeWithContentDescription("Dining room volume").performSemanticsAction(SemanticsActions.SetProgress) { it(20f) }
+        compose.onNodeWithTag("music_row_l_room_Dining room-id_volume_slider").performSemanticsAction(SemanticsActions.SetProgress) { it(20f) }
         assertThat(calls).containsExactly("room Dining room-id 20")
         compose.onNodeWithTag("music_row_l_rooms").performClick()
         compose.onNodeWithTag("music_row_l_room_Dining room-id_volume").assertDoesNotExist()
+    }
+
+    private fun sizeOf(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot().let { Math.round(it.width.value) to Math.round(it.height.value) }
+
+    @Test
+    fun theHeaderCountsRoomsAndGroups() {
+        showTab(groups = listOf(lounge, kitchen, group("b", "Bedroom")))
+        compose.onNodeWithText("Music").assertIsDisplayed()
+        compose.onNodeWithText("4 rooms · 1 group · Sonos").assertIsDisplayed()
+        compose.assertAccessible()
+    }
+
+    @Test
+    fun oneRoomAloneHasNoGroupCount() {
+        showTab(groups = listOf(kitchen))
+        compose.onNodeWithText("1 room · Sonos").assertIsDisplayed()
+        compose.assertAccessible()
+    }
+
+    @Test
+    fun noSonosShowsUnderTheNewTitle() {
+        showTab(status = "The tablet is offline. Check the Wi-Fi.", groups = emptyList())
+        val title = compose.onNodeWithText("Music").getUnclippedBoundsInRoot()
+        val status = compose.onNodeWithTag("music_status").getUnclippedBoundsInRoot()
+        assertThat(status.top).isAtLeast(title.bottom)
+        compose.onNodeWithText("Sonos", substring = true).assertDoesNotExist()
+        compose.assertAccessible()
+    }
+
+    @Test
+    fun eachCardHasTheControlRowAndALabelledVolume() {
+        showTab()
+        assertThat(sizeOf("music_row_l_pause")).isEqualTo(48 to 48)
+        assertThat(sizeOf("music_row_l_next")).isEqualTo(48 to 48)
+        assertThat(sizeOf("music_row_l_volume")).isEqualTo(280 to 48)
+        compose.onNodeWithTag("music_row_l_volume").assert(hasAnyDescendant(hasText("40")))
+        compose.onNodeWithTag("music_row_l_volume_slider")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Lounge + Dining room volume")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "40 percent"))
+        assertThat(sizeOf("music_row_l_now_art")).isEqualTo(80 to 80)
+        compose.assertAccessible()
     }
 
     @Test

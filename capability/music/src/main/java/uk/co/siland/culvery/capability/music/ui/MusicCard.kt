@@ -58,7 +58,7 @@ fun MusicCard(pick: HomePick?, status: String?, line: String?, actions: GroupAct
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.cardControlsGap)) {
             PlayPauseButton(group, "music_card", actions, playing = group.isPlaying && !pick.nothingPlaying)
             if (pick.nothingPlaying) ShuffleButton(group, "music_card", ButtonSurface.Surf, actions, compact = true) else NextButton(group, "music_card", actions)
-            VolumePill(group, "music_card_volume", { actions.onGroupVolume(group, it) }, Modifier.weight(1f))
+            VolumePill(group.name, group.volume, "music_card_volume", { actions.onGroupVolume(group, it) }, Modifier.weight(1f))
         }
         if (line != null) Text(line, style = HhType.secondary, color = c.danger, maxLines = 2, modifier = Modifier.testTag("music_card_line"))
     }

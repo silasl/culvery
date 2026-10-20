@@ -31,11 +31,15 @@ internal object MusicDimens {
     val pillTrack = 9.dp
     val pillNumber: TextStyle = HhType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.W600, fontFeatureSettings = "tnum")
 
-    // The tab's rows: art, the group slider, and each room's slider under the Rooms chip.
-    val rowArt = 64.dp
-    val rowGap = 10.dp
-    val rowSlider = 220.dp
-    val roomSlider = 280.dp
+    // The tab's room cards: art, name 21 sp, track 17 sp, then the 48 dp buttons and the 280 dp volume pill (9 §4.5).
+    val roomRadius = 24.dp
+    val roomPaddingV = 17.dp
+    val roomPaddingH = 20.dp
+    val roomArt = 80.dp
+    val roomGap = 15.dp
+    val roomPill = 280.dp
+    val roomName: TextStyle = HhType.cardTitle.copy(fontSize = 21.sp)
+    val roomTrack: TextStyle = HhType.rowTitle.copy(fontWeight = FontWeight.W400)
 
     // The Favourites and address sheets, as the calendar's.
     val sheetPaddingH = 30.dp

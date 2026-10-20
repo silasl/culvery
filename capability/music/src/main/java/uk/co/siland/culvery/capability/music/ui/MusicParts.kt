@@ -119,9 +119,9 @@ internal fun NowPlayingBlock(
 @Composable
 internal fun MusicStatusLine(text: String) = HhStatusLine(text, "music_status")
 
-/** The group's volume in a 48 dp `surf2` pill: the speaker icon, a thick track and the number (9 §4.2). Tagged [tag]; the slider [tag]_slider. */
+/** A group's or room's [volume] in a 48 dp `surf2` pill: the speaker icon, a thick track and the number (9 §4.2). Tagged [tag]; the slider [tag]_slider. */
 @Composable
-internal fun VolumePill(group: SpeakerGroup, tag: String, onLetGo: (Int) -> Unit, modifier: Modifier = Modifier) {
+internal fun VolumePill(name: String, volume: Int, tag: String, onLetGo: (Int) -> Unit, modifier: Modifier = Modifier) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -135,8 +135,8 @@ internal fun VolumePill(group: SpeakerGroup, tag: String, onLetGo: (Int) -> Unit
     ) {
         HhIcon(Icons.VOLUME_UP, size = MusicDimens.pillIcon, tint = c.mute, modifier = Modifier.shownNotSpoken())
         HhPercentSlider(
-            group.name, group.volume, "${tag}_slider", Modifier.weight(1f),
-            spokenName = volumeName(group.name), spokenState = ::percentWords,
+            name, volume, "${tag}_slider", Modifier.weight(1f),
+            spokenName = volumeName(name), spokenState = ::percentWords,
             label = { Text("$it", style = MusicDimens.pillNumber, color = c.ink, maxLines = 1, modifier = Modifier.shownNotSpoken()) },
             trackHeight = MusicDimens.pillTrack, onLetGo = onLetGo,
         )

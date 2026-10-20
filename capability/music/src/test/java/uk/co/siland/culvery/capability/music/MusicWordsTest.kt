@@ -37,4 +37,13 @@ class MusicWordsTest {
         assertThat(nowPlayingLines(kitchen.copy(nowPlaying = STATION), nothingPlaying = false)).isEqualTo("Culvery FM" to "The Breakfast Show")
         assertThat(nowPlayingLines(kitchen.copy(nowPlaying = SONG), nothingPlaying = true)).isEqualTo("Nothing playing" to null)
     }
+
+    @Test
+    fun musicSummaryCountsRoomsAndMultiRoomGroups() {
+        val lounge = group("l", "Lounge", "Dining room")
+        assertThat(musicSummary(listOf(lounge, kitchen, group("b", "Bedroom")))).isEqualTo("4 rooms · 1 group · Sonos")
+        assertThat(musicSummary(listOf(lounge, group("g", "Garden", "Hall", "Study")))).isEqualTo("5 rooms · 2 groups · Sonos")
+        assertThat(musicSummary(listOf(kitchen, group("b", "Bedroom")))).isEqualTo("2 rooms · Sonos")
+        assertThat(musicSummary(listOf(kitchen))).isEqualTo("1 room · Sonos")
+    }
 }
