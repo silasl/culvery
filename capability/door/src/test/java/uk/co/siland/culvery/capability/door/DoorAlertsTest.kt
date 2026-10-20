@@ -15,7 +15,7 @@ import uk.co.siland.culvery.capability.door.ui.DoorCardUi
 import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.WallClock
 
-/** 5 §4.6–4.7: card and chime for a new ring in front; record only otherwise; 2 minutes, Got it, quiet hours, 10 seconds. */
+/** 5 §4.6–4.7: card and chime for a new ring in front; record only otherwise; 60 seconds, Got it, quiet hours, 10 seconds. */
 class DoorAlertsTest {
     private val london = ZoneId.of("Europe/London")
     private val host = FakeAlertHost()
@@ -91,11 +91,13 @@ class DoorAlertsTest {
         assertThat(host.shown).isEqualTo(1)
     }
 
+    /** 9 §2.4: Fails if the card stays its old 2 minutes, goes a moment early, or its ring counts as seen. */
     @Test
-    fun theCardClosesAfterTwoMinutesAndItsRingStaysUnseen() = runTest {
+    fun theCardClosesAfterSixtySecondsAndItsRingStaysUnseen() = runTest {
+        assertThat(CARD_MS).isEqualTo(60_000L)
         val alerts = alerts()
         alerts.onRecorded(rung(1))
-        advanceTimeBy(CARD_MS - 1)
+        advanceTimeBy(59_999)
         runCurrent()
         assertThat(alerts.showing.value).isNotNull()
         advanceTimeBy(1)
@@ -106,10 +108,10 @@ class DoorAlertsTest {
     }
 
     @Test
-    fun aSecondRingRestartsTheTwoMinutes() = runTest {
+    fun aSecondRingRestartsTheSixtySeconds() = runTest {
         val alerts = alerts()
         alerts.onRecorded(rung(1))
-        advanceTimeBy(60_000)
+        advanceTimeBy(30_000)
         alerts.onRecorded(rung(2))
         advanceTimeBy(CARD_MS - 1)
         runCurrent()
@@ -119,9 +121,9 @@ class DoorAlertsTest {
         assertThat(alerts.showing.value).isNull()
     }
 
-    /** Ring 2 holds the lock across card 1's 2 minutes: the timer, queued behind it, must not close ring 2's card. */
+    /** Ring 2 holds the lock across card 1's 60 seconds: the timer, queued behind it, must not close ring 2's card. */
     @Test
-    fun aRingHoldingTheLockAsTheTwoMinutesEndKeepsItsCard() = runTest {
+    fun aRingHoldingTheLockAsTheSixtySecondsEndKeepsItsCard() = runTest {
         var gate: CompletableDeferred<Unit>? = null
         val alerts = DoorAlerts(host, { seen += it }, { prefs }, chime, { gate?.await(); london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { false })
         alerts.onRecorded(rung(1))
@@ -147,6 +149,25 @@ class DoorAlertsTest {
         assertThat(alerts.showing.value).isNull()
         assertThat(host.dismissed).isEqualTo(1)
         assertThat(seen).containsExactly(1L)
+    }
+
+    /** Door history: Fails if closing marks the ring seen, or a close meant for an earlier ring takes the card showing. */
+    @Test
+    fun closeLeavesTheRingUnseen() = runTest {
+        val alerts = alerts()
+        alerts.onRecorded(rung(1))
+        alerts.onRecorded(rung(2))
+        alerts.close(1)
+        runCurrent()
+        assertThat(alerts.showing.value?.eventId).isEqualTo(2)
+        alerts.close(2)
+        runCurrent()
+        assertThat(alerts.showing.value).isNull()
+        assertThat(host.dismissed).isEqualTo(1)
+        assertThat(seen).isEmpty()
+        advanceTimeBy(CARD_MS)
+        runCurrent()
+        assertThat(host.dismissed).isEqualTo(1)
     }
 
     /** A Got it meant for a card a new ring has just replaced marks that ring seen and leaves the new card up. */
@@ -184,7 +205,7 @@ class DoorAlertsTest {
         assertThat(seen).isEmpty()
     }
 
-    /** 5 §4.3: Ring's text post, then the same notification with the snapshot: one card, its picture, one chime, the same 2 minutes. */
+    /** 5 §4.3: Ring's text post, then the same notification with the snapshot: one card, its picture, one chime, the same 60 seconds. */
     @Test
     fun aSnapshotRepostUpdatesTheShowingCardWithoutAChime() = runTest {
         val alerts = alerts()

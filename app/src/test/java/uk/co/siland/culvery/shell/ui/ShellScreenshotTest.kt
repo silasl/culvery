@@ -351,7 +351,7 @@ class ShellScreenshotTest {
 
     @Test
     fun doorCardOverHomeDark() = snap("home_door_card_dark", dark = true, state = fullHome(dark = true)) {
-        AlertLayer({ DoorCard(DoorCardUi(unrecognised = false, device = "Front Door", time = "11:54", snapshot = null), onGotIt = {}) }, hidden = false)
+        AlertLayer({ DoorCard(DoorCardUi(unrecognised = false, device = "Front Door", time = "11:54", snapshot = null), onGotIt = {}, lowered = true) }, hidden = false)
     }
 
     @Test

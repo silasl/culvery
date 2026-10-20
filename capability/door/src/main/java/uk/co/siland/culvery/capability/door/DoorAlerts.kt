@@ -20,8 +20,8 @@ import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.WallClock
 
-/** A card closes by itself after this long (5 §2.9). */
-const val CARD_MS = 120_000L
+/** A card closes by itself after this long: 60 seconds (9 §2.4). */
+const val CARD_MS = 60_000L
 
 /** A chime waits this long after the last one (5 §4.6). */
 const val CHIME_GAP_MS = 10_000L
@@ -30,7 +30,7 @@ data class ShowingRing(val eventId: Long, val card: DoorCardUi)
 
 /**
  * The alert decision (5 §4.6–4.7). A new ring, or an unrecognised alert, while Culvery is in front raises the card or
- * refreshes it (a loud alert: the shell turns music down while it shows, 6 §3.3), restarts its 2 minutes, and chimes unless it is quiet hours or the last chime that played was under 10 seconds ago.
+ * refreshes it (a loud alert: the shell turns music down while it shows, 6 §3.3), restarts its 60 seconds (9 §2.4), and chimes unless it is quiet hours or the last chime that played was under 10 seconds ago.
  * A re-post of the card's own ring updates the card only. Motion, and anything while Culvery isn't in front, or at night (8 §2.7), is
  * only stored. Every change to the card happens under one lock, so a close never takes a newer ring's card.
  * quieted() is awaited inside the lock, so a Got it tap in those 500 ms waits for them.
@@ -81,7 +81,7 @@ class DoorAlerts internal constructor(
         closing?.cancel()
         closing = scope.launch {
             delay(CARD_MS)
-            // A ring that came as the 2 minutes ended has replaced this job: only this job's card goes.
+            // A ring that came as the 60 seconds ended has replaced this job: only this job's card goes.
             lock.withLock { if (closing === coroutineContext[Job]) close() }
         }
         val now = clock.nowMillis()
@@ -97,13 +97,20 @@ class DoorAlerts internal constructor(
     /** Got it on [eventId]'s card: that ring counts as seen, and the card goes if it still shows that ring (5 §4.7). */
     fun gotIt(eventId: Long) {
         scope.launch {
-            lock.withLock {
-                if (_showing.value?.eventId == eventId) {
-                    closing?.cancel()
-                    close()
-                }
-            }
+            lock.withLock { closeShowing(eventId) }
             markSeen(eventId)
+        }
+    }
+
+    /** Door history on [eventId]'s card: the card goes if it still shows that ring, which stays unseen for the Door tab (9 §4.3). */
+    fun close(eventId: Long) {
+        scope.launch { lock.withLock { closeShowing(eventId) } }
+    }
+
+    private fun closeShowing(eventId: Long) {
+        if (_showing.value?.eventId == eventId) {
+            closing?.cancel()
+            close()
         }
     }
 

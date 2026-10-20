@@ -168,7 +168,11 @@ class ShellViewModel @Inject constructor(
         selected.value = id
     }
 
-    override fun openTab(id: String) = selectTab(id)
+    /** Closes Settings first, so a tab opened from over it (the door card's Door history, 9 §4.3) is what shows. */
+    override fun openTab(id: String) {
+        settings.value = null
+        selectTab(id)
+    }
 
     override fun openSettings(page: String?) {
         viewModelScope.launch {

@@ -33,7 +33,7 @@ class DoorCardAboveKeyboardTest {
 
     private val keyboard = 360.dp
 
-    /** Fails if the picture takes the height Got it needs, so the button is squeezed under 48 dp or runs under the keys. */
+    /** Fails if the picture takes the height Got it needs (squeezed under 48 dp or under the keys), or the card isn't 747 dp and centred. */
     @Test
     fun gotItKeepsItsHeightAboveTheKeyboardWhenTheCardHasAPicture() {
         val file = File(folder.root, "1.jpg")
@@ -52,5 +52,7 @@ class DoorCardAboveKeyboardTest {
         assertThat(gotIt.bottom.value).isAtMost((screen.bottom - keyboard).value + 0.5f)
         assertThat((gotIt.bottom - gotIt.top).value).isAtLeast(48f)
         assertThat(card.top.value).isAtLeast(-0.5f)
+        assertThat((card.right - card.left).value).isWithin(0.5f).of(747f)
+        assertThat(card.left.value).isWithin(0.5f).of((1280f - 747f) / 2f)
     }
 }

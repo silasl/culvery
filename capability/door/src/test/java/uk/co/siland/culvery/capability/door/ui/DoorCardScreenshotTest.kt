@@ -1,7 +1,8 @@
 package uk.co.siland.culvery.capability.door.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -17,17 +18,20 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.door.BitmapSnapshot
 import uk.co.siland.culvery.capability.door.picture
+import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 
-/** The card at half the 1280 dp screen, as the alert layer places it. */
+/** The card at its own width on `bg`, with room round it for its shadow. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DoorCardScreenshotTest {
     @get:Rule val compose = createComposeRule()
     @get:Rule val folder = TemporaryFolder()
 
-    private fun snap(name: String, dark: Boolean, card: DoorCardUi) {
-        compose.setContent { CulveryTheme(dark = dark) { Box(Modifier.width(640.dp)) { DoorCard(card, onGotIt = {}) } } }
+    private fun snap(name: String, dark: Boolean, card: DoorCardUi, lowered: Boolean = false) {
+        compose.setContent {
+            CulveryTheme(dark = dark) { Box(Modifier.background(Culvery.colors.bg).padding(32.dp)) { DoorCard(card, onGotIt = {}, lowered = lowered) } }
+        }
         if (card.snapshot != null) compose.waitUntil(5_000) { compose.onAllNodesWithTag("door_snapshot").fetchSemanticsNodes().isNotEmpty() }
         compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
     }
@@ -38,4 +42,5 @@ class DoorCardScreenshotTest {
     @Test fun cardLight() = snap("door_card_light", false, ring)
     @Test fun cardSnapshotDark() = snap("door_card_snapshot_dark", true, ring.copy(snapshot = File(folder.root, "1.jpg").also { BitmapSnapshot(picture(640, 360)).saveTo(it) }))
     @Test fun cardUnrecognisedDark() = snap("door_card_unrecognised_dark", true, ring.copy(unrecognised = true))
+    @Test fun cardLoweredDark() = snap("door_card_lowered_dark", true, ring, lowered = true)
 }

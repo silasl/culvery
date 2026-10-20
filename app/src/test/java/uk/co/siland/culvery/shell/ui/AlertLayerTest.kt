@@ -1,11 +1,15 @@
 package uk.co.siland.culvery.shell.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,6 +30,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -39,7 +44,7 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.shell.OverlayState
 
-/** 5 §2.10, §5.1: the alert layer over a sheet, under the PIN pad, and its touches its own. */
+/** 5 §2.10, §5.1, 9 §4.3: the alert layer over a sheet, under the PIN pad, over a scrim that takes every tap. */
 @RunWith(AndroidJUnit4::class)
 class AlertLayerTest {
     @get:Rule val compose = createComposeRule()
@@ -177,18 +182,38 @@ class AlertLayerTest {
         assertThat(activity.touches.value).isEqualTo(1L)
     }
 
-    /** Fails if a tap on a part of the alert with no handler of its own reaches the sheet's scrim or counts as a touch. */
+    /**
+     * 9 §4.3: Fails if a tap on the scrim, or on a part of the alert with no handler of its own, presses the button
+     * beneath, reaches the sheet's scrim or counts as a touch.
+     */
     @Test
-    fun aTapOnABareAlertDoesNotReachTheSheetBeneath() {
-        show()
-        overlay.show(content = sheet)
+    fun aTapOnTheScrimPressesNothingBeneath() {
+        var pressed = 0
+        val narrowSheet: @Composable () -> Unit = { Box(Modifier.width(300.dp).fillMaxHeight().testTag("sheet")) }
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ShellLayers(
+                    overlay = overlay, toast = null, onToastHidden = {}, pinShowing = false, pinPad = {},
+                    activity = activity, onTouch = activity::touch, alert = alert,
+                ) { Box(Modifier.size(100.dp).clickable { pressed++ }) }
+            }
+        }
+        alert = { Box(Modifier.width(400.dp).height(200.dp).testTag("bare")) }
+        compose.waitForIdle()
+        val corner = Offset(10f, 10f)
+        compose.onRoot().performTouchInput { click(corner) }
+        compose.waitForIdle()
+        assertThat(pressed).isEqualTo(0)
+        assertThat(activity.touches.value).isEqualTo(0L)
+        overlay.show(content = narrowSheet)
         overlay.markEdited(true)
-        alert = { Box(Modifier.fillMaxWidth().height(200.dp).testTag("bare")) }
-        settle()
+        compose.waitForIdle()
+        compose.onRoot().performTouchInput { click(corner) }
         compose.onNodeWithTag("bare").performClick()
-        settle()
-        assertThat(overlay.content).isSameInstanceAs(sheet)
+        compose.waitForIdle()
+        assertThat(overlay.content).isSameInstanceAs(narrowSheet)
         assertThat(overlay.edited).isTrue()
+        assertThat(pressed).isEqualTo(0)
         assertThat(activity.touches.value).isEqualTo(0L)
     }
 
@@ -221,11 +246,17 @@ class AlertLayerTest {
 
     private fun layer(keyboard: WindowInsets) {
         compose.setContent {
-            CulveryTheme(dark = true) { AlertLayer({ Box(Modifier.fillMaxWidth().height(200.dp).testTag("card")) }, hidden = false, keyboard = keyboard) }
+            CulveryTheme(dark = true) { AlertLayer({ Box(Modifier.width(400.dp).height(200.dp).testTag("card")) }, hidden = false, keyboard = keyboard) }
         }
     }
 
-    /** Fails if the layer centres the card on the whole window: with the keyboard up, its bottom edge (Got it) sits under the keys. */
+    /** The alert keeps its own width and is centred across the screen. */
+    private fun assertCentredAcross(card: DpRect, screen: DpRect) {
+        assertThat((card.right - card.left).value).isWithin(0.5f).of(400f)
+        assertThat(card.left.value).isWithin(0.5f).of((screen.right.value - 400f) / 2f)
+    }
+
+    /** Fails if the layer centres the card on the whole window (Got it under the keys), or sets the card's width. */
     @Test
     fun theCardStaysAboveTheKeyboardAndCentresInTheSpaceLeft() {
         val keyboard = 200.dp
@@ -234,14 +265,16 @@ class AlertLayerTest {
         val card = compose.onNodeWithTag("card").getUnclippedBoundsInRoot()
         assertThat(card.bottom.value).isAtMost((screen.bottom - keyboard).value + 0.5f)
         assertThat(card.top.value).isWithin(0.5f).of(((screen.bottom - keyboard).value - (card.bottom - card.top).value) / 2f)
+        assertCentredAcross(card, screen)
     }
 
-    /** Pin: with no keyboard the card is centred on the screen. */
+    /** Fails if, with no keyboard, the card isn't centred on the screen at its own width. */
     @Test
     fun theCardCentresOnTheScreenWithoutAKeyboard() {
         layer(WindowInsets(0))
         val screen = compose.onRoot().getUnclippedBoundsInRoot()
         val card = compose.onNodeWithTag("card").getUnclippedBoundsInRoot()
         assertThat(card.top.value).isWithin(0.5f).of((screen.bottom.value - (card.bottom - card.top).value) / 2f)
+        assertCentredAcross(card, screen)
     }
 }

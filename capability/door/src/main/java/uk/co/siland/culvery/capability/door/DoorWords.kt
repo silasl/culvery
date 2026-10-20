@@ -22,12 +22,18 @@ fun badgeOf(unseen: Unseen): RailBadge? = when {
 internal const val SOMEONE_AT_THE_DOOR = "Someone’s at the door"
 internal const val RING_ALERT = "Ring alert"
 internal const val GOT_IT = "Got it"
+internal const val DOOR_HISTORY = "Door history"
+internal const val MUSIC_LOWERED = "Music lowered"
+internal const val JUST_NOW = "just now"
 
 /** "14:02" on the household's clock. */
 fun clockTime(atMillis: Long, zone: ZoneId): String = clockText(Instant.ofEpochMilli(atMillis).atZone(zone).toLocalTime())
 
 /** The card's spoken words: what, where, when (5 §5.1), leaving out a device Ring did not name. */
-fun cardWords(title: String, device: String, time: String): String = listOf(title, device, time).filter { it.isNotEmpty() }.joinToString(", ")
+fun cardWords(title: String, device: String, time: String): String = listOf(title, device, time, JUST_NOW).filter { it.isNotEmpty() }.joinToString(", ")
+
+/** "Front Door · 11:54 · just now", the card's line under its title (handoff 2a), leaving out a device Ring did not name. */
+fun cardLine(device: String, time: String): String = listOf(device, time, JUST_NOW).filter { it.isNotEmpty() }.joinToString(" · ")
 
 internal const val TODAY = "Today"
 internal const val YESTERDAY = "Yesterday"

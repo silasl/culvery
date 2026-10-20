@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -27,7 +26,6 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import uk.co.siland.culvery.core.plugin.CLOSING_WARNING_MS
@@ -112,21 +110,16 @@ private fun Modifier.countsTouches(touched: () -> Unit): Modifier = pointerInput
     }
 }
 
-// 5 §5.1: centred on the screen, about half the screen wide.
-private const val ALERT_WIDTH = 0.5f
-
-/** The alert layer: no scrim, so the screen around the alert stays usable; the alert swallows its own taps and centres above the keyboard. */
+/**
+ * The alert layer (9 §4.3): a scrim over the whole screen that takes every tap and does nothing with it, so the alert
+ * goes only by its own buttons or timer; the alert at its own width, centred above the keyboard.
+ */
 @Composable
 internal fun AlertLayer(content: @Composable () -> Unit, hidden: Boolean, keyboard: WindowInsets = WindowInsets.ime) {
-    Box(
-        Modifier
-            .fillMaxSize()
-            .then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier)
-            .windowInsetsPadding(keyboard.only(WindowInsetsSides.Bottom)),
-        contentAlignment = Alignment.Center,
-    ) {
-        // Swallows a tap on any part of the alert, padding and gaps included, so none falls through to the sheet's scrim.
-        Box(Modifier.testTag("alert_layer").fillMaxWidth(ALERT_WIDTH).pointerInput(Unit) { detectTapGestures {} }) { content() }
+    Box(Modifier.fillMaxSize().then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier)) {
+        // A gesture, not a clickable: TalkBack never lands on the scrim.
+        Box(Modifier.fillMaxSize().testTag("alert_scrim").background(ShellTokens.cardScrim).pointerInput(Unit) { detectTapGestures {} })
+        Box(Modifier.fillMaxSize().windowInsetsPadding(keyboard.only(WindowInsetsSides.Bottom)), contentAlignment = Alignment.Center) { content() }
     }
 }
 

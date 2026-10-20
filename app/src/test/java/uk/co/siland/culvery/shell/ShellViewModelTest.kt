@@ -423,6 +423,21 @@ class ShellViewModelTest {
         }
     }
 
+    /** 9 §4.3: Door history over Settings. Fails if Settings stays open over the tab it opened. */
+    @Test
+    fun openingATabClosesSettings() = runTest {
+        access.result = admin
+        val vm = vm(setOf(FakeCapability("door", order = 40, shown = true)))
+        vm.uiState.test {
+            vm.openSettings()
+            assertThat(expectMostRecentItem().settingsOpen).isTrue()
+            vm.openTab("door")
+            val state = expectMostRecentItem()
+            assertThat(state.settingsOpen).isFalse()
+            assertThat(state.selectedTabId).isEqualTo("door")
+        }
+    }
+
     @Test
     fun openTabForAHiddenTabStaysHome() = runTest {
         val vm = vm(setOf(FakeCapability("calendar", order = 10, shown = false)))
