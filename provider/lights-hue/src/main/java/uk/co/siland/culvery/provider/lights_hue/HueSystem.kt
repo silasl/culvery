@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -75,7 +76,10 @@ internal class HueSystem(
     private var unroomedLights: List<String> = emptyList()
 
     /** A brightness just sent to a group, outranking the stream's reports of other levels until [untilMillis]. */
-    private class Sent(val brightness: Int, val untilMillis: Long)
+    private class Sent(val brightness: Int, val untilMillis: Long) {
+        /** The latest report of another level, shown if the wait ends without the sent level reported. */
+        var heldBack: Double? = null
+    }
 
     // Guarded by lock, by grouped light id.
     private val sent = HashMap<String, Sent>()
@@ -116,7 +120,20 @@ internal class HueSystem(
     /** Emits once the bridge has opened the stream; an add, a delete or a room change reads everything again (7 §4.2). */
     override fun stream(): Flow<Unit> = channelFlow {
         client.events(call(), opened = { send(Unit) }).collect { events ->
-            if (HueEvent.Reread in events) readAll() else change { events.forEach(::apply) }
+            if (HueEvent.Reread in events) {
+                readAll()
+            } else {
+                val waits = change {
+                    events.forEach(::apply)
+                    events.filterIsInstance<HueEvent.GroupedLight>().mapNotNull { e -> sent[e.id]?.takeIf { it.heldBack != null }?.let { e.id to it } }
+                }
+                waits.forEach { (id, wait) ->
+                    launch {
+                        delay(wait.untilMillis - clock.nowMillis())
+                        change { endWait(id, wait) }
+                    }
+                }
+            }
         }
     }
 
@@ -141,6 +158,7 @@ internal class HueSystem(
         room,
         {
             group(it) { g -> g.copy(on = true) }
+            sent.remove(it.groupedLightId)
             activate(scene.id, roomId = it.id)
         },
     ) { call, _ -> client.recall(call, scene.id) }
@@ -273,9 +291,8 @@ internal class HueSystem(
     }
 
     /** Applies [block] to the state and publishes [rooms] from it, as one step. */
-    private inline fun change(block: () -> Unit) = synchronized(lock) {
-        block()
-        publish()
+    private inline fun <T> change(block: () -> T): T = synchronized(lock) {
+        block().also { publish() }
     }
 
     /** The groups and scenes a change replaced, as they were before it. */
@@ -329,9 +346,19 @@ internal class HueSystem(
     // Under lock. A report of another level while the brightness just sent is on its way; that level's report ends the wait.
     private fun outranked(groupId: String, brightness: Double): Boolean {
         val pending = sent[groupId] ?: return false
-        if (brightness.roundToInt() != pending.brightness && clock.nowMillis() < pending.untilMillis) return true
+        if (brightness.roundToInt() != pending.brightness && clock.nowMillis() < pending.untilMillis) {
+            pending.heldBack = brightness
+            return true
+        }
         sent.remove(groupId)
         return false
+    }
+
+    // Under lock. At [wait]'s deadline, if no report or command has ended it, the level it held back shows.
+    private fun endWait(groupId: String, wait: Sent) {
+        if (sent[groupId] !== wait) return
+        sent.remove(groupId)
+        wait.heldBack?.let { level -> groups[groupId]?.let { groups[groupId] = it.copy(brightness = level) } }
     }
 
     // Under lock.

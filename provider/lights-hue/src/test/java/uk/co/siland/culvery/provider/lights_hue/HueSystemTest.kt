@@ -5,8 +5,12 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -188,8 +192,20 @@ class HueSystemTest {
         assertThat(s.room(KITCHEN).brightness).isEqualTo(40)
     }
 
-    private fun brightnessReport(group: String, brightness: Double) =
-        """data: [{"data":[{"id":"$group","dimming":{"brightness":$brightness},"type":"grouped_light"}],"type":"update"}]"""
+    private var marks = 0
+
+    /** Opens the stream on [reports] and returns once they are applied, leaving it open: Kitchen's brightness comes with them as a mark. */
+    private suspend fun TestScope.reporting(s: HueSystem, vararg reports: Pair<String, Double>): Job {
+        val mark = ++marks
+        val items = (reports.toList() + (KITCHEN_GROUP to mark.toDouble()))
+            .joinToString(",") { (group, level) -> """{"id":"$group","dimming":{"brightness":$level},"type":"grouped_light"}""" }
+        bridge.events = """data: [{"data":[$items],"type":"update"}]"""
+        val open = launch { s.stream().collect {} }
+        s.rooms.first { rooms -> rooms.single { it.id == KITCHEN }.brightness == mark }
+        return open
+    }
+
+    private suspend fun TestScope.reported(s: HueSystem, vararg reports: Pair<String, Double>) = reporting(s, *reports).cancelAndJoin()
 
     private fun TestScope.at(millis: Long) = advanceTimeBy(millis - testScheduler.currentTime)
 
@@ -202,13 +218,10 @@ class HueSystemTest {
         val s = system()
         s.readAll()
         s.setBrightness(s.room(LOUNGE), 90)
-        bridge.events = brightnessReport(LOUNGE_GROUP, 60.2)
-        s.stream().toList()
+        reported(s, LOUNGE_GROUP to 60.2)
         assertThat(s.room(LOUNGE).brightness).isEqualTo(90)
-        bridge.events = brightnessReport(LOUNGE_GROUP, 89.8)
-        s.stream().toList()
-        bridge.events = brightnessReport(LOUNGE_GROUP, 40.0)
-        s.stream().toList()
+        reported(s, LOUNGE_GROUP to 89.8)
+        reported(s, LOUNGE_GROUP to 40.0)
         assertThat(s.room(LOUNGE).brightness).isEqualTo(40)
     }
 
@@ -219,24 +232,50 @@ class HueSystemTest {
         s.readAll()
         val sentAt = testScheduler.currentTime
         s.setBrightness(s.room(LOUNGE), 90)
-        bridge.events = brightnessReport(LOUNGE_GROUP, 60.2)
         at(sentAt + REPORT_WAIT_MS - 1)
-        s.stream().toList()
+        reported(s, LOUNGE_GROUP to 60.2)
         assertThat(s.room(LOUNGE).brightness).isEqualTo(90)
         at(sentAt + REPORT_WAIT_MS)
-        s.stream().toList()
+        reported(s, LOUNGE_GROUP to 60.2)
         assertThat(s.room(LOUNGE).brightness).isEqualTo(60)
     }
 
-    /** Fails if a refused brightness still outranks the stream after the full read showed what the bridge did. */
+    /** Fails if a level reported during the wait, with none after it, isn't shown when the wait ends: the bridge settled there (7 §4.2). */
+    @Test
+    fun theLatestLevelHeldBackShowsWhenTheWaitEnds() = runTest {
+        val s = system()
+        s.readAll()
+        val sentAt = testScheduler.currentTime
+        s.setBrightness(s.room(LOUNGE), 90)
+        at(sentAt + 1_000)
+        val open = reporting(s, LOUNGE_GROUP to 45.0, LOUNGE_GROUP to 60.2)
+        at(sentAt + REPORT_WAIT_MS - 1)
+        assertThat(s.room(LOUNGE).brightness).isEqualTo(90)
+        at(sentAt + REPORT_WAIT_MS)
+        runCurrent()
+        assertThat(s.room(LOUNGE).brightness).isEqualTo(60)
+        open.cancelAndJoin()
+    }
+
+    /** Fails if a scene recalled after a brightness still waits for that brightness, so the scene's own level is dropped. */
+    @Test
+    fun aSceneRecalledEndsTheWaitForTheBrightnessSentBefore() = runTest {
+        val s = system()
+        s.readAll()
+        s.setBrightness(s.room(LOUNGE), 90)
+        s.recallScene(s.room(LOUNGE), LightScene(BRIGHT, "Bright"))
+        reported(s, LOUNGE_GROUP to 56.0)
+        assertThat(s.room(LOUNGE).brightness).isEqualTo(56)
+    }
+
+    /** Pin: passes without the wait. Fails if a full read stops clearing the waits, so a refused brightness outranks the stream. */
     @Test
     fun aRefusedBrightnessLeavesTheStreamsReportsShowing() = runTest {
         val s = system()
         s.readAll()
         bridge.refusingCommands = true
         runCatching { s.setBrightness(s.room(LOUNGE), 90) }
-        bridge.events = brightnessReport(LOUNGE_GROUP, 55.0)
-        s.stream().toList()
+        reported(s, LOUNGE_GROUP to 55.0)
         assertThat(s.room(LOUNGE).brightness).isEqualTo(55)
     }
 
