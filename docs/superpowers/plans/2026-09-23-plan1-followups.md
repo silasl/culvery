@@ -413,11 +413,11 @@ On `culvery-5` (debug build; the AVD restarted with an emulated front camera for
 12. TalkBack: skipped by the user.
 
 Faults found:
-- Fault 1, the Lights slider bounced back to the old value after let-go. 37ef737 and b729ca8 hold the let-go value until the bridge reports it (5 s ceiling), on the card and the tab. The user still saw the card's slider jump back and forward again; the cause was the Hue provider, where the stream reports older levels about a second apart after a local update. 18a4b58 and 58f485d ignore a group's brightness reports for 5 s after a send unless they match, end the wait on a scene recall, and show the latest held-back level at the deadline. The card slider is still to be confirmed on a device with a reachable bridge (the AVD lost its network). Not an issue, noted: All lights off and switching on pause on the previous value, then move.
+- Fault 1, the Lights slider bounced back to the old value after let-go. 37ef737 and b729ca8 hold the let-go value until the bridge reports it (5 s ceiling), on the card and the tab. The user still saw the card's slider jump back and forward again; the cause was the Hue provider, where the stream reports older levels about a second apart after a local update. 18a4b58 and 58f485d ignore a group's brightness reports for 5 s after a send unless they match, end the wait on a scene recall, and show the latest held-back level at the deadline. The card slider was confirmed on the tablet (see the tablet section below). Not an issue, noted: All lights off and switching on pause on the previous value, then move.
 - Fault 2 (Plan 8), the night clock was woken by a home-activity relaunch. `DisplayState` used `AlertHost.inFront`, false on every pause, and a `singleTask` relaunch pauses and resumes in about 12 ms, which woke the wall for 60 s. e83dd7a and b3691c2 use `ShellAlerts.shown` (start to stop) instead. Changing the night times applies 60 s after Settings closes, by design.
 
 Open tablet checks:
-- A ring while music plays: on the emulator the Office speaker went from playing (lowered 24 to 5) to its Bluetooth source with nothing playing; the volume was restored to 24, and only Culvery talks to it. The emulator logged `MusicUnreachableException` every few seconds throughout. Re-test on the tablet; if it repeats there, trace it.
+- A ring while music plays: on the emulator the Office speaker went from playing (lowered 24 to 5) to its Bluetooth source with nothing playing; the volume was restored to 24, and only Culvery talks to it. The emulator logged `MusicUnreachableException` every few seconds throughout. Likely explained by fault 3 on the tablet section below (the idle Bluetooth input reports PLAYING with no track, and the source flipped to it). Keep the ring-with-music re-test on the tablet open.
 - The tablet never sleeping when nobody is around: fault 2 doesn't explain it. Read `logcat -s DisplayState` and `logcat -b events | grep wm_on_paused` on the tablet.
 - The Hue connection lost after the evening sleep and not reconnecting. The final review notes `HueSystem`'s `channelFlow` waits for pending deadline jobs, so a stream that ends mid-wait reconnects up to 5 s later; that may not be the whole story.
 
@@ -439,6 +439,23 @@ Test flakes seen across the build (timing, not Plan 9a's code; each passed on a 
 - "Database connection closed" (a Room database closed in teardown while a flow still reads it, wrong thread) in `DoorTabTest`, `PeopleUiTest`, `DoorRecorderTest` and `EventDetailHostTest`.
 - `CalendarMigrationTest`.
 - A long `java.io.tmpdir` makes Robolectric database paths pass Windows MAX_PATH and fails with SQLITE_CANTOPEN; never set TMP, TEMP or `java.io.tmpdir` for Gradle.
+
+## Plan 9a (Redesign: frame and Home): on the tablet (2026-10-20)
+
+- Density: 240 dpi, 1920 × 1200 landscape, no override. The Units' 1.5 holds.
+- Installed the release from the branch with `install -r`; the mapping is kept outside the repo.
+- The user: the redesign looks good at the wall. The card slider stays put with the bridge reachable (fault 1b confirmed on a device).
+- Covered-camera test: with the camera covered the wall went to sleep (sleep layer and glyph), with the display on, the camera open and Culvery in front. The user skipped the uncovered test and will watch it in use. If the wall stays awake in an empty room, look at the camera's movement check.
+- The display was found off at Android level before the install; the user may have pressed the lock button.
+- Fault 3 (Plan 6): Home's Music card always showed the Office, because its Bluetooth input reports PLAYING with no track. Fixed in 4f1bde2 and 234877b: an idle Bluetooth or line-in input doesn't count as playing for Home's pick and the tab order (TV audio still counts). Confirmed on the tablet. This likely also explains the emulator's "music stopped after a ring" (see the open item above).
+
+Still open on the tablet:
+- A real ring while music plays.
+- The night clock in the dark at bedtime: readable from bed, not lighting the room, the glyph findable only on looking.
+- The Hue connection lost after the evening sleep.
+
+For the end-of-v1 design review:
+- An Input group picked as Home's fallback says "Nothing playing" while its button shows Pause.
 
 ## Feature ideas (2026-10-02, after v1)
 
