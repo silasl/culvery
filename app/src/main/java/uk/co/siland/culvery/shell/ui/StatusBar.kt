@@ -27,7 +27,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
@@ -168,7 +167,7 @@ private fun ThemeControl(dark: Boolean, previewing: Boolean, onToggle: () -> Uni
             .hhClickable(onToggle, label = action)
             .semantics { contentDescription = "Theme: $label" }
             .heightIn(min = ShellDimens.topBarHeight)
-            .padding(start = 4.dp),
+            .padding(start = ShellDimens.themeTapStart),
     ) {
         HhIcon(if (dark) Icons.DARK_MODE else Icons.LIGHT_MODE, size = ShellDimens.themeIcon, tint = c.mute)
         Text(label, style = HhType.secondary, color = c.mute, maxLines = 1, modifier = Modifier.shownNotSpoken())

@@ -63,4 +63,5 @@ internal object ShellDimens {
 
     val themeIcon = 20.dp
     val themeGap = 6.dp
+    val themeTapStart = 4.dp
 }

@@ -10,17 +10,19 @@ data class HomePick(val group: SpeakerGroup, val nothingPlaying: Boolean)
 
 /**
  * 6 §2.2: the playing group; of several, the one with the usual room, else the one that started last. With none
- * playing, [keptId] while it is paused (the group Home last showed playing), else the usual room's group, else the
- * first Sonos lists: shown paused if it has something loaded, as the Music tab does, else as nothing playing.
+ * playing, [keptId] while it is paused with something loaded (the group Home last showed playing), else the usual
+ * room's group, else the first Sonos lists: shown paused if it has something loaded, as the Music tab does, else as
+ * nothing playing.
  */
 fun homePick(groups: List<SpeakerGroup>, usualRoomId: String?, keptId: String?): HomePick? {
     fun SpeakerGroup.hasUsualRoom() = rooms.any { it.id == usualRoomId }
+    fun SpeakerGroup.pausedWithSomethingLoaded() = state == PlayState.PAUSED && nowPlaying != null
     val playing = groups.filter { it.isSounding }
     val shown = playing.firstOrNull { it.hasUsualRoom() } ?: playing.maxByOrNull { it.startedAtMillis ?: Long.MIN_VALUE }
     if (shown != null) return HomePick(shown, nothingPlaying = false)
-    groups.firstOrNull { it.id == keptId && it.state == PlayState.PAUSED }?.let { return HomePick(it, nothingPlaying = false) }
+    groups.firstOrNull { it.id == keptId && it.pausedWithSomethingLoaded() }?.let { return HomePick(it, nothingPlaying = false) }
     val fallback = groups.firstOrNull { it.hasUsualRoom() } ?: groups.firstOrNull() ?: return null
-    return HomePick(fallback, nothingPlaying = !(fallback.state == PlayState.PAUSED && fallback.nowPlaying != null))
+    return HomePick(fallback, nothingPlaying = !fallback.pausedWithSomethingLoaded())
 }
 
 /** [homePick] over time, remembering what Home last showed playing. */
