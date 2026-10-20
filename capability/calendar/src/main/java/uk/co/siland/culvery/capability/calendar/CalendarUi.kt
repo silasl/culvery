@@ -45,6 +45,8 @@ data class EventUi(
     val repeats: String = REPEATS_YES,
     /** The detail sheet offers Choose who it’s for: an editable event, or a repeating one on the master (4e). */
     val assignable: Boolean = readOnlyReason == null,
+    /** Which day of a multi-day event this slice is; null for an event within one day, overnight ones included. */
+    val span: DaySpan? = null,
 ) {
     val editable: Boolean get() = readOnlyReason == null
 }
@@ -63,8 +65,13 @@ data class EditableEvent(
 
 data class DayUi(val date: LocalDate, val events: List<EventUi>)
 
-/** [people] is the legend: household members in order, then Family. */
-data class WeekUi(val start: LocalDate, val days: List<DayUi>, val people: List<Person>)
+/** [people] is the legend: household members in order, then Family. [spans] are the lane's rows of multi-day bars. */
+data class WeekUi(
+    val start: LocalDate,
+    val days: List<DayUi>,
+    val people: List<Person>,
+    val spans: List<List<SpanUi>> = emptyList(),
+)
 
 /** Why the last pass failed, by what the family can do about it (5 §A.3). */
 sealed interface SyncProblem {
@@ -304,5 +311,6 @@ internal fun StoredEvent.toUi(
         createdBy = createdByLabel(createdBy, reason, people, serviceName, source?.source?.name.orEmpty()),
         repeats = repeatsLabel(recurrenceRule, start, zone),
         assignable = mayAssign(this, reason),
+        span = dayOfSpan(date, zone),
     )
 }

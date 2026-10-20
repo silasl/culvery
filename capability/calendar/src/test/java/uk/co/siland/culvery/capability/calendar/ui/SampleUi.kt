@@ -4,12 +4,15 @@ import java.time.Instant
 import java.time.LocalDate
 import uk.co.siland.culvery.capability.calendar.ADDED_FROM_PHONE
 import uk.co.siland.culvery.capability.calendar.ALL_DAY_LABEL
+import uk.co.siland.culvery.capability.calendar.DaySpan
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
 import uk.co.siland.culvery.capability.calendar.WeekUi
+import uk.co.siland.culvery.capability.calendar.laneRows
+import uk.co.siland.culvery.capability.calendar.weekSpans
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 
@@ -106,6 +109,27 @@ object SampleUi {
         start = TODAY.plusWeeks(weeks),
         days = week.days.map { it.copy(date = it.date.plusWeeks(weeks)) },
     )
+
+    /** One date's slice of a multi-day all-day event: [day] of [of]. */
+    fun spanning(title: String, person: Person, day: Int, of: Int) = allDay(title, person).copy(span = DaySpan(day, of))
+
+    /**
+     * [week] with three multi-day events: Gran visiting from before the week (Mon 21 – Thu 24), Half term over Wed–Sat,
+     * and a Camping trip running past it (Mon 28 – Wed 30), so the lane takes two rows.
+     */
+    val weekWithSpans: WeekUi = week.copy(
+        days = week.days.mapIndexed { i, d ->
+            val spans = listOfNotNull(
+                spanning("Gran visiting", sam, i + 3, 4).takeIf { i <= 1 },
+                spanning("Half term", family, i + 1, 4).takeIf { i <= 3 },
+                spanning("Camping trip", mia, i - 4, 3).takeIf { i >= 5 },
+            )
+            d.copy(events = spans + d.events)
+        },
+    ).let { it.copy(spans = laneRows(weekSpans(it.days))) }
+
+    /** Today with a multi-day event on its second day of five. */
+    val todayWithSpan = listOf(spanning("Half term", family, 2, 5)) + today
 
     /** The people who can be assigned (hand-off 06: Alex, Sam, Mia). */
     val household = listOf(alex, sam, mia)

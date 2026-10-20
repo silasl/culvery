@@ -92,7 +92,9 @@ class CalendarRepository @Inject constructor(
         .flowOn(Dispatchers.Default)
 
     fun week(start: LocalDate): Flow<WeekUi> =
-        combine(days(start, 7), household.people) { days, people -> WeekUi(start, days, people + Person.Family) }.distinctUntilChanged()
+        combine(days(start, 7), household.people) { days, people ->
+            WeekUi(start, days, people + Person.Family, spans = laneRows(weekSpans(days)))
+        }.distinctUntilChanged()
 
     /**
      * One event for the detail sheet, a queued create not yet synced included; null once it is gone or queued for

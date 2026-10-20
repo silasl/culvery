@@ -181,6 +181,48 @@ class CalendarRepositoryTest {
     }
 
     @Test
+    fun theWeekCarriesItsSpans() = runTest {
+        put("s-family", allDay("Half term", 21, 25))
+        val week = repo.week(sept(21)).first()
+        val span = week.spans.single().single()
+        assertThat(listOf(span.title, span.label)).containsExactly("Half term", "Mon 21 – Thu 24").inOrder()
+        assertThat(listOf(span.first, span.last)).containsExactly(sept(21), sept(24)).inOrder()
+        assertThat(week.days.map { d -> d.events.map { it.title } }.take(5))
+            .containsExactly(listOf("Half term"), listOf("Half term"), listOf("Half term"), listOf("Half term"), emptyList<String>())
+            .inOrder()
+    }
+
+    @Test
+    fun aMultiDayEventsSlicesKnowTheirDay() = runTest {
+        put("s-family", allDay("Half term", 21, 25))
+        put("s-alex", timed("Night shift", 23, 22, 0, 180))
+        val days = repo.days(sept(21), 4).first()
+        assertThat(days.map { d -> d.events.single { it.title == "Half term" }.span })
+            .containsExactly(DaySpan(1, 4), DaySpan(2, 4), DaySpan(3, 4), DaySpan(4, 4)).inOrder()
+        assertThat(days.flatMap { d -> d.events.filter { it.title == "Night shift" } }.map { it.span })
+            .containsExactly(null, null)
+    }
+
+    @Test
+    fun aPendingCreateSpanningDaysGivesABar() = runTest {
+        queue(
+            ChangeKind.CREATE, null,
+            EventDraft("Camping", EventTime.AllDay(sept(25)), EventTime.AllDay(sept(28)), forPerson = sam.id.value, createdBy = sam.id.value),
+            clientKey = key,
+        )
+        val span = repo.week(sept(21)).first().spans.flatten().single()
+        assertThat(listOf(span.title, span.person.name)).containsExactly("Camping", "Sam").inOrder()
+        assertThat(listOf(span.first, span.last)).containsExactly(sept(25), sept(27)).inOrder()
+    }
+
+    @Test
+    fun aDeletedEventsBarGoes() = runTest {
+        put("s-family", allDay("Half term", 21, 25))
+        queue(ChangeKind.DELETE, "Half term")
+        assertThat(repo.week(sept(21)).first().spans).isEmpty()
+    }
+
+    @Test
     fun overnightEventReadsFromThenUntil() = runTest {
         put("s-alex", timed("Night shift", 23, 22, 0, 180))
         val days = repo.days(sept(23), 2).first()
