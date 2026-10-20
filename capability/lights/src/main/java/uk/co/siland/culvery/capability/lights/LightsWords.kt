@@ -28,6 +28,12 @@ internal fun roomState(room: LightRoom): String = when {
     else -> ON
 }
 
+/** The Home card's status: [roomState] and, while the room is on, its active scene: "On · 70% · Relax" (9 §4.2). */
+internal fun cardStatus(room: LightRoom): String {
+    val scene = room.scenes.firstOrNull { it.id == room.activeSceneId }?.name
+    return if (room.on && scene != null) "${roomState(room)} · $scene" else roomState(room)
+}
+
 /** "Lounge, on, 70 percent", "Lounge, off" (7 §5.4). */
 internal fun roomSpoken(room: LightRoom): String = when {
     !room.on -> "${room.name}, off"

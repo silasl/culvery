@@ -1,6 +1,9 @@
 package uk.co.siland.culvery.core.ui
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -39,5 +42,24 @@ class PercentSliderTest {
         val config = compose.onNodeWithTag("s").fetchSemanticsNode().config
         val spoken = config[SemanticsProperties.ContentDescription].single() + ", " + config[SemanticsProperties.StateDescription]
         assertThat(spoken).isEqualTo("Lounge brightness, 70 percent")
+    }
+
+    /** 9 §2.5. Fails if a disabled slider can be dragged, offers SetProgress, or loses the level it keeps. */
+    @Test
+    fun aDisabledSliderKeepsItsLevelAndCantBeMoved() {
+        val drags = mutableListOf<Int>()
+        val letGo = mutableListOf<Int>()
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                HhPercentSlider("x", 40, "s", enabled = false, onDrag = { drags += it }, onLetGo = { letGo += it })
+            }
+        }
+        compose.onNodeWithTag("s").assertIsNotEnabled()
+        val config = compose.onNodeWithTag("s").fetchSemanticsNode().config
+        assertThat(config.getOrNull(SemanticsActions.SetProgress)).isNull()
+        assertThat(config[SemanticsProperties.ProgressBarRangeInfo].current).isEqualTo(40f)
+        compose.onNodeWithTag("s").performTouchInput { swipeRight(startX = centerX, endX = right) }
+        assertThat(drags).isEmpty()
+        assertThat(letGo).isEmpty()
     }
 }

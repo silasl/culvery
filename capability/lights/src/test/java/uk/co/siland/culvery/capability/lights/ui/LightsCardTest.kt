@@ -20,6 +20,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -36,6 +41,8 @@ import uk.co.siland.culvery.capability.lights.LightsActions
 import uk.co.siland.culvery.capability.lights.LightsFixture
 import uk.co.siland.culvery.capability.lights.LightsFollow
 import uk.co.siland.culvery.capability.lights.LightsHouse
+import uk.co.siland.culvery.capability.lights.LightsPermissions
+import uk.co.siland.culvery.capability.lights.TestLightsSystem
 import uk.co.siland.culvery.capability.lights.LightsProblem
 import uk.co.siland.culvery.capability.lights.LightsView
 import uk.co.siland.culvery.capability.lights.TestAccess
@@ -48,6 +55,10 @@ import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.plugin.test.soon
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+
+// The card's Home size: app's HomeGridTest pins the same value.
+private val rightHalfSize = DpSize(701.dp, 285.5.dp)
 
 /** 7 §5.1, §5.4: the Home card's states, its controls and their words; it follows the rooms while it shows. */
 @RunWith(AndroidJUnit4::class)
@@ -67,7 +78,7 @@ class LightsCardTest {
         status: String? = null,
         line: String? = null,
     ) = compose.setContent {
-        CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { LightsCard(main, holidayOn, allOffLit, run, status, line, mainRoom, house) } }
+        CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(main, holidayOn, allOffLit, run, status, line, mainRoom, house) } }
     }
 
     private fun clickLabelIs(label: String) = SemanticsMatcher("click label is $label") {
@@ -129,7 +140,7 @@ class LightsCardTest {
     @Test
     fun whileItRunsTheButtonSaysTurningOn() {
         var run by mutableStateOf<HouseRun?>(HouseRun.TURNING_ON)
-        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(345.dp, 279.dp)) { LightsCard(lounge, false, true, run, null, null, mainRoom, house) } } }
+        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(lounge, false, true, run, null, null, mainRoom, house) } } }
         compose.onNodeWithText("Turning on…", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("lights_card_holiday").assertContentDescriptionEquals("Holiday mode, turning on")
         compose.assertAccessible()
@@ -166,22 +177,26 @@ class LightsCardTest {
         compose.assertAccessible()
     }
 
-    private class Host(val view: LightsView, val actions: LightsActions, val house: LightsHouse, val follow: LightsFollow)
+    private class Host(val view: LightsView, val actions: LightsActions, val house: LightsHouse, val follow: LightsFollow, val access: TestAccess, val system: TestLightsSystem)
 
     private suspend fun host(vararg rooms: LightRoom): Host {
+        val access = TestAccess(null)
         val settings = lights.settings
         settings.connect("lights.hue", link())
         val provider = TestLightsProvider()
         val bridges = Bridges(setOf(provider), settings, lights.scope)
         soon { bridges.system.first { it != null } }
-        provider.systems.single().rooms.value = rooms.toList()
+        val system = provider.systems.single()
+        system.rooms.value = rooms.toList()
         val view = LightsView(bridges, settings, lights.scope)
         val house = LightsHouse(bridges, settings)
         return Host(
             view,
-            LightsActions({ bridges.system.value }, lights.scope, System::currentTimeMillis, house, TestAccess(null)),
+            LightsActions({ bridges.system.value }, lights.scope, System::currentTimeMillis, house, access),
             house,
             LightsFollow(bridges.system, MutableStateFlow(true), lights.scope),
+            access,
+            system,
         )
     }
 
@@ -219,5 +234,72 @@ class LightsCardTest {
         compose.onNodeWithTag("lights_card_open").performClick()
         assertThat(navigator.tabs).containsExactly("lights")
         assertThat(h.view.focus.value).isEqualTo("Lounge-id")
+    }
+
+    private fun showHost(h: Host) = compose.setContent {
+        CulveryTheme(dark = true) {
+            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
+                Box(Modifier.size(rightHalfSize)) { LightsCardHost(h.view, h.actions, h.house, h.follow) }
+            }
+        }
+    }
+
+    /** 9 §2.5. Fails if an off room's slider is enabled, hides its remembered level, or isn't spoken as "Off". */
+    @Test
+    fun theSliderIsDisabledWhileTheRoomIsOff() {
+        show(room("Lounge", brightness = 40))
+        val slider = compose.onNodeWithTag("lights_card_slider")
+        slider.assertIsNotEnabled()
+        val config = slider.fetchSemanticsNode().config
+        assertThat(config[SemanticsProperties.ContentDescription].single() + ", " + config[SemanticsProperties.StateDescription]).isEqualTo("Lounge brightness, Off")
+        assertThat(config[SemanticsProperties.ProgressBarRangeInfo].current).isEqualTo(40f)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §2.5. Fails if a swipe on an off room's slider sends a brightness, or turns the room on. */
+    @Test
+    fun aSwipeOnAnOffRoomSendsNothing() = runBlocking {
+        val h = host(room("Lounge", brightness = 40))
+        showHost(h)
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_card_slider") == 1 }
+        compose.onNodeWithTag("lights_card_slider").performTouchInput { swipeRight(startX = centerX, endX = right) }
+        compose.waitForIdle()
+        assertThat(h.system.calls.filter { it.startsWith("setBrightness") || it.startsWith("setOn") }).isEmpty()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §4.2. Fails if a swipe on an on room's slider doesn't reach the bridge as a brightness in 0..100. */
+    @Test
+    fun movingTheSliderSendsTheBrightness() = runBlocking {
+        val h = host(lounge)
+        showHost(h)
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_card_slider") == 1 }
+        compose.onNodeWithTag("lights_card_slider").performTouchInput { swipeRight(startX = centerX, endX = right) }
+        compose.waitForIdle()
+        compose.waitUntil(5_000) { h.system.calls.any { it.startsWith("setBrightness Lounge-id ") } }
+        val sent = h.system.calls.filter { it.startsWith("setBrightness Lounge-id ") }.map { it.substringAfterLast(' ').toInt() }
+        assertThat(sent).isNotEmpty()
+        assertThat(sent.last()).isIn(0..100)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin. Fails if a room that can't dim gets a slider. */
+    @Test
+    fun aRoomThatCantDimHasNoSlider() {
+        show(room("Hall", on = true, dimmable = false))
+        compose.onNodeWithTag("lights_card_slider").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin (9 §2.3, §6.2). Fails if the card's Holiday mode doesn't reach toggleHoliday and ask for the Holiday permission. */
+    @Test
+    fun holidayModeAsksForTheFreshPin() = runBlocking {
+        val h = host(lounge)
+        showHost(h)
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_card_holiday") == 1 }
+        compose.onNodeWithTag("lights_card_holiday").performClick()
+        compose.waitUntil(5_000) { h.access.asked.isNotEmpty() }
+        assertThat(h.access.asked.single()).containsExactly(LightsPermissions.HOLIDAY)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 }

@@ -34,7 +34,7 @@ import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.ShellTokens
 
 /**
- * The REGULAR Home card (7 §5.1): the main room as a toggle with a › to its tab, All lights off and Holiday mode. With a
+ * The REGULAR Home card (9 §4.2): the main room as a toggle with a › to its tab, its brightness, All lights off and Holiday mode. With a
  * problem, the §6 line and no controls; before the first read, that it is looking.
  */
 @Composable
@@ -66,6 +66,10 @@ fun LightsCard(
             OpenRoomButton(main, mainRoom.onOpen)
         }
         Spacer(Modifier.weight(1f))
+        if (main.dimmable) {
+            BrightnessRow(main, mainRoom)
+            Spacer(Modifier.height(LightsDimens.bottomGap))
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(LightsDimens.buttonGap)) {
             AllOffButton(allOffLit, house.onAllOff, Modifier.weight(1f))
             HolidayButton(holidayOn, run, house.onHoliday)
@@ -97,6 +101,8 @@ internal fun LightsCardHost(view: LightsView, actions: LightsActions, house: Lig
                 room?.let { view.focus.value = it.id }
                 navigator.openTab(LIGHTS_ID)
             },
+            onDrag = { percent -> room?.let { actions.dragBrightness(it, percent) } },
+            onLetGo = { percent -> room?.let { actions.letGoBrightness(it, percent) } },
         )
     }
     val houseActions = remember(actions) { HouseActions(onAllOff = actions::allOff, onHoliday = actions::toggleHoliday) }

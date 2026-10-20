@@ -15,11 +15,12 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.lights.HouseRun
 import uk.co.siland.culvery.capability.lights.LightRoom
 import uk.co.siland.culvery.capability.lights.LightsProblem
+import uk.co.siland.culvery.capability.lights.RELAX
 import uk.co.siland.culvery.capability.lights.problemLine
 import uk.co.siland.culvery.capability.lights.room
 import uk.co.siland.culvery.core.ui.test.snap
 
-/** The Home card in a REGULAR cell as the grid gives it on the 1280×800 canvas (the forecast's 345 × 279). */
+/** The Home card in the right column's top half on the 1280×800 canvas; app's HomeGridTest pins the same size. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w1280dp-h800dp-land-hdpi")
@@ -36,7 +37,7 @@ class LightsCardScreenshotTest {
         status: String? = null,
         line: String? = null,
     ) = compose.snap(name, dark, Modifier.padding(16.dp)) {
-        Box(Modifier.size(345.dp, 279.dp)) { LightsCard(main, holidayOn, main?.on == true, run, status, line, NO_MAIN_ROOM_ACTIONS, NO_HOUSE_ACTIONS) }
+        Box(Modifier.size(701.dp, 285.5.dp)) { LightsCard(main, holidayOn, main?.on == true, run, status, line, NO_MAIN_ROOM_ACTIONS, NO_HOUSE_ACTIONS) }
     }
 
     @Test fun onDark() = snap("lights_card_on_dark", true)
@@ -44,6 +45,8 @@ class LightsCardScreenshotTest {
     @Test fun onLight() = snap("lights_card_on_light", false)
 
     @Test fun offDark() = snap("lights_card_off_dark", true, main = room("Lounge"))
+
+    @Test fun sceneDark() = snap("lights_card_scene_dark", true, main = room("Lounge", on = true, brightness = 70, scenes = listOf(RELAX), active = RELAX.id))
 
     @Test fun holidayDark() = snap("lights_card_holiday_dark", true, holidayOn = true)
 

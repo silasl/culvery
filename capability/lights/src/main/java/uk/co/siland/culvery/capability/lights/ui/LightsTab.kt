@@ -37,6 +37,7 @@ import uk.co.siland.culvery.capability.lights.roomSpoken
 import uk.co.siland.culvery.capability.lights.roomState
 import uk.co.siland.culvery.capability.lights.sceneSpoken
 import uk.co.siland.culvery.capability.lights.turnSpoken
+import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhChoiceChip
@@ -100,8 +101,8 @@ fun LightsTab(
             Column(verticalArrangement = Arrangement.spacedBy(LightsDimens.tabGap)) {
                 if (status != null) LightsStatusLine(status)
                 Row(horizontalArrangement = Arrangement.spacedBy(LightsDimens.buttonGap)) {
-                    AllOffButton(allOffLit, house.onAllOff)
-                    HolidayButton(holidayOn, run, house.onHoliday)
+                    AllOffButton(allOffLit, house.onAllOff, Modifier.heightIn(min = ButtonTokens.largeHeight))
+                    HolidayButton(holidayOn, run, house.onHoliday, Modifier.heightIn(min = ButtonTokens.largeHeight))
                 }
                 if (houseLine != null) Text(houseLine, style = HhType.secondary, color = c.danger, modifier = Modifier.testTag("lights_tab_line"))
                 if (rooms.isEmpty() && status == null) Text(LOOKING_FOR_LIGHTS, style = HhType.body, color = c.mute)
@@ -130,7 +131,7 @@ private fun RoomRow(room: LightRoom, line: String?, actions: RoomActions) {
                     .testTag("${tag}_switch")
                     .hhClickable({ actions.onOn(room, !room.on) }, label = turnSpoken(room, !room.on), role = Role.Switch, spoken = roomSpoken(room)),
             ) {
-                HhIcon(Icons.LIGHTBULB, size = LightsDimens.bulb, filled = room.on, tint = if (room.on) c.accent else c.mute)
+                HhIcon(Icons.LIGHTBULB, size = LightsDimens.tabBulb, filled = room.on, tint = if (room.on) c.accent else c.mute)
                 Column(Modifier.weight(1f).shownNotSpoken()) {
                     Text(room.name, style = HhType.cardTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(roomState(room), style = HhType.body, color = c.mute, maxLines = 1)

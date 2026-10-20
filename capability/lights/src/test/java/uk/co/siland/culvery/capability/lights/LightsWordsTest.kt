@@ -83,6 +83,16 @@ class LightsWordsTest {
         assertThat(roomSpoken(room("Hall", on = true, dimmable = false))).isEqualTo("Hall, on")
     }
 
+    /** 9 §2.5. Fails if the scene is dropped, shown on a room that is off, or shown on a room that can't dim as a percentage. */
+    @Test
+    fun theCardStatusNamesTheScene() {
+        val relax = listOf(RELAX)
+        assertThat(cardStatus(room("Lounge", on = true, brightness = 70, scenes = relax, active = RELAX.id))).isEqualTo("On · 70% · Relax")
+        assertThat(cardStatus(room("Lounge", on = true, brightness = 70, scenes = relax))).isEqualTo("On · 70%")
+        assertThat(cardStatus(room("Hall", on = true, dimmable = false, scenes = relax, active = RELAX.id))).isEqualTo("On · Relax")
+        assertThat(cardStatus(room("Lounge", on = false, scenes = relax, active = RELAX.id))).isEqualTo("Off")
+    }
+
     /** Fails if an action names the wrong state, or the chevron's words differ from the spec's. */
     @Test
     fun whatEachControlDoes() {

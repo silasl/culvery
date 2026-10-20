@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -43,7 +44,12 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
@@ -55,6 +61,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -426,8 +433,11 @@ fun HhSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, tag: Strin
 
 /**
  * A value in [range], reported as it moves ([onDrag]) and again when let go ([onLetGo]); [label], beside it, shows the
- * value under the thumb. Spoken "[spokenName], [spokenState]": "Kitchen volume, 30 percent".
+ * value under the thumb. Spoken "[spokenName], [spokenState]": "Kitchen volume, 30 percent". Not [enabled], it keeps
+ * [percent] on `surf3` over `surf2`, ignores touch and offers TalkBack no way to move it; [spokenState] then says why
+ * ("Off"). A [trackHeight] thickens the track.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HhPercentSlider(
     name: String,
@@ -440,6 +450,8 @@ fun HhPercentSlider(
     spokenState: (Int) -> String = { "$it percent" },
     label: (@Composable (Int) -> Unit)? = null,
     onDrag: ((Int) -> Unit)? = null,
+    enabled: Boolean = true,
+    trackHeight: Dp? = null,
     onLetGo: (Int) -> Unit,
 ) {
     val c = Culvery.colors
@@ -448,6 +460,14 @@ fun HhPercentSlider(
     // The value let go stays until [percent] changes, so the thumb doesn't jump back while the command is on its way.
     var held by remember(percent) { mutableStateOf<Float?>(null) }
     val shown = dragging ?: held ?: percent.toFloat()
+    val colors = SliderDefaults.colors(
+        thumbColor = c.accent,
+        activeTrackColor = c.accent,
+        inactiveTrackColor = c.surf3,
+        disabledThumbColor = c.surf3,
+        disabledActiveTrackColor = c.surf3,
+        disabledInactiveTrackColor = c.surf2,
+    )
     Slider(
         value = shown,
         onValueChange = {
@@ -463,10 +483,30 @@ fun HhPercentSlider(
         },
         valueRange = range.first.toFloat()..range.last.toFloat(),
         steps = steps,
-        colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.surf3),
-        modifier = modifier.testTag(tag).semantics {
-            contentDescription = spokenName
-            stateDescription = spokenState(shown.roundToInt())
+        enabled = enabled,
+        colors = colors,
+        track = {
+            SliderDefaults.Track(
+                sliderState = it,
+                modifier = if (trackHeight != null) Modifier.height(trackHeight) else Modifier,
+                enabled = enabled,
+                colors = colors,
+            )
+        },
+        modifier = if (enabled) {
+            modifier.testTag(tag).semantics {
+                contentDescription = spokenName
+                stateDescription = spokenState(shown.roundToInt())
+            }
+        } else {
+            // Material leaves its SetProgress on a disabled slider; TalkBack would still move it.
+            modifier.clearAndSetSemantics {
+                testTag = tag
+                contentDescription = spokenName
+                stateDescription = spokenState(shown.roundToInt())
+                progressBarRangeInfo = ProgressBarRangeInfo(shown, range.first.toFloat()..range.last.toFloat(), steps)
+                disabled()
+            }
         },
     )
     label?.invoke(shown.roundToInt())
