@@ -26,6 +26,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -97,11 +98,12 @@ internal fun LightsGrid(
     // Laid out by the kept order, so a bridge that drops and comes back keeps the grid and its place.
     val scrolling = scrolls(order.orEmpty().size)
     val grid = rememberLazyGridState()
+    val handBack by rememberUpdatedState(onFocused)
     LaunchedEffect(focus, order, shown.isEmpty()) {
         if (focus == null || shown.isEmpty()) return@LaunchedEffect
         val at = shown.indexOfFirst { it.id == focus }
         if (at >= 0 && scrolling) grid.scrollToItem(at + 1)
-        onFocused()
+        handBack()
     }
     if (!scrolling) {
         Column(modifier.fillMaxSize()) {

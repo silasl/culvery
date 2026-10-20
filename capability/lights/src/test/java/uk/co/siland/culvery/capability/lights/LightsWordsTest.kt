@@ -80,6 +80,13 @@ class LightsWordsTest {
         assertThat(roomsOn(listOf(room("Lounge", on = true)))).isEqualTo("1 of 1 room on · Hue Bridge")
     }
 
+    /** 9 §4.4. Fails if the pill says "1 more rooms", or loses the plural past one. */
+    @Test
+    fun moreRoomsCounts() {
+        assertThat(moreRooms(1)).isEqualTo("1 more room")
+        assertThat(moreRooms(3)).isEqualTo("3 more rooms")
+    }
+
     /** Fails if a room that can't dim shows a percentage, or an off room shows its brightness. */
     @Test
     fun aRoomsStateAndHowItIsSpoken() {

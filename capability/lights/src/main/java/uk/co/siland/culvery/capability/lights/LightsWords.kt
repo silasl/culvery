@@ -32,8 +32,8 @@ internal fun roomState(room: LightRoom): String = when {
 fun roomsOn(rooms: List<LightRoom>): String =
     "${rooms.count { it.on }} of ${rooms.size} ${if (rooms.size == 1) "room" else "rooms"} on · $HUE_BRIDGE"
 
-/** The pill over the grid's foot: the rooms after the last row wholly on screen (9 §4.4). */
-fun moreRooms(count: Int): String = "$count more rooms"
+/** The pill over the grid's foot: the rooms after the last row wholly on screen: "1 more room", "3 more rooms" (9 §4.4). */
+fun moreRooms(count: Int): String = "$count more ${if (count == 1) "room" else "rooms"}"
 
 /** The Home card's status: [roomState] and, while the room is on, its active scene: "On · 70% · Relax" (9 §4.2). */
 internal fun cardStatus(room: LightRoom): String {
