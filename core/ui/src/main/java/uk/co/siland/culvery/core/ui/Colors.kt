@@ -73,10 +73,15 @@ internal val HhColors.isLight: Boolean get() = bg.luminance() > 0.5f
 object HhAlpha {
     private const val TINT_DARK = 0x2E / 255f
     private const val TINT_LIGHT = 0x26 / 255f
+    private const val BAR_DARK = 0x4D / 255f
+    private const val BAR_LIGHT = 0x40 / 255f
 
     /** A past day in the date picker, the whole cell over the picker's `surf`; 60 % would be 4.499:1 in light. */
     const val PAST_DAY = 0.62f
 
     /** A week chip's tint: the person's colour at this alpha over `surf`. */
     fun tint(colors: HhColors): Float = if (colors.isLight) TINT_LIGHT else TINT_DARK
+
+    /** A multi-day bar's tint: the person's colour at this alpha over the column or the gap under it (9 §4.7). */
+    fun bar(colors: HhColors): Float = if (colors.isLight) BAR_LIGHT else BAR_DARK
 }

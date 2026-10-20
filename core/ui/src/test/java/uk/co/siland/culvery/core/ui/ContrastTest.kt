@@ -121,6 +121,24 @@ class ContrastTest {
     }
 
     @Test
+    fun barTintMatchesTheHandoff() {
+        assertWithMessage("dark bar tint").that(HhAlpha.bar(DarkColors)).isEqualTo(0x4D / 255f)
+        assertWithMessage("light bar tint").that(HhAlpha.bar(LightColors)).isEqualTo(0x40 / 255f)
+    }
+
+    @Test
+    fun inkOnEveryPersonsBarTint() {
+        themes.forEach { (name, t) ->
+            (PersonPalette.colors + FAMILY_VIOLET).forEach { colour ->
+                listOf("surf" to t.surf, "bg" to t.bg).forEach { (under, base) ->
+                    val bar = Color(colour).over(HhAlpha.bar(t), base)
+                    check("$name ink on the ${colour.toString(16)} bar over $under", t.ink, bar, TEXT)
+                }
+            }
+        }
+    }
+
+    @Test
     fun theTintEdgesStayWhereTheyAre() {
         fun darkTint(colour: Long) = Color(colour).over(HhAlpha.tint(DarkColors), DarkColors.surf)
         check("dark mute on the lime tint (4.548)", DarkColors.mute, darkTint(0xFF9CC44E), 4.54)

@@ -32,8 +32,10 @@ event_repeat
 expand_less
 expand_more
 foggy
+help
 home
 info
+keyboard_arrow_down
 light_mode
 lightbulb
 lock
