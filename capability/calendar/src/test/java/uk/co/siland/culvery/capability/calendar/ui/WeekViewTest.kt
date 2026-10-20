@@ -250,6 +250,18 @@ class WeekViewTest {
         assertThat(navigator.settingsOpened).isEqualTo(0)
     }
 
+    /** 9 §4.7. Fails if the ‹ › pill isn't level with the sync line's foot, or drops to the reconnect chip's row. */
+    @Test
+    fun theNavPillSitsLevelWithTheSyncLineAboveTheReconnectChip() {
+        show { WeekView(state(sync(agoMinutes = 45, needsSignIn = listOf("Google"))), onAdd = {}) }
+        val pill = compose.onNodeWithTag("week_nav_pill").fetchSemanticsNode().boundsInRoot
+        val update = compose.onNodeWithTag("week_update_now").fetchSemanticsNode().boundsInRoot
+        val chip = compose.onNodeWithText("Google needs reconnecting").fetchSemanticsNode().boundsInRoot
+        assertThat(pill.bottom).isWithin(1f).of(update.bottom)
+        assertThat(chip.top).isAtLeast(pill.bottom)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     @Test
     fun severalCalendarsNeedingSignInShareOneChip() {
         val status = sync(needsSignIn = listOf("Google", "School"), connections = listOf("Google", "School"))

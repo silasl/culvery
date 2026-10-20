@@ -188,7 +188,7 @@ class LightsTabTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** 9 §2.3. Fails if either button is missing from the header's row, not right of the title, or its words or action differ. */
+    /** 9 §2.3. Fails if either button is missing from the tray, the tray isn't right of the title and level with the subtitle's foot, or a button's words or action differ. */
     @Test
     fun theTrayHoldsAllLightsOffAndHolidayMode() {
         show(holidayOn = true)
@@ -203,7 +203,9 @@ class LightsTabTest {
         val holiday = compose.onNodeWithTag("lights_tray_holiday").fetchSemanticsNode().boundsInRoot
         assertThat(allOff.left).isAtLeast(title.right - 1f)
         assertThat(holiday.left).isGreaterThan(allOff.left)
-        assertThat(allOff.center.y).isWithin(2f).of(title.center.y)
+        val tray = compose.onNodeWithTag("lights_tray").fetchSemanticsNode().boundsInRoot
+        val subtitle = compose.onNodeWithText("2 of 3 rooms on · Hue Bridge").fetchSemanticsNode().boundsInRoot
+        assertThat(tray.bottom).isWithin(1f).of(subtitle.bottom)
         compose.onNodeWithTag("lights_card_all_off").assertDoesNotExist()
         compose.onNodeWithTag("lights_card_holiday").assertDoesNotExist()
         compose.assertClickablesHaveRoleAndLabel()

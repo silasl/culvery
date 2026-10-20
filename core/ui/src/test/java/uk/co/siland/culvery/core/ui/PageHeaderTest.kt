@@ -2,6 +2,8 @@ package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -66,16 +68,31 @@ class PageHeaderTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Pin: the trailing slot is the right-hand end of the title's row. */
+    /** 9 §4.4. Fails if the trailing slot isn't at the right with its foot level with the subtitle's, as the hand-off aligns them. */
     @Test
-    fun theTrailingContentSitsOnTheRight() {
-        show { Header("Sub") { HhRoundButton(Icons.HELP, "Help", {}, Modifier.testTag("help"), on = ButtonSurface.Bg) } }
+    fun theTrailingContentSitsRightLevelWithTheSubtitlesFoot() {
+        show { Header(subtitleText) { HhRoundButton(Icons.HELP, "Help", {}, Modifier.testTag("help"), on = ButtonSurface.Bg) } }
         val header = compose.onNodeWithTag("header").getUnclippedBoundsInRoot()
         val button = compose.onNodeWithTag("help").getUnclippedBoundsInRoot()
-        val title = compose.onNodeWithTag("title").getUnclippedBoundsInRoot()
+        val subtitle = compose.onNodeWithText(subtitleText).getUnclippedBoundsInRoot()
         assertThat(button.width.value).isEqualTo(48f)
         assertThat(button.right.value).isWithin(0.5f).of(header.right.value)
-        assertThat((button.top.value + button.bottom.value) / 2).isWithin(1f).of((title.top.value + title.bottom.value) / 2)
+        assertThat(button.bottom.value).isWithin(0.5f).of(subtitle.bottom.value)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §4.4. Fails if a line given as [under] leaves the left of the trailing slot, or the slot's foot isn't level with its foot. */
+    @Test
+    fun aLineUnderTheTitleKeepsLeftOfTheTrailingSlot() {
+        show {
+            HhPageHeader(
+                "This week", null, under = { Box(Modifier.testTag("under").fillMaxWidth().height(20.dp)) },
+            ) { HhRoundButton(Icons.HELP, "Help", {}, Modifier.testTag("help"), on = ButtonSurface.Bg) }
+        }
+        val under = compose.onNodeWithTag("under").getUnclippedBoundsInRoot()
+        val button = compose.onNodeWithTag("help").getUnclippedBoundsInRoot()
+        assertThat(under.right.value).isAtMost(button.left.value)
+        assertThat(button.bottom.value).isWithin(0.5f).of(under.bottom.value)
         compose.assertClickablesHaveRoleAndLabel()
     }
 

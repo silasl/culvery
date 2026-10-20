@@ -42,8 +42,9 @@ object PageHeaderTokens {
 }
 
 /**
- * A tab's title (a heading), its [subtitle] under it and [trailing] on the title's row, right-aligned (9 §4.4). [under]
- * follows the subtitle, or stands in its place, for lines richer than text.
+ * A tab's title (a heading) with its [subtitle] under it, and [trailing] on the right with its foot level with the
+ * block's last line (9 §4.4). [under] follows the subtitle, or stands in its place, for lines richer than text;
+ * [footer] runs the full width below them both.
  */
 @Composable
 fun HhPageHeader(
@@ -52,21 +53,20 @@ fun HhPageHeader(
     modifier: Modifier = Modifier,
     titleModifier: Modifier = Modifier,
     under: (@Composable () -> Unit)? = null,
+    footer: (@Composable () -> Unit)? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     Column(modifier.fillMaxWidth().padding(bottom = PageHeaderTokens.below)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(PageHeaderTokens.trailingGap)) {
-            Text(
-                title,
-                style = PageHeaderTokens.titleStyle,
-                color = Culvery.colors.ink,
-                modifier = titleModifier.weight(1f).semantics { heading() },
-            )
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(PageHeaderTokens.trailingGap)) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = PageHeaderTokens.titleStyle, color = Culvery.colors.ink, modifier = titleModifier.semantics { heading() })
+                if (subtitle != null || under != null) Spacer(Modifier.height(PageHeaderTokens.subtitleGap))
+                if (subtitle != null) Text(subtitle, style = PageHeaderTokens.subtitleStyle, color = Culvery.colors.mute)
+                under?.invoke()
+            }
             trailing()
         }
-        if (subtitle != null || under != null) Spacer(Modifier.height(PageHeaderTokens.subtitleGap))
-        if (subtitle != null) Text(subtitle, style = PageHeaderTokens.subtitleStyle, color = Culvery.colors.mute)
-        under?.invoke()
+        footer?.invoke()
     }
 }
 

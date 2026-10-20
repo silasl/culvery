@@ -94,7 +94,9 @@ internal fun WeekHeader(
                     )
                 }
             }
-            if (state.sync.needsSignIn.isNotEmpty()) {
+        },
+        footer = if (state.sync.needsSignIn.isEmpty()) null else {
+            {
                 Spacer(Modifier.height(CalendarDimens.reconnectTop))
                 ReconnectChip(reconnectLabel(state.sync.needsSignIn), onClick = onReconnect)
             }
