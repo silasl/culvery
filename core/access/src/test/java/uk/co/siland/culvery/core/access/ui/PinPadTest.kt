@@ -45,10 +45,16 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class PinPadTest {
+    private companion object {
+        const val LOCKED_UNTIL = 27_000L
+        const val FRAME_MS = 16L
+    }
+
     /** Focus behaves as on the tablet only in touch mode, set before the activity launches. */
     @get:Rule(order = 0) val touchMode = TouchModeRule()
     @get:Rule(order = 1) val compose = createComposeRule()
@@ -58,6 +64,9 @@ class PinPadTest {
 
     private fun show(overSheet: Boolean = false, overSettings: Boolean = false) =
         compose.setContent { CulveryTheme(dark = true) { PinPadHost(controller, activity, overSheet, overSettings) } }
+
+    /** The pad's clock reads 0, so a lock until [LOCKED_UNTIL] starts at 27 seconds. */
+    private fun showAtZero() = compose.setContent { CulveryTheme(dark = true) { PinPadHost(controller, activity, nowMillis = { 0L }) } }
 
     private fun tap(vararg keys: String) = keys.forEach { compose.onNodeWithTag("pin_key_$it").performClick() }
 
@@ -211,26 +220,80 @@ class PinPadTest {
         compose.onNodeWithText("Too many tries", substring = true).assertExists()
     }
 
-    /** When the wait ends nobody has typed, so the last refusal isn't said again. */
+    /** When the wait ends nobody has typed, so the last refusal isn't said again; and nothing on the pad moves. */
     @Test
     fun theEndOfALockSaysYouCanTryAgainAndClearsTheDotsError() {
         compose.mainClock.autoAdvance = false
-        controller.open("Change settings", PinError.WrongPin, System.currentTimeMillis() + 2_000)
-        show()
-        compose.mainClock.advanceTimeBy(3_000)
-        compose.onNodeWithTag("pin_message").assertContentDescriptionEquals("You can try again.")
+        controller.open("Change settings", PinError.WrongPin, LOCKED_UNTIL)
+        showAtZero()
+        compose.mainClock.advanceTimeByFrame()
+        val keyTop = compose.onNodeWithTag("pin_key_1").getUnclippedBoundsInRoot().top
+        compose.mainClock.advanceTimeBy(LOCKED_UNTIL - FRAME_MS)
+        compose.onNodeWithTag("pin_key_1").assertIsNotEnabled()
+        compose.mainClock.advanceTimeBy(2 * FRAME_MS)
+        compose.onNodeWithTag("pin_message").assertContentDescriptionEquals(TRY_AGAIN)
+        compose.onNodeWithText(TRY_AGAIN).assertExists()
         compose.onNodeWithTag("pin_dots").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Error))
         compose.onNodeWithTag("pin_key_1").assertIsEnabled()
+        assertThat(compose.onNodeWithTag("pin_key_1").getUnclippedBoundsInRoot().top).isEqualTo(keyTop)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aLockShowsTheCountdownAndTheBar() {
+        compose.mainClock.autoAdvance = false
+        controller.open("Change settings", PinError.WrongPin, LOCKED_UNTIL)
+        showAtZero()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText(TOO_MANY_TRIES).assert(isHeading())
+        compose.onNodeWithText(WAIT_A_MOMENT).assertExists()
+        compose.onNodeWithText("0:27", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("pin_bar", useUnmergedTree = true).assertWidthIsEqualTo(173.dp)
+        compose.mainClock.advanceTimeBy(14_000)
+        compose.onNodeWithText("0:13", useUnmergedTree = true).assertExists()
+        val bar = compose.onNodeWithTag("pin_bar", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertThat((bar.right - bar.left).value).isWithin(1f).of(173f * 13 / 27)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** TalkBack hears the lock once, from its first value; the drawn seconds and bar are cleared from it. */
+    @Test
+    fun theLockIsSpokenOnceAndItsDrawnSecondsAndBarAreNotInTheTree() {
+        compose.mainClock.autoAdvance = false
+        controller.open("Change settings", PinError.WrongPin, LOCKED_UNTIL)
+        showAtZero()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("pin_message").assertContentDescriptionEquals(tooManyTries(27))
+        compose.onNodeWithText("0:27").assertDoesNotExist()
+        compose.onNodeWithTag("pin_bar").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(5_000)
+        compose.onNodeWithTag("pin_message").assertContentDescriptionEquals(tooManyTries(27))
+        compose.onNodeWithText("0:22").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(LOCKED_UNTIL - 5_000 + FRAME_MS)
+        compose.onNodeWithTag("pin_message").assertContentDescriptionEquals(TRY_AGAIN)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun countdownTextIsMinutesAndSeconds() {
+        assertThat(countdownText(27)).isEqualTo("0:27")
+        assertThat(countdownText(65)).isEqualTo("1:05")
+        assertThat(countdownText(600)).isEqualTo("10:00")
     }
 
     @Test
     fun keysAreDisabledWhileLocked() {
         // The countdown loops on delay(); stop the test clock racing through it.
         compose.mainClock.autoAdvance = false
-        controller.open("Change settings", PinError.WrongPin, System.currentTimeMillis() + 60_000)
+        val request = controller.open("Change settings", PinError.WrongPin, System.currentTimeMillis() + 60_000)
         show()
-        compose.onNodeWithTag("pin_key_1").assertIsNotEnabled()
+        (0..9).forEach { compose.onNodeWithTag("pin_key_$it").assertIsNotEnabled() }
+        compose.onNodeWithTag("pin_backspace").assertIsNotEnabled()
+        compose.onNodeWithTag("pin_cancel").assertIsEnabled().performClick()
+        compose.waitForIdle()
+        assertThat(request.answer.getCompleted()).isNull()
         compose.onNodeWithText("Too many tries", substring = true).assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -247,11 +310,11 @@ class PinPadTest {
     }
 
     @Test
-    fun keysAre76dpCirclesInA400dpCard() {
+    fun keysAre77dpCirclesInA413dpCard() {
         controller.open("Change settings", null, null)
         show()
-        compose.onNodeWithTag("pin_key_5").assertWidthIsEqualTo(76.dp).assertHeightIsEqualTo(76.dp)
-        compose.onNodeWithTag("pin_card", useUnmergedTree = true).assertWidthIsEqualTo(400.dp)
+        compose.onNodeWithTag("pin_key_5").assertWidthIsEqualTo(77.dp).assertHeightIsEqualTo(77.dp)
+        compose.onNodeWithTag("pin_card", useUnmergedTree = true).assertWidthIsEqualTo(413.dp)
     }
 
     @Test
@@ -344,11 +407,11 @@ class PinPadTest {
         compose.mainClock.advanceTimeByFrame()
         val spoken = description("pin_message")
         val dotsError = compose.onNodeWithTag("pin_dots").fetchSemanticsNode().config[SemanticsProperties.Error]
-        val shown = compose.onNodeWithTag("pin_error", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single().text
+        val shown = compose.onNodeWithTag("pin_countdown", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single().text
         compose.mainClock.advanceTimeBy(3_000)
         assertThat(description("pin_message")).isEqualTo(spoken)
         assertThat(compose.onNodeWithTag("pin_dots").fetchSemanticsNode().config[SemanticsProperties.Error]).isEqualTo(dotsError)
-        assertThat(compose.onNodeWithTag("pin_error", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single().text)
+        assertThat(compose.onNodeWithTag("pin_countdown", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single().text)
             .isNotEqualTo(shown)
         assertThat(spoken).isEqualTo(tooManyTries(30))
         assertThat(dotsError).isEqualTo(spoken)

@@ -367,6 +367,18 @@ class ShellScreenshotTest {
     }
 
     @Test
+    fun pinPadLockedLight() {
+        // The countdown ticks each second; hold the clock so it still reads its first value.
+        compose.mainClock.autoAdvance = false
+        snap("pin_pad_locked_light", dark = false) {
+            PinPadSheet(
+                "Change settings", PinReason.Generic, error = PinError.WrongPin, lockedUntilMillis = 30_000L,
+                onSubmit = {}, onCancel = {}, nowMillis = { 0L },
+            )
+        }
+    }
+
+    @Test
     fun musicTabLight() = snap(
         "tab_music_light", dark = false, state = fullHome(dark = false).copy(selectedTabId = "music"),
         tabContent = { MusicTab(groups, null, emptyMap(), emptySet(), {}, GroupActions.None) },

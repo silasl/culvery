@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -108,6 +109,15 @@ internal const val WRONG_PIN = "Wrong PIN — try again."
 
 internal const val TRY_AGAIN = "You can try again."
 
+internal const val TOO_MANY_TRIES = "Too many tries"
+
+internal const val WAIT_A_MOMENT = "Wait a moment, then try your PIN again."
+
+/** A lock in force: [secondsLeft] still to wait of the [firstSeconds] it began with. */
+internal data class PinLock(val secondsLeft: Int, val firstSeconds: Int)
+
+internal fun countdownText(seconds: Int): String = "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+
 internal fun tooManyTries(seconds: Int): String {
     val minutes = seconds / 60L
     val rest = seconds % 60L
@@ -153,7 +163,8 @@ fun PinPadSheet(
     // Nobody has typed since the lock began, so its end doesn't repeat the try before it.
     val lockEnded = firstSeconds > 0 && !locked
     val message = when {
-        locked -> tooManyTries(secondsLeft)
+        // Spoken below and drawn as the countdown; this line stays empty, its two lines kept.
+        locked -> ""
         lockEnded -> TRY_AGAIN
         error is PinError.WrongPin -> WRONG_PIN
         error is PinError.NotAllowed -> error.message
@@ -167,6 +178,7 @@ fun PinPadSheet(
         spokenMessage = if (locked) tooManyTries(firstSeconds) else message,
         wrongPin = error is PinError.WrongPin && !lockEnded,
         enabled = !locked,
+        lock = if (locked) PinLock(secondsLeft, firstSeconds) else null,
         onSubmit = onSubmit,
         onCancel = onCancel,
         overSheet = overSheet,
@@ -217,9 +229,11 @@ fun ChoosePinPad(onChosen: (String) -> Unit, onCancel: () -> Unit, overSheet: Bo
 /**
  * The PIN pad's card and keypad (hand-off §7). It catches every tap on the screen: a tap outside the card cancels. The
  * pad submits on the fourth digit. [wrongPin] rings the empty dots in `danger`; [line] null leaves the reason line out.
+ * A [lock] swaps the title and line for the lock's words and the dots for its countdown and bar; both stay laid out, so
+ * the keys never move (9 §4.9).
  */
 @Composable
-fun PinPadFrame(
+internal fun PinPadFrame(
     title: String,
     line: String?,
     message: String,
@@ -228,6 +242,7 @@ fun PinPadFrame(
     enabled: Boolean,
     onSubmit: (String) -> Unit,
     onCancel: () -> Unit,
+    lock: PinLock? = null,
     overSheet: Boolean = false,
     drawScrim: Boolean = true,
     paneTitle: String = title,
@@ -274,23 +289,34 @@ fun PinPadFrame(
                     .width(PinPadDimens.cardWidth)
                     .clip(RoundedCornerShape(PinPadDimens.cardRadius))
                     .background(c.surf)
+                    .border(PinPadDimens.cardEdge, c.surf3, RoundedCornerShape(PinPadDimens.cardRadius))
                     .pointerInput(Unit) { detectTapGestures { } }
                     .padding(horizontal = PinPadDimens.cardPaddingH, vertical = PinPadDimens.cardPaddingV),
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(PinPadDimens.badge).clip(CircleShape).background(c.accentSoft),
+                    modifier = Modifier.size(PinPadDimens.badge).clip(CircleShape).background(if (lock != null) c.dangerSoft else c.accentSoft),
                 ) {
-                    HhIcon(Icons.LOCK, size = PinPadDimens.badgeIcon, tint = c.accent)
+                    if (lock != null) {
+                        HhIcon(Icons.LOCK_CLOCK, size = PinPadDimens.badgeIcon, filled = true, tint = c.danger)
+                    } else {
+                        HhIcon(Icons.LOCK, size = PinPadDimens.badgeIcon, tint = c.accent)
+                    }
                 }
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(PinPadDimens.titleReasonGap),
                 ) {
-                    Text(title, style = PinPadType.title, color = c.ink, modifier = Modifier.semantics { heading() })
-                    if (line != null) Text(line, style = PinPadType.reason, color = c.mute, textAlign = TextAlign.Center)
+                    Text(if (lock != null) TOO_MANY_TRIES else title, style = PinPadType.title, color = c.ink, modifier = Modifier.semantics { heading() })
+                    val shownLine = if (lock != null) WAIT_A_MOMENT else line
+                    if (shownLine != null) Text(shownLine, style = PinPadType.reason, color = c.mute, textAlign = TextAlign.Center)
                 }
-                Dots(filled = digits.length, error = if (wrongPin && digits.isEmpty()) spokenMessage else null)
+                Box(contentAlignment = Alignment.Center) {
+                    Box(Modifier.alpha(if (lock == null) 1f else 0f)) {
+                        Dots(filled = digits.length, error = if (wrongPin && digits.isEmpty()) spokenMessage else null)
+                    }
+                    Box(Modifier.alpha(if (lock != null) 1f else 0f)) { Countdown(lock) }
+                }
                 Box(
                     Modifier
                         .testTag("pin_message")
@@ -349,13 +375,36 @@ fun PinPadFrame(
                                 .size(PinPadDimens.key)
                                 .clip(CircleShape)
                                 // Off once four are in: that PIN is being checked.
-                                .hhClickable({ digits = digits.dropLast(1) }, enabled = digits.length in 1 until PinHasher.PIN_LENGTH && enabled),
+                                .hhClickable({ digits = digits.dropLast(1) }, enabled = digits.length in 1 until PinHasher.PIN_LENGTH && enabled)
+                                .alpha(if (enabled) 1f else DISABLED_KEY_ALPHA),
                         ) {
                             HhIcon(Icons.BACKSPACE, size = PinPadDimens.backspaceIcon, tint = c.ink, contentDescription = "Delete last digit")
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+/** Drawn only: the pad's message speaks the lock once, so TalkBack never hears these seconds tick. */
+@Composable
+private fun Countdown(lock: PinLock?) {
+    val c = Culvery.colors
+    val secondsLeft = lock?.secondsLeft ?: 0
+    val fraction = if (lock != null && lock.firstSeconds > 0) secondsLeft.toFloat() / lock.firstSeconds else 0f
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(PinPadDimens.countdownBarGap)) {
+        Box(Modifier.clearAndSetSemantics {}) {
+            Text(countdownText(secondsLeft), style = PinPadType.countdown, color = c.ink, modifier = Modifier.testTag("pin_countdown"))
+        }
+        Box(
+            Modifier
+                .clearAndSetSemantics {}
+                .size(PinPadDimens.barWidth, PinPadDimens.barHeight)
+                .clip(CircleShape)
+                .background(c.surf3),
+        ) {
+            Box(Modifier.testTag("pin_bar").fillMaxHeight().fillMaxWidth(fraction).background(c.danger))
         }
     }
 }
@@ -396,7 +445,7 @@ private fun DigitKey(digit: String, enabled: Boolean, onClick: () -> Unit) {
             .clip(CircleShape)
             .background(c.surf2)
             .hhClickable(onClick, enabled = enabled)
-            .alpha(if (enabled) 1f else 0.4f),
+            .alpha(if (enabled) 1f else DISABLED_KEY_ALPHA),
     ) {
         Text(digit, style = PinPadType.digit, color = c.ink)
     }
