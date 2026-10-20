@@ -3,6 +3,7 @@ package uk.co.siland.culvery.display.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -75,33 +75,33 @@ class SleepLayersTest {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             CulveryTheme(dark = true) {
-              Box(Modifier.padding(top = insets, start = insets)) {
-                ShellLayers(
-                    overlay = OverlayState(),
-                    toast = toast,
-                    onToastHidden = { id -> if (toast?.id == id) toast = null },
-                    pinShowing = pinShowing,
-                    pinPad = {
-                        if (pinShowing) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { HhButton("1", { keyPresses++ }, on = ButtonSurface.Surf) }
+                Box(Modifier.padding(top = insets, start = insets)) {
+                    ShellLayers(
+                        overlay = OverlayState(),
+                        toast = toast,
+                        onToastHidden = { id -> if (toast?.id == id) toast = null },
+                        pinShowing = pinShowing,
+                        pinPad = {
+                            if (pinShowing) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { HhButton("1", { keyPresses++ }, on = ButtonSurface.Surf) }
+                            }
+                        },
+                        activity = activity,
+                        onTouch = { touches++ },
+                        nowMillis = { compose.mainClock.currentTime },
+                        alert = alert,
+                        sleeping = screen != Screen.AWAKE,
+                        sleep = { SleepLayer(screen, { at }, { screen = Screen.AWAKE }, cameraRunning = running, glyphAt = glyphAt) },
+                        cameraMark = overlayCameraMark(
+                            running, sleeping = screen != Screen.AWAKE, complete = true, settingsOpen = settingsOpen,
+                            sheetShowing = false, pinShowing = pinShowing, alertShowing = alert != null,
+                        ),
+                    ) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            HhButton("Add event", { presses++ }, Modifier.testTag("button"), on = ButtonSurface.Bg)
                         }
-                    },
-                    activity = activity,
-                    onTouch = { touches++ },
-                    nowMillis = { compose.mainClock.currentTime },
-                    alert = alert,
-                    sleeping = screen != Screen.AWAKE,
-                    sleep = { SleepLayer(screen, { at }, { screen = Screen.AWAKE }, cameraRunning = running, glyphAt = glyphAt) },
-                    cameraMark = overlayCameraMark(
-                        running, sleeping = screen != Screen.AWAKE, complete = true, settingsOpen = settingsOpen,
-                        sheetShowing = false, pinShowing = pinShowing, alertShowing = alert != null,
-                    ),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        HhButton("Add event", { presses++ }, Modifier.testTag("button"), on = ButtonSurface.Bg)
                     }
                 }
-              }
             }
         }
         settle()

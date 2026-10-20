@@ -42,7 +42,6 @@ import uk.co.siland.culvery.display.ui.DisplayPage
 import uk.co.siland.culvery.display.ui.SleepLayer
 import uk.co.siland.culvery.display.ui.THE_CAMERA_IS_ON
 import uk.co.siland.culvery.holding
-import uk.co.siland.culvery.overlayCameraMark
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ui.ShellLayers
 
@@ -139,7 +138,7 @@ class DisplayWiringTest {
         access.state.first { it == CameraState.ALLOWED }
     }
 
-    /** Fails if the dark screen's glyph follows anything but the presence code's `running`, so it could show with the camera closed or hide with it open; the overlay rule leaves the dark screen to the glyph. */
+    /** Fails if the dark screen's glyph follows anything but the presence code's `running`, so it could show with the camera closed or hide with it open. Asleep, the overlay mark is off (overlayCameraMark), so the glyph is the only mark. */
     @Test
     fun theCameraMarkShowsWheneverTheCameraIsOpen() {
         val test = TestScope()
@@ -161,10 +160,6 @@ class DisplayWiringTest {
                     onTouch = {},
                     sleeping = true,
                     sleep = { SleepLayer(Screen.ASLEEP, { LocalDateTime.of(2026, 10, 19, 23, 41) }, {}, cameraRunning = running) },
-                    cameraMark = overlayCameraMark(
-                        running, sleeping = true, complete = true, settingsOpen = false,
-                        sheetShowing = false, pinShowing = false, alertShowing = false,
-                    ),
                 ) {}
             }
         }

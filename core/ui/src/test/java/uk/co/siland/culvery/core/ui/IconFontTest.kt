@@ -73,8 +73,9 @@ class IconFontTest {
 
         /** Glyphs the full font has no filled alternate for, so FILL fills them through the variation alone. */
         val NO_FILLED_FORM: Set<String> = setOf(
-            "add", "arrow_downward", "arrow_forward", "arrow_upward", "check", "chevron_left", "chevron_right", "close", "directions_walk",
-            "expand_less", "expand_more", "music_note", "power_settings_new", "rainy_heavy", "rainy_light", "refresh", "repeat", "search", "shuffle", "sync_problem",
+            "add", "arrow_downward", "arrow_forward", "arrow_upward", "check", "chevron_left", "chevron_right",
+            "close", "directions_walk", "expand_less", "expand_more", "music_note", "power_settings_new",
+            "rainy_heavy", "rainy_light", "refresh", "repeat", "search", "shuffle", "sync_problem",
         )
     }
 }

@@ -3,8 +3,8 @@ package uk.co.siland.culvery.core.ui
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.FontListFontFamily
 import androidx.compose.ui.text.font.ResourceFont
-import org.junit.Assert.assertEquals
 import androidx.compose.ui.unit.sp
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class TypeTest {

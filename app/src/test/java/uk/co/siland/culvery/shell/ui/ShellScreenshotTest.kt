@@ -171,36 +171,26 @@ class ShellScreenshotTest {
         TabItem("door", "Door", Icons.DOORBELL),
     )
 
-    /** Every card wanting to show, at the capabilities' sizes and priorities: Lights (35) above Music (30) on the right. */
-    private fun fullHome(dark: Boolean) = weatherHome(dark).copy(
-        tabs = allTabs,
-        homeCards = HomeCardPlacer.place(
-            listOf(
-                HomeCard("calendar.today", HomeCardSize.TALL, 100) { TodayCard(today) },
-                HomeCard("calendar.comingUp", HomeCardSize.WIDE, 50) { ComingUpCard(comingUp) },
-                HomeCard("lights.card", HomeCardSize.REGULAR, 35) {
-                    LightsCard(rooms[0], holidayOn = false, allOffLit = true, run = null, status = null, line = null, MainRoomActions({}, {}), noHouse)
-                },
-                HomeCard("music.card", HomeCardSize.REGULAR, 30) { MusicCard(HomePick(groups[0], nothingPlaying = false), null, null, GroupActions.None) },
-            ),
+    /**
+     * Every card wanting to show, at the capabilities' sizes and priorities: Lights (35) above Music (30) on the right.
+     * Coming up is always offered, so the placer is what leaves it out beside a REGULAR card.
+     */
+    private fun homeCards(music: Boolean = true) = HomeCardPlacer.place(
+        listOfNotNull(
+            HomeCard("calendar.today", HomeCardSize.TALL, 100) { TodayCard(today) },
+            HomeCard("calendar.comingUp", HomeCardSize.WIDE, 50) { ComingUpCard(comingUp) },
+            HomeCard("lights.card", HomeCardSize.REGULAR, 35) {
+                LightsCard(rooms[0], holidayOn = false, allOffLit = true, run = null, status = null, line = null, MainRoomActions({}, {}), noHouse)
+            },
+            HomeCard("music.card", HomeCardSize.REGULAR, 30) {
+                MusicCard(HomePick(groups[0], nothingPlaying = false), null, null, GroupActions.None)
+            }.takeIf { music },
         ),
     )
 
-    private fun lightsHome(dark: Boolean, music: Boolean) = calendarHome(dark).copy(
-        tabs = allTabs,
-        homeCards = HomeCardPlacer.place(
-            listOfNotNull(
-                HomeCard("calendar.today", HomeCardSize.TALL, 100) { TodayCard(today) },
-                HomeCard("calendar.comingUp", HomeCardSize.WIDE, 50) { ComingUpCard(comingUp) },
-                HomeCard("lights.card", HomeCardSize.REGULAR, 35) {
-                    LightsCard(rooms[0], holidayOn = false, allOffLit = true, run = null, status = null, line = null, MainRoomActions({}, {}), noHouse)
-                },
-                HomeCard("music.card", HomeCardSize.REGULAR, 30) {
-                    MusicCard(HomePick(groups[0], nothingPlaying = false), null, null, GroupActions.None)
-                }.takeIf { music },
-            ),
-        ),
-    )
+    private fun fullHome(dark: Boolean) = weatherHome(dark).copy(tabs = allTabs, homeCards = homeCards())
+
+    private fun lightsHome(dark: Boolean, music: Boolean) = calendarHome(dark).copy(tabs = allTabs, homeCards = homeCards(music))
 
     private fun snap(
         name: String,

@@ -91,7 +91,7 @@ class SleepLayersScreenshotTest {
     @Test
     fun cameraMarkLight() = snap("camera_mark_light", dark = false, screen = Screen.AWAKE, mark = true)
 
-    /** By day the theme is light, so the glyph over the dark screen is light `mute` on black. */
+    /** By day the theme is light; the glyph over the dark screen keeps its one dim colour on black, as the night clock does. */
     @Test
     fun cameraMarkAsleep() = snap("camera_mark_asleep", dark = false, screen = Screen.ASLEEP, mark = true)
 }
