@@ -186,4 +186,36 @@ class MusicQuieterTest {
         q.restore()
         assertThat(sets()).isEmpty()
     }
+
+    /** The answer the doorbell's "Music lowered" chip rests on. */
+    @Test
+    fun quietSaysWhetherItLoweredARoom() = runTest {
+        assertThat(quieter(s = null).quiet()).isFalse()
+
+        system.failures["playingNow"] = IOException("no speaker")
+        assertThat(quieter().quiet()).isFalse()
+        system.failures.clear()
+
+        system.groups.value = listOf(bedroom)
+        system.playingNowAnswer = emptyList()
+        assertThat(quieter().quiet()).isFalse()
+        system.playingNowAnswer = null
+
+        val office = group("o", "Office", state = PlayState.PLAYING, nowPlaying = SONG, volume = 40)
+        system.groups.value = listOf(office)
+        share = 30
+        val q = quieter()
+        assertThat(q.quiet()).isTrue()
+        assertThat(q.quiet()).isTrue()
+        q.restore()
+
+        system.failures["setRoomVolume Office-id 12"] = MusicUnreachableException(MusicProblem.UNREACHABLE)
+        assertThat(quieter().quiet()).isFalse()
+        system.failures.clear()
+
+        system.roomVolumes["Office-id"] = 40
+        share = 100
+        assertThat(quieter().quiet()).isFalse()
+        assertThat(system.roomVolumes["Office-id"]).isEqualTo(40)
+    }
 }

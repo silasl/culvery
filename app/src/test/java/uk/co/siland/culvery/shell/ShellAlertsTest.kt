@@ -26,17 +26,32 @@ import uk.co.siland.culvery.core.plugin.QUIET_CAP_MS
 private class RecordingQuieter(private val name: String, private val log: MutableList<String>) : AlertQuieter {
     var gate: CompletableDeferred<Unit>? = null
     var fails = false
+    var lowers = false
 
-    override suspend fun quiet() {
+    override suspend fun quiet(): Boolean {
         log += "$name quiet"
         gate?.await()
         if (fails) throw IOException("the speaker went away")
         log += "$name quieted"
+        return lowers
     }
 
     override suspend fun restore() {
         log += "$name restore"
     }
+}
+
+/** A quieter whose n-th quiet() waits for gates[n] and then answers answers[n]. */
+private class ScriptedQuieter(private val gates: List<CompletableDeferred<Unit>?>, private val answers: List<Boolean>) : AlertQuieter {
+    private var calls = 0
+
+    override suspend fun quiet(): Boolean {
+        val n = calls++
+        gates[n]?.await()
+        return answers[n]
+    }
+
+    override suspend fun restore() = Unit
 }
 
 @RunWith(AndroidJUnit4::class)
@@ -200,6 +215,73 @@ class ShellAlertsTest {
         alerts.dismiss()
         runCurrent()
         assertThat(log).containsAtLeast("gone restore", "music restore")
+    }
+
+    @Test
+    fun loweredOnlyWhenAQuieterTurnedSomethingDown() = runTest {
+        val some = RecordingQuieter("some", mutableListOf())
+        val alerts = alerts(RecordingQuieter("none", mutableListOf()), some, scope = backgroundScope)
+        assertThat(alerts.lowered.value).isFalse()
+        alerts.show(loud = true, content = nothing)
+        askQuieted(alerts)
+        assertThat(alerts.lowered.value).isFalse()
+        alerts.dismiss()
+        runCurrent()
+        some.lowers = true
+        alerts.show(loud = true, content = nothing)
+        askQuieted(alerts)
+        assertThat(alerts.lowered.value).isTrue()
+        alerts.dismiss()
+        assertThat(alerts.lowered.value).isFalse()
+    }
+
+    @Test
+    fun aFailingQuieterIsNotLowered() = runTest {
+        val gone = RecordingQuieter("gone", mutableListOf()).apply { fails = true }
+        val alone = alerts(gone, scope = backgroundScope)
+        alone.show(loud = true, content = nothing)
+        askQuieted(alone)
+        assertThat(alone.lowered.value).isFalse()
+        val withMusic = alerts(gone, RecordingQuieter("music", mutableListOf()).apply { lowers = true }, scope = backgroundScope)
+        withMusic.show(loud = true, content = nothing)
+        askQuieted(withMusic)
+        assertThat(withMusic.lowered.value).isTrue()
+    }
+
+    @Test
+    fun aRingReplacingARingKeepsLowered() = runTest {
+        val log = mutableListOf<String>()
+        val alerts = alerts(RecordingQuieter("music", log).apply { lowers = true }, scope = backgroundScope)
+        alerts.show(loud = true, content = nothing)
+        askQuieted(alerts)
+        alerts.show(loud = true, content = nothing)
+        runCurrent()
+        assertThat(alerts.lowered.value).isTrue()
+        assertThat(log.count { it == "music quiet" }).isEqualTo(1)
+    }
+
+    @Test
+    fun aQuietAlertReplacingARingClearsLowered() = runTest {
+        val alerts = alerts(RecordingQuieter("music", mutableListOf()).apply { lowers = true }, scope = backgroundScope)
+        alerts.show(loud = true, content = nothing)
+        askQuieted(alerts)
+        alerts.show(content = nothing)
+        assertThat(alerts.lowered.value).isFalse()
+    }
+
+    /** Fails if an answer is accepted without checking its pass is still the current one. */
+    @Test
+    fun aLateAnswerFromAnEarlierRingIsIgnored() = runTest {
+        val late = CompletableDeferred<Unit>()
+        val alerts = alerts(ScriptedQuieter(listOf(late, null), listOf(true, false)), scope = backgroundScope)
+        alerts.show(loud = true, content = nothing)
+        runCurrent()
+        alerts.dismiss()
+        alerts.show(loud = true, content = nothing)
+        runCurrent()
+        late.complete(Unit)
+        runCurrent()
+        assertThat(alerts.lowered.value).isFalse()
     }
 
     /** Fails if inFront is true before the screen resumes or stays true after it pauses (5 §2.7). */

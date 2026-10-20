@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.StateFlow
  * the playing groups for the doorbell. Neither call may assume the other ran; each may fail, which the shell logs.
  */
 interface AlertQuieter {
-    suspend fun quiet()
+    /** Returns true when it turned something down, false when there was nothing to turn down or it couldn't. */
+    suspend fun quiet(): Boolean
 
     suspend fun restore()
 }
@@ -25,6 +26,12 @@ const val QUIET_CAP_MS = 500L
 interface AlertHost {
     /** True while Culvery's screen is resumed in front: an alert raised otherwise would never be seen (5 §2.7). */
     val inFront: StateFlow<Boolean>
+
+    /**
+     * True once a quieter of the loud alert showing has turned something down (9 §6.3): false as each quiet pass starts,
+     * and when the loud alert goes.
+     */
+    val lowered: StateFlow<Boolean>
 
     /**
      * Shows [content] on the alert layer, replacing any alert already there. A [loud] alert runs every [AlertQuieter]'s

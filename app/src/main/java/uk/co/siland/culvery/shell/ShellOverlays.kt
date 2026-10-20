@@ -75,8 +75,12 @@ class ShellAlerts @Inject constructor(
     private val _inFront = MutableStateFlow(false)
     override val inFront: StateFlow<Boolean> = _inFront.asStateFlow()
 
+    private val _lowered = MutableStateFlow(false)
+    override val lowered: StateFlow<Boolean> = _lowered.asStateFlow()
+
     private val lock = Any()
     private var loud = false
+    private var passNumber = 0
     private var lastPass: Job = Job().apply { complete() }
     private var quietened: Deferred<Unit> = CompletableDeferred(Unit)
 
@@ -102,9 +106,11 @@ class ShellAlerts @Inject constructor(
 
     private fun startQuiet() {
         val before = lastPass
+        val number = ++passNumber
+        _lowered.value = false
         val pass = scope.launch {
             before.join()
-            runAll { it.quiet() }
+            runAll { if (it.quiet()) synchronized(lock) { if (number == passNumber) _lowered.value = true } }
         }
         lastPass = pass
         quietened = scope.async {
@@ -114,6 +120,8 @@ class ShellAlerts @Inject constructor(
     }
 
     private fun startRestore() {
+        passNumber++
+        _lowered.value = false
         val before = lastPass
         lastPass = scope.launch {
             before.join()

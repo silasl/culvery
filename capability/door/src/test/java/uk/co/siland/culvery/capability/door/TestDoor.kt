@@ -56,6 +56,7 @@ internal fun File.names(): List<String> = listFiles()?.map { it.name }?.sorted()
 /** An alert host a test drives: whether Culvery is in front, and what was shown and dismissed. */
 internal class FakeAlertHost(inFront: Boolean = true) : AlertHost {
     override val inFront = MutableStateFlow(inFront)
+    override val lowered = MutableStateFlow(false)
     var shown = 0
     var dismissed = 0
     var content: (@Composable () -> Unit)? = null

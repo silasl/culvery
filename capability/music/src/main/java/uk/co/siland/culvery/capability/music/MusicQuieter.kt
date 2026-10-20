@@ -21,7 +21,7 @@ private const val TAG = "MusicQuieter"
 internal const val RESTORE_DRIFT = 1
 
 /**
- * Music's [AlertQuieter] (6 §4.6): each room of each group playing as the bell rings drops to [share] percent of its
+ * Music's [AlertQuieter] (6 §4.6; says whether a room was lowered, 9 §6.3): each room of each group playing as the bell rings drops to [share] percent of its
  * volume, and goes back afterwards unless someone changed it meanwhile. Room by room, so a group keeps its balance. One
  * lock keeps a restore behind the quiet it undoes. Held in memory only: a restart while lowered leaves those rooms low.
  */
@@ -34,15 +34,19 @@ class MusicQuieter internal constructor(private val system: () -> MusicSystem?, 
 
     private val lock = Mutex()
     private var lowered: Pair<MusicSystem, List<Lowered>>? = null
+    private var turnedDown = false
 
-    override suspend fun quiet() = lock.withLock {
-        if (lowered != null) return@withLock
-        val s = system() ?: return@withLock
+    override suspend fun quiet(): Boolean = lock.withLock {
+        if (lowered != null) return@withLock turnedDown
+        val s = system() ?: return@withLock false
         val percent = share()
-        val playing = tried { s.playingNow() } ?: return@withLock
+        val playing = tried { s.playingNow() } ?: return@withLock false
         val rooms: MutableList<Lowered> = Collections.synchronizedList(mutableListOf())
         lowered = s to rooms
-        coroutineScope { playing.forEach { group -> launch { lowerGroup(s, group, percent, rooms) } } }
+        turnedDown = coroutineScope {
+            playing.map { group -> async { lowerGroup(s, group, percent, rooms) } }.awaitAll().any { it }
+        }
+        turnedDown
     }
 
     override suspend fun restore() = lock.withLock {
@@ -54,12 +58,14 @@ class MusicQuieter internal constructor(private val system: () -> MusicSystem?, 
     }
 
     /** All the group's rooms are read first, at once; a group that can't be read is left as it is (6 §4.6). */
-    private suspend fun lowerGroup(s: MusicSystem, group: SpeakerGroup, percent: Int, rooms: MutableList<Lowered>) {
-        val read = tried { coroutineScope { group.rooms.map { async { it to s.roomVolume(it) } }.awaitAll() } } ?: return
+    private suspend fun lowerGroup(s: MusicSystem, group: SpeakerGroup, percent: Int, rooms: MutableList<Lowered>): Boolean {
+        val read = tried { coroutineScope { group.rooms.map { async { it to s.roomVolume(it) } }.awaitAll() } } ?: return false
         val mine = read.map { (room, was) -> Lowered(room, was, (was * percent / 100.0).roundToInt()) }
         // Remembered before the commands go, so one that took effect but timed out is still put back.
         rooms += mine
-        coroutineScope { mine.forEach { launch { tried { s.setRoomVolume(it.room, it.set) } } } }
+        return coroutineScope {
+            mine.map { async { tried { s.setRoomVolume(it.room, it.set) } != null && it.set < it.was } }.awaitAll().any { it }
+        }
     }
 
     private suspend fun putBack(s: MusicSystem, room: Lowered) {
