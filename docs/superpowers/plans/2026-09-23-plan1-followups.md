@@ -457,6 +457,36 @@ Still open on the tablet:
 For the end-of-v1 design review:
 - An Input group picked as Home's fallback says "Nothing playing" while its button shows Pause.
 
+## Plan 9b (Redesign: the tabs): emulator walk-through (2026-10-20)
+
+1. The four tabs line up: passed.
+2. Lights: not checked on the emulator (the AVD couldn't reach the Hue bridge though its network validated); moved to the tablet.
+3. Music: passed. Header counts, the card's control row and labelled volume, the rooms chip, and Play last on a quiet room.
+4. Door: passed. A fake ring while the tab was open showed NEW and "1 new ring" and kept the rail badge; leaving and coming back cleared the badge and the NEW.
+5. The week: passed. One arrow pill, This week past the current week, tinted two-line chips, no legend; pressing empty space shows "+ Add on …" and adds on that day.
+6. Multi-day: the sample calendar's Half term shows as one bar across next week (passed). "Day 2 of 3" on Home was not seen: it needs the event's second day. Tests cover it; check on the tablet when a real multi-day event is on. Creating multi-day events is Plan 9c.
+
+Faults found: none.
+
+Test flakes seen during 9b's build, to add to the flakes list under Plan 9a (5 s timeouts and timing; each green on a rerun):
+- `DoorRecorderTest.everyNoticeIsHeard`
+- `DoorTabTest.tappingTheOpenTabAgainMarksEverythingSeen`
+- `CameraAccessTest.aPermissionTakenAwayInAndroidsSettingsIsSeenOnResume`
+- `SetupWizardTest.aRestoredWizardAsksForThePinAgain`
+- `SpeakersTest.noConnectionOpensNothingUntilOneIsSaved`
+- `HueSystemTest.theStreamEndsAtOnceWithAWaitPending` was a test race, not a flake; fixed in the cleanup pass (a83e876 or e37a1dc).
+
+For the end-of-v1 design review:
+- The light theme's week nav pill (surf2 on bg) is nearly invisible.
+- A bar running past the week keeps its inset; the handoff stretches it.
+- The bar's date_range icon in yellow or lime is faint in light.
+- Column outlines and today's ring show through a bar.
+- A lone Lights room fills half the width at full height.
+- The 63 dp foot under the last Lights row after the pill goes.
+- The Door Yesterday label's gaps.
+- "1 room" and "1 more room" singulars were added.
+- NEW is on rings only; motion isn't tagged.
+
 ## Feature ideas (2026-10-02, after v1)
 
 **Each its own spec → plan cycle; not in 4c, 4d or 4e**
