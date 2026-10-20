@@ -71,7 +71,9 @@ internal fun WeekHeader(
                 horizontalArrangement = Arrangement.spacedBy(CalendarDimens.staleIconGap),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (failing && !updating) HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.staleIcon, tint = c.danger, modifier = Modifier.testTag("week_out_of_date"))
+                if (failing && !updating) {
+                    HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.staleIcon, tint = c.danger, modifier = Modifier.testTag("week_out_of_date"))
+                }
                 Text(
                     if (updating) UPDATING else weekLine(state.sync, state.nowMillis),
                     style = CalendarType.subtitle,

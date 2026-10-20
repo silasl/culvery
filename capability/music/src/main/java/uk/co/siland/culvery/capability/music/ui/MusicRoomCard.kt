@@ -68,7 +68,7 @@ internal fun MusicRoomCard(
                         roomsChip(group.rooms.size), selected = roomsShown, tag = "${tag}_rooms", onClick = onRooms,
                         selectedColor = c.accentSoft, selectedInk = c.accent, unselectedFill = c.accentSoft, unselectedInk = c.accent,
                         role = Role.Button, clickLabel = roomsAction(roomsShown),
-                        trailing = { HhIcon(if (roomsShown) Icons.EXPAND_LESS else Icons.EXPAND_MORE, size = MusicDimens.chipIcon, tint = c.accent) },
+                        trailing = { ink -> HhIcon(if (roomsShown) Icons.EXPAND_LESS else Icons.EXPAND_MORE, size = MusicDimens.chipIcon, tint = ink) },
                     )
                 }
                 HhButton(

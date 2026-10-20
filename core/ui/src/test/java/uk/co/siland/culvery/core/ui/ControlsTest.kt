@@ -126,6 +126,18 @@ class ControlsTest {
         assertThat(chip.right.value - label.right.value).isAtLeast(20f)
     }
 
+    /** Fails if the trailing slot isn't given the chip's ink, unselected and selected. */
+    @Test
+    fun aChipsTrailingIsGivenItsInk() {
+        val inks = mutableListOf<Color>()
+        show {
+            HhChoiceChip("2 rooms", selected = false, tag = "a", onClick = {}, unselectedInk = Color.Blue, trailing = { inks += it })
+            HhChoiceChip("3 rooms", selected = true, tag = "b", onClick = {}, selectedInk = Color.Red, trailing = { inks += it })
+        }
+        compose.waitForIdle()
+        assertThat(inks.distinct()).containsExactly(Color.Blue, Color.Red)
+    }
+
     @Test
     fun aSelectedChipsSecondaryTextIsAtFullStrength() {
         show { HhChoiceChip("Morning", selected = true, tag = "slot", onClick = {}, secondary = "09:00") }

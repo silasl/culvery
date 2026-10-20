@@ -134,7 +134,7 @@ object ControlType {
 /**
  * Hand-off §7 chip: at least 48 dp; a long label takes two lines, then ends in …; padding 0 18, radius 24,
  * 16 sp / 600; [unselectedFill]/[unselectedInk] (`surf`/`ink`), or [selectedColor]/[selectedInk] when selected. One of a radio group by default ([role]);
- * a chip that opens something is `Role.Button`. [trailing] follows the label (an expand arrow). [spokenName] is what TalkBack reads when that isn't the label. A disabled chip is drawn at 38% but stays tappable, so a tap can
+ * a chip that opens something is `Role.Button`. [trailing] follows the label (an expand arrow) and, as [leading], is given the ink. [spokenName] is what TalkBack reads when that isn't the label. A disabled chip is drawn at 38% but stays tappable, so a tap can
  * explain why: TalkBack hears "not available" and "double-tap to find out why".
  */
 @Composable
@@ -154,7 +154,7 @@ fun HhChoiceChip(
     stateDescription: String? = null,
     leading: (@Composable (ink: Color) -> Unit)? = null,
     spokenName: String? = null,
-    trailing: (@Composable () -> Unit)? = null,
+    trailing: (@Composable (ink: Color) -> Unit)? = null,
 ) {
     val ink = if (selected) selectedInk else unselectedInk
     val state = stateDescription ?: NOT_AVAILABLE.takeIf { !enabled }
@@ -182,7 +182,7 @@ fun HhChoiceChip(
         if (secondary != null) {
             Text(secondary, style = ControlType.chipSecondary, color = ink, maxLines = 1)
         }
-        trailing?.invoke()
+        trailing?.invoke(ink)
     }
 }
 
