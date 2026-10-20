@@ -487,6 +487,27 @@ For the end-of-v1 design review:
 - "1 room" and "1 more room" singulars were added.
 - NEW is on rings only; motion isn't tagged.
 
+## Plan 9b (Redesign: the tabs): on the tablet (2026-10-20)
+
+- Installed the release from 470dee5 with `install -r`; the mapping is kept outside the repo.
+- The user at the wall found four Lights faults, all fixed and re-installed (release 2220a04), then said "looks great":
+  - A: the tray lacked the design's ONE-TAP label with its touch icon (84be81e).
+  - B: the tray sat too high. It is now bottom-aligned with the "N of M rooms on" line, which moved every tab's right-hand header content and gave the week's reconnect chip a footer row (cde048a).
+  - C: scene chips were cut at the card's edge. They now wrap, scrolling inside the card if they don't fit (7f9fe81).
+  - D: off rooms read "1%". The Hue room reports brightness 0 while off; the provider now keeps the average of the room's lights' own levels (2220a04).
+- The Lights checks moved here from the emulator walk-through (the AVD couldn't reach the bridge) are covered by the user's look.
+
+Still open on the tablet:
+- "Day 2 of 3" on Home: check when a real multi-day event is on.
+
+For the end-of-v1 design review:
+- The week's ‹ › pill follows the foot of its sync/Update now row and moves when that row appears.
+- The ONE-TAP label uses the 13 sp section style; the handoff converts to 12 sp.
+- Nothing shows that a card's chip area scrolls.
+- An off room's remembered level can shift after a full read (it becomes the average of all its lights).
+
+Test flakes seen during the fixes (each green on a rerun): `CameraAccessTest`, `DoorRecorderTest`, `BridgesTest`, plus the known `DoorTabTest` and `LightsActionsTest`.
+
 ## Feature ideas (2026-10-02, after v1)
 
 **Each its own spec → plan cycle; not in 4c, 4d or 4e**
