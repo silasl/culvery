@@ -202,7 +202,7 @@ class LightsTabTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** 9 §2.3. Fails if either button is missing from the header's row, left of the title's end, or its words or action differ. */
+    /** 9 §2.3. Fails if either button is missing from the header's row, not right of the title, or its words or action differ. */
     @Test
     fun theTrayHoldsAllLightsOffAndHolidayMode() {
         show(holidayOn = true)

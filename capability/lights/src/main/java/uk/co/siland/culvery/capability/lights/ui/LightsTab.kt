@@ -47,7 +47,8 @@ class RoomActions(
 /**
  * The Lights tab (7 §5.2, 9 §4.4): the title with the rooms on and a tray of All lights off and Holiday mode, then one
  * card per Hue room in Hue's order. The status line shows only when something is wrong; [houseLine] is how the last
- * All lights off or Holiday mode went and [lines] each room's last refused command. A [focus] naming a listed room is scrolled to, then handed back through [onFocused].
+ * All lights off or Holiday mode went and [lines] each room's last refused command. A [focus] naming a listed room is
+ * scrolled to, then handed back through [onFocused].
  */
 @Composable
 fun LightsTab(

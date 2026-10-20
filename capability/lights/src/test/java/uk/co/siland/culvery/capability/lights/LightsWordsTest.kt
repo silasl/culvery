@@ -76,8 +76,8 @@ class LightsWordsTest {
     @Test
     fun roomsOnCounts() {
         assertThat(roomsOn(listOf(room("Lounge", on = true), room("Kitchen"), room("Hall", on = true)))).isEqualTo("2 of 3 rooms on · Hue Bridge")
-        assertThat(roomsOn(listOf(room("Kitchen")))).isEqualTo("0 of 1 rooms on · Hue Bridge")
-        assertThat(roomsOn(listOf(room("Lounge", on = true)))).isEqualTo("1 of 1 rooms on · Hue Bridge")
+        assertThat(roomsOn(listOf(room("Kitchen")))).isEqualTo("0 of 1 room on · Hue Bridge")
+        assertThat(roomsOn(listOf(room("Lounge", on = true)))).isEqualTo("1 of 1 room on · Hue Bridge")
     }
 
     /** Fails if a room that can't dim shows a percentage, or an off room shows its brightness. */

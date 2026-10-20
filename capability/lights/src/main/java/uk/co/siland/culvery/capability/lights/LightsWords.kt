@@ -28,8 +28,9 @@ internal fun roomState(room: LightRoom): String = when {
     else -> ON
 }
 
-/** The tab's subtitle: "2 of 3 rooms on · Hue Bridge" (9 §4.4). */
-fun roomsOn(rooms: List<LightRoom>): String = "${rooms.count { it.on }} of ${rooms.size} rooms on · $HUE_BRIDGE"
+/** The tab's subtitle: "2 of 3 rooms on · Hue Bridge", "1 of 1 room on · Hue Bridge" (9 §4.4). */
+fun roomsOn(rooms: List<LightRoom>): String =
+    "${rooms.count { it.on }} of ${rooms.size} ${if (rooms.size == 1) "room" else "rooms"} on · $HUE_BRIDGE"
 
 /** The Home card's status: [roomState] and, while the room is on, its active scene: "On · 70% · Relax" (9 §4.2). */
 internal fun cardStatus(room: LightRoom): String {
