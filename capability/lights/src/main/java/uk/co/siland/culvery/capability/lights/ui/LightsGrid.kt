@@ -24,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -157,7 +158,7 @@ private fun SharedRows(rooms: List<LightRoom>, lines: Map<String, String>, actio
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(LightsDimens.gridGap)) {
         rooms.chunked(columns).forEach { row ->
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(LightsDimens.gridGap)) {
-                row.forEach { LightsRoomCard(it, lines[it.id], actions, Modifier.weight(1f).fillMaxHeight()) }
+                row.forEach { key(it.id) { LightsRoomCard(it, lines[it.id], actions, Modifier.weight(1f).fillMaxHeight()) } }
                 repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }

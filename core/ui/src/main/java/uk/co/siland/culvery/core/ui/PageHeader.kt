@@ -58,7 +58,7 @@ fun HhPageHeader(
 ) {
     Column(modifier.fillMaxWidth().padding(bottom = PageHeaderTokens.below)) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(PageHeaderTokens.trailingGap)) {
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).align(Alignment.Top)) {
                 Text(title, style = PageHeaderTokens.titleStyle, color = Culvery.colors.ink, modifier = titleModifier.semantics { heading() })
                 if (subtitle != null || under != null) Spacer(Modifier.height(PageHeaderTokens.subtitleGap))
                 if (subtitle != null) Text(subtitle, style = PageHeaderTokens.subtitleStyle, color = Culvery.colors.mute)

@@ -110,7 +110,7 @@ internal fun BrightnessRow(
                 style = HhType.secondary.copy(fontSize = LightsDimens.percentSize, fontWeight = FontWeight.W600),
                 color = if (room.on) c.ink else c.mute,
                 textAlign = TextAlign.End,
-                modifier = Modifier.widthIn(min = LightsDimens.percentWidth),
+                modifier = Modifier.widthIn(min = LightsDimens.percentWidth).shownNotSpoken(),
             )
         }
     }

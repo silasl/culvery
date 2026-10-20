@@ -114,6 +114,17 @@ class LightsTabTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** Fails if a card's level is spoken by its percent text as well as by its slider, or an off room says more than "Off". */
+    @Test
+    fun aCardsLevelIsSpokenOnce() {
+        show()
+        fun spoken(text: String) = compose.onAllNodes(hasText(text), useUnmergedTree = true).fetchSemanticsNodes()
+            .filter { SemanticsProperties.HideFromAccessibility !in it.config }
+        assertThat(spoken("70%")).isEmpty()
+        val kitchen = compose.onNodeWithTag("lights_room_Kitchen-id_brightness").fetchSemanticsNode().config
+        assertThat(kitchen[SemanticsProperties.StateDescription]).isEqualTo("Off")
+    }
+
     /** Fails if the switch's click label differs, or a tap asks for the state the room is already in. */
     @Test
     fun theSwitchTurnsTheRoom() {

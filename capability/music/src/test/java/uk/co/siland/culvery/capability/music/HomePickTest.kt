@@ -112,6 +112,15 @@ class HomePickTest {
         assertThat(homePick(groups, "Bedroom-id", null)?.group?.id).isEqualTo("l")
     }
 
+    /** Pin: a titled Bluetooth input playing in the only group, or the usual room's, is not a pick to play: Home offers Play. */
+    @Test
+    fun aTitledPlayingInputInTheOnlyOrUsualGroupSaysNothingPlaying() {
+        val titled = bedroom.copy(state = PlayState.PLAYING, nowPlaying = SONG, fromInput = true)
+        assertThat(homePick(listOf(titled), null, null)).isEqualTo(HomePick(titled, nothingPlaying = true))
+        val several = listOf(kitchen, lounge, titled)
+        assertThat(homePick(several, "Bedroom-id", null)).isEqualTo(HomePick(titled, nothingPlaying = true))
+    }
+
     @Test
     fun aTrackOverAnInputStillPlays() {
         val groups = all.playing("b", SONG)

@@ -474,7 +474,7 @@ Test flakes seen during 9b's build, to add to the flakes list under Plan 9a (5 s
 - `CameraAccessTest.aPermissionTakenAwayInAndroidsSettingsIsSeenOnResume`
 - `SetupWizardTest.aRestoredWizardAsksForThePinAgain`
 - `SpeakersTest.noConnectionOpensNothingUntilOneIsSaved`
-- `HueSystemTest.theStreamEndsAtOnceWithAWaitPending` was a test race, not a flake; fixed in the cleanup pass (a83e876 or e37a1dc).
+- `HueSystemTest.theStreamEndsAtOnceWithAWaitPending` was a test race, not a flake; fixed in the cleanup pass (e37a1dc). It still polls real time with a 5 s cap, so it could fail on a very slow runner.
 
 For the end-of-v1 design review:
 - The light theme's week nav pill (surf2 on bg) is nearly invisible.

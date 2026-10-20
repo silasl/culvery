@@ -81,12 +81,23 @@ class PageHeaderTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** Fails if a title with no subtitle drops to the foot of a taller trailing slot instead of staying at the header's top. */
+    @Test
+    fun theTitleStaysAtTheTopBesideATallerTrailingSlot() {
+        show { Header(null) { Box(Modifier.testTag("tall").width(40.dp).height(90.dp)) } }
+        val header = compose.onNodeWithTag("header").getUnclippedBoundsInRoot()
+        val title = compose.onNodeWithTag("title").getUnclippedBoundsInRoot()
+        assertThat(title.top.value).isWithin(1f).of(header.top.value)
+        assertThat(compose.onNodeWithTag("tall").getUnclippedBoundsInRoot().bottom.value).isWithin(0.5f).of(header.bottom.value - 15f)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     /** 9 §4.4. Fails if a line given as [under] leaves the left of the trailing slot, or the slot's foot isn't level with its foot. */
     @Test
     fun aLineUnderTheTitleKeepsLeftOfTheTrailingSlot() {
         show {
             HhPageHeader(
-                "This week", null, under = { Box(Modifier.testTag("under").fillMaxWidth().height(20.dp)) },
+                "This week", null, under = { Box(Modifier.testTag("under").fillMaxWidth().height(40.dp)) },
             ) { HhRoundButton(Icons.HELP, "Help", {}, Modifier.testTag("help"), on = ButtonSurface.Bg) }
         }
         val under = compose.onNodeWithTag("under").getUnclippedBoundsInRoot()

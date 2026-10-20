@@ -24,6 +24,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -94,7 +95,7 @@ class WeekLaneTest {
         return WeekUi(monday, days, SampleUi.people, spans = laneRows(weekSpans(days)))
     }
 
-    private fun show(week: WeekUi = week(), fontScale: Float = 1f, onOpen: (EventRef) -> Unit = {}, onAdd: ((LocalDate) -> Unit)? = null) =
+    private fun show(week: WeekUi = week(), fontScale: Float = 1f, onOpen: (EventRef) -> Unit = {}, onAdd: ((LocalDate) -> Unit)? = null, today: LocalDate = monday) =
         compose.setContent {
             composeView = LocalView.current
             window = composeView.rootView
@@ -102,7 +103,7 @@ class WeekLaneTest {
                 CulveryTheme(dark = true) {
                     WithFontScale(fontScale) {
                         Box(Modifier.background(Culvery.colors.bg).size(1116.dp, 690.dp)) {
-                            WeekView(WeekViewState(week, monday, sync, SampleUi.NOW), onOpen = onOpen, onAdd = onAdd)
+                            WeekView(WeekViewState(week, today, sync, SampleUi.NOW), onOpen = onOpen, onAdd = onAdd)
                         }
                     }
                 }
@@ -127,6 +128,15 @@ class WeekLaneTest {
 
     /** The chip list starts this far below a header's node: the header's own bottom inset, then the gap. */
     private val headerToChips = CalendarDimens.columnHeaderInset + CalendarDimens.columnGap
+
+    /** Fails if the header the lane measures with is also spoken, so the week's first day reads twice on a week that isn't this one. */
+    @Test
+    fun eachDayHeaderIsSpokenOnce() {
+        show(today = monday.minusDays(7))
+        (0..6).forEach { i ->
+            compose.onAllNodesWithContentDescription(dayHeading(day(i), null)).assertCountEquals(1)
+        }
+    }
 
     @Test
     fun aSpanIsOneBarAcrossItsDays() {

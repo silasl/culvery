@@ -155,7 +155,7 @@ private fun WeekColumns(state: WeekViewState, onOpen: (EventRef) -> Unit, onAdd:
             null
         } else {
             val inner = (columnWidth - 2 * CalendarDimens.weekColumnPaddingSide.toPx()).toInt().coerceAtLeast(0)
-            val header = subcompose("header") { DayHeader(state.week.start, isToday = false, onAdd = null) }
+            val header = subcompose("header") { Box(Modifier.clearAndSetSemantics {}) { DayHeader(state.week.start, isToday = false, onAdd = null) } }
                 .single().measure(Constraints(maxWidth = inner))
             val top = CalendarDimens.weekColumnPaddingTop.roundToPx() + header.height + CalendarDimens.columnGap.roundToPx()
             top to subcompose("lane") {

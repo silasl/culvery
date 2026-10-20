@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -207,6 +208,26 @@ class LightsGridTest {
         }
         assertThat(bounds("lights_room_Kitchen-id").topLeft).isEqualTo(before.topLeft)
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if the level a slider is held at passes to the card that takes the removed room's place. */
+    @Test
+    fun aHeldSliderDoesNotPassToAnotherCard() {
+        compose.mainClock.autoAdvance = false
+        rooms = numbered(4, on = setOf(1, 2, 3, 4))
+        show()
+        compose.onNodeWithTag("lights_room_Room 1-id_brightness").performSemanticsAction(SemanticsActions.SetProgress) { it(90f) }
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(32)
+        compose.waitForIdle()
+        compose.onNodeWithTag("lights_room_Room 1-id_brightness")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "90 percent"))
+        rooms = rooms.drop(1)
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(32)
+        compose.waitForIdle()
+        compose.onNodeWithTag("lights_room_Room 2-id_brightness")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "70 percent"))
     }
 
     /** Fails if a room paired while the tab is open goes anywhere but after the others, even when it is on. */

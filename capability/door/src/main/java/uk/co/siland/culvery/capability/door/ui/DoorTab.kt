@@ -69,8 +69,8 @@ fun DoorTab(
     zone: ZoneId,
     status: String?,
     onOpenSnapshot: (DoorEvent) -> Unit,
-    newIds: Set<Long> = emptySet(),
     modifier: Modifier = Modifier,
+    newIds: Set<Long> = emptySet(),
 ) {
     val c = Culvery.colors
     fun isNew(event: DoorEvent) = event.kind == DoorKind.RING && (event.id in newIds || !event.seen)

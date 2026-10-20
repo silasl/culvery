@@ -308,6 +308,17 @@ class MusicTabTest {
         compose.assertAccessible()
     }
 
+    /** Pin: a titled Bluetooth input playing in a room is quiet: Play last, no Pause or Next. */
+    @Test
+    fun aTitledInputRowIsQuietWithPlayLast() {
+        val input = group("b", "Bedroom", state = PlayState.PLAYING, nowPlaying = SONG).copy(fromInput = true)
+        showTab(groups = listOf(kitchen, input))
+        compose.onNodeWithTag("music_row_b_play").assertContentDescriptionEquals("Play last in Bedroom")
+        compose.onNodeWithTag("music_row_b_pause").assertDoesNotExist()
+        compose.onNodeWithTag("music_row_b_next").assertDoesNotExist()
+        compose.assertAccessible()
+    }
+
     /** Pin: a paused room with a song keeps the round Play and Next. */
     @Test
     fun aPausedRoomWithATrackStillHasPlayAndNext() {
