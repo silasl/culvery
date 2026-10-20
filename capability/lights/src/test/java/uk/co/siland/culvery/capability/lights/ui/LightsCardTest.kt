@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -22,6 +23,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.DpSize
@@ -281,6 +283,59 @@ class LightsCardTest {
         assertThat(sent).isNotEmpty()
         assertThat(sent.last()).isIn(0..100)
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    private fun levelIs(slider: SemanticsNodeInteraction, percent: Int) =
+        slider.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "$percent percent"))
+
+    private fun frames(count: Int = 3) {
+        compose.waitForIdle()
+        repeat(count) { compose.mainClock.advanceTimeByFrame() }
+    }
+
+    private fun showOnVirtualTime(main: () -> LightRoom) {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(main(), false, true, null, null, null, mainRoom, house) } }
+        }
+    }
+
+    /**
+     * Commands sent mid-drag are reported back after the finger is up. Fails if the thumb follows one of those reports
+     * (60 here) instead of staying where it was let go.
+     */
+    @Test
+    fun theLevelLetGoIgnoresTheRoomsReportsOfEarlierDragCommands() {
+        var main by mutableStateOf(lounge)
+        showOnVirtualTime { main }
+        val slider = compose.onNodeWithTag("lights_card_slider")
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(90f) }
+        frames()
+        levelIs(slider, 90)
+        main = lounge.copy(brightness = 60)
+        frames()
+        levelIs(slider, 90)
+        main = lounge.copy(brightness = 90)
+        frames()
+        levelIs(slider, 90)
+    }
+
+    /** The hold ends, so a refused command or a change from elsewhere shows. Fails if the thumb never lets go of 90. */
+    @Test
+    fun theHoldEndsOnceTheBridgeHadTimeToReport() {
+        var main by mutableStateOf(lounge)
+        showOnVirtualTime { main }
+        val slider = compose.onNodeWithTag("lights_card_slider")
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(90f) }
+        frames()
+        compose.mainClock.advanceTimeBy(LIGHTS_ECHO_MS - 16 - 48 - 32)
+        frames(2)
+        levelIs(slider, 90)
+        frames(6)
+        levelIs(slider, 70)
+        main = lounge.copy(brightness = 30)
+        frames()
+        levelIs(slider, 30)
     }
 
     /** Pin. Fails if a room that can't dim gets a slider. */

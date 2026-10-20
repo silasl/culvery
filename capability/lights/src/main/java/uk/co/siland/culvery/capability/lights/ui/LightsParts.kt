@@ -75,6 +75,9 @@ internal fun MainRoomButton(room: LightRoom, onToggle: () -> Unit, modifier: Mod
     }
 }
 
+/** How long the card's thumb stays where it was let go: the bridge's reports of the drag's own commands arrive in this time. */
+internal const val LIGHTS_ECHO_MS = 1_500L
+
 /** The main room's brightness between the dim and bright icons: disabled at its remembered level, reading "Off", while the room is off (9 §2.5). */
 @Composable
 internal fun BrightnessRow(room: LightRoom, mainRoom: MainRoomActions) {
@@ -84,7 +87,7 @@ internal fun BrightnessRow(room: LightRoom, mainRoom: MainRoomActions) {
         HhPercentSlider(
             room.name, room.brightness.coerceIn(1, 100), "lights_card_slider", Modifier.weight(1f),
             range = 1..100, spokenName = brightnessName(room), spokenState = { if (room.on) "$it percent" else OFF },
-            onDrag = mainRoom.onDrag, enabled = room.on, trackHeight = LightsDimens.trackHeight, onLetGo = mainRoom.onLetGo,
+            onDrag = mainRoom.onDrag, enabled = room.on, trackHeight = LightsDimens.trackHeight, holdMs = LIGHTS_ECHO_MS, onLetGo = mainRoom.onLetGo,
         )
         HhIcon(Icons.BRIGHTNESS_HIGH, size = LightsDimens.sliderIcon, tint = c.mute, modifier = Modifier.shownNotSpoken())
     }

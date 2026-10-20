@@ -27,7 +27,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -64,6 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /** Control values from the hand-off (§7 chips, the title field, person chips) and 4a's colour swatches. */
@@ -435,7 +438,8 @@ fun HhSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, tag: Strin
  * A value in [range], reported as it moves ([onDrag]) and again when let go ([onLetGo]); [label], beside it, shows the
  * value under the thumb. Spoken "[spokenName], [spokenState]": "Kitchen volume, 30 percent". Not [enabled], it keeps
  * [percent] on `surf3` over `surf2`, ignores touch and offers TalkBack no way to move it; [spokenState] then says why
- * ("Off"). A [trackHeight] thickens the track.
+ * ("Off"). A [trackHeight] thickens the track. The value let go stays until [percent] changes; with [holdMs], until that
+ * long has passed too, for a value whose own commands are reported back late.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -452,13 +456,23 @@ fun HhPercentSlider(
     onDrag: ((Int) -> Unit)? = null,
     enabled: Boolean = true,
     trackHeight: Dp? = null,
+    holdMs: Long = 0,
     onLetGo: (Int) -> Unit,
 ) {
     val c = Culvery.colors
     // A check mid-drag can re-read [percent]; the drag is kept apart so it survives that.
     var dragging by remember { mutableStateOf<Float?>(null) }
     // The value let go stays until [percent] changes, so the thumb doesn't jump back while the command is on its way.
-    var held by remember(percent) { mutableStateOf<Float?>(null) }
+    var held by remember { mutableStateOf<Float?>(null) }
+    var letGos by remember { mutableIntStateOf(0) }
+    var holding by remember { mutableStateOf(false) }
+    LaunchedEffect(letGos) {
+        if (holdMs > 0 && letGos > 0) {
+            delay(holdMs)
+            holding = false
+        }
+    }
+    LaunchedEffect(percent, holding) { if (!holding) held = null }
     val shown = dragging ?: held ?: percent.toFloat()
     val colors = SliderDefaults.colors(
         thumbColor = c.accent,
@@ -477,6 +491,8 @@ fun HhPercentSlider(
         onValueChangeFinished = {
             dragging?.let {
                 held = it
+                holding = holdMs > 0
+                letGos++
                 onLetGo(it.roundToInt())
             }
             dragging = null
