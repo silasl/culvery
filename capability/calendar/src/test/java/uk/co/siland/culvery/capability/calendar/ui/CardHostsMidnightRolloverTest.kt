@@ -90,7 +90,12 @@ class CardHostsMidnightRolloverTest {
             "c1",
             "s-family",
             DateRange(d23.minusDays(1), d24.plusDays(7), london),
-            SyncResult(listOf(timed("Twenty-third event", d23), timed("Twenty-fourth event", d24)), emptyList(), null, fullReplace = true),
+            SyncResult(
+                listOf(timed("Twenty-third event", d23), timed("Twenty-fourth event", d24), timed("Twenty-fifth event", d24.plusDays(1))),
+                emptyList(),
+                null,
+                fullReplace = true,
+            ),
         )
     }
 
@@ -135,7 +140,7 @@ class CardHostsMidnightRolloverTest {
         compose.onNodeWithText("Twenty-third event").assertDoesNotExist()
     }
 
-    /** 9 §4.2: the 24th's event tops up the 23rd under Tomorrow, then is one of today's rows once the 24th starts. */
+    /** 9 §4.2: the 24th's event tops up the 23rd under Tomorrow, then is one of today's rows once the 24th starts, topped up by the 25th's. */
     @Test
     fun tomorrowsTopUpsBecomeTodayAtMidnight() {
         val ticks = showTodayCardBeforeMidnight()
@@ -143,6 +148,8 @@ class CardHostsMidnightRolloverTest {
             hasContentDescription("Thursday", substring = true)
         compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodes(tomorrowRow).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Tomorrow").assertExists()
+        compose.onNodeWithText("Twenty-third event").assertExists()
+        compose.onAllNodesWithText("Twenty-fifth event").assertCountEquals(0)
 
         ticks.value += 20_000 // 00:00:10 on the 24th
         compose.waitUntil(timeoutMillis = 5_000) {
@@ -151,7 +158,11 @@ class CardHostsMidnightRolloverTest {
 
         compose.onAllNodes(tomorrowRow).assertCountEquals(0)
         compose.onNode(hasClickAction() and hasContentDescription("Twenty-fourth event, ", substring = true)).assertExists()
-        compose.onNodeWithContentDescription("Tomorrow").assertDoesNotExist()
+        compose.onNode(
+            hasClickAction() and hasContentDescription("Twenty-fifth event, ", substring = true) and
+                hasContentDescription("Friday", substring = true),
+        ).assertExists()
+        compose.onNodeWithContentDescription("Tomorrow").assertExists()
     }
 
     @Test
