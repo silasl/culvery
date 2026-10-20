@@ -21,6 +21,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
@@ -141,6 +142,32 @@ class LightsTabTest {
         assertThat(calls.filter { it.startsWith("let go Lounge") }).hasSize(1)
         assertThat(calls.last()).startsWith("let go Lounge")
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** The row's thumb stays where it was let go while the bridge reports the drag's earlier values. Fails if it follows the 60. */
+    @Test
+    fun aRowsSliderStaysWhereItWasLetGoUntilTheRoomReportsIt() {
+        var rooms by mutableStateOf(listOf(lounge))
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                Box(Modifier.size(900.dp, 800.dp)) { LightsTab(rooms, false, true, null, null, null, emptyMap(), null, {}, house, roomActions) }
+            }
+        }
+        val slider = compose.onNodeWithTag("lights_row_Lounge-id_brightness")
+        fun levelIs(percent: Int) {
+            compose.waitForIdle()
+            repeat(2) { compose.mainClock.advanceTimeByFrame() }
+            slider.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "$percent percent"))
+        }
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(90f) }
+        levelIs(90)
+        rooms = listOf(lounge.copy(brightness = 60))
+        levelIs(90)
+        rooms = listOf(lounge.copy(brightness = 90))
+        levelIs(90)
+        rooms = listOf(lounge.copy(brightness = 30))
+        levelIs(30)
     }
 
     /** Fails if the active scene is not the selected chip, a chip's words differ, a tap recalls the wrong scene, or a room without scenes has a chip row. */

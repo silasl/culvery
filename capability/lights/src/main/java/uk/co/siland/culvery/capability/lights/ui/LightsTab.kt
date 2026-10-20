@@ -141,7 +141,7 @@ private fun RoomRow(room: LightRoom, line: String?, actions: RoomActions) {
             if (room.dimmable) {
                 HhPercentSlider(
                     room.name, room.brightness.coerceIn(1, 100), "${tag}_brightness", Modifier.fillMaxWidth(),
-                    range = 1..100, spokenName = brightnessName(room),
+                    range = 1..100, spokenName = brightnessName(room), holdCeilingMs = LIGHTS_HOLD_MS,
                     onDrag = { actions.onDrag(room, it) },
                 ) { actions.onLetGo(room, it) }
             }

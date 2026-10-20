@@ -288,9 +288,20 @@ class LightsCardTest {
     private fun levelIs(slider: SemanticsNodeInteraction, percent: Int) =
         slider.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "$percent percent"))
 
-    private fun frames(count: Int = 3) {
+    /** Runs the virtual clock to [ms] since the start, drawing every frame on the way. */
+    private fun at(ms: Long) {
         compose.waitForIdle()
-        repeat(count) { compose.mainClock.advanceTimeByFrame() }
+        compose.mainClock.advanceTimeBy(ms - compose.mainClock.currentTime)
+        compose.waitForIdle()
+    }
+
+    private fun after(ms: Long) = at(compose.mainClock.currentTime + ms)
+
+    /** Lets go at [percent] and returns the time the hold began: the first frame after the let-go. */
+    private fun letGoAt(slider: SemanticsNodeInteraction, percent: Float): Long {
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(percent) }
+        after(16)
+        return compose.mainClock.currentTime
     }
 
     private fun showOnVirtualTime(main: () -> LightRoom) {
@@ -301,41 +312,59 @@ class LightsCardTest {
     }
 
     /**
-     * Commands sent mid-drag are reported back after the finger is up. Fails if the thumb follows one of those reports
-     * (60 here) instead of staying where it was let go.
+     * Commands sent mid-drag are reported back after the finger is up, out of step and late. Fails if the thumb follows a
+     * stale report (60, 80) instead of staying at 90 until the room reports 90, however late that is (here 2 s).
      */
     @Test
-    fun theLevelLetGoIgnoresTheRoomsReportsOfEarlierDragCommands() {
+    fun theLevelLetGoStaysUntilTheRoomReportsIt() {
         var main by mutableStateOf(lounge)
         showOnVirtualTime { main }
         val slider = compose.onNodeWithTag("lights_card_slider")
-        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(90f) }
-        frames()
+        val start = letGoAt(slider, 90f)
         levelIs(slider, 90)
         main = lounge.copy(brightness = 60)
-        frames()
+        after(32)
         levelIs(slider, 90)
+        main = lounge.copy(brightness = 80)
+        at(start + 1_500 + 16)
+        levelIs(slider, 90)
+        at(start + 2_000)
         main = lounge.copy(brightness = 90)
-        frames()
+        after(32)
         levelIs(slider, 90)
+        main = lounge.copy(brightness = 30)
+        after(32)
+        levelIs(slider, 30)
     }
 
-    /** The hold ends, so a refused command or a change from elsewhere shows. Fails if the thumb never lets go of 90. */
+    /** A refused command never reports the level: still held one frame before the ceiling, the room's level at it plus one frame. */
     @Test
-    fun theHoldEndsOnceTheBridgeHadTimeToReport() {
+    fun theHoldEndsAtTheCeilingWhenTheLevelNeverComes() {
         var main by mutableStateOf(lounge)
         showOnVirtualTime { main }
         val slider = compose.onNodeWithTag("lights_card_slider")
-        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(90f) }
-        frames()
-        compose.mainClock.advanceTimeBy(LIGHTS_ECHO_MS - 16 - 48 - 32)
-        frames(2)
+        val start = letGoAt(slider, 90f)
+        at(start + LIGHTS_HOLD_MS - 16)
         levelIs(slider, 90)
-        frames(6)
+        at(start + LIGHTS_HOLD_MS + 16)
         levelIs(slider, 70)
-        main = lounge.copy(brightness = 30)
-        frames()
-        levelIs(slider, 30)
+    }
+
+    /** A second let-go inside the hold starts the ceiling again. Fails if the first let-go's ceiling releases the second. */
+    @Test
+    fun aSecondLetGoRestartsTheHold() {
+        var main by mutableStateOf(lounge)
+        showOnVirtualTime { main }
+        val slider = compose.onNodeWithTag("lights_card_slider")
+        val first = letGoAt(slider, 90f)
+        at(first + 3_000)
+        val second = letGoAt(slider, 40f)
+        at(first + LIGHTS_HOLD_MS + 16)
+        levelIs(slider, 40)
+        at(second + LIGHTS_HOLD_MS - 16)
+        levelIs(slider, 40)
+        at(second + LIGHTS_HOLD_MS + 16)
+        levelIs(slider, 70)
     }
 
     /** Pin. Fails if a room that can't dim gets a slider. */
