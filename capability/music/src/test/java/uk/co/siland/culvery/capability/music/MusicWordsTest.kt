@@ -46,4 +46,11 @@ class MusicWordsTest {
         assertThat(musicSummary(listOf(kitchen, group("b", "Bedroom")))).isEqualTo("2 rooms · Sonos")
         assertThat(musicSummary(listOf(kitchen))).isEqualTo("1 room · Sonos")
     }
+
+    @Test
+    fun theGroupChipAndPlayLastWords() {
+        assertThat(roomsChip(2)).isEqualTo("2 rooms")
+        assertThat(PLAY_LAST).isEqualTo("Play last")
+        assertThat(playLastSpoken("Bedroom")).isEqualTo("Play last in Bedroom")
+    }
 }

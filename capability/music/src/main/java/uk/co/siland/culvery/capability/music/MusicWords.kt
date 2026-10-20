@@ -58,6 +58,8 @@ private fun playingWords(n: NowPlaying): String = when (n) {
 
 fun playSpoken(name: String) = "Play $name"
 
+fun playLastSpoken(name: String) = "$PLAY_LAST in $name"
+
 fun pauseSpoken(name: String) = "Pause $name"
 
 fun nextSpoken(name: String) = "Next track in $name"
@@ -69,13 +71,16 @@ fun volumeName(name: String) = "$name volume"
 fun percentWords(percent: Int) = "$percent percent"
 
 internal const val FAVOURITES_LABEL = "Favourites"
-internal const val ROOMS = "Rooms"
+internal const val PLAY_LAST = "Play last"
 internal const val NO_FAVOURITES = "No Sonos Favourites yet. Add them in the Sonos app."
 internal const val GETTING_FAVOURITES = "Getting your Favourites…"
 
 fun favouritesSpoken(name: String) = "$FAVOURITES_LABEL for $name"
 
-/** What a tap on the Rooms chip does, for TalkBack. */
+/** The group chip: how many rooms the group holds (9 §4.5). */
+fun roomsChip(count: Int): String = "$count rooms"
+
+/** What a tap on the group chip does, for TalkBack. */
 fun roomsAction(shown: Boolean) = if (shown) "hide each room’s volume" else "show each room’s volume"
 
 fun playInAction(name: String) = "play in $name"

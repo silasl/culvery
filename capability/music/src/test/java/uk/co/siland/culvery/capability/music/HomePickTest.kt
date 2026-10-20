@@ -123,4 +123,14 @@ class HomePickTest {
         val groups = all.playing("b", bluetooth).playing("l", SONG)
         assertThat(tabOrder(groups).map { it.id }).containsExactly("l", "k", "b").inOrder()
     }
+
+    /** Home's notion of nothing playing, shared with the Music tab. */
+    @Test
+    fun isQuietFollowsHome() {
+        assertThat(bedroom.isQuiet()).isTrue()
+        assertThat(all.playing("b", bluetooth).single { it.id == "b" }.isQuiet()).isTrue()
+        assertThat(all.playing("b", SONG, PlayState.STOPPED).single { it.id == "b" }.isQuiet()).isTrue()
+        assertThat(all.playing("b", SONG, PlayState.PAUSED).single { it.id == "b" }.isQuiet()).isFalse()
+        assertThat(all.playing("b", SONG).single { it.id == "b" }.isQuiet()).isFalse()
+    }
 }

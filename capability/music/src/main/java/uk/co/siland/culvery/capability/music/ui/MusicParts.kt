@@ -19,6 +19,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import uk.co.siland.culvery.capability.music.MusicActions
+import uk.co.siland.culvery.capability.music.PLAY_LAST
 import uk.co.siland.culvery.capability.music.SHUFFLE_EVERYTHING
 import uk.co.siland.culvery.capability.music.SpeakerGroup
 import uk.co.siland.culvery.capability.music.SpeakerRoom
@@ -27,6 +28,7 @@ import uk.co.siland.culvery.capability.music.nextSpoken
 import uk.co.siland.culvery.capability.music.nowPlayingLines
 import uk.co.siland.culvery.capability.music.pauseSpoken
 import uk.co.siland.culvery.capability.music.percentWords
+import uk.co.siland.culvery.capability.music.playLastSpoken
 import uk.co.siland.culvery.capability.music.playSpoken
 import uk.co.siland.culvery.capability.music.shuffleSpoken
 import uk.co.siland.culvery.capability.music.volumeName
@@ -60,6 +62,13 @@ class GroupActions(
 
 internal fun MusicActions.forGroups(onFavourites: (SpeakerGroup) -> Unit = {}) =
     GroupActions(this::play, this::pause, this::next, this::setGroupVolume, this::setRoomVolume, this::shuffleEverything, onFavourites)
+
+/** The labelled Play that resumes what a quiet room last played; the same [GroupActions.onPlay] as the round Play (9 §4.5). */
+@Composable
+internal fun PlayLastButton(group: SpeakerGroup, tag: String, actions: GroupActions) = HhButton(
+    PLAY_LAST, { actions.onPlay(group) }, Modifier.testTag("${tag}_play"),
+    tone = ButtonTone.Primary, icon = Icons.PLAY_ARROW, on = ButtonSurface.Surf, spokenName = playLastSpoken(group.name),
+)
 
 @Composable
 internal fun PlayPauseButton(group: SpeakerGroup, tag: String, actions: GroupActions, playing: Boolean = group.isPlaying) {

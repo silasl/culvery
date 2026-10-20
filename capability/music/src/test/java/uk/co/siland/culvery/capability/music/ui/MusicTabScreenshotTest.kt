@@ -19,6 +19,7 @@ import uk.co.siland.culvery.capability.music.FavouritesLoad
 import uk.co.siland.culvery.capability.music.PlayState
 import uk.co.siland.culvery.capability.music.SONG
 import uk.co.siland.culvery.capability.music.STATION
+import uk.co.siland.culvery.capability.music.SpeakerGroup
 import uk.co.siland.culvery.capability.music.group
 
 /** The tab in the shell's content area on the 1280×800 canvas; the sheet against the right edge, as the shell places it. */
@@ -35,12 +36,18 @@ class MusicTabScreenshotTest {
 
     private fun snap(name: String, dark: Boolean, content: @Composable () -> Unit) = compose.snap(name, dark, Modifier.size(1_116.dp, 700.dp), content)
 
-    private fun tab(name: String, dark: Boolean, status: String? = null, roomsShown: Set<String> = emptySet()) =
-        snap(name, dark) { MusicTab(groups, status, emptyMap(), roomsShown, {}, GroupActions.None) }
+    private fun tab(name: String, dark: Boolean, status: String? = null, roomsShown: Set<String> = emptySet(), shown: List<SpeakerGroup> = groups) =
+        snap(name, dark) { MusicTab(shown, status, emptyMap(), roomsShown, {}, GroupActions.None) }
 
     @Test fun tabDark() = tab("music_tab_dark", true)
 
     @Test fun tabLight() = tab("music_tab_light", false)
+
+    @Test
+    fun tabQuietDark() = tab(
+        "music_tab_quiet_dark", true,
+        shown = listOf(group("b", "Bedroom"), group("k", "Kitchen", state = PlayState.STOPPED, nowPlaying = SONG, artUrl = "art"), group("g", "Garden", "Hall", "Study")),
+    )
 
     @Test fun tabRoomsDark() = tab("music_tab_rooms_dark", true, roomsShown = setOf("l"))
 

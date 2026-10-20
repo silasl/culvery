@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,7 +71,10 @@ internal fun MusicTabHost(view: MusicView, actions: MusicActions, checks: MusicC
     val groups by view.groups.collectAsStateWithLifecycle(emptyList())
     val problem by view.problem.collectAsStateWithLifecycle(null)
     val lines by actions.lines.collectAsStateWithLifecycle()
-    var roomsShown by remember { mutableStateOf(emptySet<String>()) }
+    var openRooms by remember { mutableStateOf(emptySet<String>()) }
+    // Drawn from this frame's groups, so none shows for a group that has gone; the raw set is pruned after, so a group that re-forms opens closed.
+    val roomsShown = remember(groups, openRooms) { openRooms intersect groups.filter { it.rooms.size > 1 }.map { it.id }.toSet() }
+    LaunchedEffect(roomsShown) { if (roomsShown != openRooms) openRooms = roomsShown }
     val overlay = LocalOverlayHost.current
     // The sheet is drawn outside the tab, so it is given the tab's art.
     val art = LocalArtSource.current
@@ -82,7 +86,7 @@ internal fun MusicTabHost(view: MusicView, actions: MusicActions, checks: MusicC
     val ordered = remember(groups) { tabOrder(groups) }
     MusicTab(
         ordered, problem?.let(::problemLine), lines, roomsShown,
-        onRooms = { id -> roomsShown = if (id in roomsShown) roomsShown - id else roomsShown + id },
+        onRooms = { id -> openRooms = if (id in roomsShown) roomsShown - id else roomsShown + id },
         actions = groupActions,
     )
 }

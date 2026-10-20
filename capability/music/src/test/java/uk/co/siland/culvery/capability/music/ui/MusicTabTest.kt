@@ -13,9 +13,12 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -39,6 +42,8 @@ import uk.co.siland.culvery.capability.music.MusicActions
 import uk.co.siland.culvery.capability.music.MusicChecks
 import uk.co.siland.culvery.capability.music.MusicFixture
 import uk.co.siland.culvery.capability.music.MusicLink
+import uk.co.siland.culvery.capability.music.MusicRefusedException
+import uk.co.siland.culvery.capability.music.TestMusicSystem
 import uk.co.siland.culvery.capability.music.MusicView
 import uk.co.siland.culvery.capability.music.PlayState
 import uk.co.siland.culvery.capability.music.SONG
@@ -88,18 +93,33 @@ class MusicTabTest {
         compose.assertAccessible()
     }
 
-    /** 6 §5.2: only a grouped row has Rooms; it shows each room's own slider. */
+    /** 9 §4.5: only a group of several has the chip; it opens a two-column grid of the rooms' volumes. */
     @Test
-    fun theRoomsChipShowsEachRoomsVolume() {
-        showTab()
+    fun theGroupChipSaysHowManyRoomsAndOpensTheirVolumes() {
+        val pair = group("l", "Lounge", "Dining room", state = PlayState.PLAYING, nowPlaying = STATION, volume = 35)
+        showTab(groups = listOf(pair, kitchen))
         compose.onNodeWithTag("music_row_k_rooms").assertDoesNotExist()
         compose.onNodeWithTag("music_row_l_room_Dining room-id_volume").assertDoesNotExist()
-        compose.onNodeWithTag("music_row_l_rooms").performClick()
-        compose.onNodeWithTag("music_row_l_room_Dining room-id_volume_slider").performSemanticsAction(SemanticsActions.SetProgress) { it(20f) }
+        compose.onNodeWithTag("music_row_l_rooms").assertTextEquals("2 rooms").assert(notSelected).performClick()
+        compose.onNodeWithTag("music_row_l_rooms").assertIsSelected()
+        val lounge = compose.onNodeWithTag("music_row_l_room_Lounge-id_volume").getUnclippedBoundsInRoot()
+        val dining = compose.onNodeWithTag("music_row_l_room_Dining room-id_volume").getUnclippedBoundsInRoot()
+        assertThat(dining.top).isEqualTo(lounge.top)
+        assertThat(dining.left).isGreaterThan(lounge.right)
+        assertThat(lounge.height.value).isWithin(1f).of(48f)
+        compose.onNodeWithTag("music_row_l_room_Dining room-id_volume_slider")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Dining room volume")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "35 percent"))
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(20f) }
         assertThat(calls).containsExactly("room Dining room-id 20")
+        compose.assertAccessible()
         compose.onNodeWithTag("music_row_l_rooms").performClick()
+        compose.onNodeWithTag("music_row_l_rooms").assert(notSelected)
         compose.onNodeWithTag("music_row_l_room_Dining room-id_volume").assertDoesNotExist()
     }
+
+    /** A button chip holding no value says nothing about selection until it is open. */
+    private val notSelected = SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected)
 
     private fun sizeOf(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot().let { Math.round(it.width.value) to Math.round(it.height.value) }
 
@@ -214,5 +234,78 @@ class MusicTabTest {
         assertThat(loungeTop).isLessThan(kitchenTop)
         compose.onNodeWithTag("music_row_k_favourites").performClick()
         assertThat(overlay.shown).isEqualTo(1)
+    }
+
+    /** The tab over a fake system whose groups a test changes. */
+    private fun hostOver(groups: List<SpeakerGroup>): TestMusicSystem {
+        val settings = music.settings
+        val provider = TestMusicProvider()
+        val speakers = Speakers(setOf(provider), settings, scope)
+        runBlocking {
+            settings.connect("music.sonos", MusicLink("Sonos_home", "192.168.1.20:1400"))
+            withTimeout(5_000) { speakers.system.first { it != null } }
+        }
+        val live = provider.systems.single()
+        live.groups.value = groups
+        val checks = MusicChecks(speakers.system, MutableStateFlow(true), scope).also { it.start() }
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalOverlayHost provides TestOverlay()) {
+                    MusicTabHost(MusicView(speakers, settings, scope), MusicActions({ live }, scope), checks)
+                }
+            }
+        }
+        return live
+    }
+
+    /** Review focus: a group splitting under an open grid closes it without a crash, and a group that re-forms starts closed. */
+    @Test
+    fun aGroupThatGoesClosesItsRooms() {
+        val system = hostOver(listOf(lounge, kitchen))
+        compose.onNodeWithTag("music_row_l_rooms").performClick()
+        compose.onNodeWithTag("music_row_l_room_Dining room-id_volume").assertExists()
+        system.groups.value = listOf(group("l", "Lounge", state = PlayState.PLAYING, nowPlaying = STATION), group("d", "Dining room"), kitchen)
+        compose.waitFor { compose.onAllNodesWithTag("music_row_d").fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodesWithTag("music_row_l_room_Dining room-id_volume").assertCountEquals(0)
+        compose.onNodeWithTag("music_row_l_rooms").assertDoesNotExist()
+        system.groups.value = listOf(lounge, kitchen)
+        compose.waitFor { compose.onAllNodesWithTag("music_row_l_rooms").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("music_row_l_rooms").assert(notSelected)
+        compose.onAllNodesWithTag("music_row_l_room_Dining room-id_volume").assertCountEquals(0)
+    }
+
+    /** Pin: Play last is the same onPlay as the round Play, so a refusal shows the row's usual line. */
+    @Test
+    fun aRefusedPlayLastShowsOnItsRow() {
+        val bedroom = group("b", "Bedroom")
+        hostOver(listOf(bedroom, kitchen)).failures["play b"] = MusicRefusedException(701)
+        compose.onNodeWithTag("music_row_b_play").performClick()
+        compose.waitFor { compose.onAllNodesWithTag("music_row_b_line").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("music_row_b_line").assertTextEquals("Sonos didn’t do that. Try again.")
+    }
+
+    /** 9 §4.5: stopped with nothing loaded, a room offers Play last and no Next. */
+    @Test
+    fun aQuietRoomOffersPlayLastAndNoNext() {
+        showTab(groups = listOf(lounge, kitchen, group("b", "Bedroom")))
+        compose.onNodeWithText("Play last", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("music_row_b_play").assertContentDescriptionEquals("Play last in Bedroom").performClick()
+        assertThat(calls).containsExactly("play b")
+        compose.onNodeWithTag("music_row_b_next").assertDoesNotExist()
+        compose.onNodeWithTag("music_row_b_pause").assertDoesNotExist()
+        compose.onNodeWithText("Nothing playing", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("music_row_b_now_art", useUnmergedTree = true).assertExists()
+        compose.assertAccessible()
+    }
+
+    /** Pin: a paused room with a song keeps the round Play and Next. */
+    @Test
+    fun aPausedRoomWithATrackStillHasPlayAndNext() {
+        showTab()
+        compose.onNodeWithTag("music_row_k_play").assertContentDescriptionEquals("Play Kitchen")
+        compose.onNodeWithTag("music_row_k_next").assertIsEnabled()
+        compose.onNodeWithContentDescription("Kitchen, paused").assertExists()
+        compose.onNodeWithText("Song", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Play last").assertDoesNotExist()
     }
 }

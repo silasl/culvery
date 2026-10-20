@@ -38,6 +38,12 @@ internal object MusicDimens {
     val roomArt = 80.dp
     val roomGap = 15.dp
     val roomPill = 280.dp
+
+    // The opened group chip's grid: two columns, rows 48 dp, the name a fixed column so the pills line up.
+    const val ROOM_COLUMNS = 2
+    val roomCellHeight = 48.dp
+    val roomNameWidth = 120.dp
+    val chipIcon = 20.dp
     val roomName: TextStyle = HhType.cardTitle.copy(fontSize = 21.sp)
     val roomTrack: TextStyle = HhType.rowTitle.copy(fontWeight = FontWeight.W400)
 

@@ -16,7 +16,6 @@ data class HomePick(val group: SpeakerGroup, val nothingPlaying: Boolean)
  */
 fun homePick(groups: List<SpeakerGroup>, usualRoomId: String?, keptId: String?): HomePick? {
     fun SpeakerGroup.hasUsualRoom() = rooms.any { it.id == usualRoomId }
-    fun SpeakerGroup.pausedWithSomethingLoaded() = state == PlayState.PAUSED && nowPlaying != null
     val playing = groups.filter { it.isSounding }
     val shown = playing.firstOrNull { it.hasUsualRoom() } ?: playing.maxByOrNull { it.startedAtMillis ?: Long.MIN_VALUE }
     if (shown != null) return HomePick(shown, nothingPlaying = false)
@@ -24,6 +23,11 @@ fun homePick(groups: List<SpeakerGroup>, usualRoomId: String?, keptId: String?):
     val fallback = groups.firstOrNull { it.hasUsualRoom() } ?: groups.firstOrNull() ?: return null
     return HomePick(fallback, nothingPlaying = !fallback.pausedWithSomethingLoaded())
 }
+
+internal fun SpeakerGroup.pausedWithSomethingLoaded() = state == PlayState.PAUSED && nowPlaying != null
+
+/** Nothing sounding and nothing paused with a track: Home says "Nothing playing", and so does the Music tab (9 §4.5). */
+internal fun SpeakerGroup.isQuiet() = !isSounding && !pausedWithSomethingLoaded()
 
 /** [homePick] over time, remembering what Home last showed playing. */
 fun homePicks(groups: Flow<List<SpeakerGroup>>, usualRoomId: Flow<String?>): Flow<HomePick?> =
