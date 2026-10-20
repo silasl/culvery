@@ -82,6 +82,7 @@ class HueSystemTest {
         online: () -> Boolean = { true },
         onMoved: suspend (LightsLink) -> Unit = {},
         timeoutMs: Long = HUE_TIMEOUT_MS,
+        wall: WallClock = WallClock { testScheduler.currentTime },
     ) = HueSystem(
         HueClient(
             HueTrust(TestCerts.testCa()),
@@ -94,7 +95,8 @@ class HueSystemTest {
         online = online,
         link = LightsLink(BRIDGE_ID, address, KEY),
         onMoved = onMoved,
-        clock = WallClock { testScheduler.currentTime },
+        clock = wall,
+        elapsedMillis = { testScheduler.currentTime },
     )
 
     @After
@@ -248,6 +250,7 @@ class HueSystemTest {
         val sentAt = testScheduler.currentTime
         s.setBrightness(s.room(LOUNGE), 90)
         at(sentAt + 1_000)
+        bridge.streamHeld = true
         val open = reporting(s, LOUNGE_GROUP to 45.0, LOUNGE_GROUP to 60.2)
         at(sentAt + REPORT_WAIT_MS - 1)
         assertThat(s.room(LOUNGE).brightness).isEqualTo(90)
@@ -255,6 +258,51 @@ class HueSystemTest {
         runCurrent()
         assertThat(s.room(LOUNGE).brightness).isEqualTo(60)
         open.cancelAndJoin()
+    }
+
+    /** Fails if the wait is timed by the wall clock, so setting it back keeps a report of another level held back past the wait. */
+    @Test
+    fun settingTheWallClockBackDoesNotExtendTheWaitForAReport() = runTest {
+        var wallShift = 0L
+        val s = system(wall = WallClock { testScheduler.currentTime + wallShift })
+        s.readAll()
+        val sentAt = testScheduler.currentTime
+        s.setBrightness(s.room(LOUNGE), 90)
+        wallShift = -3_600_000L
+        at(sentAt + REPORT_WAIT_MS)
+        reported(s, LOUNGE_GROUP to 60.2)
+        assertThat(s.room(LOUNGE).brightness).isEqualTo(60)
+    }
+
+    /** Fails if the wait is timed by the wall clock, so setting it back keeps the level held back from showing when the wait ends. */
+    @Test
+    fun settingTheWallClockBackDoesNotExtendTheWaitForTheLevelHeldBack() = runTest {
+        var wallShift = 0L
+        val s = system(wall = WallClock { testScheduler.currentTime + wallShift })
+        s.readAll()
+        val sentAt = testScheduler.currentTime
+        s.setBrightness(s.room(LOUNGE), 90)
+        wallShift = -3_600_000L
+        at(sentAt + 1_000)
+        bridge.streamHeld = true
+        val open = reporting(s, LOUNGE_GROUP to 45.0)
+        at(sentAt + REPORT_WAIT_MS)
+        runCurrent()
+        assertThat(s.room(LOUNGE).brightness).isEqualTo(45)
+        open.cancelAndJoin()
+    }
+
+    /** Fails if the stream, once the bridge ends it, waits out a pending wait before it finishes, which holds back the reconnect. */
+    @Test
+    fun theStreamEndsAtOnceWithAWaitPending() = runTest {
+        val s = system()
+        s.readAll()
+        s.setBrightness(s.room(LOUNGE), 90)
+        bridge.events = """data: [{"data":[{"id":"$LOUNGE_GROUP","dimming":{"brightness":45.0},"type":"grouped_light"}],"type":"update"}]"""
+        val before = testScheduler.currentTime
+        s.stream().toList()
+        assertThat(testScheduler.currentTime).isEqualTo(before)
+        assertThat(s.room(LOUNGE).brightness).isEqualTo(90)
     }
 
     /** Fails if a scene recalled after a brightness still waits for that brightness, so the scene's own level is dropped. */

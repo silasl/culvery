@@ -5,6 +5,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -56,6 +57,8 @@ internal class HueSystem(
     link: LightsLink,
     private val onMoved: suspend (LightsLink) -> Unit,
     private val clock: WallClock,
+    /** Monotonic, so setting the wall clock doesn't move a wait's deadline. */
+    private val elapsedMillis: () -> Long,
     private val readBackMs: Long = READ_BACK_MS,
 ) : LightsSystem {
     private val _rooms = MutableStateFlow<List<LightRoom>>(emptyList())
@@ -129,12 +132,14 @@ internal class HueSystem(
                 }
                 waits.forEach { (id, wait) ->
                     launch {
-                        delay(wait.untilMillis - clock.nowMillis())
+                        delay(wait.untilMillis - elapsedMillis())
                         change { endWait(id, wait) }
                     }
                 }
             }
         }
+        // Waiting out the waits would hold back the reconnect; a report after the deadline shows either way.
+        coroutineContext.cancelChildren()
     }
 
     override suspend fun setOn(room: LightRoom, on: Boolean) = command(room, { group(it) { g -> g.copy(on = on) } }) { call, hue ->
@@ -147,7 +152,7 @@ internal class HueSystem(
         if (brightness == 0) return setOn(room, false)
         val shown = { hue: HueRoom ->
             group(hue) { g -> g.copy(on = true, brightness = brightness.toDouble()) }
-            sent[hue.groupedLightId] = Sent(brightness, clock.nowMillis() + REPORT_WAIT_MS)
+            sent[hue.groupedLightId] = Sent(brightness, elapsedMillis() + REPORT_WAIT_MS)
         }
         command(room, shown) { call, hue ->
             client.setBrightness(call, hue.groupedLightId, brightness, turnOn = true)
@@ -346,7 +351,7 @@ internal class HueSystem(
     // Under lock. A report of another level while the brightness just sent is on its way; that level's report ends the wait.
     private fun outranked(groupId: String, brightness: Double): Boolean {
         val pending = sent[groupId] ?: return false
-        if (brightness.roundToInt() != pending.brightness && clock.nowMillis() < pending.untilMillis) {
+        if (brightness.roundToInt() != pending.brightness && elapsedMillis() < pending.untilMillis) {
             pending.heldBack = brightness
             return true
         }

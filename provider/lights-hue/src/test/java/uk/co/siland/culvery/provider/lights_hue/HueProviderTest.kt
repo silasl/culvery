@@ -36,6 +36,7 @@ class HueProviderTest {
         },
         online = { online },
         clock = WallClock { 0L },
+        elapsedMillis = { 0L },
     )
 
     private fun FakeBridge.posts() = received.filter { it.method == "POST" }

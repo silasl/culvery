@@ -32,6 +32,7 @@ class HueProvider internal constructor(
     private val search: suspend (wanted: String?) -> List<BridgeFound>,
     private val online: () -> Boolean,
     private val clock: WallClock,
+    private val elapsedMillis: () -> Long,
 ) : LightsProvider {
     @Inject
     constructor(@ApplicationContext context: Context, clock: WallClock) : this(
@@ -39,6 +40,7 @@ class HueProvider internal constructor(
         mdnsSearch(context),
         AndroidNetwork(context)::online,
         clock,
+        SystemClock::elapsedRealtime,
     )
 
     override val descriptor = ProviderDescriptor(HUE_PROVIDER_ID, "Philips Hue", Icons.LIGHTBULB, setOf(Feature.READ, Feature.WRITE))
@@ -73,7 +75,7 @@ class HueProvider internal constructor(
     }
 
     override fun open(link: LightsLink, onMoved: suspend (LightsLink) -> Unit): LightsSystem =
-        HueSystem(client, search, online, link, onMoved, clock)
+        HueSystem(client, search, online, link, onMoved, clock, elapsedMillis)
 
     private fun whenOnline() {
         if (!online()) throw LightsUnreachableException(LightsProblem.OFFLINE)
