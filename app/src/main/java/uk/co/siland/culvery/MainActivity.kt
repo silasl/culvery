@@ -156,7 +156,7 @@ class MainActivity : ComponentActivity() {
         setupComplete = setupState.setupComplete.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
         isDeviceOwner = allowLockTaskIfOwner(this)
         lifecycle.addObserver(kiosk)
-        lifecycle.addObserver(alerts.unlessHandedOver { kiosk.handedOver })
+        lifecycle.addObserver(alerts.unlessHandedOver(handedOver = { kiosk.handedOver }, changingConfigurations = { isChangingConfigurations }))
         lifecycle.addObserver(checksExpiryOnReturn(access))
         // TalkBack's gestures reach the app as accessibility events, not touches: they keep Settings and the sheets open too.
         findViewById<ViewGroup>(android.R.id.content).accessibilityDelegate = userActivity.accessibilityDelegate

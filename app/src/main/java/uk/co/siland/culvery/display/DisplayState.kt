@@ -40,7 +40,10 @@ const val NIGHT_AWAKE_MS = 60_000L
 internal fun nightAt(now: LocalDateTime?, prefs: DisplayPrefs?): Boolean? =
     if (now == null || prefs == null) null else inDailyWindow(now.toLocalTime(), prefs.nightFrom, prefs.nightUntil)
 
-/** What the state machine decides from: the screen, the hold, the inputs as last seen, and whether it was ever in front. */
+/**
+ * What the state machine decides from: the screen, the hold, the inputs as last seen, and whether it was ever in front.
+ * [inFront] is Culvery started and not stopped ([ShellAlerts.shown]), not the resumed `AlertHost.inFront`.
+ */
 internal data class Display(
     val screen: Screen,
     val held: Boolean,
@@ -92,7 +95,7 @@ class DisplayState internal constructor(
     private val prefs: StateFlow<DisplayPrefs?>,
     private val now: StateFlow<LocalDateTime?>,
     touches: Flow<Long>,
-    inFront: StateFlow<Boolean>,
+    shown: StateFlow<Boolean>,
     camera: StateFlow<CameraState>,
     scope: CoroutineScope,
 ) : NightHours {
@@ -107,7 +110,7 @@ class DisplayState internal constructor(
     ) : this(settings.read, clock.now, activity.touches, alerts.shown, camera.state, scope)
 
     private val lock = Any()
-    private val state = MutableStateFlow(next(START, prefs.value, now.value, inFront.value))
+    private val state = MutableStateFlow(next(START, prefs.value, now.value, shown.value))
     private val activity = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     val screen: StateFlow<Screen> = state.map { it.screen }.distinctUntilChanged()
@@ -122,7 +125,7 @@ class DisplayState internal constructor(
 
     init {
         scope.launch {
-            combine(prefs, now, inFront, ::Triple).collect { (p, n, f) -> change { next(it, p, n, f) } }
+            combine(prefs, now, shown, ::Triple).collect { (p, n, f) -> change { next(it, p, n, f) } }
         }
         scope.launch {
             touches.drop(1).collect { if (state.value.screen == Screen.AWAKE) activity.tryEmit(Unit) }

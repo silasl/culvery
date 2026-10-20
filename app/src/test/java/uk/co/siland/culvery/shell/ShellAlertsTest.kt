@@ -309,10 +309,55 @@ class ShellAlertsTest {
                 handedOver = true
             }
         })
-        lifecycle.addObserver(alerts.unlessHandedOver { handedOver })
+        lifecycle.addObserver(alerts.unlessHandedOver(handedOver = { handedOver }, changingConfigurations = { false }))
         controller.setup()
         assertThat(alerts.inFront.value).isFalse()
         controller.pause()
         assertThat(alerts.inFront.value).isFalse()
+    }
+
+    /** Fails if shown is true before the screen starts, false while it is only paused, or true after it stops (8 §4.1). */
+    @Test
+    fun shownFollowsTheScreenFromStartToStop() {
+        val alerts = alerts()
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java)
+        controller.get().lifecycle.addObserver(alerts.unlessHandedOver(handedOver = { false }, changingConfigurations = { false }))
+        controller.create()
+        assertThat(alerts.shown.value).isFalse()
+        controller.start()
+        assertThat(alerts.shown.value).isTrue()
+        controller.resume().pause()
+        assertThat(alerts.shown.value).isTrue()
+        controller.stop()
+        assertThat(alerts.shown.value).isFalse()
+    }
+
+    /** Fails if the stop of an instance that handed over to the home task clears shown while the home task's is on screen. */
+    @Test
+    fun anInstanceThatHandsOverStopsWithoutWritingShown() {
+        val alerts = alerts()
+        val home = Robolectric.buildActivity(ComponentActivity::class.java)
+        home.get().lifecycle.addObserver(alerts.unlessHandedOver(handedOver = { false }, changingConfigurations = { false }))
+        home.setup()
+        var handedOver = false
+        val other = Robolectric.buildActivity(ComponentActivity::class.java)
+        other.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onResume(owner: LifecycleOwner) {
+                handedOver = true
+            }
+        })
+        other.get().lifecycle.addObserver(alerts.unlessHandedOver(handedOver = { handedOver }, changingConfigurations = { false }))
+        other.setup().pause().stop()
+        assertThat(alerts.shown.value).isTrue()
+    }
+
+    /** Fails if a stop for a configuration change, the same screen coming straight back, counts as leaving. */
+    @Test
+    fun aConfigurationChangeIsNotLeaving() {
+        val alerts = alerts()
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java)
+        controller.get().lifecycle.addObserver(alerts.unlessHandedOver(handedOver = { false }, changingConfigurations = { true }))
+        controller.setup().pause().stop()
+        assertThat(alerts.shown.value).isTrue()
     }
 }

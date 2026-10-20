@@ -60,7 +60,8 @@ class OverlayState : OverlayHost {
 }
 
 /**
- * The app's [AlertHost]: the content the alert layer draws, whether the screen it observes is resumed, and the quieters
+ * The app's [AlertHost]: the content the alert layer draws, whether the screen it observes is resumed ([inFront], for
+ * alerts) or started ([shown], for the display's states and brightness), and the quieters
  * a loud alert runs (6 §3.3). Each quiet or restore pass starts after the one before, so a restore never overtakes the
  * quiet it undoes.
  */
@@ -77,7 +78,7 @@ class ShellAlerts @Inject constructor(
 
     private val _shown = MutableStateFlow(false)
 
-    /** True from the screen's start to its stop: a pause with Culvery still shown, as for a new intent, isn't leaving (8 §4.1). */
+    /** True from the screen's start to its stop: a pause with Culvery still on screen, as for a new intent, isn't leaving (8 §4.1). */
     val shown: StateFlow<Boolean> = _shown.asStateFlow()
 
     private val _lowered = MutableStateFlow(false)
@@ -142,14 +143,17 @@ class ShellAlerts @Inject constructor(
         }
     }
 
-    /** This host as an observer that writes nothing once [handedOver] is true: an instance giving way to the home task is not in front. */
-    fun unlessHandedOver(handedOver: () -> Boolean): DefaultLifecycleObserver = object : DefaultLifecycleObserver {
+    /**
+     * This host as an observer that writes nothing once [handedOver] is true: an instance giving way to the home task is not
+     * in front. A stop while [changingConfigurations] is the same screen coming straight back, so it isn't leaving.
+     */
+    fun unlessHandedOver(handedOver: () -> Boolean, changingConfigurations: () -> Boolean): DefaultLifecycleObserver = object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
             if (!handedOver()) this@ShellAlerts.onStart(owner)
         }
 
         override fun onStop(owner: LifecycleOwner) {
-            if (!handedOver()) this@ShellAlerts.onStop(owner)
+            if (!handedOver() && !changingConfigurations()) this@ShellAlerts.onStop(owner)
         }
 
         override fun onResume(owner: LifecycleOwner) {

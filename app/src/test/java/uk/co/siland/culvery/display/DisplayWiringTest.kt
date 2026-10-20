@@ -50,6 +50,7 @@ import uk.co.siland.culvery.display.ui.THE_CAMERA_IS_ON
 import uk.co.siland.culvery.holding
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ShellAlerts
+import uk.co.siland.culvery.shell.SunToday
 import uk.co.siland.culvery.shell.ui.ShellLayers
 
 private val ELEVEN_PM = LocalDateTime.of(2026, 10, 19, 23, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
@@ -113,28 +114,72 @@ class DisplayWiringTest {
         assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
     }
 
-    /** Fails if a pause with Culvery still on screen, as a new intent to the home activity makes, wakes the night clock. */
-    @Test
-    fun aPauseWithoutLeavingKeepsTheNightClock() = runTest {
-        val alerts = ShellAlerts(emptySet(), backgroundScope)
-        val owner = object : LifecycleOwner {
+    /** The display's pieces as Hilt builds them, over the real alert host and a screen the test moves through its lifecycle, at 23:00. */
+    private inner class Wired(scope: CoroutineScope) {
+        val alerts = ShellAlerts(emptySet(), scope)
+        private val owner = object : LifecycleOwner {
             val registry = LifecycleRegistry.createUnsafe(this)
             override val lifecycle: Lifecycle get() = registry
         }
-        owner.registry.addObserver(alerts.unlessHandedOver { false })
-        val settings = displaySettings(folder.root, backgroundScope)
-        val clock = HouseholdClock(flowOf(ZoneOffset.UTC), { 0L }, backgroundScope, flowOf(ELEVEN_PM))
-        val display = DisplayState(settings, clock, FakeUserActivity(), alerts, CameraAccess({ true }, { true }, settings, backgroundScope), backgroundScope)
-        display.night.first { it == true }
-        owner.registry.currentState = Lifecycle.State.RESUMED
-        runCurrent()
-        assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
+        private val settings = displaySettings(folder.root, scope)
+        private val clock = HouseholdClock(flowOf(ZoneOffset.UTC), { 0L }, scope, flowOf(ELEVEN_PM))
+        val display = DisplayState(settings, clock, FakeUserActivity(), alerts, CameraAccess({ true }, { true }, settings, scope), scope)
+        val brightness = ScreenBrightness(display, alerts, clock, SunToday(null, scope), settings, scope)
 
-        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
-        runCurrent()
-        owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        init {
+            owner.registry.addObserver(alerts.unlessHandedOver(handedOver = { false }, changingConfigurations = { false }))
+        }
+
+        fun lifecycle(vararg events: Lifecycle.Event) = events.forEach(owner.registry::handleLifecycleEvent)
+    }
+
+    /** Resumed at night with the settings read. */
+    private suspend fun TestScope.wiredAtNight() = Wired(backgroundScope).apply {
+        display.night.first { it == true }
+        lifecycle(Lifecycle.Event.ON_CREATE, Lifecycle.Event.ON_START, Lifecycle.Event.ON_RESUME)
         runCurrent()
         assertThat(display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
+    }
+
+    /** Fails if a pause with Culvery still on screen, as a new intent to the home activity makes, wakes the night clock. */
+    @Test
+    fun aPauseWithoutLeavingKeepsTheNightClock() = runTest {
+        val wired = wiredAtNight()
+        wired.lifecycle(Lifecycle.Event.ON_PAUSE)
+        runCurrent()
+        wired.lifecycle(Lifecycle.Event.ON_RESUME)
+        runCurrent()
+        assertThat(wired.display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
+    }
+
+    /** Fails if leaving for other apps leaves the clock on, or the return skips the minute awake or lasts longer. */
+    @Test
+    fun leavingForOtherAppsWakesAndTheClockFollowsAMinuteAfterTheReturn() = runTest {
+        val wired = wiredAtNight()
+        wired.lifecycle(Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP)
+        runCurrent()
+        assertThat(wired.display.screen.value).isEqualTo(Screen.AWAKE)
+        wired.lifecycle(Lifecycle.Event.ON_START, Lifecycle.Event.ON_RESUME)
+        runCurrent()
+        advanceTimeBy(NIGHT_AWAKE_MS - 1)
+        runCurrent()
+        assertThat(wired.display.screen.value).isEqualTo(Screen.AWAKE)
+        advanceTimeBy(1)
+        runCurrent()
+        assertThat(wired.display.screen.value).isEqualTo(Screen.NIGHT_CLOCK)
+    }
+
+    /** Fails if a pause with Culvery still on screen hands the level to Android's setting, or leaving doesn't. */
+    @Test
+    fun brightnessFollowsTheSameRuleForBeingInFront() = runTest {
+        val wired = wiredAtNight()
+        assertThat(wired.brightness.level.value).isEqualTo(LOWEST)
+        wired.lifecycle(Lifecycle.Event.ON_PAUSE)
+        runCurrent()
+        assertThat(wired.brightness.level.value).isEqualTo(LOWEST)
+        wired.lifecycle(Lifecycle.Event.ON_STOP)
+        runCurrent()
+        assertThat(wired.brightness.level.value).isEqualTo(ANDROIDS)
     }
 
     /** Fails if the prompt doesn't go through the system screen's unpinning with its own missing line, or if the answer doesn't save the ask before pinning again exactly once. */

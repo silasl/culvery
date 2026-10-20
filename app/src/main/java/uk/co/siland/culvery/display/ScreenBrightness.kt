@@ -17,10 +17,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.SunTimes
+import uk.co.siland.culvery.shell.ShellAlerts
 import uk.co.siland.culvery.shell.SunToday
 import uk.co.siland.culvery.shell.ThemeSchedule
 
@@ -65,7 +65,7 @@ private class Step(val inputs: Inputs, val fades: Boolean)
 class ScreenBrightness internal constructor(
     screen: StateFlow<Screen>,
     night: Flow<Boolean?>,
-    inFront: StateFlow<Boolean>,
+    shown: StateFlow<Boolean>,
     now: Flow<LocalDateTime?>,
     sun: Flow<SunTimes?>,
     prefs: StateFlow<DisplayPrefs>,
@@ -74,19 +74,19 @@ class ScreenBrightness internal constructor(
     @Inject
     constructor(
         display: DisplayState,
-        alerts: AlertHost,
+        alerts: ShellAlerts,
         clock: HouseholdClock,
         sunToday: SunToday,
         settings: DisplaySettings,
         @ApplicationScope scope: CoroutineScope,
-    ) : this(display.screen, display.night, alerts.inFront, clock.now, sunToday.times, settings.current, scope)
+    ) : this(display.screen, display.night, alerts.shown, clock.now, sunToday.times, settings.current, scope)
 
     private val _level = MutableStateFlow(ANDROIDS)
     val level: StateFlow<Float> = _level.asStateFlow()
 
     init {
         val evening = combine(now, sun) { time, sunTimes -> time != null && isEvening(time.toLocalTime(), sunTimes) }
-        val inputs = combine(screen, inFront, night, evening, prefs) { s, front, n, e, p ->
+        val inputs = combine(screen, shown, night, evening, prefs) { s, front, n, e, p ->
             // Not known yet counts as night, so a restart in the night doesn't dazzle.
             Inputs(s, front, n ?: true, e, p)
         }
