@@ -132,8 +132,8 @@ object ControlType {
 
 /**
  * Hand-off §7 chip: at least 48 dp; a long label takes two lines, then ends in …; padding 0 18, radius 24,
- * 16 sp / 600; `surf`/`ink`, or [selectedColor]/[selectedInk] when selected. One of a radio group by default ([role]);
- * a chip that opens something is `Role.Button`. [spokenName] is what TalkBack reads when that isn't the label. A disabled chip is drawn at 38% but stays tappable, so a tap can
+ * 16 sp / 600; [unselectedFill]/[unselectedInk] (`surf`/`ink`), or [selectedColor]/[selectedInk] when selected. One of a radio group by default ([role]);
+ * a chip that opens something is `Role.Button`. [trailing] follows the label (an expand arrow). [spokenName] is what TalkBack reads when that isn't the label. A disabled chip is drawn at 38% but stays tappable, so a tap can
  * explain why: TalkBack hears "not available" and "double-tap to find out why".
  */
 @Composable
@@ -145,15 +145,17 @@ fun HhChoiceChip(
     enabled: Boolean = true,
     selectedColor: Color = Culvery.colors.accent,
     selectedInk: Color = Culvery.colors.accentInk,
+    unselectedFill: Color = Culvery.colors.surf,
+    unselectedInk: Color = Culvery.colors.ink,
     secondary: String? = null,
     role: Role = Role.RadioButton,
     clickLabel: String? = null,
     stateDescription: String? = null,
     leading: (@Composable (ink: Color) -> Unit)? = null,
     spokenName: String? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
-    val c = Culvery.colors
-    val ink = if (selected) selectedInk else c.ink
+    val ink = if (selected) selectedInk else unselectedInk
     val state = stateDescription ?: NOT_AVAILABLE.takeIf { !enabled }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -168,7 +170,7 @@ fun HhChoiceChip(
             .alpha(if (enabled) 1f else ControlTokens.DISABLED_ALPHA)
             .heightIn(min = ControlTokens.chipHeight)
             .clip(RoundedCornerShape(ControlTokens.chipRadius))
-            .background(if (selected) selectedColor else c.surf)
+            .background(if (selected) selectedColor else unselectedFill)
             // Never `enabled = false`: that would stop the explaining tap.
             .hhClickable(onClick, label = clickLabel ?: FIND_OUT_WHY.takeIf { !enabled }, role = role, spoken = spokenName)
             .padding(horizontal = ControlTokens.chipPaddingH),
@@ -178,6 +180,7 @@ fun HhChoiceChip(
         if (secondary != null) {
             Text(secondary, style = ControlType.chipSecondary, color = ink, maxLines = 1)
         }
+        trailing?.invoke()
     }
 }
 
