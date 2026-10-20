@@ -116,14 +116,17 @@ class HueSystemTest {
 
     private fun FakeBridge.reads() = received.filter { it.method == "GET" && it.path.startsWith(RESOURCE) }.map { it.path.removePrefix("$RESOURCE/") }
 
-    /** Fails if the rooms leave Hue's order, a brightness or scene is misread, or a room with no dimming light can dim (7 §4.2). */
+    /**
+     * Fails if the rooms leave Hue's order, a brightness or scene is misread, an off room loses its lights' level to the
+     * group's 0 (9 §2.5), or a room with no dimming light can dim (7 §4.2).
+     */
     @Test
     fun aFullReadBuildsTheRoomsInHuesOrder() = runTest {
         val s = system()
         s.readAll()
         assertThat(s.rooms.value).containsExactly(
             LightRoom(LOUNGE, "Lounge", on = true, brightness = 70, listOf(LightScene(RELAX, "Relax"), LightScene(BRIGHT, "Bright")), RELAX, dimmable = true),
-            LightRoom(KITCHEN, "Kitchen", on = false, brightness = 0, emptyList(), null, dimmable = true),
+            LightRoom(KITCHEN, "Kitchen", on = false, brightness = 45, emptyList(), null, dimmable = true),
             LightRoom(GARDEN, "Garden", on = true, brightness = 0, emptyList(), null, dimmable = false),
         ).inOrder()
         assertThat(bridge.reads()).containsExactly("room", "grouped_light", "light", "scene")
@@ -145,6 +148,19 @@ class HueSystemTest {
         assertThat(s.room(LOUNGE).activeSceneId).isEqualTo(BRIGHT)
         assertThat(s.room(KITCHEN).on).isTrue()
         assertThat(bridge.reads()).isEmpty()
+    }
+
+    /** 9 §2.5. Fails if a room the stream reports off at brightness 0 loses the level it was at. */
+    @Test
+    fun aRoomTurnedOffKeepsItsLevel() = runTest {
+        val s = system()
+        s.readAll()
+        bridge.events = """
+            data: [{"data":[{"id":"$LOUNGE_GROUP","on":{"on":false},"dimming":{"brightness":0.0},"type":"grouped_light"}],"type":"update"}]
+        """.trimIndent()
+        assertThat(s.stream().toList()).containsExactly(Unit)
+        assertThat(s.room(LOUNGE).on).isFalse()
+        assertThat(s.room(LOUNGE).brightness).isEqualTo(70)
     }
 
     /** Fails if an added or deleted resource leaves the rooms as they were, without a full read. */

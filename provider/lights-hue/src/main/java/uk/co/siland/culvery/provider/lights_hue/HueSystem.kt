@@ -113,6 +113,7 @@ internal class HueSystem(
             hueRooms = read
             groups.clear()
             groupsNow.forEach { groups[it.id] = it }
+            keepOffRoomsLevels(read, lightsNow)
             scenes = scenesNow
             dimmingDevices = lightsNow.filter { it.dimmable }.map { it.deviceId }.toSet()
             unroomedLights = lightsNow.filter { it.deviceId !in roomed }.map { it.id }
@@ -336,11 +337,20 @@ internal class HueSystem(
         }
     }
 
+    // Under lock. An off room's group reads 0, but its lights keep the level they were at (9 §2.5).
+    private fun keepOffRoomsLevels(rooms: List<HueRoom>, lights: List<HueLight>) = rooms.forEach { room ->
+        val group = groups[room.groupedLightId] ?: return@forEach
+        if ((group.brightness ?: 0.0) > 0.0) return@forEach
+        val levels = lights.filter { it.deviceId in room.deviceIds }.mapNotNull { it.brightness }
+        if (levels.isNotEmpty()) groups[group.id] = group.copy(brightness = levels.average())
+    }
+
     // Under lock.
     private fun apply(event: HueEvent) {
         when (event) {
             is HueEvent.GroupedLight -> groups[event.id]?.let {
-                val brightness = event.brightness?.takeUnless { b -> outranked(event.id, b) }
+                // A group turned off reports 0, which isn't a level to show: the one it was at stays (9 §2.5).
+                val brightness = event.brightness?.takeUnless { b -> b <= 0.0 || outranked(event.id, b) }
                 groups[event.id] = it.copy(on = event.on ?: it.on, brightness = brightness ?: it.brightness)
             }
             is HueEvent.Scene -> activate(event.id, scenes.firstOrNull { it.id == event.id }?.roomId, event.active)

@@ -39,6 +39,12 @@ class HueJsonTest {
         assertThat(lights.map { it.dimmable }).containsExactly(true, true, true, false, true).inOrder()
     }
 
+    /** Fails if a light's own level, which an off light keeps, isn't read, or one with no `dimming` gets one. */
+    @Test
+    fun lightsKeepTheirOwnLevel() {
+        assertThat(HueJson.lights(tree(F.LIGHTS)).map { it.brightness }).containsExactly(70.4, 70.4, 45.0, null, 100.0).inOrder()
+    }
+
     /** Fails if `inactive` reads as active, or a scene loses its room. */
     @Test
     fun scenesAndWhichIsActive() {

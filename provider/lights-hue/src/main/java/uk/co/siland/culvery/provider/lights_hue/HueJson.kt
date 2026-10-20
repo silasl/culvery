@@ -12,6 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -24,7 +25,8 @@ internal data class HueRoom(val id: String, val name: String, val deviceIds: Lis
 /** [ownerType] is `room` or `bridge_home`; [brightness] is 0 to 100, null when the group has none. */
 internal data class HueGroupedLight(val id: String, val ownerId: String, val ownerType: String, val on: Boolean, val brightness: Double?)
 
-internal data class HueLight(val id: String, val deviceId: String, val dimmable: Boolean)
+/** [brightness] is the light's own level, 0 to 100, which it keeps while off; null when it doesn't dim. */
+internal data class HueLight(val id: String, val deviceId: String, val dimmable: Boolean, val brightness: Double?)
 
 internal data class HueScene(val id: String, val name: String, val roomId: String, val active: Boolean)
 
@@ -134,7 +136,10 @@ internal object HueJson {
     }
 
     fun lights(root: JsonElement?): List<HueLight> =
-        page<LightWire>(root).map { HueLight(it.id, it.owner.rid, it.dimming != null && it.dimming !is JsonNull) }
+        page<LightWire>(root).map {
+            val level = ((it.dimming as? JsonObject)?.get("brightness") as? JsonPrimitive)?.doubleOrNull
+            HueLight(it.id, it.owner.rid, it.dimming != null && it.dimming !is JsonNull, level)
+        }
 
     fun scenes(root: JsonElement?): List<HueScene> = page<SceneWire>(root).map {
         HueScene(it.id, it.metadata.name ?: throw HueJsonException(), it.group.rid, it.status.isActive())
