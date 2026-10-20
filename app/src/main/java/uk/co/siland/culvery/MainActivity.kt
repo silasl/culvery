@@ -229,7 +229,7 @@ class MainActivity : ComponentActivity() {
                             overlaysCloseWhenIdle = !counting,
                             alert = alert,
                             sleeping = screen != Screen.AWAKE,
-                            sleep = { SleepLayer(screen, { now.value }, display::tapped) },
+                            sleep = { SleepLayer(screen, { now.value }, display::tapped, cameraRunning = running, glyphAt = spot.centre) },
                             cameraMark = overlayCameraMark(
                                 running, screen != Screen.AWAKE, complete, state.settingsOpen, overlay.isShowing, pinRequest != null, alert != null,
                             ),

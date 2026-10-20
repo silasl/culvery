@@ -10,6 +10,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -25,6 +28,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDateTime
@@ -41,6 +47,7 @@ import uk.co.siland.culvery.overlayCameraMark
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ToastMessage
 import uk.co.siland.culvery.shell.ui.ShellLayers
+import uk.co.siland.culvery.shell.ui.textLayout
 
 /** 8 §2.2, §4.1, §4.3: the sleep layer in the shell's stack, what a waking tap reaches, and what waits until it wakes. */
 @RunWith(AndroidJUnit4::class)
@@ -55,6 +62,8 @@ class SleepLayersTest {
     private var pinShowing by mutableStateOf(false)
     private var running by mutableStateOf(false)
     private var settingsOpen by mutableStateOf(false)
+    private var glyphAt by mutableStateOf<Offset?>(null)
+    private var insets by mutableStateOf(0.dp)
     private var presses = 0
     private var touches = 0
     private var alertPresses = 0
@@ -66,6 +75,7 @@ class SleepLayersTest {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             CulveryTheme(dark = true) {
+              Box(Modifier.padding(top = insets, start = insets)) {
                 ShellLayers(
                     overlay = OverlayState(),
                     toast = toast,
@@ -81,7 +91,7 @@ class SleepLayersTest {
                     nowMillis = { compose.mainClock.currentTime },
                     alert = alert,
                     sleeping = screen != Screen.AWAKE,
-                    sleep = { SleepLayer(screen, { at }) { screen = Screen.AWAKE } },
+                    sleep = { SleepLayer(screen, { at }, { screen = Screen.AWAKE }, cameraRunning = running, glyphAt = glyphAt) },
                     cameraMark = overlayCameraMark(
                         running, sleeping = screen != Screen.AWAKE, complete = true, settingsOpen = settingsOpen,
                         sheetShowing = false, pinShowing = pinShowing, alertShowing = alert != null,
@@ -91,6 +101,7 @@ class SleepLayersTest {
                         HhButton("Add event", { presses++ }, Modifier.testTag("button"), on = ButtonSurface.Bg)
                     }
                 }
+              }
             }
         }
         settle()
@@ -134,6 +145,47 @@ class SleepLayersTest {
         val texts = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text)).fetchSemanticsNodes()
         assertThat(texts.flatMap { n -> n.config[SemanticsProperties.Text].map { it.text } }).containsExactly("23:41")
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if the night clock is not 200 sp, tight, in tabular figures and `#5A5A5A` (9 §4.10). */
+    @Test
+    fun theNightClockIs200spTabularAndTight() {
+        show(Screen.NIGHT_CLOCK)
+        val style = compose.onNodeWithText("23:41", useUnmergedTree = true).textLayout().layoutInput.style
+        assertThat(style.fontSize).isEqualTo(200.sp)
+        assertThat(style.letterSpacing).isEqualTo((-8).sp)
+        assertThat(style.fontFeatureSettings).isEqualTo("tnum")
+        assertThat(style.color).isEqualTo(Color(0xFF5A5A5A))
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if the glyph is missing, off the Watching pill's spot, clickable or in the clock's name, or shows without the camera (9 §6.7). */
+    @Test
+    fun theBareGlyphShowsWhileTheCameraRuns() {
+        insets = 24.dp
+        glyphAt = Offset(900f, 60f)
+        running = true
+        show(Screen.ASLEEP)
+        for (start in listOf(Screen.ASLEEP, Screen.NIGHT_CLOCK)) {
+            running = true
+            screen = start
+            settle()
+            val glyph = compose.onNodeWithContentDescription("The camera is on", useUnmergedTree = true)
+            glyph.assertExists()
+            assertThat(glyph.fetchSemanticsNode().config.getOrNull(SemanticsActions.OnClick)).isNull()
+            val centre = glyph.fetchSemanticsNode().boundsInRoot.center
+            val tolerance = with(compose.density) { 1.dp.toPx() }
+            assertThat(centre.x).isWithin(tolerance).of(900f)
+            assertThat(centre.y).isWithin(tolerance).of(60f)
+            val clickable = compose.onAllNodes(hasClickAction()).fetchSemanticsNodes().single().config
+            assertThat(clickable.getOrNull(SemanticsProperties.ContentDescription)).isEqualTo(
+                if (start == Screen.ASLEEP) listOf("Screen asleep") else null,
+            )
+            running = false
+            settle()
+            compose.onNodeWithContentDescription("The camera is on", useUnmergedTree = true).assertDoesNotExist()
+            compose.assertClickablesHaveRoleAndLabel()
+        }
     }
 
     /** Fails if the dark screen's name is its action, or TalkBack's click doesn't wake it. */
