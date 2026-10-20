@@ -6,7 +6,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
@@ -23,7 +22,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
@@ -32,7 +30,6 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.IntOffset
 import java.time.LocalDateTime
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -102,8 +99,7 @@ private fun WakingLayer(
     content: @Composable () -> Unit = {},
 ) {
     val wake by rememberUpdatedState(onWake)
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    Box(Modifier.fillMaxSize().background(Color.Black).onGloballyPositioned { origin = it.positionInRoot() }) {
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -115,19 +111,26 @@ private fun WakingLayer(
                 },
             contentAlignment = Alignment.Center,
         ) { content() }
-        if (cameraRunning) CameraGlyph(glyphAt, origin)
+        if (cameraRunning) CameraGlyph(glyphAt)
     }
 }
 
-/** The glyph, centred on [at] (root coordinates) when known; this layer sits inside the system bars' padding, so [origin] is taken off. */
+/**
+ * The glyph, centred on [at] (root coordinates) when known. This layer sits inside the system bars' padding, so its
+ * position in the root is taken off, read while placing so the glyph is on the spot from the first frame.
+ */
 @Composable
-private fun BoxScope.CameraGlyph(at: Offset?, origin: Offset) {
+private fun BoxScope.CameraGlyph(at: Offset?) {
     val place = if (at == null) {
         Modifier.align(Alignment.TopEnd).padding(top = DisplayDimens.glyphFallbackTop, end = DisplayDimens.glyphFallbackEnd)
     } else {
-        Modifier.offset {
-            val half = DisplayDimens.markSize.toPx() / 2
-            IntOffset((at.x - origin.x - half).roundToInt(), (at.y - origin.y - half).roundToInt())
+        Modifier.layout { measurable, constraints ->
+            val placeable = measurable.measure(constraints)
+            layout(placeable.width, placeable.height) {
+                val origin = coordinates?.positionInRoot() ?: Offset.Zero
+                val half = DisplayDimens.markSize.toPx() / 2
+                placeable.place((at.x - origin.x - half).roundToInt(), (at.y - origin.y - half).roundToInt())
+            }
         }
     }
     Box(place.size(DisplayDimens.markSize), contentAlignment = Alignment.Center) {

@@ -188,6 +188,26 @@ class SleepLayersTest {
         }
     }
 
+    /** Fails if the glyph is drawn off the Watching pill's spot on a waking layer's first frame, before that layer has been placed (9 §6.7). */
+    @Test
+    fun theGlyphIsOnThePillsSpotFromTheFirstFrame() {
+        insets = 24.dp
+        glyphAt = Offset(900f, 60f)
+        running = true
+        show(Screen.AWAKE)
+        val tolerance = with(compose.density) { 1.dp.toPx() }
+        for (start in listOf(Screen.ASLEEP, Screen.NIGHT_CLOCK)) {
+            screen = start
+            compose.runOnIdle { Snapshot.sendApplyNotifications() }
+            compose.mainClock.advanceTimeByFrame()
+            val centre = compose.onNodeWithContentDescription("The camera is on", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center
+            assertThat(centre.x).isWithin(tolerance).of(900f)
+            assertThat(centre.y).isWithin(tolerance).of(60f)
+            screen = Screen.AWAKE
+            settle()
+        }
+    }
+
     /** Fails if the dark screen's name is its action, or TalkBack's click doesn't wake it. */
     @Test
     fun theDarkScreenIsNamedApartFromItsAction() {
