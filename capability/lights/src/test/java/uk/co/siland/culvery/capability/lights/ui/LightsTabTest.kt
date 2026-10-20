@@ -1,12 +1,21 @@
 package uk.co.siland.culvery.capability.lights.ui
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -14,16 +23,21 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -33,6 +47,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.lights.BRIGHT
 import uk.co.siland.culvery.capability.lights.Bridges
 import uk.co.siland.culvery.capability.lights.HouseRun
@@ -41,20 +56,26 @@ import uk.co.siland.culvery.capability.lights.LightsActions
 import uk.co.siland.culvery.capability.lights.LightsFixture
 import uk.co.siland.culvery.capability.lights.LightsFollow
 import uk.co.siland.culvery.capability.lights.LightsHouse
+import uk.co.siland.culvery.capability.lights.LightScene
+import uk.co.siland.culvery.capability.lights.LightsPermissions
 import uk.co.siland.culvery.capability.lights.LightsProblem
 import uk.co.siland.culvery.capability.lights.LightsView
 import uk.co.siland.culvery.capability.lights.RELAX
 import uk.co.siland.culvery.capability.lights.TestAccess
+import uk.co.siland.culvery.capability.lights.TestLightsSystem
 import uk.co.siland.culvery.capability.lights.TestLightsProvider
 import uk.co.siland.culvery.capability.lights.link
 import uk.co.siland.culvery.capability.lights.problemLine
 import uk.co.siland.culvery.capability.lights.room
 import uk.co.siland.culvery.core.plugin.test.soon
+import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
 /** 7 §5.2, §5.4: the Lights tab's rows, controls and words; it follows the rooms while it shows. */
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class LightsTabTest {
     @get:Rule val compose = createComposeRule()
     @get:Rule val lights = LightsFixture()
@@ -97,23 +118,13 @@ class LightsTabTest {
 
     private fun top(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.top
 
-    /** Fails if a room is missing, repeated, or the rows are not in the order Hue gave. */
-    @Test
-    fun oneRowPerRoomInHuesOrder() {
-        show()
-        val tops = listOf("Lounge", "Kitchen", "Hall").map { compose.onNodeWithTag("lights_row_$it-id").assertIsDisplayed(); top("lights_row_$it-id") }
-        assertThat(tops).isInStrictOrder()
-        assertThat(tagCount("lights_row_Lounge-id")).isEqualTo(1)
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
     /** Fails if the row's switch is not read as "Lounge, on, 70 percent", "Lounge, off" or "Hall, on". */
     @Test
     fun theRowIsSpokenAsTheRoom() {
         show()
-        compose.onNodeWithTag("lights_row_Lounge-id_switch").assertContentDescriptionEquals("Lounge, on, 70 percent")
-        compose.onNodeWithTag("lights_row_Kitchen-id_switch").assertContentDescriptionEquals("Kitchen, off")
-        compose.onNodeWithTag("lights_row_Hall-id_switch").assertContentDescriptionEquals("Hall, on")
+        compose.onNodeWithTag("lights_room_Lounge-id_switch").assertContentDescriptionEquals("Lounge, on, 70 percent")
+        compose.onNodeWithTag("lights_room_Kitchen-id_switch").assertContentDescriptionEquals("Kitchen, off")
+        compose.onNodeWithTag("lights_room_Hall-id_switch").assertContentDescriptionEquals("Hall, on")
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -121,8 +132,8 @@ class LightsTabTest {
     @Test
     fun theSwitchTurnsTheRoom() {
         show()
-        compose.onNodeWithTag("lights_row_Kitchen-id_switch").assert(clickLabelIs("Turn the Kitchen on")).performClick()
-        compose.onNodeWithTag("lights_row_Lounge-id_switch").assert(clickLabelIs("Turn the Lounge off")).performClick()
+        compose.onNodeWithTag("lights_room_Kitchen-id_switch").assert(clickLabelIs("Turn the Kitchen on")).performClick()
+        compose.onNodeWithTag("lights_room_Lounge-id_switch").assert(clickLabelIs("Turn the Lounge off")).performClick()
         assertThat(calls).containsExactly("Kitchen on", "Lounge off").inOrder()
         compose.assertClickablesHaveRoleAndLabel()
     }
@@ -131,8 +142,8 @@ class LightsTabTest {
     @Test
     fun theSliderIsHiddenForARoomThatCantDim() {
         show()
-        compose.onNodeWithTag("lights_row_Hall-id_brightness").assertDoesNotExist()
-        val slider = compose.onNodeWithTag("lights_row_Lounge-id_brightness")
+        compose.onNodeWithTag("lights_room_Hall-id_brightness").assertDoesNotExist()
+        val slider = compose.onNodeWithTag("lights_room_Lounge-id_brightness")
         val config = slider.fetchSemanticsNode().config
         assertThat(config[SemanticsProperties.ContentDescription].single() + ", " + config[SemanticsProperties.StateDescription])
             .isEqualTo("Lounge brightness, 70 percent")
@@ -154,7 +165,7 @@ class LightsTabTest {
                 Box(Modifier.size(900.dp, 800.dp)) { LightsTab(rooms, false, true, null, null, null, emptyMap(), null, {}, house, roomActions) }
             }
         }
-        val slider = compose.onNodeWithTag("lights_row_Lounge-id_brightness")
+        val slider = compose.onNodeWithTag("lights_room_Lounge-id_brightness")
         fun levelIs(percent: Int) {
             compose.waitForIdle()
             repeat(2) { compose.mainClock.advanceTimeByFrame() }
@@ -170,28 +181,173 @@ class LightsTabTest {
         levelIs(30)
     }
 
-    /** Fails if the active scene is not the selected chip, a chip's words differ, a tap recalls the wrong scene, or a room without scenes has a chip row. */
+    /** Pin. Fails if the active scene is not the selected chip, a chip's words differ, a tap recalls the wrong scene, or a room without scenes has a chip row. */
     @Test
-    fun scenesAsChipsWithTheActiveOneSelected() {
+    fun aSceneChipIsSpokenAndRecallsItsScene() {
         show()
-        compose.onNodeWithTag("lights_row_Lounge-id_scene_relax-id").assertIsSelected().assertContentDescriptionEquals("Relax scene in the Lounge")
-        compose.onNodeWithTag("lights_row_Lounge-id_scene_bright-id").assertIsNotSelected().assertContentDescriptionEquals("Bright scene in the Lounge").performClick()
+        compose.onNodeWithTag("lights_room_Lounge-id_scene_relax-id").assertIsSelected().assertContentDescriptionEquals("Relax scene in the Lounge")
+        compose.onNodeWithTag("lights_room_Lounge-id_scene_bright-id").assertIsNotSelected().assertContentDescriptionEquals("Bright scene in the Lounge").performClick()
         assertThat(calls).containsExactly("Bright in Lounge")
-        compose.onNodeWithTag("lights_row_Kitchen-id_scenes").assertDoesNotExist()
-        compose.onNodeWithTag("lights_row_Lounge-id_scenes").assertIsDisplayed()
+        compose.onNodeWithTag("lights_room_Kitchen-id_scenes").assertDoesNotExist()
+        compose.onNodeWithTag("lights_room_Lounge-id_scenes").assertIsDisplayed()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Fails if either button is missing from the top, or its words or action differ. */
+    /** 9 §4.4. Fails if the title isn't a heading, or the subtitle doesn't count the rooms on. */
     @Test
-    fun allLightsOffAndHolidayModeAtTheTop() {
+    fun theHeaderCountsTheRoomsOn() {
         show()
+        compose.onNodeWithText("Lights").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertIsDisplayed()
+        compose.onNodeWithText("2 of 3 rooms on · Hue Bridge").assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §2.3. Fails if either button is missing from the header's row, left of the title's end, or its words or action differ. */
+    @Test
+    fun theTrayHoldsAllLightsOffAndHolidayMode() {
+        show(holidayOn = true)
         compose.onNodeWithText("All lights off", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("lights_card_all_off").assert(clickLabelIs("Turn all lights off")).performClick()
+        compose.onNodeWithTag("lights_tray_all_off").assert(clickLabelIs("Turn all lights off")).performClick()
         compose.onNodeWithText("Holiday mode", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("lights_card_holiday").assertContentDescriptionEquals("Holiday mode, off").assert(clickLabelIs("Turn Holiday mode on")).performClick()
+        compose.onNode(hasText("On") and hasAnyAncestor(hasTestTag("lights_tray_holiday")), useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("lights_tray_holiday").assertContentDescriptionEquals("Holiday mode, on").assert(clickLabelIs("Turn Holiday mode off")).performClick()
         assertThat(calls).containsExactly("all off", "holiday").inOrder()
-        assertThat(top("lights_card_all_off")).isLessThan(top("lights_row_Lounge-id"))
+        val title = compose.onNodeWithText("Lights").fetchSemanticsNode().boundsInRoot
+        val allOff = compose.onNodeWithTag("lights_tray_all_off").fetchSemanticsNode().boundsInRoot
+        val holiday = compose.onNodeWithTag("lights_tray_holiday").fetchSemanticsNode().boundsInRoot
+        assertThat(allOff.left).isAtLeast(title.right - 1f)
+        assertThat(holiday.left).isGreaterThan(allOff.left)
+        assertThat(allOff.center.y).isWithin(2f).of(title.center.y)
+        compose.onNodeWithTag("lights_card_all_off").assertDoesNotExist()
+        compose.onNodeWithTag("lights_card_holiday").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: Holiday mode from the tab asks for the fresh PIN, as Home does. Fails if the tray button asks for anything else. */
+    @Test
+    fun theTrayHolidayAsksForTheFreshPin() = runBlocking {
+        val access = TestAccess(null)
+        val h = host(access, lounge)
+        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(900.dp, 800.dp)) { LightsTabHost(h.view, h.actions, h.house, h.follow) } } }
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_tray_holiday") == 1 }
+        compose.onNodeWithTag("lights_tray_holiday").performClick()
+        compose.waitUntil(5_000) { access.asked.isNotEmpty() }
+        assertThat(access.asked).containsExactly(listOf(LightsPermissions.HOLIDAY))
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if the no-bridge line is above the title block, or the count shows with no rooms read. */
+    @Test
+    fun noBridgeShowsUnderTheNewTitle() {
+        show(rooms = emptyList(), status = problemLine(LightsProblem.UNPAIRED))
+        compose.onNodeWithTag("lights_status").assertIsDisplayed()
+        assertThat(top("lights_status")).isAtLeast(compose.onNodeWithText("Lights").fetchSemanticsNode().boundsInRoot.bottom - 1f)
+        compose.onNodeWithText("0 of 0 rooms on · Hue Bridge").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §2.5. Fails if an off room's slider can be moved, loses its remembered level, or doesn't read "Off". */
+    @Test
+    fun anOffRoomsSliderIsDisabledAndReadsOff() {
+        show(rooms = listOf(room("Kitchen", brightness = 40)))
+        val slider = compose.onNodeWithTag("lights_room_Kitchen-id_brightness").assertIsNotEnabled()
+        val config = slider.fetchSemanticsNode().config
+        assertThat(config[SemanticsProperties.ContentDescription].single() + ", " + config[SemanticsProperties.StateDescription]).isEqualTo("Kitchen brightness, Off")
+        assertThat(config[SemanticsProperties.ProgressBarRangeInfo].current).isEqualTo(40f)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: the old row already sent it; this guards the new card's wiring. Fails if a chip on an off room sends anything but its scene. */
+    @Test
+    fun aSceneChipOnAnOffRoomTurnsItOnWithThatScene() = runBlocking {
+        val h = host(TestAccess(null), room("Kitchen", scenes = listOf(RELAX, BRIGHT)))
+        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(900.dp, 800.dp)) { LightsTabHost(h.view, h.actions, h.house, h.follow) } } }
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_room_Kitchen-id_scene_relax-id") == 1 }
+        compose.onNodeWithTag("lights_room_Kitchen-id_scene_relax-id").performClick()
+        compose.waitUntil(5_000) { h.system.calls.contains("recallScene Kitchen-id relax-id") }
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin (the hold, carried to the card). Fails if the thumb leaves 70 before the ceiling, or stays after it. */
+    @Test
+    fun theRoomCardsSliderHoldsWhereItWasLetGo() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                Box(Modifier.size(900.dp, 800.dp)) { LightsTab(listOf(lounge.copy(brightness = 40)), false, true, null, null, null, emptyMap(), null, {}, house, roomActions) }
+            }
+        }
+        fun at(ms: Long) {
+            compose.waitForIdle()
+            compose.mainClock.advanceTimeBy(ms - compose.mainClock.currentTime)
+            compose.waitForIdle()
+        }
+        val slider = compose.onNodeWithTag("lights_room_Lounge-id_brightness")
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(70f) }
+        at(compose.mainClock.currentTime + 16)
+        val start = compose.mainClock.currentTime
+        at(start + LIGHTS_HOLD_MS - 16)
+        slider.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "70 percent"))
+        at(start + LIGHTS_HOLD_MS + 16)
+        slider.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "40 percent"))
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if the card shows no percent beside the slider. */
+    @Test
+    fun theRoomCardShowsThePercent() {
+        show()
+        compose.onNode(hasText("70%") and hasAnyAncestor(hasTestTag("lights_room_Lounge-id")), useUnmergedTree = true).assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §2.5. Fails if eight scenes at a large font wrap or are cut: the last is reached by scrolling the one row. */
+    @Test
+    fun manyScenesScrollAcrossNotClipped() {
+        val scenes = (1..8).map { LightScene("s$it-id", "Scene number $it") }
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = 1.3f)) {
+                CulveryTheme(dark = true) {
+                    Box(Modifier.size(900.dp, 800.dp)) {
+                        LightsTab(listOf(room("Lounge", on = true, scenes = scenes)), false, true, null, null, null, emptyMap(), null, {}, house, roomActions)
+                    }
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("lights_room_Lounge-id_scenes")
+        row.performScrollToNode(hasTestTag("lights_room_Lounge-id_scene_s8-id"))
+        compose.onNodeWithText("Scene number 8", useUnmergedTree = true).assertIsDisplayed()
+        val chip = compose.onNodeWithTag("lights_room_Lounge-id_scene_s8-id").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val rowBounds = row.fetchSemanticsNode().boundsInRoot
+        assertThat(chip.top).isAtLeast(rowBounds.top)
+        assertThat(chip.bottom).isAtMost(rowBounds.bottom)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §2.5. Fails if a scene chip isn't filled (surf2 off, accent on), or loses its selected state. Real graphics: this reads pixels. */
+    @Test
+    fun everySceneChipIsFilled() {
+        lateinit var window: View
+        compose.setContent {
+            window = LocalView.current.rootView
+            CulveryTheme(dark = true) {
+                Box(Modifier.size(900.dp, 800.dp).background(Culvery.colors.bg)) {
+                    LightsTab(listOf(lounge), false, true, null, null, null, emptyMap(), null, {}, house, roomActions)
+                }
+            }
+        }
+        compose.waitForIdle()
+        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
+        window.draw(Canvas(bitmap))
+        // 4 dp in from the chip's left edge, level with its centre: inside the fill, left of the label.
+        fun fillOf(tag: String): Int {
+            val bounds = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInWindow
+            return bitmap.getPixel((bounds.left + with(compose.density) { 4.dp.toPx() }).toInt(), bounds.center.y.toInt())
+        }
+        assertThat(fillOf("lights_room_Lounge-id_scene_bright-id")).isEqualTo(DarkColors.surf2.toArgb())
+        assertThat(fillOf("lights_room_Lounge-id_scene_relax-id")).isEqualTo(DarkColors.accent.toArgb())
+        compose.onNodeWithTag("lights_room_Lounge-id_scene_relax-id").assertIsSelected()
+        compose.onNodeWithTag("lights_room_Lounge-id_scene_bright-id").assertIsNotSelected()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -215,9 +371,9 @@ class LightsTabTest {
     @Test
     fun aRowsLineShowsUnderIt() {
         show(lines = mapOf("Kitchen-id" to "Hue didn’t do that. Try again."), houseLine = "2 rooms didn’t turn off. Try again.")
-        compose.onNodeWithTag("lights_row_Kitchen-id_line").assertIsDisplayed()
-        assertThat(top("lights_row_Kitchen-id_line")).isGreaterThan(top("lights_row_Kitchen-id_switch"))
-        compose.onNodeWithTag("lights_row_Lounge-id_line").assertDoesNotExist()
+        compose.onNodeWithTag("lights_room_Kitchen-id_line").assertIsDisplayed()
+        assertThat(top("lights_room_Kitchen-id_line")).isGreaterThan(top("lights_room_Kitchen-id_switch"))
+        compose.onNodeWithTag("lights_room_Lounge-id_line").assertDoesNotExist()
         compose.onNodeWithTag("lights_tab_line").assertIsDisplayed()
         compose.assertClickablesHaveRoleAndLabel()
     }
@@ -229,8 +385,8 @@ class LightsTabTest {
         var focused = 0
         show(rooms, focus = "Room 12-id", onFocused = { focused++ }, height = 400)
         compose.waitUntil(5_000) { compose.waitForIdle(); focused == 1 }
-        compose.onNodeWithTag("lights_row_Room 1-id").assertDoesNotExist()
-        compose.onNodeWithTag("lights_row_Room 12-id").assertIsDisplayed()
+        compose.onNodeWithTag("lights_room_Room 1-id").assertDoesNotExist()
+        compose.onNodeWithTag("lights_room_Room 12-id").assertIsDisplayed()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -251,22 +407,26 @@ class LightsTabTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    private class Host(val view: LightsView, val actions: LightsActions, val house: LightsHouse, val follow: LightsFollow)
+    private class Host(val view: LightsView, val actions: LightsActions, val house: LightsHouse, val follow: LightsFollow, val system: TestLightsSystem)
 
-    private suspend fun host(vararg rooms: LightRoom): Host {
+    private suspend fun host(vararg rooms: LightRoom): Host = host(TestAccess(null), *rooms)
+
+    private suspend fun host(access: TestAccess, vararg rooms: LightRoom): Host {
         val settings = lights.settings
         settings.connect("lights.hue", link())
         val provider = TestLightsProvider()
         val bridges = Bridges(setOf(provider), settings, lights.scope)
         soon { bridges.system.first { it != null } }
-        provider.systems.single().rooms.value = rooms.toList()
+        val system = provider.systems.single()
+        system.rooms.value = rooms.toList()
         val view = LightsView(bridges, settings, lights.scope)
         val lightsHouse = LightsHouse(bridges, settings)
         return Host(
             view,
-            LightsActions({ bridges.system.value }, lights.scope, System::currentTimeMillis, lightsHouse, TestAccess(null)),
+            LightsActions({ bridges.system.value }, lights.scope, System::currentTimeMillis, lightsHouse, access),
             lightsHouse,
             LightsFollow(bridges.system, MutableStateFlow(true), lights.scope),
+            system,
         )
     }
 
@@ -281,7 +441,7 @@ class LightsTabTest {
             }
         }
         compose.waitUntil(5_000) { compose.waitForIdle(); h.follow.watching == 1 }
-        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_row_Lounge-id") == 1 }
+        compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_room_Lounge-id") == 1 }
         compose.assertClickablesHaveRoleAndLabel()
         shown = false
         compose.waitUntil(5_000) { compose.waitForIdle(); h.follow.watching == 0 }

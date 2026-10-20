@@ -33,6 +33,8 @@ import uk.co.siland.culvery.core.ui.DarkColors
 class LightsAllOffLitTest {
     @get:Rule val compose = createComposeRule()
 
+    private fun allOffTag(onTab: Boolean) = if (onTab) "lights_tray_all_off" else "lights_card_all_off"
+
     private fun fillOf(lit: Boolean, onTab: Boolean): Int {
         lateinit var window: View
         compose.setContent {
@@ -55,7 +57,7 @@ class LightsAllOffLitTest {
         // captureToImage waits on a frame callback that Robolectric's paused main looper never delivers, so draw the window.
         val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
         window.draw(Canvas(bitmap))
-        val bounds = compose.onNodeWithTag("lights_card_all_off").fetchSemanticsNode().boundsInWindow
+        val bounds = compose.onNodeWithTag(allOffTag(onTab)).fetchSemanticsNode().boundsInWindow
         // 6 dp in from the pill's left edge, level with its centre: inside the pill, left of the icon.
         val sixDp = with(compose.density) { 6.dp.toPx() }
         return bitmap.getPixel((bounds.left + sixDp).toInt(), bounds.center.y.toInt())
@@ -97,7 +99,7 @@ class LightsAllOffLitTest {
                 }
             }
         }
-        compose.onNodeWithTag("lights_card_all_off").performClick()
+        compose.onNodeWithTag(allOffTag(onTab)).performClick()
         return calls
     }
 
@@ -112,7 +114,7 @@ class LightsAllOffLitTest {
     @Test
     fun theTabButtonIsDisabledAndSendsNothingWhenNotLit() {
         assertThat(tap(lit = false, onTab = true)).isEmpty()
-        compose.onNodeWithTag("lights_card_all_off").assertIsNotEnabled()
+        compose.onNodeWithTag("lights_tray_all_off").assertIsNotEnabled()
     }
 
     /** Fails if a lit button is disabled or its tap doesn't send All lights off. */

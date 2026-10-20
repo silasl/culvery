@@ -72,6 +72,14 @@ class LightsWordsTest {
             .isEqualTo("2 rooms didn’t turn off. Try again. Culvery couldn’t start Mimic presence. Start it in the Hue app.")
     }
 
+    /** 9 §4.4. Fails if the tab's subtitle counts the rooms on wrongly or loses the bridge's name. */
+    @Test
+    fun roomsOnCounts() {
+        assertThat(roomsOn(listOf(room("Lounge", on = true), room("Kitchen"), room("Hall", on = true)))).isEqualTo("2 of 3 rooms on · Hue Bridge")
+        assertThat(roomsOn(listOf(room("Kitchen")))).isEqualTo("0 of 1 rooms on · Hue Bridge")
+        assertThat(roomsOn(listOf(room("Lounge", on = true)))).isEqualTo("1 of 1 rooms on · Hue Bridge")
+    }
+
     /** Fails if a room that can't dim shows a percentage, or an off room shows its brightness. */
     @Test
     fun aRoomsStateAndHowItIsSpoken() {

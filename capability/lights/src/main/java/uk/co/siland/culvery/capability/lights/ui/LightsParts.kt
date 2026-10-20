@@ -4,14 +4,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import uk.co.siland.culvery.capability.lights.ALL_LIGHTS_OFF
 import uk.co.siland.culvery.capability.lights.HOLIDAY_MODE
 import uk.co.siland.culvery.capability.lights.HouseRun
@@ -78,18 +81,37 @@ internal fun MainRoomButton(room: LightRoom, onToggle: () -> Unit, modifier: Mod
 /** The longest a Lights slider stays where it was let go while the bridge has yet to report that level (a refused command shows after it). */
 internal const val LIGHTS_HOLD_MS = 5_000L
 
-/** The main room's brightness between the dim and bright icons: disabled at its remembered level, reading "Off", while the room is off (9 §2.5). */
+/**
+ * A room's brightness between the dim and bright icons: disabled at its remembered level, reading "Off", while the room is
+ * off (9 §2.5). [showPercent] adds the level after the bright icon.
+ */
 @Composable
-internal fun BrightnessRow(room: LightRoom, mainRoom: MainRoomActions) {
+internal fun BrightnessRow(
+    room: LightRoom,
+    tag: String,
+    onDrag: (Int) -> Unit,
+    onLetGo: (Int) -> Unit,
+    showPercent: Boolean = false,
+    trackHeight: Dp = LightsDimens.trackHeight,
+) {
     val c = Culvery.colors
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LightsDimens.blockGap)) {
         HhIcon(Icons.BRIGHTNESS_LOW, size = LightsDimens.sliderIcon, tint = c.mute, modifier = Modifier.shownNotSpoken())
         HhPercentSlider(
-            room.name, room.brightness.coerceIn(1, 100), "lights_card_slider", Modifier.weight(1f),
+            room.name, room.brightness.coerceIn(1, 100), tag, Modifier.weight(1f),
             range = 1..100, spokenName = brightnessName(room), spokenState = { if (room.on) "$it percent" else OFF },
-            onDrag = mainRoom.onDrag, enabled = room.on, trackHeight = LightsDimens.trackHeight, holdCeilingMs = LIGHTS_HOLD_MS, onLetGo = mainRoom.onLetGo,
+            onDrag = onDrag, enabled = room.on, trackHeight = trackHeight, holdCeilingMs = LIGHTS_HOLD_MS, onLetGo = onLetGo,
         )
         HhIcon(Icons.BRIGHTNESS_HIGH, size = LightsDimens.sliderIcon, tint = c.mute, modifier = Modifier.shownNotSpoken())
+        if (showPercent) {
+            Text(
+                "${room.brightness.coerceIn(1, 100)}%",
+                style = HhType.secondary.copy(fontSize = LightsDimens.percentSize, fontWeight = FontWeight.W600),
+                color = if (room.on) c.ink else c.mute,
+                textAlign = TextAlign.End,
+                modifier = Modifier.widthIn(min = LightsDimens.percentWidth),
+            )
+        }
     }
 }
 
@@ -101,16 +123,29 @@ internal fun OpenRoomButton(room: LightRoom, onOpen: () -> Unit) {
 
 /** Accent while a room it would turn off is on; otherwise the shared disabled button, which does nothing. */
 @Composable
-internal fun AllOffButton(lit: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) = HhButton(
-    ALL_LIGHTS_OFF, onClick, modifier.testTag("lights_card_all_off"),
-    tone = ButtonTone.Primary, enabled = lit, icon = Icons.POWER_SETTINGS_NEW, on = ButtonSurface.Surf, compact = true, clickLabel = TURN_ALL_OFF,
+internal fun AllOffButton(
+    lit: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tag: String = "lights_card_all_off",
+    surface: ButtonSurface = ButtonSurface.Surf,
+) = HhButton(
+    ALL_LIGHTS_OFF, onClick, modifier.testTag(tag),
+    tone = ButtonTone.Primary, enabled = lit, icon = Icons.POWER_SETTINGS_NEW, on = surface, compact = true, clickLabel = TURN_ALL_OFF,
 )
 
 /** One button for both lines: TalkBack reads "Holiday mode, off" and offers [holidaySpoken] (7 §2.6, §5.4). */
 @Composable
-internal fun HolidayButton(on: Boolean, run: HouseRun?, onClick: () -> Unit, modifier: Modifier = Modifier) = HhButton(
-    HOLIDAY_MODE, onClick, modifier.testTag("lights_card_holiday"),
-    tone = if (on) ButtonTone.Primary else ButtonTone.Quiet, icon = Icons.LUGGAGE, on = ButtonSurface.Surf,
+internal fun HolidayButton(
+    on: Boolean,
+    run: HouseRun?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tag: String = "lights_card_holiday",
+    surface: ButtonSurface = ButtonSurface.Surf,
+) = HhButton(
+    HOLIDAY_MODE, onClick, modifier.testTag(tag),
+    tone = if (on) ButtonTone.Primary else ButtonTone.Quiet, icon = Icons.LUGGAGE, on = surface,
     spokenName = holidayNamed(on, run), compact = true, clickLabel = holidaySpoken(!on), secondLine = holidayState(on, run),
 )
 

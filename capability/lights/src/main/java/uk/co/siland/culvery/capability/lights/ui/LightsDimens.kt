@@ -10,7 +10,6 @@ internal object LightsDimens {
     val cardPaddingH = 21.dp
     val blockGap = 12.dp
     val bulb = 31.dp
-    val tabBulb = 32.dp
     val nameSize = 20.sp
     val statusSize = 15.sp
     val trackHeight = 20.dp
@@ -24,10 +23,19 @@ internal object LightsDimens {
     val buttonGap = 8.dp
     val lineGap = 10.dp
 
-    // The tab: rows 10 apart as lists are; inside a row, 12 between its lines and 8 between chips.
+    // The tab: cards 10 apart as lists are; inside a card, 12 between its lines and 8 between scene chips.
     val tabGap = 10.dp
-    val rowInnerGap = 12.dp
+    val roomRadius = 24.dp
+    val roomInnerGap = 12.dp
     val chipGap = 8.dp
+    val sceneChipMaxWidth = 240.dp
+
+    // A room card: its bulb, name, brightness track and percent (9 §4.4).
+    val roomBulb = 35.dp
+    val roomNameSize = 23.sp
+    val roomTrack = 23.dp
+    val percentSize = 15.sp
+    val percentWidth = 44.dp
 
     // Settings › Lights: as Settings' other pages; the sheets as the calendar's.
     val settingsGap = 16.dp

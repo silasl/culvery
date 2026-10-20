@@ -2,28 +2,20 @@ package uk.co.siland.culvery.capability.lights.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uk.co.siland.culvery.capability.lights.HouseRun
+import uk.co.siland.culvery.capability.lights.LIGHTS
 import uk.co.siland.culvery.capability.lights.LOOKING_FOR_LIGHTS
 import uk.co.siland.culvery.capability.lights.LightRoom
 import uk.co.siland.culvery.capability.lights.LightScene
@@ -31,26 +23,15 @@ import uk.co.siland.culvery.capability.lights.LightsActions
 import uk.co.siland.culvery.capability.lights.LightsFollow
 import uk.co.siland.culvery.capability.lights.LightsHouse
 import uk.co.siland.culvery.capability.lights.LightsView
-import uk.co.siland.culvery.capability.lights.brightnessName
 import uk.co.siland.culvery.capability.lights.problemLine
-import uk.co.siland.culvery.capability.lights.roomSpoken
-import uk.co.siland.culvery.capability.lights.roomState
-import uk.co.siland.culvery.capability.lights.sceneSpoken
-import uk.co.siland.culvery.capability.lights.turnSpoken
-import uk.co.siland.culvery.core.ui.ButtonTokens
+import uk.co.siland.culvery.capability.lights.roomsOn
+import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhCard
-import uk.co.siland.culvery.core.ui.HhChoiceChip
-import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.HhPercentSlider
-import uk.co.siland.culvery.core.ui.HhSwitch
+import uk.co.siland.culvery.core.ui.HhPageHeader
+import uk.co.siland.culvery.core.ui.HhTray
 import uk.co.siland.culvery.core.ui.HhType
-import uk.co.siland.culvery.core.ui.Icons
-import uk.co.siland.culvery.core.ui.ListRowTokens
-import uk.co.siland.culvery.core.ui.hhClickable
-import uk.co.siland.culvery.core.ui.shownNotSpoken
 
-/** What a room's row does: its switch, its slider while moving and let go, and its scene chips. */
+/** What a room's card does: its switch, its slider while moving and let go, and its scene chips. */
 class RoomActions(
     val onOn: (LightRoom, Boolean) -> Unit,
     val onDrag: (LightRoom, Int) -> Unit,
@@ -64,9 +45,9 @@ class RoomActions(
 }
 
 /**
- * The Lights tab (7 §5.2): All lights off and Holiday mode, then one row per Hue room in Hue's order. The status line
- * shows only when something is wrong; [houseLine] is how the last All lights off or Holiday mode went and [lines] each
- * room's last refused command. A [focus] naming a listed room is scrolled to, then handed back through [onFocused].
+ * The Lights tab (7 §5.2, 9 §4.4): the title with the rooms on and a tray of All lights off and Holiday mode, then one
+ * card per Hue room in Hue's order. The status line shows only when something is wrong; [houseLine] is how the last
+ * All lights off or Holiday mode went and [lines] each room's last refused command. A [focus] naming a listed room is scrolled to, then handed back through [onFocused].
  */
 @Composable
 fun LightsTab(
@@ -99,68 +80,21 @@ fun LightsTab(
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(LightsDimens.tabGap)) {
+                HhPageHeader(
+                    LIGHTS, if (rooms.isEmpty()) null else roomsOn(rooms),
+                    trailing = {
+                        HhTray {
+                            AllOffButton(allOffLit, house.onAllOff, tag = "lights_tray_all_off", surface = ButtonSurface.Bg)
+                            HolidayButton(holidayOn, run, house.onHoliday, tag = "lights_tray_holiday", surface = ButtonSurface.Bg)
+                        }
+                    },
+                )
                 if (status != null) LightsStatusLine(status)
-                Row(horizontalArrangement = Arrangement.spacedBy(LightsDimens.buttonGap)) {
-                    AllOffButton(allOffLit, house.onAllOff, Modifier.heightIn(min = ButtonTokens.largeHeight))
-                    HolidayButton(holidayOn, run, house.onHoliday, Modifier.heightIn(min = ButtonTokens.largeHeight))
-                }
                 if (houseLine != null) Text(houseLine, style = HhType.secondary, color = c.danger, modifier = Modifier.testTag("lights_tab_line"))
                 if (rooms.isEmpty() && status == null) Text(LOOKING_FOR_LIGHTS, style = HhType.body, color = c.mute)
             }
         }
-        items(rooms, key = { it.id }) { RoomRow(it, lines[it.id], room) }
-    }
-}
-
-@Composable
-private fun RoomRow(room: LightRoom, line: String?, actions: RoomActions) {
-    val c = Culvery.colors
-    val tag = "lights_row_${room.id}"
-    HhCard(
-        modifier = Modifier.fillMaxWidth().testTag(tag),
-        radius = ListRowTokens.radius,
-        padding = PaddingValues(horizontal = ListRowTokens.paddingH, vertical = ListRowTokens.paddingV),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(LightsDimens.rowInnerGap)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LightsDimens.blockGap),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = LightsDimens.chevron)
-                    .testTag("${tag}_switch")
-                    .hhClickable({ actions.onOn(room, !room.on) }, label = turnSpoken(room, !room.on), role = Role.Switch, spoken = roomSpoken(room)),
-            ) {
-                HhIcon(Icons.LIGHTBULB, size = LightsDimens.tabBulb, filled = room.on, tint = if (room.on) c.accent else c.mute)
-                Column(Modifier.weight(1f).shownNotSpoken()) {
-                    Text(room.name, style = HhType.cardTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(roomState(room), style = HhType.body, color = c.mute, maxLines = 1)
-                }
-                HhSwitch(room.on, onCheckedChange = null, tag = "${tag}_toggle")
-            }
-            if (room.dimmable) {
-                HhPercentSlider(
-                    room.name, room.brightness.coerceIn(1, 100), "${tag}_brightness", Modifier.fillMaxWidth(),
-                    range = 1..100, spokenName = brightnessName(room), holdCeilingMs = LIGHTS_HOLD_MS,
-                    onDrag = { actions.onDrag(room, it) },
-                ) { actions.onLetGo(room, it) }
-            }
-            if (room.scenes.isNotEmpty()) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(LightsDimens.chipGap),
-                    verticalArrangement = Arrangement.spacedBy(LightsDimens.chipGap),
-                    modifier = Modifier.fillMaxWidth().selectableGroup().testTag("${tag}_scenes"),
-                ) {
-                    room.scenes.forEach { scene ->
-                        HhChoiceChip(
-                            scene.name, selected = scene.id == room.activeSceneId, tag = "${tag}_scene_${scene.id}",
-                            onClick = { actions.onScene(room, scene) }, role = Role.RadioButton, spokenName = sceneSpoken(scene, room),
-                        )
-                    }
-                }
-            }
-            if (line != null) Text(line, style = HhType.secondary, color = c.danger, modifier = Modifier.testTag("${tag}_line"))
-        }
+        items(rooms, key = { it.id }) { LightsRoomCard(it, lines[it.id], room) }
     }
 }
 

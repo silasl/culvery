@@ -46,5 +46,5 @@ class LightsTabScreenshotTest {
 
     @Test fun statusDark() = snap("lights_tab_status_dark", true, status = problemLine(LightsProblem.UNREACHABLE))
 
-    @Test fun rowNoScenesDark() = snap("lights_row_no_scenes_dark", true, rooms = rooms.drop(3))
+    @Test fun roomNoScenesDark() = snap("lights_room_no_scenes_dark", true, rooms = rooms.drop(3))
 }

@@ -67,7 +67,7 @@ fun LightsCard(
         }
         Spacer(Modifier.weight(1f))
         if (main.dimmable) {
-            BrightnessRow(main, mainRoom)
+            BrightnessRow(main, "lights_card_slider", mainRoom.onDrag, mainRoom.onLetGo)
             Spacer(Modifier.height(LightsDimens.bottomGap))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(LightsDimens.buttonGap)) {
