@@ -16,6 +16,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
@@ -95,5 +96,37 @@ class PageHeaderTest {
         assertThat(tray.right.value - b.right.value).isWithin(0.5f).of(8f)
         assertThat(a.top.value - tray.top.value).isWithin(0.5f).of(8f)
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §4.4. Fails if the label isn't drawn uppercase in the section-label style with its icon left of the buttons, or is spoken. */
+    @Test
+    fun aTrayLabelSitsLeftOfItsButtonsAndIsNotSpoken() {
+        show {
+            HhTray(Modifier.testTag("tray"), label = "One-tap") {
+                HhButton("All lights off", {}, Modifier.testTag("a"), on = ButtonSurface.Bg)
+            }
+        }
+        val tray = compose.onNodeWithTag("tray").getUnclippedBoundsInRoot()
+        val text = compose.onNodeWithText("ONE-TAP", useUnmergedTree = true)
+        val style = text.textLayout().layoutInput.style
+        assertThat(style.fontSize).isEqualTo(13.sp)
+        assertThat(style.fontWeight).isEqualTo(FontWeight.W700)
+        assertThat(style.color).isEqualTo(DarkColors.mute)
+        val icon = compose.onNodeWithTag("tray_label_icon", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val label = text.getUnclippedBoundsInRoot()
+        val button = compose.onNodeWithTag("a").getUnclippedBoundsInRoot()
+        assertThat(icon.left.value).isAtLeast(tray.left.value + 8f)
+        assertThat(label.left.value).isAtLeast(icon.right.value)
+        assertThat(button.left.value).isAtLeast(label.right.value + 8f)
+        assertThat((icon.top.value + icon.bottom.value) / 2).isWithin(1f).of((button.top.value + button.bottom.value) / 2)
+        compose.onNodeWithTag("tray_label", useUnmergedTree = true).assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: with no label the tray holds only its buttons. */
+    @Test
+    fun aTrayWithoutALabelHasNone() {
+        show { HhTray { HhButton("All lights off", {}, on = ButtonSurface.Bg) } }
+        compose.onNodeWithTag("tray_label", useUnmergedTree = true).assertDoesNotExist()
     }
 }

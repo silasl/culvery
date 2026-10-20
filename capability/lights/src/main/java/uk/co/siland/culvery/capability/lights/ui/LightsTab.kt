@@ -20,6 +20,7 @@ import uk.co.siland.culvery.capability.lights.LightsActions
 import uk.co.siland.culvery.capability.lights.LightsFollow
 import uk.co.siland.culvery.capability.lights.LightsHouse
 import uk.co.siland.culvery.capability.lights.LightsView
+import uk.co.siland.culvery.capability.lights.ONE_TAP
 import uk.co.siland.culvery.capability.lights.problemLine
 import uk.co.siland.culvery.capability.lights.roomsOn
 import uk.co.siland.culvery.core.ui.ButtonSurface
@@ -71,7 +72,7 @@ fun LightsTab(
             HhPageHeader(
                 LIGHTS, if (rooms.isEmpty()) null else roomsOn(rooms),
                 trailing = {
-                    HhTray {
+                    HhTray(Modifier.testTag("lights_tray"), label = ONE_TAP) {
                         AllOffButton(allOffLit, house.onAllOff, tag = "lights_tray_all_off", surface = ButtonSurface.Bg)
                         HolidayButton(holidayOn, run, house.onHoliday, tag = "lights_tray_holiday", surface = ButtonSurface.Bg)
                     }

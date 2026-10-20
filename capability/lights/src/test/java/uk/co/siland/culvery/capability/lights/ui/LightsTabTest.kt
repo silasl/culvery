@@ -209,6 +209,16 @@ class LightsTabTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** 9 §4.4. Fails if the tray isn't labelled ONE-TAP left of All lights off. */
+    @Test
+    fun theTrayIsLabelledOneTap() {
+        show()
+        val label = compose.onNode(hasText("ONE-TAP") and hasAnyAncestor(hasTestTag("lights_tray")), useUnmergedTree = true)
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertThat(label.right).isAtMost(compose.onNodeWithTag("lights_tray_all_off").fetchSemanticsNode().boundsInRoot.left)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     /** Pin: Holiday mode from the tab asks for the fresh PIN, as Home does. Fails if the tray button asks for anything else. */
     @Test
     fun theTrayHolidayAsksForTheFreshPin() = runBlocking {

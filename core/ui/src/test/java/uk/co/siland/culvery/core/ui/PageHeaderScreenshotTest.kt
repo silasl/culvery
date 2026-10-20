@@ -29,7 +29,7 @@ class PageHeaderScreenshotTest {
                     subtitle = "2 of 4 rooms on · Hue Bridge",
                     modifier = Modifier.testTag("shot").width(900.dp).background(Culvery.colors.bg).padding(16.dp),
                 ) {
-                    HhTray {
+                    HhTray(label = "One-tap") {
                         HhButton("All lights off", {}, on = ButtonSurface.Bg)
                         HhButton("Holiday mode", {}, on = ButtonSurface.Bg)
                     }

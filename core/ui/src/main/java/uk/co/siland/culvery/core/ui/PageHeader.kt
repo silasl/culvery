@@ -14,11 +14,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Locale
 
 /** The tabs' title block and the tray beside it, from the hand-off's page header at 1.5 px per dp. */
 object PageHeaderTokens {
@@ -32,6 +35,10 @@ object PageHeaderTokens {
     val trayEdge = 1.dp
     val trayPadding = 8.dp
     val trayGap = 8.dp
+    val trayLabelIcon = 15.dp
+    val trayLabelGap = 5.dp
+    val trayLabelStart = 5.dp
+    val trayLabelEnd = 7.dp
 }
 
 /**
@@ -63,15 +70,36 @@ fun HhPageHeader(
     }
 }
 
-/** An outlined row of buttons: a `surf3` edge and no fill, so it reads as a group on `bg`. */
+/**
+ * An outlined row of buttons: a `surf3` edge and no fill, so it reads as a group on `bg`. A [label] is drawn first,
+ * uppercase with the touch icon, and not spoken: the buttons say what they do.
+ */
 @Composable
-fun HhTray(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+fun HhTray(modifier: Modifier = Modifier, label: String? = null, content: @Composable RowScope.() -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(PageHeaderTokens.trayGap),
         modifier = modifier
             .border(PageHeaderTokens.trayEdge, Culvery.colors.surf3, RoundedCornerShape(PageHeaderTokens.trayRadius))
             .padding(PageHeaderTokens.trayPadding),
-        content = content,
-    )
+    ) {
+        if (label != null) TrayLabel(label)
+        content()
+    }
+}
+
+@Composable
+private fun TrayLabel(label: String) {
+    val mute = Culvery.colors.mute
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(PageHeaderTokens.trayLabelGap),
+        modifier = Modifier
+            .testTag("tray_label")
+            .semantics(mergeDescendants = true) { hideFromAccessibility() }
+            .padding(start = PageHeaderTokens.trayLabelStart, end = PageHeaderTokens.trayLabelEnd),
+    ) {
+        HhIcon(Icons.TOUCH_APP, size = PageHeaderTokens.trayLabelIcon, filled = true, tint = mute, modifier = Modifier.testTag("tray_label_icon"))
+        Text(label.uppercase(Locale.UK), style = HhType.sectionLabel, color = mute, maxLines = 1)
+    }
 }

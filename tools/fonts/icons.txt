@@ -65,6 +65,7 @@ star
 sunny
 sync_problem
 thunderstorm
+touch_app
 volume_down
 volume_up
 weather_snowy

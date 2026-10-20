@@ -70,6 +70,7 @@ object Icons {
     const val SUNNY = "sunny"
     const val SYNC_PROBLEM = "sync_problem"
     const val THUNDERSTORM = "thunderstorm"
+    const val TOUCH_APP = "touch_app"
     const val VOLUME_DOWN = "volume_down"
     const val VOLUME_UP = "volume_up"
     const val WEATHER_SNOWY = "weather_snowy"
