@@ -44,6 +44,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.layout
@@ -54,10 +55,12 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -119,14 +122,15 @@ fun WeekView(
 
 /**
  * The seven columns with the lane of multi-day bars over them (9 §2.1): the lane sits where the chips start, below one
- * header measured at the current font scale, and every column's chips start below the lane.
+ * header measured at the current font scale, and every column's chips start below the lane. TalkBack reads the lane
+ * before the columns, each of which it reads as one.
  */
 @Composable
 private fun WeekColumns(state: WeekViewState, onOpen: (EventRef) -> Unit, onAdd: ((LocalDate) -> Unit)?, modifier: Modifier) {
     val rows = state.week.spans
     val spanRefs = remember(rows) { rows.flatten().mapTo(HashSet()) { it.ref } }
     val laneHeight = laneHeight(rows.size)
-    SubcomposeLayout(modifier) { constraints ->
+    SubcomposeLayout(modifier.semantics { isTraversalGroup = true }) { constraints ->
         val gap = CalendarDimens.weekColumnGap.toPx()
         val days = state.week.days.size
         val columnWidth = (constraints.maxWidth - gap * (days - 1)) / days
@@ -152,7 +156,13 @@ private fun WeekColumns(state: WeekViewState, onOpen: (EventRef) -> Unit, onAdd:
                 .single().measure(Constraints(maxWidth = inner))
             val top = CalendarDimens.weekColumnPaddingTop.roundToPx() + header.height + CalendarDimens.columnGap.roundToPx()
             top to subcompose("lane") {
-                WeekLane(rows, state.week.start, columnWidth.toDp(), CalendarDimens.weekColumnGap, CalendarDimens.laneBarInset, onOpen)
+                WeekLane(
+                    rows, state.week.start, columnWidth.toDp(), CalendarDimens.weekColumnGap, CalendarDimens.laneBarInset, onOpen,
+                    Modifier.semantics {
+                        isTraversalGroup = true
+                        traversalIndex = -1f
+                    },
+                )
             }.single().measure(constraints.copy(minHeight = 0))
         }
         layout(columns.width, columns.height) {
@@ -209,6 +219,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, laneHeight: Dp, onOpen: (Eve
         DayHeader(day.date, isToday, onAdd)
         Spacer(Modifier.height(CalendarDimens.columnGap))
         var pressed by remember { mutableStateOf(false) }
+        val band = if (laneHeight > 0.dp) laneHeight + CalendarDimens.columnGap else 0.dp
         Box(
             Modifier
                 .fillMaxWidth()
@@ -242,15 +253,30 @@ private fun DayColumn(day: DayUi, isToday: Boolean, laneHeight: Dp, onOpen: (Eve
         ) {
             LazyColumn(
                 state = chips,
-                contentPadding = PaddingValues(top = if (laneHeight > 0.dp) laneHeight + CalendarDimens.columnGap else 0.dp),
+                contentPadding = PaddingValues(top = band),
                 verticalArrangement = Arrangement.spacedBy(CalendarDimens.columnGap),
-                modifier = Modifier.fillMaxSize(),
+                // Chips scrolled up into the lane's band aren't drawn behind its see-through bars.
+                modifier = Modifier.fillMaxSize().drawWithContent { clipRect(top = band.toPx()) { this@drawWithContent.drawContent() } },
             ) {
                 items(day.events, key = { it.ref.listKey }) { EventChip(it, day.date, onOpen) }
             }
             if (onAdd != null) EmptySpace(day.date, chips, pressed, onAdd)
+            if (band > 0.dp) LaneBand(band)
         }
     }
+}
+
+/**
+ * Takes the lane band's touches from the chips scrolled up under it, without consuming them, so the column's add
+ * gesture still sees a tap there.
+ */
+@Composable
+private fun LaneBand(height: Dp) {
+    Box(
+        Modifier.fillMaxWidth().height(height).pointerInput(Unit) {
+            awaitPointerEventScope { while (true) awaitPointerEvent() }
+        },
+    )
 }
 
 /** Whether [y], in the list's coordinates, is past the last visible chip; anywhere is, with no chips (the lane's room too). */

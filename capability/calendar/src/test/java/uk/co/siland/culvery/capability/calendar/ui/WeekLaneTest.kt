@@ -1,8 +1,11 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -17,15 +20,20 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
@@ -33,6 +41,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
@@ -59,11 +68,15 @@ class WeekLaneTest {
     private fun day(i: Int): LocalDate = monday.plusDays(i.toLong())
     private val sync = SyncStatusUi(SampleUi.NOW - 120_000, emptyList(), listOf("Google Calendar"), failingBeforeFirstSync = false)
     private lateinit var window: View
+    private lateinit var composeView: View
 
     private fun chipTitle(i: Int) = "Walk ${day(i).format(WEEKDAY)}"
 
-    /** Half term Mon–Thu, a School trip Wed–Fri over it, Gran visiting from Fri past the week to Mon 26; one chip a day. */
-    private fun week(spans: Boolean = true): WeekUi {
+    /**
+     * Half term Mon–Thu, a School trip Wed–Fri over it, Gran visiting from Fri past the week to Mon 26; one chip a day,
+     * and [mondayErrands] more on Monday.
+     */
+    private fun week(spans: Boolean = true, mondayErrands: Int = 0): WeekUi {
         val days = (0..6).map { i ->
             val slices = if (!spans) {
                 emptyList()
@@ -75,14 +88,16 @@ class WeekLaneTest {
                 )
             }
             val bins = listOfNotNull(SampleUi.allDay("Bin day", SampleUi.family).takeIf { i == 1 })
-            DayUi(day(i), slices + bins + SampleUi.event(chipTitle(i), "09:00–10:00", SampleUi.alex))
+            val errands = if (i == 0) List(mondayErrands) { n -> SampleUi.event("Errand $n", "11:00–12:00", SampleUi.sam) } else emptyList()
+            DayUi(day(i), slices + bins + SampleUi.event(chipTitle(i), "09:00–10:00", SampleUi.alex) + errands)
         }
         return WeekUi(monday, days, SampleUi.people, spans = laneRows(weekSpans(days)))
     }
 
     private fun show(week: WeekUi = week(), fontScale: Float = 1f, onOpen: (EventRef) -> Unit = {}, onAdd: ((LocalDate) -> Unit)? = null) =
         compose.setContent {
-            window = LocalView.current.rootView
+            composeView = LocalView.current
+            window = composeView.rootView
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
                 CulveryTheme(dark = true) {
                     WithFontScale(fontScale) {
@@ -170,6 +185,84 @@ class WeekLaneTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    private fun drawn(): Bitmap {
+        compose.waitForIdle()
+        return Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888).also { window.draw(Canvas(it)) }
+    }
+
+    /** Monday's part of the lane's band, from the lane's top to a gap below it: every second pixel. */
+    private fun mondaysBand(bitmap: Bitmap): List<Int> {
+        val monday = compose.onNodeWithTag("week_day_${day(0)}").fetchSemanticsNode().boundsInWindow
+        val top = compose.onNodeWithTag("week_span_${ref("Half term").listKey}").fetchSemanticsNode().boundsInWindow.top
+        val bottom = top + px(laneHeight(2) + CalendarDimens.columnGap)
+        val side = px(CalendarDimens.weekColumnPaddingSide)
+        return (top.toInt() until bottom.toInt() step 2).flatMap { y ->
+            ((monday.left + side).toInt() until (monday.right - side).toInt() step 2).map { x -> bitmap.getPixel(x, y) }
+        }
+    }
+
+    private fun scrollMonday() {
+        compose.onNode(hasScrollAction() and hasAnyAncestor(hasTestTag("week_day_${day(0)}"))).performScrollToIndex(5)
+    }
+
+    @Test
+    fun chipsScrolledUpDontShowUnderTheLane() {
+        show(week(mondayErrands = 20))
+        val before = mondaysBand(drawn())
+        scrollMonday()
+        // Errand 3 is now inside the band, behind the lane.
+        assertThat(chip("Errand 3").top).isLessThan(bar("Half term").bottom)
+        assertThat(mondaysBand(drawn())).isEqualTo(before)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aTapInTheLanesEmptyRowOverScrolledChipsOpensNothing() {
+        val opened = mutableListOf<EventRef>()
+        show(week(mondayErrands = 20), onOpen = { opened += it })
+        scrollMonday()
+        // Monday's second lane row is empty (the School trip starts Wednesday), with a chip scrolled up under it.
+        val monday = column(0)
+        val y = bar("Half term").bottom + px(CalendarDimens.laneRowGap) + px(CalendarDimens.laneRow) / 2
+        compose.onNodeWithTag("week_day_${day(0)}").performTouchInput { click(Offset(monday.width / 2f, y - monday.top)) }
+        assertThat(opened).isEmpty()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** The names TalkBack moves through, in its order: Compose's traversal chain, read from its accessibility nodes. */
+    private fun readingOrder(): List<String> {
+        val provider = composeView.accessibilityNodeProvider
+        val any = SemanticsMatcher("any node") { true }
+        val names = compose.onAllNodes(any).fetchSemanticsNodes().associate { node ->
+            node.id to (node.config.getOrNull(SemanticsProperties.ContentDescription)?.joinToString(" ")
+                ?: node.config.getOrNull(SemanticsProperties.Text)?.joinToString(" ") { it.text }.orEmpty())
+        }
+        val next = names.keys.associateWith { id ->
+            provider.createAccessibilityNodeInfo(id)?.extras?.getInt(TRAVERSAL_BEFORE, -1)?.takeIf { it != -1 }
+        }
+        val first = names.keys.first { id -> next.values.none { it == id } && next[id] != null }
+        return generateSequence(first) { next[it] }.map { names[it].orEmpty() }.toList()
+    }
+
+    /** Each column reads as one (its header, then its chips), so the lane goes between the week's title and Monday. */
+    @Test
+    fun talkBackReadsTheLaneBeforeTheColumns() {
+        val accessibility = ApplicationProvider.getApplicationContext<Context>().getSystemService(AccessibilityManager::class.java)
+        shadowOf(accessibility).setEnabled(true)
+        shadowOf(accessibility).setTouchExplorationEnabled(true)
+        shadowOf(accessibility).setEnabledAccessibilityServiceList(listOf(AccessibilityServiceInfo()))
+        show()
+        val order = readingOrder()
+        fun at(name: String) = order.indexOfFirst { it.startsWith(name) }.also { assertThat(it).isAtLeast(0) }
+        val headers = (0..6).map { at(dayHeading(day(it), if (it == 0) "Today" else null)) }
+        val bars = listOf("Half term, Family", "School trip, Mia", "Gran visiting, Sam").map(::at)
+        val chips = (0..6).map { at("${chipTitle(it)}, Alex") }
+        assertThat(at("This week")).isLessThan(bars.min())
+        assertThat(bars.max()).isLessThan(headers.min())
+        (0..6).forEach { assertThat(headers[it]).isLessThan(chips[it]) }
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     @Test
     fun aBarOpensItsEvent() {
         val opened = mutableListOf<EventRef>()
@@ -207,3 +300,6 @@ class WeekLaneTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 }
+
+/** Compose's extra naming the node TalkBack moves to next. */
+private const val TRAVERSAL_BEFORE = "android.view.accessibility.extra.EXTRA_DATA_TEST_TRAVERSALBEFORE_VAL"

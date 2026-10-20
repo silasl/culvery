@@ -16,8 +16,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -93,8 +91,7 @@ private fun LaneBar(span: SpanUi, onOpen: (EventRef) -> Unit) {
             .testTag("week_span_${span.ref.listKey}")
             .clip(shape)
             .background(colour.copy(alpha = HhAlpha.bar(c)))
-            .semantics(mergeDescendants = true) { contentDescription = span.spoken }
-            .hhClickable({ onOpen(span.ref) }, label = OPEN_EVENT_DETAILS),
+            .hhClickable({ onOpen(span.ref) }, label = OPEN_EVENT_DETAILS, spoken = span.spoken),
     ) {
         Box(Modifier.width(CalendarDimens.laneEdge).fillMaxHeight().background(colour))
         Row(
