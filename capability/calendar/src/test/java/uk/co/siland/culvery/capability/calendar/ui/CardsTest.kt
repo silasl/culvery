@@ -40,6 +40,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
+import uk.co.siland.culvery.capability.calendar.DaySpan
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
@@ -349,6 +350,36 @@ class CardsTest {
         showSized { TodayCard(listOf(sleepover), tomorrow = DayUi(tomorrowDate, listOf(sleepover.copy(timeLabel = "until 10:00")))) }
         compose.onAllNodesWithText("Sleepover", useUnmergedTree = true).assertCountEquals(1)
         compose.onNodeWithContentDescription(todayRowName(sleepover)).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Tomorrow").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aMultiDayEventReadsWhichDayItIs() {
+        val halfTerm = SampleUi.spanning("Half term", SampleUi.family, 2, 3)
+        showSized { TodayCard(listOf(halfTerm)) }
+        compose.onNodeWithText("Day 2 of 3 · Family", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Half term, Family, day 2 of 3").assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: an overnight event is not multi-day, so it keeps its times. */
+    @Test
+    fun anOvernightEventKeepsItsTimes() {
+        val sleepover = SampleUi.event("Sleepover", "20:00–", SampleUi.mia)
+        showSized { TodayCard(listOf(sleepover)) }
+        compose.onNodeWithText("20:00– · Mia", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithContentDescription(todayRowName(sleepover)).assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: tomorrow's top-up skips an event that is already one of today's rows. */
+    @Test
+    fun aMultiDayEventTomorrowShowsOnce() {
+        val today = SampleUi.spanning("Half term", SampleUi.family, 2, 3)
+        showSized { TodayCard(listOf(today), tomorrow = DayUi(tomorrowDate, listOf(today.copy(span = DaySpan(3, 3))))) }
+        compose.onAllNodesWithText("Half term", useUnmergedTree = true).assertCountEquals(1)
+        compose.onNodeWithText("Day 2 of 3 · Family", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithContentDescription("Tomorrow").assertDoesNotExist()
         compose.assertClickablesHaveRoleAndLabel()
     }

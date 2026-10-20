@@ -50,5 +50,8 @@ private fun EventUi.badgeWords(): String = badges().joinToString("") { ", ${it.s
 internal fun eventOnDay(event: EventUi, day: LocalDate): String =
     "${event.title}, ${event.person.name}, ${day.format(FULL_WEEKDAY)} ${spokenTime(event.startLabel)}${event.badgeWords()}"
 
-/** A Today row (the card is the day): "Swimming, Sam, 09:00 to 10:30", then its badges. */
-internal fun todayRowName(event: EventUi): String = "${event.title}, ${event.person.name}, ${spokenTime(event.timeLabel)}${event.badgeWords()}"
+/** A Today row (the card is the day): "Swimming, Sam, 09:00 to 10:30", or "Half term, Family, day 2 of 3", then its badges. */
+internal fun todayRowName(event: EventUi): String {
+    val spokenWhen = event.span?.let { "day ${it.day} of ${it.of}" } ?: spokenTime(event.timeLabel)
+    return "${event.title}, ${event.person.name}, $spokenWhen${event.badgeWords()}"
+}

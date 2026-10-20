@@ -44,6 +44,7 @@ import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
+import uk.co.siland.culvery.capability.calendar.dayOf
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTokens
@@ -226,15 +227,15 @@ private fun TomorrowDivider() {
 }
 
 @Composable
-private fun TodayRow(event: EventUi, onOpen: (EventRef) -> Unit) = EventRow(event, todayRowName(event), outlined = false, onOpen)
+private fun TodayRow(event: EventUi, onOpen: (EventRef) -> Unit) = EventRow(event, todayRowName(event), outlined = false, showDayOf = true, onOpen)
 
 @Composable
 private fun TomorrowRow(event: EventUi, date: LocalDate, onOpen: (EventRef) -> Unit) =
-    EventRow(event, eventOnDay(event, date), outlined = true, onOpen)
+    EventRow(event, eventOnDay(event, date), outlined = true, showDayOf = false, onOpen)
 
 /** A today row (`surf2`, two-line title) or, [outlined], tomorrow's (a `surf2` edge, a softer bar, one line). */
 @Composable
-private fun EventRow(event: EventUi, spoken: String, outlined: Boolean, onOpen: (EventRef) -> Unit) {
+private fun EventRow(event: EventUi, spoken: String, outlined: Boolean, showDayOf: Boolean, onOpen: (EventRef) -> Unit) {
     val c = Culvery.colors
     val shape = RoundedCornerShape(CalendarDimens.todayRowRadius)
     Row(
@@ -263,7 +264,7 @@ private fun EventRow(event: EventUi, spoken: String, outlined: Boolean, onOpen: 
             )
             Spacer(Modifier.height(CalendarDimens.todayTimeTop))
             Text(
-                "${event.timeLabel} · ${event.person.name}",
+                "${event.span?.takeIf { showDayOf }?.let(::dayOf) ?: event.timeLabel} · ${event.person.name}",
                 style = if (outlined) CalendarType.tomorrowTime else CalendarType.todayTime,
                 color = c.mute,
                 maxLines = 1,

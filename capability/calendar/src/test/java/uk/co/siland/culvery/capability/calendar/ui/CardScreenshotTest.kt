@@ -72,5 +72,6 @@ class CardScreenshotTest {
     @Test fun comingUpBusyDark() = snap("coming_up_busy_dark", true, WIDE_W, WIDE_H) { ComingUpCard(SampleUi.comingUpBusy) }
     @Test fun connectDark() = snap("connect_dark", true, TALL_W, TALL_H) { ConnectCalendarCard(connectService = "Google Calendar", onConnect = {}) }
     @Test fun connectLight() = snap("connect_light", false, TALL_W, TALL_H) { ConnectCalendarCard(connectService = "Google Calendar", onConnect = {}) }
+    @Test fun todayMultiDayDark() = snap("today_multiday_dark", true, TODAY_W, TODAY_H) { TodayCard(SampleUi.todayWithSpan, onAdd = {}) }
     @Test fun todayBadgesDark() = snap("today_badges_dark", true, TODAY_W, TODAY_H) { TodayCard(SampleUi.todayWithBadges) }
 }
