@@ -20,6 +20,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.access.PinReason
+import uk.co.siland.culvery.core.access.pinReasonText
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
 
@@ -85,5 +86,29 @@ class FontScaleTest {
         listOf("1", "2", "3").forEach { compose.onNodeWithTag("pin_key_$it").performClick() }
         assertThat(cancels).isEqualTo(0)
         assertThat(submitted).isEqualTo("0123")
+    }
+
+    /** (9 §4.9) A reason that wraps to two lines is laid out beside the lock's one line, so the keys keep their place both ways. */
+    @Test
+    fun aWrappingReasonDoesNotMoveTheKeysWhenTheLockStartsOrEnds() {
+        var locked by mutableStateOf(false)
+        val reason = pinReasonText(PinReason.Delete, "Change any event")
+        compose.setContent {
+            CulveryTheme(dark = false) {
+                PinPadFrame(
+                    "Who’s this?", line = reason, message = "", wrongPin = false, enabled = !locked,
+                    lock = if (locked) PinLock(27, 27) else null, onSubmit = {}, onCancel = {},
+                )
+            }
+        }
+        // Real text metrics: the delete reason wraps here, as on the tablet.
+        assertThat(compose.onNodeWithText(reason).textLayout().lineCount).isEqualTo(2)
+        val unlocked = compose.onNodeWithTag("pin_key_1").getUnclippedBoundsInRoot().top
+        locked = true
+        compose.waitForIdle()
+        assertThat(compose.onNodeWithTag("pin_key_1").getUnclippedBoundsInRoot().top).isEqualTo(unlocked)
+        locked = false
+        compose.waitForIdle()
+        assertThat(compose.onNodeWithTag("pin_key_1").getUnclippedBoundsInRoot().top).isEqualTo(unlocked)
     }
 }

@@ -228,7 +228,7 @@ class PinPadTest {
         showAtZero()
         compose.mainClock.advanceTimeByFrame()
         val keyTop = compose.onNodeWithTag("pin_key_1").getUnclippedBoundsInRoot().top
-        compose.mainClock.advanceTimeBy(LOCKED_UNTIL - FRAME_MS)
+        compose.mainClock.advanceTimeBy(LOCKED_UNTIL - FRAME_MS - compose.mainClock.currentTime)
         compose.onNodeWithTag("pin_key_1").assertIsNotEnabled()
         compose.mainClock.advanceTimeBy(2 * FRAME_MS)
         compose.onNodeWithTag("pin_message").assertContentDescriptionEquals(TRY_AGAIN)

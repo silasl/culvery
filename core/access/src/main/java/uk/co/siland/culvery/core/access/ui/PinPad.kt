@@ -308,8 +308,11 @@ internal fun PinPadFrame(
                     verticalArrangement = Arrangement.spacedBy(PinPadDimens.titleReasonGap),
                 ) {
                     Text(if (lock != null) TOO_MANY_TRIES else title, style = PinPadType.title, color = c.ink, modifier = Modifier.semantics { heading() })
-                    val shownLine = if (lock != null) WAIT_A_MOMENT else line
-                    if (shownLine != null) Text(shownLine, style = PinPadType.reason, color = c.mute, textAlign = TextAlign.Center)
+                    // Both lines are laid out, the unused one hidden, so a reason that wraps doesn't move the keys.
+                    Box(contentAlignment = Alignment.Center) {
+                        if (line != null) ReasonLine(line, shown = lock == null)
+                        if (lock != null || line != null) ReasonLine(WAIT_A_MOMENT, shown = lock != null)
+                    }
                 }
                 Box(contentAlignment = Alignment.Center) {
                     Box(Modifier.alpha(if (lock == null) 1f else 0f)) {
@@ -384,6 +387,13 @@ internal fun PinPadFrame(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ReasonLine(text: String, shown: Boolean) {
+    Box(if (shown) Modifier else Modifier.alpha(0f).clearAndSetSemantics {}) {
+        Text(text, style = PinPadType.reason, color = Culvery.colors.mute, textAlign = TextAlign.Center)
     }
 }
 
