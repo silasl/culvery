@@ -12,7 +12,7 @@ Done means: every in-scope screen matches the handoff (allowing for the rulings 
 
 ## 2. Rulings (the user, 2026-10-19)
 
-1. **New features are speculative designs.** Shopping list, the One-tap tray and Settings › Home buttons, Party mode, house Holiday mode, Start hoover, the sound pads, the family slideshow, multi-day events, and Door's Clear history, latest-picture panel, Mark all seen and See full size are **not** built in Plan 9.
+1. **New features are speculative designs.** Shopping list, the One-tap tray and Settings › Home buttons, Party mode, house Holiday mode, Start hoover, the sound pads, the family slideshow, and Door's Clear history, latest-picture panel, Mark all seen and See full size are **not** built in Plan 9. **Multi-day events are folded into 9b and 9c** (the user, 2026-10-20): the week's lane in 9b, creating them in 9c's Add event, "Day 2 of 3" on Home's Today with them; their plans settle the details from note 31 and the follow-ups' multi-day entry, and the "**Not**" lines below no longer apply to them.
 2. **Coming up goes now.** Home's Coming up card is removed. Today always fills 5 rows, topping up from tomorrow or scrolling (note 9), and the week is one tap away. Lights and Music take the right column until Shopping and the tray arrive.
 3. **Holiday mode stays on Home's Lights card for now.** Until the One-tap tray exists, the Home Lights card keeps a Holiday mode button. The Lights tab also gets the design's top tray with All lights off and Holiday lights (note 15).
 4. **The door card closes after 60 seconds** (was 2 minutes, Plan 5). The ring stays in the Door tab with its badge.
