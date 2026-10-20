@@ -26,6 +26,7 @@ object PageHeaderTokens {
     val subtitleStyle = HhType.date.copy(fontSize = 15.sp)
     val subtitleGap = 4.dp
     val below = 15.dp
+    val trailingGap = 8.dp
 
     val trayRadius = 17.dp
     val trayEdge = 1.dp
@@ -33,17 +34,21 @@ object PageHeaderTokens {
     val trayGap = 8.dp
 }
 
-/** A tab's title (a heading), its [subtitle] under it and [trailing] on the title's row, right-aligned (9 §4.4). */
+/**
+ * A tab's title (a heading), its [subtitle] under it and [trailing] on the title's row, right-aligned (9 §4.4). [under]
+ * follows the subtitle, or stands in its place, for lines richer than text.
+ */
 @Composable
 fun HhPageHeader(
     title: String,
     subtitle: String?,
     modifier: Modifier = Modifier,
     titleModifier: Modifier = Modifier,
+    under: (@Composable () -> Unit)? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     Column(modifier.fillMaxWidth().padding(bottom = PageHeaderTokens.below)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(PageHeaderTokens.trayGap)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(PageHeaderTokens.trailingGap)) {
             Text(
                 title,
                 style = PageHeaderTokens.titleStyle,
@@ -52,10 +57,9 @@ fun HhPageHeader(
             )
             trailing()
         }
-        if (subtitle != null) {
-            Spacer(Modifier.height(PageHeaderTokens.subtitleGap))
-            Text(subtitle, style = PageHeaderTokens.subtitleStyle, color = Culvery.colors.mute)
-        }
+        if (subtitle != null || under != null) Spacer(Modifier.height(PageHeaderTokens.subtitleGap))
+        if (subtitle != null) Text(subtitle, style = PageHeaderTokens.subtitleStyle, color = Culvery.colors.mute)
+        under?.invoke()
     }
 }
 

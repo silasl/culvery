@@ -8,7 +8,7 @@ import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 enum class DoorKind { RING, MOTION }
 
 /**
- * A ring or motion as the Door tab keeps it (5 §3.1). [unrecognised] is a Ring alert the parser couldn't place, shown and
+ * A ring or motion as the Door tab keeps it (5 §3.1). [unrecognised] is a notice from Ring the parser couldn't place, shown and
  * alerted as a ring; [device] is as the doorbell's app names it, maybe empty.
  */
 data class DoorEvent(

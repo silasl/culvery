@@ -193,10 +193,9 @@ internal object CalendarDimens {
     val chipBadge = 15.dp
     val badgeGap = 4.dp
 
-    // Week view layout (9 §4.7): header→columns 15, between columns 9; column radius 20, padding 12 above and 9 at
+    // Week view layout (9 §4.7): header→columns 15 (the title block's own gap), between columns 9; column radius 20, padding 12 above and 9 at
     // the sides and foot; today's ring 2 dp wide, 2 dp in from the edge; weekday label→date number 6; chip radius
     // 12, padding 9×8, a 7 dp person dot 5 before the time; reconnect icon→label 8.
-    val weekHeaderGap = 15.dp
     val weekColumnGap = 9.dp
     val weekColumnRadius = 20.dp
     val todayRingWidth = 2.dp

@@ -95,17 +95,18 @@ internal fun BrightnessRow(
     trackHeight: Dp = LightsDimens.trackHeight,
 ) {
     val c = Culvery.colors
+    val level = room.brightness.coerceIn(1, 100)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LightsDimens.blockGap)) {
         HhIcon(Icons.BRIGHTNESS_LOW, size = LightsDimens.sliderIcon, tint = c.mute, modifier = Modifier.shownNotSpoken())
         HhPercentSlider(
-            room.name, room.brightness.coerceIn(1, 100), tag, Modifier.weight(1f),
+            room.name, level, tag, Modifier.weight(1f),
             range = 1..100, spokenName = brightnessName(room), spokenState = { if (room.on) "$it percent" else OFF },
             onDrag = onDrag, enabled = room.on, trackHeight = trackHeight, holdCeilingMs = LIGHTS_HOLD_MS, onLetGo = onLetGo,
         )
         HhIcon(Icons.BRIGHTNESS_HIGH, size = LightsDimens.sliderIcon, tint = c.mute, modifier = Modifier.shownNotSpoken())
         if (showPercent) {
             Text(
-                "${room.brightness.coerceIn(1, 100)}%",
+                "$level%",
                 style = HhType.secondary.copy(fontSize = LightsDimens.percentSize, fontWeight = FontWeight.W600),
                 color = if (room.on) c.ink else c.mute,
                 textAlign = TextAlign.End,

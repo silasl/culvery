@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.music
 
 import uk.co.siland.culvery.core.plugin.TABLET_OFFLINE
+import uk.co.siland.culvery.core.ui.plural
 
 internal const val MUSIC = "Music"
 internal const val CANT_REACH_SONOS = "Culvery can’t reach Sonos. Check the speakers are on and the tablet is on the home Wi-Fi."
@@ -20,11 +21,7 @@ fun problemLine(problem: MusicProblem): String = when (problem) {
 fun musicSummary(groups: List<SpeakerGroup>): String {
     val rooms = groups.sumOf { it.rooms.size }
     val grouped = groups.count { it.rooms.size > 1 }
-    return listOfNotNull(
-        "$rooms ${if (rooms == 1) "room" else "rooms"}",
-        if (grouped > 0) "$grouped ${if (grouped == 1) "group" else "groups"}" else null,
-        SONOS,
-    ).joinToString(" · ")
+    return listOfNotNull(plural(rooms.toLong(), "room"), if (grouped > 0) plural(grouped.toLong(), "group") else null, SONOS).joinToString(" · ")
 }
 
 internal const val NOTHING_PLAYING = "Nothing playing"

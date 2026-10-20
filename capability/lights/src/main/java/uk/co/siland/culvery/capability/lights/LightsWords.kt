@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.lights
 
 import uk.co.siland.culvery.core.plugin.TABLET_OFFLINE
+import uk.co.siland.culvery.core.ui.plural
 
 internal const val LIGHTS = "Lights"
 internal const val HUE_REFUSED = "Hue didn’t do that. Try again."
@@ -30,7 +31,7 @@ internal fun roomState(room: LightRoom): String = when {
 
 /** The tab's subtitle: "2 of 3 rooms on · Hue Bridge", "1 of 1 room on · Hue Bridge" (9 §4.4). */
 fun roomsOn(rooms: List<LightRoom>): String =
-    "${rooms.count { it.on }} of ${rooms.size} ${if (rooms.size == 1) "room" else "rooms"} on · $HUE_BRIDGE"
+    "${rooms.count { it.on }} of ${plural(rooms.size.toLong(), "room")} on · $HUE_BRIDGE"
 
 /** The pill over the grid's foot: the rooms after the last row wholly on screen: "1 more room", "3 more rooms" (9 §4.4). */
 fun moreRooms(count: Int): String = "$count more ${if (count == 1) "room" else "rooms"}"

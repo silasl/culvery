@@ -54,9 +54,7 @@ fun MusicTab(
             item { Text(LOOKING_FOR_SPEAKERS, style = HhType.body, color = c.mute, modifier = Modifier.padding(bottom = MusicDimens.roomGap)) }
         }
         items(groups, key = { it.id }) { group ->
-            Box(Modifier.padding(bottom = MusicDimens.roomGap)) {
-                MusicRoomCard(group, lines[group.id], group.id in roomsShown, { onRooms(group.id) }, actions)
-            }
+            MusicRoomCard(group, lines[group.id], group.id in roomsShown, { onRooms(group.id) }, actions, Modifier.padding(bottom = MusicDimens.roomGap))
         }
     }
 }

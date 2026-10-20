@@ -182,7 +182,7 @@ class DoorStoreTest {
         assertThat(store.takeUnseen()).isEmpty()
     }
 
-    /** 9 §6.8: a ring stored while the tab takes the unseen is either taken (so shown NEW) or left unseen, never seen unshown. */
+    /** 9 §6.8: fails if a take marks seen a ring it didn't return, as marking every unseen row would for one stored mid-take. */
     @Test
     fun aRingArrivingDuringTheMarkIsNotLost() = runBlocking {
         val taken = mutableSetOf<Long>()

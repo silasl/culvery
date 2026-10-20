@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
 import java.time.ZoneId
@@ -72,12 +73,15 @@ fun DoorTab(
     modifier: Modifier = Modifier,
 ) {
     val c = Culvery.colors
-    val shown = days.today + days.yesterday
     fun isNew(event: DoorEvent) = event.kind == DoorKind.RING && (event.id in newIds || !event.seen)
+    val subtitle = remember(days, newIds) {
+        val shown = days.today + days.yesterday
+        doorSubtitle(shown, shown.count(::isNew))
+    }
     // The header ends with its own gap, so each item after it carries the one below it.
     val gap = Modifier.padding(bottom = DoorDimens.rowGap)
     LazyColumn(modifier = modifier.fillMaxSize().testTag("door_tab")) {
-        item { HhPageHeader(DOOR, doorSubtitle(shown, shown.count(::isNew))) }
+        item { HhPageHeader(DOOR, subtitle) }
         if (status != null) item { Box(gap) { DoorStatusLine(status) } }
         item { HhSectionLabel(TODAY, gap.testTag("door_today")) }
         if (days.today.isEmpty()) item { Text(NO_RINGS_TODAY, style = HhType.body, color = c.mute, modifier = gap.testTag("door_empty")) }
@@ -124,7 +128,13 @@ internal fun DoorTabHost(store: DoorStore, today: Flow<LocalDate>, zone: Flow<Zo
     val scope = rememberCoroutineScope()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { visit.withLock { newIds = store.takeUnseen() } } }
     val reselected = LocalTabReselected.current
-    LaunchedEffect(reselected) { reselected.collect { visit.withLock { newIds = newIds + store.takeUnseen() } } }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(reselected, lifecycle) {
+        reselected.collect {
+            // Before the resume there is no visit to add to; the resume takes these rings.
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) visit.withLock { newIds = newIds + store.takeUnseen() }
+        }
+    }
     val d = day ?: return
     val z = householdZone ?: return
     val days = remember(events, d, z) { doorDays(events, d, z) }

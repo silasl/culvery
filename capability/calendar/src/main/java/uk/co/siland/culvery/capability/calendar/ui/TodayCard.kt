@@ -263,8 +263,10 @@ private fun EventRow(event: EventUi, spoken: String, outlined: Boolean, showDayO
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(CalendarDimens.todayTimeTop))
+            val span = event.span
+            val whenLabel = if (showDayOf && span != null) dayOf(span) else event.timeLabel
             Text(
-                "${event.span?.takeIf { showDayOf }?.let(::dayOf) ?: event.timeLabel} · ${event.person.name}",
+                "$whenLabel · ${event.person.name}",
                 style = if (outlined) CalendarType.tomorrowTime else CalendarType.todayTime,
                 color = c.mute,
                 maxLines = 1,

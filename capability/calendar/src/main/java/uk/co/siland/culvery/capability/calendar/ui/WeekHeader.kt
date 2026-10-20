@@ -2,7 +2,6 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,13 +18,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import java.time.LocalDate
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
@@ -40,7 +37,6 @@ import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPageHeader
 import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.Icons
-import uk.co.siland.culvery.core.ui.PageHeaderTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 
 /**
@@ -63,56 +59,54 @@ internal fun WeekHeader(
         delay(UPDATING_SHOWN_MS)
         updating = false
     }
-    Column {
-        HhPageHeader(
-            weekTitle(state.weeksAhead),
-            subtitle = null,
-            // The sync line below stands in for the subtitle, so it takes back the block's foot padding.
-            modifier = Modifier.takeBackBelow(PageHeaderTokens.below - PageHeaderTokens.subtitleGap),
-            titleModifier = Modifier.testTag("week_title").semantics { liveRegion = LiveRegionMode.Polite },
-        ) {
-            NavPill(state.weeksAhead, onWeeksAhead)
-            if (state.weeksAhead > 0) {
-                HhButton("This week", { onWeeksAhead(0) }, Modifier.testTag("week_this_week"), on = ButtonSurface.Bg)
-            }
-            if (onAdd != null) {
-                HhButton(
-                    "Add event", { onAdd(state.week.start) }, Modifier.testTag("week_add_event"),
-                    tone = ButtonTone.Primary, icon = Icons.ADD, on = ButtonSurface.Bg,
+    // A failed pass shows as soon as it happens, not only once the week is out of date (5 §A.3).
+    val failing = state.sync.isStaleAt(state.nowMillis) || state.sync.problem != null
+    HhPageHeader(
+        weekTitle(state.weeksAhead),
+        subtitle = null,
+        titleModifier = Modifier.testTag("week_title").semantics { liveRegion = LiveRegionMode.Polite },
+        under = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(CalendarDimens.staleIconGap),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (failing && !updating) HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.staleIcon, tint = c.danger, modifier = Modifier.testTag("week_out_of_date"))
+                Text(
+                    if (updating) UPDATING else weekLine(state.sync, state.nowMillis),
+                    style = CalendarType.subtitle,
+                    color = if (failing && !updating) c.danger else c.mute,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false).testTag("week_subtitle").semantics { liveRegion = LiveRegionMode.Polite },
                 )
+                if (failing && !updating) {
+                    HhButton(
+                        UPDATE_NOW,
+                        {
+                            updating = true
+                            onUpdateNow()
+                        },
+                        Modifier.testTag("week_update_now"),
+                        on = ButtonSurface.Bg,
+                    )
+                }
             }
+            if (state.sync.needsSignIn.isNotEmpty()) {
+                Spacer(Modifier.height(CalendarDimens.reconnectTop))
+                ReconnectChip(reconnectLabel(state.sync.needsSignIn), onClick = onReconnect)
+            }
+        },
+    ) {
+        NavPill(state.weeksAhead, onWeeksAhead)
+        if (state.weeksAhead > 0) {
+            HhButton("This week", { onWeeksAhead(0) }, Modifier.testTag("week_this_week"), on = ButtonSurface.Bg)
         }
-        // A failed pass shows as soon as it happens, not only once the week is out of date (5 §A.3).
-        val failing = state.sync.isStaleAt(state.nowMillis) || state.sync.problem != null
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(CalendarDimens.staleIconGap),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (failing && !updating) HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.staleIcon, tint = c.danger, modifier = Modifier.testTag("week_out_of_date"))
-            Text(
-                if (updating) UPDATING else weekLine(state.sync, state.nowMillis),
-                style = CalendarType.subtitle,
-                color = if (failing && !updating) c.danger else c.mute,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false).testTag("week_subtitle").semantics { liveRegion = LiveRegionMode.Polite },
+        if (onAdd != null) {
+            HhButton(
+                "Add event", { onAdd(state.week.start) }, Modifier.testTag("week_add_event"),
+                tone = ButtonTone.Primary, icon = Icons.ADD, on = ButtonSurface.Bg,
             )
-            if (failing && !updating) {
-                HhButton(
-                    UPDATE_NOW,
-                    {
-                        updating = true
-                        onUpdateNow()
-                    },
-                    Modifier.testTag("week_update_now"),
-                    on = ButtonSurface.Bg,
-                )
-            }
-        }
-        if (state.sync.needsSignIn.isNotEmpty()) {
-            Spacer(Modifier.height(CalendarDimens.reconnectTop))
-            ReconnectChip(reconnectLabel(state.sync.needsSignIn), onClick = onReconnect)
         }
     }
 }
@@ -135,12 +129,6 @@ private fun NavPill(weeksAhead: Int, onWeeksAhead: (Int) -> Unit) {
             enabled = weeksAhead < MAX_WEEKS_AHEAD, on = ButtonSurface.Surf,
         )
     }
-}
-
-/** Reports [amount] less height, so what follows sits closer than the content's own foot padding allows. */
-private fun Modifier.takeBackBelow(amount: Dp): Modifier = layout { measurable, constraints ->
-    val placeable = measurable.measure(constraints)
-    layout(placeable.width, (placeable.height - amount.roundToPx()).coerceAtLeast(0)) { placeable.place(0, 0) }
 }
 
 /** One chip for every connection that needs signing in again: a `dangerSoft` pill, 48 dp, radius 24. */

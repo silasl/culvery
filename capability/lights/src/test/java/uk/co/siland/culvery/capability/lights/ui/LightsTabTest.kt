@@ -62,7 +62,7 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
-/** 7 §5.2, §5.4: the Lights tab's rows, controls and words; it follows the rooms while it shows. */
+/** 7 §5.2, §5.4: the Lights tab's room cards, controls and words; it follows the rooms while it shows. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class LightsTabTest {
@@ -104,9 +104,9 @@ class LightsTabTest {
 
     private fun top(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.top
 
-    /** Fails if the row's switch is not read as "Lounge, on, 70 percent", "Lounge, off" or "Hall, on". */
+    /** Fails if the card's switch is not read as "Lounge, on, 70 percent", "Lounge, off" or "Hall, on". */
     @Test
-    fun theRowIsSpokenAsTheRoom() {
+    fun theCardIsSpokenAsTheRoom() {
         show()
         compose.onNodeWithTag("lights_room_Lounge-id_switch").assertContentDescriptionEquals("Lounge, on, 70 percent")
         compose.onNodeWithTag("lights_room_Kitchen-id_switch").assertContentDescriptionEquals("Kitchen, off")
@@ -141,9 +141,9 @@ class LightsTabTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** The row's thumb stays where it was let go while the bridge reports the drag's earlier values. Fails if it follows the 60. */
+    /** The card's thumb stays where it was let go while the bridge reports the drag's earlier values. Fails if it follows the 60. */
     @Test
-    fun aRowsSliderStaysWhereItWasLetGoUntilTheRoomReportsIt() {
+    fun aCardsSliderStaysWhereItWasLetGoUntilTheRoomReportsIt() {
         var rooms by mutableStateOf(listOf(lounge))
         compose.mainClock.autoAdvance = false
         compose.setContent {
@@ -355,7 +355,7 @@ class LightsTabTest {
 
     /** Fails if a room's own line shows anywhere but under that room, or the last All lights off or Holiday mode line is lost. */
     @Test
-    fun aRowsLineShowsUnderIt() {
+    fun aCardsLineShowsUnderIt() {
         show(lines = mapOf("Kitchen-id" to "Hue didn’t do that. Try again."), houseLine = "2 rooms didn’t turn off. Try again.")
         compose.onNodeWithTag("lights_room_Kitchen-id_line").assertIsDisplayed()
         assertThat(top("lights_room_Kitchen-id_line")).isGreaterThan(top("lights_room_Kitchen-id_switch"))

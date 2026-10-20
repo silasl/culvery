@@ -1,13 +1,11 @@
 package uk.co.siland.culvery.capability.lights.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectableGroup
@@ -80,14 +78,11 @@ internal fun LightsRoomCard(room: LightRoom, line: String?, actions: RoomActions
                     modifier = Modifier.fillMaxWidth().selectableGroup().testTag("${tag}_scenes"),
                 ) {
                     items(room.scenes, key = { it.id }) { scene ->
-                        // A row has no width to give a chip's label, so the chip is capped and its name wraps or is cut past that.
-                        Box(Modifier.widthIn(max = LightsDimens.sceneChipMaxWidth)) {
-                            HhChoiceChip(
-                                scene.name, selected = scene.id == room.activeSceneId, tag = "${tag}_scene_${scene.id}",
-                                onClick = { actions.onScene(room, scene) }, role = Role.RadioButton, spokenName = sceneSpoken(scene, room),
-                                unselectedFill = c.surf2,
-                            )
-                        }
+                        HhChoiceChip(
+                            scene.name, selected = scene.id == room.activeSceneId, tag = "${tag}_scene_${scene.id}",
+                            onClick = { actions.onScene(room, scene) }, role = Role.RadioButton, spokenName = sceneSpoken(scene, room),
+                            unselectedFill = c.surf2,
+                        )
                     }
                 }
             }

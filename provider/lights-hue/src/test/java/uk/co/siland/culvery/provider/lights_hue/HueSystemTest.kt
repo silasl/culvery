@@ -55,6 +55,8 @@ import uk.co.siland.culvery.provider.lights_hue.HueFixtures.SWITCH
 private const val RESOURCE = "/clip/v2/resource"
 private const val OFF = """{"on":{"on":false}}"""
 private const val ANOTHER_ID = "001788fffe00ffff"
+private const val REAL_WAIT_NANOS = 5_000_000_000L
+private const val POLL_MS = 5L
 
 /** Both Mimic presence instances started, and both stopped. */
 private val PM_ALL_STARTED = BEHAVIORS.replace(""""pm_state":"stopped"""", """"pm_state":"started"""")
@@ -300,7 +302,14 @@ class HueSystemTest {
         s.setBrightness(s.room(LOUNGE), 90)
         bridge.events = """data: [{"data":[{"id":"$LOUNGE_GROUP","dimming":{"brightness":45.0},"type":"grouped_light"}],"type":"update"}]"""
         val before = testScheduler.currentTime
-        s.stream().toList()
+        val stream = async { s.stream().toList() }
+        // The bridge is read on a real thread; while it is, an idle runTest would jump virtual time to the wait's deadline.
+        val giveUp = System.nanoTime() + REAL_WAIT_NANOS
+        while (!stream.isCompleted && System.nanoTime() < giveUp) {
+            runCurrent()
+            Thread.sleep(POLL_MS)
+        }
+        assertThat(stream.isCompleted).isTrue()
         assertThat(testScheduler.currentTime).isEqualTo(before)
         assertThat(s.room(LOUNGE).brightness).isEqualTo(90)
     }

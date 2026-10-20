@@ -9,21 +9,21 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasAnyDescendant
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.height
@@ -43,7 +43,6 @@ import uk.co.siland.culvery.capability.music.MusicChecks
 import uk.co.siland.culvery.capability.music.MusicFixture
 import uk.co.siland.culvery.capability.music.MusicLink
 import uk.co.siland.culvery.capability.music.MusicRefusedException
-import uk.co.siland.culvery.capability.music.TestMusicSystem
 import uk.co.siland.culvery.capability.music.MusicView
 import uk.co.siland.culvery.capability.music.PlayState
 import uk.co.siland.culvery.capability.music.SONG
@@ -51,6 +50,7 @@ import uk.co.siland.culvery.capability.music.STATION
 import uk.co.siland.culvery.capability.music.SpeakerGroup
 import uk.co.siland.culvery.capability.music.Speakers
 import uk.co.siland.culvery.capability.music.TestMusicProvider
+import uk.co.siland.culvery.capability.music.TestMusicSystem
 import uk.co.siland.culvery.capability.music.group
 import uk.co.siland.culvery.capability.music.recordingGroupActions
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
@@ -70,10 +70,17 @@ class MusicTabTest {
     private val lounge = group("l", "Lounge", "Dining room", state = PlayState.PLAYING, nowPlaying = STATION, volume = 40)
     private val kitchen = group("k", "Kitchen", state = PlayState.PAUSED, nowPlaying = SONG)
 
-    private fun showTab(status: String? = null, lines: Map<String, String> = emptyMap(), groups: List<SpeakerGroup> = listOf(lounge, kitchen)) = compose.setContent {
+    private fun showTab(
+        status: String? = null,
+        lines: Map<String, String> = emptyMap(),
+        groups: List<SpeakerGroup> = listOf(lounge, kitchen),
+        art: ArtSource = ArtSource { null },
+    ) = compose.setContent {
         var shown by remember { mutableStateOf(emptySet<String>()) }
         CulveryTheme(dark = true) {
-            MusicTab(groups, status, lines, shown, { id -> shown = if (id in shown) shown - id else shown + id }, actions)
+            CompositionLocalProvider(LocalArtSource provides art) {
+                MusicTab(groups, status, lines, shown, { id -> shown = if (id in shown) shown - id else shown + id }, actions)
+            }
         }
     }
 
@@ -284,10 +291,11 @@ class MusicTabTest {
         compose.onNodeWithTag("music_row_b_line").assertTextEquals("Sonos didn’t do that. Try again.")
     }
 
-    /** 9 §4.5: stopped with nothing loaded, a room offers Play last and no Next. */
+    /** 9 §4.5: stopped with nothing loaded, a room offers Play last and no Next, and its tile stays empty though it has art. */
     @Test
     fun aQuietRoomOffersPlayLastAndNoNext() {
-        showTab(groups = listOf(lounge, kitchen, group("b", "Bedroom")))
+        val loaded = mutableListOf<String>()
+        showTab(groups = listOf(lounge, kitchen, group("b", "Bedroom", artUrl = BEDROOM_ART)), art = ArtSource { loaded += it; null })
         compose.onNodeWithText("Play last", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("music_row_b_play").assertContentDescriptionEquals("Play last in Bedroom").performClick()
         assertThat(calls).containsExactly("play b")
@@ -295,6 +303,8 @@ class MusicTabTest {
         compose.onNodeWithTag("music_row_b_pause").assertDoesNotExist()
         compose.onNodeWithText("Nothing playing", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("music_row_b_now_art", useUnmergedTree = true).assertExists()
+        compose.waitForIdle()
+        assertThat(loaded).doesNotContain(BEDROOM_ART)
         compose.assertAccessible()
     }
 
@@ -309,3 +319,5 @@ class MusicTabTest {
         compose.onNodeWithText("Play last").assertDoesNotExist()
     }
 }
+
+private const val BEDROOM_ART = "http://192.168.1.20:1400/getaa?bedroom"

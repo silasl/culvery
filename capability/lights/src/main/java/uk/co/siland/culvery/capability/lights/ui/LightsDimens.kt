@@ -28,7 +28,6 @@ internal object LightsDimens {
     val roomRadius = 24.dp
     val roomInnerGap = 12.dp
     val chipGap = 8.dp
-    val sceneChipMaxWidth = 240.dp
 
     // The grid (9 §4.4): cards 15 apart; from seven rooms rows are 280 high under a 147 fade, the 48 dp pill 15 above the foot.
     val gridGap = 15.dp

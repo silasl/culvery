@@ -114,7 +114,8 @@ fun WeekView(
     onReconnect: () -> Unit = {},
     onUpdateNow: () -> Unit = {},
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.weekHeaderGap), modifier = modifier.fillMaxSize()) {
+    // The title block ends with its own gap above the columns.
+    Column(modifier.fillMaxSize()) {
         WeekHeader(state, onWeeksAhead, onAdd, onReconnect, onUpdateNow)
         WeekColumns(state, onOpen, onAdd, Modifier.fillMaxWidth().weight(1f))
     }
@@ -129,16 +130,18 @@ fun WeekView(
 private fun WeekColumns(state: WeekViewState, onOpen: (EventRef) -> Unit, onAdd: ((LocalDate) -> Unit)?, modifier: Modifier) {
     val rows = state.week.spans
     val spanRefs = remember(rows) { rows.flatten().mapTo(HashSet()) { it.ref } }
+    // The lane draws the multi-day events, so the columns leave them out.
+    val columnDays = remember(state.week, spanRefs) { state.week.days.map { day -> day.copy(events = day.events.filter { it.ref !in spanRefs }) } }
     val laneHeight = laneHeight(rows.size)
     SubcomposeLayout(modifier.semantics { isTraversalGroup = true }) { constraints ->
         val gap = CalendarDimens.weekColumnGap.toPx()
-        val days = state.week.days.size
+        val days = columnDays.size
         val columnWidth = (constraints.maxWidth - gap * (days - 1)) / days
         val columns = subcompose("columns") {
             Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekColumnGap)) {
-                state.week.days.forEach { day ->
+                columnDays.forEach { day ->
                     DayColumn(
-                        day.copy(events = day.events.filter { it.ref !in spanRefs }),
+                        day,
                         isToday = day.date == state.today,
                         laneHeight = laneHeight,
                         onOpen = onOpen,

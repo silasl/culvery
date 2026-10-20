@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -107,6 +109,21 @@ class ControlsTest {
         compose.onNodeWithTag("c")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Relax scene in the Lounge")))
             .assertIsSelected()
+    }
+
+    /** Fails if a chip in a row with no width to share (a LazyRow) draws its label at zero width. */
+    @Test
+    fun aChipInASideScrollingRowShowsItsLabel() {
+        show {
+            LazyRow {
+                item { HhChoiceChip("Relax", selected = false, tag = "c", onClick = {}, trailing = { HhIcon(Icons.EXPAND_MORE, size = 20.dp) }) }
+            }
+        }
+        val label = compose.onNodeWithText("Relax", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val chip = compose.onNodeWithTag("c").getUnclippedBoundsInRoot()
+        assertThat((label.right - label.left).value).isGreaterThan(0f)
+        assertThat(compose.onNodeWithText("Relax", useUnmergedTree = true).textLayout().lineCount).isEqualTo(1)
+        assertThat(chip.right.value - label.right.value).isAtLeast(20f)
     }
 
     @Test

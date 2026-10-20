@@ -42,6 +42,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -161,6 +162,7 @@ fun HhChoiceChip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipIconGap),
         modifier = Modifier
+            .boundedWidth()
             .testTag(tag)
             .semantics {
                 // A button chip that isn't holding a value says nothing about selection.
@@ -182,6 +184,17 @@ fun HhChoiceChip(
         }
         trailing?.invoke()
     }
+}
+
+/** Under an unbounded width (a LazyRow's) the label's weight would get none, so the chip is bounded at its natural width. */
+private fun Modifier.boundedWidth(): Modifier = layout { measurable, constraints ->
+    val bounded = if (constraints.hasBoundedWidth) {
+        constraints
+    } else {
+        constraints.copy(maxWidth = measurable.maxIntrinsicWidth(constraints.maxHeight).coerceAtLeast(constraints.minWidth))
+    }
+    val placeable = measurable.measure(bounded)
+    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
 }
 
 private const val NOT_AVAILABLE = "not available"
