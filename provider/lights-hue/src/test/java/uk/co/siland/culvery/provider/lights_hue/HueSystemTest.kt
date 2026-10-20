@@ -188,6 +188,58 @@ class HueSystemTest {
         assertThat(s.room(KITCHEN).brightness).isEqualTo(40)
     }
 
+    private fun brightnessReport(group: String, brightness: Double) =
+        """data: [{"data":[{"id":"$group","dimming":{"brightness":$brightness},"type":"grouped_light"}],"type":"update"}]"""
+
+    private fun TestScope.at(millis: Long) = advanceTimeBy(millis - testScheduler.currentTime)
+
+    /**
+     * Fails if the stream's report of a level sent earlier in a drag, which the bridge sends a second or more late, moves the
+     * room off the brightness just sent; once that brightness is reported, a change from elsewhere shows at once (7 §4.3).
+     */
+    @Test
+    fun aLateReportOfAnEarlierLevelLeavesTheBrightnessJustSent() = runTest {
+        val s = system()
+        s.readAll()
+        s.setBrightness(s.room(LOUNGE), 90)
+        bridge.events = brightnessReport(LOUNGE_GROUP, 60.2)
+        s.stream().toList()
+        assertThat(s.room(LOUNGE).brightness).isEqualTo(90)
+        bridge.events = brightnessReport(LOUNGE_GROUP, 89.8)
+        s.stream().toList()
+        bridge.events = brightnessReport(LOUNGE_GROUP, 40.0)
+        s.stream().toList()
+        assertThat(s.room(LOUNGE).brightness).isEqualTo(40)
+    }
+
+    /** Fails if a brightness the bridge never reports outranks its reports for good, so a level set elsewhere never shows. */
+    @Test
+    fun aReportOfAnotherLevelShowsOnceTheBridgeHadTimeToReportTheBrightnessSent() = runTest {
+        val s = system()
+        s.readAll()
+        val sentAt = testScheduler.currentTime
+        s.setBrightness(s.room(LOUNGE), 90)
+        bridge.events = brightnessReport(LOUNGE_GROUP, 60.2)
+        at(sentAt + REPORT_WAIT_MS - 1)
+        s.stream().toList()
+        assertThat(s.room(LOUNGE).brightness).isEqualTo(90)
+        at(sentAt + REPORT_WAIT_MS)
+        s.stream().toList()
+        assertThat(s.room(LOUNGE).brightness).isEqualTo(60)
+    }
+
+    /** Fails if a refused brightness still outranks the stream after the full read showed what the bridge did. */
+    @Test
+    fun aRefusedBrightnessLeavesTheStreamsReportsShowing() = runTest {
+        val s = system()
+        s.readAll()
+        bridge.refusingCommands = true
+        runCatching { s.setBrightness(s.room(LOUNGE), 90) }
+        bridge.events = brightnessReport(LOUNGE_GROUP, 55.0)
+        s.stream().toList()
+        assertThat(s.room(LOUNGE).brightness).isEqualTo(55)
+    }
+
     /** Fails if a scene isn't recalled with `action: active`, or the room still shows the scene it had. */
     @Test
     fun aSceneIsRecalledAndMarkedActive() = runTest {

@@ -37,6 +37,9 @@ internal const val READ_BACK_TRIES = 6
 /** The bridge is searched for by itself at most this often (7 §4.1). */
 internal const val SEARCH_GAP_MS = 30_000L
 
+/** How long a brightness just sent outranks the stream's reports of other levels, which the bridge sends a second or more late. */
+internal const val REPORT_WAIT_MS = 5_000L
+
 private const val BRIDGE_HOME = "bridge_home"
 
 /**
@@ -71,6 +74,12 @@ internal class HueSystem(
     private var dimmingDevices: Set<String> = emptySet()
     private var unroomedLights: List<String> = emptyList()
 
+    /** A brightness just sent to a group, outranking the stream's reports of other levels until [untilMillis]. */
+    private class Sent(val brightness: Int, val untilMillis: Long)
+
+    // Guarded by lock, by grouped light id.
+    private val sent = HashMap<String, Sent>()
+
     /** The automations as last read, by id: whether each is Mimic presence decides how it is switched. */
     @Volatile private var behaviors: Map<String, HueBehavior> = emptyMap()
 
@@ -100,6 +109,7 @@ internal class HueSystem(
             scenes = scenesNow
             dimmingDevices = lightsNow.filter { it.dimmable }.map { it.deviceId }.toSet()
             unroomedLights = lightsNow.filter { it.deviceId !in roomed }.map { it.id }
+            sent.clear()
         }
     }
 
@@ -118,7 +128,11 @@ internal class HueSystem(
     override suspend fun setBrightness(room: LightRoom, percent: Int) {
         val brightness = percent.coerceIn(0, 100)
         if (brightness == 0) return setOn(room, false)
-        command(room, { group(it) { g -> g.copy(on = true, brightness = brightness.toDouble()) } }) { call, hue ->
+        val shown = { hue: HueRoom ->
+            group(hue) { g -> g.copy(on = true, brightness = brightness.toDouble()) }
+            sent[hue.groupedLightId] = Sent(brightness, clock.nowMillis() + REPORT_WAIT_MS)
+        }
+        command(room, shown) { call, hue ->
             client.setBrightness(call, hue.groupedLightId, brightness, turnOn = true)
         }
     }
@@ -304,11 +318,20 @@ internal class HueSystem(
     private fun apply(event: HueEvent) {
         when (event) {
             is HueEvent.GroupedLight -> groups[event.id]?.let {
-                groups[event.id] = it.copy(on = event.on ?: it.on, brightness = event.brightness ?: it.brightness)
+                val brightness = event.brightness?.takeUnless { b -> outranked(event.id, b) }
+                groups[event.id] = it.copy(on = event.on ?: it.on, brightness = brightness ?: it.brightness)
             }
             is HueEvent.Scene -> activate(event.id, scenes.firstOrNull { it.id == event.id }?.roomId, event.active)
             HueEvent.Reread -> Unit
         }
+    }
+
+    // Under lock. A report of another level while the brightness just sent is on its way; that level's report ends the wait.
+    private fun outranked(groupId: String, brightness: Double): Boolean {
+        val pending = sent[groupId] ?: return false
+        if (brightness.roundToInt() != pending.brightness && clock.nowMillis() < pending.untilMillis) return true
+        sent.remove(groupId)
+        return false
     }
 
     // Under lock.
