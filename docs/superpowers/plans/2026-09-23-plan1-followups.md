@@ -394,7 +394,51 @@ The release from 25ee446 installed with `install -r` (the household kept); the u
 - A `SettingsTokens.pageGap` shared by every settings page (Display's `settingsGap` is another 16 dp); one `HhSliderRow` for Display's brightness rows and Music's.
 - `ShellLayers` taking one `screen` (or a list of layers) instead of `sleeping`, the sleep slot and the camera mark.
 - `SetupState`'s `setupStore` onto `:core:plugin`'s `settingsDataStore`, as the four settings files now are.
-- FLAG (pre-existing): `DoorTabTest` hit "connection pool has been closed" at teardown four times across Plans 7–8; it passes in isolation.
+- FLAG (pre-existing): `DoorTabTest` hit "connection pool has been closed" at teardown four times across Plans 7–8; it passes in isolation. Listed with the other flakes under Plan 9a.
+
+## Plan 9a (Redesign: frame and Home): emulator walk-through (2026-10-20)
+
+On `culvery-5` (debug build; the AVD restarted with an emulated front camera for item 2).
+1. Frame: passed. "Preview" stays and ends at the next scheduled switch.
+2. Watching pill: passed once the AVD had a front camera (the first start had none). The overlay mark shows over Settings, a sheet and the PIN pad.
+3. Home location: skipped. Settings can't clear it; the screenshot tests cover it.
+4. Today card: five rows pass; seven (two added, then deleted) scroll, with the pill and Calendar. Font scale 1.3 (the largest on API 30) fits with nothing cut. 0 and 2 events are covered by the screenshot tests and the tablet.
+5. Lights above Music: passed.
+6. Lights card: passed except the slider (fault 1 below).
+7. Music card: passed.
+8. Ring: passed. Scrim, card, "Music lowered" chip, overlay mark and badge; the card closes after 60 s (about 57 and 63 s seen); Door history opens the Door tab and clears the badge.
+9. PIN lockout: passed.
+10. Toasts: passed. The Settings timeout works; the user would like it shorter (design review).
+11. Night clock: fault 2 below, then passed (the user: it looks good).
+12. TalkBack: skipped by the user.
+
+Faults found:
+- Fault 1, the Lights slider bounced back to the old value after let-go. 37ef737 and b729ca8 hold the let-go value until the bridge reports it (5 s ceiling), on the card and the tab. The user still saw the card's slider jump back and forward again; the cause was the Hue provider, where the stream reports older levels about a second apart after a local update. 18a4b58 and 58f485d ignore a group's brightness reports for 5 s after a send unless they match, end the wait on a scene recall, and show the latest held-back level at the deadline. The card slider is still to be confirmed on a device with a reachable bridge (the AVD lost its network). Not an issue, noted: All lights off and switching on pause on the previous value, then move.
+- Fault 2 (Plan 8), the night clock was woken by a home-activity relaunch. `DisplayState` used `AlertHost.inFront`, false on every pause, and a `singleTask` relaunch pauses and resumes in about 12 ms, which woke the wall for 60 s. e83dd7a and b3691c2 use `ShellAlerts.shown` (start to stop) instead. Changing the night times applies 60 s after Settings closes, by design.
+
+Open tablet checks:
+- A ring while music plays: on the emulator the Office speaker went from playing (lowered 24 to 5) to its Bluetooth source with nothing playing; the volume was restored to 24, and only Culvery talks to it. The emulator logged `MusicUnreachableException` every few seconds throughout. Re-test on the tablet; if it repeats there, trace it.
+- The tablet never sleeping when nobody is around: fault 2 doesn't explain it. Read `logcat -s DisplayState` and `logcat -b events | grep wm_on_paused` on the tablet.
+- The Hue connection lost after the evening sleep and not reconnecting. The final review notes `HueSystem`'s `channelFlow` waits for pending deadline jobs, so a stream that ends mid-wait reconnects up to 5 s later; that may not be the whole story.
+
+For the end-of-v1 design review:
+- Home with the full column: the empty band in the Lights card between the top row and the slider (and above the Music card's row) is large, as spec §4.2 says, and larger when Lights takes the full column.
+- The sliders are Material 3's, with a gap, a vertical thumb bar and an end-stop dot; the handoff draws a plain filled track.
+- The row under the pinned pill shows faintly between the pill and the card's foot (the fade is linear to the surface colour).
+- At font scale 1.5 the pinned pill ellipsises: "1 more today · Open cal…".
+- "3 more today" while five rows are visible follows the handoff's formula; check it reads right.
+- The Settings timeout could be shorter.
+- The 1 dp disabled outline on light backgrounds is very faint (the handoff's is 2 px).
+- The "Music lowered" chip: icon and words are `ink` on the quiet fill, with 12 dp side padding and a 6 dp icon gap, none of which the handoff gives.
+- The Door card has no snapshot in the Home screenshot; "Got it" stays 17 sp against the handoff's 28 px.
+
+Test flakes seen across the build (timing, not Plan 9a's code; each passed on a rerun):
+- `LightsActionsTest` and `LightsCapabilityTest`: "Timed out waiting for 5000 ms" on DataStore and StateFlow reads.
+- `DoorCapabilityTest.theTabAppearsOnceRingIsConnected`.
+- `SonosSystemTest` after a clock jump.
+- "Database connection closed" (a Room database closed in teardown while a flow still reads it, wrong thread) in `DoorTabTest`, `PeopleUiTest`, `DoorRecorderTest` and `EventDetailHostTest`.
+- `CalendarMigrationTest`.
+- A long `java.io.tmpdir` makes Robolectric database paths pass Windows MAX_PATH and fails with SQLITE_CANTOPEN; never set TMP, TEMP or `java.io.tmpdir` for Gradle.
 
 ## Feature ideas (2026-10-02, after v1)
 
