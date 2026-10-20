@@ -33,6 +33,14 @@ class MusicQuieterTest {
         assertThat(sets()).containsExactly("setRoomVolume Kitchen-id 10", "setRoomVolume Lounge-id 8", "setRoomVolume Dining room-id 5")
     }
 
+    /** Guard: a group on an idle input still sounds if a track plays later, so its rooms are lowered like any playing group. */
+    @Test
+    fun aGroupPlayingAnInputIsStillLowered() = runTest {
+        system.groups.value = listOf(group("o", "Office", state = PlayState.PLAYING, nowPlaying = NowPlaying.Input("Bluetooth"), volume = 50))
+        quieter().quiet()
+        assertThat(sets()).containsExactly("setRoomVolume Office-id 10")
+    }
+
     /** round(v × share): 33 × 20 % is 6.6, so 7. */
     @Test
     fun theShareRounds() = runTest {

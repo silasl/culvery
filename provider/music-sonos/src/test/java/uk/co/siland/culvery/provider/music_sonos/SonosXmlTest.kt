@@ -80,7 +80,7 @@ class SonosXmlTest {
         assertThat(track.programme).isEqualTo("The Breakfast Show")
         assertThat(track.artUri).isEqualTo("https://art.example/p0abc123.jpg")
         assertThat(SonosXml.media(SonosFixtures.media(SonosFixtures.RADIO_URI, SonosFixtures.RADIO_STATION)))
-            .isEqualTo(MediaInfo(SonosFixtures.RADIO_URI, "Culvery FM", null))
+            .isEqualTo(MediaInfo(SonosFixtures.RADIO_URI, "Culvery FM", null, "object.item.audioItem.audioBroadcast"))
     }
 
     /** Without a radioShowMd the stream's own words are the programme, unless they are a ZPSTR_ placeholder. */
@@ -94,7 +94,7 @@ class SonosXmlTest {
     @Test
     fun stoppedWithNothingLoaded() {
         assertThat(SonosXml.position(SonosFixtures.emptyPosition)).isEqualTo(TrackInfo(null, null, null, null, null, null))
-        assertThat(SonosXml.media(SonosFixtures.media(""))).isEqualTo(MediaInfo(null, null, null))
+        assertThat(SonosXml.media(SonosFixtures.media(""))).isEqualTo(MediaInfo(null, null, null, null))
     }
 
     @Test

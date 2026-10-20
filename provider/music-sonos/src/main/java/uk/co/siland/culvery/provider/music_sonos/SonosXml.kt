@@ -22,7 +22,10 @@ internal data class GroupAttributes(val groupId: String, val players: Set<String
 
 internal data class TrackInfo(val uri: String?, val title: String?, val artist: String?, val album: String?, val artUri: String?, val programme: String?)
 
-internal data class MediaInfo(val uri: String?, val title: String?, val artUri: String?)
+internal data class MediaInfo(val uri: String?, val title: String?, val artUri: String?, val kind: String?) {
+    /** Line-in or Bluetooth: Sonos classes both object.item.audioItem.linein[.…]. */
+    val isInput: Boolean get() = kind?.contains(".linein") == true || uri?.startsWith(LINE_IN_PREFIX) == true
+}
 
 /** One DIDL-Lite item from a browse; [metadata] is its `r:resMD`, which Sonos wants back when it is played. */
 internal data class DidlItem(val id: String, val title: String, val artUri: String?, val uri: String?, val metadata: String?, val metadataClass: String?)
@@ -93,7 +96,7 @@ internal object SonosXml {
     fun media(answer: String): MediaInfo {
         val root = parse(answer)
         val item = didlItem(root.text("CurrentURIMetaData"))
-        return MediaInfo(root.text("CurrentURI"), item?.text("title"), item?.text("albumArtURI"))
+        return MediaInfo(root.text("CurrentURI"), item?.text("title"), item?.text("albumArtURI"), item?.text("class"))
     }
 
     fun volume(answer: String): Int = text(answer, "CurrentVolume").toIntOrNull()?.coerceIn(0, 100) ?: throw SonosXmlException()

@@ -112,27 +112,50 @@ class SonosSystemTest {
         assertThat(dining.actions()).doesNotContain("GetTransportInfo")
     }
 
-    /** A speaker playing its line-in or Bluetooth input names the input and has no track: it must not read as a station. */
+    /** A Bluetooth input as a real speaker reports it: a vli URI, an untitled track, the input's name on the media. */
     @Test
-    fun anInputWithNoTrackIsReadAsAnInput() = runTest {
-        val uri = "x-rincon-stream:$KITCHEN"
-        kitchen.answer("GetPositionInfo", SonosFixtures.position(uri, ""))
-        kitchen.answer("GetMediaInfo", SonosFixtures.media(uri, SonosFixtures.inputItem("Bluetooth")))
+    fun aBluetoothInputWithNoTrackIsReadAsAnInput() = runTest {
+        kitchen.answer("GetPositionInfo", SonosFixtures.position(SonosFixtures.BLUETOOTH_URI, SonosFixtures.untitledTrack))
+        kitchen.answer("GetMediaInfo", SonosFixtures.media(SonosFixtures.BLUETOOTH_URI, SonosFixtures.inputItem("Bluetooth")))
         val k = checked().groups.value[0]
         assertThat(k.state).isEqualTo(PlayState.PLAYING)
         assertThat(k.nowPlaying).isEqualTo(NowPlaying.Input("Bluetooth"))
         assertThat(k.isSounding).isFalse()
     }
 
+    /** Fails if an input's name read from the position metadata becomes its track. */
+    @Test
+    fun anInputNamedOnThePositionTooIsStillAnInput() = runTest {
+        kitchen.answer("GetPositionInfo", SonosFixtures.position(SonosFixtures.BLUETOOTH_URI, SonosFixtures.inputItem("Bluetooth")))
+        kitchen.answer("GetMediaInfo", SonosFixtures.media(SonosFixtures.BLUETOOTH_URI, SonosFixtures.inputItem("Bluetooth")))
+        assertThat(checked().groups.value[0].nowPlaying).isEqualTo(NowPlaying.Input("Bluetooth"))
+    }
+
+    @Test
+    fun aLineInIsReadAsAnInput() = runTest {
+        val uri = "x-rincon-stream:RINCON_TEST"
+        kitchen.answer("GetPositionInfo", SonosFixtures.position(uri, SonosFixtures.untitledTrack))
+        kitchen.answer("GetMediaInfo", SonosFixtures.media(uri, SonosFixtures.inputItem("Line-in", "object.item.audioItem.linein")))
+        assertThat(checked().groups.value[0].nowPlaying).isEqualTo(NowPlaying.Input("Line-in"))
+    }
+
     /** A track title from an input is a real track. */
     @Test
     fun anInputThatNamesATrackIsATrack() = runTest {
-        val uri = "x-rincon-stream:$KITCHEN"
-        kitchen.answer("GetPositionInfo", SonosFixtures.position(uri))
-        kitchen.answer("GetMediaInfo", SonosFixtures.media(uri, SonosFixtures.inputItem("Bluetooth")))
+        kitchen.answer("GetPositionInfo", SonosFixtures.position(SonosFixtures.BLUETOOTH_URI))
+        kitchen.answer("GetMediaInfo", SonosFixtures.media(SonosFixtures.BLUETOOTH_URI, SonosFixtures.inputItem("Bluetooth")))
         val k = checked().groups.value[0]
         assertThat(k.nowPlaying).isEqualTo(NowPlaying.Track("Song", "Artist", "Album"))
         assertThat(k.isSounding).isTrue()
+    }
+
+    /** A soundbar playing TV audio is audible: it is not an input with no track. */
+    @Test
+    fun televisionAudioIsNotAnInput() = runTest {
+        val uri = "x-sonos-htastream:RINCON_TEST:spdif"
+        kitchen.answer("GetPositionInfo", SonosFixtures.position(uri, SonosFixtures.untitledTrack))
+        kitchen.answer("GetMediaInfo", SonosFixtures.media(uri, SonosFixtures.inputItem("TV", "object.item")))
+        assertThat(checked().groups.value[0].nowPlaying).isNotInstanceOf(NowPlaying.Input::class.java)
     }
 
     /** 6 §2.2: when a group last started playing. Fails if a group already playing gets a new time at each check. */

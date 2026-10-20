@@ -19,6 +19,13 @@ class MusicWordsTest {
     }
 
     @Test
+    fun anInputIsNamedAndSpokenWithoutAProgramme() {
+        val bluetooth = kitchen.copy(state = PlayState.PLAYING, nowPlaying = NowPlaying.Input("Bluetooth"))
+        assertThat(nowPlayingLines(bluetooth, nothingPlaying = false)).isEqualTo("Bluetooth" to null)
+        assertThat(groupSpoken(bluetooth)).isEqualTo("Kitchen, playing Bluetooth")
+    }
+
+    @Test
     fun theControlsWords() {
         assertThat(listOf(pauseSpoken("Kitchen"), playSpoken("Kitchen"), nextSpoken("Kitchen"), shuffleSpoken("Kitchen"), "${volumeName("Kitchen")}, ${percentWords(30)}"))
             .containsExactly("Pause Kitchen", "Play Kitchen", "Next track in Kitchen", "Shuffle everything in Kitchen", "Kitchen volume, 30 percent").inOrder()
