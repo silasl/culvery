@@ -128,6 +128,11 @@ object SampleUi {
         },
     ).let { it.copy(spans = laneRows(weekSpans(it.days))) }
 
+    /** [weekWithSpans] without Gran visiting: Half term and the Camping trip share the lane's one row. */
+    val weekWithOneLaneRow: WeekUi = weekWithSpans.copy(
+        days = weekWithSpans.days.map { d -> d.copy(events = d.events.filter { it.title != "Gran visiting" }) },
+    ).let { it.copy(spans = laneRows(weekSpans(it.days))) }
+
     /** Today with a multi-day event on its second day of five. */
     val todayWithSpan = listOf(spanning("Half term", family, 2, 5)) + today
 

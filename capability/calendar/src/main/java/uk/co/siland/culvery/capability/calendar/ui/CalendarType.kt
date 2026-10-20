@@ -20,6 +20,10 @@ internal object CalendarType {
     /** 14 sp / 600 at 1.25 line height: week-view chip titles. */
     val chipTitle = strong14.copy(lineHeight = 17.5.sp)
 
+    /** 14 sp / 700 and 11 sp / 500: a lane bar's title and its range. */
+    val laneTitle = HhType.secondary.copy(fontWeight = FontWeight.W700)
+    val laneRange = HhType.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.W500)
+
     /** 23 sp / 700: a week column's date number. */
     val weekDate = HhType.dateNumber.copy(fontSize = 23.sp)
 
@@ -317,6 +321,20 @@ internal object CalendarDimens {
     val ghostIconGap = 4.dp
     val ghostDash = 6.dp
     val ghostGap = 4.dp
+
+    // The week's lane of multi-day bars (9 §2.1): rows 41 high and 4 apart; a bar 7 in from its first and last columns'
+    // edges, radius 12, a 4 dp colour edge at its start; an 18 dp date_range 15 from its start, 8 before the title,
+    // the range 7 after it, 12 clear of the end.
+    val laneRow = 41.dp
+    val laneRowGap = 4.dp
+    val laneBarInset = 7.dp
+    val laneBarRadius = 12.dp
+    val laneEdge = 4.dp
+    val laneIcon = 18.dp
+    val lanePaddingStart = 15.dp
+    val lanePaddingEnd = 12.dp
+    val laneIconGap = 8.dp
+    val laneTextGap = 7.dp
 
     // Connecting card (3a design §4.4): the pickers' card (radius 30, padding 26) 440 wide, a 32 dp icon; 14 between
     // blocks and 4 between its two lines (not in the spec: the date picker's spacing); Cancel as the date picker's.

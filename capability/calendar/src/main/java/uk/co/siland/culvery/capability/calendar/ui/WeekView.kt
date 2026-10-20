@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -58,6 +59,8 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import kotlinx.coroutines.delay
@@ -110,24 +113,85 @@ fun WeekView(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.weekHeaderGap), modifier = modifier.fillMaxSize()) {
         WeekHeader(state, onWeeksAhead, onAdd, onReconnect, onUpdateNow)
-        Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekColumnGap), modifier = Modifier.fillMaxWidth().weight(1f)) {
-            state.week.days.forEach { day ->
-                DayColumn(
-                    day,
-                    isToday = day.date == state.today,
-                    onOpen = onOpen,
-                    onAdd = onAdd?.let { add -> { add(day.date) } },
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                )
+        WeekColumns(state, onOpen, onAdd, Modifier.fillMaxWidth().weight(1f))
+    }
+}
+
+/**
+ * The seven columns with the lane of multi-day bars over them (9 §2.1): the lane sits where the chips start, below one
+ * header measured at the current font scale, and every column's chips start below the lane.
+ */
+@Composable
+private fun WeekColumns(state: WeekViewState, onOpen: (EventRef) -> Unit, onAdd: ((LocalDate) -> Unit)?, modifier: Modifier) {
+    val rows = state.week.spans
+    val spanRefs = remember(rows) { rows.flatten().mapTo(HashSet()) { it.ref } }
+    val laneHeight = laneHeight(rows.size)
+    SubcomposeLayout(modifier) { constraints ->
+        val gap = CalendarDimens.weekColumnGap.toPx()
+        val days = state.week.days.size
+        val columnWidth = (constraints.maxWidth - gap * (days - 1)) / days
+        val columns = subcompose("columns") {
+            Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.weekColumnGap)) {
+                state.week.days.forEach { day ->
+                    DayColumn(
+                        day.copy(events = day.events.filter { it.ref !in spanRefs }),
+                        isToday = day.date == state.today,
+                        laneHeight = laneHeight,
+                        onOpen = onOpen,
+                        onAdd = onAdd?.let { add -> { add(day.date) } },
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                }
             }
+        }.single().measure(constraints)
+        val lane = if (rows.isEmpty()) {
+            null
+        } else {
+            val inner = (columnWidth - 2 * CalendarDimens.weekColumnPaddingSide.toPx()).toInt().coerceAtLeast(0)
+            val header = subcompose("header") { DayHeader(state.week.start, isToday = false, onAdd = null) }
+                .single().measure(Constraints(maxWidth = inner))
+            val top = CalendarDimens.weekColumnPaddingTop.roundToPx() + header.height + CalendarDimens.columnGap.roundToPx()
+            top to subcompose("lane") {
+                WeekLane(rows, state.week.start, columnWidth.toDp(), CalendarDimens.weekColumnGap, CalendarDimens.laneBarInset, onOpen)
+            }.single().measure(constraints.copy(minHeight = 0))
+        }
+        layout(columns.width, columns.height) {
+            columns.place(0, 0)
+            lane?.let { (top, bars) -> bars.place(0, top) }
         }
     }
 }
 
+/** A column's day and date: one heading for TalkBack, which adds from it with [onAdd]. */
 @Composable
-private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, onAdd: (() -> Unit)?, modifier: Modifier) {
+private fun DayHeader(date: LocalDate, isToday: Boolean, onAdd: (() -> Unit)?) {
     val c = Culvery.colors
     val inset = CalendarDimens.columnHeaderInset
+    Row(
+        Modifier
+            .padding(start = inset, end = inset, bottom = inset)
+            .clearAndSetSemantics {
+                heading()
+                contentDescription = dayHeading(date, if (isToday) "Today" else null)
+                // A full column has no empty space to reach, so TalkBack adds from here.
+                if (onAdd != null) customActions = listOf(CustomAccessibilityAction(addEventOn(date)) { onAdd(); true })
+            },
+    ) {
+        Text(
+            if (isToday) "Today" else date.format(WEEKDAY),
+            style = CalendarType.strong14,
+            color = if (isToday) c.accent else c.mute,
+            modifier = Modifier.alignByBaseline(),
+        )
+        Spacer(Modifier.width(CalendarDimens.weekDayDateGap))
+        Text(date.dayOfMonth.toString(), style = CalendarType.weekDate, color = c.ink, modifier = Modifier.alignByBaseline())
+    }
+}
+
+/** [laneHeight]: how far the lane over the columns reaches into this one; its chips start a gap below that. */
+@Composable
+private fun DayColumn(day: DayUi, isToday: Boolean, laneHeight: Dp, onOpen: (EventRef) -> Unit, onAdd: (() -> Unit)?, modifier: Modifier) {
+    val c = Culvery.colors
     val chips = rememberLazyListState()
     val currentOnAdd = rememberUpdatedState(onAdd)
     HhCard(
@@ -142,25 +206,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
             bottom = CalendarDimens.weekColumnPaddingSide,
         ),
     ) {
-        Row(
-            Modifier
-                .padding(start = inset, end = inset, bottom = inset)
-                .clearAndSetSemantics {
-                    heading()
-                    contentDescription = dayHeading(day.date, if (isToday) "Today" else null)
-                    // A full column has no empty space to reach, so TalkBack adds from here.
-                    if (onAdd != null) customActions = listOf(CustomAccessibilityAction(addEventOn(day.date)) { onAdd(); true })
-                },
-        ) {
-            Text(
-                if (isToday) "Today" else day.date.format(WEEKDAY),
-                style = CalendarType.strong14,
-                color = if (isToday) c.accent else c.mute,
-                modifier = Modifier.alignByBaseline(),
-            )
-            Spacer(Modifier.width(CalendarDimens.weekDayDateGap))
-            Text(day.date.dayOfMonth.toString(), style = CalendarType.weekDate, color = c.ink, modifier = Modifier.alignByBaseline())
-        }
+        DayHeader(day.date, isToday, onAdd)
         Spacer(Modifier.height(CalendarDimens.columnGap))
         var pressed by remember { mutableStateOf(false) }
         Box(
@@ -196,6 +242,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
         ) {
             LazyColumn(
                 state = chips,
+                contentPadding = PaddingValues(top = if (laneHeight > 0.dp) laneHeight + CalendarDimens.columnGap else 0.dp),
                 verticalArrangement = Arrangement.spacedBy(CalendarDimens.columnGap),
                 modifier = Modifier.fillMaxSize(),
             ) {
@@ -206,12 +253,12 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
     }
 }
 
-/** Whether [y], in the chips' coordinates, is past the last visible chip (or there is none). */
-private fun LazyListState.isBelowChips(y: Float): Boolean = y > chipsBottom()
+/** Whether [y], in the list's coordinates, is past the last visible chip; anywhere is, with no chips (the lane's room too). */
+private fun LazyListState.isBelowChips(y: Float): Boolean = chipsBottom()?.let { y > it } ?: true
 
-/** The last visible chip's bottom edge, or 0 with no chips; the list's top padding is not a chip. */
-private fun LazyListState.chipsBottom(): Int =
-    layoutInfo.visibleItemsInfo.lastOrNull()?.let { it.offset + it.size } ?: 0
+/** The last visible chip's bottom edge in the list's coordinates, past its top padding; null with no chips. */
+private fun LazyListState.chipsBottom(): Int? =
+    layoutInfo.visibleItemsInfo.lastOrNull()?.let { it.offset + it.size - layoutInfo.viewportStartOffset }
 
 /**
  * The column's empty space as one add target (9 §4.7), from the last chip's bottom to the foot: the dashed ghost while
@@ -219,7 +266,9 @@ private fun LazyListState.chipsBottom(): Int =
  */
 @Composable
 private fun EmptySpace(date: LocalDate, chips: LazyListState, pressed: Boolean, onAdd: () -> Unit) {
-    val top by remember(chips) { derivedStateOf { chips.chipsBottom() } }
+    val chipsBottom by remember(chips) { derivedStateOf { chips.chipsBottom() } }
+    // With no chips the space starts below the list's top padding, the lane's room.
+    val top by remember(chips) { derivedStateOf { chipsBottom ?: -chips.layoutInfo.viewportStartOffset } }
     Box(
         Modifier
             .fillMaxSize()
@@ -235,7 +284,7 @@ private fun EmptySpace(date: LocalDate, chips: LazyListState, pressed: Boolean, 
                 onClick { onAdd(); true }
             },
     ) {
-        if (pressed) PressedGhost(date, hasChipsAbove = top > 0)
+        if (pressed) PressedGhost(date, hasChipsAbove = chipsBottom != null)
     }
 }
 

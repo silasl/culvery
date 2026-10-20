@@ -78,6 +78,11 @@ class WeekScreenshotTest {
         compose.waitForIdle()
     }
     @Test fun weekLight() = snap("week_light", false, fresh, canAdd = true)
+    /** Half term across Wed–Sat and a Camping trip running past the week, in one lane row (9 §2.1). */
+    @Test fun weekMultiDayDark() = snap("week_multiday_dark", true, fresh, SampleUi.weekWithOneLaneRow, canAdd = true)
+    @Test fun weekMultiDayLight() = snap("week_multiday_light", false, fresh, SampleUi.weekWithOneLaneRow, canAdd = true)
+    /** Gran visiting from before the week over Half term: the lane grows a second row. */
+    @Test fun weekMultiDayOverlapDark() = snap("week_multiday_overlap_dark", true, fresh, SampleUi.weekWithSpans, canAdd = true)
     @Test fun weekStaleDark() = snap("week_stale_dark", true, stale)
     @Test fun weekStaleLight() = snap("week_stale_light", false, stale)
     @Test fun weekOfflineDark() = snap("week_offline_dark", true, stale.copy(problem = SyncProblem.Offline))
