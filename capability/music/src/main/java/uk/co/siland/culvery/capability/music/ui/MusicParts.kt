@@ -62,8 +62,8 @@ internal fun MusicActions.forGroups(onFavourites: (SpeakerGroup) -> Unit = {}) =
     GroupActions(this::play, this::pause, this::next, this::setGroupVolume, this::setRoomVolume, this::shuffleEverything, onFavourites)
 
 @Composable
-internal fun PlayPauseButton(group: SpeakerGroup, tag: String, actions: GroupActions) {
-    if (group.isPlaying) {
+internal fun PlayPauseButton(group: SpeakerGroup, tag: String, actions: GroupActions, playing: Boolean = group.isPlaying) {
+    if (playing) {
         HhRoundButton(Icons.PAUSE, pauseSpoken(group.name), { actions.onPause(group) }, Modifier.testTag("${tag}_pause"), tone = ButtonTone.Primary, on = ButtonSurface.Surf)
     } else {
         HhRoundButton(Icons.PLAY_ARROW, playSpoken(group.name), { actions.onPlay(group) }, Modifier.testTag("${tag}_play"), tone = ButtonTone.Primary, on = ButtonSurface.Surf)

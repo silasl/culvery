@@ -77,7 +77,24 @@ class HomePickTest {
     @Test
     fun aPlayingInputWithNoTrackLosesToTheUsualRoom() {
         val groups = all.playing("b", bluetooth).playing("k", SONG, PlayState.PAUSED)
-        assertThat(homePick(groups, "Kitchen-id", null)).isEqualTo(HomePick(groups[0], nothingPlaying = true))
+        assertThat(homePick(groups, "Kitchen-id", null)).isEqualTo(HomePick(groups[0], nothingPlaying = false))
+        assertThat(homePick(all.playing("b", bluetooth), "Bedroom-id", null)).isEqualTo(HomePick(all.playing("b", bluetooth)[2], nothingPlaying = true))
+    }
+
+    /** 6 §2.2: the Music tab shows the usual room paused with its track, so Home does too, even after a restart. */
+    @Test
+    fun theUsualRoomPausedWithATrackIsShownPausedWithNoKeptGroup() {
+        val groups = all.playing("l", SONG, PlayState.PAUSED)
+        assertThat(homePick(groups, "Dining room-id", null)).isEqualTo(HomePick(groups[1], nothingPlaying = false))
+        assertThat(homePick(groups, null, null)?.nothingPlaying).isTrue()
+        val firstPaused = all.playing("k", SONG, PlayState.PAUSED)
+        assertThat(homePick(firstPaused, null, null)).isEqualTo(HomePick(firstPaused[0], nothingPlaying = false))
+    }
+
+    @Test
+    fun theUsualRoomStoppedOrEmptyStillSaysNothingPlaying() {
+        assertThat(homePick(all.playing("l", SONG, PlayState.STOPPED), "Lounge-id", null)?.nothingPlaying).isTrue()
+        assertThat(homePick(all.playing("l", SONG, PlayState.PAUSED).map { if (it.id == "l") it.copy(nowPlaying = null) else it }, "Lounge-id", null)?.nothingPlaying).isTrue()
     }
 
     @Test

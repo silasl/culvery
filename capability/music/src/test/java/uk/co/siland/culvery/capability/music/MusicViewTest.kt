@@ -62,12 +62,12 @@ class MusicViewTest {
         }
     }
 
-    /** A paused usual room that Home never showed playing is "Nothing playing" (6 §5.1). */
+    /** A paused usual room that Home never showed playing is shown paused with its track (6 §2.2). */
     @Test
-    fun aGroupPausedBeforeHomeShowedItIsNothingPlaying() = runTest {
+    fun aGroupPausedBeforeHomeShowedItIsShownPaused() = runTest {
         val paused = kitchen.copy(state = PlayState.PAUSED, nowPlaying = SONG)
         homePicks(MutableStateFlow(listOf(paused, bedroom)), MutableStateFlow("Kitchen-id")).test {
-            assertThat(awaitItem()).isEqualTo(HomePick(paused, nothingPlaying = true))
+            assertThat(awaitItem()).isEqualTo(HomePick(paused, nothingPlaying = false))
         }
     }
 }

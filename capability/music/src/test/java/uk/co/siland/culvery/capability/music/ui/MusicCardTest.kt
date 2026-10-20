@@ -38,6 +38,7 @@ import uk.co.siland.culvery.capability.music.MusicChecks
 import uk.co.siland.culvery.capability.music.MusicFixture
 import uk.co.siland.culvery.capability.music.MusicLink
 import uk.co.siland.culvery.capability.music.MusicView
+import uk.co.siland.culvery.capability.music.NowPlaying
 import uk.co.siland.culvery.capability.music.PlayState
 import uk.co.siland.culvery.capability.music.SONG
 import uk.co.siland.culvery.capability.music.STATION
@@ -152,6 +153,14 @@ class MusicCardTest {
         compose.onNodeWithTag("music_card_shuffle").assertContentDescriptionEquals("Shuffle everything in Kitchen").performClick()
         assertThat(calls).containsExactly("play k", "shuffle k").inOrder()
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 6 §5.1: an idle input reports PLAYING; beside "Nothing playing" the round button is Play, not Pause. */
+    @Test
+    fun nothingPlayingOverAnIdleInputOffersPlay() {
+        show(HomePick(group("k", "Kitchen", state = PlayState.PLAYING, nowPlaying = NowPlaying.Input("Bluetooth")), nothingPlaying = true))
+        compose.onNodeWithTag("music_card_play").assertContentDescriptionEquals("Play Kitchen")
+        compose.onNodeWithTag("music_card_pause").assertDoesNotExist()
     }
 
     /** 9 §4.2: paused with a queue the row is Play, Next, volume; no Shuffle. */
