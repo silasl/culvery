@@ -1,18 +1,15 @@
 package uk.co.siland.culvery.capability.music.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
@@ -24,6 +21,7 @@ import uk.co.siland.culvery.capability.music.roomsAction
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
@@ -40,42 +38,40 @@ internal fun MusicRoomCard(
 ) {
     val c = Culvery.colors
     val tag = "music_row_${group.id}"
-    Column(
-        verticalArrangement = Arrangement.spacedBy(MusicDimens.controlsGap),
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(tag)
-            .clip(RoundedCornerShape(MusicDimens.roomRadius))
-            .background(c.surf)
-            .padding(horizontal = MusicDimens.roomPaddingH, vertical = MusicDimens.roomPaddingV),
+    HhCard(
+        modifier = modifier.fillMaxWidth().testTag(tag),
+        radius = MusicDimens.roomRadius,
+        padding = PaddingValues(horizontal = MusicDimens.roomPaddingH, vertical = MusicDimens.roomPaddingV),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.controlsGap)) {
-            NowPlayingBlock(
-                group, nothingPlaying = false, MusicDimens.roomArt, MusicDimens.roomName, "${tag}_now", Modifier.weight(1f),
-                firstStyle = MusicDimens.roomTrack, artRadius = MusicDimens.cardArtRadius,
-            )
-            PlayPauseButton(group, tag, actions)
-            NextButton(group, tag, actions)
-            VolumePill(group.name, group.volume, "${tag}_volume", { actions.onGroupVolume(group, it) }, Modifier.width(MusicDimens.roomPill))
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.controlsGap)) {
-            if (group.rooms.size > 1) {
-                HhChoiceChip(ROOMS, selected = roomsShown, tag = "${tag}_rooms", onClick = onRooms, role = Role.Button, clickLabel = roomsAction(roomsShown))
+        Column(verticalArrangement = Arrangement.spacedBy(MusicDimens.controlsGap)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.controlsGap)) {
+                NowPlayingBlock(
+                    group, nothingPlaying = false, MusicDimens.roomArt, MusicDimens.roomName, "${tag}_now", Modifier.weight(1f),
+                    firstStyle = MusicDimens.roomTrack, artRadius = MusicDimens.cardArtRadius,
+                )
+                PlayPauseButton(group, tag, actions)
+                NextButton(group, tag, actions)
+                VolumePill(group.name, group.volume, "${tag}_volume", { actions.onGroupVolume(group, it) }, Modifier.width(MusicDimens.roomPill))
             }
-            HhButton(
-                FAVOURITES_LABEL, { actions.onFavourites(group) }, Modifier.testTag("${tag}_favourites"),
-                icon = Icons.STAR, on = ButtonSurface.Surf, spokenName = favouritesSpoken(group.name),
-            )
-            ShuffleButton(group, tag, ButtonSurface.Surf, actions)
-        }
-        if (roomsShown) {
-            group.rooms.forEach { room ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.controlsGap)) {
-                    Text(room.name, style = HhType.body, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    VolumePill(room.name, room.volume, "${tag}_room_${room.id}_volume", { actions.onRoomVolume(group, room, it) }, Modifier.width(MusicDimens.roomPill))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.controlsGap)) {
+                if (group.rooms.size > 1) {
+                    HhChoiceChip(ROOMS, selected = roomsShown, tag = "${tag}_rooms", onClick = onRooms, role = Role.Button, clickLabel = roomsAction(roomsShown))
+                }
+                HhButton(
+                    FAVOURITES_LABEL, { actions.onFavourites(group) }, Modifier.testTag("${tag}_favourites"),
+                    icon = Icons.STAR, on = ButtonSurface.Surf, spokenName = favouritesSpoken(group.name),
+                )
+                ShuffleButton(group, tag, ButtonSurface.Surf, actions)
+            }
+            if (roomsShown) {
+                group.rooms.forEach { room ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MusicDimens.controlsGap)) {
+                        Text(room.name, style = HhType.body, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        VolumePill(room.name, room.volume, "${tag}_room_${room.id}_volume", { actions.onRoomVolume(group, room, it) }, Modifier.width(MusicDimens.roomPill))
+                    }
                 }
             }
+            if (line != null) Text(line, style = HhType.secondary, color = c.danger, modifier = Modifier.testTag("${tag}_line"))
         }
-        if (line != null) Text(line, style = HhType.secondary, color = c.danger, modifier = Modifier.testTag("${tag}_line"))
     }
 }

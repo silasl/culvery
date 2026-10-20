@@ -13,7 +13,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
-import uk.co.siland.culvery.capability.music.SpeakerGroup
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -44,6 +43,7 @@ import uk.co.siland.culvery.capability.music.MusicView
 import uk.co.siland.culvery.capability.music.PlayState
 import uk.co.siland.culvery.capability.music.SONG
 import uk.co.siland.culvery.capability.music.STATION
+import uk.co.siland.culvery.capability.music.SpeakerGroup
 import uk.co.siland.culvery.capability.music.Speakers
 import uk.co.siland.culvery.capability.music.TestMusicProvider
 import uk.co.siland.culvery.capability.music.group
@@ -109,6 +109,25 @@ class MusicTabTest {
         compose.onNodeWithText("Music").assertIsDisplayed()
         compose.onNodeWithText("4 rooms · 1 group · Sonos").assertIsDisplayed()
         compose.assertAccessible()
+    }
+
+    /** One 15 dp gap under the title block, and one under a status line. */
+    @Test
+    fun theFirstCardSitsOneGapBelowTheHeader() {
+        showTab()
+        val subtitle = compose.onNodeWithText("3 rooms · 1 group · Sonos").getUnclippedBoundsInRoot()
+        val card = compose.onNodeWithTag("music_row_l").getUnclippedBoundsInRoot()
+        assertThat(card.top.value - subtitle.bottom.value).isWithin(1f).of(15f)
+    }
+
+    @Test
+    fun aStatusLineSitsOneGapBelowTheHeaderAndAboveTheFirstCard() {
+        showTab(status = "The tablet is offline. Check the Wi-Fi.")
+        val subtitle = compose.onNodeWithText("3 rooms · 1 group · Sonos").getUnclippedBoundsInRoot()
+        val status = compose.onNodeWithTag("music_status").getUnclippedBoundsInRoot()
+        val card = compose.onNodeWithTag("music_row_l").getUnclippedBoundsInRoot()
+        assertThat(status.top.value - subtitle.bottom.value).isWithin(1f).of(15f)
+        assertThat(card.top.value - status.bottom.value).isWithin(1f).of(15f)
     }
 
     @Test

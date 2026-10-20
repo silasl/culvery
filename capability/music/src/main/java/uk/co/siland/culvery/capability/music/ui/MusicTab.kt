@@ -1,7 +1,8 @@
 package uk.co.siland.culvery.capability.music.ui
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
@@ -44,11 +45,18 @@ fun MusicTab(
     modifier: Modifier = Modifier,
 ) {
     val c = Culvery.colors
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(MusicDimens.roomGap), modifier = modifier.fillMaxSize().testTag("music_tab")) {
+    LazyColumn(modifier = modifier.fillMaxSize().testTag("music_tab")) {
         item { HhPageHeader(MUSIC, if (groups.isEmpty()) null else musicSummary(groups)) }
-        if (status != null) item { MusicStatusLine(status) }
-        if (groups.isEmpty() && status == null) item { Text(LOOKING_FOR_SPEAKERS, style = HhType.body, color = c.mute) }
-        items(groups, key = { it.id }) { group -> MusicRoomCard(group, lines[group.id], group.id in roomsShown, { onRooms(group.id) }, actions) }
+        // The header ends with its own gap, so each item after it carries the one below it.
+        if (status != null) item { Box(Modifier.padding(bottom = MusicDimens.roomGap)) { MusicStatusLine(status) } }
+        if (groups.isEmpty() && status == null) {
+            item { Text(LOOKING_FOR_SPEAKERS, style = HhType.body, color = c.mute, modifier = Modifier.padding(bottom = MusicDimens.roomGap)) }
+        }
+        items(groups, key = { it.id }) { group ->
+            Box(Modifier.padding(bottom = MusicDimens.roomGap)) {
+                MusicRoomCard(group, lines[group.id], group.id in roomsShown, { onRooms(group.id) }, actions)
+            }
+        }
     }
 }
 
