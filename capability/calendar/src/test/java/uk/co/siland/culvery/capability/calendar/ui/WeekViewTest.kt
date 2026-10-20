@@ -12,13 +12,14 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
@@ -44,6 +45,8 @@ import java.time.LocalDate
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import uk.co.siland.culvery.capability.calendar.DAY_AND_DATE
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
@@ -291,15 +294,6 @@ class WeekViewTest {
     }
 
     @Test
-    fun aTapOnAColumnsAddHintAddsOnThatDay() {
-        val added = mutableListOf<LocalDate>()
-        show { WeekView(state(), onAdd = { added += it }) }
-        val friday = SampleUi.TODAY.plusDays(2)
-        compose.onNodeWithTag("week_add_$friday", useUnmergedTree = true).performClick()
-        assertThat(added).containsExactly(friday)
-    }
-
-    @Test
     fun aTapOnTheSpaceBelowAColumnsLastChipAddsOnThatDay() {
         val added = mutableListOf<LocalDate>()
         show { WeekView(state(), onAdd = { added += it }) }
@@ -307,8 +301,8 @@ class WeekViewTest {
         val sunday = SampleUi.TODAY.plusDays(6)
         val columnTop = compose.onNodeWithTag("week_day_$sunday").fetchSemanticsNode().boundsInRoot.top
         val chipBottom = compose.onNodeWithText("Sunday lunch at Gran's").fetchSemanticsNode().boundsInRoot.bottom
-        val hintTop = compose.onNodeWithTag("week_add_$sunday", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.top
-        val midY = (chipBottom + hintTop) / 2f
+        val columnBottom = compose.onNodeWithTag("week_day_$sunday").fetchSemanticsNode().boundsInRoot.bottom
+        val midY = (chipBottom + columnBottom) / 2f
         compose.onNodeWithTag("week_day_$sunday").performTouchInput { click(Offset(centerX, midY - columnTop)) }
         assertThat(added).containsExactly(sunday)
     }
@@ -347,11 +341,115 @@ class WeekViewTest {
         assertThat(added).isEmpty()
     }
 
+    /** A point in [date]'s column, in the column's own coordinates, halfway between [lastChip]'s bottom and the column's foot. */
+    private fun belowChip(date: LocalDate, lastChip: String): Offset {
+        val column = compose.onNodeWithTag("week_day_$date").fetchSemanticsNode().boundsInRoot
+        val chipBottom = compose.onNodeWithText(lastChip).fetchSemanticsNode().boundsInRoot.bottom
+        return Offset(column.width / 2f, (chipBottom + column.bottom) / 2f - column.top)
+    }
+
+    /** A column must be wide enough for the ghost's label; the default test screen is 320 dp wide. */
+    private companion object {
+        const val TABLET = "w1280dp-h800dp"
+    }
+
+    private val sunday = SampleUi.TODAY.plusDays(6)
+    private val sundayLastChip = "Sunday lunch at Gran's"
+
     @Test
-    fun eachColumnEndsWithAnAddHintAtLeast48DpTall() {
+    @Config(qualifiers = TABLET)
+    fun pressingEmptySpaceShowsTheGhost() {
+        val added = mutableListOf<LocalDate>()
+        show { WeekView(state(), onAdd = { added += it }) }
+        val point = belowChip(sunday, sundayLastChip)
+        val ghost = "Add on ${sunday.format(DAY_AND_DATE)}"
+        compose.onAllNodesWithText(ghost).assertCountEquals(0)
+        compose.onNodeWithTag("week_day_$sunday").performTouchInput { down(point) }
+        compose.onNodeWithText(ghost).assertIsDisplayed()
+        assertThat(added).isEmpty()
+        compose.onNodeWithTag("week_day_$sunday").performTouchInput { up() }
+        compose.onAllNodesWithText(ghost).assertCountEquals(0)
+        assertThat(added).containsExactly(sunday)
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun pressingBetweenTwoChipsShowsNoGhost() {
         show { WeekView(state(), onAdd = {}) }
-        (0L..6L).forEach {
-            compose.onNodeWithTag("week_add_${SampleUi.TODAY.plusDays(it)}", useUnmergedTree = true).assertHeightIsAtLeast(48.dp)
+        val saturday = SampleUi.TODAY.plusDays(3)
+        val column = compose.onNodeWithTag("week_day_$saturday").fetchSemanticsNode().boundsInRoot
+        val firstBottom = compose.onNodeWithText("INSET day — no school").fetchSemanticsNode().boundsInRoot.bottom
+        val secondTop = compose.onNodeWithText("Piano").fetchSemanticsNode().boundsInRoot.top
+        val gap = Offset(column.width / 2f, (firstBottom + secondTop) / 2f - column.top)
+        compose.onNodeWithTag("week_day_$saturday").performTouchInput { down(gap) }
+        compose.onAllNodesWithText("Add on ", substring = true).assertCountEquals(0)
+        compose.onNodeWithTag("week_day_$saturday").performTouchInput { up() }
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun aPressDraggedOffTheColumnAddsNothing() {
+        val added = mutableListOf<LocalDate>()
+        show { WeekView(state(), onAdd = { added += it }) }
+        val point = belowChip(sunday, sundayLastChip)
+        val ghost = "Add on ${sunday.format(DAY_AND_DATE)}"
+        compose.onNodeWithTag("week_day_$sunday").performTouchInput { down(point) }
+        compose.onNodeWithText(ghost).assertIsDisplayed()
+        compose.onNodeWithTag("week_day_$sunday").performTouchInput { moveBy(Offset(-3000f, 0f)) }
+        compose.onNodeWithTag("week_day_$sunday").performTouchInput { up() }
+        compose.onAllNodesWithText(ghost).assertCountEquals(0)
+        assertThat(added).isEmpty()
+    }
+
+    @Test
+    fun everyColumnHasOneAddButtonClearOfItsChips() {
+        val added = mutableListOf<LocalDate>()
+        val emptyThursday = SampleUi.week.copy(days = SampleUi.week.days.map { if (it.date == SampleUi.TODAY.plusDays(1)) it.copy(events = emptyList()) else it })
+        show { WeekView(WeekViewState(emptyThursday, SampleUi.TODAY, sync(), now), onAdd = { added += it }) }
+        emptyThursday.days.forEach { day ->
+            val add = compose.onAllNodesWithTag("week_add_${day.date}", useUnmergedTree = true)
+            add.assertCountEquals(1)
+            val node = add[0]
+            node.assert(isButton).assertContentDescriptionEquals(addEventOn(day.date)).onChildren().assertCountEquals(0)
+            val bounds = node.fetchSemanticsNode().boundsInRoot
+            assertThat(bounds.height).isGreaterThan(0f)
+            day.events.forEach { event ->
+                assertThat(compose.onNodeWithText(event.title).fetchSemanticsNode().boundsInRoot.bottom).isAtMost(bounds.top + 1f)
+            }
+            node.performClick()
+        }
+        assertThat(added).containsExactlyElementsIn(emptyThursday.days.map { it.date }).inOrder()
+    }
+
+    @Test
+    fun aFullColumnCanAddFromItsHeader() {
+        val added = mutableListOf<LocalDate>()
+        val wednesday = SampleUi.TODAY
+        val full = SampleUi.week.copy(days = SampleUi.week.days.map {
+            if (it.date == wednesday) it.copy(events = List(30) { n -> SampleUi.event("Errand $n", "09:00–10:00", SampleUi.sam) }) else it
+        })
+        show { WeekView(WeekViewState(full, SampleUi.TODAY, sync(), now), onAdd = { added += it }) }
+        val header = compose.onNodeWithContentDescription(dayHeading(wednesday, "Today"))
+        val actions = header.fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        assertThat(actions.map { it.label }).containsExactly("Add event on Wednesday 23 September")
+        compose.runOnUiThread { actions.single().action() }
+        assertThat(added).containsExactly(wednesday)
+    }
+
+    @Test
+    fun noAddTargetsWithoutOnAdd() {
+        show { WeekView(state()) }
+        val isDayAdd = SemanticsMatcher("a day's add node") {
+            it.config.getOrNull(SemanticsProperties.TestTag)?.let { tag -> tag.startsWith("week_add_") && tag != "week_add_event" } == true
+        }
+        compose.onAllNodes(isDayAdd, useUnmergedTree = true).assertCountEquals(0)
+        compose.onNodeWithTag("week_day_$sunday").performTouchInput { down(belowChip(sunday, sundayLastChip)) }
+        compose.onAllNodesWithText("Add on ", substring = true).assertCountEquals(0)
+        compose.onNodeWithTag("week_day_$sunday").performTouchInput { up() }
+        SampleUi.week.days.forEach { day ->
+            val heading = dayHeading(day.date, if (day.date == SampleUi.TODAY) "Today" else null)
+            val node = compose.onNodeWithContentDescription(heading).fetchSemanticsNode()
+            assertThat(node.config.getOrNull(SemanticsActions.CustomActions).orEmpty()).isEmpty()
         }
     }
 

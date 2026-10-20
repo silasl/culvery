@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.calendar.ui
 import java.time.LocalDate
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarRow
+import uk.co.siland.culvery.capability.calendar.DAY_AND_DATE
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.FULL_DATE
 import uk.co.siland.culvery.capability.calendar.FULL_WEEKDAY
@@ -33,6 +34,9 @@ internal fun connectingPane(service: String): String = "Connecting to $service"
 internal fun showAsEvent(name: String): String = "show as $name’s event"
 
 internal fun addEventOn(date: LocalDate): String = "Add event on ${date.format(FULL_DATE)}"
+
+/** The pressed ghost's label, "Add on Sun 27" (9 §4.7). */
+internal fun addOn(date: LocalDate): String = "Add on ${date.format(DAY_AND_DATE)}"
 
 /** A day as a heading: "Today, Tuesday 6 October", "Tomorrow, Wednesday 7 October", "Thursday 8 October". */
 internal fun dayHeading(date: LocalDate, prefix: String? = null): String = listOfNotNull(prefix, date.format(FULL_DATE)).joinToString(", ")

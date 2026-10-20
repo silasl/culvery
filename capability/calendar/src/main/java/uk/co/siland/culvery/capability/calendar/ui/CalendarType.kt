@@ -305,12 +305,18 @@ internal object CalendarDimens {
     // Footers: 10 between Delete and the main button.
     val footerGap = 10.dp
 
-    // Entry points (hand-off §7): Today's 48 dp + with a 26 dp add, 8 from Week. Each week column ends with a
-    // 24 dp add hint in at least 48 dp.
+    // Entry points (hand-off §7): Today's 48 dp + with a 26 dp add, 8 from Week.
     val todayAddIcon = 26.dp
     val todayHeaderButtonGap = 8.dp
-    val addHintIcon = 24.dp
-    val addHintMinHeight = 48.dp
+
+    // The week's pressed ghost (9 §4.7): a 1 dp dashed `accent` outline, radius 12, an 18 dp add before the label, the
+    // dashes 6 on and 4 off.
+    val ghostRadius = 12.dp
+    val ghostStroke = 1.dp
+    val ghostIcon = 18.dp
+    val ghostIconGap = 4.dp
+    val ghostDash = 6.dp
+    val ghostGap = 4.dp
 
     // Connecting card (3a design §4.4): the pickers' card (radius 30, padding 26) 440 wide, a 32 dp icon; 14 between
     // blocks and 4 between its two lines (not in the spec: the date picker's spacing); Cancel as the date picker's.

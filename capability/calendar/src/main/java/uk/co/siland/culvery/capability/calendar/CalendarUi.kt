@@ -158,6 +158,8 @@ internal val HOURS_MINUTES: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:
 // ENGLISH, not UK: JDK 17's CLDR data gives "Sept" for Locale.UK, and Android versions differ.
 internal val SHORT_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
 internal val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
+/** "Sun 27": a day and its date. */
+internal val DAY_AND_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d", Locale.ENGLISH)
 internal val DAY_AND_MONTH: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMMM", Locale.ENGLISH)
 
 internal val FULL_WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)

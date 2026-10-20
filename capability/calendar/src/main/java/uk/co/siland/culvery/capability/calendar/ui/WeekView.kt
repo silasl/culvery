@@ -12,11 +12,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -35,21 +36,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -86,7 +95,7 @@ internal fun reconnectLabel(services: List<String>): String =
  * Seven days with person-tinted chips and the sync state (9 §4.7). ‹ › step a week at a time, from this week (today and
  * six days) to [MAX_WEEKS_AHEAD] weeks on, inside the synced window (4c D10), through [onWeeksAhead]; This week jumps
  * back. With [onAdd] (there is a writable master calendar), Add event adds on the first day shown, and a tap on the
- * space below a column's chips, or on its hint, adds on that column's day; chip taps still open their event. The
+ * space below a column's chips adds on that column's day, with a ghost while pressed; chip taps still open their event. The
  * reconnect chip runs [onReconnect] (3a design §4.3) and Update now runs [onUpdateNow] ([WeekHeader]).
  */
 @Composable
@@ -139,6 +148,8 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
                 .clearAndSetSemantics {
                     heading()
                     contentDescription = dayHeading(day.date, if (isToday) "Today" else null)
+                    // A full column has no empty space to reach, so TalkBack adds from here.
+                    if (onAdd != null) customActions = listOf(CustomAccessibilityAction(addEventOn(day.date)) { onAdd(); true })
                 },
         ) {
             Text(
@@ -151,6 +162,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
             Text(day.date.dayOfMonth.toString(), style = CalendarType.weekDate, color = c.ink, modifier = Modifier.alignByBaseline())
         }
         Spacer(Modifier.height(CalendarDimens.columnGap))
+        var pressed by remember { mutableStateOf(false) }
         Box(
             Modifier
                 .fillMaxWidth()
@@ -165,10 +177,19 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
                         // gesture coroutine doesn't restart and drop a tap mid-gesture; it reads onAdd fresh via
                         // rememberUpdatedState.
                         Modifier.pointerInput(day.date) {
-                            detectTapGestures { tap ->
-                                val last = chips.layoutInfo.visibleItemsInfo.lastOrNull()
-                                if (last == null || tap.y > last.offset + last.size) currentOnAdd.value?.invoke()
-                            }
+                            detectTapGestures(
+                                onPress = { press ->
+                                    if (chips.isBelowChips(press.y)) {
+                                        pressed = true
+                                        try {
+                                            tryAwaitRelease()
+                                        } finally {
+                                            pressed = false
+                                        }
+                                    }
+                                },
+                                onTap = { tap -> if (chips.isBelowChips(tap.y)) currentOnAdd.value?.invoke() },
+                            )
                         }
                     },
                 ),
@@ -180,8 +201,68 @@ private fun DayColumn(day: DayUi, isToday: Boolean, onOpen: (EventRef) -> Unit, 
             ) {
                 items(day.events, key = { it.ref.listKey }) { EventChip(it, day.date, onOpen) }
             }
+            if (onAdd != null) EmptySpace(day.date, chips, pressed, onAdd)
         }
-        if (onAdd != null) AddHint(day.date, onAdd)
+    }
+}
+
+/** Whether [y], in the chips' coordinates, is past the last visible chip (or there is none). */
+private fun LazyListState.isBelowChips(y: Float): Boolean = y > chipsBottom()
+
+/** The last visible chip's bottom edge, or 0 with no chips; the list's top padding is not a chip. */
+private fun LazyListState.chipsBottom(): Int =
+    layoutInfo.visibleItemsInfo.lastOrNull()?.let { it.offset + it.size } ?: 0
+
+/**
+ * The column's empty space as one add target (9 §4.7), from the last chip's bottom to the foot: the dashed ghost while
+ * [pressed], and TalkBack's node. It takes no touches, so the column's gesture sees them.
+ */
+@Composable
+private fun EmptySpace(date: LocalDate, chips: LazyListState, pressed: Boolean, onAdd: () -> Unit) {
+    val top by remember(chips) { derivedStateOf { chips.chipsBottom() } }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .layout { measurable, constraints ->
+                val free = (constraints.maxHeight - top).coerceAtLeast(0)
+                val placeable = measurable.measure(constraints.copy(minHeight = free, maxHeight = free))
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, top) }
+            }
+            .semantics {
+                testTag = "week_add_$date"
+                role = Role.Button
+                contentDescription = addEventOn(date)
+                onClick { onAdd(); true }
+            },
+    ) {
+        if (pressed) PressedGhost(date, hasChipsAbove = top > 0)
+    }
+}
+
+@Composable
+private fun PressedGhost(date: LocalDate, hasChipsAbove: Boolean) {
+    val accent = Culvery.colors.accent
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = if (hasChipsAbove) CalendarDimens.columnGap else 0.dp)
+            .drawBehind {
+                val stroke = CalendarDimens.ghostStroke.toPx()
+                val dashes = floatArrayOf(CalendarDimens.ghostDash.toPx(), CalendarDimens.ghostGap.toPx())
+                drawRoundRect(
+                    accent,
+                    topLeft = Offset(stroke / 2, stroke / 2),
+                    size = Size(size.width - stroke, size.height - stroke),
+                    cornerRadius = CornerRadius(CalendarDimens.ghostRadius.toPx()),
+                    style = Stroke(stroke, pathEffect = PathEffect.dashPathEffect(dashes)),
+                )
+            },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.ghostIconGap)) {
+            HhIcon(Icons.ADD, size = CalendarDimens.ghostIcon, tint = accent)
+            Text(addOn(date), style = CalendarType.strong14, color = accent)
+        }
     }
 }
 
@@ -197,22 +278,6 @@ private fun Modifier.todayRing(color: Color): Modifier = drawWithContent {
         cornerRadius = CornerRadius(CalendarDimens.weekColumnRadius.toPx() - inset),
         style = Stroke(width),
     )
-}
-
-/** Hand-off §7: an `add` in `mute` at the foot of each column, in a tap area at least 48 dp tall, named with its day. */
-@Composable
-private fun AddHint(date: LocalDate, onAdd: () -> Unit) {
-    Box(
-        contentAlignment = Alignment.BottomCenter,
-        modifier = Modifier
-            .testTag("week_add_$date")
-            .fillMaxWidth()
-            .heightIn(min = CalendarDimens.addHintMinHeight)
-            .semantics { contentDescription = addEventOn(date) }
-            .hhClickable(onAdd),
-    ) {
-        HhIcon(Icons.ADD, size = CalendarDimens.addHintIcon, tint = Culvery.colors.mute)
-    }
 }
 
 @Composable

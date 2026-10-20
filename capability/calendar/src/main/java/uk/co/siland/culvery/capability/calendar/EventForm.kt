@@ -8,8 +8,6 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.plural
 
@@ -30,7 +28,6 @@ private const val MINUTES_PER_HOUR = 60L
 private const val DAYS_SHOWN = 7L
 private val MORNING: LocalTime = LocalTime.of(9, 0)
 private const val LAST_HOUR = 23
-private val DAY_AND_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d", Locale.ENGLISH)
 
 /** "30 minutes", "1 hour", "1 hour 30 minutes": full words, singular at one. */
 fun lengthLabel(length: Duration): String {

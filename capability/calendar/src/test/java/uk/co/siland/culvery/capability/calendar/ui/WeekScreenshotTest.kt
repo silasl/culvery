@@ -5,11 +5,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -43,6 +46,7 @@ class WeekScreenshotTest {
         canAdd: Boolean = false,
         weeksAhead: Int = 0,
         fontScale: Float = 1f,
+        whileHolding: (() -> Unit)? = null,
     ) {
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
@@ -55,6 +59,7 @@ class WeekScreenshotTest {
                 }
             }
         }
+        whileHolding?.invoke()
         compose.onNodeWithTag("shot").captureRoboImage("src/test/screenshots/$name.png")
     }
 
@@ -64,6 +69,14 @@ class WeekScreenshotTest {
 
     @Test fun weekFontScale15() = snap("week_fs15", false, fresh, canAdd = true, fontScale = 1.5f)
     @Test fun weekDark() = snap("week_dark", true, fresh, canAdd = true)
+    /** A finger held below Sunday's last chip: the dashed ghost (9 §4.7). */
+    @Test fun weekGhostDark() = snap("week_ghost_dark", true, fresh, canAdd = true) {
+        val sunday = SampleUi.TODAY.plusDays(6)
+        val column = compose.onNodeWithTag("week_day_$sunday").fetchSemanticsNode().boundsInRoot
+        val chipBottom = compose.onNodeWithText("Sunday lunch at Gran's").fetchSemanticsNode().boundsInRoot.bottom
+        compose.onNodeWithTag("week_day_$sunday").performTouchInput { down(Offset(column.width / 2f, (chipBottom + column.bottom) / 2f - column.top)) }
+        compose.waitForIdle()
+    }
     @Test fun weekLight() = snap("week_light", false, fresh, canAdd = true)
     @Test fun weekStaleDark() = snap("week_stale_dark", true, stale)
     @Test fun weekStaleLight() = snap("week_stale_light", false, stale)
