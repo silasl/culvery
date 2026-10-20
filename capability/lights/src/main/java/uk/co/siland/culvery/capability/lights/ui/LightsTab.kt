@@ -2,17 +2,14 @@ package uk.co.siland.culvery.capability.lights.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uk.co.siland.culvery.capability.lights.HouseRun
 import uk.co.siland.culvery.capability.lights.LIGHTS
@@ -45,10 +42,10 @@ class RoomActions(
 }
 
 /**
- * The Lights tab (7 §5.2, 9 §4.4): the title with the rooms on and a tray of All lights off and Holiday mode, then one
- * card per Hue room in Hue's order. The status line shows only when something is wrong; [houseLine] is how the last
- * All lights off or Holiday mode went and [lines] each room's last refused command. A [focus] naming a listed room is
- * scrolled to, then handed back through [onFocused].
+ * The Lights tab (7 §5.2, 9 §4.4): the title with the rooms on and a tray of All lights off and Holiday mode, then the
+ * rooms' cards in [LightsGrid]. The status line shows only when something is wrong; [houseLine] is how the last All
+ * lights off or Holiday mode went and [lines] each room's last refused command. A [focus] naming a listed room is
+ * brought into view, then handed back through [onFocused].
  */
 @Composable
 fun LightsTab(
@@ -66,37 +63,25 @@ fun LightsTab(
     modifier: Modifier = Modifier,
 ) {
     val c = Culvery.colors
-    val list = rememberLazyListState()
-    LaunchedEffect(focus, rooms) {
-        if (focus == null) return@LaunchedEffect
-        val at = rooms.indexOfFirst { it.id == focus }
-        // The top block is item 0; before the first read there is no room to name, so the focus waits.
-        if (at >= 0) list.scrollToItem(at + 1)
-        if (at >= 0 || rooms.isNotEmpty()) onFocused()
-    }
-    LazyColumn(
-        state = list,
-        verticalArrangement = Arrangement.spacedBy(LightsDimens.tabGap),
-        modifier = modifier.fillMaxSize().testTag("lights_tab"),
-    ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(LightsDimens.tabGap)) {
-                HhPageHeader(
-                    LIGHTS, if (rooms.isEmpty()) null else roomsOn(rooms),
-                    trailing = {
-                        HhTray {
-                            AllOffButton(allOffLit, house.onAllOff, tag = "lights_tray_all_off", surface = ButtonSurface.Bg)
-                            HolidayButton(holidayOn, run, house.onHoliday, tag = "lights_tray_holiday", surface = ButtonSurface.Bg)
-                        }
-                    },
-                )
-                if (status != null) LightsStatusLine(status)
-                if (houseLine != null) Text(houseLine, style = HhType.secondary, color = c.danger, modifier = Modifier.testTag("lights_tab_line"))
-                if (rooms.isEmpty() && status == null) Text(LOOKING_FOR_LIGHTS, style = HhType.body, color = c.mute)
-            }
+    val looking = rooms.isEmpty() && status == null
+    // HhPageHeader ends with its gap; a line under it needs one of its own before the rooms.
+    val below = if (status != null || houseLine != null || looking) LightsDimens.gridGap else 0.dp
+    LightsGrid(rooms, lines, room, focus, onFocused, modifier = modifier.testTag("lights_tab"), header = {
+        Column(Modifier.padding(bottom = below), verticalArrangement = Arrangement.spacedBy(LightsDimens.tabGap)) {
+            HhPageHeader(
+                LIGHTS, if (rooms.isEmpty()) null else roomsOn(rooms),
+                trailing = {
+                    HhTray {
+                        AllOffButton(allOffLit, house.onAllOff, tag = "lights_tray_all_off", surface = ButtonSurface.Bg)
+                        HolidayButton(holidayOn, run, house.onHoliday, tag = "lights_tray_holiday", surface = ButtonSurface.Bg)
+                    }
+                },
+            )
+            if (status != null) LightsStatusLine(status)
+            if (houseLine != null) Text(houseLine, style = HhType.secondary, color = c.danger, modifier = Modifier.testTag("lights_tab_line"))
+            if (looking) Text(LOOKING_FOR_LIGHTS, style = HhType.body, color = c.mute)
         }
-        items(rooms, key = { it.id }) { LightsRoomCard(it, lines[it.id], room) }
-    }
+    })
 }
 
 /** The tab over the view; while it shows, the rooms are followed (7 §4.2). */

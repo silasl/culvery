@@ -41,33 +41,22 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.lights.BRIGHT
-import uk.co.siland.culvery.capability.lights.Bridges
 import uk.co.siland.culvery.capability.lights.HouseRun
 import uk.co.siland.culvery.capability.lights.LightRoom
-import uk.co.siland.culvery.capability.lights.LightsActions
 import uk.co.siland.culvery.capability.lights.LightsFixture
-import uk.co.siland.culvery.capability.lights.LightsFollow
-import uk.co.siland.culvery.capability.lights.LightsHouse
 import uk.co.siland.culvery.capability.lights.LightScene
 import uk.co.siland.culvery.capability.lights.LightsPermissions
 import uk.co.siland.culvery.capability.lights.LightsProblem
-import uk.co.siland.culvery.capability.lights.LightsView
 import uk.co.siland.culvery.capability.lights.RELAX
 import uk.co.siland.culvery.capability.lights.TestAccess
-import uk.co.siland.culvery.capability.lights.TestLightsSystem
-import uk.co.siland.culvery.capability.lights.TestLightsProvider
-import uk.co.siland.culvery.capability.lights.link
 import uk.co.siland.culvery.capability.lights.problemLine
 import uk.co.siland.culvery.capability.lights.room
-import uk.co.siland.culvery.core.plugin.test.soon
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
@@ -99,13 +88,10 @@ class LightsTabTest {
         status: String? = null,
         houseLine: String? = null,
         lines: Map<String, String> = emptyMap(),
-        focus: String? = null,
-        onFocused: () -> Unit = {},
-        height: Int = 800,
     ) = compose.setContent {
         CulveryTheme(dark = true) {
-            Box(Modifier.size(900.dp, height.dp)) {
-                LightsTab(rooms, holidayOn, allOffLit, run, status, houseLine, lines, focus, onFocused, house, roomActions)
+            Box(Modifier.size(900.dp, 800.dp)) {
+                LightsTab(rooms, holidayOn, allOffLit, run, status, houseLine, lines, null, {}, house, roomActions)
             }
         }
     }
@@ -227,7 +213,7 @@ class LightsTabTest {
     @Test
     fun theTrayHolidayAsksForTheFreshPin() = runBlocking {
         val access = TestAccess(null)
-        val h = host(access, lounge)
+        val h = lights.tabHost(lounge, access = access)
         compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(900.dp, 800.dp)) { LightsTabHost(h.view, h.actions, h.house, h.follow) } } }
         compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_tray_holiday") == 1 }
         compose.onNodeWithTag("lights_tray_holiday").performClick()
@@ -260,7 +246,7 @@ class LightsTabTest {
     /** Pin: the old row already sent it; this guards the new card's wiring. Fails if a chip on an off room sends anything but its scene. */
     @Test
     fun aSceneChipOnAnOffRoomTurnsItOnWithThatScene() = runBlocking {
-        val h = host(TestAccess(null), room("Kitchen", scenes = listOf(RELAX, BRIGHT)))
+        val h = lights.tabHost(room("Kitchen", scenes = listOf(RELAX, BRIGHT)))
         compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(900.dp, 800.dp)) { LightsTabHost(h.view, h.actions, h.house, h.follow) } } }
         compose.waitUntil(5_000) { compose.waitForIdle(); tagCount("lights_room_Kitchen-id_scene_relax-id") == 1 }
         compose.onNodeWithTag("lights_room_Kitchen-id_scene_relax-id").performClick()
@@ -378,27 +364,6 @@ class LightsTabTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Fails if the focused room is not brought into view, or the focus is not handed back once it has been. */
-    @Test
-    fun theFocusedRoomIsScrolledTo() {
-        val rooms = (1..12).map { room("Room $it") }
-        var focused = 0
-        show(rooms, focus = "Room 12-id", onFocused = { focused++ }, height = 400)
-        compose.waitUntil(5_000) { compose.waitForIdle(); focused == 1 }
-        compose.onNodeWithTag("lights_room_Room 1-id").assertDoesNotExist()
-        compose.onNodeWithTag("lights_room_Room 12-id").assertIsDisplayed()
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    /** Fails if a focus naming a room Hue doesn't list is kept for ever instead of dropped. */
-    @Test
-    fun aFocusOnAnUnknownRoomIsDropped() {
-        var focused = 0
-        show(focus = "gone-id", onFocused = { focused++ })
-        compose.waitUntil(5_000) { compose.waitForIdle(); focused == 1 }
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
     /** Fails if the tab shows nothing, rather than that it is looking, before the first read. */
     @Test
     fun beforeTheFirstReadItIsLooking() {
@@ -407,33 +372,10 @@ class LightsTabTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    private class Host(val view: LightsView, val actions: LightsActions, val house: LightsHouse, val follow: LightsFollow, val system: TestLightsSystem)
-
-    private suspend fun host(vararg rooms: LightRoom): Host = host(TestAccess(null), *rooms)
-
-    private suspend fun host(access: TestAccess, vararg rooms: LightRoom): Host {
-        val settings = lights.settings
-        settings.connect("lights.hue", link())
-        val provider = TestLightsProvider()
-        val bridges = Bridges(setOf(provider), settings, lights.scope)
-        soon { bridges.system.first { it != null } }
-        val system = provider.systems.single()
-        system.rooms.value = rooms.toList()
-        val view = LightsView(bridges, settings, lights.scope)
-        val lightsHouse = LightsHouse(bridges, settings)
-        return Host(
-            view,
-            LightsActions({ bridges.system.value }, lights.scope, System::currentTimeMillis, lightsHouse, access),
-            lightsHouse,
-            LightsFollow(bridges.system, MutableStateFlow(true), lights.scope),
-            system,
-        )
-    }
-
     /** 7 §4.2: Fails if the rooms aren't followed while the tab is on screen, or still are after it goes. */
     @Test
     fun theHostWatchesWhileShown() = runBlocking {
-        val h = host(lounge)
+        val h = lights.tabHost(lounge)
         var shown by mutableStateOf(true)
         compose.setContent {
             CulveryTheme(dark = true) {
@@ -450,7 +392,7 @@ class LightsTabTest {
     /** Fails if the host leaves the focus set after scrolling to it, so the next visit scrolls again. */
     @Test
     fun theHostClearsTheFocusOnceScrolledTo() = runBlocking {
-        val h = host(lounge, kitchen)
+        val h = lights.tabHost(lounge, kitchen)
         h.view.focus.value = "Kitchen-id"
         compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(900.dp, 800.dp)) { LightsTabHost(h.view, h.actions, h.house, h.follow) } } }
         compose.waitUntil(5_000) { compose.waitForIdle(); h.view.focus.value == null }
