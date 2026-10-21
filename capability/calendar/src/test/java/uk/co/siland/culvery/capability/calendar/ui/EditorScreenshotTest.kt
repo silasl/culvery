@@ -15,17 +15,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneId
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
-import uk.co.siland.culvery.capability.calendar.EditableEvent
 import uk.co.siland.culvery.capability.calendar.EventForm
-import uk.co.siland.culvery.capability.calendar.EventRef
-import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.RepeatEnd
 import uk.co.siland.culvery.capability.calendar.TimeChoice
@@ -47,10 +44,8 @@ private val ABOVE_THE_KEYBOARD = 480.dp
 class EditorScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    private val london = ZoneId.of("Europe/London")
-
-    private fun newForm(signedIn: PersonId? = null) =
-        EventForm(EventForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), london, signedIn, preselectedDay = null)
+    private fun newForm(signedIn: PersonId? = null, repeats: Boolean = true) =
+        EventForm(EventForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), LONDON, signedIn, preselectedDay = null, repeats = repeats)
 
     private fun snap(
         name: String,
@@ -103,24 +98,17 @@ class EditorScreenshotTest {
     }
 
     /** Hand-off 12: Mia signed in, her sleepover on Sunday evening. */
-    private fun child() = EventForm(EventForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), london, SampleUi.mia.id, preselectedDay = null, repeats = false).apply {
+    private fun child() = newForm(signedIn = SampleUi.mia.id, repeats = false).apply {
         updateTitle("Sleepover at Ava's")
         chooseDay(SampleUi.TODAY.plusDays(4))
         chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
     }
 
     /** Hand-off 13: dinner at 19:30 for 2 h; the 19:30 start shows on Pick a time (2b-2 design D3). */
-    private fun edit() = dinner(hours = 2)
+    private fun edit() = dinnerOf(Duration.ofHours(2))
 
     /** 2b-2 design D3: an event 1 h 30 long adds its own length as a fourth Length chip, selected. */
-    private fun ownLength() = dinner(minutes = 90)
-
-    private fun dinner(hours: Long = 0, minutes: Long = 0): EventForm {
-        val start = SampleUi.TODAY.atTime(19, 30).atZone(london).toInstant()
-        val end = start.plusSeconds((hours * 60 + minutes) * 60)
-        val event = EditableEvent(EventRef("c1", "s1", "e1"), "Dinner with Jo & Priya", EventTime.Timed(start), EventTime.Timed(end), SampleUi.alex.id.value)
-        return EventForm(EventForm.Mode.Edit(event), SampleUi.TODAY, LocalTime.of(11, 54), london, null, null)
-    }
+    private fun ownLength() = dinnerOf(Duration.ofMinutes(90))
 
     /** Hand-off 14: the car's MOT on Friday morning, refused. */
     private fun failed() = newForm(signedIn = SampleUi.alex.id).apply {
@@ -142,16 +130,6 @@ class EditorScreenshotTest {
         chooseTime(TimeChoice.Custom(LocalTime.of(16, 15)))
     }
 
-    /** 2b-2 design D3: a timed event from Monday 28 September 18:00 to Wednesday 30 at 10:00, dates locked. */
-    private fun locked(): EventForm {
-        val visit = EditableEvent(
-            EventRef("c1", "s1", "e2"), "Grandma visiting",
-            EventTime.Timed(LocalDate.of(2026, 9, 28).atTime(18, 0).atZone(london).toInstant()),
-            EventTime.Timed(LocalDate.of(2026, 9, 30).atTime(10, 0).atZone(london).toInstant()), "family",
-        )
-        return EventForm(EventForm.Mode.Edit(visit), SampleUi.TODAY, LocalTime.of(11, 54), london, null, null)
-    }
-
     /** 9 §2.1: a holiday over Monday 19 to Thursday 22 October, All day with an Until. */
     private fun until() = newForm().apply {
         updateTitle("Holiday")
@@ -161,15 +139,6 @@ class EditorScreenshotTest {
 
     /** 9 §2.1: an Until 60 days after the day, one past the limit. */
     private fun untilError() = until().apply { chooseUntil(LocalDate.of(2026, 10, 19).plusDays(60)) }
-
-    /** 9 §2.1: the half term, all day Monday 19 to Friday 23 October, opened for change. */
-    private fun spanEdit(): EventForm {
-        val halfTerm = EditableEvent(
-            EventRef("c1", "s1", "e3"), "Half term",
-            EventTime.AllDay(LocalDate.of(2026, 10, 19)), EventTime.AllDay(LocalDate.of(2026, 10, 24)), "family",
-        )
-        return EventForm(EventForm.Mode.Edit(halfTerm), SampleUi.TODAY, LocalTime.of(11, 54), london, null, null)
-    }
 
     private fun repeats() = newForm().apply {
         updateTitle("Swimming")
@@ -207,10 +176,10 @@ class EditorScreenshotTest {
     @Test fun datePickerLight() = snap("editor_date_picker_light", false, datePicker(), picker = EditorPicker.Date)
     @Test fun timePickerDark() = snap("editor_time_picker_dark", true, timePicker(), picker = EditorPicker.Time)
     @Test fun timePickerLight() = snap("editor_time_picker_light", false, timePicker(), picker = EditorPicker.Time)
-    @Test fun lockedDark() = snap("editor_locked_dark", true, locked())
-    @Test fun lockedLight() = snap("editor_locked_light", false, locked())
+    @Test fun lockedDark() = snap("editor_locked_dark", true, lockedVisit())
+    @Test fun lockedLight() = snap("editor_locked_light", false, lockedVisit())
     @Test fun untilDark() = snap("editor_until_dark", true, until())
     @Test fun untilLight() = snap("editor_until_light", false, until())
     @Test fun untilErrorDark() = snap("editor_until_error_dark", true, untilError())
-    @Test fun spanEditDark() = snap("editor_span_edit_dark", true, spanEdit())
+    @Test fun spanEditDark() = snap("editor_span_edit_dark", true, halfTerm())
 }

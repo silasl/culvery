@@ -10,6 +10,9 @@ import java.time.LocalTime
 import java.time.ZoneId
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.calendar.ui.editFormOf
+import uk.co.siland.culvery.capability.calendar.ui.halfTerm
+import uk.co.siland.culvery.capability.calendar.ui.timedSpan
 import uk.co.siland.culvery.core.household.PersonId
 
 /**
@@ -27,15 +30,9 @@ class EventFormTest {
     private fun new(now: String = "10:54", day: LocalDate? = null, signedIn: PersonId? = null, on: LocalDate = today) =
         EventForm(EventForm.Mode.New, on, LocalTime.parse(now), london, signedIn, day)
 
-    private fun edit(start: EventTime, end: EventTime, title: String = "Dinner with Jo & Priya", forPerson: String? = "alex") =
-        EventForm(
-            EventForm.Mode.Edit(EditableEvent(EventRef("c1", "s1", "e1"), title, start, end, forPerson)),
-            today, LocalTime.of(10, 54), london, signedIn = null, preselectedDay = null,
-        )
-
     private fun editTimed(start: LocalDateTime, minutes: Long, forPerson: String? = "alex"): EventForm {
         val from = start.atZone(london).toInstant()
-        return edit(EventTime.Timed(from), EventTime.Timed(from.plusSeconds(minutes * 60)), forPerson = forPerson)
+        return editFormOf(EventTime.Timed(from), EventTime.Timed(from.plusSeconds(minutes * 60)), forPerson = forPerson)
     }
 
     private fun EventForm.summary() = summary { names.getValue(it) }
@@ -146,7 +143,7 @@ class EventFormTest {
     @Test
     fun anAllDayEditIsAllDayWithTheUsualLengths() {
         val saturday = LocalDate.of(2026, 9, 26)
-        val form = edit(EventTime.AllDay(saturday), EventTime.AllDay(saturday.plusDays(1)), title = "Bin day", forPerson = "family")
+        val form = editFormOf(EventTime.AllDay(saturday), EventTime.AllDay(saturday.plusDays(1)), title = "Bin day", forPerson = "family")
         assertThat(form.time).isEqualTo(TimeChoice.AllDay)
         assertThat(form.day).isEqualTo(saturday)
         assertThat(form.lengths).isEqualTo(LENGTH_CHOICES)
@@ -157,16 +154,13 @@ class EventFormTest {
     private val tue22 = LocalDate.of(2026, 9, 22)
     private val thu24 = LocalDate.of(2026, 9, 24)
 
-    private fun timedSpan(from: LocalDateTime, to: LocalDateTime, title: String = "Half term", forPerson: String? = "family") =
-        edit(EventTime.Timed(from.atZone(london).toInstant()), EventTime.Timed(to.atZone(london).toInstant()), title, forPerson)
-
     @Test
     fun aTimedSpanStaysLocked() {
         val trip = timedSpan(mon19.atTime(22, 0), day(21).atTime(9, 0))
         assertThat(trip.datesLocked).isTrue()
         assertThat(trip.offersUntil).isFalse()
         assertThat(trip.lockedDatesLabel("Google Calendar")).isEqualTo("Mon 19 – Wed 21 · change dates in Google Calendar on your phone")
-        assertThat(edit(EventTime.AllDay(today), EventTime.AllDay(today.plusDays(1))).datesLocked).isFalse()
+        assertThat(editFormOf(EventTime.AllDay(today), EventTime.AllDay(today.plusDays(1))).datesLocked).isFalse()
         // 22:00 to 01:00 crosses midnight; 22:00 to 00:00 ends at midnight, which counts as the same day.
         assertThat(editTimed(today.atTime(22, 0), 180).datesLocked).isTrue()
         assertThat(editTimed(today.atTime(22, 0), 120).datesLocked).isFalse()
@@ -175,7 +169,7 @@ class EventFormTest {
 
     @Test
     fun aMixedAllDayAndTimedEventStaysLocked() {
-        val mixed = edit(EventTime.AllDay(mon19), EventTime.Timed(day(21).atTime(9, 0).atZone(london).toInstant()))
+        val mixed = editFormOf(EventTime.AllDay(mon19), EventTime.Timed(day(21).atTime(9, 0).atZone(london).toInstant()))
         assertThat(mixed.datesLocked).isTrue()
         assertThat(mixed.offersUntil).isFalse()
     }
@@ -270,7 +264,7 @@ class EventFormTest {
         val secondHalfPast = Instant.parse("2026-10-25T01:30:00Z")
         val start = EventTime.Timed(secondHalfPast)
         val end = EventTime.Timed(secondHalfPast.plusSeconds(3_600))
-        val form = edit(start, end)
+        val form = editFormOf(start, end)
         assertThat(form.time).isEqualTo(TimeChoice.Custom(LocalTime.of(1, 30)))
         assertThat(form.unchanged).isTrue()
         form.updateTitle("Night feed")
@@ -288,7 +282,7 @@ class EventFormTest {
         assertThat(draft.end).isEqualTo(EventTime.Timed(Instant.parse("2026-09-23T23:00:00Z")))
         assertThat(form.summary()).isEqualTo("Today · 23:30–00:00 · Family")
         // Opened again to edit, it is a one-day event, not a locked multi-day one.
-        val reopened = edit(draft.start, draft.end)
+        val reopened = editFormOf(draft.start, draft.end)
         assertThat(reopened.datesLocked).isFalse()
         assertThat(reopened.length).isEqualTo(Duration.ofMinutes(30))
     }
@@ -323,7 +317,7 @@ class EventFormTest {
         form.updateTitle("a".repeat(MAX_TITLE_LENGTH))
         form.updateTitle("a".repeat(MAX_TITLE_LENGTH + 1))
         assertThat(form.title).hasLength(MAX_TITLE_LENGTH)
-        val long = edit(EventTime.AllDay(today), EventTime.AllDay(today.plusDays(1)), title = "b".repeat(120))
+        val long = editFormOf(EventTime.AllDay(today), EventTime.AllDay(today.plusDays(1)), title = "b".repeat(120))
         long.updateTitle("b".repeat(119))
         assertThat(long.title).hasLength(119)
         long.updateTitle("b".repeat(121))
@@ -368,7 +362,7 @@ class EventFormTest {
         val secondHalfPast = Instant.parse("2026-10-25T01:30:00Z")
         val start = EventTime.Timed(secondHalfPast)
         val end = EventTime.Timed(secondHalfPast.plusSeconds(3_600))
-        val form = edit(start, end)
+        val form = editFormOf(start, end)
         form.chooseDay(form.day)
         form.chooseTime(form.time)
         form.chooseLength(form.length)
@@ -552,7 +546,7 @@ class EventFormTest {
     @Test
     fun moreOptionsIsOnlyForANewEvent() {
         val start = today.atTime(19, 30).atZone(london).toInstant()
-        val form = edit(EventTime.Timed(start), EventTime.Timed(start.plusSeconds(3_600)))
+        val form = editFormOf(EventTime.Timed(start), EventTime.Timed(start.plusSeconds(3_600)))
         form.showMoreRepeats()
         assertThat(form.moreRepeats).isFalse()
     }
@@ -797,9 +791,6 @@ class EventFormTest {
         assertThat(form.draft(createdBy = null).end).isEqualTo(EventTime.AllDay(LocalDate.of(2027, 1, 3)))
     }
 
-    private fun halfTerm(title: String = "Half term") =
-        edit(EventTime.AllDay(day(19)), EventTime.AllDay(day(24)), title, "family")
-
     @Test
     fun anAllDaySpanOpensWithItsFirstAndLastDays() {
         val form = halfTerm()
@@ -842,7 +833,7 @@ class EventFormTest {
 
     @Test
     fun aOneDayEditGivenAnUntilTouchesOnlyTheTimes() {
-        val form = edit(EventTime.AllDay(day(19)), EventTime.AllDay(day(20)))
+        val form = editFormOf(EventTime.AllDay(day(19)), EventTime.AllDay(day(20)))
         assertThat(form.until).isNull()
         form.chooseUntil(day(21))
         assertThat(form.touched).containsExactly(EventField.TIMES)
@@ -861,7 +852,7 @@ class EventFormTest {
 
     @Test
     fun aLongAllDaySpanStaysLocked() {
-        val term = edit(EventTime.AllDay(LocalDate.of(2026, 9, 7)), EventTime.AllDay(LocalDate.of(2026, 12, 5)), "Autumn term", "family")
+        val term = editFormOf(EventTime.AllDay(LocalDate.of(2026, 9, 7)), EventTime.AllDay(LocalDate.of(2026, 12, 5)), "Autumn term", "family")
         assertThat(term.datesLocked).isTrue()
         assertThat(term.offersUntil).isFalse()
         assertThat(term.until).isNull()
@@ -872,11 +863,11 @@ class EventFormTest {
 
     @Test
     fun aSixtyDayAllDaySpanUnlocks() {
-        val sixty = edit(EventTime.AllDay(mon19), EventTime.AllDay(mon19.plusDays(60)), "Placement", "family")
+        val sixty = editFormOf(EventTime.AllDay(mon19), EventTime.AllDay(mon19.plusDays(60)), "Placement", "family")
         assertThat(sixty.datesLocked).isFalse()
         assertThat(sixty.until).isEqualTo(mon19.plusDays(59))
         assertThat(sixty.canSave).isTrue()
-        val sixtyOne = edit(EventTime.AllDay(mon19), EventTime.AllDay(mon19.plusDays(61)), "Placement", "family")
+        val sixtyOne = editFormOf(EventTime.AllDay(mon19), EventTime.AllDay(mon19.plusDays(61)), "Placement", "family")
         assertThat(sixtyOne.datesLocked).isTrue()
     }
 }

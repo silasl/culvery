@@ -14,8 +14,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
@@ -24,10 +24,8 @@ import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.filterToOne
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
-import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -40,10 +38,12 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -51,10 +51,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
-import uk.co.siland.culvery.capability.calendar.EditableEvent
-import uk.co.siland.culvery.capability.calendar.EventForm
-import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.DEFAULT_TIMES
+import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.MAX_TIMES
 import uk.co.siland.culvery.capability.calendar.MIN_TIMES
@@ -73,6 +71,7 @@ import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.isButton
 import uk.co.siland.culvery.core.ui.test.pixelAt
 
 @RunWith(AndroidJUnit4::class)
@@ -93,16 +92,7 @@ class EventEditorSheetTest {
     private fun newForm(signedIn: PersonId? = null) =
         EventForm(EventForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), london, signedIn, preselectedDay = null)
 
-    private fun editForm(start: EventTime, end: EventTime, title: String = "Dinner with Jo & Priya", forPerson: String? = "alex") =
-        EventForm(
-            EventForm.Mode.Edit(EditableEvent(EventRef("c1", "s1", "e1"), title, start, end, forPerson)),
-            SampleUi.TODAY, LocalTime.of(11, 54), london, signedIn = null, preselectedDay = null,
-        )
-
-    private fun dinner(): EventForm {
-        val start = SampleUi.TODAY.atTime(19, 30).atZone(london).toInstant()
-        return editForm(EventTime.Timed(start), EventTime.Timed(start.plusSeconds(5_400)))
-    }
+    private fun dinner() = dinnerOf(Duration.ofMinutes(90))
 
     private fun show(form: EventForm, childOnly: PersonId? = null, focus: Boolean = false) = compose.setContent {
         CulveryTheme(dark = true) {
@@ -380,7 +370,7 @@ class EventEditorSheetTest {
 
     @Test
     fun aChosenLockedChipIsDrawnChosenWithItsLock() {
-        val form = editForm(EventTime.AllDay(SampleUi.TODAY), EventTime.AllDay(SampleUi.TODAY.plusDays(1)), forPerson = "alex")
+        val form = editFormOf(EventTime.AllDay(SampleUi.TODAY), EventTime.AllDay(SampleUi.TODAY.plusDays(1)), forPerson = "alex")
         showAsMia(form)
         val alex = compose.onNodeWithTag("who_Alex").assertIsSelected()
         assertThat(pixelAt(alex, 4.dp, 24.dp)).isEqualTo(SampleUi.alex.color.toInt())
@@ -444,12 +434,7 @@ class EventEditorSheetTest {
 
     @Test
     fun aTimedSpanEditStillShowsOneLine() {
-        val visit = editForm(
-            EventTime.Timed(LocalDate.of(2026, 9, 28).atTime(18, 0).atZone(london).toInstant()),
-            EventTime.Timed(LocalDate.of(2026, 9, 30).atTime(10, 0).atZone(london).toInstant()),
-            "Grandma visiting", "family",
-        )
-        show(visit)
+        show(lockedVisit())
         compose.onNodeWithTag("editor_locked_dates").assertExists()
         compose.onNodeWithText("Mon 28 – Wed 30 · change dates in Google Calendar on your phone").assertExists()
         compose.onNodeWithTag("day_pick").assertDoesNotExist()
@@ -465,8 +450,6 @@ class EventEditorSheetTest {
     private fun newOn(on: LocalDate = oct(19)) =
         EventForm(EventForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), london, null, preselectedDay = on)
 
-    private fun halfTerm() = editForm(EventTime.AllDay(oct(19)), EventTime.AllDay(oct(24)), "Half term", "family")
-
     private fun SemanticsNodeInteraction.stateDescription() = fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)
 
     @Test
@@ -475,7 +458,7 @@ class EventEditorSheetTest {
         show(form)
         compose.onNodeWithTag("time_until").assertTextEquals("Until")
         compose.onNodeWithTag("time_until", useUnmergedTree = true).onChildren().assertCountEquals(2)
-        assertThat(compose.onNodeWithTag("time_until").role()).isEqualTo(Role.Button)
+        compose.onNodeWithTag("time_until").assert(isButton)
         val pick = bounds("time_pick")
         val until = bounds("time_until")
         assertThat(until.left.value >= pick.right.value || until.top.value >= pick.bottom.value).isTrue()
@@ -545,6 +528,7 @@ class EventEditorSheetTest {
         val form = newOn().apply { chooseUntil(oct(22)) }
         assertClosedSheetFits(form, childOnly = null)
         compose.onNodeWithTag("until_error").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -552,6 +536,7 @@ class EventEditorSheetTest {
         val form = newOn(oct(21)).apply { chooseUntil(oct(20)) }
         assertClosedSheetFits(form, childOnly = null)
         compose.onNodeWithTag("until_error").assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -570,6 +555,7 @@ class EventEditorSheetTest {
         compose.onNodeWithTag("editor_title").assertIsFocused()
         compose.onNodeWithTag("time_until").performClick()
         compose.onNodeWithTag("editor_title", useUnmergedTree = true).assertIsNotFocused()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -619,8 +605,6 @@ class EventEditorSheetTest {
         compose.onNodeWithTag("time_pick").assertTextEquals("13:15").assertIsSelected()
     }
 
-    private fun SemanticsNodeInteraction.role() = fetchSemanticsNode().config.getOrNull(SemanticsProperties.Role)
-
     @Test
     fun repeatsShowsTheCommonThreeAndMoreOptions() {
         show(newForm())
@@ -629,7 +613,7 @@ class EventEditorSheetTest {
         compose.onNodeWithTag("repeat_Weekly").assertIsDisplayed()
         compose.onNodeWithTag("repeat_Fortnightly").assertIsDisplayed()
         compose.onNodeWithTag("repeat_more").assertTextEquals("More options")
-        assertThat(compose.onNodeWithTag("repeat_more").role()).isEqualTo(Role.Button)
+        compose.onNodeWithTag("repeat_more").assert(isButton)
         listOf("repeat_Daily", "repeat_Monthly", "repeat_Yearly", "ends_never").forEach {
             compose.onNodeWithTag(it).assertDoesNotExist()
         }

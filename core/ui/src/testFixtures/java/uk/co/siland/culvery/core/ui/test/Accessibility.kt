@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.ui.test
 
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsConfiguration
 import androidx.compose.ui.semantics.SemanticsNode
@@ -75,6 +76,9 @@ private fun SemanticsNode.shownText(): String =
 
 /** A node [readAsOne][uk.co.siland.culvery.core.ui.readAsOne] made a traversal group. */
 val isReadAsOne: SemanticsMatcher = SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true)
+
+/** A node whose role is Button. */
+val isButton: SemanticsMatcher = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
 
 /** The clickable row or chip that shows [text]: its texts sit in a [shownNotSpoken][uk.co.siland.culvery.core.ui.shownNotSpoken] child. */
 fun SemanticsNodeInteractionsProvider.onClickableShowing(text: String): SemanticsNodeInteraction =
