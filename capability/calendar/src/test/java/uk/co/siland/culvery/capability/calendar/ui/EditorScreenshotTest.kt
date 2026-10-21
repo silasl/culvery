@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -58,6 +60,7 @@ class EditorScreenshotTest {
         childOnly: PersonId? = null,
         failure: SaveFailure? = null,
         picker: EditorPicker = EditorPicker.None,
+        scrollTo: String? = null,
     ) {
         compose.setContent {
             CulveryTheme(dark = dark) {
@@ -83,6 +86,7 @@ class EditorScreenshotTest {
                 }
             }
         }
+        if (scrollTo != null) compose.onNodeWithTag(scrollTo).performScrollTo()
         compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
     }
 
@@ -150,8 +154,16 @@ class EditorScreenshotTest {
     private fun repeats() = newForm().apply {
         updateTitle("Swimming")
         chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        showMoreRepeats()
         chooseRepeat(RepeatChoice.Weekly)
-        chooseEnd(RepeatEnd.OnDate(SampleUi.TODAY.plusWeeks(10)))
+        chooseEnd(RepeatEnd.After(10))
+    }
+
+    /** Hand-off 4a, More options open with Never chosen (9 §4.8). */
+    private fun moreOptions() = newForm().apply {
+        updateTitle("Swimming")
+        chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        showMoreRepeats()
     }
 
     private val failure = SaveFailure("Sample calendar", WriteProblem.Refused("calendar is full"))
@@ -162,8 +174,9 @@ class EditorScreenshotTest {
     @Test fun emptyLight() = snap("editor_empty_light", false, empty())
     @Test fun childDark() = snap("editor_child_dark", true, child(), childOnly = SampleUi.mia.id)
     @Test fun childLight() = snap("editor_child_light", false, child(), childOnly = SampleUi.mia.id)
-    @Test fun repeatsDark() = snap("editor_repeats_dark", true, repeats())
-    @Test fun repeatsLight() = snap("editor_repeats_light", false, repeats())
+    @Test fun repeatsDark() = snap("editor_repeats_dark", true, repeats(), scrollTo = "ends_after")
+    @Test fun moreOptionsDark() = snap("editor_more_options_dark", true, moreOptions())
+    @Test fun repeatsLight() = snap("editor_repeats_light", false, repeats(), scrollTo = "ends_after")
     @Test fun editDark() = snap("editor_edit_dark", true, edit())
     @Test fun editLight() = snap("editor_edit_light", false, edit())
     @Test fun ownLengthDark() = snap("editor_own_length_dark", true, ownLength())

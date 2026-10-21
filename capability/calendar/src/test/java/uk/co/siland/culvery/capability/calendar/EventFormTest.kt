@@ -523,6 +523,43 @@ class EventFormTest {
     }
 
     @Test
+    fun aDailyRepeatOpensMoreOptionsByItself() {
+        val form = new()
+        assertThat(form.moreRepeats).isFalse()
+        form.chooseRepeat(RepeatChoice.Daily)
+        assertThat(form.moreRepeats).isTrue()
+    }
+
+    @Test
+    fun anEndOpensMoreOptionsByItselfAndATapOpensItForGood() {
+        val form = new()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        assertThat(form.moreRepeats).isFalse()
+        form.chooseEnd(RepeatEnd.After(5))
+        assertThat(form.moreRepeats).isTrue()
+        val tapped = new()
+        tapped.showMoreRepeats()
+        assertThat(tapped.moreRepeats).isTrue()
+        tapped.chooseRepeat(RepeatChoice.Never)
+        assertThat(tapped.moreRepeats).isTrue()
+    }
+
+    @Test
+    fun moreOptionsIsOnlyForANewEvent() {
+        val start = today.atTime(19, 30).atZone(london).toInstant()
+        val form = edit(EventTime.Timed(start), EventTime.Timed(start.plusSeconds(3_600)))
+        form.showMoreRepeats()
+        assertThat(form.moreRepeats).isFalse()
+    }
+
+    @Test
+    fun openingMoreOptionsIsNotAnEdit() {
+        val form = new()
+        form.showMoreRepeats()
+        assertThat(form.edited).isFalse()
+    }
+
+    @Test
     fun theCountStaysBetweenTwoAndFiftyTwo() {
         val form = new()
         form.chooseRepeat(RepeatChoice.Weekly)

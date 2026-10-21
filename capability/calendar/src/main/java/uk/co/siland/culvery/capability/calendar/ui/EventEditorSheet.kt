@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +49,10 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import uk.co.siland.culvery.capability.calendar.DEFAULT_TIMES
 import uk.co.siland.culvery.capability.calendar.EventForm
+import uk.co.siland.culvery.capability.calendar.MAX_TIMES
+import uk.co.siland.culvery.capability.calendar.MIN_TIMES
 import uk.co.siland.culvery.capability.calendar.HOURS_MINUTES
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.RepeatEnd
@@ -59,12 +66,15 @@ import uk.co.siland.culvery.capability.calendar.lengthLabel
 import uk.co.siland.culvery.capability.calendar.saveFailedBody
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhFooterButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.HhMessageLine
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
@@ -80,6 +90,10 @@ internal const val PICK_A_DATE = "Pick a date"
 internal const val PICK_A_TIME = "Pick a time"
 internal const val REPEATS = "Repeats"
 internal const val ENDS = "Ends"
+internal const val MORE_OPTIONS = "More options"
+internal const val ON_A_DATE = "On a date"
+internal const val FEWER_TIMES = "Fewer times"
+internal const val MORE_TIMES = "More times"
 internal const val ADD_A_TITLE_FIRST = "Add a title first"
 internal const val ENDS_TOO_EARLY = "The end date is before the event’s day. Pick a later one."
 
@@ -171,7 +185,7 @@ fun EventEditorSheet(
                         }
                         if (form.canRepeat && childOnly == null) {
                             RepeatsSection(form, busy)
-                            if (form.repeat != RepeatChoice.Never) {
+                            if (form.moreRepeats && form.repeat != RepeatChoice.Never) {
                                 EndsSection(form, busy) {
                                     closeKeyboard()
                                     onPicker(EditorPicker.EndDate)
@@ -286,16 +300,18 @@ private fun TitleField(form: EventForm, focus: FocusRequester, readOnly: Boolean
 }
 
 @Composable
+private fun ChipFlow(content: @Composable () -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
+        verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
+    ) { content() }
+}
+
+@Composable
 private fun Section(label: String, modifier: Modifier = Modifier, chips: @Composable () -> Unit) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
         HhSectionLabel(label)
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
-            verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
-            modifier = Modifier.selectableGroup(),
-        ) {
-            chips()
-        }
+        Box(Modifier.selectableGroup()) { ChipFlow(chips) }
     }
 }
 
@@ -413,21 +429,61 @@ private fun LengthSection(form: EventForm, busy: Boolean, modifier: Modifier) {
     }
 }
 
+/** Never, every week, every 2 weeks and More options; a tap opens the rest in place, and it stays open (9 §4.8). */
 @Composable
 private fun RepeatsSection(form: EventForm, busy: Boolean) {
-    Section(REPEATS) {
-        RepeatChoice.entries.forEach { choice ->
-            HhChoiceChip(choice.label, form.repeat == choice, "repeat_${choice.name}", onClick = { if (!busy) form.chooseRepeat(choice) })
+    val dailyFocus = remember { FocusRequester() }
+    var focusDaily by remember { mutableStateOf(false) }
+    // The tapped chip is gone, so focus moves onto the first of the new choices.
+    LaunchedEffect(focusDaily) {
+        if (focusDaily) {
+            dailyFocus.requestFocus()
+            focusDaily = false
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
+        HhSectionLabel(REPEATS)
+        Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
+            ChipFlow {
+                RepeatChoice.COMMON.forEach { RepeatChip(it, form, busy) }
+                if (!form.moreRepeats) {
+                    HhChoiceChip(
+                        label = MORE_OPTIONS,
+                        selected = false,
+                        tag = "repeat_more",
+                        role = Role.Button,
+                        trailing = { ink -> HhIcon(Icons.EXPAND_MORE, size = ControlTokens.chipIcon, tint = ink) },
+                        onClick = {
+                            if (!busy) {
+                                form.showMoreRepeats()
+                                focusDaily = true
+                            }
+                        },
+                    )
+                }
+            }
+            if (form.moreRepeats) {
+                ChipFlow {
+                    RepeatChoice.MORE.forEach { choice ->
+                        RepeatChip(choice, form, busy, if (choice == RepeatChoice.Daily) Modifier.focusRequester(dailyFocus).focusable() else Modifier)
+                    }
+                }
+            }
         }
     }
 }
 
-/** Never, or a date from the date picker; a line under them while the date is before the event's day. */
+@Composable
+private fun RepeatChip(choice: RepeatChoice, form: EventForm, busy: Boolean, modifier: Modifier = Modifier) {
+    HhChoiceChip(choice.label, form.repeat == choice, "repeat_${choice.name}", onClick = { if (!busy) form.chooseRepeat(choice) }, modifier = modifier)
+}
+
+/** Never, a date, or After N times with its count buttons; a line under them while the date is before the event day. */
 @Composable
 private fun EndsSection(form: EventForm, busy: Boolean, onPickEnd: () -> Unit) {
     val endsInView = remember { BringIntoViewRequester() }
     val errorInView = remember { BringIntoViewRequester() }
-    // Ends appears below the fold when a repeat is chosen, and so can its error line.
+    // Ends appears below the fold when More options opens, and so can its error line.
     LaunchedEffect(Unit) { endsInView.bringIntoView() }
     LaunchedEffect(form.endsBeforeStart) { if (form.endsBeforeStart) errorInView.bringIntoView() }
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
@@ -435,18 +491,44 @@ private fun EndsSection(form: EventForm, busy: Boolean, onPickEnd: () -> Unit) {
             HhChoiceChip("Never", form.repeatEnd == RepeatEnd.Never, "ends_never", onClick = { if (!busy) form.chooseEnd(RepeatEnd.Never) })
             val end = (form.repeatEnd as? RepeatEnd.OnDate)?.date
             HhChoiceChip(
-                label = end?.format(SHORT_DAY) ?: "On a date…",
+                label = end?.format(SHORT_DAY) ?: ON_A_DATE,
                 selected = end != null,
                 tag = "ends_pick",
                 role = Role.Button,
                 leading = { ink -> HhIcon(Icons.CALENDAR_MONTH, size = ControlTokens.chipIcon, tint = ink) },
                 onClick = { if (!busy) onPickEnd() },
             )
+            val after = form.repeatEnd as? RepeatEnd.After
+            HhChoiceChip(
+                label = afterTimes(after?.times ?: DEFAULT_TIMES),
+                selected = after != null,
+                tag = "ends_after",
+                onClick = { if (!busy) form.chooseAfter() },
+            )
+            if (after != null) {
+                CountButton(Icons.REMOVE, FEWER_TIMES, "ends_fewer", after.times > MIN_TIMES) { if (!busy) form.fewerTimes() }
+                CountButton(Icons.ADD, MORE_TIMES, "ends_more", after.times < MAX_TIMES) { if (!busy) form.moreTimes() }
+            }
         }
         Box(Modifier.bringIntoViewRequester(errorInView)) {
             HhMessageLine(ENDS_TOO_EARLY.takeIf { form.endsBeforeStart }, CalendarType.noteBody, Culvery.colors.danger, "ends_error")
         }
     }
+}
+
+@Composable
+private fun CountButton(icon: String, spoken: String, tag: String, enabled: Boolean, onStep: () -> Unit) {
+    HhRoundButton(
+        icon = icon,
+        spoken = spoken,
+        onClick = onStep,
+        modifier = Modifier.testTag(tag),
+        enabled = enabled,
+        on = ButtonSurface.Bg,
+        size = ControlTokens.chipHeight,
+        iconSize = ButtonTokens.icon,
+        repeatWhileHeld = true,
+    )
 }
 
 /** 2b-2 design D3: a multi-day event's dates can't change here, so Day, Time and Length become this one line. */

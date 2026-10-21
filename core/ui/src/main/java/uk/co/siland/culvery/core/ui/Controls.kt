@@ -168,6 +168,7 @@ fun HhChoiceChip(
     spokenName: String? = null,
     trailing: (@Composable (ink: Color) -> Unit)? = null,
     locked: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val c = Culvery.colors
     val bare = locked && !selected
@@ -182,7 +183,7 @@ fun HhChoiceChip(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipIconGap),
-        modifier = Modifier
+        modifier = modifier
             .boundedWidth()
             .testTag(tag)
             .semantics {

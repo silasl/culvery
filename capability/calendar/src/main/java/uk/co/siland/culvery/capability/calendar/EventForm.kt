@@ -97,6 +97,16 @@ class EventForm(
     var repeatEnd: RepeatEnd by mutableStateOf(RepeatEnd.Never)
         private set
 
+    private var opened by mutableStateOf(false)
+
+    /** The rest of the Repeats choices and the Ends row show: opened, or the form already holds a choice that lives there (9 §4.8). */
+    val moreRepeats: Boolean get() = opened || repeat in RepeatChoice.MORE || repeatEnd != RepeatEnd.Never
+
+    /** Opens and never closes; ignored unless the event can repeat. */
+    fun showMoreRepeats() {
+        if (canRepeat) opened = true
+    }
+
     /** The end is before the event's day, so Save waits (5 §A.4). */
     val endsBeforeStart: Boolean get() = (repeatEnd as? RepeatEnd.OnDate)?.let { it.date < day } ?: false
 

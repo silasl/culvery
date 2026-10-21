@@ -13,6 +13,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -52,7 +54,10 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EditableEvent
 import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.EventRef
+import uk.co.siland.culvery.capability.calendar.DEFAULT_TIMES
 import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.MAX_TIMES
+import uk.co.siland.culvery.capability.calendar.MIN_TIMES
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.RepeatEnd
 import uk.co.siland.culvery.capability.calendar.TimeChoice
@@ -494,18 +499,164 @@ class EventEditorSheetTest {
         compose.onNodeWithTag("time_pick").assertTextEquals("13:15").assertIsSelected()
     }
 
-    /** 5 §A.4: All day and Pick time… only; Repeats on a new event, Ends only once it repeats. */
+    private fun SemanticsNodeInteraction.role() = fetchSemanticsNode().config.getOrNull(SemanticsProperties.Role)
+
     @Test
-    fun aNewEventOffersRepeatsAndEndsOnlyWhenItRepeats() {
+    fun repeatsShowsTheCommonThreeAndMoreOptions() {
         show(newForm())
         compose.onNodeWithTag("time_all_day").assertIsSelected()
-        compose.onNodeWithTag("time_Morning").assertDoesNotExist()
         compose.onNodeWithTag("repeat_Never").assertIsSelected()
+        compose.onNodeWithTag("repeat_Weekly").assertIsDisplayed()
+        compose.onNodeWithTag("repeat_Fortnightly").assertIsDisplayed()
+        compose.onNodeWithTag("repeat_more").assertTextEquals("More options")
+        assertThat(compose.onNodeWithTag("repeat_more").role()).isEqualTo(Role.Button)
+        listOf("repeat_Daily", "repeat_Monthly", "repeat_Yearly", "ends_never").forEach {
+            compose.onNodeWithTag(it).assertDoesNotExist()
+        }
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun moreOptionsOpensInPlaceAndStaysOpen() {
+        show(newForm())
+        compose.onNodeWithTag("repeat_more").performClick()
+        compose.waitForIdle()
+        listOf("repeat_Daily", "repeat_Monthly", "repeat_Yearly").forEach { compose.onNodeWithTag(it).assertIsDisplayed() }
+        assertThat(bounds("repeat_Daily").top.value).isGreaterThan(bounds("repeat_Never").bottom.value - 1f)
+        compose.onNodeWithTag("repeat_more").assertDoesNotExist()
+        compose.onNodeWithTag("repeat_Daily").assertIsFocused()
+        compose.onNodeWithTag("repeat_Weekly").performClick()
+        compose.onNodeWithTag("repeat_Never").performClick()
+        compose.onNodeWithTag("repeat_Monthly").assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theEndsRowShowsOnlyWhileItRepeats() {
+        val form = newForm()
+        form.showMoreRepeats()
+        show(form)
         compose.onNodeWithTag("ends_never").assertDoesNotExist()
         compose.onNodeWithTag("repeat_Weekly").performClick()
         compose.onNodeWithTag("ends_never").assertIsSelected()
+        compose.onNodeWithTag("ends_pick").assertTextEquals("On a date")
+        compose.onNodeWithTag("ends_after").assertTextEquals("After 10 times")
         compose.onNodeWithTag("ends_pick").performClick()
         assertThat(calls).contains("picker:EndDate")
+        compose.runOnIdle { picker = EditorPicker.None }
+        compose.onNodeWithTag("repeat_Never").performClick()
+        compose.onNodeWithTag("ends_never").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aWeeklyRepeatWithMoreOptionsClosedShowsNoEnds() {
+        val form = newForm()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        show(form)
+        compose.onNodeWithTag("ends_never").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun afterNTimesShowsItsCountButtons() {
+        val form = newForm()
+        form.showMoreRepeats()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        show(form)
+        compose.onNodeWithTag("ends_fewer").assertDoesNotExist()
+        compose.onNodeWithTag("ends_after").performScrollTo().performClick()
+        compose.onNodeWithTag("ends_after").assertIsSelected()
+        compose.onNodeWithTag("ends_fewer").assert(hasContentDescription("Fewer times"))
+        compose.onNodeWithTag("ends_more").assert(hasContentDescription("More times"))
+        compose.onNodeWithTag("ends_more").performClick()
+        compose.onNodeWithTag("ends_after").assertTextEquals("After 11 times")
+        compose.onNodeWithTag("ends_after").performClick()
+        compose.onNodeWithTag("ends_after").assertTextEquals("After 11 times")
+        compose.runOnIdle { form.chooseEnd(RepeatEnd.OnDate(SampleUi.TODAY.plusDays(9))) }
+        compose.onNodeWithTag("ends_after").assertTextEquals("After 10 times")
+        compose.onNodeWithTag("ends_fewer").assertDoesNotExist()
+        compose.onNodeWithTag("ends_after").performClick()
+        compose.onNodeWithTag("ends_after").assertTextEquals("After 10 times")
+        compose.onNodeWithTag("ends_never").performClick()
+        compose.onNodeWithTag("ends_fewer").assertDoesNotExist()
+        compose.onNodeWithTag("ends_more").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theCountButtonsStopAtTheirEnds() {
+        val form = newForm()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseEnd(RepeatEnd.After(MIN_TIMES))
+        show(form)
+        compose.onNodeWithTag("ends_fewer").assertIsNotEnabled()
+        compose.onNodeWithTag("ends_more").assertIsEnabled()
+        compose.runOnIdle { form.chooseEnd(RepeatEnd.After(MAX_TIMES)) }
+        compose.onNodeWithTag("ends_more").assertIsNotEnabled()
+        compose.onNodeWithTag("ends_fewer").assertIsEnabled()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Later than RoundButtonHoldTest's 500 ms: inside the scrolling body a press is recognised one tap-timeout (about 100 ms) late, so steps land near 620, 720 and 820. */
+    @Test
+    fun holdingMoreStepsTheCount() {
+        val form = newForm()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseEnd(RepeatEnd.After(DEFAULT_TIMES))
+        showAt(form)
+        compose.onNodeWithTag("ends_more").performScrollTo()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("ends_more").performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(592)
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(10))
+        compose.mainClock.advanceTimeBy(64)
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(11))
+        compose.mainClock.advanceTimeBy(64)
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(11))
+        compose.mainClock.advanceTimeBy(32)
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(12))
+        compose.onNodeWithTag("ends_more").performTouchInput { up() }
+        compose.mainClock.advanceTimeBy(400)
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(12))
+        compose.onNodeWithTag("ends_after").assertTextEquals("After 12 times")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theSheetScrollsOnlyOnceMoreOptionsOpens() {
+        val form = newForm(signedIn = SampleUi.alex.id)
+        showAt(form)
+        fun maxScroll() = compose.onNodeWithTag("editor_body").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].maxValue()
+        compose.onNodeWithTag("editor_save_reason").assertIsDisplayed()
+        assertThat(maxScroll()).isEqualTo(0f)
+        compose.onNodeWithTag("repeat_more").performClick()
+        compose.onNodeWithTag("repeat_Weekly").performClick()
+        compose.waitForIdle()
+        assertThat(maxScroll()).isGreaterThan(0f)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theEndsRowFitsAtLargeFont() {
+        val form = newForm()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseEnd(RepeatEnd.After(DEFAULT_TIMES))
+        showAt(form, fontScale = 1.3f, height = 1400.dp)
+        val body = bounds("editor_body")
+        listOf("ends_never", "ends_pick", "ends_after", "ends_fewer", "ends_more").forEach {
+            val b = bounds(it)
+            assertThat(b.left.value).isAtLeast(body.left.value)
+            assertThat(b.right.value).isAtMost(body.right.value)
+        }
+        compose.onNodeWithTag("ends_after").assertTextEquals("After 10 times")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun afterTimesSaysTheCount() {
+        assertThat(afterTimes(10)).isEqualTo("After 10 times")
+        assertThat(afterTimes(52)).isEqualTo("After 52 times")
     }
 
     /** A sheet short enough that the Ends row starts below the fold. */
@@ -522,20 +673,25 @@ class EventEditorSheetTest {
     }
 
     @Test
-    fun choosingARepeatScrollsEndsIntoView() {
+    fun openingMoreOptionsBringsEndsIntoView() {
         showShort(newForm())
+        compose.onNodeWithTag("repeat_more").performScrollTo().performClick()
         compose.onNodeWithTag("repeat_Weekly").performScrollTo().performClick()
-        compose.onNodeWithTag("ends_never").assertIsDisplayed()
+        compose.waitForIdle()
+        compose.onNodeWithTag("ends_after").assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
     fun anEndBeforeTheDayScrollsItsLineIntoView() {
         val form = newForm()
+        form.showMoreRepeats()
         form.chooseRepeat(RepeatChoice.Weekly)
         showShort(form)
         compose.onNodeWithTag("ends_never").performScrollTo()
         compose.runOnIdle { form.chooseEnd(RepeatEnd.OnDate(SampleUi.TODAY.minusDays(1))) }
         compose.onNodeWithTag("ends_error").assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -548,11 +704,13 @@ class EventEditorSheetTest {
     fun anEndBeforeTheDaySaysSoAndSaveWaits() {
         val form = newForm()
         form.updateTitle("Swimming")
+        form.showMoreRepeats()
         form.chooseRepeat(RepeatChoice.Weekly)
         form.chooseEnd(RepeatEnd.OnDate(SampleUi.TODAY.minusDays(1)))
         show(form)
         compose.onNodeWithTag("ends_error").assertTextEquals("The end date is before the event’s day. Pick a later one.")
         compose.onNodeWithTag("editor_save").assertIsNotEnabled()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
