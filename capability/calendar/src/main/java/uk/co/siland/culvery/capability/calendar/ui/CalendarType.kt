@@ -183,9 +183,6 @@ internal object CalendarDimens {
     val staleIcon = 16.dp
     val staleIconGap = 6.dp
 
-    // The date picker's ‹ › still fade at an end (4c §6.6).
-    const val DISABLED_ALPHA = 0.3f
-
     // Week columns: header inset 4 at the sides and bottom; chip title 2 below the time; badge 15.
     val columnHeaderInset = 4.dp
     val columnGap = 8.dp
@@ -266,8 +263,6 @@ internal object CalendarDimens {
     val datePickerWidth = 520.dp
     val datePickerGap = 14.dp
     val pickerRangeTop = 4.dp
-    val pageButton = 48.dp
-    val pageButtonIcon = 24.dp
     val pageButtonGap = 8.dp
     val weekdayPaddingV = 4.dp
     val dateCellHeight = 56.dp

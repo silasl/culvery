@@ -364,6 +364,31 @@ class EventEditorHostTest {
         assertThat(writer.calls).isEmpty()
     }
 
+    /** A pin: the host's `canSave` guard stays the gate whatever the footer does. */
+    @Test
+    fun saveDoesNothingWhileTheTitleIsBlankEvenIfOnSaveIsCalled() {
+        access.answer(TestAccess.ALEX)
+        showEditor(EditorRequest.New(day = null))
+        waitForText("Add event")
+        compose.onNodeWithTag("editor_save").assertIsNotEnabled().performClick()
+        compose.waitForIdle()
+        assertThat(writer.calls).isEmpty()
+        assertThat(access.requests).isEmpty()
+        assertThat(closed).isEqualTo(0)
+    }
+
+    /** A pin: Delete still goes through the PIN before the detail sheet takes over. */
+    @Test
+    fun deleteStillAsksForAPinBeforeConfirming() {
+        access.answer(TestAccess.ALEX)
+        showEditor(EditorRequest.Edit(dinner))
+        waitForText("Change event")
+        compose.onNodeWithTag("editor_delete").performClick()
+        compose.waitUntil(5_000) { deleting.isNotEmpty() }
+        assertThat(access.requests.map { it.reason }).containsExactly(PinReason.Delete)
+        assertThat(writer.calls).isEmpty()
+    }
+
     @Test
     fun aRefusedDeleteKeepsTheEditorOpen() {
         access.answer(TestAccess.MIA)

@@ -132,11 +132,39 @@ class EventEditorSheetTest {
     fun saveIsDisabledUntilThereIsATitle() {
         show(newForm())
         compose.onNodeWithTag("editor_save").assertIsNotEnabled().performClick()
+        compose.onNodeWithTag("editor_save_reason").assertTextEquals("Add a title first")
+        assertThat(bounds("editor_save_reason").bottom.value).isAtMost(bounds("editor_save").top.value)
         compose.onNodeWithTag("editor_title").performTextInput("   ")
         compose.onNodeWithTag("editor_save").assertIsNotEnabled()
         compose.onNodeWithTag("editor_title").performTextReplacement("Parents evening")
-        compose.onNodeWithTag("editor_save").assertIsEnabled().performClick()
+        compose.onNodeWithTag("editor_save").assertIsEnabled()
+        compose.onNodeWithTag("editor_save_reason").assertDoesNotExist()
+        compose.onNodeWithTag("editor_save").performClick()
         assertThat(calls).containsExactly("save")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun anEditWithItsTitleClearedShowsNoReason() {
+        val form = dinner()
+        show(form)
+        compose.onNodeWithTag("editor_title").performTextReplacement("")
+        compose.onNodeWithTag("editor_save").assertIsNotEnabled()
+        compose.onNodeWithTag("editor_save_reason").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** A pin of the reason being only for a missing title (9 §6.4). */
+    @Test
+    fun anEndBeforeTheDayHasNoFooterReason() {
+        val form = newForm()
+        form.updateTitle("Swimming")
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseEnd(RepeatEnd.OnDate(SampleUi.TODAY.minusDays(1)))
+        show(form)
+        compose.onNodeWithTag("editor_save").assertIsNotEnabled()
+        compose.onNodeWithTag("editor_save_reason").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -271,7 +299,7 @@ class EventEditorSheetTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** The reason line is the footer's, drawn by a later change; until it exists its 31 dp (a 16 sp line and the 8 dp gap) is allowed for. */
+    /** Both fit cases have an empty title, so the footer's reason shows and is where the room is measured to. */
     private fun assertClosedSheetFits(form: EventForm, childOnly: PersonId?) {
         showAt(form, childOnly)
         val lastChips = compose.onAllNodes(SemanticsMatcher("a Repeats chip") { node ->
@@ -279,8 +307,7 @@ class EventEditorSheetTest {
         }).fetchSemanticsNodes()
         val lastBottom = lastChips.maxOf { it.boundsInRoot.bottom }
         val density = compose.density.density
-        val reason = compose.onAllNodes(hasTestTag("editor_save_reason")).fetchSemanticsNodes().firstOrNull()
-        val reasonTop = reason?.boundsInRoot?.top ?: (bounds("editor_save").top.value * density - 31f * density)
+        val reasonTop = compose.onNodeWithTag("editor_save_reason").fetchSemanticsNode().boundsInRoot.top
         assertThat((reasonTop - lastBottom) / density).isAtLeast(24f)
         val scroll = compose.onNodeWithTag("editor_body").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
         assertThat(scroll.maxValue()).isEqualTo(0f)
@@ -490,6 +517,55 @@ class EventEditorSheetTest {
         compose.onNodeWithTag("editor_save").performClick()
         assertThat(calls).containsExactly("save")
     }
+
+    @Test
+    fun theFooterIsFullWidthAndLarge() {
+        showAt(newForm())
+        val body = bounds("editor_body")
+        val save = bounds("editor_save")
+        assertThat((save.bottom - save.top).value).isWithin(0.5f).of(60f)
+        assertThat((save.right - save.left).value).isWithin(0.5f).of((body.right - body.left).value)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun anEditsDeleteSitsLeftOfSaveWithTheirBottomsLevel() {
+        showAt(dinner())
+        val delete = bounds("editor_delete")
+        val save = bounds("editor_save")
+        assertThat(delete.right.value).isAtMost(save.left.value)
+        assertThat(delete.bottom.value).isWithin(1f).of(save.bottom.value)
+        assertThat(save.right.value).isWithin(0.5f).of(bounds("editor_body").right.value)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    private fun assertFooterAndReasonAboveKeyboard(scale: Float) {
+        val screen = 800.dp
+        val keyboard = 320.dp
+        val form = newForm()
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                WithFontScale(scale) {
+                    Box(Modifier.size(ShellTokens.sheetWidth, screen)) {
+                        EventEditorSheet(
+                            form = form, people = SampleUi.household, service = "Google Calendar", childOnly = null, busy = false,
+                            failure = null, picker = EditorPicker.None, onClose = {}, onSave = {}, onDelete = {},
+                            onRefusedWho = {}, onPicker = {}, keyboard = WindowInsets(bottom = keyboard),
+                        )
+                    }
+                }
+            }
+        }
+        assertThat(bounds("editor_save").bottom).isAtMost(screen - keyboard)
+        assertThat(bounds("editor_save_reason").bottom).isAtMost(screen - keyboard)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theFooterAndItsReasonStayAboveTheKeyboard() = assertFooterAndReasonAboveKeyboard(1f)
+
+    @Test
+    fun theFooterAndItsReasonStayAboveTheKeyboardAtLargeFont() = assertFooterAndReasonAboveKeyboard(1.3f)
 
     @Test
     fun theSheetsTitleIsAHeading() {

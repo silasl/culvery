@@ -8,6 +8,9 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onChild
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
@@ -32,6 +35,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.isReadAsOne
 
 @RunWith(AndroidJUnit4::class)
@@ -158,6 +162,19 @@ class PickersTest {
         compose.onNodeWithTag("picker_cancel").performClick()
         assertThat(set).isEmpty()
         assertThat(cancelled).isEqualTo(1)
+    }
+
+    /** A pin: the old calendar button was already 48 dp with a 24 dp icon; the shared one must keep them. */
+    @Test
+    fun thePickersPagesButtonsAreTheSharedRoundButton() {
+        showDates()
+        mapOf("date_prev" to "Earlier weeks", "date_next" to "Later weeks").forEach { (tag, name) ->
+            compose.onNodeWithTag(tag).assert(isButton).assertWidthIsEqualTo(48.dp).assertHeightIsEqualTo(48.dp)
+            compose.onNodeWithContentDescription(name).assert(isButton)
+            val icon = compose.onNodeWithTag(tag, useUnmergedTree = true).onChild().getUnclippedBoundsInRoot()
+            assertThat((icon.bottom - icon.top).value).isWithin(1f).of(24f)
+        }
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test

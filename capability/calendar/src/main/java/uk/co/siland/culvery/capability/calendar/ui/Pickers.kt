@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,11 +51,13 @@ import uk.co.siland.culvery.capability.calendar.SHORT_DAY
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhAlpha
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.hhClickable
@@ -145,8 +146,8 @@ internal fun DatePickerCard(today: LocalDate, selected: LocalDate, onPick: (Loca
                         .semantics { liveRegion = LiveRegionMode.Polite },
                 )
             }
-            RoundButton(Icons.CHEVRON_LEFT, "Earlier weeks", "date_prev", on = ButtonSurface.Surf) { page-- }
-            RoundButton(Icons.CHEVRON_RIGHT, "Later weeks", "date_next", on = ButtonSurface.Surf) { page++ }
+            HhRoundButton(Icons.CHEVRON_LEFT, "Earlier weeks", { page-- }, Modifier.testTag("date_prev"), on = ButtonSurface.Surf, iconSize = ButtonTokens.icon)
+            HhRoundButton(Icons.CHEVRON_RIGHT, "Later weeks", { page++ }, Modifier.testTag("date_next"), on = ButtonSurface.Surf, iconSize = ButtonTokens.icon)
         }
         Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.dateCellGap)) {
             Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.dateCellGap)) {
@@ -243,24 +244,6 @@ private fun DateCell(date: LocalDate, today: LocalDate, selected: LocalDate, mod
             },
     ) {
         Text(dateCellLabel(date), style = CalendarType.pickerCell, color = if (isSelected) c.accentInk else c.ink, maxLines = 1)
-    }
-}
-
-/** A round quiet button named by its icon ([label]); its fill is the quiet fill on [on]. */
-@Composable
-internal fun RoundButton(icon: String, label: String, tag: String, on: ButtonSurface, enabled: Boolean = true, onClick: () -> Unit) {
-    val c = Culvery.colors
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .testTag(tag)
-            .size(CalendarDimens.pageButton)
-            .alpha(if (enabled) 1f else CalendarDimens.DISABLED_ALPHA)
-            .clip(CircleShape)
-            .background(quietFill(on, c))
-            .hhClickable(onClick, enabled = enabled),
-    ) {
-        HhIcon(icon, size = CalendarDimens.pageButtonIcon, tint = c.ink, contentDescription = label)
     }
 }
 

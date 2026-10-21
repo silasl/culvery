@@ -58,12 +58,9 @@ import uk.co.siland.culvery.capability.calendar.lengthLabel
 import uk.co.siland.culvery.capability.calendar.saveFailedBody
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
-import uk.co.siland.culvery.core.ui.ButtonSize
-import uk.co.siland.culvery.core.ui.ButtonSurface
-import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhFooterButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhIcon
@@ -82,6 +79,7 @@ internal const val PICK_A_DATE = "Pick a date"
 internal const val PICK_A_TIME = "Pick a time"
 internal const val REPEATS = "Repeats"
 internal const val ENDS = "Ends"
+internal const val ADD_A_TITLE_FIRST = "Add a title first"
 internal const val ENDS_TOO_EARLY = "The end date is before the event’s day. Pick a later one."
 
 internal fun afterTimes(times: Int): String = "After $times times"
@@ -476,21 +474,24 @@ private fun FailureCard(failure: SaveFailure) {
 
 @Composable
 private fun Footer(form: EventForm, busy: Boolean, failed: Boolean, onSave: () -> Unit, onDelete: () -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         if (form.mode is EventForm.Mode.Edit) DeleteButton(enabled = !busy, tag = "editor_delete", onClick = onDelete)
-        HhButton(
+        HhFooterButton(
             text = when {
                 failed -> "Try again"
                 form.mode == EventForm.Mode.New -> "Add event"
                 else -> "Save changes"
             },
             onClick = onSave,
-            modifier = Modifier.weight(1f).testTag("editor_save"),
-            tone = ButtonTone.Primary,
-            size = ButtonSize.Large,
+            tag = "editor_save",
+            modifier = Modifier.weight(1f),
             icon = if (failed) Icons.REFRESH else Icons.CHECK,
             enabled = form.canSave && !busy,
-            on = ButtonSurface.Bg,
+            reason = ADD_A_TITLE_FIRST.takeIf { form.mode == EventForm.Mode.New && form.title.isBlank() },
         )
     }
 }
