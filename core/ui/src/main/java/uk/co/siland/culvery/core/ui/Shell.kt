@@ -151,7 +151,7 @@ fun HhCloseButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 /**
  * The toast pill: `ink` background, `bg` text, 16 sp / 600, padding 14×22, radius 26. One spoken item, polite unless [urgent].
  * With a [countdown], a ring of the time left replaces the icon (9 §4.13). With an [actionLabel], a 48 dp text button in
- * `accent` follows the message; it sits outside the merged message group so TalkBack and tests can reach it.
+ * `accentOnInk` follows the message; it sits outside the merged message group so TalkBack and tests can reach it.
  */
 @Composable
 fun HhToast(
@@ -185,7 +185,7 @@ fun HhToast(
             Box(
                 Modifier.testTag("toast_action").defaultMinSize(minWidth = ShellTokens.toastActionHeight, minHeight = ShellTokens.toastActionHeight).hhClickable(onAction),
                 contentAlignment = Alignment.Center,
-            ) { Text(actionLabel, style = ShellType.toast, color = c.accent) }
+            ) { Text(actionLabel, style = ShellType.toast, color = c.accentOnInk) }
         }
     }
 }

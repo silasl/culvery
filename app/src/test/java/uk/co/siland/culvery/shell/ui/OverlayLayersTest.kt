@@ -272,34 +272,50 @@ class OverlayLayersTest {
         compose.mainClock.advanceTimeByFrame()
     }
 
+    // One frame of the test clock, as advanceTimeByFrame steps it.
+    private val FRAME_MS get() = 16L
+
+    private fun showEditor(edited: Boolean): Long {
+        val at = compose.mainClock.currentTime
+        compose.runOnIdle {
+            overlay.showFullScreen { Box(Modifier.fillMaxSize().testTag("editor")) }
+            if (edited) overlay.markEdited(true)
+        }
+        settle()
+        return at
+    }
+
+    /** Runs the clock to [millis] after [from], then draws a frame. */
+    private fun until(from: Long, millis: Long) {
+        compose.mainClock.advanceTimeBy(from + millis - compose.mainClock.currentTime)
+        compose.mainClock.advanceTimeByFrame()
+    }
+
     private fun open(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
 
+    /** pin: the idle close is the sheet's, unchanged. */
     @Test
     fun aFullScreenOverlayStillClosesWhenIdle() {
         showShell()
-        compose.runOnIdle { overlay.showFullScreen { Box(Modifier.fillMaxSize().testTag("editor")) } }
-        settle()
-        after(OVERLAY_IDLE_MS - 100)
+        val shownAt = showEditor(edited = false)
+        until(shownAt, OVERLAY_IDLE_MS - FRAME_MS)
         assertThat(open("editor")).isTrue()
-        after(100)
+        until(shownAt, OVERLAY_IDLE_MS + FRAME_MS)
         assertThat(open("editor")).isFalse()
     }
 
+    /** pin: the edited hold and its warning are the sheet's, unchanged. */
     @Test
     fun anEditedFullScreenOverlayWarnsAt580SecondsAndClosesAt600() {
         showShell()
-        compose.runOnIdle {
-            overlay.showFullScreen { Box(Modifier.fillMaxSize().testTag("editor")) }
-            overlay.markEdited(true)
-        }
-        settle()
-        after(EDIT_HOLD_MS - CLOSING_WARNING_MS - 100)
+        val shownAt = showEditor(edited = true)
+        until(shownAt, EDIT_HOLD_MS - CLOSING_WARNING_MS - FRAME_MS)
         assertThat(open("sheet_warning")).isFalse()
-        after(100)
+        until(shownAt, EDIT_HOLD_MS - CLOSING_WARNING_MS + FRAME_MS)
         assertThat(open("sheet_warning")).isTrue()
-        after(CLOSING_WARNING_MS - 200)
+        until(shownAt, EDIT_HOLD_MS - FRAME_MS)
         assertThat(open("editor")).isTrue()
-        after(200)
+        until(shownAt, EDIT_HOLD_MS + FRAME_MS)
         assertThat(open("editor")).isFalse()
     }
 
@@ -314,6 +330,16 @@ class OverlayLayersTest {
         post(ToastMessage(2, long, "info", action = ToastAction("Undo") {}))
         assertThat(shownAt(7_984, long)).isTrue()
         assertThat(shownAt(32, long)).isFalse()
+    }
+
+    @Test
+    fun anUrgentToastWithAnActionSpeaksAssertivelyAndKeepsItsButton() {
+        showToasts()
+        post(ToastMessage(1, "Couldn’t undo.", "info", urgent = true, action = ToastAction("Undo") {}))
+        compose.onNodeWithText("Couldn’t undo.").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive))
+        compose.onNodeWithTag("toast_action").assertTextEquals("Undo")
+        assertThat(shownAt(7_984, "Couldn’t undo.")).isTrue()
+        assertThat(shownAt(32, "Couldn’t undo.")).isFalse()
     }
 
     @Test

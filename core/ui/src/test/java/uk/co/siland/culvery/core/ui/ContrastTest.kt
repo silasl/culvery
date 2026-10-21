@@ -72,6 +72,12 @@ class ContrastTest {
         }
     }
 
+    /** The toast pill is inverted, so its action takes the other theme's accent. */
+    @Test
+    fun accentOnInk() {
+        themes.forEach { (name, t) -> check("$name toast action on ink", t.accentOnInk, t.ink, TEXT) }
+    }
+
     @Test
     fun dangerTextIconsAndToasts() {
         themes.forEach { (name, t) ->

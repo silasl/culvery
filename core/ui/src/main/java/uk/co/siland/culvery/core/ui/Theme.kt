@@ -41,6 +41,7 @@ fun CulveryTheme(dark: Boolean, content: @Composable () -> Unit) {
         mute = animated(target.mute),
         accent = animated(target.accent),
         accentInk = animated(target.accentInk),
+        accentOnInk = animated(target.accentOnInk),
         accentSoft = animated(target.accentSoft),
         danger = animated(target.danger),
         dangerSoft = animated(target.dangerSoft),
