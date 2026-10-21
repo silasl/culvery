@@ -112,11 +112,15 @@ class EditorForm(
         return !e.isAllDay() || ChronoUnit.DAYS.between(first, last) + 1 > MAX_SPAN_DAYS
     }
 
+    /** Set while a save runs: every change is ignored, since the editor closes on what was sent. */
+    var saving: Boolean by mutableStateOf(false)
+
     var title: String by mutableStateOf(original?.title ?: "")
         private set
 
     /** Typing past [MAX_TITLE_LENGTH] is ignored; shortening is always allowed, even an edited title already over it. */
     fun updateTitle(value: String) {
+        if (saving) return
         if (value.length <= MAX_TITLE_LENGTH || value.length < title.length) title = value
     }
 
@@ -130,6 +134,7 @@ class EditorForm(
 
     /** Everyone replaces the set and a person replaces Everyone; the last person can be cleared, which Save then waits on. */
     fun toggleWho(person: PersonId) {
+        if (saving) return
         who = toggled(who, person, mayClear = true).sortedBy(order::rankOf)
     }
 
@@ -165,7 +170,7 @@ class EditorForm(
     /** On, the event is all day and the next tap is its first day; off, it is one day again. */
     @JvmName("chooseMultiDay")
     fun setMultiDay(on: Boolean) {
-        if (datesLocked || on == multiDay) return
+        if (saving || datesLocked || on == multiDay) return
         multiDay = on
         until = null
         awaiting = false
@@ -186,7 +191,7 @@ class EditorForm(
      * unless it is over the cap: then a tap on or after the first day replaces the last.
      */
     fun tapDay(date: LocalDate) {
-        if (datesLocked) return
+        if (saving || datesLocked) return
         val first = day
         when {
             !multiDay -> if (date == first) return else day = date
@@ -240,7 +245,7 @@ class EditorForm(
 
     // A time can't be chosen while the event lasts more than a day, nor on a locked span; re-choosing changes nothing.
     private fun applyTime(choice: TimeChoice) {
-        if (datesLocked || (multiDay && choice is TimeChoice.Custom)) return
+        if (saving || datesLocked || (multiDay && choice is TimeChoice.Custom)) return
         endError = null
         if (choice == time) return
         time = choice
@@ -248,7 +253,7 @@ class EditorForm(
     }
 
     fun chooseLength(length: Duration) {
-        if (datesLocked) return
+        if (saving || datesLocked) return
         endError = null
         if (length == this.length) return
         this.length = length
@@ -258,6 +263,7 @@ class EditorForm(
     /** An end on the start's day sets the length; one at or before the start is refused and changes nothing. */
     fun chooseEndTime(end: LocalTime) {
         val start = startTime ?: return
+        if (saving) return
         if (!end.isAfter(start)) {
             endError = END_BEFORE_START
             return
@@ -298,7 +304,7 @@ class EditorForm(
 
     /** Back to Never drops the end: Ends only shows while the event repeats. */
     fun chooseRepeat(choice: RepeatChoice) {
-        if (!canRepeat || choice == repeat) return
+        if (saving || !canRepeat || choice == repeat) return
         repeat = choice
         if (choice == RepeatChoice.Never) repeatEnd = RepeatEnd.Never
     }
@@ -311,7 +317,7 @@ class EditorForm(
     fun keepsGoing() = chooseEnd(RepeatEnd.Never)
 
     private fun chooseEnd(end: RepeatEnd) {
-        if (canRepeat && repeat != RepeatChoice.Never) repeatEnd = end
+        if (!saving && canRepeat && repeat != RepeatChoice.Never) repeatEnd = end
     }
 
     fun fewerTimes() = stepTimes(-1)
@@ -320,6 +326,7 @@ class EditorForm(
 
     private fun stepTimes(by: Int) {
         val end = repeatEnd as? RepeatEnd.After ?: return
+        if (saving) return
         repeatEnd = RepeatEnd.After((end.times + by).coerceIn(MIN_TIMES, MAX_TIMES))
     }
 

@@ -64,6 +64,37 @@ class EditorFormTest {
 
     private fun allDay(first: LocalDate, endExclusive: LocalDate) = EventTime.AllDay(first) to EventTime.AllDay(endExclusive)
 
+    /** A save in flight closes the editor on what it sent, so nothing changes until it ends. */
+    @Test
+    fun whileSavingEveryChangeIsIgnored() {
+        val form = ready(day(21)).apply {
+            chooseHour(18)
+            chooseRepeat(RepeatChoice.Weekly)
+            stopsAfter()
+        }
+        val before = form.draft(createdBy = null)
+        val repeatEnd = form.repeatEnd
+        form.saving = true
+        form.updateTitle("Other")
+        form.toggleWho(sam)
+        form.tapDay(day(22))
+        form.setMultiDay(true)
+        form.chooseAllDay()
+        form.chooseHour(9)
+        form.chooseMinute(30)
+        form.chooseTime(LocalTime.of(7, 0))
+        form.chooseLength(Duration.ofHours(3))
+        form.chooseEndTime(LocalTime.of(23, 0))
+        form.chooseRepeat(RepeatChoice.Daily)
+        form.moreTimes()
+        form.keepsGoing()
+        assertThat(form.draft(createdBy = null)).isEqualTo(before)
+        assertThat(form.repeatEnd).isEqualTo(repeatEnd)
+        form.saving = false
+        form.tapDay(day(22))
+        assertThat(form.day).isEqualTo(day(22))
+    }
+
     // Who
 
     @Test

@@ -20,10 +20,12 @@ import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.EditResult
 import uk.co.siland.culvery.capability.calendar.EditorForm
+import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.WeekFocus
 import uk.co.siland.culvery.capability.calendar.WriteProblem
+import uk.co.siland.culvery.capability.calendar.daySpan
 import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.capability.calendar.weeksTo
 import uk.co.siland.culvery.core.household.Member
@@ -91,7 +93,7 @@ private suspend fun open(request: EditorRequest, repo: CalendarRepository, edito
  * time (Save is disabled while one runs), and closes itself when there is nothing to edit. An unchanged edit closes
  * with no PIN. A refusal keeps the editor open with the failure card, and so does the tablet failing before the write; a
  * queued or saved change closes it, and a new event then shows on the Calendar tab's week that holds it ([weekFocus]),
- * from Home too. Delete authorises, then [onDeleteAuthorised] swaps to the detail sheet asking to confirm. A signed-in
+ * from Home too, unless no week shown holds it. Nothing in the form changes while a save runs. Delete authorises, then [onDeleteAuthorised] swaps to the detail sheet asking to confirm. A signed-in
  * Child's other Who tiles are locked while their session lasts. Try again after a tablet failure reuses the create's key.
  * An editor that can't load closes with a toast.
  */
@@ -144,9 +146,10 @@ internal fun EventEditorHost(
     val edited by rememberUpdatedState(onEdited)
     LaunchedEffect(form) { snapshotFlow { form.edited || action.busy }.collect { edited(it) } }
 
-    // The event's first date shows on the week (9 §3.1 After Add); past the weeks shown, the toast names it instead.
+    // The event's first date shows on the week (9 §3.1 After Add); past the weeks shown, the toast names it instead (9 §3.4).
     fun showAdded(day: LocalDate) {
-        weeksTo(form.today, day)?.let(weekFocus::show)
+        val weeks = weeksTo(form.today, day) ?: return
+        weekFocus.show(weeks)
         navigator?.openTab(CALENDAR_TAB_ID)
     }
 
@@ -158,16 +161,22 @@ internal fun EventEditorHost(
         }
         failure = null
         action.run {
-            val draft = form.draft(createdBy = null)
-            val result = when (val mode = form.mode) {
-                EditorForm.Mode.New -> editor.create(draft, createKey)
-                is EditorForm.Mode.Edit -> editor.update(mode.original.ref, draft, form.touched)
+            form.saving = true
+            val draft: EventDraft
+            val result = try {
+                draft = form.draft(createdBy = null)
+                when (val mode = form.mode) {
+                    EditorForm.Mode.New -> editor.create(draft, createKey)
+                    is EditorForm.Mode.Edit -> editor.update(mode.original.ref, draft, form.touched)
+                }
+            } finally {
+                form.saving = false
             }
             if (result != EditResult.Rejected(WriteProblem.Tablet)) createKey = newClientKey()
             when (result) {
                 EditResult.Done, EditResult.Queued -> {
                     onClose()
-                    if (form.mode == EditorForm.Mode.New) form.day?.let(::showAdded)
+                    if (form.mode == EditorForm.Mode.New) showAdded(daySpan(draft.start, draft.end, form.zone).first)
                 }
                 EditResult.NotEditable -> onClose()
                 is EditResult.Rejected -> failure = SaveFailure(loaded.service, result.problem)

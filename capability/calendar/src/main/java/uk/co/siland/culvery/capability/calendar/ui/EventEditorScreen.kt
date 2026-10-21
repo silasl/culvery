@@ -180,9 +180,12 @@ internal fun EventEditorScreen(
                             flow.open(EditorStep.Who)
                         },
                     )
+                    // A save in flight closes on what it sent, so no other pane opens meanwhile.
                     Rows(form, flow, members, service, typing, lit = !titleFocused, clash = clash) { step ->
-                        closeKeyboard()
-                        flow.open(step)
+                        if (!busy) {
+                            closeKeyboard()
+                            flow.open(step)
+                        }
                     }
                     if (!typing) {
                         Spacer(Modifier.weight(1f))
