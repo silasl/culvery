@@ -139,6 +139,18 @@ internal object CalendarType {
     /** 27 sp / 700 and 15 sp / 700: the pane's question and its Skip. */
     val paneQuestion = HhType.screenTitle.copy(fontSize = 27.sp)
     val paneSkip = HhType.buttonLabel
+
+    /** 28 sp / 700, 20 sp / 700 and 13 sp: a Who tile's initial, name and role (handoff 6b). */
+    val whoInitial = HhType.dateNumber.copy(fontSize = 28.sp)
+    val whoName = HhType.sectionTitle.copy(fontSize = 20.sp)
+    val whoRole = HhType.secondary.copy(fontSize = 13.sp)
+
+    /** 19 sp / 700 and 14 sp: "Everyone" and "Shows as a Family event". */
+    val everyoneName = HhType.cardTitle
+    val everyoneLine = HhType.secondary
+
+    /** 14 sp: the line under the Who pane. */
+    val whoHint = HhType.secondary
 }
 
 /** The full-screen editor's layout (handoff §1 Layout, px ÷ 1.5). */
@@ -196,6 +208,28 @@ internal object EditorDimens {
     val paneHeaderGap = 13.dp
     val paneButtonGap = 8.dp
     val skipPaddingH = 19.dp
+
+    // Who tiles: three a row, 13 apart, 160 tall, radius 20; a 64 circle 8 above the name, the role 8 below it. Chosen, a
+    // 3 ring inside and a 32 badge 11 in from the top right; locked, a 20 lock 11 in from the top left.
+    val tileGap = 13.dp
+    val tileHeight = 160.dp
+    val tileRadius = 20.dp
+    val tileCircle = 64.dp
+    val tileInnerGap = 8.dp
+    val tileRing = 3.dp
+    val tileBadge = 32.dp
+    val tileBadgeIcon = 21.dp
+    val tileCorner = 11.dp
+    val tileLock = 20.dp
+
+    // The Everyone row: 69 tall, radius 19, 19 in at the sides, a 40 Family circle with a 24 icon 13 before the words.
+    val everyoneHeight = 69.dp
+    val everyoneRadius = 19.dp
+    val everyonePaddingH = 19.dp
+    val everyoneGap = 13.dp
+    val everyoneCircle = 40.dp
+    val everyoneIcon = 24.dp
+    val everyoneLineGap = 1.dp
 }
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */

@@ -50,10 +50,16 @@ fun editorForm(
     order = SampleUi.household.map { it.id }, calendarPerson = null, repeats = repeats,
 )
 
-/** An edit in the full-screen editor of an event on Alex's calendar. */
-fun editorEditOf(start: EventTime, end: EventTime, title: String = "Dinner with Jo & Priya", forPerson: String? = "alex") = EditorForm(
+/** An edit in the full-screen editor of an event on Alex's calendar, by [childOnly] when a child is signed in. */
+fun editorEditOf(
+    start: EventTime,
+    end: EventTime,
+    title: String = "Dinner with Jo & Priya",
+    forPerson: String? = "alex",
+    childOnly: PersonId? = null,
+) = EditorForm(
     EventForm.Mode.Edit(EditableEvent(EventRef("c1", "s1", "e1"), title, start, end, forPerson)),
-    SampleUi.TODAY, LocalTime.of(11, 54), LONDON, signedIn = null, childOnly = null, preselectedDay = null,
+    SampleUi.TODAY, LocalTime.of(11, 54), LONDON, signedIn = childOnly, childOnly = childOnly, preselectedDay = null,
     order = SampleUi.household.map { it.id }, calendarPerson = SampleUi.alex.id,
 )
 

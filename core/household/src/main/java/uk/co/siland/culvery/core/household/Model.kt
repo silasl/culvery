@@ -22,6 +22,14 @@ data class Person(val id: PersonId, val name: String, val color: Long) {
 
 enum class Role { ADMIN, ADULT, CHILD }
 
+/** "Admin", "Adult", "Child": the role as people read it. */
+val Role.label: String
+    get() = when (this) {
+        Role.ADMIN -> "Admin"
+        Role.ADULT -> "Adult"
+        Role.CHILD -> "Child"
+    }
+
 /** Role and PIN material for one person. [pinHash] and [salt] are Base64. */
 data class Credential(
     val personId: PersonId,

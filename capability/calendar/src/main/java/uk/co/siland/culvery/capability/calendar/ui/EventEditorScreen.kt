@@ -113,7 +113,7 @@ internal fun EventEditorScreen(
     onRefusedWho: () -> Unit,
     onPicker: (EditorPicker) -> Unit,
     keyboard: WindowInsets = WindowInsets.ime,
-    pane: @Composable (EditorStep) -> Unit = { EditorPaneFor(it, form, flow) },
+    pane: @Composable (EditorStep) -> Unit = { EditorPaneFor(it, form, flow, members, childOnly, childName, busy, onRefusedWho) },
 ) {
     val c = Culvery.colors
     val focusManager = LocalFocusManager.current

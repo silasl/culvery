@@ -15,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EditorForm
+import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 
@@ -26,22 +27,22 @@ class AddEventScreenshotTest {
 
     @get:Rule(order = 1) val compose = createComposeRule()
 
-    private fun show(form: EditorForm, dark: Boolean, keyboard: Dp = 0.dp, savesTo: String = "Family calendar") {
-        val flow = editorFlow(form, null)
+    private fun show(form: EditorForm, dark: Boolean, keyboard: Dp = 0.dp, savesTo: String = "Family calendar", child: Person? = null) {
+        val flow = editorFlow(form, child?.id)
         compose.setContent {
             CulveryTheme(dark = dark) {
                 EventEditorScreen(
                     form = form,
                     flow = flow,
                     members = SampleUi.members,
-                    context = "From Calendar · Alex signed in",
+                    context = "From Calendar · ${child?.name ?: "Alex"} signed in",
                     savesTo = savesTo,
                     service = "Google Calendar",
                     busy = false,
                     failure = null,
                     picker = EditorPicker.None,
-                    childOnly = null,
-                    childName = null,
+                    childOnly = child?.id,
+                    childName = child?.name,
                     held = null,
                     onClose = {},
                     onSave = {},
@@ -75,6 +76,27 @@ class AddEventScreenshotTest {
         show(editorForm(), dark = true, keyboard = 320.dp)
         compose.onNodeWithTag("editor_title").performTextInput("Gui")
         snap("add_event_keyboard_dark")
+    }
+
+    /** Handoff 6b: "Guitar lesson" for Sam and Mia, chosen as two tiles, with Everyone and the hint below. */
+    @Test
+    fun addEventWhoDark() {
+        val form = editorForm().apply {
+            updateTitle("Guitar lesson")
+            toggleWho(SampleUi.sam.id)
+            toggleWho(SampleUi.mia.id)
+        }
+        show(form, dark = true)
+        snap("add_event_who_dark")
+    }
+
+    /** Handoff 6b with Mia signed in: Alex, Sam and Everyone locked, Mia chosen, and the line saying why. */
+    @Test
+    fun addEventWhoChildDark() {
+        val mia = SampleUi.mia
+        val form = editorForm(signedIn = mia.id, childOnly = mia.id).apply { updateTitle("Piano practice") }
+        show(form, dark = true, child = mia)
+        snap("add_event_who_child_dark")
     }
 
     /** Dinner tonight at 19:30 for 90 minutes, opened on Check with its pane still empty. */

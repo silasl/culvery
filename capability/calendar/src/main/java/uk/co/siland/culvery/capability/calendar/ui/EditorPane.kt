@@ -23,6 +23,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import uk.co.siland.culvery.capability.calendar.EditorForm
+import uk.co.siland.culvery.core.household.Member
+import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
@@ -42,8 +44,22 @@ internal fun questionFor(step: EditorStep, form: EditorForm): String = when (ste
 
 /** The pane for [step]: its question over what answers it. */
 @Composable
-internal fun EditorPaneFor(step: EditorStep, form: EditorForm, flow: EditorFlow) {
-    EditorPane(questionFor(step, form), flow, skip = step == EditorStep.Time || step == EditorStep.Repeats) {}
+internal fun EditorPaneFor(
+    step: EditorStep,
+    form: EditorForm,
+    flow: EditorFlow,
+    members: List<Member>,
+    childOnly: PersonId?,
+    childName: String?,
+    busy: Boolean,
+    onRefusedWho: () -> Unit,
+) {
+    EditorPane(questionFor(step, form), flow, skip = step == EditorStep.Time || step == EditorStep.Repeats) {
+        when (step) {
+            EditorStep.Who -> WhoPane(form, members, childOnly, childName, busy, onRefusedWho)
+            else -> Unit
+        }
+    }
 }
 
 /**

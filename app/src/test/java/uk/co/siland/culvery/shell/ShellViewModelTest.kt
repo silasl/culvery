@@ -359,11 +359,6 @@ class ShellViewModelTest {
     }
 
     @Test
-    fun roleLabelsReadAsWords() {
-        assertThat(Role.entries.map(::roleLabel)).containsExactly("Admin", "Adult", "Child").inOrder()
-    }
-
-    @Test
     fun themePreviewEndsWhenScheduleFlips() = runTest {
         val vm = vm()
         vm.uiState.test {

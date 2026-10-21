@@ -35,6 +35,7 @@ expand_less
 expand_more
 foggy
 group
+groups
 help
 home
 info

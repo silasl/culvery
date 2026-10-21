@@ -40,6 +40,7 @@ object Icons {
     const val EXPAND_MORE = "expand_more"
     const val FOGGY = "foggy"
     const val GROUP = "group"
+    const val GROUPS = "groups"
     const val HELP = "help"
     const val HOME = "home"
     const val INFO = "info"

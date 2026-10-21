@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
 import uk.co.siland.culvery.FrontTracker
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
-import uk.co.siland.culvery.core.household.Role
+import uk.co.siland.culvery.core.household.label
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Daylight
 import uk.co.siland.culvery.core.plugin.HeaderItem
@@ -144,7 +144,7 @@ class ShellViewModel @Inject constructor(
                 ShellUiState(
                     tabs = tabs,
                     selectedTabId = if (sel == HOME_TAB_ID || tabs.any { it.id == sel }) sel else HOME_TAB_ID,
-                    session = session?.let { SessionUi(it.person.name, roleLabel(it.role)) },
+                    session = session?.let { SessionUi(it.person.name, it.role.label) },
                     homeCards = cards.layout,
                     cardsLoaded = cards.loaded,
                     settingsOpen = settings != null && session != null,
@@ -243,12 +243,6 @@ class ShellViewModel @Inject constructor(
     fun toggleThemePreview() {
         previewing.value = !previewing.value
     }
-}
-
-internal fun roleLabel(role: Role): String = when (role) {
-    Role.ADMIN -> "Admin"
-    Role.ADULT -> "Adult"
-    Role.CHILD -> "Child"
 }
 
 private const val TAG = "ShellViewModel"

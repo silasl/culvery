@@ -94,12 +94,6 @@ internal fun changeDetailsLabel(name: String): String = "change $name’s detail
 
 internal const val USE_AS_HOME = "use as home"
 
-internal fun roleName(role: Role): String = when (role) {
-    Role.ADMIN -> "Admin"
-    Role.ADULT -> "Adult"
-    Role.CHILD -> "Child"
-}
-
 internal fun roleLine(role: Role): String = when (role) {
     Role.ADMIN -> "Admin — can change settings and people"
     Role.ADULT -> "Adult — can add and change any event"

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
+import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -45,6 +46,9 @@ class CalendarRepository @Inject constructor(
 
     /** The household's people, for the detail sheet's chips for choosing who it's for and the add/edit sheet's Who chips. */
     val people: Flow<List<Person>> = household.people
+
+    /** The household's people with their roles, for the editor's Who tiles (handoff 6b). */
+    val members: Flow<List<Member>> = household.members
 
     val syncStatus: Flow<SyncStatusUi> = store.connections().map { connections ->
         val service = { c: StoredConnection -> serviceNameOf(c.connection, serviceNames::get) }

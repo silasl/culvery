@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.stateDescription
 import uk.co.siland.culvery.core.household.MAX_PEOPLE
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Role
+import uk.co.siland.culvery.core.household.label
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
@@ -78,7 +79,7 @@ internal fun PersonRow(
         title = name,
         modifier = Modifier.testTag("person_$name").semantics { if (moves.isNotEmpty()) customActions = moves },
         leading = { Box(Modifier.size(SetupDimens.rowDot).clip(CircleShape).background(Color(member.person.color))) },
-        subtitle = "${roleName(member.role)} · ${pinState(member)}",
+        subtitle = "${member.role.label} · ${pinState(member)}",
         trailing = {
             if (reorderable) {
                 MoveButton(Icons.ARROW_UPWARD, moveUpLabel(name), "person_up_$name", onUp, atEnd = ALREADY_FIRST)
