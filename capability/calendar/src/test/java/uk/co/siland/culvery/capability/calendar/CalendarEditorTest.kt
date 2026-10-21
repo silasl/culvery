@@ -1209,8 +1209,8 @@ class CalendarEditorTest {
         assertThat(store.pendingNow()).isEmpty()
         assertThat(writer.calls).containsExactly("create:Swimming", "deleteSeries:key-s").inOrder()
         assertThat(access.toasts.messages.last()).isEqualTo("Removed Swimming.")
-        // Nothing left the tablet, so nothing can land.
-        assertThat(undone.pending).isEmpty()
+        // Kept in case a drain had it on its way; nothing lands, so it goes at restart.
+        assertThat(undone.pending).containsExactly("key-s")
 
         writer.failWith = null
         drain(access, aheadMillis = OUTBOX_BACKOFF_MS.first()).syncAll()
@@ -1307,6 +1307,36 @@ class CalendarEditorTest {
         assertThat(writer.calls).containsExactly("create:Swimming", "create:Swimming", "deleteSeries:key-s", "deleteSeries:key-s").inOrder()
         assertThat(undone.pending).isEmpty()
         assertThat(seriesRows("key-s")).isEmpty()
+    }
+
+    @Test
+    fun undoWhileTheDrainSendsANeverSentCreateStillRemovesIt() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        writer.failWith = OfflineException()
+        assertThat(editor.create(draft("Dinner", PersonId.FAMILY.value))).isEqualTo(EditResult.Queued)
+        assertThat(store.pendingNow().single().attempts).isEqualTo(0)
+        // Back online: the queue is due at once, so the drain sends it while the toast still shows.
+        store.makeDue("c1", opened)
+        writer.failWith = null
+        writer.createGate = CompletableDeferred()
+        val pass = launch { drain(access, aheadMillis = 0, io = Dispatchers.Default).syncAll() }
+        waitUntil { writer.calls.size == 2 }
+        assertThat(editor.undoAdd(added("key-1", "Dinner", access.alex))).isEqualTo(EditResult.Done)
+        assertThat(access.toasts.messages.last()).isEqualTo("Removed Dinner.")
+
+        writer.createGate?.complete(Unit)
+        pass.join()
+        assertThat(writer.calls).containsExactly("create:Dinner", "create:Dinner", "delete:key-1", "delete:key-1").inOrder()
+        assertThat(store.eventNow(ref("key-1"))).isNull()
+        assertThat(undone.pending).isEmpty()
+
+        val reads = ScriptedProvider("calendar.a", sourceList = listOf(family.copy(primary = true), school)).apply {
+            events = { source -> if (source.id == family.id) writer.created.values.filter { it.remoteId !in writer.deleted } else emptyList() }
+        }
+        testSync(store, setOf(reads), HouseholdZone(household), WallClock { opened }, setOf(writer), access.toasts, writeLock = lock, undone = undone).syncAll()
+        assertThat(store.eventNow(ref("key-1"))).isNull()
     }
 
     @Test

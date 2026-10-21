@@ -238,9 +238,9 @@ class CalendarEditor internal constructor(
 
     /**
      * Under [writeLock]: drops what is queued for the event, its create included, then deletes it. The key goes in
-     * [undone] first, so a create the drain already has on its way is deleted as it lands; it stays there only while a
-     * create that was sent may yet land. The mirror changes only once the service has deleted it. NotEditable: it
-     * couldn't be undone.
+     * [undone] first, so a create the drain already has on its way is deleted as it lands; it stays there while a
+     * create may yet land, until restart for one that never does. The mirror changes only once the service has deleted
+     * it. NotEditable: it couldn't be undone.
      */
     private suspend fun undo(added: AddedEvent, to: Destination): EditResult {
         val ref = EventRef(added.connectionId, added.sourceId, added.key)
@@ -251,9 +251,9 @@ class CalendarEditor internal constructor(
             if (added.series) to.writer.deleteSeries(to.connection, to.source, added.key) else to.writer.delete(to.connection, to.source, added.key)
             null
         }
-        // Never sent, so dropping it was enough.
+        // Never sent, so dropping it was enough; the key stays, as a drain may be sending it now.
         val unsent = create != null && create.attempts == 0
-        if (create == null || unsent) undone.done(added.key)
+        if (create == null) undone.done(added.key)
         return when {
             outcome is WriteOutcome.Accepted -> {
                 try {
