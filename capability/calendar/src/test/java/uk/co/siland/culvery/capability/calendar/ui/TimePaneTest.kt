@@ -22,6 +22,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -47,6 +48,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.pixelAt
@@ -67,6 +69,7 @@ class TimePaneTest {
     private var flow by mutableStateOf(editorFlow(form, null, EditorStep.Time))
     private var held by mutableStateOf<Held?>(null)
     private var picker by mutableStateOf(EditorPicker.None)
+    private var scale by mutableStateOf(1f)
     private val pickers = mutableListOf<EditorPicker>()
     private var shown = false
 
@@ -102,6 +105,7 @@ class TimePaneTest {
         shown = true
         compose.setContent {
             CulveryTheme(dark = true) {
+                WithFontScale(scale) {
                 key(form, flow) {
                     EventEditorScreen(
                         form = form,
@@ -126,6 +130,7 @@ class TimePaneTest {
                         },
                         keyboard = WindowInsets(bottom = 0.dp),
                     )
+                }
                 }
             }
         }
@@ -425,6 +430,64 @@ class TimePaneTest {
             assertThat(form.length).isEqualTo(Duration.ofHours(1))
         }
         part("editor_row_time_value").assertTextEquals("10:00–11:00")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Changing Piano itself, at its own time: it doesn't clash with itself, though another Piano at the same time does. */
+    @Test
+    fun theEventBeingChangedDoesNotClashWithItself() {
+        val start = EventTime.Timed(saturday.atTime(15, 30).atZone(LONDON).toInstant())
+        val end = EventTime.Timed(saturday.atTime(16, 15).atZone(LONDON).toInstant())
+        fun pianoAs(ref: EventRef) = Held(listOf(HeldEvent(ref, "Piano", listOf(SampleUi.mia.id), start, end)), lastShown, emptySet(), SampleUi.TODAY)
+        val edit = { editorEditOf(start, end, title = "Piano", forPerson = "mia") }
+
+        held = pianoAs(EventRef("c1", "s1", "another"))
+        show(edit())
+        assertThat(texts("time_result")).containsExactly("15:30–16:15", "Overlaps Piano, 15:30–16:15").inOrder()
+        clashTagShows()
+
+        held = pianoAs(EventRef("c1", "s1", "e1"))
+        show(edit())
+        assertThat(texts("time_result")).containsExactly("15:30–16:15", "Mia is free then").inOrder()
+        part("hour_15_dot").assertDoesNotExist()
+        part("editor_row_time_tag").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** At 1.3 and 1.5 every hour reads on one line, busy ones with their dot, Other time keeps the Evening row's height, and every length can be reached. */
+    @Test
+    fun theHoursFitAtLargerFontScales() {
+        held = piano(saturday)
+        listOf(1.3f, 1.5f).forEach { s ->
+            scale = s
+            show(guitar { chooseHour(10) })
+            val pane = node("editor_pane").getUnclippedBoundsInRoot()
+            (7..22).forEach { h ->
+                val tag = "hour_%02d".format(h)
+                val layout = compose.onNode(hasText("%02d:00".format(h)) and hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true).textLayout()
+                assertWithMessage("$tag at $s").that(layout.lineCount).isEqualTo(1)
+                assertWithMessage("$tag's words fit at $s").that(layout.getLineRight(0) - layout.getLineLeft(0)).isAtMost(layout.size.width.toFloat())
+                val b = node(tag).getUnclippedBoundsInRoot()
+                assertWithMessage("$tag's height at $s").that((b.bottom - b.top).value).isAtLeast(48f)
+            }
+            val other = compose.onNode(hasText("Other time") and hasAnyAncestor(hasTestTag("hour_other")), useUnmergedTree = true).textLayout()
+            assertWithMessage("Other time's words fit at $s").that((0 until other.lineCount).none { other.isLineEllipsized(it) }).isTrue()
+            assertWithMessage("Other time's words fit at $s").that((0 until other.lineCount).maxOf { other.getLineRight(it) - other.getLineLeft(it) }).isAtMost(other.size.width.toFloat())
+            val o = node("hour_other").getUnclippedBoundsInRoot()
+            val h22 = node("hour_22").getUnclippedBoundsInRoot()
+            assertWithMessage("Other time's top at $s").that(o.top).isEqualTo(h22.top)
+            assertWithMessage("Other time's foot at $s").that(o.bottom).isEqualTo(h22.bottom)
+            assertWithMessage("Other time inside the pane at $s").that(o.right).isAtMost(pane.right)
+            listOf("length_30", "length_45", "length_60", "length_120", "length_until").forEach { tag ->
+                node(tag).performScrollTo()
+                val b = node(tag).getUnclippedBoundsInRoot()
+                assertWithMessage("$tag's top at $s").that(b.top).isAtLeast(pane.top)
+                assertWithMessage("$tag's foot at $s").that(b.bottom).isAtMost(pane.bottom)
+                assertWithMessage("$tag's right at $s").that(b.right).isAtMost(pane.right)
+            }
+            node("length_30").performClick()
+            compose.runOnIdle { assertThat(form.length).isEqualTo(Duration.ofMinutes(30)) }
+        }
         compose.assertClickablesHaveRoleAndLabel()
     }
 

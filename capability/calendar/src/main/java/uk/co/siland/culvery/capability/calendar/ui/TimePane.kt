@@ -6,10 +6,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -172,14 +176,16 @@ private fun Hours(form: EditorForm, busy: Set<Int>, onOther: () -> Unit) {
         HOUR_GROUPS.forEachIndexed { i, (name, hours) ->
             val last = i == HOUR_GROUPS.lastIndex
             Group(name, "hour_group_$i") {
-                Row(horizontalArrangement = Arrangement.spacedBy(EditorDimens.hourGap), modifier = Modifier.fillMaxWidth()) {
+                // As tall as the tallest chip, so a two-line Other time keeps the row even.
+                Row(horizontalArrangement = Arrangement.spacedBy(EditorDimens.hourGap), modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                     hours.forEach { h ->
                         TimeChip(
                             label = clockText(LocalTime.of(h, 0)),
                             selected = hour == h,
                             tag = "hour_%02d".format(h),
                             busy = h in busy,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            fill = true,
                         ) { form.chooseHour(h) }
                     }
                     if (last) {
@@ -188,7 +194,8 @@ private fun Hours(form: EditorForm, busy: Set<Int>, onOther: () -> Unit) {
                             selected = hour != null && hour !in CHIP_HOURS,
                             tag = "hour_other",
                             busy = false,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            fill = true,
                             onClick = onOther,
                         )
                     }
@@ -244,7 +251,7 @@ private fun Group(name: String, tag: String, content: @Composable () -> Unit) {
     }
 }
 
-/** A `surf2` chip in tabular figures; [busy], a 1 dp `weather` edge (unless chosen) and a `weather` dot after the words. */
+/** A `surf2` chip in tabular figures, filling [modifier]'s size when [fill]; [busy], a 1 dp `weather` edge (unless chosen) and a `weather` dot in its top corner. */
 @Composable
 private fun TimeChip(
     label: String,
@@ -252,27 +259,39 @@ private fun TimeChip(
     tag: String,
     busy: Boolean,
     modifier: Modifier = Modifier,
+    fill: Boolean = false,
     role: Role = Role.RadioButton,
     spoken: String? = null,
     onClick: () -> Unit,
 ) {
     val c = Culvery.colors
-    HhChoiceChip(
-        label = label,
-        selected = selected,
-        tag = tag,
-        onClick = onClick,
-        unselectedFill = c.surf2,
-        role = role,
-        spokenName = if (busy) "${spoken ?: label}, $BUSY" else spoken,
-        trailing = if (busy) {
-            { Spacer(Modifier.testTag("${tag}_dot").size(EditorDimens.busyDot).clip(CircleShape).background(c.weather)) }
-        } else {
-            null
-        },
-        labelStyle = CalendarType.timeChip,
-        modifier = if (busy && !selected) modifier.border(EditorDimens.busyEdge, c.weather, RoundedCornerShape(percent = 50)) else modifier,
-    )
+    Box(modifier) {
+        HhChoiceChip(
+            label = label,
+            selected = selected,
+            tag = tag,
+            onClick = onClick,
+            unselectedFill = c.surf2,
+            role = role,
+            spokenName = if (busy) "${spoken ?: label}, $BUSY" else spoken,
+            labelStyle = CalendarType.timeChip,
+            modifier = (if (fill) Modifier.fillMaxSize() else Modifier).then(
+                if (busy && !selected) Modifier.border(EditorDimens.busyEdge, c.weather, RoundedCornerShape(percent = 50)) else Modifier,
+            ),
+        )
+        // In the corner rather than after the words, so a large font keeps the time on one line.
+        if (busy) {
+            Spacer(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = EditorDimens.busyDotInset, end = EditorDimens.busyDotInset)
+                    .testTag("${tag}_dot")
+                    .size(EditorDimens.busyDot)
+                    .clip(CircleShape)
+                    .background(c.weather),
+            )
+        }
+    }
 }
 
 /**

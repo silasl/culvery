@@ -159,7 +159,7 @@ internal object CalendarType {
     val dayDate = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W500)
 
     /** The Time pane (handoff 6e): a chip's 16 sp / 600 in tabular figures; the result 27 sp / 700, tabular, its check 15 sp / 600; the free line 14 sp. */
-    val timeChip = ControlType.chip.copy(fontFeatureSettings = "tnum")
+    val timeChip = ControlType.chip.copy(fontSize = 14.sp, fontFeatureSettings = "tnum")
     val timeResult = HhType.headerValue.copy(fontSize = 27.sp, fontWeight = FontWeight.W700)
     val timeCheck = HhType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.W600)
     val timeFreeAt = HhType.secondary
@@ -255,13 +255,15 @@ internal object EditorDimens {
     val dayDotGap = 3.dp
     val bandRadius = 27.dp
 
-    // The Time pane: a group's label 7 above its chips, 8 apart, six a row; busy, a 1 `weather` edge and a 7 dot. Minutes
+    // The Time pane: a group's label 7 above its chips, 5 apart, six a row; busy, a 1 `weather` edge and a 7 dot 9 in from
+    // the top corner. Minutes
     // and How long side by side, 24 apart, their chips 7 apart. The result under a 1 `surf3` rule, 15 below it, its check 16
     // after the range with a 19 icon 5 before its words; the free starts 8 apart.
     val timeLabelGap = 7.dp
-    val hourGap = 8.dp
+    val hourGap = 5.dp
     val busyEdge = 1.dp
     val busyDot = 7.dp
+    val busyDotInset = 9.dp
     val timeColumnsGap = 24.dp
     val timeChipGap = 7.dp
     val resultRule = 1.dp
