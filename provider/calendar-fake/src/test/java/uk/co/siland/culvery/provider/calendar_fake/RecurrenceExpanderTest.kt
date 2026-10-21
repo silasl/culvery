@@ -30,11 +30,13 @@ class RecurrenceExpanderTest {
 
     private val weeklyFive = "RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=5"
 
+    /** Pin: passes without the change. */
     @Test
     fun theWindowEndingOnTheLastOccurrenceKeepsAllOfThem() {
         assertThat(expand(timedSeries(weeklyFive), LocalDate.of(2026, 10, 30))).hasSize(5)
     }
 
+    /** Pin: passes without the change. */
     @Test
     fun theWindowEndingTheDayBeforeKeepsOneFewer() {
         assertThat(expand(timedSeries(weeklyFive), LocalDate.of(2026, 10, 29))).hasSize(4)
@@ -51,6 +53,7 @@ class RecurrenceExpanderTest {
         assertThat(only.seriesId).isEqualTo("s1")
     }
 
+    /** Pin: passes without the change. */
     @Test
     fun aBadCountIsIgnored() {
         val lastDay = friday.plusDays(21)
@@ -59,9 +62,10 @@ class RecurrenceExpanderTest {
         }
     }
 
+    /** The first case is a pin: UNTIL alone ends it. */
     @Test
     fun untilAndCountTogetherEndAtTheFirst() {
-        // UNTIL on Fri 16 Oct 23:59 UTC allows 3 of the 5 counted; COUNT=3 stops first when UNTIL is later.
+        // UNTIL 22:59:59 UTC on Fri 16 Oct (23:59:59 London) allows 3 of the 5 counted; COUNT=3 stops first when UNTIL is later.
         assertThat(expand(timedSeries("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=5;UNTIL=20261016T225959Z"), friday.plusYears(1))).hasSize(3)
         assertThat(expand(timedSeries("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=3;UNTIL=20261120"), friday.plusYears(1))).hasSize(3)
     }

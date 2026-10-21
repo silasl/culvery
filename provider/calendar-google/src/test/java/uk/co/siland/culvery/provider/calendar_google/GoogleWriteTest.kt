@@ -332,6 +332,7 @@ class GoogleWriteTest {
         assertLogsHoldNoPersonalData(minLines = 3)
     }
 
+    /** Pin: passes without the change. */
     @Test
     fun aCountedSeriesInsertSendsItsRule() = runTest {
         val rule = "RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=5"

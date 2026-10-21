@@ -70,6 +70,7 @@ class RecurrenceTest {
             .isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=5")
     }
 
+    /** Pin: passes without the change. */
     @Test
     fun neverBothUntilAndCountForAnyRepeatEnd() {
         val ends = listOf(RepeatEnd.Never, RepeatEnd.OnDate(LocalDate.of(2026, 12, 31)), RepeatEnd.After(2), RepeatEnd.After(52))

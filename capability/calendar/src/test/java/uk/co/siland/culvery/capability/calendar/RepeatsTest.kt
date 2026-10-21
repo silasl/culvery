@@ -53,6 +53,7 @@ class RepeatsTest {
             .isEqualTo("Every week")
     }
 
+    /** Pin: passes without the change. */
     @Test
     fun aCountedSeriesReadsAsItsChip() {
         assertThat(label("RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=6")).isEqualTo("Every 2 weeks")

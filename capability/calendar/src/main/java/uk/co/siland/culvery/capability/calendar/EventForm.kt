@@ -167,7 +167,11 @@ class EventForm(
         if (canRepeat && repeat != RepeatChoice.Never) repeatEnd = end
     }
 
-    fun chooseAfter(times: Int = DEFAULT_TIMES) = chooseEnd(RepeatEnd.After(times.coerceIn(MIN_TIMES, MAX_TIMES)))
+    /** Choosing it while it is chosen keeps the count. */
+    fun chooseAfter(times: Int = DEFAULT_TIMES) {
+        if (repeatEnd is RepeatEnd.After) return
+        chooseEnd(RepeatEnd.After(times.coerceIn(MIN_TIMES, MAX_TIMES)))
+    }
 
     fun fewerTimes() = stepTimes(-1)
 
