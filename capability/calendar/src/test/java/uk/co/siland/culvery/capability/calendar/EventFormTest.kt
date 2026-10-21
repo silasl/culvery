@@ -863,4 +863,25 @@ class EventFormTest {
         assertThat(form.until).isEqualTo(day(23))
         assertThat(form.unchanged).isTrue()
     }
+
+    @Test
+    fun aLongAllDaySpanStaysLocked() {
+        val term = edit(EventTime.AllDay(LocalDate.of(2026, 9, 7)), EventTime.AllDay(LocalDate.of(2026, 12, 5)), "Autumn term", "family")
+        assertThat(term.datesLocked).isTrue()
+        assertThat(term.offersUntil).isFalse()
+        assertThat(term.until).isNull()
+        term.updateTitle("Autumn term 2026")
+        assertThat(term.canSave).isTrue()
+        assertThat(term.touched).containsExactly(EventField.TITLE)
+    }
+
+    @Test
+    fun aSixtyDayAllDaySpanUnlocks() {
+        val sixty = edit(EventTime.AllDay(mon19), EventTime.AllDay(mon19.plusDays(60)), "Placement", "family")
+        assertThat(sixty.datesLocked).isFalse()
+        assertThat(sixty.until).isEqualTo(mon19.plusDays(59))
+        assertThat(sixty.canSave).isTrue()
+        val sixtyOne = edit(EventTime.AllDay(mon19), EventTime.AllDay(mon19.plusDays(61)), "Placement", "family")
+        assertThat(sixtyOne.datesLocked).isTrue()
+    }
 }

@@ -66,8 +66,8 @@ class EventForm(
 
     private val original: EditableEvent? = (mode as? Mode.Edit)?.original
 
-    /** A timed or mixed event over several days can only change its title and who (2b-2 design D3); an all-day span's dates edit. */
-    val datesLocked: Boolean = original?.let { !(it.start is EventTime.AllDay && it.end is EventTime.AllDay) && spansDays(it.start, it.end, zone) } ?: false
+    /** A timed, mixed or over-long (past [MAX_SPAN_DAYS]) event over several days keeps its dates (2b-2 design D3); a shorter all-day span's dates edit. */
+    val datesLocked: Boolean = original?.let { spansDays(it.start, it.end, zone) && (!(it.start is EventTime.AllDay && it.end is EventTime.AllDay) || spanLength(it, zone) > MAX_SPAN_DAYS) } ?: false
 
     var title: String by mutableStateOf(original?.title ?: "")
         private set
@@ -341,6 +341,11 @@ private fun lengthOf(event: EditableEvent): Duration? {
     val end = event.end
     if (start !is EventTime.Timed || end !is EventTime.Timed) return null
     return Duration.between(start.instant, end.instant).takeIf { !it.isNegative && !it.isZero }
+}
+
+private fun spanLength(event: EditableEvent, zone: ZoneId): Long {
+    val (first, last) = daySpan(event.start, event.end, zone)
+    return ChronoUnit.DAYS.between(first, last) + 1
 }
 
 private fun spansDays(start: EventTime, end: EventTime, zone: ZoneId): Boolean {
