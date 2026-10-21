@@ -41,6 +41,7 @@ import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.pinReasonText
 import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
+import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
@@ -330,10 +331,11 @@ class PinPadTest {
         controller.open("Change settings", null, null)
         show(overSheet = true)
         val area = compose.onNodeWithTag("pin_area", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertThat(area.left.value).isWithin(1f).of(680f)
-        assertThat((area.right - area.left).value).isWithin(1f).of(600f)
+        val width = ShellTokens.sheetWidth.value
+        assertThat(area.left.value).isWithin(1f).of(1280f - width)
+        assertThat((area.right - area.left).value).isWithin(1f).of(width)
         val card = compose.onNodeWithTag("pin_card", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertThat(((card.left + card.right) / 2).value).isWithin(1f).of(980f)
+        assertThat(((card.left + card.right) / 2).value).isWithin(1f).of(1280f - width / 2)
     }
 
     @Test

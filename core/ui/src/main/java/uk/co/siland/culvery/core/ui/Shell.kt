@@ -47,14 +47,14 @@ import androidx.compose.ui.unit.dp
 
 /** Shell component values from the hand-off (§6 Holiday sheet, §7 Calendar sheets and toast). */
 object ShellTokens {
-    /** rgba(0,0,0,.55) behind sheets. The same in both themes, so not an HhColors token. */
-    val sheetScrim = Color(0x8C000000)
+    /** rgba(0,0,0,.6) behind sheets. The same in both themes, so not an HhColors token. */
+    val sheetScrim = Color(0x99000000)
 
     /** rgba(0,0,0,.64) behind the door card and the PIN pad (9 §4.3, §4.9). The same in both themes. */
     val cardScrim = Color(0xA3000000)
 
-    // Right-side sheet: 600 dp, full height, bg, 1 dp left border `line`, 16 dp between blocks, 48 dp close button.
-    val sheetWidth = 600.dp
+    // Right-side sheet: 613 dp, full height, bg, 1 dp left border `surf3`, 16 dp between blocks, 48 dp close button.
+    val sheetWidth = 613.dp
     val sheetBorder = 1.dp
     val sheetGap = 16.dp
     val closeButton = 48.dp
@@ -98,7 +98,7 @@ class Countdown(val endsAt: Long, val totalMs: Long, val nowMillis: () -> Long)
 internal fun ringLeft(remainingMs: Long, totalMs: Long): Float = (remainingMs.toFloat() / totalMs).coerceIn(0f, 1f)
 
 /**
- * The hand-off's right-side sheet: 600 dp, full height, `bg`, 1 dp `line` left border, 16 dp between blocks.
+ * The hand-off's right-side sheet: 613 dp, full height, `bg`, 1 dp `surf3` left border, 16 dp between blocks.
  * Taps on empty sheet space are swallowed so they don't reach the scrim underneath.
  */
 @Composable
@@ -117,7 +117,7 @@ fun HhSheet(
             .background(c.bg)
             .drawBehind {
                 val x = ShellTokens.sheetBorder.toPx() / 2
-                drawLine(c.line, Offset(x, 0f), Offset(x, size.height), ShellTokens.sheetBorder.toPx())
+                drawLine(c.surf3, Offset(x, 0f), Offset(x, size.height), ShellTokens.sheetBorder.toPx())
             }
             .pointerInput(Unit) { detectTapGestures { } }
             // The background runs behind the keyboard; the content stays above it.

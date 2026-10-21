@@ -3,9 +3,14 @@ package uk.co.siland.culvery.core.ui
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
+import androidx.compose.ui.platform.testTag
+import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
@@ -63,6 +68,66 @@ class ShellPartsTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Close")))
         assertThat(node.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isNull()
+    }
+
+    private fun drawWindow(content: @Composable () -> Unit): Bitmap {
+        lateinit var window: View
+        compose.setContent { window = LocalView.current.rootView; content() }
+        compose.waitForIdle()
+        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
+        window.draw(Canvas(bitmap))
+        return bitmap
+    }
+
+    @Test
+    fun theSheetIsTheHandoffsWidth() {
+        compose.setContent {
+            CulveryTheme(dark = true) { Box(Modifier.size(1280.dp, 800.dp)) { HhSheet(PaddingValues(), Modifier.testTag("sheet")) {} } }
+        }
+        compose.onNodeWithTag("sheet").assertWidthIsEqualTo(613.dp)
+    }
+
+    private fun sheetEdge(dark: Boolean): Int {
+        val bitmap = drawWindow {
+            CulveryTheme(dark = dark) { Box(Modifier.fillMaxSize()) { HhSheet(PaddingValues(), Modifier.testTag("sheet")) {} } }
+        }
+        val bounds = compose.onNodeWithTag("sheet").fetchSemanticsNode().boundsInWindow
+        return bitmap.getPixel(bounds.left.toInt(), bounds.center.y.toInt())
+    }
+
+    @Test
+    fun theSheetsEdgeIsSurf3AtNight() {
+        assertThat(sheetEdge(dark = true)).isEqualTo(0xFF303537.toInt())
+    }
+
+    @Test
+    fun theSheetsEdgeIsSurf3InTheDay() {
+        assertThat(sheetEdge(dark = false)).isEqualTo(0xFFDDE3E0.toInt())
+    }
+
+    private fun scrimOverBg(dark: Boolean): Int {
+        val bitmap = drawWindow {
+            CulveryTheme(dark = dark) {
+                Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) { Box(Modifier.fillMaxSize().background(ShellTokens.sheetScrim)) }
+            }
+        }
+        return bitmap.getPixel(bitmap.width / 2, bitmap.height / 2)
+    }
+
+    private fun assertNear(actual: Int, expected: Int) {
+        for (shift in intArrayOf(16, 8, 0)) {
+            assertThat(((actual shr shift) and 0xFF).toFloat()).isWithin(2f).of(((expected shr shift) and 0xFF).toFloat())
+        }
+    }
+
+    @Test
+    fun theScrimDarkensBgToTheHandoffsAtNight() {
+        assertNear(scrimOverBg(dark = true), 0xFF060606.toInt())
+    }
+
+    @Test
+    fun theScrimDarkensBgToTheHandoffsInTheDay() {
+        assertNear(scrimOverBg(dark = false), 0xFF5F6060.toInt())
     }
 
     @Test
