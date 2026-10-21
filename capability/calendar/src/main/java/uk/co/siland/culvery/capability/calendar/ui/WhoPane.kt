@@ -51,14 +51,16 @@ private val TileInk = Color(0xFF111111)
 private const val CHOSEN = "chosen"
 private const val NOT_CHOSEN = "not chosen"
 private const val NOT_AVAILABLE = "not available"
+private const val CHOSEN_LOCKED = "$CHOSEN, $NOT_AVAILABLE"
 private const val FIND_OUT_WHY = "find out why"
 
 /**
- * A signed-in child reaches only themselves, and in a shared set not even that, so they can't untick themselves into a
- * set Save would refuse (9 §3.3). One flag for the paint and the tap; CalendarEditor is the gate if the session ends.
+ * A signed-in child is only ever themselves, so every tile is locked once anyone is chosen, theirs included: they can't
+ * untick into a set Save would refuse (9 §3.3). One flag for the paint and the tap; CalendarEditor is the gate if the
+ * session ends.
  */
 internal fun lockedFor(person: PersonId, who: List<PersonId>, childOnly: PersonId?): Boolean =
-    childOnly != null && (person != childOnly || who.any { it != childOnly })
+    childOnly != null && (person != childOnly || who.isNotEmpty())
 
 /**
  * Handoff 6b: the household as tiles, three a row, any number chosen, then Everyone, which saves a Family event and
@@ -197,6 +199,7 @@ private fun Modifier.whoToggle(selected: Boolean, locked: Boolean, onTap: () -> 
     .semantics {
         toggleableState = ToggleableState(selected)
         stateDescription = when {
+            selected && locked -> CHOSEN_LOCKED
             selected -> CHOSEN
             locked -> NOT_AVAILABLE
             else -> NOT_CHOSEN

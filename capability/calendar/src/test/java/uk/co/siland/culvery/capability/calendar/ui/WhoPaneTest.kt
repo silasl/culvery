@@ -206,8 +206,8 @@ class WhoPaneTest {
             part("${tag}_lock").assertExists()
             assertClose("$name's dot", circleColour(tag), Color(colour).toArgb())
         }
-        tile(mia).assertIsOn()
-        part("who_Mia_lock").assertDoesNotExist()
+        tile(mia).assertIsOn().assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "chosen, not available"))
+        part("who_Mia_lock").assertExists()
         compose.onNodeWithTag("editor_who_only").assertTextEquals("Mia can add events for Mia only.")
         compose.onNodeWithTag("editor_who_hint").assertDoesNotExist()
         compose.assertClickablesHaveRoleAndLabel()
@@ -229,10 +229,23 @@ class WhoPaneTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** A child is only ever themselves: unticking would leave nobody, which Save can't take from them either. */
+    @Test
+    fun aTapOnAChildsOwnTileChangesNothing() {
+        show(editorForm(signedIn = mia.id, childOnly = mia.id), child = mia.id)
+        tile(mia).performClick()
+        compose.runOnIdle {
+            assertThat(refusals).isEmpty()
+            assertThat(form.who).containsExactly(mia.id)
+        }
+        tile(mia).assertIsOn()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     @Test
     fun aChosenLockedTileStaysChosen() {
         show(miasSharedPiano(), child = mia.id)
-        tile(sam).assertIsOn()
+        tile(sam).assertIsOn().assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "chosen, not available"))
         part("who_Sam_lock").assertExists()
         tile(sam).performClick()
         compose.runOnIdle {
