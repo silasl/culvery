@@ -31,6 +31,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.pixelAt
 
 /** Real graphics: a chip's fill is read from pixels drawn on `bg`. */
 @RunWith(AndroidJUnit4::class)

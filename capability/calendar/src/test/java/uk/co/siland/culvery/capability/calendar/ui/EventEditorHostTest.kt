@@ -315,7 +315,7 @@ class EventEditorHostTest {
     }
 
     @Test
-    fun aSignedInChildsEditDisablesTheOtherWhoChipsToo() {
+    fun aSignedInChildsEditLocksTheOtherWhoChipsToo() {
         access.answer(TestAccess.MIA)
         runBlocking { access.control.authorise(CalendarPermissions.CREATE_SELF) }
         showEditor(EditorRequest.Edit(dinner))

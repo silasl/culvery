@@ -1,8 +1,5 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.view.View
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.size
@@ -16,7 +13,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -71,6 +67,7 @@ import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.pixelAt
 
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -240,17 +237,6 @@ class EventEditorSheetTest {
         }
     }
 
-    /** The window pixel [dx] right and [dy] down from the node's top-left corner, as ARGB; needs `GraphicsMode.NATIVE`. */
-    private fun pixelAt(node: SemanticsNodeInteraction, dx: Dp, dy: Dp): Int {
-        val semantics = node.fetchSemanticsNode()
-        val window = (semantics.root as View).rootView
-        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
-        window.draw(Canvas(bitmap))
-        val density = semantics.layoutInfo.density.density
-        val bounds = semantics.boundsInWindow
-        return bitmap.getPixel((bounds.left + dx.value * density).toInt(), (bounds.top + dy.value * density).toInt())
-    }
-
     private fun bounds(tag: String) = compose.onNodeWithTag(tag).getUnclippedBoundsInRoot()
 
     private fun label(text: String) = compose.onNode(hasContentDescription(text) and isHeading())
@@ -405,15 +391,15 @@ class EventEditorSheetTest {
     @Test
     fun busyFadesNoChip() {
         show(newForm(signedIn = SampleUi.alex.id))
-        val sam = compose.onNodeWithTag("who_Sam")
-        val idle = pixelAt(sam, 4.dp, 24.dp)
+        val names = listOf("Family", "Alex", "Sam", "Mia")
+        val idle = names.map { pixelAt(compose.onNodeWithTag("who_$it"), 4.dp, 24.dp) }
         busy = true
         compose.waitForIdle()
-        assertThat(pixelAt(sam, 4.dp, 24.dp)).isEqualTo(idle)
-        listOf("Family", "Alex", "Sam", "Mia").forEach { name ->
+        names.forEachIndexed { i, name ->
+            assertThat(pixelAt(compose.onNodeWithTag("who_$name"), 4.dp, 24.dp)).isEqualTo(idle[i])
             compose.onNodeWithTag("who_$name").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
         }
-        sam.performClick()
+        compose.onNodeWithTag("who_Sam").performClick()
         compose.onNodeWithTag("who_Alex").assertIsSelected()
         compose.assertClickablesHaveRoleAndLabel()
     }

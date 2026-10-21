@@ -64,7 +64,7 @@ private suspend fun open(request: EditorRequest, repo: CalendarRepository, edito
  * is disabled while one runs), and closes itself when there is nothing to edit. An unchanged edit closes with no PIN.
  * A refusal keeps the sheet open with the failure card, and so does the tablet failing before the write; a queued or
  * saved change closes it. Delete authorises, then [onDeleteAuthorised] swaps to the detail sheet asking to confirm.
- * A signed-in Child's other Who chips are disabled in a new event and in an edit alike (§6). Try again after a
+ * A signed-in Child's other Who chips are locked in a new event and in an edit alike (§6). Try again after a
  * tablet failure reuses the create's key. A sheet that can't load closes with a toast.
  */
 @Composable

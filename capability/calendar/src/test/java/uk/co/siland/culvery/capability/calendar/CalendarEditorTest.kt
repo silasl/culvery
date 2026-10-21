@@ -601,10 +601,16 @@ class CalendarEditorTest {
     @Test
     fun aChildWhoseSessionEndedCannotSaveForSomeoneElse() = runTest {
         val access = testAccess(household)
-        access.answer(TestAccess.MIA)
-        assertThat(editor(access).create(draft("Sleepover", access.alex.id.value), "key-1")).isEqualTo(EditResult.Cancelled)
-        assertThat(access.toasts.messages).containsExactly("Mia can add events for Mia only.")
-        assertThat(writer.calls).isEmpty()
+        val editor = editor(access)
+        access.answer(TestAccess.MIA, TestAccess.MIA)
+        assertThat(editor.create(draft("Sleepover", access.mia.id.value), "key-1")).isEqualTo(EditResult.Done)
+        access.control.lock()
+        assertThat(access.control.session.value).isNull()
+        assertThat(editor.create(draft("Sleepover", access.alex.id.value), "key-2")).isEqualTo(EditResult.Cancelled)
+        assertThat(access.requests).hasSize(2)
+        assertThat(access.toasts.messages).containsExactly(EVENT_ADDED, "Mia can add events for Mia only.").inOrder()
+        assertThat(writer.calls).containsExactly("create:Sleepover")
+        assertThat(store.eventNow(ref("key-2"))).isNull()
         assertThat(store.pendingNow()).isEmpty()
     }
 
