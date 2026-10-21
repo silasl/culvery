@@ -631,6 +631,30 @@ class EventEditorHostTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** A save that ends without closing (a cancelled PIN, a refusal) lets the form change again. */
+    @Test
+    fun aCancelledPinOrARefusedSaveLetsTheDayChangeAgain() {
+        newEvent(day)
+        waitForText("Add event")
+        fillTitleAndAlex()
+        compose.onNodeWithTag("editor_row_day").performClick()
+        compose.onNodeWithTag("editor_save").performClick()
+        compose.waitUntil(5_000) { access.requests.isNotEmpty() }
+        compose.runOnIdle { access.prompt.cancel() }
+        compose.onNodeWithTag("day_quick_1").performClick()
+        rowValue("day").assertTextEquals("Thu 24 Sep")
+        // Mia's PIN can't add for Alex.
+        access.answer(TestAccess.MIA)
+        compose.onNodeWithTag("editor_save").performClick()
+        compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
+        assertThat(access.toasts.messages).containsExactly(cannotAddForOthers("Mia"))
+        compose.onNodeWithTag("day_quick_0").performClick()
+        rowValue("day").assertTextEquals("Wed 23 Sep")
+        assertThat(writer.calls).isEmpty()
+        assertThat(overlay.dismissed).isEqualTo(0)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     @Test
     fun deleteStillAsksForAPinThenHandsOverToTheDetailSheet() {
         access.answer(TestAccess.ALEX)
