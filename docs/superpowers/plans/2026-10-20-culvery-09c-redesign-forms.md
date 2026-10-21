@@ -157,7 +157,7 @@ These are where the spec leaves a choice open or doesn't fit the code at 05b1cbb
     - An event lasts at most 60 days. Until = day + 59 is allowed (60 days); day + 60 shows "An event can last up to 60 days. Pick an earlier last day." and Save waits.
     The line is composed only while it shows (ruling 6). It isn't a live region, so while it shows, the Until chip's state description carries the same sentence; TalkBack hears it on the chip it just used.
 17. **All-day spans unlock on edit** (the user's brief), in Task 10.
-    - `datesLocked` becomes `!(start is AllDay && end is AllDay) && spansDays`, exactly. So a timed span, or a mixed all-day/timed record from a provider, stays locked.
+    - `datesLocked` becomes `spansDays && (!(start is AllDay && end is AllDay) || spanLength > MAX_SPAN_DAYS)`. So a timed span, a mixed all-day/timed record from a provider, or an all-day span longer than 60 days (a school term) stays locked; its title and Who can still change. (The 60-day lock is the controller's ruling during the build, 2026-10-21.)
     - An all-day multi-day edit opens with Day on its first date and Until on its last (exclusive end − 1), editable.
     - `lockedDatesLabel` is unchanged for the spans that stay locked.
     - An untouched all-day edit still keeps its own start and end exactly (`keepsOwnSpan`).
