@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import uk.co.siland.culvery.capability.calendar.EditorForm
+import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ButtonSurface
@@ -49,6 +50,7 @@ internal fun EditorPaneFor(
     form: EditorForm,
     flow: EditorFlow,
     members: List<Member>,
+    held: Held?,
     childOnly: PersonId?,
     childName: String?,
     busy: Boolean,
@@ -57,6 +59,7 @@ internal fun EditorPaneFor(
     EditorPane(questionFor(step, form), flow, skip = step == EditorStep.Time || step == EditorStep.Repeats) {
         when (step) {
             EditorStep.Who -> WhoPane(form, members, childOnly, childName, busy, onRefusedWho)
+            EditorStep.Day -> DayPane(form, held, members.map { it.person }, onPicked = flow::moveOnSoon)
             else -> Unit
         }
     }

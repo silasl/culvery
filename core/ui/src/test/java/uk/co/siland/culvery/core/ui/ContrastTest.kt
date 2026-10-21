@@ -158,4 +158,15 @@ class ContrastTest {
         val light = LightColors
         check("light past day (4.830)", light.ink.over(HhAlpha.PAST_DAY, light.surf), light.surf2.over(HhAlpha.PAST_DAY, light.surf), 4.82)
     }
+
+    /** The Day pane draws its cells straight on the pane's `surf`; the value is the lowest that keeps 4.5:1 in both themes. */
+    @Test
+    fun outsideMonthDaysKeepTheirContrast() {
+        themes.forEach { (name, t) ->
+            check("$name outside-month day: the date at its alpha over surf", t.ink.over(HhAlpha.OUTSIDE_MONTH, t.surf), t.surf, TEXT)
+        }
+        val lower = HhAlpha.OUTSIDE_MONTH - 0.01f
+        val failing = themes.filter { (_, t) -> contrast(t.ink.over(lower, t.surf), t.surf) < TEXT }.map { it.first }
+        assertWithMessage("a hundredth lower fails somewhere").that(failing).isNotEmpty()
+    }
 }

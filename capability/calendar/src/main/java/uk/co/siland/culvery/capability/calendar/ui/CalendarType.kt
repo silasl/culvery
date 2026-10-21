@@ -151,6 +151,14 @@ internal object CalendarType {
 
     /** 14 sp: the line under the Who pane. */
     val whoHint = HhType.secondary
+
+    /** 20 sp / 700, 12 sp / 700 and 18 sp: the Day pane's month, its weekday letters and a day's date (handoff 6c). */
+    val dayMonth = HhType.sectionTitle.copy(fontSize = 20.sp)
+    val dayLetter = HhType.labelSmall
+    val dayDate = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W500)
+
+    /** 14 sp: "Tap the first day, then the last". */
+    val dayHint = HhType.secondary
 }
 
 /** The full-screen editor's layout (handoff §1 Layout, px ÷ 1.5). */
@@ -230,6 +238,18 @@ internal object EditorDimens {
     val everyoneCircle = 40.dp
     val everyoneIcon = 24.dp
     val everyoneLineGap = 1.dp
+
+    // The Day pane: quick picks 8 apart; the month's header, letters and grid 6 apart. Cells 56 tall, a 53 circle with a
+    // 2 today ring, the date 3 above up to three 5 dots 3 apart; a range's band is the circle's height, its caps r 27.
+    val quickGap = 8.dp
+    val monthGap = 6.dp
+    val dayCell = 56.dp
+    val dayCircle = 53.dp
+    val todayRing = 2.dp
+    val dayDotsTop = 3.dp
+    val dayDot = 5.dp
+    val dayDotGap = 3.dp
+    val bandRadius = 27.dp
 }
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */

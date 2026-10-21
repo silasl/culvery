@@ -83,6 +83,9 @@ object HhAlpha {
     /** A past day in the date picker, the whole cell over the picker's `surf`; 60 % would be 4.499:1 in light. */
     const val PAST_DAY = 0.62f
 
+    /** A day outside the month in the editor's Day pane, the date over the pane's `surf`; 57 % would be 4.335:1 in light. */
+    const val OUTSIDE_MONTH = 0.58f
+
     /** A week chip's tint: the person's colour at this alpha over `surf`. */
     fun tint(colors: HhColors): Float = if (colors.isLight) TINT_LIGHT else TINT_DARK
 

@@ -10,12 +10,19 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import java.time.Duration
+import java.time.LocalDate
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EditorForm
+import uk.co.siland.culvery.capability.calendar.EventRef
+import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.Held
+import uk.co.siland.culvery.capability.calendar.HeldEvent
+import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 
@@ -27,8 +34,16 @@ class AddEventScreenshotTest {
 
     @get:Rule(order = 1) val compose = createComposeRule()
 
-    private fun show(form: EditorForm, dark: Boolean, keyboard: Dp = 0.dp, savesTo: String = "Family calendar", child: Person? = null) {
-        val flow = editorFlow(form, child?.id)
+    private fun show(
+        form: EditorForm,
+        dark: Boolean,
+        keyboard: Dp = 0.dp,
+        savesTo: String = "Family calendar",
+        child: Person? = null,
+        start: EditorStep? = null,
+        held: Held? = null,
+    ) {
+        val flow = editorFlow(form, child?.id, start)
         compose.setContent {
             CulveryTheme(dark = dark) {
                 EventEditorScreen(
@@ -43,7 +58,7 @@ class AddEventScreenshotTest {
                     picker = EditorPicker.None,
                     childOnly = child?.id,
                     childName = child?.name,
-                    held = null,
+                    held = held,
                     onClose = {},
                     onSave = {},
                     onDelete = {},
@@ -97,6 +112,52 @@ class AddEventScreenshotTest {
         val form = editorForm(signedIn = mia.id, childOnly = mia.id).apply { updateTitle("Piano practice") }
         show(form, dark = true, child = mia)
         snap("add_event_who_child_dark")
+    }
+
+    /** The week's people as the handoff's 6c dots them: something on most days of this week. */
+    private val sampleHeld: Held = run {
+        val (alex, sam, mia) = SampleUi.household.map { it.id }
+        val family = PersonId.FAMILY
+        val days = mapOf(
+            23 to listOf(sam, family),
+            24 to listOf(alex, mia),
+            25 to listOf(family, sam),
+            26 to listOf(family, mia, sam),
+            27 to listOf(family),
+            28 to listOf(alex, mia),
+            29 to listOf(family),
+        )
+        val events = days.map { (d, people) ->
+            val date = LocalDate.of(2026, 9, d)
+            HeldEvent(EventRef("c1", "s1", "e$d"), "Sample", people, EventTime.AllDay(date), EventTime.AllDay(date.plusDays(1)))
+        }
+        Held(events, lastShownDay(SampleUi.TODAY), emptySet(), firstDay = SampleUi.TODAY)
+    }
+
+    /** Handoff 6c: "Guitar lesson" for Mia on Sat 26 Sep, with the month's dots and today ringed. */
+    @Test
+    fun addEventDayDark() {
+        val form = editorForm().apply {
+            updateTitle("Guitar lesson")
+            toggleWho(SampleUi.mia.id)
+            tapDay(LocalDate.of(2026, 9, 26))
+        }
+        show(form, dark = true, start = EditorStep.Day, held = sampleHeld)
+        snap("add_event_day_dark")
+    }
+
+    /** Handoff 6d: a trip for everyone, Thu 29 Oct to the trailing Sun 1 Nov, banded across October's last line. */
+    @Test
+    fun addEventDaysDark() {
+        val form = editorForm().apply {
+            updateTitle("Half-term trip to Devon")
+            toggleWho(PersonId.FAMILY)
+            setMultiDay(true)
+            tapDay(LocalDate.of(2026, 10, 29))
+            tapDay(LocalDate.of(2026, 11, 1))
+        }
+        show(form, dark = true, start = EditorStep.Day, held = sampleHeld)
+        snap("add_event_days_dark")
     }
 
     /** Dinner tonight at 19:30 for 90 minutes, opened on Check with its pane still empty. */
