@@ -209,7 +209,7 @@ fun EventEditorSheet(
             }
         }
         when (picker) {
-            EditorPicker.None -> Unit
+            EditorPicker.None, EditorPicker.StartTime, EditorPicker.EndTime -> Unit
             EditorPicker.Date -> PickerLayer(onDismiss = { onPicker(EditorPicker.None) }) {
                 DatePickerCard(
                     today = form.today,

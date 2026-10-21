@@ -79,6 +79,8 @@ object HhAlpha {
     private const val TINT_LIGHT = 0x26 / 255f
     private const val BAR_DARK = 0x4D / 255f
     private const val BAR_LIGHT = 0x40 / 255f
+    private const val CLASH_DARK = 0x26 / 255f
+    private const val CLASH_LIGHT = 0x20 / 255f
 
     /** A past day in the date picker, the whole cell over the picker's `surf`; 60 % would be 4.499:1 in light. */
     const val PAST_DAY = 0.62f
@@ -91,4 +93,7 @@ object HhAlpha {
 
     /** A multi-day bar's tint: the person's colour at this alpha over the column or the gap under it (9 §4.7). */
     fun bar(colors: HhColors): Float = if (colors.isLight) BAR_LIGHT else BAR_DARK
+
+    /** The editor's Clash tag: `weather` at this alpha over `surf`, under `weather` words; the handoff's 0x22 is 4.479:1 in light. */
+    fun clash(colors: HhColors): Float = if (colors.isLight) CLASH_LIGHT else CLASH_DARK
 }

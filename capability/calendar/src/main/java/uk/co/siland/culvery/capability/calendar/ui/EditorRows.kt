@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
@@ -24,6 +25,7 @@ import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhAlpha
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
@@ -39,6 +41,15 @@ internal fun rowState(active: Boolean, set: Boolean): RowState = when {
 
 /** A pill after a row's value: "Clash" on Time. */
 internal data class RowTag(val text: String, val icon: String?, val fill: Color, val ink: Color)
+
+internal const val CLASH = "Clash"
+
+/** Handoff 6i's tag on Time: `weather` words and `warning` on a `weather` tint, made opaque over `surf` so an active row's fill doesn't lower its contrast. */
+@Composable
+internal fun clashTag(): RowTag {
+    val c = Culvery.colors
+    return RowTag(CLASH, Icons.WARNING, c.weather.copy(alpha = HhAlpha.clash(c)).compositeOver(c.surf), c.weather)
+}
 
 /**
  * One of the event's rows (handoff §1 Layout): an [icon], the [label] over the [value] on one line, an optional [tag],

@@ -17,6 +17,7 @@ object Icons {
     const val CALENDAR_ADD_ON = "calendar_add_on"
     const val CALENDAR_MONTH = "calendar_month"
     const val CHECK = "check"
+    const val CHECK_CIRCLE = "check_circle"
     const val CHEVRON_LEFT = "chevron_left"
     const val CHEVRON_RIGHT = "chevron_right"
     const val CLOSE = "close"
@@ -78,5 +79,6 @@ object Icons {
     const val TOUCH_APP = "touch_app"
     const val VOLUME_DOWN = "volume_down"
     const val VOLUME_UP = "volume_up"
+    const val WARNING = "warning"
     const val WEATHER_SNOWY = "weather_snowy"
 }

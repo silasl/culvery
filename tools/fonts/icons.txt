@@ -12,6 +12,7 @@ brightness_low
 calendar_add_on
 calendar_month
 check
+check_circle
 chevron_left
 chevron_right
 close
@@ -73,4 +74,5 @@ thunderstorm
 touch_app
 volume_down
 volume_up
+warning
 weather_snowy

@@ -83,6 +83,9 @@ object ControlTokens {
     val chipDot = 12.dp
     val chipIcon = 20.dp
 
+    // A segmented control (handoff 6e): its chips 4 inside a `surf2` pill.
+    val segmentPadding = 4.dp
+
     /** Hand-off §7: a disabled chip is drawn at 38% and stays tappable. */
     const val DISABLED_ALPHA = 0.38f
 
@@ -149,6 +152,7 @@ object ControlType {
  * a chip that opens something is `Role.Button`. [trailing] follows the label (an expand arrow) and, as [leading], is given the ink. [spokenName] is what TalkBack reads when that isn't the label. A disabled chip is drawn at 38% but stays tappable, so a tap can
  * explain why: TalkBack hears "not available" and "double-tap to find out why". A [locked] chip (9 §4.8) says the same
  * but isn't faded: the `lock` icon first, no fill, a `surf3` edge and a `mute` label, or selected, filled as chosen.
+ * [labelStyle] can ask for tabular figures; a chip stretched wider than its contents centres them.
  */
 @Composable
 fun HhChoiceChip(
@@ -169,6 +173,7 @@ fun HhChoiceChip(
     spokenName: String? = null,
     trailing: (@Composable (ink: Color) -> Unit)? = null,
     locked: Boolean = false,
+    labelStyle: TextStyle = ControlType.chip,
     modifier: Modifier = Modifier,
 ) {
     val c = Culvery.colors
@@ -183,7 +188,7 @@ fun HhChoiceChip(
     val shape = RoundedCornerShape(ControlTokens.chipRadius)
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipIconGap),
+        horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipIconGap, Alignment.CenterHorizontally),
         modifier = modifier
             .boundedWidth()
             .testTag(tag)
@@ -204,7 +209,7 @@ fun HhChoiceChip(
     ) {
         if (locked) HhIcon(Icons.LOCK, size = ControlTokens.chipIcon, tint = ink, modifier = Modifier.testTag("${tag}_lock"))
         leading?.invoke(ink)
-        Text(label, style = ControlType.chip, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        Text(label, style = labelStyle, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         if (secondary != null) {
             Text(secondary, style = ControlType.chipSecondary, color = ink, maxLines = 1)
         }
@@ -221,6 +226,43 @@ private fun Modifier.boundedWidth(): Modifier = layout { measurable, constraints
     }
     val placeable = measurable.measure(bounded)
     layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+}
+
+/**
+ * One of [options], as handoff 6e's All day | At a time: a `surf2` pill of 48 dp [HhChoiceChip] segments tagged
+ * `{tag}_{index}`, the [selected] one `accent` with `accentInk`; a radio group for TalkBack. A [locked] segment draws as a
+ * locked chip and a tap on it calls [onLocked], to say why, instead of [onSelect].
+ */
+@Composable
+fun HhSegmented(
+    options: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    tag: String,
+    modifier: Modifier = Modifier,
+    locked: Set<Int> = emptySet(),
+    onLocked: () -> Unit = {},
+) {
+    Row(
+        modifier = modifier
+            .testTag(tag)
+            .selectableGroup()
+            .clip(RoundedCornerShape(percent = 50))
+            .background(Culvery.colors.surf2)
+            .padding(ControlTokens.segmentPadding),
+    ) {
+        options.forEachIndexed { i, option ->
+            val isLocked = i in locked
+            HhChoiceChip(
+                label = option,
+                selected = i == selected,
+                tag = "${tag}_$i",
+                onClick = { if (isLocked) onLocked() else onSelect(i) },
+                unselectedFill = Color.Transparent,
+                locked = isLocked,
+            )
+        }
+    }
 }
 
 private const val NOT_AVAILABLE = "not available"

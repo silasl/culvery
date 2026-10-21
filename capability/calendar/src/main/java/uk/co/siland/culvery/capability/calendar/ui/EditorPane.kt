@@ -55,11 +55,13 @@ internal fun EditorPaneFor(
     childName: String?,
     busy: Boolean,
     onRefusedWho: () -> Unit,
+    onPicker: (EditorPicker) -> Unit,
 ) {
     EditorPane(questionFor(step, form), flow, skip = step == EditorStep.Time || step == EditorStep.Repeats) {
         when (step) {
             EditorStep.Who -> WhoPane(form, members, childOnly, childName, busy, onRefusedWho)
             EditorStep.Day -> DayPane(form, held, members.map { it.person }, onPicked = flow::moveOnSoon)
+            EditorStep.Time -> TimePane(form, held, members.map { it.person }, onPicker, onPicked = flow::moveOnSoon)
             else -> Unit
         }
     }

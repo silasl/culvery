@@ -169,4 +169,12 @@ class ContrastTest {
         val failing = themes.filter { (_, t) -> contrast(t.ink.over(lower, t.surf), t.surf) < TEXT }.map { it.first }
         assertWithMessage("a hundredth lower fails somewhere").that(failing).isNotEmpty()
     }
+
+    /** The editor's Clash tag: `weather` words on `weather` at its alpha over `surf`, drawn opaque so an active row's fill doesn't show through. */
+    @Test
+    fun theClashTagReadsOnTheRow() {
+        themes.forEach { (name, t) -> check("$name clash tag", t.weather, t.weather.over(HhAlpha.clash(t), t.surf), TEXT) }
+        val light = LightColors
+        check("light clash tag (4.552)", light.weather, light.weather.over(HhAlpha.clash(light), light.surf), 4.55)
+    }
 }

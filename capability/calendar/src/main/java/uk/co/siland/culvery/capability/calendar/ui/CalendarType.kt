@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.calendar.ui
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.ShellTokens
 
@@ -156,6 +157,12 @@ internal object CalendarType {
     val dayMonth = HhType.sectionTitle.copy(fontSize = 20.sp)
     val dayLetter = HhType.labelSmall
     val dayDate = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W500)
+
+    /** The Time pane (handoff 6e): a chip's 16 sp / 600 in tabular figures; the result 27 sp / 700, tabular, its check 15 sp / 600; the free line 14 sp. */
+    val timeChip = ControlType.chip.copy(fontFeatureSettings = "tnum")
+    val timeResult = HhType.headerValue.copy(fontSize = 27.sp, fontWeight = FontWeight.W700)
+    val timeCheck = HhType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.W600)
+    val timeFreeAt = HhType.secondary
 }
 
 /** The full-screen editor's layout (handoff §1 Layout, px ÷ 1.5). */
@@ -247,6 +254,22 @@ internal object EditorDimens {
     val dayDot = 5.dp
     val dayDotGap = 3.dp
     val bandRadius = 27.dp
+
+    // The Time pane: a group's label 7 above its chips, 8 apart, six a row; busy, a 1 `weather` edge and a 7 dot. Minutes
+    // and How long side by side, 24 apart, their chips 7 apart. The result under a 1 `surf3` rule, 15 below it, its check 16
+    // after the range with a 19 icon 5 before its words; the free starts 8 apart.
+    val timeLabelGap = 7.dp
+    val hourGap = 8.dp
+    val busyEdge = 1.dp
+    val busyDot = 7.dp
+    val timeColumnsGap = 24.dp
+    val timeChipGap = 7.dp
+    val resultRule = 1.dp
+    val resultTop = 15.dp
+    val resultGap = 16.dp
+    val checkIcon = 19.dp
+    val checkIconGap = 5.dp
+    val freeGap = 8.dp
 }
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */

@@ -160,6 +160,38 @@ class AddEventScreenshotTest {
         snap("add_event_days_dark")
     }
 
+    /** The sample week with Mia's Piano, 15:30–16:15, on Sat 26 Sep: hours 15 and 16 are busy. */
+    private val pianoHeld: Held = run {
+        val sat = LocalDate.of(2026, 9, 26)
+        val piano = HeldEvent(
+            EventRef("c1", "s1", "piano"), "Piano", listOf(SampleUi.mia.id),
+            EventTime.Timed(sat.atTime(15, 30).atZone(LONDON).toInstant()), EventTime.Timed(sat.atTime(16, 15).atZone(LONDON).toInstant()),
+        )
+        sampleHeld.copy(events = sampleHeld.events + piano)
+    }
+
+    private fun guitarAt(hour: Int) = editorForm().apply {
+        updateTitle("Guitar lesson")
+        toggleWho(SampleUi.mia.id)
+        tapDay(LocalDate.of(2026, 9, 26))
+        chooseHour(hour)
+        chooseLength(Duration.ofMinutes(45))
+    }
+
+    /** Handoff 6e: Guitar lesson for Mia on Sat 26 Sep at 10:00–10:45, with 15 and 16 busy and "Mia is free then". */
+    @Test
+    fun addEventTimeDark() {
+        show(guitarAt(10), dark = true, start = EditorStep.Time, held = pianoHeld)
+        snap("add_event_time_dark")
+    }
+
+    /** Handoff 6i: the same at 15:00–15:45, over Piano: the warning, the free starts 14:45 and 16:15, and the Clash tag. */
+    @Test
+    fun addEventClashDark() {
+        show(guitarAt(15), dark = true, start = EditorStep.Time, held = pianoHeld)
+        snap("add_event_clash_dark")
+    }
+
     /** Dinner tonight at 19:30 for 90 minutes, opened on Check with its pane still empty. */
     @Test
     fun changeEventDark() {

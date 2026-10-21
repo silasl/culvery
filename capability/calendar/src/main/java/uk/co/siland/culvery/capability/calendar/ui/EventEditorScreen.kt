@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -50,6 +51,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventForm
+import uk.co.siland.culvery.capability.calendar.FreeCheck
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.couldNotSave
@@ -74,6 +76,7 @@ internal const val KEEP_EDITING = "Keep editing"
 internal const val DISCARD = "Discard"
 internal const val OPTIONAL_HINT = "Time and repeats are optional"
 internal const val TIME_OPTIONAL_HINT = "Time is optional"
+internal const val CLASH_HINT = "Clashes are allowed; both show on the week"
 
 private const val CALENDAR_SUFFIX = " calendar"
 
@@ -113,7 +116,7 @@ internal fun EventEditorScreen(
     onRefusedWho: () -> Unit,
     onPicker: (EditorPicker) -> Unit,
     keyboard: WindowInsets = WindowInsets.ime,
-    pane: @Composable (EditorStep) -> Unit = { EditorPaneFor(it, form, flow, members, held, childOnly, childName, busy, onRefusedWho) },
+    pane: @Composable (EditorStep) -> Unit = { EditorPaneFor(it, form, flow, members, held, childOnly, childName, busy, onRefusedWho, onPicker) },
 ) {
     val c = Culvery.colors
     val focusManager = LocalFocusManager.current
@@ -136,6 +139,8 @@ internal fun EventEditorScreen(
     val typing = titleFocused && keyboard.getBottom(LocalDensity.current) > 0
     val isNew = form.mode == EventForm.Mode.New
     val heading = if (isNew) NEW_EVENT else CHANGE_EVENT
+    val order = remember(members) { members.map { it.person.id } }
+    val clash = EditorStep.Time in flow.steps && rememberTimeCheck(form, held, order).result is FreeCheck.Busy
     Box(
         Modifier
             .testTag("editor_screen")
@@ -144,7 +149,8 @@ internal fun EventEditorScreen(
             .background(c.bg)
             .windowInsetsPadding(keyboard),
     ) {
-        Column(Modifier.fillMaxSize()) {
+        // Under a picker only the picker is heard.
+        Column(Modifier.fillMaxSize().then(if (picker != EditorPicker.None) Modifier.clearAndSetSemantics {} else Modifier)) {
             TopBar(heading, context) {
                 closeKeyboard()
                 if (form.edited) discarding = true else onClose()
@@ -170,7 +176,7 @@ internal fun EventEditorScreen(
                             flow.open(EditorStep.Who)
                         },
                     )
-                    Rows(form, flow, members, service, typing, lit = !titleFocused) { step ->
+                    Rows(form, flow, members, service, typing, lit = !titleFocused, clash = clash) { step ->
                         closeKeyboard()
                         flow.open(step)
                     }
@@ -190,7 +196,11 @@ internal fun EventEditorScreen(
                                 confirmIcon = discardIcon(form.mode),
                             )
                         } else {
-                            val hint = if (EditorStep.Repeats in flow.steps) OPTIONAL_HINT else TIME_OPTIONAL_HINT
+                            val hint = when {
+                                clash -> CLASH_HINT
+                                EditorStep.Repeats in flow.steps -> OPTIONAL_HINT
+                                else -> TIME_OPTIONAL_HINT
+                            }
                             Foot(form, savesTo, hint, busy, failure, onSave = {
                                 closeKeyboard()
                                 onSave()
@@ -204,6 +214,29 @@ internal fun EventEditorScreen(
                 Box(Modifier.weight(1f).fillMaxHeight()) { pane(flow.active) }
             }
         }
+        TimePicker(form, flow, picker, onPicker)
+    }
+}
+
+/** The start picker for an hour outside the chips; the end picker for Until…, which moves on unless the end is refused. */
+@Composable
+private fun TimePicker(form: EditorForm, flow: EditorFlow, picker: EditorPicker, onPicker: (EditorPicker) -> Unit) {
+    val close = { onPicker(EditorPicker.None) }
+    when (picker) {
+        EditorPicker.StartTime -> PickerLayer(onDismiss = close) {
+            TimePickerCard(form.pickerTime, onSet = {
+                form.chooseTime(it)
+                close()
+            }, onCancel = close)
+        }
+        EditorPicker.EndTime -> PickerLayer(onDismiss = close) {
+            TimePickerCard(form.endPickerTime, onSet = {
+                form.chooseEndTime(it)
+                close()
+                if (form.endError == null) flow.moveOnSoon()
+            }, onCancel = close)
+        }
+        else -> Unit
     }
 }
 
@@ -296,6 +329,7 @@ private fun Rows(
     service: String,
     typing: Boolean,
     lit: Boolean,
+    clash: Boolean,
     onOpen: (EditorStep) -> Unit,
 ) {
     val people = members.map { it.person }
@@ -344,6 +378,7 @@ private fun Rows(
             set = editing || form.startTime != null,
             typing = typing,
             onClick = { onOpen(EditorStep.Time) },
+            tag = if (clash) clashTag() else null,
         )
     }
     if (EditorStep.Repeats in flow.steps) {
