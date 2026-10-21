@@ -6,7 +6,13 @@ import java.time.LocalTime
 import java.time.ZoneId
 import org.junit.Test
 import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.EDITOR_REPEATS
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
+import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.RepeatEnd
+import uk.co.siland.culvery.capability.calendar.occurrences
+import uk.co.siland.culvery.capability.calendar.recurrenceRule
+import uk.co.siland.culvery.capability.calendar.withSeriesStart
 
 /** The fake provider's expansion of a series the tablet wrote, COUNT and UNTIL included (9 §4.8). */
 class RecurrenceExpanderTest {
@@ -89,5 +95,68 @@ class RecurrenceExpanderTest {
         assertThat(made.map { (it.start as EventTime.AllDay).date }).containsExactly(
             LocalDate.of(2026, 10, 23), LocalDate.of(2026, 10, 30), LocalDate.of(2026, 11, 6),
         ).inOrder()
+    }
+
+    // Saturday 26 September 2026, the 4th Saturday.
+    private val saturday = LocalDate.of(2026, 9, 26)
+
+    @Test
+    fun aMonthlyNthWeekdayFollowsTheWeekday() {
+        val made = expand(timedSeries("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=4SA;COUNT=3", saturday, LocalTime.of(10, 0)), saturday.plusYears(1))
+        assertThat(made.map { it.localDay() })
+            .containsExactly(saturday, LocalDate.of(2026, 10, 24), LocalDate.of(2026, 11, 28)).inOrder()
+        assertThat(made.map { (it.start as EventTime.Timed).instant.atZone(london).toLocalTime() }.toSet()).containsExactly(LocalTime.of(10, 0))
+    }
+
+    @Test
+    fun theLastWeekdayIsTheLastInEachMonth() {
+        val first = LocalDate.of(2026, 10, 29)
+        val made = expand(timedSeries("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1TH", first), LocalDate.of(2027, 1, 31))
+        assertThat(made.map { it.localDay() })
+            .containsExactly(first, LocalDate.of(2026, 11, 26), LocalDate.of(2026, 12, 31), LocalDate.of(2027, 1, 28)).inOrder()
+    }
+
+    /** Pin: passes without the change. */
+    @Test
+    fun aCountedNthSeriesStopsAtItsCount() {
+        assertThat(expand(timedSeries("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=4SA;COUNT=5", saturday), saturday.plusYears(2))).hasSize(5)
+    }
+
+    /** The series' first date kept with its rule is not part of the rule. */
+    @Test
+    fun theSeriesStartLineIsSkipped() {
+        val made = expand(timedSeries(withSeriesStart("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=3", friday)), friday.plusYears(1))
+        assertThat(made.map { it.localDay() }).containsExactly(friday, friday.plusDays(7), friday.plusDays(14)).inOrder()
+    }
+
+    @Test
+    fun aYearlySeriesFrom29FebruaryOnlyLandsInLeapYears() {
+        val leap = LocalDate.of(2028, 2, 29)
+        val made = expand(allDaySeries("RRULE:FREQ=YEARLY;INTERVAL=1;COUNT=2", leap, 1), LocalDate.of(2033, 1, 1))
+        assertThat(made.map { (it.start as EventTime.AllDay).date }).containsExactly(leap, LocalDate.of(2032, 2, 29)).inOrder()
+    }
+
+    /** The editor's last date and the fake's series never drift apart (9 §3.1). */
+    @Test
+    fun theExpanderAgreesWithOccurrences() {
+        val days = (22..31).map { LocalDate.of(2026, 10, it) } + LocalDate.of(2028, 2, 29)
+        for (choice in EDITOR_REPEATS - RepeatChoice.Never) {
+            for (day in days) {
+                for (n in listOf(2, 10, 52)) {
+                    val expected = occurrences(choice, day, n)
+                    for (allDay in listOf(true, false)) {
+                        val rule = recurrenceRule(choice, RepeatEnd.After(n), allDay, london, day)!!
+                        val series = if (allDay) allDaySeries(rule, day, 1) else timedSeries(rule, day, LocalTime.of(10, 0))
+                        val made = expand(series, day.plusYears(250)).map {
+                            when (val s = it.start) {
+                                is EventTime.AllDay -> s.date
+                                is EventTime.Timed -> s.instant.atZone(london).toLocalDate()
+                            }
+                        }
+                        assertThat(made).isEqualTo(expected)
+                    }
+                }
+            }
+        }
     }
 }

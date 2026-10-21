@@ -304,6 +304,23 @@ class EditorForm(
         repeatEnd = RepeatEnd.After((end.times + by).coerceIn(MIN_TIMES, MAX_TIMES))
     }
 
+    /** The stepper's centre while it stops after a count: "12 times · last on Sat 12 Dec". */
+    val stepperLabel: String?
+        get() {
+            val end = repeatEnd as? RepeatEnd.After ?: return null
+            val first = day ?: return null
+            return "${plural(end.times.toLong(), "time")} · last on ${occurrences(repeat, first, end.times).last().format(SHORT_DAY)}"
+        }
+
+    /** The Repeats row: "Doesn’t repeat", "Every Saturday", or "Every Saturday · 12 times". */
+    val repeatsValue: String
+        get() {
+            // The pane offers repeats only once there is a day.
+            val first = day ?: return DOESNT_REPEAT
+            val times = (repeatEnd as? RepeatEnd.After)?.let { " · ${plural(it.times.toLong(), "time")}" }.orEmpty()
+            return repeat.wording(first) + times
+        }
+
     /**
      * A locked multi-day edit's one line: "Mon 22 – Wed 24 · change dates in Google Calendar on your phone", or, when the
      * span crosses a month, "Wed 30 Sep – Fri 2 Oct · …" on both ends; [service] names where to change them.
@@ -369,8 +386,9 @@ class EditorForm(
     /** What Save sends; only when [canSave]. A new event that repeats carries its rule. */
     fun draft(createdBy: String?): EventDraft {
         check(canSave) { "Nothing to save: $reason" }
-        val (start, end) = span(checkNotNull(day))
-        val rule = recurrenceRule(repeat, repeatEnd, allDay = start is EventTime.AllDay, zone)
+        val first = checkNotNull(day)
+        val (start, end) = span(first)
+        val rule = recurrenceRule(repeat, repeatEnd, allDay = start is EventTime.AllDay, zone, first)
         // An edit whose set wasn't changed keeps its tag exactly, so an untagged event stays untagged.
         val forPerson = if (original != null && !whoChanged) original.forPerson else tagFor(who, order)
         return EventDraft(title.trim(), start, end, forPerson, createdBy, recurrence = rule?.let { Recurrence(it, zone) })

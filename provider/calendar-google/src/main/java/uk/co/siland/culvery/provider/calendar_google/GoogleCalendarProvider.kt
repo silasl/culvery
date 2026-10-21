@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,6 +34,8 @@ import uk.co.siland.culvery.capability.calendar.SyncCursor
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
+import uk.co.siland.culvery.capability.calendar.instantIn
+import uk.co.siland.culvery.capability.calendar.withSeriesStart
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
@@ -161,7 +164,7 @@ class GoogleCalendarProvider @Inject constructor(
     override suspend fun sync(conn: Connection, source: CalendarSource, range: DateRange, cursor: SyncCursor?): SyncResult {
         val account = accountOf(conn)
         // 410 Gone: Google expired the sync token, so the provider runs a full sync itself (3a design §3.5).
-        if (cursor != null) incremental(conn, account, source, cursor)?.let { return it }
+        if (cursor != null) incremental(conn, account, source, cursor, range.zone)?.let { return it }
         return full(conn, account, source, range)
     }
 
@@ -171,7 +174,7 @@ class GoogleCalendarProvider @Inject constructor(
         val window = mapOf("timeMin" to range.startInstant.toString(), "timeMax" to range.endInstant.toString())
         val listed = list(account, source, window) ?: throw UnreachableException("Google Calendar expired a full sync of a calendar")
         val failed = mutableSetOf<String>()
-        val upserts = listed.items.filterNot { it.isGone }.mapNotNull { it.toRemoteEvent(ruleOf(account, source, it, fresh, failed)) }
+        val upserts = listed.items.filterNot { it.isGone }.mapNotNull { it.toRemoteEvent(ruleOf(account, source, it, range.zone, fresh, failed)) }
         // A resumed map can hold series deleted since the unfinished attempt.
         fresh.keys.retainAll(listed.items.mapNotNull { it.recurringEventId }.toSet())
         rules[key] = fresh
@@ -179,7 +182,7 @@ class GoogleCalendarProvider @Inject constructor(
         return SyncResult(upserts, emptyList(), listed.syncToken?.let(::SyncCursor), fullReplace = true)
     }
 
-    private suspend fun incremental(conn: Connection, account: String, source: CalendarSource, cursor: SyncCursor): SyncResult? {
+    private suspend fun incremental(conn: Connection, account: String, source: CalendarSource, cursor: SyncCursor, zone: ZoneId): SyncResult? {
         val listed = list(account, source, mapOf("syncToken" to cursor.value)) ?: return null
         val cache = rules.getOrPut(keyOf(conn, source)) { ConcurrentHashMap() }
         // No nightly full sync refreshes a rule any more: a series with a changed instance is read again (4c ruling 3).
@@ -205,7 +208,7 @@ class GoogleCalendarProvider @Inject constructor(
                     cache.remove(event.id)
                 }
             } else {
-                var rule = ruleOf(account, source, event, cache, failed)
+                var rule = ruleOf(account, source, event, zone, cache, failed)
                 val series = event.recurringEventId
                 if (rule == null && series != null && series in failed) {
                     rule = before[series]?.ifEmpty { null } ?: storedInstances()[event.id]
@@ -246,13 +249,15 @@ class GoogleCalendarProvider @Inject constructor(
     }
 
     /**
-     * An instance's series rule (3a design D12): fetched once per series into [cache]. A failed fetch is null, doesn't
-     * fail the sync, and is remembered in [failed] for the rest of this sync, so the series' other instances don't ask again.
+     * An instance's series rule (3a design D12): fetched once per series into [cache], after a line with the series' first
+     * date in [zone] (9 §3.4). A failed fetch is null, doesn't fail the sync, and is remembered in [failed] for the rest
+     * of this sync, so the series' other instances don't ask again.
      */
     private suspend fun ruleOf(
         account: String,
         source: CalendarSource,
         event: GoogleEvent,
+        zone: ZoneId,
         cache: ConcurrentHashMap<String, String>,
         failed: MutableSet<String>,
     ): String? {
@@ -260,11 +265,11 @@ class GoogleCalendarProvider @Inject constructor(
         if (series in failed) return null
         cache[series]?.let { return it.ifEmpty { null } }
         val rule = try {
-            api.send(account, "GET", api.url("calendars", source.id, "events", series))
+            val master = api.send(account, "GET", api.url("calendars", source.id, "events", series))
                 .readOrUnreachable(GoogleCall.EVENT_SERIES)
                 .decode(GoogleEvent.serializer(), GoogleCall.EVENT_SERIES)
-                .recurrence
-                ?.firstOrNull { it.startsWith("RRULE:") }
+            val first = master.start?.toEventTime()?.instantIn(zone)?.atZone(zone)?.toLocalDate()
+            master.recurrence?.firstOrNull { it.startsWith("RRULE:") }?.let { if (first != null) withSeriesStart(it, first) else it }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

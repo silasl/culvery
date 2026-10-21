@@ -6,29 +6,79 @@ import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Test
 
+/** The detail sheet reads a series back in the editor's words (9 §3.4). */
 class RepeatsTest {
     private val london = ZoneId.of("Europe/London")
 
-    // Tuesday 22 September 2026.
-    private val tuesday = EventTime.AllDay(LocalDate.of(2026, 9, 22))
+    // Saturday 26 September 2026.
+    private val saturday = LocalDate.of(2026, 9, 26)
 
-    private fun label(rule: String?) = repeatsLabel(rule, tuesday, london)
+    private fun label(rule: String?, day: LocalDate = saturday) = repeatsLabel(rule, EventTime.AllDay(day), london)
 
     @Test
-    fun simpleRulesReadAsWords() {
+    fun rulesReadInTheEditorsWords() {
         val expected = mapOf(
+            "RRULE:FREQ=WEEKLY" to "Every Saturday",
+            "RRULE:FREQ=WEEKLY;BYDAY=SA" to "Every Saturday",
+            "RRULE:FREQ=WEEKLY;INTERVAL=2" to "Every 2 weeks, on Saturday",
+            "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=SA" to "Every 2 weeks, on Saturday",
+            "RRULE:FREQ=MONTHLY;BYDAY=4SA" to "Every month, on the 4th Saturday",
+            "RRULE:FREQ=MONTHLY;BYMONTHDAY=26" to "Every month, on the 26th",
+            "RRULE:FREQ=MONTHLY" to "Every month, on the 26th",
+            "RRULE:FREQ=YEARLY" to "Every year, on 26 September",
             "RRULE:FREQ=DAILY" to "Every day",
-            "RRULE:FREQ=WEEKLY" to "Every week",
-            "RRULE:FREQ=WEEKLY;BYDAY=TU" to "Every week",
-            "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU" to "Every 2 weeks",
-            "RRULE:FREQ=MONTHLY;BYMONTHDAY=22" to "Every month",
-            "RRULE:FREQ=YEARLY" to "Every year",
-            "RRULE:FREQ=DAILY;INTERVAL=3" to "Every 3 days",
-            "RRULE:FREQ=MONTHLY;INTERVAL=6" to "Every 6 months",
-            "RRULE:FREQ=WEEKLY;UNTIL=20261231T000000Z;WKST=MO" to "Every week",
-            "RRULE:FREQ=WEEKLY;COUNT=10" to "Every week",
+            "RRULE:FREQ=WEEKLY;WKST=MO" to "Every Saturday",
         )
         expected.forEach { (rule, words) -> assertThat(label(rule)).isEqualTo(words) }
+    }
+
+    @Test
+    fun theLastWeekdayReadsAsLast() {
+        assertThat(label("RRULE:FREQ=MONTHLY;BYDAY=-1TH", LocalDate.of(2026, 10, 29))).isEqualTo("Every month, on the last Thursday")
+    }
+
+    @Test
+    fun aMonthlyRuleByDateReadsItsDay() {
+        assertThat(label("RRULE:FREQ=MONTHLY;BYMONTHDAY=22", LocalDate.of(2026, 9, 22))).isEqualTo("Every month, on the 22nd")
+    }
+
+    @Test
+    fun otherIntervalsReadAsTheirUnits() {
+        assertThat(label("RRULE:FREQ=MONTHLY;INTERVAL=3")).isEqualTo("Every 3 months")
+        assertThat(label("RRULE:FREQ=DAILY;INTERVAL=3")).isEqualTo("Every 3 days")
+        assertThat(label("RRULE:FREQ=WEEKLY;INTERVAL=3;BYDAY=SA")).isEqualTo("Every 3 weeks")
+    }
+
+    @Test
+    fun aCountWithTheSeriesStartSaysTheLastDate() {
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=WEEKLY;COUNT=12")).isEqualTo("Every Saturday · 12 times · last on Sat 12 Dec")
+    }
+
+    /** The series' own first date, not this occurrence's, is where the count starts. */
+    @Test
+    fun aLaterOccurrenceCountsFromTheSeriesStart() {
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=WEEKLY;COUNT=12", LocalDate.of(2026, 10, 31)))
+            .isEqualTo("Every Saturday · 12 times · last on Sat 12 Dec")
+        assertThat(label("DTSTART:20261029\nRRULE:FREQ=MONTHLY;BYDAY=-1TH;COUNT=3", LocalDate.of(2026, 11, 26)))
+            .isEqualTo("Every month, on the last Thursday · 3 times · last on Thu 31 Dec")
+    }
+
+    @Test
+    fun aCountWithNoSeriesStartSaysOnlyTheCount() {
+        assertThat(label("RRULE:FREQ=WEEKLY;COUNT=12")).isEqualTo("Every Saturday · 12 times")
+    }
+
+    @Test
+    fun untilReadsAsItsDay() {
+        assertThat(label("RRULE:FREQ=WEEKLY;UNTIL=20261212")).isEqualTo("Every Saturday · until Sat 12 Dec")
+    }
+
+    /** Google writes a timed series' UNTIL as a UTC time; it is read in the household zone. */
+    @Test
+    fun aTimedUntilReadsInTheHouseholdZone() {
+        assertThat(label("RRULE:FREQ=WEEKLY;UNTIL=20261212T095959Z")).isEqualTo("Every Saturday · until Sat 12 Dec")
+        // 23:30 UTC on 1 Aug is 00:30 on 2 Aug in London.
+        assertThat(label("RRULE:FREQ=DAILY;UNTIL=20260801T233000Z")).isEqualTo("Every day · until Sun 2 Aug")
     }
 
     @Test
@@ -37,7 +87,7 @@ class RepeatsTest {
             null,
             "RRULE:FREQ=WEEKLY;BYDAY=MO,WE",
             "RRULE:FREQ=WEEKLY;BYDAY=WE",
-            "RRULE:FREQ=MONTHLY;BYDAY=4TU",
+            "RRULE:FREQ=MONTHLY;BYDAY=2SA",
             "RRULE:FREQ=MONTHLY;BYMONTHDAY=1",
             "RRULE:FREQ=HOURLY",
             "RRULE:FREQ=DAILY;INTERVAL=0",
@@ -48,14 +98,16 @@ class RepeatsTest {
 
     @Test
     fun aTimedStartIsReadInTheHouseholdZone() {
-        // 23:30 UTC on Monday 21 September is 00:30 on Tuesday 22 September in London.
-        assertThat(repeatsLabel("RRULE:FREQ=WEEKLY;BYDAY=TU", EventTime.Timed(Instant.parse("2026-09-21T23:30:00Z")), london))
-            .isEqualTo("Every week")
+        // 23:30 UTC on Friday 25 September is 00:30 on Saturday 26 September in London.
+        assertThat(repeatsLabel("RRULE:FREQ=WEEKLY;BYDAY=SA", EventTime.Timed(Instant.parse("2026-09-25T23:30:00Z")), london))
+            .isEqualTo("Every Saturday")
     }
 
-    /** Pin: passes without the change. */
     @Test
-    fun aCountedSeriesReadsAsItsChip() {
-        assertThat(label("RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=6")).isEqualTo("Every 2 weeks")
+    fun theReadBackAgreesWithTheEditor() {
+        for (choice in EDITOR_REPEATS - RepeatChoice.Never) {
+            val rule = recurrenceRule(choice, RepeatEnd.Never, allDay = false, zone = london, day = saturday)
+            assertThat(repeatsLabel(rule, EventTime.AllDay(saturday), london)).isEqualTo(choice.wording(saturday))
+        }
     }
 }

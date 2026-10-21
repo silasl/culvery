@@ -110,7 +110,7 @@ class EventDetailSheetTest {
         compose.onNodeWithText("This calendar can only be changed by whoever runs it.").assertDoesNotExist()
         compose.onNodeWithText("Alex (can’t change here)").assertExists()
         compose.onNodeWithText("Google Calendar").assertExists()
-        compose.onNodeWithText("Every week").assertExists()
+        compose.onNodeWithText("Every Thursday").assertExists()
         compose.onNodeWithTag("detail_delete").assertDoesNotExist()
         compose.onNodeWithTag("detail_edit").assertDoesNotExist()
     }
@@ -131,7 +131,7 @@ class EventDetailSheetTest {
         show(SampleUi.detailRecurring)
         compose.onNodeWithText("Repeating event").assertExists()
         compose.onNodeWithText("Change repeating events in Google Calendar on your phone.", substring = true).assertExists()
-        compose.onNodeWithText("Every week").assertExists()
+        compose.onNodeWithText("Every Thursday").assertExists()
         compose.onNodeWithText("Repeats").assertExists()
         compose.onNodeWithTag("detail_delete").assertDoesNotExist()
         compose.onNodeWithTag("detail_edit").assertDoesNotExist()

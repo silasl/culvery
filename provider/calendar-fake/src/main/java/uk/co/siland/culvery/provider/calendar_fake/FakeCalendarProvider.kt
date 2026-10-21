@@ -24,6 +24,8 @@ import uk.co.siland.culvery.capability.calendar.SyncCursor
 import uk.co.siland.culvery.capability.calendar.SyncResult
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
+import uk.co.siland.culvery.capability.calendar.instantIn
+import uk.co.siland.culvery.capability.calendar.withSeriesStart
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
@@ -144,7 +146,8 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
             created.getOrPut(clientKey) {
                 RemoteEvent(
                     clientKey, draft.title, draft.start, draft.end, recurring = draft.recurrence != null, draft.forPerson, draft.createdBy,
-                    recurrenceRule = draft.recurrence?.rule,
+                    // Kept with its first date, in the household zone, as the Google provider does (9 §3.4).
+                    recurrenceRule = draft.recurrence?.let { withSeriesStart(it.rule, draft.start.instantIn(it.zone).atZone(it.zone).toLocalDate()) },
                 )
             }
         }

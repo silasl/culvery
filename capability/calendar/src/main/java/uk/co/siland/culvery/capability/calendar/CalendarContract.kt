@@ -48,7 +48,8 @@ const val CONFIG_ACCOUNT = "account"
  * as in Google Calendar and iCalendar. [start] and [end] are both Timed or both AllDay.
  * Recurring events arrive already expanded, one RemoteEvent per occurrence, each with its own [remoteId],
  * and [recurring] set. [forPerson] and [createdBy] are household PersonId values when the provider stores them.
- * [recurrenceRule] is the series' RRULE line (e.g. "RRULE:FREQ=WEEKLY") when the provider knows it. [seriesId] is the
+ * [recurrenceRule] is the series' RRULE line (e.g. "RRULE:FREQ=WEEKLY") when the provider knows it, after a line with
+ * the series' first date ("DTSTART:20260926", [withSeriesStart]) when it knows that too. [seriesId] is the
  * series an occurrence belongs to (Google: recurringEventId), what [CalendarWriter.assignSeries] takes; null otherwise.
  */
 data class RemoteEvent(

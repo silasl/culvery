@@ -607,6 +607,41 @@ class EditorFormTest {
     }
 
     @Test
+    fun theStepperSaysTheCountAndTheLastDate() {
+        val form = ready(day = LocalDate.of(2026, 9, 26))
+        form.chooseRepeat(RepeatChoice.Weekly)
+        assertThat(form.stepperLabel).isNull()
+        form.stopsAfter()
+        form.moreTimes()
+        form.moreTimes()
+        assertThat(form.stepperLabel).isEqualTo("12 times · last on Sat 12 Dec")
+        form.keepsGoing()
+        assertThat(form.stepperLabel).isNull()
+    }
+
+    @Test
+    fun changingTheDayRewordsTheRepeat() {
+        val form = ready(day = LocalDate.of(2026, 9, 26))
+        form.chooseRepeat(RepeatChoice.MonthlyOnWeekday)
+        assertThat(form.repeatsValue).isEqualTo("Every month, on the 4th Saturday")
+        form.tapDay(LocalDate.of(2026, 10, 29))
+        assertThat(form.repeatsValue).isEqualTo("Every month, on the last Thursday")
+        assertThat(form.draft(createdBy = null).recurrence?.rule).isEqualTo("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1TH")
+    }
+
+    @Test
+    fun theRepeatsRowValue() {
+        val form = ready(day = LocalDate.of(2026, 9, 26))
+        assertThat(form.repeatsValue).isEqualTo("Doesn’t repeat")
+        form.chooseRepeat(RepeatChoice.Weekly)
+        assertThat(form.repeatsValue).isEqualTo("Every Saturday")
+        form.stopsAfter()
+        form.moreTimes()
+        form.moreTimes()
+        assertThat(form.repeatsValue).isEqualTo("Every Saturday · 12 times")
+    }
+
+    @Test
     fun typingThenClearingIsNotEdited() {
         val form = new()
         form.updateTitle("Swim")

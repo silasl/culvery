@@ -29,8 +29,11 @@ import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.Recurrence
+import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.RepeatEnd
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
+import uk.co.siland.culvery.capability.calendar.recurrenceRule
 import uk.co.siland.culvery.core.plugin.Connection
 
 @RunWith(AndroidJUnit4::class)
@@ -363,6 +366,16 @@ class GoogleWriteTest {
         provider.create(conn, family, draft().copy(recurrence = Recurrence(rule, london)), key)
         val sent = google.bodies.single()
         assertThat(sent.getValue("recurrence").jsonArray.map { it.jsonPrimitive.content }).containsExactly(rule)
+    }
+
+    /** Pin: Google takes the series' start from the event itself, so no DTSTART line goes with the rule. */
+    @Test
+    fun aMonthlyNthSeriesSendsItsRule() = runTest {
+        val rule = recurrenceRule(RepeatChoice.MonthlyOnWeekday, RepeatEnd.After(12), allDay = false, zone = london, day = LocalDate.of(2026, 9, 26))!!
+        provider.create(conn, family, draft().copy(recurrence = Recurrence(rule, london)), key)
+        val sent = google.bodies.single().getValue("recurrence").jsonArray.map { it.jsonPrimitive.content }
+        assertThat(sent).containsExactly("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=4SA;COUNT=12")
+        assertThat(sent.none { it.startsWith("DTSTART") }).isTrue()
     }
 
     /** Google repeats a timed series in the zone it is given, and needs one. */

@@ -300,7 +300,7 @@ class EventForm(
     }
 
     private fun recurrence(allDay: Boolean): Recurrence? =
-        recurrenceRule(repeat, repeatEnd, allDay, zone)?.let { Recurrence(it, zone) }
+        recurrenceRule(repeat, repeatEnd, allDay, zone, day)?.let { Recurrence(it, zone) }
 
     /**
      * What an edit changed from the event as it opened (3a design C3): the fields its update sends, so a change made

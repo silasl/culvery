@@ -188,14 +188,14 @@ object SampleUi {
             serviceName = "Google Calendar",
             readOnlyReason = ReadOnlyReason.NotMaster,
             createdBy = "Google Calendar",
-            repeats = "Every week",
+            repeats = "Every Thursday",
         ),
         "Today · 07:00–08:00",
     )
 
     /** Hand-off 05. */
     val detailRecurring = EventDetailUi(
-        event("Swimming", "16:00–17:00", mia, recurring = true).onFamilyCalendar("Sam").copy(repeats = "Every week", assignable = true),
+        event("Swimming", "16:00–17:00", mia, recurring = true).onFamilyCalendar("Sam").copy(repeats = "Every Thursday", assignable = true),
         "Today · 16:00–17:00",
     )
 

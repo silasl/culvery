@@ -107,7 +107,7 @@ class GoogleReadTest {
         google.failNext(500) { it.requestUrl!!.pathSegments.last() == "piano" }
         val next = provider.sync(conn, family, range, first.cursor)
         assertThat(next.upserts).isNotEmpty()
-        assertThat(next.upserts.map { it.recurrenceRule }.distinct()).containsExactly("RRULE:FREQ=WEEKLY;BYDAY=TU")
+        assertThat(next.upserts.map { it.recurrenceRule }.distinct()).containsExactly("DTSTART:20260922\nRRULE:FREQ=WEEKLY;BYDAY=TU")
     }
 
     /** After a restart the rule cache is empty: a failed re-read then keeps the stored row's rule. */
@@ -117,13 +117,13 @@ class GoogleReadTest {
         pianoSeries()
         val first = testProvider(api, stored = StoredSeries { _, _ -> stored }).sync(conn, family, range, null)
         first.upserts.forEach { stored[it.remoteId] = it.recurrenceRule }
-        assertThat(stored.values.distinct()).containsExactly("RRULE:FREQ=WEEKLY;BYDAY=TU")
+        assertThat(stored.values.distinct()).containsExactly("DTSTART:20260922\nRRULE:FREQ=WEEKLY;BYDAY=TU")
         pianoSeries(rule = "RRULE:FREQ=DAILY")
         google.failNext(500) { it.requestUrl!!.pathSegments.last() == "piano" }
         val restarted = testProvider(api, stored = StoredSeries { _, _ -> stored })
         val next = restarted.sync(conn, family, range, first.cursor)
         assertThat(next.upserts).isNotEmpty()
-        assertThat(next.upserts.map { it.recurrenceRule }.distinct()).containsExactly("RRULE:FREQ=WEEKLY;BYDAY=TU")
+        assertThat(next.upserts.map { it.recurrenceRule }.distinct()).containsExactly("DTSTART:20260922\nRRULE:FREQ=WEEKLY;BYDAY=TU")
     }
 
     /** Ruling 3: with no nightly full sync, a series changed on a phone has its rule read again. */
@@ -133,7 +133,7 @@ class GoogleReadTest {
         val first = provider.sync(conn, family, range, null)
         pianoSeries(rule = "RRULE:FREQ=DAILY")
         val next = provider.sync(conn, family, range, first.cursor)
-        assertThat(next.upserts.map { it.recurrenceRule }.distinct()).containsExactly("RRULE:FREQ=DAILY")
+        assertThat(next.upserts.map { it.recurrenceRule }.distinct()).containsExactly("DTSTART:20260922\nRRULE:FREQ=DAILY")
         assertThat(asksFor("piano")).isEqualTo(2)
     }
 
@@ -294,12 +294,33 @@ class GoogleReadTest {
         google.putEvent(family.id, google.timed("piano_2", "Piano", at(29, 15), at(29, 16)) { put("recurringEventId", "piano") })
         val upserts = provider.sync(conn, family, range, null).upserts
         assertThat(upserts.map { it.recurring to it.recurrenceRule })
-            .containsExactly(true to "RRULE:FREQ=WEEKLY;BYDAY=TU", true to "RRULE:FREQ=WEEKLY;BYDAY=TU")
+            .containsExactly(true to "DTSTART:20260922\nRRULE:FREQ=WEEKLY;BYDAY=TU", true to "DTSTART:20260922\nRRULE:FREQ=WEEKLY;BYDAY=TU")
         assertThat(upserts.map { it.seriesId }).containsExactly("piano", "piano")
         assertThat(google.requests.count { it.requestUrl!!.pathSegments.last() == "piano" }).isEqualTo(1)
         // A full sync starts the cache again.
         provider.sync(conn, family, range, null)
         assertThat(google.requests.count { it.requestUrl!!.pathSegments.last() == "piano" }).isEqualTo(2)
+    }
+
+    /** The series' first date is kept with its rule, in the household zone, so "last on" can be worked out (9 §3.4). */
+    @Test
+    fun aSeriesRuleCarriesItsFirstDate() = runTest {
+        google.putEvent(family.id, google.allDay("bins", "Bins", LocalDate.of(2026, 9, 26), LocalDate.of(2026, 9, 27)) {
+            putJsonArray("recurrence") { add("RRULE:FREQ=WEEKLY;COUNT=12") }
+        })
+        google.putEvent(family.id, google.allDay("bins_20261003", "Bins", LocalDate.of(2026, 10, 3), LocalDate.of(2026, 10, 4)) {
+            put("recurringEventId", "bins")
+        })
+        // 23:30 on Saturday 26 September in London, which Google gives as 22:30 UTC.
+        google.putEvent(family.id, google.timed("late", "Late swim", Instant.parse("2026-09-26T22:30:00Z"), Instant.parse("2026-09-26T23:30:00Z")) {
+            putJsonArray("recurrence") { add("RRULE:FREQ=WEEKLY") }
+        })
+        google.putEvent(family.id, google.timed("late_20261003T223000Z", "Late swim", Instant.parse("2026-10-03T22:30:00Z"), Instant.parse("2026-10-03T23:30:00Z")) {
+            put("recurringEventId", "late")
+        })
+        val rules = provider.sync(conn, family, range, null).upserts.associate { it.remoteId to it.recurrenceRule }
+        assertThat(rules["bins_20261003"]).isEqualTo("DTSTART:20260926\nRRULE:FREQ=WEEKLY;COUNT=12")
+        assertThat(rules["late_20261003T223000Z"]).isEqualTo("DTSTART:20260926\nRRULE:FREQ=WEEKLY")
     }
 
     @Test
@@ -315,7 +336,7 @@ class GoogleReadTest {
         withContext(Dispatchers.Default) { withTimeout(5_000) { while (asksFor("swim") == 0) delay(10) } }
         first.cancelAndJoin()
         val upserts = provider.sync(conn, family, range, null).upserts
-        assertThat(upserts.map { it.recurrenceRule }).containsExactly("RRULE:FREQ=WEEKLY", "RRULE:FREQ=DAILY")
+        assertThat(upserts.map { it.recurrenceRule }).containsExactly("DTSTART:20260922\nRRULE:FREQ=WEEKLY", "DTSTART:20260923\nRRULE:FREQ=DAILY")
         assertThat(asksFor("piano")).isEqualTo(1)
         assertThat(asksFor("swim")).isEqualTo(2)
     }
