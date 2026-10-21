@@ -80,7 +80,7 @@ class AddEventScreenshotTest {
     /** Dinner tonight at 19:30 for 90 minutes, opened on Check with its pane still empty. */
     @Test
     fun changeEventDark() {
-        show(editorDinnerOf(Duration.ofMinutes(90)), dark = true, savesTo = "Alex")
+        show(editorDinnerOf(Duration.ofMinutes(90)), dark = true, savesTo = "Family")
         snap("change_event_dark")
     }
 }

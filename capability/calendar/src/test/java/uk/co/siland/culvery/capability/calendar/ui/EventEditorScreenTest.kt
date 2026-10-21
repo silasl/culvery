@@ -46,6 +46,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventForm
+import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -169,13 +170,52 @@ class EventEditorScreenTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** Handoff 6a then 6b: while the title has focus no row is lit, though the pane already asks about Who. */
     @Test
     fun aNewEventFocusesTheTitleWithWhoActive() {
         show()
         node("editor_title").assertIsFocused()
-        val who = compose.onNodeWithTag("editor_row_who").assertIsSelected()
+        assertThat(flow.active).isEqualTo(EditorStep.Who)
+        node("editor_question").assertTextEquals("Who’s it for?")
+        val who = compose.onNodeWithTag("editor_row_who").assertIsNotSelected()
+        assertThat(who.fill()).isEqualTo(c.surf.toArgb())
+        assertThat(draws("editor_row_who_icon", c.accent)).isFalse()
+        compose.assertClickablesHaveRoleAndLabel()
+        compose.onNodeWithTag("editor_title").performImeAction()
+        node("editor_title").assertIsNotFocused()
+        compose.onNodeWithTag("editor_row_who").assertIsSelected()
         assertThat(who.fill()).isEqualTo(c.accentSoft.toArgb())
         assertThat(draws("editor_row_who_icon", c.accent)).isTrue()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** On Change every answered row is done, All day and all; only a new event's untouched rows are placeholders. */
+    @Test
+    fun aChangeShowsEveryRowItHasAsDone() {
+        val day = SampleUi.TODAY.plusDays(3)
+        show(editorEditOf(EventTime.AllDay(day), EventTime.AllDay(day.plusDays(1)), "Bin day", "family"))
+        node("editor_row_time_value").assertTextEquals("All day")
+        listOf("who", "day", "time").forEach { row ->
+            assertWithMessage(row).that(valueColor("editor_row_$row")).isEqualTo(c.ink)
+            assertWithMessage(row).that(draws("editor_row_${row}_icon", c.accent)).isTrue()
+            assertWithMessage(row).that(draws("editor_row_${row}_icon", c.mute)).isFalse()
+        }
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun withoutARepeatsRowTheHintSaysOnlyTimeIsOptional() {
+        show(editorDinnerOf(Duration.ofHours(1)))
+        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Time is optional")
+        compose.assertClickablesHaveRoleAndLabel()
+        val child = editorForm(signedIn = SampleUi.mia.id, childOnly = SampleUi.mia.id).apply {
+            updateTitle("Sleepover")
+            tapDay(SampleUi.TODAY.plusDays(4))
+        }
+        compose.runOnIdle { use(child, child = SampleUi.mia.id) }
+        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Time is optional")
+        compose.runOnIdle { use(newWithTitleWhoAndDay()) }
+        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Time and repeats are optional")
         compose.assertClickablesHaveRoleAndLabel()
     }
 

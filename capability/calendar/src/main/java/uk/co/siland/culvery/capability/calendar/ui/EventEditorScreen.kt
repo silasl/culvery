@@ -73,6 +73,7 @@ internal const val DISCARD_CHANGES = "Discard your changes?"
 internal const val KEEP_EDITING = "Keep editing"
 internal const val DISCARD = "Discard"
 internal const val OPTIONAL_HINT = "Time and repeats are optional"
+internal const val TIME_OPTIONAL_HINT = "Time is optional"
 
 private const val CALENDAR_SUFFIX = " calendar"
 
@@ -169,7 +170,7 @@ internal fun EventEditorScreen(
                             flow.open(EditorStep.Who)
                         },
                     )
-                    Rows(form, flow, members, service, typing) { step ->
+                    Rows(form, flow, members, service, typing, lit = !titleFocused) { step ->
                         closeKeyboard()
                         flow.open(step)
                     }
@@ -189,7 +190,8 @@ internal fun EventEditorScreen(
                                 confirmIcon = discardIcon(form.mode),
                             )
                         } else {
-                            Foot(form, savesTo, busy, failure, onSave = {
+                            val hint = if (EditorStep.Repeats in flow.steps) OPTIONAL_HINT else TIME_OPTIONAL_HINT
+                            Foot(form, savesTo, hint, busy, failure, onSave = {
                                 closeKeyboard()
                                 onSave()
                             }, onDelete = {
@@ -282,16 +284,29 @@ private const val WHO = "Who"
 private const val DAY = "Day"
 private const val TIME = "Time"
 
-/** Who, Day, Time and Repeats as [flow] has them; with the keyboard up an unset Who and Day read as their names (handoff 6a). */
+/**
+ * Who, Day, Time and Repeats as [flow] has them; with the keyboard up an unset Who and Day read as their names. While the
+ * title has focus no row is [lit] (handoff 6a). On Change every row is answered, All day and Doesn’t repeat included.
+ */
 @Composable
-private fun Rows(form: EditorForm, flow: EditorFlow, members: List<Member>, service: String, typing: Boolean, onOpen: (EditorStep) -> Unit) {
+private fun Rows(
+    form: EditorForm,
+    flow: EditorFlow,
+    members: List<Member>,
+    service: String,
+    typing: Boolean,
+    lit: Boolean,
+    onOpen: (EditorStep) -> Unit,
+) {
     val people = members.map { it.person }
+    val editing = form.mode is EventForm.Mode.Edit
+    val active = { step: EditorStep -> lit && flow.active == step }
     EditorRow(
         testTag = "editor_row_who",
         icon = Icons.GROUP,
         label = WHO,
         value = if (typing && form.who.isEmpty()) WHO else whoValue(form, people),
-        active = flow.active == EditorStep.Who,
+        active = active(EditorStep.Who),
         set = form.who.isNotEmpty(),
         typing = typing,
         onClick = { onOpen(EditorStep.Who) },
@@ -313,7 +328,7 @@ private fun Rows(form: EditorForm, flow: EditorFlow, members: List<Member>, serv
             icon = Icons.CALENDAR_MONTH,
             label = DAY,
             value = if (typing && form.day == null) DAY else dayValue(form),
-            active = flow.active == EditorStep.Day,
+            active = active(EditorStep.Day),
             set = form.day != null,
             typing = typing,
             onClick = { onOpen(EditorStep.Day) },
@@ -325,8 +340,8 @@ private fun Rows(form: EditorForm, flow: EditorFlow, members: List<Member>, serv
             icon = Icons.SCHEDULE,
             label = TIME,
             value = timeValue(form),
-            active = flow.active == EditorStep.Time,
-            set = form.startTime != null,
+            active = active(EditorStep.Time),
+            set = editing || form.startTime != null,
             typing = typing,
             onClick = { onOpen(EditorStep.Time) },
         )
@@ -337,8 +352,8 @@ private fun Rows(form: EditorForm, flow: EditorFlow, members: List<Member>, serv
             icon = Icons.REPEAT,
             label = REPEATS,
             value = form.repeatsValue,
-            active = flow.active == EditorStep.Repeats,
-            set = form.repeat != RepeatChoice.Never,
+            active = active(EditorStep.Repeats),
+            set = editing || form.repeat != RepeatChoice.Never,
             typing = typing,
             onClick = { onOpen(EditorStep.Repeats) },
         )
@@ -347,7 +362,7 @@ private fun Rows(form: EditorForm, flow: EditorFlow, members: List<Member>, serv
 
 /** Where it saves, a failed save's card, and Delete beside the one green button with what it waits for under it. */
 @Composable
-private fun Foot(form: EditorForm, savesTo: String?, busy: Boolean, failure: SaveFailure?, onSave: () -> Unit, onDelete: () -> Unit) {
+private fun Foot(form: EditorForm, savesTo: String?, hint: String, busy: Boolean, failure: SaveFailure?, onSave: () -> Unit, onDelete: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.footGap)) {
         if (failure != null) FailureCard(failure)
         if (savesTo != null) SavesTo(savesToLine(savesTo))
@@ -366,7 +381,7 @@ private fun Foot(form: EditorForm, savesTo: String?, busy: Boolean, failure: Sav
                 enabled = form.canSave && !busy,
                 reason = form.reason,
                 below = true,
-                hint = OPTIONAL_HINT,
+                hint = hint,
             )
         }
     }
