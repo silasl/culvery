@@ -508,6 +508,9 @@ For the end-of-v1 design review:
 
 Test flakes seen during the fixes (each green on a rerun): `CameraAccessTest`, `DoorRecorderTest`, `BridgesTest`, plus the known `DoorTabTest` and `LightsActionsTest`.
 
+## To check when the tablet is next plugged in
+- **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings).
+
 ## Feature ideas (2026-10-02, after v1)
 
 **Each its own spec → plan cycle; not in 4c, 4d or 4e**
