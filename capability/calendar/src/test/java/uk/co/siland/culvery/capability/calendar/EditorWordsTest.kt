@@ -116,4 +116,32 @@ class EditorWordsTest {
         assertThat(firstDates(bins())).isEqualTo(listOf(mon28, mon28.plusWeeks(1), mon28.plusWeeks(2), mon28.plusWeeks(3)) to 0)
         assertThat(firstDates(guitar())).isEqualTo(listOf(sat26) to 0)
     }
+
+    @Test
+    fun theTimeRowReadsWhatSaveWritesOnTheClocksChangeNight() {
+        // Sunday 25 October 2026: 01:00–02:00 happens twice, so two real hours from 00:30 end at 01:30.
+        val form = new().apply {
+            updateTitle("Night ferry")
+            toggleWho(mia.id)
+            tapDay(LocalDate.of(2026, 10, 25))
+            chooseTime(LocalTime.of(0, 30))
+            chooseLength(Duration.ofHours(2))
+        }
+        val end = (form.draft(createdBy = null).end as EventTime.Timed).instant.atZone(london).toLocalTime()
+        assertThat(end).isEqualTo(LocalTime.of(1, 30))
+        assertThat(timeValue(form)).isEqualTo("00:30–01:30")
+        assertThat(checkSentence(form, people)).isEqualTo("Night ferry for Mia, Sun 25 Oct, 00:30–01:30.")
+    }
+
+    @Test
+    fun theTimeRowEndsAtMidnightAsSaveDoes() {
+        val form = new().apply {
+            updateTitle("Film")
+            toggleWho(mia.id)
+            tapDay(sat26)
+            chooseTime(LocalTime.of(23, 30))
+            chooseLength(Duration.ofHours(2))
+        }
+        assertThat(timeValue(form)).isEqualTo("23:30–00:00")
+    }
 }

@@ -170,8 +170,9 @@ private fun unhealthyPeople(sources: List<StoredSource>, connections: List<Store
     val failing = connections.filter {
         it.health == ConnectionHealth.NeedsSignIn || it.lastSyncMillis == null || isStale(it.lastSyncMillis, nowMillis)
     }.map { it.connection.id }.toSet()
+    // A writable calendar's events can be tagged for anyone, so its trouble is everyone's.
     return sources.filter { it.mapping.visible && (it.connectionId in failing || it.readProblem != null) }
-        .flatMapTo(mutableSetOf()) { if (it.isMaster) order else listOf(it.mapping.person) }
+        .flatMapTo(mutableSetOf()) { if (it.isMaster || it.source.writable) order else listOf(it.mapping.person) } - PersonId.FAMILY
 }
 
 /** Signing in first (only the family can fix it), then the tablet offline, then a service that didn't answer. */

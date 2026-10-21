@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -378,9 +379,8 @@ class EditorForm(
     private fun span(first: LocalDate): Pair<EventTime, EventTime> {
         original?.takeIf { keepsOwnSpan }?.let { return it.start to it.end }
         val start = startTime ?: return EventTime.AllDay(first) to EventTime.AllDay((until ?: first).plusDays(1))
-        val from = ZonedDateTime.of(first, start, zone).toInstant()
-        val midnight = first.plusDays(1).atStartOfDay(zone).toInstant()
-        return EventTime.Timed(from) to EventTime.Timed(minOf(from.plus(length), midnight))
+        val (from, to) = draftSpan(first, start, length, zone)
+        return EventTime.Timed(from) to EventTime.Timed(to)
     }
 
     /** What Save sends; only when [canSave]. A new event that repeats carries its rule. */
@@ -407,6 +407,15 @@ class EditorForm(
 
     /** An edit that changes nothing: the editor just closes, with no PIN. A new event never is. */
     val unchanged: Boolean get() = original != null && touched.isEmpty()
+}
+
+/**
+ * A timed event's span as Save writes it: from [start] on [day] in [zone] for [length] of real time, ending at the
+ * next midnight at the latest. The Time row, the clash check and the draft all read it, so they can't disagree.
+ */
+internal fun draftSpan(day: LocalDate, start: LocalTime, length: Duration, zone: ZoneId): Pair<Instant, Instant> {
+    val from = ZonedDateTime.of(day, start, zone).toInstant()
+    return from to minOf(from.plus(length), day.plusDays(1).atStartOfDay(zone).toInstant())
 }
 
 private fun timeOf(start: EventTime, zone: ZoneId): TimeChoice = when (start) {

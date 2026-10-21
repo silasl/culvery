@@ -79,7 +79,7 @@ fun Held.check(
     if (!canCheck(people, day)) return FreeCheck.None
     val chosen = people.distinct().sortedBy { order.indexOf(it).takeIf { i -> i >= 0 } ?: Int.MAX_VALUE }
     val busy = busyEvents(chosen, except)
-    val (from, to) = span(day, start, length, zone)
+    val (from, to) = draftSpan(day, start, length, zone)
     for (person in chosen) {
         val clash = busy.filter { person in it.people && it.overlaps(from, to) }.minByOrNull { it.start.instantIn(zone) } ?: continue
         return FreeCheck.Busy(person, clash, freeStarts(busy, day, start, length, zone))
@@ -93,11 +93,6 @@ private fun Held.canCheck(people: List<PersonId>, day: LocalDate): Boolean =
 // Family and all-day events make nobody busy (9 §3.4).
 private fun Held.busyEvents(people: List<PersonId>, except: EventRef?): List<HeldEvent> = events.filter { e ->
     e.ref != except && e.start is EventTime.Timed && e.end is EventTime.Timed && e.people.any { it in people }
-}
-
-private fun span(day: LocalDate, start: LocalTime, length: Duration, zone: ZoneId): Pair<Instant, Instant> {
-    val from = ZonedDateTime.of(day, start, zone).toInstant()
-    return from to minOf(from.plus(length), day.plusDays(1).atStartOfDay(zone).toInstant())
 }
 
 /** The nearest quarter-hour before and after [start] whose whole [length] lies in 07:00–23:00 with nobody busy. */

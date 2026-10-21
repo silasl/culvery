@@ -1,8 +1,6 @@
 package uk.co.siland.culvery.capability.calendar
 
-import java.time.Duration
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -18,7 +16,6 @@ const val CLASHES_ALLOWED_TAIL = "or keep it; clashes are allowed."
 const val CLASHES_ALLOWED = "Clashes are allowed."
 
 private const val FIRST_FEW = 4
-private const val MINUTES_PER_DAY = 24 * 60L
 private val DAY_MONTH: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
 private val DAY_AND_CLOCK: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE HH:mm", Locale.ENGLISH)
 
@@ -107,13 +104,9 @@ private fun datesOf(form: EditorForm): String? {
     return "$from – ${last.format(SHORT_DAY)}"
 }
 
-// "10:00–10:45", ending at midnight at most as the draft does; null when all day.
+// "10:00–10:45", ending where the draft does; null when all day.
 private fun timesOf(form: EditorForm): String? {
     val start = form.startTime ?: return null
-    return "${clockText(start)}–${clockText(endOf(start, form.length))}"
-}
-
-private fun endOf(start: LocalTime, length: Duration): LocalTime {
-    val toMidnight = MINUTES_PER_DAY - start.toSecondOfDay() / 60L
-    return if (length.toMinutes() >= toMidnight) LocalTime.MIDNIGHT else start.plus(length)
+    val (_, end) = draftSpan(form.day ?: form.today, start, form.length, form.zone)
+    return "${clockText(start)}–${end.atZone(form.zone).format(HOURS_MINUTES)}"
 }

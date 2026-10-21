@@ -690,7 +690,7 @@ class CalendarRepositoryTest {
 
         store.markSynced("c2", now)
         assertThat(heldRepo(now).held(sept(23)).first().unhealthy).isEmpty()
-        assertThat(heldRepo(now + STALE_AFTER_MS + 1).held(sept(23)).first().unhealthy).containsAtLeast(alex.id, sam.id)
+        assertThat(heldRepo(now + STALE_AFTER_MS + 1).held(sept(23)).first().unhealthy).containsExactly(alex.id, sam.id)
 
         store.markReadRefused("c1", "s-alex")
         assertThat(heldRepo(now).held(sept(23)).first().unhealthy).containsExactly(alex.id)
@@ -700,7 +700,30 @@ class CalendarRepositoryTest {
     fun aMasterCalendarNeedingSignInMarksEveryone() = runTest {
         store.markSynced("c1", noonOn(sept(23)))
         store.setHealth("c1", ConnectionHealth.NeedsSignIn, noonOn(sept(23)))
-        assertThat(heldRepo().held(sept(23)).first().unhealthy).containsAtLeast(alex.id, sam.id)
+        assertThat(heldRepo().held(sept(23)).first().unhealthy).containsExactly(alex.id, sam.id)
+    }
+
+    @Test
+    fun anUnhealthyWritableCalendarMarksEveryone() = runTest {
+        val now = noonOn(sept(23))
+        store.addConnection(
+            Connection("c2", "calendar.test", "School", emptyMap()),
+            listOf(CalendarSource("s-sam", "Sam", writable = false)),
+            mapOf("s-sam" to SourceMapping(sam.id, visible = true)),
+        )
+        store.addConnection(
+            Connection("c3", "calendar.test", "Shared", emptyMap()),
+            listOf(CalendarSource("s-shared", "Shared", writable = true)),
+            mapOf("s-shared" to SourceMapping(sam.id, visible = true)),
+        )
+        listOf("c1", "c2", "c3").forEach { store.markSynced(it, now) }
+        // The control: a read-only calendar only holds its own person's events.
+        store.setHealth("c2", ConnectionHealth.NeedsSignIn, now)
+        assertThat(heldRepo(now).held(sept(23)).first().unhealthy).containsExactly(sam.id)
+
+        store.setHealth("c2", ConnectionHealth.Ok, now)
+        store.setHealth("c3", ConnectionHealth.NeedsSignIn, now)
+        assertThat(heldRepo(now).held(sept(23)).first().unhealthy).containsExactly(alex.id, sam.id)
     }
 }
 
