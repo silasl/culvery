@@ -79,7 +79,8 @@ class TinyProvider(
             // Every write bumps the version, so a cursor from before it gets a full replace.
             val current = SyncCursor("w$version")
             if (cursor == current) return SyncResult(emptyList(), emptyList(), current, fullReplace = false)
-            return SyncResult(written.values.filter { range.overlaps(it.start, it.end) }, emptyList(), current, fullReplace = true)
+            val events = written.values.flatMap { if (it.recurring) occurrences(it, range.zone) else listOf(it) }
+            return SyncResult(events.filter { range.overlaps(it.start, it.end) }, emptyList(), current, fullReplace = true)
         }
         if (cursor != null && !repeatOnCursor) return SyncResult(emptyList(), emptyList(), cursor, fullReplace = false)
         val events = all(range.zone).filter { leakOutOfRange || range.overlaps(it.start, it.end) }
@@ -105,9 +106,10 @@ class TinyProvider(
             draft.title,
             draft.start,
             draft.end,
-            recurring = false,
+            recurring = draft.recurrence != null,
             forPerson = if (dropTagsOnCreate) null else draft.forPerson,
             createdBy = if (dropTagsOnCreate) null else draft.createdBy,
+            recurrenceRule = draft.recurrence?.rule,
         )
         written[event.remoteId] = event
         keyOf[event.remoteId] = clientKey
@@ -154,11 +156,33 @@ class TinyProvider(
         throw WriteRejectedException("No series $seriesId")
     }
 
+    override suspend fun deleteSeries(conn: Connection, source: CalendarSource, seriesId: String) {
+        checkWritable(source)
+        val series = written[seriesId]
+        when {
+            series == null -> if (rejectMissingDelete) throw WriteRejectedException("No series $seriesId")
+            !series.recurring -> throw WriteRejectedException("$seriesId is not a series")
+            else -> delete(conn, source, seriesId)
+        }
+    }
+
     override suspend fun find(conn: Connection, source: CalendarSource, remoteId: String): RemoteEvent? =
         if (findNothing || source.id != WRITABLE.id) null else written[remoteId]
 
     private fun checkWritable(source: CalendarSource) {
         if (!canWrite || source.id != WRITABLE.id) throw WriteRejectedException("Tiny can't write to ${source.id}")
+    }
+
+    /** A written series' occurrences, each a week apart: Tiny repeats only weekly, as many times as its COUNT says. */
+    private fun occurrences(series: RemoteEvent, zone: ZoneId): List<RemoteEvent> {
+        val count = Regex("COUNT=(\\d+)").find(series.recurrenceRule.orEmpty())?.groupValues?.get(1)?.toInt() ?: 1
+        fun later(time: EventTime, weeks: Long): EventTime = when (time) {
+            is EventTime.Timed -> EventTime.Timed(time.instant.atZone(zone).plusWeeks(weeks).toInstant())
+            is EventTime.AllDay -> EventTime.AllDay(time.date.plusWeeks(weeks))
+        }
+        return (0L until count).map { week ->
+            series.copy(remoteId = "${series.remoteId}_$week", start = later(series.start, week), end = later(series.end, week), seriesId = series.remoteId)
+        }
     }
 
     private fun all(zone: ZoneId): List<RemoteEvent> {

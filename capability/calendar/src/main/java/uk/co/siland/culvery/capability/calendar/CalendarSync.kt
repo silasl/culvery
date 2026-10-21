@@ -6,6 +6,7 @@ import java.net.NoRouteToHostException
 import java.net.UnknownHostException
 import java.time.Instant
 import java.time.ZoneId
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.CoroutineContext
@@ -43,6 +44,7 @@ class CalendarSync internal constructor(
     private val toaster: Toaster,
     private val writeLock: CalendarWriteLock,
     private val refresher: SourceRefresher,
+    private val undone: UndoneKeys,
 ) {
     @Inject
     constructor(
@@ -54,7 +56,14 @@ class CalendarSync internal constructor(
         clock: WallClock,
         writeLock: CalendarWriteLock,
         refresher: SourceRefresher,
-    ) : this(store, providers, zone, clock, Dispatchers.IO, PROVIDER_TIMEOUT_MS, writers, toaster, writeLock, refresher)
+        undone: UndoneKeys,
+    ) : this(store, providers, zone, clock, Dispatchers.IO, PROVIDER_TIMEOUT_MS, writers, toaster, writeLock, refresher, undone)
+
+    /** A create Undo removed that landed after all, whose delete failed: retried each pass until it goes (9 §2.3). */
+    private class Unlanded(val connectionId: String, val sourceId: String, val series: Boolean)
+
+    // By key. In memory only, as UndoneKeys is.
+    private val unlanded = ConcurrentHashMap<String, Unlanded>()
 
     // The loop's timer, a connection change and requestSync may all ask at once: one pass writes at a time.
     private val passLock = Mutex()
@@ -131,6 +140,7 @@ class CalendarSync internal constructor(
         }
 
         try {
+            deleteUnlanded(byId)
             for (change in store.pendingNow()) {
                 val ref = change.ref
                 val stored = byId[change.connectionId]
@@ -181,7 +191,8 @@ class CalendarSync internal constructor(
                 }
                 when (outcome) {
                     is WriteOutcome.Accepted -> if (aged && ref != null) foundCreates += ref
-                    is WriteOutcome.Rejected -> drop(change, label, outcome.reason)
+                    // Undo already dropped it, and has said so.
+                    is WriteOutcome.Rejected -> if (!change.isUndoneCreate()) drop(change, label, outcome.reason)
                     is WriteOutcome.Retry -> {
                         val next = retryLater(change, now)
                         ref?.let { blockedRefs[it] = next }
@@ -195,6 +206,43 @@ class CalendarSync internal constructor(
             // Those changes are already gone, so they are told even when a later change fails the pass.
             dropped.forEach { (label, reasons) -> toaster.show(changesLost(label, reasons), urgent = true) }
         }
+    }
+
+    private fun PendingChange.isUndoneCreate(): Boolean = kind == ChangeKind.CREATE && clientKey?.let(undone::has) == true
+
+    /** Tries again each delete of an undone create that landed; one whose connection or calendar has gone is let go. */
+    private suspend fun deleteUnlanded(byId: Map<String, StoredConnection>) {
+        for ((key, event) in unlanded) {
+            val stored = byId[event.connectionId]
+            val source = store.source(event.connectionId, event.sourceId)
+            val writer = stored?.let { s -> writers.firstOrNull { it.providerId == s.connection.providerId } }
+            if (stored == null || source == null || writer == null) {
+                unlanded.remove(key)
+                undone.done(key)
+                continue
+            }
+            deleteUndone(key, event, stored.connection, source.source, writer)
+        }
+    }
+
+    /**
+     * Deletes a create the service accepted after Undo removed it (9 §2.3); it is never mirrored. A failure to reach the
+     * service is tried again next pass; a refusal (a series no longer one) is let go, as nothing more can be done.
+     */
+    private suspend fun deleteUndone(key: String, event: Unlanded, conn: Connection, source: CalendarSource, writer: CalendarWriter): WriteOutcome {
+        val outcome = callWriter(io, timeoutMillis) {
+            if (event.series) writer.deleteSeries(conn, source, key) else writer.delete(conn, source, key)
+            null
+        }
+        if (outcome is WriteOutcome.Retry) {
+            Log.w(TAG, "${conn.id}: couldn't delete an undone event that landed; trying again next pass")
+            unlanded[key] = event
+        } else {
+            if (outcome is WriteOutcome.Rejected) Log.w(TAG, "${conn.id}: the service refused to delete an undone event that landed")
+            unlanded.remove(key)
+            undone.done(key)
+        }
+        return WriteOutcome.Accepted(null)
     }
 
     /** Whether the change carries what its kind needs; one that doesn't can never be sent. */
@@ -219,7 +267,11 @@ class CalendarSync internal constructor(
                 val draft = checkNotNull(change.draft)
                 val key = checkNotNull(change.clientKey)
                 // The key makes a retry safe: if an earlier attempt did create the event, the provider returns it.
-                callWriter(io, timeoutMillis) { writer.create(conn, source, draft, key) }
+                val created = callWriter(io, timeoutMillis) { writer.create(conn, source, draft, key) }
+                if (created is WriteOutcome.Accepted && undone.has(key)) {
+                    return deleteUndone(key, Unlanded(conn.id, source.id, draft.recurrence != null), conn, source, writer)
+                }
+                created
             }
             ChangeKind.UPDATE -> {
                 val remoteId = checkNotNull(change.remoteId)

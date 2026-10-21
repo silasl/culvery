@@ -398,6 +398,18 @@ class CalendarStoreTest {
     }
 
     @Test
+    fun applySeriesDeletedRemovesTheSeriesAndItsOccurrences() = runTest {
+        connect("s1", "s2")
+        val occurrences = (0..2).map { timed("swim-$it", "Swimming", 23 + it, 9).copy(recurring = true, seriesId = "swim") }
+        val master = timed("swim", "Swimming", 23, 9).copy(recurring = true)
+        store.applySync("c1", "s1", window, full(*(occurrences + master + timed("other", "Other", 24, 9)).toTypedArray()))
+        store.applySync("c1", "s2", window, full(timed("swim-0", "Swimming", 23, 9).copy(recurring = true, seriesId = "swim")))
+        store.applySeriesDeleted("c1", "s1", "swim")
+        assertThat(storedIds()).containsExactly("other", "swim-0")
+        assertThat(store.eventNow(EventRef("c1", "s2", "swim-0"))).isNotNull()
+    }
+
+    @Test
     fun aQueuedCreateKeepsItsClientKeyAndItsRefUsesIt() = runTest {
         connect("s1")
         val key = "0123456789abcdef0123456789abcdef"

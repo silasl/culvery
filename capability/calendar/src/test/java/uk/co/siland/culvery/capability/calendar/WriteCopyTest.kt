@@ -49,6 +49,21 @@ class WriteCopyTest {
     }
 
     @Test
+    fun theAddedLine() {
+        val sat12Dec = java.time.LocalDate.of(2026, 12, 12)
+        assertThat(addedLine("Guitar lesson", null, null)).isEqualTo("Added Guitar lesson.")
+        assertThat(addedLine("Guitar lesson", "Every Saturday", null)).isEqualTo("Added Guitar lesson, every Saturday.")
+        assertThat(addedLine("Guitar lesson", null, sat12Dec)).isEqualTo("Added Guitar lesson, Sat 12 Dec.")
+        assertThat(addedLine("Guitar lesson", "Every Saturday", sat12Dec)).isEqualTo("Added Guitar lesson, every Saturday from Sat 12 Dec.")
+    }
+
+    @Test
+    fun undoSaysWhatHappened() {
+        assertThat(removed("Dinner")).isEqualTo("Removed Dinner.")
+        assertThat(couldNotUndo(gc)).isEqualTo("Couldn’t undo — remove it in Google Calendar on your phone.")
+    }
+
+    @Test
     fun lengthsAreInFullWords() {
         assertThat(listOf(1L, 30L, 60L, 90L, 120L, 135L).map { lengthLabel(java.time.Duration.ofMinutes(it)) })
             .containsExactly("1 minute", "30 minutes", "1 hour", "1 hour 30 minutes", "2 hours", "2 hours 15 minutes").inOrder()

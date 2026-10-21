@@ -302,6 +302,21 @@ class GoogleWriteTest {
     }
 
     @Test
+    fun deleteSeriesLooksThenDeletesTheSeries() = runTest {
+        putSeries()
+        provider.deleteSeries(conn, family, "piano")
+        assertThat(google.requests.map { it.method to it.requestUrl!!.pathSegments.last() })
+            .containsExactly("GET" to "piano", "DELETE" to "piano").inOrder()
+        assertThat(google.event(family.id, "piano")!!.text("status")).isEqualTo("cancelled")
+
+        putSeries("violin")
+        google.failNext(410, "deleted") { it.method == "GET" }
+        provider.deleteSeries(conn, family, "violin")
+        assertThat(google.requests.count { it.method == "DELETE" }).isEqualTo(1)
+        assertThat(google.event(family.id, "violin")!!.text("status")).isEqualTo("confirmed")
+    }
+
+    @Test
     fun aLookBeforeAWriteThatGoogleRefusesIsARefusalNotTryLater() = runTest {
         provider.create(conn, family, draft(), key)
         google.failNext(400, "invalid") { it.method == "GET" }

@@ -252,6 +252,12 @@ interface CalendarDao {
     @Query("DELETE FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId AND remoteId IN (:ids)")
     suspend fun deleteEvents(connectionId: String, sourceId: String, ids: List<String>)
 
+    @Query(
+        "DELETE FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId " +
+            "AND (seriesId = :seriesId OR remoteId = :seriesId)",
+    )
+    suspend fun deleteSeries(connectionId: String, sourceId: String, seriesId: String)
+
     @Upsert
     suspend fun upsertEvents(events: List<EventEntity>)
 

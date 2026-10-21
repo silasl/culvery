@@ -329,6 +329,10 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         completing?.let { dao.deleteOutbox(it) }
     }
 
+    /** Removes an accepted series delete from the mirror: the series and every occurrence of it held. */
+    suspend fun applySeriesDeleted(connectionId: String, sourceId: String, seriesId: String) =
+        dao.deleteSeries(connectionId, sourceId, seriesId)
+
     suspend fun enqueue(change: PendingChange): Long = dao.insertOutbox(change.toEntity())
 
     /** Skips a row this version can't read; [pendingNow] deletes it. */

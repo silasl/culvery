@@ -13,6 +13,7 @@ import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
+import uk.co.siland.culvery.capability.calendar.Recurrence
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.SyncCursor
 import uk.co.siland.culvery.capability.calendar.SyncResult
@@ -374,9 +375,70 @@ abstract class CalendarProviderContractTest {
         assertWithMessage("find must return null for a deleted event").that(w.find(conn, source, created.remoteId)).isNull()
     }
 
+    /** A weekly series of three from the window's second day, at 10:00. */
+    private fun seriesIn(title: String): EventDraft =
+        draftIn(title, 0).copy(recurrence = Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=3", window.zone))
+
+    /** The series [seriesId] as a first sync over its three weeks returns it: its occurrences, or the series itself. */
+    private suspend fun occurrencesOf(source: CalendarSource, seriesId: String): List<RemoteEvent> {
+        val weeks = DateRange(window.start, window.start.plusDays(SERIES_DAYS), window.zone)
+        return subject.sync(conn, source, weeks, null).upserts.filter { it.seriesId == seriesId || it.remoteId == seriesId }
+    }
+
+    private suspend fun failureOf(write: suspend () -> Unit): Throwable? =
+        try {
+            write()
+            null
+        } catch (e: Throwable) {
+            e
+        }
+
+    /**
+     * Undo removes a series just added (9 §2.3), every occurrence with it. Until then find returns the series, as the
+     * drain's look for a create whose reply was lost needs, and afterwards a retried create of its key never makes it again.
+     */
+    @Test
+    fun deleteSeriesRemovesEveryOccurrence() = runTest {
+        val (w, source) = requireWriting()
+        val key = newClientKey()
+        val draft = seriesIn("Series check")
+        val series = w.create(conn, source, draft, key).remoteId
+        assertWithMessage("fixture: the next sync must return the series' three occurrences").that(occurrencesOf(source, series)).hasSize(3)
+        assertWithMessage("find must return a series that exists").that(w.find(conn, source, series)).isNotNull()
+        w.deleteSeries(conn, source, series)
+        assertWithMessage("the next sync must return none of the deleted series' occurrences").that(occurrencesOf(source, series)).isEmpty()
+        assertWithMessage("a retried create of a deleted series' key must be refused, never make the series again")
+            .that(failureOf { w.create(conn, source, draft, key) }).isInstanceOf(WriteRejectedException::class.java)
+        assertThat(occurrencesOf(source, series)).isEmpty()
+    }
+
+    @Test
+    fun deleteSeriesOfAGoneSeriesSucceeds() = runTest {
+        val (w, source) = requireWriting()
+        val series = w.create(conn, source, seriesIn("Series twice"), newClientKey()).remoteId
+        w.deleteSeries(conn, source, series)
+        assertWithMessage("a second series delete must succeed: Undo's delete and the drain's may both land")
+            .that(failureOf { w.deleteSeries(conn, source, series) }).isNull()
+    }
+
+    /** Only Undo deletes a series (9 §2.3): an id that isn't one is refused, so a one-off is never deleted as a series. */
+    @Test
+    fun deleteSeriesOfAOneOffIsRefused() = runTest {
+        val (w, source) = requireWriting()
+        val made = w.create(conn, source, draftIn("Not a series", 1), newClientKey())
+        assertWithMessage("a series delete of a one-off must be refused")
+            .that(failureOf { w.deleteSeries(conn, source, made.remoteId) }).isInstanceOf(WriteRejectedException::class.java)
+        assertThat(subject.sync(conn, source, window, null).upserts.map { it.remoteId }).contains(made.remoteId)
+    }
+
     @Test
     fun sourcesReportAtMostOnePrimary() = runTest {
         assertWithMessage("at most one source may be the account's primary calendar")
             .that(subject.sources(conn).count { it.primary }).isAtMost(1)
+    }
+
+    private companion object {
+        /** How far the series checks read: three weeks from the window's second day, and a little more. */
+        const val SERIES_DAYS = 30L
     }
 }

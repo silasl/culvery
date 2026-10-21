@@ -5,8 +5,8 @@ import kotlinx.coroutines.awaitCancellation
 import uk.co.siland.culvery.core.plugin.Connection
 
 /**
- * An in-test writer. [calls] reads "create:<title>", "update:<remoteId>", "delete:<remoteId>", "find:<remoteId>"
- * or "assignSeries:<seriesId>".
+ * An in-test writer. [calls] reads "create:<title>", "update:<remoteId>", "delete:<remoteId>", "find:<remoteId>",
+ * "assignSeries:<seriesId>" or "deleteSeries:<seriesId>".
  * Creates keep the contract: the client key is the event's id, and a repeated key returns the event it made.
  */
 internal class ScriptedWriter(override val providerId: String) : CalendarWriter {
@@ -19,9 +19,15 @@ internal class ScriptedWriter(override val providerId: String) : CalendarWriter 
     val created = linkedMapOf<String, RemoteEvent>()
     /** Events find returns besides those create made: an event the mirror doesn't hold (3a design m3). */
     val findable = linkedMapOf<String, RemoteEvent>()
+    /** The ids delete and deleteSeries removed. */
+    val deleted = mutableSetOf<String>()
     var failWith: Throwable? = null
+    /** The next delete or deleteSeries throws it; then they work again. */
+    var failNextDelete: Throwable? = null
     /** When set, each write waits for it: a slow network the test releases. */
     var gate: CompletableDeferred<Unit>? = null
+    /** When set, each create waits for it, while the other writes go through. */
+    var createGate: CompletableDeferred<Unit>? = null
     /** The next create makes its event, then never replies: a reply lost after the provider acted. */
     var loseNextReply = false
     /** The next create makes its event, then the connection drops before the reply (UnreachableException). */
@@ -32,6 +38,7 @@ internal class ScriptedWriter(override val providerId: String) : CalendarWriter 
     override suspend fun create(conn: Connection, source: CalendarSource, draft: EventDraft, clientKey: String): RemoteEvent {
         record("create:${draft.title}", draft)
         gate?.await()
+        createGate?.await()
         failWith?.let { throw it }
         val event = synchronized(this) {
             created.getOrPut(clientKey) {
@@ -65,8 +72,24 @@ internal class ScriptedWriter(override val providerId: String) : CalendarWriter 
 
     override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) {
         record("delete:$remoteId", null)
+        removed(remoteId)
+    }
+
+    override suspend fun deleteSeries(conn: Connection, source: CalendarSource, seriesId: String) {
+        record("deleteSeries:$seriesId", null)
+        removed(seriesId)
+    }
+
+    private suspend fun removed(id: String) {
         gate?.await()
         failWith?.let { throw it }
+        synchronized(this) {
+            failNextDelete?.let {
+                failNextDelete = null
+                throw it
+            }
+            deleted += id
+        }
     }
 
     override suspend fun assignSeries(conn: Connection, source: CalendarSource, seriesId: String, draft: EventDraft) {

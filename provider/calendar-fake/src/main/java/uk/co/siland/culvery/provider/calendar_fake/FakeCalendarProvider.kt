@@ -179,6 +179,15 @@ class FakeCalendarProvider(private val clock: Clock) : CalendarProvider, Calenda
         Unit
     }
 
+    override suspend fun deleteSeries(conn: Connection, source: CalendarSource, seriesId: String) = write(source) {
+        // Only a series made here can go; anything else not here is already gone (CalendarWriter contract).
+        val series = created[seriesId]
+        if (series != null && !series.recurring) throw WriteRejectedException()
+        created.remove(seriesId)
+        deleted += seriesId
+        Unit
+    }
+
     override suspend fun assignSeries(conn: Connection, source: CalendarSource, seriesId: String, draft: EventDraft) = write(source) {
         if (familySamples().none { it.seriesId == seriesId }) throw WriteRejectedException(EVENT_GONE)
         seriesFor[seriesId] = draft.forPerson

@@ -46,4 +46,14 @@ class MonthTitleTest {
             .isEqualTo("This week · Wed 23 – Tue 29 Sep · The tablet is offline. Check the Wi-Fi, then Update now.")
         assertThat(weekSubtitleLine(0, wed23Sep, "Updating…")).endsWith("· Updating…")
     }
+
+    @Test
+    fun weeksToTheDate() {
+        assertThat(weeksTo(wed23Sep, wed23Sep)).isEqualTo(0)
+        assertThat(weeksTo(wed23Sep, wed23Sep.plusDays(6))).isEqualTo(0)
+        assertThat(weeksTo(wed23Sep, wed23Sep.plusDays(7))).isEqualTo(1)
+        assertThat(weeksTo(wed23Sep, lastShownDay(wed23Sep))).isEqualTo(3)
+        assertThat(weeksTo(wed23Sep, lastShownDay(wed23Sep).plusDays(1))).isNull()
+        assertThat(weeksTo(wed23Sep, wed23Sep.minusDays(1))).isNull()
+    }
 }

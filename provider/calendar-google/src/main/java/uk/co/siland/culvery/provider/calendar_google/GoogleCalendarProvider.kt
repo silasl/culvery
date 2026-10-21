@@ -305,9 +305,14 @@ class GoogleCalendarProvider @Inject constructor(
     }
 
     /** Gone already (looked up first, or 404 or 410) is success; an event since made a series is refused, not deleted whole. */
-    override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) {
+    override suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String) = delete(conn, source, remoteId, series = false)
+
+    /** As [delete], for the series itself: a DELETE of it takes every instance (9 §2.3). One no longer a series is refused. */
+    override suspend fun deleteSeries(conn: Connection, source: CalendarSource, seriesId: String) = delete(conn, source, seriesId, series = true)
+
+    private suspend fun delete(conn: Connection, source: CalendarSource, remoteId: String, series: Boolean) {
         val account = accountOf(conn)
-        toChange(account, source, remoteId, GoogleCall.DELETING) ?: return
+        toChange(account, source, remoteId, GoogleCall.DELETING, series) ?: return
         val answer = api.send(account, "DELETE", api.url("calendars", source.id, "events", remoteId))
         if (answer.isSuccessful || answer.isGoneStatus) return
         throw answer.refusal(GoogleCall.DELETING)

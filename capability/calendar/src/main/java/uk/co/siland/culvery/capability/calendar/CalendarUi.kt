@@ -5,6 +5,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -165,7 +166,6 @@ internal val SHORT_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d M
 internal val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
 /** "Sun 27": a day and its date. */
 internal val DAY_AND_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d", Locale.ENGLISH)
-internal val DAY_AND_MONTH: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMMM", Locale.ENGLISH)
 
 internal val MONTH_NAME: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH)
 /** "Oct": the small label over the 1st of a new month in the week. */
@@ -222,8 +222,21 @@ fun weekSubtitleLine(weeksAhead: Int, start: LocalDate, sync: String): String {
 
 private val AGE_LINES = listOf("Updated", "Out of date", "Not updated")
 
-/** 4c §6.6: the toast after adding an event the Calendar tab can't reach, so the family know where it went. */
-fun eventAddedFor(day: LocalDate): String = "Event added on ${day.format(DAY_AND_MONTH)}."
+/** How many weeks after this one the Calendar tab shows [date] in; null before [today] or past [lastShownDay]. */
+internal fun weeksTo(today: LocalDate, date: LocalDate): Int? =
+    if (date < today || date > lastShownDay(today)) null else (ChronoUnit.DAYS.between(today, date) / DAYS_PER_WEEK).toInt()
+
+private const val DAYS_PER_WEEK = 7
+
+/**
+ * The toast after adding (9 §3.1): "Added Guitar lesson.", with a series' [wording] ("every Saturday"), and the first
+ * date when the week can't show it ([beyond]): "Added Guitar lesson, every Saturday from Sat 12 Dec.".
+ */
+fun addedLine(title: String, wording: String?, beyond: LocalDate?): String {
+    val repeats = wording?.let { ", ${lowerFirst(it)}" }.orEmpty()
+    val day = beyond?.format(SHORT_DAY)?.let { if (wording != null) " from $it" else ", $it" }.orEmpty()
+    return "Added $title$repeats$day."
+}
 
 /** An event ending at exactly midnight ends on the day before. */
 private fun lastDayOf(from: ZonedDateTime, to: ZonedDateTime): LocalDate {

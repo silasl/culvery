@@ -26,6 +26,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 
@@ -35,9 +36,28 @@ const val WRITE_ATTEMPT_MS = 10_000L
 /** Hand-off §7: the toast after a delete. */
 const val EVENT_DELETED = "Event deleted."
 
-/** 2b-2 design D1: the toasts after a save. */
-const val EVENT_ADDED = "Event added."
+/** 2b-2 design D1: the toast after a change; an add says what it added ([addedLine]). */
 const val CHANGES_SAVED = "Changes saved."
+
+/** The added toast's button (9 §3.1), and what Undo says afterwards. */
+const val UNDO = "Undo"
+
+fun removed(title: String): String = "Removed $title."
+
+fun couldNotUndo(service: String): String = "Couldn’t undo — remove it in $service on your phone."
+
+/**
+ * What the added toast's Undo removes (9 §2.3): the event made as [key], a whole series when [series], which only
+ * [createdBy], the person who added it, may undo.
+ */
+data class AddedEvent(
+    val key: String,
+    val connectionId: String,
+    val sourceId: String,
+    val title: String,
+    val series: Boolean,
+    val createdBy: String,
+)
 
 /** 3a design §3.12: the add/edit sheet couldn't load what it needs, so it closed. */
 const val COULD_NOT_OPEN = "Couldn’t open the event — try again."
@@ -59,7 +79,10 @@ sealed interface EditResult {
     /** The PIN pad was cancelled, or the person was refused and told so by a toast. */
     data object Cancelled : EditResult
 
-    /** The event is gone, queued for deletion, or can't be changed here; or there is no master calendar to add to. */
+    /**
+     * The event is gone, queued for deletion, or can't be changed here; or there is no master calendar to add to; or
+     * Undo couldn't remove what was added, and has said so.
+     */
     data object NotEditable : EditResult
 }
 
@@ -85,6 +108,7 @@ class CalendarEditor internal constructor(
     private val personOf: suspend (PersonId) -> Person?,
     private val serviceOf: (providerId: String) -> String?,
     private val order: suspend () -> List<PersonId>,
+    private val undone: UndoneKeys,
 ) {
     @Inject
     constructor(
@@ -99,9 +123,10 @@ class CalendarEditor internal constructor(
         writeLock: CalendarWriteLock,
         household: HouseholdRepository,
         providers: Set<@JvmSuppressWildcards CalendarProvider>,
+        undone: UndoneKeys,
     ) : this(
         store, writers, access, toaster, zone, clock, scope, loop::requestSync, Dispatchers.IO, WRITE_ATTEMPT_MS, writeLock,
-        household::person, providers::displayNameOf, { household.people.first().map { it.id } },
+        household::person, providers::displayNameOf, { household.people.first().map { it.id } }, undone,
     )
 
     /** The week's Update now: a sync pass at once. It changes nothing, so it asks for no PIN. */
@@ -113,15 +138,13 @@ class CalendarEditor internal constructor(
     /** Now, in the household zone: the add sheet's "today" and its default time. */
     internal suspend fun openedAt(): ZonedDateTime = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone.current())
 
-    /** "Event added", or with its day when that is past what the Calendar tab shows (4c §6.6). */
-    private suspend fun addedToast(start: EventTime): String {
+    /** The added toast for [draft]: a series says how it repeats, and a first day the week can't show is named (9 §3.1). */
+    private suspend fun addedLineFor(draft: EventDraft): String {
         val z = zone.current()
-        val day = when (start) {
-            is EventTime.AllDay -> start.date
-            is EventTime.Timed -> start.instant.atZone(z).toLocalDate()
-        }
+        val day = draft.start.instantIn(z).atZone(z).toLocalDate()
         val today = Instant.ofEpochMilli(clock.nowMillis()).atZone(z).toLocalDate()
-        return if (day > lastShownDay(today)) eventAddedFor(day) else EVENT_ADDED
+        val wording = draft.recurrence?.let { ruleParts(it.rule)?.let { parts -> readChoice(parts, day) } }?.wording(day)
+        return addedLine(draft.title, wording, day.takeIf { weeksTo(today, day) == null })
     }
 
     /** A signed-in child tapped someone else's Who chip: say why it is locked (2b-2 design §4.2). */
@@ -183,10 +206,77 @@ class CalendarEditor internal constructor(
             refusal = Refusal.Toast { name -> if (refusedRepeat) CANT_REPEAT_FOR_CHILD else cannotAddForOthers(name) },
         ) ?: return EditResult.Cancelled
         val toSend = draft.copy(createdBy = who.person.id.value, forPersonColor = colorOf(draft.forPerson))
-        val added = addedToast(draft.start)
-        return onAppScope(ChangeKind.CREATE, serviceNameOf(to.connection, serviceOf), added) {
+        val added = AddedEvent(clientKey, to.connection.id, to.source.id, draft.title, draft.recurrence != null, who.person.id.value)
+        val line = addedLineFor(draft)
+        val label = serviceNameOf(to.connection, serviceOf)
+        return onAppScope(ChangeKind.CREATE, label, say = { report(ChangeKind.CREATE, label, it, added, line) }) {
             writeLock.withLock { attempt(to, ChangeKind.CREATE, remoteId = null, toSend, clientKey = clientKey) }
         }
+    }
+
+    /**
+     * The added toast's Undo (9 §2.3): removes [added], a whole series included, even while its create waits in the
+     * outbox or is on its way. Only the person who added it may, whatever their role; nobody signed in asks for a PIN.
+     * The one way the tablet deletes a series.
+     */
+    suspend fun undoAdd(added: AddedEvent): EditResult {
+        // Whoever added it could create; the test that matters is that it was them.
+        access.authorise(
+            CalendarPermissions.CREATE,
+            CalendarPermissions.CREATE_SELF,
+            reason = PinReason.Delete,
+            allow = { who, _ -> who.person.id.value == added.createdBy },
+            refusal = Refusal.Toast(::cannotChangeOthers),
+        ) ?: return EditResult.Cancelled
+        val source = store.source(added.connectionId, added.sourceId) ?: return EditResult.NotEditable
+        val to = destination(added.connectionId, source.source) ?: return EditResult.NotEditable
+        val label = serviceNameOf(to.connection, serviceOf)
+        return onAppScope(ChangeKind.DELETE, label, say = { reportUndo(added.title, label, it) }) {
+            writeLock.withLock { undo(added, to) }
+        }
+    }
+
+    /**
+     * Under [writeLock]: drops what is queued for the event, its create included, then deletes it. The key goes in
+     * [undone] first, so a create the drain already has on its way is deleted as it lands; it stays there unless no
+     * create was left to land. The mirror changes only once the service has deleted it. NotEditable: it couldn't be undone.
+     */
+    private suspend fun undo(added: AddedEvent, to: Destination): EditResult {
+        val ref = EventRef(added.connectionId, added.sourceId, added.key)
+        undone.add(added.key)
+        val create = store.pendingNow().firstOrNull { it.kind == ChangeKind.CREATE && it.ref == ref }
+        store.dropCreate(ref)
+        val outcome = callWriter(io, attemptMillis) {
+            if (added.series) to.writer.deleteSeries(to.connection, to.source, added.key) else to.writer.delete(to.connection, to.source, added.key)
+            null
+        }
+        if (create == null) undone.done(added.key)
+        return when {
+            outcome is WriteOutcome.Accepted -> {
+                try {
+                    if (added.series) store.applySeriesDeleted(added.connectionId, added.sourceId, added.key) else store.applyDeleted(ref)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "The provider deleted an undone event but the tablet couldn't store it (${e::class.simpleName}); the next sync will")
+                }
+                EditResult.Done
+            }
+            // As a delete does: queued, and hidden until it sends.
+            outcome is WriteOutcome.Retry && !added.series -> {
+                if (outcome.needsSignIn) store.setHealth(to.connection.id, ConnectionHealth.NeedsSignIn, clock.nowMillis())
+                queue(to, ChangeKind.DELETE, added.key, draft = null, attempted = true)
+            }
+            // Never tried, so dropping it was enough; once tried, the service may hold it.
+            create != null && create.attempts == 0 -> EditResult.Done
+            else -> EditResult.NotEditable
+        }
+    }
+
+    private fun reportUndo(title: String, label: String, result: EditResult) = when (result) {
+        EditResult.Done, EditResult.Queued -> toaster.show(removed(title))
+        EditResult.Cancelled -> Unit
+        else -> toaster.show(couldNotUndo(label), urgent = true)
     }
 
     /**
@@ -265,14 +355,14 @@ class CalendarEditor internal constructor(
 
     /**
      * Runs [block] on the application scope, so closing the sheet mid-write can't lose the change or its toast, then
-     * reports the outcome and nudges the sync loop. A store failure (disk full, corruption) becomes
+     * tells the outcome through [say] and nudges the sync loop. A store failure (disk full, corruption) becomes
      * Rejected(Tablet) instead of reaching the sheet's scope and killing the app. A save's refusal is the sheet's
      * to show; if the sheet stops waiting (it was closed), the editor toasts it instead.
      */
     private suspend fun onAppScope(
         kind: ChangeKind,
         label: String,
-        added: String = EVENT_ADDED,
+        say: (EditResult) -> Unit = { report(kind, label, it) },
         block: suspend () -> EditResult,
     ): EditResult {
         val job = scope.async {
@@ -284,7 +374,7 @@ class CalendarEditor internal constructor(
                 Log.w(TAG, "Couldn't save a ${kind.name} (${e::class.simpleName})")
                 EditResult.Rejected(WriteProblem.Tablet)
             }
-            report(kind, label, result, added)
+            say(result)
             // A sync pass already in flight may briefly put back the old mirror; the pass this asks for corrects it.
             requestSync()
             result
@@ -449,14 +539,18 @@ class CalendarEditor internal constructor(
         return EditResult.Queued
     }
 
-    /** A queued change already shows (a delete hides the event), so it reads as done too. A failed delete says delete. */
-    private fun report(kind: ChangeKind, label: String, result: EditResult, added: String) {
+    /**
+     * A queued change already shows (a delete hides the event), so it reads as done too. A failed delete says delete.
+     * A saved create says [line] with an Undo of [added].
+     */
+    private fun report(kind: ChangeKind, label: String, result: EditResult, added: AddedEvent? = null, line: String = "") {
         val saved = result == EditResult.Done || result == EditResult.Queued
         when {
             result is EditResult.Rejected && kind == ChangeKind.DELETE -> toaster.show(couldNotDelete(label, result.problem), urgent = true)
             result is EditResult.Rejected && kind.isAssign -> toaster.show(couldNotSave(label, result.problem), urgent = true)
             saved && kind == ChangeKind.DELETE -> toaster.show(EVENT_DELETED)
-            saved && kind == ChangeKind.CREATE -> toaster.show(added)
+            saved && kind == ChangeKind.CREATE && added != null ->
+                toaster.show(line, action = ToastAction(UNDO) { scope.launch { undoAdd(added) } })
             saved && kind == ChangeKind.UPDATE -> toaster.show(CHANGES_SAVED)
         }
     }

@@ -4,6 +4,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
@@ -33,9 +35,12 @@ private val ACCESS_ROLES = listOf("freeBusyReader", "reader", "writer", "owner")
 /** Google's rule for an event id the client chooses: base32hex (a–v, 0–9), 5 to 1024 characters. */
 private val EVENT_ID = Regex("[a-v0-9]{5,1024}")
 
+/** An instance id's original start, as Google writes it: 20261005T141500Z. */
+private val INSTANCE_TIME = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC)
+
 /**
  * Google Calendar API v3 on a MockWebServer (3a design §7): calendars and their events in memory, sync tokens, pages,
- * cancelled (deleted) events, extended properties and PATCH's merge. All-day dates are read in [zone], the calendar's
+ * cancelled (deleted) events, extended properties, PATCH's merge, and an inserted weekly series' instances. All-day dates are read in [zone], the calendar's
  * own zone. Tests seed it, queue failures, hold writes, and read what it was sent.
  */
 internal class FakeGoogleServer(private val zone: ZoneId = ZoneId.of("Europe/London")) : Dispatcher() {
@@ -248,6 +253,7 @@ internal class FakeGoogleServer(private val zone: ZoneId = ZoneId.of("Europe/Lon
             if (id in stored) return error(409, "duplicate")
             val event = JsonObject(body + ("id" to JsonPrimitive(id)) + ("status" to JsonPrimitive("confirmed")))
             stored[id] = Stored(event, version.incrementAndGet())
+            instancesOf(event).forEach { stored[it.id] = Stored(it, version.incrementAndGet()) }
             return ok(event)
         }
     }
@@ -270,9 +276,40 @@ internal class FakeGoogleServer(private val zone: ZoneId = ZoneId.of("Europe/Lon
         synchronized(stored) {
             val e = stored[eventId] ?: return error(404, "notFound")
             if (e.json.status == "cancelled") return error(410, "deleted")
-            e.json = JsonObject(e.json + ("status" to JsonPrimitive("cancelled")))
-            e.version = version.incrementAndGet()
+            // A series goes with every instance of it.
+            stored.values.filter { it === e || it.json.string("recurringEventId") == eventId }.forEach {
+                it.json = JsonObject(it.json + ("status" to JsonPrimitive("cancelled")))
+                it.version = version.incrementAndGet()
+            }
             return MockResponse().setResponseCode(204)
+        }
+    }
+
+    /**
+     * The instances Google makes for an inserted weekly series with a COUNT, each named "<series>_<original start>" and
+     * moved a week at a time in the series' own zone; none for any other event.
+     */
+    private fun instancesOf(series: JsonObject): List<JsonObject> {
+        val rule = (series["recurrence"] as? JsonArray)?.firstOrNull()?.jsonPrimitive?.content ?: return emptyList()
+        if ("FREQ=WEEKLY" !in rule) return emptyList()
+        val count = Regex("COUNT=(\\d+)").find(rule)?.groupValues?.get(1)?.toInt() ?: return emptyList()
+        val start = series.getValue("start").jsonObject
+        val end = series.getValue("end").jsonObject
+        val seriesZone = start.string("timeZone")?.let(ZoneId::of) ?: zone
+        fun later(time: JsonObject, weeks: Long): JsonObject = time.string("dateTime")?.let {
+            JsonObject(time + ("dateTime" to JsonPrimitive(OffsetDateTime.parse(it).atZoneSameInstant(seriesZone).plusWeeks(weeks).toInstant().toString())))
+        } ?: JsonObject(time + ("date" to JsonPrimitive(LocalDate.parse(time.string("date")).plusWeeks(weeks).toString())))
+        return (0L until count).map { week ->
+            val first = later(start, week)
+            val original = first.string("dateTime")?.let { INSTANCE_TIME.format(Instant.parse(it)) } ?: first.string("date")!!.replace("-", "")
+            JsonObject(
+                series - "recurrence" + mapOf(
+                    "id" to JsonPrimitive("${series.id}_$original"),
+                    "recurringEventId" to JsonPrimitive(series.id),
+                    "start" to first,
+                    "end" to later(end, week),
+                ),
+            )
         }
     }
 

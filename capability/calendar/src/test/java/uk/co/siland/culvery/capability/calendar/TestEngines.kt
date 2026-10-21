@@ -27,8 +27,9 @@ internal fun testEditor(
     personOf: suspend (PersonId) -> Person? = { null },
     serviceOf: (providerId: String) -> String? = { null },
     order: suspend () -> List<PersonId> = { emptyList() },
+    undone: UndoneKeys = UndoneKeys(),
 ): CalendarEditor =
-    CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, personOf, serviceOf, order)
+    CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, personOf, serviceOf, order, undone)
 
 internal fun testSync(
     store: CalendarStore,
@@ -41,4 +42,5 @@ internal fun testSync(
     timeoutMillis: Long = PROVIDER_TIMEOUT_MS,
     writeLock: CalendarWriteLock = CalendarWriteLock(),
     refresher: SourceRefresher = SourceRefresher(store, { emptyList() }, clock, toaster, io, timeoutMillis),
-): CalendarSync = CalendarSync(store, providers, zone, clock, io, timeoutMillis, writers, toaster, writeLock, refresher)
+    undone: UndoneKeys = UndoneKeys(),
+): CalendarSync = CalendarSync(store, providers, zone, clock, io, timeoutMillis, writers, toaster, writeLock, refresher, undone)

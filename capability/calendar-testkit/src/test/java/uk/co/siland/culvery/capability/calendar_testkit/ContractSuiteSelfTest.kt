@@ -37,7 +37,7 @@ class ContractSuiteSelfTest {
     fun wellBehavedProviderPassesEveryCheck() {
         val result = JUnitCore.runClasses(GoodContract::class.java)
         assertThat(result.failures.map { "${it.description.methodName}: ${it.message}" }).isEmpty()
-        assertThat(result.runCount).isEqualTo(22)
+        assertThat(result.runCount).isEqualTo(25)
         // A skipped check would otherwise count as a pass.
         assertThat(result.assumptionFailureCount).isEqualTo(0)
     }
@@ -81,15 +81,15 @@ class ContractSuiteSelfTest {
 
     @Test
     fun refusingToDeleteAMissingEventIsCaught() {
-        assertThat(failuresOf(StrictDeleteContract::class.java)).containsExactly("deletingAnEventThatIsAlreadyGoneSucceeds")
+        assertThat(failuresOf(StrictDeleteContract::class.java)).containsExactly("deletingAnEventThatIsAlreadyGoneSucceeds", "deleteSeriesOfAGoneSeriesSucceeds")
     }
 
     @Test
     fun aReadOnlyProviderSkipsOnlyTheWriteChecks() {
         val result = JUnitCore.runClasses(ReadOnlyContract::class.java)
         assertThat(result.failures.map { "${it.description.methodName}: ${it.message}" }).isEmpty()
-        assertThat(result.runCount).isEqualTo(22)
-        assertThat(result.assumptionFailureCount).isEqualTo(11)
+        assertThat(result.runCount).isEqualTo(25)
+        assertThat(result.assumptionFailureCount).isEqualTo(14)
     }
 
     @Test
@@ -104,7 +104,7 @@ class ContractSuiteSelfTest {
 
     @Test
     fun aWriterThatRecreatesADeletedEventIsCaught() {
-        assertThat(failuresOf(RecreatingContract::class.java)).containsExactly("aCreateNeverRecreatesADeletedEvent")
+        assertThat(failuresOf(RecreatingContract::class.java)).containsExactly("aCreateNeverRecreatesADeletedEvent", "deleteSeriesRemovesEveryOccurrence")
     }
 
     @Test
@@ -114,7 +114,7 @@ class ContractSuiteSelfTest {
 
     @Test
     fun aWriterThatCannotFindItsEventsIsCaught() {
-        assertThat(failuresOf(BlindContract::class.java)).containsExactly("findReturnsACreatedEventAndNullOnceItIsDeleted")
+        assertThat(failuresOf(BlindContract::class.java)).containsExactly("findReturnsACreatedEventAndNullOnceItIsDeleted", "deleteSeriesRemovesEveryOccurrence")
     }
 
     @Test

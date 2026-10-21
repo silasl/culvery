@@ -23,7 +23,6 @@ import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.CalendarSync
 import uk.co.siland.culvery.capability.calendar.CalendarSyncLoop
 import uk.co.siland.culvery.capability.calendar.CalendarWriteLock
-import uk.co.siland.culvery.capability.calendar.EVENT_ADDED
 import uk.co.siland.culvery.capability.calendar.EVENT_DELETED
 import uk.co.siland.culvery.capability.calendar.EditResult
 import uk.co.siland.culvery.capability.calendar.EventDraft
@@ -31,6 +30,8 @@ import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.OUTBOX_BACKOFF_MS
 import uk.co.siland.culvery.capability.calendar.SourceRefresher
+import uk.co.siland.culvery.capability.calendar.UndoneKeys
+import uk.co.siland.culvery.capability.calendar.addedLine
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.newClientKey
 import uk.co.siland.culvery.core.access.CorePermissionSource
@@ -108,8 +109,9 @@ class SampleAddTest {
             FakeUserActivity(),
         )
         val lock = CalendarWriteLock()
-        val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, clock, lock, SourceRefresher(store, household, clock, toasts))
-        val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, FirstDraw().also { it.markDrawn() }, backgroundScope), lock, household, setOf(fake))
+        val undone = UndoneKeys()
+        val sync = CalendarSync(store, setOf(fake), setOf(fake), toasts, zone, clock, lock, SourceRefresher(store, household, clock, toasts), undone)
+        val editor = CalendarEditor(store, setOf(fake), access, toasts, zone, clock, backgroundScope, CalendarSyncLoop(sync, store, clock, FirstDraw().also { it.markDrawn() }, backgroundScope), lock, household, setOf(fake), undone)
         val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake))
         sync.syncAll()
 
@@ -134,6 +136,6 @@ class SampleAddTest {
         sync.syncAll()
         assertThat(store.pendingNow()).isEmpty()
         assertThat(repo.day(today).first().map { it.title }).containsNoneIn(titles)
-        assertThat(toasts.messages).containsExactly(EVENT_ADDED, CHANGES_SAVED, EVENT_DELETED).inOrder()
+        assertThat(toasts.messages).containsExactly(addedLine("Parents evening", null, null), CHANGES_SAVED, EVENT_DELETED).inOrder()
     }
 }

@@ -48,7 +48,6 @@ import uk.co.siland.culvery.capability.calendar.CalendarSource
 import uk.co.siland.culvery.capability.calendar.CalendarStore
 import uk.co.siland.culvery.capability.calendar.ChangeKind
 import uk.co.siland.culvery.capability.calendar.DateRange
-import uk.co.siland.culvery.capability.calendar.EVENT_ADDED
 import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventRef
@@ -195,7 +194,7 @@ class EventEditorHostTest {
         assertThat(writer.calls).containsExactly("create:Parents evening")
         assertThat(writer.drafts.single().createdBy).isEqualTo(access.alex.id.value)
         assertThat(access.requests.single().reason).isEqualTo(PinReason.Save)
-        assertThat(access.toasts.messages).containsExactly(EVENT_ADDED)
+        assertThat(access.toasts.messages).containsExactly("Added Parents evening.")
     }
 
     @Test
@@ -236,7 +235,7 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_failure").assertDoesNotExist()
         compose.waitUntil(5_000) { closed > 0 }
         assertThat(writer.created).hasSize(1)
-        assertThat(access.toasts.messages).containsExactly(EVENT_ADDED)
+        assertThat(access.toasts.messages).containsExactly("Added Parents evening.")
     }
 
     @Test

@@ -20,6 +20,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarWriteLock
 import uk.co.siland.culvery.capability.calendar.ChangeKind
 import uk.co.siland.culvery.capability.calendar.PendingChange
 import uk.co.siland.culvery.capability.calendar.SourceRefresher
+import uk.co.siland.culvery.capability.calendar.UndoneKeys
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.core.access.PinHasher
 import uk.co.siland.culvery.core.access.PinManager
@@ -78,7 +79,7 @@ class SampleRollbackTest {
         ) {}.create()
         val sync = CalendarSync(
             store, setOf(fake), setOf(fake), toasts, zone, WallClock { System.currentTimeMillis() }, CalendarWriteLock(),
-            SourceRefresher(store, household, WallClock { System.currentTimeMillis() }, toasts),
+            SourceRefresher(store, household, WallClock { System.currentTimeMillis() }, toasts), UndoneKeys(),
         )
         val repo = CalendarRepository(store, household, zone, setOf(fake), setOf(fake))
         sync.syncAll()

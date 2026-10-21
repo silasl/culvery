@@ -14,6 +14,7 @@ import uk.co.siland.culvery.core.access.CorePermissionSource
 import uk.co.siland.culvery.core.access.DefaultAccessControl
 import uk.co.siland.culvery.core.access.LockoutStore
 import uk.co.siland.culvery.core.access.PermissionRegistry
+import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.access.PinHasher
 import uk.co.siland.culvery.core.access.PinManager
 import uk.co.siland.culvery.core.access.PinPromptController
@@ -71,6 +72,7 @@ internal suspend fun testAccess(
     listenIn: CoroutineScope,
     clock: WallClock,
     sessionScope: CoroutineScope,
+    calendarPermissions: PermissionSource = CalendarPermissionSource(),
 ): TestAccess {
     val pins = PinManager(household, PinHasher())
     suspend fun person(name: String, color: Long, role: Role, pin: String) =
@@ -81,7 +83,7 @@ internal suspend fun testAccess(
     val prompt = PinPromptController()
     val toasts = RecordingToaster()
     val control = DefaultAccessControl(
-        registry = PermissionRegistry(setOf(CorePermissionSource(), CalendarPermissionSource())),
+        registry = PermissionRegistry(setOf(CorePermissionSource(), calendarPermissions)),
         pins = pins,
         lockout = LockoutStore(ApplicationProvider.getApplicationContext()),
         prompt = prompt,
@@ -95,8 +97,11 @@ internal suspend fun testAccess(
 
 /** For runTest: PIN pads are answered on the test's background scope; the session timer runs outside it. */
 @OptIn(ExperimentalCoroutinesApi::class)
-internal suspend fun TestScope.testAccess(household: HouseholdRepository): TestAccess {
+internal suspend fun TestScope.testAccess(
+    household: HouseholdRepository,
+    calendarPermissions: PermissionSource = CalendarPermissionSource(),
+): TestAccess {
     val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     backgroundScope.coroutineContext.job.invokeOnCompletion { sessionScope.cancel() }
-    return testAccess(household, backgroundScope, WallClock { testScheduler.currentTime }, sessionScope)
+    return testAccess(household, backgroundScope, WallClock { testScheduler.currentTime }, sessionScope, calendarPermissions)
 }

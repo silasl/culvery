@@ -218,4 +218,10 @@ interface CalendarWriter {
      * [WriteRejectedException] ([EVENT_GONE]); an id that is no longer a series is refused.
      */
     suspend fun assignSeries(conn: Connection, source: CalendarSource, seriesId: String, draft: EventDraft)
+
+    /**
+     * Deletes the series [seriesId] with every occurrence: only Undo calls it, on a series just added (9 §2.3). A series
+     * already gone succeeds, as [delete] does; an id that is no longer a series is refused.
+     */
+    suspend fun deleteSeries(conn: Connection, source: CalendarSource, seriesId: String)
 }
