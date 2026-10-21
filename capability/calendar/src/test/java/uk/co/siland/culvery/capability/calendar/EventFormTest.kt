@@ -467,7 +467,7 @@ class EventFormTest {
         form.updateTitle("Swimming")
         form.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
         form.chooseRepeat(RepeatChoice.Fortnightly)
-        form.chooseEnd(LocalDate.of(2026, 12, 31))
+        form.chooseEnd(RepeatEnd.OnDate(LocalDate.of(2026, 12, 31)))
         assertThat(form.draft(createdBy = null).recurrence)
             .isEqualTo(Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=2;UNTIL=20261231T235959Z", london))
         form.chooseTime(TimeChoice.AllDay)
@@ -479,9 +479,9 @@ class EventFormTest {
     fun choosingNeverDropsTheEndDate() {
         val form = new()
         form.chooseRepeat(RepeatChoice.Weekly)
-        form.chooseEnd(today.plusDays(30))
+        form.chooseEnd(RepeatEnd.OnDate(today.plusDays(30)))
         form.chooseRepeat(RepeatChoice.Never)
-        assertThat(form.endsOn).isNull()
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.Never)
     }
 
     /** 5 §A.4: an end before the event's day can't be saved, however it came about. */
@@ -490,10 +490,10 @@ class EventFormTest {
         val form = new()
         form.updateTitle("Swimming")
         form.chooseRepeat(RepeatChoice.Weekly)
-        form.chooseEnd(today.minusDays(1))
+        form.chooseEnd(RepeatEnd.OnDate(today.minusDays(1)))
         assertThat(form.endsBeforeStart).isTrue()
         assertThat(form.canSave).isFalse()
-        form.chooseEnd(today)
+        form.chooseEnd(RepeatEnd.OnDate(today))
         assertThat(form.canSave).isTrue()
         form.chooseDay(today.plusDays(1))
         assertThat(form.endsBeforeStart).isTrue()
@@ -505,10 +505,95 @@ class EventFormTest {
         val form = new()
         form.chooseRepeat(RepeatChoice.Daily)
         assertThat(form.edited).isTrue()
-        form.chooseEnd(today.plusDays(30))
+        form.chooseEnd(RepeatEnd.OnDate(today.plusDays(30)))
         assertThat(form.edited).isTrue()
         form.chooseRepeat(RepeatChoice.Never)
-        assertThat(form.endsOn).isNull()
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.Never)
+        assertThat(form.edited).isFalse()
+    }
+
+    @Test
+    fun theCountStaysBetweenTwoAndFiftyTwo() {
+        val form = new()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseEnd(RepeatEnd.After(2))
+        form.fewerTimes()
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(2))
+        form.chooseEnd(RepeatEnd.After(52))
+        form.moreTimes()
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(52))
+        form.chooseEnd(RepeatEnd.After(10))
+        form.moreTimes()
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(11))
+        form.fewerTimes()
+        form.fewerTimes()
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(9))
+    }
+
+    @Test
+    fun theStepsDoNothingUnlessTheEndIsACount() {
+        val form = new()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.moreTimes()
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.Never)
+        form.chooseEnd(RepeatEnd.OnDate(today.plusDays(30)))
+        form.fewerTimes()
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.OnDate(today.plusDays(30)))
+    }
+
+    @Test
+    fun chooseAfterClampsItsCount() {
+        val form = new()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseAfter(1)
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(2))
+        form.chooseAfter(99)
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(52))
+        form.chooseAfter()
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(10))
+    }
+
+    @Test
+    fun anEndChosenWhileNotRepeatingIsIgnored() {
+        val form = new()
+        form.chooseEnd(RepeatEnd.After(10))
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.Never)
+        assertThat(form.edited).isFalse()
+    }
+
+    @Test
+    fun changingTheEndReplacesIt() {
+        val form = new()
+        form.updateTitle("Swim")
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseEnd(RepeatEnd.After(5))
+        assertThat(form.draft(createdBy = null).recurrence?.rule).contains("COUNT=5")
+        form.chooseEnd(RepeatEnd.OnDate(today.plusDays(30)))
+        val rule = form.draft(createdBy = null).recurrence!!.rule
+        assertThat(rule).contains("UNTIL=")
+        assertThat(rule).doesNotContain("COUNT")
+        form.chooseRepeat(RepeatChoice.Never)
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.Never)
+        assertThat(form.draft(createdBy = null).recurrence).isNull()
+    }
+
+    @Test
+    fun changingBetweenRepeatsKeepsTheEnd() {
+        val form = new()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseEnd(RepeatEnd.After(5))
+        form.chooseRepeat(RepeatChoice.Monthly)
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(5))
+    }
+
+    @Test
+    fun aCountMakesTheSheetEdited() {
+        val form = new()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseEnd(RepeatEnd.After(10))
+        assertThat(form.edited).isTrue()
+        form.chooseEnd(RepeatEnd.Never)
+        form.chooseRepeat(RepeatChoice.Never)
         assertThat(form.edited).isFalse()
     }
 }

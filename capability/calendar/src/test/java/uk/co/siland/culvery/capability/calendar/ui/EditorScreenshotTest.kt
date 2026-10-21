@@ -25,6 +25,7 @@ import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.RepeatEnd
 import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.core.household.PersonId
@@ -150,7 +151,7 @@ class EditorScreenshotTest {
         updateTitle("Swimming")
         chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
         chooseRepeat(RepeatChoice.Weekly)
-        chooseEnd(SampleUi.TODAY.plusWeeks(10))
+        chooseEnd(RepeatEnd.OnDate(SampleUi.TODAY.plusWeeks(10)))
     }
 
     private val failure = SaveFailure("Sample calendar", WriteProblem.Refused("calendar is full"))

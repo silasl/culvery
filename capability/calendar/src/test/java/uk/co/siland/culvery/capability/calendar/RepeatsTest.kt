@@ -52,4 +52,9 @@ class RepeatsTest {
         assertThat(repeatsLabel("RRULE:FREQ=WEEKLY;BYDAY=TU", EventTime.Timed(Instant.parse("2026-09-21T23:30:00Z")), london))
             .isEqualTo("Every week")
     }
+
+    @Test
+    fun aCountedSeriesReadsAsItsChip() {
+        assertThat(label("RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=6")).isEqualTo("Every 2 weeks")
+    }
 }

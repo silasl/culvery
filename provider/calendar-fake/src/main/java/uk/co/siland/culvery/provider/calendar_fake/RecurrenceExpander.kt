@@ -16,8 +16,9 @@ private val UNTIL_UTC: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd
 
 /**
  * Turns a series the tablet wrote into one event per occurrence, as Google returns it with singleEvents=true.
- * Understands what the tablet writes: FREQ of DAILY, WEEKLY, MONTHLY or YEARLY, INTERVAL, and UNTIL (a date, or a
- * UTC date-time), inclusive. Occurrence ids are "{series}-{date}", as in [SampleEvents].
+ * Understands what the tablet writes: FREQ of DAILY, WEEKLY, MONTHLY or YEARLY, INTERVAL, UNTIL (a date, or a
+ * UTC date-time), inclusive, and COUNT (ignored unless a whole number of 1 or more; with UNTIL too, the first to end it wins).
+ * Occurrence ids are "{series}-{date}", as in [SampleEvents].
  */
 internal object RecurrenceExpander {
     /** The occurrences of [series] starting on or before [lastDay] in [zone]; [series] as it is when it doesn't repeat. */
@@ -35,12 +36,14 @@ internal object RecurrenceExpander {
         }
         val untilDay = parts["UNTIL"]?.takeIf { it.length == 8 }?.let { runCatching { LocalDate.parse(it, UNTIL_DATE) }.getOrNull() }
         val untilAt = parts["UNTIL"]?.let { runCatching { LocalDateTime.parse(it, UNTIL_UTC).toInstant(ZoneOffset.UTC) }.getOrNull() }
+        val count = parts["COUNT"]?.toIntOrNull()?.takeIf { it >= 1 } ?: Int.MAX_VALUE
         val first = series.start.dateIn(zone)
         return generateSequence(0L) { it + 1 }
             .map { n -> step(first, n * interval) }
             .takeWhile { !it.isAfter(lastDay) && (untilDay == null || !it.isAfter(untilDay)) }
             .map { day -> series.on(day, zone) }
             .takeWhile { untilAt == null || !it.start.instantIn(zone).isAfter(untilAt) }
+            .take(count)
             .toList()
     }
 

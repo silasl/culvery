@@ -1,0 +1,89 @@
+package uk.co.siland.culvery.provider.calendar_fake
+
+import com.google.common.truth.Truth.assertThat
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import org.junit.Test
+import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.RemoteEvent
+
+/** The fake provider's expansion of a series the tablet wrote, COUNT and UNTIL included (9 §4.8). */
+class RecurrenceExpanderTest {
+    private val london = ZoneId.of("Europe/London")
+
+    // Friday 2 October 2026, 18:00 London (BST), an hour long.
+    private val friday = LocalDate.of(2026, 10, 2)
+
+    private fun timedSeries(rule: String, first: LocalDate = friday, at: LocalTime = LocalTime.of(18, 0)): RemoteEvent {
+        val from = first.atTime(at).atZone(london).toInstant()
+        return RemoteEvent("s1", "Swim", EventTime.Timed(from), EventTime.Timed(from.plusSeconds(3600)), recurring = true, recurrenceRule = rule)
+    }
+
+    private fun allDaySeries(rule: String, first: LocalDate, days: Long) = RemoteEvent(
+        "s2", "Camp", EventTime.AllDay(first), EventTime.AllDay(first.plusDays(days)), recurring = true, recurrenceRule = rule,
+    )
+
+    private fun RemoteEvent.localDay(): LocalDate = (start as EventTime.Timed).instant.atZone(london).toLocalDate()
+
+    private fun expand(series: RemoteEvent, lastDay: LocalDate) = RecurrenceExpander.expand(series, london, lastDay)
+
+    private val weeklyFive = "RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=5"
+
+    @Test
+    fun theWindowEndingOnTheLastOccurrenceKeepsAllOfThem() {
+        assertThat(expand(timedSeries(weeklyFive), LocalDate.of(2026, 10, 30))).hasSize(5)
+    }
+
+    @Test
+    fun theWindowEndingTheDayBeforeKeepsOneFewer() {
+        assertThat(expand(timedSeries(weeklyFive), LocalDate.of(2026, 10, 29))).hasSize(4)
+    }
+
+    @Test
+    fun aCountedSeriesStopsAtItsCount() {
+        assertThat(expand(timedSeries(weeklyFive), friday.plusYears(1))).hasSize(5)
+    }
+
+    @Test
+    fun aCountOfOneIsOneOccurrence() {
+        val only = expand(timedSeries("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=1"), friday.plusYears(1)).single()
+        assertThat(only.seriesId).isEqualTo("s1")
+    }
+
+    @Test
+    fun aBadCountIsIgnored() {
+        val lastDay = friday.plusDays(21)
+        for (bad in listOf("0", "-3", "abc", "")) {
+            assertThat(expand(timedSeries("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=$bad"), lastDay)).hasSize(4)
+        }
+    }
+
+    @Test
+    fun untilAndCountTogetherEndAtTheFirst() {
+        // UNTIL on Fri 16 Oct 23:59 UTC allows 3 of the 5 counted; COUNT=3 stops first when UNTIL is later.
+        assertThat(expand(timedSeries("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=5;UNTIL=20261016T225959Z"), friday.plusYears(1))).hasSize(3)
+        assertThat(expand(timedSeries("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=3;UNTIL=20261120"), friday.plusYears(1))).hasSize(3)
+    }
+
+    @Test
+    fun aCountedSeriesKeepsItsLocalTimeOverTheClockChange() {
+        val first = LocalDate.of(2026, 10, 16)
+        val made = expand(timedSeries("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=5", first), first.plusYears(1))
+        assertThat(made.map { it.localDay() }).containsExactly(
+            LocalDate.of(2026, 10, 16), LocalDate.of(2026, 10, 23), LocalDate.of(2026, 10, 30), LocalDate.of(2026, 11, 6), LocalDate.of(2026, 11, 13),
+        ).inOrder()
+        assertThat(made.map { (it.start as EventTime.Timed).instant.atZone(london).toLocalTime() }.toSet()).containsExactly(LocalTime.of(18, 0))
+    }
+
+    @Test
+    fun aCountedAllDaySpanKeepsItsDays() {
+        val made = expand(allDaySeries("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=3", LocalDate.of(2026, 10, 23), 3), LocalDate.of(2027, 10, 1))
+        assertThat(made).hasSize(3)
+        assertThat(made.map { (it.end as EventTime.AllDay).date.toEpochDay() - (it.start as EventTime.AllDay).date.toEpochDay() }.toSet())
+            .containsExactly(3L)
+        assertThat(made.map { (it.start as EventTime.AllDay).date }).containsExactly(
+            LocalDate.of(2026, 10, 23), LocalDate.of(2026, 10, 30), LocalDate.of(2026, 11, 6),
+        ).inOrder()
+    }
+}

@@ -46,6 +46,7 @@ import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.RepeatEnd
 import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.couldNotSave
@@ -283,7 +284,7 @@ class EventEditorSheetTest {
         form.chooseRepeat(RepeatChoice.Weekly)
         showShort(form)
         compose.onNodeWithTag("ends_never").performScrollTo()
-        compose.runOnIdle { form.chooseEnd(SampleUi.TODAY.minusDays(1)) }
+        compose.runOnIdle { form.chooseEnd(RepeatEnd.OnDate(SampleUi.TODAY.minusDays(1))) }
         compose.onNodeWithTag("ends_error").assertIsDisplayed()
     }
 
@@ -298,7 +299,7 @@ class EventEditorSheetTest {
         val form = newForm()
         form.updateTitle("Swimming")
         form.chooseRepeat(RepeatChoice.Weekly)
-        form.chooseEnd(SampleUi.TODAY.minusDays(1))
+        form.chooseEnd(RepeatEnd.OnDate(SampleUi.TODAY.minusDays(1)))
         show(form)
         compose.onNodeWithTag("ends_error").assertTextEquals("The end date is before the event’s day. Pick a later one.")
         compose.onNodeWithTag("editor_save").assertIsNotEnabled()

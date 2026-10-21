@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 /** 5 §A.4: what Save writes for each choice, both UNTIL forms, and that it reads back as a simple label. */
@@ -12,7 +13,7 @@ class RecurrenceTest {
 
     @Test
     fun eachChoiceWritesItsFrequencyAndInterval() {
-        assertThat(RepeatChoice.entries.map { recurrenceRule(it, endsOn = null, allDay = false, zone = london) }).containsExactly(
+        assertThat(RepeatChoice.entries.map { recurrenceRule(it, end = RepeatEnd.Never, allDay = false, zone = london) }).containsExactly(
             null,
             "RRULE:FREQ=DAILY;INTERVAL=1",
             "RRULE:FREQ=WEEKLY;INTERVAL=1",
@@ -26,24 +27,24 @@ class RecurrenceTest {
 
     @Test
     fun anAllDaySeriesEndsOnADate() {
-        assertThat(recurrenceRule(RepeatChoice.Weekly, LocalDate.of(2026, 12, 31), allDay = true, zone = london))
+        assertThat(recurrenceRule(RepeatChoice.Weekly, RepeatEnd.OnDate(LocalDate.of(2026, 12, 31)), allDay = true, zone = london))
             .isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20261231")
     }
 
     @Test
     fun aTimedSeriesEndsAtTheEndOfThatDayInTheHouseholdZoneAsUtc() {
-        assertThat(recurrenceRule(RepeatChoice.Weekly, LocalDate.of(2026, 12, 31), allDay = false, zone = london))
+        assertThat(recurrenceRule(RepeatChoice.Weekly, RepeatEnd.OnDate(LocalDate.of(2026, 12, 31)), allDay = false, zone = london))
             .isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20261231T235959Z")
-        assertThat(recurrenceRule(RepeatChoice.Daily, LocalDate.of(2027, 6, 30), allDay = false, zone = london))
+        assertThat(recurrenceRule(RepeatChoice.Daily, RepeatEnd.OnDate(LocalDate.of(2027, 6, 30)), allDay = false, zone = london))
             .isEqualTo("RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20270630T225959Z")
     }
 
     /** The change happens in the small hours, so the end of the day is in the evening's offset. */
     @Test
     fun onTheDaysTheClocksChangeUntilUsesThatEveningsOffset() {
-        assertThat(recurrenceRule(RepeatChoice.Weekly, LocalDate.of(2026, 10, 25), allDay = false, zone = london))
+        assertThat(recurrenceRule(RepeatChoice.Weekly, RepeatEnd.OnDate(LocalDate.of(2026, 10, 25)), allDay = false, zone = london))
             .isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20261025T235959Z")
-        assertThat(recurrenceRule(RepeatChoice.Weekly, LocalDate.of(2026, 3, 29), allDay = false, zone = london))
+        assertThat(recurrenceRule(RepeatChoice.Weekly, RepeatEnd.OnDate(LocalDate.of(2026, 3, 29)), allDay = false, zone = london))
             .isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20260329T225959Z")
     }
 
@@ -56,10 +57,42 @@ class RecurrenceTest {
         )
         for ((start, allDay) in starts) {
             for (choice in RepeatChoice.entries - RepeatChoice.Never) {
-                for (end in listOf(null, LocalDate.of(2026, 12, 31))) {
+                for (end in listOf(RepeatEnd.Never, RepeatEnd.OnDate(LocalDate.of(2026, 12, 31)), RepeatEnd.After(5))) {
                     assertThat(repeatsLabel(recurrenceRule(choice, end, allDay, london), start, london)).isEqualTo(choice.label)
                 }
             }
         }
+    }
+
+    @Test
+    fun aCountedSeriesWritesCountAndNoUntil() {
+        assertThat(recurrenceRule(RepeatChoice.Weekly, RepeatEnd.After(5), allDay = false, zone = london))
+            .isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=5")
+    }
+
+    @Test
+    fun neverBothUntilAndCountForAnyRepeatEnd() {
+        val ends = listOf(RepeatEnd.Never, RepeatEnd.OnDate(LocalDate.of(2026, 12, 31)), RepeatEnd.After(2), RepeatEnd.After(52))
+        for (choice in RepeatChoice.entries - RepeatChoice.Never) {
+            for (end in ends) {
+                for (allDay in listOf(true, false)) {
+                    val rule = recurrenceRule(choice, end, allDay, london)!!
+                    assertThat(rule.contains("UNTIL=") && rule.contains("COUNT=")).isFalse()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun aCountOutsideTheRangeCannotBeBuilt() {
+        for (times in listOf(1, 53, 0)) {
+            assertThrows(IllegalArgumentException::class.java) { RepeatEnd.After(times) }
+        }
+    }
+
+    @Test
+    fun theChipsAreSplitIntoCommonAndMore() {
+        assertThat(RepeatChoice.COMMON).containsExactly(RepeatChoice.Never, RepeatChoice.Weekly, RepeatChoice.Fortnightly).inOrder()
+        assertThat(RepeatChoice.MORE).containsExactly(RepeatChoice.Daily, RepeatChoice.Monthly, RepeatChoice.Yearly).inOrder()
     }
 }

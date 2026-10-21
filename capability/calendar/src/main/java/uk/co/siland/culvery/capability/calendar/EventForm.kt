@@ -87,12 +87,12 @@ class EventForm(
     var repeat: RepeatChoice by mutableStateOf(RepeatChoice.Never)
         private set
 
-    /** The day the series ends, or null for Never. */
-    var endsOn: LocalDate? by mutableStateOf(null)
+    /** How the series ends; only a repeating new event has one other than Never. */
+    var repeatEnd: RepeatEnd by mutableStateOf(RepeatEnd.Never)
         private set
 
     /** The end is before the event's day, so Save waits (5 §A.4). */
-    val endsBeforeStart: Boolean get() = endsOn?.let { it < day } ?: false
+    val endsBeforeStart: Boolean get() = (repeatEnd as? RepeatEnd.OnDate)?.let { it.date < day } ?: false
 
     private data class Answers(
         val title: String,
@@ -101,13 +101,13 @@ class EventForm(
         val time: TimeChoice,
         val length: Duration,
         val repeat: RepeatChoice,
-        val endsOn: LocalDate?,
+        val repeatEnd: RepeatEnd,
     )
 
-    private val opening = Answers(title, who, day, time, length, repeat, endsOn)
+    private val opening = Answers(title, who, day, time, length, repeat, repeatEnd)
 
     /** Any field differs from how the sheet opened: closing it now would lose something (4d-2 §6.3). Changed back, it isn't. */
-    val edited: Boolean get() = Answers(title, who, day, time, length, repeat, endsOn) != opening
+    val edited: Boolean get() = Answers(title, who, day, time, length, repeat, repeatEnd) != opening
 
     private var whoTouched = false
 
@@ -155,15 +155,27 @@ class EventForm(
         whenTouched = true
     }
 
-    /** Back to Never drops the end date: Ends only shows while the event repeats. */
+    /** Back to Never drops the end: Ends only shows while the event repeats. */
     fun chooseRepeat(choice: RepeatChoice) {
         if (!canRepeat || choice == repeat) return
         repeat = choice
-        if (choice == RepeatChoice.Never) endsOn = null
+        if (choice == RepeatChoice.Never) repeatEnd = RepeatEnd.Never
     }
 
-    fun chooseEnd(date: LocalDate?) {
-        if (canRepeat) endsOn = date
+    /** Ignored unless the event repeats; changing between repeats keeps the end. */
+    fun chooseEnd(end: RepeatEnd) {
+        if (canRepeat && repeat != RepeatChoice.Never) repeatEnd = end
+    }
+
+    fun chooseAfter(times: Int = DEFAULT_TIMES) = chooseEnd(RepeatEnd.After(times.coerceIn(MIN_TIMES, MAX_TIMES)))
+
+    fun fewerTimes() = stepTimes(-1)
+
+    fun moreTimes() = stepTimes(1)
+
+    private fun stepTimes(by: Int) {
+        val end = repeatEnd as? RepeatEnd.After ?: return
+        repeatEnd = RepeatEnd.After((end.times + by).coerceIn(MIN_TIMES, MAX_TIMES))
     }
 
     /** The start time a timed choice gives; null for All day. */
@@ -217,7 +229,7 @@ class EventForm(
     }
 
     private fun recurrence(allDay: Boolean): Recurrence? =
-        recurrenceRule(repeat, endsOn, allDay, zone)?.let { Recurrence(it, zone) }
+        recurrenceRule(repeat, repeatEnd, allDay, zone)?.let { Recurrence(it, zone) }
 
     /**
      * What an edit changed from the event as it opened (3a design C3): the fields its update sends, so a change made

@@ -15,6 +15,7 @@ import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.Recurrence
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.RepeatEnd
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
@@ -362,7 +363,7 @@ class FakeCalendarProviderTest {
     @Test
     fun aTimedUntilInUtcEndsTheSeriesOnThatDayInclusive() = runTest {
         val fake = providerOn(today)
-        val rule = recurrenceRule(RepeatChoice.Weekly, today.plusDays(7), allDay = false, zone = zone)!!
+        val rule = recurrenceRule(RepeatChoice.Weekly, RepeatEnd.OnDate(today.plusDays(7)), allDay = false, zone = zone)!!
         fake.create(conn, family, timedSeries(rule), "k-choir")
         assertThat(fake.choirDays()).containsExactly(today, today.plusDays(7)).inOrder()
     }
@@ -370,7 +371,7 @@ class FakeCalendarProviderTest {
     @Test
     fun anAllDayUntilDateEndsTheSeriesOnThatDayInclusive() = runTest {
         val fake = providerOn(today)
-        val rule = recurrenceRule(RepeatChoice.Daily, today.plusDays(2), allDay = true, zone = zone)!!
+        val rule = recurrenceRule(RepeatChoice.Daily, RepeatEnd.OnDate(today.plusDays(2)), allDay = true, zone = zone)!!
         fake.create(conn, family, allDaySeries(rule), "k-bins")
         val bins = fake.familyEvents().filter { it.title == "Bins" }
         assertThat(bins.map { (it.start as EventTime.AllDay).date }).containsExactly(today, today.plusDays(1), today.plusDays(2)).inOrder()

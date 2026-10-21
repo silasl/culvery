@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.HOURS_MINUTES
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.RepeatEnd
 import uk.co.siland.culvery.capability.calendar.SHORT_DAY
 import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
@@ -80,6 +81,8 @@ data class SaveFailure(val service: String, val problem: WriteProblem)
 internal const val REPEATS = "Repeats"
 internal const val ENDS = "Ends"
 internal const val ENDS_TOO_EARLY = "The end date is before the event’s day. Pick a later one."
+
+internal fun afterTimes(times: Int): String = "After $times times"
 
 /**
  * Hand-off §7 "Sheet 2 — Quick-add / edit" (2b-2 design §4.2). Stateless apart from the [form] it edits: the host
@@ -218,9 +221,9 @@ fun EventEditorSheet(
             EditorPicker.EndDate -> PickerLayer(onDismiss = { onPicker(EditorPicker.None) }) {
                 DatePickerCard(
                     today = form.today,
-                    selected = form.endsOn ?: form.day,
+                    selected = (form.repeatEnd as? RepeatEnd.OnDate)?.date ?: form.day,
                     onPick = {
-                        form.chooseEnd(it)
+                        form.chooseEnd(RepeatEnd.OnDate(it))
                         onPicker(EditorPicker.None)
                     },
                     onCancel = { onPicker(EditorPicker.None) },
@@ -389,8 +392,8 @@ private fun EndsSection(form: EventForm, busy: Boolean, onPickEnd: () -> Unit) {
     LaunchedEffect(form.endsBeforeStart) { if (form.endsBeforeStart) errorInView.bringIntoView() }
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
         Section(ENDS, Modifier.bringIntoViewRequester(endsInView)) {
-            HhChoiceChip("Never", form.endsOn == null, "ends_never", onClick = { if (!busy) form.chooseEnd(null) })
-            val end = form.endsOn
+            HhChoiceChip("Never", form.repeatEnd == RepeatEnd.Never, "ends_never", onClick = { if (!busy) form.chooseEnd(RepeatEnd.Never) })
+            val end = (form.repeatEnd as? RepeatEnd.OnDate)?.date
             HhChoiceChip(
                 label = end?.format(SHORT_DAY) ?: "On a date…",
                 selected = end != null,

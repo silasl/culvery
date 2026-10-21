@@ -332,6 +332,14 @@ class GoogleWriteTest {
         assertLogsHoldNoPersonalData(minLines = 3)
     }
 
+    @Test
+    fun aCountedSeriesInsertSendsItsRule() = runTest {
+        val rule = "RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=5"
+        provider.create(conn, family, draft().copy(recurrence = Recurrence(rule, london)), key)
+        val sent = google.bodies.single()
+        assertThat(sent.getValue("recurrence").jsonArray.map { it.jsonPrimitive.content }).containsExactly(rule)
+    }
+
     /** Google repeats a timed series in the zone it is given, and needs one. */
     @Test
     fun aTimedSeriesInsertSendsItsRuleAndTheHouseholdZone() = runTest {
