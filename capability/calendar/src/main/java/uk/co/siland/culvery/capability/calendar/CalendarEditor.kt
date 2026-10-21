@@ -84,6 +84,7 @@ class CalendarEditor internal constructor(
     private val writeLock: CalendarWriteLock,
     private val personOf: suspend (PersonId) -> Person?,
     private val serviceOf: (providerId: String) -> String?,
+    private val order: suspend () -> List<PersonId>,
 ) {
     @Inject
     constructor(
@@ -100,7 +101,7 @@ class CalendarEditor internal constructor(
         providers: Set<@JvmSuppressWildcards CalendarProvider>,
     ) : this(
         store, writers, access, toaster, zone, clock, scope, loop::requestSync, Dispatchers.IO, WRITE_ATTEMPT_MS, writeLock,
-        household::person, providers::displayNameOf,
+        household::person, providers::displayNameOf, { household.people.first().map { it.id } },
     )
 
     /** The week's Update now: a sync pass at once. It changes nothing, so it asks for no PIN. */
@@ -146,10 +147,10 @@ class CalendarEditor internal constructor(
     }
 
     /**
-     * Tags [ref] as being for [person] (hand-off: "Choose who it’s for"). Adults only. On an occurrence of a repeating
-     * event it tags the whole series (4e).
+     * Tags [ref] as being for [people], written in the household's order (hand-off: "Choose who it’s for"). Adults
+     * only. On an occurrence of a repeating event it tags the whole series (4e).
      */
-    suspend fun assign(ref: EventRef, person: PersonId): EditResult {
+    suspend fun assign(ref: EventRef, people: List<PersonId>): EditResult {
         val target = resolve(ref, assigning = true) ?: return EditResult.NotEditable
         if (target.pending.any { it.kind == ChangeKind.DELETE }) return EditResult.NotEditable
         access.authorise(
@@ -158,7 +159,7 @@ class CalendarEditor internal constructor(
             refusal = Refusal.Toast { ASK_AN_ADULT },
         ) ?: return EditResult.Cancelled
         val kind = if (target.event.recurring) ChangeKind.ASSIGN_SERIES else ChangeKind.ASSIGN
-        return write(target, kind, who = null, forPerson = person.value)
+        return write(target, kind, who = null, forPerson = tagFor(people, order()))
     }
 
     /**

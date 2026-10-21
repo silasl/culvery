@@ -14,6 +14,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsEqualTo
@@ -37,6 +38,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
 @RunWith(AndroidJUnit4::class)
 class ControlsTest {
@@ -247,5 +249,27 @@ class ControlsTest {
         show { HhPersonChip("Sam", Color(0xFF5B9BE0), "assign_Sam", enabled = true, clickLabel = "show as Sam’s event") {} }
         val node = compose.onNodeWithTag("assign_Sam").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         assertThat(node.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("show as Sam’s event")
+    }
+
+    @Test
+    fun aPersonChipCanBeAToggle() {
+        var taps = 0
+        var selected: Boolean? by mutableStateOf(true)
+        show { HhPersonChip("Sam", Color(0xFF5B9BE0), "assign_Sam", enabled = true, selected = selected) { taps++ } }
+        compose.onNodeWithTag("assign_Sam")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Checkbox))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.On))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "chosen"))
+            .performClick()
+        assertThat(taps).isEqualTo(1)
+        selected = false
+        compose.onNodeWithTag("assign_Sam")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.Off))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "not chosen"))
+        selected = null
+        compose.onNodeWithTag("assign_Sam")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ToggleableState))
+        compose.assertClickablesHaveRoleAndLabel()
     }
 }

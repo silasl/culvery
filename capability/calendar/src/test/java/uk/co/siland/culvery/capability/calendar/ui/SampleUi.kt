@@ -154,6 +154,11 @@ object SampleUi {
         "Today · 17:00–18:00",
     )
 
+    /** [detailShared] as a weekly series on the Family calendar, so its Who chips show. */
+    val detailSharedRecurring = detailShared.copy(
+        event = detailShared.event.copy(recurring = true, readOnlyReason = ReadOnlyReason.Recurring, repeats = "Every Wednesday", assignable = true),
+    )
+
     /** Today with a multi-day event on its second day of five. */
     val todayWithSpan = listOf(spanning("Half term", family, 2, 5)) + today
 

@@ -15,7 +15,9 @@ import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.EditResult
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventRef
+import uk.co.siland.culvery.capability.calendar.toggled
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
@@ -52,6 +54,8 @@ internal fun EventDetailHost(
         LaunchedEffect(ref) { onClose() }
         return
     }
+    // The set just written, until the detail re-collected from the store shows it: a quick next tap builds on it.
+    var written by remember(detail) { mutableStateOf<List<PersonId>?>(null) }
 
     EventDetailSheet(
         detail = detail,
@@ -73,11 +77,15 @@ internal fun EventDetailHost(
         },
         onChoosePerson = { mode = DetailMode.ChoosingPerson },
         onAssign = { person ->
-            action.run {
-                when (editor.assign(ref, person.id)) {
-                    EditResult.Done, EditResult.Queued -> mode = DetailMode.Idle
-                    is EditResult.Rejected, EditResult.Cancelled -> Unit
-                    EditResult.NotEditable -> onClose()
+            val current = written ?: chosenFor(detail.event)
+            val next = toggled(current, person.id)
+            if (next.toSet() != current.toSet()) {
+                action.run {
+                    when (editor.assign(ref, next)) {
+                        EditResult.Done, EditResult.Queued -> written = next
+                        is EditResult.Rejected, EditResult.Cancelled -> Unit
+                        EditResult.NotEditable -> onClose()
+                    }
                 }
             }
         },

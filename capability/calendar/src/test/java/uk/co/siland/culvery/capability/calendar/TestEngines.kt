@@ -26,8 +26,9 @@ internal fun testEditor(
     writeLock: CalendarWriteLock = CalendarWriteLock(),
     personOf: suspend (PersonId) -> Person? = { null },
     serviceOf: (providerId: String) -> String? = { null },
+    order: suspend () -> List<PersonId> = { emptyList() },
 ): CalendarEditor =
-    CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, personOf, serviceOf)
+    CalendarEditor(store, writers, access, toaster, zone, clock, scope, requestSync, io, WRITE_ATTEMPT_MS, writeLock, personOf, serviceOf, order)
 
 internal fun testSync(
     store: CalendarStore,

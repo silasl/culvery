@@ -33,8 +33,6 @@ internal fun forAccount(action: String, row: CalendarRow): String =
 
 internal fun connectingPane(service: String): String = "Connecting to $service"
 
-internal fun showAsEvent(name: String): String = "show as $name’s event"
-
 internal fun addEventOn(date: LocalDate): String = "Add event on ${date.format(FULL_DATE)}"
 
 /** The pressed ghost's label, "Add on Sun 27" (9 §4.7). */

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -224,6 +225,8 @@ private fun Modifier.boundedWidth(): Modifier = layout { measurable, constraints
 
 private const val NOT_AVAILABLE = "not available"
 private const val FIND_OUT_WHY = "find out why"
+private const val CHOSEN = "chosen"
+private const val NOT_CHOSEN = "not chosen"
 
 /**
  * 64 dp, `surf`, 22 sp / 600, one line; [placeholder] while empty; the keyboard's Done calls [onDone] and never saves.
@@ -351,10 +354,22 @@ fun HhStatusLine(
     }
 }
 
-/** Hand-off §7 person chip: a chip's size and shape, `surf`, a 12 dp dot in the person's [color] 8 from their [name]. */
+/**
+ * Hand-off §7 person chip: a chip's size and shape, `surf`, a 12 dp dot in the person's [color] 8 from their [name].
+ * With [selected] it is a toggle, filled in `accent` while chosen; null keeps it a button.
+ */
 @Composable
-fun HhPersonChip(name: String, color: Color, tag: String, enabled: Boolean, clickLabel: String? = null, onClick: () -> Unit) {
+fun HhPersonChip(
+    name: String,
+    color: Color,
+    tag: String,
+    enabled: Boolean,
+    clickLabel: String? = null,
+    selected: Boolean? = null,
+    onClick: () -> Unit,
+) {
     val c = Culvery.colors
+    val chosen = selected == true
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipIconGap),
@@ -362,12 +377,20 @@ fun HhPersonChip(name: String, color: Color, tag: String, enabled: Boolean, clic
             .testTag(tag)
             .height(ControlTokens.chipHeight)
             .clip(RoundedCornerShape(ControlTokens.chipRadius))
-            .background(c.surf)
-            .hhClickable(onClick, label = clickLabel, enabled = enabled)
+            .background(if (chosen) c.accent else c.surf)
+            .then(
+                if (selected == null) {
+                    Modifier.hhClickable(onClick, label = clickLabel, enabled = enabled)
+                } else {
+                    Modifier
+                        .semantics { stateDescription = if (selected) CHOSEN else NOT_CHOSEN }
+                        .toggleable(value = selected, enabled = enabled, role = Role.Checkbox, onValueChange = { onClick() })
+                },
+            )
             .padding(horizontal = ControlTokens.chipPaddingH),
     ) {
         Box(Modifier.size(ControlTokens.chipDot).clip(CircleShape).background(color))
-        Text(name, style = ControlType.chip, color = c.ink, maxLines = 1)
+        Text(name, style = ControlType.chip, color = if (chosen) c.accentInk else c.ink, maxLines = 1)
     }
 }
 

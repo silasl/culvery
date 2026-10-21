@@ -107,4 +107,15 @@ class WhoTest {
         assertThat(spokenWho(listOf(sam, mia))).isEqualTo("Sam and Mia")
         assertThat(spokenWho(listOf(alex, sam, mia))).isEqualTo("Alex, Sam and Mia")
     }
+
+    @Test
+    fun toggling() {
+        val family = PersonId.FAMILY
+        assertThat(toggled(listOf(sam.id), mia.id)).containsExactly(sam.id, mia.id).inOrder()
+        assertThat(toggled(listOf(sam.id, mia.id), sam.id)).containsExactly(mia.id)
+        assertThat(toggled(listOf(mia.id), mia.id)).containsExactly(mia.id)
+        assertThat(toggled(listOf(mia.id), mia.id, mayClear = true)).isEmpty()
+        assertThat(toggled(listOf(sam.id), family)).containsExactly(family)
+        assertThat(toggled(listOf(family), sam.id)).containsExactly(sam.id)
+    }
 }

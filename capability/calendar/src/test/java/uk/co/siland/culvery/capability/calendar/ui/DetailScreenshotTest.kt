@@ -62,6 +62,7 @@ class DetailScreenshotTest {
     @Test fun recurringLight() = snap("detail_recurring_light", false, SampleUi.detailRecurring)
     @Test fun untaggedDark() = snap("detail_untagged_dark", true, SampleUi.detailUntagged, DetailMode.ChoosingPerson)
     @Test fun untaggedLight() = snap("detail_untagged_light", false, SampleUi.detailUntagged, DetailMode.ChoosingPerson)
+    @Test fun chooseSharedDark() = snap("detail_choose_shared_dark", true, SampleUi.detailSharedRecurring, DetailMode.ChoosingPerson)
     @Test fun syncingDark() = snap("detail_syncing_dark", true, SampleUi.detailSyncing)
     @Test fun syncingLight() = snap("detail_syncing_light", false, SampleUi.detailSyncing)
     @Test fun fontScale15() = snap("detail_fs15", false, SampleUi.detailLongTitle, fontScale = 1.5f)

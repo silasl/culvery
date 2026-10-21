@@ -91,6 +91,7 @@ class CalendarEditorTest {
     private fun TestScope.editor(access: TestAccess, io: CoroutineContext = EmptyCoroutineContext) = testEditor(
         store, setOf(writer), access.control, access.toasts, HouseholdZone(household), WallClock { opened + testScheduler.currentTime },
         backgroundScope, requestSync = { syncRequests++ }, io = io, writeLock = lock, personOf = household::person,
+        order = { household.people.first().map { it.id } },
     )
 
     /** As the sheet chooses them: "key-1", "key-2"… in the order Save is tapped. */
@@ -224,7 +225,7 @@ class CalendarEditorTest {
         val access = testAccess(household)
         put(event("plumber", createdBy = null))
         access.answer(TestAccess.ALEX)
-        assertThat(editor(access).assign(ref("plumber"), access.sam.id)).isEqualTo(EditResult.Done)
+        assertThat(editor(access).assign(ref("plumber"), listOf(access.sam.id))).isEqualTo(EditResult.Done)
         assertThat(writer.calls).containsExactly("update:plumber")
         val stored = store.eventNow(ref("plumber"))!!
         assertThat(stored.forPerson).isEqualTo(access.sam.id.value)
@@ -239,7 +240,7 @@ class CalendarEditorTest {
         put(event("plumber", createdBy = null))
         writer.failWith = WriteRejectedException("event is locked")
         access.answer(TestAccess.ALEX)
-        assertThat(editor(access).assign(ref("plumber"), access.sam.id)).isEqualTo(EditResult.Rejected(WriteProblem.Refused("event is locked")))
+        assertThat(editor(access).assign(ref("plumber"), listOf(access.sam.id))).isEqualTo(EditResult.Rejected(WriteProblem.Refused("event is locked")))
         assertThat(store.eventNow(ref("plumber"))!!.forPerson).isNull()
         assertThat(store.pendingNow()).isEmpty()
         assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", WriteProblem.Refused("event is locked")))
@@ -250,7 +251,7 @@ class CalendarEditorTest {
         val access = testAccess(household)
         put(event("plumber", createdBy = null))
         access.answer(TestAccess.MIA)
-        assertThat(editor(access).assign(ref("plumber"), access.mia.id)).isEqualTo(EditResult.Cancelled)
+        assertThat(editor(access).assign(ref("plumber"), listOf(access.mia.id))).isEqualTo(EditResult.Cancelled)
         assertThat(access.toasts.messages).containsExactly("Ask a grown-up to choose who this is for.")
         assertThat(writer.calls).isEmpty()
     }
@@ -302,7 +303,7 @@ class CalendarEditorTest {
         failEvery("INSERT", "outbox")
         writer.failWith = UnreachableException("offline")
         access.answer(TestAccess.ALEX)
-        assertThat(editor(access).assign(ref("plumber"), access.sam.id)).isEqualTo(EditResult.Rejected(WriteProblem.Tablet))
+        assertThat(editor(access).assign(ref("plumber"), listOf(access.sam.id))).isEqualTo(EditResult.Rejected(WriteProblem.Tablet))
         assertThat(store.pendingNow()).isEmpty()
         assertThat(access.toasts.messages).containsExactly(couldNotSave("Sample calendar", WriteProblem.Tablet))
         assertThat(access.toasts.urgent).isEqualTo(access.toasts.messages)
@@ -340,7 +341,7 @@ class CalendarEditorTest {
         put(event("plumber", createdBy = null))
         writer.failWith = NeedsSignInException("expired")
         access.answer(TestAccess.ALEX)
-        assertThat(editor(access).assign(ref("plumber"), access.sam.id)).isEqualTo(EditResult.Queued)
+        assertThat(editor(access).assign(ref("plumber"), listOf(access.sam.id))).isEqualTo(EditResult.Queued)
         assertThat(store.pendingNow().single().let { it.kind to it.draft?.forPerson }).isEqualTo(ChangeKind.ASSIGN to access.sam.id.value)
         // The pass this asks for flags the connection from its own read.
         assertThat(syncRequests).isEqualTo(1)
@@ -390,9 +391,9 @@ class CalendarEditorTest {
         writer.failWith = UnreachableException("offline")
         access.answer(TestAccess.ALEX)
         val editor = editor(access)
-        assertThat(editor.assign(ref("plumber"), access.sam.id)).isEqualTo(EditResult.Queued)
+        assertThat(editor.assign(ref("plumber"), listOf(access.sam.id))).isEqualTo(EditResult.Queued)
         writer.failWith = null
-        assertThat(editor.assign(ref("plumber"), access.mia.id)).isEqualTo(EditResult.Queued)
+        assertThat(editor.assign(ref("plumber"), listOf(access.mia.id))).isEqualTo(EditResult.Queued)
         assertThat(writer.calls).containsExactly("update:plumber")
         val second = store.pendingNow()[1]
         assertThat(second.kind).isEqualTo(ChangeKind.ASSIGN)
@@ -427,10 +428,10 @@ class CalendarEditorTest {
         writer.gate = CompletableDeferred()
         access.answer(TestAccess.ALEX)
         val editor = editor(access, io = Dispatchers.Default)
-        val first = async { editor.assign(ref("plumber"), access.sam.id) }
+        val first = async { editor.assign(ref("plumber"), listOf(access.sam.id)) }
         writer.entered.await()
         // A second sheet on the same event, on the session the first one started.
-        val second = async { editor.assign(ref("plumber"), access.mia.id) }
+        val second = async { editor.assign(ref("plumber"), listOf(access.mia.id)) }
         // Real time for the second write to reach the writer, if the lock didn't hold it back.
         withContext(Dispatchers.Default) { delay(200) }
         assertThat(writer.calls).containsExactly("update:plumber")
@@ -449,7 +450,7 @@ class CalendarEditorTest {
         val editor = editor(access)
         assertThat(editor.delete(ref("swim"))).isEqualTo(EditResult.NotEditable)
         assertThat(editor.delete(ref("inset", "s-school"))).isEqualTo(EditResult.NotEditable)
-        assertThat(editor.assign(ref("inset", "s-school"), access.sam.id)).isEqualTo(EditResult.NotEditable)
+        assertThat(editor.assign(ref("inset", "s-school"), listOf(access.sam.id))).isEqualTo(EditResult.NotEditable)
         assertThat(editor.mayDelete(ref("swim"))).isFalse()
         assertThat(access.requests).isEmpty()
     }
@@ -466,7 +467,7 @@ class CalendarEditorTest {
         val access = testAccess(household)
         putWeeklySwim(forPerson = access.alex.id.value)
         access.answer(TestAccess.ALEX)
-        assertThat(editor(access).assign(ref("swim_1"), access.sam.id)).isEqualTo(EditResult.Done)
+        assertThat(editor(access).assign(ref("swim_1"), listOf(access.sam.id))).isEqualTo(EditResult.Done)
         assertThat(writer.calls).containsExactly("assignSeries:swim")
         assertThat(writer.drafts.single().let { it.forPerson to it.forPersonColor }).isEqualTo(access.sam.id.value to access.sam.color)
         assertThat(access.requests.single().reason).isEqualTo(PinReason.Assign)
@@ -476,11 +477,23 @@ class CalendarEditorTest {
     }
 
     @Test
+    fun assigningASetToASeriesTagsEveryOccurrence() = runTest {
+        val access = testAccess(household)
+        putWeeklySwim(forPerson = access.alex.id.value)
+        access.answer(TestAccess.ALEX)
+        assertThat(editor(access).assign(ref("swim_1"), listOf(access.mia.id, access.sam.id))).isEqualTo(EditResult.Done)
+        val tag = "${access.sam.id.value},${access.mia.id.value}"
+        assertThat(writer.calls).containsExactly("assignSeries:swim")
+        assertThat(writer.drafts.single().let { it.forPerson to it.forPersonColor }).isEqualTo(tag to null)
+        assertThat(listOf("swim_1", "swim_2").map { store.eventNow(ref(it))!!.forPerson }).containsExactly(tag, tag)
+    }
+
+    @Test
     fun childCannotChooseWhoARepeatingEventIsFor() = runTest {
         val access = testAccess(household)
         putWeeklySwim()
         access.answer(TestAccess.MIA)
-        assertThat(editor(access).assign(ref("swim_1"), access.mia.id)).isEqualTo(EditResult.Cancelled)
+        assertThat(editor(access).assign(ref("swim_1"), listOf(access.mia.id))).isEqualTo(EditResult.Cancelled)
         assertThat(access.toasts.messages).containsExactly("Ask a grown-up to choose who this is for.")
         assertThat(writer.calls).isEmpty()
     }
@@ -491,7 +504,7 @@ class CalendarEditorTest {
         putWeeklySwim()
         writer.failWith = UnreachableException("offline")
         access.answer(TestAccess.ALEX)
-        assertThat(editor(access).assign(ref("swim_2"), access.sam.id)).isEqualTo(EditResult.Queued)
+        assertThat(editor(access).assign(ref("swim_2"), listOf(access.sam.id))).isEqualTo(EditResult.Queued)
         val queued = store.pendingNow().single()
         assertThat(listOf(queued.kind, queued.remoteId, queued.draft?.forPerson)).containsExactly(ChangeKind.ASSIGN_SERIES, "swim", access.sam.id.value).inOrder()
         assertThat(syncRequests).isEqualTo(1)
@@ -518,7 +531,7 @@ class CalendarEditorTest {
     fun aRepeatingEventWhoseSeriesIsNotKnownYetCanNotBeAssigned() = runTest {
         val access = testAccess(household)
         put(event("swim", createdBy = null, recurring = true))
-        assertThat(editor(access).assign(ref("swim"), access.sam.id)).isEqualTo(EditResult.NotEditable)
+        assertThat(editor(access).assign(ref("swim"), listOf(access.sam.id))).isEqualTo(EditResult.NotEditable)
         assertThat(access.requests).isEmpty()
     }
 
@@ -955,7 +968,7 @@ class CalendarEditorTest {
         val editor = editor(access)
         editor.create(draft("Sleepover", access.mia.id.value))
         editor.create(draft("Pizza night", PersonId.FAMILY.value))
-        editor.assign(ref("plumber"), access.sam.id)
+        editor.assign(ref("plumber"), listOf(access.sam.id))
         assertThat(writer.drafts.map { it.forPersonColor }).containsExactly(access.mia.color, null, access.sam.color).inOrder()
     }
 

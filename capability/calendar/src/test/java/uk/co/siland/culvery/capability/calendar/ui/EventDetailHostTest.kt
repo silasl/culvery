@@ -1,6 +1,13 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import android.os.Looper
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -14,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -21,6 +29,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
+import uk.co.siland.culvery.capability.calendar.ASK_AN_ADULT
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.CalendarSource
@@ -43,6 +52,7 @@ import uk.co.siland.culvery.capability.calendar.testEditor
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
+import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -94,11 +104,17 @@ class EventDetailHostTest {
             ),
         )
         repo = CalendarRepository(store, household, zone, emptySet(), setOf(writer))
-        editor = testEditor(store, setOf(writer), access.control, access.toasts, zone, WallClock { System.currentTimeMillis() }, scope)
+        editor = testEditor(
+            store, setOf(writer), access.control, access.toasts, zone, WallClock { System.currentTimeMillis() }, scope,
+            personOf = household::person, order = { household.people.first().map { it.id } },
+        )
     }
 
     @After
     fun tearDown() {
+        // The sheet stops reading the store before it closes; a write's last change may still be re-querying.
+        shown = false
+        compose.waitForIdle()
         scope.cancel()
         calendar.close()
         householdDb.close()
@@ -109,9 +125,36 @@ class EventDetailHostTest {
         return RemoteEvent(id, title, EventTime.Timed(start), EventTime.Timed(start.plusSeconds(5_400)), false, null, createdBy)
     }
 
+    private val swim = EventRef("c1", "s-family", "swim_1")
+
+    /** A weekly swim on the Family calendar tagged [forPerson]: a repeating event, so its Who chips stay up. */
+    private fun putSwim(forPerson: String) = runBlocking {
+        store.applySync(
+            "c1", "s-family", DateRange(today.minusDays(1), today.plusDays(14), london),
+            SyncResult(listOf(event("swim_1", "Swimming", null).copy(recurring = true, seriesId = "swim", forPerson = forPerson)), emptyList(), null, fullReplace = false),
+        )
+    }
+
+    private fun tagOf(ref: EventRef) = runBlocking { store.eventNow(ref) }?.forPerson
+
+    private fun ids(vararg people: Person) = people.joinToString(",") { it.id.value }
+
+    /** Opens the swim's detail and its Who chips. */
+    private fun chooseFor(forPerson: String) {
+        putSwim(forPerson)
+        show("swim_1")
+        waitForText("Swimming")
+        compose.onNodeWithTag("detail_assign").performClick()
+        compose.onNodeWithTag("assign_Family").assertExists()
+    }
+
+    private fun tap(name: String) = compose.onNodeWithTag("assign_$name").performClick()
+
+    private var shown by mutableStateOf(true)
+
     private fun show(id: String) = compose.setContent {
         CulveryTheme(dark = true) {
-            EventDetailHost(EventRef("c1", "s-family", id), today, repo, editor, onClose = { closed++ }, onEdit = {})
+            if (shown) EventDetailHost(EventRef("c1", "s-family", id), today, repo, editor, onClose = { closed++ }, onEdit = {})
         }
     }
 
@@ -204,5 +247,84 @@ class EventDetailHostTest {
         waitForText("Dinner with Jo & Priya")
         runBlocking { store.applyDeleted(EventRef("c1", "s-family", "dinner")) }
         waitUntil { closed > 0 }
+    }
+
+    @Test
+    fun tappingAChipAddsThatPersonToTheEvent() {
+        access.answer(TestAccess.ALEX)
+        chooseFor(ids(access.mia))
+        tap("Sam")
+        waitUntil { tagOf(swim) == ids(access.sam, access.mia) }
+        assertThat(writer.calls).containsExactly("assignSeries:swim")
+    }
+
+    @Test
+    fun theLastPersonCannotBeCleared() {
+        access.answer(TestAccess.ALEX)
+        chooseFor(ids(access.mia))
+        tap("Mia")
+        // A real change next: once it lands, the only write is its own.
+        tap("Sam")
+        waitUntil { tagOf(swim) == ids(access.sam, access.mia) }
+        assertThat(writer.calls).containsExactly("assignSeries:swim")
+        assertThat(access.requests).hasSize(1)
+    }
+
+    @Test
+    fun familyStaysExclusive() {
+        access.answer(TestAccess.ALEX)
+        chooseFor(ids(access.sam, access.mia))
+        tap("Family")
+        waitUntil { tagOf(swim) == "family" }
+        waitUntil { compose.onAllNodes(hasTestTag("assign_Sam") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        tap("Sam")
+        waitUntil { tagOf(swim) == ids(access.sam) }
+    }
+
+    @Test
+    fun aChildTappingADetailChipIsAskedForAnAdultAndNothingChanges() {
+        access.answer(TestAccess.MIA)
+        chooseFor(ids(access.mia))
+        tap("Sam")
+        waitUntil { access.toasts.messages.isNotEmpty() }
+        assertThat(access.toasts.messages).containsExactly(ASK_AN_ADULT)
+        assertThat(writer.calls).isEmpty()
+        assertThat(runBlocking { store.pendingNow() }).isEmpty()
+        assertThat(tagOf(swim)).isEqualTo(ids(access.mia))
+    }
+
+    @Test
+    fun theChooserStaysOpenAfterAToggle() {
+        access.answer(TestAccess.ALEX)
+        chooseFor(ids(access.mia))
+        tap("Sam")
+        waitUntil { tagOf(swim) == ids(access.sam, access.mia) }
+        shadowOf(Looper.getMainLooper()).idle()
+        compose.onNodeWithTag("assign_Alex").assertExists()
+        compose.onNodeWithTag("assign_Sam").assertIsOn()
+    }
+
+    @Test
+    fun twoTogglesInARowBothLand() {
+        val gate = CompletableDeferred<Unit>()
+        writer.gate = gate
+        access.answer(TestAccess.ALEX)
+        chooseFor(ids(access.mia))
+        tap("Sam")
+        waitUntil { writer.calls.isNotEmpty() }
+        compose.onNodeWithTag("assign_Alex").assertIsNotEnabled()
+        gate.complete(Unit)
+        waitUntil { compose.onAllNodes(hasTestTag("assign_Alex") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        tap("Alex")
+        waitUntil { tagOf(swim) == ids(access.alex, access.sam, access.mia) }
+        assertThat(writer.calls).containsExactly("assignSeries:swim", "assignSeries:swim")
+    }
+
+    @Test
+    fun aRemovedPersonIsDroppedWhenTheSetIsChanged() {
+        access.answer(TestAccess.ALEX)
+        chooseFor("${access.sam.id.value},gone")
+        tap("Mia")
+        waitUntil { tagOf(swim) == ids(access.sam, access.mia) }
     }
 }

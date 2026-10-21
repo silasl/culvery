@@ -5,13 +5,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.hasAnyAncestor
@@ -261,12 +262,26 @@ class EventDetailSheetTest {
     }
 
     @Test
-    fun theChipsToChooseWhoSayWhatATapDoes() {
+    fun theChipsShowTheSetChosen() {
+        mode = DetailMode.ChoosingPerson
+        show(SampleUi.detailSharedRecurring)
+        val checkbox = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Checkbox)
+        listOf("Sam", "Mia").forEach {
+            compose.onNodeWithTag("assign_$it").assert(checkbox).assertIsOn()
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "chosen"))
+        }
+        listOf("Alex", "Family").forEach { compose.onNodeWithTag("assign_$it").assert(checkbox).assertIsOff() }
+        compose.onNode(hasTestTag("assign_Sam") and hasText("Sam")).assertExists()
+        compose.assertAccessible()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun familyComesLastAndNothingIsChosenOnAnUntaggedEvent() {
         mode = DetailMode.ChoosingPerson
         show(SampleUi.detailUntagged)
-        val chip = compose.onNodeWithTag("assign_Alex").assert(isButton)
-        assertThat(chip.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("show as Alex’s event")
-        compose.assertAccessible()
+        val left = listOf("Alex", "Sam", "Mia", "Family").map { compose.onNodeWithTag("assign_$it").assertIsOff().getUnclippedBoundsInRoot().left }
+        assertThat(left).isInStrictOrder()
     }
 
     @Test

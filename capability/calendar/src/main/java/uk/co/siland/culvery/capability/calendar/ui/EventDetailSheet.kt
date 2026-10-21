@@ -39,6 +39,7 @@ import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
 import uk.co.siland.culvery.capability.calendar.whoLine
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
@@ -121,7 +122,7 @@ fun EventDetailSheet(
                     body = "Change repeating events in ${e.serviceName} on your phone." +
                         if (e.assignable) " Choosing who it’s for changes every time it repeats." else "",
                 ) {
-                    if (e.assignable) ChooseWho(people, mode, busy, onChoosePerson, onAssign)
+                    if (e.assignable) ChooseWho(people, chosenFor(e), mode, busy, onChoosePerson, onAssign)
                 }
                 e.untagged -> Note(
                     icon = Icons.MOBILE,
@@ -130,7 +131,7 @@ fun EventDetailSheet(
                     background = c.accentSoft,
                     iconTint = c.accent,
                 ) {
-                    ChooseWho(people, mode, busy, onChoosePerson, onAssign)
+                    ChooseWho(people, chosenFor(e), mode, busy, onChoosePerson, onAssign)
                 }
             }
         }
@@ -171,17 +172,27 @@ fun EventDetailSheet(
     }
 }
 
-/** Choose who it’s for, then the household’s chips once it is tapped. */
+/** Who the chips show as chosen: the event's people, or nobody while it is untagged and only shows as its fallback. */
+internal fun chosenFor(event: EventUi): List<PersonId> = if (event.untagged) emptyList() else event.people.map { it.id }
+
+/** Choose who it’s for, then a toggle for each of the household's people and Family last, once it is tapped (9 §3.4). */
 @Composable
-private fun ChooseWho(people: List<Person>, mode: DetailMode, busy: Boolean, onChoosePerson: () -> Unit, onAssign: (Person) -> Unit) {
+private fun ChooseWho(
+    people: List<Person>,
+    chosen: List<PersonId>,
+    mode: DetailMode,
+    busy: Boolean,
+    onChoosePerson: () -> Unit,
+    onAssign: (Person) -> Unit,
+) {
     Spacer(Modifier.height(CalendarDimens.assignTop))
     if (mode == DetailMode.ChoosingPerson) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(CalendarDimens.personChipGap),
             modifier = Modifier.horizontalScroll(rememberScrollState()),
         ) {
-            people.forEach { person ->
-                HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy, clickLabel = showAsEvent(person.name)) { onAssign(person) }
+            (people.filter { it.id != PersonId.FAMILY } + Person.Family).forEach { person ->
+                HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy, selected = person.id in chosen) { onAssign(person) }
             }
         }
     } else {

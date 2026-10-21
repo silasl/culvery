@@ -17,6 +17,18 @@ fun tagFor(people: List<PersonId>, order: List<PersonId>): String {
 }
 
 /**
+ * [current] after a tap on [tapped] (9 §3.4): Family replaces the set and a person replaces Family; otherwise the person
+ * is added or removed, but the last one stays unless [mayClear].
+ */
+internal fun toggled(current: List<PersonId>, tapped: PersonId, mayClear: Boolean = false): List<PersonId> = when {
+    tapped == PersonId.FAMILY -> listOf(PersonId.FAMILY)
+    PersonId.FAMILY in current -> listOf(tapped)
+    tapped !in current -> current + tapped
+    current.size > 1 || mayClear -> current - tapped
+    else -> current
+}
+
+/**
  * Who an event is for, in household [order] and never empty: the tag's people still in [people] (9 §3.4). A shared
  * tag with nobody left is Family; no tag, or one unknown id, reads as before, as the calendar's person (9 §3.3).
  */
