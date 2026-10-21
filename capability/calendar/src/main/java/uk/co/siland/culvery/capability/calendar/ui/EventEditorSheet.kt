@@ -78,6 +78,8 @@ import uk.co.siland.culvery.core.ui.ShellTokens
 /** A save that failed: where it was going ([service]) and why ([problem]); the card says both. */
 data class SaveFailure(val service: String, val problem: WriteProblem)
 
+internal const val PICK_A_DATE = "Pick a date"
+internal const val PICK_A_TIME = "Pick a time"
 internal const val REPEATS = "Repeats"
 internal const val ENDS = "Ends"
 internal const val ENDS_TOO_EARLY = "The end date is before the event’s day. Pick a later one."
@@ -129,8 +131,8 @@ fun EventEditorSheet(
         HhSheet(
             modifier = if (picker != EditorPicker.None) Modifier.clearAndSetSemantics {} else Modifier,
             padding = PaddingValues(
-                start = CalendarDimens.sheetPaddingH,
-                end = CalendarDimens.sheetPaddingH,
+                start = CalendarDimens.editorPaddingH,
+                end = CalendarDimens.editorPaddingH,
                 top = CalendarDimens.editorPaddingTop,
                 bottom = CalendarDimens.editorPaddingBottom,
             ),
@@ -150,6 +152,7 @@ fun EventEditorSheet(
                 Column(
                     verticalArrangement = Arrangement.spacedBy(CalendarDimens.editorBodyGap),
                     modifier = Modifier
+                        .testTag("editor_body")
                         .weight(1f)
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
@@ -163,11 +166,10 @@ fun EventEditorSheet(
                             closeKeyboard()
                             onPicker(EditorPicker.Date)
                         }
-                        TimeSection(form, busy) {
+                        WhenRow(form, busy) {
                             closeKeyboard()
                             onPicker(EditorPicker.Time)
                         }
-                        if (form.time != TimeChoice.AllDay) LengthSection(form, busy)
                         if (form.canRepeat) {
                             RepeatsSection(form, busy)
                             if (form.repeat != RepeatChoice.Never) {
@@ -349,7 +351,7 @@ private fun DaySection(form: EventForm, busy: Boolean, onPickDate: () -> Unit) {
         }
         val picked = form.pickedDateLabel
         HhChoiceChip(
-            label = picked ?: "Pick date…",
+            label = picked ?: PICK_A_DATE,
             selected = picked != null,
             tag = "day_pick",
             role = Role.Button,
@@ -359,13 +361,22 @@ private fun DaySection(form: EventForm, busy: Boolean, onPickDate: () -> Unit) {
     }
 }
 
+/** Time at its natural width with Length beside it, wrapping within what is left; all day has no Length (9 §4.8). */
+@Composable
+private fun WhenRow(form: EventForm, busy: Boolean, onPickTime: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.timeLengthGap), modifier = Modifier.testTag("editor_time_length").fillMaxWidth()) {
+        TimeSection(form, busy, onPickTime)
+        if (form.time != TimeChoice.AllDay) LengthSection(form, busy, Modifier.weight(1f))
+    }
+}
+
 @Composable
 private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit) {
     Section("Time") {
         HhChoiceChip("All day", form.time == TimeChoice.AllDay, "time_all_day", onClick = { if (!busy) form.chooseTime(TimeChoice.AllDay) })
         val custom = form.time as? TimeChoice.Custom
         HhChoiceChip(
-            label = custom?.time?.format(HOURS_MINUTES) ?: "Pick time…",
+            label = custom?.time?.format(HOURS_MINUTES) ?: PICK_A_TIME,
             selected = custom != null,
             tag = "time_pick",
             role = Role.Button,
@@ -376,8 +387,8 @@ private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit) 
 }
 
 @Composable
-private fun LengthSection(form: EventForm, busy: Boolean) {
-    Section("Length") {
+private fun LengthSection(form: EventForm, busy: Boolean, modifier: Modifier) {
+    Section("Length", modifier) {
         form.lengths.forEach { length ->
             HhChoiceChip(lengthLabel(length), form.length == length, "length_${length.toMinutes()}", onClick = { if (!busy) form.chooseLength(length) })
         }

@@ -94,11 +94,11 @@ internal object CalendarType {
     /** 64 sp / 600: the ":" between them. */
     val timeColon = HhType.headerValue.copy(fontSize = 64.sp)
 
-    /** 30 sp / 700, −0.5 tracking: "Add event", "Change event". */
-    val editorTitle = HhType.screenTitle.copy(fontSize = 30.sp, letterSpacing = (-0.5).sp)
+    /** 35 sp / 700, −0.5 tracking: "Add event", "Change event" (9 §4.8). */
+    val editorTitle = HhType.screenTitle.copy(fontSize = 35.sp, fontWeight = FontWeight.W700, letterSpacing = (-0.5).sp)
 
     /** 15 sp / 400: the add/edit sheet's live summary. */
-    val editorSummary = subtitle
+    val editorSummary = HhType.secondary.copy(fontSize = 15.sp)
 
     /** 16 sp / 600: a locked multi-day edit's dates line. */
     val lockedDates = personChip
@@ -285,15 +285,17 @@ internal object CalendarDimens {
     val colonBottom = 10.dp
     val timeButtonGap = 10.dp
 
-    // Add/edit sheet (hand-off §7 Sheet 2 and Culvery.dc.html): padding 24×30×20; the summary 4 below the title and
-    // ✕ 16 away; the body 4 below the Title field, 20 between sections, each label 10 above its chips.
-    val editorPaddingTop = 24.dp
-    val editorPaddingBottom = 20.dp
+    // Add/edit sheet (9 §4.8, handoff 4a): padding 29 above, 32 at the sides, 27 below; the summary 4 below the title and
+    // ✕ 16 away; the body 4 below the Title field, 16 between sections, each label 8 above its chips; Time and Length 27 apart.
+    val editorPaddingTop = 29.dp
+    val editorPaddingH = 32.dp
+    val editorPaddingBottom = 27.dp
     val editorHeaderGap = 16.dp
     val editorSummaryTop = 4.dp
     val editorBodyTop = 4.dp
-    val editorBodyGap = 20.dp
-    val sectionGap = 10.dp
+    val editorBodyGap = 16.dp
+    val sectionGap = 8.dp
+    val timeLengthGap = 27.dp
 
     // The locked dates line and the failure card: radius 18, padding 14×16, the icon 12 from the text;
     // `date_range` 22 dp, `cloud_off` 24 dp, the failure body 2 below its title.

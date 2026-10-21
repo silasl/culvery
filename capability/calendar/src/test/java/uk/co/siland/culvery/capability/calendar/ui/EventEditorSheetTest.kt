@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
@@ -20,10 +21,14 @@ import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
@@ -32,6 +37,7 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -41,6 +47,7 @@ import java.time.ZoneId
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EditableEvent
 import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.EventRef
@@ -54,10 +61,13 @@ import uk.co.siland.culvery.capability.calendar.saveFailedBody
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.ShellTokens
+import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class EventEditorSheetTest {
     /** Focus and the keyboard behave as on the tablet only in touch mode, set before the activity launches. */
     @get:Rule(order = 0) val touchMode = TouchModeRule()
@@ -174,6 +184,114 @@ class EventEditorSheetTest {
         compose.onNodeWithTag("time_all_day").performClick()
         compose.onNodeWithTag("length_60").assertDoesNotExist()
     }
+
+    /** The sheet at the hand-off's 613 × 800 dp, optionally at a larger font. */
+    private fun showAt(form: EventForm, childOnly: PersonId? = null, fontScale: Float = 1f, height: Dp = 800.dp) = compose.setContent {
+        CulveryTheme(dark = true) {
+            WithFontScale(fontScale) {
+                Box(Modifier.size(ShellTokens.sheetWidth, height)) {
+                    EventEditorSheet(
+                        form = form, people = SampleUi.household, service = "Google Calendar", childOnly = childOnly, busy = false,
+                        failure = null, picker = EditorPicker.None, onClose = {}, onSave = {}, onDelete = {}, onRefusedWho = {},
+                        onPicker = {}, focusTitleOnOpen = false,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun bounds(tag: String) = compose.onNodeWithTag(tag).getUnclippedBoundsInRoot()
+
+    private fun label(text: String) = compose.onNode(hasContentDescription(text) and isHeading())
+
+    @Test
+    fun theHeaderSitsAsDrawn() {
+        showAt(newForm())
+        val title = compose.onAllNodesWithText("Add event").filterToOne(isHeading()).getUnclippedBoundsInRoot()
+        val summary = bounds("editor_summary")
+        val close = bounds("sheet_close")
+        assertThat(summary.top.value).isWithin(0.5f).of(title.bottom.value + 4f)
+        assertThat(close.top.value).isWithin(1f).of(title.top.value)
+        assertThat(title.top.value).isWithin(0.5f).of(29f)
+        assertThat(title.left.value).isWithin(0.5f).of(32f)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theChipsSayPickADateAndPickATime() {
+        showAt(newForm())
+        compose.onNodeWithTag("day_pick").assertTextEquals(PICK_A_DATE)
+        compose.onNodeWithTag("time_pick").assertTextEquals(PICK_A_TIME)
+        // The glyphs are cleared from semantics, so the leading icon is checked as a node of its own; its name by image.
+        compose.onNodeWithTag("day_pick", useUnmergedTree = true).onChildren().assertCountEquals(2)
+        compose.onNodeWithTag("time_pick", useUnmergedTree = true).onChildren().assertCountEquals(2)
+        val ellipsis = SemanticsMatcher("has an ellipsis") { node ->
+            val said = node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } +
+                node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
+            said.any { "…" in it }
+        }
+        compose.onAllNodes(ellipsis, useUnmergedTree = true).assertCountEquals(0)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun timeAndLengthSitSideBySide() {
+        val form = newForm()
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        showAt(form)
+        val time = label("Time").getUnclippedBoundsInRoot()
+        val length = label("Length").getUnclippedBoundsInRoot()
+        val timeEnd = bounds("time_pick").right
+        assertThat(length.left.value).isAtLeast(timeEnd.value + 27f)
+        assertThat(length.top.value).isWithin(1f).of(time.top.value)
+        compose.onNodeWithTag("editor_time_length").assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun anAllDayEventHasNoLengthSection() {
+        showAt(newForm())
+        label("Time").assertExists()
+        label("Length").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun timeAndLengthWrapAtLargeFont() {
+        val form = newForm()
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        showAt(form, fontScale = 1.3f)
+        val body = bounds("editor_body")
+        val timeEnd = maxOf(bounds("time_all_day").right.value, bounds("time_pick").right.value)
+        form.lengths.forEach { length ->
+            val chip = bounds("length_${length.toMinutes()}")
+            assertThat(chip.left.value).isAtLeast(timeEnd)
+            assertThat(chip.right.value).isAtMost(body.right.value)
+        }
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** The reason line is the footer's, drawn by a later change; until it exists its 31 dp (a 16 sp line and the 8 dp gap) is allowed for. */
+    private fun assertClosedSheetFits(form: EventForm, childOnly: PersonId?) {
+        showAt(form, childOnly)
+        val lastChips = compose.onAllNodes(SemanticsMatcher("a Repeats chip") { node ->
+            node.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("repeat_") == true
+        }).fetchSemanticsNodes()
+        val lastBottom = lastChips.maxOf { it.boundsInRoot.bottom }
+        val density = compose.density.density
+        val reason = compose.onAllNodes(hasTestTag("editor_save_reason")).fetchSemanticsNodes().firstOrNull()
+        val reasonTop = reason?.boundsInRoot?.top ?: (bounds("editor_save").top.value * density - 31f * density)
+        assertThat((reasonTop - lastBottom) / density).isAtLeast(24f)
+        val scroll = compose.onNodeWithTag("editor_body").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        assertThat(scroll.maxValue()).isEqualTo(0f)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theClosedSheetFitsWithRoomToSpareForAnAdult() = assertClosedSheetFits(newForm(signedIn = SampleUi.alex.id), childOnly = null)
+
+    @Test
+    fun theClosedSheetFitsWithRoomToSpareForAChild() = assertClosedSheetFits(newForm(signedIn = SampleUi.mia.id), childOnly = SampleUi.mia.id)
 
     @Test
     fun aSignedInChildsOtherWhoChipsAreDisabledAndATapExplains() {
