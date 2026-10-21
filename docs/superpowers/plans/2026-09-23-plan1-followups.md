@@ -419,7 +419,7 @@ Faults found:
 Open tablet checks:
 - A ring while music plays: on the emulator the Office speaker went from playing (lowered 24 to 5) to its Bluetooth source with nothing playing; the volume was restored to 24, and only Culvery talks to it. The emulator logged `MusicUnreachableException` every few seconds throughout. Likely explained by fault 3 on the tablet section below (the idle Bluetooth input reports PLAYING with no track, and the source flipped to it). Keep the ring-with-music re-test on the tablet open.
 - The tablet never sleeping when nobody is around: fault 2 doesn't explain it. Read `logcat -s DisplayState` and `logcat -b events | grep wm_on_paused` on the tablet.
-- The Hue connection lost after the evening sleep and not reconnecting. The final review notes `HueSystem`'s `channelFlow` waits for pending deadline jobs, so a stream that ends mid-wait reconnects up to 5 s later; that may not be the whole story.
+- The Hue connection lost after the evening sleep: explained (2026-10-20). The tablet still has the household's parental restrictions from its time as a child's device, which cut its network at night; the calendar drops at the same time. Not Culvery.
 
 For the end-of-v1 design review:
 - Home with the full column: the empty band in the Lights card between the top row and the slider (and above the Music card's row) is large, as spec §4.2 says, and larger when Lights takes the full column.
@@ -452,7 +452,7 @@ Test flakes seen across the build (timing, not Plan 9a's code; each passed on a 
 Still open on the tablet:
 - A real ring while music plays.
 - The night clock in the dark at bedtime: readable from bed, not lighting the room, the glyph findable only on looking.
-- The Hue connection lost after the evening sleep.
+- The Hue connection lost after the evening sleep: explained, the parental restrictions cut the network at night (see above).
 
 For the end-of-v1 design review:
 - An Input group picked as Home's fallback says "Nothing playing" while its button shows Pause.
