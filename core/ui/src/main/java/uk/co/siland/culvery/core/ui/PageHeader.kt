@@ -56,10 +56,32 @@ fun HhPageHeader(
     footer: (@Composable () -> Unit)? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
+    HhPageHeader(
+        title = {
+            Text(title, style = PageHeaderTokens.titleStyle, color = Culvery.colors.ink, modifier = titleModifier.semantics { heading() })
+        },
+        subtitle = subtitle,
+        modifier = modifier,
+        under = under,
+        footer = footer,
+        trailing = trailing,
+    )
+}
+
+/** As above with a composable [title], for a title that is more than one run of text; it brings its own heading semantics. */
+@Composable
+fun HhPageHeader(
+    title: @Composable () -> Unit,
+    subtitle: String?,
+    modifier: Modifier = Modifier,
+    under: (@Composable () -> Unit)? = null,
+    footer: (@Composable () -> Unit)? = null,
+    trailing: @Composable RowScope.() -> Unit = {},
+) {
     Column(modifier.fillMaxWidth().padding(bottom = PageHeaderTokens.below)) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(PageHeaderTokens.trailingGap)) {
             Column(Modifier.weight(1f).align(Alignment.Top)) {
-                Text(title, style = PageHeaderTokens.titleStyle, color = Culvery.colors.ink, modifier = titleModifier.semantics { heading() })
+                title()
                 if (subtitle != null || under != null) Spacer(Modifier.height(PageHeaderTokens.subtitleGap))
                 if (subtitle != null) Text(subtitle, style = PageHeaderTokens.subtitleStyle, color = Culvery.colors.mute)
                 under?.invoke()

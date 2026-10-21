@@ -167,6 +167,10 @@ internal val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Loc
 internal val DAY_AND_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d", Locale.ENGLISH)
 internal val DAY_AND_MONTH: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMMM", Locale.ENGLISH)
 
+internal val MONTH_NAME: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH)
+/** "Oct": the small label over the 1st of a new month in the week. */
+internal val MONTH_SHORT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)
+
 internal val FULL_WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)
 
 /** "Tuesday 7 October": how TalkBack names a day. */
@@ -187,6 +191,36 @@ fun weekTitle(weeksAhead: Int): String = when (weeksAhead) {
     1 -> "Next week"
     else -> "In $weeksAhead weeks"
 }
+
+/** The week's title (9 §3.2): [months] in bold, [year] muted beside it, and [spoken] for TalkBack. */
+data class MonthTitle(val months: String, val year: String, val spoken: String)
+
+/** The month the week from [start] is in, or both when it crosses into the next, and the year (the first's too across years). */
+fun monthTitle(start: LocalDate): MonthTitle {
+    val end = start.plusDays(6)
+    val first = start.format(MONTH_NAME)
+    val last = end.format(MONTH_NAME)
+    return when {
+        start.month == end.month -> MonthTitle(first, "${end.year}", "$first ${end.year}")
+        start.year == end.year -> MonthTitle("$first – $last", "${end.year}", "$first to $last ${end.year}")
+        else -> MonthTitle("$first ${start.year} – $last", "${end.year}", "$first ${start.year} to $last ${end.year}")
+    }
+}
+
+/** "Wed 23 – Tue 29 Sep", with the month at both ends when the week crosses one. */
+fun weekRange(start: LocalDate): String {
+    val end = start.plusDays(6)
+    val from = if (start.month == end.month) start.format(DAY_AND_DATE) else start.format(SHORT_DAY)
+    return "$from – ${end.format(SHORT_DAY)}"
+}
+
+/** "This week · Wed 23 – Tue 29 Sep · updated from Google Calendar 2 minutes ago": a sync age line joins in lower case. */
+fun weekSubtitleLine(weeksAhead: Int, start: LocalDate, sync: String): String {
+    val joined = if (AGE_LINES.any { sync.startsWith(it) }) sync.replaceFirstChar { it.lowercase() } else sync
+    return "${weekTitle(weeksAhead)} · ${weekRange(start)} · $joined"
+}
+
+private val AGE_LINES = listOf("Updated", "Out of date", "Not updated")
 
 /** 4c §6.6: the toast after adding an event the Calendar tab can't reach, so the family know where it went. */
 fun eventAddedFor(day: LocalDate): String = "Event added on ${day.format(DAY_AND_MONTH)}."

@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -56,6 +57,7 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
+import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
@@ -90,32 +92,67 @@ class WeekViewTest {
     fun showsSevenDaysStartingTodayAsThisWeek() {
         show { WeekView(state()) }
         (0L..6L).forEach { compose.onNodeWithTag("week_day_${SampleUi.TODAY.plusDays(it)}").assertExists() }
-        compose.onNodeWithText("This week").assertExists()
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("This week · Wed 23 – Tue 29 Sep · updated from Google 2 minutes ago")
     }
 
     @Test
     fun subtitleNamesTheOnlyConnection() {
         show { WeekView(state()) }
-        compose.onNodeWithText("Updated from Google 2 minutes ago").assertExists()
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("This week · Wed 23 – Tue 29 Sep · updated from Google 2 minutes ago")
     }
 
     @Test
     fun staleSubtitleStillShowsTheAge() {
         show { WeekView(state(sync(agoMinutes = 45))) }
-        compose.onNodeWithText("Out of date — updated from Google 45 minutes ago").assertExists()
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("This week · Wed 23 – Tue 29 Sep · out of date — updated from Google 45 minutes ago")
+    }
+
+    /** 9 §3.2. */
+    @Test
+    fun theTitleIsTheMonthWithTheYearMuted() {
+        var mute = Color.Unspecified
+        show {
+            mute = Culvery.colors.mute
+            WeekView(state())
+        }
+        val title = compose.onNodeWithTag("week_title")
+        title.assertContentDescriptionEquals("September 2026")
+        title.assert(isHeading())
+        compose.onNodeWithText("September", useUnmergedTree = true).assertExists()
+        val year = compose.onNodeWithText("2026", useUnmergedTree = true).textLayout().layoutInput.style.color
+        assertThat(year).isEqualTo(mute)
+    }
+
+    @Test
+    fun aWeekAcrossTwoMonthsLabelsTheFirst() {
+        show { WeekView(WeekViewState(SampleUi.weekAhead(1), SampleUi.TODAY, sync(), now, weeksAhead = 1)) }
+        compose.onNodeWithTag("week_title").assertContentDescriptionEquals("September to October 2026")
+        val labels = compose.onAllNodesWithTag("week_month_label", useUnmergedTree = true)
+        labels.assertCountEquals(1)
+        labels[0].assertTextEquals("Oct")
+        val label = labels[0].fetchSemanticsNode().boundsInRoot
+        val first = compose.onNodeWithTag("week_day_2026-10-01").fetchSemanticsNode().boundsInRoot
+        assertThat(label.left).isAtLeast(first.left)
+        assertThat(label.right).isAtMost(first.right)
+    }
+
+    @Test
+    fun aWeekWithinOneMonthHasNoMonthLabel() {
+        show { WeekView(state()) }
+        compose.onAllNodesWithTag("week_month_label", useUnmergedTree = true).assertCountEquals(0)
     }
 
     @Test
     fun aStaleWeekShowsTheIconAndTheWordsAsWellAsTheColour() {
         show { WeekView(state(sync(agoMinutes = 45, connections = listOf("Google Calendar")))) }
-        compose.onNodeWithTag("week_subtitle").assertTextEquals("Out of date — updated from Google Calendar 45 minutes ago")
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("This week · Wed 23 – Tue 29 Sep · out of date — updated from Google Calendar 45 minutes ago")
         compose.onNodeWithTag("week_out_of_date", useUnmergedTree = true).assertExists()
     }
 
     @Test
     fun aFreshWeekHasNoIcon() {
         show { WeekView(state(sync(agoMinutes = 2, connections = listOf("Google Calendar")))) }
-        compose.onNodeWithTag("week_subtitle").assertTextEquals("Updated from Google Calendar 2 minutes ago")
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("This week · Wed 23 – Tue 29 Sep · updated from Google Calendar 2 minutes ago")
         compose.onNodeWithTag("week_out_of_date", useUnmergedTree = true).assertDoesNotExist()
     }
 
@@ -126,8 +163,15 @@ class WeekViewTest {
         show { WeekView(state(sync(agoMinutes = 45, connections = listOf("Google Calendar"))), onUpdateNow = { asked++ }) }
         compose.onNodeWithTag("week_update_now").assert(isButton).performClick()
         assertThat(asked).isEqualTo(1)
-        compose.onNodeWithTag("week_subtitle").assertTextEquals("Updating…")
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("This week · Wed 23 – Tue 29 Sep · Updating…")
         compose.onNodeWithTag("week_update_now").assertDoesNotExist()
+    }
+
+    @Test
+    fun updatingReplacesOnlyTheSyncPart() {
+        show { WeekView(state(sync(agoMinutes = 45)), onUpdateNow = {}) }
+        compose.onNodeWithTag("week_update_now").performClick()
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("This week · Wed 23 – Tue 29 Sep · Updating…")
     }
 
     @Test
@@ -143,7 +187,7 @@ class WeekViewTest {
         show { WeekView(state(sync(agoMinutes = 45, connections = listOf("Google Calendar"))), onUpdateNow = {}) }
         compose.onNodeWithTag("week_update_now").performClick()
         compose.mainClock.advanceTimeBy(UPDATING_SHOWN_MS + 100)
-        compose.onNodeWithTag("week_subtitle").assertTextEquals("Out of date — updated from Google Calendar 45 minutes ago")
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("This week · Wed 23 – Tue 29 Sep · out of date — updated from Google Calendar 45 minutes ago")
         compose.onNodeWithTag("week_update_now").assertExists()
     }
 
@@ -519,14 +563,14 @@ class WeekViewTest {
         compose.onNodeWithTag("week_earlier").assertIsNotEnabled()
         compose.onNodeWithTag("week_this_week").assertDoesNotExist()
         compose.onNodeWithTag("week_later").performClick()
-        compose.onNodeWithText("Next week").assertExists()
+        compose.onNodeWithTag("week_subtitle").assert(hasText("Next week", substring = true))
         repeat(MAX_WEEKS_AHEAD) { compose.onNodeWithTag("week_later").performClick() }
-        compose.onNodeWithText("In 3 weeks").assertExists()
+        compose.onNodeWithTag("week_subtitle").assert(hasText("In 3 weeks", substring = true))
         compose.onNodeWithTag("week_later").assertIsNotEnabled()
         compose.onNodeWithTag("week_earlier").assertIsEnabled()
         compose.onNodeWithTag("week_this_week").performClick()
         assertThat(asked).containsExactly(1, 2, 3, 0).inOrder()
-        compose.onNodeWithText("This week").assertExists()
+        compose.onNodeWithTag("week_subtitle").assert(hasText("This week", substring = true))
         compose.onNodeWithTag("week_this_week").assertDoesNotExist()
     }
 
@@ -656,14 +700,14 @@ class WeekViewTest {
         show { WeekView(state()) }
         compose.onNodeWithContentDescription("Today, Wednesday 23 September").assert(isHeading()).onChildren().assertCountEquals(0)
         compose.onNodeWithContentDescription("Thursday 24 September").assert(isHeading())
-        compose.onNodeWithText("This week").assert(isHeading())
+        compose.onNodeWithTag("week_title").assert(isHeading()).assertContentDescriptionEquals("September 2026")
     }
 
     /** 5 §A.3: the reason in the week's line, with Update now still beside it. */
     @Test
     fun aFailedUpdateSaysWhyAndKeepsUpdateNow() {
         show { WeekView(state(sync(agoMinutes = 45, connections = listOf("Google Calendar")).copy(problem = SyncProblem.Offline))) }
-        compose.onNodeWithTag("week_subtitle").assertTextEquals("The tablet is offline. Check the Wi-Fi, then Update now.")
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("This week · Wed 23 – Tue 29 Sep · The tablet is offline. Check the Wi-Fi, then Update now.")
         compose.onNodeWithTag("week_update_now").assertExists()
         compose.onNodeWithTag("week_out_of_date", useUnmergedTree = true).assertExists()
     }
@@ -672,7 +716,7 @@ class WeekViewTest {
     @Test
     fun aFreshWeekWithAProblemStillSaysWhyAndOffersUpdateNow() {
         show { WeekView(state(sync(agoMinutes = 2, connections = listOf("Google Calendar")).copy(problem = SyncProblem.NoAnswer("Google Calendar")))) }
-        compose.onNodeWithTag("week_subtitle").assertTextEquals("Google Calendar didn’t answer. Try Update now in a few minutes.")
+        compose.onNodeWithTag("week_subtitle").assertTextEquals("This week · Wed 23 – Tue 29 Sep · Google Calendar didn’t answer. Try Update now in a few minutes.")
         compose.onNodeWithTag("week_update_now").assertExists()
     }
 }

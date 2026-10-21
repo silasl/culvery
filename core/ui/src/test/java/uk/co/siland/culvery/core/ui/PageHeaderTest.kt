@@ -54,6 +54,28 @@ class PageHeaderTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** Pin: a String title is still one heading in the 45 sp bold title style, tagged by its caller. */
+    @Test
+    fun theStringTitleIsUnchanged() {
+        show { Header(subtitleText) }
+        compose.onNodeWithTag("title").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        val style = compose.onNodeWithTag("title").textLayout().layoutInput.style
+        assertThat(style.fontSize).isEqualTo(45.sp)
+        assertThat(style.fontWeight).isEqualTo(FontWeight.W700)
+        assertThat(style.letterSpacing).isEqualTo((-0.7).sp)
+        compose.onNodeWithText("Lights").assertExists()
+    }
+
+    @Test
+    fun aComposableTitleSitsWhereTheStringOneDoes() {
+        show { HhPageHeader({ Box(Modifier.testTag("slot").width(100.dp).height(50.dp)) }, subtitleText, Modifier.testTag("header")) }
+        val header = compose.onNodeWithTag("header").getUnclippedBoundsInRoot()
+        val slot = compose.onNodeWithTag("slot").getUnclippedBoundsInRoot()
+        val subtitle = compose.onNodeWithText(subtitleText).getUnclippedBoundsInRoot()
+        assertThat(slot.top.value).isWithin(0.5f).of(header.top.value)
+        assertThat(subtitle.top.value - slot.bottom.value).isWithin(0.5f).of(4f)
+    }
+
     @Test
     fun aSubtitleAddsItsLineAndGap() {
         var subtitle by mutableStateOf<String?>(null)

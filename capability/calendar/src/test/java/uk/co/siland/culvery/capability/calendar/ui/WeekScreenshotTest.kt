@@ -104,6 +104,9 @@ class WeekScreenshotTest {
     @Test fun weekSyncingDark() = snap("week_syncing_dark", true, fresh, SampleUi.weekWithSyncing)
     @Test fun weekNextLight() = snap("week_next_light", false, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
     @Test fun weekNextDark() = snap("week_next_dark", true, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
+    /** Wed 30 Sep to Tue 6 Oct: "September – October 2026" and "Oct" over Thu 1 Oct. */
+    @Test fun weekTwoMonthsDark() = snap("week_two_months_dark", true, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
+    @Test fun weekTwoMonthsLight() = snap("week_two_months_light", false, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
     @Test fun weekFurthestLight() = snap("week_furthest_light", false, fresh, SampleUi.weekAhead(3), canAdd = true, weeksAhead = 3)
     @Test fun weekFurthestDark() = snap("week_furthest_dark", true, fresh, SampleUi.weekAhead(3), canAdd = true, weeksAhead = 3)
 }

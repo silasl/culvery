@@ -27,8 +27,12 @@ internal object CalendarType {
     /** 23 sp / 700: a week column's date number. */
     val weekDate = HhType.dateNumber.copy(fontSize = 23.sp)
 
-    /** 34 sp / 700, −0.5 tracking: "This week". */
-    val weekTitle = HhType.screenTitle.copy(letterSpacing = (-0.5).sp)
+    /** 45 sp / 700, −1 tracking: the week's month; its year is 400 and muted, [monthYearGap] after it (9 §3.2). */
+    val monthTitle = HhType.screenTitle.copy(fontSize = 45.sp, fontWeight = FontWeight.W700, letterSpacing = (-1).sp)
+    val monthTitleYear = monthTitle.copy(fontWeight = FontWeight.W400, letterSpacing = 0.sp)
+
+    /** 11 sp / 700: "Oct" over the 1st's date. */
+    val monthLabel = HhType.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.W700)
 
     /** 15 sp / 400: the week-view subtitle. */
     val subtitle = HhType.secondary.copy(fontSize = 15.sp)
@@ -37,7 +41,7 @@ internal object CalendarType {
     val pill = strong14
 
     /** 34 sp / 700, −0.5 tracking: the detail sheet's title. */
-    val sheetTitle = weekTitle
+    val sheetTitle = HhType.screenTitle.copy(letterSpacing = (-0.5).sp)
 
     /** 15 sp / 400: info-row labels. */
     val infoLabel = subtitle
@@ -188,6 +192,8 @@ internal object CalendarDimens {
 
     // Week columns: header inset 4 at the sides and bottom; chip title 2 below the time; badge 15.
     val columnHeaderInset = 4.dp
+    val monthYearGap = 12.dp
+    val monthLabelOverlap = 3.dp
     val columnGap = 8.dp
     val chipTitleTop = 2.dp
     val chipBadge = 15.dp

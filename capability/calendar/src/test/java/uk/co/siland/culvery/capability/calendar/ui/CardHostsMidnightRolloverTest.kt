@@ -4,6 +4,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -221,6 +223,6 @@ class CardHostsMidnightRolloverTest {
         compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodesWithTag("week_day_2026-10-06").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("week_day_2026-09-30").assertExists()
         compose.onNodeWithTag("week_day_2026-09-29").assertDoesNotExist()
-        compose.onNodeWithText("Next week").assertExists()
+        compose.onNodeWithTag("week_subtitle").assert(hasText("Next week · Wed 30 Sep – Tue 6 Oct", substring = true))
     }
 }

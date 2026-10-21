@@ -298,7 +298,7 @@ class WeekLaneTest {
         val headers = (0..6).map { at(dayHeading(day(it), if (it == 0) "Today" else null)) }
         val bars = listOf("Half term, Family", "School trip, Mia", "Gran visiting, Sam").map(::at)
         val chips = (0..6).map { at("${chipTitle(it)}, Alex") }
-        assertThat(at("This week")).isLessThan(bars.min())
+        assertThat(at("October 2026")).isLessThan(bars.min())
         assertThat(bars.max()).isLessThan(headers.min())
         (0..6).forEach { assertThat(headers[it]).isLessThan(chips[it]) }
         compose.assertClickablesHaveRoleAndLabel()

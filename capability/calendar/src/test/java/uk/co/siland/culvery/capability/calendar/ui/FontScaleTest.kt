@@ -157,7 +157,7 @@ class FontScaleTest {
                 }
             }
         }
-        assertThat(compose.onNodeWithText("In 3 weeks", useUnmergedTree = true).textLayout().lineCount).isEqualTo(1)
+        assertThat(compose.onNodeWithText("October", useUnmergedTree = true).textLayout().lineCount).isEqualTo(1)
         val thisWeek = compose.onNode(hasText("This week") and hasAnyAncestor(hasTestTag("week_this_week")), useUnmergedTree = true).textLayout()
         assertThat(thisWeek.isLineEllipsized(0)).isFalse()
     }

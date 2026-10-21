@@ -20,6 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -27,8 +30,10 @@ import java.time.LocalDate
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
 import uk.co.siland.culvery.capability.calendar.isStaleAt
+import uk.co.siland.culvery.capability.calendar.monthTitle
 import uk.co.siland.culvery.capability.calendar.weekLine
-import uk.co.siland.culvery.capability.calendar.weekTitle
+import uk.co.siland.culvery.capability.calendar.weekSubtitleLine
+import uk.co.siland.culvery.capability.calendar.MonthTitle
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
@@ -61,10 +66,10 @@ internal fun WeekHeader(
     }
     // A failed pass shows as soon as it happens, not only once the week is out of date (5 §A.3).
     val failing = state.sync.isStaleAt(state.nowMillis) || state.sync.problem != null
+    val sync = if (updating) UPDATING else weekLine(state.sync, state.nowMillis)
     HhPageHeader(
-        weekTitle(state.weeksAhead),
+        title = { MonthTitleText(monthTitle(state.week.start)) },
         subtitle = null,
-        titleModifier = Modifier.testTag("week_title").semantics { liveRegion = LiveRegionMode.Polite },
         under = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -75,7 +80,7 @@ internal fun WeekHeader(
                     HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.staleIcon, tint = c.danger, modifier = Modifier.testTag("week_out_of_date"))
                 }
                 Text(
-                    if (updating) UPDATING else weekLine(state.sync, state.nowMillis),
+                    weekSubtitleLine(state.weeksAhead, state.week.start, sync),
                     style = CalendarType.subtitle,
                     color = if (failing && !updating) c.danger else c.mute,
                     maxLines = 3,
@@ -112,6 +117,22 @@ internal fun WeekHeader(
                 tone = ButtonTone.Primary, icon = Icons.ADD, on = ButtonSurface.Bg,
             )
         }
+    }
+}
+
+/** "September" bold and "2026" muted after it, read as one heading: "September 2026" (9 §3.2). */
+@Composable
+private fun MonthTitleText(title: MonthTitle) {
+    Row(
+        Modifier.testTag("week_title").clearAndSetSemantics {
+            heading()
+            contentDescription = title.spoken
+            liveRegion = LiveRegionMode.Polite
+        },
+        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.monthYearGap),
+    ) {
+        Text(title.months, style = CalendarType.monthTitle, color = Culvery.colors.ink, modifier = Modifier.alignByBaseline())
+        Text(title.year, style = CalendarType.monthTitleYear, color = Culvery.colors.mute, modifier = Modifier.alignByBaseline())
     }
 }
 

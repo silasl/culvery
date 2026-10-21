@@ -73,6 +73,7 @@ import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
+import uk.co.siland.culvery.capability.calendar.MONTH_SHORT
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WeekUi
@@ -145,6 +146,7 @@ private fun WeekColumns(state: WeekViewState, onOpen: (EventRef) -> Unit, onAdd:
                     DayColumn(
                         day,
                         isToday = day.date == state.today,
+                        monthLabel = day.date.takeIf { it.dayOfMonth == 1 && it != state.week.start }?.format(MONTH_SHORT),
                         laneHeight = laneHeight,
                         onOpen = onOpen,
                         onAdd = onAdd?.let { add -> { add(day.date) } },
@@ -177,9 +179,12 @@ private fun WeekColumns(state: WeekViewState, onOpen: (EventRef) -> Unit, onAdd:
     }
 }
 
-/** A column's day and date: one heading for TalkBack, which adds from it with [onAdd]. */
+/**
+ * A column's day and date: one heading for TalkBack, which adds from it with [onAdd]. A [monthLabel] ("Oct", on the 1st
+ * of a new month) sits just over the date without taking height, so every column's chips still start level (9 §3.2).
+ */
 @Composable
-private fun DayHeader(date: LocalDate, isToday: Boolean, onAdd: (() -> Unit)?) {
+private fun DayHeader(date: LocalDate, isToday: Boolean, onAdd: (() -> Unit)?, monthLabel: String? = null) {
     val c = Culvery.colors
     val inset = CalendarDimens.columnHeaderInset
     Row(
@@ -199,13 +204,28 @@ private fun DayHeader(date: LocalDate, isToday: Boolean, onAdd: (() -> Unit)?) {
             modifier = Modifier.alignByBaseline(),
         )
         Spacer(Modifier.width(CalendarDimens.weekDayDateGap))
+        if (monthLabel != null) {
+            Text(
+                monthLabel,
+                style = CalendarType.monthLabel,
+                color = c.accent,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier
+                    .layout { measurable, constraints ->
+                        val label = measurable.measure(constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity))
+                        layout(0, 0) { label.place(0, -label.height + CalendarDimens.monthLabelOverlap.roundToPx()) }
+                    }
+                    .testTag("week_month_label"),
+            )
+        }
         Text(date.dayOfMonth.toString(), style = CalendarType.weekDate, color = c.ink, modifier = Modifier.alignByBaseline())
     }
 }
 
 /** [laneHeight]: how far the lane over the columns reaches into this one; its chips start a gap below that. */
 @Composable
-private fun DayColumn(day: DayUi, isToday: Boolean, laneHeight: Dp, onOpen: (EventRef) -> Unit, onAdd: (() -> Unit)?, modifier: Modifier) {
+private fun DayColumn(day: DayUi, isToday: Boolean, monthLabel: String?, laneHeight: Dp, onOpen: (EventRef) -> Unit, onAdd: (() -> Unit)?, modifier: Modifier) {
     val c = Culvery.colors
     val chips = rememberLazyListState()
     val currentOnAdd = rememberUpdatedState(onAdd)
@@ -221,7 +241,7 @@ private fun DayColumn(day: DayUi, isToday: Boolean, laneHeight: Dp, onOpen: (Eve
             bottom = CalendarDimens.weekColumnPaddingSide,
         ),
     ) {
-        DayHeader(day.date, isToday, onAdd)
+        DayHeader(day.date, isToday, onAdd, monthLabel)
         Spacer(Modifier.height(CalendarDimens.columnGap))
         var pressed by remember { mutableStateOf(false) }
         val band = if (laneHeight > 0.dp) laneHeight + CalendarDimens.columnGap else 0.dp
