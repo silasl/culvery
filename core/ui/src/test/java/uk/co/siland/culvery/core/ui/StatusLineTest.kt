@@ -45,7 +45,8 @@ class StatusLineTest {
         assertThat(text.textLayout().layoutInput.style.fontSize).isEqualTo(14.sp)
         val iconNode = compose.onNodeWithTag("x_icon", useUnmergedTree = true)
         val icon = iconNode.getUnclippedBoundsInRoot()
-        assertThat(icon.right).isAtMost(text.getUnclippedBoundsInRoot().left)
+        assertThat(icon.width.value).isWithin(0.5f).of(17f)
+        assertThat((text.getUnclippedBoundsInRoot().left - icon.right).value).isWithin(0.5f).of(5f)
         // The filled glyph's disc is solid `danger` a quarter in from its left; the outline's is empty there.
         assertThat(pixelAt(iconNode, icon.width / 4, icon.height / 2)).isEqualTo(DarkColors.danger.toArgb())
         compose.assertClickablesHaveRoleAndLabel()

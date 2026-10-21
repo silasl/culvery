@@ -5,9 +5,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.down
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.moveTo
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -79,6 +81,26 @@ class RoundButtonHoldTest {
         compose.mainClock.advanceTimeBy(16)
         compose.mainClock.advanceTimeBy(500)
         assertThat(steps).isEqualTo(2)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aHoldThatIsCancelledDoesNotSwallowTheNextTap() {
+        show()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("more").performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(616)
+        assertThat(steps).isEqualTo(2)
+        compose.onNodeWithTag("more").performTouchInput {
+            moveTo(Offset(-200f, -200f))
+            up()
+        }
+        compose.mainClock.advanceTimeBy(400)
+        assertThat(steps).isEqualTo(2)
+        compose.mainClock.autoAdvance = true
+        compose.onNodeWithTag("more").performClick()
+        compose.waitForIdle()
+        assertThat(steps).isEqualTo(3)
         compose.assertClickablesHaveRoleAndLabel()
     }
 }

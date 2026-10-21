@@ -1,10 +1,11 @@
 package uk.co.siland.culvery.core.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -217,9 +218,10 @@ private fun Modifier.heldClickable(onClick: () -> Unit, enabled: Boolean): Modif
     val pressed by source.collectIsPressedAsState()
     val step by rememberUpdatedState(onClick)
     val fired = remember { BooleanArray(1) }
-    LaunchedEffect(pressed, enabled) {
-        if (!pressed || !enabled) return@LaunchedEffect
-        fired[0] = false
+    // A hold that ended in a cancel must not swallow the next tap.
+    LaunchedEffect(source) { source.interactions.collect { if (it is PressInteraction.Press) fired[0] = false } }
+    LaunchedEffect(pressed) {
+        if (!pressed) return@LaunchedEffect
         delay(ButtonTokens.HOLD_DELAY_MILLIS)
         fired[0] = true
         while (true) {

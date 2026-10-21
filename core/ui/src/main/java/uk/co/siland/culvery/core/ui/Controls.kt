@@ -52,12 +52,12 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.TextStyle
@@ -319,7 +319,7 @@ fun HhMessageLine(
 
 /**
  * The one line saying what is wrong and how to fix it, in `danger` with an [icon]; TalkBack hears it appear. Under a field
- * it takes [Icons.ERROR] (drawn filled) and [ControlType.fieldError]; [spoken] false hides it from TalkBack and makes it
+ * it takes [ControlType.fieldError], which sizes the icon 17 dp and its gap 5 dp (else 20 and 8), and [Icons.ERROR], drawn filled; [spoken] false hides it from TalkBack and makes it
  * not live, for a field that already carries its error.
  */
 @Composable
@@ -331,7 +331,7 @@ fun HhStatusLine(
     spoken: Boolean = true,
 ) {
     val c = Culvery.colors
-    val field = icon == Icons.ERROR
+    val field = style == ControlType.fieldError
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (field) ControlTokens.fieldErrorGap else ControlTokens.statusGap),
@@ -342,7 +342,7 @@ fun HhStatusLine(
         HhIcon(
             icon,
             size = if (field) ControlTokens.fieldErrorIcon else ControlTokens.statusIcon,
-            filled = field,
+            filled = icon == Icons.ERROR,
             tint = c.danger,
             modifier = Modifier.testTag("${tag}_icon"),
         )
