@@ -24,7 +24,6 @@ import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
-import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 
 /** Handoff §1 as the shell shows the editor: full screen on the 1280 × 800 canvas, at 11:54 on Wednesday 23 September. */
@@ -46,28 +45,10 @@ class AddEventScreenshotTest {
     ) {
         val flow = editorFlow(form, child?.id, start)
         compose.setContent {
-            CulveryTheme(dark = dark) {
-                EventEditorScreen(
-                    form = form,
-                    flow = flow,
-                    members = SampleUi.members,
-                    context = "From Calendar · ${child?.name ?: "Alex"} signed in",
-                    savesTo = savesTo,
-                    service = "Google Calendar",
-                    busy = false,
-                    failure = null,
-                    picker = EditorPicker.None,
-                    childOnly = child?.id,
-                    childName = child?.name,
-                    held = held,
-                    onClose = {},
-                    onSave = {},
-                    onDelete = {},
-                    onRefusedWho = {},
-                    onPicker = {},
-                    keyboard = WindowInsets(bottom = keyboard),
-                )
-            }
+            ShowEditor(
+                form, flow, held = held, dark = dark, context = "From Calendar · ${child?.name ?: "Alex"} signed in", savesTo = savesTo,
+                childOnly = child?.id, childName = child?.name, keyboard = WindowInsets(bottom = keyboard),
+            )
         }
     }
 

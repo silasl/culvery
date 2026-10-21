@@ -2,7 +2,6 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
@@ -49,10 +48,8 @@ import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.core.household.PersonId
-import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.Icons
-import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.pixelAt
@@ -85,32 +82,15 @@ class EventEditorScreenTest {
     ) {
         use(editor, start, child)
         compose.setContent {
-            CulveryTheme(dark = true) {
-                WithFontScale(scale) {
-                    key(form, flow) {
-                        EventEditorScreen(
-                            form = form,
-                            flow = flow,
-                            members = SampleUi.members,
-                            context = "From Calendar · Alex signed in",
-                            savesTo = savesTo,
-                            service = "Google Calendar",
-                            busy = false,
-                            failure = failure,
-                            picker = EditorPicker.None,
-                            childOnly = childOnly,
-                            childName = childOnly?.let { id -> SampleUi.household.first { it.id == id }.name },
-                            held = null,
-                            onClose = { calls += "close" },
-                            onSave = { calls += "save" },
-                            onDelete = { calls += "delete" },
-                            onRefusedWho = { calls += "refused" },
-                            onPicker = { calls += "picker:$it" },
-                            keyboard = WindowInsets(bottom = keyboard),
-                        )
-                    }
-                }
-            }
+            ShowEditor(
+                form, flow, scale = scale, savesTo = savesTo, failure = failure, childOnly = childOnly,
+                keyboard = WindowInsets(bottom = keyboard),
+                onClose = { calls += "close" },
+                onSave = { calls += "save" },
+                onDelete = { calls += "delete" },
+                onRefusedWho = { calls += "refused" },
+                onPicker = { calls += "picker:$it" },
+            )
         }
     }
 

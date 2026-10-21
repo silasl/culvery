@@ -1,7 +1,9 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
@@ -183,17 +185,12 @@ class FontScaleTest {
             preselectedDay = SampleUi.TODAY, order = people.map { it.id }, calendarPerson = null,
         )
         form.toggleWho(max.id)
+        val flow = editorFlow(form, null, null)
         compose.setContent {
-            CulveryTheme(dark = false) {
-                WithFontScale(1.5f) {
-                    EventEditorScreen(
-                        form = form, flow = editorFlow(form, null, null), members = SampleUi.members + Member(max, Role.ADULT, hasPin = true),
-                        context = "From Calendar", savesTo = "Family calendar", service = "Google Calendar", busy = false, failure = null,
-                        picker = EditorPicker.None, childOnly = null, childName = null, held = null,
-                        onClose = {}, onSave = {}, onDelete = {}, onRefusedWho = {}, onPicker = {},
-                    )
-                }
-            }
+            ShowEditor(
+                form, flow, scale = 1.5f, dark = false, members = SampleUi.members + Member(max, Role.ADULT, hasPin = true),
+                context = "From Calendar", keyboard = WindowInsets.ime,
+            )
         }
         val who = compose.onNodeWithTag("editor_row_who_value", useUnmergedTree = true).textLayout()
         assertThat(who.lineCount).isEqualTo(1)

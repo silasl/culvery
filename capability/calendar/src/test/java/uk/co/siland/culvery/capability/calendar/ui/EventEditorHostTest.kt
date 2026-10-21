@@ -91,6 +91,7 @@ import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.isButton
 
 /**
  * The full-screen editor wired to a real repository, editor and access rules, as EventDetailHostTest wires the detail
@@ -272,7 +273,7 @@ class EventEditorHostTest {
         showOverlay { showDetail(dinner, day, repo, editor, weekFocus, EditorFrom.Calendar) }
         waitForText("Created by")
         compose.onNodeWithTag("detail_for")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Button))
+            .assert(isButton)
         compose.assertClickablesHaveRoleAndLabel()
         compose.onNodeWithTag("detail_for").performClick()
         waitForText("Change event")

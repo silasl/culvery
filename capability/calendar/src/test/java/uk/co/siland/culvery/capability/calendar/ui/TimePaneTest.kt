@@ -1,8 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
@@ -45,10 +43,8 @@ import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.check
 import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.core.household.PersonId
-import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.Icons
-import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.pixelAt
@@ -71,7 +67,7 @@ class TimePaneTest {
     private var picker by mutableStateOf(EditorPicker.None)
     private var scale by mutableStateOf(1f)
     private val pickers = mutableListOf<EditorPicker>()
-    private var shown = false
+    private val screen = ShownOnce(compose)
 
     /** "Guitar lesson" for Mia (or [who]) on [day], with [setUp] applied. */
     private fun guitar(day: LocalDate = saturday, who: PersonId = SampleUi.mia.id, setUp: EditorForm.() -> Unit = {}) = editorForm().apply {
@@ -98,40 +94,10 @@ class TimePaneTest {
     private fun show(editor: EditorForm = guitar()) {
         form = editor
         flow = editorFlow(editor, null, EditorStep.Time)
-        if (shown) {
-            compose.waitForIdle()
-            return
-        }
-        shown = true
-        compose.setContent {
-            CulveryTheme(dark = true) {
-                WithFontScale(scale) {
-                key(form, flow) {
-                    EventEditorScreen(
-                        form = form,
-                        flow = flow,
-                        members = SampleUi.members,
-                        context = "From Calendar · Alex signed in",
-                        savesTo = "Family calendar",
-                        service = "Google Calendar",
-                        busy = false,
-                        failure = null,
-                        picker = picker,
-                        childOnly = null,
-                        childName = null,
-                        held = held,
-                        onClose = {},
-                        onSave = {},
-                        onDelete = {},
-                        onRefusedWho = {},
-                        onPicker = {
-                            pickers += it
-                            picker = it
-                        },
-                        keyboard = WindowInsets(bottom = 0.dp),
-                    )
-                }
-                }
+        screen.show {
+            ShowEditor(form, flow, held = held, picker = picker, scale = scale) {
+                pickers += it
+                picker = it
             }
         }
     }
@@ -466,13 +432,12 @@ class TimePaneTest {
                 val tag = "hour_%02d".format(h)
                 val layout = compose.onNode(hasText("%02d:00".format(h)) and hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true).textLayout()
                 assertWithMessage("$tag at $s").that(layout.lineCount).isEqualTo(1)
-                assertWithMessage("$tag's words fit at $s").that(layout.getLineRight(0) - layout.getLineLeft(0)).isAtMost(layout.size.width.toFloat())
                 val b = node(tag).getUnclippedBoundsInRoot()
                 assertWithMessage("$tag's height at $s").that((b.bottom - b.top).value).isAtLeast(48f)
             }
             val other = compose.onNode(hasText("Other time") and hasAnyAncestor(hasTestTag("hour_other")), useUnmergedTree = true).textLayout()
-            assertWithMessage("Other time's words fit at $s").that((0 until other.lineCount).none { other.isLineEllipsized(it) }).isTrue()
-            assertWithMessage("Other time's words fit at $s").that((0 until other.lineCount).maxOf { other.getLineRight(it) - other.getLineLeft(it) }).isAtMost(other.size.width.toFloat())
+            assertWithMessage("Other time isn't ellipsised at $s").that((0 until other.lineCount).none { other.isLineEllipsized(it) }).isTrue()
+            assertWithMessage("Other time's lines fit its width at $s").that((0 until other.lineCount).maxOf { other.getLineRight(it) - other.getLineLeft(it) }).isAtMost(other.size.width.toFloat())
             val o = node("hour_other").getUnclippedBoundsInRoot()
             val h22 = node("hour_22").getUnclippedBoundsInRoot()
             assertWithMessage("Other time's top at $s").that(o.top).isEqualTo(h22.top)

@@ -1,5 +1,10 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
+import androidx.compose.ui.unit.dp
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -9,7 +14,11 @@ import uk.co.siland.culvery.capability.calendar.EditableEvent
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.Held
+import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.WithFontScale
 
 val LONDON: ZoneId = ZoneId.of("Europe/London")
 
@@ -48,3 +57,71 @@ fun editorDinnerOf(length: Duration): EditorForm {
 
 /** Grandma's visit over [LOCKED_START] to [LOCKED_END] in the full-screen editor: its dates can't change here. */
 fun editorLockedVisit() = editorEditOf(LOCKED_START, LOCKED_END, "Grandma visiting", "family")
+
+/**
+ * The full-screen editor as the tests draw it: [form] on [flow] for the sample household, saving to the Family calendar,
+ * in the dark theme with no keyboard, and nothing failing; a new [form] or [flow] is a new editor.
+ */
+@Composable
+fun ShowEditor(
+    form: EditorForm,
+    flow: EditorFlow,
+    held: Held? = null,
+    picker: EditorPicker = EditorPicker.None,
+    scale: Float = 1f,
+    dark: Boolean = true,
+    members: List<Member> = SampleUi.members,
+    context: String = "From Calendar · Alex signed in",
+    savesTo: String? = "Family calendar",
+    busy: Boolean = false,
+    failure: SaveFailure? = null,
+    childOnly: PersonId? = null,
+    childName: String? = childOnly?.let { id -> SampleUi.household.first { it.id == id }.name },
+    keyboard: WindowInsets = WindowInsets(bottom = 0.dp),
+    onClose: () -> Unit = {},
+    onSave: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    onRefusedWho: () -> Unit = {},
+    onPicker: (EditorPicker) -> Unit = {},
+) {
+    CulveryTheme(dark = dark) {
+        WithFontScale(scale) {
+            key(form, flow) {
+                EventEditorScreen(
+                    form = form,
+                    flow = flow,
+                    members = members,
+                    context = context,
+                    savesTo = savesTo,
+                    service = "Google Calendar",
+                    busy = busy,
+                    failure = failure,
+                    picker = picker,
+                    childOnly = childOnly,
+                    childName = childName,
+                    held = held,
+                    onClose = onClose,
+                    onSave = onSave,
+                    onDelete = onDelete,
+                    onRefusedWho = onRefusedWho,
+                    onPicker = onPicker,
+                    keyboard = keyboard,
+                )
+            }
+        }
+    }
+}
+
+/** Sets the content the first time; after that the content is on screen, reading state the test has swapped, so it waits. */
+class ShownOnce(private val compose: ComposeContentTestRule) {
+    private var shown = false
+
+    fun show(content: @Composable () -> Unit) {
+        if (shown) {
+            compose.waitForIdle()
+        } else {
+            shown = true
+            compose.setContent(content)
+        }
+    }
+}

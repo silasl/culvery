@@ -1,8 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
@@ -34,7 +32,6 @@ import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.core.household.FAMILY_COLOR
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
-import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
@@ -61,30 +58,7 @@ class WhoPaneTest {
         form = editor
         flow = editorFlow(editor, child, EditorStep.Who)
         compose.setContent {
-            CulveryTheme(dark = true) {
-                key(form) {
-                    EventEditorScreen(
-                        form = form,
-                        flow = flow,
-                        members = SampleUi.members,
-                        context = "From Calendar · Alex signed in",
-                        savesTo = "Family calendar",
-                        service = "Google Calendar",
-                        busy = busy,
-                        failure = null,
-                        picker = EditorPicker.None,
-                        childOnly = child,
-                        childName = child?.let { id -> SampleUi.household.first { it.id == id }.name },
-                        held = null,
-                        onClose = {},
-                        onSave = {},
-                        onDelete = {},
-                        onRefusedWho = { refusals += Unit },
-                        onPicker = {},
-                        keyboard = WindowInsets(bottom = 0.dp),
-                    )
-                }
-            }
+            ShowEditor(form, flow, busy = busy, childOnly = child, onRefusedWho = { refusals += Unit })
         }
     }
 

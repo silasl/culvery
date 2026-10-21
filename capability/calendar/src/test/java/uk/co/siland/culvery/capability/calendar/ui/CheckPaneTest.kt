@@ -1,9 +1,7 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import android.graphics.Color as AndroidColor
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
@@ -36,10 +34,8 @@ import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.HeldEvent
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.lastShownDay
-import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.HhAlpha
-import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.pixelAt
@@ -55,8 +51,9 @@ class CheckPaneTest {
     private val c = DarkColors
     private var scale by mutableStateOf(1f)
     private var form by mutableStateOf(guitar())
+    private var flow by mutableStateOf(editorFlow(form, null, EditorStep.Check))
     private var held by mutableStateOf<Held?>(null)
-    private var shown = false
+    private val screen = ShownOnce(compose)
 
     /** Guitar lesson for Mia, weekly from Sat 26 Sep, 10:00–10:45, 12 times. */
     private fun guitar() = editorForm().apply {
@@ -81,38 +78,9 @@ class CheckPaneTest {
 
     private fun show(editor: EditorForm = guitar()) {
         form = editor
-        if (shown) {
-            compose.waitForIdle()
-            return
-        }
-        shown = true
-        compose.setContent {
-            CulveryTheme(dark = true) {
-                WithFontScale(scale) {
-                    key(form) {
-                        EventEditorScreen(
-                            form = form,
-                            flow = editorFlow(form, null, EditorStep.Check),
-                            members = SampleUi.members,
-                            context = "From Calendar · Alex signed in",
-                            savesTo = "Family calendar",
-                            service = "Google Calendar",
-                            busy = false,
-                            failure = null,
-                            picker = EditorPicker.None,
-                            childOnly = null,
-                            childName = null,
-                            held = held,
-                            onClose = {},
-                            onSave = {},
-                            onDelete = {},
-                            onRefusedWho = {},
-                            onPicker = {},
-                            keyboard = WindowInsets(bottom = 0.dp),
-                        )
-                    }
-                }
-            }
+        flow = editorFlow(editor, null, EditorStep.Check)
+        screen.show {
+            ShowEditor(form, flow, held = held, scale = scale)
         }
     }
 

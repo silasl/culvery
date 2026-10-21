@@ -1,8 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
@@ -37,10 +35,8 @@ import uk.co.siland.culvery.capability.calendar.HeldEvent
 import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.UNTIL_TOO_LATE
 import uk.co.siland.culvery.core.household.PersonId
-import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.HhAlpha
-import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.pixelAt
@@ -59,44 +55,14 @@ class DayPaneTest {
     private var flow by mutableStateOf(editorFlow(form, null, EditorStep.Day))
     private var held by mutableStateOf<Held?>(null)
     private var scale by mutableStateOf(1f)
-    private var shown = false
+    private val screen = ShownOnce(compose)
 
     /** Puts [editor] on screen opened on Day, in place of the one showing. */
     private fun show(editor: EditorForm = editorForm()) {
         form = editor
         flow = editorFlow(editor, null, EditorStep.Day)
-        if (shown) {
-            compose.waitForIdle()
-            return
-        }
-        shown = true
-        compose.setContent {
-            CulveryTheme(dark = true) {
-                WithFontScale(scale) {
-                    key(form, flow) {
-                        EventEditorScreen(
-                            form = form,
-                            flow = flow,
-                            members = SampleUi.members,
-                            context = "From Calendar · Alex signed in",
-                            savesTo = "Family calendar",
-                            service = "Google Calendar",
-                            busy = false,
-                            failure = null,
-                            picker = EditorPicker.None,
-                            childOnly = null,
-                            childName = null,
-                            held = held,
-                            onClose = {},
-                            onSave = {},
-                            onDelete = {},
-                            onRefusedWho = {},
-                            onPicker = {},
-                            keyboard = WindowInsets(bottom = 0.dp),
-                        )
-                    }
-                }
-            }
+        screen.show {
+            ShowEditor(form, flow, held = held, scale = scale)
         }
     }
 
