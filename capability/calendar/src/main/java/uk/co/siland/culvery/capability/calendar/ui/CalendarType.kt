@@ -163,6 +163,14 @@ internal object CalendarType {
     val timeResult = HhType.headerValue.copy(fontSize = 27.sp, fontWeight = FontWeight.W700)
     val timeCheck = HhType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.W600)
     val timeFreeAt = HhType.secondary
+
+    /** 17 sp / 600: a Repeats option, and the stepper's count in tabular figures (handoff 6f). */
+    val repeatOption = HhType.rowTitle
+    val repeatCount = HhType.rowTitle.copy(fontFeatureSettings = "tnum")
+
+    /** 24 sp / 600 and 14 sp / 600: the Check pane's sentence and a date chip (handoff 6g). */
+    val checkSentence = editorField
+    val checkDate = ControlType.chip.copy(fontSize = 14.sp)
 }
 
 /** The full-screen editor's layout (handoff §1 Layout, px ÷ 1.5). */
@@ -272,6 +280,27 @@ internal object EditorDimens {
     val checkIcon = 19.dp
     val checkIconGap = 5.dp
     val freeGap = 8.dp
+
+    // The Repeats pane: options 56 tall, 7 apart, radius 15, 19 in at the sides, a 20 radio with a 10 dot 13 before the
+    // words; the stepper's 48 buttons 8 either side of its count, a 48 pill 19 in at its sides.
+    val repeatRowHeight = 56.dp
+    val repeatRowGap = 7.dp
+    val repeatRowRadius = 15.dp
+    val repeatRowPaddingH = 19.dp
+    val radio = 20.dp
+    val radioDot = 10.dp
+    val radioGap = 13.dp
+    val stepperGap = 8.dp
+    val stepperPaddingH = 19.dp
+
+    // The Check pane: date chips 40 tall, 8 apart, 15 in at the sides, an 8 dot 7 before the date; the week chip about as
+    // wide as a week column's inside.
+    val checkDateHeight = 40.dp
+    val checkDateGap = 8.dp
+    val checkDatePaddingH = 15.dp
+    val checkDot = 8.dp
+    val checkDotGap = 7.dp
+    val checkChipWidth = 150.dp
 }
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */

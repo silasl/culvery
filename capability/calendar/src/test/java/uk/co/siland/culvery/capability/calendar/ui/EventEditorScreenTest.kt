@@ -205,7 +205,7 @@ class EventEditorScreenTest {
 
     @Test
     fun withoutARepeatsRowTheHintSaysOnlyTimeIsOptional() {
-        show(editorDinnerOf(Duration.ofHours(1)))
+        show(editorDinnerOf(Duration.ofHours(1)), start = EditorStep.Time)
         compose.onNodeWithTag("editor_save_hint").assertTextEquals("Time is optional")
         compose.assertClickablesHaveRoleAndLabel()
         val child = editorForm(signedIn = SampleUi.mia.id, childOnly = SampleUi.mia.id).apply {

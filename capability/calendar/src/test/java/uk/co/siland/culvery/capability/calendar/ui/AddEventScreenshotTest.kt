@@ -20,6 +20,7 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.HeldEvent
+import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -192,7 +193,42 @@ class AddEventScreenshotTest {
         snap("add_event_clash_dark")
     }
 
-    /** Dinner tonight at 19:30 for 90 minutes, opened on Check with its pane still empty. */
+    /** Guitar lesson for Mia, Sat 26 Sep 10:00–10:45, every Saturday, 12 times. */
+    private fun weeklyGuitar() = guitarAt(10).apply {
+        chooseRepeat(RepeatChoice.Weekly)
+        stopsAfter()
+        repeat(2) { moreTimes() }
+    }
+
+    /** Handoff 6f: Every Saturday chosen, Stops after 12 with its last date, and where to skip one date. */
+    @Test
+    fun addEventRepeatsDark() {
+        show(weeklyGuitar(), dark = true, start = EditorStep.Repeats)
+        snap("add_event_repeats_dark")
+    }
+
+    /** Handoff 6g: the sentence, the first four Saturdays with Mia's dot and "+ 8 more", and Mia's week chip. */
+    @Test
+    fun addEventCheckDark() {
+        show(weeklyGuitar(), dark = true, start = EditorStep.Check)
+        snap("add_event_check_dark")
+    }
+
+    /** Cinema for Sam and Mia on Fri 25 Sep, 17:00–18:00: one date with both dots, and the neutral striped chip. */
+    @Test
+    fun addEventCheckSharedDark() {
+        val form = editorForm().apply {
+            updateTitle("Cinema")
+            toggleWho(SampleUi.sam.id)
+            toggleWho(SampleUi.mia.id)
+            tapDay(LocalDate.of(2026, 9, 25))
+            chooseHour(17)
+        }
+        show(form, dark = true, start = EditorStep.Check)
+        snap("add_event_check_shared_dark")
+    }
+
+    /** Dinner tonight at 19:30 for 90 minutes, opened on Check. */
     @Test
     fun changeEventDark() {
         show(editorDinnerOf(Duration.ofMinutes(90)), dark = true, savesTo = "Family")

@@ -51,6 +51,7 @@ internal fun EditorPaneFor(
     flow: EditorFlow,
     members: List<Member>,
     held: Held?,
+    service: String,
     childOnly: PersonId?,
     childName: String?,
     busy: Boolean,
@@ -62,7 +63,8 @@ internal fun EditorPaneFor(
             EditorStep.Who -> WhoPane(form, members, childOnly, childName, busy, onRefusedWho)
             EditorStep.Day -> DayPane(form, held, members.map { it.person }, onPicked = flow::moveOnSoon)
             EditorStep.Time -> TimePane(form, held, members.map { it.person }, onPicker, onPicked = flow::moveOnSoon)
-            else -> Unit
+            EditorStep.Repeats -> RepeatsPane(form, service, onPicked = flow::moveOnSoon, onChooseDay = { flow.open(EditorStep.Day) })
+            EditorStep.Check -> CheckPane(form, members.map { it.person })
         }
     }
 }

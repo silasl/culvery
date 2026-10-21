@@ -77,6 +77,7 @@ internal const val DISCARD = "Discard"
 internal const val OPTIONAL_HINT = "Time and repeats are optional"
 internal const val TIME_OPTIONAL_HINT = "Time is optional"
 internal const val CLASH_HINT = "Clashes are allowed; both show on the week"
+internal const val ALL_SET_HINT = "Everything’s set"
 
 private const val CALENDAR_SUFFIX = " calendar"
 
@@ -116,7 +117,7 @@ internal fun EventEditorScreen(
     onRefusedWho: () -> Unit,
     onPicker: (EditorPicker) -> Unit,
     keyboard: WindowInsets = WindowInsets.ime,
-    pane: @Composable (EditorStep) -> Unit = { EditorPaneFor(it, form, flow, members, held, childOnly, childName, busy, onRefusedWho, onPicker) },
+    pane: @Composable (EditorStep) -> Unit = { EditorPaneFor(it, form, flow, members, held, service, childOnly, childName, busy, onRefusedWho, onPicker) },
 ) {
     val c = Culvery.colors
     val focusManager = LocalFocusManager.current
@@ -198,6 +199,7 @@ internal fun EventEditorScreen(
                         } else {
                             val hint = when {
                                 clash -> CLASH_HINT
+                                flow.active == EditorStep.Check -> ALL_SET_HINT
                                 EditorStep.Repeats in flow.steps -> OPTIONAL_HINT
                                 else -> TIME_OPTIONAL_HINT
                             }
