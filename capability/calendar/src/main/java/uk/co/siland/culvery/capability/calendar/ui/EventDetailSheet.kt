@@ -124,10 +124,11 @@ fun EventDetailSheet(
                 ) {
                     if (e.assignable) ChooseWho(people, chosenFor(e), mode, busy, onChoosePerson, onAssign)
                 }
-                e.untagged -> Note(
+                // A phone event keeps its chips once the first tap tags it, so a set can be built (9 §3.4).
+                e.untagged || (mode == DetailMode.ChoosingPerson && e.editable) -> Note(
                     icon = Icons.MOBILE,
                     title = "Added from a phone",
-                    body = "Showing as Family until someone chooses who it’s for.",
+                    body = "Showing as Family until someone chooses who it’s for.".takeIf { e.untagged },
                     background = c.accentSoft,
                     iconTint = c.accent,
                 ) {
@@ -175,7 +176,7 @@ fun EventDetailSheet(
 /** Who the chips show as chosen: the event's people, or nobody while it is untagged and only shows as its fallback. */
 internal fun chosenFor(event: EventUi): List<PersonId> = if (event.untagged) emptyList() else event.people.map { it.id }
 
-/** Choose who it’s for, then a toggle for each of the household's people and Family last, once it is tapped (9 §3.4). */
+/** Choose who it’s for, then a toggle for each of the household's [people] (never Family) and Family last, once it is tapped (9 §3.4). */
 @Composable
 private fun ChooseWho(
     people: List<Person>,
@@ -191,7 +192,7 @@ private fun ChooseWho(
             horizontalArrangement = Arrangement.spacedBy(CalendarDimens.personChipGap),
             modifier = Modifier.horizontalScroll(rememberScrollState()),
         ) {
-            (people.filter { it.id != PersonId.FAMILY } + Person.Family).forEach { person ->
+            (people + Person.Family).forEach { person ->
                 HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy, selected = person.id in chosen) { onAssign(person) }
             }
         }
@@ -301,7 +302,7 @@ private fun Divider() {
 private fun Note(
     icon: String,
     title: String,
-    body: String,
+    body: String?,
     background: Color = Culvery.colors.surf,
     iconTint: Color = Culvery.colors.mute,
     content: @Composable ColumnScope.() -> Unit = {},
@@ -317,7 +318,7 @@ private fun Note(
             HhIcon(icon, size = CalendarDimens.noteIcon, tint = iconTint)
             Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.noteTextGap)) {
                 Text(title, style = CalendarType.noteTitle, color = c.ink)
-                Text(body, style = CalendarType.noteBody, color = c.mute)
+                if (body != null) Text(body, style = CalendarType.noteBody, color = c.mute)
             }
         }
         content()

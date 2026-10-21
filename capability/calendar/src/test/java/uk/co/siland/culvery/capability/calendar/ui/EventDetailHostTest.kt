@@ -5,12 +5,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -126,6 +129,7 @@ class EventDetailHostTest {
     }
 
     private val swim = EventRef("c1", "s-family", "swim_1")
+    private val plumber = EventRef("c1", "s-family", "plumber")
 
     /** A weekly swim on the Family calendar tagged [forPerson]: a repeating event, so its Who chips stay up. */
     private fun putSwim(forPerson: String) = runBlocking {
@@ -326,5 +330,30 @@ class EventDetailHostTest {
         chooseFor("${access.sam.id.value},gone")
         tap("Mia")
         waitUntil { tagOf(swim) == ids(access.sam, access.mia) }
+    }
+
+    @Test
+    fun aPhoneEventCanBeGivenASetFromItsChips() {
+        access.answer(TestAccess.ALEX)
+        show("plumber")
+        waitForText("Added from a phone")
+        compose.onNodeWithTag("detail_assign").performClick()
+        tap("Sam")
+        waitUntil { tagOf(plumber) == ids(access.sam) }
+        waitUntil { compose.onAllNodes(hasTestTag("assign_Mia") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Showing as Family until someone chooses who it’s for.").assertDoesNotExist()
+        tap("Mia")
+        waitUntil { tagOf(plumber) == ids(access.sam, access.mia) }
+    }
+
+    @Test
+    fun theFamilyChipWritesFamilyAndTheEventReadsAsFamily() {
+        access.answer(TestAccess.ALEX)
+        chooseFor(ids(access.sam))
+        tap("Family")
+        waitUntil { tagOf(swim) == "family" }
+        waitUntil { compose.onAllNodes(hasText("For") and hasText("Family")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("assign_Family").assertIsOn()
+        compose.onNodeWithTag("assign_Sam").assertIsOff()
     }
 }

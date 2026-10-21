@@ -356,7 +356,7 @@ fun HhStatusLine(
 
 /**
  * Hand-off §7 person chip: a chip's size and shape, `surf`, a 12 dp dot in the person's [color] 8 from their [name].
- * With [selected] it is a toggle, filled in `accent` while chosen; null keeps it a button.
+ * With [selected] it is a toggle, filled in `accent` while chosen; null keeps it a button. Only a button takes [clickLabel].
  */
 @Composable
 fun HhPersonChip(
@@ -368,6 +368,7 @@ fun HhPersonChip(
     selected: Boolean? = null,
     onClick: () -> Unit,
 ) {
+    require(selected == null || clickLabel == null) { "A toggle chip has no click label" }
     val c = Culvery.colors
     val chosen = selected == true
     Row(
