@@ -13,7 +13,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.UNTIL
 import uk.co.siland.culvery.core.ui.plural
 
-/** What the Time chips choose: all day, or a time from Pick time…. */
+/** What the Time chips choose: all day, or a time from Pick a time. */
 sealed interface TimeChoice {
     data object AllDay : TimeChoice
     data class Custom(val time: LocalTime) : TimeChoice
@@ -21,6 +21,9 @@ sealed interface TimeChoice {
 
 /** The longest an event may last, in days (the first and last day count). */
 const val MAX_SPAN_DAYS = 60L
+
+internal const val UNTIL_TOO_EARLY = "The last day is before the first day. Pick a later one."
+internal const val UNTIL_TOO_LATE = "An event can last up to $MAX_SPAN_DAYS days. Pick an earlier last day."
 
 /** 2b-2 design D8: a title is at most 100 characters. */
 const val MAX_TITLE_LENGTH = 100
@@ -67,7 +70,13 @@ class EventForm(
     private val original: EditableEvent? = (mode as? Mode.Edit)?.original
 
     /** A timed, mixed or over-long (past [MAX_SPAN_DAYS]) event over several days keeps its dates (2b-2 design D3); a shorter all-day span's dates edit. */
-    val datesLocked: Boolean = original?.let { spansDays(it.start, it.end, zone) && (!(it.start is EventTime.AllDay && it.end is EventTime.AllDay) || spanLength(it, zone) > MAX_SPAN_DAYS) } ?: false
+    val datesLocked: Boolean = original?.let(::locksDates) ?: false
+
+    private fun locksDates(e: EditableEvent): Boolean {
+        val (first, last) = daySpan(e.start, e.end, zone)
+        if (!last.isAfter(first)) return false
+        return !e.isAllDay() || ChronoUnit.DAYS.between(first, last) + 1 > MAX_SPAN_DAYS
+    }
 
     var title: String by mutableStateOf(original?.title ?: "")
         private set
@@ -115,7 +124,7 @@ class EventForm(
         private set
 
     private fun openingUntil(): LocalDate? = original
-        ?.takeIf { !datesLocked && it.start is EventTime.AllDay && it.end is EventTime.AllDay }
+        ?.takeIf { !datesLocked && it.isAllDay() }
         ?.let { daySpan(it.start, it.end, zone) }
         ?.let { (first, last) -> last.takeIf { it > first } }
 
@@ -124,18 +133,16 @@ class EventForm(
 
     val offersUntil: Boolean get() = time == TimeChoice.AllDay && !datesLocked
 
-    val untilBeforeStart: Boolean get() = offersUntil && until?.let { it < day } == true
-
-    val untilTooLate: Boolean get() = offersUntil && until?.let { it > day.plusDays(MAX_SPAN_DAYS - 1) } == true
-
     /** "Until", or "Until Thu 22 Oct" once picked. */
     val untilLabel: String get() = until?.let { "$UNTIL ${it.format(SHORT_DAY)}" } ?: UNTIL
 
     val untilError: String?
-        get() = when {
-            untilBeforeStart -> UNTIL_TOO_EARLY
-            untilTooLate -> UNTIL_TOO_LATE
-            else -> null
+        get() = until?.takeIf { offersUntil }?.let {
+            when {
+                it < day -> UNTIL_TOO_EARLY
+                it > day.plusDays(MAX_SPAN_DAYS - 1) -> UNTIL_TOO_LATE
+                else -> null
+            }
         }
 
     /** Ignored unless [offersUntil]; the day itself means one day. */
@@ -169,7 +176,7 @@ class EventForm(
     /** The Length chips: 30 minutes, 1 hour, 2 hours, and an edited event's own length when it is none of those (D3). */
     val lengths: List<Duration> = LENGTH_CHOICES + listOfNotNull(original?.let(::lengthOf)?.takeIf { it !in LENGTH_CHOICES })
 
-    /** Today and the six days after it: the Day chips before Pick date…. */
+    /** Today and the six days after it: the Day chips before Pick a date. */
     val dayChoices: List<LocalDate> = (0 until DAYS_SHOWN).map { today.plusDays(it) }
 
     val canSave: Boolean get() = title.trim().isNotEmpty() && !endsBeforeStart && untilError == null
@@ -228,9 +235,9 @@ class EventForm(
     }
 
     /** Choosing it while it is chosen keeps the count. */
-    fun chooseAfter(times: Int = DEFAULT_TIMES) {
+    fun chooseAfter() {
         if (repeatEnd is RepeatEnd.After) return
-        chooseEnd(RepeatEnd.After(times.coerceIn(MIN_TIMES, MAX_TIMES)))
+        chooseEnd(RepeatEnd.After(DEFAULT_TIMES))
     }
 
     fun fewerTimes() = stepTimes(-1)
@@ -253,7 +260,7 @@ class EventForm(
     val pickerTime: LocalTime
         get() = startTime ?: if (day != today) MORNING else if (now.hour >= LAST_HOUR) LocalTime.of(LAST_HOUR, 0) else LocalTime.of(now.hour + 1, 0)
 
-    /** Pick date…'s label: the chosen date, e.g. "Mon 5 Oct", when it isn't one of the seven Day chips. */
+    /** Pick a date's label: the chosen date, e.g. "Mon 5 Oct", when it isn't one of the seven Day chips. */
     val pickedDateLabel: String?
         get() = day.takeIf { it !in dayChoices }?.format(SHORT_DAY)
 
@@ -343,15 +350,4 @@ private fun lengthOf(event: EditableEvent): Duration? {
     return Duration.between(start.instant, end.instant).takeIf { !it.isNegative && !it.isZero }
 }
 
-private fun spanLength(event: EditableEvent, zone: ZoneId): Long {
-    val (first, last) = daySpan(event.start, event.end, zone)
-    return ChronoUnit.DAYS.between(first, last) + 1
-}
-
-private fun spansDays(start: EventTime, end: EventTime, zone: ZoneId): Boolean {
-    val (first, last) = daySpan(start, end, zone)
-    return last.isAfter(first)
-}
-
-internal const val UNTIL_TOO_EARLY = "The last day is before the first day. Pick a later one."
-internal const val UNTIL_TOO_LATE = "An event can last up to 60 days. Pick an earlier last day."
+private fun EditableEvent.isAllDay(): Boolean = start is EventTime.AllDay && end is EventTime.AllDay

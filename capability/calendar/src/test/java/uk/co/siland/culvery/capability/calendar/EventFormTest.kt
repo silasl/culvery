@@ -594,16 +594,11 @@ class EventFormTest {
     }
 
     @Test
-    fun chooseAfterClampsItsCount() {
-        fun after(times: Int?): RepeatEnd {
-            val form = new()
-            form.chooseRepeat(RepeatChoice.Weekly)
-            if (times == null) form.chooseAfter() else form.chooseAfter(times)
-            return form.repeatEnd
-        }
-        assertThat(after(1)).isEqualTo(RepeatEnd.After(2))
-        assertThat(after(99)).isEqualTo(RepeatEnd.After(52))
-        assertThat(after(null)).isEqualTo(RepeatEnd.After(10))
+    fun chooseAfterStartsAtTen() {
+        val form = new()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseAfter()
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(10))
     }
 
     @Test

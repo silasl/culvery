@@ -28,9 +28,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -305,8 +302,9 @@ private fun TitleField(form: EventForm, focus: FocusRequester, readOnly: Boolean
 }
 
 @Composable
-private fun ChipFlow(content: @Composable () -> Unit) {
+private fun ChipFlow(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     FlowRow(
+        modifier = modifier.selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
         verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
     ) { content() }
@@ -316,7 +314,7 @@ private fun ChipFlow(content: @Composable () -> Unit) {
 private fun Section(label: String, modifier: Modifier = Modifier, chips: @Composable () -> Unit) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
         HhSectionLabel(label)
-        Box(Modifier.selectableGroup()) { ChipFlow(chips) }
+        ChipFlow(content = chips)
     }
 }
 
@@ -346,9 +344,8 @@ private fun WhoSection(form: EventForm, everyone: List<Person>, childOnly: Perso
                     // The chosen chip may be a locked one (an adult tagged the child's event); a tap on it does nothing.
                     onClick = {
                         when {
-                            busy -> Unit
-                            locked && !selected -> onRefusedWho()
-                            locked -> Unit
+                            busy || (locked && selected) -> Unit
+                            locked -> onRefusedWho()
                             else -> form.chooseWho(person.id)
                         }
                     },
@@ -454,13 +451,10 @@ private fun LengthSection(form: EventForm, busy: Boolean, modifier: Modifier) {
 @Composable
 private fun RepeatsSection(form: EventForm, busy: Boolean) {
     val dailyFocus = remember { FocusRequester() }
-    var focusDaily by remember { mutableStateOf(false) }
+    val openedAtStart = remember { form.moreRepeats }
     // The tapped chip is gone, so focus moves onto the first of the new choices.
-    LaunchedEffect(focusDaily) {
-        if (focusDaily) {
-            dailyFocus.requestFocus()
-            focusDaily = false
-        }
+    LaunchedEffect(form.moreRepeats) {
+        if (form.moreRepeats && !openedAtStart) dailyFocus.requestFocus()
     }
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
         HhSectionLabel(REPEATS)
@@ -474,12 +468,7 @@ private fun RepeatsSection(form: EventForm, busy: Boolean) {
                         tag = "repeat_more",
                         role = Role.Button,
                         trailing = { ink -> HhIcon(Icons.EXPAND_MORE, size = ControlTokens.chipIcon, tint = ink) },
-                        onClick = {
-                            if (!busy) {
-                                form.showMoreRepeats()
-                                focusDaily = true
-                            }
-                        },
+                        onClick = { if (!busy) form.showMoreRepeats() },
                     )
                 }
             }

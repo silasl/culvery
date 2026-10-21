@@ -109,7 +109,7 @@ class EditorScreenshotTest {
         chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
     }
 
-    /** Hand-off 13: dinner at 19:30 for 2 h; the 19:30 start shows on Pick time… (2b-2 design D3). */
+    /** Hand-off 13: dinner at 19:30 for 2 h; the 19:30 start shows on Pick a time (2b-2 design D3). */
     private fun edit() = dinner(hours = 2)
 
     /** 2b-2 design D3: an event 1 h 30 long adds its own length as a fourth Length chip, selected. */

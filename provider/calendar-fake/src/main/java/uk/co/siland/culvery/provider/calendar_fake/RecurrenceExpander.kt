@@ -18,6 +18,7 @@ private val UNTIL_UTC: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd
  * Turns a series the tablet wrote into one event per occurrence, as Google returns it with singleEvents=true.
  * Understands what the tablet writes: FREQ of DAILY, WEEKLY, MONTHLY or YEARLY, INTERVAL, UNTIL (a date, or a
  * UTC date-time), inclusive, and COUNT (ignored unless a whole number of 1 or more; with UNTIL too, the first to end it wins).
+ * It accepts any COUNT of 1 or more on purpose: a phone can write COUNT=1, though the tablet writes 2 to 52.
  * Occurrence ids are "{series}-{date}", as in [SampleEvents].
  */
 internal object RecurrenceExpander {

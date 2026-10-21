@@ -123,7 +123,7 @@ class CalendarEditor internal constructor(
         return if (day > lastShownDay(today)) eventAddedFor(day) else EVENT_ADDED
     }
 
-    /** A signed-in child tapped someone else's Who chip: say why it is disabled (2b-2 design §4.2). */
+    /** A signed-in child tapped someone else's Who chip: say why it is locked (2b-2 design §4.2). */
     internal fun refuseOtherWho(name: String) = toaster.show(cannotAddForOthers(name), urgent = true)
 
     /** The add/edit sheet couldn't load (a store failure): it closes and says so. */
