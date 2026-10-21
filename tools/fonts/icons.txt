@@ -26,6 +26,7 @@ directions_walk
 doorbell
 edit
 edit_note
+error
 event
 event_available
 event_repeat
@@ -54,6 +55,7 @@ rainy
 rainy_heavy
 rainy_light
 refresh
+remove
 repeat
 schedule
 search
