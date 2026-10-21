@@ -80,18 +80,18 @@ Each is the plan's call unless it cites the spec or the user.
     - `CalendarEditor.assign` takes the new set. ASSIGN (adults) is still the gate, so a child is told `ASK_AN_ADULT` and nothing changes.
     - Tapping the detail's For row on an editable event opens the editor with Who active (spec §3.3, Task 16).
 11. **The month title** (spec §3.2): "September" 45 sp W700, letter-spacing −1 sp, then "2026" 45 sp W400 `mute`, 12 dp apart. Across two months it reads "September – October 2026", and across a year "December 2026 – January 2027". TalkBack hears "September 2026", or "September to October 2026". `HhPageHeader` gains an overload whose `title` is a composable slot; the String one calls it.
-12. **The week subtitle** (spec §3.2): "{This week | Next week | In N weeks} · {range} · {sync}". The range is "Wed 23 – Tue 29 Sep", with the month on both ends across months. The sync part is `weekLine`. Its age line ("Updated…", "Out of date —…", "Not updated yet") is joined with its first letter lowered; a problem line ("The tablet is offline…") keeps its case. Updating… keeps replacing only the sync part. The small "Oct" (11 sp W700 `accent`) sits over the date in the 1st's column, and only when the week crosses a month.
+12. **The week subtitle** (spec §3.2): "{This week | Next week | In N weeks} · {range} · {sync}". The range is "Wed 23 – Tue 29 Sep", with the month on both ends across months. The sync part is `weekLine`. Only its age line ("Updated…", "Out of date —…", "Not updated yet") is joined with its first letter lowered. "Updating…" and a problem line ("The tablet is offline…") keep their case. Updating… keeps replacing only the sync part. The small "Oct" (11 sp W700 `accent`) sits over the date in the 1st's column, and only when the week crosses a month.
 13. **The full-screen overlay** (spec §3.1, §5 call 8) is `OverlayHost.showFullScreen(content)`, an interface method with a default that calls `show(content = content)`, so the other hosts need no change. `OverlayState` overrides it and sets `fullScreen = true`. `OverlayLayer` then draws the content with `fillMaxSize`, over a `bg` box and with no scrim, so nothing dismisses on a tap. The idle close (2 min, 10 edited, the 20 s warning) is unchanged. `MainActivity` passes `overSheet = overlay.isShowing && !overlay.fullScreen` to the PIN pad, so the pad covers the whole screen over the editor.
-14. **The toast's action** (spec §3.1): `Toaster.show(message, icon, urgent, action: ToastAction)` is a second interface method with a default that drops the action. `ToastAction(label: String, onClick: () -> Unit)`. `ShellToasts` and the calendar's `RecordingToaster` override it. A toast with an action shows for `TOAST_WITH_ACTION_MS = 8_000` (with `activity.timeout(…, hasControls = true)`), not `toastMillis`. core/ui doesn't depend on core/plugin, so `HhToast` takes plain `actionLabel: String? = null, onAction: () -> Unit = {}`, and `ToastLayer` maps `ToastMessage.action` onto them. It draws the action as a text button in `accent`, 48 dp tall, after the message. A tap runs `onClick` and hides the toast. TalkBack reads the toast as now and reaches the button. **The toast keeps the shared `ink` pill and its icon** (Plan 9 §6.10). The handoff's `s3` pill with a check goes to the design review, so there stays one toast look.
+14. **The toast's action** (spec §3.1): `Toaster.show(message, icon, urgent, action: ToastAction)` is a second interface method with a default that drops the action. `ToastAction(label: String, onClick: () -> Unit)`. `ShellToasts` and the calendar's `RecordingToaster` override it. A toast with an action shows for `TOAST_WITH_ACTION_MS = 8_000` (with `activity.timeout(…, hasControls = true)`), not `toastMillis`. core/ui doesn't depend on core/plugin, so `HhToast` takes plain `actionLabel: String? = null, onAction: () -> Unit = {}`, and `ToastLayer` maps `ToastMessage.action` onto them. The icon and message stay one merged group with the live region, as now. The action is a sibling text button in `accent`, 48 dp tall, after the message. An outer row tagged `toast` holds both, so `toast_action` is its own node in the merged tree and TalkBack reaches it. A tap runs `onClick` and hides the toast. **The toast keeps the shared `ink` pill and its icon** (Plan 9 §6.10). The handoff's `s3` pill with a check goes to the design review, so there stays one toast look.
 15. **`EditorForm` is new, beside `EventForm`** (spec §3.1 "reuse 9c-1's model"). It ports these rules: the 100-character title, required title, the 60-day cap and its message, timed and over-60-day spans locked on edit, `keepsOwnSpan`, `touched`/`unchanged`, `edited`, COUNT 2–52 default 10, `canRepeat = mode == New && repeats`. **`edited` counts every answer**: the title, Who, Day, multi-day, Until, the hour, the minute, the length and the repeat. Choosing only a day still gets the 10-minute idle close and the discard check. Lengths are `java.time.Duration`, as in `EventForm`. `EventForm.kt`, its tests and the side sheet go in Task 16. Until then the shared top-level names (`TimeChoice`, `MAX_SPAN_DAYS`, `UNTIL_TOO_LATE`, `MAX_TITLE_LENGTH`, `lengthLabel`) stay in `EventForm.kt`, and `EditorForm.kt` uses them. Task 16 moves them into `EditorForm.kt`.
-16. **Who starts empty for an adult; a child starts as themselves** (spec §3.4). "Everyone" is `listOf(PersonId.FAMILY)` and clears individual picks. Picking a person clears Everyone. An edit opens on the event's set (untagged reads as Family), with removed people dropped (ruling 4). `whoTouched` keeps an untouched edit's tag exactly. Who counts as touched only when the **set** differs (`peopleIn` compared as sets), here and in `CalendarEditor.update`'s retag check, so re-picking someone or a reordered household isn't a retag. A child editing a shared set has their own tile locked too, so they can't untick themselves into a set Save would refuse.
+16. **Who starts empty for an adult; a child starts as themselves** (spec §3.4). "Everyone" is `listOf(PersonId.FAMILY)` and clears individual picks. Picking a person clears Everyone. An edit opens on the set it shows elsewhere: its resolved people, with removed people dropped (ruling 4). An untagged event resolves through its calendar's person, else Family. `whoTouched` keeps an untouched edit's tag exactly. Who counts as touched only when the **set** differs (`peopleIn` compared as sets), so re-picking someone or a reordered household isn't a retag. The form then sends no `FOR_PERSON`. A child editing a shared set has their own tile locked too, so they can't untick themselves into a set Save would refuse.
 17. **Day is optional until saved:** `day: LocalDate?` starts null for the week's Add event (spec §5 call 9), on the column's date for an empty-column tap, and on today for Home's +.
 18. **Range picking** (spec §3.1, handoff 6d). The "Lasts more than a day" switch is `setMultiDay(on)`. On, it forces All day; the stashed time comes back if it is turned off with the same Day. The first tap sets Day and waits for the last. A later tap sets Until, or ends as one day when it is the same date. A tap before Day starts again from it. Once the range is set, the next tap starts a new one. Ranges cross months, and the 60-day cap (`UNTIL_TOO_LATE`) holds Save back. `UNTIL_TOO_EARLY` and "moving Day moves Until" go: a tap can't make an Until before Day. While multi-day is on, the Time pane's "At a time" is a locked segment with the line "An event over several days is all day."
 19. **Time** (spec §3.1). `time` is `AllDay` or `Custom(LocalTime)`. "At a time" with no hour yet is the pane's own state, not the form's: the row still reads All day and nothing is lost. An hour chip sets `hour:00`, or keeps the chosen minute. Minutes are ignored while All day. "Other time" opens the existing `TimePickerCard` for any hour. Lengths are 30 min, 45 min, 1 hour and 2 hours (`EDITOR_LENGTHS`), plus "Until…", which opens `TimePickerCard` for an end time on the same day. A pick at or before the start is refused, and the pane shows "The end is before the start. Pick a later time." until the time or length changes. A length outside the four (an edit's own, or an Until pick) shows as "Until 18:30" with that chip selected. **The chips read "30 min" and "45 min" as the spec lists them**, which overrides 9c-1 ruling 19. TalkBack still hears `lengthLabel` ("30 minutes").
 20. **Moving on** (handoff Behaviour): `MOVE_ON_MS = 250`. These move on: a Day pick (a one-day pick, or the range's last tap), All day, a length chip or an Until pick, and Doesn't repeat. An hour, a minute and a repeating choice don't, so the minutes, length and Ends can still be set; Next moves on. Who never moves on by itself. Next is "Next: {row}", or "Next: Check" from the last row. Skip (Time and Repeats only) moves on and changes nothing. Not moving on after an hour or a repeating choice differs from the handoff and goes to the design review. The pane's question carries `paneTitle`, so TalkBack speaks the new question when the pane changes.
 21. **Rows by mode:** a new adult event shows Who, Day, Time, Repeats. A child's has no Repeats (9c-1 ruling 10). Change event has Who, Day, Time, because only new events repeat. A locked span (a timed or over-60-day multi-day edit, 9c-1 ruling 17) shows Day as one row with `lockedDatesLabel` and a `lock` icon in place of the chevron, which doesn't open a pane. Time is hidden.
 22. **Where it opens:** a new event with an empty title focuses the title, with Who active. Change event opens on Check with nothing focused, except from the detail's For row, which opens on Who (`EditorRequest.Edit(ref, from, start = EditorStep.Who)`). The keyboard's Next (`ImeAction.Next`) clears focus and makes Who active. While the title is focused, the pane shows the active row's question (no suggestions, spec §2 ruling 2).
-23. **What's missing** (handoff): `needsLine(missing)` gives "Needs a title", "Needs who", "Needs a day", "Needs a title and who", "Needs a title and a day", "Needs who and a day", "Needs a title, who and a day". The foot's reason is that line, else the cap's message (`UNTIL_TOO_LATE`), else the end-time error, else null. This widens 9c-1 ruling 5: Add event and Save changes both show a reason whenever they're disabled. The hint while enabled is "Clashes are allowed; both show on the week" on a clash, "Everything’s set" on Check, and "Time and repeats are optional" otherwise.
+23. **What's missing** (handoff): `needsLine(missing)` gives "Needs a title", "Needs who", "Needs a day", "Needs a title and who", "Needs a title and a day", "Needs who and a day", "Needs a title, who and a day". The foot's reason is that line, else the cap's message (`UNTIL_TOO_LATE`), else null. A refused end time changes nothing in the draft, so its message stays in the Time pane only, until the next time or length change, and doesn't disable Save. This widens 9c-1 ruling 5: Add event and Save changes both show a reason whenever they're disabled. The hint while enabled is "Clashes are allowed; both show on the week" on a clash, "Everything’s set" on Check, and "Time and repeats are optional" otherwise.
 24. **The foot's Add event is `HhFooterButton` at `ButtonSize.Large` (60 dp)**, not the handoff's 64 dp: 9c-1 ruling 5's reasoning holds. Its reason and hint sit **under** the button, as the handoff draws, with the `info` icon; that is a new `below = true` on `HhFooterButton`. The 9c-1 sheet's reason above goes with the sheet. Change event's foot has `DeleteButton` (Large) on the left, as 9c-1 ruling 5.
 25. **Saves to:** "Saves to the {name} calendar" (spec §3.1), with no "Change". On New, `{name}` is the master source's name. On Change it is the event's own calendar (`EventUi.sourceName`), because that is where the change goes. Either way the name is shown with a trailing " calendar" (any case) removed, so "Family calendar" reads "Saves to the Family calendar". A Google primary calendar named by its address reads "Saves to the alex@example.com calendar"; that is for the design review.
 26. **Discard** (spec §3.1): ✕ on an edited form shows `HhConfirmCard` in place of the foot: "Discard this event?" on New and "Discard your changes?" on Change, then "Keep editing" (left) and "Discard" (`ButtonTone.Destroy`). Its icon is `Icons.DELETE` on New and `Icons.CLOSE` on Change, where only the edits are thrown away and a bin would read as deleting the event. ✕ on an unedited form closes at once.
@@ -100,7 +100,7 @@ Each is the plan's call unless it cites the spec or the user.
 29. **Quick picks** (handoff §1 6c): "Today", "Tomorrow", the next Saturday or Sunday after tomorrow by its date ("Sat 26 Sep"), and "{Wednesday} next week" (today + 7). The HTML draws "This weekend"/"Next weekend"; the handoff's text wins. A quick pick in multi-day mode is a first tap.
 30. **Day dots and the clash read only what the tablet has actually synced** (spec §3.1, §3.4). `CalendarRepository.held(today)` is a member, built like `days()`, with the queued changes laid over it. It covers today to `Held.lastDay`, which is the earliest of:
     - `lastShownDay(today)`;
-    - for each connection, its last successful sync's day + `SYNC_FUTURE_DAYS`. A tablet offline for five days holds five fewer days.
+    - for each connection, its last successful sync's day + `SYNC_FUTURE_DAYS`. The sync's window ends, exclusive, at that day + 29 (`CalendarSync.kt:93`), and `lastShownDay` is today + 27, so a sync five days ago holds four fewer days.
 
     Past `lastDay` there are no dots, no busy hours and no result line (spec §5 call 6). `Held.unhealthy: Set<PersonId>` holds the people whose calendars sit on a connection that needs signing in, has a read problem, or is out of date (the week's "Out of date" rule). A check that includes any of them is `None`, because their events are missing, not absent. The Day pane still allows any date.
 31. **Busy** (spec §3.4): a **timed** event whose resolved people include the person. Family events and all-day events make nobody busy, and Everyone checks nobody. The event being changed never clashes with itself. A busy hour is any overlap with [h:00, h+1:00). The clash is the first overlapping event, by start, for the first busy person in household order. The free starts are the nearest earlier and nearest later quarter-hours on that day, from 07:00 to 23:00, where the whole length is free for every chosen person. That gives at most two chips.
@@ -117,8 +117,8 @@ Each is the plan's call unless it cites the spec or the user.
     - other intervals are "Every {n} {units}", as today;
     - anything else is "Yes".
     Then `COUNT=n` adds " · {n} times · last on {EEE d MMM}" and `UNTIL` adds " · until {EEE d MMM}". UNTIL may be a date or a UTC time (`20261212T095959Z`, as Google writes timed series); either is read in the household zone.
-    **The series' first date is kept with the rule**, so "last on" can be worked out. Both providers put a `DTSTART:{yyyyMMdd}` line before the `RRULE:` line in `RemoteEvent.recurrenceRule`: Google from the master that `ruleOf` already fetches, the fake from the series it made. It is stored in the same string, so there is no migration. `seriesStart(rule): LocalDate?` reads it, and anything that reads rule parts skips the line. A rule without it (stored before this plan, until the next sync) reads " · {n} times" alone.
-36. **The Check sentence** (handoff 6g) is "{title} for {who}, {when}, {time}{, from … to …}.{ N times in all.}". `{who}` is `spokenWho`, or "everyone". `{when}` is "Sat 26 Sep", "Mon 19 – Fri 23 Oct", or for a series its wording in lower case ("every Saturday"). `{time}` is "10:00–10:45" or "all day". A series that keeps going adds "from 26 Sep"; a counted one adds "from 26 Sep to 12 Dec. 12 times in all." The first four start dates show as chips with the people's dots, then "+ {n − 4} more" for a counted series. A series that keeps going shows four chips and no more.
+    **The series' first date is kept with the rule**, so "last on" can be worked out. Both providers put a `DTSTART:{yyyyMMdd}` line before the `RRULE:` line in `RemoteEvent.recurrenceRule`: Google from the master that `ruleOf` already fetches, the fake from the series it made. The date is the master's start in the household zone; for an all-day master it is the start date as given. It is stored in the same string, so there is no migration. `seriesStart(rule): LocalDate?` reads it, and anything that reads rule parts skips the line. A rule without it (stored before this plan, until the next sync) reads " · {n} times" alone.
+36. **The Check sentence** (handoff 6g) is "{title} for {who}, {when}, {time}{, from … to …}.{ N times in all.}". `{who}` is `spokenWho`, or "everyone". `{when}` is "Sat 26 Sep", "Mon 19 – Fri 23 Oct", or, for a series, its wording with only the first letter lowered ("every Saturday", "every month, on the 4th Saturday"). One helper, `lowerFirst(s)` in `EditorWords.kt`, does this for both `checkSentence` and `addedLine`. `{time}` is "10:00–10:45" or "all day". A series that keeps going adds "from 26 Sep"; a counted one adds "from 26 Sep to 12 Dec. 12 times in all." The first four start dates show as chips with the people's dots, then "+ {n − 4} more" for a counted series. A series that keeps going shows four chips and no more.
 37. **After Add** (spec §3.1, §3.4). From every entry point, Home included, the editor closes onto the Calendar tab, on the week that holds the event's first date (`weeksTo(today, date)`). That works when the date is today to `lastShownDay`. Otherwise the week stays where it was and the toast names the date. The editor lives in the shell's overlay, not in a tab, so it asks for the week through a new `@Singleton class WeekFocus { val requested: StateFlow<Int?>; fun show(weeksAhead: Int); fun consumed() }` in `:capability:calendar`. `WeekViewHost` collects it into `rememberWeekShown().show(n)` and then calls `consumed()`. From Home, the editor also calls `LocalShellNavigator.current.openTab(CALENDAR_TAB_ID)`.
 38. **The added toast** (spec §3.1): "Added {title}." for a one-off, "Added {title}, every Saturday." for a series, and "Added {title}, Sat 12 Dec." whenever the week can't show it, past `lastShownDay` or before today (both: "Added {title}, every Saturday from Sat 12 Dec."). It carries the Undo action. A queued create says the same. `EVENT_ADDED` and `eventAddedFor` go.
 39. **Undo** (spec §2 ruling 3). `CalendarEditor.undoAdd(added: AddedEvent)` runs on the app scope under the write lock.
@@ -257,7 +257,7 @@ From this plan's calls:
    - **Expected:** the queued create and what's behind it are dropped; the in-flight create is deleted as soon as it is accepted and never mirrored; an accepted series is deleted with every occurrence gone from the mirror; the timed-out series says "Couldn’t undo…" and stays in the mirror; an offline one-off queues a DELETE; anyone but Alex is refused and nothing changes.
    - **Tests** (Task 15): `CalendarEditorTest.undoingASeriesStillInTheOutboxDropsItAndWhatIsBehindIt`, `undoBeforeTheDrainsCreateLandsStillRemovesIt`, `undoingASeriesTheServiceHasDeletesItAndEveryOccurrence`, `undoingASeriesWhoseSendTimedOutWhileStillOfflineSaysItCouldNot`, `undoingAOneOffOfflineQueuesItsDelete`, `onlyThePersonWhoAddedItCanUndo`; `CalendarProviderContractTest.deleteSeriesRemovesEveryOccurrence`.
 3. **A range across a month boundary.**
-   - **Cases:** multi-day on, tap Thu 29 Oct, page to November, tap Sun 1 Nov; the band over the visible month's trailing November days; a range Mon 26 Oct – Sun 1 Nov wrapping onto the next grid line; day + 59 and day + 60.
+   - **Cases:** multi-day on, tap Thu 29 Oct, page to November, tap Sun 1 Nov; the band over the visible month's trailing November days; a range Mon 26 Oct – Tue 3 Nov, seen in November, wrapping from the Sun 1 Nov line onto the next; day + 59 and day + 60.
    - **Expected:** the draft is `AllDay(29 Oct)` → `AllDay(2 Nov)`, Day reads "Thu 29 Oct – Sun 1 Nov", Time is All day; the band is drawn on 30 and 31 Oct and on the trailing 1 Nov cell, rounded at both ends and at the wrap; +60 holds Save back with the cap's message.
    - **Tests:** Task 7: `EditorFormTest.aRangeAcrossAMonthEndsTheDayAfterItsLastDay`, `theRangeKeepsTheSixtyDayCap`; Task 12: `DayPaneTest.aRangeCrossesIntoTheNextMonth`, `theBandIsRoundedAtItsEndsAndWhereItWraps`.
 4. **A signed-in child can't reach anyone else.**
@@ -266,8 +266,8 @@ From this plan's calls:
    - **Tests:** Task 1 (**pins**, guarding against a later `who in peopleIn(forPerson)` check): `CalendarEditorTest.aChildCannotAddASharedEventEvenWithThemselvesInIt`, `aChildCannotRetagToASet`; Task 4: `EventDetailHostTest.aChildTappingADetailChipIsAskedForAnAdultAndNothingChanges`; Task 11: `WhoPaneTest.aChildsOtherTilesAndEveryoneAreLocked`, `aTapOnALockedTileExplainsAndChangesNothing`, `aChosenLockedTileStaysChosen`; Task 16: `EventEditorHostTest.aChildWhoseSessionEndsCannotSaveForSomeoneElse`.
 5. **A clash past the held window.**
    - **Cases:** Mia chosen, a timed event of hers 15:30–16:15 on `lastShownDay`, and the same on `lastShownDay + 1`; 15:00 for 45 minutes on each day; the last sync five days ago; Mia's calendar needing sign-in; Everyone chosen; an all-day event of hers; changing her Piano itself to 15:45.
-   - **Expected:** on `lastShownDay` the 15 hour is busy and the line reads "Overlaps Piano, 15:30–16:15" with the Clash tag; the day after shows no busy hour, no result line and no tag (never "free"); a stale sync shrinks the held days by five; a calendar needing sign-in gives no line for Mia; Everyone and the all-day event show no clash; the edited event doesn't clash with itself.
-   - **Tests:** Task 9: `ClashTest.aDayPastTheHeldWindowHasNoLine`, `aStaleSyncHoldsFewerDays`, `aPersonWhoseCalendarNeedsSignInGetsNoLine`, `allDayAndFamilyEventsMakeNobodyBusy`, `theEventBeingChangedDoesNotClashWithItself`; Task 13: `TimePaneTest.pastTheHeldWindowThereIsNoResultLineAndNoTag`.
+   - **Expected:** on `lastShownDay` the 15 hour is busy and the line reads "Overlaps Piano, 15:30–16:15" with the Clash tag; the day after shows no busy hour, no result line and no tag (never "free"); a sync five days old shrinks the held days by four; a calendar needing sign-in gives no line for Mia; Everyone and the all-day event show no clash; the edited event doesn't clash with itself.
+   - **Tests:** Task 9: `CalendarRepositoryTest.aStaleSyncHoldsFewerDays`; `ClashTest.aDayPastTheHeldWindowHasNoLine`, `aPersonWhoseCalendarNeedsSignInGetsNoLine`, `allDayAndFamilyEventsMakeNobodyBusy`, `theEventBeingChangedDoesNotClashWithItself`; Task 13: `TimePaneTest.pastTheHeldWindowThereIsNoResultLineAndNoTag`.
 
 The spec's own tests (§6) have their tasks: each of 6b–6g and 6i gets a dark image (Tasks 11–14); shared events get Home, week, lane and detail images (Tasks 2, 3); Google round trips for one, two and family (Task 1); one walk-through (Task 17).
 
@@ -291,7 +291,7 @@ capability/calendar/.../ui/DayPane.kt (new) (Task 12)
 capability/calendar/.../ui/TimePane.kt (new), core/ui/.../Controls.kt (HhSegmented) (Task 13)
 capability/calendar/.../ui/RepeatsPane.kt (new), ui/CheckPane.kt (new) (Task 14)
 capability/calendar/.../UndoneKeys.kt (new), CalendarEditor.kt (undoAdd, the added toast), CalendarSync.kt (undone keys), CalendarContract.kt (deleteSeries), CalendarStore.kt (applySeriesDeleted), provider/calendar-google/.../GoogleCalendarProvider.kt, provider/calendar-fake/.../FakeCalendarProvider.kt, capability/calendar-testkit/.../CalendarProviderContractTest.kt, its TinyProvider and ContractSuiteSelfTest (Task 15)
-capability/calendar/.../WeekFocus.kt (new), ui/EventEditorHost.kt, ui/Sheets.kt, ui/CardHosts.kt, ui/WeekHeader.kt, ui/WeekView.kt, ui/TodayCard.kt; deletes ui/EventEditorSheet.kt, EventForm.kt, the date picker in ui/Pickers.kt (Task 16)
+capability/calendar/.../WeekFocus.kt (new), ui/EventEditorHost.kt, ui/Sheets.kt, ui/CardHosts.kt, ui/WeekHeader.kt, ui/WeekView.kt; deletes ui/EventEditorSheet.kt, EventForm.kt, the date picker in ui/Pickers.kt (Task 16)
 docs/superpowers/plans/2026-09-23-plan1-followups.md (Tasks 17–19)
 ```
 
@@ -319,7 +319,7 @@ docs/superpowers/plans/2026-09-23-plan1-followups.md (Tasks 17–19)
   - `fun peopleIn(forPerson: String?): List<PersonId>`: split on `,`, trimmed, blanks dropped, distinct, in the order written; `family` dropped when anyone else is there; null or blank gives an empty list.
   - `fun tagFor(people: List<PersonId>, order: List<PersonId>): String`: `require(people.isNotEmpty())`, `require(PersonId.FAMILY !in people || people.size == 1)`; sorted by index in `order` (ids not in `order` last, as given), joined with `,`.
   - `fun resolvePeople(forPerson: String?, sourcePerson: PersonId, people: Map<PersonId, Person>, order: List<PersonId>): List<Person>`: the ids in `peopleIn` that `people` knows (Family included), in household order. An untagged event gives `listOf(people[sourcePerson] ?: Person.Family)`; a tag with nobody known gives `listOf(Person.Family)` (ruling 4).
-  - `fun whoLine(people: List<Person>): String` and `fun spokenWho(people: List<Person>): String` (ruling 8).
+  - `fun whoLine(people: List<Person>): String` and `fun spokenWho(people: List<Person>): String` (ruling 8). `spokenWho` calls `fun spokenNames(names: List<String>): String` ("Sam", "Sam and Mia", "Alex, Sam and Mia"), which Task 9's free lines also use.
 - `CalendarEditor.colorOf(forPerson)` gives a colour only for a tag of exactly one real person.
 
 - [ ] **Step 1: The failing tests.**
@@ -351,8 +351,8 @@ docs/superpowers/plans/2026-09-23-plan1-followups.md (Tasks 17–19)
   - `PersonResolutionTest` keeps passing through `resolvePerson`.
 
   Run `./gradlew :capability:calendar:testDebugUnitTest --tests '*WhoTest*' --tests '*CalendarEditorTest*' --tests '*CalendarStoreTest*' --tests '*PersonResolutionTest*' :provider:calendar-google:testDebugUnitTest :provider:calendar-fake:testDebugUnitTest :capability:calendar-testkit:testDebugUnitTest`. Expected: FAIL to compile (no `Who.kt`), and `ContractSuiteSelfTest` fails on its counts until they are updated. The storage, colour and permission tests are pins and pass once `WhoTest` compiles.
-- [ ] **Step 2: Implement** per the Interfaces and rulings 2–6. The fake's sample uses `idsByName` for Sam and Mia, so `today_` and `week_` images that draw the fake's samples may move; predict them from the compare report.
-- [ ] **Step 3: The gate and commit.** Expected: PASS; only images drawing the fake's samples change (none in `:capability:calendar`, whose samples are `SampleUi`).
+- [ ] **Step 2: Implement** per the Interfaces and rulings 2–6. The fake's sample uses `idsByName` for Sam and Mia.
+- [ ] **Step 3: The gate and commit.** Expected: PASS, **no image changed**, since no screenshot test draws the fake's samples.
 ```bash
 git add capability/calendar capability/calendar-testkit provider/calendar-google provider/calendar-fake
 git commit -m "Let one event be for several people, stored as a list of ids in the one tag, with no colour of its own and a child still only able to add for themselves"
@@ -372,7 +372,7 @@ git commit -m "Let one event be for several people, stored as a list of ids in t
   - `ui/Components.kt`: `StripedBar(colors: List<Color>, width: Dp, modifier: Modifier = Modifier, radius: Dp = width / 2)` (as `ColourBar` rounds) replaces `ColourBar`'s uses for events; `ColourBar` stays only where something isn't an event.
   - `ui/TodayCard.kt` (the bar, and the meta line's who line), `ui/ComingUpCard.kt:115/:120`, `ui/EventDetailSheet.kt:203` (title bar), `:248–249` (Who row: overlapping dots as on the week chip, then the who line), `ui/Spoken.kt:52/:57`.
   - `ui/WeekView.kt` and `ui/WeekLane.kt` read `people.first()` for now, so they compile unchanged in look (Task 3 redraws them).
-- Test: `PersonResolutionTest.kt` (moves to `resolvePeople`), `ui/SampleUi.kt` (a `cinema` shared sample, Sam + Mia; every `person =` becomes `people = listOf(…)`), `ui/CardsTest.kt`, `ui/EventDetailSheetTest.kt`, `SpokenTimeTest.kt` or the spoken test that covers `Spoken.kt`, `MultiDayTest.kt`, `ui/CardScreenshotTest.kt`, `ui/DetailScreenshotTest.kt`, `app/src/test/.../ShellScreenshotTest.kt`; and the files that build or read the field: `WhenLabelTest.kt:55` (`EventUi(…)`), `LaneRowsTest.kt:10` (`SpanUi(…)`), `CalendarRepositoryTest.kt:144/:214/:403/:487/:559` (`.person` → `.people.single()`).
+- Test: `PersonResolutionTest.kt` (moves to `resolvePeople`), `ui/SampleUi.kt` (a `cinema` shared sample, Sam + Mia, kept in its own `SampleUi.shared` list outside the default days so existing images don't move; every `person =` becomes `people = listOf(…)`), `ui/CardsTest.kt`, `ui/EventDetailSheetTest.kt`, `SpokenTimeTest.kt` or the spoken test that covers `Spoken.kt`, `MultiDayTest.kt`, `ui/CardScreenshotTest.kt`, `ui/DetailScreenshotTest.kt`, `app/src/test/.../ShellScreenshotTest.kt`; and the files that build or read the field: `WhenLabelTest.kt:55` (`EventUi(…)`), `LaneRowsTest.kt:10` (`SpanUi(…)`), `CalendarRepositoryTest.kt:144/:214/:403/:487/:559` (`.person` → `.people.single()`).
 
 **Interfaces:**
 - Consumes: `resolvePeople`, `whoLine`, `spokenWho` (Task 1).
@@ -448,15 +448,19 @@ git commit -m "Draw a shared event's week chip on the neutral surface with a str
 - Consumes: `tagFor`, `peopleIn` (Task 1).
 - Produces:
   - `suspend fun CalendarEditor.assign(ref: EventRef, people: List<PersonId>): EditResult` writes `tagFor(people, order())`; ASSIGN_SERIES for a recurring event, as today.
-  - `internal fun toggled(current: List<PersonId>, tapped: PersonId): List<PersonId>`, in `Who.kt`: Family gives `[FAMILY]`; a person on Family gives `[person]`; otherwise membership is toggled; removing the last person leaves the set as it was.
+  - `internal fun toggled(current: List<PersonId>, tapped: PersonId, mayClear: Boolean = false): List<PersonId>`, in `Who.kt`:
+    - tapping Family gives `[FAMILY]`;
+    - tapping a person when the set is Family gives `[person]`;
+    - otherwise membership is toggled;
+    - removing the last person leaves the set as it was, unless `mayClear`.
 
 - [ ] **Step 1: The failing tests.**
   - `WhoTest.toggling`: `[sam]` + mia gives `[sam, mia]`; `[sam, mia]` + sam gives `[mia]`; `[mia]` + mia stays `[mia]`; `[sam]` + FAMILY gives `[FAMILY]`; `[FAMILY]` + sam gives `[sam]`.
   - `EventDetailSheetTest.theChipsShowTheSetChosen`: on a Sam + Mia recurring event in ChoosingPerson, `assign_Sam` and `assign_Mia` are selected and the others aren't. TalkBack: the chips are toggles (`Role.Checkbox`), with "Sam, chosen".
   - `EventDetailHostTest.tappingAChipAddsThatPersonToTheEvent`: Alex signed in taps `assign_Sam` on Mia's event, and the store's tag becomes `"sam,mia"` (household order).
-  - `EventDetailHostTest.theLastPersonCannotBeCleared`: tapping Mia on a Mia-only event writes nothing.
+  - `EventDetailHostTest.theLastPersonCannotBeCleared` (**pin**: a tap on the chosen person already writes the same tag): tapping Mia on a Mia-only event writes nothing.
   - `EventDetailHostTest.familyStaysExclusive`: tapping Family on Sam + Mia writes `"family"`; then tapping Sam writes `"sam"`.
-  - `EventDetailHostTest.aChildTappingADetailChipIsAskedForAnAdultAndNothingChanges` (Review Focus 4): Mia (child) taps `assign_Sam` and gets the `ASK_AN_ADULT` toast; nothing is written and nothing is queued.
+  - `EventDetailHostTest.aChildTappingADetailChipIsAskedForAnAdultAndNothingChanges` (**pin**, Review Focus 4; ASSIGN already gates it): Mia (child) taps `assign_Sam` and gets the `ASK_AN_ADULT` toast; nothing is written and nothing is queued.
   - `CalendarEditorTest.assigningASetToASeriesTagsEveryOccurrence`: ASSIGN_SERIES with `"sam,mia"` and no colour.
   - `EventDetailHostTest.theChooserStaysOpenAfterAToggle`: after tapping Sam, `assign_Alex` is still shown.
   - `EventDetailHostTest.twoTogglesInARowBothLand`: with a writer holding the first write, Sam is tapped on Mia's event; the chips are disabled until it lands; then Alex is tapped. The tag is `"alex,sam,mia"`.
@@ -576,15 +580,18 @@ git commit -m "Let an overlay take the whole screen, rail included, and let a to
 - Modify: nothing else (the old `EventForm` stays until Task 16).
 
 **Interfaces:**
-- Consumes: `TimeChoice`, `MAX_SPAN_DAYS`, `UNTIL_TOO_LATE`, `MAX_TITLE_LENGTH`, `lengthLabel` (`EventForm.kt`); `RepeatChoice`, `RepeatEnd.Never`/`After`, `recurrenceRule`, `MIN_TIMES`/`MAX_TIMES`/`DEFAULT_TIMES` (`Recurrence.kt`); `tagFor`, `peopleIn` (Task 1); `EditableEvent`, `EventDraft`, `EventField`, `daySpan`, `whenLabel`.
+- Consumes: `TimeChoice`, `MAX_SPAN_DAYS`, `UNTIL_TOO_LATE`, `MAX_TITLE_LENGTH`, `lengthLabel` (`EventForm.kt`); `RepeatChoice`, `RepeatEnd.Never`/`After`, `recurrenceRule`, `MIN_TIMES`/`MAX_TIMES`/`DEFAULT_TIMES` (`Recurrence.kt`); `tagFor`, `peopleIn` (Task 1); `toggled` (Task 4); `EditableEvent`, `EventDraft`, `EventField`, `daySpan`, `whenLabel`.
 - Produces, in `EditorForm.kt`:
   - `class EditorForm(mode: EventForm.Mode, today: LocalDate, now: LocalTime, zone: ZoneId, signedIn: PersonId?, childOnly: PersonId?, preselectedDay: LocalDate?, order: List<PersonId>, repeats: Boolean = true)`. It reuses `EventForm.Mode` until Task 16 moves `Mode` here.
   - `var title` and `fun updateTitle(value)`, as `EventForm`.
-  - `var who: List<PersonId>` (private set): empty for an adult's new event; `[childOnly]` for a child's. `fun toggleWho(person: PersonId)` uses `toggled`, except that it may clear the last person (the pane's Next and the reason handle an empty set). `val everyone: Boolean`.
+  - `var who: List<PersonId>` (private set): empty for an adult's new event; `[childOnly]` for a child's. `fun toggleWho(person: PersonId)` uses `toggled(who, person, mayClear = true)`; the pane's Next and the reason handle an empty set. `val everyone: Boolean`.
   - `var day: LocalDate?`, `var until: LocalDate?`, `var multiDay: Boolean`, `val awaitingLastDay: Boolean`; `fun setMultiDay(on: Boolean)`, `fun tapDay(date: LocalDate)` (ruling 18); `val untilError: String?` (`UNTIL_TOO_LATE` or null).
   - `var time: TimeChoice`, `var length: java.time.Duration`, `val startTime: LocalTime?`, `var endError: String?`; `fun chooseAllDay()`, `fun chooseHour(hour: Int)`, `fun chooseMinute(minute: Int)`, `fun chooseTime(time: LocalTime)`, `fun chooseLength(length: Duration)`, `fun chooseEndTime(end: LocalTime)`, `val untilTimeLabel: String` ("Until…" until an end is picked, then "Until 18:30").
   - `val EDITOR_LENGTHS = listOf(Duration.ofMinutes(30), Duration.ofMinutes(45), Duration.ofHours(1), Duration.ofHours(2))` (`java.time.Duration`, as `EventForm`); `fun lengthChip(length: Duration): String` gives "30 min", "45 min", "1 hour", "2 hours".
   - `internal const val END_BEFORE_START = "The end is before the start. Pick a later time."`.
+  - `val mode: EventForm.Mode`.
+  - `val pickerTime: LocalTime`: the start picker's initial, which is the chosen time, else the next whole hour (as `EventForm.pickerTime`).
+  - `val endPickerTime: LocalTime`: the end picker's initial, which is the start plus the length.
   - `val datesLocked`, `fun lockedDatesLabel(service)`, `val canRepeat`, `var repeat`, `var repeatEnd`, `fun chooseRepeat`, `fun stopsAfter()`, `fun keepsGoing()`, `fun fewerTimes()`, `fun moreTimes()`. They carry over from `EventForm`, with `stopsAfter` as 9c-1's `chooseAfter` and `keepsGoing` as `chooseEnd(Never)`.
   - `enum class Needed { Title, Who, Day }`, `val missing: List<Needed>`, `fun needsLine(missing: List<Needed>): String?`, `val reason: String?`, `val canSave: Boolean get() = reason == null`.
   - `val edited`, `val touched`, `val unchanged`, `fun draft(createdBy: String?): EventDraft` (requires `canSave`).
@@ -595,8 +602,9 @@ git commit -m "Let an overlay take the whole screen, rail included, and let a to
     - `aChildsNewEventStartsAsThemselves`: `who == [mia]`.
     - `toggleWhoKeepsTheHouseholdOrder`: mia then alex gives `[alex, mia]`.
     - `everyoneClearsThePeopleAndAPersonClearsEveryone`.
+    - `theLastPersonCanBeClearedInTheForm`: from `[sam]`, `toggleWho(sam)` gives `[]` and `Needed.Who`. The detail sheet's chips can't do this (Task 4).
     - `anEditOpensOnItsSetWithRemovedPeopleDropped`: an event tagged `"sam,gone"` opens with `[sam]`.
-    - `anUntaggedEditOpensAsFamily`.
+    - `anUntaggedEditOpensAsItsCalendarsPerson`: an untagged event on a calendar mapped to Alex opens with `[alex]`, and its untouched draft keeps `forPerson == null`. On an unmapped calendar it opens as Family.
     - `anUntouchedWhoKeepsTheTagExactly`: the untagged edit's draft has `forPerson == null`.
     - `theDraftCarriesTheSetsTag`: `[mia, sam]` gives `"sam,mia"`.
   - **Day:**
@@ -618,17 +626,18 @@ git commit -m "Let an overlay take the whole screen, rail included, and let a to
     - `anHourSetsItOnTheHour`: `chooseHour(10)` gives `Custom(10:00)`, length 1 hour.
     - `aMinuteKeepsTheHour`: then `chooseMinute(45)` gives 10:45; `chooseHour(14)` gives 14:45.
     - `aMinuteWhileAllDayIsIgnored`.
+    - `thePickersStartWhereTheFormIs`: on New at 09:20, `pickerTime` is 10:00. After `chooseHour(14)` with 45 minutes, `pickerTime` is 14:00 and `endPickerTime` is 14:45. `mode` is the one given.
     - `otherTimeSetsAnyTime`: `chooseTime(06:30)`.
     - `theLengthsAreTheFour`: `EDITOR_LENGTHS` chips read "30 min", "45 min", "1 hour", "2 hours".
     - `anEndTimeSetsTheLength`: 10:00, then `chooseEndTime(11:20)`, gives length 80 minutes and `untilTimeLabel == "Until 11:20"`.
-    - `anEndAtOrBeforeTheStartIsRefused`: `chooseEndTime(09:30)` and `(10:00)` leave the length and set `endError == END_BEFORE_START`, which is the `reason` and blocks Save; `chooseLength(30 min)` clears it.
+    - `anEndAtOrBeforeTheStartIsRefused`: `chooseEndTime(09:30)` and `(10:00)` leave the length and set `endError == END_BEFORE_START`. `reason` stays null and `canSave` stays true, because the draft is unchanged. `chooseLength(30 min)` clears the error.
     - `anEditsOwnLengthShowsAsUntil`: a 90-minute edit gives "Until {end}".
     - `aTimedEventStillEndsByMidnight` (port): 23:00 for 2 hours ends 00:00 the next day.
   - **Missing and reason** (ruling 23):
     - `needsLineNamesWhatIsMissing`: each of the seven combinations gives its line exactly, and nothing missing gives null.
     - `theReasonIsNeedsFirst`: missing Day plus the cap gives "Needs a day".
   - **Edited and touched** (ruling 15, ruling 16):
-    - `choosingOnlyWhoOrADayIsEdited`: on a fresh form, each answer on its own makes `edited` true: Who, Day, multi-day on, the last day, an hour, a minute, a length, a repeat.
+    - `choosingOnlyWhoOrADayIsEdited`: on a fresh form, each answer on its own makes `edited` true: Who, Day, multi-day on, the last day, an hour, a length, a repeat. A minute counts only after an hour: a minute while All day is ignored, so it isn't an edit.
     - `aReorderedSetIsNotTouched`: an edit stored as `"mia,sam"` (an old household order), with Sam ticked off and on again, has `touched` without `FOR_PERSON` and is `unchanged`.
     - `everyoneAndAPersonNeverMix`: Everyone then Sam gives `[sam]`; Sam then Everyone gives `[FAMILY]`; neither draft throws in `tagFor`.
   - **Ported from `EventFormTest`** (same assertions, new members):
@@ -681,7 +690,7 @@ git commit -m "Add the new editor's form: several people, a day that starts empt
   - `fun occurrences(choice: RepeatChoice, day: LocalDate, count: Int): List<LocalDate>`: the one source of the last date (ruling 34).
   - `fun seriesStart(rule: String?): LocalDate?` and `fun choiceOf(rule: String, start: LocalDate): RepeatChoice?` (the rule parsed back, null for anything the editor can't make).
   - In `EditorForm`: `val stepperLabel: String?` ("12 times · last on Sat 12 Dec" while `After`) and `val repeatsValue: String` ("Doesn’t repeat", or the wording, plus " · 12 times").
-  - `repeatsLabel(rule, start, zone)` per ruling 35.
+  - `repeatsLabel(rule, start, zone)` per ruling 35. It first tries `choiceOf(rule, seriesStart ?: start)?.wording(…)`, so the editor's words are built in one place. Only monthly by date, other intervals and "Yes" are its own branches.
 
 - [ ] **Step 1: The failing tests.**
   - `RecurrenceTest`:
@@ -693,7 +702,7 @@ git commit -m "Add the new editor's form: several people, a day that starts empt
       - weekly from Sat 26 Sep, 12 gives Sat 12 Dec last;
       - monthly 4th Saturday from 26 Sep, 3 gives 26 Sep, 24 Oct, 28 Nov;
       - last Thursday from 29 Oct, 3 gives 29 Oct, 26 Nov, 31 Dec;
-      - yearly from Sat 29 Feb 2028, 2 gives 29 Feb 2028 and 29 Feb 2032;
+      - yearly from Tue 29 Feb 2028 (`LocalDate.of(2028, 2, 29)`), 2 gives 29 Feb 2028 and 29 Feb 2032;
       - daily 3 gives three days.
     - `neverBothUntilAndCountForAnyRepeatEnd` (port, with the day).
   - `EditorFormTest`:
@@ -715,14 +724,15 @@ RRULE:FREQ=WEEKLY;COUNT=12"` adds " · 12 times · last on Sat 12 Dec", read thr
     - `UNTIL=20261212` adds " · until Sat 12 Dec";
     - `UNTIL=20261212T095959Z` (Google's timed form) reads " · until Sat 12 Dec" in Europe/London, not a day off;
     - `INTERVAL=3` monthly reads "Every 3 months";
-    - `BYDAY=MO,WE` reads "Yes".
+    - `BYDAY=MO,WE` reads "Yes";
+    - `theReadBackAgreesWithTheEditor`: for every `EDITOR_REPEATS` entry except Never, on Sat 26 Sep, `repeatsLabel(recurrenceRule(choice, Never, false, zone, day), day, zone)` equals `choice.wording(day)`.
   - `RecurrenceExpanderTest`:
     - `aMonthlyNthWeekdayFollowsTheWeekday`: from Sat 26 Sep 2026, `BYDAY=4SA;COUNT=3` gives 26 Sep, 24 Oct, 28 Nov at the same local time.
     - `theLastWeekdayIsTheLastInEachMonth`: `BYDAY=-1TH`.
     - `aCountedNthSeriesStopsAtItsCount`.
     - `theExpanderAgreesWithOccurrences` (property test, risk of drift between the two): for each of `EDITOR_REPEATS` except Never; start days 22–31 Oct 2026, 29 Feb 2028, and a 10:00 timed start that crosses the 25 Oct clocks change; COUNT 2, 10 and 52: the fake's expansion of `recurrenceRule(choice, After(n), allDay, zone, day)` equals `occurrences(choice, day, n)` as local dates.
   - `FakeCalendarProviderTest.aSeriesKeepsItsFirstDateWithItsRule`: a created weekly series syncs back with `seriesStart(rule) == ` its first date on every occurrence.
-  - `GoogleReadTest.aSeriesRuleCarriesItsFirstDate`: an instance whose master starts 26 Sep reads a rule beginning `DTSTART:20260926`.
+  - `GoogleReadTest.aSeriesRuleCarriesItsFirstDate`: an instance whose master starts 26 Sep reads a rule beginning `DTSTART:20260926`. A timed master at 23:30 on 26 Sep in Europe/London, which Google gives as `2026-09-26T22:30:00Z`, also reads `DTSTART:20260926`.
   - `GoogleWriteTest.aMonthlyNthSeriesSendsItsRule` (**pin**): the insert's `recurrence` holds the `BYDAY=4SA` line and no `DTSTART` line.
 
   Run `./gradlew :capability:calendar:testDebugUnitTest --tests '*RecurrenceTest*' --tests '*RepeatsTest*' --tests '*EditorFormTest*' --tests '*EventFormTest*' :provider:calendar-fake:testDebugUnitTest --tests '*RecurrenceExpander*' :provider:calendar-google:testDebugUnitTest --tests '*GoogleWriteTest*'`. Expected: FAIL.
@@ -756,8 +766,8 @@ git commit -m "Word repeats from the chosen day, repeat monthly on the nth weekd
   - `sealed interface FreeCheck { data object None : FreeCheck; data class Free(val people: List<PersonId>) : FreeCheck; data class Busy(val person: PersonId, val event: HeldEvent, val freeStarts: List<LocalTime>) : FreeCheck }`.
   - `fun Held.check(people: List<PersonId>, day: LocalDate, start: LocalTime, length: java.time.Duration, zone: ZoneId, except: EventRef?, order: List<PersonId>): FreeCheck`, which is `None` for no people, for Everyone, past `lastDay`, or when any chosen person is in `unhealthy`. The checked span ends at midnight at most, as the draft caps it.
 - Produces, in `EditorWords.kt`:
-  - `fun freeLine(check: FreeCheck.Free, names: (PersonId) -> String): String` and `fun clashLine(check: FreeCheck.Busy, single: Boolean, names: …, zone): String` (ruling 32).
-  - `fun freeAtLine(people: List<String>): String`; `const val CLASHES_ALLOWED_TAIL = "or keep it; clashes are allowed."`, `CLASHES_ALLOWED = "Clashes are allowed."`.
+  - `fun freeLine(check: FreeCheck.Free, names: (PersonId) -> String): String` and `fun clashLine(check: FreeCheck.Busy, single: Boolean, names: (PersonId) -> String, zone: ZoneId): String` (ruling 32). Both join names with `spokenNames` (Task 1).
+  - `fun freeAtLine(people: List<String>): String`, also through `spokenNames`; `const val CLASHES_ALLOWED_TAIL = "or keep it; clashes are allowed."`, `CLASHES_ALLOWED = "Clashes are allowed."`.
   - `fun whoValue(form, people): String`, `fun dayValue(form): String`, `fun timeValue(form): String` (row values).
   - `fun checkSentence(form: EditorForm, people: List<Person>): String` and `fun firstDates(form: EditorForm): Pair<List<LocalDate>, Int>` (four dates and how many more) (ruling 36).
 
@@ -772,7 +782,7 @@ git commit -m "Word repeats from the chosen day, repeat monthly on the nth weekd
     - `aMultiDayTimedEventMakesTheDaysBetweenBusy`: a timed event Fri 18:00 – Sun 16:00 makes every Saturday hour busy.
     - `theCheckStopsAtMidnight`: 22:30 for 2 hours checks only to 00:00, so an event at 00:15 the next day isn't a clash.
     - `theClocksChangeKeepsLocalHours`: on Sun 25 Oct 2026 an event 10:00–11:00 local marks hour 10 only.
-    - `noFreeStartBeforeSevenOrPastEleven`: a busy day 07:00–22:00 gives none.
+    - `noFreeStartBeforeSevenOrPastEleven`: the whole span must lie within 07:00–23:00. A day busy 07:00–23:00 gives none, and so does a 2-hour check on a day busy 07:00–21:30.
     - `severalPeopleNameTheBusyOneInHouseholdOrder`: Sam and Mia both busy names Sam.
     - `everyoneChecksNobody`: `[FAMILY]` gives `None`.
     - `aDayPastTheHeldWindowHasNoLine` (Review Focus 5): on `lastDay + 1`, with a Piano there in the data, `check` is `None` and `busyHours` is empty. On `lastDay` it is `Busy`.
@@ -783,7 +793,7 @@ git commit -m "Word repeats from the chosen day, repeat monthly on the nth weekd
     - `aSharedEventGivesEachPersonADot`.
     - `noDotsPastTheHeldWindow`.
   - `CalendarRepositoryTest.heldCoversTodayToTheLastShownDayWithQueuedChanges`: a queued create shows, a queued delete hides, and an event on `lastShownDay + 1` isn't there.
-  - `CalendarRepositoryTest.aStaleSyncHoldsFewerDays` (Review Focus 5): with the connection's last successful sync five days ago, `lastDay` is that sync's day + `SYNC_FUTURE_DAYS`, five days short of `lastShownDay`.
+  - `CalendarRepositoryTest.aStaleSyncHoldsFewerDays` (Review Focus 5): with the connection's last successful sync five days ago, `lastDay` is that sync's day + `SYNC_FUTURE_DAYS` (today + 23), four days short of `lastShownDay`.
   - `CalendarRepositoryTest.anUnhealthyConnectionMarksItsPeople`: a connection needing sign-in puts the person mapped to its calendar in `unhealthy`; a healthy one doesn't.
   - `EditorWordsTest`:
     - `theRowValues`: "Choose who", "Sam + Mia", "Everyone"; "Choose a day", "Sat 26 Sep", "Thu 29 Oct – Sun 1 Nov"; "All day", "10:00–10:45".
@@ -820,7 +830,7 @@ git commit -m "Work out from the days the tablet holds who is busy when, the nea
   - `core/ui/.../Buttons.kt`: `HhFooterButton(…, below: Boolean = false, hint: String? = null)`, where the reason or hint goes under the button with the `info` icon.
   - `ui/CalendarType.kt`: `EditorDimens`, with the Units values.
   - `CalendarRepository.kt`: `masterCalendarName: Flow<String?>`.
-  - Icons: `event_note`.
+  - Icons: `event_note`, and `group` (the Who row's icon).
   - `ui/SampleUi.kt` / `ui/EditForms.kt`: `editorForm(...)` fixtures.
 - Test: `core/ui/src/test/.../ButtonsTest.kt`.
 
@@ -835,7 +845,7 @@ git commit -m "Work out from the days the tablet holds who is busy when, the nea
   - `internal const val DISCARD_NEW = "Discard this event?"`, `DISCARD_CHANGES = "Discard your changes?"`, `KEEP_EDITING = "Keep editing"`, `DISCARD = "Discard"`.
   - `fun savesToLine(name: String): String` (ruling 25). The host passes the master's name on New and the event's `sourceName` on Change.
   - The panes take what they need from these: the people are `members.map { it.person }`, and the event a clash check skips is derived from `form.mode` (an Edit's ref), not passed.
-  - `Icons.EVENT_NOTE`.
+  - `Icons.EVENT_NOTE`, `Icons.GROUP`.
 - Until Tasks 11–14, `EditorPaneFor` draws each pane's question with an empty body.
 
 - [ ] **Step 1: The failing tests.** These are in `EventEditorScreenTest` at 1280 × 800 dp; each ends with `assertClickablesHaveRoleAndLabel()`.
@@ -897,7 +907,7 @@ git commit -m "Add the full-screen editor's frame: the event so far on the left 
   - `CalendarRepository.kt`: `members: Flow<List<Member>>`;
   - `ui/EditorPane.kt`: `EditorPaneFor(Who)`;
   - `ui/AddEventScreenshotTest.kt`;
-  - Icons: `group` (the Who row), `groups` (Everyone).
+  - Icons: `groups` (Everyone).
 
 **Interfaces:**
 - Consumes: `HhChoiceChip(locked)`'s rule (9c-1 ruling 8: one `locked` flag for paint and click), `EditorForm.toggleWho`, `cannotAddForOthers`.
@@ -905,7 +915,7 @@ git commit -m "Add the full-screen editor's frame: the event so far on the left 
   - `@Composable internal fun WhoPane(form: EditorForm, members: List<Member>, childOnly: PersonId?, childName: String?, busy: Boolean, onRefusedWho: () -> Unit)`.
   - Tags: `who_{name}`, `who_everyone`, `editor_who_only`.
   - `internal const val EVERYONE = "Everyone"`, `SHOWS_AS_FAMILY = "Shows as a Family event"`, `PICK_MORE_THAN_ONE = "Pick more than one person for a shared event."`.
-  - `Icons.GROUP`, `Icons.GROUPS`.
+  - `Icons.GROUPS`.
 
 - [ ] **Step 1: The failing tests.** Each ends with `assertClickablesHaveRoleAndLabel()`.
   - `tilesAreThreeAcrossAsDrawn`: the tiles are 160 dp tall, 13 dp apart, three a row; each has a 64 dp circle with the initial, the name, and the role ("Adult", "Child").
@@ -927,7 +937,7 @@ git commit -m "Add the full-screen editor's frame: the event so far on the left 
 - [ ] **Step 2: Implement** per ruling 16 and Units.
 - [ ] **Step 3: Images.**
   - New: `add_event_who_dark` (6b, Sam and Mia chosen), `add_event_who_child_dark`.
-  - Also predicted: `add_event_start_` (the `group` icon).
+  - Also predicted: `add_event_start_*` and `add_event_keyboard_*`, because the Who pane now draws beside them.
   - Check against handoff 6b.
 ```bash
 git add capability/calendar core/household core/setup app tools/fonts core/ui
@@ -942,7 +952,8 @@ git commit -m "Add the editor's Who pane: tiles that choose one or several peopl
 
 **Files:**
 - Create: `ui/DayPane.kt`; test `ui/DayPaneTest.kt`.
-- Modify: `ui/EditorPane.kt`, `ui/AddEventScreenshotTest.kt`.
+- Modify: `ui/EditorPane.kt`, `ui/AddEventScreenshotTest.kt`, `core/ui/.../Colors.kt` (`HhAlpha.OUTSIDE_MONTH`).
+- Test: `core/ui/src/test/.../ContrastTest.kt`.
 
 **Interfaces:**
 - Consumes: `EditorForm.tapDay`/`setMultiDay`/`untilError`, `Held.dotsOn`, `HhSwitchRow`, `HhRoundButton`, `HhChoiceChip`, `HhStatusLine(icon = ERROR, style = fieldError)`.
@@ -956,8 +967,8 @@ git commit -m "Add the editor's Who pane: tiles that choose one or several peopl
 - [ ] **Step 1: The failing tests.** Each ends with `assertClickablesHaveRoleAndLabel()`; today is Wed 23 Sep 2026.
   - `quickPicksAreAsTheHandoffSays` (ruling 29): "Today", "Tomorrow", "Sat 26 Sep", "Wednesday next week"; on a Friday the weekend pick is Sun.
   - `theMonthStartsOnMonday`: `monthCells(Sep 2026)` starts Mon 31 Aug and ends Sun 4 Oct; the weekday letters read M T W T F S S.
-  - `pastAndOutsideDaysFade`: a `pixelAt` inside Mon 21 Sep's digit stroke matches `ink` at `HhAlpha.PAST_DAY` over `surf`, and Mon 31 Aug's matches `HhAlpha.OUTSIDE_MONTH` (within 2 per channel, values hard-coded). Past days are still tappable (any date is allowed).
-  - `ContrastTest.outsideMonthDaysKeepTheirContrast` (core/ui): `HhAlpha.OUTSIDE_MONTH` passes 4.5:1 in both themes, as `PAST_DAY` does.
+  - `ContrastTest.outsideMonthDaysKeepTheirContrast` (core/ui), written first: it picks `HhAlpha.OUTSIDE_MONTH`'s value as the lowest that passes 4.5:1 in both themes, as `PAST_DAY` does.
+  - `pastAndOutsideDaysFade`: each cell carries a test-only semantics key, `DayFade`, holding the alpha it draws at. Mon 21 Sep's is `PAST_DAY`, and Mon 31 Aug's is that chosen number, hard-coded. Past days are still tappable (any date is allowed).
   - `todayIsRingedAndTheChosenDayFilled`: Wed 23's ring pixel is `accent` and its date is W700; after a tap on Sat 26, its circle centre-edge pixel is `accent` with `accentInk` text.
   - `aPickMovesOnToTime` (ruling 20): a tap on Sat 26 sets the day, and Time is active at 266 ms.
   - `upToThreeDotsFromHeldEvents`: a day with four people's events shows three 5 dp dots; a day past `held.lastDay` shows none.
@@ -1023,9 +1034,9 @@ git commit -m "Add the editor's Day pane: quick picks, a month with each day's p
     - the Time row's `editor_row_time_tag` "Clash";
     - `editor_save` still enabled, with the hint "Clashes are allowed; both show on the week".
   - `aFreeStartChipMovesTheTime`: `time_free_1615` sets 16:15, and the clash goes.
-  - `pastTheHeldWindowThereIsNoResultLineAndNoTag` (Review Focus 5): on `lastShownDay + 1` with Mia chosen, there is no `time_result` check line (only the range), no busy hour and no Clash tag.
-  - `everyoneHasNoCheck`.
-  - `aPersonWhoseCalendarNeedsSignInHasNoCheck`: with Mia in `held.unhealthy`, no `time_result` check line and no busy hours.
+  - `pastTheHeldWindowThereIsNoResultLineAndNoTag` (Review Focus 5): Piano is on both days. As the control, 15:00 on `lastShownDay` shows the line and the Clash tag. On `lastShownDay + 1` there is no `time_result` check line (only the range), no busy hour and no Clash tag.
+  - `everyoneHasNoCheck`: as the control, Mia chosen at 15:00 shows the clash. Everyone at the same time shows none.
+  - `aPersonWhoseCalendarNeedsSignInHasNoCheck`: as the control, a healthy Mia at 15:00 shows the clash. With Mia in `held.unhealthy` there is no `time_result` check line and no busy hour.
   - `multiDayLocksAtATime` (ruling 18): with multi-day on, `time_mode_1` is locked, and a tap shows `time_all_day_only` "An event over several days is all day.".
   - `skipLeavesItAsItIs`: `editor_skip` moves to Repeats with the time unchanged.
 
@@ -1078,7 +1089,7 @@ git commit -m "Add the editor's Time pane: all day or hour and minute chips with
   Run `./gradlew :capability:calendar:testDebugUnitTest --tests '*RepeatsPaneTest*' --tests '*CheckPaneTest*'`. Expected: FAIL.
 - [ ] **Step 2: Implement** per rulings 33–34, 36 and Units.
 - [ ] **Step 3: Images.**
-  - New: `add_event_repeats_dark` (6f, Weekly, Stops after 12), `add_event_check_dark` (6g), `change_event_dark` (now its Check pane), `add_event_check_shared_dark`.
+  - New: `add_event_repeats_dark` (6f, Weekly, Stops after 12), `add_event_check_dark` (6g), `add_event_check_shared_dark`. Changed: `change_event_dark`, whose Check pane is now drawn.
   - Check against handoff 6f and 6g.
 ```bash
 git add capability/calendar
@@ -1098,7 +1109,8 @@ git commit -m "Add the editor's Repeats pane, worded from the day with one stepp
   - `CalendarEditor.kt`: `AddedEvent`, `undoAdd`, the added toast with its action; `EVENT_ADDED` and `eventAddedFor` go.
   - `CalendarSync.kt`: when a CREATE comes back Accepted and its key is in `UndoneKeys`, it isn't mirrored and is deleted at once. A key whose delete failed is retried on the next pass (ruling 39).
   - `CalendarStore.kt` + `db/CalendarDatabase.kt`: `applySeriesDeleted`, a DAO delete by `seriesId` or `remoteId`; no schema change.
-  - `CalendarUi.kt`: `addedLine`.
+  - `CalendarUi.kt`: `addedLine`, and `internal fun weeksTo(today: LocalDate, date: LocalDate): Int?` (null past `lastShownDay` or before today). `addedLine`'s `beyond` is the date whenever `weeksTo` is null.
+  - `TestEngines.kt`, and every test that constructs `CalendarSync` or `CalendarEditor`: pass `UndoneKeys()`.
   - `provider/calendar-google/.../GoogleCalendarProvider.kt`, `provider/calendar-fake/.../FakeCalendarProvider.kt`.
   - `capability/calendar-testkit/.../CalendarProviderContractTest.kt`. The series checks don't use `assertMatches`, which asserts a written event is never recurring (`:202`).
   - `capability/calendar-testkit/src/test/.../TinyProvider.kt`: a series create that expands its occurrences, and `deleteSeries`.
@@ -1118,7 +1130,7 @@ git commit -m "Add the editor's Repeats pane, worded from the day with one stepp
 - Consumes: `Toaster.show(…, action)`, `ToastAction` (Task 6); `repeatsLabel`, `RepeatChoice.wording` (Task 8).
 - Produces:
   - `suspend fun CalendarWriter.deleteSeries(conn: Connection, source: CalendarSource, seriesId: String)`, with the same throws as `delete` and the contract of ruling 40.
-  - `data class AddedEvent(val key: String, val connectionId: String, val sourceId: String, val title: String, val series: Boolean, val createdBy: String, val attempted: Boolean)`.
+  - `data class AddedEvent(val key: String, val connectionId: String, val sourceId: String, val title: String, val series: Boolean, val createdBy: String)`. Whether the create was ever sent is read from its outbox row, under the write lock, when Undo runs, because the drain may try it within the 8 s.
   - `suspend fun CalendarEditor.undoAdd(added: AddedEvent): EditResult`. The only gate is `who.person.id.value == added.createdBy` (ruling 39). With nobody signed in, it asks for a PIN with `PinReason.Delete`.
   - `class UndoneKeys { fun add(key: String); fun has(key: String): Boolean; fun done(key: String); val pending: Set<String> }`.
   - `fun addedLine(title: String, wording: String?, beyond: LocalDate?): String` (ruling 38).
@@ -1157,6 +1169,7 @@ git commit -m "Add the editor's Repeats pane, worded from the day with one stepp
       - the create timed out, so it is queued with `attempts == 1` and Google may hold it;
       - the tablet is still offline;
       - Undo drops the row, toasts "Couldn’t undo — …", and leaves the mirror as it was.
+    - `aDrainAttemptAfterTheAddCountsAtUndo`: the create is queued with `attempts == 0`, then the drain tries once and times out, still offline. Undo reads `attempts == 1` and toasts "Couldn’t undo — …".
     - `onlyThePersonWhoAddedItCanUndo` (Review Focus 2, ruling 39): Alex adds an event. Then Sam (adult), an admin, and Mia (child) are each signed in in turn. Each Undo is refused with `cannotChangeOthers(name)`, and nothing is written, dropped or queued.
     - `thePersonWhoAddedItCanUndoWithoutEditOwn`: with a role set lacking `EDIT_OWN`, Alex's Undo still removes the event.
     - `undoDoesNotOpenSeriesDeleteElsewhere` (**pin**, spec §2 ruling 3): `delete(ref)` of a recurring occurrence still returns `NotEditable`.
@@ -1166,6 +1179,7 @@ git commit -m "Add the editor's Repeats pane, worded from the day with one stepp
     - `deleteSeriesOfAOneOffIsRefused`: `WriteRejectedException`.
   - `GoogleWriteTest.deleteSeriesLooksThenDeletesTheSeries`: a GET of the series id, then a DELETE of it. A 410 on the GET returns without a DELETE.
   - `CalendarStoreTest.applySeriesDeletedRemovesTheSeriesAndItsOccurrences`.
+  - `MonthTitleTest.weeksToTheDate`: today gives 0; today + 6 gives 0; today + 7 gives 1; `lastShownDay` gives 3; one day more gives null; yesterday gives null.
 
   Run `./gradlew :capability:calendar:testDebugUnitTest --tests '*CalendarEditorTest*' --tests '*WriteCopyTest*' --tests '*CalendarStoreTest*' --tests '*CalendarSyncTest*' --tests '*EventEditorHostTest*' :capability:calendar-testkit:testDebugUnitTest :provider:calendar-google:testDebugUnitTest :provider:calendar-fake:testDebugUnitTest :app:testDebugUnitTest --tests '*SampleAddTest*'`. Expected: FAIL to compile.
 - [ ] **Step 2: Implement** per rulings 38–40.
@@ -1193,13 +1207,12 @@ git commit -m "Offer Undo on the toast after adding an event, which removes it, 
     - it collects `repo.held(today)`, `repo.members` and `repo.masterCalendarName`;
     - it draws `EventEditorScreen`, passing the master's name on New and `EventUi.sourceName` on Change (ruling 25);
     - on `Done`/`Queued` for a new event, after `onClose()`, it calls `weekFocus.show(n)` for `weeksTo(today, day)`, and opens the Calendar tab when `from == Home` (ruling 37).
-    - `rememberEventAdder` (`:174`) gains `from`.
+    - `rememberEventAdder` (`:174`) and `rememberEventOpener` gain `from`.
   - `WeekFocus.kt` (create, ruling 37); `ui/CardHosts.kt`: `WeekViewHost` collects `WeekFocus.requested` into `shown.show(n)` then `consumed()`; Home's adder (`:25`) passes `EditorFrom.Home` and today.
   - `ui/Sheets.kt:28`: the detail's Change opens `EditorRequest.Edit(ref, from)`. `showEditor` uses `showFullScreen`; `showDetail` carries `from`.
   - `ui/EventDetailSheet.kt` / `ui/EventDetailHost.kt`: on an editable event, the For row is clickable ("Change who") and opens `Edit(ref, from, start = EditorStep.Who)` (spec §3.3).
-  - `ui/WeekHeader.kt:109–111`: `onAdd(null)` (spec §5 call 9).
+  - `ui/WeekHeader.kt:109–111`: its `onAdd` becomes `((LocalDate?) -> Unit)?`, and Add event calls `onAdd(null)` (spec §5 call 9).
   - `ui/WeekView.kt`: `onAdd: ((LocalDate?) -> Unit)?`; the empty column passes its date.
-  - `CalendarUi.kt`: `internal fun weeksTo(today: LocalDate, date: LocalDate): Int?`.
   - `EditorForm.kt`: takes in `Mode`, `TimeChoice`, `MAX_SPAN_DAYS`, `UNTIL_TOO_LATE`, `MAX_TITLE_LENGTH` and `lengthLabel` from `EventForm.kt`.
   - `Recurrence.kt`: `Monthly`, `COMMON`, `MORE`, `RepeatChoice.label`, `RepeatEnd.OnDate` and the UNTIL branch go.
   - `ui/Pickers.kt`: `DatePickerCard`, `firstPageStart`, `pageOf`, `pageStart`, `pageRangeLabel`, `dateCellLabel` go; `EditorPicker` is `{ None, StartTime, EndTime }`.
@@ -1210,6 +1223,7 @@ git commit -m "Offer Undo on the toast after adding an event, which removes it, 
   - every `editor_*` baseline in `capability/calendar/src/test/screenshots/`: `editor_keyboard_`, `editor_empty_`, `editor_child_`, `editor_repeats_`, `editor_more_options_`, `editor_edit_`, `editor_own_length_`, `editor_failed_`, `editor_date_picker_`, `editor_time_picker_`, `editor_locked_`, `editor_until_`, `editor_until_error_`, `editor_span_edit_`.
 - Re-point:
   - `ui/EventEditorHostTest.kt` (every test, to the new tags; see Step 1);
+  - `CalendarEditorTest.kt:137` (`aMultiDayAllDayEventIsWrittenWithItsExclusiveEnd`): builds an `EditorForm` in place of `EventForm` (`setMultiDay(true)`, then `tapDay` Mon 19 Oct and Wed 21 Oct). Task 15 edits this file earlier;
   - `ui/EditForms.kt`: its `EventForm` fixtures (`dinnerOf`, `editOf`, …) go; the `editorForm` ones stay;
   - `provider/calendar-fake/src/test/.../FakeCalendarProviderTest.kt:366/:374`: the `RepeatEnd.OnDate` cases build a hand-written `UNTIL` rule string instead, so the expander still reads rules made on phones;
   - `ui/PickersTest.kt` (the date picker's tests go; the time picker's stay);
@@ -1234,7 +1248,7 @@ git commit -m "Offer Undo on the toast after adding an event, which removes it, 
 - Produces:
   - `enum class EditorFrom { Home, Calendar }`;
   - `fun contextLine(from: EditorFrom, signedIn: String?): String` (ruling 28);
-  - `internal fun weeksTo(today: LocalDate, date: LocalDate): Int?` (null past `lastShownDay` or before today).
+  - Consumes `weeksTo` (Task 15).
 
 - [ ] **Step 1: The failing tests.** Each UI test ends with `assertClickablesHaveRoleAndLabel()`.
   - `EventEditorHostTest` (re-pointed, plus new):
@@ -1256,7 +1270,6 @@ git commit -m "Offer Undo on the toast after adding an event, which removes it, 
     - `tryAgainAfterATabletFailureReusesTheKeyAndMakesOneEvent`, `anUnchangedEditClosesWithoutAPin`, `typingATitleMarksTheSheetEditedAndClearingItDoesNot`, `dismissingAnEditedSheetSavesNothing`, `aSheetThatCannotLoadClosesAndSaysSo`, `eachOpeningGetsAFreshSheet`, `aQueuedCreateOpensAsSyncingAndItsEditQueuesBehindIt` (ports, same assertions on the new tags).
     - `theContextLineSaysWhereFromAndWho`: "From Calendar · Alex signed in"; from Home with nobody signed in, "From Home".
   - `EventEditorScreenTest.aLockedSpanShowsOneDayRow` (ruling 21): a timed span edit shows Day with "Mon 28 – Wed 30 · change dates in Google Calendar on your phone" and `lock`, and no Time row; tapping Day opens no pane.
-  - `MonthTitleTest.weeksToTheDate` (or `CalendarUiTest`): today gives 0; today + 6 gives 0; today + 7 gives 1; `lastShownDay` gives 3; + 1 more gives null.
   - `CopyScanTest` passes with the side sheet's copy gone.
 
   Run `./gradlew :capability:calendar:testDebugUnitTest :app:testDebugUnitTest`. Expected: FAIL.
