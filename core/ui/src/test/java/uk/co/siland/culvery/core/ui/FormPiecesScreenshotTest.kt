@@ -59,4 +59,19 @@ class FormPiecesScreenshotTest {
 
     @Test fun formPiecesDark() = snap("form_pieces_dark", true)
     @Test fun formPiecesLight() = snap("form_pieces_light", false)
+
+    private fun snapToast(name: String, dark: Boolean) {
+        compose.setContent {
+            CulveryTheme(dark = dark) {
+                Column(Modifier.testTag("shot").background(Culvery.colors.bg).padding(16.dp)) {
+                    HhToast("Added Piano, every Tuesday.", Icons.INFO, actionLabel = "Undo")
+                }
+            }
+        }
+        compose.onNodeWithTag("shot").captureRoboImage("src/test/screenshots/$name.png")
+    }
+
+    @Test fun toastActionDark() = snapToast("toast_action_dark", true)
+
+    @Test fun toastActionLight() = snapToast("toast_action_light", false)
 }

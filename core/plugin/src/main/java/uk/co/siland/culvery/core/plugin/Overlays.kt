@@ -16,6 +16,12 @@ interface OverlayHost {
      */
     fun show(closesWhenIdle: Boolean = true, content: @Composable () -> Unit)
 
+    /**
+     * Like [show], but the content fills the whole window, rail included, with no scrim, so nothing closes it by a tap
+     * outside. The idle close is the same (3.1). A host that can't do this shows it as a sheet.
+     */
+    fun showFullScreen(content: @Composable () -> Unit) = show(content = content)
+
     /** The open sheet has changes that closing it would lose, or is saving them; reset by each show and dismiss. */
     fun markEdited(edited: Boolean)
 
@@ -37,4 +43,14 @@ const val TOAST_ICON_INFO = "info"
  */
 interface Toaster {
     fun show(message: String, icon: String = TOAST_ICON_INFO, urgent: Boolean = false)
+
+    /** Like [show] with one button after the message; a host that can't draw it shows the message alone. */
+    fun show(message: String, icon: String = TOAST_ICON_INFO, urgent: Boolean = false, action: ToastAction) =
+        show(message, icon, urgent)
 }
+
+/** The button a toast carries; a tap runs [onClick] and hides the toast. */
+data class ToastAction(val label: String, val onClick: () -> Unit)
+
+/** How long a toast with an action shows, whatever its length (3.1). */
+const val TOAST_WITH_ACTION_MS = 8_000L

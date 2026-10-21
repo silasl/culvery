@@ -13,11 +13,19 @@ class RecordingOverlay : OverlayHost {
         private set
     var closesWhenIdle = true
         private set
+    var fullScreen = false
+        private set
 
     override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) {
         this.content = content
         this.closesWhenIdle = closesWhenIdle
         edited = false
+        fullScreen = false
+    }
+
+    override fun showFullScreen(content: @Composable () -> Unit) {
+        show(content = content)
+        fullScreen = true
     }
 
     override fun markEdited(edited: Boolean) {
@@ -27,6 +35,7 @@ class RecordingOverlay : OverlayHost {
     override fun dismiss() {
         content = null
         edited = false
+        fullScreen = false
         dismissed++
     }
 }

@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import java.util.concurrent.CopyOnWriteArrayList
+import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 
 class RecordingToaster : Toaster {
@@ -10,8 +11,16 @@ class RecordingToaster : Toaster {
     /** The messages shown as urgent (errors and refusals). */
     val urgent: MutableList<String> = CopyOnWriteArrayList()
 
+    /** The action of each toast shown with one, in order; a plain toast adds nothing. */
+    val actions: MutableList<ToastAction> = CopyOnWriteArrayList()
+
     override fun show(message: String, icon: String, urgent: Boolean) {
         messages += message
         if (urgent) this.urgent += message
+    }
+
+    override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction) {
+        show(message, icon, urgent)
+        actions += action
     }
 }

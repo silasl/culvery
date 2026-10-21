@@ -2,6 +2,7 @@ package uk.co.siland.culvery.shell
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import uk.co.siland.culvery.core.plugin.ToastAction
 
 class ShellToastsTest {
     private val toasts = ShellToasts()
@@ -36,5 +37,13 @@ class ShellToastsTest {
         assertThat(toasts.current.value?.urgent).isTrue()
         toasts.show("Event added.")
         assertThat(toasts.current.value?.urgent).isFalse()
+    }
+
+    @Test
+    fun aNewToastReplacesOneWithAnAction() {
+        toasts.show("Added Piano.", action = ToastAction("Undo") {})
+        assertThat(toasts.current.value?.action?.label).isEqualTo("Undo")
+        toasts.show("Removed Piano.")
+        assertThat(toasts.current.value?.action).isNull()
     }
 }

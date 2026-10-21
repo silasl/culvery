@@ -31,8 +31,10 @@ import kotlinx.coroutines.flow.collectLatest
 import uk.co.siland.culvery.core.plugin.CLOSING_WARNING_MS
 import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
 import uk.co.siland.culvery.core.plugin.OVERLAY_IDLE_MS
+import uk.co.siland.culvery.core.plugin.TOAST_WITH_ACTION_MS
 import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.ui.Countdown
+import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhToast
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
@@ -123,10 +125,14 @@ internal fun AlertLayer(content: @Composable () -> Unit, hidden: Boolean, keyboa
     }
 }
 
-/** The sheet layer: a scrim over the whole shell that dismisses on a tap, and the content against the right edge. */
+/** The sheet layer: a scrim over the whole shell that dismisses on a tap, and the content against the right edge; a full-screen overlay has neither. */
 @Composable
 fun OverlayLayer(state: OverlayState, hidden: Boolean = false) {
     val content = state.content ?: return
+    if (state.fullScreen) {
+        Box(Modifier.fillMaxSize().then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier).background(Culvery.colors.bg)) { content() }
+        return
+    }
     Box(
         Modifier.fillMaxSize().then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier),
         contentAlignment = Alignment.CenterEnd,
@@ -142,6 +148,9 @@ fun OverlayLayer(state: OverlayState, hidden: Boolean = false) {
         content()
     }
 }
+
+/** The PIN pad covers the whole screen over a full-screen overlay, and only the sheet's width over a sheet. */
+internal fun pinOverSheet(overlay: OverlayState): Boolean = overlay.isShowing && !overlay.fullScreen
 
 /** True from [CLOSING_WARNING_MS] before [expiresAt] until it moves; false without one. Once per countdown: keyed on it. */
 @Composable
@@ -209,14 +218,19 @@ internal fun ClosingWarningLayer(text: String, tag: String, endsAt: Long, nowMil
 
 /**
  * Draws [toast] bottom-centre, 28 dp above the bottom or above the on-screen keyboard while it shows (hand-off §7),
- * and reports it hidden after its reading time ([toastMillis]), or TalkBack's longer one; a new toast restarts the timer.
+ * and reports it hidden after its reading time ([toastMillis]), or TalkBack's longer one; a toast with an action stays [TOAST_WITH_ACTION_MS], and its tap runs the action and hides it; a new toast restarts the timer.
  */
 @Composable
 fun ToastLayer(toast: ToastMessage?, activity: UserActivity, keyboard: WindowInsets = WindowInsets.ime, onHidden: (Long) -> Unit) {
     val t = toast ?: return
     LaunchedEffect(t.id) {
-        delay(activity.timeout(toastMillis(t.message), hasControls = false))
+        delay(if (t.action == null) activity.timeout(toastMillis(t.message), hasControls = false) else activity.timeout(TOAST_WITH_ACTION_MS, hasControls = true))
         onHidden(t.id)
     }
-    ToastSlot(keyboard) { HhToast(t.message, t.icon, urgent = t.urgent) }
+    ToastSlot(keyboard) {
+        HhToast(
+            t.message, t.icon, urgent = t.urgent, actionLabel = t.action?.label,
+            onAction = { t.action?.onClick?.invoke(); onHidden(t.id) },
+        )
+    }
 }

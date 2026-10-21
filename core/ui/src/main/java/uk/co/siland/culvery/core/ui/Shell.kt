@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.only
@@ -70,6 +72,8 @@ object ShellTokens {
     val ringStroke = 3.dp
     val toastIconGap = 10.dp
     val toastMaxWidth = 720.dp
+    val toastActionGap = 16.dp
+    val toastActionHeight = 48.dp
 
     /** Home's cards (9 §4.2). */
     val homeCardRadius = 24.dp
@@ -146,24 +150,43 @@ fun HhCloseButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 
 /**
  * The toast pill: `ink` background, `bg` text, 16 sp / 600, padding 14×22, radius 26. One spoken item, polite unless [urgent].
- * With a [countdown], a ring of the time left replaces the icon (9 §4.13).
+ * With a [countdown], a ring of the time left replaces the icon (9 §4.13). With an [actionLabel], a 48 dp text button in
+ * `accent` follows the message; it sits outside the merged message group so TalkBack and tests can reach it.
  */
 @Composable
-fun HhToast(message: String, icon: String, modifier: Modifier = Modifier, urgent: Boolean = false, countdown: Countdown? = null) {
+fun HhToast(
+    message: String,
+    icon: String,
+    modifier: Modifier = Modifier,
+    urgent: Boolean = false,
+    countdown: Countdown? = null,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+) {
     val c = Culvery.colors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(ShellTokens.toastIconGap),
-        modifier = modifier
-            .testTag("toast")
-            .semantics(mergeDescendants = true) { liveRegion = if (urgent) LiveRegionMode.Assertive else LiveRegionMode.Polite }
-            .widthIn(max = ShellTokens.toastMaxWidth)
-            .clip(RoundedCornerShape(ShellTokens.toastRadius))
-            .background(c.ink)
-            .padding(horizontal = ShellTokens.toastPaddingH, vertical = ShellTokens.toastPaddingV),
-    ) {
+    val spoken = Modifier.semantics(mergeDescendants = true) { liveRegion = if (urgent) LiveRegionMode.Assertive else LiveRegionMode.Polite }
+    // The merged group is the tagged node itself when there is no action, so its tag, live region and text are one node.
+    fun pill(group: Modifier) = modifier
+        .testTag("toast")
+        .then(group)
+        .widthIn(max = ShellTokens.toastMaxWidth)
+        .clip(RoundedCornerShape(ShellTokens.toastRadius))
+        .background(c.ink)
+        .padding(horizontal = ShellTokens.toastPaddingH, vertical = ShellTokens.toastPaddingV)
+    val body: @Composable RowScope.() -> Unit = {
         if (countdown != null) CountdownRing(countdown, c.bg) else HhIcon(icon, size = ShellTokens.toastIcon, tint = c.bg)
         Text(message, style = ShellType.toast, color = c.bg)
+    }
+    if (actionLabel == null) {
+        Row(pill(spoken), Arrangement.spacedBy(ShellTokens.toastIconGap), Alignment.CenterVertically, body)
+    } else {
+        Row(pill(Modifier), Arrangement.spacedBy(ShellTokens.toastActionGap), Alignment.CenterVertically) {
+            Row(spoken, Arrangement.spacedBy(ShellTokens.toastIconGap), Alignment.CenterVertically, body)
+            Box(
+                Modifier.testTag("toast_action").defaultMinSize(minWidth = ShellTokens.toastActionHeight, minHeight = ShellTokens.toastActionHeight).hhClickable(onAction),
+                contentAlignment = Alignment.Center,
+            ) { Text(actionLabel, style = ShellType.toast, color = c.accent) }
+        }
     }
 }
 

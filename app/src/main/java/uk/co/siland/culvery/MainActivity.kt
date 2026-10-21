@@ -77,6 +77,7 @@ import uk.co.siland.culvery.shell.ShellViewModel
 import uk.co.siland.culvery.shell.ui.CameraMarkSpot
 import uk.co.siland.culvery.shell.ui.CulveryShell
 import uk.co.siland.culvery.shell.ui.ShellLayers
+import uk.co.siland.culvery.shell.ui.pinOverSheet
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -221,7 +222,7 @@ class MainActivity : ComponentActivity() {
                             toast = toast,
                             onToastHidden = toasts::hide,
                             pinShowing = pinRequest != null,
-                            pinPad = { PinPadHost(pinPrompt, userActivity, overSheet = overlay.isShowing, overSettings = state.settingsOpen) },
+                            pinPad = { PinPadHost(pinPrompt, userActivity, overSheet = pinOverSheet(overlay), overSettings = state.settingsOpen) },
                             activity = userActivity,
                             onTouch = userActivity::touched,
                             settingsExpiresAt = if (state.settingsOpen) sessionEnds else null,

@@ -27,6 +27,7 @@ import uk.co.siland.culvery.core.plugin.AlertQuieter
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.plugin.QUIET_CAP_MS
+import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.attempt
 
@@ -41,12 +42,22 @@ class OverlayState : OverlayHost {
     var edited by mutableStateOf(false)
         private set
 
+    /** The content covers the whole window with no scrim; reset by each [show] and [dismiss]. */
+    var fullScreen by mutableStateOf(false)
+        private set
+
     val isShowing: Boolean get() = content != null
 
     override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) {
         this.closesWhenIdle = closesWhenIdle
         edited = false
+        fullScreen = false
         this.content = content
+    }
+
+    override fun showFullScreen(content: @Composable () -> Unit) {
+        show(content = content)
+        fullScreen = true
     }
 
     override fun markEdited(edited: Boolean) {
@@ -56,6 +67,7 @@ class OverlayState : OverlayHost {
     override fun dismiss() {
         content = null
         edited = false
+        fullScreen = false
     }
 }
 
@@ -186,7 +198,7 @@ class ShellAlerts @Inject constructor(
     }
 }
 
-data class ToastMessage(val id: Long, val message: String, val icon: String, val urgent: Boolean = false)
+data class ToastMessage(val id: Long, val message: String, val icon: String, val urgent: Boolean = false, val action: ToastAction? = null)
 
 @Singleton
 class ShellToasts @Inject constructor() : Toaster {
@@ -196,6 +208,10 @@ class ShellToasts @Inject constructor() : Toaster {
 
     override fun show(message: String, icon: String, urgent: Boolean) {
         _current.value = ToastMessage(ids.incrementAndGet(), message, icon, urgent)
+    }
+
+    override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction) {
+        _current.value = ToastMessage(ids.incrementAndGet(), message, icon, urgent, action)
     }
 
     /** Hides [id] if it is still the one showing, so an older toast's timer can't hide a newer toast. */

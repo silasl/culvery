@@ -1,17 +1,28 @@
 package uk.co.siland.culvery.shell.ui
 
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -33,7 +44,12 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.ui.EditorPicker
 import uk.co.siland.culvery.capability.calendar.ui.EventEditorSheet
+import uk.co.siland.culvery.core.plugin.CLOSING_WARNING_MS
+import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
+import uk.co.siland.culvery.core.plugin.OVERLAY_IDLE_MS
+import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.shell.OverlayState
@@ -184,5 +200,136 @@ class OverlayLayersTest {
     fun theToastLayerSpeaksAnUrgentToastAssertively() {
         compose.setContent { CulveryTheme(dark = true) { ToastLayer(ToastMessage(1, "Couldn’t save — try again.", "info", urgent = true), activity) {} } }
         compose.onNodeWithTag("toast").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive))
+    }
+
+    @Test
+    fun aSheetIsUnchanged() {
+        showLayer()
+        compose.runOnIdle { overlay.show { HhSheet(padding = PaddingValues(0.dp), modifier = Modifier.testTag("sheet")) { Text("Sheet body") } } }
+        compose.onNodeWithTag("overlay_scrim").assertExists()
+        assertThat(overlay.fullScreen).isFalse()
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        assertThat(compose.onNodeWithTag("sheet").getUnclippedBoundsInRoot().right.value).isWithin(0.5f).of(screen.right.value)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aFullScreenOverlayCoversTheRailAndHasNoScrim() {
+        showLayer()
+        compose.runOnIdle { overlay.showFullScreen { Box(Modifier.fillMaxSize().testTag("editor").pointerInput(Unit) { detectTapGestures {} }) } }
+        compose.onNodeWithTag("overlay_scrim").assertDoesNotExist()
+        val bounds = compose.onNodeWithTag("editor").getUnclippedBoundsInRoot()
+        assertThat(bounds.left.value).isEqualTo(0f)
+        assertThat(bounds.top.value).isEqualTo(0f)
+        assertThat((bounds.right - bounds.left).value).isWithin(0.5f).of(1280f)
+        assertThat((bounds.bottom - bounds.top).value).isWithin(0.5f).of(800f)
+        compose.onRoot().performTouchInput { click(Offset(10.dp.toPx(), 400.dp.toPx())) }
+        assertThat(overlay.isShowing).isTrue()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun showAndDismissResetTheFullScreenMark() {
+        overlay.showFullScreen { Text("Editor") }
+        assertThat(overlay.fullScreen).isTrue()
+        overlay.show { Text("Sheet") }
+        assertThat(overlay.fullScreen).isFalse()
+        overlay.showFullScreen { Text("Editor") }
+        overlay.dismiss()
+        assertThat(overlay.fullScreen).isFalse()
+    }
+
+    @Test
+    fun thePinPadCoversTheWholeScreenOverAFullScreenOverlay() {
+        assertThat(pinOverSheet(overlay)).isFalse()
+        overlay.show { Text("Sheet") }
+        assertThat(pinOverSheet(overlay)).isTrue()
+        overlay.showFullScreen { Text("Editor") }
+        assertThat(pinOverSheet(overlay)).isFalse()
+    }
+
+    private fun showShell() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ShellLayers(
+                    overlay = overlay, toast = null, onToastHidden = {}, pinShowing = false, pinPad = {},
+                    activity = activity, onTouch = activity::touch, nowMillis = { compose.mainClock.currentTime },
+                ) { Text("Home") }
+            }
+        }
+    }
+
+    private fun settle() {
+        repeat(2) {
+            compose.runOnIdle { Snapshot.sendApplyNotifications() }
+            compose.mainClock.advanceTimeByFrame()
+        }
+    }
+
+    private fun after(millis: Long) {
+        compose.mainClock.advanceTimeBy(millis)
+        compose.mainClock.advanceTimeByFrame()
+    }
+
+    private fun open(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+
+    @Test
+    fun aFullScreenOverlayStillClosesWhenIdle() {
+        showShell()
+        compose.runOnIdle { overlay.showFullScreen { Box(Modifier.fillMaxSize().testTag("editor")) } }
+        settle()
+        after(OVERLAY_IDLE_MS - 100)
+        assertThat(open("editor")).isTrue()
+        after(100)
+        assertThat(open("editor")).isFalse()
+    }
+
+    @Test
+    fun anEditedFullScreenOverlayWarnsAt580SecondsAndClosesAt600() {
+        showShell()
+        compose.runOnIdle {
+            overlay.showFullScreen { Box(Modifier.fillMaxSize().testTag("editor")) }
+            overlay.markEdited(true)
+        }
+        settle()
+        after(EDIT_HOLD_MS - CLOSING_WARNING_MS - 100)
+        assertThat(open("sheet_warning")).isFalse()
+        after(100)
+        assertThat(open("sheet_warning")).isTrue()
+        after(CLOSING_WARNING_MS - 200)
+        assertThat(open("editor")).isTrue()
+        after(200)
+        assertThat(open("editor")).isFalse()
+    }
+
+    @Test
+    fun aToastWithAnActionStaysEightSeconds() {
+        showToasts()
+        post(ToastMessage(1, "Added Piano.", "info", action = ToastAction("Undo") {}))
+        assertThat(shownAt(7_984, "Added Piano.")).isTrue()
+        assertThat(shownAt(32, "Added Piano.")).isFalse()
+        // Whatever its length: 40 words would read for 10 s as a plain toast.
+        val long = List(40) { "word" }.joinToString(" ")
+        post(ToastMessage(2, long, "info", action = ToastAction("Undo") {}))
+        assertThat(shownAt(7_984, long)).isTrue()
+        assertThat(shownAt(32, long)).isFalse()
+    }
+
+    @Test
+    fun tappingTheActionRunsItAndHidesTheToast() {
+        showToasts()
+        var undone = 0
+        post(ToastMessage(1, "Added Piano.", "info", action = ToastAction("Undo") { undone++ }))
+        compose.onNodeWithTag("toast_action")
+            .assertTextEquals("Undo")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assertHeightIsEqualTo(48.dp)
+            .performClick()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeByFrame()
+        assertThat(undone).isEqualTo(1)
+        compose.onNodeWithTag("toast").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 }

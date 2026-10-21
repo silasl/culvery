@@ -168,6 +168,31 @@ class ControlsTest {
         compose.onNodeWithTag("urgent").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive))
     }
 
+    /** pin: a toast with no action is the one merged, tagged row it was, with no button. */
+    @Test
+    fun aToastWithoutAnActionIsUnchanged() {
+        show { HhToast("Event added.", Icons.INFO) }
+        compose.onNodeWithTag("toast")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+            .assertTextEquals("Event added.")
+        compose.onNodeWithTag("toast_action").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aToastsActionIsItsOwnButtonBesideTheMergedMessage() {
+        var taps = 0
+        show { HhToast("Added Piano.", Icons.INFO, actionLabel = "Undo", onAction = { taps++ }) }
+        compose.onNodeWithTag("toast_action")
+            .assertTextEquals("Undo")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assertHeightIsEqualTo(48.dp)
+            .performClick()
+        assertThat(taps).isEqualTo(1)
+        compose.onNodeWithText("Added Piano.").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     @Test
     fun aFilledTextFieldKeepsItsNameAndCarriesItsError() {
         show { HhTextField("Alex", {}, placeholder = "Name", label = "Name", tag = "field", error = "Someone is already called Alex.") }
