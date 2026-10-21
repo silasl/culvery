@@ -24,6 +24,7 @@ private val DEFAULT_LENGTH: Duration = Duration.ofHours(1)
 private const val MINUTES_PER_HOUR = 60L
 private val MORNING: LocalTime = LocalTime.of(9, 0)
 private const val LAST_HOUR = 23
+private val LAST_END: LocalTime = LocalTime.of(23, 59)
 
 /** "30 min", "45 min", "1 hour", "2 hours": a chip's words; TalkBack hears [lengthLabel]. */
 fun lengthChip(length: Duration): String {
@@ -62,12 +63,12 @@ class EditorForm(
     val today: LocalDate,
     private val now: LocalTime,
     val zone: ZoneId,
-    val signedIn: PersonId?,
+    signedIn: PersonId?,
     childOnly: PersonId?,
     preselectedDay: LocalDate?,
     private val order: List<PersonId>,
+    calendarPerson: PersonId?,
     repeats: Boolean = true,
-    calendarPerson: PersonId? = null,
 ) {
     private val original: EditableEvent? = (mode as? EventForm.Mode.Edit)?.original
 
@@ -260,7 +261,12 @@ class EditorForm(
             else -> LocalTime.of(now.hour + 1, 0)
         }
 
-    val endPickerTime: LocalTime get() = pickerTime.plus(length)
+    /** Where the end picker opens: the start plus the length, but no later than 23:59, since an end can't pass midnight. */
+    val endPickerTime: LocalTime
+        get() {
+            val end = pickerTime.plus(length)
+            return if (end > pickerTime) end else LAST_END
+        }
 
     /** Only a new event repeats here, and not a child's: a series can't be deleted from the wall (9 §4.8, 5 §A.4). */
     val canRepeat: Boolean = mode == EventForm.Mode.New && repeats

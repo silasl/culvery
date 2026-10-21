@@ -30,7 +30,7 @@ class EditorFormTest {
         day: LocalDate? = null,
         childOnly: PersonId? = null,
         repeats: Boolean = true,
-    ) = EditorForm(EventForm.Mode.New, today, LocalTime.parse(now), london, childOnly ?: alex, childOnly, day, order, repeats)
+    ) = EditorForm(EventForm.Mode.New, today, LocalTime.parse(now), london, childOnly ?: alex, childOnly, day, order, calendarPerson = null, repeats = repeats)
 
     /** A new event with a title and Mia, so only the day and times are left to choose. */
     private fun ready(day: LocalDate? = null) = new(day = day).apply {
@@ -46,7 +46,7 @@ class EditorFormTest {
         calendarPerson: PersonId? = null,
     ) = EditorForm(
         EventForm.Mode.Edit(EditableEvent(EventRef("c1", "s1", "e1"), title, start, end, forPerson)),
-        today, LocalTime.of(10, 0), london, alex, null, null, order, calendarPerson = calendarPerson,
+        today, LocalTime.of(10, 0), london, alex, null, null, order, calendarPerson,
     )
 
     private fun editTimed(start: LocalDateTime, minutes: Long, forPerson: String? = "alex", calendarPerson: PersonId? = null): EditorForm {
@@ -343,6 +343,13 @@ class EditorFormTest {
     }
 
     @Test
+    fun theEndPickerStopsBeforeMidnight() {
+        val form = new()
+        form.chooseTime(LocalTime.of(23, 30))
+        assertThat(form.endPickerTime).isEqualTo(LocalTime.of(23, 59))
+    }
+
+    @Test
     fun otherTimeSetsAnyTime() {
         val form = new()
         form.chooseTime(LocalTime.of(6, 30))
@@ -572,6 +579,7 @@ class EditorFormTest {
         form.chooseRepeat(RepeatChoice.Weekly)
         assertThat(form.repeat).isEqualTo(RepeatChoice.Never)
         assertThat(form.draft(createdBy = null).recurrence).isNull()
+        assertThat(form.draft(createdBy = null).forPerson).isEqualTo("mia")
         assertThat(editTimed(today.atTime(19, 30), 90).canRepeat).isFalse()
     }
 
