@@ -1,6 +1,9 @@
 package uk.co.siland.culvery.capability.calendar
 
 import android.util.Log
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.UnknownHostException
 import java.time.ZoneId
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CancellationException
@@ -59,8 +62,9 @@ internal sealed interface WriteOutcome {
     /**
      * Try again later. [blocksConnection]: the provider didn't answer, so its other changes should wait too.
      * [needsSignIn]: the connection needs signing in again, so its health says so at once (3a design §3.7).
+     * [sent]: false only when it failed before leaving the tablet, so the provider can't hold it.
      */
-    data class Retry(val blocksConnection: Boolean, val needsSignIn: Boolean = false) : WriteOutcome
+    data class Retry(val blocksConnection: Boolean, val needsSignIn: Boolean = false, val sent: Boolean = true) : WriteOutcome
 }
 
 /**
@@ -84,12 +88,21 @@ internal suspend fun callWriter(io: CoroutineContext, timeoutMillis: Long, call:
     } catch (e: NeedsSignInException) {
         WriteOutcome.Retry(blocksConnection = true, needsSignIn = true)
     } catch (e: UnreachableException) {
-        WriteOutcome.Retry(blocksConnection = true)
+        WriteOutcome.Retry(blocksConnection = true, sent = !e.neverSent())
     } catch (e: Throwable) {
         // An Error too (review M1): logged and retried, never out of the drain.
         Log.w(TAG, "A calendar write failed unexpectedly (${e::class.simpleName}); it will be retried")
         WriteOutcome.Retry(blocksConnection = false)
     }
+
+/** No address looked up or reached: the tablet's own connection (5 §A.3). OkHttp keeps the cause the provider wraps. */
+internal fun Throwable.isOffline(): Boolean = causes()
+    .any { it is OfflineException || it is UnknownHostException || it is ConnectException || it is NoRouteToHostException }
+
+/** Offline with no earlier failure kept: OkHttp suppresses a route that failed mid-send before it tries the next. */
+private fun Throwable.neverSent(): Boolean = isOffline() && causes().all { it.suppressed.isEmpty() }
+
+private fun Throwable.causes(): Sequence<Throwable> = generateSequence(this) { it.cause }
 
 /**
  * The one way the engine reads a provider (a sync, or its sources for the refresh and for connecting): on [io], under

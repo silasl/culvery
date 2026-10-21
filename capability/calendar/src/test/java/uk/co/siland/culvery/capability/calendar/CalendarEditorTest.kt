@@ -1121,7 +1121,7 @@ class CalendarEditorTest {
 
     /** What the added toast's Undo carries, for an event [by] added as [key]. */
     private fun added(key: String, title: String, by: Person, series: Boolean = false) =
-        AddedEvent(key, "c1", "s-family", title, series, by.id.value)
+        AddedEvent(key, "c1", "s-family", title, series, by.id.value, sample)
 
     /** The series [key]'s three Sundays, as a sync brings them once the service has made it. */
     private suspend fun syncOccurrences(key: String) = put(
@@ -1133,14 +1133,6 @@ class CalendarEditorTest {
 
     private suspend fun seriesRows(key: String) =
         store.eventsBetween(Long.MIN_VALUE, Long.MAX_VALUE).first().filter { it.seriesId == key || it.remoteId == key }
-
-    /** A create in the outbox that no attempt has reached yet. */
-    private suspend fun queuedUnsent(draft: EventDraft, key: String, by: Person) = store.enqueue(
-        PendingChange(
-            id = 0, connectionId = "c1", sourceId = "s-family", remoteId = null, kind = ChangeKind.CREATE,
-            draft = draft.copy(createdBy = by.id.value), attempts = 0, nextAttemptMillis = opened, createdMillis = opened, clientKey = key,
-        ),
-    )
 
     /** Waits, in bounded real time, for [done]: the writes run on Room's and the app scope's threads. */
     private suspend fun waitUntil(done: () -> Boolean) =
@@ -1189,24 +1181,52 @@ class CalendarEditorTest {
     }
 
     @Test
+    fun anOfflineCreateIsQueuedAsNeverSent() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        writer.failWith = OfflineException()
+        assertThat(editor.create(draft("Dinner", PersonId.FAMILY.value), "key-a")).isEqualTo(EditResult.Queued)
+        writer.failWith = UnreachableException("Couldn't reach Google Calendar", java.net.UnknownHostException())
+        assertThat(editor.create(draft("Dinner", PersonId.FAMILY.value), "key-b")).isEqualTo(EditResult.Queued)
+        val queued = store.pendingNow()
+        assertThat(queued.map { it.attempts }).containsExactly(0, 0)
+        // The backoff is the same as for a send that failed.
+        assertThat(queued.map { it.nextAttemptMillis }.distinct()).containsExactly(opened + OUTBOX_BACKOFF_MS.first())
+    }
+
+    @Test
     fun undoingASeriesStillInTheOutboxDropsItAndWhatIsBehindIt() = runTest {
         val access = testAccess(household)
         access.answer(TestAccess.ALEX)
         val editor = editor(access)
-        writer.failWith = UnreachableException("offline")
-        queuedUnsent(seriesDraft(), "key-s", access.alex)
+        writer.failWith = OfflineException()
+        assertThat(editor.create(seriesDraft(), "key-s")).isEqualTo(EditResult.Queued)
         assertThat(editor.assign(ref("key-s"), listOf(access.sam.id))).isEqualTo(EditResult.Queued)
         assertThat(store.pendingNow().map { it.ref }).containsExactly(ref("key-s"), ref("key-s"))
-        assertThat(store.pendingNow().first().attempts).isEqualTo(0)
 
         assertThat(editor.undoAdd(added("key-s", "Swimming", access.alex, series = true))).isEqualTo(EditResult.Done)
         assertThat(store.pendingNow()).isEmpty()
-        assertThat(writer.calls).containsExactly("deleteSeries:key-s")
+        assertThat(writer.calls).containsExactly("create:Swimming", "deleteSeries:key-s").inOrder()
         assertThat(access.toasts.messages.last()).isEqualTo("Removed Swimming.")
+        // Nothing left the tablet, so nothing can land.
+        assertThat(undone.pending).isEmpty()
 
         writer.failWith = null
         drain(access, aheadMillis = OUTBOX_BACKOFF_MS.first()).syncAll()
-        assertThat(writer.calls).containsExactly("deleteSeries:key-s")
+        assertThat(writer.calls).containsExactly("create:Swimming", "deleteSeries:key-s").inOrder()
+    }
+
+    @Test
+    fun undoingAOneOffStillInTheOutboxQueuesNothing() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        writer.failWith = OfflineException()
+        assertThat(editor.create(draft("Dinner", PersonId.FAMILY.value))).isEqualTo(EditResult.Queued)
+        assertThat(editor.undoAdd(added("key-1", "Dinner", access.alex))).isEqualTo(EditResult.Done)
+        assertThat(store.pendingNow()).isEmpty()
+        assertThat(access.toasts.messages.last()).isEqualTo("Removed Dinner.")
     }
 
     @Test
@@ -1270,6 +1290,88 @@ class CalendarEditorTest {
     }
 
     @Test
+    fun undoBeforeTheDrainsSeriesCreateLandsStillRemovesTheSeries() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        writer.failWith = UnreachableException("offline")
+        assertThat(editor.create(seriesDraft(), "key-s")).isEqualTo(EditResult.Queued)
+        writer.failWith = null
+        writer.createGate = CompletableDeferred()
+        val pass = launch { drain(access, aheadMillis = OUTBOX_BACKOFF_MS.first(), io = Dispatchers.Default).syncAll() }
+        waitUntil { writer.calls.size == 2 }
+        assertThat(editor.undoAdd(added("key-s", "Swimming", access.alex, series = true))).isEqualTo(EditResult.Done)
+
+        writer.createGate?.complete(Unit)
+        pass.join()
+        assertThat(writer.calls).containsExactly("create:Swimming", "create:Swimming", "deleteSeries:key-s", "deleteSeries:key-s").inOrder()
+        assertThat(undone.pending).isEmpty()
+        assertThat(seriesRows("key-s")).isEmpty()
+    }
+
+    @Test
+    fun anUndoneCreateTheServiceRefusesIsLetGo() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        writer.failWith = UnreachableException("offline")
+        assertThat(editor.create(draft("Dinner", PersonId.FAMILY.value))).isEqualTo(EditResult.Queued)
+        writer.failWith = null
+        writer.createGate = CompletableDeferred()
+        val pass = launch { drain(access, aheadMillis = OUTBOX_BACKOFF_MS.first(), io = Dispatchers.Default).syncAll() }
+        waitUntil { writer.calls.size == 2 }
+        assertThat(editor.undoAdd(added("key-1", "Dinner", access.alex))).isEqualTo(EditResult.Done)
+
+        writer.failWith = WriteRejectedException()
+        writer.createGate?.complete(Unit)
+        pass.join()
+        assertThat(undone.pending).isEmpty()
+        // Undo has already said what happened.
+        assertThat(access.toasts.messages).containsExactly("Added Dinner.", "Removed Dinner.").inOrder()
+    }
+
+    @Test
+    fun anUndoneCreateWithNoReplyIsDeletedNextPass() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        writer.failWith = UnreachableException("offline")
+        assertThat(editor.create(draft("Dinner", PersonId.FAMILY.value))).isEqualTo(EditResult.Queued)
+        writer.failWith = null
+        writer.createGate = CompletableDeferred()
+        val drain = drain(access, aheadMillis = OUTBOX_BACKOFF_MS.first(), io = Dispatchers.Default)
+        val pass = launch { drain.syncAll() }
+        waitUntil { writer.calls.size == 2 }
+        assertThat(editor.undoAdd(added("key-1", "Dinner", access.alex))).isEqualTo(EditResult.Done)
+
+        // It may have landed before the connection dropped.
+        writer.dropNextReply = true
+        writer.createGate?.complete(Unit)
+        pass.join()
+        assertThat(writer.created.keys).contains("key-1")
+        assertThat(undone.pending).containsExactly("key-1")
+
+        drain.syncAll()
+        assertThat(writer.calls.count { it == "delete:key-1" }).isEqualTo(2)
+        assertThat(writer.deleted).contains("key-1")
+        assertThat(undone.pending).isEmpty()
+        assertThat(access.toasts.messages).containsExactly("Added Dinner.", "Removed Dinner.").inOrder()
+    }
+
+    @Test
+    fun undoingWhenTheCalendarHasGoneSaysItCouldNot() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        assertThat(editor.create(draft("Dinner", PersonId.FAMILY.value))).isEqualTo(EditResult.Done)
+        val dinner = added("key-1", "Dinner", access.alex)
+        assertThat(editor.undoAdd(dinner.copy(sourceId = "s-gone"))).isEqualTo(EditResult.NotEditable)
+        assertThat(editor.undoAdd(dinner.copy(connectionId = "c-gone"))).isEqualTo(EditResult.NotEditable)
+        assertThat(access.toasts.messages.drop(1)).containsExactly(couldNotUndo(sample), couldNotUndo(sample))
+        assertThat(writer.calls).containsExactly("create:Dinner")
+    }
+
+    @Test
     fun undoingAOneOffOfflineQueuesItsDelete() = runTest {
         val access = testAccess(household)
         access.answer(TestAccess.ALEX)
@@ -1330,9 +1432,12 @@ class CalendarEditorTest {
         val access = testAccess(household)
         access.answer(TestAccess.ALEX)
         val editor = editor(access)
-        queuedUnsent(seriesDraft(), "key-s", access.alex)
+        writer.failWith = OfflineException()
+        assertThat(editor.create(seriesDraft(), "key-s")).isEqualTo(EditResult.Queued)
+        assertThat(store.pendingNow().single().attempts).isEqualTo(0)
+        // The drain's attempt may have reached the service before the reply was lost.
         writer.failWith = UnreachableException("offline")
-        drain(access, aheadMillis = 0).syncAll()
+        drain(access, aheadMillis = OUTBOX_BACKOFF_MS.first()).syncAll()
         assertThat(store.pendingNow().single().attempts).isEqualTo(1)
         assertThat(editor.undoAdd(added("key-s", "Swimming", access.alex, series = true))).isEqualTo(EditResult.NotEditable)
         assertThat(store.pendingNow()).isEmpty()

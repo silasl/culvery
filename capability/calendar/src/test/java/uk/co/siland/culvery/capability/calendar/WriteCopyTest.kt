@@ -1,6 +1,10 @@
 package uk.co.siland.culvery.capability.calendar
 
 import com.google.common.truth.Truth.assertThat
+import java.net.ConnectException
+import java.net.SocketException
+import java.net.UnknownHostException
+import kotlinx.coroutines.awaitCancellation
 import org.junit.Test
 
 /** 4d-2 §7.2: each failure says what went wrong, by its cause, and what to do. */
@@ -46,6 +50,20 @@ class WriteCopyTest {
     fun aRefusalWithNoReasonOfItsOwnHasNone() = kotlinx.coroutines.test.runTest {
         val outcome = callWriter(coroutineContext, 1_000) { throw WriteRejectedException() }
         assertThat(outcome).isEqualTo(WriteOutcome.Rejected(null))
+    }
+
+    /** Only a failure before anything left the tablet counts as never sent; a reply that never came may hide a write. */
+    @Test
+    fun aRetrySaysWhetherTheWriteMayHaveBeenSent() = kotlinx.coroutines.test.runTest {
+        suspend fun sent(failure: Throwable) = (callWriter(coroutineContext, 1_000) { throw failure } as WriteOutcome.Retry).sent
+        assertThat(sent(OfflineException())).isFalse()
+        assertThat(sent(UnreachableException("Couldn't reach Google Calendar", UnknownHostException()))).isFalse()
+        assertThat(sent(UnreachableException("Couldn't reach Google Calendar", ConnectException()))).isFalse()
+        assertThat((callWriter(coroutineContext, 1_000) { awaitCancellation() } as WriteOutcome.Retry).sent).isTrue()
+        assertThat(sent(UnreachableException("Google Calendar asked to try later (503)"))).isTrue()
+        // OkHttp retried the POST on a fresh route after the first one failed mid-send.
+        val retried = ConnectException().apply { addSuppressed(SocketException("Connection reset")) }
+        assertThat(sent(UnreachableException("Couldn't reach Google Calendar", retried))).isTrue()
     }
 
     @Test

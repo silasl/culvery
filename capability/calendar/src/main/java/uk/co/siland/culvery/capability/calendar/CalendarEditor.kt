@@ -48,7 +48,7 @@ fun couldNotUndo(service: String): String = "Couldn’t undo — remove it in $s
 
 /**
  * What the added toast's Undo removes (9 §2.3): the event made as [key], a whole series when [series], which only
- * [createdBy], the person who added it, may undo.
+ * [createdBy], the person who added it, may undo. [service] names where it went, for when Undo can't.
  */
 data class AddedEvent(
     val key: String,
@@ -57,6 +57,7 @@ data class AddedEvent(
     val title: String,
     val series: Boolean,
     val createdBy: String,
+    val service: String,
 )
 
 /** 3a design §3.12: the add/edit sheet couldn't load what it needs, so it closed. */
@@ -206,9 +207,9 @@ class CalendarEditor internal constructor(
             refusal = Refusal.Toast { name -> if (refusedRepeat) CANT_REPEAT_FOR_CHILD else cannotAddForOthers(name) },
         ) ?: return EditResult.Cancelled
         val toSend = draft.copy(createdBy = who.person.id.value, forPersonColor = colorOf(draft.forPerson))
-        val added = AddedEvent(clientKey, to.connection.id, to.source.id, draft.title, draft.recurrence != null, who.person.id.value)
-        val line = addedLineFor(draft)
         val label = serviceNameOf(to.connection, serviceOf)
+        val added = AddedEvent(clientKey, to.connection.id, to.source.id, draft.title, draft.recurrence != null, who.person.id.value, label)
+        val line = addedLineFor(draft)
         return onAppScope(ChangeKind.CREATE, label, say = { report(ChangeKind.CREATE, label, it, added, line) }) {
             writeLock.withLock { attempt(to, ChangeKind.CREATE, remoteId = null, toSend, clientKey = clientKey) }
         }
@@ -228,18 +229,18 @@ class CalendarEditor internal constructor(
             allow = { who, _ -> who.person.id.value == added.createdBy },
             refusal = Refusal.Toast(::cannotChangeOthers),
         ) ?: return EditResult.Cancelled
-        val source = store.source(added.connectionId, added.sourceId) ?: return EditResult.NotEditable
-        val to = destination(added.connectionId, source.source) ?: return EditResult.NotEditable
-        val label = serviceNameOf(to.connection, serviceOf)
-        return onAppScope(ChangeKind.DELETE, label, say = { reportUndo(added.title, label, it) }) {
+        return onAppScope(ChangeKind.DELETE, added.service, say = { reportUndo(added.title, added.service, it) }) {
+            val source = store.source(added.connectionId, added.sourceId) ?: return@onAppScope EditResult.NotEditable
+            val to = destination(added.connectionId, source.source) ?: return@onAppScope EditResult.NotEditable
             writeLock.withLock { undo(added, to) }
         }
     }
 
     /**
      * Under [writeLock]: drops what is queued for the event, its create included, then deletes it. The key goes in
-     * [undone] first, so a create the drain already has on its way is deleted as it lands; it stays there unless no
-     * create was left to land. The mirror changes only once the service has deleted it. NotEditable: it couldn't be undone.
+     * [undone] first, so a create the drain already has on its way is deleted as it lands; it stays there only while a
+     * create that was sent may yet land. The mirror changes only once the service has deleted it. NotEditable: it
+     * couldn't be undone.
      */
     private suspend fun undo(added: AddedEvent, to: Destination): EditResult {
         val ref = EventRef(added.connectionId, added.sourceId, added.key)
@@ -250,7 +251,9 @@ class CalendarEditor internal constructor(
             if (added.series) to.writer.deleteSeries(to.connection, to.source, added.key) else to.writer.delete(to.connection, to.source, added.key)
             null
         }
-        if (create == null) undone.done(added.key)
+        // Never sent, so dropping it was enough.
+        val unsent = create != null && create.attempts == 0
+        if (create == null || unsent) undone.done(added.key)
         return when {
             outcome is WriteOutcome.Accepted -> {
                 try {
@@ -262,13 +265,12 @@ class CalendarEditor internal constructor(
                 }
                 EditResult.Done
             }
+            unsent -> EditResult.Done
             // As a delete does: queued, and hidden until it sends.
             outcome is WriteOutcome.Retry && !added.series -> {
                 if (outcome.needsSignIn) store.setHealth(to.connection.id, ConnectionHealth.NeedsSignIn, clock.nowMillis())
                 queue(to, ChangeKind.DELETE, added.key, draft = null, attempted = true)
             }
-            // Never tried, so dropping it was enough; once tried, the service may hold it.
-            create != null && create.attempts == 0 -> EditResult.Done
             else -> EditResult.NotEditable
         }
     }
@@ -504,18 +506,22 @@ class CalendarEditor internal constructor(
             is WriteOutcome.Retry -> {
                 // The reconnect chip shows at once rather than at the next sync (3a design §3.7).
                 if (outcome.needsSignIn) store.setHealth(to.connection.id, ConnectionHealth.NeedsSignIn, clock.nowMillis())
-                queue(to, kind, remoteId, draft, attempted = true, clientKey = clientKey, fields = fields)
+                queue(to, kind, remoteId, draft, attempted = true, sent = outcome.sent, clientKey = clientKey, fields = fields)
             }
         }
     }
 
-    /** An [attempted] change waits out the first backoff; one queued behind others is due at the next pass. */
+    /**
+     * An [attempted] change waits out the first backoff; one queued behind others is due at the next pass. One that
+     * never left the tablet ([sent] false) counts no attempt, so Undo knows the service can't hold it (9 §2.3).
+     */
     private suspend fun queue(
         to: Destination,
         kind: ChangeKind,
         remoteId: String?,
         draft: EventDraft?,
         attempted: Boolean,
+        sent: Boolean = true,
         clientKey: String? = null,
         fields: Set<EventField>? = null,
     ): EditResult {
@@ -528,7 +534,7 @@ class CalendarEditor internal constructor(
                 remoteId = remoteId,
                 kind = kind,
                 draft = draft,
-                attempts = if (attempted) 1 else 0,
+                attempts = if (attempted && sent) 1 else 0,
                 nextAttemptMillis = if (attempted) now + backoffMillis(1) else now,
                 createdMillis = now,
                 clientKey = clientKey,
