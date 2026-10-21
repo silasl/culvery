@@ -45,6 +45,8 @@ import uk.co.siland.culvery.core.ui.hhClickable
 internal const val KEEPS_GOING = "Keeps going"
 internal const val STOPS_AFTER = "Stops after"
 internal const val CHOOSE_A_DAY_FIRST = "Choose a day first."
+internal const val FEWER_TIMES = "Fewer times"
+internal const val MORE_TIMES = "More times"
 
 /** "To skip one date, change it in Google Calendar on your phone." */
 internal fun skipOneDateLine(service: String): String = "To skip one date, change it in $service on your phone."

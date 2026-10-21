@@ -50,10 +50,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.EditorForm
-import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.FreeCheck
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.couldNotSave
 import uk.co.siland.culvery.capability.calendar.dayValue
 import uk.co.siland.culvery.capability.calendar.saveFailedBody
@@ -67,6 +67,9 @@ import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhFooterButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
+
+/** A save that failed: where it was going ([service]) and why ([problem]); the card says both. */
+data class SaveFailure(val service: String, val problem: WriteProblem)
 
 internal const val NEW_EVENT = "New event"
 internal const val CHANGE_EVENT = "Change event"
@@ -88,7 +91,7 @@ fun savesToLine(name: String): String {
 }
 
 /** A change throws away only the edits, where a bin would read as deleting the event (9 §3.1). */
-internal fun discardIcon(mode: EventForm.Mode): String = if (mode == EventForm.Mode.New) Icons.DELETE else Icons.CLOSE
+internal fun discardIcon(mode: EditorForm.Mode): String = if (mode == EditorForm.Mode.New) Icons.DELETE else Icons.CLOSE
 
 /**
  * The full-screen Add event and Change event (handoff §1 Layout): the top bar, the event so far on the left with the one
@@ -125,7 +128,7 @@ internal fun EventEditorScreen(
     val titleFocus = remember { FocusRequester() }
     var titleFocused by remember { mutableStateOf(false) }
     var discarding by remember { mutableStateOf(false) }
-    val focusOnOpen = remember { form.mode == EventForm.Mode.New && form.title.isEmpty() }
+    val focusOnOpen = remember { form.mode == EditorForm.Mode.New && form.title.isEmpty() }
     LaunchedEffect(flow) { flow.runMoves() }
     LaunchedEffect(Unit) {
         if (focusOnOpen) {
@@ -138,7 +141,7 @@ internal fun EventEditorScreen(
         keyboardController?.hide()
     }
     val typing = titleFocused && keyboard.getBottom(LocalDensity.current) > 0
-    val isNew = form.mode == EventForm.Mode.New
+    val isNew = form.mode == EditorForm.Mode.New
     val heading = if (isNew) NEW_EVENT else CHANGE_EVENT
     val order = remember(members) { members.map { it.person.id } }
     val clash = EditorStep.Time in flow.steps && rememberTimeCheck(form, held, order).result is FreeCheck.Busy
@@ -318,6 +321,7 @@ private const val TITLE_PLACEHOLDER = "What’s happening?"
 private const val WHO = "Who"
 private const val DAY = "Day"
 private const val TIME = "Time"
+internal const val REPEATS = "Repeats"
 
 /**
  * Who, Day, Time and Repeats as [flow] has them; with the keyboard up an unset Who and Day read as their names. While the
@@ -335,7 +339,7 @@ private fun Rows(
     onOpen: (EditorStep) -> Unit,
 ) {
     val people = members.map { it.person }
-    val editing = form.mode is EventForm.Mode.Edit
+    val editing = form.mode is EditorForm.Mode.Edit
     val active = { step: EditorStep -> lit && flow.active == step }
     EditorRow(
         testTag = "editor_row_who",
@@ -404,11 +408,11 @@ private fun Foot(form: EditorForm, savesTo: String?, hint: String, busy: Boolean
         if (failure != null) FailureCard(failure)
         if (savesTo != null) SavesTo(savesToLine(savesTo))
         Row(horizontalArrangement = Arrangement.spacedBy(EditorDimens.footGap), modifier = Modifier.fillMaxWidth()) {
-            if (form.mode is EventForm.Mode.Edit) DeleteButton(enabled = !busy, tag = "editor_delete", onClick = onDelete)
+            if (form.mode is EditorForm.Mode.Edit) DeleteButton(enabled = !busy, tag = "editor_delete", onClick = onDelete)
             HhFooterButton(
                 text = when {
                     failure != null -> "Try again"
-                    form.mode == EventForm.Mode.New -> "Add event"
+                    form.mode == EditorForm.Mode.New -> "Add event"
                     else -> "Save changes"
                 },
                 onClick = onSave,

@@ -23,6 +23,7 @@ import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
@@ -526,11 +527,11 @@ class CalendarRepositoryTest {
         val original = timed("Dinner with Jo & Priya", 23, 19, 30, 90, forPerson = alex.id.value)
         put("s-family", original)
         assertThat(repo.editable(ref(original.remoteId)).first())
-            .isEqualTo(EditableEvent(ref(original.remoteId), original.title, original.start, original.end, alex.id.value))
+            .isEqualTo(EditableEvent(ref(original.remoteId), original.title, original.start, original.end, alex.id.value, "Family", PersonId.FAMILY))
         val moved = timed("Dinner at Gran's", 24, 18, 0, 60)
         queue(ChangeKind.UPDATE, original.remoteId, EventDraft(moved.title, moved.start, moved.end, sam.id.value, alex.id.value))
         assertThat(repo.editable(ref(original.remoteId)).first())
-            .isEqualTo(EditableEvent(ref(original.remoteId), "Dinner at Gran's", moved.start, moved.end, sam.id.value))
+            .isEqualTo(EditableEvent(ref(original.remoteId), "Dinner at Gran's", moved.start, moved.end, sam.id.value, "Family", PersonId.FAMILY))
         queue(ChangeKind.DELETE, original.remoteId)
         assertThat(repo.editable(ref(original.remoteId)).first()).isNull()
     }

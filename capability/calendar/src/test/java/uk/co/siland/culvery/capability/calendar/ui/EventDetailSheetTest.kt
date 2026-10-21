@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -69,6 +70,7 @@ class EventDetailSheetTest {
                 onChoosePerson = { calls += "choose" },
                 onAssign = { p: Person -> calls += "assign:${p.name}" },
                 onEdit = { calls += "edit" },
+                onChangeWho = { calls += "who" },
             )
         }
     }
@@ -245,6 +247,25 @@ class EventDetailSheetTest {
         assertThat(edit.left).isGreaterThan(delete.right)
         compose.onNodeWithTag("detail_edit").performClick()
         assertThat(calls).containsExactly("edit")
+    }
+
+    /** 9 §3.3: an editable event's For row opens the editor on Who; not while it saves. */
+    @Test
+    fun theForRowChangesWhoOnlyWhenTheEventCanChange() {
+        show(SampleUi.detailEditable)
+        compose.onNodeWithTag("detail_for").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        compose.onNodeWithTag("detail_for").performClick()
+        assertThat(calls).containsExactly("who")
+        busy = true
+        compose.onNodeWithTag("detail_for").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aRepeatingEventsForRowOpensNothing() {
+        show(SampleUi.detailRecurring)
+        compose.onNodeWithTag("detail_for").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test

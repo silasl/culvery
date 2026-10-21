@@ -30,7 +30,7 @@ class EditorFormTest {
         day: LocalDate? = null,
         childOnly: PersonId? = null,
         repeats: Boolean = true,
-    ) = EditorForm(EventForm.Mode.New, today, LocalTime.parse(now), london, childOnly ?: alex, childOnly, day, order, calendarPerson = null, repeats = repeats)
+    ) = EditorForm(EditorForm.Mode.New, today, LocalTime.parse(now), london, childOnly ?: alex, childOnly, day, order, calendarPerson = null, repeats = repeats)
 
     /** A new event with a title and Mia, so only the day and times are left to choose. */
     private fun ready(day: LocalDate? = null) = new(day = day).apply {
@@ -45,7 +45,7 @@ class EditorFormTest {
         title: String = "Dinner with Jo & Priya",
         calendarPerson: PersonId? = null,
     ) = EditorForm(
-        EventForm.Mode.Edit(EditableEvent(EventRef("c1", "s1", "e1"), title, start, end, forPerson)),
+        EditorForm.Mode.Edit(EditableEvent(EventRef("c1", "s1", "e1"), title, start, end, forPerson)),
         today, LocalTime.of(10, 0), london, alex, null, null, order, calendarPerson,
     )
 
@@ -359,7 +359,7 @@ class EditorFormTest {
     @Test
     fun thePickersStartWhereTheFormIs() {
         val form = new(now = "09:20")
-        assertThat(form.mode).isEqualTo(EventForm.Mode.New)
+        assertThat(form.mode).isEqualTo(EditorForm.Mode.New)
         assertThat(form.pickerTime).isEqualTo(LocalTime.of(10, 0))
         form.chooseHour(14)
         form.chooseLength(Duration.ofMinutes(45))

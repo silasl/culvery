@@ -15,6 +15,31 @@ import uk.co.siland.culvery.core.ui.UNTIL
 import uk.co.siland.culvery.core.ui.clockText
 import uk.co.siland.culvery.core.ui.plural
 
+/** What the Time pane chooses: all day, or a start time. */
+sealed interface TimeChoice {
+    data object AllDay : TimeChoice
+    data class Custom(val time: LocalTime) : TimeChoice
+}
+
+/** The longest an event may last, in days (the first and last day count). */
+const val MAX_SPAN_DAYS = 60L
+
+internal const val UNTIL_TOO_LATE = "An event can last up to $MAX_SPAN_DAYS days. Pick an earlier last day."
+
+/** 2b-2 design D8: a title is at most 100 characters. */
+const val MAX_TITLE_LENGTH = 100
+
+/** "30 minutes", "1 hour", "1 hour 30 minutes": full words, singular at one. */
+fun lengthLabel(length: Duration): String {
+    val hours = length.toHours()
+    val minutes = length.toMinutes() % MINUTES_PER_HOUR
+    return when {
+        hours == 0L -> plural(minutes, "minute")
+        minutes == 0L -> plural(hours, "hour")
+        else -> "${plural(hours, "hour")} ${plural(minutes, "minute")}"
+    }
+}
+
 /** The Time pane's length chips (9 §3.1); any other length shows as "Until {end}". */
 val EDITOR_LENGTHS: List<Duration> = listOf(Duration.ofMinutes(30), Duration.ofMinutes(45), Duration.ofHours(1), Duration.ofHours(2))
 
@@ -60,7 +85,7 @@ fun needsLine(missing: List<Needed>): String? {
  * calendar is mapped to, which an untagged edit opens on.
  */
 class EditorForm(
-    val mode: EventForm.Mode,
+    val mode: Mode,
     val today: LocalDate,
     private val now: LocalTime,
     val zone: ZoneId,
@@ -71,7 +96,12 @@ class EditorForm(
     calendarPerson: PersonId?,
     repeats: Boolean = true,
 ) {
-    private val original: EditableEvent? = (mode as? EventForm.Mode.Edit)?.original
+    sealed interface Mode {
+        data object New : Mode
+        data class Edit(val original: EditableEvent) : Mode
+    }
+
+    private val original: EditableEvent? = (mode as? Mode.Edit)?.original
 
     /** A timed, mixed or over-long (past [MAX_SPAN_DAYS]) event over several days keeps its dates; a shorter all-day span's dates edit. */
     val datesLocked: Boolean = original?.let(::locksDates) ?: false
@@ -91,7 +121,7 @@ class EditorForm(
     }
 
     // An edit opens on the set it shows elsewhere (9 §3.4); a new event on nobody, or on the child adding it.
-    private val openingWho: List<PersonId> = original?.let { whoOf(it.forPerson, calendarPerson) } ?: listOfNotNull(childOnly)
+    private val openingWho: List<PersonId> = original?.let { resolveIds(it.forPerson, calendarPerson, order) } ?: listOfNotNull(childOnly)
 
     var who: List<PersonId> by mutableStateOf(openingWho)
         private set
@@ -100,20 +130,7 @@ class EditorForm(
 
     /** Everyone replaces the set and a person replaces Everyone; the last person can be cleared, which Save then waits on. */
     fun toggleWho(person: PersonId) {
-        who = toggled(who, person, mayClear = true).sortedBy(::rankOf)
-    }
-
-    private fun rankOf(id: PersonId): Int = order.indexOf(id).takeIf { it >= 0 } ?: Int.MAX_VALUE
-
-    // As resolvePeople, by id: known people in household order, a set with nobody left is Family, else the calendar's person.
-    private fun whoOf(forPerson: String?, calendarPerson: PersonId?): List<PersonId> {
-        val ids = peopleIn(forPerson)
-        val known = ids.filter { it == PersonId.FAMILY || it in order }
-        return when {
-            known.isNotEmpty() -> known.sortedBy(::rankOf)
-            ids.size > 1 -> listOf(PersonId.FAMILY)
-            else -> listOf(calendarPerson?.takeIf { it in order } ?: PersonId.FAMILY)
-        }
+        who = toggled(who, person, mayClear = true).sortedBy(order::rankOf)
     }
 
     // A reordered household or a re-picked person isn't a retag (9 §3.4).
@@ -271,7 +288,7 @@ class EditorForm(
         }
 
     /** Only a new event repeats here, and not a child's: a series can't be deleted from the wall (9 §4.8, 5 §A.4). */
-    val canRepeat: Boolean = mode == EventForm.Mode.New && repeats
+    val canRepeat: Boolean = mode == Mode.New && repeats
 
     var repeat: RepeatChoice by mutableStateOf(RepeatChoice.Never)
         private set
@@ -389,7 +406,7 @@ class EditorForm(
         check(canSave) { "Nothing to save: $reason" }
         val first = checkNotNull(day)
         val (start, end) = span(first)
-        val rule = recurrenceRule(repeat, repeatEnd, allDay = start is EventTime.AllDay, zone, first)
+        val rule = recurrenceRule(repeat, repeatEnd, first)
         // An edit whose set wasn't changed keeps its tag exactly, so an untagged event stays untagged.
         val forPerson = if (original != null && !whoChanged) original.forPerson else tagFor(who, order)
         return EventDraft(title.trim(), start, end, forPerson, createdBy, recurrence = rule?.let { Recurrence(it, zone) })

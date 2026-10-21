@@ -146,9 +146,12 @@ class CalendarRepository @Inject constructor(
         EventDetailUi(e.toUi(day, s.zone, s.people, s.order, s.catalog, s.shown.syncing), whenLabel(e.start, e.end, s.zone, today))
     }
 
-    /** What the add/edit sheet starts from: [ref] as shown; null once it is gone or queued for deletion. */
+    /** What the editor starts from: [ref] as shown; null once it is gone or queued for deletion. */
     fun editable(ref: EventRef): Flow<EditableEvent?> = shownEvent(ref).map { s ->
-        s?.shown?.event?.let { EditableEvent(ref, it.title, it.start, it.end, it.forPerson) }
+        s?.shown?.event?.let {
+            val source = s.catalog.source(ref.connectionId, ref.sourceId)
+            EditableEvent(ref, it.title, it.start, it.end, it.forPerson, source?.source?.name.orEmpty(), source?.mapping?.person)
+        }
     }
 
     private class Shown(val shown: ShownEvent, val catalog: SourceCatalog, val people: Map<PersonId, Person>, val order: List<PersonId>, val zone: ZoneId)

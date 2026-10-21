@@ -14,14 +14,11 @@ import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventField
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.Recurrence
-import uk.co.siland.culvery.capability.calendar.RepeatChoice
-import uk.co.siland.culvery.capability.calendar.RepeatEnd
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.instantIn
 import uk.co.siland.culvery.capability.calendar.newClientKey
-import uk.co.siland.culvery.capability.calendar.recurrenceRule
 import uk.co.siland.culvery.capability.calendar.seriesStart
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
@@ -388,7 +385,8 @@ class FakeCalendarProviderTest {
     @Test
     fun aTimedUntilInUtcEndsTheSeriesOnThatDayInclusive() = runTest {
         val fake = providerOn(today)
-        val rule = recurrenceRule(RepeatChoice.Weekly, RepeatEnd.OnDate(today.plusDays(7)), allDay = false, zone = zone, day = today)!!
+        // As a phone writes it: the end of Wed 30 Sep in London, in UTC.
+        val rule = "RRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20260930T225959Z"
         fake.create(conn, family, timedSeries(rule), "k-choir")
         assertThat(fake.choirDays()).containsExactly(today, today.plusDays(7)).inOrder()
     }
@@ -396,7 +394,7 @@ class FakeCalendarProviderTest {
     @Test
     fun anAllDayUntilDateEndsTheSeriesOnThatDayInclusive() = runTest {
         val fake = providerOn(today)
-        val rule = recurrenceRule(RepeatChoice.Daily, RepeatEnd.OnDate(today.plusDays(2)), allDay = true, zone = zone, day = today)!!
+        val rule = "RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20260925"
         fake.create(conn, family, allDaySeries(rule), "k-bins")
         val bins = fake.familyEvents().filter { it.title == "Bins" }
         assertThat(bins.map { (it.start as EventTime.AllDay).date }).containsExactly(today, today.plusDays(1), today.plusDays(2)).inOrder()

@@ -15,6 +15,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.EditResult
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventRef
+import uk.co.siland.culvery.capability.calendar.WeekFocus
 import uk.co.siland.culvery.capability.calendar.toggled
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -31,7 +32,7 @@ private class Loaded(val detail: EventDetailUi?)
  * Only one action runs at a time; while one runs, further taps are ignored, and one that fails before the editor's
  * write (the tablet's store) is logged rather than crashing the app. The editor toasts each outcome; the host only
  * decides whether the sheet stays open. [initialMode] is ConfirmingDelete when the editor's Delete handed over
- * (2b-2 design D4); [onEdit] swaps to the add/edit sheet.
+ * (2b-2 design D4); [onEdit] swaps to the editor, and [onChangeWho] to the editor asking who it is for.
  */
 @Composable
 internal fun EventDetailHost(
@@ -42,6 +43,7 @@ internal fun EventDetailHost(
     onClose: () -> Unit,
     initialMode: DetailMode = DetailMode.Idle,
     onEdit: () -> Unit,
+    onChangeWho: () -> Unit,
 ) {
     val loaded: Loaded? by remember(ref, today) { repo.event(ref, today).map { Loaded(it) } }.collectAsState(initial = null)
     val people: List<Person> by repo.people.collectAsState(initial = emptyList())
@@ -90,14 +92,21 @@ internal fun EventDetailHost(
             }
         },
         onEdit = onEdit,
+        onChangeWho = onChangeWho,
     )
 }
 
-/** Opens an event's detail sheet through the shell's overlay host; its Edit swaps to the add/edit sheet. */
+/** Opens an event's detail sheet through the shell's overlay host; its Change swaps to the editor. */
 @Composable
-internal fun rememberEventOpener(repo: CalendarRepository, editor: CalendarEditor, today: LocalDate): (EventRef) -> Unit {
+internal fun rememberEventOpener(
+    repo: CalendarRepository,
+    editor: CalendarEditor,
+    weekFocus: WeekFocus,
+    today: LocalDate,
+    from: EditorFrom,
+): (EventRef) -> Unit {
     val overlay = LocalOverlayHost.current
-    return remember(overlay, repo, editor, today) {
-        { ref -> overlay.showDetail(ref, today, repo, editor) }
+    return remember(overlay, repo, editor, weekFocus, today, from) {
+        { ref -> overlay.showDetail(ref, today, repo, editor, weekFocus, from) }
     }
 }

@@ -1,15 +1,18 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import java.time.LocalDate
+import kotlinx.coroutines.flow.filterNotNull
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
+import uk.co.siland.culvery.capability.calendar.WeekFocus
 import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.core.plugin.Connection
 
@@ -18,11 +21,11 @@ import uk.co.siland.culvery.core.plugin.Connection
  * calendar to add to.
  */
 @Composable
-internal fun TodayCardHost(repo: CalendarRepository, editor: CalendarEditor, today: LocalDate) {
-    val open = rememberEventOpener(repo, editor, today)
-    val add = rememberEventAdder(repo, editor, today)
+internal fun TodayCardHost(repo: CalendarRepository, editor: CalendarEditor, weekFocus: WeekFocus, today: LocalDate) {
+    val open = rememberEventOpener(repo, editor, weekFocus, today, EditorFrom.Home)
+    val add = rememberEventAdder(repo, editor, weekFocus, today, EditorFrom.Home)
     val days: List<DayUi>? by remember(today) { repo.days(today, 2) }.collectAsState(initial = null)
-    TodayCard(days?.first()?.events, onOpen = open, onAdd = add?.let { a -> { a(null) } }, tomorrow = days?.last())
+    TodayCard(days?.first()?.events, onOpen = open, onAdd = add?.let { a -> { a(today) } }, tomorrow = days?.last())
 }
 
 @Composable
@@ -36,19 +39,26 @@ internal fun ComingUpCardHost(repo: CalendarRepository, today: LocalDate) {
  * the week rolls with it and is back on this week. Shows nothing until both flows load.
  * Add event and the column taps show only when there is a writable master calendar to add to. The reconnect chip
  * reconnects the first connection that needs it ([onReconnect]). The return to this week counts every touch the shell
- * sees (4d-2 §6.4).
+ * sees (4d-2 §6.4). A week the editor asks for after adding ([weekFocus]) is shown, then marked shown.
  */
 @Composable
 internal fun WeekViewHost(
     repo: CalendarRepository,
     editor: CalendarEditor,
+    weekFocus: WeekFocus,
     today: LocalDate,
     nowMillis: Long,
     onReconnect: (Connection) -> Unit,
 ) {
-    val open = rememberEventOpener(repo, editor, today)
-    val add = rememberEventAdder(repo, editor, today)
+    val open = rememberEventOpener(repo, editor, weekFocus, today, EditorFrom.Calendar)
+    val add = rememberEventAdder(repo, editor, weekFocus, today, EditorFrom.Calendar)
     val shown = rememberWeekShown(today)
+    LaunchedEffect(shown) {
+        weekFocus.requested.filterNotNull().collect {
+            shown.show(it)
+            weekFocus.consumed()
+        }
+    }
     val start = today.plusWeeks(shown.weeks.toLong())
     // produceState keeps the week on screen while the next one loads, so a step doesn't blank the view.
     val week: WeekUi? by produceState<WeekUi?>(null, repo, start) { repo.week(start).collect { value = it } }

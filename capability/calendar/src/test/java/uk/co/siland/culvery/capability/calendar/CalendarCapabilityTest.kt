@@ -39,7 +39,7 @@ class CalendarCapabilityTest {
         capability = CalendarCapability(
             CalendarRepository(store, household, zone, emptySet(), emptySet()), HouseholdClock(zone.zone, WallClock { 0L }, clockScope),
             stubEditor(store, zone), stubConnections(store),
-            stubReview(store, household),
+            stubReview(store, household), WeekFocus(),
         )
     }
 

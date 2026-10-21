@@ -6,10 +6,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -35,6 +31,7 @@ import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.ScriptedWriter
 import uk.co.siland.culvery.capability.calendar.SyncResult
+import uk.co.siland.culvery.capability.calendar.WeekFocus
 import uk.co.siland.culvery.capability.calendar.calendarDb
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
@@ -123,15 +120,12 @@ class OpenEventTest {
     private fun waitForText(text: String) =
         compose.waitUntil(5_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
 
-    private fun assertAddMode() =
-        compose.onNodeWithTag("editor_sheet").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Add event"))
-
     private fun waitForTag(tag: String) =
         compose.waitUntil(5_000) { compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
 
     @Test
     fun tappingATodayRowOpensItsDetailSheetAndCloseDismissesIt() {
-        show { TodayCardHost(repo, editor, today) }
+        show { TodayCardHost(repo, editor, WeekFocus(), today) }
         waitForText("Dinner with Jo & Priya")
         compose.onNodeWithText("Dinner with Jo & Priya").performClick()
         waitForText("Created by")
@@ -143,7 +137,7 @@ class OpenEventTest {
 
     @Test
     fun tappingAWeekChipOpensItsDetailSheet() {
-        show { WeekViewHost(repo, editor, today, nowMillis = 0L, onReconnect = {}) }
+        show { WeekViewHost(repo, editor, WeekFocus(), today, nowMillis = 0L, onReconnect = {}) }
         waitForText("Dinner with Jo & Priya")
         compose.onNodeWithText("Dinner with Jo & Priya").performClick()
         waitForText("Created by")
@@ -153,8 +147,8 @@ class OpenEventTest {
     /** Both hosts at once, for the tests where neither may offer to add. */
     private fun showBothHosts() = show {
         Row(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f)) { TodayCardHost(repo, editor, today) }
-            Box(Modifier.weight(1f)) { WeekViewHost(repo, editor, today, nowMillis = 0L, onReconnect = {}) }
+            Box(Modifier.weight(1f)) { TodayCardHost(repo, editor, WeekFocus(), today) }
+            Box(Modifier.weight(1f)) { WeekViewHost(repo, editor, WeekFocus(), today, nowMillis = 0L, onReconnect = {}) }
         }
     }
 
@@ -180,46 +174,12 @@ class OpenEventTest {
     }
 
     @Test
-    fun thePlusOnTodayOpensANewEventForToday() {
-        makeFamilyTheWritableMaster()
-        show { TodayCardHost(repo, editor, today) }
-        waitForTag("today_add")
-        compose.onNodeWithTag("today_add").performClick()
-        waitForTag("editor_sheet")
-        assertAddMode()
-        compose.onNodeWithTag("editor_summary").assertTextEquals("Today · All day · Family")
-    }
-
-    @Test
-    fun addEventInTheWeekOpensANewEventForToday() {
-        makeFamilyTheWritableMaster()
-        show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW, onReconnect = {}) }
-        waitForTag("week_add_event")
-        compose.onNodeWithTag("week_add_event").performClick()
-        waitForTag("editor_sheet")
-        assertAddMode()
-        compose.onNodeWithTag("editor_summary").assertTextEquals("Today · All day · Family")
-    }
-
-    @Test
-    fun aColumnTapPresetsItsDay() {
-        makeFamilyTheWritableMaster()
-        show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW, onReconnect = {}) }
-        val friday = today.plusDays(2)
-        waitForTag("week_add_$friday")
-        compose.onNodeWithTag("week_add_$friday", useUnmergedTree = true).performClick()
-        waitForTag("editor_sheet")
-        assertAddMode()
-        compose.onNodeWithTag("editor_summary").assertTextEquals("Fri 25 Sep · All day · Family")
-    }
-
-    @Test
     fun aChipTapStillOpensTheEventNotTheEditor() {
         makeFamilyTheWritableMaster()
-        show { WeekViewHost(repo, editor, today, nowMillis = SampleUi.NOW, onReconnect = {}) }
+        show { WeekViewHost(repo, editor, WeekFocus(), today, nowMillis = SampleUi.NOW, onReconnect = {}) }
         waitForText("Dinner with Jo & Priya")
         compose.onNodeWithText("Dinner with Jo & Priya").performClick()
         waitForText("Created by")
-        compose.onNodeWithTag("editor_sheet").assertDoesNotExist()
+        compose.onNodeWithTag("editor_screen").assertDoesNotExist()
     }
 }

@@ -8,7 +8,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import uk.co.siland.culvery.capability.calendar.EditorForm
-import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.core.household.PersonId
 
 /** The editor's rows, then Check: which question the pane asks. */
@@ -83,4 +82,4 @@ internal fun editorSteps(form: EditorForm, childOnly: PersonId?): List<EditorSte
 
 /** A new event opens on Who, a change on Check, unless the caller says where (9 §3.4: the detail's For row opens Who). */
 internal fun editorFlow(form: EditorForm, childOnly: PersonId?, start: EditorStep? = null): EditorFlow =
-    EditorFlow(editorSteps(form, childOnly), start ?: if (form.mode == EventForm.Mode.New) EditorStep.Who else EditorStep.Check)
+    EditorFlow(editorSteps(form, childOnly), start ?: if (form.mode == EditorForm.Mode.New) EditorStep.Who else EditorStep.Check)

@@ -103,8 +103,8 @@ internal fun reconnectLabel(services: List<String>): String =
 /**
  * Seven days with person-tinted chips and the sync state (9 §4.7). ‹ › step a week at a time, from this week (today and
  * six days) to [MAX_WEEKS_AHEAD] weeks on, inside the synced window (4c D10), through [onWeeksAhead]; This week jumps
- * back. With [onAdd] (there is a writable master calendar), Add event adds on the first day shown, and a tap on the
- * space below a column's chips adds on that column's day, with a ghost while pressed; chip taps still open their event. The
+ * back. With [onAdd] (there is a writable master calendar), Add event adds with no day chosen (9 §5 call 9), and a tap on
+ * the space below a column's chips adds on that column's day, with a ghost while pressed; chip taps still open their event. The
  * reconnect chip runs [onReconnect] (3a design §4.3) and Update now runs [onUpdateNow] ([WeekHeader]).
  */
 @Composable
@@ -112,7 +112,7 @@ fun WeekView(
     state: WeekViewState,
     modifier: Modifier = Modifier,
     onOpen: (EventRef) -> Unit = {},
-    onAdd: ((LocalDate) -> Unit)? = null,
+    onAdd: ((LocalDate?) -> Unit)? = null,
     onWeeksAhead: (Int) -> Unit = {},
     onReconnect: () -> Unit = {},
     onUpdateNow: () -> Unit = {},

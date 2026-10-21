@@ -32,6 +32,7 @@ class CalendarCapability @Inject constructor(
     private val editor: CalendarEditor,
     private val connections: CalendarConnections,
     private val review: CalendarReview,
+    private val weekFocus: WeekFocus,
 ) : Capability {
     override val id = CALENDAR_TAB_ID
     override val label = "Calendar"
@@ -54,7 +55,7 @@ class CalendarCapability @Inject constructor(
             listOf(HomeCard(CONNECT_CARD_ID, HomeCardSize.TALL, 100) { ConnectCardHost(connections) })
         } else {
             listOf(
-                HomeCard(TODAY_CARD_ID, HomeCardSize.TALL, 100) { rememberToday(clock)?.let { TodayCardHost(repo, editor, it) } },
+                HomeCard(TODAY_CARD_ID, HomeCardSize.TALL, 100) { rememberToday(clock)?.let { TodayCardHost(repo, editor, weekFocus, it) } },
                 HomeCard(COMING_UP_CARD_ID, HomeCardSize.WIDE, 50) { rememberToday(clock)?.let { ComingUpCardHost(repo, it) } },
             )
         }
@@ -64,6 +65,6 @@ class CalendarCapability @Inject constructor(
     override fun TabContent() {
         val connector = rememberConnector(connections)
         val today = rememberToday(clock) ?: return
-        WeekViewHost(repo, editor, today = today, nowMillis = rememberNowMillis(clock), onReconnect = connector::reconnect)
+        WeekViewHost(repo, editor, weekFocus, today = today, nowMillis = rememberNowMillis(clock), onReconnect = connector::reconnect)
     }
 }

@@ -100,7 +100,7 @@ class WeekLaneTest {
         return WeekUi(monday, days, SampleUi.people, spans = laneRows(weekSpans(days)))
     }
 
-    private fun show(week: WeekUi = week(), fontScale: Float = 1f, onOpen: (EventRef) -> Unit = {}, onAdd: ((LocalDate) -> Unit)? = null, today: LocalDate = monday) =
+    private fun show(week: WeekUi = week(), fontScale: Float = 1f, onOpen: (EventRef) -> Unit = {}, onAdd: ((LocalDate?) -> Unit)? = null, today: LocalDate = monday) =
         compose.setContent {
             composeView = LocalView.current
             window = composeView.rootView
@@ -328,7 +328,7 @@ class WeekLaneTest {
 
     @Test
     fun aTapUnderTheLaneInAnEmptyColumnStillAdds() {
-        val added = mutableListOf<LocalDate>()
+        val added = mutableListOf<LocalDate?>()
         // Sunday without its chip: only Gran visiting's bar in its first lane row, so the second row's place is empty.
         val w = week().let { w -> w.copy(days = w.days.map { d -> if (d.date == day(6)) d.copy(events = d.events.filter { it.span != null }) else d }) }
         show(w, onAdd = { added += it })

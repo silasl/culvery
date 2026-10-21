@@ -28,7 +28,6 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import java.time.LocalDate
 import java.time.LocalTime
 import org.junit.Rule
 import org.junit.Test
@@ -42,20 +41,9 @@ import uk.co.siland.culvery.core.ui.test.isReadAsOne
 class PickersTest {
     @get:Rule val compose = createComposeRule()
 
-    /** Wednesday 23 September 2026, the hand-off's day. */
-    private val today = LocalDate.of(2026, 9, 23)
-    private val picked = mutableListOf<LocalDate>()
     private val set = mutableListOf<LocalTime>()
     private var cancelled = 0
     private val isButton = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
-
-    private fun showDates(selected: LocalDate = today) = compose.setContent {
-        CulveryTheme(dark = true) {
-            PickerLayer(onDismiss = { cancelled++ }) {
-                DatePickerCard(today, selected, onPick = { picked += it }, onCancel = { cancelled++ })
-            }
-        }
-    }
 
     private fun showTime(initial: LocalTime) = compose.setContent {
         CulveryTheme(dark = true) {
@@ -74,17 +62,6 @@ class PickersTest {
     }
 
     @Test
-    fun pagesAreFiveWeeksFromThisWeeksMonday() {
-        assertThat(firstPageStart(today)).isEqualTo(LocalDate.of(2026, 9, 21))
-        assertThat(pageRangeLabel(pageStart(0, today))).isEqualTo("Mon 21 Sep – Sun 25 Oct")
-        assertThat(pageOf(LocalDate.of(2026, 10, 25), today)).isEqualTo(0)
-        assertThat(pageOf(LocalDate.of(2026, 10, 26), today)).isEqualTo(1)
-        assertThat(pageOf(LocalDate.of(2026, 9, 20), today)).isEqualTo(-1)
-        assertThat(dateCellLabel(LocalDate.of(2026, 10, 1))).isEqualTo("1 Oct")
-        assertThat(dateCellLabel(LocalDate.of(2026, 10, 2))).isEqualTo("2")
-    }
-
-    @Test
     fun hoursWrapWithoutChangingTheDayAndMinutesStepByQuarters() {
         assertThat(hourStep(23, up = true)).isEqualTo(0)
         assertThat(hourStep(0, up = false)).isEqualTo(23)
@@ -96,40 +73,13 @@ class PickersTest {
     }
 
     @Test
-    fun aPastDayCanBePicked() {
-        showDates()
-        compose.onNodeWithTag("date_range").assertTextEquals("Mon 21 Sep – Sun 25 Oct")
-        compose.onNodeWithTag("date_cell_2026-09-21").performClick()
-        assertThat(picked).containsExactly(LocalDate.of(2026, 9, 21))
-    }
-
-    @Test
-    fun theArrowsPageByFiveWeeks() {
-        showDates()
-        compose.onNodeWithTag("date_next").performClick()
-        compose.onNodeWithTag("date_range").assertTextEquals("Mon 26 Oct – Sun 29 Nov")
-        compose.onNodeWithTag("date_cell_2026-11-10").performClick()
-        compose.onNodeWithTag("date_prev").performClick()
-        compose.onNodeWithTag("date_prev").performClick()
-        compose.onNodeWithTag("date_range").assertTextEquals("Mon 17 Aug – Sun 20 Sep")
-        assertThat(picked).containsExactly(LocalDate.of(2026, 11, 10))
-    }
-
-    @Test
-    fun thePickerOpensOnThePageHoldingTheSelectedDay() {
-        showDates(selected = LocalDate.of(2026, 11, 10))
-        compose.onNodeWithTag("date_range").assertTextEquals("Mon 26 Oct – Sun 29 Nov")
-        compose.onNodeWithTag("date_cell_2026-11-10").assertExists()
-    }
-
-    @Test
-    fun cancelAndTheScrimPickNothing() {
-        showDates()
+    fun cancelAndTheScrimSetNothing() {
+        showTime(LocalTime.of(9, 0))
         compose.onNodeWithTag("picker_cancel").performClick()
         // The scrim's top-left corner is clear of the centred card.
         compose.onNodeWithTag("picker_scrim").performTouchInput { click(Offset(10f, 10f)) }
         assertThat(cancelled).isEqualTo(2)
-        assertThat(picked).isEmpty()
+        assertThat(set).isEmpty()
     }
 
     @Test
@@ -164,25 +114,10 @@ class PickersTest {
         assertThat(cancelled).isEqualTo(1)
     }
 
-    /** A pin: the old calendar button was already 48 dp with a 24 dp icon; the shared one must keep them. */
     @Test
-    fun thePickersPagesButtonsAreTheSharedRoundButton() {
-        showDates()
-        mapOf("date_prev" to "Earlier weeks", "date_next" to "Later weeks").forEach { (tag, name) ->
-            compose.onNodeWithTag(tag).assert(isButton).assertWidthIsEqualTo(48.dp).assertHeightIsEqualTo(48.dp)
-            compose.onNodeWithContentDescription(name).assert(isButton)
-            val icon = compose.onNodeWithTag(tag, useUnmergedTree = true).onChild().getUnclippedBoundsInRoot()
-            assertThat((icon.bottom - icon.top).value).isWithin(1f).of(24f)
-        }
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    @Test
-    fun theDatePickersScrimIsSilentAndEveryControlIsNamed() {
-        showDates()
+    fun theScrimIsSilentAndEveryControlIsNamed() {
+        showTime(LocalTime.of(9, 0))
         compose.onNodeWithTag("picker_scrim").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
-        compose.onNodeWithContentDescription("Earlier weeks").assert(isButton)
-        assertThat(compose.onNodeWithTag("date_prev").fetchSemanticsNode().config[SemanticsActions.OnClick].label).isNull()
         compose.assertAccessible()
     }
 
@@ -208,19 +143,6 @@ class PickersTest {
     }
 
     @Test
-    fun theWeekdayLettersAreLeftToTheCells() {
-        showDates()
-        compose.onAllNodesWithText("Mon", useUnmergedTree = true).onFirst()
-            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
-    }
-
-    @Test
-    fun thePickersTitlesAreHeadings() {
-        showDates()
-        compose.onNodeWithText("Pick a date").assert(isHeading())
-    }
-
-    @Test
     fun theTimePickersTitleIsAHeading() {
         showTime(LocalTime.of(9, 0))
         compose.onNodeWithText("Pick a time").assert(isHeading())
@@ -230,33 +152,6 @@ class PickersTest {
     fun theTimePickerIsAPane() {
         showTime(LocalTime.of(9, 0))
         compose.onNodeWithTag("time_picker").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Pick a time"))
-    }
-
-    @Test
-    fun aDateCellSaysItsDayAndWhetherItIsToday() {
-        showDates(selected = today.plusDays(1))
-        compose.onNodeWithTag("date_cell_$today")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Wednesday 23 September, today")))
-            .assert(isButton)
-        compose.onNodeWithContentDescription("Thursday 24 September").assertIsSelected()
-        compose.assertAccessible()
-    }
-
-    /** TalkBack's double-tap is the semantics action: it must pick the day as a touch does. */
-    @Test
-    fun aDateCellIsPickedFromTalkBack() {
-        showDates()
-        compose.onNodeWithTag("date_cell_${today.plusDays(2)}").performSemanticsAction(SemanticsActions.OnClick)
-        assertThat(picked).containsExactly(today.plusDays(2))
-    }
-
-    @Test
-    fun theRangeLineIsSpokenWhenItChanges() {
-        showDates()
-        compose.onNodeWithTag("date_next").performClick()
-        compose.onNodeWithTag("date_range")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
-            .assertTextEquals("Mon 26 Oct – Sun 29 Nov")
     }
 
     @Test

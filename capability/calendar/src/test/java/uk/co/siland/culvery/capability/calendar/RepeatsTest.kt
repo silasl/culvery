@@ -116,7 +116,7 @@ class RepeatsTest {
     @Test
     fun theReadBackAgreesWithTheEditor() {
         for (choice in EDITOR_REPEATS - RepeatChoice.Never) {
-            val rule = recurrenceRule(choice, RepeatEnd.Never, allDay = false, zone = london, day = saturday)
+            val rule = recurrenceRule(choice, RepeatEnd.Never, day = saturday)
             assertThat(repeatsLabel(rule, EventTime.AllDay(saturday), london)).isEqualTo(choice.wording(saturday))
         }
     }

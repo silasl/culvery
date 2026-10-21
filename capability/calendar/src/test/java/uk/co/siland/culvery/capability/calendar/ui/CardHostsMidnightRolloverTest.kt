@@ -36,6 +36,7 @@ import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.SyncResult
+import uk.co.siland.culvery.capability.calendar.WeekFocus
 import uk.co.siland.culvery.capability.calendar.calendarDb
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
@@ -119,7 +120,7 @@ class CardHostsMidnightRolloverTest {
         val clock = HouseholdClock(zone.zone, WallClock { ticks.value }, clockScope, ticks)
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalOverlayHost provides RecordingOverlay()) {
-                CulveryTheme(dark = true) { rememberToday(clock)?.let { TodayCardHost(repo, editor, it) } }
+                CulveryTheme(dark = true) { rememberToday(clock)?.let { TodayCardHost(repo, editor, WeekFocus(), it) } }
             }
         }
         return ticks
@@ -180,7 +181,7 @@ class CardHostsMidnightRolloverTest {
             ) {
                 CulveryTheme(dark = true) {
                     val today = rememberToday(clock) ?: return@CulveryTheme
-                    WeekViewHost(repo, editor, today, rememberNowMillis(clock), onReconnect = {})
+                    WeekViewHost(repo, editor, WeekFocus(), today, rememberNowMillis(clock), onReconnect = {})
                 }
             }
         }
@@ -214,7 +215,7 @@ class CardHostsMidnightRolloverTest {
             ) {
                 CulveryTheme(dark = true) {
                     val today = rememberToday(clock) ?: return@CulveryTheme
-                    WeekViewHost(repo, editor, today, rememberNowMillis(clock), onReconnect = {})
+                    WeekViewHost(repo, editor, WeekFocus(), today, rememberNowMillis(clock), onReconnect = {})
                 }
             }
         }

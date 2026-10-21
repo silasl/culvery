@@ -81,35 +81,14 @@ internal object CalendarType {
     /** 16 sp / 600: person chips. */
     val personChip = HhType.body.copy(fontWeight = FontWeight.W600)
 
-    /** 24 sp / 700: "Pick a date", "Pick a time". */
+    /** 24 sp / 700: "Pick a time". */
     val pickerTitle = HhType.dateNumber
-
-    /** 15 sp / 400: the date picker's range, "Mon 21 Sep – Sun 25 Oct". */
-    val pickerRange = subtitle
-
-    /** 13 sp / 700: the date picker's weekday header. */
-    val pickerWeekday = HhType.label.copy(fontWeight = FontWeight.W700)
-
-    /** 16 sp / 600: date cells. */
-    val pickerCell = personChip
 
     /** 72 sp / 600, tabular, −2 tracking, line height 1: the time picker's hour and minute. */
     val timeValue = HhType.headerValue.copy(fontSize = 72.sp, letterSpacing = (-2).sp, lineHeight = 72.sp)
 
     /** 64 sp / 600: the ":" between them. */
     val timeColon = HhType.headerValue.copy(fontSize = 64.sp)
-
-    /** 35 sp / 700, −0.5 tracking: "Add event", "Change event" (9 §4.8). */
-    val editorTitle = HhType.screenTitle.copy(fontSize = 35.sp, fontWeight = FontWeight.W700, letterSpacing = (-0.5).sp)
-
-    /** 15 sp / 400: the add/edit sheet's live summary. */
-    val editorSummary = HhType.secondary.copy(fontSize = 15.sp)
-
-    /** 13 sp / 400: the line under a child's Who chips (9 §4.8). */
-    val whoOnly = HhType.secondary.copy(fontSize = 13.sp)
-
-    /** 16 sp / 600: a locked multi-day edit's dates line. */
-    val lockedDates = personChip
 
     /** 22 sp / 700: "Connecting to Google Calendar…" and Settings' "Calendars" (3a design §4). */
     val blockTitle = HhType.sectionTitle
@@ -453,22 +432,11 @@ internal object CalendarDimens {
     // The confirm card's delete icon.
     val footerIcon = 24.dp
 
-    // Pickers (hand-off §7 and Culvery.dc.html): card `surf`, radius 30, padding 26. Date: 520 wide, 14 between blocks,
-    // the range 4 below "Pick a date", ‹ › 48 dp circles 8 apart; weekday header padding 4; cells 56 dp, radius 16,
-    // 6 apart, today's ring 2 dp; Cancel a Large button. Time: 440 wide, 18 between blocks; the columns 14 apart;
-    // steppers 88×52, radius 18, a 32 dp icon, 8 from the value; ":" 10 above the baseline; Cancel and Set time
-    // Large buttons 10 apart.
+    // The time picker (hand-off §7 and Culvery.dc.html): card `surf`, radius 30, padding 26; 440 wide, 18 between
+    // blocks; the columns 14 apart; steppers 88×52, radius 18, a 32 dp icon, 8 from the value; ":" 10 above the
+    // baseline; Cancel and Set time Large buttons 10 apart.
     val pickerRadius = 30.dp
     val pickerPadding = 26.dp
-    val datePickerWidth = 520.dp
-    val datePickerGap = 14.dp
-    val pickerRangeTop = 4.dp
-    val pageButtonGap = 8.dp
-    val weekdayPaddingV = 4.dp
-    val dateCellHeight = 56.dp
-    val dateCellRadius = 16.dp
-    val dateCellGap = 6.dp
-    val dateRing = 2.dp
     val timePickerWidth = 440.dp
     val timePickerGap = 18.dp
     val timeColumnGap = 14.dp
@@ -480,28 +448,11 @@ internal object CalendarDimens {
     val colonBottom = 10.dp
     val timeButtonGap = 10.dp
 
-    // Add/edit sheet (9 §4.8, handoff 4a): padding 29 above, 32 at the sides, 27 below; the summary 4 below the title and
-    // ✕ 16 away; the body 4 below the Title field, 16 between sections, each label 8 above its chips; Time and Length 27 apart.
-    val editorPaddingTop = 29.dp
-    val editorPaddingH = 32.dp
-    val editorPaddingBottom = 27.dp
-    val editorHeaderGap = 16.dp
-    val editorSummaryTop = 4.dp
-    val editorBodyTop = 4.dp
-    val editorBodyGap = 16.dp
-    val sectionGap = 8.dp
-    val timeLengthGap = 27.dp
-
-    // The locked dates line and the failure card: radius 18, padding 14×16, the icon 12 from the text;
-    // `date_range` 22 dp, `cloud_off` 24 dp, the failure body 2 below its title.
+    // The failure card: radius 18, padding 14×16, the icon 12 from the text; `cloud_off` 24 dp, the body 2 below its title.
     val editorCardRadius = 18.dp
     val editorCardPaddingV = 14.dp
     val editorCardPaddingH = 16.dp
     val editorCardIconGap = 12.dp
-    val lockedIcon = 22.dp
-    val whoOnlyIcon = 15.dp
-    val whoOnlyGap = 5.dp
-    val whoOnlyTop = 8.dp
     val failureIcon = 24.dp
     val failureBodyTop = 2.dp
 

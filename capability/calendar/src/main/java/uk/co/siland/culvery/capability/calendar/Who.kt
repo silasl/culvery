@@ -42,10 +42,21 @@ fun resolvePeople(forPerson: String?, sourcePerson: PersonId, people: Map<Person
     }
 }
 
+/** [resolvePeople] by id, for the household [order]: an unknown calendar person reads as Family. */
+internal fun resolveIds(forPerson: String?, sourcePerson: PersonId?, order: List<PersonId>): List<PersonId> {
+    val ids = peopleIn(forPerson)
+    val known = ids.filter { it == PersonId.FAMILY || it in order }
+    return when {
+        known.isNotEmpty() -> known.sortedBy(order::rankOf)
+        ids.size > 1 -> listOf(PersonId.FAMILY)
+        else -> listOf(sourcePerson?.takeIf { it in order } ?: PersonId.FAMILY)
+    }
+}
+
 /** No tag at all, or one that names nobody. */
 fun isUntagged(forPerson: String?): Boolean = peopleIn(forPerson).isEmpty()
 
-private fun List<PersonId>.rankOf(id: PersonId): Int = indexOf(id).takeIf { it >= 0 } ?: Int.MAX_VALUE
+internal fun List<PersonId>.rankOf(id: PersonId): Int = indexOf(id).takeIf { it >= 0 } ?: Int.MAX_VALUE
 
 /** "Sam", "Sam + Mia", "Alex, Sam +1". */
 fun whoLine(people: List<Person>): String = when (people.size) {

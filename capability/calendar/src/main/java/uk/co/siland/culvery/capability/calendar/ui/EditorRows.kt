@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,6 +45,9 @@ internal data class RowTag(val text: String, val icon: String?, val fill: Color,
 
 internal const val CLASH = "Clash"
 
+/** TalkBack's word for a locked row, whose value says where its dates change instead (9 §3.1). */
+internal const val LOCKED_SPAN = "locked, as it runs over several days"
+
 /** Handoff 6i's tag on Time: `weather` words and `warning` on a `weather` tint, made opaque over `surf` so an active row's fill doesn't lower its contrast. */
 @Composable
 internal fun clashTag(): RowTag {
@@ -53,8 +57,9 @@ internal fun clashTag(): RowTag {
 
 /**
  * One of the event's rows (handoff §1 Layout): an [icon], the [label] over the [value] on one line, an optional [tag],
- * and a chevron; [onClick] null is a locked row, with a lock and no pane to open. With the keyboard up ([typing]) it is
- * shorter and has no label. Its parts are tagged [testTag] with `_value`, `_icon` and `_tag`.
+ * and a chevron; [onClick] null is a locked row, with a lock and no pane to open, which TalkBack hears as [LOCKED_SPAN].
+ * With the keyboard up ([typing]) it is shorter and has no label. Its parts are tagged [testTag] with `_value`, `_icon`,
+ * `_tag` and `_lock`.
  */
 @Composable
 internal fun EditorRow(
@@ -81,7 +86,10 @@ internal fun EditorRow(
             .clip(shape)
             .background(if (state == RowState.Active) c.accentSoft else c.surf)
             .then(if (state == RowState.Active) Modifier.border(EditorDimens.ring, c.accent, shape) else Modifier)
-            .semantics(mergeDescendants = true) { selected = active }
+            .semantics(mergeDescendants = true) {
+                selected = active
+                if (onClick == null) stateDescription = LOCKED_SPAN
+            }
             .then(if (onClick != null) Modifier.hhClickable(onClick) else Modifier)
             .padding(start = EditorDimens.rowPaddingStart, end = EditorDimens.rowPaddingEnd),
     ) {
@@ -101,7 +109,11 @@ internal fun EditorRow(
             )
         }
         if (tag != null) RowTagPill(tag, Modifier.testTag("${testTag}_tag"))
-        HhIcon(if (onClick != null) Icons.CHEVRON_RIGHT else Icons.LOCK, size = EditorDimens.rowEndIcon, tint = c.mute)
+        if (onClick != null) {
+            HhIcon(Icons.CHEVRON_RIGHT, size = EditorDimens.rowEndIcon, tint = c.mute)
+        } else {
+            HhIcon(Icons.LOCK, size = EditorDimens.rowEndIcon, tint = c.mute, modifier = Modifier.testTag("${testTag}_lock"))
+        }
     }
 }
 

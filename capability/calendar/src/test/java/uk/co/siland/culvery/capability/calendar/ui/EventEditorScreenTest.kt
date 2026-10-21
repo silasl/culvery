@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -45,7 +46,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EditorForm
-import uk.co.siland.culvery.capability.calendar.EventForm
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.core.household.PersonId
@@ -422,7 +422,7 @@ class EventEditorScreenTest {
         compose.onNodeWithTag("sheet_close").performClick()
         compose.onNodeWithTag("editor_discard_confirm").assertTextEquals("Discard").performClick()
         assertThat(calls).containsExactly("close")
-        assertThat(discardIcon(EventForm.Mode.New)).isEqualTo(Icons.DELETE)
+        assertThat(discardIcon(EditorForm.Mode.New)).isEqualTo(Icons.DELETE)
 
         calls.clear()
         compose.runOnIdle { use(editorDinnerOf(Duration.ofHours(1))) }
@@ -476,6 +476,21 @@ class EventEditorScreenTest {
         assertThat(day.lineCount).isEqualTo(1)
         assertThat(day.isLineEllipsized(0)).isTrue()
         node("editor_row_time").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** 9 §3.1: a timed span keeps its dates, so its one Day row is locked and says why. */
+    @Test
+    fun aLockedSpanShowsOneDayRow() {
+        show(editorLockedVisit())
+        node("editor_row_day_value").assertTextEquals("Mon 28 – Wed 30 · change dates in Google Calendar on your phone")
+        node("editor_row_day_lock").assertExists()
+        node("editor_row_time").assertDoesNotExist()
+        compose.onNodeWithTag("editor_row_day").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, LOCKED_SPAN))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        val before = flow.active
+        compose.onNodeWithTag("editor_row_day").performClick()
+        assertThat(flow.active).isEqualTo(before)
         compose.assertClickablesHaveRoleAndLabel()
     }
 

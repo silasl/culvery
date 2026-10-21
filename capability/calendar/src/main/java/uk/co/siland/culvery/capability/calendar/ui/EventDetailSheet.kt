@@ -55,11 +55,13 @@ import uk.co.siland.culvery.core.ui.HhPersonChip
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
+import uk.co.siland.culvery.core.ui.hhClickable
 
 enum class DetailMode { Idle, ChoosingPerson, ConfirmingDelete }
 
 internal const val CANT_CHANGE_HERE = "Can’t change here"
 internal const val CHOOSE_WHO = "Choose who it’s for"
+internal const val CHANGE_WHO = "Change who"
 
 /** The Calendar row's value: the source's name, said to be out of reach when the tablet can't change it (4d-2 Decision 2g). */
 internal fun calendarLabel(event: EventUi): String = when (event.readOnlyReason) {
@@ -70,8 +72,8 @@ internal fun calendarLabel(event: EventUi): String = when (event.readOnlyReason)
 /**
  * Hand-off §7 "Sheet 1 — Event detail". Stateless: the host decides [mode] and [busy]. Buttons are never hidden
  * for permission reasons; the checks happen when they are tapped. Delete runs the guard ([onDelete]); only the
- * confirmation's "Delete event" deletes ([onConfirmDelete]). Edit ([onEdit]) shows exactly where Delete does and
- * opens the add/edit sheet without a PIN (2b-2 design D12).
+ * confirmation's "Delete event" deletes ([onConfirmDelete]). Change ([onEdit]) shows exactly where Delete does and
+ * opens the editor without a PIN (2b-2 design D12); on an event it can change, the For row opens it on Who ([onChangeWho], 9 §3.3).
  */
 @Composable
 fun EventDetailSheet(
@@ -86,6 +88,7 @@ fun EventDetailSheet(
     onChoosePerson: () -> Unit,
     onAssign: (Person) -> Unit,
     onEdit: () -> Unit,
+    onChangeWho: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = Culvery.colors
@@ -105,7 +108,7 @@ fun EventDetailSheet(
             modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
         ) {
             Header(e, onClose)
-            InfoCard(detail)
+            InfoCard(detail, onChangeWho.takeIf { e.editable && !busy })
             when {
                 e.readOnlyReason == ReadOnlyReason.OtherCalendar || e.readOnlyReason == ReadOnlyReason.NotMaster -> Note(
                     icon = Icons.LOCK,
@@ -247,7 +250,7 @@ private fun SyncingPill(service: String) {
 }
 
 @Composable
-private fun InfoCard(detail: EventDetailUi) {
+private fun InfoCard(detail: EventDetailUi, onChangeWho: (() -> Unit)?) {
     val e = detail.event
     HhCard(
         modifier = Modifier.fillMaxWidth().testTag("detail_info"),
@@ -256,7 +259,7 @@ private fun InfoCard(detail: EventDetailUi) {
     ) {
         InfoRow(Icons.SCHEDULE, "When") { Value(detail.whenLabel) }
         Divider()
-        InfoRow(Icons.PERSON, "For") {
+        InfoRow(Icons.PERSON, "For", Modifier.testTag("detail_for"), onClick = onChangeWho, clickLabel = CHANGE_WHO) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.infoDotGap)) {
                 PersonDots(e.people, CalendarDimens.infoDot, ring = Culvery.colors.surf, dotTag = "for_dot")
                 Value(whoLine(e.people))
@@ -274,11 +277,22 @@ private fun InfoCard(detail: EventDetailUi) {
 }
 
 @Composable
-private fun InfoRow(icon: String, label: String, value: @Composable () -> Unit) {
+private fun InfoRow(
+    icon: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    clickLabel: String? = null,
+    value: @Composable () -> Unit,
+) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().heightIn(min = CalendarDimens.infoRowMin).semantics(mergeDescendants = true) {},
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = CalendarDimens.infoRowMin)
+            .semantics(mergeDescendants = true) {}
+            .then(if (onClick != null) Modifier.hhClickable(onClick, label = clickLabel) else Modifier),
     ) {
         HhIcon(icon, size = CalendarDimens.infoIcon, tint = c.mute)
         Spacer(Modifier.width(CalendarDimens.infoIconGap))

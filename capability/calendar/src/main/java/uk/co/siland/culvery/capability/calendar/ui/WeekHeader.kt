@@ -53,7 +53,7 @@ import uk.co.siland.culvery.core.ui.hhClickable
 internal fun WeekHeader(
     state: WeekViewState,
     onWeeksAhead: (Int) -> Unit,
-    onAdd: ((LocalDate) -> Unit)?,
+    onAdd: ((LocalDate?) -> Unit)?,
     onReconnect: () -> Unit,
     onUpdateNow: () -> Unit,
 ) {
@@ -113,7 +113,7 @@ internal fun WeekHeader(
         }
         if (onAdd != null) {
             HhButton(
-                "Add event", { onAdd(state.week.start) }, Modifier.testTag("week_add_event"),
+                "Add event", { onAdd(null) }, Modifier.testTag("week_add_event"),
                 tone = ButtonTone.Primary, icon = Icons.ADD, on = ButtonSurface.Bg,
             )
         }

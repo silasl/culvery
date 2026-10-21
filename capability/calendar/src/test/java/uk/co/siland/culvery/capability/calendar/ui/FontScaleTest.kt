@@ -30,17 +30,20 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
-import uk.co.siland.culvery.capability.calendar.EventForm
+import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.ReviewConnection
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
+import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
 /** The calendar's screens at large font scales (4d-1 §6). Real text metrics: these measure lines and ellipses. */
 @RunWith(AndroidJUnit4::class)
@@ -54,7 +57,7 @@ class FontScaleTest {
         CulveryTheme(dark = false) {
             WithFontScale(1.5f) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
-                    EventDetailSheet(detail, SampleUi.household, mode, busy = false, {}, {}, {}, {}, {}, {}, {})
+                    EventDetailSheet(detail, SampleUi.household, mode, busy = false, {}, {}, {}, {}, {}, {}, {}, {})
                 }
             }
         }
@@ -172,26 +175,30 @@ class FontScaleTest {
     }
 
     @Test
-    fun atFontScale15TheEditorSummaryTakesTwoLinesBeforeCuttingTheName() {
+    fun atFontScale15TheEditorsRowValuesEllipsiseOnOneLine() {
         val max = Person(PersonId("max"), "Maximilian-Alexander Fotheringham-Smythe", 0xFF9C7CE3)
-        val form = EventForm(EventForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), ZoneId.of("Europe/London"), signedIn = null, preselectedDay = null)
-        form.chooseWho(max.id)
+        val people = SampleUi.household + max
+        val form = EditorForm(
+            EditorForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), ZoneId.of("Europe/London"), signedIn = null, childOnly = null,
+            preselectedDay = SampleUi.TODAY, order = people.map { it.id }, calendarPerson = null,
+        )
+        form.toggleWho(max.id)
         compose.setContent {
             CulveryTheme(dark = false) {
                 WithFontScale(1.5f) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
-                        EventEditorSheet(
-                            form = form, people = SampleUi.household + max, service = "Google Calendar", childOnly = null, busy = false, failure = null,
-                            picker = EditorPicker.None, onClose = {}, onSave = {}, onDelete = {}, onRefusedWho = {}, onPicker = {},
-                            focusTitleOnOpen = false,
-                        )
-                    }
+                    EventEditorScreen(
+                        form = form, flow = editorFlow(form, null, null), members = SampleUi.members + Member(max, Role.ADULT, hasPin = true),
+                        context = "From Calendar", savesTo = "Family calendar", service = "Google Calendar", busy = false, failure = null,
+                        picker = EditorPicker.None, childOnly = null, childName = null, held = null,
+                        onClose = {}, onSave = {}, onDelete = {}, onRefusedWho = {}, onPicker = {},
+                    )
                 }
             }
         }
-        val summary = compose.onNodeWithTag("editor_summary").textLayout()
-        assertThat(summary.lineCount).isEqualTo(2)
-        assertThat(summary.isLineEllipsized(1)).isFalse()
+        val who = compose.onNodeWithTag("editor_row_who_value", useUnmergedTree = true).textLayout()
+        assertThat(who.lineCount).isEqualTo(1)
+        assertThat(who.isLineEllipsized(0)).isTrue()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** The hand-off puts the value 18 dp after the label column, which a wide label mustn't swallow. */

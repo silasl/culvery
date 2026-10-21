@@ -44,7 +44,7 @@ private val CONTENT_H = 724.dp
 class WeekScreenshotTest {
     @get:Rule val compose = createComposeRule()
     private val now = SampleUi.NOW
-    private val addNothing: (LocalDate) -> Unit = {}
+    private val addNothing: (LocalDate?) -> Unit = {}
 
     private fun snap(name: String, dark: Boolean, sync: SyncStatusUi, week: WeekUi = SampleUi.week,
         canAdd: Boolean = false,

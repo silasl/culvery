@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,76 +23,38 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
-import java.time.DayOfWeek
-import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-import java.time.temporal.TemporalAdjusters
-import java.util.Locale
-import uk.co.siland.culvery.capability.calendar.SHORT_DAY
-import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
-import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhAlpha
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.quietFill
 import uk.co.siland.culvery.core.ui.readAsOne
 
-/** Which picker is drawn over the add/edit sheet, or over the editor's Time pane: its start or its end time. */
-enum class EditorPicker { None, Date, Time, EndDate, Until, StartTime, EndTime }
+/** Which picker is drawn over the editor's Time pane: its start or its end time. */
+enum class EditorPicker { None, StartTime, EndTime }
 
-/** A date-picker page is 5 weeks (2b-2 design D10). */
-internal const val PICKER_WEEKS = 5
-private const val DAYS_PER_WEEK = 7
-private const val DAYS_PER_PAGE = PICKER_WEEKS * DAYS_PER_WEEK
 private const val HOURS_PER_DAY = 24
 private const val MINUTES_PER_HOUR = 60
 
 /** The time picker's minute step (hand-off §7). */
 internal const val MINUTE_STEP = 15
-
-// ENGLISH, as elsewhere in the calendar: the hand-off's "1 Oct".
-private val DAY_MONTH = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
-
-/** The first page starts on this week's Monday. */
-internal fun firstPageStart(today: LocalDate): LocalDate = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-
-/** The page holding [date], counted from the first page; negative for earlier pages. */
-internal fun pageOf(date: LocalDate, today: LocalDate): Int =
-    Math.floorDiv(ChronoUnit.DAYS.between(firstPageStart(today), date), DAYS_PER_PAGE.toLong()).toInt()
-
-internal fun pageStart(page: Int, today: LocalDate): LocalDate = firstPageStart(today).plusDays(DAYS_PER_PAGE.toLong() * page)
-
-/** "Mon 21 Sep – Sun 25 Oct". */
-internal fun pageRangeLabel(start: LocalDate): String =
-    "${start.format(SHORT_DAY)} – ${start.plusDays(DAYS_PER_PAGE - 1L).format(SHORT_DAY)}"
-
-/** A cell reads its day of the month; the 1st reads "1 Oct". */
-internal fun dateCellLabel(date: LocalDate): String = if (date.dayOfMonth == 1) date.format(DAY_MONTH) else date.dayOfMonth.toString()
 
 /** Hours step by 1 and wrap 23 ↔ 00 without changing the day. */
 internal fun hourStep(hour: Int, up: Boolean): Int = Math.floorMod(hour + if (up) 1 else -1, HOURS_PER_DAY)
@@ -106,7 +66,7 @@ internal fun minuteStep(minute: Int, up: Boolean): Int = when {
     else -> Math.floorMod(minute - MINUTE_STEP, MINUTES_PER_HOUR)
 }
 
-/** Over the sheet only (2b-2 design D4): a scrim that cancels on a tap, with [content] centred on it. */
+/** Over the editor only: a scrim that cancels on a tap, with [content] centred on it. */
 @Composable
 internal fun PickerLayer(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     val dismiss by rememberUpdatedState(onDismiss)
@@ -120,58 +80,6 @@ internal fun PickerLayer(onDismiss: () -> Unit, content: @Composable () -> Unit)
                 .pointerInput(Unit) { detectTapGestures { dismiss() } },
         )
         content()
-    }
-}
-
-/**
- * Hand-off §7 date picker with 2b-2 design D10's changes: pages of 5 weeks, ‹ and › to move between them, past
- * days dimmed but selectable. It opens on the page holding [selected]; tapping a day picks it.
- */
-@Composable
-internal fun DatePickerCard(today: LocalDate, selected: LocalDate, onPick: (LocalDate) -> Unit, onCancel: () -> Unit) {
-    val c = Culvery.colors
-    var page by remember { mutableIntStateOf(pageOf(selected, today)) }
-    val start = pageStart(page, today)
-    PickerCard(CalendarDimens.datePickerWidth, CalendarDimens.datePickerGap, "date_picker", paneTitle = "Pick a date") {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.pageButtonGap)) {
-            Column(Modifier.weight(1f)) {
-                Text("Pick a date", style = CalendarType.pickerTitle, color = c.ink, modifier = Modifier.semantics { heading() })
-                Text(
-                    pageRangeLabel(start),
-                    style = CalendarType.pickerRange,
-                    color = c.mute,
-                    modifier = Modifier
-                        .padding(top = CalendarDimens.pickerRangeTop)
-                        .testTag("date_range")
-                        .semantics { liveRegion = LiveRegionMode.Polite },
-                )
-            }
-            HhRoundButton(Icons.CHEVRON_LEFT, "Earlier weeks", { page-- }, Modifier.testTag("date_prev"), on = ButtonSurface.Surf, iconSize = ButtonTokens.icon)
-            HhRoundButton(Icons.CHEVRON_RIGHT, "Later weeks", { page++ }, Modifier.testTag("date_next"), on = ButtonSurface.Surf, iconSize = ButtonTokens.icon)
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.dateCellGap)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.dateCellGap)) {
-                (0 until DAYS_PER_WEEK).forEach { d ->
-                    Text(
-                        start.plusDays(d.toLong()).format(WEEKDAY),
-                        style = CalendarType.pickerWeekday,
-                        color = c.mute,
-                        textAlign = TextAlign.Center,
-                        // Each cell says its weekday.
-                        modifier = Modifier.weight(1f).padding(vertical = CalendarDimens.weekdayPaddingV).semantics { hideFromAccessibility() },
-                    )
-                }
-            }
-            (0 until PICKER_WEEKS).forEach { week ->
-                Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.dateCellGap)) {
-                    (0 until DAYS_PER_WEEK).forEach { d ->
-                        val date = start.plusDays((week * DAYS_PER_WEEK + d).toLong())
-                        DateCell(date, today, selected, Modifier.weight(1f)) { onPick(date) }
-                    }
-                }
-            }
-        }
-        HhButton("Cancel", onCancel, Modifier.fillMaxWidth().testTag("picker_cancel"), size = ButtonSize.Large, on = ButtonSurface.Surf)
     }
 }
 
@@ -220,31 +128,6 @@ internal fun PickerCard(width: Dp, gap: Dp, tag: String, paneTitle: String, cont
             .padding(CalendarDimens.pickerPadding),
         content = content,
     )
-}
-
-@Composable
-private fun DateCell(date: LocalDate, today: LocalDate, selected: LocalDate, modifier: Modifier, onClick: () -> Unit) {
-    val c = Culvery.colors
-    val isSelected = date == selected
-    val shape = RoundedCornerShape(CalendarDimens.dateCellRadius)
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .testTag("date_cell_$date")
-            .alpha(if (date.isBefore(today) && !isSelected) HhAlpha.PAST_DAY else 1f)
-            .height(CalendarDimens.dateCellHeight)
-            .clip(shape)
-            .background(if (isSelected) c.accent else c.surf2)
-            .then(if (date == today) Modifier.border(CalendarDimens.dateRing, c.accent, shape) else Modifier)
-            .hhClickable(onClick)
-            // After the click, so it clears only the number inside; one click serves a touch and TalkBack alike.
-            .clearAndSetSemantics {
-                contentDescription = dateCellName(date, today)
-                this.selected = isSelected
-            },
-    ) {
-        Text(dateCellLabel(date), style = CalendarType.pickerCell, color = if (isSelected) c.accentInk else c.ink, maxLines = 1)
-    }
 }
 
 @Composable

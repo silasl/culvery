@@ -386,7 +386,7 @@ class GoogleWriteTest {
     /** Pin: Google takes the series' start from the event itself, so no DTSTART line goes with the rule. */
     @Test
     fun aMonthlyNthSeriesSendsItsRule() = runTest {
-        val rule = recurrenceRule(RepeatChoice.MonthlyOnWeekday, RepeatEnd.After(12), allDay = false, zone = london, day = LocalDate.of(2026, 9, 26))!!
+        val rule = recurrenceRule(RepeatChoice.MonthlyOnWeekday, RepeatEnd.After(12), day = LocalDate.of(2026, 9, 26))!!
         provider.create(conn, family, draft().copy(recurrence = Recurrence(rule, london)), key)
         val sent = google.bodies.single().getValue("recurrence").jsonArray.map { it.jsonPrimitive.content }
         assertThat(sent).containsExactly("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=4SA;COUNT=12")

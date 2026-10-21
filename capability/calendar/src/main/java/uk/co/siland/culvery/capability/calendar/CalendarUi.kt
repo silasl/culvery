@@ -57,13 +57,19 @@ data class EventUi(
 /** The detail sheet's model: the event plus its "When" row. */
 data class EventDetailUi(val event: EventUi, val whenLabel: String)
 
-/** Where the add/edit sheet starts: an event as shown, with its queued changes laid over it (2b-2 design §3.1). */
+/**
+ * Where the editor starts: an event as shown, with its queued changes laid over it (2b-2 design §3.1). [sourceName] is
+ * its calendar's name, where a change goes; [calendarPerson] the person that calendar is mapped to, whom an untagged
+ * event is for.
+ */
 data class EditableEvent(
     val ref: EventRef,
     val title: String,
     val start: EventTime,
     val end: EventTime,
     val forPerson: String?,
+    val sourceName: String = "",
+    val calendarPerson: PersonId? = null,
 )
 
 data class DayUi(val date: LocalDate, val events: List<EventUi>)

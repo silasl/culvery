@@ -7,7 +7,7 @@ import java.time.ZoneId
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
-/** 5 §A.4, 9 §3.1: what Save writes for each choice, both UNTIL forms, the words from the day, and the dates a count lands on. */
+/** 5 §A.4, 9 §3.1: what Save writes for each choice, the words from the day, and the dates a count lands on. */
 class RecurrenceTest {
     private val london = ZoneId.of("Europe/London")
 
@@ -17,8 +17,8 @@ class RecurrenceTest {
     // Thursday 29 October 2026: a 5th Thursday.
     private val thursday = LocalDate.of(2026, 10, 29)
 
-    private fun rule(choice: RepeatChoice, end: RepeatEnd = RepeatEnd.Never, allDay: Boolean = false, day: LocalDate = saturday) =
-        recurrenceRule(choice, end, allDay, london, day)
+    private fun rule(choice: RepeatChoice, end: RepeatEnd = RepeatEnd.Never, day: LocalDate = saturday) =
+        recurrenceRule(choice, end, day)
 
     @Test
     fun eachChoiceWritesItsFrequencyAndInterval() {
@@ -31,8 +31,6 @@ class RecurrenceTest {
             "RRULE:FREQ=YEARLY;INTERVAL=1",
             "RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=4SA",
         ).inOrder()
-        assertThat(RepeatChoice.entries.map { it.label })
-            .containsExactly("Never", "Every day", "Every week", "Every 2 weeks", "Every month", "Every year", "Every month").inOrder()
     }
 
     @Test
@@ -105,41 +103,15 @@ class RecurrenceTest {
         assertThat(choiceOf("RRULE:FREQ=WEEKLY;BYDAY=MO,WE", saturday)).isNull()
     }
 
-    @Test
-    fun anAllDaySeriesEndsOnADate() {
-        assertThat(rule(RepeatChoice.Weekly, RepeatEnd.OnDate(LocalDate.of(2026, 12, 31)), allDay = true))
-            .isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20261231")
-    }
-
-    @Test
-    fun aTimedSeriesEndsAtTheEndOfThatDayInTheHouseholdZoneAsUtc() {
-        assertThat(rule(RepeatChoice.Weekly, RepeatEnd.OnDate(LocalDate.of(2026, 12, 31))))
-            .isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20261231T235959Z")
-        assertThat(rule(RepeatChoice.Daily, RepeatEnd.OnDate(LocalDate.of(2027, 6, 30))))
-            .isEqualTo("RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20270630T225959Z")
-    }
-
-    /** The change happens in the small hours, so the end of the day is in the evening's offset. */
-    @Test
-    fun onTheDaysTheClocksChangeUntilUsesThatEveningsOffset() {
-        assertThat(rule(RepeatChoice.Weekly, RepeatEnd.OnDate(LocalDate.of(2026, 10, 25))))
-            .isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20261025T235959Z")
-        assertThat(rule(RepeatChoice.Weekly, RepeatEnd.OnDate(LocalDate.of(2026, 3, 29))))
-            .isEqualTo("RRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20260329T225959Z")
-    }
-
     /** Never "Yes": whatever either editor writes, the detail sheet's Repeats row starts with the words for it. */
     @Test
     fun whatSaveWritesReadsBackInItsWords() {
-        val starts = listOf(
-            EventTime.AllDay(LocalDate.of(2026, 9, 23)) to true,
-            EventTime.Timed(Instant.parse("2026-09-23T17:00:00Z")) to false,
-        )
+        val starts = listOf(EventTime.AllDay(LocalDate.of(2026, 9, 23)), EventTime.Timed(Instant.parse("2026-09-23T17:00:00Z")))
         val day = LocalDate.of(2026, 9, 23)
-        for ((start, allDay) in starts) {
+        for (start in starts) {
             for (choice in RepeatChoice.entries - RepeatChoice.Never) {
-                for (end in listOf(RepeatEnd.Never, RepeatEnd.OnDate(LocalDate.of(2026, 12, 31)), RepeatEnd.After(5))) {
-                    assertThat(repeatsLabel(rule(choice, end, allDay, day), start, london)).startsWith(choice.wording(day))
+                for (end in listOf(RepeatEnd.Never, RepeatEnd.After(5))) {
+                    assertThat(repeatsLabel(rule(choice, end, day), start, london)).startsWith(choice.wording(day))
                 }
             }
         }
@@ -152,14 +124,11 @@ class RecurrenceTest {
 
     /** Pin: passes without the change. */
     @Test
-    fun neverBothUntilAndCountForAnyRepeatEnd() {
-        val ends = listOf(RepeatEnd.Never, RepeatEnd.OnDate(LocalDate.of(2026, 12, 31)), RepeatEnd.After(2), RepeatEnd.After(52))
+    fun saveNeverWritesAnUntil() {
+        val ends = listOf(RepeatEnd.Never, RepeatEnd.After(2), RepeatEnd.After(52))
         for (choice in RepeatChoice.entries - RepeatChoice.Never) {
             for (end in ends) {
-                for (allDay in listOf(true, false)) {
-                    val rule = rule(choice, end, allDay)!!
-                    assertThat(rule.contains("UNTIL=") && rule.contains("COUNT=")).isFalse()
-                }
+                assertThat(rule(choice, end)!!).doesNotContain("UNTIL=")
             }
         }
     }
@@ -169,11 +138,5 @@ class RecurrenceTest {
         for (times in listOf(1, 53, 0)) {
             assertThrows(IllegalArgumentException::class.java) { RepeatEnd.After(times) }
         }
-    }
-
-    @Test
-    fun theChipsAreSplitIntoCommonAndMore() {
-        assertThat(RepeatChoice.COMMON).containsExactly(RepeatChoice.Never, RepeatChoice.Weekly, RepeatChoice.Fortnightly).inOrder()
-        assertThat(RepeatChoice.MORE).containsExactly(RepeatChoice.Daily, RepeatChoice.Monthly, RepeatChoice.Yearly).inOrder()
     }
 }

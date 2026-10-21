@@ -38,6 +38,7 @@ import uk.co.siland.culvery.capability.calendar.ReviewCalendarsStep
 import uk.co.siland.culvery.capability.calendar.ScriptedProvider
 import uk.co.siland.culvery.capability.calendar.TestAccess
 import uk.co.siland.culvery.capability.calendar.UnreachableException
+import uk.co.siland.culvery.capability.calendar.WeekFocus
 import uk.co.siland.culvery.capability.calendar.YOUR_CALENDARS_LINE
 import uk.co.siland.culvery.capability.calendar.calendarDb
 import uk.co.siland.culvery.capability.calendar.couldNotConnect
@@ -337,7 +338,7 @@ class CalendarConnectHostTest {
                 CulveryTheme(dark = true) {
                     Box {
                         val connector = rememberConnector(connections)
-                        WeekViewHost(repo, editor, LocalDate.of(2026, 9, 23), nowMillis = 0L, onReconnect = connector::reconnect)
+                        WeekViewHost(repo, editor, WeekFocus(), LocalDate.of(2026, 9, 23), nowMillis = 0L, onReconnect = connector::reconnect)
                         overlay.content?.invoke()
                     }
                 }

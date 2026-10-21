@@ -2,33 +2,25 @@ package uk.co.siland.culvery.capability.calendar
 
 import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.MonthDay
 import java.time.YearMonth
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
 /**
- * How a new series repeats. [label] is the old add sheet's chip (5 §A.4), which doesn't list [MonthlyOnWeekday]; the
- * new editor words each choice from its day with [wording] (9 §3.1).
+ * How a series repeats; the editor words each choice from its day with [wording] (9 §3.1). [Monthly] (by date) is never
+ * offered, but the detail sheet reads a phone's monthly-by-date rule as it.
  */
-enum class RepeatChoice(val label: String, val freq: String?, val interval: Int) {
-    Never("Never", null, 1),
-    Daily("Every day", "DAILY", 1),
-    Weekly("Every week", "WEEKLY", 1),
-    Fortnightly("Every 2 weeks", "WEEKLY", 2),
-    Monthly("Every month", "MONTHLY", 1),
-    Yearly("Every year", "YEARLY", 1),
-    MonthlyOnWeekday("Every month", "MONTHLY", 1);
-
-    companion object {
-        /** The first row of Repeats chips; the rest sit under More options (9 §4.8). */
-        val COMMON: List<RepeatChoice> = listOf(Never, Weekly, Fortnightly)
-        val MORE: List<RepeatChoice> = listOf(Daily, Monthly, Yearly)
-    }
+enum class RepeatChoice(val freq: String?, val interval: Int) {
+    Never(null, 1),
+    Daily("DAILY", 1),
+    Weekly("WEEKLY", 1),
+    Fortnightly("WEEKLY", 2),
+    Monthly("MONTHLY", 1),
+    Yearly("YEARLY", 1),
+    MonthlyOnWeekday("MONTHLY", 1),
 }
 
 /** The editor's Repeats choices, in the pane's order (9 §3.1). */
@@ -116,11 +108,9 @@ const val MIN_TIMES = 2
 const val MAX_TIMES = 52
 const val DEFAULT_TIMES = 10
 
-/** How a new series ends (9 §4.8): never, on a date, or after a number of times. One value, so UNTIL and COUNT never both appear. */
+/** How a new series ends (9 §3.1): never, or after a number of times. */
 sealed interface RepeatEnd {
     data object Never : RepeatEnd
-
-    data class OnDate(val date: LocalDate) : RepeatEnd
 
     data class After(val times: Int) : RepeatEnd {
         init {
@@ -134,26 +124,19 @@ data class Recurrence(val rule: String, val zone: ZoneId)
 
 internal val UNTIL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
 internal val UNTIL_UTC: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
-private val END_OF_DAY: LocalTime = LocalTime.of(23, 59, 59)
 private const val SERIES_START = "DTSTART:"
 
 /**
- * `RRULE:FREQ=…;INTERVAL=n`, then by [end]: `UNTIL` for [RepeatEnd.OnDate] (that date for an [allDay] series; for a timed
- * one, 23:59:59 that day in [zone], as UTC, an hour earlier in BST), `COUNT=n` for [RepeatEnd.After], nothing for
- * [RepeatEnd.Never]. [RepeatChoice.MonthlyOnWeekday] first adds `BYDAY` for [day]'s place in its month ("4SA", "-1TH").
- * Null for [RepeatChoice.Never].
+ * `RRULE:FREQ=…;INTERVAL=n`, then `COUNT=n` for [RepeatEnd.After], nothing for [RepeatEnd.Never].
+ * [RepeatChoice.MonthlyOnWeekday] first adds `BYDAY` for [day]'s place in its month ("4SA", "-1TH"). Null for
+ * [RepeatChoice.Never].
  */
-fun recurrenceRule(choice: RepeatChoice, end: RepeatEnd, allDay: Boolean, zone: ZoneId, day: LocalDate): String? {
+fun recurrenceRule(choice: RepeatChoice, end: RepeatEnd, day: LocalDate): String? {
     val freq = choice.freq ?: return null
     val byDay = if (choice == RepeatChoice.MonthlyOnWeekday) ";BYDAY=${nthWeekday(day)}${day.dayOfWeek.code()}" else ""
     val ending = when (end) {
         RepeatEnd.Never -> ""
         is RepeatEnd.After -> ";COUNT=${end.times}"
-        is RepeatEnd.OnDate -> {
-            val until = if (allDay) end.date.format(UNTIL_DATE)
-            else end.date.atTime(END_OF_DAY).atZone(zone).withZoneSameInstant(ZoneOffset.UTC).format(UNTIL_UTC)
-            ";UNTIL=$until"
-        }
     }
     return "RRULE:FREQ=$freq;INTERVAL=${choice.interval}$byDay$ending"
 }

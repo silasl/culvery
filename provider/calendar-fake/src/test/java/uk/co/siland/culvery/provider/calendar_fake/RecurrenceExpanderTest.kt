@@ -144,7 +144,7 @@ class RecurrenceExpanderTest {
                 for (n in listOf(2, 10, 52)) {
                     val expected = occurrences(choice, day, n)
                     for (allDay in listOf(true, false)) {
-                        val rule = recurrenceRule(choice, RepeatEnd.After(n), allDay, london, day)!!
+                        val rule = recurrenceRule(choice, RepeatEnd.After(n), day)!!
                         val series = if (allDay) allDaySeries(rule, day, 1) else timedSeries(rule, day, LocalTime.of(10, 0))
                         val made = expand(series, day.plusYears(250)).map {
                             when (val s = it.start) {

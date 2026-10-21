@@ -405,16 +405,16 @@ class WeekViewTest {
     }
 
     @Test
-    fun addEventInTheHeaderAddsOnToday() {
-        val added = mutableListOf<LocalDate>()
+    fun addEventInTheHeaderOpensWithNoDay() {
+        val added = mutableListOf<LocalDate?>()
         show { WeekView(state(), onAdd = { added += it }) }
         compose.onNodeWithTag("week_add_event").assertHeightIsEqualTo(48.dp).performClick()
-        assertThat(added).containsExactly(SampleUi.TODAY)
+        assertThat(added).containsExactly(null)
     }
 
     @Test
     fun aTapOnTheSpaceBelowAColumnsLastChipAddsOnThatDay() {
-        val added = mutableListOf<LocalDate>()
+        val added = mutableListOf<LocalDate?>()
         show { WeekView(state(), onAdd = { added += it }) }
         // Sunday has just the one chip ("Sunday lunch at Gran's"), leaving plenty of empty space below it.
         val sunday = SampleUi.TODAY.plusDays(6)
@@ -428,7 +428,7 @@ class WeekViewTest {
 
     @Test
     fun aTapAnywhereInAnEmptyColumnAddsOnThatDay() {
-        val added = mutableListOf<LocalDate>()
+        val added = mutableListOf<LocalDate?>()
         // Today's column with no chips at all: there's no last chip to compare against (the `last == null` branch).
         val emptyToday = SampleUi.week.copy(days = SampleUi.week.days.map { if (it.date == SampleUi.TODAY) it.copy(events = emptyList()) else it })
         show { WeekView(WeekViewState(emptyToday, SampleUi.TODAY, sync(), now), onAdd = { added += it }) }
@@ -438,7 +438,7 @@ class WeekViewTest {
 
     @Test
     fun aTapInTheGapBetweenTwoChipsAddsNothing() {
-        val added = mutableListOf<LocalDate>()
+        val added = mutableListOf<LocalDate?>()
         show { WeekView(state(), onAdd = { added += it }) }
         // Saturday has three chips ("INSET day — no school", "Piano", "Book club"), so there's a gap to tap between the first two.
         val saturday = SampleUi.TODAY.plusDays(3)
@@ -452,7 +452,7 @@ class WeekViewTest {
 
     @Test
     fun aChipTapStillOpensItsEventAndAddsNothing() {
-        val added = mutableListOf<LocalDate>()
+        val added = mutableListOf<LocalDate?>()
         val opened = mutableListOf<EventRef>()
         show { WeekView(state(), onOpen = { opened += it }, onAdd = { added += it }) }
         compose.onNodeWithText("Dinner with Jo & Priya").performClick()
@@ -478,7 +478,7 @@ class WeekViewTest {
     @Test
     @Config(qualifiers = TABLET)
     fun pressingEmptySpaceShowsTheGhost() {
-        val added = mutableListOf<LocalDate>()
+        val added = mutableListOf<LocalDate?>()
         show { WeekView(state(), onAdd = { added += it }) }
         val point = belowChip(sunday, sundayLastChip)
         val ghost = "Add on ${sunday.format(DAY_AND_DATE)}"
@@ -508,7 +508,7 @@ class WeekViewTest {
     @Test
     @Config(qualifiers = TABLET)
     fun aPressDraggedOffTheColumnAddsNothing() {
-        val added = mutableListOf<LocalDate>()
+        val added = mutableListOf<LocalDate?>()
         show { WeekView(state(), onAdd = { added += it }) }
         val point = belowChip(sunday, sundayLastChip)
         val ghost = "Add on ${sunday.format(DAY_AND_DATE)}"
@@ -522,7 +522,7 @@ class WeekViewTest {
 
     @Test
     fun everyColumnHasOneAddButtonClearOfItsChips() {
-        val added = mutableListOf<LocalDate>()
+        val added = mutableListOf<LocalDate?>()
         val emptyThursday = SampleUi.week.copy(days = SampleUi.week.days.map { if (it.date == SampleUi.TODAY.plusDays(1)) it.copy(events = emptyList()) else it })
         show { WeekView(WeekViewState(emptyThursday, SampleUi.TODAY, sync(), now), onAdd = { added += it }) }
         emptyThursday.days.forEach { day ->
@@ -542,7 +542,7 @@ class WeekViewTest {
 
     @Test
     fun aFullColumnCanAddFromItsHeader() {
-        val added = mutableListOf<LocalDate>()
+        val added = mutableListOf<LocalDate?>()
         val wednesday = SampleUi.TODAY
         val full = SampleUi.week.copy(days = SampleUi.week.days.map {
             if (it.date == wednesday) it.copy(events = List(30) { n -> SampleUi.event("Errand $n", "09:00–10:00", SampleUi.sam) }) else it
@@ -580,7 +580,7 @@ class WeekViewTest {
 
     @Test
     fun aTapOnAColumnsHeaderAddsNothing() {
-        val added = mutableListOf<LocalDate>()
+        val added = mutableListOf<LocalDate?>()
         show { WeekView(state(), onAdd = { added += it }) }
         // A missed tap near the day's name is not a request for a new event: only the space below the chips adds.
         compose.onNodeWithTag("week_day_${SampleUi.TODAY}").performTouchInput { click(Offset(centerX, 10f)) }
@@ -612,14 +612,14 @@ class WeekViewTest {
         assertThat((0..MAX_WEEKS_AHEAD).map(::weekTitle)).containsExactly("This week", "Next week", "In 2 weeks", "In 3 weeks").inOrder()
     }
 
-    /** 4c §6.6: on a later week, + adds on its first day and a column on its own day; no column says Today. */
+    /** 4c §6.6: on a later week, Add event opens with no day and a column on its own day; no column says Today. */
     @Test
     fun aLaterWeekAddsOnItsOwnDays() {
-        val added = mutableListOf<LocalDate>()
+        val added = mutableListOf<LocalDate?>()
         show { WeekView(WeekViewState(SampleUi.weekAhead(1), SampleUi.TODAY, sync(), now, weeksAhead = 1), onAdd = { added += it }) }
         compose.onNodeWithTag("week_add_event").performClick()
         compose.onNodeWithTag("week_add_${SampleUi.TODAY.plusDays(9)}").performClick()
-        assertThat(added).containsExactly(SampleUi.TODAY.plusWeeks(1), SampleUi.TODAY.plusDays(9)).inOrder()
+        assertThat(added).containsExactly(null, SampleUi.TODAY.plusDays(9)).inOrder()
         compose.onAllNodesWithContentDescription("Today, ", substring = true).assertCountEquals(0)
     }
 
