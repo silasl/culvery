@@ -128,6 +128,20 @@ class CalendarEditorTest {
         assertThat(access.toasts.messages).containsExactly(EVENT_ADDED, "Event added on Wed 21 October.").inOrder()
     }
 
+    @Test
+    fun aMultiDayAllDayEventIsWrittenWithItsExclusiveEnd() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val monday = LocalDate.of(2026, 10, 19)
+        val form = EventForm(EventForm.Mode.New, monday, java.time.LocalTime.of(9, 0), london, access.alex.id, null)
+        form.updateTitle("Camping")
+        form.chooseUntil(monday.plusDays(2))
+        assertThat(editor(access).create(form.draft(createdBy = access.alex.id.value))).isEqualTo(EditResult.Done)
+        val sent = writer.drafts.single()
+        assertThat(sent.start).isEqualTo(EventTime.AllDay(monday))
+        assertThat(sent.end).isEqualTo(EventTime.AllDay(monday.plusDays(3)))
+    }
+
     /** A change to an event, as the edit sheet sends it; its createdBy is ignored by the editor. */
     private fun edited(title: String, forPerson: String? = null): EventDraft {
         val start = LocalDate.of(2026, 9, 23).atTime(20, 0).atZone(london).toInstant()

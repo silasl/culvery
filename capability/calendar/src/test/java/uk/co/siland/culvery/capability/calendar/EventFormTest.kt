@@ -606,4 +606,145 @@ class EventFormTest {
         form.chooseAfter()
         assertThat(form.repeatEnd).isEqualTo(RepeatEnd.After(15))
     }
+
+    private val mon19 = LocalDate.of(2026, 10, 19)
+    private fun day(d: Int) = mon19.plusDays(d - 19L)
+
+    private fun newOn19() = new(on = mon19).apply { updateTitle("Holiday") }
+
+    @Test
+    fun aMultiDayDraftEndsTheDayAfterItsLastDay() {
+        val form = newOn19()
+        form.chooseWho(mia)
+        form.chooseUntil(day(22))
+        val draft = form.draft(createdBy = null)
+        assertThat(draft.start).isEqualTo(EventTime.AllDay(day(19)))
+        assertThat(draft.end).isEqualTo(EventTime.AllDay(day(23)))
+        assertThat(form.summary()).isEqualTo("${whenLabel(draft.start, draft.end, london, mon19)} · Mia")
+    }
+
+    @Test
+    fun untilOnTheDayItselfIsOneDay() {
+        val form = newOn19()
+        form.chooseUntil(day(21))
+        form.chooseUntil(day(19))
+        assertThat(form.until).isNull()
+        assertThat(form.draft(createdBy = null).end).isEqualTo(EventTime.AllDay(day(20)))
+        assertThat(form.untilLabel).isEqualTo("Until")
+    }
+
+    @Test
+    fun untilBeforeTheDayWaitsToSave() {
+        val form = newOn19()
+        form.chooseDay(day(21))
+        form.chooseUntil(day(20))
+        assertThat(form.untilError).isEqualTo(UNTIL_TOO_EARLY)
+        assertThat(form.canSave).isFalse()
+    }
+
+    @Test
+    fun untilOnTheSixtiethDayIsAllowed() {
+        val form = newOn19()
+        form.chooseUntil(mon19.plusDays(59))
+        assertThat(form.untilError).isNull()
+        assertThat(form.canSave).isTrue()
+        assertThat(form.draft(createdBy = null).end).isEqualTo(EventTime.AllDay(LocalDate.of(2026, 12, 18)))
+    }
+
+    @Test
+    fun untilOnTheSixtyFirstDayWaitsToSave() {
+        val form = newOn19()
+        form.chooseUntil(mon19.plusDays(60))
+        assertThat(form.untilError).isEqualTo(UNTIL_TOO_LATE)
+        assertThat(form.canSave).isFalse()
+    }
+
+    @Test
+    fun movingTheDayMovesUntilWithIt() {
+        val form = newOn19()
+        form.chooseUntil(day(21))
+        form.chooseDay(day(23))
+        assertThat(form.until).isEqualTo(day(25))
+        form.chooseDay(day(20))
+        assertThat(form.until).isEqualTo(day(22))
+    }
+
+    @Test
+    fun choosingATimeSetsUntilAside() {
+        val form = newOn19()
+        form.chooseUntil(day(21))
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        assertThat(form.until).isNull()
+        assertThat(form.offersUntil).isFalse()
+        val draft = form.draft(createdBy = null)
+        assertThat(draft.start).isInstanceOf(EventTime.Timed::class.java)
+        assertThat((draft.end as EventTime.Timed).instant).isEqualTo((draft.start as EventTime.Timed).instant.plus(Duration.ofHours(1)))
+    }
+
+    @Test
+    fun reChoosingAllDayRestoresUntil() {
+        val form = newOn19()
+        form.chooseUntil(day(21))
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        form.chooseTime(TimeChoice.AllDay)
+        assertThat(form.until).isEqualTo(day(21))
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        form.chooseDay(day(20))
+        form.chooseTime(TimeChoice.AllDay)
+        assertThat(form.until).isNull()
+    }
+
+    @Test
+    fun chooseUntilIsIgnoredForATimedEvent() {
+        val form = newOn19()
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        val before = form.edited
+        form.chooseUntil(day(21))
+        assertThat(form.until).isNull()
+        assertThat(form.edited).isEqualTo(before)
+        val fresh = new(on = mon19)
+        fresh.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        fresh.chooseTime(TimeChoice.AllDay)
+        assertThat(fresh.edited).isFalse()
+    }
+
+    @Test
+    fun aHiddenUntilNeverHoldsSaveBack() {
+        val form = newOn19()
+        form.chooseDay(day(21))
+        form.chooseUntil(day(20))
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        assertThat(form.untilError).isNull()
+        assertThat(form.canSave).isTrue()
+    }
+
+    @Test
+    fun untilMakesTheSheetEdited() {
+        val form = new(on = mon19)
+        form.chooseUntil(day(21))
+        assertThat(form.edited).isTrue()
+        form.chooseUntil(day(19))
+        assertThat(form.edited).isFalse()
+    }
+
+    @Test
+    fun aMultiDaySeriesCarriesItsRule() {
+        val form = newOn19()
+        form.chooseUntil(day(21))
+        form.chooseRepeat(RepeatChoice.Weekly)
+        form.chooseEnd(RepeatEnd.After(4))
+        val draft = form.draft(createdBy = null)
+        assertThat(draft.start).isEqualTo(EventTime.AllDay(day(19)))
+        assertThat(draft.end).isEqualTo(EventTime.AllDay(day(22)))
+        assertThat(draft.recurrence?.rule).contains("COUNT=4")
+    }
+
+    @Test
+    fun anUntilAcrossTheYearEndIsLabelled() {
+        val form = newOn19()
+        form.chooseDay(LocalDate.of(2026, 12, 30))
+        form.chooseUntil(LocalDate.of(2027, 1, 2))
+        assertThat(form.untilLabel).isEqualTo("Until Sat 2 Jan")
+        assertThat(form.draft(createdBy = null).end).isEqualTo(EventTime.AllDay(LocalDate.of(2027, 1, 3)))
+    }
 }

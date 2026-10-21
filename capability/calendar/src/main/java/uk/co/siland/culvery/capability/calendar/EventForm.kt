@@ -8,7 +8,9 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.time.temporal.ChronoUnit
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.ui.UNTIL
 import uk.co.siland.culvery.core.ui.plural
 
 /** What the Time chips choose: all day, or a time from Pick time…. */
@@ -16,6 +18,9 @@ sealed interface TimeChoice {
     data object AllDay : TimeChoice
     data class Custom(val time: LocalTime) : TimeChoice
 }
+
+/** The longest an event may last, in days (the first and last day count). */
+const val MAX_SPAN_DAYS = 60L
 
 /** 2b-2 design D8: a title is at most 100 characters. */
 const val MAX_TITLE_LENGTH = 100
@@ -94,6 +99,36 @@ class EventForm(
     /** The end is before the event's day, so Save waits (5 §A.4). */
     val endsBeforeStart: Boolean get() = (repeatEnd as? RepeatEnd.OnDate)?.let { it.date < day } ?: false
 
+    /** The last day of a new all-day event; null means one day. */
+    var until: LocalDate? by mutableStateOf(null)
+        private set
+
+    // Set aside by choosing a time; All day with the same Day puts it back.
+    private var untilAside: Pair<LocalDate, LocalDate>? = null
+
+    val offersUntil: Boolean get() = time == TimeChoice.AllDay && !datesLocked
+
+    val untilBeforeStart: Boolean get() = offersUntil && until?.let { it < day } == true
+
+    val untilTooLate: Boolean get() = offersUntil && until?.let { it > day.plusDays(MAX_SPAN_DAYS - 1) } == true
+
+    /** "Until", or "Until Thu 22 Oct" once picked. */
+    val untilLabel: String get() = until?.let { "$UNTIL ${it.format(SHORT_DAY)}" } ?: UNTIL
+
+    val untilError: String?
+        get() = when {
+            untilBeforeStart -> UNTIL_TOO_EARLY
+            untilTooLate -> UNTIL_TOO_LATE
+            else -> null
+        }
+
+    /** Ignored unless [offersUntil]; the day itself means one day. */
+    fun chooseUntil(date: LocalDate) {
+        if (!offersUntil) return
+        until = date.takeIf { it != day }
+        whenTouched = true
+    }
+
     private data class Answers(
         val title: String,
         val who: PersonId,
@@ -102,12 +137,13 @@ class EventForm(
         val length: Duration,
         val repeat: RepeatChoice,
         val repeatEnd: RepeatEnd,
+        val until: LocalDate?,
     )
 
-    private val opening = Answers(title, who, day, time, length, repeat, repeatEnd)
+    private val opening = Answers(title, who, day, time, length, repeat, repeatEnd, until)
 
     /** Any field differs from how the sheet opened: closing it now would lose something (4d-2 §6.3). Changed back, it isn't. */
-    val edited: Boolean get() = Answers(title, who, day, time, length, repeat, repeatEnd) != opening
+    val edited: Boolean get() = Answers(title, who, day, time, length, repeat, repeatEnd, until) != opening
 
     private var whoTouched = false
 
@@ -120,7 +156,7 @@ class EventForm(
     /** Today and the six days after it: the Day chips before Pick date…. */
     val dayChoices: List<LocalDate> = (0 until DAYS_SHOWN).map { today.plusDays(it) }
 
-    val canSave: Boolean get() = title.trim().isNotEmpty() && !endsBeforeStart
+    val canSave: Boolean get() = title.trim().isNotEmpty() && !endsBeforeStart && untilError == null
 
     /** Typing past [MAX_TITLE_LENGTH] is ignored; shortening is always allowed, even an edited title already over it. */
     fun updateTitle(value: String) {
@@ -137,6 +173,7 @@ class EventForm(
     /** Choosing the day already chosen changes nothing (as [chooseWho]), so re-tapping it can't nudge a timed event. */
     fun chooseDay(date: LocalDate) {
         if (date == day) return
+        until = until?.plusDays(ChronoUnit.DAYS.between(day, date))
         day = date
         whenTouched = true
     }
@@ -144,6 +181,13 @@ class EventForm(
     /** Re-choosing the time already chosen changes nothing. */
     fun chooseTime(choice: TimeChoice) {
         if (choice == time) return
+        if (choice is TimeChoice.Custom) {
+            until?.let { untilAside = day to it }
+            until = null
+        } else {
+            until = untilAside?.takeIf { it.first == day }?.second
+            untilAside = null
+        }
         time = choice
         whenTouched = true
     }
@@ -210,7 +254,7 @@ class EventForm(
     /**
      * What Save sends. All day is one whole date. A timed event starts at the chosen local time in the household zone
      * (in a spring-forward gap it moves forward; an ambiguous autumn time takes the earlier offset) and lasts
-     * [length] of real time, but ends at the next midnight at the latest, since new events can't span days. A new event that repeats carries its rule (5 §A.4). A
+     * [length] of real time, but ends at the next midnight at the latest, since new timed events can't span days. An all-day event with an Until ends the day after it (exclusive). A new event that repeats carries its rule (5 §A.4). A
      * locked edit, or one whose Day, Time and Length weren't touched and whose own span was valid (all-day, or a
      * positive length), keeps its own start and end: rebuilt from the chips, an event in the autumn's repeated hour
      * would move. A zero- or negative-length original (bad provider data) is always rebuilt from the chips, so Save
@@ -224,7 +268,7 @@ class EventForm(
         if (o != null && keepsOwnSpan) return EventDraft(title.trim(), o.start, o.end, forPerson, createdBy)
         val start = startTime
         return if (start == null) {
-            EventDraft(title.trim(), EventTime.AllDay(day), EventTime.AllDay(day.plusDays(1)), forPerson, createdBy, recurrence = recurrence(allDay = true))
+            EventDraft(title.trim(), EventTime.AllDay(day), EventTime.AllDay(maxOf(until ?: day, day).plusDays(1)), forPerson, createdBy, recurrence = recurrence(allDay = true))
         } else {
             val from = ZonedDateTime.of(day, start, zone).toInstant()
             val midnight = day.plusDays(1).atStartOfDay(zone).toInstant()
@@ -287,3 +331,6 @@ private fun spansDays(start: EventTime, end: EventTime, zone: ZoneId): Boolean {
     val (first, last) = daySpan(start, end, zone)
     return last.isAfter(first)
 }
+
+internal const val UNTIL_TOO_EARLY = "The last day is before the first day. Pick a later one."
+internal const val UNTIL_TOO_LATE = "An event can last up to 60 days. Pick an earlier last day."

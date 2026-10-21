@@ -229,6 +229,17 @@ fun EventEditorSheet(
                     onCancel = { onPicker(EditorPicker.None) },
                 )
             }
+            EditorPicker.Until -> PickerLayer(onDismiss = { onPicker(EditorPicker.None) }) {
+                DatePickerCard(
+                    today = form.today,
+                    selected = form.until ?: form.day,
+                    onPick = {
+                        form.chooseUntil(it)
+                        onPicker(EditorPicker.None)
+                    },
+                    onCancel = { onPicker(EditorPicker.None) },
+                )
+            }
         }
     }
 }
