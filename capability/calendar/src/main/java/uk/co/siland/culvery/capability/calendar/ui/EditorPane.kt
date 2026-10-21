@@ -19,16 +19,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.core.household.Member
+import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
 
@@ -43,14 +50,23 @@ internal fun questionFor(step: EditorStep, form: EditorForm): String = when (ste
     EditorStep.Check -> "Check it"
 }
 
-/** The pane for [step]: its question over what answers it. */
+/** The household as the panes read it: [people] in order, their ids in [order], and [byId] with Family too. */
+internal class EditorPeople(members: List<Member>) {
+    val people: List<Person> = members.map { it.person }
+    val order: List<PersonId> = people.map { it.id }
+    val byId: Map<PersonId, Person> = (people + Person.Family).associateBy { it.id }
+}
+
+/** The pane for [step]: its question over what answers it; [check] is the screen's one clash check. */
 @Composable
 internal fun EditorPaneFor(
     step: EditorStep,
     form: EditorForm,
     flow: EditorFlow,
     members: List<Member>,
+    household: EditorPeople,
     held: Held?,
+    check: TimeCheck,
     service: String,
     childOnly: PersonId?,
     childName: String?,
@@ -61,10 +77,10 @@ internal fun EditorPaneFor(
     EditorPane(questionFor(step, form), flow, skip = step == EditorStep.Time || step == EditorStep.Repeats) {
         when (step) {
             EditorStep.Who -> WhoPane(form, members, childOnly, childName, busy, onRefusedWho)
-            EditorStep.Day -> DayPane(form, held, members.map { it.person }, onPicked = flow::moveOnSoon)
-            EditorStep.Time -> TimePane(form, held, members.map { it.person }, onPicker, onPicked = flow::moveOnSoon)
+            EditorStep.Day -> DayPane(form, held, household, onPicked = flow::moveOnSoon)
+            EditorStep.Time -> TimePane(form, check, household, onPicker, onPicked = flow::moveOnSoon)
             EditorStep.Repeats -> RepeatsPane(form, service, onPicked = flow::moveOnSoon, onChooseDay = { flow.open(EditorStep.Day) })
-            EditorStep.Check -> CheckPane(form, members.map { it.person })
+            EditorStep.Check -> CheckPane(form, household)
         }
     }
 }
@@ -120,6 +136,35 @@ internal fun EditorPane(question: String, flow: EditorFlow, skip: Boolean, body:
             }
         }
         body()
+    }
+}
+
+/** A heading in capitals, heard as the word. */
+@Composable
+internal fun CapsHeading(name: String, modifier: Modifier = Modifier) {
+    Text(
+        name.uppercase(),
+        style = CalendarType.rowLabel,
+        color = Culvery.colors.mute,
+        maxLines = 1,
+        modifier = modifier.clearAndSetSemantics {
+            text = AnnotatedString(name)
+            heading()
+        },
+    )
+}
+
+/** A `lock` and a muted line, read as one; [live] says it as it appears. */
+@Composable
+internal fun LockedNote(text: String, tag: String, live: Boolean = false) {
+    val mute = Culvery.colors.mute
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(EditorDimens.footIconGap),
+        modifier = Modifier.testTag(tag).semantics(mergeDescendants = true) { if (live) liveRegion = LiveRegionMode.Polite },
+    ) {
+        HhIcon(Icons.LOCK, size = EditorDimens.footIcon, tint = mute)
+        Text(text, style = CalendarType.whoHint, color = mute)
     }
 }
 

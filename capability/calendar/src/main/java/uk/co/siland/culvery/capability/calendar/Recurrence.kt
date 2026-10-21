@@ -36,7 +36,6 @@ val EDITOR_REPEATS: List<RepeatChoice> = listOf(
 const val DOESNT_REPEAT = "Doesn’t repeat"
 
 private val DATE_IN_YEAR: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale.ENGLISH)
-private const val DAYS_PER_WEEK = 7
 private const val LAST = -1
 private const val FIFTH = 5
 

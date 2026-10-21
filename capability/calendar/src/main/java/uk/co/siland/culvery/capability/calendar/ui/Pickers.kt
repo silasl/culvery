@@ -35,6 +35,8 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import java.time.LocalTime
+import uk.co.siland.culvery.capability.calendar.HOURS_PER_DAY
+import uk.co.siland.culvery.capability.calendar.MINUTES_PER_HOUR
 import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
@@ -46,9 +48,6 @@ import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.quietFill
 import uk.co.siland.culvery.core.ui.readAsOne
-
-private const val HOURS_PER_DAY = 24
-private const val MINUTES_PER_HOUR = 60
 
 /** The time picker's minute step (hand-off §7). */
 internal const val MINUTE_STEP = 15

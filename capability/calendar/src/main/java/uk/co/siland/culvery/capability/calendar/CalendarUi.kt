@@ -173,6 +173,12 @@ internal val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Loc
 /** "Sun 27": a day and its date. */
 internal val DAY_AND_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d", Locale.ENGLISH)
 
+/** "Mon 19 – Fri 23 Oct", or "Wed 30 Sep – Fri 2 Oct" with the month at both ends across months. */
+internal fun dayRange(first: LocalDate, last: LocalDate): String {
+    val from = if (first.month == last.month && first.year == last.year) first.format(DAY_AND_DATE) else first.format(SHORT_DAY)
+    return "$from – ${last.format(SHORT_DAY)}"
+}
+
 internal val MONTH_NAME: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH)
 /** "Oct": the small label over the 1st of a new month in the week. */
 internal val MONTH_SHORT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)
@@ -181,6 +187,10 @@ internal val FULL_WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE
 
 /** "Tuesday 7 October": how TalkBack names a day. */
 internal val FULL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
+
+internal const val DAYS_PER_WEEK = 7
+internal const val HOURS_PER_DAY = 24
+internal const val MINUTES_PER_HOUR = 60
 
 /** How many weeks past this one the Calendar tab steps to (4c D10): four weeks in all, inside the synced window. */
 const val MAX_WEEKS_AHEAD = 3
@@ -214,11 +224,7 @@ fun monthTitle(start: LocalDate): MonthTitle {
 }
 
 /** "Wed 23 – Tue 29 Sep", with the month at both ends when the week crosses one. */
-fun weekRange(start: LocalDate): String {
-    val end = start.plusDays(6)
-    val from = if (start.month == end.month) start.format(DAY_AND_DATE) else start.format(SHORT_DAY)
-    return "$from – ${end.format(SHORT_DAY)}"
-}
+fun weekRange(start: LocalDate): String = dayRange(start, start.plusDays(6))
 
 /** "This week · Wed 23 – Tue 29 Sep · updated from Google Calendar 2 minutes ago": a sync age line joins in lower case. */
 fun weekSubtitleLine(weeksAhead: Int, start: LocalDate, sync: String): String {
@@ -231,8 +237,6 @@ private val AGE_LINES = listOf("Updated", "Out of date", "Not updated")
 /** How many weeks after this one the Calendar tab shows [date] in; null before [today] or past [lastShownDay]. */
 internal fun weeksTo(today: LocalDate, date: LocalDate): Int? =
     if (date < today || date > lastShownDay(today)) null else (ChronoUnit.DAYS.between(today, date) / DAYS_PER_WEEK).toInt()
-
-private const val DAYS_PER_WEEK = 7
 
 /**
  * The toast after adding (9 §3.1): "Added Guitar lesson.", with a series' [wording] ("every Saturday"), and the first

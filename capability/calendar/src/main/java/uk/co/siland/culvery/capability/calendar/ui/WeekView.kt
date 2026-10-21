@@ -395,7 +395,7 @@ internal fun EventChip(event: EventUi, day: LocalDate, onOpen: ((EventRef) -> Un
             .semantics(mergeDescendants = true) { contentDescription = eventOnDay(event, day) }
             .then(if (onOpen != null) Modifier.hhClickable({ onOpen(event.ref) }, label = OPEN_EVENT_DETAILS) else Modifier),
     ) {
-        if (shared) StripedBar(event.people.map { Color(it.color) }, width = CalendarDimens.sharedChipEdge, radius = 0.dp)
+        if (shared) StripedBar(event.people, width = CalendarDimens.sharedChipEdge, radius = 0.dp)
         Column(
             Modifier
                 .weight(1f)

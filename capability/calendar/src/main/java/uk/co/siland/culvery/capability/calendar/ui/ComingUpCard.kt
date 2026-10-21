@@ -21,7 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -113,7 +112,7 @@ private fun CompactRow(event: EventUi, day: LocalDate) {
             .background(c.surf2)
             .padding(horizontal = CalendarDimens.compactRowPaddingH, vertical = CalendarDimens.compactRowPaddingV),
     ) {
-        StripedBar(event.people.map { Color(it.color) }, width = CalendarDimens.compactBarWidth)
+        StripedBar(event.people, width = CalendarDimens.compactBarWidth)
         Spacer(Modifier.width(CalendarDimens.compactBarGap))
         Column(Modifier.shownNotSpoken()) {
             Text(event.title, style = CalendarType.strong14, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)

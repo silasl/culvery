@@ -265,10 +265,11 @@ fun HhSegmented(
     }
 }
 
-private const val NOT_AVAILABLE = "not available"
-private const val FIND_OUT_WHY = "find out why"
-private const val CHOSEN = "chosen"
-private const val NOT_CHOSEN = "not chosen"
+/** What TalkBack says of a choice's state, and a locked one's tap. */
+const val NOT_AVAILABLE = "not available"
+const val FIND_OUT_WHY = "find out why"
+const val CHOSEN = "chosen"
+const val NOT_CHOSEN = "not chosen"
 
 /**
  * 64 dp, `surf`, 22 sp / 600, one line; [placeholder] while empty; the keyboard's Done calls [onDone] and never saves.

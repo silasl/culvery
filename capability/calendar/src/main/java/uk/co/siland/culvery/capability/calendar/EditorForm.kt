@@ -30,15 +30,7 @@ internal const val UNTIL_TOO_LATE = "An event can last up to $MAX_SPAN_DAYS days
 const val MAX_TITLE_LENGTH = 100
 
 /** "30 minutes", "1 hour", "1 hour 30 minutes": full words, singular at one. */
-fun lengthLabel(length: Duration): String {
-    val hours = length.toHours()
-    val minutes = length.toMinutes() % MINUTES_PER_HOUR
-    return when {
-        hours == 0L -> plural(minutes, "minute")
-        minutes == 0L -> plural(hours, "hour")
-        else -> "${plural(hours, "hour")} ${plural(minutes, "minute")}"
-    }
-}
+fun lengthLabel(length: Duration): String = lengthWords(length) { plural(it, "minute") }
 
 /** The Time pane's length chips (9 §3.1); any other length shows as "Until {end}". */
 val EDITOR_LENGTHS: List<Duration> = listOf(Duration.ofMinutes(30), Duration.ofMinutes(45), Duration.ofHours(1), Duration.ofHours(2))
@@ -47,19 +39,20 @@ internal const val END_BEFORE_START = "The end is before the start. Pick a later
 
 private const val UNTIL_UNPICKED = "$UNTIL…"
 private val DEFAULT_LENGTH: Duration = Duration.ofHours(1)
-private const val MINUTES_PER_HOUR = 60L
 private val MORNING: LocalTime = LocalTime.of(9, 0)
 private const val LAST_HOUR = 23
 private val LAST_END: LocalTime = LocalTime.of(23, 59)
 
 /** "30 min", "45 min", "1 hour", "2 hours": a chip's words; TalkBack hears [lengthLabel]. */
-fun lengthChip(length: Duration): String {
+fun lengthChip(length: Duration): String = lengthWords(length) { "$it min" }
+
+private fun lengthWords(length: Duration, minuteWords: (Long) -> String): String {
     val hours = length.toHours()
     val minutes = length.toMinutes() % MINUTES_PER_HOUR
     return when {
-        hours == 0L -> "$minutes min"
+        hours == 0L -> minuteWords(minutes)
         minutes == 0L -> plural(hours, "hour")
-        else -> "${plural(hours, "hour")} $minutes min"
+        else -> "${plural(hours, "hour")} ${minuteWords(minutes)}"
     }
 }
 
@@ -210,7 +203,7 @@ class EditorForm(
     val untilError: String?
         get() {
             val first = day ?: return null
-            return until?.takeIf { multiDay && it > first.plusDays(MAX_SPAN_DAYS - 1) }?.let { UNTIL_TOO_LATE }
+            return until?.takeIf { it > first.plusDays(MAX_SPAN_DAYS - 1) }?.let { UNTIL_TOO_LATE }
         }
 
     var time: TimeChoice by mutableStateOf(original?.let { timeOf(it.start, zone) } ?: TimeChoice.AllDay)

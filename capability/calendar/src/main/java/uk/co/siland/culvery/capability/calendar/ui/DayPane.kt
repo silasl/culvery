@@ -44,6 +44,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
+import uk.co.siland.culvery.capability.calendar.DAYS_PER_WEEK
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.SHORT_DAY
@@ -72,7 +73,6 @@ private const val LATER_MONTHS = "Later months"
 private const val IN_THE_RANGE = "in the range"
 private const val FIRST_DAY = "first day"
 private const val LAST_DAY = "last day"
-private const val DAYS_A_WEEK = 7
 private val MONTH_YEAR: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
 private val FULL_WEEKDAY_NAME: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)
 private val WEEKEND = setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)
@@ -109,10 +109,8 @@ internal fun monthCells(month: YearMonth): List<LocalDate> {
  * range's last day within the 60-day cap, calls [onPicked].
  */
 @Composable
-internal fun DayPane(form: EditorForm, held: Held?, people: List<Person>, onPicked: () -> Unit) {
+internal fun DayPane(form: EditorForm, held: Held?, household: EditorPeople, onPicked: () -> Unit) {
     var month by remember { mutableStateOf(YearMonth.from(form.day ?: form.today)) }
-    val byId = remember(people) { (people + Person.Family).associateBy { it.id } }
-    val order = remember(people) { people.map { it.id } }
     val pick = { date: LocalDate ->
         form.tapDay(date)
         if (!form.awaitingLastDay && form.untilError == null) onPicked()
@@ -126,10 +124,10 @@ internal fun DayPane(form: EditorForm, held: Held?, people: List<Person>, onPick
             MonthHeader(month, onEarlier = { month = month.minusMonths(1) }, onLater = { month = month.plusMonths(1) })
             WeekdayLetters()
             Column {
-                monthCells(month).chunked(DAYS_A_WEEK).forEach { week ->
+                monthCells(month).chunked(DAYS_PER_WEEK).forEach { week ->
                     Row(Modifier.fillMaxWidth()) {
                         week.forEachIndexed { column, date ->
-                            val on = held?.peopleOn(date, order, form.zone).orEmpty().mapNotNull { byId[it] }
+                            val on = held?.peopleOn(date, household.order, form.zone).orEmpty().mapNotNull { household.byId[it] }
                             DayCell(date, column, form, month, on, Modifier.weight(1f)) { pick(date) }
                         }
                     }
@@ -205,7 +203,7 @@ private fun WeekdayLetters() {
 private fun DayCell(date: LocalDate, column: Int, form: EditorForm, month: YearMonth, on: List<Person>, modifier: Modifier, onTap: () -> Unit) {
     val c = Culvery.colors
     val first = form.day
-    val last = form.until?.takeIf { form.multiDay }
+    val last = form.until
     val chosen = date == first || date == last
     val banded = first != null && last != null && date in first..last
     val fade = when {
@@ -231,7 +229,7 @@ private fun DayCell(date: LocalDate, column: Int, form: EditorForm, month: YearM
         if (banded) {
             Row(Modifier.fillMaxWidth().height(EditorDimens.dayCircle)) {
                 BandHalf(show = date != first, rounded = column == 0, start = true, Modifier.weight(1f))
-                BandHalf(show = date != last, rounded = column == DAYS_A_WEEK - 1, start = false, Modifier.weight(1f))
+                BandHalf(show = date != last, rounded = column == DAYS_PER_WEEK - 1, start = false, Modifier.weight(1f))
             }
         }
         Column(

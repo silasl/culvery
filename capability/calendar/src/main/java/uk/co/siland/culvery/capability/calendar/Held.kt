@@ -28,16 +28,14 @@ internal const val MAX_DOTS = 3
 private const val QUARTER_MINUTES = 15L
 private val FIRST_FREE_START: LocalTime = LocalTime.of(7, 0)
 private val LAST_FREE_END: LocalTime = LocalTime.of(23, 0)
-private const val HOURS_PER_DAY = 24
 
 /** The people with an event on [date], in household [order] then Family; none outside the held days. */
 fun Held.peopleOn(date: LocalDate, order: List<PersonId>, zone: ZoneId): List<PersonId> {
     if (!holds(date)) return emptyList()
-    val rank = { id: PersonId -> if (id == PersonId.FAMILY) Int.MAX_VALUE - 1 else order.indexOf(id).takeIf { it >= 0 } ?: Int.MAX_VALUE }
     return events.filter { it.isOn(date, zone) }
         .flatMap { it.people }
         .distinct()
-        .sortedBy(rank)
+        .sortedBy(order::rankOfWithFamilyLast)
 }
 
 /** A day's dots: the colours of [people], each once, at most [MAX_DOTS]. */
@@ -77,7 +75,7 @@ fun Held.check(
     order: List<PersonId>,
 ): FreeCheck {
     if (!canCheck(people, day)) return FreeCheck.None
-    val chosen = people.distinct().sortedBy { order.indexOf(it).takeIf { i -> i >= 0 } ?: Int.MAX_VALUE }
+    val chosen = people.distinct().sortedBy(order::rankOf)
     val busy = busyEvents(chosen, except)
     val (from, to) = draftSpan(day, start, length, zone)
     for (person in chosen) {

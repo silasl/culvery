@@ -16,11 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.text
-import androidx.compose.ui.text.AnnotatedString
 import uk.co.siland.culvery.capability.calendar.ALL_DAY_LABEL
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventRef
@@ -32,6 +28,7 @@ import uk.co.siland.culvery.capability.calendar.firstDates
 import uk.co.siland.culvery.capability.calendar.needsLine
 import uk.co.siland.culvery.capability.calendar.timeValue
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.clockText
 
@@ -42,20 +39,18 @@ internal const val ON_THE_WEEK = "On the week"
 internal fun moreDates(n: Int): String = "+ $n more"
 
 // Everyone is Family; with nobody chosen yet the preview has nobody to tint it, so it shows as Family too.
-private fun chosenPeople(form: EditorForm, people: List<Person>): List<Person> {
-    val byId = (people + Person.Family).associateBy { it.id }
-    return form.who.mapNotNull { byId[it] }.ifEmpty { listOf(Person.Family) }
-}
+private fun chosenPeople(form: EditorForm, byId: Map<PersonId, Person>): List<Person> =
+    form.who.mapNotNull { byId[it] }.ifEmpty { listOf(Person.Family) }
 
 /** The event as the week would show it (handoff 6g "On the week"): never opened, so its ref names nothing. */
-internal fun previewUi(form: EditorForm, people: List<Person>): EventUi {
+internal fun previewUi(form: EditorForm, byId: Map<PersonId, Person>): EventUi {
     val start = form.startTime
     return EventUi(
         ref = EventRef("", "", "preview"),
         title = form.title.trim(),
         timeLabel = timeValue(form),
         startLabel = start?.let(::clockText) ?: ALL_DAY_LABEL,
-        people = chosenPeople(form, people),
+        people = chosenPeople(form, byId),
         allDay = start == null,
         recurring = form.repeat != RepeatChoice.Never,
         startSort = 0,
@@ -68,19 +63,19 @@ internal fun previewUi(form: EditorForm, people: List<Person>): EventUi {
  * event at the foot is the one action.
  */
 @Composable
-internal fun CheckPane(form: EditorForm, people: List<Person>) {
+internal fun CheckPane(form: EditorForm, household: EditorPeople) {
     val c = Culvery.colors
-    val who = chosenPeople(form, people)
+    val who = chosenPeople(form, household.byId)
     needsLine(form.missing)?.let {
         Text(it, style = CalendarType.whoHint, color = c.mute, modifier = Modifier.testTag("check_needs"))
         return
     }
     val (dates, more) = firstDates(form)
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap)) {
-        Text(checkSentence(form, people), style = CalendarType.checkSentence, color = c.ink, modifier = Modifier.testTag("check_sentence"))
+        Text(checkSentence(form, household.people), style = CalendarType.checkSentence, color = c.ink, modifier = Modifier.testTag("check_sentence"))
         if (dates.isNotEmpty()) {
             // A one-off's single date needs no heading over it.
-            if (form.repeat != RepeatChoice.Never) Heading(FIRST_FEW)
+            if (form.repeat != RepeatChoice.Never) CapsHeading(FIRST_FEW)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(EditorDimens.checkDateGap),
                 verticalArrangement = Arrangement.spacedBy(EditorDimens.checkDateGap),
@@ -90,9 +85,9 @@ internal fun CheckPane(form: EditorForm, people: List<Person>) {
                 if (more > 0) Text(moreDates(more), style = CalendarType.checkDate, color = c.mute, modifier = Modifier.testTag("check_more"))
             }
         }
-        Heading(ON_THE_WEEK)
+        CapsHeading(ON_THE_WEEK)
         Box(Modifier.testTag("check_chip").width(EditorDimens.checkChipWidth)) {
-            EventChip(previewUi(form, people), form.day ?: form.today, onOpen = null)
+            EventChip(previewUi(form, household.byId), form.day ?: form.today, onOpen = null)
         }
     }
 }
@@ -115,19 +110,4 @@ private fun DateChip(date: String, who: List<Person>, tag: String) {
         PersonDots(who, EditorDimens.checkDot, ring = c.surf2, dotTag = "check_date_dot")
         Text(date, style = CalendarType.checkDate, color = c.ink, maxLines = 1)
     }
-}
-
-/** A heading in capitals, heard as the word. */
-@Composable
-private fun Heading(name: String) {
-    Text(
-        name.uppercase(),
-        style = CalendarType.rowLabel,
-        color = Culvery.colors.mute,
-        maxLines = 1,
-        modifier = Modifier.clearAndSetSemantics {
-            text = AnnotatedString(name)
-            heading()
-        },
-    )
 }

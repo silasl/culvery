@@ -39,6 +39,12 @@ internal fun StripedBar(colors: List<Color>, width: Dp, modifier: Modifier = Mod
     }
 }
 
+/** [StripedBar] in [people]'s colours. */
+@JvmName("StripedBarOf")
+@Composable
+internal fun StripedBar(people: List<Person>, width: Dp, modifier: Modifier = Modifier, radius: Dp = width / 2) =
+    StripedBar(people.map { Color(it.color) }, width, modifier, radius)
+
 /**
  * [people]'s dots in a row, each [CalendarDimens.sharedDotOverlap] over the last and ringed in [ring] (the surface behind) so
  * they read apart; one person is a plain dot. Each dot is tagged [dotTag].

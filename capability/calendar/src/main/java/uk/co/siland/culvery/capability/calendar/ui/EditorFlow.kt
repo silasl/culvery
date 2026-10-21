@@ -28,21 +28,16 @@ class EditorFlow(val steps: List<EditorStep>, initial: EditorStep) {
         require(initial in steps) { "$initial isn't one of $steps" }
     }
 
-    private var shown by mutableStateOf(initial)
+    var active by mutableStateOf(initial)
+        private set
 
     // Bumped by every change of row, so a pending move made before it doesn't fire.
     private var generation = 0
     private val moves = Channel<Int>(Channel.CONFLATED)
 
-    var active: EditorStep
-        get() = shown
-        set(value) {
-            require(value in steps) { "$value isn't one of $steps" }
-            generation++
-            shown = value
-        }
-
     fun open(step: EditorStep) {
+        require(step in steps) { "$step isn't one of $steps" }
+        generation++
         active = step
     }
 
@@ -50,7 +45,7 @@ class EditorFlow(val steps: List<EditorStep>, initial: EditorStep) {
     val nextStep: EditorStep? get() = steps.getOrNull(steps.indexOf(active) + 1)
 
     fun next() {
-        nextStep?.let { active = it }
+        nextStep?.let(::open)
     }
 
     fun moveOnSoon() {

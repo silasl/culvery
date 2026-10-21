@@ -84,7 +84,6 @@ fun checkSentence(form: EditorForm, people: List<Person>): String {
 /** The Check pane's first few dates, and how many more a counted series has after them; one for a one-off. */
 fun firstDates(form: EditorForm): Pair<List<LocalDate>, Int> {
     val first = form.day ?: return emptyList<LocalDate>() to 0
-    if (form.repeat == RepeatChoice.Never) return listOf(first) to 0
     return when (val end = form.repeatEnd) {
         is RepeatEnd.After -> occurrences(form.repeat, first, minOf(end.times, FIRST_FEW)) to maxOf(end.times - FIRST_FEW, 0)
         else -> occurrences(form.repeat, first, FIRST_FEW) to 0
@@ -99,9 +98,8 @@ private fun chosen(form: EditorForm, people: List<Person>): List<Person> {
 // "Sat 26 Sep", or a range: "Mon 19 – Fri 23 Oct", with the month on both ends across months.
 private fun datesOf(form: EditorForm): String? {
     val first = form.day ?: return null
-    val last = form.until?.takeIf { form.multiDay } ?: return first.format(SHORT_DAY)
-    val from = if (first.month == last.month && first.year == last.year) first.format(DAY_AND_DATE) else first.format(SHORT_DAY)
-    return "$from – ${last.format(SHORT_DAY)}"
+    val last = form.until ?: return first.format(SHORT_DAY)
+    return dayRange(first, last)
 }
 
 // "10:00–10:45", ending where the draft does; null when all day.

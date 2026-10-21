@@ -29,12 +29,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.text
-import androidx.compose.ui.text.AnnotatedString
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -53,7 +49,6 @@ import uk.co.siland.culvery.capability.calendar.freeLine
 import uk.co.siland.culvery.capability.calendar.lengthChip
 import uk.co.siland.culvery.capability.calendar.lengthLabel
 import uk.co.siland.culvery.capability.calendar.timeValue
-import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
@@ -73,7 +68,7 @@ private const val HOW_LONG = "How long"
 private const val BUSY = "busy"
 private const val HOURS_A_ROW = 6
 private val HOUR_GROUPS = listOf("Morning" to 7..11, "Afternoon" to 12..17, "Evening" to 18..22)
-private val CHIP_HOURS = 7..22
+private val CHIP_HOURS = HOUR_GROUPS.first().second.first..HOUR_GROUPS.last().second.last
 private val MINUTE_CHIPS = listOf(0, 15, 30, 45)
 private val HOUR_MINUTE_TAG: DateTimeFormatter = DateTimeFormatter.ofPattern("HHmm", Locale.ENGLISH)
 
@@ -117,14 +112,12 @@ internal fun checkIcon(check: FreeCheck): String? = when (check) {
  * lasts more than a day, At a time is locked and a tap on it says why (9 §3.1).
  */
 @Composable
-internal fun TimePane(form: EditorForm, held: Held?, people: List<Person>, onPicker: (EditorPicker) -> Unit, onPicked: () -> Unit) {
+internal fun TimePane(form: EditorForm, check: TimeCheck, household: EditorPeople, onPicker: (EditorPicker) -> Unit, onPicked: () -> Unit) {
     // At a time with no hour yet is the pane's own state: the row still reads All day.
     var atATime by remember { mutableStateOf(form.startTime != null) }
     var explainLock by remember { mutableStateOf(false) }
     val timed = !form.multiDay && (atATime || form.startTime != null)
-    val check = rememberTimeCheck(form, held, people.map { it.id })
-    val names = remember(people) { (people + Person.Family).associate { it.id to it.name } }
-    val nameOf = { id: PersonId -> names[id].orEmpty() }
+    val nameOf = { id: PersonId -> household.byId[id]?.name.orEmpty() }
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap)) {
         HhSegmented(
             options = listOf(ALL_DAY_LABEL, AT_A_TIME),
@@ -142,7 +135,7 @@ internal fun TimePane(form: EditorForm, held: Held?, people: List<Person>, onPic
             locked = if (form.multiDay) setOf(1) else emptySet(),
             onLocked = { explainLock = true },
         )
-        if (form.multiDay && explainLock) AllDayOnlyLine()
+        if (form.multiDay && explainLock) LockedNote(ALL_DAY_ONLY, "time_all_day_only", live = true)
         if (timed) {
             Hours(form, check.busyHours, onOther = { onPicker(EditorPicker.StartTime) })
             if (form.startTime != null) {
@@ -151,19 +144,6 @@ internal fun TimePane(form: EditorForm, held: Held?, people: List<Person>, onPic
                 Result(form, check.result, nameOf)
             }
         }
-    }
-}
-
-@Composable
-private fun AllDayOnlyLine() {
-    val mute = Culvery.colors.mute
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(EditorDimens.footIconGap),
-        modifier = Modifier.testTag("time_all_day_only").semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
-    ) {
-        HhIcon(Icons.LOCK, size = EditorDimens.footIcon, tint = mute)
-        Text(ALL_DAY_ONLY, style = CalendarType.whoHint, color = mute)
     }
 }
 
@@ -192,7 +172,6 @@ private fun Hours(form: EditorForm, busy: Set<Int>, onOther: () -> Unit) {
                             label = OTHER_TIME,
                             selected = hour != null && hour !in CHIP_HOURS,
                             tag = "hour_other",
-                            busy = false,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             fill = true,
                             onClick = onOther,
@@ -214,38 +193,29 @@ private fun MinutesAndLength(form: EditorForm, onUntil: () -> Unit, onLength: ()
         Group(MINUTES, "minute_group") {
             Row(horizontalArrangement = Arrangement.spacedBy(EditorDimens.timeChipGap)) {
                 MINUTE_CHIPS.forEach { m ->
-                    TimeChip(":%02d".format(m), minute == m, "minute_%02d".format(m), busy = false) { form.chooseMinute(m) }
+                    TimeChip(":%02d".format(m), minute == m, "minute_%02d".format(m)) { form.chooseMinute(m) }
                 }
             }
         }
         Group(HOW_LONG, "length_group") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(EditorDimens.timeChipGap), verticalArrangement = Arrangement.spacedBy(EditorDimens.timeChipGap)) {
                 EDITOR_LENGTHS.forEach { length ->
-                    TimeChip(lengthChip(length), form.length == length, "length_${length.toMinutes()}", busy = false, spoken = lengthLabel(length)) {
+                    TimeChip(lengthChip(length), form.length == length, "length_${length.toMinutes()}", spoken = lengthLabel(length)) {
                         form.chooseLength(length)
                         onLength()
                     }
                 }
-                TimeChip(form.untilTimeLabel, custom, "length_until", busy = false, onClick = onUntil)
+                TimeChip(form.untilTimeLabel, custom, "length_until", onClick = onUntil)
             }
         }
     }
 }
 
-/** A heading in capitals, heard as the word, over [content]. */
+/** [name] as a heading over [content]. */
 @Composable
 private fun Group(name: String, tag: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.timeLabelGap)) {
-        Text(
-            name.uppercase(),
-            style = CalendarType.rowLabel,
-            color = Culvery.colors.mute,
-            maxLines = 1,
-            modifier = Modifier.testTag(tag).clearAndSetSemantics {
-                text = AnnotatedString(name)
-                heading()
-            },
-        )
+        CapsHeading(name, Modifier.testTag(tag))
         content()
     }
 }
@@ -256,7 +226,7 @@ private fun TimeChip(
     label: String,
     selected: Boolean,
     tag: String,
-    busy: Boolean,
+    busy: Boolean = false,
     modifier: Modifier = Modifier,
     fill: Boolean = false,
     role: Role = Role.RadioButton,
@@ -342,7 +312,7 @@ private fun FreeStarts(form: EditorForm, starts: List<LocalTime>, nameOf: (Perso
         }
         Text(freeAtLine(form.who.map(nameOf)), style = CalendarType.timeFreeAt, color = mute, modifier = Modifier.testTag("time_free_at"))
         starts.forEach { start ->
-            TimeChip(clockText(start), selected = false, tag = "time_free_${start.format(HOUR_MINUTE_TAG)}", busy = false, role = Role.Button) {
+            TimeChip(clockText(start), selected = false, tag = "time_free_${start.format(HOUR_MINUTE_TAG)}", role = Role.Button) {
                 form.chooseTime(start)
             }
         }

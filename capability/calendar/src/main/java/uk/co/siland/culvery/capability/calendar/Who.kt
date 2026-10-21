@@ -32,15 +32,8 @@ internal fun toggled(current: List<PersonId>, tapped: PersonId, mayClear: Boolea
  * Who an event is for, in household [order] and never empty: the tag's people still in [people] (9 §3.4). A shared
  * tag with nobody left is Family; no tag, or one unknown id, reads as before, as the calendar's person (9 §3.3).
  */
-fun resolvePeople(forPerson: String?, sourcePerson: PersonId, people: Map<PersonId, Person>, order: List<PersonId>): List<Person> {
-    val ids = peopleIn(forPerson)
-    val known = ids.mapNotNull { people[it] ?: if (it == PersonId.FAMILY) Person.Family else null }
-    return when {
-        known.isNotEmpty() -> known.sortedBy { order.rankOf(it.id) }
-        ids.size > 1 -> listOf(Person.Family)
-        else -> listOf(people[sourcePerson] ?: Person.Family)
-    }
-}
+fun resolvePeople(forPerson: String?, sourcePerson: PersonId, people: Map<PersonId, Person>, order: List<PersonId>): List<Person> =
+    resolveIds(forPerson, sourcePerson, order.filter { it in people }).map { people[it] ?: Person.Family }
 
 /** [resolvePeople] by id, for the household [order]: an unknown calendar person reads as Family. */
 internal fun resolveIds(forPerson: String?, sourcePerson: PersonId?, order: List<PersonId>): List<PersonId> {
@@ -57,6 +50,9 @@ internal fun resolveIds(forPerson: String?, sourcePerson: PersonId?, order: List
 fun isUntagged(forPerson: String?): Boolean = peopleIn(forPerson).isEmpty()
 
 internal fun List<PersonId>.rankOf(id: PersonId): Int = indexOf(id).takeIf { it >= 0 } ?: Int.MAX_VALUE
+
+/** As [rankOf], with Family after the household and before anyone not in it. */
+internal fun List<PersonId>.rankOfWithFamilyLast(id: PersonId): Int = if (id == PersonId.FAMILY) Int.MAX_VALUE - 1 else rankOf(id)
 
 /** "Sam", "Sam + Mia", "Alex, Sam +1". */
 fun whoLine(people: List<Person>): String = when (people.size) {

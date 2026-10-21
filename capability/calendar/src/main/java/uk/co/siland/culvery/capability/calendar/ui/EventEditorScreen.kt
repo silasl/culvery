@@ -60,6 +60,7 @@ import uk.co.siland.culvery.capability.calendar.saveFailedBody
 import uk.co.siland.culvery.capability.calendar.timeValue
 import uk.co.siland.culvery.capability.calendar.whoValue
 import uk.co.siland.culvery.core.household.Member
+import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCloseButton
@@ -95,7 +96,7 @@ internal fun discardIcon(mode: EditorForm.Mode): String = if (mode == EditorForm
 
 /**
  * The full-screen Add event and Change event (handoff §1 Layout): the top bar, the event so far on the left with the one
- * green button at its foot, and on the right the [pane] for the [flow]'s active row. Stateless apart from the [form] it
+ * green button at its foot, and on the right the pane for the [flow]'s active row. Stateless apart from the [form] it
  * edits and whether the discard check shows. [savesTo] names the calendar the event goes to; [service] where a locked
  * span's dates change. While the title is focused and the keyboard is up the rows shrink and the foot goes (handoff 6a).
  * [keyboard] is the keyboard's inset, passed in by tests.
@@ -120,7 +121,6 @@ internal fun EventEditorScreen(
     onRefusedWho: () -> Unit,
     onPicker: (EditorPicker) -> Unit,
     keyboard: WindowInsets = WindowInsets.ime,
-    pane: @Composable (EditorStep) -> Unit = { EditorPaneFor(it, form, flow, members, held, service, childOnly, childName, busy, onRefusedWho, onPicker) },
 ) {
     val c = Culvery.colors
     val focusManager = LocalFocusManager.current
@@ -143,8 +143,9 @@ internal fun EventEditorScreen(
     val typing = titleFocused && keyboard.getBottom(LocalDensity.current) > 0
     val isNew = form.mode == EditorForm.Mode.New
     val heading = if (isNew) NEW_EVENT else CHANGE_EVENT
-    val order = remember(members) { members.map { it.person.id } }
-    val clash = EditorStep.Time in flow.steps && rememberTimeCheck(form, held, order).result is FreeCheck.Busy
+    val household = remember(members) { EditorPeople(members) }
+    val timeCheck = rememberTimeCheck(form, held, household.order)
+    val clash = EditorStep.Time in flow.steps && timeCheck.result is FreeCheck.Busy
     Box(
         Modifier
             .testTag("editor_screen")
@@ -173,6 +174,7 @@ internal fun EventEditorScreen(
                     TitleField(
                         form = form,
                         focus = titleFocus,
+                        focused = titleFocused,
                         readOnly = busy,
                         onFocus = { titleFocused = it },
                         onNext = {
@@ -181,7 +183,7 @@ internal fun EventEditorScreen(
                         },
                     )
                     // A save in flight closes on what it sent, so no other pane opens meanwhile.
-                    Rows(form, flow, members, service, typing, lit = !titleFocused, clash = clash) { step ->
+                    Rows(form, flow, household.people, service, typing, lit = !titleFocused, clash = clash) { step ->
                         if (!busy) {
                             closeKeyboard()
                             flow.open(step)
@@ -219,7 +221,9 @@ internal fun EventEditorScreen(
                         }
                     }
                 }
-                Box(Modifier.weight(1f).fillMaxHeight()) { pane(flow.active) }
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+                    EditorPaneFor(flow.active, form, flow, members, household, held, timeCheck, service, childOnly, childName, busy, onRefusedWho, onPicker)
+                }
             }
         }
         TimePicker(form, flow, picker, onPicker)
@@ -279,9 +283,8 @@ private fun TopBar(heading: String, context: String, onClose: () -> Unit) {
  * Who (9 §2 "the keyboard's Next moves to Who").
  */
 @Composable
-private fun TitleField(form: EditorForm, focus: FocusRequester, readOnly: Boolean, onFocus: (Boolean) -> Unit, onNext: () -> Unit) {
+private fun TitleField(form: EditorForm, focus: FocusRequester, focused: Boolean, readOnly: Boolean, onFocus: (Boolean) -> Unit, onNext: () -> Unit) {
     val c = Culvery.colors
-    var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(EditorDimens.fieldRadius)
     BasicTextField(
         value = form.title,
@@ -298,10 +301,7 @@ private fun TitleField(form: EditorForm, focus: FocusRequester, readOnly: Boolea
             .focusRequester(focus)
             .fillMaxWidth()
             .height(EditorDimens.fieldHeight)
-            .onFocusChanged {
-                focused = it.isFocused
-                onFocus(it.isFocused)
-            },
+            .onFocusChanged { onFocus(it.isFocused) },
         decorationBox = { inner ->
             Box(
                 contentAlignment = Alignment.CenterStart,
@@ -334,14 +334,13 @@ internal const val REPEATS = "Repeats"
 private fun Rows(
     form: EditorForm,
     flow: EditorFlow,
-    members: List<Member>,
+    people: List<Person>,
     service: String,
     typing: Boolean,
     lit: Boolean,
     clash: Boolean,
     onOpen: (EditorStep) -> Unit,
 ) {
-    val people = members.map { it.person }
     val editing = form.mode is EditorForm.Mode.Edit
     val active = { step: EditorStep -> lit && flow.active == step }
     EditorRow(
@@ -354,29 +353,21 @@ private fun Rows(
         typing = typing,
         onClick = { onOpen(EditorStep.Who) },
     )
-    if (form.datesLocked) {
-        EditorRow(
-            testTag = "editor_row_day",
-            icon = Icons.CALENDAR_MONTH,
-            label = DAY,
-            value = form.lockedDatesLabel(service).orEmpty(),
-            active = false,
-            set = true,
-            typing = typing,
-            onClick = null,
-        )
-    } else {
-        EditorRow(
-            testTag = "editor_row_day",
-            icon = Icons.CALENDAR_MONTH,
-            label = DAY,
-            value = if (typing && form.day == null) DAY else dayValue(form),
-            active = active(EditorStep.Day),
-            set = form.day != null,
-            typing = typing,
-            onClick = { onOpen(EditorStep.Day) },
-        )
-    }
+    val locked = form.datesLocked
+    EditorRow(
+        testTag = "editor_row_day",
+        icon = Icons.CALENDAR_MONTH,
+        label = DAY,
+        value = when {
+            locked -> form.lockedDatesLabel(service).orEmpty()
+            typing && form.day == null -> DAY
+            else -> dayValue(form)
+        },
+        active = !locked && active(EditorStep.Day),
+        set = locked || form.day != null,
+        typing = typing,
+        onClick = if (locked) null else ({ onOpen(EditorStep.Day) }),
+    )
     if (EditorStep.Time in flow.steps) {
         EditorRow(
             testTag = "editor_row_time",

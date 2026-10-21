@@ -35,11 +35,15 @@ import uk.co.siland.culvery.core.household.FAMILY_COLOR
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.label
+import uk.co.siland.culvery.core.ui.CHOSEN
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.FIND_OUT_WHY
 import uk.co.siland.culvery.core.ui.HhColors
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.NOT_AVAILABLE
+import uk.co.siland.culvery.core.ui.NOT_CHOSEN
 import uk.co.siland.culvery.core.ui.hhClickable
 
 internal const val SHOWS_AS_FAMILY = "Shows as a Family event"
@@ -48,11 +52,7 @@ internal const val PICK_MORE_THAN_ONE = "Pick more than one person for a shared 
 private const val TILES_A_ROW = 3
 private const val TINT_ALPHA = 0x33 / 255f
 private val TileInk = Color(0xFF111111)
-private const val CHOSEN = "chosen"
-private const val NOT_CHOSEN = "not chosen"
-private const val NOT_AVAILABLE = "not available"
 private const val CHOSEN_LOCKED = "$CHOSEN, $NOT_AVAILABLE"
-private const val FIND_OUT_WHY = "find out why"
 
 /**
  * A signed-in child is only ever themselves, so every tile is locked once anyone is chosen, theirs included: they can't
@@ -99,7 +99,7 @@ internal fun WhoPane(
         }
         val everyoneLocked = lockedFor(PersonId.FAMILY, form.who, childOnly)
         EveryoneRow(form.everyone, everyoneLocked) { tap(PersonId.FAMILY, form.everyone, everyoneLocked) }
-        if (childName != null) WhoOnlyLine(cannotAddForOthers(childName)) else WhoHint()
+        if (childName != null) LockedNote(cannotAddForOthers(childName), "editor_who_only") else WhoHint()
     }
 }
 
@@ -210,17 +210,4 @@ private fun Modifier.whoToggle(selected: Boolean, locked: Boolean, onTap: () -> 
 @Composable
 private fun WhoHint() {
     Text(PICK_MORE_THAN_ONE, style = CalendarType.whoHint, color = Culvery.colors.mute, modifier = Modifier.testTag("editor_who_hint"))
-}
-
-@Composable
-private fun WhoOnlyLine(text: String) {
-    val mute = Culvery.colors.mute
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(EditorDimens.footIconGap),
-        modifier = Modifier.testTag("editor_who_only").semantics(mergeDescendants = true) {},
-    ) {
-        HhIcon(Icons.LOCK, size = EditorDimens.footIcon, tint = mute)
-        Text(text, style = CalendarType.whoHint, color = mute)
-    }
 }

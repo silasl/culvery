@@ -216,7 +216,7 @@ private fun Header(e: EventUi, onClose: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(Modifier.weight(1f).height(IntrinsicSize.Min)) {
-            StripedBar(e.people.map { Color(it.color) }, width = CalendarDimens.sheetTitleBar)
+            StripedBar(e.people, width = CalendarDimens.sheetTitleBar)
             Spacer(Modifier.width(CalendarDimens.sheetTitleBarGap))
             Column {
                 if (e.syncing) {
