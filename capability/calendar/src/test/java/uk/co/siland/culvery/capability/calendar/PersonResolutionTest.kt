@@ -20,10 +20,10 @@ class PersonResolutionTest {
         assertThat(resolvePerson("family", alex.id, people)).isEqualTo(Person.Family)
     }
 
-    /** 9 §3.4: only an untagged event uses its calendar's person; a tag naming nobody left is Family. */
+    /** 9 §3.3: a single id reads as it always has, so one naming someone removed is the calendar's person. */
     @Test
-    fun aTagNamingSomeoneRemovedIsFamily() {
-        assertThat(resolvePerson("someone-removed", alex.id, people)).isEqualTo(Person.Family)
+    fun unknownTagFallsBackToSourceMapping() {
+        assertThat(resolvePerson("someone-removed", alex.id, people)).isEqualTo(alex)
     }
 
     @Test

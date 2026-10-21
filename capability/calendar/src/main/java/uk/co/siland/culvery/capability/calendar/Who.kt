@@ -13,18 +13,25 @@ fun peopleIn(forPerson: String?): List<PersonId> {
 fun tagFor(people: List<PersonId>, order: List<PersonId>): String {
     require(people.isNotEmpty()) { "A tag names at least one person" }
     require(PersonId.FAMILY !in people || people.size == 1) { "Family is never mixed with people" }
-    return people.sortedBy(order::rankOf).joinToString(",") { it.value }
+    return people.distinct().sortedBy(order::rankOf).joinToString(",") { it.value }
 }
 
 /**
- * Who an event is for, in household [order] and never empty (9 §3.4): the tag's people still in [people]; an untagged
- * event is its calendar's person; a tag naming nobody left is Family.
+ * Who an event is for, in household [order] and never empty: the tag's people still in [people] (9 §3.4). A shared
+ * tag with nobody left is Family; no tag, or one unknown id, reads as before, as the calendar's person (9 §3.3).
  */
 fun resolvePeople(forPerson: String?, sourcePerson: PersonId, people: Map<PersonId, Person>, order: List<PersonId>): List<Person> {
-    if (forPerson.isNullOrBlank()) return listOf(people[sourcePerson] ?: Person.Family)
-    val known = peopleIn(forPerson).mapNotNull { people[it] ?: if (it == PersonId.FAMILY) Person.Family else null }
-    return known.sortedBy { order.rankOf(it.id) }.ifEmpty { listOf(Person.Family) }
+    val ids = peopleIn(forPerson)
+    val known = ids.mapNotNull { people[it] ?: if (it == PersonId.FAMILY) Person.Family else null }
+    return when {
+        known.isNotEmpty() -> known.sortedBy { order.rankOf(it.id) }
+        ids.size > 1 -> listOf(Person.Family)
+        else -> listOf(people[sourcePerson] ?: Person.Family)
+    }
 }
+
+/** No tag at all, or one that names nobody. */
+fun isUntagged(forPerson: String?): Boolean = peopleIn(forPerson).isEmpty()
 
 private fun List<PersonId>.rankOf(id: PersonId): Int = indexOf(id).takeIf { it >= 0 } ?: Int.MAX_VALUE
 

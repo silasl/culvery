@@ -438,6 +438,13 @@ class CalendarRepositoryTest {
         assertThat(byTitle.getValue("Gym").untagged).isFalse()
     }
 
+    /** A blank tag is no tag: the event is untagged, as Who reads it. */
+    @Test
+    fun aBlankTagIsUntagged() = runTest {
+        put("s-family", timed("Plumber quote call", 23, 13, 0, 30, forPerson = " "))
+        assertThat(today().single().untagged).isTrue()
+    }
+
     @Test
     fun aQueuedDeleteIsHidden() = runTest {
         put("s-family", timed("Boiler service", 23, 10, 0, 60))

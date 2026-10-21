@@ -40,6 +40,11 @@ class WhoTest {
     }
 
     @Test
+    fun aTagNamesEachPersonOnce() {
+        assertThat(tagFor(listOf(mia.id, sam.id, mia.id), order)).isEqualTo("sam,mia")
+    }
+
+    @Test
     fun familyIsNeverMixed() {
         assertThrows(IllegalArgumentException::class.java) { tagFor(listOf(PersonId.FAMILY, sam.id), order) }
         assertThrows(IllegalArgumentException::class.java) { tagFor(emptyList(), order) }
@@ -49,6 +54,25 @@ class WhoTest {
     @Test
     fun aRemovedPersonIsDroppedAndOneLeftMakesItTheirs() {
         assertThat(resolvePeople("sam,mia", PersonId.FAMILY, household(alex, mia), order)).containsExactly(mia)
+    }
+
+    /** 9 §3.4: on a calendar mapped to Alex, the one left is still the event's person, not Alex. */
+    @Test
+    fun aSharedTagWithOneLeftIsTheirsWhateverTheCalendar() {
+        assertThat(resolvePeople("sam,mia", alex.id, household(alex, mia), order)).containsExactly(mia)
+    }
+
+    /** 9 §3.3: a single id reads as today, so one naming someone removed is the calendar's person. */
+    @Test
+    fun aSingleIdNamingSomeoneRemovedIsTheCalendarsPerson() {
+        assertThat(resolvePeople("sam", alex.id, household(alex, mia), order)).containsExactly(alex)
+        assertThat(resolvePeople("sam", PersonId("removed"), household(alex, mia), order)).containsExactly(Person.Family)
+    }
+
+    @Test
+    fun aBlankTagIsUntagged() {
+        assertThat(resolvePeople(" ", alex.id, household(alex, sam), order)).containsExactly(alex)
+        assertThat(resolvePeople(",", alex.id, household(alex, sam), order)).containsExactly(alex)
     }
 
     @Test

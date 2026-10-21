@@ -309,7 +309,7 @@ internal fun StoredEvent.toUi(
         sourceName = source?.source?.name.orEmpty(),
         serviceName = serviceName,
         readOnlyReason = reason,
-        untagged = source?.isMaster == true && source.source.writable && forPerson == null && createdBy == null,
+        untagged = source?.isMaster == true && source.source.writable && isUntagged(forPerson) && createdBy == null,
         syncing = syncing,
         createdBy = createdByLabel(createdBy, reason, people, serviceName, source?.source?.name.orEmpty()),
         repeats = repeatsLabel(recurrenceRule, start, zone),
