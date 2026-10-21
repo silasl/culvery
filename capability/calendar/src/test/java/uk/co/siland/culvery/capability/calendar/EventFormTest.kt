@@ -154,12 +154,18 @@ class EventFormTest {
         assertThat(form.unchanged).isTrue()
     }
 
+    private val tue22 = LocalDate.of(2026, 9, 22)
+    private val thu24 = LocalDate.of(2026, 9, 24)
+
+    private fun timedSpan(from: LocalDateTime, to: LocalDateTime, title: String = "Half term", forPerson: String? = "family") =
+        edit(EventTime.Timed(from.atZone(london).toInstant()), EventTime.Timed(to.atZone(london).toInstant()), title, forPerson)
+
     @Test
-    fun anEventOverSeveralDaysLocksItsDates() {
-        val halfTerm = edit(EventTime.AllDay(LocalDate.of(2026, 9, 22)), EventTime.AllDay(LocalDate.of(2026, 9, 25)), "Half term", "family")
-        assertThat(halfTerm.datesLocked).isTrue()
-        assertThat(halfTerm.lockedDatesLabel("Google Calendar")).isEqualTo("Tue 22 – Thu 24 · change dates in Google Calendar on your phone")
-        assertThat(halfTerm.summary()).isEqualTo("Yesterday – Tomorrow · All day · Family")
+    fun aTimedSpanStaysLocked() {
+        val trip = timedSpan(mon19.atTime(22, 0), day(21).atTime(9, 0))
+        assertThat(trip.datesLocked).isTrue()
+        assertThat(trip.offersUntil).isFalse()
+        assertThat(trip.lockedDatesLabel("Google Calendar")).isEqualTo("Mon 19 – Wed 21 · change dates in Google Calendar on your phone")
         assertThat(edit(EventTime.AllDay(today), EventTime.AllDay(today.plusDays(1))).datesLocked).isFalse()
         // 22:00 to 01:00 crosses midnight; 22:00 to 00:00 ends at midnight, which counts as the same day.
         assertThat(editTimed(today.atTime(22, 0), 180).datesLocked).isTrue()
@@ -168,27 +174,26 @@ class EventFormTest {
     }
 
     @Test
+    fun aMixedAllDayAndTimedEventStaysLocked() {
+        val mixed = edit(EventTime.AllDay(mon19), EventTime.Timed(day(21).atTime(9, 0).atZone(london).toInstant()))
+        assertThat(mixed.datesLocked).isTrue()
+        assertThat(mixed.offersUntil).isFalse()
+    }
+
+    @Test
     fun aLockedSpanCrossingAMonthOrYearNamesTheMonthOnBothEnds() {
-        val crossMonth = edit(
-            EventTime.AllDay(LocalDate.of(2026, 9, 30)),
-            EventTime.AllDay(LocalDate.of(2026, 10, 3)),
-            "Half term", "family",
-        )
+        val crossMonth = timedSpan(LocalDateTime.of(2026, 9, 30, 22, 0), LocalDateTime.of(2026, 10, 2, 9, 0))
         assertThat(crossMonth.lockedDatesLabel("Google Calendar")).isEqualTo("Wed 30 Sep – Fri 2 Oct · change dates in Google Calendar on your phone")
 
-        val crossYear = edit(
-            EventTime.AllDay(LocalDate.of(2026, 12, 31)),
-            EventTime.AllDay(LocalDate.of(2027, 1, 3)),
-            "New Year trip", "family",
-        )
+        val crossYear = timedSpan(LocalDateTime.of(2026, 12, 31, 22, 0), LocalDateTime.of(2027, 1, 2, 9, 0), "New Year trip")
         assertThat(crossYear.lockedDatesLabel("Google Calendar")).isEqualTo("Thu 31 Dec – Sat 2 Jan · change dates in Google Calendar on your phone")
     }
 
     @Test
     fun aLockedEditKeepsItsDatesAndChangesOnlyTitleAndWho() {
-        val start = EventTime.AllDay(LocalDate.of(2026, 9, 22))
-        val end = EventTime.AllDay(LocalDate.of(2026, 9, 25))
-        val form = edit(start, end, title = "Half term", forPerson = "family")
+        val form = timedSpan(tue22.atTime(22, 0), thu24.atTime(9, 0))
+        val start = EventTime.Timed(tue22.atTime(22, 0).atZone(london).toInstant())
+        val end = EventTime.Timed(thu24.atTime(9, 0).atZone(london).toInstant())
         form.updateTitle("Half term at Gran's")
         form.chooseWho(mia)
         val draft = form.draft(createdBy = null)
@@ -374,9 +379,9 @@ class EventFormTest {
 
     @Test
     fun chooseDayOnALockedEditDoesNotChangeItsDates() {
-        val start = EventTime.AllDay(LocalDate.of(2026, 9, 22))
-        val end = EventTime.AllDay(LocalDate.of(2026, 9, 25))
-        val form = edit(start, end, title = "Half term", forPerson = "family")
+        val form = timedSpan(tue22.atTime(22, 0), thu24.atTime(9, 0))
+        val start = EventTime.Timed(tue22.atTime(22, 0).atZone(london).toInstant())
+        val end = EventTime.Timed(thu24.atTime(9, 0).atZone(london).toInstant())
         form.chooseDay(today)
         val draft = form.draft(createdBy = null)
         assertThat(listOf(draft.start, draft.end)).containsExactly(start, end).inOrder()
@@ -687,6 +692,8 @@ class EventFormTest {
         form.chooseUntil(day(20))
         assertThat(form.untilError).isEqualTo(UNTIL_TOO_EARLY)
         assertThat(form.canSave).isFalse()
+        assertThat(form.draft(createdBy = null).end).isEqualTo(EventTime.AllDay(day(22)))
+        assertThat(form.summary()).isEqualTo("${whenLabel(EventTime.AllDay(day(21)), EventTime.AllDay(day(22)), london, mon19)} · Family")
     }
 
     @Test
@@ -793,5 +800,67 @@ class EventFormTest {
         form.chooseUntil(LocalDate.of(2027, 1, 2))
         assertThat(form.untilLabel).isEqualTo("Until Sat 2 Jan")
         assertThat(form.draft(createdBy = null).end).isEqualTo(EventTime.AllDay(LocalDate.of(2027, 1, 3)))
+    }
+
+    private fun halfTerm(title: String = "Half term") =
+        edit(EventTime.AllDay(day(19)), EventTime.AllDay(day(24)), title, "family")
+
+    @Test
+    fun anAllDaySpanOpensWithItsFirstAndLastDays() {
+        val form = halfTerm()
+        assertThat(form.datesLocked).isFalse()
+        assertThat(form.day).isEqualTo(day(19))
+        assertThat(form.until).isEqualTo(day(23))
+        assertThat(form.offersUntil).isTrue()
+        assertThat(form.untilLabel).isEqualTo("Until Fri 23 Oct")
+    }
+
+    @Test
+    fun anUntouchedAllDaySpanIsUnchanged() {
+        val form = halfTerm()
+        assertThat(form.unchanged).isTrue()
+        assertThat(form.edited).isFalse()
+        val draft = form.draft(createdBy = null)
+        assertThat(listOf(draft.start, draft.end)).containsExactly(EventTime.AllDay(day(19)), EventTime.AllDay(day(24))).inOrder()
+        form.updateTitle("Half term at Gran's")
+        assertThat(form.touched).containsExactly(EventField.TITLE)
+    }
+
+    @Test
+    fun movingUntilOnAnEditTouchesOnlyTheTimes() {
+        val form = halfTerm()
+        form.chooseUntil(day(21))
+        assertThat(form.touched).containsExactly(EventField.TIMES)
+        assertThat(form.draft(createdBy = null).end).isEqualTo(EventTime.AllDay(day(22)))
+    }
+
+    @Test
+    fun movingTheDayOnASpanEditTouchesOnlyTheTimes() {
+        val form = halfTerm()
+        form.chooseDay(day(20))
+        assertThat(form.until).isEqualTo(day(24))
+        assertThat(form.touched).containsExactly(EventField.TIMES)
+        val draft = form.draft(createdBy = null)
+        assertThat(draft.start).isEqualTo(EventTime.AllDay(day(20)))
+        assertThat(draft.end).isEqualTo(EventTime.AllDay(day(25)))
+    }
+
+    @Test
+    fun aOneDayEditGivenAnUntilTouchesOnlyTheTimes() {
+        val form = edit(EventTime.AllDay(day(19)), EventTime.AllDay(day(20)))
+        assertThat(form.until).isNull()
+        form.chooseUntil(day(21))
+        assertThat(form.touched).containsExactly(EventField.TIMES)
+        assertThat(form.draft(createdBy = null).end).isEqualTo(EventTime.AllDay(day(22)))
+    }
+
+    @Test
+    fun anEditWhoseTimeWasChosenThenAllDayAgainIsUnchanged() {
+        val form = halfTerm()
+        form.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))
+        assertThat(form.unchanged).isFalse()
+        form.chooseTime(TimeChoice.AllDay)
+        assertThat(form.until).isEqualTo(day(23))
+        assertThat(form.unchanged).isTrue()
     }
 }

@@ -69,6 +69,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.ControlTokens
+import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhFooterButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
@@ -78,6 +79,7 @@ import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.HhMessageLine
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
+import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.PersonChipInk
@@ -179,10 +181,13 @@ fun EventEditorSheet(
                             closeKeyboard()
                             onPicker(EditorPicker.Date)
                         }
-                        WhenRow(form, busy) {
+                        WhenRow(form, busy, onPickTime = {
                             closeKeyboard()
                             onPicker(EditorPicker.Time)
-                        }
+                        }, onPickUntil = {
+                            closeKeyboard()
+                            onPicker(EditorPicker.Until)
+                        })
                         if (form.canRepeat && childOnly == null) {
                             RepeatsSection(form, busy)
                             if (form.moreRepeats && form.repeat != RepeatChoice.Never) {
@@ -397,26 +402,42 @@ private fun DaySection(form: EventForm, busy: Boolean, onPickDate: () -> Unit) {
 
 /** Time at its natural width with Length beside it, wrapping within what is left; all day has no Length (9 §4.8). */
 @Composable
-private fun WhenRow(form: EventForm, busy: Boolean, onPickTime: () -> Unit) {
+private fun WhenRow(form: EventForm, busy: Boolean, onPickTime: () -> Unit, onPickUntil: () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.timeLengthGap), modifier = Modifier.testTag("editor_time_length").fillMaxWidth()) {
-        TimeSection(form, busy, onPickTime)
+        TimeSection(form, busy, onPickTime, onPickUntil)
         if (form.time != TimeChoice.AllDay) LengthSection(form, busy, Modifier.weight(1f))
     }
 }
 
+/** All day offers Until, for an event over several days; its error shows under the chips and the chip says it too (9 §2.1). */
 @Composable
-private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit) {
-    Section("Time") {
-        HhChoiceChip("All day", form.time == TimeChoice.AllDay, "time_all_day", onClick = { if (!busy) form.chooseTime(TimeChoice.AllDay) })
-        val custom = form.time as? TimeChoice.Custom
-        HhChoiceChip(
-            label = custom?.time?.format(HOURS_MINUTES) ?: PICK_A_TIME,
-            selected = custom != null,
-            tag = "time_pick",
-            role = Role.Button,
-            leading = { ink -> HhIcon(Icons.SCHEDULE, size = ControlTokens.chipIcon, tint = ink) },
-            onClick = { if (!busy) onPickTime() },
-        )
+private fun TimeSection(form: EventForm, busy: Boolean, onPickTime: () -> Unit, onPickUntil: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.sectionGap)) {
+        Section("Time") {
+            HhChoiceChip("All day", form.time == TimeChoice.AllDay, "time_all_day", onClick = { if (!busy) form.chooseTime(TimeChoice.AllDay) })
+            val custom = form.time as? TimeChoice.Custom
+            HhChoiceChip(
+                label = custom?.time?.format(HOURS_MINUTES) ?: PICK_A_TIME,
+                selected = custom != null,
+                tag = "time_pick",
+                role = Role.Button,
+                leading = { ink -> HhIcon(Icons.SCHEDULE, size = ControlTokens.chipIcon, tint = ink) },
+                onClick = { if (!busy) onPickTime() },
+            )
+            if (form.offersUntil) {
+                HhChoiceChip(
+                    label = form.untilLabel,
+                    selected = form.until != null,
+                    tag = "time_until",
+                    role = Role.Button,
+                    // The error line isn't a live region, so the chip the person just used says it.
+                    stateDescription = form.untilError,
+                    leading = { ink -> HhIcon(Icons.DATE_RANGE, size = ControlTokens.chipIcon, tint = ink) },
+                    onClick = { if (!busy) onPickUntil() },
+                )
+            }
+        }
+        form.untilError?.let { HhStatusLine(it, "until_error", Icons.ERROR, ControlType.fieldError) }
     }
 }
 

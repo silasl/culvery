@@ -66,8 +66,8 @@ class EventForm(
 
     private val original: EditableEvent? = (mode as? Mode.Edit)?.original
 
-    /** Editing an event over several days: only the title and who can change (2b-2 design D3). */
-    val datesLocked: Boolean = original?.let { spansDays(it.start, it.end, zone) } ?: false
+    /** A timed or mixed event over several days can only change its title and who (2b-2 design D3); an all-day span's dates edit. */
+    val datesLocked: Boolean = original?.let { !(it.start is EventTime.AllDay && it.end is EventTime.AllDay) && spansDays(it.start, it.end, zone) } ?: false
 
     var title: String by mutableStateOf(original?.title ?: "")
         private set
@@ -110,9 +110,14 @@ class EventForm(
     /** The end is before the event's day, so Save waits (5 §A.4). */
     val endsBeforeStart: Boolean get() = (repeatEnd as? RepeatEnd.OnDate)?.let { it.date < day } ?: false
 
-    /** The last day of a new all-day event; null means one day. */
-    var until: LocalDate? by mutableStateOf(null)
+    /** The last day of an all-day event; null means one day. */
+    var until: LocalDate? by mutableStateOf(openingUntil())
         private set
+
+    private fun openingUntil(): LocalDate? = original
+        ?.takeIf { !datesLocked && it.start is EventTime.AllDay && it.end is EventTime.AllDay }
+        ?.let { daySpan(it.start, it.end, zone) }
+        ?.let { (first, last) -> last.takeIf { it > first } }
 
     // Set aside by choosing a time; All day with the same Day puts it back.
     private var untilAside: Pair<LocalDate, LocalDate>? = null

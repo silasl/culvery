@@ -64,6 +64,7 @@ import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.couldNotSave
 import uk.co.siland.culvery.capability.calendar.saveFailedBody
+import uk.co.siland.culvery.capability.calendar.whenLabel
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -442,14 +443,133 @@ class EventEditorSheetTest {
     }
 
     @Test
-    fun aLockedMultiDayEditShowsOneLineInPlaceOfDayTimeAndLength() {
-        val halfTerm = editForm(EventTime.AllDay(LocalDate.of(2026, 9, 28)), EventTime.AllDay(LocalDate.of(2026, 10, 1)), "Half term", "family")
-        show(halfTerm)
+    fun aTimedSpanEditStillShowsOneLine() {
+        val visit = editForm(
+            EventTime.Timed(LocalDate.of(2026, 9, 28).atTime(18, 0).atZone(london).toInstant()),
+            EventTime.Timed(LocalDate.of(2026, 9, 30).atTime(10, 0).atZone(london).toInstant()),
+            "Grandma visiting", "family",
+        )
+        show(visit)
         compose.onNodeWithTag("editor_locked_dates").assertExists()
         compose.onNodeWithText("Mon 28 – Wed 30 · change dates in Google Calendar on your phone").assertExists()
         compose.onNodeWithTag("day_pick").assertDoesNotExist()
         compose.onNodeWithTag("time_all_day").assertDoesNotExist()
+        compose.onNodeWithTag("time_until").assertDoesNotExist()
         compose.onNodeWithTag("who_Family").assertIsSelected()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    private fun oct(d: Int) = LocalDate.of(2026, 10, d)
+
+    /** A new all-day event on Monday 19 October (or [on]), the sheet opened on Wednesday 23 September. */
+    private fun newOn(on: LocalDate = oct(19)) =
+        EventForm(EventForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), london, null, preselectedDay = on)
+
+    private fun halfTerm() = editForm(EventTime.AllDay(oct(19)), EventTime.AllDay(oct(24)), "Half term", "family")
+
+    private fun SemanticsNodeInteraction.stateDescription() = fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)
+
+    @Test
+    fun untilShowsOnlyForAllDay() {
+        val form = newOn()
+        show(form)
+        compose.onNodeWithTag("time_until").assertTextEquals("Until")
+        compose.onNodeWithTag("time_until", useUnmergedTree = true).onChildren().assertCountEquals(2)
+        assertThat(compose.onNodeWithTag("time_until").role()).isEqualTo(Role.Button)
+        val pick = bounds("time_pick")
+        val until = bounds("time_until")
+        assertThat(until.left.value >= pick.right.value || until.top.value >= pick.bottom.value).isTrue()
+        compose.runOnIdle { form.chooseTime(TimeChoice.Custom(LocalTime.of(18, 0))) }
+        compose.onNodeWithTag("time_until").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun untilOpensTheDatePickerAndAPickSetsTheLastDay() {
+        val form = newOn()
+        show(form)
+        compose.onNodeWithTag("time_until").performClick()
+        assertThat(calls).containsExactly("picker:Until")
+        compose.onNodeWithTag("date_picker").assertExists()
+        // With no Until the picker opens on the day.
+        compose.onNodeWithTag("date_cell_2026-10-19").assertIsSelected()
+        compose.onNodeWithTag("date_cell_2026-10-22").performClick()
+        assertThat(form.until).isEqualTo(oct(22))
+        compose.onNodeWithTag("date_picker").assertDoesNotExist()
+        compose.onNodeWithTag("time_until").assertTextEquals("Until Thu 22 Oct").assertIsSelected()
+        compose.onNodeWithTag("editor_summary").assertTextEquals(
+            "${whenLabel(EventTime.AllDay(oct(19)), EventTime.AllDay(oct(23)), london, SampleUi.TODAY)} · Family",
+        )
+        // Now it opens on Until's date.
+        compose.onNodeWithTag("time_until").performClick()
+        compose.onNodeWithTag("date_cell_2026-10-22").assertIsSelected()
+        compose.onNodeWithTag("picker_cancel").performClick()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun anUntilBeforeTheDaySaysSoAndSaveWaits() {
+        val form = newOn(oct(21)).apply {
+            updateTitle("Holiday")
+            chooseUntil(oct(20))
+        }
+        show(form)
+        val sentence = "The last day is before the first day. Pick a later one."
+        compose.onNodeWithTag("until_error").assertTextEquals(sentence)
+        assertThat(compose.onNodeWithTag("time_until").stateDescription()).isEqualTo(sentence)
+        compose.onNodeWithTag("editor_save").assertIsNotEnabled()
+        compose.onNodeWithTag("editor_save_reason").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun anUntilPastSixtyDaysSaysSoAndSaveWaits() {
+        val form = newOn().apply {
+            updateTitle("Holiday")
+            chooseUntil(oct(19).plusDays(60))
+        }
+        show(form)
+        val sentence = "An event can last up to 60 days. Pick an earlier last day."
+        compose.onNodeWithTag("until_error").assertTextEquals(sentence)
+        assertThat(compose.onNodeWithTag("time_until").stateDescription()).isEqualTo(sentence)
+        compose.onNodeWithTag("editor_save").assertIsNotEnabled()
+        compose.runOnIdle { form.chooseUntil(oct(19).plusDays(59)) }
+        compose.onNodeWithTag("until_error").assertDoesNotExist()
+        assertThat(compose.onNodeWithTag("time_until").stateDescription()).isNull()
+        compose.onNodeWithTag("editor_save").assertIsEnabled()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun noUntilErrorTakesRoomWhenThereIsNone() {
+        val form = newOn().apply { chooseUntil(oct(22)) }
+        assertClosedSheetFits(form, childOnly = null)
+        compose.onNodeWithTag("until_error").assertDoesNotExist()
+    }
+
+    @Test
+    fun aShownUntilErrorStillFits() {
+        val form = newOn(oct(21)).apply { chooseUntil(oct(20)) }
+        assertClosedSheetFits(form, childOnly = null)
+        compose.onNodeWithTag("until_error").assertExists()
+    }
+
+    @Test
+    fun anAllDaySpanEditShowsItsUntil() {
+        show(halfTerm())
+        compose.onNodeWithTag("editor_locked_dates").assertDoesNotExist()
+        compose.onNodeWithTag("day_pick").assertTextEquals("Mon 19 Oct").assertIsSelected()
+        compose.onNodeWithTag("time_all_day").assertIsSelected()
+        compose.onNodeWithTag("time_until").assertTextEquals("Until Fri 23 Oct").assertIsSelected()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun openingUntilClosesTheKeyboard() {
+        show(newOn(), focus = true)
+        compose.onNodeWithTag("editor_title").assertIsFocused()
+        compose.onNodeWithTag("time_until").performClick()
+        compose.onNodeWithTag("editor_title", useUnmergedTree = true).assertIsNotFocused()
     }
 
     @Test

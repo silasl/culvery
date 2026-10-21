@@ -142,13 +142,33 @@ class EditorScreenshotTest {
         chooseTime(TimeChoice.Custom(LocalTime.of(16, 15)))
     }
 
-    /** 2b-2 design D3: an all-day event from Monday 28 September to Wednesday 30, dates locked. */
+    /** 2b-2 design D3: a timed event from Monday 28 September 18:00 to Wednesday 30 at 10:00, dates locked. */
     private fun locked(): EventForm {
         val visit = EditableEvent(
             EventRef("c1", "s1", "e2"), "Grandma visiting",
-            EventTime.AllDay(LocalDate.of(2026, 9, 28)), EventTime.AllDay(LocalDate.of(2026, 10, 1)), "family",
+            EventTime.Timed(LocalDate.of(2026, 9, 28).atTime(18, 0).atZone(london).toInstant()),
+            EventTime.Timed(LocalDate.of(2026, 9, 30).atTime(10, 0).atZone(london).toInstant()), "family",
         )
         return EventForm(EventForm.Mode.Edit(visit), SampleUi.TODAY, LocalTime.of(11, 54), london, null, null)
+    }
+
+    /** 9 §2.1: a holiday over Monday 19 to Thursday 22 October, All day with an Until. */
+    private fun until() = newForm().apply {
+        updateTitle("Holiday")
+        chooseDay(LocalDate.of(2026, 10, 19))
+        chooseUntil(LocalDate.of(2026, 10, 22))
+    }
+
+    /** 9 §2.1: an Until 60 days after the day, one past the limit. */
+    private fun untilError() = until().apply { chooseUntil(LocalDate.of(2026, 10, 19).plusDays(60)) }
+
+    /** 9 §2.1: the half term, all day Monday 19 to Friday 23 October, opened for change. */
+    private fun spanEdit(): EventForm {
+        val halfTerm = EditableEvent(
+            EventRef("c1", "s1", "e3"), "Half term",
+            EventTime.AllDay(LocalDate.of(2026, 10, 19)), EventTime.AllDay(LocalDate.of(2026, 10, 24)), "family",
+        )
+        return EventForm(EventForm.Mode.Edit(halfTerm), SampleUi.TODAY, LocalTime.of(11, 54), london, null, null)
     }
 
     private fun repeats() = newForm().apply {
@@ -189,4 +209,8 @@ class EditorScreenshotTest {
     @Test fun timePickerLight() = snap("editor_time_picker_light", false, timePicker(), picker = EditorPicker.Time)
     @Test fun lockedDark() = snap("editor_locked_dark", true, locked())
     @Test fun lockedLight() = snap("editor_locked_light", false, locked())
+    @Test fun untilDark() = snap("editor_until_dark", true, until())
+    @Test fun untilLight() = snap("editor_until_light", false, until())
+    @Test fun untilErrorDark() = snap("editor_until_error_dark", true, untilError())
+    @Test fun spanEditDark() = snap("editor_span_edit_dark", true, spanEdit())
 }

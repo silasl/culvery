@@ -393,6 +393,24 @@ class EventEditorHostTest {
         assertThat(closed).isEqualTo(0)
     }
 
+    /** A pin: the host's `canSave` guard also holds Save back for a last day before the first. */
+    @Test
+    fun saveDoesNothingWhileUntilIsBeforeTheDay() {
+        access.answer(TestAccess.ALEX)
+        showEditor(EditorRequest.New(day = null))
+        waitForText("Add event")
+        compose.onNodeWithTag("editor_title").performTextInput("Holiday")
+        compose.onNodeWithTag("day_2026-09-25").performClick()
+        compose.onNodeWithTag("time_until").performClick()
+        compose.onNodeWithTag("date_cell_2026-09-24").performClick()
+        compose.onNodeWithTag("until_error").assertExists()
+        compose.onNodeWithTag("editor_save").assertIsNotEnabled().performClick()
+        compose.waitForIdle()
+        assertThat(writer.calls).isEmpty()
+        assertThat(access.requests).isEmpty()
+        assertThat(closed).isEqualTo(0)
+    }
+
     /** A pin: Delete still goes through the PIN before the detail sheet takes over. */
     @Test
     fun deleteStillAsksForAPinBeforeConfirming() {
