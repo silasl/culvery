@@ -11,8 +11,9 @@ import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider.Companio
 /**
  * The hand-off's week (screenshots/calendar-sheets/02-calendar-week-dark.png, durations from Culvery.dc.html),
  * relative to today, on the one shared "Family calendar" as Culvery would write it: each event tagged with who it
- * is for and who added it, by person name. [forSource] turns names into household ids; "Family" is always
- * "family". Plumber quote call has no tags, as if added from a phone. INSET day comes from the read-only school feed.
+ * is for and who added it, by person name (several joined by commas). [forSource] turns names into household ids;
+ * "Family" is always "family". Plumber quote call has no tags, as if added from a phone. INSET day comes from the
+ * read-only school feed.
  */
 internal object SampleEvents {
     // So the debug build's Repeats row reads "Every week", as Google's would.
@@ -53,6 +54,8 @@ internal object SampleEvents {
         // Mia added this herself, so she may delete it.
         Timed("football", SOURCE_FAMILY, "Football", 1, t(18, 0), 60, forName = "Mia", byName = "Mia"),
         Timed("dentist", SOURCE_FAMILY, "Dentist", 2, t(12, 30), 60, forName = "Sam", byName = "Sam"),
+        // A shared event: one tag naming both, as Culvery writes it (9 §3.3).
+        Timed("cinema", SOURCE_FAMILY, "Cinema", 2, t(17, 0), 60, forName = "Sam,Mia", byName = "Alex"),
         Timed("piano", SOURCE_FAMILY, "Piano", 3, t(15, 30), 60, weekly = true, forName = "Mia", byName = "Alex"),
         Timed("book-club", SOURCE_FAMILY, "Book club", 3, t(20, 0), 120, forName = "Sam", byName = "Sam"),
         Timed("pizza", SOURCE_FAMILY, "Pizza night", 4, t(19, 0), 240, forName = "Family", byName = "Mia"),
@@ -77,7 +80,7 @@ internal object SampleEvents {
     private fun tag(name: String?, idsByName: Map<String, String>): String? = when (name) {
         null -> null
         "Family" -> "family"
-        else -> idsByName[name]
+        else -> name.split(',').mapNotNull { idsByName[it] }.takeIf { it.isNotEmpty() }?.joinToString(",")
     }
 
     fun forSource(sourceId: String, today: LocalDate, zone: ZoneId, idsByName: Map<String, String> = emptyMap()): List<RemoteEvent> =

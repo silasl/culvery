@@ -365,9 +365,9 @@ class CalendarEditor internal constructor(
         ChangeKind.CREATE -> error("A create has no event to change")
     }
 
-    /** The colour of the person [forPerson] names, for the provider's event colour; null for Family, untagged or someone gone. */
+    /** The provider's event colour: only a tag of exactly one real person has one, so Family, a set or someone gone has none (9 §3.3). */
     private suspend fun colorOf(forPerson: String?): Long? =
-        forPerson?.takeIf { it != PersonId.FAMILY.value }?.let { personOf(PersonId(it))?.color }
+        peopleIn(forPerson).singleOrNull()?.takeIf { it != PersonId.FAMILY }?.let { personOf(it)?.color }
 
     /**
      * Tries the provider once. A create sends its [clientKey], and a queued create keeps it: if the provider did make

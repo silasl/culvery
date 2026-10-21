@@ -166,6 +166,7 @@ class FakeCalendarProviderTest {
         assertThat(byTitle.getValue("Football").let { it.forPerson to it.createdBy }).isEqualTo("mia-id" to "mia-id")
         assertThat(byTitle.getValue("Boiler service").let { it.forPerson to it.createdBy }).isEqualTo("family" to "alex-id")
         assertThat(byTitle.getValue("Plumber quote call").let { it.forPerson to it.createdBy }).isEqualTo(null to null)
+        assertThat(byTitle.getValue("Cinema").let { it.forPerson to it.createdBy }).isEqualTo("sam-id,mia-id" to "alex-id")
     }
 
     @Test
@@ -306,6 +307,20 @@ class FakeCalendarProviderTest {
             runBlocking { fake.create(conn, family, draft("Sleepover"), key) }
         }
         assertThat(fake.familyEvents().map { it.title }).doesNotContain("Sleepover")
+    }
+
+    /** Pin (9 §3.3): a shared event's one tag survives a create, an update and a series assign unchanged. */
+    @Test
+    fun aSharedEventRoundTrips() = runTest {
+        val fake = providerOn(today)
+        val shared = "sam-id,mia-id"
+        val key = newClientKey()
+        assertThat(fake.create(conn, family, draft("Cinema night").copy(forPerson = shared), key).forPerson).isEqualTo(shared)
+        assertThat(fake.familyEvents().single { it.remoteId == key }.forPerson).isEqualTo(shared)
+        assertThat(fake.update(conn, family, key, draft("Cinema trip"), setOf(EventField.TITLE)).forPerson).isEqualTo(shared)
+        val piano = fake.familyEvents().first { it.title == "Piano" }
+        fake.assignSeries(conn, family, piano.seriesId!!, draft("Piano").copy(forPerson = shared))
+        assertThat(fake.familyEvents().filter { it.title == "Piano" }.map { it.forPerson }.distinct()).containsExactly(shared)
     }
 
     @Test

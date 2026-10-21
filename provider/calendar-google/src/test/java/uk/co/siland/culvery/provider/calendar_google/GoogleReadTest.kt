@@ -249,6 +249,18 @@ class GoogleReadTest {
         assertThat(event.seriesId).isNull()
     }
 
+    /** Pin (9 §3.3): a shared event's people are one comma-separated tag, read as written. */
+    @Test
+    fun aPersonListIsReadAsWritten() = runTest {
+        google.putEvent(
+            family.id,
+            google.timed("cinema", "Cinema", at(25, 17), at(25, 18)) {
+                putJsonObject("extendedProperties") { putJsonObject("private") { put(PERSON_KEY, "sam,mia") } }
+            },
+        )
+        assertThat(provider.sync(conn, family, range, null).upserts.single().forPerson).isEqualTo("sam,mia")
+    }
+
     @Test
     fun anEventWhoseTimeDoesntParseIsLeftOutAndSaidSo() = runTest {
         google.putEvent(family.id, google.timed("a", "Walk", at(23, 9), at(23, 10)))

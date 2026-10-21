@@ -37,7 +37,7 @@ class ContractSuiteSelfTest {
     fun wellBehavedProviderPassesEveryCheck() {
         val result = JUnitCore.runClasses(GoodContract::class.java)
         assertThat(result.failures.map { "${it.description.methodName}: ${it.message}" }).isEmpty()
-        assertThat(result.runCount).isEqualTo(21)
+        assertThat(result.runCount).isEqualTo(22)
         // A skipped check would otherwise count as a pass.
         assertThat(result.assumptionFailureCount).isEqualTo(0)
     }
@@ -75,7 +75,8 @@ class ContractSuiteSelfTest {
 
     @Test
     fun droppedTagsAreCaught() {
-        assertThat(failuresOf(DroppingTagsContract::class.java)).containsExactly("createdEventComesBackOnTheNextSyncWithItsTags")
+        assertThat(failuresOf(DroppingTagsContract::class.java))
+            .containsExactly("createdEventComesBackOnTheNextSyncWithItsTags", "aDraftForTwoPeopleSyncsBackUnchanged")
     }
 
     @Test
@@ -87,8 +88,8 @@ class ContractSuiteSelfTest {
     fun aReadOnlyProviderSkipsOnlyTheWriteChecks() {
         val result = JUnitCore.runClasses(ReadOnlyContract::class.java)
         assertThat(result.failures.map { "${it.description.methodName}: ${it.message}" }).isEmpty()
-        assertThat(result.runCount).isEqualTo(21)
-        assertThat(result.assumptionFailureCount).isEqualTo(10)
+        assertThat(result.runCount).isEqualTo(22)
+        assertThat(result.assumptionFailureCount).isEqualTo(11)
     }
 
     @Test

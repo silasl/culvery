@@ -380,6 +380,23 @@ class CalendarStoreTest {
         ).inOrder()
     }
 
+    /** Pin (9 §3.3): a shared tag is one string in the mirror's column and the outbox's JSON, with no migration. */
+    @Test
+    fun aSharedTagRoundTripsThroughTheMirrorAndTheOutbox() = runTest {
+        connect("s1")
+        val shared = "sam,mia"
+        store.applySync("c1", "s1", window, full(timed("cinema", "Cinema", 25, 17).copy(forPerson = shared)))
+        assertThat(store.eventNow(EventRef("c1", "s1", "cinema"))!!.forPerson).isEqualTo(shared)
+
+        store.enqueue(change(ChangeKind.CREATE, remoteId = null, draft = eventDraft("Cinema", 25, 17, forPerson = shared)).copy(clientKey = "k-1"))
+        assertThat(store.pendingNow().single().draft!!.forPerson).isEqualTo(shared)
+
+        val daily = (0..2).map { timed("swim-$it", "Swimming", 23 + it, 9).copy(recurring = true, seriesId = "swim") }
+        store.applySync("c1", "s1", window, full(*daily.toTypedArray()))
+        store.applySeriesAssigned("c1", "s1", "swim", shared)
+        assertThat(daily.map { store.eventNow(EventRef("c1", "s1", it.remoteId))!!.forPerson }).containsExactly(shared, shared, shared)
+    }
+
     @Test
     fun aQueuedCreateKeepsItsClientKeyAndItsRefUsesIt() = runTest {
         connect("s1")

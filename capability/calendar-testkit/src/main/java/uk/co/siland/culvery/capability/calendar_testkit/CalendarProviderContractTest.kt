@@ -214,6 +214,18 @@ abstract class CalendarProviderContractTest {
         assertMatches("the next sync", synced!!, draft)
     }
 
+    /** A shared event's people are one tag of comma-joined ids (9 §3.3), kept exactly as written. */
+    @Test
+    fun aDraftForTwoPeopleSyncsBackUnchanged() = runTest {
+        val (w, source) = requireWriting()
+        val before = subject.sync(conn, source, window, null)
+        val draft = draftIn("Shared check", 2, forPerson = "a,b")
+        val created = w.create(conn, source, draft, newClientKey())
+        val synced = nextSyncReturns(source, before.cursor, created.remoteId)
+        assertWithMessage("the next sync must return the shared event").that(synced).isNotNull()
+        assertWithMessage("the next sync: the forPerson tag").that(synced!!.forPerson).isEqualTo("a,b")
+    }
+
     @Test
     fun anAllDayEventRoundTrips() = runTest {
         val (w, source) = requireWriting()

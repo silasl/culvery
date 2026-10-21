@@ -959,6 +959,75 @@ class CalendarEditorTest {
         assertThat(writer.drafts.map { it.forPersonColor }).containsExactly(access.mia.color, null, access.sam.color).inOrder()
     }
 
+    /** Pin (9 §3.3): a shared event has no colour of its own; one person's still carries theirs. */
+    @Test
+    fun aSharedEventGetsNoColour() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        editor.create(draft("Cinema", "${access.sam.id.value},${access.mia.id.value}"))
+        editor.create(draft("Football", access.sam.id.value))
+        assertThat(writer.drafts.map { it.forPersonColor }).containsExactly(null, access.sam.color).inOrder()
+    }
+
+    /** Pin (9 §3.3): an adult may add for any set of people. */
+    @Test
+    fun anAdultMayAddForAnySet() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val both = "${access.sam.id.value},${access.mia.id.value}"
+        assertThat(editor(access).create(draft("Cinema", both))).isEqualTo(EditResult.Done)
+        assertThat(writer.calls).containsExactly("create:Cinema")
+        assertThat(writer.drafts.single().forPerson).isEqualTo(both)
+    }
+
+    /** Pin (9 §3.3): a child's set must be exactly them, so one that includes them is still refused. */
+    @Test
+    fun aChildCannotAddASharedEventEvenWithThemselvesInIt() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.MIA)
+        val both = "${access.sam.id.value},${access.mia.id.value}"
+        assertThat(editor(access).create(draft("Cinema", both))).isEqualTo(EditResult.Cancelled)
+        assertThat(access.toasts.messages).containsExactly("Mia can add events for Mia only.")
+        assertThat(writer.calls).isEmpty()
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
+    /** Pin. */
+    @Test
+    fun aChildMayAddForThemselvesAlone() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.MIA)
+        assertThat(editor(access).create(draft("Swimming", access.mia.id.value))).isEqualTo(EditResult.Done)
+        assertThat(writer.drafts.single().forPerson).isEqualTo(access.mia.id.value)
+    }
+
+    /** Pin (9 §3.3): retagging her own event to a set that includes her is still a retag to others. */
+    @Test
+    fun aChildCannotRetagToASet() = runTest {
+        val access = testAccess(household)
+        put(event("football", createdBy = access.mia.id.value, forPerson = access.mia.id.value))
+        access.answer(TestAccess.MIA)
+        val both = "${access.sam.id.value},${access.mia.id.value}"
+        val result = editor(access).update(ref("football"), edited("Football", both), setOf(EventField.TITLE, EventField.FOR_PERSON))
+        assertThat(result).isEqualTo(EditResult.Cancelled)
+        assertThat(access.toasts.messages).containsExactly("Mia can add events for Mia only.")
+        assertThat(writer.calls).isEmpty()
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
+    /** Pin. */
+    @Test
+    fun anAdultMayRetagToASet() = runTest {
+        val access = testAccess(household)
+        put(event("football", createdBy = access.mia.id.value, forPerson = access.mia.id.value))
+        access.answer(TestAccess.ALEX)
+        val both = "${access.sam.id.value},${access.mia.id.value}"
+        val result = editor(access).update(ref("football"), edited("Football", both), setOf(EventField.TITLE, EventField.FOR_PERSON))
+        assertThat(result).isEqualTo(EditResult.Done)
+        assertThat(writer.drafts.single().let { it.forPerson to it.forPersonColor }).isEqualTo(both to null)
+    }
+
     @Test
     fun anEditThatTouchesWhoCarriesThePersonsColour() = runTest {
         val access = testAccess(household)

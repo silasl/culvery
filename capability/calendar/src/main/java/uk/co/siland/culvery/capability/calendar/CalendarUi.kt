@@ -157,9 +157,9 @@ fun problemLine(problem: SyncProblem): String = when (problem) {
     is SyncProblem.SignIn -> "${problem.service} needs you to sign in again. Reconnect in Settings › Calendars."
 }
 
-/** A tag naming a real person (or Family) wins; otherwise the source's person; otherwise Family. */
+/** The first of [resolvePeople], with [people]'s own order as the household's. */
 fun resolvePerson(forPerson: String?, sourcePerson: PersonId, people: Map<PersonId, Person>): Person =
-    forPerson?.let { people[PersonId(it)] } ?: people[sourcePerson] ?: Person.Family
+    resolvePeople(forPerson, sourcePerson, people, people.keys.toList()).first()
 
 internal val HOURS_MINUTES: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 // ENGLISH, not UK: JDK 17's CLDR data gives "Sept" for Locale.UK, and Android versions differ.

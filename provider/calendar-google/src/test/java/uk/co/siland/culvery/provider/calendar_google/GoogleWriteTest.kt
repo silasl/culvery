@@ -22,6 +22,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarSource
+import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar.EVENT_GONE
 import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventField
@@ -153,6 +154,29 @@ class GoogleWriteTest {
         provider.update(conn, family, key, draft(forPerson = "family", color = null), setOf(EventField.FOR_PERSON))
         assertThat(google.bodies.last()["colorId"]).isEqualTo(JsonNull)
         assertThat(google.event(family.id, key)!!["colorId"]).isNull()
+    }
+
+    /** Pin (9 §6): one person, two and Family are each written as one tag and read back unchanged. */
+    @Test
+    fun whoRoundTripsForOneTwoAndFamily() = runTest {
+        val tags = listOf("sam", "sam,mia", "family")
+        val keys = tags.indices.map { "${key.dropLast(1)}$it" }
+        tags.zip(keys).forEach { (tag, id) ->
+            provider.create(conn, family, draft(forPerson = tag, color = null), id)
+            assertThat(google.event(family.id, id)!!.obj("extendedProperties").obj("private").text(PERSON_KEY)).isEqualTo(tag)
+        }
+        val read = provider.sync(conn, family, DateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 10, 8), london), null)
+            .upserts.associate { it.remoteId to it.forPerson }
+        assertThat(keys.map { read[it] }).containsExactlyElementsIn(tags).inOrder()
+    }
+
+    /** Pin (9 §3.3): a shared event has no colour of its own, on insert or when Who changes to a set. */
+    @Test
+    fun aSharedDraftSendsNoColour() = runTest {
+        provider.create(conn, family, draft(forPerson = "sam,mia", color = null), key)
+        assertThat(google.bodies.single()["colorId"]).isNull()
+        provider.update(conn, family, key, draft(forPerson = "sam,mia", color = null), setOf(EventField.FOR_PERSON))
+        assertThat(google.bodies.last()["colorId"]).isEqualTo(JsonNull)
     }
 
     @Test
