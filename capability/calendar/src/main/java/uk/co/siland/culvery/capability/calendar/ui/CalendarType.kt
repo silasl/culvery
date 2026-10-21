@@ -240,6 +240,7 @@ internal object CalendarDimens {
     val infoLabelGap = 18.dp
     val infoDot = 12.dp
     val infoDotGap = 8.dp
+    val infoDotOverlap = 3.dp
 
     // Explanation cards (read-only, repeating, untagged): radius 22, padding 16×18, 26 dp icon.
     val noteRadius = 22.dp

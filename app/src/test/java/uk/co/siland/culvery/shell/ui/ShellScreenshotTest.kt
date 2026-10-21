@@ -81,12 +81,12 @@ class ShellScreenshotTest {
     private val mia = Person(PersonId("mia"), "Mia", 0xFFE07BA8)
 
     private fun event(title: String, time: String, person: Person, recurring: Boolean = false) = EventUi(
-        EventRef("sample", "family", title), title, time, time.substringBefore('–'), person,
+        EventRef("sample", "family", title), title, time, time.substringBefore('–'), listOf(person),
         allDay = false, recurring = recurring, startSort = 0,
     )
 
     private fun allDay(title: String, person: Person, recurring: Boolean = false) =
-        EventUi(EventRef("sample", "family", title), title, "All day", "All day", person, allDay = true, recurring = recurring, startSort = 0)
+        EventUi(EventRef("sample", "family", title), title, "All day", "All day", listOf(person), allDay = true, recurring = recurring, startSort = 0)
 
     private val today = listOf(
         event("School run", "07:45–08:30", sam),

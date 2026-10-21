@@ -131,7 +131,7 @@ class CalendarRepositoryTest {
         put("s-alex", timed("Dinner with Jo & Priya", 23, 19, 30, 90))
         put("s-family", timed("School run", 23, 7, 45, 45, forPerson = sam.id.value))
         val day = repo.day(sept(23)).first()
-        assertThat(day.map { Triple(it.title, it.timeLabel, it.person.name) }).containsExactly(
+        assertThat(day.map { Triple(it.title, it.timeLabel, it.people.single().name) }).containsExactly(
             Triple("School run", "07:45–08:30", "Sam"),
             Triple("Dinner with Jo & Priya", "19:30–21:00", "Alex"),
         ).inOrder()
@@ -141,7 +141,7 @@ class CalendarRepositoryTest {
     @Test
     fun untaggedEventOnAnUnmappedSourceIsFamily() = runTest {
         put("s-family", timed("Boiler service", 23, 10, 0, 60))
-        assertThat(repo.day(sept(23)).first().single().person).isEqualTo(Person.Family)
+        assertThat(repo.day(sept(23)).first().single().people.single()).isEqualTo(Person.Family)
     }
 
     @Test
@@ -211,7 +211,7 @@ class CalendarRepositoryTest {
             clientKey = key,
         )
         val span = repo.week(sept(21)).first().spans.flatten().single()
-        assertThat(listOf(span.title, span.person.name)).containsExactly("Camping", "Sam").inOrder()
+        assertThat(listOf(span.title, span.people.single().name)).containsExactly("Camping", "Sam").inOrder()
         assertThat(listOf(span.first, span.last)).containsExactly(sept(25), sept(27)).inOrder()
     }
 
@@ -400,7 +400,7 @@ class CalendarRepositoryTest {
         queue(ChangeKind.ASSIGN_SERIES, "swim", EventDraft(swim.title, swim.start, swim.end, sam.id.value, null))
         val detail = repo.event(ref(swim.remoteId), today = sept(23)).first()!!
         assertThat(detail.event.syncing).isTrue()
-        assertThat(detail.event.person.name).isEqualTo("Sam")
+        assertThat(detail.event.people.single().name).isEqualTo("Sam")
     }
 
     @Test
@@ -480,9 +480,9 @@ class CalendarRepositoryTest {
             "Plumber quote call",
             EventDraft(original.title, original.start, original.end, forPerson = sam.id.value, createdBy = null),
         )
-        assertThat(today().single().let { it.person.name to it.syncing }).isEqualTo("Sam" to true)
+        assertThat(today().single().let { it.people.single().name to it.syncing }).isEqualTo("Sam" to true)
         put("s-family", original)
-        assertThat(today().single().let { it.person.name to it.syncing }).isEqualTo("Sam" to true)
+        assertThat(today().single().let { it.people.single().name to it.syncing }).isEqualTo("Sam" to true)
         assertThat(today().single().untagged).isFalse()
     }
 
@@ -491,7 +491,7 @@ class CalendarRepositoryTest {
         val slot = timed("Sleepover", 23, 18, 0, 60)
         queue(ChangeKind.CREATE, null, EventDraft("Sleepover", slot.start, slot.end, forPerson = sam.id.value, createdBy = sam.id.value), clientKey = key)
         val e = today().single()
-        assertThat(listOf(e.title, e.person.name)).containsExactly("Sleepover", "Sam").inOrder()
+        assertThat(listOf(e.title, e.people.single().name)).containsExactly("Sleepover", "Sam").inOrder()
         assertThat(e.syncing).isTrue()
         assertThat(e.ref).isEqualTo(ref(key))
     }
@@ -563,7 +563,7 @@ class CalendarRepositoryTest {
         queue(ChangeKind.ASSIGN, original.remoteId, EventDraft(original.title, original.start, original.end, sam.id.value, null))
         val detail = repo.event(ref(original.remoteId), today = sept(23)).first()!!
         assertThat(detail.event.syncing).isTrue()
-        assertThat(detail.event.person.name).isEqualTo("Sam")
+        assertThat(detail.event.people.single().name).isEqualTo("Sam")
     }
 
     @Test

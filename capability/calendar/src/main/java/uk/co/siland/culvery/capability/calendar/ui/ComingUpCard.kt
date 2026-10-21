@@ -32,6 +32,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventUi
+import uk.co.siland.culvery.capability.calendar.whoLine
 import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCard
@@ -112,12 +113,12 @@ private fun CompactRow(event: EventUi, day: LocalDate) {
             .background(c.surf2)
             .padding(horizontal = CalendarDimens.compactRowPaddingH, vertical = CalendarDimens.compactRowPaddingV),
     ) {
-        ColourBar(Color(event.person.color), width = CalendarDimens.compactBarWidth)
+        StripedBar(event.people.map { Color(it.color) }, width = CalendarDimens.compactBarWidth)
         Spacer(Modifier.width(CalendarDimens.compactBarGap))
         Column(Modifier.shownNotSpoken()) {
             Text(event.title, style = CalendarType.strong14, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "${event.timeLabel} · ${event.person.name}",
+                "${event.timeLabel} · ${whoLine(event.people)}",
                 style = CalendarType.small12,
                 color = c.mute,
                 maxLines = 1,

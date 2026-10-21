@@ -54,6 +54,8 @@ class DetailScreenshotTest {
 
     @Test fun editableDark() = snap("detail_editable_dark", true, SampleUi.detailEditable)
     @Test fun editableLight() = snap("detail_editable_light", false, SampleUi.detailEditable)
+    @Test fun sharedDark() = snap("detail_shared_dark", true, SampleUi.detailShared)
+    @Test fun sharedLight() = snap("detail_shared_light", false, SampleUi.detailShared)
     @Test fun readOnlyFeedDark() = snap("detail_readonly_feed_dark", true, SampleUi.detailReadOnlyFeed)
     @Test fun readOnlyFeedLight() = snap("detail_readonly_feed_light", false, SampleUi.detailReadOnlyFeed)
     @Test fun recurringDark() = snap("detail_recurring_dark", true, SampleUi.detailRecurring)

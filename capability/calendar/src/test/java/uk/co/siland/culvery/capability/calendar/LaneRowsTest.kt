@@ -7,7 +7,7 @@ import uk.co.siland.culvery.core.household.Person
 
 class LaneRowsTest {
     private fun span(title: String, firstDay: Int, lastDay: Int) = SpanUi(
-        EventRef("c1", "s-family", title), title, Person.Family,
+        EventRef("c1", "s-family", title), title, listOf(Person.Family),
         LocalDate.of(2026, 10, firstDay), LocalDate.of(2026, 10, lastDay),
         startsBefore = false, endsAfter = false, label = "", spoken = "",
     )

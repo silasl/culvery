@@ -15,7 +15,7 @@ data class DaySpan(val day: Int, val of: Int)
 data class SpanUi(
     val ref: EventRef,
     val title: String,
-    val person: Person,
+    val people: List<Person>,
     val first: LocalDate,
     val last: LocalDate,
     val startsBefore: Boolean,
@@ -58,13 +58,13 @@ fun weekSpans(days: List<DayUi>): List<SpanUi> =
             SpanUi(
                 ref = ref,
                 title = head.event.title,
-                person = head.event.person,
+                people = head.event.people,
                 first = head.date,
                 last = tail.date,
                 startsBefore = head.span.day > 1,
                 endsAfter = endsAfter,
                 label = if (endsAfter) "until ${lastDay.format(WEEKDAY)} →" else "${firstDay.format(DAY_AND_DATE)} – ${lastDay.format(DAY_AND_DATE)}",
-                spoken = "${head.event.title}, ${head.event.person.name}, ${firstDay.format(FULL_DATE)} to ${lastDay.format(FULL_DATE)}",
+                spoken = "${head.event.title}, ${spokenWho(head.event.people)}, ${firstDay.format(FULL_DATE)} to ${lastDay.format(FULL_DATE)}",
             )
         }
 

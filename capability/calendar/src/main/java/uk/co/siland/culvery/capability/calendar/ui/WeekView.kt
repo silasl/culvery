@@ -365,7 +365,7 @@ private fun EventChip(event: EventUi, day: LocalDate, onOpen: (EventRef) -> Unit
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(CalendarDimens.chipRadius))
-            .background(Color(event.person.color).copy(alpha = HhAlpha.tint(c)))
+            .background(Color(event.people.first().color).copy(alpha = HhAlpha.tint(c)))
             .semantics(mergeDescendants = true) { contentDescription = eventOnDay(event, day) }
             .hhClickable({ onOpen(event.ref) }, label = OPEN_EVENT_DETAILS)
             .padding(horizontal = CalendarDimens.chipPaddingH, vertical = CalendarDimens.chipPaddingV),
@@ -375,10 +375,10 @@ private fun EventChip(event: EventUi, day: LocalDate, onOpen: (EventRef) -> Unit
             horizontalArrangement = Arrangement.spacedBy(CalendarDimens.chipDotGap),
             modifier = Modifier.shownNotSpoken(),
         ) {
-            Box(Modifier.testTag("chip_dot").size(CalendarDimens.chipDot).clip(CircleShape).background(Color(event.person.color)))
+            Box(Modifier.testTag("chip_dot").size(CalendarDimens.chipDot).clip(CircleShape).background(Color(event.people.first().color)))
             // One line, so a long name is cut before the time (4d-1 Decision 2).
             Text(
-                "${event.startLabel} · ${event.person.name}",
+                "${event.startLabel} · ${event.people.first().name}",
                 style = CalendarType.chipTime,
                 color = c.mute,
                 maxLines = 1,

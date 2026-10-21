@@ -18,7 +18,9 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -30,10 +32,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.sp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.collect.Range
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
@@ -51,6 +56,7 @@ import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
 import uk.co.siland.culvery.core.ui.test.onClickableShowing
+import uk.co.siland.culvery.core.ui.test.pixelAt
 
 // app's HomeGridTest pins the same size for Home's Today card.
 internal val todayCardSize = DpSize(400.dp, 586.dp)
@@ -85,6 +91,64 @@ class CardsTest {
     private val tomorrowDate = SampleUi.TODAY.plusDays(1)
 
     private fun events(prefix: String, count: Int) = List(count) { SampleUi.event("$prefix ${it + 1}", "1$it:00–1$it:30", SampleUi.alex) }
+
+    private val sam = 0xFF5B9BE0.toInt()
+    private val mia = 0xFFE07BA8.toInt()
+    private val alex = 0xFF4CB387.toInt()
+
+    private fun barBand(dy: (Dp) -> Dp): Int {
+        val bar = compose.onNodeWithTag("event_bar", useUnmergedTree = true)
+        return pixelAt(bar, 1.dp, dy(bar.getUnclippedBoundsInRoot().height))
+    }
+
+    @Test
+    fun aSharedTodayRowHasOneStripePerPersonAndTheWhoLine() {
+        show { TodayCard(SampleUi.shared) }
+        compose.onAllNodesWithText("Cinema").assertCountEquals(1)
+        compose.onNodeWithText("17:00–18:00 · Sam + Mia").assertExists()
+        assertThat(barBand { 2.dp }).isEqualTo(sam)
+        assertThat(barBand { it - 2.dp }).isEqualTo(mia)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Sam's and Mia's colours at 75 % over the card's dark background. */
+    private fun assertNear(argb: Int, r: Int, g: Int, b: Int) {
+        val actual = listOf(argb shr 16 and 0xFF, argb shr 8 and 0xFF, argb and 0xFF)
+        actual.zip(listOf(r, g, b)).forEach { (a, e) -> assertThat(a).isIn(Range.closed(e - 2, e + 2)) }
+    }
+
+    @Test
+    fun aSharedTomorrowRowKeepsItsFade() {
+        show { TodayCard(emptyList(), tomorrow = DayUi(tomorrowDate, SampleUi.shared)) }
+        assertNear(barBand { 2.dp }, 75, 124, 176)
+        assertNear(barBand { it - 2.dp }, 175, 100, 134)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin. */
+    @Test
+    fun aSinglePersonRowIsUnchanged() {
+        show { TodayCard(listOf(SampleUi.event("Dinner", "19:30–21:00", SampleUi.alex))) }
+        assertThat(barBand { 2.dp }).isEqualTo(alex)
+        assertThat(barBand { it - 2.dp }).isEqualTo(alex)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun comingUpUsesTheWhoLine() {
+        show { ComingUpCard(listOf(DayUi(tomorrowDate, SampleUi.shared))) }
+        compose.onNodeWithText("17:00–18:00 · Sam + Mia").assertExists()
+        assertThat(barBand { 2.dp }).isEqualTo(sam)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aSharedEventIsSpokenWithAnd() {
+        show { TodayCard(SampleUi.shared) }
+        compose.onNode(hasContentDescription("Cinema, Sam and Mia, 17:00 to 18:00", substring = true)).assertExists()
+        assertThat(eventOnDay(SampleUi.cinema, SampleUi.TODAY)).startsWith("Cinema, Sam and Mia, ")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
 
     private val pill = hasText("more today · Open calendar", substring = true)
 

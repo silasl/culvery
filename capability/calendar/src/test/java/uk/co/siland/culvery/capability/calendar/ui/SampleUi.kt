@@ -27,16 +27,27 @@ object SampleUi {
     val family = Person.Family
     val people = listOf(alex, sam, mia, family)
 
-    fun event(title: String, time: String, person: Person, recurring: Boolean = false) = EventUi(
-        EventRef("sample", "family", title), title, time, time.substringBefore('–'), person,
+    fun event(title: String, time: String, vararg people: Person, recurring: Boolean = false) = EventUi(
+        EventRef("sample", "family", title), title, time, time.substringBefore('–'), people.toList(),
         allDay = false, recurring = recurring, startSort = 0,
         readOnlyReason = if (recurring) ReadOnlyReason.Recurring else null,
     )
 
-    fun allDay(title: String, person: Person, recurring: Boolean = false) = EventUi(
-        EventRef("sample", "family", title), title, ALL_DAY_LABEL, ALL_DAY_LABEL, person,
+    fun allDay(title: String, vararg people: Person, recurring: Boolean = false) = EventUi(
+        EventRef("sample", "family", title), title, ALL_DAY_LABEL, ALL_DAY_LABEL, people.toList(),
         allDay = true, recurring = recurring, startSort = 0,
         readOnlyReason = if (recurring) ReadOnlyReason.Recurring else null,
+    )
+
+    /** One event for two people, kept out of the default days so the images of single-person rows stay as they are. */
+    val cinema = event("Cinema", "17:00–18:00", sam, mia)
+
+    val shared = listOf(cinema)
+
+    /** Cinema's detail sheet, added by Alex. */
+    val detailShared = EventDetailUi(
+        cinema.copy(sourceName = "Family calendar", serviceName = "Google Calendar", createdBy = "Alex"),
+        "Today · 17:00–18:00",
     )
 
     private fun day(offset: Long, vararg events: EventUi) = DayUi(TODAY.plusDays(offset), events.toList())

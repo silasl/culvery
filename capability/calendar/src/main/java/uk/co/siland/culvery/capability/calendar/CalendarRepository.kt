@@ -75,13 +75,14 @@ class CalendarRepository @Inject constructor(
         val to = millis(start.plusDays(count.toLong()), z) + ZONE_MARGIN_MS
         combine(store.eventsBetween(from, to), store.pending(), catalog, household.peopleWithFamily) { events, pending, cat, people ->
             val byId = people.associateBy { it.id }
+            val order = people.map { it.id }
             val shown = overlayPending(events, pending, cat::source, z, from, to)
             (0 until count).map { i ->
                 val date = start.plusDays(i.toLong())
                 DayUi(
                     date,
                     shown.filter { it.event.isOn(date, z) }
-                        .map { it.event.toUi(date, z, byId, cat, it.syncing) }
+                        .map { it.event.toUi(date, z, byId, order, cat, it.syncing) }
                         .sortedWith(compareByDescending<EventUi> { it.allDay }.thenBy { it.startSort }.thenBy { it.title }),
                 )
             }
@@ -104,7 +105,7 @@ class CalendarRepository @Inject constructor(
         if (s == null) return@map null
         val e = s.shown.event
         val day = e.start.instantIn(s.zone).atZone(s.zone).toLocalDate()
-        EventDetailUi(e.toUi(day, s.zone, s.people, s.catalog, s.shown.syncing), whenLabel(e.start, e.end, s.zone, today))
+        EventDetailUi(e.toUi(day, s.zone, s.people, s.order, s.catalog, s.shown.syncing), whenLabel(e.start, e.end, s.zone, today))
     }
 
     /** What the add/edit sheet starts from: [ref] as shown; null once it is gone or queued for deletion. */
@@ -112,7 +113,7 @@ class CalendarRepository @Inject constructor(
         s?.shown?.event?.let { EditableEvent(ref, it.title, it.start, it.end, it.forPerson) }
     }
 
-    private class Shown(val shown: ShownEvent, val catalog: SourceCatalog, val people: Map<PersonId, Person>, val zone: ZoneId)
+    private class Shown(val shown: ShownEvent, val catalog: SourceCatalog, val people: Map<PersonId, Person>, val order: List<PersonId>, val zone: ZoneId)
 
     /** [ref] with its queued changes laid over it; a queued create not yet in the mirror counts (2b-2 design D6). */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -121,7 +122,7 @@ class CalendarRepository @Inject constructor(
             val forIt = pending.filter { it.ref == ref || (it.kind == ChangeKind.ASSIGN_SERIES && it.remoteId == stored?.seriesId) }
             overlayPending(listOfNotNull(stored), forIt, cat::source, z, Long.MIN_VALUE, Long.MAX_VALUE)
                 .singleOrNull()
-                ?.let { Shown(it, cat, people.associateBy { p -> p.id }, z) }
+                ?.let { Shown(it, cat, people.associateBy { p -> p.id }, people.map { p -> p.id }, z) }
         }
     }
 

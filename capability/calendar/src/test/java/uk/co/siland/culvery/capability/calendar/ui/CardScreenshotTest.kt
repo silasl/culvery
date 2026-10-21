@@ -19,6 +19,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -53,6 +54,10 @@ class CardScreenshotTest {
     @Test fun todayDark() = snap("today_dark", true, TODAY_W, TODAY_H) { TodayCard(SampleUi.today, onAdd = {}) }
     @Test fun todayLight() = snap("today_light", false, TODAY_W, TODAY_H) { TodayCard(SampleUi.today, onAdd = {}) }
     @Test fun todayEmptyDark() = snap("today_empty_dark", true, TODAY_W, TODAY_H) { TodayCard(emptyList()) }
+    @Test fun todaySharedDark() = snap("today_shared_dark", true, TODAY_W, TODAY_H) { TodayCard(SampleUi.shared, onAdd = {}, tomorrow = DayUi(SampleUi.TODAY.plusDays(1), SampleUi.shared)) }
+    @Test fun todaySharedLight() = snap("today_shared_light", false, TODAY_W, TODAY_H) { TodayCard(SampleUi.shared, onAdd = {}, tomorrow = DayUi(SampleUi.TODAY.plusDays(1), SampleUi.shared)) }
+    @Test fun comingUpSharedDark() = snap("coming_up_shared_dark", true, WIDE_W, WIDE_H) { ComingUpCard(listOf(DayUi(SampleUi.TODAY.plusDays(1), SampleUi.shared))) }
+
     @Test fun todayScrollDark() = snap("today_scroll_dark", true, TODAY_W, TODAY_H) { TodayCard(SampleUi.todayBusy, onAdd = {}) }
     @Test fun todayScrollLight() = snap("today_scroll_light", false, TODAY_W, TODAY_H) { TodayCard(SampleUi.todayBusy, onAdd = {}) }
 

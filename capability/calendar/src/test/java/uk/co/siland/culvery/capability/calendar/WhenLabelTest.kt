@@ -52,7 +52,7 @@ class WhenLabelTest {
     }
 
     private fun ui(syncing: Boolean = false, readOnly: ReadOnlyReason? = null, recurring: Boolean = false) = EventUi(
-        EventRef("c", "s", "e"), "Swim", "16:00–17:00", "16:00", Person.Family,
+        EventRef("c", "s", "e"), "Swim", "16:00–17:00", "16:00", listOf(Person.Family),
         allDay = false, recurring = recurring, startSort = 0, readOnlyReason = readOnly, syncing = syncing,
     )
 

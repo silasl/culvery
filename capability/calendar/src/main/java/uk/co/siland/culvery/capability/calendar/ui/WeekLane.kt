@@ -79,7 +79,7 @@ internal fun WeekLane(
 @Composable
 private fun LaneBar(span: SpanUi, onOpen: (EventRef) -> Unit) {
     val c = Culvery.colors
-    val colour = Color(span.person.color)
+    val colour = Color(span.people.first().color)
     val radius = CalendarDimens.laneBarRadius
     val shape = RoundedCornerShape(
         topStart = if (span.startsBefore) 0.dp else radius,

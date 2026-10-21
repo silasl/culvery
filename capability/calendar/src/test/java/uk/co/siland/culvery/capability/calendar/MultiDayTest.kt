@@ -5,6 +5,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import org.junit.Test
+import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 
 class MultiDayTest {
@@ -18,17 +19,19 @@ class MultiDayTest {
 
     private fun allDay(month: Int, day: Int) = EventTime.AllDay(date(month, day))
 
-    private fun event(title: String, start: EventTime, end: EventTime) = StoredEvent(
+    private fun event(title: String, start: EventTime, end: EventTime, forPerson: String? = null) = StoredEvent(
         "c1", "s-family", title, title, start, end,
-        recurring = false, forPerson = null, createdBy = null, sourcePerson = PersonId.FAMILY,
+        recurring = false, forPerson = forPerson, createdBy = null, sourcePerson = PersonId.FAMILY,
         startSort = start.instantIn(london).toEpochMilli(), endSort = end.instantIn(london).toEpochMilli(),
     )
 
     /** The week from [start] as the repository builds it: each date's slices of the events on it. */
     private fun week(start: LocalDate, vararg events: StoredEvent): List<DayUi> = (0L..6L).map { i ->
         val d = start.plusDays(i)
-        DayUi(d, events.filter { it.isOn(d, london) }.map { it.toUi(d, london, emptyMap(), catalog) })
+        DayUi(d, events.filter { it.isOn(d, london) }.map { it.toUi(d, london, household.associateBy { p -> p.id }, household.map { p -> p.id }, catalog) })
     }
+
+    private val household = listOf(Person(PersonId("sam"), "Sam", 0xFF5B9BE0), Person(PersonId("mia"), "Mia", 0xFFE07BA8))
 
     private val halfTerm = event("Half term", allDay(10, 19), allDay(10, 24))
 
@@ -130,6 +133,13 @@ class MultiDayTest {
         assertThat(span.label).isEqualTo("Mon 19 – Thu 22")
         assertThat(span.spoken).isEqualTo("Half term, Family, Monday 19 October to Thursday 22 October")
         assertThat(span.ref).isEqualTo(EventRef("c1", "s-family", "Half term"))
-        assertThat(span.person.name).isEqualTo("Family")
+        assertThat(span.people.single().name).isEqualTo("Family")
+    }
+
+    @Test
+    fun aSharedSpanSaysBoth() {
+        val span = weekSpans(week(date(10, 19), event("Half term", allDay(10, 19), allDay(10, 23), forPerson = "mia,sam"))).single()
+        assertThat(span.people.map { it.name }).containsExactly("Sam", "Mia").inOrder()
+        assertThat(span.spoken).isEqualTo("Half term, Sam and Mia, Monday 19 October to Thursday 22 October")
     }
 }

@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -23,16 +24,20 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.pixelAt
 
 @RunWith(AndroidJUnit4::class)
 class EventDetailSheetTest {
@@ -280,5 +285,31 @@ class EventDetailSheetTest {
     fun theSyncingPillIsSpokenPolitely() {
         show(SampleUi.detailSyncing)
         compose.onNodeWithTag("detail_syncing").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+    }
+
+    @Test
+    fun theWhoRowShowsTheSet() {
+        show(SampleUi.detailShared)
+        compose.onNode(hasText("For") and hasText("Sam + Mia")).assertExists()
+        compose.onAllNodesWithTag("for_dot", useUnmergedTree = true).assertCountEquals(2)
+        compose.onAllNodesWithTag("event_bar", useUnmergedTree = true).assertCountEquals(1)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun theHeaderBarIsStripedForASharedEvent() {
+        show(SampleUi.detailShared)
+        val bar = compose.onNodeWithTag("event_bar", useUnmergedTree = true)
+        val height = bar.getUnclippedBoundsInRoot().height
+        assertThat(pixelAt(bar, 1.dp, 2.dp)).isEqualTo(0xFF5B9BE0.toInt())
+        assertThat(pixelAt(bar, 1.dp, height - 2.dp)).isEqualTo(0xFFE07BA8.toInt())
+    }
+
+    @Test
+    fun threePeopleReadAsTwoAndMore() {
+        show(SampleUi.detailShared.copy(event = SampleUi.detailShared.event.copy(people = listOf(SampleUi.alex, SampleUi.sam, SampleUi.mia))))
+        compose.onNode(hasText("For") and hasText("Alex, Sam +1")).assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 }

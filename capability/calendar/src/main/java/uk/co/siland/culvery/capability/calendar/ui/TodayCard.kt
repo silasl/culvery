@@ -45,6 +45,7 @@ import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.dayOf
+import uk.co.siland.culvery.capability.calendar.whoLine
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTokens
@@ -251,8 +252,8 @@ private fun EventRow(event: EventUi, spoken: String, outlined: Boolean, showDayO
                 vertical = if (outlined) CalendarDimens.tomorrowRowPaddingV else CalendarDimens.todayRowPaddingV,
             ),
     ) {
-        val bar = Color(event.person.color)
-        ColourBar(if (outlined) bar.copy(alpha = CalendarDimens.TOMORROW_BAR_ALPHA) else bar, width = CalendarDimens.todayBarWidth)
+        val bars = event.people.map { Color(it.color).let { bar -> if (outlined) bar.copy(alpha = CalendarDimens.TOMORROW_BAR_ALPHA) else bar } }
+        StripedBar(bars, width = CalendarDimens.todayBarWidth)
         Spacer(Modifier.width(CalendarDimens.todayBarGap))
         Column(Modifier.weight(1f).shownNotSpoken()) {
             Text(
@@ -266,7 +267,7 @@ private fun EventRow(event: EventUi, spoken: String, outlined: Boolean, showDayO
             val span = event.span
             val whenLabel = if (showDayOf && span != null) dayOf(span) else event.timeLabel
             Text(
-                "$whenLabel · ${event.person.name}",
+                "$whenLabel · ${whoLine(event.people)}",
                 style = if (outlined) CalendarType.tomorrowTime else CalendarType.todayTime,
                 color = c.mute,
                 maxLines = 1,

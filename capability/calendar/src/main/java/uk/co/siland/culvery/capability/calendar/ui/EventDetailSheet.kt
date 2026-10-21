@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
+import uk.co.siland.culvery.capability.calendar.whoLine
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.KEEP
 import uk.co.siland.culvery.core.ui.ButtonSize
@@ -200,7 +201,7 @@ private fun Header(e: EventUi, onClose: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(Modifier.weight(1f).height(IntrinsicSize.Min)) {
-            ColourBar(Color(e.person.color), width = CalendarDimens.sheetTitleBar)
+            StripedBar(e.people.map { Color(it.color) }, width = CalendarDimens.sheetTitleBar)
             Spacer(Modifier.width(CalendarDimens.sheetTitleBarGap))
             Column {
                 if (e.syncing) {
@@ -245,8 +246,10 @@ private fun InfoCard(detail: EventDetailUi) {
         Divider()
         InfoRow(Icons.PERSON, "For") {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.infoDotGap)) {
-                Box(Modifier.size(CalendarDimens.infoDot).clip(CircleShape).background(Color(e.person.color)))
-                Value(e.person.name)
+                Row(horizontalArrangement = Arrangement.spacedBy(-CalendarDimens.infoDotOverlap)) {
+                    e.people.forEach { Box(Modifier.testTag("for_dot").size(CalendarDimens.infoDot).clip(CircleShape).background(Color(it.color))) }
+                }
+                Value(whoLine(e.people))
             }
         }
         Divider()

@@ -9,30 +9,31 @@ class PersonResolutionTest {
     private val alex = Person(PersonId("alex"), "Alex", 0xFF4CB387)
     private val sam = Person(PersonId("sam"), "Sam", 0xFF5B9BE0)
     private val people = listOf(Person.Family, alex, sam).associateBy { it.id }
+    private val order = listOf(alex.id, sam.id)
 
     @Test
     fun taggedPersonWins() {
-        assertThat(resolvePerson("sam", alex.id, people)).isEqualTo(sam)
+        assertThat(resolvePeople("sam", alex.id, people, order)).containsExactly(sam)
     }
 
     @Test
     fun taggedFamilyWinsOverTheSourceMapping() {
-        assertThat(resolvePerson("family", alex.id, people)).isEqualTo(Person.Family)
+        assertThat(resolvePeople("family", alex.id, people, order)).containsExactly(Person.Family)
     }
 
     /** 9 §3.3: a single id reads as it always has, so one naming someone removed is the calendar's person. */
     @Test
     fun unknownTagFallsBackToSourceMapping() {
-        assertThat(resolvePerson("someone-removed", alex.id, people)).isEqualTo(alex)
+        assertThat(resolvePeople("someone-removed", alex.id, people, order)).containsExactly(alex)
     }
 
     @Test
     fun untaggedUsesSourceMapping() {
-        assertThat(resolvePerson(null, sam.id, people)).isEqualTo(sam)
+        assertThat(resolvePeople(null, sam.id, people, order)).containsExactly(sam)
     }
 
     @Test
     fun sourceMappedToRemovedPersonShowsFamily() {
-        assertThat(resolvePerson(null, PersonId("removed"), people)).isEqualTo(Person.Family)
+        assertThat(resolvePeople(null, PersonId("removed"), people, order)).containsExactly(Person.Family)
     }
 }

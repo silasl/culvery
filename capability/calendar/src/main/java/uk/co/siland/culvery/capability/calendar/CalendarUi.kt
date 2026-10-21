@@ -24,7 +24,8 @@ data class EventUi(
     val timeLabel: String,
     /** The week chip's label: "07:45" for a one-day event, otherwise the same as [timeLabel]. */
     val startLabel: String,
-    val person: Person,
+    /** Who it is for, in household order; never empty. */
+    val people: List<Person>,
     /** True for all-day events and for the middle days of a multi-day timed event; they sort first. */
     val allDay: Boolean,
     val recurring: Boolean,
@@ -49,6 +50,7 @@ data class EventUi(
     val span: DaySpan? = null,
 ) {
     val editable: Boolean get() = readOnlyReason == null
+    val shared: Boolean get() = people.size > 1
 }
 
 /** The detail sheet's model: the event plus its "When" row. */
@@ -156,10 +158,6 @@ fun problemLine(problem: SyncProblem): String = when (problem) {
     is SyncProblem.NoAnswer -> "${problem.service} didn’t answer. Try Update now in a few minutes."
     is SyncProblem.SignIn -> "${problem.service} needs you to sign in again. Reconnect in Settings › Calendars."
 }
-
-/** The first of [resolvePeople], with [people]'s own order as the household's. */
-fun resolvePerson(forPerson: String?, sourcePerson: PersonId, people: Map<PersonId, Person>): Person =
-    resolvePeople(forPerson, sourcePerson, people, people.keys.toList()).first()
 
 internal val HOURS_MINUTES: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
 // ENGLISH, not UK: JDK 17's CLDR data gives "Sept" for Locale.UK, and Android versions differ.
@@ -290,6 +288,7 @@ internal fun StoredEvent.toUi(
     date: LocalDate,
     zone: ZoneId,
     people: Map<PersonId, Person>,
+    order: List<PersonId>,
     catalog: SourceCatalog,
     syncing: Boolean = false,
 ): EventUi {
@@ -302,7 +301,7 @@ internal fun StoredEvent.toUi(
         title = title,
         timeLabel = slice.timeLabel,
         startLabel = slice.startLabel,
-        person = resolvePerson(forPerson, sourcePerson, people),
+        people = resolvePeople(forPerson, sourcePerson, people, order),
         allDay = slice.allDay,
         recurring = recurring,
         startSort = startSort,

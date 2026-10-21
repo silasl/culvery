@@ -10,6 +10,7 @@ import uk.co.siland.culvery.capability.calendar.FULL_WEEKDAY
 import uk.co.siland.culvery.capability.calendar.badges
 import uk.co.siland.culvery.capability.calendar.dayOf
 import uk.co.siland.culvery.capability.calendar.spokenTime
+import uk.co.siland.culvery.capability.calendar.spokenWho
 
 // What TalkBack says for the calendar's controls. Click labels follow "double-tap to", in lower case.
 
@@ -49,10 +50,10 @@ private fun EventUi.badgeWords(): String = badges().joinToString("") { ", ${it.s
 
 /** A week chip or a Coming up row: "Swimming, Sam, Tuesday 09:00", then its badges. */
 internal fun eventOnDay(event: EventUi, day: LocalDate): String =
-    "${event.title}, ${event.person.name}, ${day.format(FULL_WEEKDAY)} ${spokenTime(event.startLabel)}${event.badgeWords()}"
+    "${event.title}, ${spokenWho(event.people)}, ${day.format(FULL_WEEKDAY)} ${spokenTime(event.startLabel)}${event.badgeWords()}"
 
 /** A Today row (the card is the day): "Swimming, Sam, 09:00 to 10:30", or "Half term, Family, day 2 of 3", then its badges. */
 internal fun todayRowName(event: EventUi): String {
     val spokenWhen = event.span?.let { dayOf(it).lowercase() } ?: spokenTime(event.timeLabel)
-    return "${event.title}, ${event.person.name}, $spokenWhen${event.badgeWords()}"
+    return "${event.title}, ${spokenWho(event.people)}, $spokenWhen${event.badgeWords()}"
 }

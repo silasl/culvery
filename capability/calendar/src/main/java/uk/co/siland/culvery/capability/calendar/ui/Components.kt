@@ -2,6 +2,8 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,16 +19,18 @@ import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.Icons
 
-/** The person-colour bar at the start of an event row; fills the row's intrinsic height. */
+/** An event's colour bar: [colors] in equal bands along its length, the first at the top (9 §3.4); fills the row's intrinsic height. */
 @Composable
-internal fun ColourBar(color: Color, width: Dp) {
-    Box(
-        Modifier
+internal fun StripedBar(colors: List<Color>, width: Dp, modifier: Modifier = Modifier, radius: Dp = width / 2) {
+    Column(
+        modifier
             .width(width)
             .fillMaxHeight()
-            .clip(RoundedCornerShape(width / 2))
-            .background(color),
-    )
+            .clip(RoundedCornerShape(radius))
+            .testTag("event_bar"),
+    ) {
+        colors.forEach { Box(Modifier.fillMaxWidth().weight(1f).background(it)) }
+    }
 }
 
 /** A sheet's Delete (hand-off §7): the danger tone, large, on the sheet's `bg`. Disabled, grey like every button. */
