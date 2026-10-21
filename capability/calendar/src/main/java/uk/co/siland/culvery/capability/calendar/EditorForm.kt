@@ -165,14 +165,15 @@ class EditorForm(
 
     /**
      * One day: the day. Several (9 §3.1): the first tap sets the day and waits; the next sets the last day, or one day if
-     * it is the same date, or starts again from a date before the first. Once a range is set, a tap starts a new one.
+     * it is the same date, or starts again from a date before the first. Once a range is set, a tap starts a new one,
+     * unless it is over the cap: then a tap on or after the first day replaces the last.
      */
     fun tapDay(date: LocalDate) {
         if (datesLocked) return
         val first = day
         when {
             !multiDay -> if (date == first) return else day = date
-            !awaiting || first == null || date < first -> {
+            (!awaiting && untilError == null) || first == null || date < first -> {
                 day = date
                 until = null
                 awaiting = true

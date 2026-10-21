@@ -30,18 +30,19 @@ private val FIRST_FREE_START: LocalTime = LocalTime.of(7, 0)
 private val LAST_FREE_END: LocalTime = LocalTime.of(23, 0)
 private const val HOURS_PER_DAY = 24
 
-/** Up to three colours of the people with an event on [date], in household [order] then Family; none outside the held days. */
-fun Held.dotsOn(date: LocalDate, colors: Map<PersonId, Long>, order: List<PersonId>, zone: ZoneId): List<Long> {
+/** The people with an event on [date], in household [order] then Family; none outside the held days. */
+fun Held.peopleOn(date: LocalDate, order: List<PersonId>, zone: ZoneId): List<PersonId> {
     if (!holds(date)) return emptyList()
     val rank = { id: PersonId -> if (id == PersonId.FAMILY) Int.MAX_VALUE - 1 else order.indexOf(id).takeIf { it >= 0 } ?: Int.MAX_VALUE }
     return events.filter { it.isOn(date, zone) }
         .flatMap { it.people }
         .distinct()
         .sortedBy(rank)
-        .mapNotNull { colors[it] }
-        .distinct()
-        .take(MAX_DOTS)
 }
+
+/** Up to three colours of the people [peopleOn] [date]. */
+fun Held.dotsOn(date: LocalDate, colors: Map<PersonId, Long>, order: List<PersonId>, zone: ZoneId): List<Long> =
+    peopleOn(date, order, zone).mapNotNull { colors[it] }.distinct().take(MAX_DOTS)
 
 /** The hours of [day] in which any of [people] is busy (9 §3.4); none when the tablet can't know. */
 fun Held.busyHours(people: List<PersonId>, day: LocalDate, zone: ZoneId, except: EventRef?): Set<Int> {

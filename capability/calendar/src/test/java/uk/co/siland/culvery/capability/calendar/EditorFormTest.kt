@@ -281,6 +281,31 @@ class EditorFormTest {
         assertThat(sixtyOne.canSave).isFalse()
     }
 
+    /** The cap's message asks for an earlier last day, so a tap on or after the first day becomes it. */
+    @Test
+    fun aTapAfterAnOverCapRangeReplacesTheLastDay() {
+        val form = ready()
+        form.setMultiDay(true)
+        form.tapDay(mon19)
+        form.tapDay(mon19.plusDays(60))
+        assertThat(form.untilError).isEqualTo(UNTIL_TOO_LATE)
+        form.tapDay(mon19.plusDays(10))
+        assertThat(form.day).isEqualTo(mon19)
+        assertThat(form.until).isEqualTo(mon19.plusDays(10))
+        assertThat(form.untilError).isNull()
+        assertThat(form.awaitingLastDay).isFalse()
+        // A range within the cap: the next tap starts a new one, as before.
+        form.tapDay(mon19.plusDays(20))
+        assertThat(form.day).isEqualTo(mon19.plusDays(20))
+        assertThat(form.awaitingLastDay).isTrue()
+        form.tapDay(mon19.plusDays(90))
+        assertThat(form.untilError).isEqualTo(UNTIL_TOO_LATE)
+        form.tapDay(mon19)
+        assertThat(form.day).isEqualTo(mon19)
+        assertThat(form.until).isNull()
+        assertThat(form.awaitingLastDay).isTrue()
+    }
+
     @Test
     fun turningMultiDayOffDropsUntil() {
         val form = ready()

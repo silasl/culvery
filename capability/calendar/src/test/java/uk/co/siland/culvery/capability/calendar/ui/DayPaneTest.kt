@@ -244,6 +244,10 @@ class DayPaneTest {
         ).inOrder()
         compose.onAllNodesWithTag("day_${at(9, 26)}_dot", useUnmergedTree = true).assertCountEquals(1)
         compose.onAllNodesWithTag("day_${at(9, 29)}_dot", useUnmergedTree = true).assertCountEquals(0)
+        // TalkBack names everyone on the day, the fourth too.
+        cell(at(9, 25)).assertContentDescriptionEquals("Friday 25 September, Alex, Sam, Mia and Family")
+        cell(at(9, 26)).assertContentDescriptionEquals("Saturday 26 September, Mia")
+        cell(at(9, 29)).assertContentDescriptionEquals("Tuesday 29 September")
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -265,11 +269,11 @@ class DayPaneTest {
         show(editorForm().apply { chooseHour(10) })
         part("editor_row_time_value").assertTextEquals("10:00–11:00")
         part("editor_question").assertTextEquals("Which day?")
-        part("day_hint").assertDoesNotExist()
+        compose.onNodeWithTag("day_multi").assertTextEquals("Lasts more than a day")
         compose.onNodeWithTag("day_multi").performClick()
         compose.runOnIdle { assertThat(form.multiDay).isTrue() }
         part("editor_question").assertTextEquals("Which days?")
-        part("day_hint").assertTextEquals("Tap the first day, then the last")
+        compose.onNodeWithTag("day_multi").assertTextEquals("Lasts more than a day", "Tap the first day, then the last")
         part("editor_row_time_value").assertTextEquals("All day")
         compose.assertClickablesHaveRoleAndLabel()
     }
@@ -323,6 +327,9 @@ class DayPaneTest {
         assertWithMessage("but not after it").that(bandPixel(at(11, 1), -1f)).isEqualTo(surf)
         assertThat(fadeOf(at(11, 1))).isEqualTo(1f)
         assertWithMessage("a day after the range").that(bandPixel(at(10, 28), -1f)).isEqualTo(surf)
+        listOf(at(10, 29) to "first day", at(10, 30) to "in the range", at(11, 1) to "last day").forEach { (d, state) ->
+            assertThat(cell(d).fetchSemanticsNode().config[SemanticsProperties.StateDescription]).isEqualTo(state)
+        }
 
         show(multiDay(at(10, 26), at(11, 3)))
         compose.onNodeWithTag("month_next").performClick()
@@ -361,8 +368,30 @@ class DayPaneTest {
             assertWithMessage("it stays for an earlier last day").that(flow.active).isEqualTo(EditorStep.Day)
         }
         compose.onNodeWithTag("day_error").assertTextEquals(UNTIL_TOO_LATE)
-        part("day_hint").assertDoesNotExist()
         compose.onNodeWithTag("editor_save_reason").assertTextEquals(UNTIL_TOO_LATE)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** The cap's message asks for an earlier last day, so the next tap is that day, not a new range. */
+    @Test
+    fun aTapAfterTheCapPicksAnEarlierLastDay() {
+        show(multiDay(today, today.plusDays(60)))
+        compose.onNodeWithTag("day_error").assertTextEquals(UNTIL_TOO_LATE)
+        compose.onNodeWithTag("month_next").performClick()
+        compose.onNodeWithTag("month_title").assertTextEquals("October 2026")
+        compose.mainClock.autoAdvance = false
+        cell(today.plusDays(30)).performClick()
+        compose.mainClock.advanceTimeBy(MOVE_ON_MS - 16, ignoreFrameDuration = true)
+        assertThat(flow.active).isEqualTo(EditorStep.Day)
+        part("day_error").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(32, ignoreFrameDuration = true)
+        assertThat(flow.active).isEqualTo(EditorStep.Time)
+        compose.mainClock.autoAdvance = true
+        compose.runOnIdle {
+            assertThat(form.day).isEqualTo(today)
+            assertThat(form.until).isEqualTo(today.plusDays(30))
+        }
+        part("editor_row_day_value").assertTextEquals("Wed 23 Sep – Fri 23 Oct")
         compose.assertClickablesHaveRoleAndLabel()
     }
 

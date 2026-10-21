@@ -156,9 +156,6 @@ internal object CalendarType {
     val dayMonth = HhType.sectionTitle.copy(fontSize = 20.sp)
     val dayLetter = HhType.labelSmall
     val dayDate = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W500)
-
-    /** 14 sp: "Tap the first day, then the last". */
-    val dayHint = HhType.secondary
 }
 
 /** The full-screen editor's layout (handoff §1 Layout, px ÷ 1.5). */

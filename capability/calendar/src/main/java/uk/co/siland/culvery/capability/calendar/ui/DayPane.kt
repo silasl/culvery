@@ -47,10 +47,9 @@ import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.SHORT_DAY
-import uk.co.siland.culvery.capability.calendar.dotsOn
-import uk.co.siland.culvery.core.household.FAMILY_COLOR
+import uk.co.siland.culvery.capability.calendar.peopleOn
+import uk.co.siland.culvery.capability.calendar.spokenWho
 import uk.co.siland.culvery.core.household.Person
-import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
@@ -70,6 +69,9 @@ private const val PICK_TOMORROW = "Tomorrow"
 private const val EARLIER_MONTHS = "Earlier months"
 private const val LATER_MONTHS = "Later months"
 private const val IN_THE_RANGE = "in the range"
+private const val FIRST_DAY = "first day"
+private const val LAST_DAY = "last day"
+private const val MAX_DOTS = 3
 private const val DAYS_A_WEEK = 7
 private val MONTH_YEAR: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
 private val FULL_WEEKDAY_NAME: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)
@@ -109,7 +111,7 @@ internal fun monthCells(month: YearMonth): List<LocalDate> {
 @Composable
 internal fun DayPane(form: EditorForm, held: Held?, people: List<Person>, onPicked: () -> Unit) {
     var month by remember { mutableStateOf(YearMonth.from(form.day ?: form.today)) }
-    val colours = remember(people) { people.associate { it.id to it.color } + (PersonId.FAMILY to FAMILY_COLOR) }
+    val byId = remember(people) { (people + Person.Family).associateBy { it.id } }
     val order = remember(people) { people.map { it.id } }
     val pick = { date: LocalDate ->
         form.tapDay(date)
@@ -127,19 +129,17 @@ internal fun DayPane(form: EditorForm, held: Held?, people: List<Person>, onPick
                 monthCells(month).chunked(DAYS_A_WEEK).forEach { week ->
                     Row(Modifier.fillMaxWidth()) {
                         week.forEachIndexed { column, date ->
-                            val dots = held?.dotsOn(date, colours, order, form.zone).orEmpty()
-                            DayCell(date, column, form, month, dots, Modifier.weight(1f)) { pick(date) }
+                            val on = held?.peopleOn(date, order, form.zone).orEmpty().mapNotNull { byId[it] }
+                            DayCell(date, column, form, month, on, Modifier.weight(1f)) { pick(date) }
                         }
                     }
                 }
             }
         }
-        val error = form.untilError
-        when {
-            error != null -> HhStatusLine(error, tag = "day_error", icon = Icons.ERROR, style = ControlType.fieldError)
-            form.multiDay -> Text(TAP_FIRST_THEN_LAST, style = CalendarType.dayHint, color = Culvery.colors.mute, modifier = Modifier.testTag("day_hint"))
+        form.untilError?.let { HhStatusLine(it, tag = "day_error", icon = Icons.ERROR, style = ControlType.fieldError) }
+        HhSwitchRow(LASTS_MORE_THAN_A_DAY, line = TAP_FIRST_THEN_LAST.takeIf { form.multiDay }, checked = form.multiDay, tag = "day_multi") {
+            form.setMultiDay(it)
         }
-        HhSwitchRow(LASTS_MORE_THAN_A_DAY, line = null, checked = form.multiDay, tag = "day_multi") { form.setMultiDay(it) }
     }
 }
 
@@ -197,12 +197,12 @@ private fun WeekdayLetters() {
 }
 
 /**
- * One day of [month]'s grid: a circle with the date and the people dots, filled `accent` when chosen or a range's end,
- * ringed when today. A range's band runs behind the circles, each half rounded where the range ends or the line wraps.
+ * One day of [month]'s grid: a circle with the date and up to three dots for the people [on] it, whom TalkBack names too;
+ * filled `accent` when chosen or a range's end, ringed when today. A range's band runs behind the circles, each half rounded where the range ends or the line wraps.
  * Outside the month or past, a day fades, unless it is in the range.
  */
 @Composable
-private fun DayCell(date: LocalDate, column: Int, form: EditorForm, month: YearMonth, dots: List<Long>, modifier: Modifier, onTap: () -> Unit) {
+private fun DayCell(date: LocalDate, column: Int, form: EditorForm, month: YearMonth, on: List<Person>, modifier: Modifier, onTap: () -> Unit) {
     val c = Culvery.colors
     val first = form.day
     val last = form.until?.takeIf { form.multiDay }
@@ -221,11 +221,11 @@ private fun DayCell(date: LocalDate, column: Int, form: EditorForm, month: YearM
             .testTag("day_$date")
             .height(EditorDimens.dayCell)
             .alpha(fade)
-            .hhClickable(onTap, spoken = dateCellName(date, form.today))
+            .hhClickable(onTap, spoken = listOf(dateCellName(date, form.today), spokenWho(on)).filter { it.isNotEmpty() }.joinToString(", "))
             .semantics {
                 dayFade = fade
                 selected = chosen
-                if (banded && !chosen) stateDescription = IN_THE_RANGE
+                if (banded) stateDescription = if (date == first) FIRST_DAY else if (date == last) LAST_DAY else IN_THE_RANGE
             },
     ) {
         if (banded) {
@@ -252,7 +252,7 @@ private fun DayCell(date: LocalDate, column: Int, form: EditorForm, month: YearM
                 modifier = Modifier.testTag("day_${date}_date").semantics { hideFromAccessibility() },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(EditorDimens.dayDotGap), modifier = Modifier.height(EditorDimens.dayDot)) {
-                dots.forEach { colour ->
+                on.map { it.color }.distinct().take(MAX_DOTS).forEach { colour ->
                     Spacer(Modifier.testTag("day_${date}_dot").size(EditorDimens.dayDot).clip(CircleShape).background(Color(colour)))
                 }
             }
