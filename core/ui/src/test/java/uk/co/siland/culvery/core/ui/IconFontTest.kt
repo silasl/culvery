@@ -75,7 +75,8 @@ class IconFontTest {
         val NO_FILLED_FORM: Set<String> = setOf(
             "add", "arrow_downward", "arrow_forward", "arrow_upward", "check", "chevron_left", "chevron_right",
             "close", "directions_walk", "expand_less", "expand_more", "keyboard_arrow_down", "music_note",
-            "power_settings_new", "rainy_heavy", "rainy_light", "refresh", "remove", "repeat", "search", "shuffle", "sync_problem",
+            "power_settings_new", "rainy_heavy", "rainy_light", "refresh", "remove", "repeat", "search", "shuffle",
+            "sync_problem",
         )
     }
 }

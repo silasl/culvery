@@ -5,6 +5,7 @@ import androidx.room.useWriterConnection
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -133,7 +134,7 @@ class CalendarEditorTest {
         val access = testAccess(household)
         access.answer(TestAccess.ALEX)
         val monday = LocalDate.of(2026, 10, 19)
-        val form = EventForm(EventForm.Mode.New, monday, java.time.LocalTime.of(9, 0), london, access.alex.id, null)
+        val form = EventForm(EventForm.Mode.New, monday, LocalTime.of(9, 0), london, access.alex.id, null)
         form.updateTitle("Camping")
         form.chooseUntil(monday.plusDays(2))
         assertThat(editor(access).create(form.draft(createdBy = access.alex.id.value))).isEqualTo(EditResult.Done)

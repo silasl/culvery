@@ -41,9 +41,9 @@ import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.pinReasonText
 import uk.co.siland.culvery.core.plugin.EDIT_HOLD_MS
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
-import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhTextField
+import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
