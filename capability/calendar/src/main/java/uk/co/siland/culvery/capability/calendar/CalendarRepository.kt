@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import android.util.Log
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -19,6 +20,7 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.Feature
+import uk.co.siland.culvery.core.plugin.WallClock
 
 /** Read-only view of the cache as UI models, with queued changes laid over it. The UI never touches the network. */
 @Singleton
@@ -28,6 +30,7 @@ class CalendarRepository @Inject constructor(
     private val zone: HouseholdZone,
     providers: Set<@JvmSuppressWildcards CalendarProvider>,
     writers: Set<@JvmSuppressWildcards CalendarWriter>,
+    private val clock: WallClock = WallClock(System::currentTimeMillis),
 ) {
     private val writerIds = writers.map { it.providerId }.toSet()
     private val serviceNames = providers.associate { it.descriptor.id to it.descriptor.displayName }
@@ -98,6 +101,32 @@ class CalendarRepository @Inject constructor(
         }.distinctUntilChanged()
 
     /**
+     * What the editor's dots and clash check read (9 §3.1): today to the last day every connection's last sync covers
+     * (no later than [lastShownDay]), with queued changes laid over it. A connection that needs signing in, is out of
+     * date or has never synced, and a calendar the service refuses, mark their people unhealthy; on the master
+     * calendar, where anyone's events are tagged, that is everyone.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun held(today: LocalDate): Flow<Held> = zone.zone.flatMapLatest { z ->
+        val from = millis(today, z) - ZONE_MARGIN_MS
+        val to = millis(lastShownDay(today).plusDays(1), z) + ZONE_MARGIN_MS
+        combine(store.eventsBetween(from, to), store.pending(), store.sources(), store.connections(), household.peopleWithFamily) { events, pending, sources, connections, people ->
+            val cat = SourceCatalog(sources, connections, writerIds, serviceNames)
+            val byId = people.associateBy { it.id }
+            val order = people.map { it.id }
+            val synced = connections.mapNotNull { c -> c.lastSyncMillis?.let { Instant.ofEpochMilli(it).atZone(z).toLocalDate().plusDays(SYNC_FUTURE_DAYS) } }
+            val lastDay = (synced + lastShownDay(today)).min()
+            val shown = overlayPending(events, pending, cat::source, z, from, to)
+                .map { it.event }
+                .filter { e -> daySpan(e.start, e.end, z).let { (first, last) -> first <= lastDay && last >= today } }
+                .map { it.toHeld(byId, order) }
+            Held(shown, lastDay, unhealthyPeople(sources, connections, order, clock.nowMillis()), firstDay = today)
+        }
+    }
+        .distinctUntilChanged()
+        .flowOn(Dispatchers.Default)
+
+    /**
      * One event for the detail sheet, a queued create not yet synced included; null once it is gone or queued for
      * deletion. [today] makes "Today · …".
      */
@@ -134,6 +163,15 @@ class CalendarRepository @Inject constructor(
         /** Two days: more than any two zones' offsets differ. */
         const val ZONE_MARGIN_MS = 2 * 86_400_000L
     }
+}
+
+// Their events may be missing rather than absent (9 §3.1); Out of date is the week's rule.
+private fun unhealthyPeople(sources: List<StoredSource>, connections: List<StoredConnection>, order: List<PersonId>, nowMillis: Long): Set<PersonId> {
+    val failing = connections.filter {
+        it.health == ConnectionHealth.NeedsSignIn || it.lastSyncMillis == null || isStale(it.lastSyncMillis, nowMillis)
+    }.map { it.connection.id }.toSet()
+    return sources.filter { it.mapping.visible && (it.connectionId in failing || it.readProblem != null) }
+        .flatMapTo(mutableSetOf()) { if (it.isMaster) order else listOf(it.mapping.person) }
 }
 
 /** Signing in first (only the family can fix it), then the tablet offline, then a service that didn't answer. */

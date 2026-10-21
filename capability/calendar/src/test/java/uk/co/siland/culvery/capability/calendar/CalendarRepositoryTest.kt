@@ -27,6 +27,7 @@ import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.plugin.WallClock
 
 @RunWith(AndroidJUnit4::class)
 class CalendarRepositoryTest {
@@ -605,6 +606,101 @@ class CalendarRepositoryTest {
         assertThat(piano.serviceName).isEqualTo("Google Calendar")
         assertThat(piano.repeats).isEqualTo("Every Wednesday")
         assertThat(named.masterService.first()).isEqualTo("Google Calendar")
+    }
+
+    // What the editor reads (9 §3.1): today is Wednesday 23 September, so the week shows to Tuesday 20 October.
+
+    private fun noonOn(date: LocalDate) = date.atTime(12, 0).atZone(london).toInstant().toEpochMilli()
+
+    private val wideWindow = DateRange(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 11, 1), london)
+
+    private fun heldRepo(nowMillis: Long = noonOn(sept(23))) =
+        CalendarRepository(store, household, HouseholdZone(household), emptySet(), setOf(ScriptedWriter("calendar.test")), WallClock { nowMillis })
+
+    private fun onDay(title: String, date: LocalDate, forPerson: String? = null): RemoteEvent {
+        val start = date.atTime(10, 0).atZone(london).toInstant()
+        return RemoteEvent(title, title, EventTime.Timed(start), EventTime.Timed(start.plusSeconds(3_600)), recurring = false, forPerson = forPerson)
+    }
+
+    @Test
+    fun heldCoversTodayToTheLastShownDayWithQueuedChanges() = runTest {
+        val last = lastShownDay(sept(23))
+        store.applySync(
+            "c1", "s-family", wideWindow,
+            SyncResult(
+                listOf(
+                    onDay("Yesterday", sept(22)), onDay("Boiler service", sept(23), sam.id.value), onDay("Gone", sept(25)),
+                    onDay("Last day", last), onDay("Too far", last.plusDays(1)),
+                ),
+                emptyList(), null, fullReplace = true,
+            ),
+        )
+        store.markSynced("c1", noonOn(sept(23)))
+        val swim = onDay("Swimming", sept(24), alex.id.value)
+        queue(ChangeKind.CREATE, null, EventDraft(swim.title, swim.start, swim.end, alex.id.value, null), clientKey = key)
+        queue(ChangeKind.DELETE, "Gone")
+
+        val held = heldRepo().held(sept(23)).first()
+
+        assertThat(held.lastDay).isEqualTo(last)
+        assertThat(held.events.map { it.title }).containsExactly("Boiler service", "Swimming", "Last day").inOrder()
+        assertThat(held.events.first().people).containsExactly(sam.id)
+    }
+
+    @Test
+    fun aStaleSyncHoldsFewerDays() = runTest {
+        val syncDay = sept(23).minusDays(5)
+        store.applySync("c1", "s-family", wideWindow, SyncResult(listOf(onDay("Held", sept(23).plusDays(23)), onDay("Not held", sept(23).plusDays(24))), emptyList(), null, fullReplace = true))
+        store.markSynced("c1", noonOn(syncDay))
+
+        val held = heldRepo().held(sept(23)).first()
+
+        assertThat(held.lastDay).isEqualTo(syncDay.plusDays(SYNC_FUTURE_DAYS))
+        assertThat(held.lastDay).isEqualTo(sept(23).plusDays(23))
+        assertThat(held.lastDay).isEqualTo(lastShownDay(sept(23)).minusDays(4))
+        assertThat(held.events.map { it.title }).containsExactly("Held")
+    }
+
+    @Test
+    fun anUnhealthyConnectionMarksItsPeople() = runTest {
+        store.addConnection(
+            Connection("c2", "calendar.test", "School", emptyMap()),
+            listOf(CalendarSource("s-sam", "Sam", writable = false)),
+            mapOf("s-sam" to SourceMapping(sam.id, visible = true)),
+        )
+        store.markSynced("c1", noonOn(sept(23)))
+        store.markSynced("c2", noonOn(sept(23)))
+        store.setHealth("c2", ConnectionHealth.NeedsSignIn, noonOn(sept(23)))
+        assertThat(heldRepo().held(sept(23)).first().unhealthy).containsExactly(sam.id)
+
+        store.setHealth("c2", ConnectionHealth.Ok, noonOn(sept(23)))
+        assertThat(heldRepo().held(sept(23)).first().unhealthy).isEmpty()
+    }
+
+    @Test
+    fun aRefusedCalendarAnOldSyncOrNoSyncYetMarksItsPeople() = runTest {
+        store.addConnection(
+            Connection("c2", "calendar.test", "School", emptyMap()),
+            listOf(CalendarSource("s-sam", "Sam", writable = false)),
+            mapOf("s-sam" to SourceMapping(sam.id, visible = true)),
+        )
+        val now = noonOn(sept(23))
+        store.markSynced("c1", now)
+        assertThat(heldRepo(now).held(sept(23)).first().unhealthy).containsExactly(sam.id)
+
+        store.markSynced("c2", now)
+        assertThat(heldRepo(now).held(sept(23)).first().unhealthy).isEmpty()
+        assertThat(heldRepo(now + STALE_AFTER_MS + 1).held(sept(23)).first().unhealthy).containsAtLeast(alex.id, sam.id)
+
+        store.markReadRefused("c1", "s-alex")
+        assertThat(heldRepo(now).held(sept(23)).first().unhealthy).containsExactly(alex.id)
+    }
+
+    @Test
+    fun aMasterCalendarNeedingSignInMarksEveryone() = runTest {
+        store.markSynced("c1", noonOn(sept(23)))
+        store.setHealth("c1", ConnectionHealth.NeedsSignIn, noonOn(sept(23)))
+        assertThat(heldRepo().held(sept(23)).first().unhealthy).containsAtLeast(alex.id, sam.id)
     }
 }
 
