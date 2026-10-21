@@ -7,6 +7,7 @@ import com.google.common.truth.Truth.assertWithMessage
 import kotlin.coroutines.cancellation.CancellationException
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.StoredSeries
+import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 
 /** What [block] threw, or null if it returned; a cancellation is never swallowed. Shared by this module's tests. */
@@ -22,7 +23,7 @@ internal suspend fun failureOf(block: suspend () -> Unit): Throwable? =
 
 /** Toasts nobody reads. */
 internal object NoToasts : Toaster {
-    override fun show(message: String, icon: String, urgent: Boolean) = Unit
+    override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) = Unit
 }
 
 /** Records every toast's message. */
@@ -32,7 +33,7 @@ internal class Toasts : Toaster {
     /** The messages shown as urgent (errors and refusals). */
     val urgent = mutableListOf<String>()
 
-    override fun show(message: String, icon: String, urgent: Boolean) {
+    override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) {
         messages += message
         if (urgent) this.urgent += message
     }

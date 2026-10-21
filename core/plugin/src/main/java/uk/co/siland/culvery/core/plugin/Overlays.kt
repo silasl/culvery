@@ -42,11 +42,8 @@ const val TOAST_ICON_INFO = "info"
  * stays longer.
  */
 interface Toaster {
-    fun show(message: String, icon: String = TOAST_ICON_INFO, urgent: Boolean = false)
-
-    /** Like [show] with one button after the message; a host that can't draw it shows the message alone. */
-    fun show(message: String, icon: String = TOAST_ICON_INFO, urgent: Boolean = false, action: ToastAction) =
-        show(message, icon, urgent)
+    /** [action] puts one button after the message; a host that can't draw it shows the message alone. */
+    fun show(message: String, icon: String = TOAST_ICON_INFO, urgent: Boolean = false, action: ToastAction? = null)
 }
 
 /** The button a toast carries; a tap runs [onClick] and hides the toast. */

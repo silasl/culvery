@@ -224,7 +224,7 @@ internal fun ClosingWarningLayer(text: String, tag: String, endsAt: Long, nowMil
 fun ToastLayer(toast: ToastMessage?, activity: UserActivity, keyboard: WindowInsets = WindowInsets.ime, onHidden: (Long) -> Unit) {
     val t = toast ?: return
     LaunchedEffect(t.id) {
-        delay(if (t.action == null) activity.timeout(toastMillis(t.message), hasControls = false) else activity.timeout(TOAST_WITH_ACTION_MS, hasControls = true))
+        delay(activity.timeout(if (t.action == null) toastMillis(t.message) else TOAST_WITH_ACTION_MS, hasControls = t.action != null))
         onHidden(t.id)
     }
     ToastSlot(keyboard) {

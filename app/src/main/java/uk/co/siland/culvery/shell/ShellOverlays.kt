@@ -48,16 +48,15 @@ class OverlayState : OverlayHost {
 
     val isShowing: Boolean get() = content != null
 
-    override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) {
+    override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) = open(closesWhenIdle, fullScreen = false, content)
+
+    override fun showFullScreen(content: @Composable () -> Unit) = open(closesWhenIdle = true, fullScreen = true, content)
+
+    private fun open(closesWhenIdle: Boolean, fullScreen: Boolean, content: @Composable () -> Unit) {
         this.closesWhenIdle = closesWhenIdle
         edited = false
-        fullScreen = false
+        this.fullScreen = fullScreen
         this.content = content
-    }
-
-    override fun showFullScreen(content: @Composable () -> Unit) {
-        show(content = content)
-        fullScreen = true
     }
 
     override fun markEdited(edited: Boolean) {
@@ -206,11 +205,7 @@ class ShellToasts @Inject constructor() : Toaster {
     private val _current = MutableStateFlow<ToastMessage?>(null)
     val current: StateFlow<ToastMessage?> = _current.asStateFlow()
 
-    override fun show(message: String, icon: String, urgent: Boolean) {
-        _current.value = ToastMessage(ids.incrementAndGet(), message, icon, urgent)
-    }
-
-    override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction) {
+    override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) {
         _current.value = ToastMessage(ids.incrementAndGet(), message, icon, urgent, action)
     }
 

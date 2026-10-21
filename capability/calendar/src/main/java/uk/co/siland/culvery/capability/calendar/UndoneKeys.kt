@@ -10,18 +10,36 @@ import javax.inject.Singleton
  */
 @Singleton
 class UndoneKeys @Inject constructor() {
-    private val keys = ConcurrentHashMap.newKeySet<String>()
+    /** Where an undone create was going, so one that lands can be deleted. */
+    internal class Undone(val connectionId: String, val sourceId: String, val series: Boolean)
 
-    fun add(key: String) {
-        keys += key
+    private val keys = ConcurrentHashMap<String, Undone>()
+
+    // Creates that landed, or may have, and aren't yet deleted: the drain tries each pass until they go. Kept past done().
+    private val strays = ConcurrentHashMap<String, Undone>()
+
+    fun add(key: String, connectionId: String, sourceId: String, series: Boolean) {
+        keys[key] = Undone(connectionId, sourceId, series)
     }
 
-    fun has(key: String): Boolean = key in keys
+    internal operator fun get(key: String): Undone? = keys[key]
 
     /** Nothing can bring [key]'s event back any more. */
     fun done(key: String) {
         keys -= key
     }
 
-    internal val pending: Set<String> get() = keys.toSet()
+    internal val strayCreates: Map<String, Undone> get() = strays
+
+    internal fun stray(key: String, undone: Undone) {
+        strays[key] = undone
+    }
+
+    /** [key]'s stray is deleted, or can't be: nothing more to try. */
+    internal fun letGo(key: String) {
+        strays -= key
+        done(key)
+    }
+
+    internal val pending: Set<String> get() = keys.keys.toSet()
 }

@@ -28,6 +28,7 @@ import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider
@@ -41,7 +42,7 @@ class SampleRollbackTest {
     private class Toasts : Toaster {
         val messages = mutableListOf<String>()
 
-        override fun show(message: String, icon: String, urgent: Boolean) {
+        override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) {
             messages += message
         }
     }

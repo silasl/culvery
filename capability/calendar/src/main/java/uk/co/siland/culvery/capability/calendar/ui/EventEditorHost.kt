@@ -20,7 +20,6 @@ import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.EditResult
 import uk.co.siland.culvery.capability.calendar.EditorForm
-import uk.co.siland.culvery.capability.calendar.EventDraft
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.WeekFocus
@@ -160,10 +159,9 @@ internal fun EventEditorHost(
         }
         failure = null
         action.run {
+            val draft = form.draft(createdBy = null)
             form.saving = true
-            val draft: EventDraft
             val result = try {
-                draft = form.draft(createdBy = null)
                 when (val mode = form.mode) {
                     EditorForm.Mode.New -> editor.create(draft, createKey)
                     is EditorForm.Mode.Edit -> editor.update(mode.original.ref, draft, form.touched)

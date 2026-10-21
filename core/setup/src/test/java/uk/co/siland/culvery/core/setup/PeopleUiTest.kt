@@ -41,6 +41,7 @@ import uk.co.siland.culvery.core.household.MAX_PEOPLE
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.PersonPalette
@@ -275,7 +276,7 @@ class PeopleUiTest {
     fun anErrorThatEscapesTheEditorShowsCouldNotSaveAndLogsOnlyItsClass() {
         addSam()
         val failing = PeopleEditor(household, access.pins, access.control, object : uk.co.siland.culvery.core.plugin.Toaster {
-            override fun show(message: String, icon: String, urgent: Boolean) = throw IllegalStateException("Sam removed")
+            override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) = throw IllegalStateException("Sam removed")
         })
         compose.setContent {
             CulveryTheme(dark = true) {

@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import uk.co.siland.culvery.core.plugin.OverlayHost
+import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 
 /** [block] on a real dispatcher, as DataStore's writes need, failing after 5 s. */
@@ -19,7 +20,7 @@ suspend fun <T> soon(block: suspend CoroutineScope.() -> T): T = withContext(Dis
 class RecordingToaster : Toaster {
     val shown = CopyOnWriteArrayList<String>()
 
-    override fun show(message: String, icon: String, urgent: Boolean) {
+    override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) {
         shown += message
     }
 }

@@ -37,6 +37,7 @@ import uk.co.siland.culvery.core.access.PinPromptController
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
@@ -62,7 +63,7 @@ class SampleWizardTest {
     private lateinit var state: SetupState
     private val fake = FakeCalendarProvider()
     private val noToasts = object : Toaster {
-        override fun show(message: String, icon: String, urgent: Boolean) = Unit
+        override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) = Unit
     }
 
     @Before

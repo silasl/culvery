@@ -42,6 +42,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.setup.SetupState
@@ -50,7 +51,7 @@ import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.provider.calendar_fake.FakeCalendarProvider
 
 private object NoToasts : Toaster {
-    override fun show(message: String, icon: String, urgent: Boolean) = Unit
+    override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) = Unit
 }
 
 @RunWith(AndroidJUnit4::class)

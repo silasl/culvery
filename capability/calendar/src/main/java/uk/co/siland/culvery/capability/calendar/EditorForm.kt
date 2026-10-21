@@ -107,12 +107,15 @@ class EditorForm(
     /** Set while a save runs: every change is ignored, since the editor closes on what was sent. */
     var saving: Boolean by mutableStateOf(false)
 
+    private inline fun edit(change: () -> Unit) {
+        if (!saving) change()
+    }
+
     var title: String by mutableStateOf(original?.title ?: "")
         private set
 
     /** Typing past [MAX_TITLE_LENGTH] is ignored; shortening is always allowed, even an edited title already over it. */
-    fun updateTitle(value: String) {
-        if (saving) return
+    fun updateTitle(value: String) = edit {
         if (value.length <= MAX_TITLE_LENGTH || value.length < title.length) title = value
     }
 
@@ -125,8 +128,7 @@ class EditorForm(
     val everyone: Boolean get() = who == listOf(PersonId.FAMILY)
 
     /** Everyone replaces the set and a person replaces Everyone; the last person can be cleared, which Save then waits on. */
-    fun toggleWho(person: PersonId) {
-        if (saving) return
+    fun toggleWho(person: PersonId) = edit {
         who = toggled(who, person, mayClear = true).sortedBy(order::rankOf)
     }
 
@@ -161,8 +163,8 @@ class EditorForm(
     // multiDay's private setter already takes the JVM name setMultiDay.
     /** On, the event is all day and the next tap is its first day; off, it is one day again. */
     @JvmName("chooseMultiDay")
-    fun setMultiDay(on: Boolean) {
-        if (saving || datesLocked || on == multiDay) return
+    fun setMultiDay(on: Boolean) = edit {
+        if (datesLocked || on == multiDay) return@edit
         multiDay = on
         until = null
         awaiting = false
@@ -182,11 +184,11 @@ class EditorForm(
      * it is the same date, or starts again from a date before the first. Once a range is set, a tap starts a new one,
      * unless it is over the cap: then a tap on or after the first day replaces the last.
      */
-    fun tapDay(date: LocalDate) {
-        if (saving || datesLocked) return
+    fun tapDay(date: LocalDate) = edit {
+        if (datesLocked) return@edit
         val first = day
         when {
-            !multiDay -> if (date == first) return else day = date
+            !multiDay -> if (date == first) return@edit else day = date
             (!awaiting && untilError == null) || first == null || date < first -> {
                 day = date
                 until = null
@@ -236,29 +238,28 @@ class EditorForm(
     fun chooseTime(time: LocalTime) = applyTime(TimeChoice.Custom(time))
 
     // A time can't be chosen while the event lasts more than a day, nor on a locked span; re-choosing changes nothing.
-    private fun applyTime(choice: TimeChoice) {
-        if (saving || datesLocked || (multiDay && choice is TimeChoice.Custom)) return
+    private fun applyTime(choice: TimeChoice) = edit {
+        if (datesLocked || (multiDay && choice is TimeChoice.Custom)) return@edit
         endError = null
-        if (choice == time) return
+        if (choice == time) return@edit
         time = choice
         whenTouched = true
     }
 
-    fun chooseLength(length: Duration) {
-        if (saving || datesLocked) return
+    fun chooseLength(length: Duration) = edit {
+        if (datesLocked) return@edit
         endError = null
-        if (length == this.length) return
+        if (length == this.length) return@edit
         this.length = length
         whenTouched = true
     }
 
     /** An end on the start's day sets the length; one at or before the start is refused and changes nothing. */
-    fun chooseEndTime(end: LocalTime) {
-        val start = startTime ?: return
-        if (saving) return
+    fun chooseEndTime(end: LocalTime) = edit {
+        val start = startTime ?: return@edit
         if (!end.isAfter(start)) {
             endError = END_BEFORE_START
-            return
+            return@edit
         }
         chooseLength(Duration.between(start, end))
     }
@@ -295,8 +296,8 @@ class EditorForm(
         private set
 
     /** Back to Never drops the end: Ends only shows while the event repeats. */
-    fun chooseRepeat(choice: RepeatChoice) {
-        if (saving || !canRepeat || choice == repeat) return
+    fun chooseRepeat(choice: RepeatChoice) = edit {
+        if (!canRepeat || choice == repeat) return@edit
         repeat = choice
         if (choice == RepeatChoice.Never) repeatEnd = RepeatEnd.Never
     }
@@ -308,17 +309,16 @@ class EditorForm(
 
     fun keepsGoing() = chooseEnd(RepeatEnd.Never)
 
-    private fun chooseEnd(end: RepeatEnd) {
-        if (!saving && canRepeat && repeat != RepeatChoice.Never) repeatEnd = end
+    private fun chooseEnd(end: RepeatEnd) = edit {
+        if (canRepeat && repeat != RepeatChoice.Never) repeatEnd = end
     }
 
     fun fewerTimes() = stepTimes(-1)
 
     fun moreTimes() = stepTimes(1)
 
-    private fun stepTimes(by: Int) {
-        val end = repeatEnd as? RepeatEnd.After ?: return
-        if (saving) return
+    private fun stepTimes(by: Int) = edit {
+        val end = repeatEnd as? RepeatEnd.After ?: return@edit
         repeatEnd = RepeatEnd.After((end.times + by).coerceIn(MIN_TIMES, MAX_TIMES))
     }
 

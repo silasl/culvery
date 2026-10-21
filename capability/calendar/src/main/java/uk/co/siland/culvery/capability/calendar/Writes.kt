@@ -64,7 +64,7 @@ internal sealed interface WriteOutcome {
      * [needsSignIn]: the connection needs signing in again, so its health says so at once (3a design §3.7).
      * [sent]: false only when it failed before leaving the tablet, so the provider can't hold it.
      */
-    data class Retry(val blocksConnection: Boolean, val needsSignIn: Boolean = false, val sent: Boolean = true) : WriteOutcome
+    data class Retry(val blocksConnection: Boolean, val needsSignIn: Boolean = false, val sent: Boolean) : WriteOutcome
 }
 
 /**
@@ -80,19 +80,19 @@ internal suspend fun callWriter(io: CoroutineContext, timeoutMillis: Long, call:
     } catch (e: TimeoutCancellationException) {
         // Rethrows if it was the caller's own timeout, not this call's.
         currentCoroutineContext().ensureActive()
-        WriteOutcome.Retry(blocksConnection = true)
+        WriteOutcome.Retry(blocksConnection = true, sent = true)
     } catch (e: CancellationException) {
         // Rethrows if the caller was really cancelled; otherwise the writer leaked a stray cancellation.
         currentCoroutineContext().ensureActive()
-        WriteOutcome.Retry(blocksConnection = true)
+        WriteOutcome.Retry(blocksConnection = true, sent = true)
     } catch (e: NeedsSignInException) {
-        WriteOutcome.Retry(blocksConnection = true, needsSignIn = true)
+        WriteOutcome.Retry(blocksConnection = true, needsSignIn = true, sent = true)
     } catch (e: UnreachableException) {
         WriteOutcome.Retry(blocksConnection = true, sent = !e.neverSent())
     } catch (e: Throwable) {
         // An Error too (review M1): logged and retried, never out of the drain.
         Log.w(TAG, "A calendar write failed unexpectedly (${e::class.simpleName}); it will be retried")
-        WriteOutcome.Retry(blocksConnection = false)
+        WriteOutcome.Retry(blocksConnection = false, sent = true)
     }
 
 /** No address looked up or reached: the tablet's own connection (5 §A.3). OkHttp keeps the cause the provider wraps. */

@@ -36,7 +36,7 @@ const val WRITE_ATTEMPT_MS = 10_000L
 /** Hand-off §7: the toast after a delete. */
 const val EVENT_DELETED = "Event deleted."
 
-/** 2b-2 design D1: the toast after a change; an add says what it added ([addedLine]). */
+/** 2b-2 design D1: the toast after a change. */
 const val CHANGES_SAVED = "Changes saved."
 
 /** The added toast's button (9 §3.1), and what Undo says afterwards. */
@@ -210,7 +210,7 @@ class CalendarEditor internal constructor(
         val label = serviceNameOf(to.connection, serviceOf)
         val added = AddedEvent(clientKey, to.connection.id, to.source.id, draft.title, draft.recurrence != null, who.person.id.value, label)
         val line = addedLineFor(draft)
-        return onAppScope(ChangeKind.CREATE, label, say = { report(ChangeKind.CREATE, label, it, added, line) }) {
+        return onAppScope(ChangeKind.CREATE, label, say = { reportAdded(added, line, it) }) {
             writeLock.withLock { attempt(to, ChangeKind.CREATE, remoteId = null, toSend, clientKey = clientKey) }
         }
     }
@@ -244,7 +244,7 @@ class CalendarEditor internal constructor(
      */
     private suspend fun undo(added: AddedEvent, to: Destination): EditResult {
         val ref = EventRef(added.connectionId, added.sourceId, added.key)
-        undone.add(added.key)
+        undone.add(added.key, added.connectionId, added.sourceId, added.series)
         val create = store.pendingNow().firstOrNull { it.kind == ChangeKind.CREATE && it.ref == ref }
         store.dropCreate(ref)
         val outcome = callWriter(io, attemptMillis) {
@@ -273,6 +273,11 @@ class CalendarEditor internal constructor(
             }
             else -> EditResult.NotEditable
         }
+    }
+
+    /** A saved create says [line] with an Undo of [added]; a refusal is the editor's to show. */
+    private fun reportAdded(added: AddedEvent, line: String, result: EditResult) {
+        if (result == EditResult.Done || result == EditResult.Queued) toaster.show(line, action = ToastAction(UNDO) { scope.launch { undoAdd(added) } })
     }
 
     private fun reportUndo(title: String, label: String, result: EditResult) = when (result) {
@@ -545,18 +550,13 @@ class CalendarEditor internal constructor(
         return EditResult.Queued
     }
 
-    /**
-     * A queued change already shows (a delete hides the event), so it reads as done too. A failed delete says delete.
-     * A saved create says [line] with an Undo of [added].
-     */
-    private fun report(kind: ChangeKind, label: String, result: EditResult, added: AddedEvent? = null, line: String = "") {
+    /** A queued change already shows (a delete hides the event), so it reads as done too. A failed delete says delete. */
+    private fun report(kind: ChangeKind, label: String, result: EditResult) {
         val saved = result == EditResult.Done || result == EditResult.Queued
         when {
             result is EditResult.Rejected && kind == ChangeKind.DELETE -> toaster.show(couldNotDelete(label, result.problem), urgent = true)
             result is EditResult.Rejected && kind.isAssign -> toaster.show(couldNotSave(label, result.problem), urgent = true)
             saved && kind == ChangeKind.DELETE -> toaster.show(EVENT_DELETED)
-            saved && kind == ChangeKind.CREATE && added != null ->
-                toaster.show(line, action = ToastAction(UNDO) { scope.launch { undoAdd(added) } })
             saved && kind == ChangeKind.UPDATE -> toaster.show(CHANGES_SAVED)
         }
     }

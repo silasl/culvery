@@ -37,6 +37,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
+import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 
@@ -653,7 +654,7 @@ class CalendarSyncTest {
         connect("c1", "calendar.a", s1)
         a.events = { listOf(swim()) }
         val broken = object : Toaster {
-            override fun show(message: String, icon: String, urgent: Boolean) = error("toasts are down")
+            override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) = error("toasts are down")
         }
         val sync = engineWith(setOf(w), broken)
         queue(ChangeKind.DELETE, draft = null, sourceId = "gone")
@@ -797,7 +798,7 @@ class CalendarSyncTest {
         connect("c1", "calendar.a", s1)
         var toastsWork = false
         val flaky = object : Toaster {
-            override fun show(message: String, icon: String, urgent: Boolean) {
+            override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) {
                 if (!toastsWork) error("toasts are down")
             }
         }

@@ -28,6 +28,7 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
@@ -45,7 +46,7 @@ internal class RecordingToaster : Toaster {
     /** The messages shown as urgent (errors and refusals). */
     val urgent: MutableList<String> = CopyOnWriteArrayList()
 
-    override fun show(message: String, icon: String, urgent: Boolean) {
+    override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) {
         messages += message
         if (urgent) this.urgent += message
     }
