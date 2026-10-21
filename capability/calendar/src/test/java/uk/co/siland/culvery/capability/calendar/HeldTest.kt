@@ -17,7 +17,7 @@ class HeldTest {
     private val sam = Person(PersonId("sam"), "Sam", 0xFF5B9BE0)
     private val mia = Person(PersonId("mia"), "Mia", 0xFFE07BA8)
     private val order = listOf(alex.id, sam.id, mia.id)
-    private val colors = listOf(Person.Family, alex, sam, mia).associate { it.id to it.color }
+    private val byId = listOf(Person.Family, alex, sam, mia).associateBy { it.id }
     private val sat26 = LocalDate.of(2026, 9, 26)
 
     private fun event(title: String, day: LocalDate, vararg people: Person): HeldEvent {
@@ -25,7 +25,7 @@ class HeldTest {
         return HeldEvent(EventRef("c1", "s1", title), title, people.map { it.id }, EventTime.Timed(start), EventTime.Timed(start.plusSeconds(3_600)))
     }
 
-    private fun Held.dots(day: LocalDate) = dotsOn(day, colors, order, london)
+    private fun Held.dots(day: LocalDate) = dotColours(peopleOn(day, order, london).mapNotNull { byId[it] })
 
     @Test
     fun dotsAreUpToThreeInHouseholdOrder() {

@@ -198,7 +198,7 @@ class WhoPaneTest {
 
     @Test
     fun aChildsOtherTilesAndEveryoneAreLocked() {
-        show(editorForm(signedIn = mia.id, childOnly = mia.id), child = mia.id)
+        show(editorForm(childOnly = mia.id), child = mia.id)
         listOf("Alex" to alex.color, "Sam" to sam.color, "everyone" to FAMILY_COLOR).forEach { (name, colour) ->
             val tag = "who_$name"
             compose.onNodeWithTag(tag).assertIsOff()
@@ -215,7 +215,7 @@ class WhoPaneTest {
 
     @Test
     fun aTapOnALockedTileExplainsAndChangesNothing() {
-        show(editorForm(signedIn = mia.id, childOnly = mia.id), child = mia.id)
+        show(editorForm(childOnly = mia.id), child = mia.id)
         tile(alex).performClick()
         compose.runOnIdle {
             assertThat(refusals).hasSize(1)
@@ -232,7 +232,7 @@ class WhoPaneTest {
     /** A child is only ever themselves: unticking would leave nobody, which Save can't take from them either. */
     @Test
     fun aTapOnAChildsOwnTileChangesNothing() {
-        show(editorForm(signedIn = mia.id, childOnly = mia.id), child = mia.id)
+        show(editorForm(childOnly = mia.id), child = mia.id)
         tile(mia).performClick()
         compose.runOnIdle {
             assertThat(refusals).isEmpty()

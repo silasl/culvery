@@ -398,7 +398,7 @@ fun HhStatusLine(
 
 /**
  * Hand-off §7 person chip: a chip's size and shape, `surf`, a 12 dp dot in the person's [color] 8 from their [name].
- * With [selected] it is a toggle, filled in `accent` while chosen; null keeps it a button. Only a button takes [clickLabel].
+ * A toggle, filled in `accent` while [selected].
  */
 @Composable
 fun HhPersonChip(
@@ -406,13 +406,10 @@ fun HhPersonChip(
     color: Color,
     tag: String,
     enabled: Boolean,
-    clickLabel: String? = null,
-    selected: Boolean? = null,
+    selected: Boolean,
     onClick: () -> Unit,
 ) {
-    require(selected == null || clickLabel == null) { "A toggle chip has no click label" }
     val c = Culvery.colors
-    val chosen = selected == true
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipIconGap),
@@ -420,20 +417,13 @@ fun HhPersonChip(
             .testTag(tag)
             .height(ControlTokens.chipHeight)
             .clip(RoundedCornerShape(ControlTokens.chipRadius))
-            .background(if (chosen) c.accent else c.surf)
-            .then(
-                if (selected == null) {
-                    Modifier.hhClickable(onClick, label = clickLabel, enabled = enabled)
-                } else {
-                    Modifier
-                        .semantics { stateDescription = if (selected) CHOSEN else NOT_CHOSEN }
-                        .toggleable(value = selected, enabled = enabled, role = Role.Checkbox, onValueChange = { onClick() })
-                },
-            )
+            .background(if (selected) c.accent else c.surf)
+            .semantics { stateDescription = if (selected) CHOSEN else NOT_CHOSEN }
+            .toggleable(value = selected, enabled = enabled, role = Role.Checkbox, onValueChange = { onClick() })
             .padding(horizontal = ControlTokens.chipPaddingH),
     ) {
         Box(Modifier.size(ControlTokens.chipDot).clip(CircleShape).background(color))
-        Text(name, style = ControlType.chip, color = if (chosen) c.accentInk else c.ink, maxLines = 1)
+        Text(name, style = ControlType.chip, color = if (selected) c.accentInk else c.ink, maxLines = 1)
     }
 }
 

@@ -140,7 +140,7 @@ class CalendarEditorTest {
         val access = testAccess(household)
         access.answer(TestAccess.ALEX)
         val monday = LocalDate.of(2026, 10, 19)
-        val form = EditorForm(EditorForm.Mode.New, monday, LocalTime.of(9, 0), london, access.alex.id, null, null, listOf(access.alex.id), null)
+        val form = EditorForm(EditorForm.Mode.New, monday, LocalTime.of(9, 0), london, null, null, listOf(access.alex.id), null)
         form.updateTitle("Camping")
         form.toggleWho(access.alex.id)
         form.setMultiDay(true)

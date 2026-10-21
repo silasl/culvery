@@ -24,7 +24,7 @@ data class Held(val events: List<HeldEvent>, val lastDay: LocalDate, val unhealt
 internal fun StoredEvent.toHeld(people: Map<PersonId, Person>, order: List<PersonId>): HeldEvent =
     HeldEvent(ref, title, resolvePeople(forPerson, sourcePerson, people, order).map { it.id }, start, end)
 
-private const val MAX_DOTS = 3
+internal const val MAX_DOTS = 3
 private const val QUARTER_MINUTES = 15L
 private val FIRST_FREE_START: LocalTime = LocalTime.of(7, 0)
 private val LAST_FREE_END: LocalTime = LocalTime.of(23, 0)
@@ -40,9 +40,8 @@ fun Held.peopleOn(date: LocalDate, order: List<PersonId>, zone: ZoneId): List<Pe
         .sortedBy(rank)
 }
 
-/** Up to three colours of the people [peopleOn] [date]. */
-fun Held.dotsOn(date: LocalDate, colors: Map<PersonId, Long>, order: List<PersonId>, zone: ZoneId): List<Long> =
-    peopleOn(date, order, zone).mapNotNull { colors[it] }.distinct().take(MAX_DOTS)
+/** A day's dots: the colours of [people], each once, at most [MAX_DOTS]. */
+internal fun dotColours(people: List<Person>): List<Long> = people.map { it.color }.distinct().take(MAX_DOTS)
 
 /** The hours of [day] in which any of [people] is busy (9 §3.4); none when the tablet can't know. */
 fun Held.busyHours(people: List<PersonId>, day: LocalDate, zone: ZoneId, except: EventRef?): Set<Int> {

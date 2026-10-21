@@ -47,9 +47,6 @@ import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.quietFill
 import uk.co.siland.culvery.core.ui.readAsOne
 
-/** Which picker is drawn over the editor's Time pane: its start or its end time. */
-enum class EditorPicker { None, StartTime, EndTime }
-
 private const val HOURS_PER_DAY = 24
 private const val MINUTES_PER_HOUR = 60
 

@@ -89,7 +89,6 @@ class EditorForm(
     val today: LocalDate,
     private val now: LocalTime,
     val zone: ZoneId,
-    signedIn: PersonId?,
     childOnly: PersonId?,
     preselectedDay: LocalDate?,
     private val order: List<PersonId>,

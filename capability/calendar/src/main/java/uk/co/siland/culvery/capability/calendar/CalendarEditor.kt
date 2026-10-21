@@ -144,7 +144,7 @@ class CalendarEditor internal constructor(
         val z = zone.current()
         val day = draft.start.instantIn(z).atZone(z).toLocalDate()
         val today = Instant.ofEpochMilli(clock.nowMillis()).atZone(z).toLocalDate()
-        val wording = draft.recurrence?.let { ruleParts(it.rule)?.let { parts -> readChoice(parts, day) } }?.wording(day)
+        val wording = draft.recurrence?.let { choiceOf(it.rule, day) }?.wording(day)
         return addedLine(draft.title, wording, day.takeIf { weeksTo(today, day) == null })
     }
 

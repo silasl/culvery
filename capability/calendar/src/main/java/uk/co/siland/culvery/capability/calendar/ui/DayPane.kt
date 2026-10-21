@@ -47,6 +47,7 @@ import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.SHORT_DAY
+import uk.co.siland.culvery.capability.calendar.dotColours
 import uk.co.siland.culvery.capability.calendar.peopleOn
 import uk.co.siland.culvery.capability.calendar.spokenWho
 import uk.co.siland.culvery.core.household.Person
@@ -71,7 +72,6 @@ private const val LATER_MONTHS = "Later months"
 private const val IN_THE_RANGE = "in the range"
 private const val FIRST_DAY = "first day"
 private const val LAST_DAY = "last day"
-private const val MAX_DOTS = 3
 private const val DAYS_A_WEEK = 7
 private val MONTH_YEAR: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
 private val FULL_WEEKDAY_NAME: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)
@@ -252,7 +252,7 @@ private fun DayCell(date: LocalDate, column: Int, form: EditorForm, month: YearM
                 modifier = Modifier.testTag("day_${date}_date").semantics { hideFromAccessibility() },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(EditorDimens.dayDotGap), modifier = Modifier.height(EditorDimens.dayDot)) {
-                on.map { it.color }.distinct().take(MAX_DOTS).forEach { colour ->
+                dotColours(on).forEach { colour ->
                     Spacer(Modifier.testTag("day_${date}_dot").size(EditorDimens.dayDot).clip(CircleShape).background(Color(colour)))
                 }
             }

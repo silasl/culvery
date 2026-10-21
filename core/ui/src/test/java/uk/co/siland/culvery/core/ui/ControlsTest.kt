@@ -270,16 +270,9 @@ class ControlsTest {
     }
 
     @Test
-    fun aPersonChipSaysWhatATapDoes() {
-        show { HhPersonChip("Sam", Color(0xFF5B9BE0), "assign_Sam", enabled = true, clickLabel = "show as Sam’s event") {} }
-        val node = compose.onNodeWithTag("assign_Sam").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-        assertThat(node.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("show as Sam’s event")
-    }
-
-    @Test
     fun aPersonChipCanBeAToggle() {
         var taps = 0
-        var selected: Boolean? by mutableStateOf(true)
+        var selected by mutableStateOf(true)
         show { HhPersonChip("Sam", Color(0xFF5B9BE0), "assign_Sam", enabled = true, selected = selected) { taps++ } }
         compose.onNodeWithTag("assign_Sam")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Checkbox))
@@ -291,10 +284,6 @@ class ControlsTest {
         compose.onNodeWithTag("assign_Sam")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.Off))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "not chosen"))
-        selected = null
-        compose.onNodeWithTag("assign_Sam")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ToggleableState))
         compose.assertClickablesHaveRoleAndLabel()
     }
 }

@@ -110,7 +110,7 @@ class AddEventScreenshotTest {
     @Test
     fun addEventWhoChildDark() {
         val mia = SampleUi.mia
-        val form = editorForm(signedIn = mia.id, childOnly = mia.id).apply { updateTitle("Piano practice") }
+        val form = editorForm(childOnly = mia.id).apply { updateTitle("Piano practice") }
         show(form, dark = true, child = mia)
         snap("add_event_who_child_dark")
     }

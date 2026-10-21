@@ -23,5 +23,5 @@ class UndoneKeys @Inject constructor() {
         keys -= key
     }
 
-    val pending: Set<String> get() = keys.toSet()
+    internal val pending: Set<String> get() = keys.toSet()
 }

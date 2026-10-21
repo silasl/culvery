@@ -78,9 +78,6 @@ internal object CalendarType {
     /** 14 sp / 400: explanation card text. */
     val noteBody = HhType.secondary
 
-    /** 16 sp / 600: person chips. */
-    val personChip = HhType.body.copy(fontWeight = FontWeight.W600)
-
     /** 24 sp / 700: "Pick a time". */
     val pickerTitle = HhType.dateNumber
 
@@ -243,9 +240,8 @@ internal object EditorDimens {
     val bandRadius = 27.dp
 
     // The Time pane: a group's label 7 above its chips, 5 apart, six a row; busy, a 1 `weather` edge and a 7 dot 9 in from
-    // the top corner. Minutes
-    // and How long side by side, 24 apart, their chips 7 apart. The result under a 1 `surf3` rule, 15 below it, its check 16
-    // after the range with a 19 icon 5 before its words; the free starts 8 apart.
+    // the top corner. Minutes and How long side by side, 24 apart, their chips 7 apart. The result under a 1 `surf3` rule,
+    // 15 below it, its check 16 after the range with a 19 icon 5 before its words; the free starts 8 apart.
     val timeLabelGap = 7.dp
     val hourGap = 5.dp
     val busyEdge = 1.dp
@@ -354,12 +350,14 @@ internal object CalendarDimens {
 
     // Week columns: header inset 4 at the sides and bottom; chip title 2 below the time; badge 15.
     val columnHeaderInset = 4.dp
-    val monthYearGap = 12.dp
-    val monthLabelTop = 2.dp
     val columnGap = 8.dp
     val chipTitleTop = 2.dp
     val chipBadge = 15.dp
     val badgeGap = 4.dp
+
+    // Week header: the month's year 12 after it; a column's "Oct" hangs 2 below the card's top edge.
+    val monthYearGap = 12.dp
+    val monthLabelTop = 2.dp
 
     // Week view layout (9 §4.7): header→columns 15 (the title block's own gap), between columns 9; column radius 20, padding 12 above and 9 at
     // the sides and foot; today's ring 2 dp wide, 2 dp in from the edge; weekday label→date number 6; chip radius

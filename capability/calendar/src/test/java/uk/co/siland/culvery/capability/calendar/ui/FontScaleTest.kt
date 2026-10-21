@@ -179,7 +179,7 @@ class FontScaleTest {
         val max = Person(PersonId("max"), "Maximilian-Alexander Fotheringham-Smythe", 0xFF9C7CE3)
         val people = SampleUi.household + max
         val form = EditorForm(
-            EditorForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), ZoneId.of("Europe/London"), signedIn = null, childOnly = null,
+            EditorForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), ZoneId.of("Europe/London"), childOnly = null,
             preselectedDay = SampleUi.TODAY, order = people.map { it.id }, calendarPerson = null,
         )
         form.toggleWho(max.id)

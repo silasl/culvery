@@ -19,12 +19,11 @@ val LOCKED_END = EventTime.Timed(LocalDateTime.of(2026, 9, 30, 10, 0).atZone(LON
 
 /** A new event in the full-screen editor, opened at 11:54 on the sample Wednesday for the household Alex, Sam, Mia. */
 fun editorForm(
-    signedIn: PersonId? = null,
     childOnly: PersonId? = null,
     preselectedDay: LocalDate? = null,
     repeats: Boolean = childOnly == null,
 ) = EditorForm(
-    EditorForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), LONDON, signedIn, childOnly, preselectedDay,
+    EditorForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), LONDON, childOnly, preselectedDay,
     order = SampleUi.household.map { it.id }, calendarPerson = null, repeats = repeats,
 )
 
@@ -37,7 +36,7 @@ fun editorEditOf(
     childOnly: PersonId? = null,
 ) = EditorForm(
     EditorForm.Mode.Edit(EditableEvent(EventRef("c1", "s1", "e1"), title, start, end, forPerson)),
-    SampleUi.TODAY, LocalTime.of(11, 54), LONDON, signedIn = childOnly, childOnly = childOnly, preselectedDay = null,
+    SampleUi.TODAY, LocalTime.of(11, 54), LONDON, childOnly = childOnly, preselectedDay = null,
     order = SampleUi.household.map { it.id }, calendarPerson = SampleUi.alex.id,
 )
 

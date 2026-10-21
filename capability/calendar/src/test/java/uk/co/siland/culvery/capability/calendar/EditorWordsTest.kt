@@ -25,7 +25,7 @@ class EditorWordsTest {
     private val names = { id: PersonId -> people.single { it.id == id }.name }
     private val sat26 = LocalDate.of(2026, 9, 26)
 
-    private fun new() = EditorForm(EditorForm.Mode.New, today, LocalTime.of(10, 0), london, alex.id, null, null, order, calendarPerson = null)
+    private fun new() = EditorForm(EditorForm.Mode.New, today, LocalTime.of(10, 0), london, null, null, order, calendarPerson = null)
 
     private fun guitar(times: Int? = null) = new().apply {
         updateTitle("Guitar lesson")

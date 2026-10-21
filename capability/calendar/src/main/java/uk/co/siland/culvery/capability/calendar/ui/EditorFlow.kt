@@ -13,6 +13,9 @@ import uk.co.siland.culvery.core.household.PersonId
 /** The editor's rows, then Check: which question the pane asks. */
 enum class EditorStep { Who, Day, Time, Repeats, Check }
 
+/** Which picker is drawn over the editor's Time pane: its start or its end time. */
+enum class EditorPicker { None, StartTime, EndTime }
+
 /** How long after a single-choice pick the next row lights up (handoff Behaviour). */
 internal const val MOVE_ON_MS = 250L
 

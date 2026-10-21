@@ -78,7 +78,6 @@ private suspend fun open(request: EditorRequest, repo: CalendarRepository, edito
         today = at.toLocalDate(),
         now = at.toLocalTime(),
         zone = at.zone,
-        signedIn = session?.person?.id,
         childOnly = child,
         preselectedDay = (request as? EditorRequest.New)?.day,
         order = repo.people.first().map { it.id },

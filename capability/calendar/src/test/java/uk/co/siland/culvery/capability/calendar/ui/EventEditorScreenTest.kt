@@ -208,7 +208,7 @@ class EventEditorScreenTest {
         show(editorDinnerOf(Duration.ofHours(1)), start = EditorStep.Time)
         compose.onNodeWithTag("editor_save_hint").assertTextEquals("Time is optional")
         compose.assertClickablesHaveRoleAndLabel()
-        val child = editorForm(signedIn = SampleUi.mia.id, childOnly = SampleUi.mia.id).apply {
+        val child = editorForm(childOnly = SampleUi.mia.id).apply {
             updateTitle("Sleepover")
             tapDay(SampleUi.TODAY.plusDays(4))
         }
@@ -277,7 +277,7 @@ class EventEditorScreenTest {
 
     @Test
     fun aChildHasNoRepeatsRowAndAnEditHasNone() {
-        show(editorForm(signedIn = SampleUi.mia.id, childOnly = SampleUi.mia.id), child = SampleUi.mia.id)
+        show(editorForm(childOnly = SampleUi.mia.id), child = SampleUi.mia.id)
         node("editor_row_who_value").assertTextEquals("Mia")
         node("editor_row_time").assertExists()
         node("editor_row_repeats").assertDoesNotExist()

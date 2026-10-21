@@ -30,7 +30,7 @@ class EditorFormTest {
         day: LocalDate? = null,
         childOnly: PersonId? = null,
         repeats: Boolean = true,
-    ) = EditorForm(EditorForm.Mode.New, today, LocalTime.parse(now), london, childOnly ?: alex, childOnly, day, order, calendarPerson = null, repeats = repeats)
+    ) = EditorForm(EditorForm.Mode.New, today, LocalTime.parse(now), london, childOnly, day, order, calendarPerson = null, repeats = repeats)
 
     /** A new event with a title and Mia, so only the day and times are left to choose. */
     private fun ready(day: LocalDate? = null) = new(day = day).apply {
@@ -46,7 +46,7 @@ class EditorFormTest {
         calendarPerson: PersonId? = null,
     ) = EditorForm(
         EditorForm.Mode.Edit(EditableEvent(EventRef("c1", "s1", "e1"), title, start, end, forPerson)),
-        today, LocalTime.of(10, 0), london, alex, null, null, order, calendarPerson,
+        today, LocalTime.of(10, 0), london, null, null, order, calendarPerson,
     )
 
     private fun editTimed(start: LocalDateTime, minutes: Long, forPerson: String? = "alex", calendarPerson: PersonId? = null): EditorForm {
