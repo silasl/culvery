@@ -48,7 +48,7 @@ private const val DAYS_PER_WEEK = 7
 private const val LAST = -1
 private const val FIFTH = 5
 
-private fun weekdayName(day: LocalDate): String = day.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+internal fun weekdayName(day: LocalDate): String = day.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
 
 /** "Every Saturday", "Every 2 weeks, on Saturday", "Every month, on the 4th Saturday", "Every year, on 26 September"… */
 fun RepeatChoice.wording(day: LocalDate): String = when (this) {
@@ -78,7 +78,7 @@ fun ordinal(n: Int): String {
 }
 
 // RRULE's two-letter weekday, "SA".
-private fun DayOfWeek.code(): String = name.take(2)
+internal fun DayOfWeek.code(): String = name.take(2)
 
 /** The [n]th (−1: last) [weekday] of [month]. */
 private fun nthWeekdayIn(month: YearMonth, n: Int, weekday: DayOfWeek): LocalDate {
@@ -92,9 +92,10 @@ private fun nthWeekdayIn(month: YearMonth, n: Int, weekday: DayOfWeek): LocalDat
 
 /**
  * The first [count] dates of [choice] from [day], as the RRULE has them: a month or year with no such date (the 31st,
- * or 29 February outside a leap year) is skipped, not moved. The one place a series' last date is worked out (9 §3.1).
+ * or 29 February outside a leap year) is skipped, not moved. [nth] is [RepeatChoice.MonthlyOnWeekday]'s place in the
+ * month, −1 for last; a phone may say last where the editor says 4th. The one place a series' last date is worked out (9 §3.1).
  */
-fun occurrences(choice: RepeatChoice, day: LocalDate, count: Int): List<LocalDate> {
+fun occurrences(choice: RepeatChoice, day: LocalDate, count: Int, nth: Int = nthWeekday(day)): List<LocalDate> {
     val step = choice.interval.toLong()
     val month = YearMonth.from(day)
     val candidate: (Long) -> LocalDate? = when (choice) {
@@ -102,7 +103,7 @@ fun occurrences(choice: RepeatChoice, day: LocalDate, count: Int): List<LocalDat
         RepeatChoice.Daily -> { k -> day.plusDays(k * step) }
         RepeatChoice.Weekly, RepeatChoice.Fortnightly -> { k -> day.plusWeeks(k * step) }
         RepeatChoice.Monthly -> { k -> month.plusMonths(k * step).takeIf { it.isValidDay(day.dayOfMonth) }?.atDay(day.dayOfMonth) }
-        RepeatChoice.MonthlyOnWeekday -> { k -> nthWeekdayIn(month.plusMonths(k * step), nthWeekday(day), day.dayOfWeek) }
+        RepeatChoice.MonthlyOnWeekday -> { k -> nthWeekdayIn(month.plusMonths(k * step), nth, day.dayOfWeek) }
         RepeatChoice.Yearly -> { k ->
             val year = Math.toIntExact(day.year + k * step)
             MonthDay.from(day).takeIf { it.isValidYear(year) }?.atYear(year)

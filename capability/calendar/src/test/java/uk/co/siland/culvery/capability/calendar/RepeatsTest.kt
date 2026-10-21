@@ -37,6 +37,16 @@ class RepeatsTest {
         assertThat(label("RRULE:FREQ=MONTHLY;BYDAY=-1TH", LocalDate.of(2026, 10, 29))).isEqualTo("Every month, on the last Thursday")
     }
 
+    /** Google offers "last Saturday" for a 4th Saturday that is also the last; the editor writes the 4th there. */
+    @Test
+    fun aLastWeekdayFromAFourthThatIsAlsoTheLastReadsAsLast() {
+        assertThat(label("DTSTART:20260926\nRRULE:FREQ=MONTHLY;BYDAY=-1SA;COUNT=3"))
+            .isEqualTo("Every month, on the last Saturday · 3 times · last on Sat 28 Nov")
+        assertThat(label("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1SA")).isEqualTo("Every month, on the last Saturday")
+        // The 19th is no month's last Saturday.
+        assertThat(label("RRULE:FREQ=MONTHLY;BYDAY=-1SA", LocalDate.of(2026, 9, 19))).isEqualTo(REPEATS_YES)
+    }
+
     @Test
     fun aMonthlyRuleByDateReadsItsDay() {
         assertThat(label("RRULE:FREQ=MONTHLY;BYMONTHDAY=22", LocalDate.of(2026, 9, 22))).isEqualTo("Every month, on the 22nd")

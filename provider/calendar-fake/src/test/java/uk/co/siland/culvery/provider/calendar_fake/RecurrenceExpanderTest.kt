@@ -6,7 +6,6 @@ import java.time.LocalTime
 import java.time.ZoneId
 import org.junit.Test
 import uk.co.siland.culvery.capability.calendar.EventTime
-import uk.co.siland.culvery.capability.calendar.EDITOR_REPEATS
 import uk.co.siland.culvery.capability.calendar.RemoteEvent
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.RepeatEnd
@@ -140,7 +139,7 @@ class RecurrenceExpanderTest {
     @Test
     fun theExpanderAgreesWithOccurrences() {
         val days = (22..31).map { LocalDate.of(2026, 10, it) } + LocalDate.of(2028, 2, 29)
-        for (choice in EDITOR_REPEATS - RepeatChoice.Never) {
+        for (choice in RepeatChoice.entries - RepeatChoice.Never) {
             for (day in days) {
                 for (n in listOf(2, 10, 52)) {
                     val expected = occurrences(choice, day, n)
@@ -157,6 +156,15 @@ class RecurrenceExpanderTest {
                     }
                 }
             }
+        }
+    }
+
+    /** A phone's "last Saturday" from a 4th Saturday that is also the last: the read-back's last date agrees too. */
+    @Test
+    fun theExpanderAgreesWithOccurrencesForALastWeekdayFromAFourth() {
+        for (n in listOf(2, 10, 52)) {
+            val made = expand(allDaySeries("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1SA;COUNT=$n", saturday, 1), saturday.plusYears(10))
+            assertThat(made.map { (it.start as EventTime.AllDay).date }).isEqualTo(occurrences(RepeatChoice.MonthlyOnWeekday, saturday, n, nth = -1))
         }
     }
 }
