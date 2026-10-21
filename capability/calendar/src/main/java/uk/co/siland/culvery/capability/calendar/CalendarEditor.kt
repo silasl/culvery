@@ -164,18 +164,22 @@ class CalendarEditor internal constructor(
     /**
      * Adds [draft] to the master calendar (2b-2 design §3.3) as [clientKey], the id the event keeps. The sheet chooses
      * the key, and keeps it for a Try again after the tablet failed (3a design §3.12): if the provider did make the event,
-     * the retry gets it back rather than making a second. Adults may add for anyone; a child only for themselves.
+     * the retry gets it back rather than making a second. Adults may add for anyone, and repeating; a child only for themselves, once.
      * [EventDraft.createdBy] is ignored: the person who authorises is recorded. A queued create keeps its key for every
      * retry.
      */
     suspend fun create(draft: EventDraft, clientKey: String): EditResult {
         val to = master() ?: return EditResult.NotEditable
+        var refusedRepeat = false
         val who = access.authorise(
             CalendarPermissions.CREATE,
             CalendarPermissions.CREATE_SELF,
             reason = PinReason.Save,
-            allow = { person, granted -> mayCreateFor(granted, person, draft.forPerson) },
-            refusal = Refusal.Toast(::cannotAddForOthers),
+            allow = { person, granted ->
+                refusedRepeat = draft.recurrence != null && !mayRepeat(granted)
+                !refusedRepeat && mayCreateFor(granted, person, draft.forPerson)
+            },
+            refusal = Refusal.Toast { name -> if (refusedRepeat) CANT_REPEAT_FOR_CHILD else cannotAddForOthers(name) },
         ) ?: return EditResult.Cancelled
         val toSend = draft.copy(createdBy = who.person.id.value, forPersonColor = colorOf(draft.forPerson))
         val added = addedToast(draft.start)

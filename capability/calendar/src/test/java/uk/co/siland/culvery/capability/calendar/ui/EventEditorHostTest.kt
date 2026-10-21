@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -295,7 +296,7 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_title").performTextInput("Pizza night")
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
-        assertThat(access.toasts.messages).containsExactly("Mia can only add events for themselves.")
+        assertThat(access.toasts.messages).containsExactly("Mia can add events for Mia only.")
         compose.onNodeWithTag("editor_title").assertTextEquals("Pizza night")
         assertThat(closed).isEqualTo(0)
         assertThat(writer.calls).isEmpty()
@@ -309,7 +310,7 @@ class EventEditorHostTest {
         waitForText("Add event")
         compose.onNodeWithTag("who_Mia").assertIsSelected()
         compose.onNodeWithTag("who_Sam").performClick()
-        assertThat(access.toasts.messages).containsExactly("Mia can only add events for themselves.")
+        assertThat(access.toasts.messages).containsExactly("Mia can add events for Mia only.")
         compose.onNodeWithTag("who_Mia").assertIsSelected()
     }
 
@@ -321,8 +322,23 @@ class EventEditorHostTest {
         waitForText("Change event")
         // The dinner is untagged, so Family is chosen; Mia can't move it to Sam (2b-2 design §6).
         compose.onNodeWithTag("who_Sam").performClick()
-        assertThat(access.toasts.messages).containsExactly("Mia can only add events for themselves.")
+        assertThat(access.toasts.messages).containsExactly("Mia can add events for Mia only.")
         compose.onNodeWithTag("who_Family").assertIsSelected()
+    }
+
+    @Test
+    fun theLockedChipsFollowTheSessionRole() {
+        access.answer(TestAccess.MIA)
+        runBlocking { access.control.authorise(CalendarPermissions.CREATE_SELF) }
+        showEditor(EditorRequest.New(day = null))
+        waitForText("Add event")
+        compose.onNodeWithTag("who_Sam_lock", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("repeat_Never").assertDoesNotExist()
+        runBlocking { access.control.lock() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("who_Sam_lock", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("who_Sam").performClick()
+        compose.onNodeWithTag("who_Sam").assertIsSelected()
+        assertThat(access.toasts.messages).isEmpty()
     }
 
     @Test

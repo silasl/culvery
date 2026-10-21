@@ -100,6 +100,9 @@ internal object CalendarType {
     /** 15 sp / 400: the add/edit sheet's live summary. */
     val editorSummary = HhType.secondary.copy(fontSize = 15.sp)
 
+    /** 13 sp / 400: the line under a child's Who chips (9 §4.8). */
+    val whoOnly = HhType.secondary.copy(fontSize = 13.sp)
+
     /** 16 sp / 600: a locked multi-day edit's dates line. */
     val lockedDates = personChip
 
@@ -299,6 +302,9 @@ internal object CalendarDimens {
     val editorCardPaddingH = 16.dp
     val editorCardIconGap = 12.dp
     val lockedIcon = 22.dp
+    val whoOnlyIcon = 15.dp
+    val whoOnlyGap = 5.dp
+    val whoOnlyTop = 8.dp
     val failureIcon = 24.dp
     val failureBodyTop = 2.dp
 

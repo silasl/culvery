@@ -54,6 +54,7 @@ private suspend fun open(request: EditorRequest, repo: CalendarRepository, edito
         zone = at.zone,
         signedIn = editor.session.value?.person?.id,
         preselectedDay = (request as? EditorRequest.New)?.day,
+        repeats = editor.session.value?.role != Role.CHILD,
     )
     return Opened(request, form, label)
 }

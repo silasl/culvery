@@ -99,7 +99,7 @@ class EditorScreenshotTest {
     }
 
     /** Hand-off 12: Mia signed in, her sleepover on Sunday evening. */
-    private fun child() = newForm(signedIn = SampleUi.mia.id).apply {
+    private fun child() = EventForm(EventForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), london, SampleUi.mia.id, preselectedDay = null, repeats = false).apply {
         updateTitle("Sleepover at Ava's")
         chooseDay(SampleUi.TODAY.plusDays(4))
         chooseTime(TimeChoice.Custom(LocalTime.of(18, 0)))

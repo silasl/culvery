@@ -65,6 +65,13 @@ class CalendarPermissionsTest {
 
     @Test
     fun theAddRefusalNamesThePerson() {
-        assertThat(cannotAddForOthers("Mia")).isEqualTo("Mia can only add events for themselves.")
+        assertThat(cannotAddForOthers("Mia")).isEqualTo("Mia can add events for Mia only.")
+    }
+
+    @Test
+    fun onlyAddingForAnyoneAllowsARepeat() {
+        assertThat(mayRepeat(setOf(CalendarPermissions.CREATE))).isTrue()
+        assertThat(mayRepeat(setOf(CalendarPermissions.CREATE_SELF))).isFalse()
+        assertThat(CANT_REPEAT_FOR_CHILD).isEqualTo("Ask a grown-up to add an event that repeats.")
     }
 }

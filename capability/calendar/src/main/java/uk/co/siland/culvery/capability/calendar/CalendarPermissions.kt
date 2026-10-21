@@ -43,6 +43,11 @@ internal fun mayRetag(granted: Set<String>, who: Identified, forPerson: String?)
 fun cannotChangeOthers(name: String): String = "$name can only change events they created."
 
 /** Hand-off §7 refusal wording for a child adding an event for someone else, or moving one to someone else. */
-fun cannotAddForOthers(name: String): String = "$name can only add events for themselves."
+fun cannotAddForOthers(name: String): String = "$name can add events for $name only."
+
+/** A repeating event needs create: a child can't make a series that can't be deleted from the wall (9 §4.8). */
+internal fun mayRepeat(granted: Set<String>): Boolean = CalendarPermissions.CREATE in granted
+
+const val CANT_REPEAT_FOR_CHILD = "Ask a grown-up to add an event that repeats."
 
 const val ASK_AN_ADULT = "Ask a grown-up to choose who this is for."

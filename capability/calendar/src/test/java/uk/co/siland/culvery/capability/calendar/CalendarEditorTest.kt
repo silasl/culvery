@@ -572,7 +572,38 @@ class CalendarEditorTest {
         val access = testAccess(household)
         access.answer(TestAccess.MIA)
         assertThat(editor(access).create(draft("Pizza night", PersonId.FAMILY.value))).isEqualTo(EditResult.Cancelled)
-        assertThat(access.toasts.messages).containsExactly("Mia can only add events for themselves.")
+        assertThat(access.toasts.messages).containsExactly("Mia can add events for Mia only.")
+        assertThat(writer.calls).isEmpty()
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
+    @Test
+    fun aChildCannotSaveARepeatingEvent() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.MIA)
+        val series = draft("Swimming", access.mia.id.value).copy(recurrence = Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=1", london))
+        assertThat(editor(access).create(series, "key-series")).isEqualTo(EditResult.Cancelled)
+        assertThat(access.toasts.messages).containsExactly(CANT_REPEAT_FOR_CHILD)
+        assertThat(writer.calls).isEmpty()
+        assertThat(store.pendingNow()).isEmpty()
+    }
+
+    /** Pin: an adult's repeating event is written. */
+    @Test
+    fun anAdultMaySaveARepeatingEvent() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val series = draft("Swimming", access.mia.id.value).copy(recurrence = Recurrence("RRULE:FREQ=WEEKLY;INTERVAL=1", london))
+        assertThat(editor(access).create(series, "key-series")).isEqualTo(EditResult.Done)
+        assertThat(writer.drafts.single().recurrence).isEqualTo(series.recurrence)
+    }
+
+    @Test
+    fun aChildWhoseSessionEndedCannotSaveForSomeoneElse() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.MIA)
+        assertThat(editor(access).create(draft("Sleepover", access.alex.id.value), "key-1")).isEqualTo(EditResult.Cancelled)
+        assertThat(access.toasts.messages).containsExactly("Mia can add events for Mia only.")
         assertThat(writer.calls).isEmpty()
         assertThat(store.pendingNow()).isEmpty()
     }
@@ -585,7 +616,7 @@ class CalendarEditorTest {
         assertThat(editor.create(draft("Sleepover", access.mia.id.value))).isEqualTo(EditResult.Done)
         assertThat(editor.create(draft("Pizza night", PersonId.FAMILY.value))).isEqualTo(EditResult.Cancelled)
         assertThat(access.requests).hasSize(1)
-        assertThat(access.toasts.messages).containsExactly(EVENT_ADDED, "Mia can only add events for themselves.").inOrder()
+        assertThat(access.toasts.messages).containsExactly(EVENT_ADDED, "Mia can add events for Mia only.").inOrder()
         assertThat(access.control.session.value).isNull()
         assertThat(writer.calls).containsExactly("create:Sleepover")
     }
@@ -733,7 +764,7 @@ class CalendarEditorTest {
         put(event("football", createdBy = access.mia.id.value, forPerson = access.mia.id.value))
         access.answer(TestAccess.MIA)
         assertThat(editor(access).update(ref("football"), edited("Football", PersonId.FAMILY.value))).isEqualTo(EditResult.Cancelled)
-        assertThat(access.toasts.messages).containsExactly("Mia can only add events for themselves.")
+        assertThat(access.toasts.messages).containsExactly("Mia can add events for Mia only.")
         assertThat(writer.calls).isEmpty()
     }
 

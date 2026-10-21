@@ -1,5 +1,8 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.size
@@ -9,9 +12,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -58,6 +63,7 @@ import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.couldNotSave
 import uk.co.siland.culvery.capability.calendar.saveFailedBody
+import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.ShellTokens
@@ -214,18 +220,35 @@ class EventEditorSheetTest {
     }
 
     /** The sheet at the hand-off's 613 × 800 dp, optionally at a larger font. */
-    private fun showAt(form: EventForm, childOnly: PersonId? = null, fontScale: Float = 1f, height: Dp = 800.dp) = compose.setContent {
+    private fun showAt(
+        form: EventForm,
+        childOnly: PersonId? = null,
+        fontScale: Float = 1f,
+        height: Dp = 800.dp,
+        people: List<Person> = SampleUi.household,
+    ) = compose.setContent {
         CulveryTheme(dark = true) {
             WithFontScale(fontScale) {
                 Box(Modifier.size(ShellTokens.sheetWidth, height)) {
                     EventEditorSheet(
-                        form = form, people = SampleUi.household, service = "Google Calendar", childOnly = childOnly, busy = false,
+                        form = form, people = people, service = "Google Calendar", childOnly = childOnly, busy = false,
                         failure = null, picker = EditorPicker.None, onClose = {}, onSave = {}, onDelete = {}, onRefusedWho = {},
                         onPicker = {}, focusTitleOnOpen = false,
                     )
                 }
             }
         }
+    }
+
+    /** The window pixel [dx] right and [dy] down from the node's top-left corner, as ARGB; needs `GraphicsMode.NATIVE`. */
+    private fun pixelAt(node: SemanticsNodeInteraction, dx: Dp, dy: Dp): Int {
+        val semantics = node.fetchSemanticsNode()
+        val window = (semantics.root as View).rootView
+        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
+        window.draw(Canvas(bitmap))
+        val density = semantics.layoutInfo.density.density
+        val bounds = semantics.boundsInWindow
+        return bitmap.getPixel((bounds.left + dx.value * density).toInt(), (bounds.top + dy.value * density).toInt())
     }
 
     private fun bounds(tag: String) = compose.onNodeWithTag(tag).getUnclippedBoundsInRoot()
@@ -302,10 +325,14 @@ class EventEditorSheetTest {
     /** Both fit cases have an empty title, so the footer's reason shows and is where the room is measured to. */
     private fun assertClosedSheetFits(form: EventForm, childOnly: PersonId?) {
         showAt(form, childOnly)
-        val lastChips = compose.onAllNodes(SemanticsMatcher("a Repeats chip") { node ->
-            node.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("repeat_") == true
-        }).fetchSemanticsNodes()
-        val lastBottom = lastChips.maxOf { it.boundsInRoot.bottom }
+        // A child has no Repeats, so the Time and Length row is the last block.
+        val lastBottom = if (childOnly != null) {
+            compose.onNodeWithTag("editor_time_length").fetchSemanticsNode().boundsInRoot.bottom
+        } else {
+            compose.onAllNodes(SemanticsMatcher("a Repeats chip") { node ->
+                node.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("repeat_") == true
+            }).fetchSemanticsNodes().maxOf { it.boundsInRoot.bottom }
+        }
         val density = compose.density.density
         val reasonTop = compose.onNodeWithTag("editor_save_reason").fetchSemanticsNode().boundsInRoot.top
         assertThat((reasonTop - lastBottom) / density).isAtLeast(24f)
@@ -320,15 +347,107 @@ class EventEditorSheetTest {
     @Test
     fun theClosedSheetFitsWithRoomToSpareForAChild() = assertClosedSheetFits(newForm(signedIn = SampleUi.mia.id), childOnly = SampleUi.mia.id)
 
+    private val mia = SampleUi.mia.id
+
+    private fun showAsMia(form: EventForm = newForm(signedIn = mia)) = show(form, childOnly = mia)
+
     @Test
-    fun aSignedInChildsOtherWhoChipsAreDisabledAndATapExplains() {
-        val form = newForm(signedIn = SampleUi.mia.id)
-        show(form, childOnly = SampleUi.mia.id)
+    fun aChildsOtherChipsAreLockedWithTheLine() {
+        val form = newForm(signedIn = mia)
+        showAsMia(form)
+        // 4 dp in is inside the padding and clear of the lock; the gap beside the chip shows the sheet's own background.
+        listOf("Family", "Alex", "Sam").forEach { name ->
+            val chip = compose.onNodeWithTag("who_$name")
+            assertThat(pixelAt(chip, 4.dp, 24.dp)).isEqualTo(pixelAt(chip, (-4).dp, 24.dp))
+            chip.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "not available"))
+            compose.onNodeWithTag("who_${name}_lock", useUnmergedTree = true).assertExists()
+        }
         compose.onNodeWithTag("who_Mia").assertIsSelected()
+        assertThat(pixelAt(compose.onNodeWithTag("who_Mia"), 4.dp, 24.dp)).isEqualTo(SampleUi.mia.color.toInt())
+        compose.onNodeWithTag("who_Mia_lock", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("editor_who_only").assertTextEquals("Mia can add events for Mia only.")
+        compose.onNodeWithTag("editor_who_only_icon", useUnmergedTree = true).assertExists()
+        assertThat(bounds("editor_who_only").top.value).isAtLeast(bounds("who_Sam").bottom.value)
         compose.onNodeWithTag("who_Sam").performClick()
         compose.onNodeWithTag("who_Family").performClick()
         assertThat(calls).containsExactly("refused", "refused")
-        assertThat(form.who).isEqualTo(SampleUi.mia.id)
+        assertThat(form.who).isEqualTo(mia)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aTapOnALockedChipExplainsAndChangesNothing() {
+        val form = newForm(signedIn = mia)
+        showAsMia(form)
+        compose.onNodeWithTag("who_Alex").performClick()
+        assertThat(calls).containsExactly("refused")
+        assertThat(form.who).isEqualTo(mia)
+        compose.onNodeWithTag("who_Mia").assertIsSelected()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aChosenLockedChipIsDrawnChosenWithItsLock() {
+        val form = editForm(EventTime.AllDay(SampleUi.TODAY), EventTime.AllDay(SampleUi.TODAY.plusDays(1)), forPerson = "alex")
+        showAsMia(form)
+        val alex = compose.onNodeWithTag("who_Alex").assertIsSelected()
+        assertThat(pixelAt(alex, 4.dp, 24.dp)).isEqualTo(SampleUi.alex.color.toInt())
+        compose.onNodeWithTag("who_Alex_lock", useUnmergedTree = true).assertExists()
+        alex.performClick()
+        assertThat(calls).isEmpty()
+        compose.onNodeWithTag("who_Alex").assertIsSelected()
+        assertThat(form.who).isEqualTo(SampleUi.alex.id)
+        compose.onNodeWithTag("who_Mia_lock", useUnmergedTree = true).assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: a save in flight fades no chip and calls none unavailable. */
+    @Test
+    fun busyFadesNoChip() {
+        show(newForm(signedIn = SampleUi.alex.id))
+        val sam = compose.onNodeWithTag("who_Sam")
+        val idle = pixelAt(sam, 4.dp, 24.dp)
+        busy = true
+        compose.waitForIdle()
+        assertThat(pixelAt(sam, 4.dp, 24.dp)).isEqualTo(idle)
+        listOf("Family", "Alex", "Sam", "Mia").forEach { name ->
+            compose.onNodeWithTag("who_$name").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
+        }
+        sam.performClick()
+        compose.onNodeWithTag("who_Alex").assertIsSelected()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun anAdultSeesNoLine() {
+        show(newForm(signedIn = SampleUi.alex.id))
+        compose.onNodeWithTag("editor_who_only").assertDoesNotExist()
+        compose.onNodeWithTag("who_Sam_lock", useUnmergedTree = true).assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aChildWithALongNameKeepsTheLineWhole() {
+        val long = Person(PersonId("long"), "Mia Mia Mia Mia Mia Mia Mia Mi", 0xFFE07BA8)
+        showAt(newForm(signedIn = long.id), childOnly = long.id, fontScale = 1.3f, people = SampleUi.household + long)
+        val line = bounds("editor_who_only")
+        val body = bounds("editor_body")
+        assertThat((line.bottom - line.top).value).isGreaterThan(30f)
+        assertThat(line.right.value).isAtMost(body.right.value)
+        compose.onNodeWithTag("editor_who_only").assertTextEquals("${long.name} can add events for ${long.name} only.")
+        compose.onNodeWithTag("editor_save").assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aChildSeesNoRepeats() {
+        val form = EventForm(EventForm.Mode.New, SampleUi.TODAY, LocalTime.of(11, 54), london, mia, preselectedDay = null, repeats = false)
+        showAsMia(form)
+        compose.onAllNodes(SemanticsMatcher("a Repeats or Ends node") { node ->
+            node.config.getOrNull(SemanticsProperties.TestTag)?.let { it.startsWith("repeat_") || it.startsWith("ends_") } == true
+        }).assertCountEquals(0)
+        compose.onNodeWithText("Repeats").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -590,6 +709,7 @@ class EventEditorSheetTest {
         compose.onNodeWithTag("who_Mia").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton)).assertIsSelected()
         compose.onNodeWithTag("who_Mia").onParent().assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
         val sam = compose.onNodeWithTag("who_Sam").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "not available"))
+        assertThat(sam.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("find out why")
         sam.performClick()
         assertThat(calls).contains("refused")
         compose.onNodeWithTag("day_pick").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))

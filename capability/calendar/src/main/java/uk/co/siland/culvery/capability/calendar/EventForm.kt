@@ -57,6 +57,7 @@ class EventForm(
     val zone: ZoneId,
     signedIn: PersonId?,
     preselectedDay: LocalDate?,
+    repeats: Boolean = true,
 ) {
     sealed interface Mode {
         data object New : Mode
@@ -86,8 +87,8 @@ class EventForm(
     var length: Duration by mutableStateOf(original?.let(::lengthOf) ?: DEFAULT_LENGTH)
         private set
 
-    /** Only a new event repeats here; a series' time or title is changed on a phone (5 §A.4). */
-    val canRepeat: Boolean = mode == Mode.New
+    /** Only a new event repeats here, and not a child's: a series can't be deleted from the wall (9 §4.8, 5 §A.4). */
+    val canRepeat: Boolean = mode == Mode.New && repeats
 
     var repeat: RepeatChoice by mutableStateOf(RepeatChoice.Never)
         private set

@@ -53,6 +53,7 @@ import uk.co.siland.culvery.capability.calendar.SHORT_DAY
 import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WriteProblem
+import uk.co.siland.culvery.capability.calendar.cannotAddForOthers
 import uk.co.siland.culvery.capability.calendar.couldNotSave
 import uk.co.siland.culvery.capability.calendar.lengthLabel
 import uk.co.siland.culvery.capability.calendar.saveFailedBody
@@ -87,7 +88,7 @@ internal fun afterTimes(times: Int): String = "After $times times"
 /**
  * Hand-off §7 "Sheet 2 — Quick-add / edit" (2b-2 design §4.2). Stateless apart from the [form] it edits: the host
  * decides [busy], [failure] and which [picker] shows. [childOnly] is a signed-in Child's own id, in a new event or an
- * edit (§6): every other Who chip is drawn disabled and a tap on one calls [onRefusedWho]. The pickers draw inside
+ * edit (§6): every other Who chip is drawn locked and a tap on one calls [onRefusedWho]. The pickers draw inside
  * the sheet's box. Save, ✕, Done and opening a picker close the keyboard; tapping a chip doesn't. Everything but the
  * background sits above [keyboard]. While [busy], the form can't change: a save in flight would close the sheet on
  * edits it never sent.
@@ -168,7 +169,7 @@ fun EventEditorSheet(
                             closeKeyboard()
                             onPicker(EditorPicker.Time)
                         }
-                        if (form.canRepeat) {
+                        if (form.canRepeat && childOnly == null) {
                             RepeatsSection(form, busy)
                             if (form.repeat != RepeatChoice.Never) {
                                 EndsSection(form, busy) {
@@ -300,35 +301,54 @@ private fun Section(label: String, modifier: Modifier = Modifier, chips: @Compos
 
 @Composable
 private fun WhoSection(form: EventForm, everyone: List<Person>, childOnly: PersonId?, busy: Boolean, onRefusedWho: () -> Unit) {
-    Section("Who") {
-        everyone.forEach { person ->
-            val selected = form.who == person.id
-            val enabled = childOnly == null || person.id == childOnly
-            val colour = Color(person.color)
-            HhChoiceChip(
-                label = person.name,
-                selected = selected,
-                tag = "who_${person.name}",
-                enabled = enabled,
-                selectedColor = colour,
-                selectedInk = PersonChipInk,
-                leading = { ink ->
-                    if (selected) {
-                        HhIcon(Icons.CHECK, size = ControlTokens.chipIcon, tint = ink)
-                    } else {
-                        Box(Modifier.size(ControlTokens.chipDot).clip(CircleShape).background(colour))
-                    }
-                },
-                // The chosen chip may be a disabled one (an adult tagged the child's event); a tap on it does nothing.
-                onClick = {
-                    when {
-                        busy -> Unit
-                        enabled || selected -> form.chooseWho(person.id)
-                        else -> onRefusedWho()
-                    }
-                },
-            )
+    Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.whoOnlyTop)) {
+        Section("Who") {
+            everyone.forEach { person ->
+                val selected = form.who == person.id
+                // One flag for the paint and the tap; CalendarEditor is the gate if the session ends mid-sheet (9 §4.8).
+                val locked = childOnly != null && person.id != childOnly
+                val colour = Color(person.color)
+                HhChoiceChip(
+                    label = person.name,
+                    selected = selected,
+                    tag = "who_${person.name}",
+                    locked = locked,
+                    selectedColor = colour,
+                    selectedInk = PersonChipInk,
+                    leading = { ink ->
+                        if (selected) {
+                            HhIcon(Icons.CHECK, size = ControlTokens.chipIcon, tint = ink)
+                        } else {
+                            Box(Modifier.size(ControlTokens.chipDot).clip(CircleShape).background(colour))
+                        }
+                    },
+                    // The chosen chip may be a locked one (an adult tagged the child's event); a tap on it does nothing.
+                    onClick = {
+                        when {
+                            busy -> Unit
+                            locked && !selected -> onRefusedWho()
+                            locked -> Unit
+                            else -> form.chooseWho(person.id)
+                        }
+                    },
+                )
+            }
         }
+        val childName = childOnly?.let { id -> everyone.firstOrNull { it.id == id }?.name }
+        if (childName != null) WhoOnlyLine(cannotAddForOthers(childName))
+    }
+}
+
+@Composable
+private fun WhoOnlyLine(text: String) {
+    val c = Culvery.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.whoOnlyGap),
+        modifier = Modifier.testTag("editor_who_only").semantics(mergeDescendants = true) {},
+    ) {
+        HhIcon(Icons.LOCK, size = CalendarDimens.whoOnlyIcon, tint = c.mute, modifier = Modifier.testTag("editor_who_only_icon"))
+        Text(text, style = CalendarType.whoOnly, color = c.mute)
     }
 }
 

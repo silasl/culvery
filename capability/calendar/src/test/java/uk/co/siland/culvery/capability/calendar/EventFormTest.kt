@@ -40,6 +40,16 @@ class EventFormTest {
 
     private fun EventForm.summary() = summary { names.getValue(it) }
 
+    @Test
+    fun aChildsFormNeverRepeats() {
+        val form = EventForm(EventForm.Mode.New, today, LocalTime.of(10, 54), london, mia, null, repeats = false)
+        form.updateTitle("Swimming")
+        assertThat(form.canRepeat).isFalse()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        assertThat(form.repeat).isEqualTo(RepeatChoice.Never)
+        assertThat(form.draft(createdBy = null).recurrence).isNull()
+    }
+
     /** 5 §A.4: All day is the default, today or any other day; the slots are gone. */
     @Test
     fun aNewEventStartsAllDayAndAWeekColumnPresetsItsDay() {

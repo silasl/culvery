@@ -144,7 +144,7 @@ class OverlayLayersTest {
         val keyboard = 320.dp
         compose.setContent {
             CulveryTheme(dark = true) {
-                ToastLayer(ToastMessage(1, "Mia can only add events for themselves.", "info"), activity, keyboard = WindowInsets(bottom = keyboard)) {}
+                ToastLayer(ToastMessage(1, "Mia can add events for Mia only.", "info"), activity, keyboard = WindowInsets(bottom = keyboard)) {}
             }
         }
         val screen = compose.onRoot().getUnclippedBoundsInRoot()
