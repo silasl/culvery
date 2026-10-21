@@ -57,6 +57,7 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.TextStyle
@@ -106,6 +107,13 @@ object ControlTokens {
     // A status line: a 20 dp info icon 8 from its words.
     val statusIcon = 20.dp
     val statusGap = 8.dp
+
+    // A field's error (9 §4.8): a filled 17 dp icon 5 from its words.
+    val fieldErrorIcon = 17.dp
+    val fieldErrorGap = 5.dp
+
+    // A locked chip (9 §4.8): no fill, a 1 dp `surf3` edge.
+    val lockedEdge = 1.dp
     val swatchRingGap = 3.dp
     val swatchStrike = 2.dp
 
@@ -127,6 +135,9 @@ object ControlType {
     /** 17 sp / 700: a sheet's footer button. */
     val button = HhType.rowTitle.copy(fontWeight = FontWeight.W700)
 
+    /** 14 sp / 600: the error under a field. */
+    val fieldError = HhType.body.copy(fontSize = 14.sp, fontWeight = FontWeight.W600)
+
     /** 18 sp / 700: a confirmation's question. */
     val confirmTitle = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W700)
 }
@@ -135,7 +146,8 @@ object ControlType {
  * Hand-off §7 chip: at least 48 dp; a long label takes two lines, then ends in …; padding 0 18, radius 24,
  * 16 sp / 600; [unselectedFill]/[unselectedInk] (`surf`/`ink`), or [selectedColor]/[selectedInk] when selected. One of a radio group by default ([role]);
  * a chip that opens something is `Role.Button`. [trailing] follows the label (an expand arrow) and, as [leading], is given the ink. [spokenName] is what TalkBack reads when that isn't the label. A disabled chip is drawn at 38% but stays tappable, so a tap can
- * explain why: TalkBack hears "not available" and "double-tap to find out why".
+ * explain why: TalkBack hears "not available" and "double-tap to find out why". A [locked] chip (9 §4.8) says the same
+ * but isn't faded: the `lock` icon first, no fill, a `surf3` edge and a `mute` label, or selected, filled as chosen.
  */
 @Composable
 fun HhChoiceChip(
@@ -155,9 +167,18 @@ fun HhChoiceChip(
     leading: (@Composable (ink: Color) -> Unit)? = null,
     spokenName: String? = null,
     trailing: (@Composable (ink: Color) -> Unit)? = null,
+    locked: Boolean = false,
 ) {
-    val ink = if (selected) selectedInk else unselectedInk
-    val state = stateDescription ?: NOT_AVAILABLE.takeIf { !enabled }
+    val c = Culvery.colors
+    val bare = locked && !selected
+    val ink = when {
+        selected -> selectedInk
+        bare -> c.mute
+        else -> unselectedInk
+    }
+    val unavailable = !enabled || locked
+    val state = stateDescription ?: NOT_AVAILABLE.takeIf { unavailable }
+    val shape = RoundedCornerShape(ControlTokens.chipRadius)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipIconGap),
@@ -171,12 +192,15 @@ fun HhChoiceChip(
             }
             .alpha(if (enabled) 1f else ControlTokens.DISABLED_ALPHA)
             .heightIn(min = ControlTokens.chipHeight)
-            .clip(RoundedCornerShape(ControlTokens.chipRadius))
-            .background(if (selected) selectedColor else unselectedFill)
+            .clip(shape)
+            .then(
+                if (bare) Modifier.border(ControlTokens.lockedEdge, c.surf3, shape) else Modifier.background(if (selected) selectedColor else unselectedFill),
+            )
             // Never `enabled = false`: that would stop the explaining tap.
-            .hhClickable(onClick, label = clickLabel ?: FIND_OUT_WHY.takeIf { !enabled }, role = role, spoken = spokenName)
+            .hhClickable(onClick, label = clickLabel ?: FIND_OUT_WHY.takeIf { unavailable }, role = role, spoken = spokenName)
             .padding(horizontal = ControlTokens.chipPaddingH),
     ) {
+        if (locked) HhIcon(Icons.LOCK, size = ControlTokens.chipIcon, tint = ink, modifier = Modifier.testTag("${tag}_lock"))
         leading?.invoke(ink)
         Text(label, style = ControlType.chip, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         if (secondary != null) {
@@ -293,17 +317,36 @@ fun HhMessageLine(
     )
 }
 
-/** The one line saying what is wrong and how to fix it, in `danger` with an info icon; TalkBack hears it appear. */
+/**
+ * The one line saying what is wrong and how to fix it, in `danger` with an [icon]; TalkBack hears it appear. Under a field
+ * it takes [Icons.ERROR] (drawn filled) and [ControlType.fieldError]; [spoken] false hides it from TalkBack and makes it
+ * not live, for a field that already carries its error.
+ */
 @Composable
-fun HhStatusLine(text: String, tag: String) {
+fun HhStatusLine(
+    text: String,
+    tag: String,
+    icon: String = Icons.INFO,
+    style: TextStyle = HhType.body,
+    spoken: Boolean = true,
+) {
     val c = Culvery.colors
+    val field = icon == Icons.ERROR
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(ControlTokens.statusGap),
-        modifier = Modifier.testTag(tag).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        horizontalArrangement = Arrangement.spacedBy(if (field) ControlTokens.fieldErrorGap else ControlTokens.statusGap),
+        modifier = Modifier.testTag(tag).semantics(mergeDescendants = true) {
+            if (spoken) liveRegion = LiveRegionMode.Polite else hideFromAccessibility()
+        },
     ) {
-        HhIcon(Icons.INFO, size = ControlTokens.statusIcon, tint = c.danger)
-        Text(text, style = HhType.body, color = c.danger)
+        HhIcon(
+            icon,
+            size = if (field) ControlTokens.fieldErrorIcon else ControlTokens.statusIcon,
+            filled = field,
+            tint = c.danger,
+            modifier = Modifier.testTag("${tag}_icon"),
+        )
+        Text(text, style = style, color = c.danger)
     }
 }
 

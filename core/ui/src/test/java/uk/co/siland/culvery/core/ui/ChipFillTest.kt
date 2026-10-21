@@ -6,11 +6,19 @@ import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -72,6 +80,47 @@ class ChipFillTest {
         val label = compose.onNodeWithText("2 rooms", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val chip = compose.onNodeWithTag("chip").getUnclippedBoundsInRoot()
         assertThat(chip.right.value - label.right.value).isAtLeast(20f)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    private fun lockedChip(selected: Boolean, taps: () -> Unit = {}) {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
+                    HhChoiceChip(
+                        "Mia", selected = selected, tag = "chip", onClick = taps, locked = true,
+                        leading = { Box(Modifier.size(ControlTokens.chipDot).background(Culvery.colors.accent, CircleShape).testTag("dot")) },
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+    }
+
+    @Test
+    fun aLockedChipHasNoFillALockAndAMutedLabel() {
+        var taps = 0
+        lockedChip(selected = false) { taps++ }
+        val chip = compose.onNodeWithTag("chip")
+        // Level with the centre: 4 dp in is inside the padding, 1 dp is on the edge.
+        assertThat(pixelAt(chip, 4.dp, 24.dp)).isEqualTo(DarkColors.bg.toArgb())
+        assertThat(pixelAt(chip, 1.dp, 24.dp)).isEqualTo(DarkColors.surf3.toArgb())
+        val lock = compose.onNodeWithTag("chip_lock", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val dot = compose.onNodeWithTag("dot", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertThat(lock.right).isAtMost(dot.left)
+        assertThat(compose.onNodeWithText("Mia", useUnmergedTree = true).textLayout().layoutInput.style.color).isEqualTo(DarkColors.mute)
+        chip.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "not available"))
+        assertThat(chip.fetchSemanticsNode().config[SemanticsActions.OnClick].label).isEqualTo("find out why")
+        chip.performClick()
+        assertThat(taps).isEqualTo(1)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aLockedChipThatIsChosenIsFilled() {
+        lockedChip(selected = true)
+        assertThat(pixelAt(compose.onNodeWithTag("chip"), 4.dp, 24.dp)).isEqualTo(DarkColors.accent.toArgb())
+        compose.onNodeWithTag("chip_lock", useUnmergedTree = true).assertExists()
         compose.assertClickablesHaveRoleAndLabel()
     }
 }

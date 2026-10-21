@@ -1,7 +1,12 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -11,6 +16,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
@@ -29,6 +35,7 @@ import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
 @RunWith(AndroidJUnit4::class)
 class ButtonsTest {
@@ -128,5 +135,50 @@ class ButtonsTest {
             .assertWidthIsEqualTo(48.dp)
             .assertHeightIsEqualTo(48.dp)
         assertThat(buttonColors(ButtonTone.Primary, true, ButtonSurface.Surf, LightColors).fill).isEqualTo(LightColors.accent)
+    }
+
+    @Test
+    fun aFooterButtonIsLargeAndFillsTheWidth() {
+        compose.setContent {
+            CulveryTheme(dark = false) {
+                Column(Modifier.width(549.dp)) { HhFooterButton("Add event", {}, "footer", icon = Icons.CHECK) }
+            }
+        }
+        compose.onNodeWithTag("footer").assertHeightIsEqualTo(60.dp).assertWidthIsEqualTo(549.dp)
+        compose.onNodeWithTag("footer_reason").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aDisabledFooterButtonShowsItsReasonAbove() {
+        var enabled by mutableStateOf(false)
+        compose.setContent {
+            CulveryTheme(dark = false) {
+                Column(Modifier.width(549.dp)) { HhFooterButton("Add event", {}, "footer", enabled = enabled, reason = "Add a title first") }
+            }
+        }
+        val reason = compose.onNodeWithTag("footer_reason").assertIsDisplayed()
+        val button = compose.onNodeWithTag("footer")
+        assertThat(button.fetchSemanticsNode().config[SemanticsProperties.StateDescription]).isEqualTo("Add a title first")
+        val gap = button.getUnclippedBoundsInRoot().top - reason.getUnclippedBoundsInRoot().bottom
+        assertThat(gap.value).isWithin(0.01f).of(8f)
+        assertThat(compose.onNodeWithTag("footer_reason").textLayout().layoutInput.style.color).isEqualTo(LightColors.mute)
+        enabled = true
+        compose.onNodeWithTag("footer_reason").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: the reason is optional (9 §6.4); a disabled footer without one is the outline alone. */
+    @Test
+    fun aFooterButtonWithoutAReasonShowsNone() {
+        compose.setContent {
+            CulveryTheme(dark = false) { Column(Modifier.width(549.dp)) { HhFooterButton("Save changes", {}, "footer", enabled = false) } }
+        }
+        compose.onNodeWithTag("footer_reason").assertDoesNotExist()
+        compose.onNodeWithTag("footer").assertIsNotEnabled()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
+        val label = compose.onNode(hasText("Save changes") and hasAnyAncestor(hasTestTag("footer")), useUnmergedTree = true)
+        assertThat(label.textLayout().layoutInput.style.color).isEqualTo(LightColors.mute)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 }

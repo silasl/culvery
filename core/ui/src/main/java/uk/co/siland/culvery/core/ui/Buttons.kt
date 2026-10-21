@@ -1,11 +1,16 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -13,17 +18,26 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 /** Button values (hand-off §7; 4d-1 §4.1). Both sizes are pills: the radius is half the height. */
 object ButtonTokens {
@@ -42,6 +56,13 @@ object ButtonTokens {
     val icon = 24.dp
     val roundIcon = 28.dp
     val disabledOutline = 1.dp
+
+    // A footer's reason line sits 8 dp above its button (9 §4.8).
+    val footerReasonGap = 8.dp
+
+    // A round button held down steps once after this long, then again every interval (9 §4.8).
+    const val HOLD_DELAY_MILLIS = 500L
+    const val HOLD_INTERVAL_MILLIS = 100L
 }
 
 /**
@@ -160,7 +181,8 @@ fun HhButton(
 
 /**
  * A round [size] button in [tone]'s colours, named by [spoken] (9 §6.4); disabled it is the outline and does nothing.
- * Tag it through [modifier].
+ * Tag it through [modifier]. With [repeatWhileHeld] a tap steps once and a press held for 500 ms steps again, then every
+ * 100 ms until let go; the release after a hold adds none, and TalkBack's click is one step.
  */
 @Composable
 fun HhRoundButton(
@@ -173,6 +195,7 @@ fun HhRoundButton(
     on: ButtonSurface,
     size: Dp = ButtonTokens.regularHeight,
     iconSize: Dp = ButtonTokens.roundIcon,
+    repeatWhileHeld: Boolean = false,
 ) {
     val (fill, ink, outline) = buttonColors(tone, enabled, on, Culvery.colors)
     Box(
@@ -181,9 +204,76 @@ fun HhRoundButton(
             .size(size)
             .buttonFill(fill, outline, CircleShape)
             .semantics { contentDescription = spoken }
-            .hhClickable(onClick, enabled = enabled),
+            .then(if (repeatWhileHeld) Modifier.heldClickable(onClick, enabled) else Modifier.hhClickable(onClick, enabled = enabled)),
     ) {
         HhIcon(icon, size = iconSize, tint = ink)
+    }
+}
+
+/** A button click that repeats while the press is held; the click that follows a hold is swallowed. */
+@Composable
+private fun Modifier.heldClickable(onClick: () -> Unit, enabled: Boolean): Modifier {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val step by rememberUpdatedState(onClick)
+    val fired = remember { BooleanArray(1) }
+    LaunchedEffect(pressed, enabled) {
+        if (!pressed || !enabled) return@LaunchedEffect
+        fired[0] = false
+        delay(ButtonTokens.HOLD_DELAY_MILLIS)
+        fired[0] = true
+        while (true) {
+            step()
+            delay(ButtonTokens.HOLD_INTERVAL_MILLIS)
+        }
+    }
+    return clickable(source, LocalIndication.current, enabled = enabled, role = Role.Button) {
+        if (fired[0]) fired[0] = false else step()
+    }
+}
+
+/**
+ * A sheet's footer: a Primary [HhButton] at [ButtonSize.Large] across the width, tagged [tag]. Disabled with a [reason], the
+ * reason shows above it (`${tag}_reason`) and is the button's state for TalkBack, so it is heard once ("Add event, Add a
+ * title first, disabled"). The reason is optional (9 §6.4).
+ */
+@Composable
+fun HhFooterButton(
+    text: String,
+    onClick: () -> Unit,
+    tag: String,
+    modifier: Modifier = Modifier,
+    icon: String? = null,
+    enabled: Boolean = true,
+    reason: String? = null,
+) {
+    Column(modifier) {
+        if (!enabled && reason != null) {
+            Text(
+                reason,
+                style = HhType.body,
+                color = Culvery.colors.mute,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = ButtonTokens.footerReasonGap)
+                    .testTag("${tag}_reason")
+                    .shownNotSpoken(),
+            )
+        }
+        HhButton(
+            text,
+            onClick,
+            Modifier
+                .fillMaxWidth()
+                .testTag(tag)
+                .semantics { if (!enabled && reason != null) stateDescription = reason },
+            tone = ButtonTone.Primary,
+            size = ButtonSize.Large,
+            icon = icon,
+            enabled = enabled,
+            on = ButtonSurface.Bg,
+        )
     }
 }
 
