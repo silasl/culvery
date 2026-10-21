@@ -30,7 +30,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EditorForm
+import uk.co.siland.culvery.capability.calendar.EventRef
+import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.Held
+import uk.co.siland.culvery.capability.calendar.HeldEvent
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.HhAlpha
@@ -50,6 +55,7 @@ class CheckPaneTest {
     private val c = DarkColors
     private var scale by mutableStateOf(1f)
     private var form by mutableStateOf(guitar())
+    private var held by mutableStateOf<Held?>(null)
     private var shown = false
 
     /** Guitar lesson for Mia, weekly from Sat 26 Sep, 10:00–10:45, 12 times. */
@@ -96,7 +102,7 @@ class CheckPaneTest {
                             picker = EditorPicker.None,
                             childOnly = null,
                             childName = null,
-                            held = null,
+                            held = held,
                             onClose = {},
                             onSave = {},
                             onDelete = {},
@@ -145,6 +151,7 @@ class CheckPaneTest {
         }
         node("check_date_4").assertDoesNotExist()
         node("check_more").assertTextEquals("+ 8 more")
+        compose.onNode(hasText("First few")).assertExists()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -176,12 +183,32 @@ class CheckPaneTest {
         node("check_date_0").assertTextEquals("Fri 25 Sep")
         node("check_date_1").assertDoesNotExist()
         node("check_more").assertDoesNotExist()
+        compose.onNode(hasText("First few")).assertDoesNotExist()
         val both = listOf(SampleUi.sam, SampleUi.mia).map { Color(it.color).toArgb() }
         assertThat(dotColours("check_date_0", "check_date_dot")).containsExactlyElementsIn(both).inOrder()
         compose.onNode(hasText("17:00 · Sam + Mia") and hasAnyAncestor(hasTestTag("check_chip")), useUnmergedTree = true).assertExists()
         assertNear("the neutral chip", pixelAt(node("check_chip"), (width("check_chip") - 5).dp, (height("check_chip") / 2).dp), c.surf2)
         compose.onAllNodes(hasTestTag("event_bar") and hasAnyAncestor(hasTestTag("check_chip")), useUnmergedTree = true).assertCountEquals(1)
         assertThat(dotColours("check_chip", "chip_dot")).containsExactlyElementsIn(both).inOrder()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Guitar lesson moved to 15:00 over Mia's Piano, 15:30–16:15: on Check the foot still says it clashes. */
+    @Test
+    fun aClashOutranksEverythingsSet() {
+        val saturday = LocalDate.of(2026, 9, 26)
+        held = Held(
+            listOf(
+                HeldEvent(
+                    EventRef("c1", "s1", "piano"), "Piano", listOf(SampleUi.mia.id),
+                    EventTime.Timed(saturday.atTime(15, 30).atZone(LONDON).toInstant()),
+                    EventTime.Timed(saturday.atTime(16, 15).atZone(LONDON).toInstant()),
+                ),
+            ),
+            lastShownDay(SampleUi.TODAY), emptySet(), firstDay = SampleUi.TODAY,
+        )
+        show(guitar().apply { chooseHour(15) })
+        node("editor_save_hint").assertTextEquals("Clashes are allowed; both show on the week")
         compose.assertClickablesHaveRoleAndLabel()
     }
 

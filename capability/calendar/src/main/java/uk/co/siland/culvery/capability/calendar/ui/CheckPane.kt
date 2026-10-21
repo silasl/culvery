@@ -79,7 +79,8 @@ internal fun CheckPane(form: EditorForm, people: List<Person>) {
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap)) {
         Text(checkSentence(form, people), style = CalendarType.checkSentence, color = c.ink, modifier = Modifier.testTag("check_sentence"))
         if (dates.isNotEmpty()) {
-            Heading(FIRST_FEW)
+            // A one-off's single date needs no heading over it.
+            if (form.repeat != RepeatChoice.Never) Heading(FIRST_FEW)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(EditorDimens.checkDateGap),
                 verticalArrangement = Arrangement.spacedBy(EditorDimens.checkDateGap),
