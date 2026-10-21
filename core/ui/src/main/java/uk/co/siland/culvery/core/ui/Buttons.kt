@@ -58,8 +58,11 @@ object ButtonTokens {
     val roundIcon = 28.dp
     val disabledOutline = 1.dp
 
-    // A footer's reason line sits 8 dp above its button (9 §4.8).
+    // A footer's reason line sits 8 dp above its button (9 §4.8); under it, 9 dp below with a 16 dp `info` 5 dp before the text.
     val footerReasonGap = 8.dp
+    val footerNoteGap = 9.dp
+    val footerNoteIcon = 16.dp
+    val footerNoteIconGap = 5.dp
 
     // A round button held down steps once after this long, then again every interval (9 §4.8).
     const val HOLD_DELAY_MILLIS = 500L
@@ -237,7 +240,8 @@ private fun Modifier.heldClickable(onClick: () -> Unit, enabled: Boolean): Modif
 /**
  * A sheet's footer: a Primary [HhButton] at [ButtonSize.Large] across the width, tagged [tag]. Disabled with a [reason], the
  * reason shows above it (`${tag}_reason`) and is the button's state for TalkBack, so it is heard once ("Add event, Add a
- * title first, disabled"). The reason is optional (9 §6.4).
+ * title first, disabled"). The reason is optional (9 §6.4). With [below], the reason sits under the button instead, with
+ * the `info` icon, and while enabled the [hint] does (`${tag}_hint`, "Time and repeats are optional").
  */
 @Composable
 fun HhFooterButton(
@@ -248,9 +252,11 @@ fun HhFooterButton(
     icon: String? = null,
     enabled: Boolean = true,
     reason: String? = null,
+    below: Boolean = false,
+    hint: String? = null,
 ) {
     Column(modifier) {
-        if (!enabled && reason != null) {
+        if (!below && !enabled && reason != null) {
             Text(
                 reason,
                 style = HhType.body,
@@ -276,6 +282,30 @@ fun HhFooterButton(
             enabled = enabled,
             on = ButtonSurface.Bg,
         )
+        if (below) {
+            when {
+                !enabled && reason != null -> FooterNote(reason, "${tag}_reason", spoken = false)
+                enabled && hint != null -> FooterNote(hint, "${tag}_hint", spoken = true)
+            }
+        }
+    }
+}
+
+/** A footer's line under its button; the reason isn't [spoken], since the button's state already says it. */
+@Composable
+private fun FooterNote(text: String, tag: String, spoken: Boolean) {
+    val mute = Culvery.colors.mute
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ButtonTokens.footerNoteIconGap, Alignment.CenterHorizontally),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = ButtonTokens.footerNoteGap)
+            .testTag(tag)
+            .then(if (spoken) Modifier.semantics(mergeDescendants = true) {} else Modifier.shownNotSpoken()),
+    ) {
+        HhIcon(Icons.INFO, size = ButtonTokens.footerNoteIcon, tint = mute, modifier = Modifier.testTag("${tag}_icon"))
+        Text(text, style = HhType.secondary, color = mute, modifier = Modifier.weight(1f, fill = false))
     }
 }
 

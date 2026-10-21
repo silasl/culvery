@@ -38,11 +38,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,9 +56,7 @@ import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.cannotAddForOthers
-import uk.co.siland.culvery.capability.calendar.couldNotSave
 import uk.co.siland.culvery.capability.calendar.lengthLabel
-import uk.co.siland.culvery.capability.calendar.saveFailedBody
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ButtonSurface
@@ -557,30 +553,6 @@ private fun LockedDates(label: String) {
     ) {
         HhIcon(Icons.DATE_RANGE, size = CalendarDimens.lockedIcon, tint = c.mute)
         Text(label, style = CalendarType.lockedDates, color = c.ink)
-    }
-}
-
-/** Hand-off 14: the save didn't happen; the details are still in the sheet, and the body says what to do next. */
-@Composable
-private fun FailureCard(failure: SaveFailure) {
-    val c = Culvery.colors
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.editorCardIconGap),
-        modifier = Modifier
-            .testTag("editor_failure")
-            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(CalendarDimens.editorCardRadius))
-            .background(c.dangerSoft)
-            .padding(horizontal = CalendarDimens.editorCardPaddingH, vertical = CalendarDimens.editorCardPaddingV),
-    ) {
-        HhIcon(Icons.CLOUD_OFF, size = CalendarDimens.failureIcon, tint = c.danger)
-        Column {
-            // A long provider reason must not push Save off screen with the keyboard up; the body says what to do.
-            Text(couldNotSave(failure.service, failure.problem), style = CalendarType.noteTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(CalendarDimens.failureBodyTop))
-            Text(saveFailedBody(failure.service, failure.problem), style = CalendarType.noteBody, color = c.mute)
-        }
     }
 }
 

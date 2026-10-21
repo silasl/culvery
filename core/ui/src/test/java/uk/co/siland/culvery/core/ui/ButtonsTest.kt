@@ -168,6 +168,34 @@ class ButtonsTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    @Test
+    fun aFooterReasonCanSitBelow() {
+        var enabled by mutableStateOf(false)
+        compose.setContent {
+            CulveryTheme(dark = false) {
+                Column(Modifier.width(507.dp)) {
+                    HhFooterButton("Add event", {}, "footer", enabled = enabled, reason = "Needs a day", below = true, hint = "Time and repeats are optional")
+                }
+            }
+        }
+        val button = compose.onNodeWithTag("footer")
+        val reason = compose.onNodeWithTag("footer_reason", useUnmergedTree = true).assertIsDisplayed()
+        assertThat(button.fetchSemanticsNode().config[SemanticsProperties.StateDescription]).isEqualTo("Needs a day")
+        val gap = reason.getUnclippedBoundsInRoot().top - button.getUnclippedBoundsInRoot().bottom
+        // 9 dp is 13.5 px at the tablet's density, so it lands on a whole pixel either side.
+        assertThat(gap.value).isWithin(0.5f).of(9f)
+        compose.onNodeWithTag("footer_reason_icon", useUnmergedTree = true).assertIsDisplayed()
+        val words = compose.onNode(hasText("Needs a day") and hasAnyAncestor(hasTestTag("footer_reason")), useUnmergedTree = true)
+        assertThat(words.textLayout().layoutInput.style.color).isEqualTo(LightColors.mute)
+        compose.onNodeWithTag("footer_hint", useUnmergedTree = true).assertDoesNotExist()
+        enabled = true
+        compose.onNodeWithTag("footer_reason", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("footer_hint", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("footer_hint_icon", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasText("Time and repeats are optional") and hasAnyAncestor(hasTestTag("footer_hint")), useUnmergedTree = true).assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     /** Pin: the reason is optional (9 §6.4); a disabled footer without one is the outline alone. */
     @Test
     fun aFooterButtonWithoutAReasonShowsNone() {

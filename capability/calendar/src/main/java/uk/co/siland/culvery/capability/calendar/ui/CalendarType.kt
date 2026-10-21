@@ -118,6 +118,84 @@ internal object CalendarType {
 
     /** 13 sp / 700: the "Main" badge. */
     val badge = syncingPill
+
+    /** 29 sp / 700 and 14 sp: the full-screen editor's "New event" and its context line (9 §3.1). */
+    val editorBarTitle = HhType.screenTitle.copy(fontSize = 29.sp)
+    val editorContext = HhType.secondary
+
+    /** 24 sp / 600: the editor's title field. */
+    val editorField = HhType.dateNumber.copy(fontWeight = FontWeight.W600)
+
+    /** 12 sp / 700, 1 sp tracking, and 19 sp / 600: a row's label and its value. */
+    val rowLabel = HhType.labelSmall.copy(letterSpacing = 1.sp)
+    val rowValue = HhType.rowTitle.copy(fontSize = 19.sp)
+
+    /** 12 sp / 700: a row's tag ("Clash"). */
+    val rowTag = HhType.labelSmall
+
+    /** 14 sp: "Saves to the Family calendar". */
+    val footLine = HhType.secondary
+
+    /** 27 sp / 700 and 15 sp / 700: the pane's question and its Skip. */
+    val paneQuestion = HhType.screenTitle.copy(fontSize = 27.sp)
+    val paneSkip = HhType.buttonLabel
+}
+
+/** The full-screen editor's layout (handoff §1 Layout, px ÷ 1.5). */
+internal object EditorDimens {
+    // Top bar: 85 tall, 32 at the sides; ✕ then the title 16 after it, the context line 1 below the title.
+    val barHeight = 85.dp
+    val sides = 32.dp
+    val barGap = 16.dp
+    val contextTop = 1.dp
+
+    // Body: 29 above the window's foot; the event column 507 wide, the pane 21 after it.
+    val bodyBottom = 29.dp
+    val columnWidth = 507.dp
+    val columnGap = 21.dp
+
+    // Title field: 75 tall, `surf`, radius 19, 21 at the sides; focused, a 2 dp `accent` ring inside.
+    val fieldHeight = 75.dp
+    val fieldRadius = 19.dp
+    val fieldPaddingH = 21.dp
+    val ring = 2.dp
+
+    // Rows: 77 tall (61 with the keyboard up), 9 apart, radius 19, 20 in at the start and 16 at the end; a 25 dp icon 15
+    // before the words, the label 3 above the value; a 24 dp chevron or lock 15 after them.
+    val rowGap = 9.dp
+    val rowHeight = 77.dp
+    val rowHeightTyping = 61.dp
+    val rowRadius = 19.dp
+    val rowPaddingStart = 20.dp
+    val rowPaddingEnd = 16.dp
+    val rowIcon = 25.dp
+    val rowIconGap = 15.dp
+    val rowLabelGap = 3.dp
+    val rowEndIcon = 24.dp
+
+    // A row's tag: 27 tall, a pill, 11 at the sides, a 16 dp icon 4 before its word.
+    val tagHeight = 27.dp
+    val tagPaddingH = 11.dp
+    val tagIcon = 16.dp
+    val tagIconGap = 4.dp
+
+    // The foot: 9 between its parts; "Saves to" 5 in from the column's sides, a 16 dp `event_note` 8 before the words.
+    val footGap = 9.dp
+    val footLinePaddingH = 5.dp
+    val footIcon = 16.dp
+    val footIconGap = 8.dp
+
+    // The pane: `surf`, radius 24, padding 24 / 29 / 27, 15 between its parts; the header at least 48 tall, the question
+    // 13 from Skip and Next, which are 8 apart; Skip 19 at its sides.
+    val paneRadius = 24.dp
+    val panePaddingTop = 24.dp
+    val panePaddingH = 29.dp
+    val panePaddingBottom = 27.dp
+    val paneGap = 15.dp
+    val paneHeader = 48.dp
+    val paneHeaderGap = 13.dp
+    val paneButtonGap = 8.dp
+    val skipPaddingH = 19.dp
 }
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */

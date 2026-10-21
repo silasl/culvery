@@ -13,8 +13,10 @@ import uk.co.siland.culvery.capability.calendar.ReadOnlyReason
 import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.capability.calendar.laneRows
 import uk.co.siland.culvery.capability.calendar.weekSpans
+import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.household.Role
 
 /** The hand-off's sample week (Wednesday 23 September 2026, calendar-sheets/02-calendar-week-dark.png) as UI models. */
 object SampleUi {
@@ -164,6 +166,9 @@ object SampleUi {
 
     /** The people who can be assigned (hand-off 06: Alex, Sam, Mia). */
     val household = listOf(alex, sam, mia)
+
+    /** The household with their roles: Alex the admin, Sam an adult, Mia a child. */
+    val members = listOf(Member(alex, Role.ADMIN, hasPin = true), Member(sam, Role.ADULT, hasPin = true), Member(mia, Role.CHILD, hasPin = false))
 
     private fun EventUi.onFamilyCalendar(createdBy: String) =
         copy(sourceName = "Family calendar", serviceName = "Google Calendar", createdBy = createdBy)

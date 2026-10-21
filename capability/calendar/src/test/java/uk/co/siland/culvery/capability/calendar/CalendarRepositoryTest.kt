@@ -547,6 +547,13 @@ class CalendarRepositoryTest {
     }
 
     @Test
+    fun theMasterCalendarNameIsTheCalendarNewEventsGoTo() = runTest {
+        assertThat(repo.masterCalendarName.first()).isEqualTo("Family")
+        val readOnly = CalendarRepository(store, household, HouseholdZone(household), emptySet(), emptySet())
+        assertThat(readOnly.masterCalendarName.first()).isNull()
+    }
+
+    @Test
     fun detailHasTheWhenLabelAndFollowsTheOutbox() = runTest {
         put("s-family", timed("Dinner with Jo & Priya", 23, 19, 30, 90).copy(createdBy = alex.id.value))
         val detail = repo.event(ref("Dinner with Jo & Priya"), today = sept(23)).first()!!

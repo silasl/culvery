@@ -29,10 +29,12 @@ edit_note
 error
 event
 event_available
+event_note
 event_repeat
 expand_less
 expand_more
 foggy
+group
 help
 home
 info

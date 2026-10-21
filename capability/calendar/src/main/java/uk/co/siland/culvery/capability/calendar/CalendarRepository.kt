@@ -66,6 +66,11 @@ class CalendarRepository @Inject constructor(
         writableMaster(master, connections, writerIds)?.connection?.let { serviceNameOf(it, serviceNames::get) }
     }.distinctUntilChanged()
 
+    /** The writable master calendar's own name, which the new editor's "Saves to" line names (9 §3.1); null as [masterService]. */
+    val masterCalendarName: Flow<String?> = combine(store.master(), store.connections()) { master, connections ->
+        writableMaster(master, connections, writerIds)?.source?.source?.name
+    }.distinctUntilChanged()
+
     private val catalog: Flow<SourceCatalog> =
         combine(store.sources(), store.connections()) { sources, connections -> SourceCatalog(sources, connections, writerIds, serviceNames) }
 
