@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -140,7 +141,8 @@ private fun Stepper(form: EditorForm, times: Int) {
                 .background(c.surf2)
                 .padding(horizontal = EditorDimens.stepperPaddingH),
         ) {
-            Text(form.stepperLabel.orEmpty(), style = CalendarType.repeatCount, color = c.ink, maxLines = 1)
+            val label = remember(form.repeat, form.day, form.repeatEnd) { form.stepperLabel.orEmpty() }
+            Text(label, style = CalendarType.repeatCount, color = c.ink, maxLines = 1)
         }
         StepButton(Icons.ADD, MORE_TIMES, "ends_more", enabled = times < MAX_TIMES, onStep = form::moreTimes)
     }

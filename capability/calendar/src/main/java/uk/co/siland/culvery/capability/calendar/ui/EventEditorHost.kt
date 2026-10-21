@@ -15,6 +15,7 @@ import androidx.compose.runtime.snapshotFlow
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
@@ -118,7 +119,8 @@ internal fun EventEditorHost(
         }
     }
     val members: List<Member>? by repo.members.collectAsState(initial = null)
-    val master: String? by repo.masterCalendarName.collectAsState(initial = null)
+    // Only a new event says where it saves; a change names its own calendar.
+    val master: String? by remember(request) { if (request is EditorRequest.New) repo.masterCalendarName else flowOf(null) }.collectAsState(initial = null)
     val session by editor.session.collectAsState()
     val navigator = if (request.from == EditorFrom.Home) LocalShellNavigator.current else null
     var failure by remember(request) { mutableStateOf<SaveFailure?>(null) }

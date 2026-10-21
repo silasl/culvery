@@ -33,11 +33,17 @@ internal fun toggled(current: List<PersonId>, tapped: PersonId, mayClear: Boolea
  * tag with nobody left is Family; no tag, or one unknown id, reads as before, as the calendar's person (9 §3.3).
  */
 fun resolvePeople(forPerson: String?, sourcePerson: PersonId, people: Map<PersonId, Person>, order: List<PersonId>): List<Person> =
-    resolveIds(forPerson, sourcePerson, order.filter { it in people }).map { people[it] ?: Person.Family }
+    resolvePeople(peopleIn(forPerson), sourcePerson, people, order)
+
+/** [resolvePeople] from a tag already read with [peopleIn]. */
+internal fun resolvePeople(ids: List<PersonId>, sourcePerson: PersonId, people: Map<PersonId, Person>, order: List<PersonId>): List<Person> =
+    resolveIds(ids, sourcePerson, order.filter { it in people }).map { people[it] ?: Person.Family }
 
 /** [resolvePeople] by id, for the household [order]: an unknown calendar person reads as Family. */
-internal fun resolveIds(forPerson: String?, sourcePerson: PersonId?, order: List<PersonId>): List<PersonId> {
-    val ids = peopleIn(forPerson)
+internal fun resolveIds(forPerson: String?, sourcePerson: PersonId?, order: List<PersonId>): List<PersonId> =
+    resolveIds(peopleIn(forPerson), sourcePerson, order)
+
+private fun resolveIds(ids: List<PersonId>, sourcePerson: PersonId?, order: List<PersonId>): List<PersonId> {
     val known = ids.filter { it == PersonId.FAMILY || it in order }
     return when {
         known.isNotEmpty() -> known.sortedBy(order::rankOf)

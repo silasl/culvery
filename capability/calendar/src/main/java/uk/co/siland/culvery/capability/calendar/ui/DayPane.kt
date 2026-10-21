@@ -49,7 +49,7 @@ import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.SHORT_DAY
 import uk.co.siland.culvery.capability.calendar.dotColours
-import uk.co.siland.culvery.capability.calendar.peopleOn
+import uk.co.siland.culvery.capability.calendar.peopleByDay
 import uk.co.siland.culvery.capability.calendar.spokenWho
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.ButtonSurface
@@ -111,6 +111,11 @@ internal fun monthCells(month: YearMonth): List<LocalDate> {
 @Composable
 internal fun DayPane(form: EditorForm, held: Held?, household: EditorPeople, onPicked: () -> Unit) {
     var month by remember { mutableStateOf(YearMonth.from(form.day ?: form.today)) }
+    val weeks = remember(month) { monthCells(month).chunked(DAYS_PER_WEEK) }
+    val onDay = remember(held, weeks, household, form.zone) {
+        held?.peopleByDay(weeks.first().first(), weeks.last().last(), household.order, form.zone).orEmpty()
+            .mapValues { (_, ids) -> ids.mapNotNull { household.byId[it] } }
+    }
     val pick = { date: LocalDate ->
         form.tapDay(date)
         if (!form.awaitingLastDay && form.untilError == null) onPicked()
@@ -124,11 +129,10 @@ internal fun DayPane(form: EditorForm, held: Held?, household: EditorPeople, onP
             MonthHeader(month, onEarlier = { month = month.minusMonths(1) }, onLater = { month = month.plusMonths(1) })
             WeekdayLetters()
             Column {
-                monthCells(month).chunked(DAYS_PER_WEEK).forEach { week ->
+                weeks.forEach { week ->
                     Row(Modifier.fillMaxWidth()) {
                         week.forEachIndexed { column, date ->
-                            val on = held?.peopleOn(date, household.order, form.zone).orEmpty().mapNotNull { household.byId[it] }
-                            DayCell(date, column, form, month, on, Modifier.weight(1f)) { pick(date) }
+                            DayCell(date, column, form, month, onDay[date].orEmpty(), Modifier.weight(1f)) { pick(date) }
                         }
                     }
                 }

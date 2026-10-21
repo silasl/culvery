@@ -43,7 +43,7 @@ data class EventUi(
     val syncing: Boolean = false,
     /** A person's name, [ADDED_FROM_PHONE], the service's name, or the calendar's own name for one nobody here can change. */
     val createdBy: String = "",
-    /** The Repeats row: "Every week"… or "Yes" (3a design D12). */
+    /** The detail sheet's Repeats row: "Every week"… or "Yes" (3a design D12); only the detail works it out. */
     val repeats: String = REPEATS_YES,
     /** The detail sheet offers Choose who it’s for: an editable event, or a repeating one on the master (4e). */
     val assignable: Boolean = readOnlyReason == null,
@@ -351,24 +351,25 @@ internal fun StoredEvent.toUi(
 ): EventUi {
     val slice = sliceOn(date, zone)
     val source = catalog.source(connectionId, sourceId)
+    val sourceName = source?.source?.name.orEmpty()
     val serviceName = catalog.serviceName(connectionId)
     val reason = readOnlyReason(this, source, catalog.hasWriter(connectionId))
+    val tagged = peopleIn(forPerson)
     return EventUi(
         ref = ref,
         title = title,
         timeLabel = slice.timeLabel,
         startLabel = slice.startLabel,
-        people = resolvePeople(forPerson, sourcePerson, people, order),
+        people = resolvePeople(tagged, sourcePerson, people, order),
         allDay = slice.allDay,
         recurring = recurring,
         startSort = startSort,
-        sourceName = source?.source?.name.orEmpty(),
+        sourceName = sourceName,
         serviceName = serviceName,
         readOnlyReason = reason,
-        untagged = source?.isMaster == true && source.source.writable && isUntagged(forPerson) && createdBy == null,
+        untagged = source?.isMaster == true && source.source.writable && tagged.isEmpty() && createdBy == null,
         syncing = syncing,
-        createdBy = createdByLabel(createdBy, reason, people, serviceName, source?.source?.name.orEmpty()),
-        repeats = repeatsLabel(recurrenceRule, start, zone),
+        createdBy = createdByLabel(createdBy, reason, people, serviceName, sourceName),
         assignable = mayAssign(this, reason),
         span = dayOfSpan(date, zone),
     )

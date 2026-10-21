@@ -30,26 +30,49 @@ private val FIRST_FREE_START: LocalTime = LocalTime.of(7, 0)
 private val LAST_FREE_END: LocalTime = LocalTime.of(23, 0)
 
 /** The people with an event on [date], in household [order] then Family; none outside the held days. */
-fun Held.peopleOn(date: LocalDate, order: List<PersonId>, zone: ZoneId): List<PersonId> {
-    if (!holds(date)) return emptyList()
-    return events.filter { it.isOn(date, zone) }
-        .flatMap { it.people }
-        .distinct()
-        .sortedBy(order::rankOfWithFamilyLast)
+fun Held.peopleOn(date: LocalDate, order: List<PersonId>, zone: ZoneId): List<PersonId> = peopleByDay(date, date, order, zone)[date].orEmpty()
+
+/** [peopleOn] for each day from [from] to [to], in one pass over the events; a day with nobody on it is left out. */
+fun Held.peopleByDay(from: LocalDate, to: LocalDate, order: List<PersonId>, zone: ZoneId): Map<LocalDate, List<PersonId>> {
+    val byDay = mutableMapOf<LocalDate, LinkedHashSet<PersonId>>()
+    for (event in events) {
+        val (first, last) = daySpan(event.start, event.end, zone)
+        var day = maxOf(first, from, firstDay)
+        val end = minOf(last, to, lastDay)
+        while (day <= end) {
+            byDay.getOrPut(day) { LinkedHashSet() }.addAll(event.people)
+            day = day.plusDays(1)
+        }
+    }
+    return byDay.mapValues { (_, people) -> people.sortedBy(order::rankOfWithFamilyLast) }
 }
 
 /** A day's dots: the colours of [people], each once, at most [MAX_DOTS]. */
 internal fun dotColours(people: List<Person>): List<Long> = people.map { it.color }.distinct().take(MAX_DOTS)
 
 /** The hours of [day] in which any of [people] is busy (9 §3.4); none when the tablet can't know. */
-fun Held.busyHours(people: List<PersonId>, day: LocalDate, zone: ZoneId, except: EventRef?): Set<Int> {
-    if (!canCheck(people, day)) return emptySet()
+fun Held.busyHours(people: List<PersonId>, day: LocalDate, zone: ZoneId, except: EventRef?): Set<Int> =
+    if (canCheck(people, day)) busyHoursOf(busyEvents(people, except), day, zone) else emptySet()
+
+private fun busyHoursOf(busy: List<HeldEvent>, day: LocalDate, zone: ZoneId): Set<Int> {
+    // Each hour's start, then the next midnight.
+    val bounds = (0 until HOURS_PER_DAY).map { h -> ZonedDateTime.of(day, LocalTime.of(h, 0), zone).toInstant() } + day.plusDays(1).atStartOfDay(zone).toInstant()
+    return (0 until HOURS_PER_DAY).filterTo(mutableSetOf()) { h -> busy.any { it.overlaps(bounds[h], bounds[h + 1]) } }
+}
+
+/** [busyHours], and [check] when there is a [start], with the busy events found once: what the Time pane reads. */
+internal fun Held.busyHoursAndCheck(
+    people: List<PersonId>,
+    day: LocalDate,
+    start: LocalTime?,
+    length: Duration,
+    zone: ZoneId,
+    except: EventRef?,
+    order: List<PersonId>,
+): Pair<Set<Int>, FreeCheck> {
+    if (!canCheck(people, day)) return emptySet<Int>() to FreeCheck.None
     val busy = busyEvents(people, except)
-    return (0 until HOURS_PER_DAY).filterTo(mutableSetOf()) { h ->
-        val from = ZonedDateTime.of(day, LocalTime.of(h, 0), zone).toInstant()
-        val to = if (h == HOURS_PER_DAY - 1) day.plusDays(1).atStartOfDay(zone).toInstant() else ZonedDateTime.of(day, LocalTime.of(h + 1, 0), zone).toInstant()
-        busy.any { it.overlaps(from, to) }
-    }
+    return busyHoursOf(busy, day, zone) to (start?.let { checkOf(busy, people, day, it, length, zone, order) } ?: FreeCheck.None)
 }
 
 /** The clash check's answer: nothing to say, everyone chosen is free, or who is busy with what and the nearest free starts. */
@@ -73,10 +96,19 @@ fun Held.check(
     zone: ZoneId,
     except: EventRef?,
     order: List<PersonId>,
+): FreeCheck = if (canCheck(people, day)) checkOf(busyEvents(people, except), people, day, start, length, zone, order) else FreeCheck.None
+
+// [busy] is [busyEvents] for [people].
+private fun checkOf(
+    busy: List<HeldEvent>,
+    people: List<PersonId>,
+    day: LocalDate,
+    start: LocalTime,
+    length: Duration,
+    zone: ZoneId,
+    order: List<PersonId>,
 ): FreeCheck {
-    if (!canCheck(people, day)) return FreeCheck.None
     val chosen = people.distinct().sortedBy(order::rankOf)
-    val busy = busyEvents(chosen, except)
     val (from, to) = draftSpan(day, start, length, zone)
     for (person in chosen) {
         val clash = busy.filter { person in it.people && it.overlaps(from, to) }.minByOrNull { it.start.instantIn(zone) } ?: continue
@@ -118,10 +150,4 @@ private fun HeldEvent.overlaps(from: Instant, to: Instant): Boolean {
     val s = (start as EventTime.Timed).instant
     val e = (end as EventTime.Timed).instant
     return s < to && e > from
-}
-
-// As StoredEvent.isOn: an all-day event goes by its own dates, a timed one by its instants in [zone].
-private fun HeldEvent.isOn(date: LocalDate, zone: ZoneId): Boolean {
-    val (first, last) = daySpan(start, end, zone)
-    return date in first..last
 }

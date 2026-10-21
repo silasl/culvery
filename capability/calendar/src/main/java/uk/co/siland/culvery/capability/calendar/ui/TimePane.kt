@@ -41,8 +41,7 @@ import uk.co.siland.culvery.capability.calendar.EDITOR_LENGTHS
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.FreeCheck
 import uk.co.siland.culvery.capability.calendar.Held
-import uk.co.siland.culvery.capability.calendar.busyHours
-import uk.co.siland.culvery.capability.calendar.check
+import uk.co.siland.culvery.capability.calendar.busyHoursAndCheck
 import uk.co.siland.culvery.capability.calendar.clashLine
 import uk.co.siland.culvery.capability.calendar.freeAtLine
 import uk.co.siland.culvery.capability.calendar.freeLine
@@ -90,10 +89,8 @@ internal fun rememberTimeCheck(form: EditorForm, held: Held?, order: List<Person
     return remember(held, who, day, start, length, order) {
         if (held == null || day == null) return@remember NO_CHECK
         val except = (form.mode as? EditorForm.Mode.Edit)?.original?.ref
-        TimeCheck(
-            held.busyHours(who, day, form.zone, except),
-            start?.let { held.check(who, day, it, length, form.zone, except, order) } ?: FreeCheck.None,
-        )
+        val (busyHours, result) = held.busyHoursAndCheck(who, day, start, length, form.zone, except, order)
+        TimeCheck(busyHours, result)
     }
 }
 

@@ -143,7 +143,8 @@ class CalendarRepository @Inject constructor(
         if (s == null) return@map null
         val e = s.shown.event
         val day = e.start.instantIn(s.zone).atZone(s.zone).toLocalDate()
-        EventDetailUi(e.toUi(day, s.zone, s.people, s.order, s.catalog, s.shown.syncing), whenLabel(e.start, e.end, s.zone, today))
+        val event = e.toUi(day, s.zone, s.people, s.order, s.catalog, s.shown.syncing).copy(repeats = repeatsLabel(e.recurrenceRule, e.start, s.zone))
+        EventDetailUi(event, whenLabel(e.start, e.end, s.zone, today))
     }
 
     /** What the editor starts from: [ref] as shown; null once it is gone or queued for deletion. */

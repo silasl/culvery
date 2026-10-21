@@ -612,7 +612,7 @@ class CalendarRepositoryTest {
         val piano = named.day(LocalDate.of(2026, 9, 23)).first().single { it.title == "Piano" }
         assertThat(piano.serviceName).isEqualTo("Google Calendar")
         assertThat(piano.serviceName).isEqualTo("Google Calendar")
-        assertThat(piano.repeats).isEqualTo("Every Wednesday")
+        assertThat(named.event(piano.ref, LocalDate.of(2026, 9, 23)).first()?.event?.repeats).isEqualTo("Every Wednesday")
         assertThat(named.masterService.first()).isEqualTo("Google Calendar")
     }
 
