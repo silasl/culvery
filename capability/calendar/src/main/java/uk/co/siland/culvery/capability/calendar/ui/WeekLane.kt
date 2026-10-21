@@ -94,7 +94,7 @@ private fun LaneBar(span: SpanUi, onOpen: (EventRef) -> Unit) {
             .background(colour.copy(alpha = HhAlpha.bar(c)))
             .hhClickable({ onOpen(span.ref) }, label = OPEN_EVENT_DETAILS, spoken = span.spoken),
     ) {
-        Box(Modifier.width(CalendarDimens.laneEdge).fillMaxHeight().background(colour))
+        StripedBar(span.people.map { Color(it.color) }, width = CalendarDimens.laneEdge, radius = 0.dp)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(CalendarDimens.laneIconGap),

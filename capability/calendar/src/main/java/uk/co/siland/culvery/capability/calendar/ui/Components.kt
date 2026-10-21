@@ -1,6 +1,11 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
+import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
@@ -30,6 +36,20 @@ internal fun StripedBar(colors: List<Color>, width: Dp, modifier: Modifier = Mod
             .testTag("event_bar"),
     ) {
         colors.forEach { Box(Modifier.fillMaxWidth().weight(1f).background(it)) }
+    }
+}
+
+/**
+ * [people]'s dots in a row, each [CalendarDimens.sharedDotOverlap] over the last and ringed in [ring] (the surface behind) so
+ * they read apart; one person is a plain dot. Each dot is tagged [dotTag].
+ */
+@Composable
+internal fun PersonDots(people: List<Person>, dot: Dp, ring: Color, dotTag: String, modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(-CalendarDimens.sharedDotOverlap)) {
+        people.forEach {
+            val ringed = if (people.size > 1) Modifier.border(CalendarDimens.sharedDotRing, ring, CircleShape) else Modifier
+            Box(Modifier.testTag(dotTag).size(dot).clip(CircleShape).background(Color(it.color)).then(ringed))
+        }
     }
 }
 

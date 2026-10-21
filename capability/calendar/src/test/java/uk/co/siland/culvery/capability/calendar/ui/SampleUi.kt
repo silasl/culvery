@@ -44,12 +44,6 @@ object SampleUi {
 
     val shared = listOf(cinema)
 
-    /** Cinema's detail sheet, added by Alex. */
-    val detailShared = EventDetailUi(
-        cinema.copy(sourceName = "Family calendar", serviceName = "Google Calendar", createdBy = "Alex"),
-        "Today · 17:00–18:00",
-    )
-
     private fun day(offset: Long, vararg events: EventUi) = DayUi(TODAY.plusDays(offset), events.toList())
 
     val today = listOf(
@@ -143,6 +137,22 @@ object SampleUi {
     val weekWithOneLaneRow: WeekUi = weekWithSpans.copy(
         days = weekWithSpans.days.map { d -> d.copy(events = d.events.filter { it.title != "Gran visiting" }) },
     ).let { it.copy(spans = laneRows(weekSpans(it.days))) }
+
+    /** [week] with Cinema on its Friday, after that day's other events. */
+    val weekWithShared: WeekUi = week.copy(days = week.days.mapIndexed { i, d -> if (i == 2) d.copy(events = d.events + cinema) else d })
+
+    /** [weekWithOneLaneRow] with Half term made Sam's and Mia's, so its bar is striped. */
+    val weekWithSharedSpan: WeekUi = weekWithOneLaneRow.copy(
+        days = weekWithOneLaneRow.days.map { d ->
+            d.copy(events = d.events.map { if (it.title == "Half term") it.copy(people = listOf(sam, mia)) else it })
+        },
+    ).let { it.copy(spans = laneRows(weekSpans(it.days))) }
+
+    /** Cinema's detail sheet, added by Alex. */
+    val detailShared = EventDetailUi(
+        cinema.copy(sourceName = "Family calendar", serviceName = "Google Calendar", createdBy = "Alex"),
+        "Today · 17:00–18:00",
+    )
 
     /** Today with a multi-day event on its second day of five. */
     val todayWithSpan = listOf(spanning("Half term", family, 2, 5)) + today

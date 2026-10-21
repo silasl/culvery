@@ -208,6 +208,14 @@ internal object CalendarDimens {
     val chipPaddingV = 8.dp
     val chipDot = 7.dp
     val chipDotGap = 5.dp
+
+    // A shared event's chip (9 §3.3): `surf2`, a 4 dp striped edge, content 12 from the chip's left, overlapping
+    // 8 dp dots 2 dp over each other with a 1 dp ring in the surface behind; the detail sheet's For row uses the same overlap.
+    val sharedChipEdge = 4.dp
+    val sharedChipPaddingStart = 12.dp
+    val sharedDot = 8.dp
+    val sharedDotOverlap = 2.dp
+    val sharedDotRing = 1.dp
     val reconnectIconGap = 8.dp
 
     // Event detail sheet (hand-off §7): padding 28×30×26; a 6 dp colour bar 14 dp from the title; close 12 dp away.
@@ -240,7 +248,6 @@ internal object CalendarDimens {
     val infoLabelGap = 18.dp
     val infoDot = 12.dp
     val infoDotGap = 8.dp
-    val infoDotOverlap = 3.dp
 
     // Explanation cards (read-only, repeating, untagged): radius 22, padding 16×18, 26 dp icon.
     val noteRadius = 22.dp

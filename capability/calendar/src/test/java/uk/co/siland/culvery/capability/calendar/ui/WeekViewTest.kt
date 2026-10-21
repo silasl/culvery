@@ -240,6 +240,36 @@ class WeekViewTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    private val friday: LocalDate = SampleUi.TODAY.plusDays(2)
+    private val cinemaName = "Cinema, Sam and Mia, Friday 17:00"
+
+    @Test
+    fun aChipWithNoOpenIsNotClickable() {
+        show { EventChip(SampleUi.cinema, friday, onOpen = null) }
+        compose.onNodeWithContentDescription(cinemaName).assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+    }
+
+    @Test
+    fun aSharedChipsMetaHasOverlappingDotsAndTheWhoLine() {
+        show { EventChip(SampleUi.cinema, friday, onOpen = {}) }
+        val chip = compose.onNodeWithContentDescription(cinemaName).fetchSemanticsNode().boundsInRoot
+        val dots = compose.onNodeWithTag("chip_dots", useUnmergedTree = true).onChildren().fetchSemanticsNodes().map { it.boundsInRoot }
+        val dp = compose.density.density
+        assertThat(dots).hasSize(2)
+        dots.forEach { assertThat(it.width / dp).isWithin(0.1f).of(8f) }
+        assertThat((dots[1].left - dots[0].left) / dp).isWithin(0.1f).of(6f)
+        assertThat((dots[0].left - chip.left) / dp).isWithin(0.1f).of(12f)
+        compose.onAllNodes(hasText("17:00 · Sam + Mia")).assertCountEquals(1)
+    }
+
+    @Test
+    fun aSharedChipIsSpokenWithAnd() {
+        show { WeekView(WeekViewState(SampleUi.weekWithShared, SampleUi.TODAY, sync(), now)) }
+        compose.onNodeWithContentDescription("Cinema, Sam and Mia, Friday 17:00").assert(isButton)
+        compose.assertNothingReadTwice()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     @Test
     fun theReconnectChipRunsTheReconnect() {
         var reconnects = 0

@@ -246,9 +246,7 @@ private fun InfoCard(detail: EventDetailUi) {
         Divider()
         InfoRow(Icons.PERSON, "For") {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.infoDotGap)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(-CalendarDimens.infoDotOverlap)) {
-                    e.people.forEach { Box(Modifier.testTag("for_dot").size(CalendarDimens.infoDot).clip(CircleShape).background(Color(it.color))) }
-                }
+                PersonDots(e.people, CalendarDimens.infoDot, ring = Culvery.colors.surf, dotTag = "for_dot")
                 Value(whoLine(e.people))
             }
         }

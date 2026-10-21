@@ -22,6 +22,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -34,6 +35,7 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -45,18 +47,21 @@ import org.robolectric.annotation.Config
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.DayUi
+import uk.co.siland.culvery.capability.calendar.DaySpan
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.capability.calendar.laneRows
 import uk.co.siland.culvery.capability.calendar.weekSpans
+import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.pixelAt
 
 /** The week's lane of multi-day bars (9 §2.1, note 31), on the week from Mon 19 Oct 2026; real graphics for its pixels. */
 @RunWith(AndroidJUnit4::class)
@@ -150,6 +155,32 @@ class WeekLaneTest {
         }
         compose.onAllNodes(isHalfTermChip).assertCountEquals(0)
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** One all-day event over Mon–Wed that began before the week, so its start is square and the edge's corners aren't clipped away. */
+    private fun squareStartedSpan(vararg people: Person): WeekUi {
+        val trip = SampleUi.allDay("Gran visiting", *people)
+        val days = (0..6).map { i -> DayUi(day(i), if (i <= 2) listOf(trip.copy(span = DaySpan(i + 2, 4))) else emptyList()) }
+        return WeekUi(monday, days, SampleUi.people, spans = laneRows(weekSpans(days)))
+    }
+
+    @Test
+    fun aSharedSpanHasAStripedEdge() {
+        show(squareStartedSpan(SampleUi.sam, SampleUi.mia))
+        val bar = compose.onNodeWithTag("week_span_${ref("Gran visiting").listKey}")
+        val height = bar.getUnclippedBoundsInRoot().height
+        assertThat(pixelAt(bar, 1.dp, 4.dp)).isEqualTo(SampleUi.sam.color.toInt())
+        assertThat(pixelAt(bar, 1.dp, height - 4.dp)).isEqualTo(SampleUi.mia.color.toInt())
+    }
+
+    /** Pin: a one-person bar's edge is one colour from top to bottom. */
+    @Test
+    fun aSinglePersonSpanKeepsAPlainEdge() {
+        show(squareStartedSpan(SampleUi.sam))
+        val bar = compose.onNodeWithTag("week_span_${ref("Gran visiting").listKey}")
+        val height = bar.getUnclippedBoundsInRoot().height
+        assertThat(pixelAt(bar, 1.dp, 4.dp)).isEqualTo(SampleUi.sam.color.toInt())
+        assertThat(pixelAt(bar, 1.dp, height - 4.dp)).isEqualTo(SampleUi.sam.color.toInt())
     }
 
     @Test

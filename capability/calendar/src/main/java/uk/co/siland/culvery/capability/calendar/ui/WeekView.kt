@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -75,6 +76,7 @@ import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WeekUi
+import uk.co.siland.culvery.capability.calendar.whoLine
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhAlpha
@@ -358,40 +360,58 @@ private fun Modifier.todayRing(color: Color): Modifier = drawWithContent {
     )
 }
 
+/** A day's event chip: the person's tint, or for a shared event the neutral surface with a striped edge and both dots (9 §3.3). A null [onOpen] leaves it unclickable. */
 @Composable
-private fun EventChip(event: EventUi, day: LocalDate, onOpen: (EventRef) -> Unit) {
+internal fun EventChip(event: EventUi, day: LocalDate, onOpen: ((EventRef) -> Unit)?) {
     val c = Culvery.colors
-    Column(
+    val shared = event.shared
+    Row(
         Modifier
             .fillMaxWidth()
+            .height(IntrinsicSize.Min)
             .clip(RoundedCornerShape(CalendarDimens.chipRadius))
-            .background(Color(event.people.first().color).copy(alpha = HhAlpha.tint(c)))
+            .background(if (shared) c.surf2 else Color(event.people.first().color).copy(alpha = HhAlpha.tint(c)))
             .semantics(mergeDescendants = true) { contentDescription = eventOnDay(event, day) }
-            .hhClickable({ onOpen(event.ref) }, label = OPEN_EVENT_DETAILS)
-            .padding(horizontal = CalendarDimens.chipPaddingH, vertical = CalendarDimens.chipPaddingV),
+            .then(if (onOpen != null) Modifier.hhClickable({ onOpen(event.ref) }, label = OPEN_EVENT_DETAILS) else Modifier),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(CalendarDimens.chipDotGap),
-            modifier = Modifier.shownNotSpoken(),
+        if (shared) StripedBar(event.people.map { Color(it.color) }, width = CalendarDimens.sharedChipEdge, radius = 0.dp)
+        Column(
+            Modifier
+                .weight(1f)
+                .padding(
+                    start = if (shared) CalendarDimens.sharedChipPaddingStart - CalendarDimens.sharedChipEdge else CalendarDimens.chipPaddingH,
+                    end = CalendarDimens.chipPaddingH,
+                    top = CalendarDimens.chipPaddingV,
+                    bottom = CalendarDimens.chipPaddingV,
+                ),
         ) {
-            Box(Modifier.testTag("chip_dot").size(CalendarDimens.chipDot).clip(CircleShape).background(Color(event.people.first().color)))
-            // One line, so a long name is cut before the time (4d-1 Decision 2).
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(CalendarDimens.chipDotGap),
+                modifier = Modifier.shownNotSpoken(),
+            ) {
+                if (shared) {
+                    PersonDots(event.people, CalendarDimens.sharedDot, ring = c.surf2, dotTag = "chip_dot", modifier = Modifier.testTag("chip_dots"))
+                } else {
+                    Box(Modifier.testTag("chip_dot").size(CalendarDimens.chipDot).clip(CircleShape).background(Color(event.people.first().color)))
+                }
+                // One line, so a long name is cut before the time (4d-1 Decision 2).
+                Text(
+                    "${event.startLabel} · ${whoLine(event.people)}",
+                    style = CalendarType.chipTime,
+                    color = c.mute,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                EventBadges(event, CalendarDimens.chipBadge)
+            }
+            Spacer(Modifier.height(CalendarDimens.chipTitleTop))
             Text(
-                "${event.startLabel} · ${event.people.first().name}",
-                style = CalendarType.chipTime,
-                color = c.mute,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+                event.title, style = CalendarType.chipTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.shownNotSpoken(),
             )
-            EventBadges(event, CalendarDimens.chipBadge)
         }
-        Spacer(Modifier.height(CalendarDimens.chipTitleTop))
-        Text(
-            event.title, style = CalendarType.chipTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.shownNotSpoken(),
-        )
     }
 }
 

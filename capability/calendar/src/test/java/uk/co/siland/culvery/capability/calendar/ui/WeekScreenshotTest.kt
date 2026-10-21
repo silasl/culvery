@@ -80,6 +80,11 @@ class WeekScreenshotTest {
     @Test fun weekLight() = snap("week_light", false, fresh, canAdd = true)
     /** Half term across Wed–Sat and a Camping trip running past the week, in one lane row (9 §2.1). */
     @Test fun weekMultiDayDark() = snap("week_multiday_dark", true, fresh, SampleUi.weekWithOneLaneRow, canAdd = true)
+    /** Cinema, for Sam and Mia, on Friday: the neutral chip with a striped edge and two dots. */
+    @Test fun weekSharedDark() = snap("week_shared_dark", true, fresh, SampleUi.weekWithShared, canAdd = true)
+    @Test fun weekSharedLight() = snap("week_shared_light", false, fresh, SampleUi.weekWithShared, canAdd = true)
+    /** Half term for Sam and Mia: the lane bar's edge is striped. */
+    @Test fun weekMultiDaySharedDark() = snap("week_multiday_shared_dark", true, fresh, SampleUi.weekWithSharedSpan, canAdd = true)
     @Test fun weekMultiDayLight() = snap("week_multiday_light", false, fresh, SampleUi.weekWithOneLaneRow, canAdd = true)
     /** Gran visiting from before the week over Half term: the lane grows a second row. */
     @Test fun weekMultiDayOverlapDark() = snap("week_multiday_overlap_dark", true, fresh, SampleUi.weekWithSpans, canAdd = true)
