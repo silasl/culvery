@@ -181,7 +181,8 @@ private fun WeekColumns(state: WeekViewState, onOpen: (EventRef) -> Unit, onAdd:
 
 /**
  * A column's day and date: one heading for TalkBack, which adds from it with [onAdd]. A [monthLabel] ("Oct", on the 1st
- * of a new month) sits just over the date without taking height, so every column's chips still start level (9 §3.2).
+ * of a new month) hangs from [CalendarDimens.monthLabelTop] below the card's top edge, whatever its own height, and takes no header height, so
+ * every column's chips still start level (9 §3.2).
  */
 @Composable
 private fun DayHeader(date: LocalDate, isToday: Boolean, onAdd: (() -> Unit)?, monthLabel: String? = null) {
@@ -214,7 +215,7 @@ private fun DayHeader(date: LocalDate, isToday: Boolean, onAdd: (() -> Unit)?, m
                 modifier = Modifier
                     .layout { measurable, constraints ->
                         val label = measurable.measure(constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity))
-                        layout(0, 0) { label.place(0, -label.height + CalendarDimens.monthLabelOverlap.roundToPx()) }
+                        layout(0, 0) { label.place(0, -(CalendarDimens.weekColumnPaddingTop - CalendarDimens.monthLabelTop).roundToPx()) }
                     }
                     .testTag("week_month_label"),
             )

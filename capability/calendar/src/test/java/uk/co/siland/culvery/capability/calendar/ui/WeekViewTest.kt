@@ -8,6 +8,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -25,6 +27,8 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -52,6 +56,7 @@ import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.SyncProblem
+import uk.co.siland.culvery.capability.calendar.WeekUi
 import uk.co.siland.culvery.capability.calendar.weekTitle
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
@@ -59,6 +64,7 @@ import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.assertNothingReadTwice
@@ -123,19 +129,46 @@ class WeekViewTest {
         assertThat(year).isEqualTo(mute)
     }
 
-    @Test
-    fun aWeekAcrossTwoMonthsLabelsTheFirst() {
-        show { WeekView(WeekViewState(SampleUi.weekAhead(1), SampleUi.TODAY, sync(), now, weeksAhead = 1)) }
-        compose.onNodeWithTag("week_title").assertContentDescriptionEquals("September to October 2026")
-        val labels = compose.onAllNodesWithTag("week_month_label", useUnmergedTree = true)
-        labels.assertCountEquals(1)
-        labels[0].assertTextEquals("Oct")
-        val label = labels[0].fetchSemanticsNode().boundsInRoot
-        val first = compose.onNodeWithTag("week_day_2026-10-01").fetchSemanticsNode().boundsInRoot
-        assertThat(label.left).isAtLeast(first.left)
-        assertThat(label.right).isAtMost(first.right)
+    private fun twoMonthsAt(scale: Float, week: WeekUi = SampleUi.weekAhead(1), weeksAhead: Int = 1) {
+        show { WithFontScale(scale) { WeekView(WeekViewState(week, SampleUi.TODAY, sync(), now, weeksAhead = weeksAhead)) } }
     }
 
+    /** The label sits above the 1st's date, inside its column, and takes no header height from it. */
+    private fun assertLabelAbove(label: String, first: LocalDate, otherChip: String, firstChip: String) {
+        val labels = compose.onAllNodesWithTag("week_month_label", useUnmergedTree = true)
+        labels.assertCountEquals(1)
+        labels[0].assertTextEquals(label)
+        // Not boundsInRoot: that is clipped to the card, which would hide a label cut off by its top edge.
+        val node = labels[0].fetchSemanticsNode()
+        val box = Rect(node.positionInRoot, Size(node.size.width.toFloat(), node.size.height.toFloat()))
+        val column = compose.onNodeWithTag("week_day_$first").fetchSemanticsNode().boundsInRoot
+        val date = compose.onNode(hasText("1") and hasAnyAncestor(hasTestTag("week_day_$first")), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertThat(box.top).isAtLeast(column.top)
+        assertThat(box.left).isAtLeast(column.left)
+        assertThat(box.right).isAtMost(column.right)
+        assertThat(box.top).isLessThan(date.top)
+        val chip = compose.onNodeWithText(firstChip).fetchSemanticsNode().boundsInRoot.top
+        val other = compose.onNodeWithText(otherChip).fetchSemanticsNode().boundsInRoot.top
+        assertThat(chip).isWithin(0.5f).of(other)
+    }
+
+    @Test
+    fun aNewYearsDayWeekLabelsJan() {
+        val start = LocalDate.of(2026, 12, 30)
+        val week = SampleUi.week.copy(start = start, days = SampleUi.week.days.mapIndexed { i, d -> d.copy(date = start.plusDays(i.toLong())) })
+        twoMonthsAt(1f, week, weeksAhead = 1)
+        compose.onNodeWithTag("week_title").assertContentDescriptionEquals("December 2026 to January 2027")
+        assertLabelAbove("Jan", LocalDate.of(2027, 1, 1), otherChip = "Bin day", firstChip = "Office day")
+    }
+
+    @Test
+    fun aWeekAcrossTwoMonthsLabelsTheFirst() {
+        twoMonthsAt(1f)
+        compose.onNodeWithTag("week_title").assertContentDescriptionEquals("September to October 2026")
+        assertLabelAbove("Oct", LocalDate.of(2026, 10, 1), otherChip = "Bin day", firstChip = "Office day")
+    }
+
+    /** Pin: only a week that crosses a month has the label. */
     @Test
     fun aWeekWithinOneMonthHasNoMonthLabel() {
         show { WeekView(state()) }

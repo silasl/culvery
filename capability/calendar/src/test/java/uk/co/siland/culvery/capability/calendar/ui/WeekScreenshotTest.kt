@@ -6,9 +6,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -104,9 +108,22 @@ class WeekScreenshotTest {
     @Test fun weekSyncingDark() = snap("week_syncing_dark", true, fresh, SampleUi.weekWithSyncing)
     @Test fun weekNextLight() = snap("week_next_light", false, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
     @Test fun weekNextDark() = snap("week_next_dark", true, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
-    /** Wed 30 Sep to Tue 6 Oct: "September – October 2026" and "Oct" over Thu 1 Oct. */
-    @Test fun weekTwoMonthsDark() = snap("week_two_months_dark", true, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
-    @Test fun weekTwoMonthsLight() = snap("week_two_months_light", false, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1)
+    /** "September – October 2026" at 1.5: the title stays on one line and "Oct" stays inside Thu 1 Oct's card (text is measured for real only in this graphics mode). */
+    @Test fun weekTwoMonthsFontScale15Dark() {
+        snap("week_two_months_fs15_dark", true, fresh, SampleUi.weekAhead(1), canAdd = true, weeksAhead = 1, fontScale = 1.5f)
+        val title = mutableListOf<TextLayoutResult>()
+        compose.runOnUiThread {
+            compose.onNode(hasText("September – October"), useUnmergedTree = true).fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(title)
+        }
+        assertThat(title.single().lineCount).isEqualTo(1)
+        // Not boundsInRoot: that is clipped to the card, which would hide the very cut-off being tested.
+        val labelNode = compose.onNodeWithTag("week_month_label", useUnmergedTree = true).fetchSemanticsNode()
+        val labelTop = labelNode.positionInRoot.y
+        val column = compose.onNodeWithTag("week_day_2026-10-01").fetchSemanticsNode().boundsInRoot
+        val date = compose.onNode(hasText("1") and hasAnyAncestor(hasTestTag("week_day_2026-10-01")), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertThat(labelTop).isAtLeast(column.top)
+        assertThat(labelTop + labelNode.size.height).isLessThan(date.top + date.height / 2)
+    }
     @Test fun weekFurthestLight() = snap("week_furthest_light", false, fresh, SampleUi.weekAhead(3), canAdd = true, weeksAhead = 3)
     @Test fun weekFurthestDark() = snap("week_furthest_dark", true, fresh, SampleUi.weekAhead(3), canAdd = true, weeksAhead = 3)
 }

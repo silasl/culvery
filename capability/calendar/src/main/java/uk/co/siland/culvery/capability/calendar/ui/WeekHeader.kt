@@ -29,11 +29,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import java.time.LocalDate
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.capability.calendar.MAX_WEEKS_AHEAD
+import uk.co.siland.culvery.capability.calendar.MonthTitle
 import uk.co.siland.culvery.capability.calendar.isStaleAt
 import uk.co.siland.culvery.capability.calendar.monthTitle
 import uk.co.siland.culvery.capability.calendar.weekLine
 import uk.co.siland.culvery.capability.calendar.weekSubtitleLine
-import uk.co.siland.culvery.capability.calendar.MonthTitle
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery

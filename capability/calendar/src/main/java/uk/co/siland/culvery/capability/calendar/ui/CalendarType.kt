@@ -193,7 +193,7 @@ internal object CalendarDimens {
     // Week columns: header inset 4 at the sides and bottom; chip title 2 below the time; badge 15.
     val columnHeaderInset = 4.dp
     val monthYearGap = 12.dp
-    val monthLabelOverlap = 3.dp
+    val monthLabelTop = 2.dp
     val columnGap = 8.dp
     val chipTitleTop = 2.dp
     val chipBadge = 15.dp
