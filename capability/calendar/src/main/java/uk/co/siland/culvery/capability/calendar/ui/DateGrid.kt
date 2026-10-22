@@ -36,12 +36,15 @@ import androidx.compose.ui.text.style.TextAlign
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.DAYS_PER_WEEK
+import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.dotColours
+import uk.co.siland.culvery.capability.calendar.peopleByDay
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
@@ -69,6 +72,15 @@ internal fun monthCells(month: YearMonth): List<LocalDate> {
     val last = month.atEndOfMonth().with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY))
     return generateSequence(first) { it.plusDays(1) }.takeWhile { it <= last }.toList()
 }
+
+/** The people from [held] on each day [month]'s grid shows, ready for [DateGrid]'s dots. */
+@Composable
+internal fun rememberGridDots(held: Held?, month: YearMonth, household: EditorPeople, zone: ZoneId): Map<LocalDate, List<Person>> =
+    remember(held, month, household, zone) {
+        val cells = monthCells(month)
+        held?.peopleByDay(cells.first(), cells.last(), household.order, zone).orEmpty()
+            .mapValues { (_, ids) -> ids.mapNotNull { household.byId[it] } }
+    }
 
 /**
  * A month header with ‹ ›, M T W T F S S, then the month's weeks. Days in [chosen] are filled, [band] runs behind its days,

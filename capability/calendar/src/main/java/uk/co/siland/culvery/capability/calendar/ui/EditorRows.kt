@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.calendar.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -114,6 +117,98 @@ internal fun EditorRow(
         } else {
             HhIcon(Icons.LOCK, size = EditorDimens.rowEndIcon, tint = c.mute, modifier = Modifier.testTag("${testTag}_lock"))
         }
+    }
+}
+
+/** What a row says in place of a date, and what TalkBack hears for the Ends row before a Starts day is chosen. */
+internal const val CHOOSE_A_DAY = "Choose a day"
+internal const val CHOOSE_A_START_DAY_FIRST = "choose a start day first"
+
+/**
+ * Starts or Ends (9c §3.1): an [icon], then the [label] over the [date] and, when there is one, the [time], each its own
+ * button ([onDate], [onTime]) heard as "Starts, Saturday 26 September" ([spokenDate]) and "Starts at 10:00". With no date and
+ * no [onDate] the row waits: its label alone, not a button. [locked] reads [date] as the span's dates, with a lock and no
+ * button. With the keyboard up ([typing]) it is shorter and has no label. Parts are tagged [testTag] with `_date`, `_time`,
+ * `_icon`, `_tag` and `_lock`.
+ */
+@Composable
+internal fun EditorWhenRow(
+    testTag: String,
+    icon: String,
+    label: String,
+    date: String?,
+    time: String?,
+    spokenDate: String?,
+    active: Boolean,
+    set: Boolean,
+    typing: Boolean,
+    onDate: (() -> Unit)?,
+    onTime: (() -> Unit)?,
+    tag: RowTag? = null,
+    locked: Boolean = false,
+) {
+    if (locked) {
+        EditorRow(testTag, icon, label, date.orEmpty(), active = false, set = true, typing = typing, onClick = null, tag = tag)
+        return
+    }
+    val c = Culvery.colors
+    val state = rowState(active, set)
+    val shape = RoundedCornerShape(EditorDimens.rowRadius)
+    val waiting = date == null && onDate == null
+    val height = if (typing) EditorDimens.rowHeightTyping else EditorDimens.rowHeight
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(EditorDimens.rowIconGap),
+        modifier = Modifier
+            .testTag(testTag)
+            .fillMaxWidth()
+            .heightIn(min = height)
+            .clip(shape)
+            .background(if (state == RowState.Active) c.accentSoft else c.surf)
+            .then(if (state == RowState.Active) Modifier.border(EditorDimens.ring, c.accent, shape) else Modifier)
+            .then(
+                if (waiting) Modifier.semantics(mergeDescendants = true) { contentDescription = "$label, $CHOOSE_A_START_DAY_FIRST" } else Modifier,
+            )
+            .padding(start = EditorDimens.rowPaddingStart, end = EditorDimens.rowPaddingEnd),
+    ) {
+        HhIcon(icon, size = EditorDimens.rowIcon, tint = if (state == RowState.NotYet) c.mute else c.accent, modifier = Modifier.testTag("${testTag}_icon"))
+        if (waiting) {
+            Text(label, style = CalendarType.rowValue, color = c.mute, maxLines = 1, modifier = Modifier.weight(1f))
+        } else {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(EditorDimens.rowLabelGap, Alignment.CenterVertically),
+                modifier = Modifier
+                    .testTag("${testTag}_date")
+                    .weight(1f)
+                    .heightIn(min = height)
+                    .then(if (onDate != null) Modifier.hhClickable(onDate, spoken = "$label, ${spokenDate ?: CHOOSE_A_DAY}") else Modifier),
+            ) {
+                if (!typing) {
+                    Text(label.uppercase(), style = CalendarType.rowLabel, color = c.mute, maxLines = 1, modifier = Modifier.semantics { hideFromAccessibility() })
+                }
+                Text(
+                    date ?: CHOOSE_A_DAY,
+                    style = CalendarType.rowValue,
+                    color = if (date != null) c.ink else c.mute,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { hideFromAccessibility() },
+                )
+            }
+            if (time != null && onTime != null) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .testTag("${testTag}_time")
+                        .heightIn(min = height)
+                        .hhClickable(onTime, spoken = "$label at $time")
+                        .padding(horizontal = EditorDimens.rowTimePaddingH),
+                ) {
+                    Text(time, style = CalendarType.rowValue, color = c.ink, maxLines = 1, modifier = Modifier.semantics { hideFromAccessibility() })
+                }
+            }
+        }
+        if (tag != null) RowTagPill(tag, Modifier.testTag("${testTag}_tag"))
     }
 }
 

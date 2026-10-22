@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,24 +26,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.ALL_DAY_LABEL
-import uk.co.siland.culvery.capability.calendar.CLASHES_ALLOWED
-import uk.co.siland.culvery.capability.calendar.CLASHES_ALLOWED_TAIL
 import uk.co.siland.culvery.capability.calendar.EDITOR_LENGTHS
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.FreeCheck
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.busyHoursAndCheck
-import uk.co.siland.culvery.capability.calendar.clashLine
-import uk.co.siland.culvery.capability.calendar.freeAtLine
-import uk.co.siland.culvery.capability.calendar.freeLine
 import uk.co.siland.culvery.capability.calendar.lengthChip
 import uk.co.siland.culvery.capability.calendar.lengthLabel
 import uk.co.siland.culvery.capability.calendar.spansDays
@@ -53,7 +42,6 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhChoiceChip
-import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhSegmented
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.Icons
@@ -70,10 +58,6 @@ private const val HOURS_A_ROW = 6
 private val HOUR_GROUPS = listOf("Morning" to 7..11, "Afternoon" to 12..17, "Evening" to 18..22)
 private val CHIP_HOURS = HOUR_GROUPS.first().second.first..HOUR_GROUPS.last().second.last
 private val MINUTE_CHIPS = listOf(0, 15, 30, 45)
-private val HOUR_MINUTE_TAG: DateTimeFormatter = DateTimeFormatter.ofPattern("HHmm", Locale.ENGLISH)
-
-/** What the tablet can say about the chosen time (9 §3.1, §3.4): the day's busy hours and whether everyone chosen is free. */
-internal data class TimeCheck(val busyHours: Set<Int>, val result: FreeCheck)
 
 private val NO_CHECK = TimeCheck(emptySet(), FreeCheck.None)
 
@@ -100,13 +84,6 @@ private fun overDays(form: EditorForm): Boolean {
     val day = form.day ?: return false
     val from = day.atTime(form.startTime ?: return false)
     return spansDays(from, from + form.length)
-}
-
-/** The result line's icon: `check_circle` when free, `warning` on a clash, none when the tablet can't say. */
-internal fun checkIcon(check: FreeCheck): String? = when (check) {
-    is FreeCheck.Free -> Icons.CHECK_CIRCLE
-    is FreeCheck.Busy -> Icons.WARNING
-    FreeCheck.None -> null
 }
 
 /**
@@ -146,7 +123,7 @@ internal fun TimePane(form: EditorForm, check: TimeCheck, household: EditorPeopl
             if (form.startTime != null) {
                 MinutesAndLength(form, onUntil = { onPicker(EditorPicker.EndTime) }, onLength = onPicked)
                 form.endError?.let { HhStatusLine(it, tag = "time_end_error", icon = Icons.ERROR, style = ControlType.fieldError) }
-                Result(form, check.result, nameOf)
+                ClashResult(timeValue(form), check.result, form.who, overDays(form), form.zone, nameOf, form::chooseTime)
             }
         }
     }
@@ -265,62 +242,5 @@ private fun TimeChip(
                     .background(c.weather),
             )
         }
-    }
-}
-
-/**
- * Under a rule: the range, and what the tablet knows of it, said as it changes: "Mia is free then" in `accent`, or the
- * clash in `weather`, then the nearest free starts for the same length; nothing past what it holds (9 §3.1).
- */
-@Composable
-private fun Result(form: EditorForm, check: FreeCheck, nameOf: (PersonId) -> String) {
-    val c = Culvery.colors
-    Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.resultTop)) {
-        Box(Modifier.fillMaxWidth().height(EditorDimens.resultRule).background(c.surf3))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(EditorDimens.resultGap),
-            modifier = Modifier.testTag("time_result").semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
-        ) {
-            Text(timeValue(form), style = CalendarType.timeResult, color = c.ink, maxLines = 1)
-            val line = when (check) {
-                is FreeCheck.Free -> freeLine(check, nameOf)
-                is FreeCheck.Busy -> clashLine(check, single = form.who.size == 1, overDays = overDays(form), nameOf, form.zone)
-                FreeCheck.None -> null
-            }
-            val icon = checkIcon(check)
-            if (line != null && icon != null) {
-                val tint = if (check is FreeCheck.Busy) c.weather else c.accent
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EditorDimens.checkIconGap)) {
-                    HhIcon(icon, size = EditorDimens.checkIcon, filled = true, tint = tint, modifier = Modifier.testTag("time_result_icon"))
-                    Text(line, style = CalendarType.timeCheck, color = tint)
-                }
-            }
-        }
-        if (check is FreeCheck.Busy) FreeStarts(form, check.freeStarts, nameOf)
-    }
-}
-
-/** "Mia is free at" 14:45 16:15 "or keep it; clashes are allowed.", or with no free start, "Clashes are allowed." */
-@Composable
-private fun FreeStarts(form: EditorForm, starts: List<LocalTime>, nameOf: (PersonId) -> String) {
-    val mute = Culvery.colors.mute
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(EditorDimens.freeGap),
-        verticalArrangement = Arrangement.spacedBy(EditorDimens.freeGap),
-        itemVerticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.testTag("time_free"),
-    ) {
-        if (starts.isEmpty()) {
-            Text(CLASHES_ALLOWED, style = CalendarType.timeFreeAt, color = mute, modifier = Modifier.testTag("time_free_tail"))
-            return@FlowRow
-        }
-        Text(freeAtLine(form.who.map(nameOf)), style = CalendarType.timeFreeAt, color = mute, modifier = Modifier.testTag("time_free_at"))
-        starts.forEach { start ->
-            TimeChip(clockText(start), selected = false, tag = "time_free_${start.format(HOUR_MINUTE_TAG)}", role = Role.Button) {
-                form.chooseTime(start)
-            }
-        }
-        Text(CLASHES_ALLOWED_TAIL, style = CalendarType.timeFreeAt, color = mute, modifier = Modifier.testTag("time_free_tail"))
     }
 }

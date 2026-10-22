@@ -14,11 +14,9 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import uk.co.siland.culvery.capability.calendar.DAYS_PER_WEEK
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.SHORT_DAY
-import uk.co.siland.culvery.capability.calendar.peopleByDay
 import uk.co.siland.culvery.capability.calendar.spokenWho
 import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.Culvery
@@ -58,11 +56,7 @@ internal fun quickPicks(today: LocalDate): List<Pair<String, LocalDate>> {
 @Composable
 internal fun DayPane(form: EditorForm, held: Held?, household: EditorPeople, onPicked: () -> Unit) {
     var month by remember { mutableStateOf(YearMonth.from(form.day ?: form.today)) }
-    val weeks = remember(month) { monthCells(month).chunked(DAYS_PER_WEEK) }
-    val onDay = remember(held, weeks, household, form.zone) {
-        held?.peopleByDay(weeks.first().first(), weeks.last().last(), household.order, form.zone).orEmpty()
-            .mapValues { (_, ids) -> ids.mapNotNull { household.byId[it] } }
-    }
+    val onDay = rememberGridDots(held, month, household, form.zone)
     val pick = { date: LocalDate ->
         form.tapDay(date)
         if (!form.awaitingLastDay && form.untilError == null) onPicked()

@@ -176,6 +176,7 @@ internal object EditorDimens {
     val rowRadius = 19.dp
     val rowPaddingStart = 20.dp
     val rowPaddingEnd = 16.dp
+    val rowTimePaddingH = 12.dp
     val rowIcon = 25.dp
     val rowIconGap = 15.dp
     val rowLabelGap = 3.dp
