@@ -18,40 +18,32 @@ sealed interface EventSpan {
 
 enum class ClockField { Hour, Minute }
 
-/** The other mode's end, kept while All day is flipped so toggling never loses it. */
-data class EndAside(val endDays: Int, val endClock: LocalTime)
-
-/**
- * The Starts row, the Ends row and the All day switch (9c §3). [endDays] is the end's date minus the start's
- * (all day: the last day minus the first), so the end follows the start while no date is chosen. The end is
- * always after the start; every way in keeps it so.
- */
+/** Starts, Ends and All day (9c §3); [endDays] is the end's date minus the start's (all day: last day minus first), and the end is always after the start. */
 data class EventWhen(
     val allDay: Boolean,
     val startDate: LocalDate?,
     val startClock: LocalTime,
     val endDays: Int,
     val endClock: LocalTime,
-    val aside: EndAside? = null,
 ) {
     val endDate: LocalDate? get() = startDate?.plusDays(endDays.toLong())
 
-    /** Real wall-clock minutes from the start to the end. */
+    /** Wall-clock time from the start to the end. */
     val length: Duration
         get() = Duration.ofMinutes(endDays * MINUTES_PER_DAY + minutesOf(endClock) - minutesOf(startClock))
 
     val capError: String? get() = UNTIL_TOO_LATE.takeIf { endDays > MAX_SPAN_DAYS - 1 }
 
-    /** Null with no start date. A timed end is not capped at midnight; an ambiguous autumn time takes the earlier offset. */
+    /** Null with no start date; an ambiguous autumn time takes the earlier offset. */
     fun span(zone: ZoneId): EventSpan? {
         val first = startDate ?: return null
         return if (allDay) {
             EventSpan.AllDay(first, first.plusDays(endDays + 1L))
         } else {
-            EventSpan.Timed(
-                ZonedDateTime.of(first, startClock, zone),
-                ZonedDateTime.of(first.plusDays(endDays.toLong()), endClock, zone),
-            )
+            val start = ZonedDateTime.of(first, startClock, zone)
+            val end = ZonedDateTime.of(first.plusDays(endDays.toLong()), endClock, zone)
+            // A start moved out of a spring gap can pass an end that wasn't.
+            EventSpan.Timed(start, end.takeIf { it.isAfter(start) } ?: start.plus(length))
         }
     }
 
@@ -76,7 +68,7 @@ data class EventWhen(
         if (allDay) return this
         val start = clock.truncatedTo(ChronoUnit.MINUTES)
         val end = minutesOf(start) + length.toMinutes()
-        return copy(startClock = start, endDays = (end / MINUTES_PER_DAY).toInt(), endClock = clockOf(end % MINUTES_PER_DAY))
+        return copy(startClock = start, endDays = Math.floorDiv(end, MINUTES_PER_DAY).toInt(), endClock = clockOf(end))
     }
 
     /** Null when the step would leave the end's day, or reach or pass the start. */
@@ -91,23 +83,16 @@ data class EventWhen(
 
     fun canStepEnd(field: ClockField, up: Boolean): Boolean = stepEnd(field, up) != null
 
-    /** Both dates stay; the other mode's end comes back, or is worked out from this one. */
+    /** Both dates stay and the clocks are kept; a midnight end belongs to the day before while All day is on. */
     fun withAllDay(on: Boolean): EventWhen {
         if (on == allDay) return this
-        val target = aside ?: derived(toAllDay = on)
-        val flipped = copy(allDay = on, endDays = target.endDays, endClock = target.endClock, aside = null)
-        val left = EndAside(endDays, endClock)
-        return flipped.copy(aside = left.takeIf { it != flipped.derived(toAllDay = !on) })
+        val midnightEnd = endClock == LocalTime.MIDNIGHT
+        if (on) return copy(allDay = true, endDays = if (midnightEnd) endDays - 1 else endDays)
+        val back = copy(allDay = false, endDays = if (midnightEnd) endDays + 1 else endDays)
+        return if (back.endDays == 0 && !back.endClock.isAfter(back.startClock)) back.withEndAnHourAfterStart() else back
     }
 
-    private fun derived(toAllDay: Boolean): EndAside = if (toAllDay) {
-        // A timed end at exactly midnight belongs to the day before (as daySpan reads it).
-        EndAside(if (endClock == LocalTime.MIDNIGHT && endDays > 0) endDays - 1 else endDays, endClock)
-    } else {
-        hourAfter(startClock)
-    }
-
-    private fun withEndAnHourAfterStart(): EventWhen = hourAfter(startClock).let { copy(endDays = it.endDays, endClock = it.endClock) }
+    private fun withEndAnHourAfterStart(): EventWhen = hourAfter(startClock).let { (days, clock) -> copy(endDays = days, endClock = clock) }
 
     companion object {
         private const val MINUTES_PER_DAY = 24L * 60
@@ -122,35 +107,32 @@ data class EventWhen(
             } else {
                 MORNING
             }
-            val end = hourAfter(start)
-            return EventWhen(false, startDate, start, end.endDays, end.endClock)
+            val (days, clock) = hourAfter(start)
+            return EventWhen(false, startDate, start, days, clock)
         }
 
         /** Opens on the event's own values; an end at or before the start becomes an hour after it. */
         fun of(span: EventSpan, zone: ZoneId): EventWhen = when (span) {
             is EventSpan.AllDay -> {
                 val days = ChronoUnit.DAYS.between(span.first, span.endExclusive) - 1
-                val end = hourAfter(MORNING)
-                EventWhen(true, span.first, MORNING, days.coerceAtLeast(0).toInt(), end.endClock)
+                EventWhen(true, span.first, MORNING, days.coerceAtLeast(0).toInt(), hourAfter(MORNING).second)
             }
             is EventSpan.Timed -> {
-                val start = span.start.withZoneSameInstant(zone).toLocalDateTime()
-                val rawEnd = span.end.withZoneSameInstant(zone).toLocalDateTime()
-                val end: LocalDateTime = if (span.end.isAfter(span.start)) rawEnd else start.plusHours(1)
+                // Wall times decide, since that is what the rows show: an autumn span can end earlier on the clock than it starts.
+                val start = span.start.withZoneSameInstant(zone).toLocalDateTime().truncatedTo(ChronoUnit.MINUTES)
+                val rawEnd = span.end.withZoneSameInstant(zone).toLocalDateTime().truncatedTo(ChronoUnit.MINUTES)
+                val end: LocalDateTime = if (rawEnd.isAfter(start)) rawEnd else start.plusHours(1)
                 EventWhen(
                     allDay = false,
                     startDate = start.toLocalDate(),
-                    startClock = start.toLocalTime().truncatedTo(ChronoUnit.MINUTES),
+                    startClock = start.toLocalTime(),
                     endDays = ChronoUnit.DAYS.between(start.toLocalDate(), end.toLocalDate()).toInt(),
-                    endClock = end.toLocalTime().truncatedTo(ChronoUnit.MINUTES),
+                    endClock = end.toLocalTime(),
                 )
             }
         }
 
-        /**
-         * From provider times. A start and end of different kinds (the editor locks these) read by the start's kind:
-         * an all-day start takes the end's day, a timed start takes an all-day end's midnight.
-         */
+        /** From provider times; a mixed pair (the editor locks these) reads by the start's kind. */
         fun of(start: EventTime, end: EventTime, zone: ZoneId): EventWhen = when (start) {
             is EventTime.AllDay -> {
                 val last = when (end) {
@@ -165,14 +147,14 @@ data class EventWhen(
             )
         }
 
-        private fun hourAfter(start: LocalTime): EndAside {
-            val minutes = minutesOf(start) + 60
-            return EndAside((minutes / MINUTES_PER_DAY).toInt(), clockOf(minutes % MINUTES_PER_DAY))
+        private fun hourAfter(start: LocalTime): Pair<Int, LocalTime> {
+            val minutes = minutesOf(start) + 60L
+            return (minutes / MINUTES_PER_DAY).toInt() to clockOf(minutes)
         }
 
         private fun minutesOf(clock: LocalTime): Int = clock.hour * 60 + clock.minute
 
-        private fun clockOf(minutes: Long): LocalTime = LocalTime.of((minutes / 60).toInt(), (minutes % 60).toInt())
+        private fun clockOf(minutes: Long): LocalTime = LocalTime.ofSecondOfDay(Math.floorMod(minutes, MINUTES_PER_DAY) * 60)
 
         /** [clock] one step on, as minutes since midnight (outside 0..1439 when it leaves the day). An off-quarter minute snaps. */
         private fun stepped(clock: LocalTime, field: ClockField, up: Boolean): Int {

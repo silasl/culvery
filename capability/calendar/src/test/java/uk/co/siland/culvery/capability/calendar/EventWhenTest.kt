@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import com.google.common.truth.Truth.assertThat
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -192,12 +193,69 @@ class EventWhenTest {
 
     @Test
     fun anAllDayEventToggledOffAndOnKeepsItsDays() {
-        val w = EventWhen.of(EventSpan.AllDay(sat, sat.plusDays(3)), london)
+        val w = EventWhen.of(EventSpan.AllDay(sat, sat.plusDays(4)), london)
         val timed = w.withAllDay(false)
         assertThat(timed.allDay).isFalse()
-        assertThat(timed.endDays).isEqualTo(0)
-        assertThat(timed.endClock).isEqualTo(timed.startClock.plusHours(1))
+        assertThat(timed.startDate).isEqualTo(sat)
+        assertThat(timed.endDate).isEqualTo(sat.plusDays(3))
+        assertThat(timed.clocks()).isEqualTo(at(9) to at(10))
         assertThat(timed.withAllDay(true)).isEqualTo(w)
+    }
+
+    @Test
+    fun anEndsDatePickedWhileTimedSurvivesAllDayOn() {
+        val w = checkNotNull(timed(at(10), at(11)).pickEndDate(sat.plusDays(3)))
+        assertThat(w.withAllDay(true).endDate).isEqualTo(sat.plusDays(3))
+    }
+
+    @Test
+    fun anEndsDatePickedWhileAllDaySurvivesAllDayOff() {
+        val w = checkNotNull(timed(at(10), at(11)).withAllDay(true).pickEndDate(sat.plusDays(3)))
+        val back = w.withAllDay(false)
+        assertThat(back.endDate).isEqualTo(sat.plusDays(3))
+        assertThat(back.clocks()).isEqualTo(at(10) to at(11))
+    }
+
+    @Test
+    fun aSpanOverTheAutumnClockChangeWhoseWallEndIsBeforeItsStartOpensValid() {
+        val day = LocalDate.of(2026, 10, 25)
+        val start = ZonedDateTime.of(day, at(1, 45), london).withEarlierOffsetAtOverlap()
+        val end = ZonedDateTime.of(day, at(1, 15), london).withLaterOffsetAtOverlap()
+        assertThat(end.isAfter(start)).isTrue()
+        var w = EventWhen.of(EventSpan.Timed(start, end), london)
+        assertThat(w.length.toMinutes()).isGreaterThan(0)
+        repeat(7) { w = w.stepStart(ClockField.Minute, up = false) }
+        assertThat(w.startClock).isEqualTo(at(0))
+        assertThat(w.length.toMinutes()).isEqualTo(60)
+    }
+
+    @Test
+    fun aSameMinuteSpanOpensAnHourAfter() {
+        val start = ZonedDateTime.of(sat, LocalTime.of(10, 0, 10), london)
+        val w = EventWhen.of(EventSpan.Timed(start, start.plusSeconds(30)), london)
+        assertThat(w.clocks()).isEqualTo(at(10) to at(11))
+    }
+
+    @Test
+    fun aSpanStartingInTheSpringGapNeverEndsBeforeItsStart() {
+        val day = LocalDate.of(2027, 3, 28)
+        val span = timed(at(1, 30), at(2), date = day).span(london) as EventSpan.Timed
+        assertThat(span.end.isAfter(span.start)).isTrue()
+        assertThat(Duration.between(span.start, span.end).toMinutes()).isEqualTo(30)
+    }
+
+    @Test
+    fun aStartsStepThatPushesTheEndPastSixtyDaysIsReportedByTheCap() {
+        val w = timed(at(0, 30), at(1, 30), endDays = 59)
+        assertThat(w.capError).isNull()
+        assertThat(w.stepStart(ClockField.Hour, up = false).capError).isEqualTo(UNTIL_TOO_LATE)
+    }
+
+    @Test
+    fun aMidnightEndOverSeveralDaysRoundTripsAllDay() {
+        val w = timed(at(22), at(0), endDays = 3)
+        assertThat(w.withAllDay(true).endDays).isEqualTo(2)
+        assertThat(w.withAllDay(true).withAllDay(false)).isEqualTo(w)
     }
 
     @Test
