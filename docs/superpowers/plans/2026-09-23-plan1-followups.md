@@ -533,6 +533,17 @@ For the end-of-v1 design review:
 - Undo's refusal reads oddly for an admin, beside the role line "Adult — can add and change any event".
 - The clash wording; the lane bar showing dates only; the "Too long" tag staying after the event is shortened again; the Ends grid opening on the end's month.
 
+## Plans 9c-1, 9c-1b and 9c-1c: on the tablet (2026-10-22, evening)
+
+- Release from 145dc7e installed with `install -r` (household kept); mapping in `culvery-notes/mappings/mapping-145dc7e.txt`.
+- Doorbell, 2026-10-21: logcat reaches back only to the afternoon of the 22nd and usage stats to 20:49 on the 21st, so the 13:10, 16:20 and 18:03 rings can't be read; the Door tab's history doesn't reach 13:10 either. Lead only: Android keeps the Ring app in standby bucket 40 ("rare") between notifications, lifted to 10 for ten minutes by each one. On Android 11 that shouldn't hold back Ring's high-priority pushes. The 22 Oct 18:07 ring and motion arrived as notifications. Next missed ring: note the minute and read logcat the same day.
+- Home's speed, cold start (stop, start, screenshots about every 0.8 s), three runs: splash by 0.2 s; Music's card by 1.5 s; Today filled by 1.3–1.5 s (once still empty at 1.8 s); Lights read "Looking for the lights…" until 2.2, 2.5 and 2.9 s. Home filled by 2.2–2.9 s, the Hue bridge's first read the slowest part. Return from the Calendar tab, three runs: filled in the first frame, about 1 s after the tap command (most of it the command itself).
+- Each relaunch shows Android's "App is pinned" dialog; expected without device owner (release.md §6). Stopping Culvery while the lock screen sits behind it lets the lock screen's 5 s timeout put the tablet to sleep; a test artefact, not a fault.
+- At the wall (the user, a quick look, not the full Step 3 list): everything seemed fine. The full Step 3 checks are still to do.
+
+Fault found:
+- Fault A, while adding an event (title typed), a tap on a start date closed the editor and an existing event's details opened. Not reproduced; no crash and no warning in the log. Nothing in the editor opens an event, so the editor closed first and a tap reached the week or Home behind it; the idle close (10 min once edited, warned at 9:40) and a session ending don't fit. Next time: note the minute, the entry point and where the opened event sat, and read logcat at once.
+
 ## Left out of Plan 9c-1c on purpose (2026-10-22)
 - **Choosing the destination calendar per event:** an event still saves to the household's one destination calendar. Picking another calendar for one event is a later change.
 - **A year-long fetch of past events:** the tablet still keeps about a day of past events. Title suggestions use a remembered list that sync builds up over time, so "From before" starts sparse and fills in over the following weeks.
