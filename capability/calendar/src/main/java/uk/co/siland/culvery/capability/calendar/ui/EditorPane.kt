@@ -217,4 +217,4 @@ private fun SkipButton(onClick: () -> Unit) {
 private fun copiedBanner(form: EditorForm): String? = form.usedSuggestion?.takeIf { form.copied.isNotEmpty() }?.let { bannerLine(it, form.copied, form.today) }
 
 // Only a repeat that was filled in gives dates to pick.
-private fun copiedQuickPicks(form: EditorForm): List<LocalDate> = form.copiedRepeat?.let { quickPicksFor(it, form.today) }.orEmpty()
+private fun copiedQuickPicks(form: EditorForm): List<LocalDate> = form.copiedRepeat?.let { quickPicksFor(it, form.today, form.now) }.orEmpty()

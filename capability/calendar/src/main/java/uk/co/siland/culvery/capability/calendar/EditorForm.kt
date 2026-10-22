@@ -43,7 +43,7 @@ fun needsLine(missing: List<Needed>): String? {
 class EditorForm(
     val mode: Mode,
     val today: LocalDate,
-    private val now: LocalTime,
+    val now: LocalTime,
     val zone: ZoneId,
     private val childOnly: PersonId?,
     preselectedDay: LocalDate?,

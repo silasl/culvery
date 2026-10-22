@@ -10,6 +10,7 @@ import uk.co.siland.culvery.core.household.PersonId
 
 class SuggestionWordsTest {
     private val today = LocalDate.of(2026, 9, 23)
+    private val morning = LocalTime.of(8, 0)
     private val alex = Person(PersonId("alex"), "Alex", 0xFF111111)
     private val sam = Person(PersonId("sam"), "Sam", 0xFF222222)
     private val mia = Person(PersonId("mia"), "Mia", 0xFF333333)
@@ -150,7 +151,7 @@ class SuggestionWordsTest {
 
     @Test
     fun quickPicks() {
-        fun picks(s: Suggestion) = quickPicksFor(s, today)
+        fun picks(s: Suggestion) = quickPicksFor(s, today, morning)
         assertThat(picks(guitar())).containsExactly(day(9, 26), day(10, 3), day(10, 10)).inOrder()
         assertThat(picks(series("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=4SA", day(9, 26), first = day(9, 26))))
             .containsExactly(day(9, 26), day(10, 24), day(11, 28)).inOrder()
@@ -170,11 +171,19 @@ class SuggestionWordsTest {
         val lastThursday = series("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1TH", day(9, 24), first = day(9, 24))
         assertThat(patternLine(lastThursday, household, today)).isEqualTo("Family · Every month, on the last Thursday, 10:00–11:00 · next on Thu 24 Sep")
         assertThat(fillLine(lastThursday, household, childOnly = false)).isEqualTo("Fills in Everyone, 10:00–11:00 and every month, on the last Thursday")
-        assertThat(quickPicksFor(lastThursday, today)).containsExactly(day(9, 24), day(10, 29), day(11, 26)).inOrder()
+        assertThat(quickPicksFor(lastThursday, today, morning)).containsExactly(day(9, 24), day(10, 29), day(11, 26)).inOrder()
     }
 
     @Test
     fun aWeeklyPickIncludesToday() {
-        assertThat(quickPicksFor(guitar(remembered = day(9, 16)).copy(seriesStart = day(9, 2)), today).first()).isEqualTo(today)
+        assertThat(quickPicksFor(guitar(remembered = day(9, 16)).copy(seriesStart = day(9, 2)), today, morning).first()).isEqualTo(today)
+    }
+
+    @Test
+    fun todayIsNotPickedOnceTheCopiedStartHasPassed() {
+        val wednesdays = guitar(remembered = day(9, 16)).copy(seriesStart = day(9, 2))
+        assertThat(quickPicksFor(wednesdays, today, LocalTime.of(10, 0))).containsExactly(day(9, 30), day(10, 7), day(10, 14)).inOrder()
+        val wednesdaysAllDay = wednesdays.copy(allDay = true, start = null, length = null, days = 1)
+        assertThat(quickPicksFor(wednesdaysAllDay, today, LocalTime.of(23, 0)).first()).isEqualTo(today)
     }
 }

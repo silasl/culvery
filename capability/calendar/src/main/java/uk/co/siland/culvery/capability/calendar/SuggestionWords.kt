@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.calendar
 
 import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.MonthDay
 import java.time.temporal.ChronoUnit
 import uk.co.siland.culvery.core.household.Person
@@ -99,23 +100,25 @@ fun bannerLine(s: Suggestion, copied: Set<CopiedRow>, today: LocalDate): String 
 }
 
 /**
- * The next dates that fit a copied repeat, from [today] on (9c §4.4): three for a weekly, fortnightly or
- * monthly-on-a-weekday repeat, one for a yearly one, none otherwise. A fortnight counts from the series' first date.
+ * The next dates that fit a copied repeat, from [today] on, or from tomorrow once a timed start is past [now] (9c §4.4):
+ * three for a weekly, fortnightly or monthly-on-a-weekday repeat, one for a yearly one, none otherwise. A fortnight counts
+ * from the series' first date.
  */
-fun quickPicksFor(s: Suggestion, today: LocalDate): List<LocalDate> {
+fun quickPicksFor(s: Suggestion, today: LocalDate, now: LocalTime): List<LocalDate> {
+    val from = if (!s.allDay && s.start?.isAfter(now) == false) today.plusDays(1) else today
     val anchor = s.anchor()
-    val firstWeekday = today.plusDays(Math.floorMod(anchor.dayOfWeek.value - today.dayOfWeek.value, DAYS_PER_WEEK).toLong())
+    val firstWeekday = from.plusDays(Math.floorMod(anchor.dayOfWeek.value - from.dayOfWeek.value, DAYS_PER_WEEK).toLong())
     return when (val choice = s.choice()) {
         RepeatChoice.Weekly -> occurrences(choice, firstWeekday, PICKS)
         RepeatChoice.Fortnightly -> {
             val onFortnight = if (ChronoUnit.WEEKS.between(anchor, firstWeekday) % 2 == 0L) firstWeekday else firstWeekday.plusWeeks(1)
             occurrences(choice, onFortnight, PICKS)
         }
-        // One more than wanted, since this month's date may be before today.
-        RepeatChoice.MonthlyOnWeekday -> occurrences(choice, firstWeekday, PICKS + 1, s.nth()).filter { it >= today }.take(PICKS)
+        // One more than wanted, since this month's date may be before the first that can be picked.
+        RepeatChoice.MonthlyOnWeekday -> occurrences(choice, firstWeekday, PICKS + 1, s.nth()).filter { it >= from }.take(PICKS)
         RepeatChoice.Yearly -> listOfNotNull(
-            (today.year..today.year + LEAP_GAP_YEARS).firstNotNullOfOrNull { year ->
-                MonthDay.from(anchor).takeIf { it.isValidYear(year) }?.atYear(year)?.takeIf { it >= today }
+            (from.year..from.year + LEAP_GAP_YEARS).firstNotNullOfOrNull { year ->
+                MonthDay.from(anchor).takeIf { it.isValidYear(year) }?.atYear(year)?.takeIf { it >= from }
             },
         )
         else -> emptyList()
