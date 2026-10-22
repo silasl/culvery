@@ -541,6 +541,20 @@ class EventEditorScreenTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** Once the keyboard has gone, one tap on close asks to discard, as it does with no suggestions showing. */
+    @Test
+    fun closingWhileSuggestionsShowAsksToDiscardAtOnce() {
+        suggestions = listOf(guitarSuggestion())
+        show()
+        compose.onNodeWithTag("editor_title").performTextInput("Gu")
+        compose.onNodeWithTag("suggestion_0").assertExists()
+        compose.onNodeWithTag("sheet_close").performClick()
+        node("editor_title").assertIsNotFocused()
+        compose.runOnIdle { assertThat(keyboardUp()).isFalse() }
+        compose.onNodeWithTag("editor_discard").assertIsDisplayed()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     private fun keyboardUp(): Boolean =
         shadowOf(ApplicationProvider.getApplicationContext<Context>().getSystemService(InputMethodManager::class.java)).isSoftInputVisible
 
