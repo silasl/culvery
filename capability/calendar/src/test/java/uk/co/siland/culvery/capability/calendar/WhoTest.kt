@@ -118,4 +118,11 @@ class WhoTest {
         assertThat(toggled(listOf(sam.id), family)).containsExactly(family)
         assertThat(toggled(listOf(family), sam.id)).containsExactly(sam.id)
     }
+
+    @Test
+    fun theWhoLineShortensBeforeItIsCut() {
+        assertThat(whoLineForms(listOf(sam, mia))).containsExactly("Sam + Mia", "Sam +1").inOrder()
+        assertThat(whoLineForms(listOf(alex, sam, mia))).containsExactly("Alex, Sam +1", "Alex +2").inOrder()
+        assertThat(whoLineForms(listOf(sam))).containsExactly("Sam")
+    }
 }

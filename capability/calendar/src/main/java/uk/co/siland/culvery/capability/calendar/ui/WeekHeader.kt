@@ -45,7 +45,7 @@ import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
 
 /**
- * The week's title block (9 §4.7): the title with ‹ › in one pill, This week past the current week and Add event beside
+ * The week's title block (9 §4.7): the title with This week past the current week, ‹ › in one pill and Add event beside
  * it; under it the sync line with Update now, and the reconnect chip. While the week is out of date, Update now runs
  * [onUpdateNow] and the line says "Updating…" until the sync lands or [UPDATING_SHOWN_MS] passes (4e).
  */
@@ -107,10 +107,10 @@ internal fun WeekHeader(
             }
         },
     ) {
-        NavPill(state.weeksAhead, onWeeksAhead)
         if (state.weeksAhead > 0) {
             HhButton("This week", { onWeeksAhead(0) }, Modifier.testTag("week_this_week"), on = ButtonSurface.Bg)
         }
+        NavPill(state.weeksAhead, onWeeksAhead)
         if (onAdd != null) {
             HhButton(
                 "Add event", { onAdd(null) }, Modifier.testTag("week_add_event"),

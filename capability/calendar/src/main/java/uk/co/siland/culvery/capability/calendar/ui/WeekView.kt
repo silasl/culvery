@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
@@ -62,6 +63,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -77,7 +79,7 @@ import uk.co.siland.culvery.capability.calendar.MONTH_SHORT
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WEEKDAY
 import uk.co.siland.culvery.capability.calendar.WeekUi
-import uk.co.siland.culvery.capability.calendar.whoLine
+import uk.co.siland.culvery.capability.calendar.whoLineForms
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhAlpha
@@ -416,14 +418,12 @@ internal fun EventChip(event: EventUi, day: LocalDate, onOpen: ((EventRef) -> Un
                 } else {
                     Box(Modifier.testTag("chip_dot").size(CalendarDimens.chipDot).clip(CircleShape).background(Color(event.people.first().color)))
                 }
-                // One line, so a long name is cut before the time (4d-1 Decision 2).
-                Text(
-                    "${event.startLabel} · ${whoLine(event.people)}",
+                // One line: the who shortens first, then a long name is cut before the time (4d-1 Decision 2, 9c §5).
+                ShorteningText(
+                    whoLineForms(event.people).map { "${event.startLabel} · $it" },
                     style = CalendarType.chipTime,
                     color = c.mute,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).testTag("chip_who"),
                 )
                 EventBadges(event, CalendarDimens.chipBadge)
             }
@@ -470,4 +470,24 @@ internal fun rememberWeekShown(today: LocalDate): WeekShown {
         }
     }
     return shown
+}
+
+/** One line showing the first of [forms] that fits the width it is given; only the last may end in an ellipsis. */
+@Composable
+private fun ShorteningText(forms: List<String>, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
+    Layout(
+        content = {
+            forms.forEachIndexed { i, form ->
+                Text(
+                    form, style = style, color = color, maxLines = 1,
+                    overflow = if (i == forms.lastIndex) TextOverflow.Ellipsis else TextOverflow.Clip,
+                )
+            }
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val fitting = measurables.firstOrNull { it.maxIntrinsicWidth(Constraints.Infinity) <= constraints.maxWidth }
+        val placeable = (fitting ?: measurables.last()).measure(constraints.copy(minWidth = 0))
+        layout(placeable.width.coerceAtLeast(constraints.minWidth), placeable.height) { placeable.placeRelative(0, 0) }
+    }
 }

@@ -14,6 +14,7 @@ import uk.co.siland.culvery.capability.calendar.DayUi
 import uk.co.siland.culvery.capability.calendar.SyncStatusUi
 import uk.co.siland.culvery.capability.calendar.WeekFocus
 import uk.co.siland.culvery.capability.calendar.WeekUi
+import uk.co.siland.culvery.capability.calendar.weeksTo
 import uk.co.siland.culvery.core.plugin.Connection
 
 /**
@@ -60,13 +61,14 @@ internal fun WeekViewHost(
         }
     }
     val start = today.plusWeeks(shown.weeks.toLong())
-    // produceState keeps the week on screen while the next one loads, so a step doesn't blank the view.
+    // produceState keeps the week on screen while the next one loads, so a step doesn't blank the view; its label
+    // follows the loaded week, so it changes with its dates.
     val week: WeekUi? by produceState<WeekUi?>(null, repo, start) { repo.week(start).collect { value = it } }
     val sync: SyncStatusUi? by repo.syncStatus.collectAsState(initial = null)
     val w = week ?: return
     val s = sync ?: return
     WeekView(
-        WeekViewState(w, today, s, nowMillis, shown.weeks),
+        WeekViewState(w, today, s, nowMillis, weeksTo(today, w.days.first().date) ?: shown.weeks),
         onOpen = open,
         onAdd = add,
         onWeeksAhead = shown::show,

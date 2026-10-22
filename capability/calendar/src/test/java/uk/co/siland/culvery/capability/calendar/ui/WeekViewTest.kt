@@ -1,5 +1,8 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -42,7 +45,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -260,7 +267,7 @@ class WeekViewTest {
     }
 
     @Test
-    fun theArrowsShareOnePillAndThisWeekSitsBetween() {
+    fun theArrowsShareOnePill() {
         show { WeekView(state().copy(weeksAhead = 1), onAdd = {}) }
         val pill = compose.onNodeWithTag("week_nav_pill").fetchSemanticsNode().boundsInRoot
         listOf("week_earlier", "week_later").forEach {
@@ -269,11 +276,47 @@ class WeekViewTest {
             assertThat(arrow.left).isAtLeast(pill.left)
             assertThat(arrow.right).isAtMost(pill.right)
         }
-        val thisWeek = compose.onNodeWithTag("week_this_week").fetchSemanticsNode().boundsInRoot
-        val add = compose.onNodeWithTag("week_add_event").fetchSemanticsNode().boundsInRoot
-        assertThat(thisWeek.left).isAtLeast(pill.right)
-        assertThat(thisWeek.right).isAtMost(add.left)
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theHeaderReadsThisWeekThenTheArrowsThenAddEvent() {
+        var weeksAhead by mutableStateOf(1)
+        show { WeekView(state().copy(weeksAhead = weeksAhead), onAdd = {}) }
+        fun bounds(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+        assertThat(bounds("week_this_week").right).isLessThan(bounds("week_earlier").left)
+        assertThat(bounds("week_later").right).isLessThan(bounds("week_add_event").left)
+        val nextWeekGap = bounds("week_add_event").left - bounds("week_later").right
+
+        compose.runOnIdle { weeksAhead = 0 }
+        compose.onAllNodesWithTag("week_this_week").assertCountEquals(0)
+        assertThat(bounds("week_add_event").left - bounds("week_later").right).isEqualTo(nextWeekGap)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aNarrowChipShowsTheShorterWhoLine() {
+        lateinit var measurer: TextMeasurer
+        lateinit var chipStyle: TextStyle
+        var chipWidth by mutableStateOf(400.dp)
+        show {
+            measurer = rememberTextMeasurer()
+            chipStyle = LocalTextStyle.current.merge(CalendarType.chipTime)
+            Box(Modifier.width(chipWidth)) { EventChip(SampleUi.cinema, friday, onOpen = {}) }
+        }
+        val long = "17:00 · Sam + Mia"
+        val short = "17:00 · Sam +1"
+        fun textWidth(text: String) = compose.runOnIdle { measurer.measure(text, chipStyle, maxLines = 1).size.width }
+        val wide = compose.onNodeWithTag("chip_who", useUnmergedTree = true).fetchSemanticsNode().size.width
+        val chrome = with(compose.density) { chipWidth.roundToPx() } - wide
+        val room = (textWidth(short) + textWidth(long)) / 2
+        compose.runOnIdle { chipWidth = with(compose.density) { (chrome + room).toDp() } }
+        compose.waitForIdle()
+
+        assertThat(compose.onNode(hasText(short), useUnmergedTree = true).fetchSemanticsNode().layoutInfo.isPlaced).isTrue()
+        assertThat(compose.onNode(hasText(long), useUnmergedTree = true).fetchSemanticsNode().layoutInfo.isPlaced).isFalse()
+        assertThat(compose.onNode(hasText(short), useUnmergedTree = true).textLayout().isLineEllipsized(0)).isFalse()
+        compose.onNodeWithContentDescription(cinemaName).assertExists()
     }
 
     /** Pin: an arrow at its end is the shared disabled button, not a faded one. */

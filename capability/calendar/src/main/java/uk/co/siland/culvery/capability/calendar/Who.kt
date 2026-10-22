@@ -73,3 +73,7 @@ fun spokenWho(people: List<Person>): String = spokenNames(people.map { it.name }
 /** "Sam", "Sam and Mia", "Alex, Sam and Mia". */
 fun spokenNames(names: List<String>): String =
     if (names.size < 2) names.firstOrNull().orEmpty() else names.dropLast(1).joinToString(", ") + " and " + names.last()
+
+/** [whoLine], then the shorter "Sam +1", "Alex +2" for a chip too narrow for it; one person has one form. */
+fun whoLineForms(people: List<Person>): List<String> =
+    if (people.size < 2) listOf(whoLine(people)) else listOf(whoLine(people), "${people[0].name} +${people.size - 1}")
