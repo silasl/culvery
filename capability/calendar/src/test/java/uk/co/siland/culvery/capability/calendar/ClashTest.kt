@@ -51,13 +51,6 @@ class ClashTest {
     private fun Held.check(people: List<Person>, day: LocalDate, start: String, length: Duration = fortyFive, except: EventRef? = null) =
         check(people.map { it.id }, day.atTime(LocalTime.parse(start)), day.atTime(LocalTime.parse(start)) + length, london, except, order)
 
-    private fun Held.busy(people: List<Person>, day: LocalDate, except: EventRef? = null) = busyHours(people.map { it.id }, day, london, except)
-
-    @Test
-    fun anOverlapIsABusyHour() {
-        assertThat(held(piano).busy(listOf(mia), thu1)).containsExactly(15, 16)
-    }
-
     @Test
     fun allDayAndFamilyEventsMakeNobodyBusy() {
         val start = thu1
@@ -68,7 +61,6 @@ class ClashTest {
         ).toHeld(people, order)
         val family = timed("Boiler service", thu1, "15:00", "16:00", forPerson = PersonId.FAMILY.value)
         val h = held(allDay, family)
-        assertThat(h.busy(listOf(mia), thu1)).isEmpty()
         assertThat(h.check(listOf(mia), thu1, "15:00")).isEqualTo(FreeCheck.Free(listOf(mia.id)))
     }
 
@@ -76,7 +68,6 @@ class ClashTest {
     fun aSharedEventMakesEachOfItsPeopleBusy() {
         val cinema = timed("Cinema", sat26, "19:00", "21:00", forPerson = "${sam.id.value},${mia.id.value}")
         val h = held(cinema)
-        assertThat(h.busy(listOf(sam), sat26)).containsExactly(19, 20)
         assertThat(h.check(listOf(sam), sat26, "19:30")).isEqualTo(FreeCheck.Busy(listOf(Clash(sam.id, cinema)), 0, listOf(LocalTime.of(18, 15), LocalTime.of(21, 0))))
     }
 
@@ -84,7 +75,6 @@ class ClashTest {
     fun aCalendarsPersonIsBusyWithItsUntaggedEvents() {
         val swim = timed("Swimming", sat26, "10:00", "11:00", forPerson = null, sourcePerson = mia.id)
         val h = held(swim)
-        assertThat(h.busy(listOf(mia), sat26)).containsExactly(10)
         assertThat((h.check(listOf(mia), sat26, "10:00") as FreeCheck.Busy).clashes.single().event).isEqualTo(swim)
     }
 
@@ -105,13 +95,6 @@ class ClashTest {
     }
 
     @Test
-    fun aMultiDayTimedEventMakesTheDaysBetweenBusy() {
-        val fri = LocalDate.of(2026, 10, 2)
-        val camp = timed("Camp", fri, "18:00", "16:00", endDay = fri.plusDays(2))
-        assertThat(held(camp).busy(listOf(mia), fri.plusDays(1))).isEqualTo((0..23).toSet())
-    }
-
-    @Test
     fun aTimedSpanPastMidnightChecksTheNextDay() {
         val early = timed("Ferry", thu1.plusDays(1), "00:15", "01:00")
         assertThat(held(early).check(listOf(mia), thu1, "22:30", Duration.ofHours(1))).isEqualTo(FreeCheck.Free(listOf(mia.id)))
@@ -119,13 +102,6 @@ class ClashTest {
         assertThat(past).isEqualTo(FreeCheck.Busy(listOf(Clash(mia.id, early)), 0, emptyList()))
         val late = timed("Film", thu1, "23:45", "23:59")
         assertThat(held(late).check(listOf(mia), thu1, "22:30", Duration.ofHours(2))).isInstanceOf(FreeCheck.Busy::class.java)
-    }
-
-    @Test
-    fun theClocksChangeKeepsLocalHours() {
-        val sun25 = LocalDate.of(2026, 10, 25)
-        val brunch = timed("Brunch", sun25, "10:00", "11:00")
-        assertThat(held(brunch, lastDay = sun25).busy(listOf(mia), sun25)).containsExactly(10)
     }
 
     @Test
@@ -214,7 +190,6 @@ class ClashTest {
         val family = timed("Boiler service", thu1, "15:00", "16:00", forPerson = PersonId.FAMILY.value)
         val h = held(piano, family)
         assertThat(h.check(listOf(Person.Family), thu1, "15:00")).isEqualTo(FreeCheck.None)
-        assertThat(h.busy(listOf(Person.Family), thu1)).isEmpty()
         assertThat(h.check(emptyList(), thu1, "15:00")).isEqualTo(FreeCheck.None)
     }
 
@@ -225,7 +200,6 @@ class ClashTest {
         val after = timed("Piano next", lastDay.plusDays(1), "15:30", "16:15")
         val h = held(onLast, after)
         assertThat(h.check(listOf(mia), lastDay.plusDays(1), "15:00")).isEqualTo(FreeCheck.None)
-        assertThat(h.busy(listOf(mia), lastDay.plusDays(1))).isEmpty()
         assertThat(h.check(listOf(mia), lastDay, "15:00")).isInstanceOf(FreeCheck.Busy::class.java)
     }
 
@@ -234,7 +208,6 @@ class ClashTest {
         val yesterday = timed("Piano", today.minusDays(1), "15:30", "16:15")
         val h = held(yesterday)
         assertThat(h.check(listOf(mia), today.minusDays(1), "15:00")).isEqualTo(FreeCheck.None)
-        assertThat(h.busy(listOf(mia), today.minusDays(1))).isEmpty()
         assertThat(h.check(listOf(mia), today, "15:00")).isEqualTo(FreeCheck.Free(listOf(mia.id)))
     }
 
@@ -242,7 +215,6 @@ class ClashTest {
     fun theEventBeingChangedDoesNotClashWithItself() {
         val h = held(piano)
         assertThat(h.check(listOf(mia), thu1, "15:45", except = piano.ref)).isEqualTo(FreeCheck.Free(listOf(mia.id)))
-        assertThat(h.busy(listOf(mia), thu1, except = piano.ref)).isEmpty()
     }
 
     @Test

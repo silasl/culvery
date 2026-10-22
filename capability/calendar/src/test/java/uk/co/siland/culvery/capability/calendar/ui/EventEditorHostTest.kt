@@ -209,6 +209,8 @@ class EventEditorHostTest {
 
     private fun rowValue(row: String) = compose.onNodeWithTag("editor_row_${row}_value", useUnmergedTree = true)
 
+    private fun startsSays(): List<String> = compose.onNodeWithTag("editor_starts_date").fetchSemanticsNode().config[SemanticsProperties.ContentDescription]
+
     private fun millisAt(date: LocalDate, hour: Int, minute: Int) = date.atTime(hour, minute).atZone(london).toInstant().toEpochMilli()
 
     /** A title and Alex: what a new event with its day needs before Add event. */
@@ -223,7 +225,7 @@ class EventEditorHostTest {
         waitForTag("week_add_event")
         compose.onNodeWithTag("week_add_event").performClick()
         waitForText("New event")
-        rowValue("day").assertTextEquals("Choose a day")
+        assertThat(startsSays()).contains("Starts, Choose a day")
         assertThat(overlay.fullScreen).isTrue()
         assertThat(compose.onNodeWithTag("editor_screen").getUnclippedBoundsInRoot()).isEqualTo(compose.onRoot().getUnclippedBoundsInRoot())
         compose.assertClickablesHaveRoleAndLabel()
@@ -236,7 +238,7 @@ class EventEditorHostTest {
         waitForTag("week_add_$friday")
         compose.onNodeWithTag("week_add_$friday", useUnmergedTree = true).performClick()
         waitForText("New event")
-        rowValue("day").assertTextEquals("Fri 25 Sep")
+        assertThat(startsSays()).contains("Starts, Friday 25 September")
         assertThat(overlay.fullScreen).isTrue()
         compose.assertClickablesHaveRoleAndLabel()
     }
@@ -247,7 +249,7 @@ class EventEditorHostTest {
         waitForTag("today_add")
         compose.onNodeWithTag("today_add").performClick()
         waitForText("New event")
-        rowValue("day").assertTextEquals("Wed 23 Sep")
+        assertThat(startsSays()).contains("Starts, Wednesday 23 September")
         compose.onNodeWithTag("editor_context", useUnmergedTree = true).assertTextEquals("From Home")
         assertThat(overlay.fullScreen).isTrue()
         compose.assertClickablesHaveRoleAndLabel()
@@ -261,8 +263,9 @@ class EventEditorHostTest {
         waitForText("Change event")
         assertThat(overlay.fullScreen).isTrue()
         rowValue("who").assertTextEquals("Everyone")
-        rowValue("day").assertTextEquals("Wed 23 Sep")
-        rowValue("time").assertTextEquals("19:30–21:00")
+        assertThat(startsSays()).contains("Starts, Wednesday 23 September")
+        compose.onNodeWithTag("editor_starts_time").assertTextEquals("19:30")
+        compose.onNodeWithTag("editor_ends_time").assertTextEquals("21:00")
         compose.onNodeWithTag("editor_question", useUnmergedTree = true).assertTextEquals("Check it")
         compose.onNodeWithTag("editor_title").assertTextEquals("Dinner with Jo & Priya").assertIsNotFocused()
         compose.onNodeWithTag("detail_sheet").assertDoesNotExist()
@@ -316,12 +319,12 @@ class EventEditorHostTest {
         showEditor(EditorRequest.New(day = null, from = EditorFrom.Calendar))
         waitForText("Add event")
         fillTitleAndAlex("Bonfire")
-        compose.onNodeWithTag("editor_row_day").performClick()
-        compose.onNodeWithTag("day_quick_1").assertTextEquals("Tomorrow").performClick()
+        compose.onNodeWithTag("editor_starts_date").performClick()
+        compose.onNodeWithTag("day_2026-10-25").performClick()
         now = millisAt(LocalDate.of(2026, 10, 25), 0, 5)
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { overlay.dismissed > 0 }
-        assertThat(writer.drafts.single().start).isEqualTo(EventTime.AllDay(LocalDate.of(2026, 10, 25)))
+        assertThat(writer.drafts.single().start).isEqualTo(EventTime.Timed(LocalDate.of(2026, 10, 25).atTime(9, 0).atZone(london).toInstant()))
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -490,8 +493,8 @@ class EventEditorHostTest {
     fun anEditorWithOnlyADayChosenWaitsTenMinutesAndAsksBeforeDiscarding() {
         newEvent(null)
         waitForText("Add event")
-        compose.onNodeWithTag("editor_row_day").performClick()
-        compose.onNodeWithTag("day_quick_0").performClick()
+        compose.onNodeWithTag("editor_starts_date").performClick()
+        compose.onNodeWithTag("day_$day").performClick()
         compose.waitUntil(5_000) { overlay.edited }
         compose.onNodeWithTag("sheet_close").performClick()
         compose.onNodeWithText("Discard this event?").assertExists()
@@ -561,8 +564,8 @@ class EventEditorHostTest {
                 it.execSQL("CREATE TRIGGER fail_outbox BEFORE DELETE ON outbox BEGIN SELECT RAISE(ABORT, 'disk full'); END")
             }
         }
-        compose.onNodeWithTag("editor_row_time").performClick()
-        compose.onNodeWithTag("length_120").performClick()
+        compose.onNodeWithTag("editor_ends_time").performClick()
+        compose.onNodeWithTag("end_hour_up").performClick()
         compose.onNodeWithTag("editor_save").performClick()
         waitForText(couldNotSave("Sample calendar", WriteProblem.Tablet))
         compose.onNodeWithTag("editor_failure").assertExists()
@@ -588,8 +591,8 @@ class EventEditorHostTest {
         access.answer(TestAccess.SAM)
         showEditor(EditorRequest.Edit(dinner, EditorFrom.Calendar))
         waitForText("Change event")
-        compose.onNodeWithTag("editor_row_time").performClick()
-        compose.onNodeWithTag("length_120").performClick()
+        compose.onNodeWithTag("editor_ends_time").performClick()
+        compose.onNodeWithTag("end_hour_up").performClick()
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { overlay.dismissed > 0 }
         assertThat(writer.calls).containsExactly("update:dinner")
@@ -611,25 +614,25 @@ class EventEditorHostTest {
         showEditor(EditorRequest.New(day = day.plusDays(9), from = EditorFrom.Calendar))
         waitForText("Add event")
         fillTitleAndAlex("Parents evening")
-        compose.onNodeWithTag("editor_row_day").performClick()
-        val chosen = rowValue("day").fetchSemanticsNode().config[SemanticsProperties.Text].joinToString()
+        compose.onNodeWithTag("editor_starts_date").performClick()
+        assertThat(startsSays()).contains("Starts, Friday 2 October")
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { writer.entered.isCompleted }
         compose.onNodeWithTag("editor_save").performClick()
         // Nothing can change under a save in flight: it would close with that edit lost.
         compose.onNodeWithTag("editor_title").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.SetText))
-        compose.onNodeWithTag("day_quick_0").performClick()
-        rowValue("day").assertTextEquals(chosen)
+        compose.onNodeWithTag("day_${day.plusDays(10)}").performClick()
+        assertThat(startsSays()).contains("Starts, Friday 2 October")
         // No other pane opens either; Who's own tiles ignore taps too (WhoPaneTest).
         compose.onNodeWithTag("editor_row_who").performClick()
-        compose.onNodeWithTag("editor_row_time").performClick()
+        compose.onNodeWithTag("editor_starts_time").performClick()
         compose.onNodeWithTag("editor_row_repeats").performClick()
-        compose.onNodeWithTag("editor_row_day").assertIsSelected()
+        compose.onNodeWithTag("editor_question").assertTextEquals("Which day does it start?")
         compose.assertClickablesHaveRoleAndLabel()
         gate.complete(Unit)
         compose.waitUntil(5_000) { overlay.dismissed > 0 }
         assertThat(writer.calls).containsExactly("create:Parents evening")
-        assertThat(writer.drafts.single().start).isEqualTo(EventTime.AllDay(day.plusDays(9)))
+        assertThat(writer.drafts.single().start).isEqualTo(EventTime.Timed(day.plusDays(9).atTime(9, 0).atZone(london).toInstant()))
         // The week goes to the date that was saved.
         assertThat(weekFocus.requested.value).isEqualTo(1)
         compose.assertClickablesHaveRoleAndLabel()
@@ -640,16 +643,16 @@ class EventEditorHostTest {
         newEvent(day)
         waitForText("Add event")
         fillTitleAndAlex()
-        compose.onNodeWithTag("editor_row_day").performClick()
-        compose.onNodeWithTag("day_quick_1").performClick()
+        compose.onNodeWithTag("editor_starts_date").performClick()
+        compose.onNodeWithTag("day_${day.plusDays(1)}").performClick()
         // Within the 250 ms move-on of that pick; nobody is signed in, so the PIN pad opens.
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { access.requests.isNotEmpty() }
         compose.mainClock.advanceTimeBy(300)
-        compose.onNodeWithTag("editor_row_day").assertIsSelected()
+        compose.onNodeWithTag("editor_question").assertTextEquals("Which day does it start?")
         compose.runOnIdle { access.prompt.cancel() }
         compose.mainClock.advanceTimeBy(300)
-        compose.onNodeWithTag("editor_row_day").assertIsSelected()
+        compose.onNodeWithTag("editor_question").assertTextEquals("Which day does it start?")
     }
 
     /** A save that ends without closing (a cancelled PIN, a refusal) lets the form change again. */
@@ -658,19 +661,19 @@ class EventEditorHostTest {
         newEvent(day)
         waitForText("Add event")
         fillTitleAndAlex()
-        compose.onNodeWithTag("editor_row_day").performClick()
+        compose.onNodeWithTag("editor_starts_date").performClick()
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { access.requests.isNotEmpty() }
         compose.runOnIdle { access.prompt.cancel() }
-        compose.onNodeWithTag("day_quick_1").performClick()
-        rowValue("day").assertTextEquals("Thu 24 Sep")
+        compose.onNodeWithTag("day_${day.plusDays(1)}").performClick()
+        assertThat(startsSays()).contains("Starts, Thursday 24 September")
         // Mia's PIN can't add for Alex.
         access.answer(TestAccess.MIA)
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
         assertThat(access.toasts.messages).containsExactly(cannotAddForOthers("Mia"))
-        compose.onNodeWithTag("day_quick_0").performClick()
-        rowValue("day").assertTextEquals("Wed 23 Sep")
+        compose.onNodeWithTag("day_$day").performClick()
+        assertThat(startsSays()).contains("Starts, Wednesday 23 September")
         assertThat(writer.calls).isEmpty()
         assertThat(overlay.dismissed).isEqualTo(0)
         compose.assertClickablesHaveRoleAndLabel()
@@ -724,8 +727,8 @@ class EventEditorHostTest {
         waitForText("Change event")
         // Deleted on a phone, then synced, while the editor was open.
         runBlocking { store.applyDeleted(dinner) }
-        compose.onNodeWithTag("editor_row_time").performClick()
-        compose.onNodeWithTag("length_120").performClick()
+        compose.onNodeWithTag("editor_ends_time").performClick()
+        compose.onNodeWithTag("end_hour_up").performClick()
         compose.onNodeWithTag("editor_save").performClick()
         compose.waitUntil(5_000) { overlay.dismissed > 0 }
         assertThat(access.requests).isEmpty()
@@ -783,7 +786,7 @@ class EventEditorHostTest {
         compose.runOnIdle { open(EditorRequest.Edit(dinner, EditorFrom.Calendar)) }
         waitForText("Change event")
         compose.onNodeWithTag("editor_title").assertTextEquals("Dinner with Jo & Priya").assertIsNotFocused()
-        rowValue("time").assertTextEquals("19:30–21:00")
+        compose.onNodeWithTag("editor_ends_time").assertTextEquals("21:00")
         compose.runOnIdle { open(EditorRequest.New(null, EditorFrom.Calendar)) }
         waitForText("Add event")
         compose.onNodeWithTag("editor_title").assertIsFocused()

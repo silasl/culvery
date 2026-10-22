@@ -48,9 +48,10 @@ class TimeSteppersTest {
                     time, prefix,
                     onStep = { field, up ->
                         stepped += field to up
+                        val sign = if (up) 1L else -1L
                         time = when (field) {
-                            ClockField.Hour -> time.withHour(hourStep(time.hour, up))
-                            ClockField.Minute -> time.withMinute(minuteStep(time.minute, up))
+                            ClockField.Hour -> time.plusHours(sign)
+                            ClockField.Minute -> time.plusMinutes(sign * 15)
                         }
                     },
                     enabled = enabled,

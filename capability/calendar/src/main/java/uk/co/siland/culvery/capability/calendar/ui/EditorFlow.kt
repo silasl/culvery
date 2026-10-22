@@ -11,29 +11,42 @@ import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.core.household.PersonId
 
 /** The editor's rows, then Check: which question the pane asks. */
-enum class EditorStep { Who, Day, Time, Repeats, Check }
-
-/** Which picker is drawn over the editor's Time pane: its start or its end time. */
-enum class EditorPicker { None, StartTime, EndTime }
+enum class EditorStep { Who, StartDate, StartTime, EndDate, EndTime, Repeats, Check }
 
 /** How long after a single-choice pick the next row lights up (handoff Behaviour). */
 internal const val MOVE_ON_MS = 250L
 
+/** What Next says it moves to (9c §3.6). */
+internal fun nextLabelFor(step: EditorStep): String = "Next: " + when (step) {
+    EditorStep.Who -> "Who"
+    EditorStep.StartDate -> "Starts"
+    EditorStep.StartTime -> "Start time"
+    EditorStep.EndDate -> "Ends"
+    EditorStep.EndTime -> "End time"
+    EditorStep.Repeats -> "Repeats"
+    EditorStep.Check -> "Check"
+}
+
 /**
- * Which of [steps] the pane asks about. Tapping a row [open]s it; Next moves on at once and [moveOnSoon] after
- * [MOVE_ON_MS], unless the person has gone somewhere else first.
+ * Which of [stepsOf]'s steps the pane asks about; the steps can change while it is open, as All day hides the times.
+ * Tapping a row [open]s it; Next moves on at once and [moveOnSoon] after [MOVE_ON_MS], unless the person has gone
+ * somewhere else first.
  */
-class EditorFlow(val steps: List<EditorStep>, initial: EditorStep) {
+class EditorFlow(private val stepsOf: () -> List<EditorStep>, initial: EditorStep) {
+    constructor(steps: List<EditorStep>, initial: EditorStep) : this({ steps }, initial)
+
     init {
         require(initial in steps) { "$initial isn't one of $steps" }
     }
+
+    val steps: List<EditorStep> get() = stepsOf()
 
     var active by mutableStateOf(initial)
         private set
 
     // Bumped by every change of row, so a pending move made before it doesn't fire.
     private var generation = 0
-    private val moves = Channel<Int>(Channel.CONFLATED)
+    private val moves = Channel<Pair<Int, EditorStep>>(Channel.CONFLATED)
 
     fun open(step: EditorStep) {
         require(step in steps) { "$step isn't one of $steps" }
@@ -53,31 +66,42 @@ class EditorFlow(val steps: List<EditorStep>, initial: EditorStep) {
         generation++
     }
 
-    fun moveOnSoon() {
-        moves.trySend(generation)
+    fun moveOnSoon(to: EditorStep) {
+        moves.trySend(generation to to)
     }
 
-    /** "Next: Day", "Next: Check". */
-    fun nextLabel(): String = "Next: ${checkNotNull(nextStep) { "Nothing comes after $active" }.name}"
+    /** After a Starts or Ends date pick (9c §3.6): on to its [time], or with All day on, to Repeats, else Check. */
+    fun moveOnAfterDate(time: EditorStep) = moveOnSoon(if (time in steps) time else afterWhen)
+
+    /** Skip on Ends keeps the end that follows the start: on to Repeats, else Check. */
+    fun skipEnds() = open(afterWhen)
+
+    private val afterWhen: EditorStep get() = if (EditorStep.Repeats in steps) EditorStep.Repeats else EditorStep.Check
+
+    /** "Next: Starts", "Next: Check". */
+    fun nextLabel(): String = nextLabelFor(checkNotNull(nextStep) { "Nothing comes after $active" })
 
     /** Carries out [moveOnSoon]'s moves while the editor is on screen. */
     internal suspend fun runMoves() {
-        moves.receiveAsFlow().collectLatest { asked ->
+        moves.receiveAsFlow().collectLatest { (asked, to) ->
             delay(MOVE_ON_MS)
-            if (asked == generation) next()
+            if (asked == generation && to in steps) open(to)
         }
     }
 }
 
 /**
- * The rows [form] shows (9 §3.1): Who, Day and Time, and Repeats on a new event that a child isn't adding; a locked
- * span's Day doesn't open and Time goes. Check always ends them.
+ * The rows [form] shows (9c §3.6): Who, Starts and Ends with their times while All day is off, and Repeats on a new
+ * event that a child isn't adding; a locked span opens no When pane. Check always ends them.
  */
 internal fun editorSteps(form: EditorForm, childOnly: PersonId?): List<EditorStep> = buildList {
     add(EditorStep.Who)
     if (!form.datesLocked) {
-        add(EditorStep.Day)
-        add(EditorStep.Time)
+        val timed = !form.eventWhen.allDay
+        add(EditorStep.StartDate)
+        if (timed) add(EditorStep.StartTime)
+        add(EditorStep.EndDate)
+        if (timed) add(EditorStep.EndTime)
     }
     if (form.canRepeat && childOnly == null) add(EditorStep.Repeats)
     add(EditorStep.Check)
@@ -85,4 +109,4 @@ internal fun editorSteps(form: EditorForm, childOnly: PersonId?): List<EditorSte
 
 /** A new event opens on Who, a change on Check, unless the caller says where (9 §3.4: the detail's For row opens Who). */
 internal fun editorFlow(form: EditorForm, childOnly: PersonId?, start: EditorStep? = null): EditorFlow =
-    EditorFlow(editorSteps(form, childOnly), start ?: if (form.mode == EditorForm.Mode.New) EditorStep.Who else EditorStep.Check)
+    EditorFlow({ editorSteps(form, childOnly) }, start ?: if (form.mode == EditorForm.Mode.New) EditorStep.Who else EditorStep.Check)

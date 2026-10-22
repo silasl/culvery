@@ -66,7 +66,7 @@ class StartsEndsPanesTest {
     private val saturday = LocalDate.of(2026, 9, 26)
     private val lastShown = lastShownDay(today)
     private val household = EditorPeople(SampleUi.members)
-    private val flow = EditorFlow(listOf(EditorStep.Who, EditorStep.Day, EditorStep.Check), EditorStep.Day)
+    private val flow = EditorFlow(listOf(EditorStep.Who, EditorStep.StartDate, EditorStep.Check), EditorStep.StartDate)
 
     private var which by mutableStateOf(Pane.StartDate)
     private var eventWhen by mutableStateOf(saturdayAt(10, 0, lengthMinutes = 60))
@@ -74,7 +74,6 @@ class StartsEndsPanesTest {
     private var who by mutableStateOf(listOf(SampleUi.mia.id))
     private var except by mutableStateOf<EventRef?>(null)
     private var scale by mutableStateOf(1f)
-    private var timesTouched by mutableStateOf(true)
     private var picked = 0
 
     private fun saturdayAt(hour: Int, minute: Int, lengthMinutes: Long, day: LocalDate = saturday): EventWhen {
@@ -89,13 +88,21 @@ class StartsEndsPanesTest {
                 WithFontScale(scale) {
                     Box(Modifier.size(688.dp, 686.dp)) {
                         val context = WhenContext(held, household, who, except, LONDON, today)
-                        EditorPane(which.question, flow, skip = false) {
-                            val change = { next: EventWhen -> eventWhen = next }
+                        EditorPane(which.question, flow, skip = null) {
+                            val freeStart = { clock: LocalTime -> eventWhen = eventWhen.withStart(clock) }
                             when (which) {
-                                Pane.StartDate -> StartDatePane(eventWhen, change, context, LocalTime.of(11, 54), timesTouched) { picked++ }
-                                Pane.StartTime -> StartTimePane(eventWhen, change, context)
-                                Pane.EndDate -> EndDatePane(eventWhen, change, context) { picked++ }
-                                Pane.EndTime -> EndTimePane(eventWhen, change, context)
+                                Pane.StartDate -> StartDatePane(eventWhen, context) {
+                                    eventWhen = eventWhen.pickStartDate(it, defaults = false, today, LocalTime.of(11, 54))
+                                    picked++
+                                }
+                                Pane.StartTime -> StartTimePane(eventWhen, context, { field, up -> eventWhen = eventWhen.stepStart(field, up) }, freeStart)
+                                Pane.EndDate -> EndDatePane(eventWhen, context) { date ->
+                                    eventWhen.pickEndDate(date)?.let {
+                                        eventWhen = it
+                                        picked++
+                                    }
+                                }
+                                Pane.EndTime -> EndTimePane(eventWhen, context, { field, up -> eventWhen.stepEnd(field, up)?.let { eventWhen = it } }, freeStart)
                             }
                         }
                     }
@@ -164,15 +171,6 @@ class StartsEndsPanesTest {
             assertThat(eventWhen).isEqualTo(EventWhen(false, saturday.plusDays(7), LocalTime.of(18, 0), 2, LocalTime.of(16, 0)))
             assertThat(picked).isEqualTo(1)
         }
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    @Test
-    fun untouchedTimesTakeTheNewDaysDefaultOnAStartsPick() {
-        timesTouched = false
-        show(Pane.StartDate)
-        cell(today).performClick()
-        compose.runOnIdle { assertThat(eventWhen).isEqualTo(EventWhen(false, today, LocalTime.of(12, 0), 0, LocalTime.of(13, 0))) }
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -381,5 +379,18 @@ class StartsEndsPanesTest {
         val range = node("editor_pane").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
         assertThat(range.maxValue()).isEqualTo(0f)
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** A long span shows each end where it is: the Starts grid on August, the Ends grid on October. */
+    @Test
+    fun eachGridOpensOnItsOwnMonth() {
+        eventWhen = EventWhen(false, LocalDate.of(2026, 8, 20), LocalTime.of(10, 0), 46, LocalTime.of(11, 0))
+        show(Pane.StartDate)
+        node("month_title").assertTextEquals("August 2026")
+        compose.runOnIdle { which = Pane.EndDate }
+        node("month_title").assertTextEquals("October 2026")
+        cell(LocalDate.of(2026, 10, 5)).assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        compose.runOnIdle { which = Pane.StartDate }
+        node("month_title").assertTextEquals("August 2026")
     }
 }

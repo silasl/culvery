@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import uk.co.siland.culvery.capability.calendar.CHOOSE_A_DAY
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhAlpha
 import uk.co.siland.culvery.core.ui.HhIcon
@@ -43,15 +44,15 @@ internal fun rowState(active: Boolean, set: Boolean): RowState = when {
     else -> RowState.NotYet
 }
 
-/** A pill after a row's value: "Clash" on Time. */
+/** A pill after a row's value: "Clash" on Starts. */
 internal data class RowTag(val text: String, val icon: String?, val fill: Color, val ink: Color)
 
 internal const val CLASH = "Clash"
 
 /** TalkBack's word for a locked row, whose value says where its dates change instead (9 §3.1). */
-internal const val LOCKED_SPAN = "locked, as it runs over several days"
+internal const val LOCKED_SPAN = "dates locked, as it runs over more than 60 days"
 
-/** Handoff 6i's tag on Time: `weather` words and `warning` on a `weather` tint, made opaque over `surf` so an active row's fill doesn't lower its contrast. */
+/** Handoff 6i's tag on Starts: `weather` words and `warning` on a `weather` tint, made opaque over `surf` so an active row's fill doesn't lower its contrast. */
 @Composable
 internal fun clashTag(): RowTag {
     val c = Culvery.colors
@@ -120,8 +121,7 @@ internal fun EditorRow(
     }
 }
 
-/** What a row says in place of a date, and what TalkBack hears for the Ends row before a Starts day is chosen. */
-internal const val CHOOSE_A_DAY = "Choose a day"
+/** What TalkBack hears for the Ends row before a Starts day is chosen. */
 internal const val CHOOSE_A_START_DAY_FIRST = "choose a start day first"
 
 /**
@@ -166,6 +166,7 @@ internal fun EditorWhenRow(
             .clip(shape)
             .background(if (state == RowState.Active) c.accentSoft else c.surf)
             .then(if (state == RowState.Active) Modifier.border(EditorDimens.ring, c.accent, shape) else Modifier)
+            .semantics { selected = active }
             .then(
                 if (waiting) Modifier.semantics(mergeDescendants = true) { contentDescription = "$label, $CHOOSE_A_START_DAY_FIRST" } else Modifier,
             )
@@ -211,6 +212,9 @@ internal fun EditorWhenRow(
         if (tag != null) RowTagPill(tag, Modifier.testTag("${testTag}_tag"))
     }
 }
+
+/** Starts carries one tag (9c §3.1): a clash hides Copied until it clears. */
+internal fun startsTag(clash: RowTag?, copied: RowTag?): RowTag? = clash ?: copied
 
 @Composable
 private fun RowTagPill(tag: RowTag, modifier: Modifier) {

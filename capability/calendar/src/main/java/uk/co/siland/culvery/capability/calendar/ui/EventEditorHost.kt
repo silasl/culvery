@@ -158,7 +158,6 @@ internal fun EventEditorHost(
     val session by editor.session.collectAsState()
     val navigator = if (request.from == EditorFrom.Home) LocalShellNavigator.current else null
     var failure by remember(opened) { mutableStateOf<SaveFailure?>(null) }
-    var picker by remember(opened) { mutableStateOf(EditorPicker.None) }
     // Kept only after the tablet failed (WriteProblem.Tablet), so Try again can't make a second event (3a design §3.12).
     var createKey by remember(opened) { mutableStateOf(newClientKey()) }
     val action = rememberSingleAction(opened) { e ->
@@ -235,7 +234,6 @@ internal fun EventEditorHost(
             service = opened.service,
             busy = action.busy,
             failure = failure,
-            picker = picker,
             childOnly = child?.id,
             childName = child?.name,
             held = held,
@@ -243,7 +241,6 @@ internal fun EventEditorHost(
             onSave = { save() },
             onDelete = { delete() },
             onRefusedWho = { session?.person?.name?.let(editor::refuseOtherWho) },
-            onPicker = { picker = it },
         )
     }
 }

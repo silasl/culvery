@@ -3,6 +3,9 @@ package uk.co.siland.culvery.capability.calendar.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
@@ -157,5 +160,24 @@ class EditorRowsTest {
         assertThat(listOf(date.left, time.left, tag.left)).isInStrictOrder()
         assertWithMessage("the tag stays inside the row").that(tag.right).isAtMost(row.right)
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** One tag on Starts: a clash hides Copied, and Copied comes back once the clash clears. */
+    @Test
+    fun aClashHidesCopiedUntilItClears() {
+        val copied = RowTag("Copied", null, Color.Gray, Color.Black)
+        val clash = RowTag("Clash", Icons.WARNING, Color.Gray, Color.Black)
+        var clashing by mutableStateOf(false)
+        show { startsRow(tag = startsTag(clash.takeIf { clashing }, copied))() }
+        fun shown() = compose.onAllNodes(hasAnyAncestor(hasTestTag("editor_row_starts_tag")) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Text), useUnmergedTree = true)
+            .fetchSemanticsNodes().flatMap { n -> n.config[SemanticsProperties.Text].map { it.text } }
+        assertThat(shown()).containsExactly("Copied")
+        clashing = true
+        compose.waitForIdle()
+        assertThat(shown()).containsExactly("Clash")
+        clashing = false
+        compose.waitForIdle()
+        assertThat(shown()).containsExactly("Copied")
+        assertThat(startsTag(null, null)).isNull()
     }
 }

@@ -189,8 +189,6 @@ internal val FULL_WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE
 internal val FULL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
 
 internal const val DAYS_PER_WEEK = 7
-internal const val HOURS_PER_DAY = 24
-internal const val MINUTES_PER_HOUR = 60
 
 /** How many weeks past this one the Calendar tab steps to (4c D10): four weeks in all, inside the synced window. */
 const val MAX_WEEKS_AHEAD = 3

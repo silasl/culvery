@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
@@ -29,7 +30,10 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -97,7 +101,6 @@ class EventEditorScreenTest {
                 onSave = { calls += "save" },
                 onDelete = { calls += "delete" },
                 onRefusedWho = { calls += "refused" },
-                onPicker = { calls += "picker:$it" },
             )
         }
     }
@@ -128,7 +131,7 @@ class EventEditorScreenTest {
     private fun newWithTitleWhoAndDay() = editorForm().apply {
         updateTitle("Guitar lesson")
         toggleWho(SampleUi.mia.id)
-        tapDay(SampleUi.TODAY.plusDays(3))
+        pickStartDate(SampleUi.TODAY.plusDays(3))
     }
 
     @Test
@@ -177,86 +180,99 @@ class EventEditorScreenTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** The words drawn inside [tag], for rows whose parts aren't tagged. */
+    private fun textColor(tag: String, text: String): Color =
+        compose.onNode(hasText(text) and hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true).textLayout().layoutInput.style.color
+
     /** On Change every answered row is done, All day and all; only a new event's untouched rows are placeholders. */
     @Test
     fun aChangeShowsEveryRowItHasAsDone() {
         val day = SampleUi.TODAY.plusDays(3)
         show(editorEditOf(EventTime.AllDay(day), EventTime.AllDay(day.plusDays(1)), "Bin day", "family"))
-        node("editor_row_time_value").assertTextEquals("All day")
-        listOf("who", "day", "time").forEach { row ->
-            assertWithMessage(row).that(valueColor("editor_row_$row")).isEqualTo(c.ink)
-            assertWithMessage(row).that(draws("editor_row_${row}_icon", c.accent)).isTrue()
-            assertWithMessage(row).that(draws("editor_row_${row}_icon", c.mute)).isFalse()
+        compose.onNodeWithTag("editor_all_day").assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.On))
+        assertThat(valueColor("editor_row_who")).isEqualTo(c.ink)
+        listOf("editor_starts", "editor_ends").forEach { row ->
+            assertWithMessage(row).that(textColor("${row}_date", "Sat 26 Sep")).isEqualTo(c.ink)
+            node("${row}_time").assertDoesNotExist()
+        }
+        listOf("editor_row_who", "editor_starts", "editor_ends").forEach { row ->
+            assertWithMessage(row).that(draws("${row}_icon", c.accent)).isTrue()
+            assertWithMessage(row).that(draws("${row}_icon", c.mute)).isFalse()
         }
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** P13: the time always has a value, so only Repeats is optional; with no Repeats row there is no hint. */
     @Test
-    fun withoutARepeatsRowTheHintSaysOnlyTimeIsOptional() {
-        show(editorDinnerOf(Duration.ofHours(1)), start = EditorStep.Time)
-        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Time is optional")
+    fun theHintSaysRepeatsAreOptionalWhereThereAreRepeats() {
+        show(newWithTitleWhoAndDay())
+        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Repeats are optional")
         compose.assertClickablesHaveRoleAndLabel()
+        compose.runOnIdle { use(editorDinnerOf(Duration.ofHours(1)), start = EditorStep.StartDate) }
+        node("editor_save_hint").assertDoesNotExist()
         val child = editorForm(childOnly = SampleUi.mia.id).apply {
             updateTitle("Sleepover")
-            tapDay(SampleUi.TODAY.plusDays(4))
+            pickStartDate(SampleUi.TODAY.plusDays(4))
         }
         compose.runOnIdle { use(child, child = SampleUi.mia.id) }
-        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Time is optional")
-        compose.runOnIdle { use(newWithTitleWhoAndDay()) }
-        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Time and repeats are optional")
+        node("editor_save_hint").assertDoesNotExist()
+        assertThat(compose.onAllNodesWithText("Time is optional").fetchSemanticsNodes()).isEmpty()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
     fun theRowsShowTheirStates() {
-        show(start = EditorStep.Time)
+        show(start = EditorStep.StartTime)
         node("editor_row_who_value").assertTextEquals("Choose who")
         assertThat(valueColor("editor_row_who")).isEqualTo(c.mute)
         assertThat(draws("editor_row_who_icon", c.mute)).isTrue()
         assertThat(draws("editor_row_who_icon", c.accent)).isFalse()
-        compose.runOnIdle { form.tapDay(SampleUi.TODAY.plusDays(3)) }
-        val day = compose.onNodeWithTag("editor_row_day").assertIsNotSelected()
-        assertThat(day.fill()).isEqualTo(c.surf.toArgb())
-        assertThat(draws("editor_row_day_icon", c.accent)).isTrue()
-        node("editor_row_day_value").assertTextEquals("Sat 26 Sep")
-        assertThat(valueColor("editor_row_day")).isEqualTo(c.ink)
-        val rows = listOf("who", "day", "time", "repeats").map { bounds("editor_row_$it") }
+        assertThat(textColor("editor_starts_date", "Choose a day")).isEqualTo(c.mute)
+        compose.runOnIdle { form.pickStartDate(SampleUi.TODAY.plusDays(3)) }
+        compose.onNodeWithTag("editor_title").performImeAction()
+        compose.runOnIdle { flow.open(EditorStep.Repeats) }
+        val starts = compose.onNodeWithTag("editor_starts").assertIsNotSelected()
+        assertThat(starts.fill()).isEqualTo(c.surf.toArgb())
+        assertThat(draws("editor_starts_icon", c.accent)).isTrue()
+        assertThat(textColor("editor_starts_date", "Sat 26 Sep")).isEqualTo(c.ink)
+        val rows = listOf("editor_row_who", "editor_starts", "editor_ends", "editor_row_repeats").map { bounds(it) }
         rows.forEach { assertThat((it.bottom - it.top).value).isWithin(0.5f).of(77f) }
-        rows.zipWithNext().forEach { (a, b) -> assertThat((b.top - a.bottom).value).isWithin(0.5f).of(9f) }
+        val all = listOf("editor_row_who", "editor_all_day", "editor_starts", "editor_ends", "editor_row_repeats").map { bounds(it) }
+        all.zipWithNext().forEach { (a, b) -> assertThat((b.top - a.bottom).value).isWithin(0.5f).of(9f) }
         compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
     fun tappingARowOpensItsPane() {
         show()
-        compose.onNodeWithTag("editor_row_time").performClick()
-        compose.onNodeWithTag("editor_row_time").assertIsSelected()
+        compose.onNodeWithTag("editor_starts_date").performClick()
+        compose.onNodeWithTag("editor_starts").assertIsSelected()
         compose.onNodeWithTag("editor_row_who").assertIsNotSelected()
-        assertThat(flow.active).isEqualTo(EditorStep.Time)
-        node("editor_question").assertTextEquals("What time?")
+        assertThat(flow.active).isEqualTo(EditorStep.StartDate)
+        node("editor_question").assertTextEquals("Which day does it start?")
         compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
     fun nextMovesOnAndIsNeverGreen() {
         show()
-        val next = compose.onNodeWithTag("editor_next").assertTextEquals("Next: Day")
+        val next = compose.onNodeWithTag("editor_next").assertTextEquals("Next: Starts")
         assertThat(pixelAt(next, 24.dp, 4.dp)).isEqualTo(c.surf2.toArgb())
         next.performClick()
-        assertThat(flow.active).isEqualTo(EditorStep.Day)
-        compose.onNodeWithTag("editor_next").assertTextEquals("Next: Time")
+        assertThat(flow.active).isEqualTo(EditorStep.StartDate)
+        compose.onNodeWithTag("editor_next").assertTextEquals("Next: Start time")
         compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
-    fun skipShowsOnTimeAndRepeatsOnly() {
+    fun skipShowsOnEndsAndRepeatsOnly() {
         show()
         for (step in flow.steps) {
             compose.runOnIdle { flow.open(step) }
             val shown = compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.TestTag, "editor_skip")).fetchSemanticsNodes().isNotEmpty()
-            assertWithMessage("$step").that(shown).isEqualTo(step == EditorStep.Time || step == EditorStep.Repeats)
+            assertWithMessage("$step").that(shown).isEqualTo(step in listOf(EditorStep.EndDate, EditorStep.EndTime, EditorStep.Repeats))
         }
-        compose.runOnIdle { flow.open(EditorStep.Time) }
+        compose.runOnIdle { flow.open(EditorStep.EndTime) }
         compose.onNodeWithTag("editor_skip").assertTextEquals("Skip").performClick()
         assertThat(flow.active).isEqualTo(EditorStep.Repeats)
         assertThat(form.edited).isFalse()
@@ -267,29 +283,29 @@ class EventEditorScreenTest {
     fun aChildHasNoRepeatsRowAndAnEditHasNone() {
         show(editorForm(childOnly = SampleUi.mia.id), child = SampleUi.mia.id)
         node("editor_row_who_value").assertTextEquals("Mia")
-        node("editor_row_time").assertExists()
+        node("editor_starts").assertExists()
         node("editor_row_repeats").assertDoesNotExist()
         assertThat(flow.steps).doesNotContain(EditorStep.Repeats)
         compose.assertClickablesHaveRoleAndLabel()
         compose.runOnIdle { use(editorDinnerOf(Duration.ofHours(1))) }
-        node("editor_row_day").assertExists()
-        node("editor_row_time").assertExists()
+        node("editor_starts_time").assertExists()
+        node("editor_ends_time").assertExists()
         node("editor_row_repeats").assertDoesNotExist()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
     fun moveOnSoonWaitsAQuarterSecond() {
-        show(start = EditorStep.Day)
+        show(start = EditorStep.StartDate)
         compose.mainClock.autoAdvance = false
-        flow.moveOnSoon()
+        flow.moveOnSoon(EditorStep.StartTime)
         compose.mainClock.advanceTimeBy(MOVE_ON_MS - 16, ignoreFrameDuration = true)
-        assertThat(flow.active).isEqualTo(EditorStep.Day)
+        assertThat(flow.active).isEqualTo(EditorStep.StartDate)
         compose.mainClock.advanceTimeBy(32, ignoreFrameDuration = true)
-        assertThat(flow.active).isEqualTo(EditorStep.Time)
+        assertThat(flow.active).isEqualTo(EditorStep.StartTime)
         // A row tapped before the move lands keeps the person where they went.
-        compose.runOnIdle { flow.open(EditorStep.Day) }
-        flow.moveOnSoon()
+        compose.runOnIdle { flow.open(EditorStep.StartDate) }
+        flow.moveOnSoon(EditorStep.StartTime)
         compose.mainClock.advanceTimeBy(100, ignoreFrameDuration = true)
         compose.onNodeWithTag("editor_row_who").performClick()
         compose.mainClock.advanceTimeByFrame()
@@ -302,10 +318,10 @@ class EventEditorScreenTest {
 
     @Test
     fun theNewQuestionIsAPaneTitle() {
-        show(start = EditorStep.Day)
-        flow.moveOnSoon()
+        show(start = EditorStep.StartDate)
+        flow.moveOnSoon(EditorStep.StartTime)
         compose.mainClock.advanceTimeBy(MOVE_ON_MS + 16)
-        node("editor_question").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "What time?"))
+        node("editor_question").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "What time does it start?"))
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -343,10 +359,10 @@ class EventEditorScreenTest {
             form.toggleWho(SampleUi.mia.id)
         }
         compose.onNodeWithTag("editor_save_reason").assertTextEquals("Needs a day")
-        compose.runOnIdle { form.tapDay(SampleUi.TODAY.plusDays(3)) }
+        compose.runOnIdle { form.pickStartDate(SampleUi.TODAY.plusDays(3)) }
         compose.onNodeWithTag("editor_save").assertIsEnabled()
         node("editor_save_reason").assertDoesNotExist()
-        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Time and repeats are optional")
+        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Repeats are optional")
         assertThat(bounds("editor_save_hint").top.value).isGreaterThan(bounds("editor_save").bottom.value)
         compose.assertClickablesHaveRoleAndLabel()
     }
@@ -381,7 +397,7 @@ class EventEditorScreenTest {
         node("editor_question").assertTextEquals("Check it")
         node("editor_next").assertDoesNotExist()
         node("editor_title").assertIsNotFocused()
-        listOf("who", "day", "time").forEach { compose.onNodeWithTag("editor_row_$it").assertIsNotSelected() }
+        listOf("editor_row_who", "editor_starts", "editor_ends").forEach { compose.onNodeWithTag(it).assertIsNotSelected() }
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -458,58 +474,29 @@ class EventEditorScreenTest {
     fun withTheKeyboardUpTheRowsShrinkAndTheFootGoes() {
         show(keyboard = KEYBOARD)
         node("editor_title").assertIsFocused()
-        val values = mapOf("who" to "Who", "day" to "Day", "time" to "All day", "repeats" to "Doesn’t repeat")
+        val values = mapOf("who" to "Who", "repeats" to "Doesn’t repeat")
         values.forEach { (row, value) ->
-            val r = bounds("editor_row_$row")
-            assertWithMessage(row).that((r.bottom - r.top).value).isWithin(0.5f).of(61f)
             node("editor_row_${row}_value").assertTextEquals(value)
             // No label: the row reads its value alone.
             compose.onNodeWithTag("editor_row_$row").assertTextEquals(value)
         }
+        listOf("editor_row_who", "editor_starts", "editor_ends", "editor_row_repeats").forEach { row ->
+            val r = bounds(row)
+            assertWithMessage(row).that((r.bottom - r.top).value).isWithin(0.5f).of(61f)
+        }
+        assertThat(compose.onAllNodesWithText("STARTS", useUnmergedTree = true).fetchSemanticsNodes()).isEmpty()
         node("editor_save").assertDoesNotExist()
         node("editor_saves_to").assertDoesNotExist()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
-    fun nothingIsCutWithTheKeyboardUp() {
-        show(keyboard = KEYBOARD)
-        for (s in listOf(1f, 1.3f)) {
-            compose.runOnIdle { scale = s }
-            compose.waitForIdle()
-            node("editor_title").assertIsFocused()
-            val keyboardTop = compose.onRoot().getUnclippedBoundsInRoot().bottom - KEYBOARD
-            listOf("who", "day", "time", "repeats").forEach { row ->
-                assertWithMessage("$row at $s").that(bounds("editor_row_$row").bottom.value).isAtMost(keyboardTop.value)
-                val value = node("editor_row_${row}_value").textLayout()
-                assertWithMessage("$row at $s").that(value.didOverflowHeight || value.isLineEllipsized(0)).isFalse()
-            }
-            compose.assertClickablesHaveRoleAndLabel()
-        }
-    }
-
-    @Test
     fun aLongValueEllipsisesOnOneLineAtTheDefaultScale() {
         show(editorLockedVisit())
-        val day = node("editor_row_day_value").textLayout()
-        assertThat(day.lineCount).isEqualTo(1)
-        assertThat(day.isLineEllipsized(0)).isTrue()
-        node("editor_row_time").assertDoesNotExist()
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    /** 9 §3.1: a timed span keeps its dates, so its one Day row is locked and says why. */
-    @Test
-    fun aLockedSpanShowsOneDayRow() {
-        show(editorLockedVisit())
-        node("editor_row_day_value").assertTextEquals("Mon 28 – Wed 30 · change dates in Google Calendar on your phone")
-        node("editor_row_day_lock").assertExists()
-        node("editor_row_time").assertDoesNotExist()
-        compose.onNodeWithTag("editor_row_day").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, LOCKED_SPAN))
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
-        val before = flow.active
-        compose.onNodeWithTag("editor_row_day").performClick()
-        assertThat(flow.active).isEqualTo(before)
+        val starts = node("editor_starts_value").textLayout()
+        assertThat(starts.lineCount).isEqualTo(1)
+        assertThat(starts.isLineEllipsized(0)).isTrue()
+        node("editor_starts_time").assertDoesNotExist()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -543,7 +530,7 @@ class EventEditorScreenTest {
 
     @Test
     fun theKeyboardsNextMovesToWho() {
-        show(start = EditorStep.Time)
+        show(start = EditorStep.StartDate)
         node("editor_title").assertIsFocused()
         compose.onNodeWithTag("editor_title").performImeAction()
         node("editor_title").assertIsNotFocused()
@@ -558,6 +545,92 @@ class EventEditorScreenTest {
         compose.onNodeWithTag("editor_failure").assertIsDisplayed()
         assertThat(bounds("editor_failure").bottom.value).isAtMost(bounds("editor_save").top.value)
         compose.onNodeWithTag("editor_save").assertTextEquals("Try again")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    private fun description(tag: String): List<String> =
+        compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.ContentDescription]
+
+    @Test
+    fun theRowsReadTitleWhoAllDayStartsEndsRepeats() {
+        show()
+        val tops = listOf("editor_title", "editor_row_who", "editor_all_day", "editor_starts", "editor_ends", "editor_row_repeats").map { bounds(it).top }
+        assertThat(tops).isInStrictOrder()
+        compose.onNodeWithTag("editor_all_day").assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.Off))
+        assertThat(description("editor_starts_date")).containsExactly("Starts, Choose a day")
+        node("editor_starts_time").assertDoesNotExist()
+        assertThat(description("editor_ends")).containsExactly("Ends, choose a start day first")
+        compose.onNodeWithTag("editor_ends").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        compose.runOnIdle { form.pickStartDate(SampleUi.TODAY.plusDays(3)) }
+        assertThat(description("editor_starts_date")).containsExactly("Starts, Saturday 26 September")
+        assertThat(description("editor_starts_time")).containsExactly("Starts at 09:00")
+        assertThat(description("editor_ends_date")).containsExactly("Ends, Saturday 26 September")
+        assertThat(description("editor_ends_time")).containsExactly("Ends at 10:00")
+        compose.onNodeWithTag("editor_starts_time").performClick()
+        assertThat(flow.active).isEqualTo(EditorStep.StartTime)
+        node("editor_question").assertTextEquals("What time does it start?")
+        compose.onNodeWithTag("editor_ends_date").performClick()
+        assertThat(flow.active).isEqualTo(EditorStep.EndDate)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun allDayHidesBothTimes() {
+        show(newWithTitleWhoAndDay())
+        node("editor_starts_time").assertExists()
+        node("editor_ends_time").assertExists()
+        compose.onNodeWithTag("editor_all_day").performClick()
+        assertThat(form.eventWhen.allDay).isTrue()
+        node("editor_starts_time").assertDoesNotExist()
+        node("editor_ends_time").assertDoesNotExist()
+        assertThat(description("editor_starts_date")).containsExactly("Starts, Saturday 26 September")
+        assertThat(description("editor_ends_date")).containsExactly("Ends, Saturday 26 September")
+        compose.onNodeWithTag("editor_all_day").performClick()
+        node("editor_starts_time").assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun withTheKeyboardUpTheAllDayRowHidesAndNothingIsCut() {
+        show(keyboard = KEYBOARD)
+        for (s in listOf(1f, 1.3f, 1.5f)) {
+            compose.runOnIdle { scale = s }
+            compose.waitForIdle()
+            node("editor_title").assertIsFocused()
+            node("editor_all_day").assertDoesNotExist()
+            val keyboardTop = compose.onRoot().getUnclippedBoundsInRoot().bottom - KEYBOARD
+            listOf("editor_row_who", "editor_starts", "editor_ends", "editor_row_repeats").forEach { row ->
+                assertWithMessage("$row at $s").that(bounds(row).bottom.value).isAtMost(keyboardTop.value)
+            }
+            compose.onAllNodes(hasAnyAncestor(hasTestTag("editor_column")) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Text), useUnmergedTree = true)
+                .fetchSemanticsNodes().forEach { n ->
+                    val layout = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                    n.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action?.invoke(layout)
+                    layout.firstOrNull()?.let {
+                        assertWithMessage("${n.config.getOrNull(SemanticsProperties.Text)} at $s").that(it.didOverflowHeight || it.isLineEllipsized(0)).isFalse()
+                    }
+                }
+            compose.assertClickablesHaveRoleAndLabel()
+        }
+        compose.runOnIdle { form.updateTitle("Swim") }
+        compose.onNodeWithTag("editor_row_who").performClick()
+        node("editor_all_day").assertExists()
+    }
+
+    /** A span past the cap keeps its dates: All day, Starts and Ends are locked and say why. */
+    @Test
+    fun aLockedSpanShowsLockedRows() {
+        show(editorLockedVisit())
+        listOf("editor_all_day", "editor_starts", "editor_ends").forEach { row ->
+            node("${row}_value").assertTextEquals("Mon 28 Sep – Sun 6 Dec · change dates in Google Calendar on your phone")
+            node("${row}_lock").assertExists()
+            compose.onNodeWithTag(row).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, LOCKED_SPAN))
+                .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+            compose.onNodeWithTag(row).performClick()
+            assertThat(flow.active).isEqualTo(EditorStep.Check)
+        }
+        assertThat(LOCKED_SPAN).isEqualTo("dates locked, as it runs over more than 60 days")
+        node("editor_starts_time").assertDoesNotExist()
         compose.assertClickablesHaveRoleAndLabel()
     }
 

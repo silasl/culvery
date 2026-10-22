@@ -2,7 +2,6 @@ package uk.co.siland.culvery.capability.calendar
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -30,9 +29,9 @@ class EditorWordsTest {
     private fun guitar(times: Int? = null) = new().apply {
         updateTitle("Guitar lesson")
         toggleWho(mia.id)
-        tapDay(sat26)
-        chooseHour(10)
-        chooseLength(Duration.ofMinutes(45))
+        pickStartDate(sat26)
+        stepStart(ClockField.Hour, up = true)
+        stepEnd(ClockField.Minute, up = false)
         if (times != null) {
             chooseRepeat(RepeatChoice.Weekly)
             stopsAfter()
@@ -44,15 +43,16 @@ class EditorWordsTest {
         updateTitle("Half term")
         toggleWho(sam.id)
         toggleWho(mia.id)
-        setMultiDay(true)
-        tapDay(LocalDate.of(2026, 10, 19))
-        tapDay(LocalDate.of(2026, 10, 23))
+        chooseAllDay(true)
+        pickStartDate(LocalDate.of(2026, 10, 19))
+        pickEndDate(LocalDate.of(2026, 10, 23))
     }
 
     private fun bins() = new().apply {
         updateTitle("Bins")
         toggleWho(PersonId.FAMILY)
-        tapDay(LocalDate.of(2026, 9, 28))
+        chooseAllDay(true)
+        pickStartDate(LocalDate.of(2026, 9, 28))
         chooseRepeat(RepeatChoice.Weekly)
     }
 
@@ -72,16 +72,7 @@ class EditorWordsTest {
         form.toggleWho(PersonId.FAMILY)
         assertThat(whoValue(form, people)).isEqualTo("Everyone")
 
-        assertThat(dayValue(form)).isEqualTo("Choose a day")
-        form.tapDay(sat26)
-        assertThat(dayValue(form)).isEqualTo("Sat 26 Sep")
-        val range = new().apply {
-            setMultiDay(true)
-            tapDay(LocalDate.of(2026, 10, 29))
-            tapDay(LocalDate.of(2026, 11, 1))
-        }
-        assertThat(dayValue(range)).isEqualTo("Thu 29 Oct – Sun 1 Nov")
-
+        form.chooseAllDay(true)
         assertThat(timeValue(form)).isEqualTo("All day")
         assertThat(timeValue(guitar())).isEqualTo("10:00–10:45")
     }
@@ -128,31 +119,33 @@ class EditorWordsTest {
         assertThat(firstDates(guitar())).isEqualTo(listOf(sat26) to 0)
     }
 
+    /** Sunday 25 October 2026, when 01:00–02:00 happens twice: the row and Save both keep the wall clocks. */
     @Test
-    fun theTimeRowReadsWhatSaveWritesOnTheClocksChangeNight() {
-        // Sunday 25 October 2026: 01:00–02:00 happens twice, so two real hours from 00:30 end at 01:30.
+    fun theTimeRowReadsTheWallClocksSaveWrites() {
         val form = new().apply {
             updateTitle("Night ferry")
             toggleWho(mia.id)
-            tapDay(LocalDate.of(2026, 10, 25))
-            chooseTime(LocalTime.of(0, 30))
-            chooseLength(Duration.ofHours(2))
+            pickStartDate(LocalDate.of(2026, 10, 25))
+            kotlin.repeat(9) { stepStart(ClockField.Hour, up = false) }
+            stepEnd(ClockField.Hour, up = true)
         }
         val end = (form.draft(createdBy = null).end as EventTime.Timed).instant.atZone(london).toLocalTime()
-        assertThat(end).isEqualTo(LocalTime.of(1, 30))
-        assertThat(timeValue(form)).isEqualTo("00:30–01:30")
-        assertThat(checkSentence(form, people)).isEqualTo("Night ferry for Mia, Sun 25 Oct, 00:30–01:30.")
+        assertThat(end).isEqualTo(LocalTime.of(2, 0))
+        assertThat(timeValue(form)).isEqualTo("00:00–02:00")
+        assertThat(checkSentence(form, people)).isEqualTo("Night ferry for Mia, Sun 25 Oct, 00:00–02:00.")
     }
 
+    /** An end at midnight belongs to the day before, so the sentence names one day. */
     @Test
-    fun theTimeRowEndsAtMidnightAsSaveDoes() {
+    fun anEndAtMidnightIsOneDay() {
         val form = new().apply {
             updateTitle("Film")
             toggleWho(mia.id)
-            tapDay(sat26)
-            chooseTime(LocalTime.of(23, 30))
-            chooseLength(Duration.ofHours(2))
+            pickStartDate(sat26)
+            kotlin.repeat(14) { stepStart(ClockField.Hour, up = true) }
         }
-        assertThat(timeValue(form)).isEqualTo("23:30–00:00")
+        assertThat(form.eventWhen.endDays).isEqualTo(1)
+        assertThat(timeValue(form)).isEqualTo("23:00–00:00")
+        assertThat(checkSentence(form, people)).isEqualTo("Film for Mia, Sat 26 Sep, 23:00–00:00.")
     }
 }

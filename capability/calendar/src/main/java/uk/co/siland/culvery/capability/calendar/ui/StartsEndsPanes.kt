@@ -14,6 +14,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
 import java.time.ZoneId
+import uk.co.siland.culvery.capability.calendar.ClockField
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventWhen
 import uk.co.siland.culvery.capability.calendar.FreeCheck
@@ -37,69 +38,42 @@ internal class WhenContext(
     val today: LocalDate,
 )
 
-/**
- * The month of days for the start (9c §3.1), with a dot for each person already busy that day. A pick keeps the length, or
- * with [timesTouched] false starts over from that day's default times at [now]; it calls [onPicked].
- */
+/** The month of days for the start (9c §3.1), opening on the start's month, with a dot for each person already busy that day. */
 @Composable
-internal fun StartDatePane(
-    eventWhen: EventWhen,
-    onChange: (EventWhen) -> Unit,
-    context: WhenContext,
-    now: LocalTime,
-    timesTouched: Boolean,
-    onPicked: () -> Unit,
-) {
-    WhenDateGrid(
-        eventWhen, context, "starts_date_pane",
-        allowed = { true },
-        onPick = { date ->
-            onChange(eventWhen.pickStartDate(date, defaults = !timesTouched, context.today, now))
-            onPicked()
-        },
-    )
+internal fun StartDatePane(eventWhen: EventWhen, context: WhenContext, onPick: (LocalDate) -> Unit) {
+    WhenDateGrid(eventWhen, context, "starts_date_pane", opensOn = eventWhen.startDate, allowed = { true }, onPick = onPick)
 }
 
 /** Hour and minute steppers for the start; the end follows. Under them, whether the people are free, and the nearest free starts. */
 @Composable
-internal fun StartTimePane(eventWhen: EventWhen, onChange: (EventWhen) -> Unit, context: WhenContext) {
+internal fun StartTimePane(eventWhen: EventWhen, context: WhenContext, onStep: (ClockField, Boolean) -> Unit, onFreeStart: (LocalTime) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap), modifier = Modifier.testTag("starts_time_pane")) {
-        TimeSteppers(
-            eventWhen.startClock, "start_",
-            onStep = { field, up -> onChange(eventWhen.stepStart(field, up)) },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        WhenClash(eventWhen, onChange, context)
+        TimeSteppers(eventWhen.startClock, "start_", onStep = onStep, modifier = Modifier.fillMaxWidth())
+        WhenClash(eventWhen, context, onFreeStart)
     }
 }
 
-/** The month of days for the end: only the start's day and the 59 after it can be picked, and a pick keeps the end time. */
+/**
+ * The month of days for the end, opening on the end's month: only the start's day and the 59 after it can be picked,
+ * and a pick keeps the end time.
+ */
 @Composable
-internal fun EndDatePane(eventWhen: EventWhen, onChange: (EventWhen) -> Unit, context: WhenContext, onPicked: () -> Unit) {
+internal fun EndDatePane(eventWhen: EventWhen, context: WhenContext, onPick: (LocalDate) -> Unit) {
     val first = eventWhen.startDate
     WhenDateGrid(
         eventWhen, context, "ends_date_pane",
+        opensOn = eventWhen.endDate,
         allowed = { date -> first != null && date >= first && date < first.plusDays(MAX_SPAN_DAYS) },
-        onPick = { date ->
-            eventWhen.pickEndDate(date)?.let {
-                onChange(it)
-                onPicked()
-            }
-        },
+        onPick = onPick,
     )
 }
 
 /** Steppers for the end, with any step that would reach the start or leave the end's day dimmed. */
 @Composable
-internal fun EndTimePane(eventWhen: EventWhen, onChange: (EventWhen) -> Unit, context: WhenContext) {
+internal fun EndTimePane(eventWhen: EventWhen, context: WhenContext, onStep: (ClockField, Boolean) -> Unit, onFreeStart: (LocalTime) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap), modifier = Modifier.testTag("ends_time_pane")) {
-        TimeSteppers(
-            eventWhen.endClock, "end_",
-            onStep = { field, up -> eventWhen.stepEnd(field, up)?.let(onChange) },
-            enabled = eventWhen::canStepEnd,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        WhenClash(eventWhen, onChange, context)
+        TimeSteppers(eventWhen.endClock, "end_", onStep = onStep, enabled = eventWhen::canStepEnd, modifier = Modifier.fillMaxWidth())
+        WhenClash(eventWhen, context, onFreeStart)
     }
 }
 
@@ -108,10 +82,11 @@ private fun WhenDateGrid(
     eventWhen: EventWhen,
     context: WhenContext,
     tag: String,
+    opensOn: LocalDate?,
     allowed: (LocalDate) -> Boolean,
     onPick: (LocalDate) -> Unit,
 ) {
-    var month by remember { mutableStateOf(YearMonth.from(eventWhen.endDate ?: eventWhen.startDate ?: context.today)) }
+    var month by remember { mutableStateOf(YearMonth.from(opensOn ?: context.today)) }
     val dots = rememberGridDots(context.held, month, context.household, context.zone)
     val first = eventWhen.startDate
     val last = eventWhen.endDate
@@ -130,7 +105,7 @@ private fun WhenDateGrid(
 }
 
 @Composable
-private fun WhenClash(eventWhen: EventWhen, onChange: (EventWhen) -> Unit, context: WhenContext) {
+private fun WhenClash(eventWhen: EventWhen, context: WhenContext, onFreeStart: (LocalTime) -> Unit) {
     val order = context.household.order
     val check = remember(context.held, eventWhen, context.who, context.except, context.zone, order) {
         context.held?.checkWhen(eventWhen, context.who, context.zone, context.except, order) ?: FreeCheck.None
@@ -142,6 +117,6 @@ private fun WhenClash(eventWhen: EventWhen, onChange: (EventWhen) -> Unit, conte
         overDays = eventWhen.overDays(context.zone),
         zone = context.zone,
         nameOf = { id -> context.household.byId[id]?.name.orEmpty() },
-        onFreeStart = { onChange(eventWhen.withStart(it)) },
+        onFreeStart = onFreeStart,
     )
 }

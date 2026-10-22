@@ -10,6 +10,8 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import kotlin.math.abs
+import uk.co.siland.culvery.capability.calendar.ClockField
 import uk.co.siland.culvery.capability.calendar.EditableEvent
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventRef
@@ -22,9 +24,9 @@ import uk.co.siland.culvery.core.ui.WithFontScale
 
 val LONDON: ZoneId = ZoneId.of("Europe/London")
 
-/** A timed event from Monday 28 September 18:00 to Wednesday 30 at 10:00: its dates stay locked. */
-val LOCKED_START = EventTime.Timed(LocalDateTime.of(2026, 9, 28, 18, 0).atZone(LONDON).toInstant())
-val LOCKED_END = EventTime.Timed(LocalDateTime.of(2026, 9, 30, 10, 0).atZone(LONDON).toInstant())
+/** All day from Monday 28 September for 70 days, to Sunday 6 December: over the cap, so its dates stay locked. */
+val LOCKED_START = EventTime.AllDay(LocalDate.of(2026, 9, 28))
+val LOCKED_END = EventTime.AllDay(LocalDate.of(2026, 12, 7))
 
 /** A new event in the full-screen editor, opened at 11:54 on the sample Wednesday for the household Alex, Sam, Mia. */
 fun editorForm(
@@ -49,6 +51,15 @@ fun editorEditOf(
     order = SampleUi.household.map { it.id }, calendarPerson = SampleUi.alex.id,
 )
 
+/** Picks [date], then steps the start to [hour]:00 and the end to [minutes] after it, as the steppers would. */
+fun EditorForm.timedAt(date: LocalDate, hour: Int, minutes: Int = 60) {
+    pickStartDate(date)
+    val by = hour - eventWhen.startClock.hour
+    repeat(abs(by)) { stepStart(ClockField.Hour, up = by > 0) }
+    val quarters = (minutes - 60) / 15
+    repeat(abs(quarters)) { stepEnd(ClockField.Minute, up = quarters > 0) }
+}
+
 /** Dinner tonight at 19:30 for [length], in the full-screen editor. */
 fun editorDinnerOf(length: Duration): EditorForm {
     val start = SampleUi.TODAY.atTime(19, 30).atZone(LONDON).toInstant()
@@ -57,6 +68,13 @@ fun editorDinnerOf(length: Duration): EditorForm {
 
 /** Grandma's visit over [LOCKED_START] to [LOCKED_END] in the full-screen editor: its dates can't change here. */
 fun editorLockedVisit() = editorEditOf(LOCKED_START, LOCKED_END, "Grandma visiting", "family")
+
+/** A weekend away made on a phone, Monday 28 September 18:00 to Wednesday 30 at 16:00: it opens like any other event. */
+fun editorTimedSpan() = editorEditOf(
+    EventTime.Timed(LocalDateTime.of(2026, 9, 28, 18, 0).atZone(LONDON).toInstant()),
+    EventTime.Timed(LocalDateTime.of(2026, 9, 30, 16, 0).atZone(LONDON).toInstant()),
+    "Grandma visiting", "family",
+)
 
 /**
  * The full-screen editor as the tests draw it: [form] on [flow] for the sample household, saving to the Family calendar,
@@ -67,7 +85,6 @@ fun ShowEditor(
     form: EditorForm,
     flow: EditorFlow,
     held: Held? = null,
-    picker: EditorPicker = EditorPicker.None,
     scale: Float = 1f,
     dark: Boolean = true,
     members: List<Member> = SampleUi.members,
@@ -82,7 +99,6 @@ fun ShowEditor(
     onSave: () -> Unit = {},
     onDelete: () -> Unit = {},
     onRefusedWho: () -> Unit = {},
-    onPicker: (EditorPicker) -> Unit = {},
 ) {
     CulveryTheme(dark = dark) {
         WithFontScale(scale) {
@@ -96,7 +112,6 @@ fun ShowEditor(
                     service = "Google Calendar",
                     busy = busy,
                     failure = failure,
-                    picker = picker,
                     childOnly = childOnly,
                     childName = childName,
                     held = held,
@@ -104,7 +119,6 @@ fun ShowEditor(
                     onSave = onSave,
                     onDelete = onDelete,
                     onRefusedWho = onRefusedWho,
-                    onPicker = onPicker,
                     keyboard = keyboard,
                 )
             }

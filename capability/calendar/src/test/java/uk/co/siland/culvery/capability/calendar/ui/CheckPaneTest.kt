@@ -20,13 +20,13 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
-import java.time.Duration
 import java.time.LocalDate
 import kotlin.math.abs
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
+import uk.co.siland.culvery.capability.calendar.ClockField
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
@@ -59,9 +59,7 @@ class CheckPaneTest {
     private fun guitar() = editorForm().apply {
         updateTitle("Guitar lesson")
         toggleWho(SampleUi.mia.id)
-        tapDay(LocalDate.of(2026, 9, 26))
-        chooseHour(10)
-        chooseLength(Duration.ofMinutes(45))
+        timedAt(LocalDate.of(2026, 9, 26), 10, minutes = 45)
         chooseRepeat(RepeatChoice.Weekly)
         stopsAfter()
         repeat(2) { moreTimes() }
@@ -72,8 +70,7 @@ class CheckPaneTest {
         updateTitle("Cinema")
         toggleWho(SampleUi.sam.id)
         toggleWho(SampleUi.mia.id)
-        tapDay(LocalDate.of(2026, 9, 25))
-        chooseHour(17)
+        timedAt(LocalDate.of(2026, 9, 25), 17)
     }
 
     private fun show(editor: EditorForm = guitar()) {
@@ -175,7 +172,7 @@ class CheckPaneTest {
             ),
             lastShownDay(SampleUi.TODAY), emptySet(), firstDay = SampleUi.TODAY,
         )
-        show(guitar().apply { chooseHour(15) })
+        show(guitar().apply { repeat(5) { stepStart(ClockField.Hour, up = true) } })
         node("editor_save_hint").assertTextEquals("Clashes are allowed; both show on the week")
         compose.assertClickablesHaveRoleAndLabel()
     }

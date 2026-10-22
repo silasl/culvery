@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -58,9 +59,6 @@ fun whoValue(form: EditorForm, people: List<Person>): String = when {
     else -> whoLine(chosen(form, people))
 }
 
-/** The Day row: "Choose a day", "Sat 26 Sep", "Thu 29 Oct – Sun 1 Nov". */
-fun dayValue(form: EditorForm): String = datesOf(form) ?: CHOOSE_A_DAY
-
 /** The Time row: "All day", "10:00–10:45". */
 fun timeValue(form: EditorForm): String = timesOf(form) ?: ALL_DAY_LABEL
 
@@ -70,7 +68,7 @@ fun timeValue(form: EditorForm): String = timesOf(form) ?: ALL_DAY_LABEL
  */
 fun checkSentence(form: EditorForm, people: List<Person>): String {
     val who = if (form.everyone) lowerFirst(EVERYONE) else spokenWho(chosen(form, people))
-    val first = form.day
+    val first = form.eventWhen.startDate
     val series = form.repeat.takeIf { first != null && it != RepeatChoice.Never }
     val parts = listOfNotNull(
         "${form.title.trim()} for $who",
@@ -90,7 +88,7 @@ fun checkSentence(form: EditorForm, people: List<Person>): String {
 
 /** The Check pane's first few dates, and how many more a counted series has after them; one for a one-off. */
 fun firstDates(form: EditorForm): Pair<List<LocalDate>, Int> {
-    val first = form.day ?: return emptyList<LocalDate>() to 0
+    val first = form.eventWhen.startDate ?: return emptyList<LocalDate>() to 0
     return when (val end = form.repeatEnd) {
         is RepeatEnd.After -> occurrences(form.repeat, first, minOf(end.times, FIRST_FEW)) to maxOf(end.times - FIRST_FEW, 0)
         else -> occurrences(form.repeat, first, FIRST_FEW) to 0
@@ -102,16 +100,19 @@ private fun chosen(form: EditorForm, people: List<Person>): List<Person> {
     return form.who.mapNotNull { byId[it] }
 }
 
-// "Sat 26 Sep", or a range: "Mon 19 – Fri 23 Oct", with the month on both ends across months.
+// "Sat 26 Sep", or a range: "Mon 19 – Fri 23 Oct", with the month on both ends across months. A timed end at
+// midnight belongs to the day before.
 private fun datesOf(form: EditorForm): String? {
-    val first = form.day ?: return null
-    val last = form.until ?: return first.format(SHORT_DAY)
-    return dayRange(first, last)
+    val w = form.eventWhen
+    val first = w.startDate ?: return null
+    val end = checkNotNull(w.endDate)
+    val last = if (!w.allDay && w.endDays > 0 && w.endClock == LocalTime.MIDNIGHT) end.minusDays(1) else end
+    return if (last == first) first.format(SHORT_DAY) else dayRange(first, last)
 }
 
-// "10:00–10:45", ending where the draft does; null when all day.
+// "10:00–10:45"; null when all day.
 private fun timesOf(form: EditorForm): String? {
-    val start = form.startTime ?: return null
-    val (_, end) = draftSpan(form.day ?: form.today, start, form.length, form.zone)
-    return "${clockText(start)}–${end.atZone(form.zone).format(HOURS_MINUTES)}"
+    val w = form.eventWhen
+    if (w.allDay) return null
+    return "${clockText(w.startClock)}–${clockText(w.endClock)}"
 }

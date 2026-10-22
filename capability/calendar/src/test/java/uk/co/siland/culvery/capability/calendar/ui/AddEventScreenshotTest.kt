@@ -15,6 +15,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
+import uk.co.siland.culvery.capability.calendar.ClockField
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
@@ -116,30 +117,51 @@ class AddEventScreenshotTest {
         Held(events, lastShownDay(SampleUi.TODAY), emptySet(), firstDay = SampleUi.TODAY)
     }
 
-    /** Handoff 6c: "Guitar lesson" for Mia on Sat 26 Sep, with the month's dots and today ringed. */
+    /** Handoff 6c as Starts: "Guitar lesson" for Mia from Sat 26 Sep, with the month's dots and today ringed. */
     @Test
-    fun addEventDayDark() {
+    fun addEventStartsDateDark() {
         val form = editorForm().apply {
             updateTitle("Guitar lesson")
             toggleWho(SampleUi.mia.id)
-            tapDay(LocalDate.of(2026, 9, 26))
+            pickStartDate(LocalDate.of(2026, 9, 26))
         }
-        show(form, dark = true, start = EditorStep.Day, held = sampleHeld)
-        snap("add_event_day_dark")
+        show(form, dark = true, start = EditorStep.StartDate, held = sampleHeld)
+        snap("add_event_starts_date_dark")
     }
 
-    /** Handoff 6d: a trip for everyone, Thu 29 Oct to the trailing Sun 1 Nov, banded across October's last line. */
+    /** Half-term trip for everyone, Thu 29 Oct 09:00 to Sun 1 Nov 10:00: the Ends grid banded across October's last line. */
+    private fun trip() = editorForm().apply {
+        updateTitle("Half-term trip to Devon")
+        toggleWho(PersonId.FAMILY)
+        pickStartDate(LocalDate.of(2026, 10, 29))
+        pickEndDate(LocalDate.of(2026, 11, 1))
+    }
+
     @Test
-    fun addEventDaysDark() {
+    fun addEventEndsDateDark() {
+        show(trip(), dark = true, start = EditorStep.EndDate, held = sampleHeld)
+        snap("add_event_ends_date_dark")
+    }
+
+    /** The trip all day: both times gone, the dates kept. */
+    @Test
+    fun addEventAllDayDark() {
+        show(trip().apply { chooseAllDay(true) }, dark = true, start = EditorStep.EndDate, held = sampleHeld)
+        snap("add_event_all_day_dark")
+    }
+
+    /** Camp for Sam, Fri 23 Oct 18:00 to Sun 25 Oct 16:00, on the end's steppers. */
+    @Test
+    fun addEventSpanDark() {
         val form = editorForm().apply {
-            updateTitle("Half-term trip to Devon")
-            toggleWho(PersonId.FAMILY)
-            setMultiDay(true)
-            tapDay(LocalDate.of(2026, 10, 29))
-            tapDay(LocalDate.of(2026, 11, 1))
+            updateTitle("Camp")
+            toggleWho(SampleUi.sam.id)
+            timedAt(LocalDate.of(2026, 10, 23), 18)
+            pickEndDate(LocalDate.of(2026, 10, 25))
+            repeat(3) { stepEnd(ClockField.Hour, up = false) }
         }
-        show(form, dark = true, start = EditorStep.Day, held = sampleHeld)
-        snap("add_event_days_dark")
+        show(form, dark = true, start = EditorStep.EndTime)
+        snap("add_event_span_dark")
     }
 
     /** The sample week with Mia's Piano, 15:30–16:15, on Sat 26 Sep: hours 15 and 16 are busy. */
@@ -155,22 +177,27 @@ class AddEventScreenshotTest {
     private fun guitarAt(hour: Int) = editorForm().apply {
         updateTitle("Guitar lesson")
         toggleWho(SampleUi.mia.id)
-        tapDay(LocalDate.of(2026, 9, 26))
-        chooseHour(hour)
-        chooseLength(Duration.ofMinutes(45))
+        timedAt(LocalDate.of(2026, 9, 26), hour, minutes = 45)
     }
 
-    /** Handoff 6e: Guitar lesson for Mia on Sat 26 Sep at 10:00–10:45, with 15 and 16 busy and "Mia is free then". */
+    /** Handoff 6e on Starts' steppers: Guitar lesson for Mia on Sat 26 Sep at 10:00–10:45, and "Mia is free then". */
     @Test
-    fun addEventTimeDark() {
-        show(guitarAt(10), dark = true, start = EditorStep.Time, held = pianoHeld)
-        snap("add_event_time_dark")
+    fun addEventStartsTimeDark() {
+        show(guitarAt(10), dark = true, start = EditorStep.StartTime, held = pianoHeld)
+        snap("add_event_starts_time_dark")
     }
 
-    /** Handoff 6i: the same at 15:00–15:45, over Piano: the warning, the free starts 14:45 and 16:15, and the Clash tag. */
+    /** The same on Ends' steppers: hour down is dimmed, as 09:45 would be before the start. */
+    @Test
+    fun addEventEndsTimeDark() {
+        show(guitarAt(10), dark = true, start = EditorStep.EndTime, held = pianoHeld)
+        snap("add_event_ends_time_dark")
+    }
+
+    /** Handoff 6i: the same at 15:00–15:45, over Piano: the warning, the free starts 14:45 and 16:15, and the Clash tag on Starts. */
     @Test
     fun addEventClashDark() {
-        show(guitarAt(15), dark = true, start = EditorStep.Time, held = pianoHeld)
+        show(guitarAt(15), dark = true, start = EditorStep.StartTime, held = pianoHeld)
         snap("add_event_clash_dark")
     }
 
@@ -202,8 +229,7 @@ class AddEventScreenshotTest {
             updateTitle("Cinema")
             toggleWho(SampleUi.sam.id)
             toggleWho(SampleUi.mia.id)
-            tapDay(LocalDate.of(2026, 9, 25))
-            chooseHour(17)
+            timedAt(LocalDate.of(2026, 9, 25), 17)
         }
         show(form, dark = true, start = EditorStep.Check)
         snap("add_event_check_shared_dark")

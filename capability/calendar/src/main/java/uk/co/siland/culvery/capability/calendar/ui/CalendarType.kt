@@ -78,9 +78,6 @@ internal object CalendarType {
     /** 14 sp / 400: explanation card text. */
     val noteBody = HhType.secondary
 
-    /** 24 sp / 700: "Pick a time". */
-    val pickerTitle = HhType.dateNumber
-
     /** 72 sp / 600, tabular, −2 tracking, line height 1: the time picker's hour and minute. */
     val timeValue = HhType.headerValue.copy(fontSize = 72.sp, letterSpacing = (-2).sp, lineHeight = 72.sp)
 
@@ -431,13 +428,10 @@ internal object CalendarDimens {
     // The confirm card's delete icon.
     val footerIcon = 24.dp
 
-    // The time picker (hand-off §7 and Culvery.dc.html): card `surf`, radius 30, padding 26; 440 wide, 18 between
-    // blocks; the columns 14 apart; steppers 88×52, radius 18, a 32 dp icon, 8 from the value; ":" 10 above the
-    // baseline; Cancel and Set time Large buttons 10 apart.
+    // The time steppers (hand-off §7 and Culvery.dc.html), and the picker card's radius 30 and padding 26: the columns
+    // 14 apart; steppers 88×52, radius 18, a 32 dp icon, 8 from the value; ":" 10 above the baseline.
     val pickerRadius = 30.dp
     val pickerPadding = 26.dp
-    val timePickerWidth = 440.dp
-    val timePickerGap = 18.dp
     val timeColumnGap = 14.dp
     val stepperWidth = 88.dp
     val stepperHeight = 52.dp
@@ -445,7 +439,6 @@ internal object CalendarDimens {
     val stepperIcon = 32.dp
     val stepperGap = 8.dp
     val colonBottom = 10.dp
-    val timeButtonGap = 10.dp
 
     // The failure card: radius 18, padding 14×16, the icon 12 from the text; `cloud_off` 24 dp, the body 2 below its title.
     val editorCardRadius = 18.dp

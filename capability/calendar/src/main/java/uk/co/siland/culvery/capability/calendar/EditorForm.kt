@@ -3,56 +3,17 @@ package uk.co.siland.culvery.capability.calendar
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import java.time.Duration
-import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.ZonedDateTime
-import java.time.temporal.ChronoUnit
 import uk.co.siland.culvery.core.household.PersonId
-import uk.co.siland.culvery.core.ui.UNTIL
-import uk.co.siland.culvery.core.ui.clockText
 import uk.co.siland.culvery.core.ui.plural
-
-/** What the Time pane chooses: all day, or a start time. */
-sealed interface TimeChoice {
-    data object AllDay : TimeChoice
-    data class Custom(val time: LocalTime) : TimeChoice
-}
 
 /** The longest an event may last, in days (the first and last day count). */
 const val MAX_SPAN_DAYS = 60L
 
 /** 2b-2 design D8: a title is at most 100 characters. */
 const val MAX_TITLE_LENGTH = 100
-
-/** "30 minutes", "1 hour", "1 hour 30 minutes": full words, singular at one. */
-fun lengthLabel(length: Duration): String = lengthWords(length) { plural(it, "minute") }
-
-/** The Time pane's length chips (9 §3.1); any other length shows as "Until {end}". */
-val EDITOR_LENGTHS: List<Duration> = listOf(Duration.ofMinutes(30), Duration.ofMinutes(45), Duration.ofHours(1), Duration.ofHours(2))
-
-internal const val END_BEFORE_START = "The end is before the start. Pick a later time."
-
-private const val UNTIL_UNPICKED = "$UNTIL…"
-private val DEFAULT_LENGTH: Duration = Duration.ofHours(1)
-private val MORNING: LocalTime = LocalTime.of(9, 0)
-private const val LAST_HOUR = 23
-private val LAST_END: LocalTime = LocalTime.of(23, 59)
-
-/** "30 min", "45 min", "1 hour", "2 hours": a chip's words; TalkBack hears [lengthLabel]. */
-fun lengthChip(length: Duration): String = lengthWords(length) { "$it min" }
-
-private fun lengthWords(length: Duration, minuteWords: (Long) -> String): String {
-    val hours = length.toHours()
-    val minutes = length.toMinutes() % MINUTES_PER_HOUR
-    return when {
-        hours == 0L -> minuteWords(minutes)
-        minutes == 0L -> plural(hours, "hour")
-        else -> "${plural(hours, "hour")} ${minuteWords(minutes)}"
-    }
-}
 
 /** What Add event still waits for, in the order the foot names them. */
 enum class Needed { Title, Who, Day }
@@ -93,14 +54,10 @@ class EditorForm(
 
     private val original: EditableEvent? = (mode as? Mode.Edit)?.original
 
-    /** A timed, mixed or over-long (past [MAX_SPAN_DAYS]) event over several days keeps its dates; a shorter all-day span's dates edit. */
-    val datesLocked: Boolean = original?.let(::locksDates) ?: false
+    private val openingWhen: EventWhen = original?.let { EventWhen.of(it.start, it.end, zone) } ?: EventWhen.defaults(preselectedDay, today, now)
 
-    private fun locksDates(e: EditableEvent): Boolean {
-        val (first, last) = daySpan(e.start, e.end, zone)
-        if (!last.isAfter(first)) return false
-        return !e.isAllDay() || ChronoUnit.DAYS.between(first, last) + 1 > MAX_SPAN_DAYS
-    }
+    /** A mixed all-day and timed event, or one past the cap that Save would refuse, keeps its dates (9c §3.3). */
+    val datesLocked: Boolean = original != null && (original.isMixed() || openingWhen.capError != null)
 
     /** Set while a save runs: every change is ignored, since the editor closes on what was sent. */
     var saving: Boolean by mutableStateOf(false)
@@ -133,156 +90,38 @@ class EditorForm(
     // A reordered household or a re-picked person isn't a retag (9 §3.4).
     private val whoChanged: Boolean get() = who.toSet() != openingWho.toSet()
 
-    private val openingSpan: Pair<LocalDate, LocalDate>? = original?.let { daySpan(it.start, it.end, zone) }
-
-    var day: LocalDate? by mutableStateOf(openingSpan?.first ?: preselectedDay)
+    /** Starts, Ends and All day (9c §3); a new event opens on the default times, which aren't an edit. */
+    var eventWhen: EventWhen by mutableStateOf(openingWhen)
         private set
 
-    var multiDay: Boolean by mutableStateOf(
-        openingSpan != null && !datesLocked && original?.isAllDay() == true && openingSpan.second > openingSpan.first,
-    )
+    /** A time or the Ends date was chosen, so a Starts date pick keeps the times rather than that day's defaults. */
+    var timesTouched: Boolean = false
         private set
 
-    /** The last day of a multi-day event; null while it is one day or waiting for the last tap. */
-    var until: LocalDate? by mutableStateOf(openingSpan?.second?.takeIf { multiDay })
-        private set
-
-    private var awaiting by mutableStateOf(false)
-
-    /** A first day is tapped and the next tap sets the last. */
-    val awaitingLastDay: Boolean get() = multiDay && awaiting
-
-    // Set aside by Lasts more than a day; turned off with the same Day, it comes back.
-    private var timeAside: Pair<LocalDate?, LocalTime>? = null
-
-    // Until Day, Time or Length is touched, an edit keeps the event's own start and end.
-    private var whenTouched = false
-
-    // multiDay's private setter already takes the JVM name setMultiDay.
-    /** On, the event is all day and the next tap is its first day; off, it is one day again. */
-    @JvmName("chooseMultiDay")
-    fun setMultiDay(on: Boolean) = edit {
-        if (datesLocked || on == multiDay) return@edit
-        multiDay = on
-        until = null
-        awaiting = false
-        if (on) {
-            timeAside = startTime?.let { day to it }
-            time = TimeChoice.AllDay
-            endError = null
-        } else {
-            timeAside?.takeIf { it.first == day }?.let { time = TimeChoice.Custom(it.second) }
-            timeAside = null
-        }
-        whenTouched = true
+    private inline fun editWhen(change: () -> Unit) = edit {
+        if (!datesLocked) change()
     }
 
-    /**
-     * One day: the day. Several (9 §3.1): the first tap sets the day and waits; the next sets the last day, or one day if
-     * it is the same date, or starts again from a date before the first. Once a range is set, a tap starts a new one,
-     * unless it is over the cap: then a tap on or after the first day replaces the last.
-     */
-    fun tapDay(date: LocalDate) = edit {
-        if (datesLocked) return@edit
-        val first = day
-        when {
-            !multiDay -> if (date == first) return@edit else day = date
-            (!awaiting && untilError == null) || first == null || date < first -> {
-                day = date
-                until = null
-                awaiting = true
-            }
-            else -> {
-                until = date.takeIf { it != first }
-                awaiting = false
-            }
-        }
-        whenTouched = true
+    /** Both dates stay; the times hide, and come back as they were (9c §3.1). */
+    fun chooseAllDay(on: Boolean) = editWhen { eventWhen = eventWhen.withAllDay(on) }
+
+    fun pickStartDate(date: LocalDate) = editWhen { eventWhen = eventWhen.pickStartDate(date, defaults = !timesTouched, today, now) }
+
+    /** A day outside the start's day and the 59 after it changes nothing. */
+    fun pickEndDate(date: LocalDate) = editWhen { eventWhen.pickEndDate(date)?.let(::touchWhen) }
+
+    fun stepStart(field: ClockField, up: Boolean) = editWhen { touchWhen(eventWhen.stepStart(field, up)) }
+
+    /** A step that would reach the start or leave the end's day changes nothing. */
+    fun stepEnd(field: ClockField, up: Boolean) = editWhen { eventWhen.stepEnd(field, up)?.let(::touchWhen) }
+
+    /** A free start from the clash line; the end follows. */
+    fun useFreeStart(clock: LocalTime) = editWhen { touchWhen(eventWhen.withStart(clock)) }
+
+    private fun touchWhen(next: EventWhen) {
+        eventWhen = next
+        timesTouched = true
     }
-
-    val untilError: String?
-        get() {
-            val first = day ?: return null
-            return until?.takeIf { it > first.plusDays(MAX_SPAN_DAYS - 1) }?.let { UNTIL_TOO_LATE }
-        }
-
-    var time: TimeChoice by mutableStateOf(original?.let { timeOf(it.start, zone) } ?: TimeChoice.AllDay)
-        private set
-
-    var length: Duration by mutableStateOf(original?.let(::lengthOf) ?: DEFAULT_LENGTH)
-        private set
-
-    /** A refused end time's message, shown in the Time pane until the time or length changes; it never holds Save back. */
-    var endError: String? by mutableStateOf(null)
-        private set
-
-    val startTime: LocalTime?
-        get() = when (val t = time) {
-            TimeChoice.AllDay -> null
-            is TimeChoice.Custom -> t.time
-        }
-
-    fun chooseAllDay() = applyTime(TimeChoice.AllDay)
-
-    /** On the hour, or at the minute already chosen. */
-    fun chooseHour(hour: Int) = applyTime(TimeChoice.Custom(startTime?.withHour(hour) ?: LocalTime.of(hour, 0)))
-
-    /** Ignored while All day. */
-    fun chooseMinute(minute: Int) {
-        val start = startTime ?: return
-        applyTime(TimeChoice.Custom(start.withMinute(minute)))
-    }
-
-    fun chooseTime(time: LocalTime) = applyTime(TimeChoice.Custom(time))
-
-    // A time can't be chosen while the event lasts more than a day, nor on a locked span; re-choosing changes nothing.
-    private fun applyTime(choice: TimeChoice) = edit {
-        if (datesLocked || (multiDay && choice is TimeChoice.Custom)) return@edit
-        endError = null
-        if (choice == time) return@edit
-        time = choice
-        whenTouched = true
-    }
-
-    fun chooseLength(length: Duration) = edit {
-        if (datesLocked) return@edit
-        endError = null
-        if (length == this.length) return@edit
-        this.length = length
-        whenTouched = true
-    }
-
-    /** An end on the start's day sets the length; one at or before the start is refused and changes nothing. */
-    fun chooseEndTime(end: LocalTime) = edit {
-        val start = startTime ?: return@edit
-        if (!end.isAfter(start)) {
-            endError = END_BEFORE_START
-            return@edit
-        }
-        chooseLength(Duration.between(start, end))
-    }
-
-    /** "Until…", or "Until 18:30" when the length is none of [EDITOR_LENGTHS]. */
-    val untilTimeLabel: String
-        get() {
-            val start = startTime
-            return if (start == null || length in EDITOR_LENGTHS) UNTIL_UNPICKED else "$UNTIL ${clockText(start.plus(length))}"
-        }
-
-    /** Where the start picker opens: the chosen start; with none, the next whole hour (23:00 at the latest), or 09:00 on another day. */
-    val pickerTime: LocalTime
-        get() = startTime ?: when {
-            day != null && day != today -> MORNING
-            now.hour >= LAST_HOUR -> LocalTime.of(LAST_HOUR, 0)
-            else -> LocalTime.of(now.hour + 1, 0)
-        }
-
-    /** Where the end picker opens: the start plus the length, but no later than 23:59, since an end can't pass midnight. */
-    val endPickerTime: LocalTime
-        get() {
-            val end = pickerTime.plus(length)
-            return if (end > pickerTime) end else LAST_END
-        }
 
     /** Only a new event repeats here, and not a child's: a series can't be deleted from the wall (9 §4.8, 5 §A.4). */
     val canRepeat: Boolean = mode == Mode.New && repeats
@@ -324,7 +163,7 @@ class EditorForm(
     val stepperLabel: String?
         get() {
             val end = repeatEnd as? RepeatEnd.After ?: return null
-            val first = day ?: return null
+            val first = eventWhen.startDate ?: return null
             return "${plural(end.times.toLong(), "time")} · last on ${occurrences(repeat, first, end.times).last().format(SHORT_DAY)}"
         }
 
@@ -332,7 +171,7 @@ class EditorForm(
     val repeatsValue: String
         get() {
             // The pane offers repeats only once there is a day.
-            val first = day ?: return DOESNT_REPEAT
+            val first = eventWhen.startDate ?: return DOESNT_REPEAT
             val times = (repeatEnd as? RepeatEnd.After)?.let { " · ${plural(it.times.toLong(), "time")}" }.orEmpty()
             return repeat.wording(first) + times
         }
@@ -351,58 +190,52 @@ class EditorForm(
         get() = buildList {
             if (title.isBlank()) add(Needed.Title)
             if (who.isEmpty()) add(Needed.Who)
-            if (day == null) add(Needed.Day)
+            if (eventWhen.startDate == null) add(Needed.Day)
         }
 
-    /** Why Add event or Save changes is disabled: what's missing, else the 60-day cap; null when it can save. */
-    val reason: String? get() = needsLine(missing) ?: untilError
+    /** Why Add event or Save changes is disabled: what's missing, else the 60-day cap, which a locked span never writes; null when it can save. */
+    val reason: String? get() = needsLine(missing) ?: eventWhen.capError.takeUnless { datesLocked }
 
     val canSave: Boolean get() = reason == null
+
+    // The When as the rows show it: clocks hidden under All day, or before there is a date, aren't an edit.
+    private fun shownWhen(): Pair<EventSpan?, Boolean> = eventWhen.span(zone) to eventWhen.allDay
 
     private data class Answers(
         val title: String,
         val who: List<PersonId>,
-        val day: LocalDate?,
-        val multiDay: Boolean,
-        val until: LocalDate?,
-        val time: TimeChoice,
-        val length: Duration,
+        val shownWhen: Pair<EventSpan?, Boolean>,
         val repeat: RepeatChoice,
         val repeatEnd: RepeatEnd,
     )
 
-    private fun answers() = Answers(title, who, day, multiDay, until, time, length, repeat, repeatEnd)
+    private fun answers() = Answers(title, who, shownWhen(), repeat, repeatEnd)
 
     private val opening = answers()
 
     /** Any answer differs from how the editor opened: closing now would lose something. Changed back, it isn't. */
     val edited: Boolean get() = answers() != opening
 
-    // A locked edit, or one whose times weren't touched and whose own span was valid, keeps its own start and end:
-    // rebuilt from the answers, an event in the autumn's repeated hour would move.
+    // A locked edit, or one whose When shows as it opened, keeps its own start and end: rebuilt, an event in the
+    // autumn's repeated hour would move, and one whose end wasn't after its start would be mended unasked.
     private val keepsOwnSpan: Boolean
-        get() {
-            val o = original ?: return false
-            return datesLocked || (!whenTouched && (o.start is EventTime.AllDay || lengthOf(o) != null))
-        }
+        get() = original != null && (datesLocked || shownWhen() == opening.shownWhen)
 
-    /**
-     * All day runs to the day after the last day (exclusive). A timed event starts at the local time in the household
-     * zone (a spring-forward gap moves it forward; an ambiguous autumn time takes the earlier offset) and lasts [length]
-     * of real time, but ends at the next midnight at the latest.
-     */
-    private fun span(first: LocalDate): Pair<EventTime, EventTime> {
+    /** All day runs to the day after the last day (exclusive); a timed event between its two wall times in the household zone. */
+    private fun times(): Pair<EventTime, EventTime>? {
         original?.takeIf { keepsOwnSpan }?.let { return it.start to it.end }
-        val start = startTime ?: return EventTime.AllDay(first) to EventTime.AllDay((until ?: first).plusDays(1))
-        val (from, to) = draftSpan(first, start, length, zone)
-        return EventTime.Timed(from) to EventTime.Timed(to)
+        return when (val span = eventWhen.span(zone)) {
+            null -> null
+            is EventSpan.AllDay -> EventTime.AllDay(span.first) to EventTime.AllDay(span.endExclusive)
+            is EventSpan.Timed -> EventTime.Timed(span.start.toInstant()) to EventTime.Timed(span.end.toInstant())
+        }
     }
 
     /** What Save sends; only when [canSave]. A new event that repeats carries its rule. */
     fun draft(createdBy: String?): EventDraft {
         check(canSave) { "Nothing to save: $reason" }
-        val first = checkNotNull(day)
-        val (start, end) = span(first)
+        val first = checkNotNull(eventWhen.startDate)
+        val (start, end) = checkNotNull(times())
         val rule = recurrenceRule(repeat, repeatEnd, first)
         // An edit whose set wasn't changed keeps its tag exactly, so an untagged event stays untagged.
         val forPerson = if (original != null && !whoChanged) original.forPerson else tagFor(who, order)
@@ -415,7 +248,7 @@ class EditorForm(
             val o = original ?: return EventField.entries.toSet()
             return buildSet {
                 if (title.trim() != o.title.trim()) add(EventField.TITLE)
-                if (day?.let(::span) != (o.start to o.end)) add(EventField.TIMES)
+                if (times() != (o.start to o.end)) add(EventField.TIMES)
                 if (whoChanged) add(EventField.FOR_PERSON)
             }
         }
@@ -424,26 +257,4 @@ class EditorForm(
     val unchanged: Boolean get() = original != null && touched.isEmpty()
 }
 
-/**
- * A timed event's span as Save writes it: from [start] on [day] in [zone] for [length] of real time, ending at the
- * next midnight at the latest. The Time row, the clash check and the draft all read it, so they can't disagree.
- */
-internal fun draftSpan(day: LocalDate, start: LocalTime, length: Duration, zone: ZoneId): Pair<Instant, Instant> {
-    val from = ZonedDateTime.of(day, start, zone).toInstant()
-    return from to minOf(from.plus(length), day.plusDays(1).atStartOfDay(zone).toInstant())
-}
-
-private fun timeOf(start: EventTime, zone: ZoneId): TimeChoice = when (start) {
-    is EventTime.AllDay -> TimeChoice.AllDay
-    is EventTime.Timed -> TimeChoice.Custom(start.instant.atZone(zone).toLocalTime())
-}
-
-/** A timed event's length in real time; null for an all-day event, or one whose end isn't after its start (bad provider data). */
-private fun lengthOf(event: EditableEvent): Duration? {
-    val start = event.start
-    val end = event.end
-    if (start !is EventTime.Timed || end !is EventTime.Timed) return null
-    return Duration.between(start.instant, end.instant).takeIf { !it.isNegative && !it.isZero }
-}
-
-private fun EditableEvent.isAllDay(): Boolean = start is EventTime.AllDay && end is EventTime.AllDay
+private fun EditableEvent.isMixed(): Boolean = (start is EventTime.AllDay) != (end is EventTime.AllDay)

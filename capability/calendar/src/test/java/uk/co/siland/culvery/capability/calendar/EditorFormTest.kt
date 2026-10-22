@@ -2,8 +2,6 @@ package uk.co.siland.culvery.capability.calendar
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import java.time.Duration
-import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -68,7 +66,7 @@ class EditorFormTest {
     @Test
     fun whileSavingEveryChangeIsIgnored() {
         val form = ready(day(21)).apply {
-            chooseHour(18)
+            stepStart(ClockField.Hour, up = true)
             chooseRepeat(RepeatChoice.Weekly)
             stopsAfter()
         }
@@ -77,22 +75,20 @@ class EditorFormTest {
         form.saving = true
         form.updateTitle("Other")
         form.toggleWho(sam)
-        form.tapDay(day(22))
-        form.setMultiDay(true)
-        form.chooseAllDay()
-        form.chooseHour(9)
-        form.chooseMinute(30)
-        form.chooseTime(LocalTime.of(7, 0))
-        form.chooseLength(Duration.ofHours(3))
-        form.chooseEndTime(LocalTime.of(23, 0))
+        form.pickStartDate(day(22))
+        form.pickEndDate(day(23))
+        form.chooseAllDay(true)
+        form.stepStart(ClockField.Hour, up = true)
+        form.stepEnd(ClockField.Minute, up = true)
+        form.useFreeStart(LocalTime.of(7, 0))
         form.chooseRepeat(RepeatChoice.Daily)
         form.moreTimes()
         form.keepsGoing()
         assertThat(form.draft(createdBy = null)).isEqualTo(before)
         assertThat(form.repeatEnd).isEqualTo(repeatEnd)
         form.saving = false
-        form.tapDay(day(22))
-        assertThat(form.day).isEqualTo(day(22))
+        form.pickStartDate(day(22))
+        assertThat(form.eventWhen.startDate).isEqualTo(day(22))
     }
 
     // Who
@@ -178,287 +174,52 @@ class EditorFormTest {
         assertThat(form.draft(createdBy = "alex").forPerson).isEqualTo("sam,mia")
     }
 
-    // Day
+    // Starts and Ends
 
     @Test
     fun theWeeksAddEventStartsWithNoDay() {
         val form = new(day = null)
-        assertThat(form.day).isNull()
+        assertThat(form.eventWhen.startDate).isNull()
         assertThat(form.missing).contains(Needed.Day)
     }
 
     @Test
     fun anEmptyColumnStartsOnItsDay() {
         val form = new(day = today.plusDays(2))
-        assertThat(form.day).isEqualTo(today.plusDays(2))
+        assertThat(form.eventWhen.startDate).isEqualTo(today.plusDays(2))
         assertThat(form.missing).doesNotContain(Needed.Day)
     }
 
     @Test
-    fun aOneDayTapSetsTheDay() {
+    fun anAllDayStartsPickIsOneDay() {
         val form = ready()
-        form.tapDay(today.plusDays(3))
-        assertThat(form.day).isEqualTo(today.plusDays(3))
-        assertThat(form.until).isNull()
-        assertThat(form.awaitingLastDay).isFalse()
+        form.chooseAllDay(true)
+        form.pickStartDate(today.plusDays(3))
         assertThat(form.span()).isEqualTo(allDay(today.plusDays(3), today.plusDays(4)))
     }
 
-    // Range
-
     @Test
-    fun turningOnMultiDayForcesAllDay() {
-        val form = ready(day = mon19)
-        form.chooseTime(LocalTime.of(18, 0))
-        form.setMultiDay(true)
-        assertThat(form.multiDay).isTrue()
-        assertThat(form.time).isEqualTo(TimeChoice.AllDay)
-        // A time can't be chosen while it lasts more than a day.
-        form.chooseHour(9)
-        assertThat(form.time).isEqualTo(TimeChoice.AllDay)
-        form.setMultiDay(false)
-        assertThat(form.time).isEqualTo(TimeChoice.Custom(LocalTime.of(18, 0)))
-
-        val moved = ready(day = mon19)
-        moved.chooseTime(LocalTime.of(18, 0))
-        moved.setMultiDay(true)
-        moved.tapDay(day(20))
-        moved.setMultiDay(false)
-        assertThat(moved.time).isEqualTo(TimeChoice.AllDay)
-    }
-
-    @Test
-    fun theFirstTapWaitsForTheLast() {
+    fun anAllDaySpanEndsTheDayAfterItsLastDay() {
         val form = ready()
-        form.setMultiDay(true)
-        form.tapDay(mon19)
-        assertThat(form.day).isEqualTo(mon19)
-        assertThat(form.until).isNull()
-        assertThat(form.awaitingLastDay).isTrue()
-    }
-
-    @Test
-    fun theSecondTapSetsTheLastDay() {
-        val form = ready()
-        form.setMultiDay(true)
-        form.tapDay(mon19)
-        form.tapDay(day(22))
-        assertThat(form.until).isEqualTo(day(22))
-        assertThat(form.awaitingLastDay).isFalse()
-        assertThat(form.span()).isEqualTo(allDay(day(19), day(23)))
-    }
-
-    @Test
-    fun aSecondTapOnTheSameDayIsOneDay() {
-        val form = ready()
-        form.setMultiDay(true)
-        form.tapDay(mon19)
-        form.tapDay(mon19)
-        assertThat(form.day).isEqualTo(mon19)
-        assertThat(form.until).isNull()
-        assertThat(form.awaitingLastDay).isFalse()
-        assertThat(form.span()).isEqualTo(allDay(day(19), day(20)))
-    }
-
-    @Test
-    fun aTapBeforeTheFirstStartsAgain() {
-        val form = ready()
-        form.setMultiDay(true)
-        form.tapDay(mon19)
-        form.tapDay(day(16))
-        assertThat(form.day).isEqualTo(day(16))
-        assertThat(form.until).isNull()
-        assertThat(form.awaitingLastDay).isTrue()
-    }
-
-    @Test
-    fun aTapAfterARangeStartsANewOne() {
-        val form = ready()
-        form.setMultiDay(true)
-        form.tapDay(mon19)
-        form.tapDay(day(22))
-        form.tapDay(day(26))
-        assertThat(form.day).isEqualTo(day(26))
-        assertThat(form.until).isNull()
-        assertThat(form.awaitingLastDay).isTrue()
-    }
-
-    @Test
-    fun aRangeAcrossAMonthEndsTheDayAfterItsLastDay() {
-        val form = ready()
-        form.setMultiDay(true)
-        form.tapDay(LocalDate.of(2026, 10, 29))
-        form.tapDay(LocalDate.of(2026, 11, 1))
-        assertThat(form.time).isEqualTo(TimeChoice.AllDay)
+        form.chooseAllDay(true)
+        form.pickStartDate(LocalDate.of(2026, 10, 29))
+        form.pickEndDate(LocalDate.of(2026, 11, 1))
         assertThat(form.span()).isEqualTo(allDay(LocalDate.of(2026, 10, 29), LocalDate.of(2026, 11, 2)))
-    }
-
-    @Test
-    fun theRangeKeepsTheSixtyDayCap() {
-        val sixty = ready()
-        sixty.setMultiDay(true)
-        sixty.tapDay(mon19)
-        sixty.tapDay(mon19.plusDays(59))
-        assertThat(sixty.untilError).isNull()
-        assertThat(sixty.canSave).isTrue()
-        assertThat(sixty.span()).isEqualTo(allDay(mon19, LocalDate.of(2026, 12, 18)))
-
-        val sixtyOne = ready()
-        sixtyOne.setMultiDay(true)
-        sixtyOne.tapDay(mon19)
-        sixtyOne.tapDay(mon19.plusDays(60))
-        assertThat(sixtyOne.untilError).isEqualTo(UNTIL_TOO_LATE)
-        assertThat(sixtyOne.reason).isEqualTo(UNTIL_TOO_LATE)
-        assertThat(sixtyOne.canSave).isFalse()
-    }
-
-    /** The cap's message asks for an earlier last day, so a tap on or after the first day becomes it. */
-    @Test
-    fun aTapAfterAnOverCapRangeReplacesTheLastDay() {
-        val form = ready()
-        form.setMultiDay(true)
-        form.tapDay(mon19)
-        form.tapDay(mon19.plusDays(60))
-        assertThat(form.untilError).isEqualTo(UNTIL_TOO_LATE)
-        form.tapDay(mon19.plusDays(10))
-        assertThat(form.day).isEqualTo(mon19)
-        assertThat(form.until).isEqualTo(mon19.plusDays(10))
-        assertThat(form.untilError).isNull()
-        assertThat(form.awaitingLastDay).isFalse()
-        // A range within the cap: the next tap starts a new one, as before.
-        form.tapDay(mon19.plusDays(20))
-        assertThat(form.day).isEqualTo(mon19.plusDays(20))
-        assertThat(form.awaitingLastDay).isTrue()
-        form.tapDay(mon19.plusDays(90))
-        assertThat(form.untilError).isEqualTo(UNTIL_TOO_LATE)
-        form.tapDay(mon19)
-        assertThat(form.day).isEqualTo(mon19)
-        assertThat(form.until).isNull()
-        assertThat(form.awaitingLastDay).isTrue()
-    }
-
-    @Test
-    fun turningMultiDayOffDropsUntil() {
-        val form = ready()
-        form.setMultiDay(true)
-        form.tapDay(mon19)
-        form.tapDay(day(22))
-        form.setMultiDay(false)
-        assertThat(form.multiDay).isFalse()
-        assertThat(form.until).isNull()
-        assertThat(form.day).isEqualTo(mon19)
-        assertThat(form.span()).isEqualTo(allDay(day(19), day(20)))
-    }
-
-    @Test
-    fun aRangeAcrossTheYearEnd() {
-        val form = ready()
-        form.setMultiDay(true)
-        form.tapDay(LocalDate.of(2026, 12, 30))
-        form.tapDay(LocalDate.of(2027, 1, 2))
+        form.pickStartDate(LocalDate.of(2026, 12, 30))
         assertThat(form.span()).isEqualTo(allDay(LocalDate.of(2026, 12, 30), LocalDate.of(2027, 1, 3)))
     }
 
-    // Time
-
+    /** The Ends grid offers the start's day and the 59 after it; another day changes nothing. */
     @Test
-    fun anHourSetsItOnTheHour() {
-        val form = new()
-        form.chooseHour(10)
-        assertThat(form.time).isEqualTo(TimeChoice.Custom(LocalTime.of(10, 0)))
-        assertThat(form.length).isEqualTo(Duration.ofHours(1))
-    }
-
-    @Test
-    fun aMinuteKeepsTheHour() {
-        val form = new()
-        form.chooseHour(10)
-        form.chooseMinute(45)
-        assertThat(form.startTime).isEqualTo(LocalTime.of(10, 45))
-        form.chooseHour(14)
-        assertThat(form.startTime).isEqualTo(LocalTime.of(14, 45))
-    }
-
-    @Test
-    fun aMinuteWhileAllDayIsIgnored() {
-        val form = new()
-        form.chooseMinute(45)
-        assertThat(form.time).isEqualTo(TimeChoice.AllDay)
-        assertThat(form.edited).isFalse()
-    }
-
-    @Test
-    fun thePickersStartWhereTheFormIs() {
-        val form = new(now = "09:20")
-        assertThat(form.mode).isEqualTo(EditorForm.Mode.New)
-        assertThat(form.pickerTime).isEqualTo(LocalTime.of(10, 0))
-        form.chooseHour(14)
-        form.chooseLength(Duration.ofMinutes(45))
-        assertThat(form.pickerTime).isEqualTo(LocalTime.of(14, 0))
-        assertThat(form.endPickerTime).isEqualTo(LocalTime.of(14, 45))
-    }
-
-    @Test
-    fun theEndPickerStopsBeforeMidnight() {
-        val form = new()
-        form.chooseTime(LocalTime.of(23, 30))
-        assertThat(form.endPickerTime).isEqualTo(LocalTime.of(23, 59))
-    }
-
-    @Test
-    fun otherTimeSetsAnyTime() {
-        val form = new()
-        form.chooseTime(LocalTime.of(6, 30))
-        assertThat(form.time).isEqualTo(TimeChoice.Custom(LocalTime.of(6, 30)))
-    }
-
-    @Test
-    fun theLengthsAreTheFour() {
-        assertThat(EDITOR_LENGTHS.map(::lengthChip)).containsExactly("30 min", "45 min", "1 hour", "2 hours").inOrder()
-    }
-
-    @Test
-    fun anEndTimeSetsTheLength() {
-        val form = new()
-        form.chooseHour(10)
-        assertThat(form.untilTimeLabel).isEqualTo("Until…")
-        form.chooseEndTime(LocalTime.of(11, 20))
-        assertThat(form.length).isEqualTo(Duration.ofMinutes(80))
-        assertThat(form.untilTimeLabel).isEqualTo("Until 11:20")
-    }
-
-    @Test
-    fun anEndAtOrBeforeTheStartIsRefused() {
-        val form = ready(day = today)
-        form.chooseHour(10)
-        form.chooseEndTime(LocalTime.of(9, 30))
-        assertThat(form.length).isEqualTo(Duration.ofHours(1))
-        assertThat(form.endError).isEqualTo(END_BEFORE_START)
-        form.chooseEndTime(LocalTime.of(10, 0))
-        assertThat(form.length).isEqualTo(Duration.ofHours(1))
-        assertThat(form.endError).isEqualTo(END_BEFORE_START)
-        // The draft is as it was, so Save stays enabled.
+    fun anEndsPickPastTheCapChangesNothing() {
+        val form = ready(day = mon19)
+        form.chooseAllDay(true)
+        form.pickEndDate(mon19.plusDays(59))
+        assertThat(form.span()).isEqualTo(allDay(mon19, LocalDate.of(2026, 12, 18)))
+        form.pickEndDate(mon19.plusDays(60))
+        form.pickEndDate(mon19.minusDays(1))
+        assertThat(form.eventWhen.endDays).isEqualTo(59)
         assertThat(form.reason).isNull()
-        assertThat(form.canSave).isTrue()
-        form.chooseLength(Duration.ofMinutes(30))
-        assertThat(form.endError).isNull()
-        assertThat(form.length).isEqualTo(Duration.ofMinutes(30))
-    }
-
-    @Test
-    fun anEditsOwnLengthShowsAsUntil() {
-        assertThat(editTimed(today.atTime(19, 30), 90).untilTimeLabel).isEqualTo("Until 21:00")
-    }
-
-    @Test
-    fun aTimedEventStillEndsByMidnight() {
-        val form = ready(day = today)
-        form.chooseHour(23)
-        form.chooseLength(Duration.ofHours(2))
-        // 23:00 BST + 2 h would cross midnight: it stops at 00:00 BST (23:00Z).
-        assertThat(form.span()).isEqualTo(
-            EventTime.Timed(Instant.parse("2026-09-23T22:00:00Z")) to EventTime.Timed(Instant.parse("2026-09-23T23:00:00Z")),
-        )
     }
 
     // Missing and reason
@@ -481,13 +242,10 @@ class EditorFormTest {
 
     @Test
     fun theReasonIsNeedsFirst() {
-        // A range needs a day, so a day can't be missing with the cap broken: the title is.
-        val form = new()
-        form.toggleWho(mia)
-        form.setMultiDay(true)
-        form.tapDay(mon19)
-        form.tapDay(mon19.plusDays(60))
-        assertThat(form.untilError).isEqualTo(UNTIL_TOO_LATE)
+        val form = timedSpan(mon19.atStartOfDay(), mon19.plusDays(59).atTime(23, 0))
+        form.updateTitle("")
+        form.stepStart(ClockField.Minute, up = false)
+        assertThat(form.eventWhen.capError).isEqualTo(UNTIL_TOO_LATE)
         assertThat(form.reason).isEqualTo("Needs a title")
     }
 
@@ -497,11 +255,8 @@ class EditorFormTest {
     fun choosingOnlyWhoOrADayIsEdited() {
         val answers: List<EditorForm.() -> Unit> = listOf(
             { toggleWho(sam) },
-            { tapDay(today.plusDays(1)) },
-            { setMultiDay(true) },
-            { chooseHour(10) },
-            { chooseHour(10); chooseMinute(15) },
-            { chooseLength(Duration.ofHours(2)) },
+            { pickStartDate(today.plusDays(1)) },
+            { chooseAllDay(true) },
             { chooseRepeat(RepeatChoice.Weekly) },
         )
         answers.forEach { answer ->
@@ -510,10 +265,21 @@ class EditorFormTest {
             form.answer()
             assertThat(form.edited).isTrue()
         }
-        // The last day on its own: an edit's range given a new last day.
+        val steps: List<EditorForm.() -> Unit> = listOf(
+            { stepStart(ClockField.Hour, up = true) },
+            { stepEnd(ClockField.Minute, up = true) },
+            { pickEndDate(mon19.plusDays(1)) },
+            { useFreeStart(LocalTime.of(14, 45)) },
+        )
+        steps.forEach { step ->
+            val form = new(day = mon19)
+            assertThat(form.edited).isFalse()
+            form.step()
+            assertThat(form.edited).isTrue()
+        }
+        // The last day on its own: an edit's span given a new last day.
         val span = halfTerm()
-        span.tapDay(day(19))
-        span.tapDay(day(21))
+        span.pickEndDate(day(21))
         assertThat(span.edited).isTrue()
     }
 
@@ -560,38 +326,24 @@ class EditorFormTest {
     }
 
     @Test
-    fun aTimedSpanStaysLocked() {
-        val trip = timedSpan(mon19.atTime(22, 0), day(21).atTime(9, 0))
-        val own = trip.span()
-        assertThat(trip.datesLocked).isTrue()
-        assertThat(trip.multiDay).isFalse()
-        assertThat(trip.lockedDatesLabel("Google Calendar")).isEqualTo("Mon 19 – Wed 21 · change dates in Google Calendar on your phone")
-        trip.tapDay(day(20))
-        trip.setMultiDay(true)
-        trip.chooseHour(8)
-        assertThat(trip.span()).isEqualTo(own)
-        assertThat(edit(EventTime.AllDay(today), EventTime.AllDay(today.plusDays(1))).datesLocked).isFalse()
-        // 22:00 to 01:00 crosses midnight; 22:00 to 00:00 ends at midnight, which counts as the same day.
-        assertThat(editTimed(today.atTime(22, 0), 180).datesLocked).isTrue()
-        assertThat(editTimed(today.atTime(22, 0), 120).datesLocked).isFalse()
-        assertThat(editTimed(today.atTime(22, 0), 120).lockedDatesLabel("Google Calendar")).isNull()
-    }
-
-    @Test
     fun aMixedAllDayAndTimedEventStaysLocked() {
         val mixed = edit(EventTime.AllDay(mon19), EventTime.Timed(day(21).atTime(9, 0).atZone(london).toInstant()))
+        val own = mixed.span()
         assertThat(mixed.datesLocked).isTrue()
-        assertThat(mixed.multiDay).isFalse()
+        assertThat(mixed.lockedDatesLabel("Google Calendar")).isEqualTo("Mon 19 – Wed 21 · change dates in Google Calendar on your phone")
+        mixed.chooseAllDay(false)
+        mixed.pickStartDate(day(20))
+        assertThat(mixed.span()).isEqualTo(own)
+        assertThat(edit(EventTime.AllDay(today), EventTime.AllDay(today.plusDays(1))).datesLocked).isFalse()
     }
 
     @Test
     fun anAllDaySpanOpensWithItsFirstAndLastDays() {
         val form = halfTerm()
         assertThat(form.datesLocked).isFalse()
-        assertThat(form.day).isEqualTo(day(19))
-        assertThat(form.multiDay).isTrue()
-        assertThat(form.until).isEqualTo(day(23))
-        assertThat(form.awaitingLastDay).isFalse()
+        assertThat(form.eventWhen.allDay).isTrue()
+        assertThat(form.eventWhen.startDate).isEqualTo(day(19))
+        assertThat(form.eventWhen.endDate).isEqualTo(day(23))
     }
 
     @Test
@@ -607,24 +359,9 @@ class EditorFormTest {
     @Test
     fun movingTheLastDayOnAnEditTouchesOnlyTheTimes() {
         val form = halfTerm()
-        form.tapDay(day(19))
-        form.tapDay(day(21))
+        form.pickEndDate(day(21))
         assertThat(form.touched).containsExactly(EventField.TIMES)
         assertThat(form.span()).isEqualTo(allDay(day(19), day(22)))
-    }
-
-    @Test
-    fun anEditWhoseTimeWasChosenThenAllDayAgainIsUnchanged() {
-        val form = halfTerm()
-        form.setMultiDay(false)
-        form.chooseHour(18)
-        assertThat(form.unchanged).isFalse()
-        form.chooseAllDay()
-        form.setMultiDay(true)
-        form.tapDay(day(19))
-        form.tapDay(day(23))
-        assertThat(form.until).isEqualTo(day(23))
-        assertThat(form.unchanged).isTrue()
     }
 
     @Test
@@ -680,7 +417,7 @@ class EditorFormTest {
         val form = ready(day = LocalDate.of(2026, 9, 26))
         form.chooseRepeat(RepeatChoice.MonthlyOnWeekday)
         assertThat(form.repeatsValue).isEqualTo("Every month, on the 4th Saturday")
-        form.tapDay(LocalDate.of(2026, 10, 29))
+        form.pickStartDate(LocalDate.of(2026, 10, 29))
         assertThat(form.repeatsValue).isEqualTo("Every month, on the last Thursday")
         assertThat(form.draft(createdBy = null).recurrence?.rule).isEqualTo("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1TH")
     }
@@ -699,11 +436,11 @@ class EditorFormTest {
 
     @Test
     fun typingThenClearingIsNotEdited() {
-        val form = new()
+        val form = new(day = mon19)
         form.updateTitle("Swim")
         form.updateTitle("")
-        form.chooseLength(Duration.ofHours(2))
-        form.chooseLength(Duration.ofHours(1))
+        form.stepEnd(ClockField.Hour, up = true)
+        form.stepEnd(ClockField.Hour, up = false)
         assertThat(form.edited).isFalse()
     }
 
@@ -715,8 +452,148 @@ class EditorFormTest {
         form.toggleWho(alex)
         form.toggleWho(alex)
         assertThat(form.unchanged).isTrue()
-        form.chooseLength(Duration.ofHours(1))
+        form.stepEnd(ClockField.Hour, up = false)
         assertThat(form.unchanged).isFalse()
         assertThat(new().unchanged).isFalse()
+    }
+
+    // When (9c §3)
+
+    @Test
+    fun aNewEventStartsTimedWithTheDefaults() {
+        val form = new(now = "10:20")
+        assertThat(form.eventWhen).isEqualTo(EventWhen(false, null, LocalTime.of(11, 0), 0, LocalTime.of(12, 0)))
+        assertThat(form.timesTouched).isFalse()
+        assertThat(form.edited).isFalse()
+        val onAnotherDay = new(day = mon19)
+        assertThat(onAnotherDay.eventWhen).isEqualTo(EventWhen(false, mon19, LocalTime.of(9, 0), 0, LocalTime.of(10, 0)))
+        assertThat(onAnotherDay.edited).isFalse()
+    }
+
+    @Test
+    fun pickingAStartsDateIsAnEditButTheDefaultsAreNot() {
+        val form = new()
+        form.pickStartDate(mon19)
+        assertThat(form.eventWhen).isEqualTo(EventWhen(false, mon19, LocalTime.of(9, 0), 0, LocalTime.of(10, 0)))
+        assertThat(form.edited).isTrue()
+        // Times stepped are kept by a later pick; untouched, the day's own defaults come back.
+        form.stepStart(ClockField.Hour, up = true)
+        assertThat(form.timesTouched).isTrue()
+        form.pickStartDate(today)
+        assertThat(form.eventWhen).isEqualTo(EventWhen(false, today, LocalTime.of(10, 0), 0, LocalTime.of(11, 0)))
+    }
+
+    @Test
+    fun aTimedSpanMadeElsewhereOpensUnlocked() {
+        val trip = timedSpan(mon19.atTime(22, 0), day(21).atTime(9, 0))
+        assertThat(trip.datesLocked).isFalse()
+        assertThat(trip.lockedDatesLabel("Google Calendar")).isNull()
+        assertThat(trip.eventWhen).isEqualTo(EventWhen(false, mon19, LocalTime.of(22, 0), 2, LocalTime.of(9, 0)))
+        trip.stepEnd(ClockField.Hour, up = true)
+        assertThat(trip.span()).isEqualTo(
+            EventTime.Timed(mon19.atTime(22, 0).atZone(london).toInstant()) to EventTime.Timed(day(21).atTime(10, 0).atZone(london).toInstant()),
+        )
+        assertThat(trip.touched).containsExactly(EventField.TIMES)
+    }
+
+    /** Fri 23 Oct 18:00 to Sun 25 Oct 16:00 over the autumn clock change, made on a phone: only the title is sent. */
+    @Test
+    fun aTimedSpanMadeElsewhereSavesWithoutTouchingItsTimes() {
+        val start = EventTime.Timed(LocalDateTime.of(2026, 10, 23, 18, 0).atZone(london).toInstant())
+        val end = EventTime.Timed(LocalDateTime.of(2026, 10, 25, 16, 0).atZone(london).toInstant())
+        val camp = edit(start, end, "family", "Camp")
+        camp.updateTitle("Scout camp")
+        assertThat(camp.touched).containsExactly(EventField.TITLE)
+        assertThat(camp.span()).isEqualTo(start to end)
+        // An end at its start, read as an hour after, is written back as it was while the When is unchanged.
+        val bad = edit(start, start, "family", "Camp")
+        assertThat(bad.eventWhen.endClock).isEqualTo(LocalTime.of(19, 0))
+        bad.updateTitle("Scout camp")
+        assertThat(bad.span()).isEqualTo(start to start)
+        assertThat(bad.touched).containsExactly(EventField.TITLE)
+    }
+
+    @Test
+    fun aTimedSpanOverSixtyDaysSavesATitleChange() {
+        val long = timedSpan(mon19.atTime(9, 0), mon19.plusDays(70).atTime(9, 0))
+        val own = long.span()
+        assertThat(long.datesLocked).isTrue()
+        long.updateTitle("Gran staying")
+        long.pickStartDate(day(20))
+        long.pickEndDate(day(22))
+        long.stepStart(ClockField.Hour, up = true)
+        long.stepEnd(ClockField.Hour, up = false)
+        long.chooseAllDay(true)
+        assertThat(long.reason).isNull()
+        assertThat(long.span()).isEqualTo(own)
+        assertThat(long.touched).containsExactly(EventField.TITLE)
+    }
+
+    @Test
+    fun anAllDaySpanOverSixtyDaysIsLocked() {
+        val long = edit(EventTime.AllDay(mon19), EventTime.AllDay(mon19.plusDays(70)), "family", "Gran staying")
+        assertThat(long.datesLocked).isTrue()
+        assertThat(long.lockedDatesLabel("Google Calendar")).isEqualTo("Mon 19 Oct – Sun 27 Dec · change dates in Google Calendar on your phone")
+        long.chooseAllDay(false)
+        assertThat(long.eventWhen.allDay).isTrue()
+        assertThat(long.edited).isFalse()
+        // Sixty days exactly is within the cap.
+        assertThat(edit(EventTime.AllDay(mon19), EventTime.AllDay(mon19.plusDays(60))).datesLocked).isFalse()
+    }
+
+    @Test
+    fun togglingAllDayBackIsNotAnEdit() {
+        val form = halfTerm()
+        form.chooseAllDay(false)
+        assertThat(form.eventWhen.allDay).isFalse()
+        assertThat(form.edited).isTrue()
+        form.chooseAllDay(true)
+        assertThat(form.edited).isFalse()
+        assertThat(form.unchanged).isTrue()
+        // Clocks stepped while timed are hidden again under All day, so they aren't an edit either.
+        form.chooseAllDay(false)
+        form.stepStart(ClockField.Hour, up = true)
+        form.chooseAllDay(true)
+        assertThat(form.edited).isFalse()
+        assertThat(form.span()).isEqualTo(allDay(day(19), day(24)))
+    }
+
+    @Test
+    fun theDraftOfATimedSpanHasItsOwnEnd() {
+        val form = ready()
+        form.pickStartDate(day(23))
+        form.stepStart(ClockField.Hour, up = true)
+        form.pickEndDate(day(25))
+        form.stepEnd(ClockField.Minute, up = false)
+        assertThat(form.span()).isEqualTo(
+            EventTime.Timed(day(23).atTime(10, 0).atZone(london).toInstant()) to EventTime.Timed(day(25).atTime(10, 45).atZone(london).toInstant()),
+        )
+        form.chooseAllDay(true)
+        assertThat(form.span()).isEqualTo(allDay(day(23), day(26)))
+    }
+
+    @Test
+    fun onlyTheStartsDateIsMissing() {
+        val form = ready()
+        assertThat(form.missing).containsExactly(Needed.Day)
+        assertThat(form.reason).isEqualTo("Needs a day")
+        form.pickStartDate(mon19)
+        assertThat(form.missing).isEmpty()
+        form.chooseAllDay(true)
+        assertThat(form.missing).isEmpty()
+        assertThat(form.canSave).isTrue()
+    }
+
+    /** Only a Starts step can carry an opened span past the cap: Save then says why. */
+    @Test
+    fun aSpanPastTheCapCannotSave() {
+        val form = timedSpan(mon19.atStartOfDay(), mon19.plusDays(59).atTime(23, 0))
+        assertThat(form.datesLocked).isFalse()
+        assertThat(form.reason).isNull()
+        form.stepStart(ClockField.Minute, up = false)
+        assertThat(form.eventWhen.endDays).isEqualTo(60)
+        assertThat(form.reason).isEqualTo(UNTIL_TOO_LATE)
+        assertThat(UNTIL_TOO_LATE).isEqualTo("An event can last up to 60 days. Pick an earlier end.")
+        assertThat(form.canSave).isFalse()
     }
 }

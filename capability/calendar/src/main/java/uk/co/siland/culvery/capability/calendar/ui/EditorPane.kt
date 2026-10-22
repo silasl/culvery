@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,11 +42,13 @@ import uk.co.siland.culvery.core.ui.hhClickable
 
 internal const val SKIP = "Skip"
 
-/** The pane's question for [step] (handoff §1 The frames). */
-internal fun questionFor(step: EditorStep, form: EditorForm): String = when (step) {
+/** The pane's question for [step] (handoff §1 The frames, 9c §3.2). */
+internal fun questionFor(step: EditorStep): String = when (step) {
     EditorStep.Who -> "Who’s it for?"
-    EditorStep.Day -> if (form.multiDay) "Which days?" else "Which day?"
-    EditorStep.Time -> "What time?"
+    EditorStep.StartDate -> STARTS_DATE_QUESTION
+    EditorStep.StartTime -> STARTS_TIME_QUESTION
+    EditorStep.EndDate -> ENDS_DATE_QUESTION
+    EditorStep.EndTime -> ENDS_TIME_QUESTION
     EditorStep.Repeats -> "Does it repeat?"
     EditorStep.Check -> "Check it"
 }
@@ -57,7 +60,7 @@ internal class EditorPeople(members: List<Member>) {
     val byId: Map<PersonId, Person> = (people + Person.Family).associateBy { it.id }
 }
 
-/** The pane for [step]: its question over what answers it; [check] is the screen's one clash check. */
+/** The pane for [step]: its question over what answers it. A pick made while [busy] saving doesn't move on. */
 @Composable
 internal fun EditorPaneFor(
     step: EditorStep,
@@ -66,20 +69,35 @@ internal fun EditorPaneFor(
     members: List<Member>,
     household: EditorPeople,
     held: Held?,
-    check: TimeCheck,
     service: String,
     childOnly: PersonId?,
     childName: String?,
     busy: Boolean,
     onRefusedWho: () -> Unit,
-    onPicker: (EditorPicker) -> Unit,
 ) {
-    EditorPane(questionFor(step, form), flow, skip = step == EditorStep.Time || step == EditorStep.Repeats) {
+    val except = (form.mode as? EditorForm.Mode.Edit)?.original?.ref
+    val context = remember(held, household, form.who, except, form.zone, form.today) {
+        WhenContext(held, household, form.who, except, form.zone, form.today)
+    }
+    val skip: (() -> Unit)? = when (step) {
+        EditorStep.EndDate, EditorStep.EndTime -> flow::skipEnds
+        EditorStep.Repeats -> flow::next
+        else -> null
+    }
+    EditorPane(questionFor(step), flow, skip) {
         when (step) {
             EditorStep.Who -> WhoPane(form, members, childOnly, childName, busy, onRefusedWho)
-            EditorStep.Day -> DayPane(form, held, household, onPicked = flow::moveOnSoon)
-            EditorStep.Time -> TimePane(form, check, household, onPicker, onPicked = flow::moveOnSoon)
-            EditorStep.Repeats -> RepeatsPane(form, service, onPicked = flow::moveOnSoon, onChooseDay = { flow.open(EditorStep.Day) })
+            EditorStep.StartDate -> StartDatePane(form.eventWhen, context) {
+                form.pickStartDate(it)
+                if (!busy) flow.moveOnAfterDate(EditorStep.StartTime)
+            }
+            EditorStep.StartTime -> StartTimePane(form.eventWhen, context, form::stepStart, form::useFreeStart)
+            EditorStep.EndDate -> EndDatePane(form.eventWhen, context) {
+                form.pickEndDate(it)
+                if (!busy) flow.moveOnAfterDate(EditorStep.EndTime)
+            }
+            EditorStep.EndTime -> EndTimePane(form.eventWhen, context, form::stepEnd, form::useFreeStart)
+            EditorStep.Repeats -> RepeatsPane(form, service, onPicked = { flow.moveOnSoon(EditorStep.Check) }, onChooseDay = { flow.open(EditorStep.StartDate) })
             EditorStep.Check -> CheckPane(form, household)
         }
     }
@@ -87,11 +105,11 @@ internal fun EditorPaneFor(
 
 /**
  * The right-hand pane (handoff §1): `surf`, scrolling inside itself, with the [question] and, on its right, Skip (when
- * [skip]: it moves on and changes nothing) and a quiet Next. The question is the pane's title, so TalkBack speaks a new
+ * there is a [skip]: it moves on and changes nothing) and a quiet Next. The question is the pane's title, so TalkBack speaks a new
  * one as the pane changes (9 §3.1).
  */
 @Composable
-internal fun EditorPane(question: String, flow: EditorFlow, skip: Boolean, body: @Composable ColumnScope.() -> Unit) {
+internal fun EditorPane(question: String, flow: EditorFlow, skip: (() -> Unit)?, body: @Composable ColumnScope.() -> Unit) {
     val c = Culvery.colors
     Column(
         verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap),
@@ -123,7 +141,7 @@ internal fun EditorPane(question: String, flow: EditorFlow, skip: Boolean, body:
                 },
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EditorDimens.paneButtonGap)) {
-                if (skip) SkipButton(flow::next)
+                if (skip != null) SkipButton(skip)
                 if (flow.nextStep != null) {
                     HhButton(
                         flow.nextLabel(),

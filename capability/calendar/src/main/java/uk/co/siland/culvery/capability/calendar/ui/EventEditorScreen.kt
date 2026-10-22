@@ -40,7 +40,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -49,15 +48,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
+import uk.co.siland.culvery.capability.calendar.ALL_DAY_LABEL
 import uk.co.siland.culvery.capability.calendar.EditorForm
+import uk.co.siland.culvery.capability.calendar.FULL_DATE
 import uk.co.siland.culvery.capability.calendar.FreeCheck
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.SHORT_DAY
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.couldNotSave
-import uk.co.siland.culvery.capability.calendar.dayValue
 import uk.co.siland.culvery.capability.calendar.saveFailedBody
-import uk.co.siland.culvery.capability.calendar.timeValue
 import uk.co.siland.culvery.capability.calendar.whoValue
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Person
@@ -68,7 +68,9 @@ import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhFooterButton
 import uk.co.siland.culvery.core.ui.KeepsToastsAbove
 import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.clockText
 
 /** A save that failed: where it was going ([service]) and why ([problem]); the card says both. */
 data class SaveFailure(val service: String, val problem: WriteProblem)
@@ -79,8 +81,7 @@ internal const val DISCARD_NEW = "Discard this event?"
 internal const val DISCARD_CHANGES = "Discard your changes?"
 internal const val KEEP_EDITING = "Keep editing"
 internal const val DISCARD = "Discard"
-internal const val OPTIONAL_HINT = "Time and repeats are optional"
-internal const val TIME_OPTIONAL_HINT = "Time is optional"
+internal const val REPEATS_OPTIONAL_HINT = "Repeats are optional"
 internal const val CLASH_HINT = "Clashes are allowed; both show on the week"
 internal const val ALL_SET_HINT = "Everything’s set"
 
@@ -112,7 +113,6 @@ internal fun EventEditorScreen(
     service: String,
     busy: Boolean,
     failure: SaveFailure?,
-    picker: EditorPicker,
     childOnly: PersonId?,
     childName: String?,
     held: Held?,
@@ -120,7 +120,6 @@ internal fun EventEditorScreen(
     onSave: () -> Unit,
     onDelete: () -> Unit,
     onRefusedWho: () -> Unit,
-    onPicker: (EditorPicker) -> Unit,
     keyboard: WindowInsets = WindowInsets.ime,
 ) {
     val c = Culvery.colors
@@ -145,8 +144,7 @@ internal fun EventEditorScreen(
     val isNew = form.mode == EditorForm.Mode.New
     val heading = if (isNew) NEW_EVENT else CHANGE_EVENT
     val household = remember(members) { EditorPeople(members) }
-    val timeCheck = rememberTimeCheck(form, held, household.order)
-    val clash = EditorStep.Time in flow.steps && timeCheck.result is FreeCheck.Busy
+    val clash = !form.datesLocked && rememberClash(form, held, household.order)
     Box(
         Modifier
             .testTag("editor_screen")
@@ -155,8 +153,7 @@ internal fun EventEditorScreen(
             .background(c.bg)
             .windowInsetsPadding(keyboard),
     ) {
-        // Under a picker only the picker is heard.
-        Column(Modifier.fillMaxSize().then(if (picker != EditorPicker.None) Modifier.clearAndSetSemantics {} else Modifier)) {
+        Column(Modifier.fillMaxSize()) {
             TopBar(heading, context) {
                 flow.stay()
                 closeKeyboard()
@@ -185,7 +182,21 @@ internal fun EventEditorScreen(
                         },
                     )
                     // A save in flight closes on what it sent, so no other pane opens meanwhile.
-                    Rows(form, flow, household.people, service, typing, lit = !titleFocused, clash = clash) { step ->
+                    Rows(
+                        form, flow, household.people, service, typing, lit = !titleFocused, clash = clash,
+                        onAllDay = { on ->
+                            if (!busy) {
+                                closeKeyboard()
+                                form.chooseAllDay(on)
+                                // The time panes go with the times.
+                                when (flow.active) {
+                                    EditorStep.StartTime -> flow.open(EditorStep.StartDate)
+                                    EditorStep.EndTime -> flow.open(EditorStep.EndDate)
+                                    else -> Unit
+                                }
+                            }
+                        },
+                    ) { step ->
                         if (!busy) {
                             closeKeyboard()
                             flow.open(step)
@@ -211,8 +222,8 @@ internal fun EventEditorScreen(
                                 val hint = when {
                                     clash -> CLASH_HINT
                                     flow.active == EditorStep.Check -> ALL_SET_HINT
-                                    EditorStep.Repeats in flow.steps -> OPTIONAL_HINT
-                                    else -> TIME_OPTIONAL_HINT
+                                    EditorStep.Repeats in flow.steps -> REPEATS_OPTIONAL_HINT
+                                    else -> null
                                 }
                                 Foot(form, savesTo, hint, busy, failure, onSave = {
                                     flow.stay()
@@ -228,33 +239,19 @@ internal fun EventEditorScreen(
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
-                    EditorPaneFor(flow.active, form, flow, members, household, held, timeCheck, service, childOnly, childName, busy, onRefusedWho, onPicker)
+                    EditorPaneFor(flow.active, form, flow, members, household, held, service, childOnly, childName, busy, onRefusedWho)
                 }
             }
         }
-        TimePicker(form, flow, picker, onPicker)
     }
 }
 
-/** The start picker for an hour outside the chips; the end picker for Until…, which moves on unless the end is refused. */
+/** Whether anyone chosen is busy over the form's When: the Clash tag on Starts and the foot's hint. */
 @Composable
-private fun TimePicker(form: EditorForm, flow: EditorFlow, picker: EditorPicker, onPicker: (EditorPicker) -> Unit) {
-    val close = { onPicker(EditorPicker.None) }
-    when (picker) {
-        EditorPicker.StartTime -> PickerLayer(onDismiss = close) {
-            TimePickerCard(form.pickerTime, onSet = {
-                form.chooseTime(it)
-                close()
-            }, onCancel = close)
-        }
-        EditorPicker.EndTime -> PickerLayer(onDismiss = close) {
-            TimePickerCard(form.endPickerTime, onSet = {
-                form.chooseEndTime(it)
-                close()
-                if (form.endError == null) flow.moveOnSoon()
-            }, onCancel = close)
-        }
-        else -> Unit
+private fun rememberClash(form: EditorForm, held: Held?, order: List<PersonId>): Boolean {
+    val except = (form.mode as? EditorForm.Mode.Edit)?.original?.ref
+    return remember(held, form.eventWhen, form.who, except, form.zone, order) {
+        held?.checkWhen(form.eventWhen, form.who, form.zone, except, order) is FreeCheck.Busy
     }
 }
 
@@ -328,13 +325,14 @@ private fun TitleField(form: EditorForm, focus: FocusRequester, focused: Boolean
 private const val EVENT_NAME = "Event name"
 private const val TITLE_PLACEHOLDER = "What’s happening?"
 private const val WHO = "Who"
-private const val DAY = "Day"
-private const val TIME = "Time"
+private const val STARTS = "Starts"
+private const val ENDS = "Ends"
 internal const val REPEATS = "Repeats"
 
 /**
- * Who, Day, Time and Repeats as [flow] has them; with the keyboard up an unset Who and Day read as their names. While the
- * title has focus no row is [lit] (handoff 6a). On Change every row is answered, All day and Doesn’t repeat included.
+ * Who, All day, Starts, Ends and Repeats as [flow] has them (9c §3.1); with the keyboard up an unset Who reads as its
+ * name and All day goes. While the title has focus no row is [lit] (handoff 6a). A locked span's All day, Starts and Ends
+ * each say where its dates change. The Clash tag sits on Starts.
  */
 @Composable
 private fun Rows(
@@ -345,6 +343,7 @@ private fun Rows(
     typing: Boolean,
     lit: Boolean,
     clash: Boolean,
+    onAllDay: (Boolean) -> Unit,
     onOpen: (EditorStep) -> Unit,
 ) {
     val editing = form.mode is EditorForm.Mode.Edit
@@ -359,32 +358,42 @@ private fun Rows(
         typing = typing,
         onClick = { onOpen(EditorStep.Who) },
     )
-    val locked = form.datesLocked
-    EditorRow(
-        testTag = "editor_row_day",
-        icon = Icons.CALENDAR_MONTH,
-        label = DAY,
-        value = when {
-            locked -> form.lockedDatesLabel(service).orEmpty()
-            typing && form.day == null -> DAY
-            else -> dayValue(form)
-        },
-        active = !locked && active(EditorStep.Day),
-        set = locked || form.day != null,
-        typing = typing,
-        onClick = if (locked) null else ({ onOpen(EditorStep.Day) }),
-    )
-    if (EditorStep.Time in flow.steps) {
-        EditorRow(
-            testTag = "editor_row_time",
-            icon = Icons.SCHEDULE,
-            label = TIME,
-            value = timeValue(form),
-            active = active(EditorStep.Time),
-            set = editing || form.startTime != null,
+    val w = form.eventWhen
+    if (form.datesLocked) {
+        val dates = form.lockedDatesLabel(service).orEmpty()
+        if (!typing) EditorRow("editor_all_day", Icons.SCHEDULE, ALL_DAY_LABEL, dates, active = false, set = true, typing = false, onClick = null)
+        EditorWhenRow("editor_starts", Icons.CALENDAR_MONTH, STARTS, dates, null, null, active = false, set = true, typing = typing, onDate = null, onTime = null, locked = true)
+        EditorWhenRow("editor_ends", Icons.EVENT_AVAILABLE, ENDS, dates, null, null, active = false, set = true, typing = typing, onDate = null, onTime = null, locked = true)
+    } else {
+        if (!typing) HhSwitchRow(ALL_DAY_LABEL, null, w.allDay, "editor_all_day", onAllDay)
+        val start = w.startDate
+        EditorWhenRow(
+            testTag = "editor_starts",
+            icon = Icons.CALENDAR_MONTH,
+            label = STARTS,
+            date = start?.format(SHORT_DAY),
+            time = clockText(w.startClock).takeIf { start != null && !w.allDay },
+            spokenDate = start?.format(FULL_DATE),
+            active = active(EditorStep.StartDate) || active(EditorStep.StartTime),
+            set = start != null,
             typing = typing,
-            onClick = { onOpen(EditorStep.Time) },
-            tag = if (clash) clashTag() else null,
+            onDate = { onOpen(EditorStep.StartDate) },
+            onTime = { onOpen(EditorStep.StartTime) },
+            tag = startsTag(clash = if (clash) clashTag() else null, copied = null),
+        )
+        val end = w.endDate
+        EditorWhenRow(
+            testTag = "editor_ends",
+            icon = Icons.EVENT_AVAILABLE,
+            label = ENDS,
+            date = end?.format(SHORT_DAY),
+            time = clockText(w.endClock).takeIf { end != null && !w.allDay },
+            spokenDate = end?.format(FULL_DATE),
+            active = active(EditorStep.EndDate) || active(EditorStep.EndTime),
+            set = end != null,
+            typing = typing,
+            onDate = if (end != null) ({ onOpen(EditorStep.EndDate) }) else null,
+            onTime = { onOpen(EditorStep.EndTime) },
         )
     }
     if (EditorStep.Repeats in flow.steps) {
@@ -403,7 +412,7 @@ private fun Rows(
 
 /** Where it saves, a failed save's card, and Delete beside the one green button with what it waits for under it. */
 @Composable
-private fun Foot(form: EditorForm, savesTo: String?, hint: String, busy: Boolean, failure: SaveFailure?, onSave: () -> Unit, onDelete: () -> Unit) {
+private fun Foot(form: EditorForm, savesTo: String?, hint: String?, busy: Boolean, failure: SaveFailure?, onSave: () -> Unit, onDelete: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.footGap)) {
         if (failure != null) FailureCard(failure)
         if (savesTo != null) SavesTo(savesToLine(savesTo))

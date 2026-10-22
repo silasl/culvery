@@ -44,7 +44,7 @@ private fun chosenPeople(form: EditorForm, byId: Map<PersonId, Person>): List<Pe
 
 /** The event as the week would show it (handoff 6g "On the week"): never opened, so its ref names nothing. */
 internal fun previewUi(form: EditorForm, byId: Map<PersonId, Person>): EventUi {
-    val start = form.startTime
+    val start = form.eventWhen.startClock.takeUnless { form.eventWhen.allDay }
     return EventUi(
         ref = EventRef("", "", "preview"),
         title = form.title.trim(),
@@ -87,7 +87,7 @@ internal fun CheckPane(form: EditorForm, household: EditorPeople) {
         }
         CapsHeading(ON_THE_WEEK)
         Box(Modifier.testTag("check_chip").width(EditorDimens.checkChipWidth)) {
-            EventChip(previewUi(form, household.byId), form.day ?: form.today, onOpen = null)
+            EventChip(previewUi(form, household.byId), form.eventWhen.startDate ?: form.today, onOpen = null)
         }
     }
 }

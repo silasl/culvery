@@ -60,7 +60,7 @@ internal fun skipOneDateLine(service: String): String = "To skip one date, chang
  */
 @Composable
 internal fun RepeatsPane(form: EditorForm, service: String, onPicked: () -> Unit, onChooseDay: () -> Unit) {
-    val day = form.day
+    val day = form.eventWhen.startDate
     if (day == null) {
         NeedsADay(onChooseDay)
         return
@@ -141,7 +141,7 @@ private fun Stepper(form: EditorForm, times: Int) {
                 .background(c.surf2)
                 .padding(horizontal = EditorDimens.stepperPaddingH),
         ) {
-            val label = remember(form.repeat, form.day, form.repeatEnd) { form.stepperLabel.orEmpty() }
+            val label = remember(form.repeat, form.eventWhen.startDate, form.repeatEnd) { form.stepperLabel.orEmpty() }
             Text(label, style = CalendarType.repeatCount, color = c.ink, maxLines = 1)
         }
         StepButton(Icons.ADD, MORE_TIMES, "ends_more", enabled = times < MAX_TIMES, onStep = form::moreTimes)

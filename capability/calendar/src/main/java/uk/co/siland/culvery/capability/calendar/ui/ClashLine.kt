@@ -42,9 +42,6 @@ import uk.co.siland.culvery.core.ui.clockText
 
 private val HOUR_MINUTE_TAG: DateTimeFormatter = DateTimeFormatter.ofPattern("HHmm", Locale.ENGLISH)
 
-/** What the tablet can say about the chosen time (9 §3.1, §3.4): the day's busy hours and whether everyone chosen is free. */
-internal data class TimeCheck(val busyHours: Set<Int>, val result: FreeCheck)
-
 /** The result line's icon: `check_circle` when free, `warning` on a clash, none when the tablet can't say. */
 internal fun checkIcon(check: FreeCheck): String? = when (check) {
     is FreeCheck.Free -> Icons.CHECK_CIRCLE

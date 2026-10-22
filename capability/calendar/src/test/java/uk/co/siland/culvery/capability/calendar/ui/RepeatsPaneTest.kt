@@ -61,7 +61,7 @@ class RepeatsPaneTest {
     private fun guitar(day: LocalDate? = saturday, setUp: EditorForm.() -> Unit = {}) = editorForm().apply {
         updateTitle("Guitar lesson")
         toggleWho(SampleUi.mia.id)
-        day?.let(::tapDay)
+        day?.let(::pickStartDate)
         setUp()
     }
 
@@ -224,7 +224,7 @@ class RepeatsPaneTest {
         node("repeats_need_day").assertTextEquals("Choose a day first.")
         node("repeat_Weekly").assertDoesNotExist()
         node("repeats_choose_day").assertTextEquals("Choose a day").performClick()
-        compose.runOnIdle { assertThat(flow.active).isEqualTo(EditorStep.Day) }
+        compose.runOnIdle { assertThat(flow.active).isEqualTo(EditorStep.StartDate) }
         compose.assertClickablesHaveRoleAndLabel()
     }
 
