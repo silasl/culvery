@@ -140,6 +140,7 @@ internal fun EventEditorScreen(
     val c = Culvery.colors
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val view = LocalView.current
     val titleFocus = remember { FocusRequester() }
     var titleFocused by remember { mutableStateOf(false) }
     var discarding by remember { mutableStateOf(false) }
@@ -160,7 +161,6 @@ internal fun EventEditorScreen(
             keyboardController?.show()
         }
     }
-    val view = LocalView.current
     // The window hides it: once focus clears the title has no input session, and the controller's hide does nothing.
     val closeKeyboard: () -> Unit = {
         view.context.getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(view.windowToken, 0)
@@ -264,14 +264,14 @@ internal fun EventEditorScreen(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .pointerInput(leavesTitleOnTap) {
-                            if (leavesTitleOnTap) {
+                        .then(
+                            if (!leavesTitleOnTap) Modifier else Modifier.pointerInput(Unit) {
                                 awaitEachGesture {
                                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                                     closeKeyboard()
                                 }
-                            }
-                        },
+                            },
+                        ),
                 ) {
                     if (titleFocused && suggestions.isNotEmpty()) {
                         // Next here is the keyboard's Next: leave the title for Who.

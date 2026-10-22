@@ -105,7 +105,8 @@ fun bannerLine(s: Suggestion, copied: Set<CopiedRow>, today: LocalDate): String 
  * from the series' first date.
  */
 fun quickPicksFor(s: Suggestion, today: LocalDate, now: LocalTime): List<LocalDate> {
-    val from = if (!s.allDay && s.start?.isAfter(now) == false) today.plusDays(1) else today
+    val startPassed = !s.allDay && s.start?.let { it <= now } == true
+    val from = if (startPassed) today.plusDays(1) else today
     val anchor = s.anchor()
     val firstWeekday = from.plusDays(Math.floorMod(anchor.dayOfWeek.value - from.dayOfWeek.value, DAYS_PER_WEEK).toLong())
     return when (val choice = s.choice()) {
