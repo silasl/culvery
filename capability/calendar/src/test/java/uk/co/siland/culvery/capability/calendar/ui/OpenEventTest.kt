@@ -22,6 +22,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.calendar.TEST_TODAY
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.CalendarSource
@@ -84,6 +85,7 @@ class OpenEventTest {
                 listOf(RemoteEvent("dinner", "Dinner with Jo & Priya", EventTime.Timed(start), EventTime.Timed(start.plusSeconds(5_400)), recurring = false)),
                 emptyList(), null, fullReplace = true,
             ),
+            TEST_TODAY,
         )
         repo = CalendarRepository(store, household, zone, emptySet(), emptySet())
         editor = stubEditor(store, zone)

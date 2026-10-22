@@ -90,6 +90,7 @@ class CalendarRepositoryTest {
         store.applySync(
             "c1", "s-family", DateRange(window.start, window.endExclusive, auckland),
             SyncResult(listOf(allDayOn("Bin day", sept(23))), emptyList(), null, fullReplace = true),
+            TEST_TODAY,
         )
         assertThat(repo.day(sept(23)).first().map { it.title }).containsExactly("Bin day")
         assertThat(repo.day(sept(22)).first()).isEmpty()
@@ -103,7 +104,7 @@ class CalendarRepositoryTest {
         repo.days(start, count).first().map { d -> d.events.map { "${it.title} ${it.timeLabel}" } }
 
     private suspend fun put(sourceId: String, vararg events: RemoteEvent) =
-        store.applySync("c1", sourceId, window, SyncResult(events.toList(), emptyList(), null, fullReplace = true))
+        store.applySync("c1", sourceId, window, SyncResult(events.toList(), emptyList(), null, fullReplace = true), TEST_TODAY)
 
     /** P4: a pass that only records its time (markSynced) changes nothing on screen, so nothing is re-sent. */
     @Test
@@ -642,6 +643,7 @@ class CalendarRepositoryTest {
                 ),
                 emptyList(), null, fullReplace = true,
             ),
+            TEST_TODAY,
         )
         store.markSynced("c1", noonOn(sept(23)))
         val swim = onDay("Swimming", sept(24), alex.id.value)
@@ -658,7 +660,7 @@ class CalendarRepositoryTest {
     @Test
     fun aStaleSyncHoldsFewerDays() = runTest {
         val syncDay = sept(23).minusDays(5)
-        store.applySync("c1", "s-family", wideWindow, SyncResult(listOf(onDay("Held", sept(23).plusDays(23)), onDay("Not held", sept(23).plusDays(24))), emptyList(), null, fullReplace = true))
+        store.applySync("c1", "s-family", wideWindow, SyncResult(listOf(onDay("Held", sept(23).plusDays(23)), onDay("Not held", sept(23).plusDays(24))), emptyList(), null, fullReplace = true), TEST_TODAY)
         store.markSynced("c1", noonOn(syncDay))
 
         val held = heldRepo().held(sept(23)).first()

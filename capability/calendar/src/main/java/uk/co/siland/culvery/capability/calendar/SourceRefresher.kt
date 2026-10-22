@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import android.util.Log
+import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -59,7 +60,7 @@ class SourceRefresher internal constructor(
      * "every calendar was deleted", which would remove them all with their events and queued changes. A store failure
      * fails the pass, as any other.
      */
-    suspend fun refreshIfDue(provider: CalendarProvider, stored: StoredConnection) {
+    suspend fun refreshIfDue(provider: CalendarProvider, stored: StoredConnection, zone: ZoneId) {
         val id = stored.connection.id
         val now = clock.nowMillis()
         val checked = stored.sourcesCheckedMillis
@@ -77,7 +78,7 @@ class SourceRefresher internal constructor(
             return
         }
         val household = people()
-        val outcome = store.refreshSources(id, sources, now) { defaultMapping(it, household) }
+        val outcome = store.refreshSources(id, sources, now, zone) { defaultMapping(it, household) }
         refreshed += id
         flagged[id]?.removeAll(gone)
         if (outcome.masterCleared) toaster.show(masterGone(provider.descriptor.displayName, outcome.droppedChanges), urgent = true)

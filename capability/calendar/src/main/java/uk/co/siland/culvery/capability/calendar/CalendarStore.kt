@@ -17,6 +17,7 @@ import uk.co.siland.culvery.capability.calendar.db.ConnectionEntity
 import uk.co.siland.culvery.capability.calendar.db.EventEntity
 import uk.co.siland.culvery.capability.calendar.db.EventRow
 import uk.co.siland.culvery.capability.calendar.db.OutboxEntity
+import uk.co.siland.culvery.capability.calendar.db.RememberedTitleEntity
 import uk.co.siland.culvery.capability.calendar.db.SourceEntity
 import uk.co.siland.culvery.capability.calendar.db.SyncStateEntity
 import uk.co.siland.culvery.core.household.PersonId
@@ -70,6 +71,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
 
     /** The connection with its sources, events, cursors and queued changes, in one transaction (3a design D5). */
     suspend fun removeConnection(connectionId: String) = db.withTransaction {
+        dao.deleteRememberedOf(connectionId)
         dao.deleteOutboxOf(connectionId)
         dao.deleteSyncStatesOf(connectionId)
         dao.deleteEventsOf(connectionId)
@@ -90,6 +92,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         connectionId: String,
         sources: List<CalendarSource>,
         nowMillis: Long,
+        zone: ZoneId,
         mappingForNew: (CalendarSource) -> SourceMapping,
     ): SourcesRefreshed = db.withTransaction {
         // Removed while the provider was being read: no orphan sources.
@@ -101,7 +104,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         var dropped = 0
         stored.values.filter { it.sourceId !in listed }.forEach { gone ->
             if (gone.isMaster) masterCleared = true
-            dropped += removeSourceRows(connectionId, gone.sourceId)
+            dropped += removeSourceRows(connectionId, gone.sourceId, Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate(), zone)
         }
         listed.values.forEach { s ->
             val existing = stored[s.id]
@@ -126,11 +129,14 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         SourcesRefreshed(masterCleared, dropped)
     }
 
-    private suspend fun removeSourceRows(connectionId: String, sourceId: String): Int {
+    private suspend fun removeSourceRows(connectionId: String, sourceId: String, today: LocalDate, zone: ZoneId): Int {
+        val titles = dao.rememberedKeysOfSource(connectionId, sourceId)
+        dao.deleteRememberedOfSource(connectionId, sourceId)
         val dropped = dao.deleteOutboxOfSource(connectionId, sourceId)
         dao.deleteSyncState(connectionId, sourceId)
         dao.deleteEventsForSource(connectionId, sourceId)
         dao.deleteSource(connectionId, sourceId)
+        forget(connectionId, titles, today, zone)
         return dropped
     }
 
@@ -254,17 +260,25 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
      * Touches only the event mirror and the cursor; queued changes in the outbox are never affected. Writes nothing
      * once the source is gone.
      */
-    suspend fun applySync(connectionId: String, sourceId: String, range: DateRange, result: SyncResult) =
+    suspend fun applySync(connectionId: String, sourceId: String, range: DateRange, result: SyncResult, today: LocalDate) =
         db.withTransaction {
             // A source removed while this sync was in flight: no orphan events or stale cursor.
-            if (dao.source(connectionId, sourceId) == null) return@withTransaction
+            val source = dao.source(connectionId, sourceId) ?: return@withTransaction
             dao.clearReadProblem(connectionId, sourceId)
             if (result.fullReplace) {
                 dao.deleteEventsForSource(connectionId, sourceId)
             } else {
                 result.removedIds.chunked(REMOVE_CHUNK).forEach { dao.deleteEvents(connectionId, sourceId, it) }
             }
-            dao.upsertEvents(result.upserts.map { it.toEntity(connectionId, sourceId, range.zone) })
+            val entities = result.upserts.map { it.toEntity(connectionId, sourceId, range.zone) }
+            dao.upsertEvents(entities)
+            forgetUnsupplied(connectionId, sourceId, today, range.zone)
+            if (source.visible) {
+                rememberedFrom(entities.map { EventRow(it, source.personId) }, range.zone, today).forEach { read ->
+                    mergedTitle(dao.remembered(connectionId, read.titleKey), read, today)?.let { dao.upsertRemembered(it) }
+                }
+            }
+            dao.pruneRemembered(rememberedCutoff(today).toString())
             // An incremental result keeps what the full sync read: only a full sync reads a new range (4c ruling 1).
             val key = if (result.fullReplace) range.cursorKey() else dao.syncState(connectionId, sourceId)?.rangeStart ?: range.cursorKey()
             dao.upsertSyncState(SyncStateEntity(connectionId, sourceId, result.cursor?.value, key))
@@ -296,6 +310,36 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     override suspend fun instances(connectionId: String, sourceId: String): Map<String, String?> =
         dao.seriesInstances(connectionId, sourceId).associate { it.remoteId to it.recurrenceRule }
 
+    /** The titles of visible calendars only, so a hidden calendar's titles are never offered (9c ruling 39). */
+    suspend fun rememberedTitles(): List<RememberedTitleEntity> = dao.visibleRemembered()
+
+    /**
+     * Fills a connection's remembered titles from the events it already holds, once: when it has none (9c ruling 38).
+     * Writes nothing once the connection is gone.
+     */
+    suspend fun seedRememberedTitles(connectionId: String, today: LocalDate, zone: ZoneId) = db.withTransaction {
+        dao.connection(connectionId) ?: return@withTransaction
+        if (dao.countRememberedOf(connectionId) > 0) return@withTransaction
+        rememberedFrom(dao.visibleEventRows(connectionId), zone, today).forEach { dao.upsertRemembered(it) }
+    }
+
+    /** Forgets the titles of [sourceId] whose supplying event, or series, no longer holds that title (ruling 37). */
+    private suspend fun forgetUnsupplied(connectionId: String, sourceId: String, today: LocalDate, zone: ZoneId) {
+        val unsupplied = dao.suppliedTitles(connectionId, sourceId)
+            .groupBy({ it.titleKey }, { it.eventTitle })
+            .filter { (key, titles) -> titles.none { it != null && titleKey(it) == key } }
+            .keys
+        forget(connectionId, unsupplied.toList(), today, zone)
+    }
+
+    /** Deletes the rows for [keys], then supplies each from another visible stored event with that title, if any. */
+    private suspend fun forget(connectionId: String, keys: List<String>, today: LocalDate, zone: ZoneId) {
+        if (keys.isEmpty()) return
+        keys.chunked(REMOVE_CHUNK).forEach { dao.deleteRemembered(connectionId, it) }
+        val forgotten = keys.toSet()
+        rememberedFrom(dao.visibleEventRows(connectionId), zone, today).filter { it.titleKey in forgotten }.forEach { dao.upsertRemembered(it) }
+    }
+
     fun eventsBetween(startMillis: Long, endMillis: Long): Flow<List<StoredEvent>> =
         dao.eventsBetween(startMillis, endMillis).map { rows -> rows.map { it.toStored() } }
 
@@ -324,14 +368,18 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         }
 
     /** Removes an accepted delete from the mirror and, if it came from the outbox, completes it. */
-    suspend fun applyDeleted(ref: EventRef, completing: Long? = null) = db.withTransaction {
+    suspend fun applyDeleted(ref: EventRef, today: LocalDate, zone: ZoneId, completing: Long? = null) = db.withTransaction {
         dao.deleteEvents(ref.connectionId, ref.sourceId, listOf(ref.remoteId))
         completing?.let { dao.deleteOutbox(it) }
+        forgetUnsupplied(ref.connectionId, ref.sourceId, today, zone)
     }
 
     /** Removes an accepted series delete from the mirror: the series and every occurrence of it held. */
-    suspend fun applySeriesDeleted(connectionId: String, sourceId: String, seriesId: String) =
-        dao.deleteSeries(connectionId, sourceId, seriesId)
+    suspend fun applySeriesDeleted(connectionId: String, sourceId: String, seriesId: String, today: LocalDate, zone: ZoneId) =
+        db.withTransaction {
+            dao.deleteSeries(connectionId, sourceId, seriesId)
+            forgetUnsupplied(connectionId, sourceId, today, zone)
+        }
 
     suspend fun enqueue(change: PendingChange): Long = dao.insertOutbox(change.toEntity())
 

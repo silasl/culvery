@@ -28,6 +28,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.calendar.TEST_TODAY
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
 import uk.co.siland.culvery.capability.calendar.CalendarSource
@@ -99,6 +100,7 @@ class CardHostsMidnightRolloverTest {
                 null,
                 fullReplace = true,
             ),
+            TEST_TODAY,
         )
     }
 

@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.calendar
 
 import android.util.Log
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -88,9 +89,11 @@ class CalendarSync internal constructor(
 
     private suspend fun currentWindow(): DateRange {
         val z = zone.current()
-        val today = Instant.ofEpochMilli(clock.nowMillis()).atZone(z).toLocalDate()
+        val today = todayIn(z)
         return DateRange(today.minusDays(SYNC_PAST_DAYS), today.plusDays(SYNC_FUTURE_DAYS + 1), z)
     }
+
+    private fun todayIn(z: ZoneId): LocalDate = Instant.ofEpochMilli(clock.nowMillis()).atZone(z).toLocalDate()
 
     /**
      * Delivers queued changes in the order they were made. An event's later changes wait while an earlier one is
@@ -316,7 +319,7 @@ class CalendarSync internal constructor(
         zone: ZoneId,
     ): WriteOutcome =
         try {
-            store.applyAcceptedWrite(change.kind, conn.id, source.id, change.remoteId, change.draft?.forPerson, accepted, zone, completing = change.id, series = change.draft?.recurrence != null)
+            store.applyAcceptedWrite(change.kind, conn.id, source.id, change.remoteId, change.draft?.forPerson, accepted, todayIn(zone), zone, completing = change.id, series = change.draft?.recurrence != null)
             store.writeAccepted(conn.id, clock.nowMillis())
             accepted
         } catch (e: CancellationException) {
@@ -342,7 +345,8 @@ class CalendarSync internal constructor(
             store.setHealth(conn.id, ConnectionHealth.Error("Provider not installed"), clock.nowMillis())
             return
         }
-        refresher.refreshIfDue(provider, stored)
+        refresher.refreshIfDue(provider, stored, window.zone)
+        store.seedRememberedTitles(conn.id, todayIn(window.zone), window.zone)
         var worst: ConnectionHealth = ConnectionHealth.Ok
         val visible = store.visibleSourcesFor(conn.id)
         var refused = 0
@@ -380,7 +384,7 @@ class CalendarSync internal constructor(
         val read = DateRange(window.start, window.endExclusive.plusDays(SYNC_AHEAD_DAYS), window.zone)
         val result = callReader(io, timeoutMillis) { provider.sync(conn, source, read, cursor) }
             .getOrElse { return healthAfter(it, conn, source.id) }
-        store.applySync(conn.id, source.id, read, result)
+        store.applySync(conn.id, source.id, read, result, todayIn(window.zone))
         store.prune(conn.id, source.id, window)
         return ConnectionHealth.Ok
     }

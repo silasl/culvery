@@ -33,6 +33,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
+import uk.co.siland.culvery.capability.calendar.TEST_ZONE
+import uk.co.siland.culvery.capability.calendar.TEST_TODAY
 import uk.co.siland.culvery.capability.calendar.ASK_AN_ADULT
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
@@ -106,6 +108,7 @@ class EventDetailHostTest {
                 listOf(event("dinner", "Dinner with Jo & Priya", access.alex.id.value), event("plumber", "Plumber quote call", null)),
                 emptyList(), null, fullReplace = true,
             ),
+            TEST_TODAY,
         )
         repo = CalendarRepository(store, household, zone, emptySet(), setOf(writer))
         editor = testEditor(
@@ -137,6 +140,7 @@ class EventDetailHostTest {
         store.applySync(
             "c1", "s-family", DateRange(today.minusDays(1), today.plusDays(14), london),
             SyncResult(listOf(event("swim_1", "Swimming", null).copy(recurring = true, seriesId = "swim", forPerson = forPerson)), emptyList(), null, fullReplace = false),
+            TEST_TODAY,
         )
     }
 
@@ -250,7 +254,7 @@ class EventDetailHostTest {
     fun theSheetClosesWhenItsEventDisappears() {
         show("dinner")
         waitForText("Dinner with Jo & Priya")
-        runBlocking { store.applyDeleted(EventRef("c1", "s-family", "dinner")) }
+        runBlocking { store.applyDeleted(EventRef("c1", "s-family", "dinner"), TEST_TODAY, TEST_ZONE) }
         waitUntil { closed > 0 }
     }
 

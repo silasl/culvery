@@ -43,7 +43,7 @@ class SourceRefresherTest {
     private suspend fun connect(sources: List<CalendarSource> = listOf(primary), master: String = primary.id) =
         store.addConnection(Connection("g1", "calendar.google", "Google", emptyMap()), sources, emptyMap(), masterSourceId = master)
 
-    private suspend fun refresh() = refresher.refreshIfDue(provider, store.connectionsNow().single())
+    private suspend fun refresh() = refresher.refreshIfDue(provider, store.connectionsNow().single(), TEST_ZONE)
 
     private suspend fun sourceIds() = store.sources().first().map { it.source.id }
 
@@ -51,7 +51,7 @@ class SourceRefresherTest {
     fun theFirstPassAfterTheAppStartsRefreshesEvenARecentCheckAndMapsNewCalendarsByName() = runTest {
         connect()
         // The process before this one checked a minute ago: only the app start makes this refresh due.
-        store.refreshSources("g1", listOf(primary), now - 60_000) { SourceMapping.Default }
+        store.refreshSources("g1", listOf(primary), now - 60_000, TEST_ZONE) { SourceMapping.Default }
         provider.sourceList = listOf(primary, swimming)
         refresh()
         assertThat(store.source("g1", "mia-swim")!!.mapping).isEqualTo(SourceMapping(mia.id, visible = true))

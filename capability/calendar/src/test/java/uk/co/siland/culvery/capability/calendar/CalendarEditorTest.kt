@@ -82,7 +82,7 @@ class CalendarEditorTest {
     }
 
     private suspend fun put(vararg events: RemoteEvent, source: String = "s-family") =
-        store.applySync("c1", source, window, SyncResult(events.toList(), emptyList(), null, fullReplace = true))
+        store.applySync("c1", source, window, SyncResult(events.toList(), emptyList(), null, fullReplace = true), TEST_TODAY)
 
     private fun ref(id: String, source: String = "s-family") = EventRef("c1", source, id)
 

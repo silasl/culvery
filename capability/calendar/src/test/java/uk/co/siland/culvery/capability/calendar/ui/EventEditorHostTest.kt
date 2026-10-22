@@ -46,6 +46,8 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.calendar.TEST_ZONE
+import uk.co.siland.culvery.capability.calendar.TEST_TODAY
 import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
 import uk.co.siland.culvery.capability.calendar.CANT_REPEAT_FOR_CHILD
 import uk.co.siland.culvery.capability.calendar.CHANGES_SAVED
@@ -155,6 +157,7 @@ class EventEditorHostTest {
                 ),
                 emptyList(), null, fullReplace = true,
             ),
+            TEST_TODAY,
         )
         repo = CalendarRepository(store, household, zone, emptySet(), setOf(writer))
         editor = testEditor(store, setOf(writer), access.control, access.toasts, zone, WallClock { now }, scope)
@@ -726,7 +729,7 @@ class EventEditorHostTest {
         showEditor(EditorRequest.Edit(dinner, EditorFrom.Calendar))
         waitForText("Change event")
         // Deleted on a phone, then synced, while the editor was open.
-        runBlocking { store.applyDeleted(dinner) }
+        runBlocking { store.applyDeleted(dinner, TEST_TODAY, TEST_ZONE) }
         compose.onNodeWithTag("editor_ends_time").performClick()
         compose.onNodeWithTag("end_hour_up").performClick()
         compose.onNodeWithTag("editor_save").performClick()

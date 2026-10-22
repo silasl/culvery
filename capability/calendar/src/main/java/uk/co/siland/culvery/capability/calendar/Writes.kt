@@ -4,6 +4,7 @@ import android.util.Log
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.UnknownHostException
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CancellationException
@@ -138,6 +139,7 @@ internal suspend fun CalendarStore.applyAcceptedWrite(
     remoteId: String?,
     forPerson: String?,
     accepted: WriteOutcome.Accepted,
+    today: LocalDate,
     zone: ZoneId,
     completing: Long? = null,
     series: Boolean = false,
@@ -148,7 +150,7 @@ internal suspend fun CalendarStore.applyAcceptedWrite(
         kind == ChangeKind.ASSIGN_SERIES ->
             applySeriesAssigned(connectionId, sourceId, requireNotNull(remoteId) { "A series assign needs its series" }, forPerson, completing)
         event == null ->
-            applyDeleted(EventRef(connectionId, sourceId, requireNotNull(remoteId) { "An accepted delete needs its remoteId" }), completing)
+            applyDeleted(EventRef(connectionId, sourceId, requireNotNull(remoteId) { "An accepted delete needs its remoteId" }), today, zone, completing)
         else -> applyAccepted(connectionId, sourceId, event, zone, completing)
     }
 }

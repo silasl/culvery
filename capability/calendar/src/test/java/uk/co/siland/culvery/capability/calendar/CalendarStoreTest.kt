@@ -95,18 +95,19 @@ class CalendarStoreTest {
     @Test
     fun fullReplaceDropsEventsMissingFromTheNewSet() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(timed("a", "Old", 23, 9), timed("b", "Kept", 23, 10)))
-        store.applySync("c1", "s1", window, full(timed("b", "Kept", 23, 10), timed("c", "New", 23, 11)))
+        store.applySync("c1", "s1", window, full(timed("a", "Old", 23, 9), timed("b", "Kept", 23, 10)), TEST_TODAY)
+        store.applySync("c1", "s1", window, full(timed("b", "Kept", 23, 10), timed("c", "New", 23, 11)), TEST_TODAY)
         assertThat(titlesBetween(23, 24)).containsExactly("Kept", "New").inOrder()
     }
 
     @Test
     fun incrementalSyncUpsertsAndRemoves() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(timed("a", "Gone", 23, 9), timed("b", "Before", 23, 10)))
+        store.applySync("c1", "s1", window, full(timed("a", "Gone", 23, 9), timed("b", "Before", 23, 10)), TEST_TODAY)
         store.applySync(
             "c1", "s1", window,
             SyncResult(listOf(timed("b", "After", 23, 10), timed("c", "Added", 23, 11)), listOf("a"), SyncCursor("k2"), fullReplace = false),
+            TEST_TODAY,
         )
         assertThat(titlesBetween(23, 24)).containsExactly("After", "Added").inOrder()
     }
@@ -122,6 +123,7 @@ class CalendarStoreTest {
                 timed("tomorrow", "Tomorrow", 24, 10),
                 allDay("half", "Half term", 21, 25),
             ),
+            TEST_TODAY,
         )
         assertThat(titlesBetween(23, 24)).containsExactly("Half term", "Early", "Late").inOrder()
     }
@@ -129,7 +131,7 @@ class CalendarStoreTest {
     @Test
     fun allDayEventIsNotReturnedOnItsExclusiveEndDay() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(allDay("bins", "Bin day", 23, 24)))
+        store.applySync("c1", "s1", window, full(allDay("bins", "Bin day", 23, 24)), TEST_TODAY)
         assertThat(titlesBetween(23, 24)).containsExactly("Bin day")
         assertThat(titlesBetween(24, 25)).isEmpty()
     }
@@ -137,8 +139,8 @@ class CalendarStoreTest {
     @Test
     fun hiddenSourcesAreExcluded() = runTest {
         connect("s1", "s2", mapping = mapOf("s2" to SourceMapping(PersonId.FAMILY, visible = false)))
-        store.applySync("c1", "s1", window, full(timed("a", "Shown", 23, 9)))
-        store.applySync("c1", "s2", window, full(timed("b", "Hidden", 23, 10)))
+        store.applySync("c1", "s1", window, full(timed("a", "Shown", 23, 9)), TEST_TODAY)
+        store.applySync("c1", "s2", window, full(timed("b", "Hidden", 23, 10)), TEST_TODAY)
         assertThat(titlesBetween(23, 24)).containsExactly("Shown")
         assertThat(store.visibleSourcesFor("c1").map { it.source.id }).containsExactly("s1")
     }
@@ -146,7 +148,7 @@ class CalendarStoreTest {
     @Test
     fun unmappedSourceDefaultsToFamilyAndVisible() = runTest {
         connect("s1", mapping = emptyMap())
-        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)), TEST_TODAY)
         assertThat(store.visibleSourcesFor("c1").single().mapping).isEqualTo(SourceMapping.Default)
         assertThat(store.eventsBetween(millis(23), millis(24)).first().single().sourcePerson).isEqualTo(PersonId.FAMILY)
     }
@@ -154,7 +156,7 @@ class CalendarStoreTest {
     @Test
     fun mappedSourceCarriesItsPerson() = runTest {
         connect("s1", mapping = mapOf("s1" to SourceMapping(PersonId("alex"), visible = true)))
-        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)), TEST_TODAY)
         assertThat(store.eventsBetween(millis(23), millis(24)).first().single().sourcePerson).isEqualTo(PersonId("alex"))
     }
 
@@ -164,10 +166,11 @@ class CalendarStoreTest {
         val store = CalendarStore(db, counting)
         store.addConnection(conn, listOf(CalendarSource("s1", "S1", writable = false)), emptyMap())
         val many = (1..1_200).map { timed("e$it", "Event $it", 23, 9) }
-        store.applySync("c1", "s1", window, full(*many.toTypedArray(), timed("keep", "Keep", 23, 10)))
+        store.applySync("c1", "s1", window, full(*many.toTypedArray(), timed("keep", "Keep", 23, 10)), TEST_TODAY)
         store.applySync(
             "c1", "s1", window,
             SyncResult(emptyList(), many.map { it.remoteId }, SyncCursor("k2"), fullReplace = false),
+            TEST_TODAY,
         )
         assertThat(store.eventsBetween(millis(23), millis(24)).first().map { it.title }).containsExactly("Keep")
         assertThat(counting.mostBound).isAtMost(999)
@@ -178,7 +181,7 @@ class CalendarStoreTest {
         connect("s1")
         val timedEvent = timed("a", "Walk", 23, 9, minutes = 45)
         val allDayEvent = allDay("b", "Holiday", 23, 26)
-        store.applySync("c1", "s1", window, full(timedEvent, allDayEvent))
+        store.applySync("c1", "s1", window, full(timedEvent, allDayEvent), TEST_TODAY)
         val stored = store.eventsBetween(millis(23), millis(24)).first().associateBy { it.remoteId }
         assertThat(stored.getValue("a").start).isEqualTo(timedEvent.start)
         assertThat(stored.getValue("a").end).isEqualTo(timedEvent.end)
@@ -189,7 +192,7 @@ class CalendarStoreTest {
     @Test
     fun cursorIsStoredPerSource() = runTest {
         connect("s1", "s2")
-        store.applySync("c1", "s1", window, full(timed("a", "One", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("a", "One", 23, 9)), TEST_TODAY)
         assertThat(store.cursor("c1", "s1", window)).isEqualTo(SyncCursor("k1"))
         assertThat(store.cursor("c1", "s2", window)).isNull()
     }
@@ -197,7 +200,7 @@ class CalendarStoreTest {
     @Test
     fun cursorIsDroppedOnceTheWindowPassesWhatWasRead() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(timed("a", "One", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("a", "One", 23, 9)), TEST_TODAY)
         val nextDay = DateRange(window.start.plusDays(1), window.endExclusive.plusDays(1), zone)
         assertThat(store.cursor("c1", "s1", nextDay)).isNull()
     }
@@ -205,7 +208,7 @@ class CalendarStoreTest {
     @Test
     fun cursorIsDroppedWhenTheZoneChanges() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(timed("a", "One", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("a", "One", 23, 9)), TEST_TODAY)
         val sameDatesElsewhere = DateRange(window.start, window.endExclusive, ZoneId.of("Pacific/Auckland"))
         assertThat(store.cursor("c1", "s1", sameDatesElsewhere)).isNull()
         assertThat(store.cursor("c1", "s1", window)).isEqualTo(SyncCursor("k1"))
@@ -222,7 +225,7 @@ class CalendarStoreTest {
     @Test
     fun cursorIsKeptWhileWhatWasReadCoversTheWindow() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", read, full(timed("a", "One", 23, 9)))
+        store.applySync("c1", "s1", read, full(timed("a", "One", 23, 9)), TEST_TODAY)
         val nextDay = DateRange(window.start.plusDays(1), window.endExclusive.plusDays(1), zone)
         assertThat(store.cursor("c1", "s1", nextDay)).isEqualTo(SyncCursor("k1"))
     }
@@ -231,7 +234,7 @@ class CalendarStoreTest {
     @Test
     fun aClockMovedBackReadsInFullAgain() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", read, full(timed("a", "One", 23, 9)))
+        store.applySync("c1", "s1", read, full(timed("a", "One", 23, 9)), TEST_TODAY)
         val dayBefore = DateRange(window.start.minusDays(1), window.endExclusive.minusDays(1), zone)
         assertThat(store.cursor("c1", "s1", dayBefore)).isNull()
     }
@@ -239,9 +242,9 @@ class CalendarStoreTest {
     @Test
     fun anIncrementalResultKeepsWhatTheFullSyncRead() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(timed("a", "One", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("a", "One", 23, 9)), TEST_TODAY)
         val later = DateRange(window.start.plusDays(10), window.endExclusive.plusDays(10), zone)
-        store.applySync("c1", "s1", later, SyncResult(emptyList(), emptyList(), SyncCursor("k2"), fullReplace = false))
+        store.applySync("c1", "s1", later, SyncResult(emptyList(), emptyList(), SyncCursor("k2"), fullReplace = false), TEST_TODAY)
         // Still only what the full sync read: a window past it isn't covered, whatever the incremental pass asked with.
         assertThat(store.cursor("c1", "s1", DateRange(window.start.plusDays(1), window.endExclusive.plusDays(1), zone))).isNull()
         assertThat(store.cursor("c1", "s1", window)).isEqualTo(SyncCursor("k2"))
@@ -261,6 +264,7 @@ class CalendarStoreTest {
                 spanning("lastHour", read.endInstant.minusSeconds(3_600), read.endInstant),
                 spanning("startsAtTheEnd", read.endInstant, read.endInstant.plusSeconds(3_600)),
             ),
+            TEST_TODAY,
         )
         assertThat(store.prune("c1", "s1", window)).isEqualTo(3)
         assertThat(storedIds()).containsExactly("edge", "kept", "lastHour").inOrder()
@@ -270,7 +274,7 @@ class CalendarStoreTest {
     @Test
     fun pruningKeepsAZeroLengthEventAtTheWindowStart() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", read, full(spanning("instant", window.startInstant, window.startInstant)))
+        store.applySync("c1", "s1", read, full(spanning("instant", window.startInstant, window.startInstant)), TEST_TODAY)
         assertThat(store.prune("c1", "s1", window)).isEqualTo(0)
         assertThat(storedIds()).containsExactly("instant")
     }
@@ -279,7 +283,7 @@ class CalendarStoreTest {
     @Test
     fun pruningKeepsAnEventAQueuedChangeTargets() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", read, full(timed("old", "Old", 20, 9), timed("gone", "Gone", 20, 11)))
+        store.applySync("c1", "s1", read, full(timed("old", "Old", 20, 9), timed("gone", "Gone", 20, 11)), TEST_TODAY)
         val draft = EventDraft("Old, renamed", EventTime.Timed(at(20, 9)), EventTime.Timed(at(20, 10)), forPerson = null, createdBy = null)
         store.enqueue(PendingChange(0, "c1", "s1", "old", ChangeKind.UPDATE, draft, attempts = 0, nextAttemptMillis = 0, createdMillis = 0, fields = setOf(EventField.TITLE)))
         store.prune("c1", "s1", window)
@@ -290,7 +294,7 @@ class CalendarStoreTest {
     @Test
     fun aClockSetBackAfterPruningReadsInFullAgain() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", read, full(timed("a", "One", 23, 9)))
+        store.applySync("c1", "s1", read, full(timed("a", "One", 23, 9)), TEST_TODAY)
         store.prune("c1", "s1", DateRange(window.start.plusDays(3), window.endExclusive.plusDays(3), zone))
         assertThat(store.cursor("c1", "s1", DateRange(window.start.plusDays(1), window.endExclusive.plusDays(1), zone))).isNull()
         assertThat(store.cursor("c1", "s1", DateRange(window.start.plusDays(3), window.endExclusive.plusDays(3), zone)))
@@ -301,7 +305,7 @@ class CalendarStoreTest {
     @Test
     fun pruningKeepsAnEventStoredUnderAQueuedCreatesClientKey() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", read, full(timed("k-1", "Created", 20, 9), timed("gone", "Gone", 20, 11)))
+        store.applySync("c1", "s1", read, full(timed("k-1", "Created", 20, 9), timed("gone", "Gone", 20, 11)), TEST_TODAY)
         val draft = EventDraft("Created", EventTime.Timed(at(20, 9)), EventTime.Timed(at(20, 10)), forPerson = null, createdBy = null)
         store.enqueue(PendingChange(0, "c1", "s1", null, ChangeKind.CREATE, draft, attempts = 0, nextAttemptMillis = 0, createdMillis = 0, clientKey = "k-1"))
         store.prune("c1", "s1", window)
@@ -312,7 +316,7 @@ class CalendarStoreTest {
     fun cursorIsDroppedWhenWhatWasReadStartsAfterTheWindowStarts() = runTest {
         connect("s1")
         val readFromLater = DateRange(window.start.plusDays(1), window.endExclusive.plusDays(SYNC_AHEAD_DAYS), zone)
-        store.applySync("c1", "s1", readFromLater, full(timed("a", "One", 23, 9)))
+        store.applySync("c1", "s1", readFromLater, full(timed("a", "One", 23, 9)), TEST_TODAY)
         assertThat(store.cursor("c1", "s1", window)).isNull()
     }
 
@@ -385,14 +389,14 @@ class CalendarStoreTest {
     fun aSharedTagRoundTripsThroughTheMirrorAndTheOutbox() = runTest {
         connect("s1")
         val shared = "sam,mia"
-        store.applySync("c1", "s1", window, full(timed("cinema", "Cinema", 25, 17).copy(forPerson = shared)))
+        store.applySync("c1", "s1", window, full(timed("cinema", "Cinema", 25, 17).copy(forPerson = shared)), TEST_TODAY)
         assertThat(store.eventNow(EventRef("c1", "s1", "cinema"))!!.forPerson).isEqualTo(shared)
 
         store.enqueue(change(ChangeKind.CREATE, remoteId = null, draft = eventDraft("Cinema", 25, 17, forPerson = shared)).copy(clientKey = "k-1"))
         assertThat(store.pendingNow().single().draft!!.forPerson).isEqualTo(shared)
 
         val daily = (0..2).map { timed("swim-$it", "Swimming", 23 + it, 9).copy(recurring = true, seriesId = "swim") }
-        store.applySync("c1", "s1", window, full(*daily.toTypedArray()))
+        store.applySync("c1", "s1", window, full(*daily.toTypedArray()), TEST_TODAY)
         store.applySeriesAssigned("c1", "s1", "swim", shared)
         assertThat(daily.map { store.eventNow(EventRef("c1", "s1", it.remoteId))!!.forPerson }).containsExactly(shared, shared, shared)
     }
@@ -402,9 +406,9 @@ class CalendarStoreTest {
         connect("s1", "s2")
         val occurrences = (0..2).map { timed("swim-$it", "Swimming", 23 + it, 9).copy(recurring = true, seriesId = "swim") }
         val master = timed("swim", "Swimming", 23, 9).copy(recurring = true)
-        store.applySync("c1", "s1", window, full(*(occurrences + master + timed("other", "Other", 24, 9)).toTypedArray()))
-        store.applySync("c1", "s2", window, full(timed("swim-0", "Swimming", 23, 9).copy(recurring = true, seriesId = "swim")))
-        store.applySeriesDeleted("c1", "s1", "swim")
+        store.applySync("c1", "s1", window, full(*(occurrences + master + timed("other", "Other", 24, 9)).toTypedArray()), TEST_TODAY)
+        store.applySync("c1", "s2", window, full(timed("swim-0", "Swimming", 23, 9).copy(recurring = true, seriesId = "swim")), TEST_TODAY)
+        store.applySeriesDeleted("c1", "s1", "swim", TEST_TODAY, TEST_ZONE)
         assertThat(storedIds()).containsExactly("other", "swim-0")
         assertThat(store.eventNow(EventRef("c1", "s2", "swim-0"))).isNotNull()
     }
@@ -502,7 +506,7 @@ class CalendarStoreTest {
     fun aConnectionAndEverythingItHoldsIsRemovedTogether() = runTest {
         connect("s1", "s2")
         store.setMaster("c1", "s1")
-        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)), TEST_TODAY)
         store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null))
         store.removeConnection("c1")
         assertThat(store.connectionsNow()).isEmpty()
@@ -516,7 +520,7 @@ class CalendarStoreTest {
     @Test
     fun refreshingAddsNewSourcesWithTheirMappingAndKeepsExistingMappings() = runTest {
         connect("s1", mapping = mapOf("s1" to SourceMapping(PersonId("alex"), visible = true)))
-        store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 5_000L, mapping("mia"))
+        store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.sources().first().associate { it.source.id to it.mapping.person })
             .containsExactly("s1", PersonId("alex"), "s2", PersonId("mia"))
     }
@@ -524,25 +528,25 @@ class CalendarStoreTest {
     @Test
     fun refreshingFollowsTheTicksButKeepsThePrimaryVisible() = runTest {
         connect("s1", "s2")
-        store.refreshSources("c1", listOf(listed("s1", shown = false), listed("s2", shown = false, primary = true)), 5_000L, mapping("mia"))
+        store.refreshSources("c1", listOf(listed("s1", shown = false), listed("s2", shown = false, primary = true)), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.sources().first().associate { it.source.id to it.mapping.visible }).containsExactly("s1", false, "s2", true)
-        store.refreshSources("c1", listOf(listed("s1", shown = true), listed("s2", primary = true)), 6_000L, mapping("mia"))
+        store.refreshSources("c1", listOf(listed("s1", shown = true), listed("s2", primary = true)), 6_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
     }
 
     @Test
     fun refreshingUpdatesNamesAndWritability() = runTest {
         connect("s1")
-        store.refreshSources("c1", listOf(CalendarSource("s1", "Swimming club", writable = true)), 5_000L, mapping("mia"))
+        store.refreshSources("c1", listOf(CalendarSource("s1", "Swimming club", writable = true)), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.source("c1", "s1")!!.source.let { it.name to it.writable }).isEqualTo("Swimming club" to true)
     }
 
     @Test
     fun refreshingRemovesAGoneSourceWithItsEventsCursorAndQueue() = runTest {
         connect("s1", "s2")
-        store.applySync("c1", "s2", window, full(timed("a", "Walk", 23, 9)))
+        store.applySync("c1", "s2", window, full(timed("a", "Walk", 23, 9)), TEST_TODAY)
         store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null).copy(sourceId = "s2"))
-        val cleared = store.refreshSources("c1", listOf(listed("s1")), 5_000L, mapping("mia"))
+        val cleared = store.refreshSources("c1", listOf(listed("s1")), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(cleared.masterCleared).isFalse()
         assertThat(store.sources().first().map { it.source.id }).containsExactly("s1")
         assertThat(rowsFor("s2")).isEqualTo(Triple(0L, null, 0))
@@ -552,9 +556,9 @@ class CalendarStoreTest {
     fun refreshingWithoutTheMasterClearsItAndRemovesItsRows() = runTest {
         connect("s1", "s2")
         store.setMaster("c1", "s1")
-        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)), TEST_TODAY)
         store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null))
-        val cleared = store.refreshSources("c1", listOf(listed("s2")), 5_000L, mapping("mia"))
+        val cleared = store.refreshSources("c1", listOf(listed("s2")), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(cleared.masterCleared).isTrue()
         assertThat(store.master().first()).isNull()
         assertThat(rowsFor("s1")).isEqualTo(Triple(0L, null, 0))
@@ -564,7 +568,7 @@ class CalendarStoreTest {
     fun aMasterThatBecomesReadOnlyIsClearedButStays() = runTest {
         connect("s1")
         store.setMaster("c1", "s1")
-        val cleared = store.refreshSources("c1", listOf(listed("s1", writable = false)), 5_000L, mapping("mia"))
+        val cleared = store.refreshSources("c1", listOf(listed("s1", writable = false)), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(cleared.masterCleared).isTrue()
         assertThat(store.master().first()).isNull()
         assertThat(store.source("c1", "s1")!!.source.writable).isFalse()
@@ -574,7 +578,7 @@ class CalendarStoreTest {
     fun aWritableMasterStaysTheMasterThroughARefresh() = runTest {
         connect("s1")
         store.setMaster("c1", "s1")
-        assertThat(store.refreshSources("c1", listOf(listed("s1", writable = true)), 5_000L, mapping("mia")).masterCleared).isFalse()
+        assertThat(store.refreshSources("c1", listOf(listed("s1", writable = true)), 5_000L, TEST_ZONE, mapping("mia")).masterCleared).isFalse()
         assertThat(store.master().first()?.source?.id).isEqualTo("s1")
     }
 
@@ -582,7 +586,7 @@ class CalendarStoreTest {
     fun refreshingRecordsWhenItChecked() = runTest {
         connect("s1")
         assertThat(store.connectionsNow().single().sourcesCheckedMillis).isNull()
-        store.refreshSources("c1", listOf(listed("s1")), 5_000L, mapping("mia"))
+        store.refreshSources("c1", listOf(listed("s1")), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.connectionsNow().single().sourcesCheckedMillis).isEqualTo(5_000L)
     }
 
@@ -591,7 +595,7 @@ class CalendarStoreTest {
         connect("s1")
         val queued = store.enqueue(change(ChangeKind.UPDATE, remoteId = "a"))
         store.removeConnection("c1")
-        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)), TEST_TODAY)
         store.applyAccepted("c1", "s1", timed("a", "Walk", 23, 9), zone, completing = queued)
         assertThat(eventRows("s1")).isEqualTo(0L)
         assertThat(store.cursor("c1", "s1", window)).isNull()
@@ -620,14 +624,14 @@ class CalendarStoreTest {
     fun aRefreshForARemovedConnectionWritesNothing() = runTest {
         connect("s1")
         store.removeConnection("c1")
-        assertThat(store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 5_000L, mapping("mia")).masterCleared).isFalse()
+        assertThat(store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 5_000L, TEST_ZONE, mapping("mia")).masterCleared).isFalse()
         assertThat(store.sources().first()).isEmpty()
     }
 
     @Test
     fun aDuplicatedSourceIdInTheProviderListIsAddedOnce() = runTest {
         connect("s1")
-        store.refreshSources("c1", listOf(listed("s1"), listed("s2"), listed("s2")), 5_000L, mapping("mia"))
+        store.refreshSources("c1", listOf(listed("s1"), listed("s2"), listed("s2")), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.sources().first().map { it.source.id }).containsExactly("s1", "s2")
     }
 
@@ -635,8 +639,8 @@ class CalendarStoreTest {
     fun aHiddenCalendarStaysHiddenWhileItsTickIsUnchanged() = runTest {
         connect("s1", "s2")
         store.setMapping("c1", "s1", PersonId.FAMILY, visible = false)
-        store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 5_000L, mapping("mia"))
-        store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 6_000L, mapping("mia"))
+        store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 5_000L, TEST_ZONE, mapping("mia"))
+        store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 6_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.source("c1", "s1")!!.mapping.visible).isFalse()
     }
 
@@ -644,12 +648,12 @@ class CalendarStoreTest {
     fun aChangedTickInTheServiceWins() = runTest {
         connect("s1")
         store.setMapping("c1", "s1", PersonId.FAMILY, visible = false)
-        store.refreshSources("c1", listOf(listed("s1", shown = false)), 5_000L, mapping("mia"))
+        store.refreshSources("c1", listOf(listed("s1", shown = false)), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.source("c1", "s1")!!.mapping.visible).isFalse()
-        store.refreshSources("c1", listOf(listed("s1", shown = true)), 6_000L, mapping("mia"))
+        store.refreshSources("c1", listOf(listed("s1", shown = true)), 6_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
         store.setMapping("c1", "s1", PersonId.FAMILY, visible = true)
-        store.refreshSources("c1", listOf(listed("s1", shown = false)), 7_000L, mapping("mia"))
+        store.refreshSources("c1", listOf(listed("s1", shown = false)), 7_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.source("c1", "s1")!!.mapping.visible).isFalse()
     }
 
@@ -657,7 +661,7 @@ class CalendarStoreTest {
     fun theMasterStaysShownWhateverTheServiceSays() = runTest {
         connect("s1")
         store.setMaster("c1", "s1")
-        store.refreshSources("c1", listOf(listed("s1", writable = true, shown = false)), 5_000L, mapping("mia"))
+        store.refreshSources("c1", listOf(listed("s1", writable = true, shown = false)), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
     }
 
@@ -818,14 +822,14 @@ class CalendarStoreTest {
     @Test
     fun eventsKeepTheirRecurrenceRule() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(timed("a", "Swim", 23, 9).copy(recurring = true, recurrenceRule = "RRULE:FREQ=WEEKLY")))
+        store.applySync("c1", "s1", window, full(timed("a", "Swim", 23, 9).copy(recurring = true, recurrenceRule = "RRULE:FREQ=WEEKLY")), TEST_TODAY)
         assertThat(store.eventNow(EventRef("c1", "s1", "a"))!!.recurrenceRule).isEqualTo("RRULE:FREQ=WEEKLY")
     }
 
     @Test
     fun eventsKeepTheirSeries() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(timed("piano_1", "Piano", 23, 15).copy(recurring = true, seriesId = "piano"), timed("once", "Once", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("piano_1", "Piano", 23, 15).copy(recurring = true, seriesId = "piano"), timed("once", "Once", 23, 9)), TEST_TODAY)
         assertThat(store.eventNow(EventRef("c1", "s1", "piano_1"))!!.seriesId).isEqualTo("piano")
         assertThat(store.eventNow(EventRef("c1", "s1", "once"))!!.seriesId).isNull()
     }
@@ -834,27 +838,27 @@ class CalendarStoreTest {
     fun theStoredSeriesAreEachRepeatingInstanceWithItsRule() = runTest {
         connect("s1", "s2")
         val weekly = RemoteEvent("piano_1", "Piano", EventTime.Timed(at(23, 15)), EventTime.Timed(at(23, 16)), recurring = true, recurrenceRule = "RRULE:FREQ=WEEKLY")
-        store.applySync("c1", "s1", window, full(weekly, timed("once", "Once", 23, 9)))
-        store.applySync("c1", "s2", window, full(weekly.copy(remoteId = "swim_1")))
+        store.applySync("c1", "s1", window, full(weekly, timed("once", "Once", 23, 9)), TEST_TODAY)
+        store.applySync("c1", "s2", window, full(weekly.copy(remoteId = "swim_1")), TEST_TODAY)
         store.addConnection(Connection("c2", "calendar.test", "Other", emptyMap()), listOf(CalendarSource("s1", "S1", writable = false)), emptyMap())
-        store.applySync("c2", "s1", window, full(weekly.copy(remoteId = "choir_1")))
+        store.applySync("c2", "s1", window, full(weekly.copy(remoteId = "choir_1")), TEST_TODAY)
         assertThat(store.instances("c1", "s1")).containsExactly("piano_1", "RRULE:FREQ=WEEKLY")
     }
 
     @Test
     fun fullReplaceSyncLeavesTheOutboxAlone() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(timed("e1", "Swim", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("e1", "Swim", 23, 9)), TEST_TODAY)
         val id = store.enqueue(change(ChangeKind.DELETE, draft = null))
-        store.applySync("c1", "s1", window, full(timed("e1", "Swim", 23, 9), timed("e2", "Walk", 23, 10)))
-        store.applySync("c1", "s1", window, full())
+        store.applySync("c1", "s1", window, full(timed("e1", "Swim", 23, 9), timed("e2", "Walk", 23, 10)), TEST_TODAY)
+        store.applySync("c1", "s1", window, full(), TEST_TODAY)
         assertThat(store.pendingNow().map { it.id }).containsExactly(id)
     }
 
     @Test
     fun eventByRefFollowsTheMirror() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(timed("e1", "Swim", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("e1", "Swim", 23, 9)), TEST_TODAY)
         val ref = EventRef("c1", "s1", "e1")
         assertThat(store.event(ref).first()!!.title).isEqualTo("Swim")
         assertThat(store.eventNow(ref)!!.ref).isEqualTo(ref)
@@ -864,7 +868,7 @@ class CalendarStoreTest {
     @Test
     fun applyAcceptedUpsertsTheEventAndCompletesTheChange() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(timed("e1", "Swim", 23, 9)))
+        store.applySync("c1", "s1", window, full(timed("e1", "Swim", 23, 9)), TEST_TODAY)
         val id = store.enqueue(change(ChangeKind.UPDATE))
         store.applyAccepted("c1", "s1", timed("e1", "Swim", 23, 9).copy(forPerson = "sam-id"), zone, completing = id)
         assertThat(store.eventNow(EventRef("c1", "s1", "e1"))!!.forPerson).isEqualTo("sam-id")
@@ -874,9 +878,9 @@ class CalendarStoreTest {
     @Test
     fun applyDeletedRemovesTheEventAndCompletesTheChange() = runTest {
         connect("s1")
-        store.applySync("c1", "s1", window, full(timed("e1", "Swim", 23, 9), timed("e2", "Walk", 23, 10)))
+        store.applySync("c1", "s1", window, full(timed("e1", "Swim", 23, 9), timed("e2", "Walk", 23, 10)), TEST_TODAY)
         val id = store.enqueue(change(ChangeKind.DELETE, draft = null))
-        store.applyDeleted(EventRef("c1", "s1", "e1"), completing = id)
+        store.applyDeleted(EventRef("c1", "s1", "e1"), TEST_TODAY, TEST_ZONE, completing = id)
         assertThat(titlesBetween(23, 24)).containsExactly("Walk")
         assertThat(store.pendingNow()).isEmpty()
     }

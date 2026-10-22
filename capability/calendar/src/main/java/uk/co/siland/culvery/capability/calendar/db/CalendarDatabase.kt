@@ -80,6 +80,37 @@ data class EventEntity(
     val seriesId: String? = null,
 )
 
+/**
+ * v8 (9c-1c ruling 33): a title the Add event editor can offer, one per [connectionId] and [titleKey]. [sourceEventId] is the
+ * supplying event's series id, else its remote id. [forPerson] is the event's people tag, else its calendar's person id.
+ * Timed events set [startMinute] (minutes after local midnight) and [lengthMinutes]; all-day events set [days].
+ * [rule] is the repeat without COUNT, UNTIL or DTSTART, only when the editor offers it; [seriesStart] and
+ * [rememberedDate] are ISO dates.
+ */
+@Entity(
+    tableName = "remembered_titles",
+    primaryKeys = ["connectionId", "titleKey"],
+    indices = [Index("rememberedDate")],
+)
+data class RememberedTitleEntity(
+    val connectionId: String,
+    val titleKey: String,
+    val title: String,
+    val sourceId: String,
+    val sourceEventId: String,
+    val forPerson: String,
+    val allDay: Boolean,
+    val startMinute: Int?,
+    val lengthMinutes: Int?,
+    val days: Int?,
+    val rule: String?,
+    val seriesStart: String?,
+    val rememberedDate: String,
+)
+
+/** A remembered title with a title of the event that supplies it, null when the supplier has no stored event. */
+data class SuppliedTitle(val titleKey: String, val eventTitle: String?)
+
 @Entity(tableName = "sync_state", primaryKeys = ["connectionId", "sourceId"])
 data class SyncStateEntity(
     val connectionId: String,
@@ -119,6 +150,63 @@ data class SeriesInstance(val remoteId: String, val recurrenceRule: String?)
 
 @Dao
 interface CalendarDao {
+    @Query("SELECT * FROM remembered_titles")
+    suspend fun allRemembered(): List<RememberedTitleEntity>
+
+    @Query(
+        """
+        SELECT r.* FROM remembered_titles r
+        JOIN source s ON s.connectionId = r.connectionId AND s.sourceId = r.sourceId
+        WHERE s.visible = 1
+        """,
+    )
+    suspend fun visibleRemembered(): List<RememberedTitleEntity>
+
+    @Query("SELECT * FROM remembered_titles WHERE connectionId = :connectionId AND titleKey = :titleKey")
+    suspend fun remembered(connectionId: String, titleKey: String): RememberedTitleEntity?
+
+    @Query("SELECT COUNT(*) FROM remembered_titles WHERE connectionId = :connectionId")
+    suspend fun countRememberedOf(connectionId: String): Int
+
+    @Query("SELECT titleKey FROM remembered_titles WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun rememberedKeysOfSource(connectionId: String, sourceId: String): List<String>
+
+    /** One row per remembered title of the source and per stored event that supplies it. */
+    @Query(
+        """
+        SELECT r.titleKey AS titleKey, e.title AS eventTitle FROM remembered_titles r
+        LEFT JOIN event e ON e.connectionId = r.connectionId AND e.sourceId = r.sourceId
+            AND (e.seriesId = r.sourceEventId OR (e.seriesId IS NULL AND e.remoteId = r.sourceEventId))
+        WHERE r.connectionId = :connectionId AND r.sourceId = :sourceId
+        """,
+    )
+    suspend fun suppliedTitles(connectionId: String, sourceId: String): List<SuppliedTitle>
+
+    @Query(
+        """
+        SELECT e.*, s.personId AS sourcePersonId FROM event e
+        JOIN source s ON s.connectionId = e.connectionId AND s.sourceId = e.sourceId
+        WHERE e.connectionId = :connectionId AND s.visible = 1
+        """,
+    )
+    suspend fun visibleEventRows(connectionId: String): List<EventRow>
+
+    @Upsert
+    suspend fun upsertRemembered(row: RememberedTitleEntity)
+
+    @Query("DELETE FROM remembered_titles WHERE connectionId = :connectionId AND titleKey IN (:keys)")
+    suspend fun deleteRemembered(connectionId: String, keys: List<String>)
+
+    @Query("DELETE FROM remembered_titles WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun deleteRememberedOfSource(connectionId: String, sourceId: String)
+
+    @Query("DELETE FROM remembered_titles WHERE connectionId = :connectionId")
+    suspend fun deleteRememberedOf(connectionId: String)
+
+    /** Dates are ISO, so text order is date order. */
+    @Query("DELETE FROM remembered_titles WHERE rememberedDate < :cutoff")
+    suspend fun pruneRemembered(cutoff: String)
+
     @Query("SELECT remoteId, recurrenceRule FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId AND recurring = 1")
     suspend fun seriesInstances(connectionId: String, sourceId: String): List<SeriesInstance>
 
@@ -330,8 +418,11 @@ interface CalendarDao {
  * fallback. The schema JSON under schemas/ is committed.
  */
 @Database(
-    entities = [ConnectionEntity::class, SourceEntity::class, EventEntity::class, SyncStateEntity::class, OutboxEntity::class],
-    version = 7,
+    entities = [
+        ConnectionEntity::class, SourceEntity::class, EventEntity::class, SyncStateEntity::class, OutboxEntity::class,
+        RememberedTitleEntity::class,
+    ],
+    version = 8,
     exportSchema = true,
 )
 abstract class CalendarDatabase : RoomDatabase() {

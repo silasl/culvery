@@ -70,5 +70,21 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+/**
+ * v8 (Plan 9c-1c): the titles the Add event editor offers. Filled by the first sync pass after the upgrade, from the
+ * stored events. The SQL must match schemas/…/8.json exactly.
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `remembered_titles` (`connectionId` TEXT NOT NULL, `titleKey` TEXT NOT NULL, " +
+                "`title` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `sourceEventId` TEXT NOT NULL, `forPerson` TEXT NOT NULL, " +
+                "`allDay` INTEGER NOT NULL, `startMinute` INTEGER, `lengthMinutes` INTEGER, `days` INTEGER, `rule` TEXT, " +
+                "`seriesStart` TEXT, `rememberedDate` TEXT NOT NULL, PRIMARY KEY(`connectionId`, `titleKey`))",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_remembered_titles_rememberedDate` ON `remembered_titles` (`rememberedDate`)")
+    }
+}
+
 /** Every migration, oldest first: the database builder and the tests add these. */
-val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)

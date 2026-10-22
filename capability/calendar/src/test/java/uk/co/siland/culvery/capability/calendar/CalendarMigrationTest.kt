@@ -26,6 +26,7 @@ import uk.co.siland.culvery.capability.calendar.db.MIGRATION_3_4
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_4_5
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_5_6
 import uk.co.siland.culvery.capability.calendar.db.MIGRATION_6_7
+import uk.co.siland.culvery.capability.calendar.db.MIGRATION_7_8
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -298,7 +299,7 @@ class CalendarMigrationTest {
                 CalendarSource("s2", "Alex", writable = false, shown = false),
                 CalendarSource("s3", "Swimming", writable = false),
             )
-            store.refreshSources("c1", listed, 6_000L) { SourceMapping.Default }
+            store.refreshSources("c1", listed, 6_000L, ZoneId.of("Europe/London")) { SourceMapping.Default }
             assertThat(store.sources().first().associate { it.source.id to it.mapping }).containsExactly(
                 "s1", SourceMapping(PersonId.FAMILY, visible = true),
                 "s2", SourceMapping(PersonId("alex-id"), visible = false),
@@ -420,6 +421,45 @@ class CalendarMigrationTest {
                 .containsExactly(Triple("e1", ChangeKind.UPDATE, setOf(EventField.TITLE)))
         } finally {
             db.close()
+        }
+    }
+
+    @Test
+    fun migrationFromV7AddsTheRememberedTitlesTable() = runTest {
+        file.parentFile?.mkdirs()
+        file.delete()
+
+        val v7 = helper.createDatabase(7)
+        v7.execSQL(
+            "INSERT INTO connection (id, providerId, label, configJson, health, healthMessage, lastSyncMillis, sourcesCheckedMillis, " +
+                "needsSignInSinceMillis) VALUES ('c1', 'calendar.test', 'Google', '{}', 'OK', NULL, 1234, 1000, NULL)",
+        )
+        v7.execSQL(
+            "INSERT INTO source (connectionId, sourceId, name, writable, visible, personId, isMaster, shownInService, readProblem) " +
+                "VALUES ('c1', 's1', 'Family', 1, 1, 'family', 1, 1, NULL)",
+        )
+        v7.execSQL(
+            "INSERT INTO event (connectionId, sourceId, remoteId, title, startInstant, startDate, endInstant, endDate, " +
+                "recurring, forPerson, createdBy, startSort, endSort, recurrenceRule, seriesId) " +
+                "VALUES ('c1', 's1', 'piano_1', 'Piano', 1000, NULL, 2000, NULL, 1, 'alex-id', 'sam-id', 1000, 2000, 'RRULE:FREQ=WEEKLY', 'piano')",
+        )
+        v7.execSQL("INSERT INTO sync_state (connectionId, sourceId, cursor, rangeStart) VALUES ('c1', 's1', 'k7', '2026-09-22|2026-10-08|Europe/London')")
+        v7.close()
+
+        val v8 = helper.runMigrationsAndValidate(8, listOf(MIGRATION_7_8))
+        try {
+            assertThat(scalar(v8, "SELECT title FROM event WHERE remoteId = 'piano_1'")).isEqualTo("Piano")
+            assertThat(scalar(v8, "SELECT cursor FROM sync_state")).isEqualTo("k7")
+            assertThat(scalar(v8, "SELECT COUNT(*) FROM remembered_titles")).isEqualTo("0")
+            val insert = "INSERT INTO remembered_titles (connectionId, titleKey, title, sourceId, sourceEventId, forPerson, allDay, " +
+                "startMinute, lengthMinutes, days, rule, seriesStart, rememberedDate) " +
+                "VALUES ('c1', 'piano', 'Piano', 's1', 'piano', 'alex-id', 0, 960, 45, NULL, 'RRULE:FREQ=WEEKLY;INTERVAL=1', '2026-09-05', '2026-09-19')"
+            v8.execSQL(insert)
+            assertThat(scalar(v8, "SELECT title || startMinute || rememberedDate FROM remembered_titles")).isEqualTo("Piano9602026-09-19")
+            assertThat(runCatching { v8.execSQL(insert) }.exceptionOrNull()).isNotNull()
+            assertThat(scalar(v8, "SELECT COUNT(*) FROM remembered_titles")).isEqualTo("1")
+        } finally {
+            v8.close()
         }
     }
 

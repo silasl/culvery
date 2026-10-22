@@ -29,6 +29,7 @@ import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.db.CalendarDao
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
+import uk.co.siland.culvery.capability.calendar.db.EventEntity
 import uk.co.siland.culvery.capability.calendar.db.OutboxEntity
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.household.HouseholdRepository
@@ -130,6 +131,25 @@ class CalendarSyncTest {
         val stored = store.connectionsNow().single()
         assertThat(stored.health).isEqualTo(ConnectionHealth.Ok)
         assertThat(stored.lastSyncMillis).isEqualTo(now.toEpochMilli())
+    }
+
+    @Test
+    fun aPassRemembersWhatItReadAndSeedsFromWhatIsAlreadyStored() = runTest {
+        connect("c1", "calendar.a", s1)
+        a.events = { listOf(swim()) }
+        val sync = engine()
+        sync.syncAll()
+        assertThat(store.rememberedTitles().map { it.title }).containsExactly("Swim")
+
+        val start = Instant.parse("2026-09-22T10:00:00Z").toEpochMilli()
+        calendar.calendarDao().upsertEvents(
+            listOf(EventEntity("c1", "s1", "dentist", "Dentist", start, null, start + 3_600_000, null, false, null, null, start, start + 3_600_000)),
+        )
+        calendar.calendarDao().deleteRemembered("c1", listOf("swim"))
+        now = now.plusSeconds(300)
+        sync.syncAll()
+        assertThat(a.calls.last().cursor).isNotNull()
+        assertThat(store.rememberedTitles().map { it.title }).containsExactly("Dentist", "Swim")
     }
 
     @Test

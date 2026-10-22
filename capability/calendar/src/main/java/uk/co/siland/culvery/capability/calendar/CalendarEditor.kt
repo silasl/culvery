@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.calendar
 
 import android.util.Log
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import javax.inject.Inject
@@ -139,6 +140,8 @@ class CalendarEditor internal constructor(
     internal val session: StateFlow<Identified?> get() = access.session
 
     /** Now, in the household zone: the add sheet's "today" and its default time. */
+    private suspend fun today(): LocalDate = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone.current()).toLocalDate()
+
     internal suspend fun openedAt(): ZonedDateTime = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone.current())
 
     /** The added toast for [draft]: a series says how it repeats, and a first day the week can't show is named (9 §3.1). */
@@ -262,7 +265,11 @@ class CalendarEditor internal constructor(
         return when {
             outcome is WriteOutcome.Accepted -> {
                 try {
-                    if (added.series) store.applySeriesDeleted(added.connectionId, added.sourceId, added.key) else store.applyDeleted(ref)
+                    if (added.series) {
+                        store.applySeriesDeleted(added.connectionId, added.sourceId, added.key, today(), zone.current())
+                    } else {
+                        store.applyDeleted(ref, today(), zone.current())
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -503,7 +510,7 @@ class CalendarEditor internal constructor(
         return when (outcome) {
             is WriteOutcome.Accepted -> {
                 try {
-                    store.applyAcceptedWrite(kind, to.connection.id, to.source.id, remoteId, draft?.forPerson, outcome, zone.current(), series = draft?.recurrence != null)
+                    store.applyAcceptedWrite(kind, to.connection.id, to.source.id, remoteId, draft?.forPerson, outcome, today(), zone.current(), series = draft?.recurrence != null)
                     store.writeAccepted(to.connection.id, clock.nowMillis())
                 } catch (e: CancellationException) {
                     throw e

@@ -183,7 +183,7 @@ class DebugSeedTest {
         val range = DateRange(today.minusDays(1), today.plusDays(15), zone)
         val sample = store.connectionsNow().single().connection
         val family = FakeCalendarProvider.SOURCES.single { it.id == FakeCalendarProvider.SOURCE_FAMILY }
-        store.applySync(DEBUG_CONNECTION_ID, family.id, range, fake.sync(sample, family, range, null))
+        store.applySync(DEBUG_CONNECTION_ID, family.id, range, fake.sync(sample, family, range, null), LocalDate.of(2026, 9, 23))
         store.enqueue(PendingChange(0, DEBUG_CONNECTION_ID, family.id, "e1", ChangeKind.DELETE, null, 0, 0L, 0L))
         assertThat(sampleRows()).containsExactly("event", true, "outbox", true, "sync_state", true)
         store.addConnection(Connection("g1", "calendar.google", "Google", emptyMap()), emptyList(), emptyMap())
