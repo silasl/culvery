@@ -25,6 +25,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.AnnotatedString
@@ -219,6 +220,8 @@ class EventEditorHostTest {
     /** A title and Alex: what a new event with its day needs before Add event. */
     private fun fillTitleAndAlex(title: String = "Dinner") {
         compose.onNodeWithTag("editor_title").performTextInput(title)
+        // Next on the keyboard leaves the title, whose remembered matches would otherwise fill the pane.
+        compose.onNodeWithTag("editor_title").performImeAction()
         compose.onNodeWithTag("who_Alex").performClick()
     }
 

@@ -19,18 +19,20 @@ private const val LEAP_GAP_YEARS = 8
 private const val SECONDS_PER_MINUTE = 60
 
 // The date a repeat counts from: the series' first date, else the date the title is remembered by.
-private fun Suggestion.anchor(): LocalDate = seriesStart ?: rememberedDate
+internal fun Suggestion.anchor(): LocalDate = seriesStart ?: rememberedDate
 
-private fun Suggestion.choice(): RepeatChoice? = rule?.let { choiceOf(it, anchor()) }?.takeIf { it != RepeatChoice.Never }
+/** The repeat the suggestion remembers, when the editor offers it. */
+internal fun Suggestion.choice(): RepeatChoice? = rule?.let { choiceOf(it, anchor()) }?.takeIf { it != RepeatChoice.Never }
 
-private fun Suggestion.nth(): Int = rule?.let { nthOf(it, anchor()) } ?: nthWeekday(anchor())
+internal fun Suggestion.nth(): Int = rule?.let { nthOf(it, anchor()) } ?: nthWeekday(anchor())
 
 private fun Suggestion.eventLength(): Duration? = if (allDay) days?.let { Duration.ofDays(it.toLong()) } else length
 
 // Dropped when the event is longer than the repeat allows (9c §3.3).
 private fun Suggestion.filledRepeat(): RepeatChoice? = choice()?.takeIf { c -> eventLength()?.let(c::fitsLength) ?: true }
 
-private fun Suggestion.whoNow(people: List<Person>): List<Person> =
+/** The people the suggestion is for, still in the household; Family when none are. */
+internal fun Suggestion.whoNow(people: List<Person>): List<Person> =
     resolvePeople(forPerson, PersonId.FAMILY, people.associateBy { it.id }, people.map { it.id })
 
 private fun durationWords(length: Duration): String {

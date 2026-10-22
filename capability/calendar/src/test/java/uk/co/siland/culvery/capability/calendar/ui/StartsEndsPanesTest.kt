@@ -16,6 +16,8 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -75,6 +77,8 @@ class StartsEndsPanesTest {
     private var except by mutableStateOf<EventRef?>(null)
     private var scale by mutableStateOf(1f)
     private var picked = 0
+    private var banner by mutableStateOf<String?>(null)
+    private var quickPicks by mutableStateOf(emptyList<LocalDate>())
 
     private fun saturdayAt(hour: Int, minute: Int, lengthMinutes: Long, day: LocalDate = saturday): EventWhen {
         val end = LocalTime.of(hour, minute).plusMinutes(lengthMinutes)
@@ -91,7 +95,7 @@ class StartsEndsPanesTest {
                         EditorPane(which.question, flow, skip = null) {
                             val freeStart = { clock: LocalTime -> eventWhen = eventWhen.withStart(clock) }
                             when (which) {
-                                Pane.StartDate -> StartDatePane(eventWhen, context) {
+                                Pane.StartDate -> StartDatePane(eventWhen, context, banner, quickPicks) {
                                     eventWhen = eventWhen.pickStartDate(it, defaults = false, today, LocalTime.of(11, 54))
                                     picked++
                                 }
@@ -143,6 +147,37 @@ class StartsEndsPanesTest {
 
     /** 15:00 for 45 minutes on [day]: over Mia's Piano. */
     private fun clashAt3(day: LocalDate = saturday) = saturdayAt(15, 0, lengthMinutes = 45, day = day)
+
+    @Test
+    fun aBannerAndQuickPicksShowAboveTheGridAndAPickIsAStartsDatePick() {
+        eventWhen = eventWhen.copy(startDate = null, endDays = 0)
+        banner = "Copied from Guitar lesson (last on Sat 12 Sep): who, time and repeats. Tap any row to change it. The date is never copied."
+        quickPicks = listOf(saturday, saturday.plusDays(7), saturday.plusDays(14))
+        show(Pane.StartDate)
+        node("copied_banner").assertTextEquals(banner!!)
+        assertThat(anyPixel(node("copied_banner"), c.accentSoft)).isTrue()
+        val bannerBounds = node("copied_banner").getUnclippedBoundsInRoot()
+        val picksBounds = node("quick_picks").getUnclippedBoundsInRoot()
+        val gridBounds = node("starts_date_pane").getUnclippedBoundsInRoot()
+        assertThat(bannerBounds.bottom.value).isAtMost(picksBounds.top.value)
+        assertThat(picksBounds.bottom.value).isAtMost(gridBounds.top.value)
+        listOf("Sat 26 Sep", "Sat 3 Oct", "Sat 10 Oct").forEachIndexed { i, label ->
+            compose.onNode(hasText(label) and hasAnyAncestor(hasTestTag("quick_pick_$i")), useUnmergedTree = true).assertExists()
+        }
+        node("quick_pick_1").performClick()
+        assertThat(eventWhen.startDate).isEqualTo(saturday.plusDays(7))
+        assertThat(picked).isEqualTo(1)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun withNoBannerOrQuickPicksOnlyTheGridShows() {
+        show(Pane.StartDate)
+        node("copied_banner").assertDoesNotExist()
+        node("quick_picks").assertDoesNotExist()
+        node("starts_date_pane").assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
 
     @Test
     fun eachPaneAsksItsQuestion() {

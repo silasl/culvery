@@ -54,6 +54,21 @@ data class EventWhen(
     fun pickStartDate(date: LocalDate, defaults: Boolean, today: LocalDate, now: LocalTime): EventWhen =
         if (defaults && !allDay) defaults(date, today, now) else copy(startDate = date)
 
+    /**
+     * What a remembered title fills in (9c §4.4): All day or the start and length it knows, and no date. A time it didn't
+     * keep stays as it is here; a span past the cap is cut to it.
+     */
+    fun copiedFrom(s: Suggestion): EventWhen {
+        val lastDay = (MAX_SPAN_DAYS - 1).toInt()
+        if (s.allDay) {
+            val days = ((s.days ?: 1) - 1).coerceIn(0, lastDay)
+            return copy(allDay = true, startDate = null, endDays = days, endClock = if (endClock == LocalTime.MIDNIGHT) LAST_MINUTE else endClock)
+        }
+        val start = s.start ?: startClock
+        val end = minutesOf(start) + (s.length?.toMinutes()?.takeIf { it > 0 } ?: 60L)
+        return copy(allDay = false, startDate = null, startClock = start, endDays = Math.floorDiv(end, MINUTES_PER_DAY).toInt().coerceAtMost(lastDay), endClock = clockOf(end))
+    }
+
     /** Null when [date] is before the start or more than 59 days after it. */
     fun pickEndDate(date: LocalDate): EventWhen? {
         val first = startDate ?: return null

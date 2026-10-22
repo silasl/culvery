@@ -24,6 +24,7 @@ import uk.co.siland.culvery.capability.calendar.EditResult
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.Held
+import uk.co.siland.culvery.capability.calendar.Suggestion
 import uk.co.siland.culvery.capability.calendar.WeekFocus
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.daySpan
@@ -223,6 +224,7 @@ internal fun EventEditorHost(
     }
 
     val child = session?.takeIf { it.role == Role.CHILD }?.person
+    val suggest: suspend (String) -> List<Suggestion> = if (request is EditorRequest.New) repo.suggestions::matching else { _ -> emptyList() }
     // A new opening is a new editor: its focus and title state don't carry over from the last one.
     key(opened) {
         EventEditorScreen(
@@ -241,6 +243,7 @@ internal fun EventEditorHost(
             onSave = { save() },
             onDelete = { delete() },
             onRefusedWho = { session?.person?.name?.let(editor::refuseOtherWho) },
+            suggest = suggest,
         )
     }
 }

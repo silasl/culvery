@@ -27,7 +27,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,13 +50,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.flow.collectLatest
 import uk.co.siland.culvery.capability.calendar.ALL_DAY_LABEL
+import uk.co.siland.culvery.capability.calendar.CopiedRow
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.FULL_DATE
 import uk.co.siland.culvery.capability.calendar.FreeCheck
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.SHORT_DAY
+import uk.co.siland.culvery.capability.calendar.Suggestion
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.capability.calendar.couldNotSave
 import uk.co.siland.culvery.capability.calendar.saveFailedBody
@@ -121,6 +126,7 @@ internal fun EventEditorScreen(
     onDelete: () -> Unit,
     onRefusedWho: () -> Unit,
     keyboard: WindowInsets = WindowInsets.ime,
+    suggest: suspend (String) -> List<Suggestion> = { emptyList() },
 ) {
     val c = Culvery.colors
     val focusManager = LocalFocusManager.current
@@ -128,8 +134,17 @@ internal fun EventEditorScreen(
     val titleFocus = remember { FocusRequester() }
     var titleFocused by remember { mutableStateOf(false) }
     var discarding by remember { mutableStateOf(false) }
+    var suggestions by remember { mutableStateOf(emptyList<Suggestion>()) }
+    val ask by rememberUpdatedState(suggest)
     val focusOnOpen = remember { form.mode == EditorForm.Mode.New && form.title.isEmpty() }
     LaunchedEffect(flow) { flow.runMoves() }
+    // A new event's title asks for suggestions on every keystroke; an answer overtaken by a later keystroke is dropped.
+    LaunchedEffect(form) {
+        if (form.mode != EditorForm.Mode.New) return@LaunchedEffect
+        snapshotFlow { titleFocused to form.title }.collectLatest { (focused, title) ->
+            suggestions = if (focused) ask(title) else emptyList()
+        }
+    }
     LaunchedEffect(Unit) {
         if (focusOnOpen) {
             titleFocus.requestFocus()
@@ -234,7 +249,19 @@ internal fun EventEditorScreen(
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
-                    EditorPaneFor(flow.active, form, flow, members, household, held, service, childOnly, childName, busy, onRefusedWho)
+                    if (titleFocused && suggestions.isNotEmpty()) {
+                        EditorPane(FROM_BEFORE, flow, skip = null) {
+                            FromBeforePane(suggestions, household.people, form.today, childOnly != null) { s ->
+                                if (!busy) {
+                                    form.use(s)
+                                    closeKeyboard()
+                                    flow.open(EditorStep.StartDate)
+                                }
+                            }
+                        }
+                    } else {
+                        EditorPaneFor(flow.active, form, flow, members, household, held, service, childOnly, childName, busy, onRefusedWho)
+                    }
                 }
             }
         }
@@ -360,6 +387,7 @@ private fun Rows(
         set = form.who.isNotEmpty(),
         typing = typing,
         onClick = { onOpen(EditorStep.Who) },
+        tag = if (CopiedRow.Who in form.copied) copiedTag() else null,
     )
     val w = form.eventWhen
     if (form.datesLocked) {
@@ -382,7 +410,7 @@ private fun Rows(
             typing = typing,
             onDate = { onOpen(EditorStep.StartDate) },
             onTime = { onOpen(EditorStep.StartTime) },
-            tag = startsTag(clash = if (clash) clashTag() else null, copied = null),
+            tag = startsTag(clash = if (clash) clashTag() else null, copied = if (CopiedRow.Starts in form.copied) copiedTag() else null),
         )
         val end = w.endDate
         EditorWhenRow(
@@ -409,7 +437,7 @@ private fun Rows(
             set = editing || form.repeat != RepeatChoice.Never,
             typing = typing,
             onClick = { onOpen(EditorStep.Repeats) },
-            tag = if (form.repeatTooLong) tooLongTag() else null,
+            tag = if (form.repeatTooLong) tooLongTag() else if (CopiedRow.Repeats in form.copied) copiedTag() else null,
         )
     }
 }

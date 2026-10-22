@@ -28,8 +28,12 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
+import java.time.LocalDate
+import uk.co.siland.culvery.capability.calendar.CopiedRow
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.Held
+import uk.co.siland.culvery.capability.calendar.bannerLine
+import uk.co.siland.culvery.capability.calendar.quickPicksFor
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -87,7 +91,7 @@ internal fun EditorPaneFor(
     EditorPane(questionFor(step), flow, skip) {
         when (step) {
             EditorStep.Who -> WhoPane(form, members, childOnly, childName, busy, onRefusedWho)
-            EditorStep.StartDate -> StartDatePane(form.eventWhen, context) {
+            EditorStep.StartDate -> StartDatePane(form.eventWhen, context, copiedBanner(form), copiedQuickPicks(form)) {
                 form.pickStartDate(it)
                 if (!busy) flow.moveOnAfterDate(EditorStep.StartTime)
             }
@@ -201,3 +205,9 @@ private fun SkipButton(onClick: () -> Unit) {
         Text(SKIP, style = CalendarType.paneSkip, color = Culvery.colors.mute, maxLines = 1)
     }
 }
+
+private fun copiedBanner(form: EditorForm): String? = form.usedSuggestion?.takeIf { form.copied.isNotEmpty() }?.let { bannerLine(it, form.copied, form.today) }
+
+// Only a repeat that was filled in gives dates to pick.
+private fun copiedQuickPicks(form: EditorForm): List<LocalDate> =
+    form.usedSuggestion?.takeIf { CopiedRow.Repeats in form.copied }?.let { quickPicksFor(it, form.today) }.orEmpty()

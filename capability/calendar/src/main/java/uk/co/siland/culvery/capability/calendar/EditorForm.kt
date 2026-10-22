@@ -41,7 +41,7 @@ class EditorForm(
     val today: LocalDate,
     private val now: LocalTime,
     val zone: ZoneId,
-    childOnly: PersonId?,
+    private val childOnly: PersonId?,
     preselectedDay: LocalDate?,
     private val order: List<PersonId>,
     calendarPerson: PersonId?,
@@ -84,6 +84,7 @@ class EditorForm(
 
     /** Everyone replaces the set and a person replaces Everyone; the last person can be cleared, which Save then waits on. */
     fun toggleWho(person: PersonId) = edit {
+        copied -= CopiedRow.Who
         who = toggled(who, person, mayClear = true).sortedBy(order::rankOf)
     }
 
@@ -106,7 +107,10 @@ class EditorForm(
     }
 
     /** Both dates stay; the times hide, and come back as they were (9c §3.1). */
-    fun chooseAllDay(on: Boolean) = editWhen { eventWhen = eventWhen.withAllDay(on) }
+    fun chooseAllDay(on: Boolean) = editWhen {
+        copied -= CopiedRow.Starts
+        eventWhen = eventWhen.withAllDay(on)
+    }
 
     fun pickStartDate(date: LocalDate) = editWhen { eventWhen = eventWhen.pickStartDate(date, defaults = !timesTouched, today, now) }
 
@@ -122,6 +126,7 @@ class EditorForm(
     fun useFreeStart(clock: LocalTime) = editWhen { touchWhen(eventWhen.withStart(clock)) }
 
     private fun touchWhen(next: EventWhen) {
+        copied -= CopiedRow.Starts
         eventWhen = next
         timesTouched = true
     }
@@ -146,6 +151,7 @@ class EditorForm(
     }
 
     private fun dropRepeat() {
+        copied -= CopiedRow.Repeats
         repeat = RepeatChoice.Never
         repeatEnd = RepeatEnd.Never
         repeatTooLong = true
@@ -154,11 +160,47 @@ class EditorForm(
     var repeatEnd: RepeatEnd by mutableStateOf(RepeatEnd.Never)
         private set
 
+    /** What [use] filled in, until each row changes (9c §4.4). */
+    var copied: Set<CopiedRow> by mutableStateOf(emptySet())
+        private set
+
+    /** The suggestion last used, which the banner names. */
+    var usedSuggestion: Suggestion? by mutableStateOf(null)
+        private set
+
+    /**
+     * "Use this" (9c §4.4): fills the title, who, All day, the time and length, and the repeat, and clears the Starts date.
+     * A child keeps themselves and gets no repeat; a repeat the span rules out is not filled.
+     */
+    fun use(s: Suggestion) = edit {
+        if (mode != Mode.New) return@edit
+        title = s.title.take(MAX_TITLE_LENGTH)
+        if (childOnly == null) who = resolveIds(s.forPerson, PersonId.FAMILY, order)
+        eventWhen = eventWhen.copiedFrom(s)
+        timesTouched = true
+        val filled = s.choice()?.takeIf { canRepeat && childOnly == null && it.fitsLength(eventWhen.repeatLength) }
+        if (filled != null) {
+            repeat = filled
+            repeatEnd = RepeatEnd.Never
+            repeatTooLong = false
+            repeatsAnswered = true
+        } else if (!repeat.fitsLength(eventWhen.repeatLength)) {
+            dropRepeat()
+        }
+        copied = buildSet {
+            if (childOnly == null) add(CopiedRow.Who)
+            add(CopiedRow.Starts)
+            if (filled != null) add(CopiedRow.Repeats)
+        }
+        usedSuggestion = s
+    }
+
     /** Back to Never drops the end: Ends only shows while the event repeats. */
     fun chooseRepeat(choice: RepeatChoice) = edit {
         if (!canRepeat) return@edit
         openRepeats()
         if (choice == repeat || !choice.fitsLength(eventWhen.repeatLength)) return@edit
+        copied -= CopiedRow.Repeats
         repeat = choice
         if (choice == RepeatChoice.Never) repeatEnd = RepeatEnd.Never
     }
@@ -194,10 +236,16 @@ class EditorForm(
     /** The Repeats row: "Doesn’t repeat", "Every Saturday", or "Every Saturday · 12 times". */
     val repeatsValue: String
         get() {
-            // The pane offers repeats only once there is a day.
-            val first = eventWhen.startDate ?: return DOESNT_REPEAT
+            val first = eventWhen.startDate
+            // The pane offers repeats only once there is a day; a copied one is worded from the suggestion's own rule until then.
+            val copiedFrom = usedSuggestion?.takeIf { first == null && repeat != RepeatChoice.Never }
+            val words = when {
+                first != null -> repeat.wording(first)
+                copiedFrom != null -> repeat.wording(copiedFrom.anchor(), copiedFrom.nth())
+                else -> return DOESNT_REPEAT
+            }
             val times = (repeatEnd as? RepeatEnd.After)?.let { " · ${plural(it.times.toLong(), "time")}" }.orEmpty()
-            return repeat.wording(first) + times
+            return words + times
         }
 
     /**

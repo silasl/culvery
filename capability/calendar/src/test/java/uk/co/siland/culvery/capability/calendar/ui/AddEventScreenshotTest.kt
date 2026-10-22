@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -11,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,6 +24,7 @@ import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.HeldEvent
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.Suggestion
 import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -43,12 +46,14 @@ class AddEventScreenshotTest {
         child: Person? = null,
         start: EditorStep? = null,
         held: Held? = null,
+        suggest: suspend (String) -> List<Suggestion> = { emptyList() },
     ) {
         val flow = editorFlow(form, child?.id, start)
         compose.setContent {
             ShowEditor(
                 form, flow, held = held, dark = dark, context = "From Calendar · ${child?.name ?: "Alex"} signed in", savesTo = savesTo,
                 childOnly = child?.id, childName = child?.name, keyboard = WindowInsets(bottom = keyboard),
+                suggest = suggest,
             )
         }
     }
@@ -74,6 +79,42 @@ class AddEventScreenshotTest {
         show(editorForm(), dark = true, keyboard = 320.dp)
         compose.onNodeWithTag("editor_title").performTextInput("Gui")
         snap("add_event_keyboard_dark")
+    }
+
+    private val remembered = listOf(
+        Suggestion(
+            "Guitar lesson", "mia", false, LocalTime.of(10, 0), Duration.ofMinutes(45), null, "RRULE:FREQ=WEEKLY;INTERVAL=1",
+            LocalDate.of(2026, 9, 5), LocalDate.of(2026, 9, 12),
+        ),
+        Suggestion("Guitar club", "family", false, LocalTime.of(10, 30), Duration.ofMinutes(90), null, null, null, LocalDate.of(2026, 7, 11)),
+        Suggestion("Guitar camp", "sam", true, null, null, 3, null, null, LocalDate.of(2026, 7, 20)),
+    )
+
+    private val suggestFromBefore: suspend (String) -> List<Suggestion> = { typed -> if (typed.length >= 2) remembered else emptyList() }
+
+    /** Handoff 6a: "Gui" typed on a new event, the title still focused: the list in place of Who's question. */
+    @Test
+    fun addEventFromBeforeDark() {
+        show(editorForm(), dark = true, suggest = suggestFromBefore)
+        compose.onNodeWithTag("editor_title").performTextInput("Gui")
+        snap("add_event_from_before_dark")
+    }
+
+    /** Handoff 6a with the keyboard up: the rows short, the list scrolling above the keys. */
+    @Test
+    fun addEventFromBeforeKeyboardDark() {
+        show(editorForm(), dark = true, keyboard = 320.dp, suggest = suggestFromBefore)
+        compose.onNodeWithTag("editor_title").performTextInput("Gui")
+        snap("add_event_from_before_keyboard_dark")
+    }
+
+    /** Handoff 6h: "Use this" on the weekly lesson: Copied on Who, Starts and Repeats, and the Starts date asking for a Saturday. */
+    @Test
+    fun addEventCopiedDark() {
+        show(editorForm(), dark = true, suggest = suggestFromBefore)
+        compose.onNodeWithTag("editor_title").performTextInput("Gui")
+        compose.onNodeWithTag("suggestion_0").performClick()
+        snap("add_event_copied_dark")
     }
 
     /** Handoff 6b: "Guitar lesson" for Sam and Mia, chosen as two tiles, with Everyone and the hint below. */

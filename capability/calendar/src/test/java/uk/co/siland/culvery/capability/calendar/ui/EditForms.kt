@@ -17,6 +17,7 @@ import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.Held
+import uk.co.siland.culvery.capability.calendar.Suggestion
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -99,6 +100,7 @@ fun ShowEditor(
     onSave: () -> Unit = {},
     onDelete: () -> Unit = {},
     onRefusedWho: () -> Unit = {},
+    suggest: suspend (String) -> List<Suggestion> = { emptyList() },
 ) {
     CulveryTheme(dark = dark) {
         WithFontScale(scale) {
@@ -120,6 +122,7 @@ fun ShowEditor(
                     onDelete = onDelete,
                     onRefusedWho = onRefusedWho,
                     keyboard = keyboard,
+                    suggest = suggest,
                 )
             }
         }

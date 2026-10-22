@@ -19,6 +19,7 @@ close
 cloud
 cloud_off
 cloud_upload
+content_copy
 dark_mode
 date_range
 delete

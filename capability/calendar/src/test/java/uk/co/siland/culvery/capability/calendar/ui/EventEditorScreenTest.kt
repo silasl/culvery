@@ -50,6 +50,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,6 +62,7 @@ import uk.co.siland.culvery.capability.calendar.EventTime
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.HeldEvent
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.Suggestion
 import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.core.household.PersonId
@@ -90,6 +93,7 @@ class EventEditorScreenTest {
     private var failure by mutableStateOf<SaveFailure?>(null)
     private var scale by mutableStateOf(1f)
     private var held by mutableStateOf<Held?>(null)
+    private var suggestions: List<Suggestion> = emptyList()
 
     /** `WindowInsets.ime` is zero under Robolectric, so the hand-off's keyboard is passed in. */
     private fun show(
@@ -107,6 +111,7 @@ class EventEditorScreenTest {
                 onSave = { calls += "save" },
                 onDelete = { calls += "delete" },
                 onRefusedWho = { calls += "refused" },
+                suggest = { suggestions },
             )
         }
     }
@@ -704,6 +709,77 @@ class EventEditorScreenTest {
         }
         assertThat(LOCKED_SPAN).isEqualTo("dates locked, as it runs over more than 60 days")
         node("editor_starts_time").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    private fun tagWords(tag: String): String =
+        compose.onNode(hasAnyAncestor(hasTestTag(tag)) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Text), useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
+
+    private fun guitarSuggestion() = Suggestion(
+        "Guitar lesson", "mia", false, LocalTime.of(10, 0), Duration.ofMinutes(45), null, "RRULE:FREQ=WEEKLY;INTERVAL=1",
+        LocalDate.of(2026, 9, 5), LocalDate.of(2026, 9, 12),
+    )
+
+    /** The people, time and repeat are copied, the keyboard closes, and the Starts date asks for a day, with the banner and the next Saturdays. */
+    @Test
+    fun useThisClosesTheKeyboardAndOpensTheStartsDateWithTheBanner() {
+        suggestions = listOf(guitarSuggestion())
+        show()
+        compose.onNodeWithTag("editor_title").performTextInput("Gu")
+        compose.waitForIdle()
+        node("editor_title").assertIsFocused()
+        compose.onNodeWithTag("suggestion_0").performClick()
+        node("editor_title").assertIsNotFocused()
+        assertThat(flow.active).isEqualTo(EditorStep.StartDate)
+        node("editor_question").assertTextEquals("Which day does it start?")
+        assertThat(form.title).isEqualTo("Guitar lesson")
+        compose.onNodeWithTag("copied_banner").assertTextEquals(
+            "Copied from Guitar lesson (last on Sat 12 Sep): who, time and repeats. Tap any row to change it. The date is never copied.",
+        )
+        listOf("editor_row_who", "editor_starts", "editor_row_repeats").forEach { row ->
+            assertWithMessage(row).that(tagWords("${row}_tag")).isEqualTo("Copied")
+        }
+        listOf("Sat 26 Sep", "Sat 3 Oct", "Sat 10 Oct").forEachIndexed { i, label ->
+            compose.onNode(hasText(label) and hasAnyAncestor(hasTestTag("quick_pick_$i")), useUnmergedTree = true).assertExists()
+        }
+        node("quick_pick_3").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("quick_pick_0").performClick()
+        assertThat(form.eventWhen.startDate).isEqualTo(LocalDate.of(2026, 9, 26))
+        assertThat(form.eventWhen.startClock).isEqualTo(LocalTime.of(10, 0))
+        compose.mainClock.advanceTimeBy(MOVE_ON_MS - 16, ignoreFrameDuration = true)
+        assertThat(flow.active).isEqualTo(EditorStep.StartDate)
+        compose.mainClock.advanceTimeBy(32, ignoreFrameDuration = true)
+        assertThat(flow.active).isEqualTo(EditorStep.StartTime)
+        compose.mainClock.autoAdvance = true
+        node("editor_starts_tag").assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** One tag per Starts row: a clash hides Copied, and it comes back when the clash clears. */
+    @Test
+    fun aClashHidesTheCopiedTagOnStartsUntilItClears() {
+        show(editorForm().apply { use(guitarSuggestion()) }, start = EditorStep.StartDate)
+        val saturday = LocalDate.of(2026, 9, 26)
+        compose.runOnIdle {
+            held = Held(
+                listOf(
+                    HeldEvent(
+                        EventRef("c1", "s1", "piano"), "Piano", listOf(SampleUi.mia.id),
+                        EventTime.Timed(saturday.atTime(9, 30).atZone(LONDON).toInstant()),
+                        EventTime.Timed(saturday.atTime(10, 30).atZone(LONDON).toInstant()),
+                    ),
+                ),
+                lastShownDay(SampleUi.TODAY), emptySet(), firstDay = SampleUi.TODAY,
+            )
+            form.pickStartDate(saturday)
+        }
+        assertThat(tagWords("editor_starts_tag")).isEqualTo("Clash")
+        compose.runOnIdle { held = null }
+        assertThat(tagWords("editor_starts_tag")).isEqualTo("Copied")
         compose.assertClickablesHaveRoleAndLabel()
     }
 

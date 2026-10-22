@@ -49,6 +49,7 @@ internal data class RowTag(val text: String, val icon: String?, val fill: Color,
 
 internal const val CLASH = "Clash"
 internal const val TOO_LONG = "Too long"
+internal const val COPIED = "Copied"
 
 /** TalkBack's word for a locked row, whose value says where its dates change instead (9 §3.1). */
 internal const val LOCKED_SPAN = "dates locked, as it runs over more than 60 days"
@@ -59,6 +60,10 @@ internal fun clashTag(): RowTag {
     val c = Culvery.colors
     return RowTag(CLASH, Icons.WARNING, c.weather.copy(alpha = HhAlpha.clash(c)).compositeOver(c.surf), c.weather)
 }
+
+/** What "Use this" filled in (9c §4.4): the Clash tag's shape in `accentSoft` and `accent`. */
+@Composable
+internal fun copiedTag(): RowTag = Culvery.colors.let { RowTag(COPIED, Icons.CONTENT_COPY, it.accentSoft, it.accent) }
 
 /** The Repeats row's tag when a change to the When ruled out the chosen repeat (9c §3.3): the Copied tag's colours. */
 @Composable

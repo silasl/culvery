@@ -24,6 +24,7 @@ object Icons {
     const val CLOUD = "cloud"
     const val CLOUD_OFF = "cloud_off"
     const val CLOUD_UPLOAD = "cloud_upload"
+    const val CONTENT_COPY = "content_copy"
     const val DARK_MODE = "dark_mode"
     const val DATE_RANGE = "date_range"
     const val DELETE = "delete"

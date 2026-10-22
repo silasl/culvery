@@ -1,15 +1,23 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
@@ -20,8 +28,14 @@ import uk.co.siland.culvery.capability.calendar.EventWhen
 import uk.co.siland.culvery.capability.calendar.FreeCheck
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.MAX_SPAN_DAYS
+import uk.co.siland.culvery.capability.calendar.SHORT_DAY
 import uk.co.siland.culvery.capability.calendar.spokenWho
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhIcon
+import uk.co.siland.culvery.core.ui.Icons
 
 internal const val STARTS_DATE_QUESTION = "Which day does it start?"
 internal const val STARTS_TIME_QUESTION = "What time does it start?"
@@ -38,10 +52,45 @@ internal class WhenContext(
     val today: LocalDate,
 )
 
-/** The month of days for the start (9c §3.1), opening on the start's month, with a dot for each person already busy that day. */
+/**
+ * The month of days for the start (9c §3.1), opening on the start's month, with a dot for each person already busy that
+ * day. After "Use this" the [banner] says what was copied and the [quickPicks] offer the next dates that fit its repeat.
+ */
 @Composable
-internal fun StartDatePane(eventWhen: EventWhen, context: WhenContext, onPick: (LocalDate) -> Unit) {
-    WhenDateGrid(eventWhen, context, "starts_date_pane", opensOn = eventWhen.startDate, allowed = { true }, onPick = onPick)
+internal fun StartDatePane(eventWhen: EventWhen, context: WhenContext, banner: String? = null, quickPicks: List<LocalDate> = emptyList(), onPick: (LocalDate) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap)) {
+        if (banner != null) CopiedBanner(banner)
+        if (quickPicks.isNotEmpty()) QuickPicks(quickPicks, onPick)
+        WhenDateGrid(eventWhen, context, "starts_date_pane", opensOn = eventWhen.startDate, allowed = { true }, onPick = onPick)
+    }
+}
+
+@Composable
+private fun CopiedBanner(text: String) {
+    val c = Culvery.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(EditorDimens.bannerGap),
+        modifier = Modifier
+            .testTag("copied_banner")
+            .semantics(mergeDescendants = true) {}
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(EditorDimens.bannerRadius))
+            .background(c.accentSoft)
+            .padding(EditorDimens.bannerPadding),
+    ) {
+        HhIcon(Icons.CONTENT_COPY, size = EditorDimens.bannerIcon, tint = c.accent)
+        Text(text, style = CalendarType.suggestionLine, color = c.ink, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun QuickPicks(days: List<LocalDate>, onPick: (LocalDate) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(EditorDimens.quickGap), modifier = Modifier.testTag("quick_picks")) {
+        days.forEachIndexed { i, day ->
+            HhButton(day.format(SHORT_DAY), { onPick(day) }, Modifier.testTag("quick_pick_$i"), on = ButtonSurface.Surf)
+        }
+    }
 }
 
 /** Hour and minute steppers for the start; the end follows. Under them, whether the people are free, and the nearest free starts. */

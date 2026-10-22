@@ -141,6 +141,12 @@ internal object CalendarType {
     val repeatOption = HhType.rowTitle
     val repeatCount = HhType.rowTitle.copy(fontFeatureSettings = "tnum")
 
+    /** 19 sp / 600 the title, 14 sp the muted line, 13 sp / 600 the fill line, 15 sp / 700 the pill: a suggestion (handoff 6a). */
+    val suggestionTitle = HhType.rowTitle.copy(fontSize = 19.sp)
+    val suggestionLine = HhType.secondary
+    val suggestionFill = HhType.label
+    val suggestionPill = HhType.buttonLabel
+
     /** 24 sp / 600 and 14 sp / 600: the Check pane's sentence and a date chip (handoff 6g). */
     val checkSentence = editorField
     val checkDate = ControlType.chip.copy(fontSize = 14.sp)
@@ -202,6 +208,23 @@ internal object EditorDimens {
     val paneHeaderGap = 13.dp
     val paneButtonGap = 8.dp
     val skipPaddingH = 19.dp
+
+    // From before: rows radius 17, 9 apart, 15 in, a 4 bar, the lines 3 apart, a 16 icon 5 before the fill line, a 48 pill
+    // 19 in at its sides; the banner radius 15, 15 in, a 20 icon 10 before its words; quick picks 8 apart (quickGap).
+    val suggestionRadius = 17.dp
+    val suggestionGap = 9.dp
+    val suggestionPadding = 15.dp
+    val suggestionBar = 4.dp
+    val suggestionLineGap = 3.dp
+    val suggestionFillIcon = 16.dp
+    val suggestionFillGap = 5.dp
+    val suggestionPillHeight = 48.dp
+    val suggestionPillPaddingH = 19.dp
+    val suggestionRowGap = 13.dp
+    val bannerRadius = 15.dp
+    val bannerPadding = 15.dp
+    val bannerIcon = 20.dp
+    val bannerGap = 10.dp
 
     // Who tiles: three a row, 13 apart, 160 tall, radius 20; a 64 circle 8 above the name, the role 8 below it. Chosen, a
     // 3 ring inside and a 32 badge 11 in from the top right; locked, a 20 lock 11 in from the top left.
