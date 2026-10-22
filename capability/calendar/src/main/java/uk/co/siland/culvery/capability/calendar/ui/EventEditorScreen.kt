@@ -1,8 +1,11 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import android.util.Log
+import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,9 +41,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -154,10 +160,13 @@ internal fun EventEditorScreen(
             keyboardController?.show()
         }
     }
+    val view = LocalView.current
+    // The window hides it: once focus clears the title has no input session, and the controller's hide does nothing.
     val closeKeyboard: () -> Unit = {
+        view.context.getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(view.windowToken, 0)
         focusManager.clearFocus()
-        keyboardController?.hide()
     }
+    val leavesTitleOnTap = titleFocused && suggestions.isEmpty()
     val typing = titleFocused && keyboard.getBottom(LocalDensity.current) > 0
     val isNew = form.mode == EditorForm.Mode.New
     val heading = if (isNew) NEW_EVENT else CHANGE_EVENT
@@ -250,7 +259,20 @@ internal fun EventEditorScreen(
                         }
                     }
                 }
-                Box(Modifier.weight(1f).fillMaxHeight()) {
+                // A touch on the pane leaves the title before the pane acts on it.
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .pointerInput(leavesTitleOnTap) {
+                            if (leavesTitleOnTap) {
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                    closeKeyboard()
+                                }
+                            }
+                        },
+                ) {
                     if (titleFocused && suggestions.isNotEmpty()) {
                         // Next here is the keyboard's Next: leave the title for Who.
                         val toWho = PaneNext(nextLabelFor(EditorStep.Who)) {

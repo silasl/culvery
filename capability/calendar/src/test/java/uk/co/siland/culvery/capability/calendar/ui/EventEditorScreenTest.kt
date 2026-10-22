@@ -1,5 +1,7 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import android.content.Context
+import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.CompositionLocalProvider
@@ -46,6 +48,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
@@ -55,6 +58,7 @@ import java.time.LocalTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventRef
@@ -535,6 +539,26 @@ class EventEditorScreenTest {
         compose.onNodeWithTag("editor_discard_confirm").performClick()
         assertThat(calls).containsExactly("close")
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    private fun keyboardUp(): Boolean =
+        shadowOf(ApplicationProvider.getApplicationContext<Context>().getSystemService(InputMethodManager::class.java)).isSoftInputVisible
+
+    @Test
+    fun leavingTheTitleForARowPutsTheKeyboardAway() {
+        show()
+        compose.runOnIdle { assertThat(keyboardUp()).isTrue() }
+        compose.onNodeWithTag("editor_row_who").performClick()
+        compose.runOnIdle { assertThat(keyboardUp()).isFalse() }
+    }
+
+    @Test
+    fun choosingSomeoneInThePaneLeavesTheTitleAndPutsTheKeyboardAway() {
+        show()
+        compose.runOnIdle { assertThat(keyboardUp()).isTrue() }
+        compose.onNodeWithTag("who_Alex").performClick()
+        node("editor_title").assertIsNotFocused()
+        compose.runOnIdle { assertThat(keyboardUp()).isFalse() }
     }
 
     @Test
