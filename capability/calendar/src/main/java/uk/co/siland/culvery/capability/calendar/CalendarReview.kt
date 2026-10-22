@@ -1,6 +1,8 @@
 package uk.co.siland.culvery.capability.calendar
 
 import android.util.Log
+import java.time.Instant
+import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -10,9 +12,11 @@ import kotlinx.coroutines.flow.first
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.household.HouseholdRepository
+import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.plugin.WallClock
 
 /** One connection as Review calendars shows it (4a design §4.5): its row, and its calendars. */
 data class ReviewConnection(val row: CalendarRow, val sources: List<StoredSource>)
@@ -48,6 +52,8 @@ class CalendarReview @Inject constructor(
     private val household: HouseholdRepository,
     private val access: AccessControl,
     private val toaster: Toaster,
+    private val zone: HouseholdZone,
+    private val clock: WallClock,
 ) {
     val connections: Flow<List<ReviewConnection>> = combine(calendarConnections.rows, store.sources()) { rows, sources ->
         rows.map { row -> ReviewConnection(row, sources.filter { it.connectionId == row.connection.id }) }
@@ -56,15 +62,17 @@ class CalendarReview @Inject constructor(
     /** Family first, then the household: the person chips. */
     val people: Flow<List<Person>> = household.peopleWithFamily
 
+    private suspend fun today(): LocalDate = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone.current()).toLocalDate()
+
     /** A person removed since the chips were drawn is Family: the store doesn't check that the person exists. */
     suspend fun setPerson(source: StoredSource, person: Person): Boolean = change {
         val target = household.peopleWithFamily.first().firstOrNull { it.id == person.id } ?: Person.Family
-        store.setMapping(source.connectionId, source.source.id, target.id, source.mapping.visible)
+        store.setMapping(source.connectionId, source.source.id, target.id, source.mapping.visible, today(), zone.current())
         toaster.show(nowShowsAs(source.source.name, target.name))
     }
 
     suspend fun setShown(source: StoredSource, shown: Boolean): Boolean = change {
-        store.setMapping(source.connectionId, source.source.id, source.mapping.person, shown)
+        store.setMapping(source.connectionId, source.source.id, source.mapping.person, shown, today(), zone.current())
         toaster.show(if (shown) calendarShown(source.source.name) else calendarHidden(source.source.name))
     }
 

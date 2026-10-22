@@ -18,6 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
+import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -63,7 +64,7 @@ class CalendarReviewTest {
         val setup = CalendarSetup(store, setOf(google), { household.people.first() }, toaster, WallClock { 0L }, EmptyCoroutineContext)
         val connections = CalendarConnections(store, setup, access.control, setOf(google), backgroundScope)
         store.addConnection(connection, google.sourceList, emptyMap(), masterSourceId = family.id)
-        return CalendarReview(store, setup, connections, household, access.control, toaster) to access
+        return CalendarReview(store, setup, connections, household, access.control, toaster, HouseholdZone(household), WallClock { 0L }) to access
     }
 
     private suspend fun source(id: String): StoredSource = store.source("g1", id)!!

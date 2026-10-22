@@ -60,4 +60,6 @@ internal fun stubReview(store: CalendarStore, household: HouseholdRepository): C
     household,
     NobodyMay,
     RecordingToaster(),
+    HouseholdZone(household),
+    WallClock { 0L },
 )

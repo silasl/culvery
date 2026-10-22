@@ -81,7 +81,7 @@ data class EventEntity(
 )
 
 /**
- * v8 (9c-1c ruling 33): a title the Add event editor can offer, one per [connectionId] and [titleKey]. [sourceEventId] is the
+ * v8 (9c §4.1): a title the Add event editor can offer, one per [connectionId] and [titleKey]. [sourceEventId] is the
  * supplying event's series id, else its remote id. [forPerson] is the event's people tag, else its calendar's person id.
  * Timed events set [startMinute] (minutes after local midnight) and [lengthMinutes]; all-day events set [days].
  * [rule] is the repeat without COUNT, UNTIL or DTSTART, only when the editor offers it; [seriesStart] and
@@ -107,9 +107,6 @@ data class RememberedTitleEntity(
     val seriesStart: String?,
     val rememberedDate: String,
 )
-
-/** A remembered title with a title of the event that supplies it, null when the supplier has no stored event. */
-data class SuppliedTitle(val titleKey: String, val eventTitle: String?)
 
 @Entity(tableName = "sync_state", primaryKeys = ["connectionId", "sourceId"])
 data class SyncStateEntity(
@@ -168,19 +165,46 @@ interface CalendarDao {
     @Query("SELECT COUNT(*) FROM remembered_titles WHERE connectionId = :connectionId")
     suspend fun countRememberedOf(connectionId: String): Int
 
-    @Query("SELECT titleKey FROM remembered_titles WHERE connectionId = :connectionId AND sourceId = :sourceId")
-    suspend fun rememberedKeysOfSource(connectionId: String, sourceId: String): List<String>
+    @Query("SELECT * FROM remembered_titles WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun rememberedOfSource(connectionId: String, sourceId: String): List<RememberedTitleEntity>
 
-    /** One row per remembered title of the source and per stored event that supplies it. */
+    /** The titles of the stored events of one supplier: a series' occurrences and master, or a one-off. */
+    @Query(
+        "SELECT title FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId " +
+            "AND (seriesId = :supplierId OR (seriesId IS NULL AND remoteId = :supplierId))",
+    )
+    suspend fun supplierTitles(connectionId: String, sourceId: String, supplierId: String): List<String>
+
+    @Query("SELECT * FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun eventsOfSource(connectionId: String, sourceId: String): List<EventEntity>
+
+    @Query("SELECT * FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId AND remoteId IN (:ids)")
+    suspend fun eventsByIds(connectionId: String, sourceId: String, ids: List<String>): List<EventEntity>
+
+    @Query(
+        "SELECT * FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId " +
+            "AND (seriesId = :seriesId OR remoteId = :seriesId)",
+    )
+    suspend fun eventsOfSeries(connectionId: String, sourceId: String, seriesId: String): List<EventEntity>
+
+    /** Visible calendars' events with one of [titles] (letters of any case): the candidates to supply a forgotten title again. */
     @Query(
         """
-        SELECT r.titleKey AS titleKey, e.title AS eventTitle FROM remembered_titles r
-        LEFT JOIN event e ON e.connectionId = r.connectionId AND e.sourceId = r.sourceId
-            AND (e.seriesId = r.sourceEventId OR (e.seriesId IS NULL AND e.remoteId = r.sourceEventId))
-        WHERE r.connectionId = :connectionId AND r.sourceId = :sourceId
+        SELECT e.*, s.personId AS sourcePersonId FROM event e
+        JOIN source s ON s.connectionId = e.connectionId AND s.sourceId = e.sourceId
+        WHERE e.connectionId = :connectionId AND s.visible = 1 AND e.title COLLATE NOCASE IN (:titles)
         """,
     )
-    suspend fun suppliedTitles(connectionId: String, sourceId: String): List<SuppliedTitle>
+    suspend fun visibleEventRowsTitled(connectionId: String, titles: List<String>): List<EventRow>
+
+    @Query(
+        """
+        SELECT e.*, s.personId AS sourcePersonId FROM event e
+        JOIN source s ON s.connectionId = e.connectionId AND s.sourceId = e.sourceId
+        WHERE e.connectionId = :connectionId AND e.sourceId = :sourceId
+        """,
+    )
+    suspend fun eventRowsOfSource(connectionId: String, sourceId: String): List<EventRow>
 
     @Query(
         """

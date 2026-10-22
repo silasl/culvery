@@ -97,9 +97,12 @@ private fun keptRule(rule: String, start: LocalDate): String? {
     return recurrenceRule(choice, RepeatEnd.Never, start)
 }
 
-/** What a sync that read [new] makes of the row [old] (ruling 36); null leaves [old] as it is. */
-internal fun mergedTitle(old: RememberedTitleEntity?, new: RememberedTitleEntity, today: LocalDate): RememberedTitleEntity? = when {
-    old == null -> new
+/**
+ * What reading [new] makes of the row [old] (9c §4.1); null leaves [old] as it is. A row of a hidden calendar
+ * ([oldHidden]) is never offered, so any visible title replaces it.
+ */
+internal fun mergedTitle(old: RememberedTitleEntity?, new: RememberedTitleEntity, today: LocalDate, oldHidden: Boolean): RememberedTitleEntity? = when {
+    old == null || oldHidden -> new
     old.sourceId == new.sourceId && old.sourceEventId == new.sourceEventId ->
         new.copy(rememberedDate = better(old.date(), new.date(), today).toString())
     isBetter(new.date(), old.date(), today) -> new

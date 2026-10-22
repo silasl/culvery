@@ -102,7 +102,7 @@ class CalendarConnectHostTest {
         access = testAccess(household, scope, clock, scope)
         val setup = CalendarSetup(store, setOf(google), { household.people.first() }, access.toasts, clock, EmptyCoroutineContext, PROVIDER_TIMEOUT_MS)
         connections = CalendarConnections(store, setup, access.control, setOf(google), scope)
-        review = CalendarReview(store, setup, connections, household, access.control, access.toasts)
+        review = CalendarReview(store, setup, connections, household, access.control, access.toasts, HouseholdZone(household), clock)
     }
 
     @After

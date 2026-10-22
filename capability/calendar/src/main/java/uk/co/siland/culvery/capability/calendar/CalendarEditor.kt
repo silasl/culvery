@@ -139,16 +139,15 @@ class CalendarEditor internal constructor(
     /** Who is signed in now: the add/edit sheet's Who default and its disabled chips (2b-2 design D2). */
     internal val session: StateFlow<Identified?> get() = access.session
 
-    /** Now, in the household zone: the add sheet's "today" and its default time. */
     private suspend fun today(): LocalDate = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone.current()).toLocalDate()
 
+    /** Now, in the household zone: the add sheet's "today" and its default time. */
     internal suspend fun openedAt(): ZonedDateTime = Instant.ofEpochMilli(clock.nowMillis()).atZone(zone.current())
 
     /** The added toast for [draft]: a series says how it repeats, and a first day the week can't show is named (9 §3.1). */
     private suspend fun addedLineFor(draft: EventDraft): String {
-        val z = zone.current()
-        val (day, last) = daySpan(draft.start, draft.end, z)
-        val today = Instant.ofEpochMilli(clock.nowMillis()).atZone(z).toLocalDate()
+        val (day, last) = daySpan(draft.start, draft.end, zone.current())
+        val today = today()
         val wording = draft.recurrence?.let { choiceOf(it.rule, day) }?.wording(day)
         return addedLine(draft.title, wording, day.takeIf { weeksTo(today, day) == null }, through = last)
     }

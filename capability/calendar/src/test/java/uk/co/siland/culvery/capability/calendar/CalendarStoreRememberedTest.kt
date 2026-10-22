@@ -126,7 +126,7 @@ class CalendarStoreRememberedTest {
     fun aCalendarHiddenLaterIsNotOffered() = runTest {
         connect()
         sync("s1", full(timed("swim", "Swim", sept(23))))
-        store.setMapping("c1", "s1", PersonId.FAMILY, visible = false)
+        store.setMapping("c1", "s1", PersonId.FAMILY, visible = false, TEST_TODAY, TEST_ZONE)
         assertThat(store.rememberedTitles()).isEmpty()
     }
 
@@ -234,6 +234,52 @@ class CalendarStoreRememberedTest {
         sync("s1", full(timed("a", "Swim", sept(23))), "c2")
         store.removeConnection("c1")
         assertThat(everything().map { it.connectionId }).containsExactly("c2")
+    }
+
+    // pruning is not deleting
+
+    private val later = DateRange(sept(25), sept(30), zone)
+
+    @Test
+    fun aTitleLeavingTheWindowIsNotForgotten() = runTest {
+        connect()
+        store.applySync("c1", "s1", window, full(timed("dentist", "Dentist", sept(20))), sept(20))
+        store.prune("c1", "s1", later)
+        assertThat(store.eventNow(EventRef("c1", "s1", "dentist"))).isNull()
+        store.applySync("c1", "s1", later, changes(), sept(25))
+        assertThat(keys()).containsExactly("dentist")
+    }
+
+    @Test
+    fun deletingAnotherEventLeavesAPrunedTitleAlone() = runTest {
+        connect()
+        store.applySync("c1", "s1", window, full(timed("dentist", "Dentist", sept(20)), timed("swim", "Swim", sept(25))), sept(20))
+        store.prune("c1", "s1", later)
+        store.applyDeleted(EventRef("c1", "s1", "swim"), sept(25), zone)
+        assertThat(keys()).containsExactly("dentist")
+        store.applySeriesDeleted("c1", "s1", "nothing", sept(25), zone)
+        assertThat(keys()).containsExactly("dentist")
+    }
+
+    // calendars shown and hidden
+
+    @Test
+    fun aCalendarShownAgainIsRememberedFromItsStoredEvents() = runTest {
+        connect(sourceIds = listOf("s1", "s2"), hidden = setOf("s2"))
+        sync("s2", full(timed("party", "Surprise party", sept(23))))
+        assertThat(everything()).isEmpty()
+        store.setMapping("c1", "s2", PersonId.FAMILY, visible = true, today, zone)
+        assertThat(store.rememberedTitles().map { it.title }).containsExactly("Surprise party")
+    }
+
+    @Test
+    fun aVisibleCalendarReplacesATitleOnlyAHiddenCalendarHad() = runTest {
+        connect(sourceIds = listOf("s1", "s2"))
+        sync("s2", full(timed("b", "Swim", sept(21))))
+        store.setMapping("c1", "s2", PersonId.FAMILY, visible = false, today, zone)
+        assertThat(store.rememberedTitles()).isEmpty()
+        sync("s1", full(timed("a", "Swim", sept(10))))
+        assertThat(store.rememberedTitles().single().sourceEventId).isEqualTo("a")
     }
 
     // age

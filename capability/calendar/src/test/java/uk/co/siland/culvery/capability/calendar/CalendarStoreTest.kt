@@ -606,7 +606,7 @@ class CalendarStoreTest {
         connect("s1", "s2")
         assertThat(store.markReadRefused("c1", "s2")).isTrue()
         assertThat(store.markReadRefused("c1", "s2")).isFalse()
-        store.setMapping("c1", "s2", PersonId.FAMILY, visible = false)
+        store.setMapping("c1", "s2", PersonId.FAMILY, visible = false, TEST_TODAY, TEST_ZONE)
         assertThat(store.source("c1", "s2")!!.readProblem).isNull()
     }
 
@@ -638,7 +638,7 @@ class CalendarStoreTest {
     @Test
     fun aHiddenCalendarStaysHiddenWhileItsTickIsUnchanged() = runTest {
         connect("s1", "s2")
-        store.setMapping("c1", "s1", PersonId.FAMILY, visible = false)
+        store.setMapping("c1", "s1", PersonId.FAMILY, visible = false, TEST_TODAY, TEST_ZONE)
         store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 5_000L, TEST_ZONE, mapping("mia"))
         store.refreshSources("c1", listOf(listed("s1"), listed("s2")), 6_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.source("c1", "s1")!!.mapping.visible).isFalse()
@@ -647,12 +647,12 @@ class CalendarStoreTest {
     @Test
     fun aChangedTickInTheServiceWins() = runTest {
         connect("s1")
-        store.setMapping("c1", "s1", PersonId.FAMILY, visible = false)
+        store.setMapping("c1", "s1", PersonId.FAMILY, visible = false, TEST_TODAY, TEST_ZONE)
         store.refreshSources("c1", listOf(listed("s1", shown = false)), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.source("c1", "s1")!!.mapping.visible).isFalse()
         store.refreshSources("c1", listOf(listed("s1", shown = true)), 6_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
-        store.setMapping("c1", "s1", PersonId.FAMILY, visible = true)
+        store.setMapping("c1", "s1", PersonId.FAMILY, visible = true, TEST_TODAY, TEST_ZONE)
         store.refreshSources("c1", listOf(listed("s1", shown = false)), 7_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.source("c1", "s1")!!.mapping.visible).isFalse()
     }
@@ -668,7 +668,7 @@ class CalendarStoreTest {
     @Test
     fun setMappingChangesWhoItIsForAndWhetherItShows() = runTest {
         connect("s1")
-        store.setMapping("c1", "s1", PersonId("mia"), visible = false)
+        store.setMapping("c1", "s1", PersonId("mia"), visible = false, TEST_TODAY, TEST_ZONE)
         assertThat(store.source("c1", "s1")!!.mapping).isEqualTo(SourceMapping(PersonId("mia"), visible = false))
     }
 
@@ -677,7 +677,7 @@ class CalendarStoreTest {
         connect("s1")
         store.setMaster("c1", "s1")
         assertThrows(IllegalArgumentException::class.java) {
-            runBlocking { store.setMapping("c1", "s1", PersonId.FAMILY, visible = false) }
+            runBlocking { store.setMapping("c1", "s1", PersonId.FAMILY, visible = false, TEST_TODAY, TEST_ZONE) }
         }
         assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
     }
@@ -685,7 +685,7 @@ class CalendarStoreTest {
     @Test
     fun makingAHiddenCalendarTheMasterShowsIt() = runTest {
         connect("s1")
-        store.setMapping("c1", "s1", PersonId.FAMILY, visible = false)
+        store.setMapping("c1", "s1", PersonId.FAMILY, visible = false, TEST_TODAY, TEST_ZONE)
         store.setMaster("c1", "s1")
         assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
     }

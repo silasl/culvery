@@ -413,7 +413,7 @@ class EventEditorHostTest {
     /** 9 §3.3: an untagged event is for its calendar's person, so it opens with that person chosen. */
     @Test
     fun anUntaggedEventOnACalendarMappedToSamOpensWithSamChosen() {
-        runBlocking { store.setMapping("c1", "s-family", access.sam.id, visible = true) }
+        runBlocking { store.setMapping("c1", "s-family", access.sam.id, visible = true, TEST_TODAY, TEST_ZONE) }
         showEditor(EditorRequest.Edit(dinner, EditorFrom.Calendar, start = EditorStep.Who))
         waitForText("Change event")
         rowValue("who").assertTextEquals("Sam")
