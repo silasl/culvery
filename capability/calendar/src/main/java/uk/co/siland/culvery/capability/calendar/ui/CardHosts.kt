@@ -68,7 +68,7 @@ internal fun WeekViewHost(
     val w = week ?: return
     val s = sync ?: return
     WeekView(
-        WeekViewState(w, today, s, nowMillis, weeksTo(today, w.days.first().date) ?: shown.weeks),
+        WeekViewState(w, today, s, nowMillis, shown.weeks, weeksTo(today, w.days.first().date) ?: shown.weeks),
         onOpen = open,
         onAdd = add,
         onWeeksAhead = shown::show,

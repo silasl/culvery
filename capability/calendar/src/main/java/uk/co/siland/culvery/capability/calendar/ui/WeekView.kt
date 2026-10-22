@@ -89,13 +89,14 @@ import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
-/** [weeksAhead]: how many weeks after this one [week] is (4c D10). */
+/** [weeksAhead]: the week the arrows step from; [loadedWeeksAhead]: how many weeks after this one [week] is, for its label, [weeksAhead] when null (4c D10). */
 data class WeekViewState(
     val week: WeekUi,
     val today: LocalDate,
     val sync: SyncStatusUi,
     val nowMillis: Long,
     val weeksAhead: Int = 0,
+    val loadedWeeksAhead: Int? = null,
 )
 
 /** One chip for every connection needing sign-in: the service by name, or how many accounts (4d-2 C20). */

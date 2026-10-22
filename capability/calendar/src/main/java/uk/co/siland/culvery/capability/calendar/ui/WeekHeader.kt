@@ -80,7 +80,7 @@ internal fun WeekHeader(
                     HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.staleIcon, tint = c.danger, modifier = Modifier.testTag("week_out_of_date"))
                 }
                 Text(
-                    weekSubtitleLine(state.weeksAhead, state.week.start, sync),
+                    weekSubtitleLine(state.loadedWeeksAhead ?: state.weeksAhead, state.week.start, sync),
                     style = CalendarType.subtitle,
                     color = if (failing && !updating) c.danger else c.mute,
                     maxLines = 3,

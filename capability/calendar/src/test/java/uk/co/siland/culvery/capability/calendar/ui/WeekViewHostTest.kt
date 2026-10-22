@@ -92,12 +92,12 @@ class WeekViewHostTest {
     private fun assertLabelMatchesDates() {
         val line = subtitle()
         assertThat(
-            line.startsWith("This week · Wed 23 – Tue 29 Sep") || line.startsWith("Next week · Wed 30 Sep – Tue 6 Oct"),
+            line.startsWith("This week · Wed 23 – Tue 29 Sep") || line.startsWith("Next week · Wed 30 Sep – Tue 6 Oct") ||
+                line.startsWith("In 2 weeks · Wed 7 – Tue 13 Oct"),
         ).isTrue()
     }
 
-    @Test
-    fun theWeeksLabelAndDatesChangeInTheSameFrame() = runTest {
+    private suspend fun showHost() {
         val store = CalendarStore(calendar, dao)
         val household = HouseholdRepository(householdDb)
         val zone = HouseholdZone(household)
@@ -120,26 +120,56 @@ class WeekViewHostTest {
         }
         compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodesWithTag("week_day_2026-09-23").fetchSemanticsNodes().isNotEmpty() }
         compose.mainClock.autoAdvance = false
-        assertThat(subtitle()).startsWith("This week · Wed 23 – Tue 29 Sep")
+    }
 
-        val gate = CompletableDeferred<Unit>()
-        dao.gate = gate
-        compose.onNodeWithTag("week_later").performClick()
-        repeat(5) {
-            compose.mainClock.advanceTimeByFrame()
-            assertLabelMatchesDates()
-        }
-        assertThat(subtitle()).startsWith("This week · Wed 23 – Tue 29 Sep")
+    /** A tap reaches the host a little after the frame that follows it, so each frame also gives it real time. */
+    private fun steppedFrames(count: Int = 5) = repeat(count) {
+        compose.mainClock.advanceTimeByFrame()
+        assertLabelMatchesDates()
+        Thread.sleep(20)
+    }
 
-        gate.complete(Unit)
+    private fun stepUntil(day: String) {
         val deadline = System.currentTimeMillis() + 5_000
-        while (compose.onAllNodesWithTag("week_day_2026-09-30").fetchSemanticsNodes().isEmpty()) {
-            check(System.currentTimeMillis() < deadline) { "The next week never loaded" }
+        while (compose.onAllNodesWithTag("week_day_$day").fetchSemanticsNodes().isEmpty()) {
+            check(System.currentTimeMillis() < deadline) { "The week of $day never loaded" }
             compose.mainClock.advanceTimeByFrame()
             assertLabelMatchesDates()
             Thread.sleep(10)
         }
         compose.mainClock.advanceTimeByFrame()
+    }
+
+    @Test
+    fun theWeeksLabelAndDatesChangeInTheSameFrame() = runTest {
+        showHost()
+        assertThat(subtitle()).startsWith("This week · Wed 23 – Tue 29 Sep")
+
+        val gate = CompletableDeferred<Unit>()
+        dao.gate = gate
+        compose.onNodeWithTag("week_later").performClick()
+        steppedFrames()
+        assertThat(subtitle()).startsWith("This week · Wed 23 – Tue 29 Sep")
+
+        gate.complete(Unit)
+        stepUntil("2026-09-30")
         assertThat(subtitle()).startsWith("Next week · Wed 30 Sep – Tue 6 Oct")
+    }
+
+    @Test
+    fun twoQuickTapsOnLaterWhileAWeekLoadsStepTwoWeeks() = runTest {
+        showHost()
+        val gate = CompletableDeferred<Unit>()
+        dao.gate = gate
+        compose.onNodeWithTag("week_later").performClick()
+        steppedFrames()
+        compose.onNodeWithTag("week_this_week").assertExists()
+        compose.onNodeWithTag("week_later").performClick()
+        steppedFrames()
+        assertThat(subtitle()).startsWith("This week · Wed 23 – Tue 29 Sep")
+
+        gate.complete(Unit)
+        stepUntil("2026-10-07")
+        assertThat(subtitle()).startsWith("In 2 weeks · Wed 7 – Tue 13 Oct")
     }
 }
