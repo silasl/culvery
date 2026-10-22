@@ -6,7 +6,6 @@ import java.time.LocalTime
 import uk.co.siland.culvery.capability.calendar.db.RememberedTitleEntity
 
 private const val MIN_TYPED = 2
-private const val MINUTES_PER_HOUR = 60
 
 /** A title remembered from a calendar and what the editor fills in with it (9c §4.4); never a date to use. */
 data class Suggestion(
@@ -41,7 +40,7 @@ private fun RememberedTitleEntity.toSuggestion() = Suggestion(
     title = title,
     forPerson = forPerson,
     allDay = allDay,
-    start = startMinute?.let { LocalTime.of(it / MINUTES_PER_HOUR, it % MINUTES_PER_HOUR) },
+    start = startMinute?.let { clockAt(it.toLong()) },
     length = lengthMinutes?.let { Duration.ofMinutes(it.toLong()) },
     days = days,
     rule = rule,

@@ -11,7 +11,6 @@ import uk.co.siland.culvery.capability.calendar.db.RememberedTitleEntity
 
 private val WHITESPACE = Regex("\\s+")
 private val MARKS = Regex("\\p{Mn}+")
-private const val MINUTES_PER_HOUR = 60
 private const val MILLIS_PER_MINUTE = 60_000L
 private const val KEPT_MONTHS = 12L
 
@@ -70,7 +69,7 @@ private fun EventRow.remembered(zone: ZoneId): RememberedTitleEntity? {
         val startMillis = requireNotNull(event.startInstant)
         val start = Instant.ofEpochMilli(startMillis).atZone(zone)
         startDate = start.toLocalDate()
-        startMinute = start.hour * MINUTES_PER_HOUR + start.minute
+        startMinute = start.toLocalTime().minuteOfDay()
         length = ((requireNotNull(event.endInstant) - startMillis) / MILLIS_PER_MINUTE).toInt().coerceAtLeast(0)
     }
     val series = event.recurrenceRule?.let(::seriesStart)

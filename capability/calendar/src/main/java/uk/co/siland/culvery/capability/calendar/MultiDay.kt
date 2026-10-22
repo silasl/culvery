@@ -42,11 +42,14 @@ private fun StoredEvent.multiDaySpan(zone: ZoneId): Pair<LocalDate, LocalDate>? 
 /** An all-day event over two or more dates, or a timed one ending a calendar day or more after it starts. */
 fun StoredEvent.isMultiDay(zone: ZoneId): Boolean = multiDaySpan(zone) != null
 
+/** How many days from [first] to [last], both counted. */
+internal fun dayCount(first: LocalDate, last: LocalDate): Int = ChronoUnit.DAYS.between(first, last).toInt() + 1
+
 /** Which day of its span [date] is; null unless the event is multi-day and on [date]. */
 fun StoredEvent.dayOfSpan(date: LocalDate, zone: ZoneId): DaySpan? {
     val (first, last) = multiDaySpan(zone) ?: return null
     if (date < first || date > last) return null
-    return DaySpan(ChronoUnit.DAYS.between(first, date).toInt() + 1, ChronoUnit.DAYS.between(first, last).toInt() + 1)
+    return DaySpan(dayCount(first, date), dayCount(first, last))
 }
 
 /** The bars for [days]: one per event whose slices carry a span, in the order they first appear. */

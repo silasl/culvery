@@ -3,7 +3,6 @@ package uk.co.siland.culvery.capability.calendar
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
 import java.util.Locale
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -113,7 +112,7 @@ fun firstDates(form: EditorForm): Pair<List<LocalDate>, Int> {
 /** An occurrence starting on [date] as its Check chip words it: "Sat 26 Sep", or "Fri 23 – Sun 25 Oct" for a span of days. */
 fun dateChipWords(form: EditorForm, date: LocalDate): String {
     val (first, last) = form.eventWhen.span(form.zone)?.let { daysOf(it, form.zone) } ?: return date.format(SHORT_DAY)
-    return if (first == last) date.format(SHORT_DAY) else dayRange(date, date.plusDays(ChronoUnit.DAYS.between(first, last)))
+    return dayRangeOrDay(date, date.plusDays(dayCount(first, last) - 1L))
 }
 
 private fun chosen(form: EditorForm, people: List<Person>): List<Person> {

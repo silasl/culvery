@@ -367,4 +367,14 @@ class EventWhenTest {
         assertThat(timed(at(18), at(0), endDays = 1).withAllDay(true).lastDay).isEqualTo(sat)
         assertThat(timed(at(18), at(0), endDays = 1, date = null).lastDay).isNull()
     }
+
+    @Test
+    fun aMinuteOfTheDayAndBack() {
+        assertThat(at(0).minuteOfDay()).isEqualTo(0)
+        assertThat(at(10, 45).minuteOfDay()).isEqualTo(645)
+        assertThat(LocalTime.of(23, 59, 30).minuteOfDay()).isEqualTo(1439)
+        assertThat(clockAt(645)).isEqualTo(at(10, 45))
+        assertThat(clockAt(MINUTES_PER_DAY + 30)).isEqualTo(at(0, 30))
+        assertThat(clockAt(-15)).isEqualTo(at(23, 45))
+    }
 }

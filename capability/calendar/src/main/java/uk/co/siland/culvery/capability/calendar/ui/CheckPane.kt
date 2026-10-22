@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
-import java.time.temporal.ChronoUnit
 import uk.co.siland.culvery.capability.calendar.ALL_DAY_LABEL
 import uk.co.siland.culvery.capability.calendar.DAY_AND_DATE
 import uk.co.siland.culvery.capability.calendar.EditorForm
@@ -28,6 +27,7 @@ import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.SpanUi
 import uk.co.siland.culvery.capability.calendar.checkSentence
 import uk.co.siland.culvery.capability.calendar.dateChipWords
+import uk.co.siland.culvery.capability.calendar.dayCount
 import uk.co.siland.culvery.capability.calendar.daysOf
 import uk.co.siland.culvery.capability.calendar.isMultiDay
 import uk.co.siland.culvery.capability.calendar.spanWords
@@ -112,7 +112,7 @@ internal fun CheckPane(form: EditorForm, household: EditorPeople) {
         CapsHeading(ON_THE_WEEK)
         val bar = previewBar(form, household.byId)
         if (bar != null) {
-            val days = ChronoUnit.DAYS.between(bar.first, bar.last).toInt() + 1
+            val days = dayCount(bar.first, bar.last)
             Box(Modifier.testTag("check_chip").width(EditorDimens.checkChipWidth * minOf(days, EditorDimens.checkBarMaxDays)).height(CalendarDimens.laneRow)) {
                 LaneBar(bar, onOpen = null, Modifier.fillMaxSize())
             }

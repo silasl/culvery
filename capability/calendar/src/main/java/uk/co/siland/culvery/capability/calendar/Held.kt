@@ -113,15 +113,15 @@ private fun freeStarts(busy: List<HeldEvent>, day: LocalDate, start: LocalTime, 
         val to = from.plus(length)
         return from >= first && to <= last && busy.none { it.overlaps(from, to) }
     }
-    val minutes = start.toSecondOfDay() / 60L
+    val minutes = start.minuteOfDay().toLong()
     val below = (minutes - 1).floorDiv(QUARTER_MINUTES) * QUARTER_MINUTES
     val above = minutes.floorDiv(QUARTER_MINUTES) * QUARTER_MINUTES + QUARTER_MINUTES
-    val firstMinute = FIRST_FREE_START.toSecondOfDay() / 60L
-    val lastMinute = LAST_FREE_END.toSecondOfDay() / 60L
+    val firstMinute = FIRST_FREE_START.minuteOfDay()
+    val lastMinute = LAST_FREE_END.minuteOfDay()
     val earlier = generateSequence(below) { it - QUARTER_MINUTES }.takeWhile { it >= firstMinute }
-        .map { LocalTime.ofSecondOfDay(it * 60) }.firstOrNull(::free)
+        .map(::clockAt).firstOrNull(::free)
     val later = generateSequence(above) { it + QUARTER_MINUTES }.takeWhile { it < lastMinute }
-        .map { LocalTime.ofSecondOfDay(it * 60) }.firstOrNull(::free)
+        .map(::clockAt).firstOrNull(::free)
     return listOfNotNull(earlier, later)
 }
 

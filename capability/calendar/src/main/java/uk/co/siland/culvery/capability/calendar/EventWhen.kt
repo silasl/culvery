@@ -10,6 +10,15 @@ import java.time.temporal.ChronoUnit
 
 internal const val UNTIL_TOO_LATE = "An event can last up to $MAX_SPAN_DAYS days. Pick an earlier end."
 
+internal const val MINUTES_PER_HOUR = 60L
+internal const val MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
+
+/** Minutes since midnight. */
+internal fun LocalTime.minuteOfDay(): Int = (hour * MINUTES_PER_HOUR + minute).toInt()
+
+/** The clock [minutes] after midnight, wrapped into the day. */
+internal fun clockAt(minutes: Long): LocalTime = LocalTime.ofSecondOfDay(Math.floorMod(minutes, MINUTES_PER_DAY) * 60)
+
 /** What an event covers: two wall times in the household zone, or whole days with the end exclusive. */
 sealed interface EventSpan {
     data class Timed(val start: ZonedDateTime, val end: ZonedDateTime) : EventSpan {
@@ -38,7 +47,7 @@ data class EventWhen(
 
     /** Wall-clock time from the start to the end. */
     val length: Duration
-        get() = Duration.ofMinutes(endDays * MINUTES_PER_DAY + minutesOf(endClock) - minutesOf(startClock))
+        get() = Duration.ofMinutes(endDays * MINUTES_PER_DAY + endClock.minuteOfDay() - startClock.minuteOfDay())
 
     /** What a repeat must fit: the days the event covers when All day is on, else [length]. */
     val repeatLength: Duration get() = if (allDay) Duration.ofDays(endDays + 1L) else length
@@ -73,8 +82,8 @@ data class EventWhen(
             return copy(allDay = true, startDate = null, endDays = days, endClock = if (endClock == LocalTime.MIDNIGHT) LAST_MINUTE else endClock)
         }
         val start = s.start ?: startClock
-        val end = minutesOf(start) + (s.length?.toMinutes()?.takeIf { it > 0 } ?: 60L)
-        return copy(allDay = false, startDate = null, startClock = start, endDays = Math.floorDiv(end, MINUTES_PER_DAY).toInt().coerceAtMost(lastDay), endClock = clockOf(end))
+        val end = start.minuteOfDay() + (s.length?.toMinutes()?.takeIf { it > 0 } ?: MINUTES_PER_HOUR)
+        return copy(allDay = false, startDate = null, startClock = start, endDays = Math.floorDiv(end, MINUTES_PER_DAY).toInt().coerceAtMost(lastDay), endClock = clockAt(end))
     }
 
     /** Null when [date] is before the start or more than 59 days after it. */
@@ -94,13 +103,13 @@ data class EventWhen(
 
     /** A Starts step wraps within the day; the end follows, keeping the length. */
     fun stepStart(field: ClockField, up: Boolean): EventWhen =
-        withStart(startClock.plusMinutes((stepped(startClock, field, up) - minutesOf(startClock)).toLong()))
+        withStart(startClock.plusMinutes((stepped(startClock, field, up) - startClock.minuteOfDay()).toLong()))
 
     fun withStart(clock: LocalTime): EventWhen {
         if (allDay) return this
         val start = clock.truncatedTo(ChronoUnit.MINUTES)
-        val end = minutesOf(start) + length.toMinutes()
-        return copy(startClock = start, endDays = Math.floorDiv(end, MINUTES_PER_DAY).toInt(), endClock = clockOf(end))
+        val end = start.minuteOfDay() + length.toMinutes()
+        return copy(startClock = start, endDays = Math.floorDiv(end, MINUTES_PER_DAY).toInt(), endClock = clockAt(end))
     }
 
     /** Null when the step would leave the end's day, or reach or pass the start. */
@@ -108,7 +117,7 @@ data class EventWhen(
         if (allDay) return null
         val minutes = stepped(endClock, field, up)
         if (minutes !in 0 until MINUTES_PER_DAY.toInt()) return null
-        val clock = clockOf(minutes.toLong())
+        val clock = clockAt(minutes.toLong())
         if (endDays == 0 && !clock.isAfter(startClock)) return null
         return copy(endClock = clock)
     }
@@ -126,7 +135,6 @@ data class EventWhen(
     private fun withEndAnHourAfterStart(): EventWhen = hourAfter(startClock).let { (days, clock) -> copy(endDays = days, endClock = clock) }
 
     companion object {
-        private const val MINUTES_PER_DAY = 24L * 60
         private const val QUARTER = 15
         private val MORNING: LocalTime = LocalTime.of(9, 0)
         private const val LAST_START_HOUR = 23
@@ -173,17 +181,13 @@ data class EventWhen(
         }
 
         private fun hourAfter(start: LocalTime): Pair<Int, LocalTime> {
-            val minutes = minutesOf(start) + 60L
-            return (minutes / MINUTES_PER_DAY).toInt() to clockOf(minutes)
+            val minutes = start.minuteOfDay() + MINUTES_PER_HOUR
+            return (minutes / MINUTES_PER_DAY).toInt() to clockAt(minutes)
         }
-
-        private fun minutesOf(clock: LocalTime): Int = clock.hour * 60 + clock.minute
-
-        private fun clockOf(minutes: Long): LocalTime = LocalTime.ofSecondOfDay(Math.floorMod(minutes, MINUTES_PER_DAY) * 60)
 
         /** [clock] one step on, as minutes since midnight (outside 0..1439 when it leaves the day). An off-quarter minute snaps. */
         private fun stepped(clock: LocalTime, field: ClockField, up: Boolean): Int {
-            val total = minutesOf(clock)
+            val total = clock.minuteOfDay()
             return when (field) {
                 ClockField.Hour -> if (up) total + 60 else total - 60
                 ClockField.Minute -> if (up) (total / QUARTER + 1) * QUARTER else Math.floorDiv(total - 1, QUARTER) * QUARTER

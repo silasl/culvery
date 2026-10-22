@@ -13,10 +13,7 @@ import uk.co.siland.culvery.core.ui.plural
 enum class CopiedRow(val word: String) { Who("who"), Starts("time"), Repeats("repeats") }
 
 private const val PICKS = 3
-private const val MINUTES_PER_DAY = 24 * 60L
-private const val MINUTES_PER_HOUR = 60L
 private const val LEAP_GAP_YEARS = 8
-private const val SECONDS_PER_MINUTE = 60
 
 // The date a repeat counts from: the series' first date, else the date the title is remembered by.
 internal fun Suggestion.anchor(): LocalDate = seriesStart ?: rememberedDate
@@ -49,7 +46,7 @@ private fun Suggestion.timeWords(spoken: Boolean): String {
     if (allDay) return days?.takeIf { it > 1 }?.let { "all day for ${plural(it.toLong(), "day")}" } ?: "all day"
     val from = start ?: return ""
     val long = length ?: return clockText(from)
-    if (from.toSecondOfDay() / SECONDS_PER_MINUTE + long.toMinutes() > MINUTES_PER_DAY) return "${clockText(from)} for ${durationWords(long)}"
+    if (from.minuteOfDay() + long.toMinutes() > MINUTES_PER_DAY) return "${clockText(from)} for ${durationWords(long)}"
     return "${clockText(from)}${if (spoken) " to " else "–"}${clockText(from.plus(long))}"
 }
 
@@ -65,7 +62,7 @@ fun patternLine(s: Suggestion, people: List<Person>, today: LocalDate): String {
     val choice = s.choice()
     if (choice == null) {
         val last = s.days?.takeIf { s.allDay && it > 1 }?.let { s.rememberedDate.plusDays(it - 1L) }
-        val date = if (last == null) s.rememberedDate.format(SHORT_DAY) else dayRange(s.rememberedDate, last)
+        val date = dayRangeOrDay(s.rememberedDate, last ?: s.rememberedDate)
         val clock = if (s.allDay) "all day" else s.start?.let(::clockText).orEmpty()
         return listOf(who, "$date, $clock").joinToString(" · ")
     }

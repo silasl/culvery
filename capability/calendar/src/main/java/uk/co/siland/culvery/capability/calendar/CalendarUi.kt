@@ -180,6 +180,9 @@ internal fun dayRange(first: LocalDate, last: LocalDate): String {
     return "$from – ${last.format(SHORT_DAY)}"
 }
 
+/** [dayRange], or "Sat 26 Sep" when [first] is [last]. */
+internal fun dayRangeOrDay(first: LocalDate, last: LocalDate): String = if (first == last) first.format(SHORT_DAY) else dayRange(first, last)
+
 internal val MONTH_NAME: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH)
 /** "Oct": the small label over the 1st of a new month in the week. */
 internal val MONTH_SHORT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)
@@ -244,7 +247,7 @@ internal fun weeksTo(today: LocalDate, date: LocalDate): Int? =
  */
 fun addedLine(title: String, wording: String?, beyond: LocalDate?, through: LocalDate? = null): String {
     val repeats = wording?.let { ", ${lowerFirst(it)}" }.orEmpty()
-    val dates = beyond?.let { if (wording == null && through != null && through != it) dayRange(it, through) else it.format(SHORT_DAY) }
+    val dates = beyond?.let { if (wording == null && through != null) dayRangeOrDay(it, through) else it.format(SHORT_DAY) }
     val day = dates?.let { if (wording != null) " from $it" else ", $it" }.orEmpty()
     return "Added $title$repeats$day."
 }
@@ -305,8 +308,7 @@ internal fun daysOf(span: EventSpan, zone: ZoneId): Pair<LocalDate, LocalDate> =
 fun spanWords(span: EventSpan, zone: ZoneId): String = when (span) {
     is EventSpan.AllDay -> {
         val (first, last) = daysOf(span, zone)
-        val days = if (last == first) first.format(SHORT_DAY) else dayRange(first, last)
-        "$days, ${lowerFirst(ALL_DAY_LABEL)}"
+        "${dayRangeOrDay(first, last)}, ${lowerFirst(ALL_DAY_LABEL)}"
     }
     is EventSpan.Timed -> {
         val from = span.start.withZoneSameInstant(zone)

@@ -166,4 +166,18 @@ class MultiDayTest {
         assertThat(daySpan(at(10, 23, 18), at(10, 25, 0), london)).isEqualTo(date(10, 23) to date(10, 24))
         assertThat(daySpan(allDay(10, 23), at(10, 24, 12), london)).isEqualTo(date(10, 23) to date(10, 24))
     }
+
+    @Test
+    fun aDayCountCountsBothEnds() {
+        assertThat(dayCount(date(10, 23), date(10, 23))).isEqualTo(1)
+        assertThat(dayCount(date(10, 23), date(10, 25))).isEqualTo(3)
+        assertThat(dayCount(date(9, 30), date(10, 2))).isEqualTo(3)
+    }
+
+    @Test
+    fun aDayRangeOfOneDayIsThatDay() {
+        assertThat(dayRangeOrDay(date(9, 26), date(9, 26))).isEqualTo("Sat 26 Sep")
+        assertThat(dayRangeOrDay(date(10, 19), date(10, 23))).isEqualTo("Mon 19 – Fri 23 Oct")
+        assertThat(dayRangeOrDay(date(9, 30), date(10, 2))).isEqualTo("Wed 30 Sep – Fri 2 Oct")
+    }
 }
