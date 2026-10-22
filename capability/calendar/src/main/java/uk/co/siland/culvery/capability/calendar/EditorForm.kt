@@ -99,7 +99,10 @@ class EditorForm(
         private set
 
     private inline fun editWhen(change: () -> Unit) = edit {
-        if (!datesLocked) change()
+        if (!datesLocked) {
+            change()
+            if (!repeat.fitsLength(eventWhen.repeatLength)) dropRepeat()
+        }
     }
 
     /** Both dates stay; the times hide, and come back as they were (9c §3.1). */
@@ -129,12 +132,33 @@ class EditorForm(
     var repeat: RepeatChoice by mutableStateOf(RepeatChoice.Never)
         private set
 
+    /** A When change ruled out the chosen repeat; the Repeats row says so until it is opened or changed. */
+    var repeatTooLong: Boolean by mutableStateOf(false)
+        private set
+
+    /** Whether Repeats has been looked at or answered, which the foot's hint waits on. */
+    var repeatsAnswered: Boolean by mutableStateOf(false)
+        private set
+
+    fun openRepeats() {
+        repeatTooLong = false
+        repeatsAnswered = true
+    }
+
+    private fun dropRepeat() {
+        repeat = RepeatChoice.Never
+        repeatEnd = RepeatEnd.Never
+        repeatTooLong = true
+    }
+
     var repeatEnd: RepeatEnd by mutableStateOf(RepeatEnd.Never)
         private set
 
     /** Back to Never drops the end: Ends only shows while the event repeats. */
     fun chooseRepeat(choice: RepeatChoice) = edit {
-        if (!canRepeat || choice == repeat) return@edit
+        if (!canRepeat) return@edit
+        openRepeats()
+        if (choice == repeat || !choice.fitsLength(eventWhen.repeatLength)) return@edit
         repeat = choice
         if (choice == RepeatChoice.Never) repeatEnd = RepeatEnd.Never
     }

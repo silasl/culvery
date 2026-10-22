@@ -638,4 +638,36 @@ class EditorFormTest {
         assertThat(UNTIL_TOO_LATE).isEqualTo("An event can last up to 60 days. Pick an earlier end.")
         assertThat(form.canSave).isFalse()
     }
+
+    @Test
+    fun changingTheSpanPastTheRepeatFallsBackToDoesntRepeat() {
+        val form = ready(day = mon19)
+        form.chooseRepeat(RepeatChoice.Daily)
+        form.stopsAfter()
+        form.pickEndDate(day(20))
+        assertThat(form.repeat).isEqualTo(RepeatChoice.Never)
+        assertThat(form.repeatEnd).isEqualTo(RepeatEnd.Never)
+        assertThat(form.repeatTooLong).isTrue()
+        form.openRepeats()
+        assertThat(form.repeatTooLong).isFalse()
+
+        form.chooseRepeat(RepeatChoice.Daily)
+        assertThat(form.repeat).isEqualTo(RepeatChoice.Never)
+        assertThat(form.repeatTooLong).isFalse()
+        form.chooseRepeat(RepeatChoice.Weekly)
+        assertThat(form.repeat).isEqualTo(RepeatChoice.Weekly)
+
+        form.chooseAllDay(true)
+        form.pickEndDate(day(26))
+        assertThat(form.repeat).isEqualTo(RepeatChoice.Never)
+        assertThat(form.repeatTooLong).isTrue()
+        form.chooseRepeat(RepeatChoice.Yearly)
+        assertThat(form.repeat).isEqualTo(RepeatChoice.Yearly)
+        assertThat(form.repeatTooLong).isFalse()
+
+        val kept = ready(day = mon19).apply { chooseRepeat(RepeatChoice.Daily) }
+        kept.stepEnd(ClockField.Minute, up = true)
+        assertThat(kept.repeat).isEqualTo(RepeatChoice.Daily)
+        assertThat(kept.repeatTooLong).isFalse()
+    }
 }

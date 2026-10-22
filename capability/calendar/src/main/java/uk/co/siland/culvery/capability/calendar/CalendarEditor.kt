@@ -144,10 +144,10 @@ class CalendarEditor internal constructor(
     /** The added toast for [draft]: a series says how it repeats, and a first day the week can't show is named (9 §3.1). */
     private suspend fun addedLineFor(draft: EventDraft): String {
         val z = zone.current()
-        val day = draft.start.instantIn(z).atZone(z).toLocalDate()
+        val (day, last) = daySpan(draft.start, draft.end, z)
         val today = Instant.ofEpochMilli(clock.nowMillis()).atZone(z).toLocalDate()
         val wording = draft.recurrence?.let { choiceOf(it.rule, day) }?.wording(day)
-        return addedLine(draft.title, wording, day.takeIf { weeksTo(today, day) == null })
+        return addedLine(draft.title, wording, day.takeIf { weeksTo(today, day) == null }, through = last)
     }
 
     /** A signed-in child tapped someone else's Who chip: say why it is locked (2b-2 design §4.2). */

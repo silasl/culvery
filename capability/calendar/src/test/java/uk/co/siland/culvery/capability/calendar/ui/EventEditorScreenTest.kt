@@ -55,7 +55,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EditorForm
+import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventTime
+import uk.co.siland.culvery.capability.calendar.Held
+import uk.co.siland.culvery.capability.calendar.HeldEvent
+import uk.co.siland.culvery.capability.calendar.RepeatChoice
+import uk.co.siland.culvery.capability.calendar.lastShownDay
 import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.DarkColors
@@ -84,6 +89,7 @@ class EventEditorScreenTest {
     private var savesTo by mutableStateOf<String?>("Family calendar")
     private var failure by mutableStateOf<SaveFailure?>(null)
     private var scale by mutableStateOf(1f)
+    private var held by mutableStateOf<Held?>(null)
 
     /** `WindowInsets.ime` is zero under Robolectric, so the hand-off's keyboard is passed in. */
     private fun show(
@@ -95,7 +101,7 @@ class EventEditorScreenTest {
         use(editor, start, child)
         compose.setContent {
             ShowEditor(
-                form, flow, scale = scale, savesTo = savesTo, failure = failure, childOnly = childOnly,
+                form, flow, held = held, scale = scale, savesTo = savesTo, failure = failure, childOnly = childOnly,
                 keyboard = WindowInsets(bottom = keyboard),
                 onClose = { calls += "close" },
                 onSave = { calls += "save" },
@@ -217,6 +223,55 @@ class EventEditorScreenTest {
         compose.runOnIdle { use(child, child = SampleUi.mia.id) }
         node("editor_save_hint").assertDoesNotExist()
         assertThat(compose.onAllNodesWithText("Time is optional").fetchSemanticsNodes()).isEmpty()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** The foot's hint in its order: a clash, then Repeats unanswered on a complete new event, then Check, else none. */
+    @Test
+    fun theFootHintFollowsItsOrder() {
+        show(newWithTitleWhoAndDay())
+        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Repeats are optional")
+        compose.runOnIdle { flow.open(EditorStep.Check) }
+        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Repeats are optional")
+        compose.runOnIdle { flow.open(EditorStep.Repeats) }
+        compose.runOnIdle { form.chooseRepeat(RepeatChoice.Never) }
+        compose.runOnIdle { flow.open(EditorStep.Check) }
+        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Everything’s set")
+        compose.runOnIdle { flow.open(EditorStep.Who) }
+        node("editor_save_hint").assertDoesNotExist()
+
+        val day = SampleUi.TODAY.plusDays(3)
+        compose.runOnIdle {
+            held = Held(
+                listOf(
+                    HeldEvent(
+                        EventRef("c1", "s1", "piano"), "Piano", listOf(SampleUi.mia.id),
+                        EventTime.Timed(day.atTime(9, 30).atZone(LONDON).toInstant()),
+                        EventTime.Timed(day.atTime(10, 30).atZone(LONDON).toInstant()),
+                    ),
+                ),
+                lastShownDay(SampleUi.TODAY), emptySet(), firstDay = SampleUi.TODAY,
+            )
+        }
+        compose.onNodeWithTag("editor_save_hint").assertTextEquals("Clashes are allowed; both show on the week")
+
+        compose.runOnIdle { held = null; use(editorDinnerOf(Duration.ofHours(1))) }
+        node("editor_save_hint").assertDoesNotExist()
+        compose.runOnIdle { flow.open(EditorStep.Check) }
+        node("editor_save_hint").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aRepeatTheSpanRulesOutLeavesATagOnTheRepeatsRowUntilItIsOpened() {
+        val camp = newWithTitleWhoAndDay().apply { chooseRepeat(RepeatChoice.Daily) }
+        show(camp, start = EditorStep.Who)
+        compose.onNodeWithText("Too long").assertDoesNotExist()
+        compose.runOnIdle { camp.pickEndDate(SampleUi.TODAY.plusDays(5)) }
+        node("editor_row_repeats_value").assertTextEquals("Doesn’t repeat")
+        compose.onNodeWithText("Too long").assertExists()
+        compose.runOnIdle { flow.open(EditorStep.Repeats) }
+        compose.onNodeWithText("Too long").assertDoesNotExist()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -419,12 +474,18 @@ class EventEditorScreenTest {
         assertThat(clearance.top).isEqualTo(node("editor_discard").fetchSemanticsNode().positionInWindow.y)
     }
 
-    /** The busy foot keeps its buttons and its hint where they were. */
+    /** The busy foot keeps its buttons and its hint (a clash, on a change) where they were. */
     @Test
     fun theFootButtonsKeepTheirPlacesWhileBusy() {
         var busy by mutableStateOf(false)
         use(editorDinnerOf(Duration.ofHours(1)))
-        compose.setContent { ShowEditor(form, flow, busy = busy) }
+        val overlap = HeldEvent(
+            EventRef("c1", "s1", "piano"), "Piano", listOf(SampleUi.alex.id),
+            EventTime.Timed(SampleUi.TODAY.atTime(19, 45).atZone(LONDON).toInstant()),
+            EventTime.Timed(SampleUi.TODAY.atTime(20, 15).atZone(LONDON).toInstant()),
+        )
+        val clashing = Held(listOf(overlap), lastShownDay(SampleUi.TODAY), emptySet(), firstDay = SampleUi.TODAY)
+        compose.setContent { ShowEditor(form, flow, held = clashing, busy = busy) }
         val tags = listOf("editor_save", "editor_delete", "editor_save_hint")
         val before = tags.map { bounds(it) }
         busy = true

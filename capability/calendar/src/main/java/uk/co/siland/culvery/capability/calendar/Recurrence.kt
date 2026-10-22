@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import java.time.DayOfWeek
+import java.time.Duration
 import java.time.LocalDate
 import java.time.MonthDay
 import java.time.YearMonth
@@ -32,6 +33,15 @@ val EDITOR_REPEATS: List<RepeatChoice> = listOf(
     RepeatChoice.Yearly,
     RepeatChoice.Daily,
 )
+
+/** Whether an event [length] long ends before the next one of this repeat starts (9c §3.3). */
+fun RepeatChoice.fitsLength(length: Duration): Boolean = when (this) {
+    RepeatChoice.Never, RepeatChoice.Yearly -> true
+    RepeatChoice.Daily -> length <= Duration.ofDays(1)
+    RepeatChoice.Weekly -> length <= Duration.ofDays(DAYS_PER_WEEK.toLong())
+    RepeatChoice.Fortnightly -> length <= Duration.ofDays(2L * DAYS_PER_WEEK)
+    RepeatChoice.Monthly, RepeatChoice.MonthlyOnWeekday -> length <= Duration.ofDays(4L * DAYS_PER_WEEK)
+}
 
 const val DOESNT_REPEAT = "Doesn’t repeat"
 

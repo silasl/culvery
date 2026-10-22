@@ -52,7 +52,7 @@ internal fun WeekLane(
 ) {
     val placed = remember(rows) { rows.flatMapIndexed { row, spans -> spans.map { row to it } } }
     Layout(
-        content = { placed.forEach { (_, span) -> LaneBar(span, onOpen) } },
+        content = { placed.forEach { (_, span) -> LaneBar(span, { onOpen(span.ref) }) } },
         modifier = modifier,
     ) { measurables, constraints ->
         val column = columnWidth.toPx()
@@ -75,9 +75,12 @@ internal fun WeekLane(
     }
 }
 
-/** One bar: the person's tint and colour edge, date_range, the title and its range; square where it runs past the week. */
+/**
+ * One bar: the person's tint and colour edge, date_range, the title and its range; square where it runs past the week.
+ * With no [onOpen] it is a picture, as in the editor's Check preview; the week sizes it, a preview through [modifier].
+ */
 @Composable
-private fun LaneBar(span: SpanUi, onOpen: (EventRef) -> Unit) {
+internal fun LaneBar(span: SpanUi, onOpen: (() -> Unit)?, modifier: Modifier = Modifier) {
     val c = Culvery.colors
     val colour = Color(span.people.first().color)
     val radius = CalendarDimens.laneBarRadius
@@ -88,11 +91,11 @@ private fun LaneBar(span: SpanUi, onOpen: (EventRef) -> Unit) {
         bottomEnd = if (span.endsAfter) 0.dp else radius,
     )
     Box(
-        Modifier
+        modifier
             .testTag("week_span_${span.ref.listKey}")
             .clip(shape)
             .background(colour.copy(alpha = HhAlpha.bar(c)))
-            .hhClickable({ onOpen(span.ref) }, label = OPEN_EVENT_DETAILS, spoken = span.spoken),
+            .then(if (onOpen != null) Modifier.hhClickable(onOpen, label = OPEN_EVENT_DETAILS, spoken = span.spoken) else Modifier),
     ) {
         StripedBar(span.people, width = CalendarDimens.laneEdge, radius = 0.dp)
         Row(

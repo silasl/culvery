@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -17,13 +18,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
+import java.time.temporal.ChronoUnit
 import uk.co.siland.culvery.capability.calendar.ALL_DAY_LABEL
+import uk.co.siland.culvery.capability.calendar.DAY_AND_DATE
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.EventRef
 import uk.co.siland.culvery.capability.calendar.EventUi
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
-import uk.co.siland.culvery.capability.calendar.SHORT_DAY
+import uk.co.siland.culvery.capability.calendar.SpanUi
 import uk.co.siland.culvery.capability.calendar.checkSentence
+import uk.co.siland.culvery.capability.calendar.dateChipWords
+import uk.co.siland.culvery.capability.calendar.daysOf
+import uk.co.siland.culvery.capability.calendar.isMultiDay
+import uk.co.siland.culvery.capability.calendar.spanWords
 import uk.co.siland.culvery.capability.calendar.firstDates
 import uk.co.siland.culvery.capability.calendar.needsLine
 import uk.co.siland.culvery.capability.calendar.timeValue
@@ -57,6 +64,23 @@ internal fun previewUi(form: EditorForm, byId: Map<PersonId, Person>): EventUi {
     )
 }
 
+/** The event's bar as the week would draw it, when it has one: an event over several days (9c §3.7). */
+private fun previewBar(form: EditorForm, byId: Map<PersonId, Person>): SpanUi? {
+    val span = form.eventWhen.span(form.zone)?.takeIf { it.isMultiDay(form.zone) } ?: return null
+    val (first, last) = daysOf(span, form.zone)
+    return SpanUi(
+        ref = EventRef("", "", "preview"),
+        title = form.title.trim(),
+        people = chosenPeople(form, byId),
+        first = first,
+        last = last,
+        startsBefore = false,
+        endsAfter = false,
+        label = "${first.format(DAY_AND_DATE)} – ${last.format(DAY_AND_DATE)}",
+        spoken = spanWords(span, form.zone),
+    )
+}
+
 /**
  * Handoff 6g: the event said back in a sentence, its first few dates with who it's for, "+ 8 more" for a counted
  * series, and the week's chip for it; until it can be added, only what it still needs. Nothing here is a button: Add
@@ -81,13 +105,21 @@ internal fun CheckPane(form: EditorForm, household: EditorPeople) {
                 verticalArrangement = Arrangement.spacedBy(EditorDimens.checkDateGap),
                 itemVerticalAlignment = Alignment.CenterVertically,
             ) {
-                dates.forEachIndexed { i, date -> DateChip(date.format(SHORT_DAY), who, "check_date_$i") }
+                dates.forEachIndexed { i, date -> DateChip(dateChipWords(form, date), who, "check_date_$i") }
                 if (more > 0) Text(moreDates(more), style = CalendarType.checkDate, color = c.mute, modifier = Modifier.testTag("check_more"))
             }
         }
         CapsHeading(ON_THE_WEEK)
-        Box(Modifier.testTag("check_chip").width(EditorDimens.checkChipWidth)) {
-            EventChip(previewUi(form, household.byId), form.eventWhen.startDate ?: form.today, onOpen = null)
+        val bar = previewBar(form, household.byId)
+        if (bar != null) {
+            val days = ChronoUnit.DAYS.between(bar.first, bar.last).toInt() + 1
+            Box(Modifier.testTag("check_chip").width(EditorDimens.checkChipWidth * minOf(days, EditorDimens.checkBarMaxDays)).height(CalendarDimens.laneRow)) {
+                LaneBar(bar, onOpen = null, Modifier.fillMaxSize())
+            }
+        } else {
+            Box(Modifier.testTag("check_chip").width(EditorDimens.checkChipWidth)) {
+                EventChip(previewUi(form, household.byId), form.eventWhen.startDate ?: form.today, onOpen = null)
+            }
         }
     }
 }

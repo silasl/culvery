@@ -4,6 +4,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -64,17 +65,20 @@ fun timeValue(form: EditorForm): String = timesOf(form) ?: ALL_DAY_LABEL
 
 /**
  * The Check pane's sentence (handoff 6g): "Guitar lesson for Mia, every Saturday, 10:00–10:45, from 26 Sep to 12 Dec. 12
- * times in all.", "Half term for Sam and Mia, Mon 19 – Fri 23 Oct, all day."
+ * times in all.", "Half term for Sam and Mia, Mon 19 – Fri 23 Oct, all day.", "Camp for Mia, Fri 23 Oct 18:00 – Sun 25 Oct
+ * 16:00." A one-off words its span as [spanWords] does; a series words its repeat and then the time of day.
  */
 fun checkSentence(form: EditorForm, people: List<Person>): String {
     val who = if (form.everyone) lowerFirst(EVERYONE) else spokenWho(chosen(form, people))
     val first = form.eventWhen.startDate
     val series = form.repeat.takeIf { first != null && it != RepeatChoice.Never }
-    val parts = listOfNotNull(
-        "${form.title.trim()} for $who",
-        if (first != null && series != null) lowerFirst(series.wording(first)) else datesOf(form),
-        timesOf(form) ?: lowerFirst(ALL_DAY_LABEL),
-    ).joinToString(", ")
+    val span = form.eventWhen.span(form.zone)
+    val whenWords = when {
+        first != null && series != null -> "${lowerFirst(series.wording(first))}, ${seriesTime(form)}"
+        span != null -> spanWords(span, form.zone)
+        else -> null
+    }
+    val parts = listOfNotNull("${form.title.trim()} for $who", whenWords).joinToString(", ")
     if (first == null || series == null) return "$parts."
     val from = first.format(DAY_MONTH)
     return when (val end = form.repeatEnd) {
@@ -83,6 +87,18 @@ fun checkSentence(form: EditorForm, people: List<Person>): String {
             "$parts, from $from to ${last.format(DAY_MONTH)}. ${plural(end.times.toLong(), "time")} in all."
         }
         else -> "$parts, from $from."
+    }
+}
+
+// A series' time of day: "10:00–10:45", "18:00 – Sun 16:00" over several days, "all day" or "for 3 days, all day".
+private fun seriesTime(form: EditorForm): String {
+    val w = form.eventWhen
+    val days = w.endDays + 1
+    return when {
+        w.allDay && days > 1 -> "for $days days, ${lowerFirst(ALL_DAY_LABEL)}"
+        w.allDay -> lowerFirst(ALL_DAY_LABEL)
+        w.endDays == 0 || (w.endDays == 1 && w.endClock == LocalTime.MIDNIGHT) -> "${clockText(w.startClock)}–${clockText(w.endClock)}"
+        else -> "${clockText(w.startClock)} – ${checkNotNull(w.endDate).format(WEEKDAY)} ${clockText(w.endClock)}"
     }
 }
 
@@ -95,19 +111,15 @@ fun firstDates(form: EditorForm): Pair<List<LocalDate>, Int> {
     }
 }
 
+/** An occurrence starting on [date] as its Check chip words it: "Sat 26 Sep", or "Fri 23 – Sun 25 Oct" for a span of days. */
+fun dateChipWords(form: EditorForm, date: LocalDate): String {
+    val (first, last) = form.eventWhen.span(form.zone)?.let { daysOf(it, form.zone) } ?: return date.format(SHORT_DAY)
+    return if (first == last) date.format(SHORT_DAY) else dayRange(date, date.plusDays(ChronoUnit.DAYS.between(first, last)))
+}
+
 private fun chosen(form: EditorForm, people: List<Person>): List<Person> {
     val byId = people.associateBy { it.id }
     return form.who.mapNotNull { byId[it] }
-}
-
-// "Sat 26 Sep", or a range: "Mon 19 – Fri 23 Oct", with the month on both ends across months. A timed end at
-// midnight belongs to the day before.
-private fun datesOf(form: EditorForm): String? {
-    val w = form.eventWhen
-    val first = w.startDate ?: return null
-    val end = checkNotNull(w.endDate)
-    val last = if (!w.allDay && w.endDays > 0 && w.endClock == LocalTime.MIDNIGHT) end.minusDays(1) else end
-    return if (last == first) first.format(SHORT_DAY) else dayRange(first, last)
 }
 
 // "10:00–10:45"; null when all day.

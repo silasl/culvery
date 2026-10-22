@@ -32,6 +32,9 @@ data class EventWhen(
     val length: Duration
         get() = Duration.ofMinutes(endDays * MINUTES_PER_DAY + minutesOf(endClock) - minutesOf(startClock))
 
+    /** What a repeat must fit: the days the event covers when All day is on, else [length]. */
+    val repeatLength: Duration get() = if (allDay) Duration.ofDays(endDays + 1L) else length
+
     val capError: String? get() = UNTIL_TOO_LATE.takeIf { endDays > MAX_SPAN_DAYS - 1 }
 
     /** Null with no start date; an ambiguous autumn time takes the earlier offset. */

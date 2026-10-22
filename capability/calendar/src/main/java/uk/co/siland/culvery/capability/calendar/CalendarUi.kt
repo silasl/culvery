@@ -238,11 +238,13 @@ internal fun weeksTo(today: LocalDate, date: LocalDate): Int? =
 
 /**
  * The toast after adding (9 §3.1): "Added Guitar lesson.", with a series' [wording] ("every Saturday"), and the first
- * date when the week can't show it ([beyond]): "Added Guitar lesson, every Saturday from Sat 12 Dec.".
+ * date when the week can't show it ([beyond]): "Added Guitar lesson, every Saturday from Sat 12 Dec.". A one-off over
+ * several days names them through its last day ([through]): "Added Camp, Fri 23 – Sun 25 Oct.".
  */
-fun addedLine(title: String, wording: String?, beyond: LocalDate?): String {
+fun addedLine(title: String, wording: String?, beyond: LocalDate?, through: LocalDate? = null): String {
     val repeats = wording?.let { ", ${lowerFirst(it)}" }.orEmpty()
-    val day = beyond?.format(SHORT_DAY)?.let { if (wording != null) " from $it" else ", $it" }.orEmpty()
+    val dates = beyond?.let { if (wording == null && through != null && through != it) dayRange(it, through) else it.format(SHORT_DAY) }
+    val day = dates?.let { if (wording != null) " from $it" else ", $it" }.orEmpty()
     return "Added $title$repeats$day."
 }
 
@@ -287,17 +289,26 @@ fun whenLabel(start: EventTime, end: EventTime, zone: ZoneId, today: LocalDate):
     }
 }
 
+/** The first and last day [span] covers: an all-day end is exclusive, and a timed end at exactly midnight belongs to the day before. */
+internal fun daysOf(span: EventSpan, zone: ZoneId): Pair<LocalDate, LocalDate> = when (span) {
+    is EventSpan.AllDay -> span.first to maxOf(span.first, span.endExclusive.minusDays(1))
+    is EventSpan.Timed -> {
+        val from = span.start.withZoneSameInstant(zone)
+        from.toLocalDate() to lastDayOf(from, span.end.withZoneSameInstant(zone))
+    }
+}
+
 /** A span as the editor and Check word it: "Sat 26 Sep, 10:00–10:45", "Fri 23 Oct 18:00 – Sun 25 Oct 16:00", "Mon 19 – Fri 23 Oct, all day". */
 fun spanWords(span: EventSpan, zone: ZoneId): String = when (span) {
     is EventSpan.AllDay -> {
-        val last = maxOf(span.first, span.endExclusive.minusDays(1))
-        val days = if (last == span.first) span.first.format(SHORT_DAY) else dayRange(span.first, last)
+        val (first, last) = daysOf(span, zone)
+        val days = if (last == first) first.format(SHORT_DAY) else dayRange(first, last)
         "$days, ${lowerFirst(ALL_DAY_LABEL)}"
     }
     is EventSpan.Timed -> {
         val from = span.start.withZoneSameInstant(zone)
         val to = span.end.withZoneSameInstant(zone)
-        if (lastDayOf(from, to) == from.toLocalDate()) {
+        if (daysOf(span, zone).let { it.first == it.second }) {
             "${from.format(SHORT_DAY)}, ${from.format(HOURS_MINUTES)}–${to.format(HOURS_MINUTES)}"
         } else {
             "${from.format(SHORT_DAY)} ${from.format(HOURS_MINUTES)} – ${to.format(SHORT_DAY)} ${to.format(HOURS_MINUTES)}"

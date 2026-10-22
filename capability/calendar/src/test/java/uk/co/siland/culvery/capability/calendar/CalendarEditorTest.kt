@@ -136,6 +136,17 @@ class CalendarEditorTest {
     }
 
     @Test
+    fun theAddedToastNamesTheSpansDays() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        val start = LocalDate.of(2026, 10, 23).atTime(18, 0).atZone(london).toInstant()
+        val end = LocalDate.of(2026, 10, 25).atTime(16, 0).atZone(london).toInstant()
+        assertThat(editor.create(EventDraft("Camp", EventTime.Timed(start), EventTime.Timed(end), PersonId.FAMILY.value, null))).isEqualTo(EditResult.Done)
+        assertThat(access.toasts.messages).containsExactly("Added Camp, Fri 23 – Sun 25 Oct.")
+    }
+
+    @Test
     fun aMultiDayAllDayEventIsWrittenWithItsExclusiveEnd() = runTest {
         val access = testAccess(household)
         access.answer(TestAccess.ALEX)

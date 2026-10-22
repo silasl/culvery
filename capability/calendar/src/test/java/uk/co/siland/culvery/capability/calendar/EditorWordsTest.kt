@@ -148,4 +148,28 @@ class EditorWordsTest {
         assertThat(timeValue(form)).isEqualTo("23:00–00:00")
         assertThat(checkSentence(form, people)).isEqualTo("Film for Mia, Sat 26 Sep, 23:00–00:00.")
     }
+
+    @Test
+    fun theCheckSentenceUsesTheSpanWords() {
+        assertThat(checkSentence(guitar().apply { updateTitle("Dinner"); toggleWho(mia.id); toggleWho(sam.id) }, people))
+            .isEqualTo("Dinner for Sam, Sat 26 Sep, 10:00–10:45.")
+        val camp = new().apply {
+            updateTitle("Camp")
+            toggleWho(mia.id)
+            pickStartDate(LocalDate.of(2026, 10, 23))
+            repeat(9) { stepStart(ClockField.Hour, up = true) }
+            pickEndDate(LocalDate.of(2026, 10, 25))
+            repeat(3) { stepEnd(ClockField.Hour, up = false) }
+        }
+        assertThat(checkSentence(camp, people)).isEqualTo("Camp for Mia, Fri 23 Oct 18:00 – Sun 25 Oct 16:00.")
+        assertThat(checkSentence(halfTerm(), people)).isEqualTo("Half term for Sam and Mia, Mon 19 – Fri 23 Oct, all day.")
+        assertThat(checkSentence(guitar(times = 12), people)).contains("every Saturday, 10:00–10:45, from 26 Sep to 12 Dec")
+    }
+
+    @Test
+    fun theAddedLineNamesASpansDays() {
+        val first = LocalDate.of(2026, 10, 23)
+        assertThat(addedLine("Camp", null, first, through = first.plusDays(2))).isEqualTo("Added Camp, Fri 23 – Sun 25 Oct.")
+        assertThat(addedLine("Camp", null, first)).isEqualTo("Added Camp, Fri 23 Oct.")
+    }
 }

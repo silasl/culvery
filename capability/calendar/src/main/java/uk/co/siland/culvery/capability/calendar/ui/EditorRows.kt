@@ -48,6 +48,7 @@ internal fun rowState(active: Boolean, set: Boolean): RowState = when {
 internal data class RowTag(val text: String, val icon: String?, val fill: Color, val ink: Color)
 
 internal const val CLASH = "Clash"
+internal const val TOO_LONG = "Too long"
 
 /** TalkBack's word for a locked row, whose value says where its dates change instead (9 §3.1). */
 internal const val LOCKED_SPAN = "dates locked, as it runs over more than 60 days"
@@ -58,6 +59,10 @@ internal fun clashTag(): RowTag {
     val c = Culvery.colors
     return RowTag(CLASH, Icons.WARNING, c.weather.copy(alpha = HhAlpha.clash(c)).compositeOver(c.surf), c.weather)
 }
+
+/** The Repeats row's tag when a change to the When ruled out the chosen repeat (9c §3.3): the Copied tag's colours. */
+@Composable
+internal fun tooLongTag(): RowTag = Culvery.colors.let { RowTag(TOO_LONG, Icons.INFO, it.accentSoft, it.accent) }
 
 /**
  * One of the event's rows (handoff §1 Layout): an [icon], the [label] over the [value] on one line, an optional [tag],

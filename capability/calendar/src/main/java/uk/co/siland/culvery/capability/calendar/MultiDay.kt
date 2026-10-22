@@ -38,6 +38,12 @@ private fun StoredEvent.multiDaySpan(zone: ZoneId): Pair<LocalDate, LocalDate>? 
 /** An all-day event over two or more dates, or a timed one ending a calendar day or more after it starts. */
 fun StoredEvent.isMultiDay(zone: ZoneId): Boolean = multiDaySpan(zone) != null
 
+/** Whether the week draws an event over [this] as a lane bar: two or more dates, a timed one ending a calendar day or more after it starts. */
+internal fun EventSpan.isMultiDay(zone: ZoneId): Boolean = when (this) {
+    is EventSpan.AllDay -> daysOf(this, zone).let { it.first != it.second }
+    is EventSpan.Timed -> !end.isBefore(start.plusDays(1))
+}
+
 /** Which day of its span [date] is; null unless the event is multi-day and on [date]. */
 fun StoredEvent.dayOfSpan(date: LocalDate, zone: ZoneId): DaySpan? {
     val (first, last) = multiDaySpan(zone) ?: return null

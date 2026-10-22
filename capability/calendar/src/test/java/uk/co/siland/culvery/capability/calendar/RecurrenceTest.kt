@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import com.google.common.truth.Truth.assertThat
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -138,5 +139,20 @@ class RecurrenceTest {
         for (times in listOf(1, 53, 0)) {
             assertThrows(IllegalArgumentException::class.java) { RepeatEnd.After(times) }
         }
+    }
+
+    @Test
+    fun eachRepeatFitsOnlySpansThatEndBeforeTheNextStarts() {
+        fun fits(choice: RepeatChoice, length: Duration) = choice.fitsLength(length)
+        assertThat(fits(RepeatChoice.Daily, Duration.ofHours(24))).isTrue()
+        assertThat(fits(RepeatChoice.Daily, Duration.ofHours(25))).isFalse()
+        assertThat(fits(RepeatChoice.Weekly, Duration.ofDays(7))).isTrue()
+        assertThat(fits(RepeatChoice.Weekly, Duration.ofDays(8))).isFalse()
+        assertThat(fits(RepeatChoice.Fortnightly, Duration.ofDays(14))).isTrue()
+        assertThat(fits(RepeatChoice.Fortnightly, Duration.ofDays(15))).isFalse()
+        assertThat(fits(RepeatChoice.MonthlyOnWeekday, Duration.ofDays(28))).isTrue()
+        assertThat(fits(RepeatChoice.MonthlyOnWeekday, Duration.ofDays(29))).isFalse()
+        assertThat(fits(RepeatChoice.Yearly, Duration.ofDays(60))).isTrue()
+        assertThat(fits(RepeatChoice.Never, Duration.ofDays(60))).isTrue()
     }
 }

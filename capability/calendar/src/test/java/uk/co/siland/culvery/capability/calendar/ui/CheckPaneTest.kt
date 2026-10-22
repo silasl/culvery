@@ -7,6 +7,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -128,6 +131,33 @@ class CheckPaneTest {
         val tint = Color(SampleUi.mia.color).copy(alpha = HhAlpha.tint(c)).compositeOver(c.surf)
         assertNear("Mia's tint", pixelAt(node("check_chip"), (width("check_chip") - 5).dp, (height("check_chip") / 2).dp), tint)
         compose.onAllNodes(hasTestTag("event_bar") and hasAnyAncestor(hasTestTag("check_chip")), useUnmergedTree = true).assertCountEquals(0)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Camp for Mia, Fri 23 Oct 18:00 – Sun 25 Oct 16:00, every Friday. */
+    private fun camp() = editorForm().apply {
+        updateTitle("Camp")
+        toggleWho(SampleUi.mia.id)
+        pickStartDate(LocalDate.of(2026, 10, 23))
+        repeat(9) { stepStart(ClockField.Hour, up = true) }
+        pickEndDate(LocalDate.of(2026, 10, 25))
+        repeat(3) { stepEnd(ClockField.Hour, up = false) }
+        chooseRepeat(RepeatChoice.Weekly)
+    }
+
+    @Test
+    fun aSpanHasOneDateChipPerOccurrence() {
+        show(camp())
+        node("check_sentence").assertTextEquals("Camp for Mia, every Friday, 18:00 – Sun 16:00, from 23 Oct.")
+        listOf("Fri 23 – Sun 25 Oct", "Fri 30 Oct – Sun 1 Nov", "Fri 6 – Sun 8 Nov", "Fri 13 – Sun 15 Nov").forEachIndexed { i, words ->
+            node("check_date_$i").assertTextEquals(words)
+        }
+        node("check_date_4").assertDoesNotExist()
+        val laneBar = SemanticsMatcher("is a lane bar") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("week_span_") == true }
+        val bars = laneBar and hasAnyAncestor(hasTestTag("check_chip"))
+        compose.onAllNodes(bars, useUnmergedTree = true).assertCountEquals(1)
+        compose.onNode(hasText("Camp") and hasAnyAncestor(hasTestTag("check_chip")), useUnmergedTree = true).assertExists()
+        compose.onNode(hasText("Fri 23 – Sun 25") and hasAnyAncestor(hasTestTag("check_chip")), useUnmergedTree = true).assertExists()
         compose.assertClickablesHaveRoleAndLabel()
     }
 

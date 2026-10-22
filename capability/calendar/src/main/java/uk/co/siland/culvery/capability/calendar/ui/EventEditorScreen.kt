@@ -219,12 +219,7 @@ internal fun EventEditorScreen(
                                     confirmIcon = discardIcon(form.mode),
                                 )
                             } else {
-                                val hint = when {
-                                    clash -> CLASH_HINT
-                                    flow.active == EditorStep.Check -> ALL_SET_HINT
-                                    EditorStep.Repeats in flow.steps -> REPEATS_OPTIONAL_HINT
-                                    else -> null
-                                }
+                                val hint = footHint(clash, isNew, form, flow)
                                 Foot(form, savesTo, hint, busy, failure, onSave = {
                                     flow.stay()
                                     closeKeyboard()
@@ -244,6 +239,14 @@ internal fun EventEditorScreen(
             }
         }
     }
+}
+
+/** The foot's one hint, first match wins (9c §3.7): a clash; Repeats still unanswered on a new event that can be added; Check on a new event. */
+private fun footHint(clash: Boolean, isNew: Boolean, form: EditorForm, flow: EditorFlow): String? = when {
+    clash -> CLASH_HINT
+    isNew && form.canSave && EditorStep.Repeats in flow.steps && !form.repeatsAnswered -> REPEATS_OPTIONAL_HINT
+    isNew && flow.active == EditorStep.Check -> ALL_SET_HINT
+    else -> null
 }
 
 /** Whether anyone chosen is busy over the form's When: the Clash tag on Starts and the foot's hint. */
@@ -406,6 +409,7 @@ private fun Rows(
             set = editing || form.repeat != RepeatChoice.Never,
             typing = typing,
             onClick = { onOpen(EditorStep.Repeats) },
+            tag = if (form.repeatTooLong) tooLongTag() else null,
         )
     }
 }

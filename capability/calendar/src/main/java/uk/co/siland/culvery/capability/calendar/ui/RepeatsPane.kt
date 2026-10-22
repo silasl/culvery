@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +33,7 @@ import uk.co.siland.culvery.capability.calendar.MAX_TIMES
 import uk.co.siland.culvery.capability.calendar.MIN_TIMES
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.RepeatEnd
+import uk.co.siland.culvery.capability.calendar.fitsLength
 import uk.co.siland.culvery.capability.calendar.wording
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTokens
@@ -48,6 +50,7 @@ internal const val STOPS_AFTER = "Stops after"
 internal const val CHOOSE_A_DAY_FIRST = "Choose a day first."
 internal const val FEWER_TIMES = "Fewer times"
 internal const val MORE_TIMES = "More times"
+internal const val TOO_LONG_TO_REPEAT = "Too long to repeat that often."
 
 /** "To skip one date, change it in Google Calendar on your phone." */
 internal fun skipOneDateLine(service: String): String = "To skip one date, change it in $service on your phone."
@@ -60,6 +63,7 @@ internal fun skipOneDateLine(service: String): String = "To skip one date, chang
  */
 @Composable
 internal fun RepeatsPane(form: EditorForm, service: String, onPicked: () -> Unit, onChooseDay: () -> Unit) {
+    LaunchedEffect(Unit) { form.openRepeats() }
     val day = form.eventWhen.startDate
     if (day == null) {
         NeedsADay(onChooseDay)
@@ -68,7 +72,8 @@ internal fun RepeatsPane(form: EditorForm, service: String, onPicked: () -> Unit
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap)) {
         Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.repeatRowGap), modifier = Modifier.selectableGroup()) {
             EDITOR_REPEATS.forEach { choice ->
-                RepeatRow(choice.wording(day), selected = form.repeat == choice, tag = "repeat_${choice.name}") {
+                val locked = !choice.fitsLength(form.eventWhen.repeatLength)
+                RepeatRow(choice.wording(day), selected = form.repeat == choice, tag = "repeat_${choice.name}", locked = locked) {
                     form.chooseRepeat(choice)
                     if (choice == RepeatChoice.Never) onPicked()
                 }
@@ -96,9 +101,12 @@ private fun NeedsADay(onChooseDay: () -> Unit) {
     }
 }
 
-/** 56 dp, `surf2`, a radio then the words; chosen, `accentSoft` with a 2 dp `accent` ring inside. */
+/**
+ * 56 dp, `surf2`, a radio then the words; chosen, `accentSoft` with a 2 dp `accent` ring inside. [locked] is a repeat the
+ * span rules out: muted, not tappable, with its reason under the words.
+ */
 @Composable
-private fun RepeatRow(words: String, selected: Boolean, tag: String, onClick: () -> Unit) {
+private fun RepeatRow(words: String, selected: Boolean, tag: String, locked: Boolean, onClick: () -> Unit) {
     val c = Culvery.colors
     val shape = RoundedCornerShape(EditorDimens.repeatRowRadius)
     Row(
@@ -107,7 +115,7 @@ private fun RepeatRow(words: String, selected: Boolean, tag: String, onClick: ()
         modifier = Modifier
             .testTag(tag)
             .semantics { this.selected = selected }
-            .hhClickable(onClick, role = Role.RadioButton)
+            .hhClickable(onClick, role = Role.RadioButton, enabled = !locked)
             .fillMaxWidth()
             .heightIn(min = EditorDimens.repeatRowHeight)
             .clip(shape)
@@ -117,11 +125,14 @@ private fun RepeatRow(words: String, selected: Boolean, tag: String, onClick: ()
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(EditorDimens.radio).border(EditorDimens.ring, if (selected) c.accent else c.mute, CircleShape),
+            modifier = Modifier.size(EditorDimens.radio).border(EditorDimens.ring, if (selected && !locked) c.accent else c.mute, CircleShape),
         ) {
             if (selected) Box(Modifier.size(EditorDimens.radioDot).clip(CircleShape).background(c.accent))
         }
-        Text(words, style = CalendarType.repeatOption, color = c.ink, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            Text(words, style = CalendarType.repeatOption, color = if (locked) c.mute else c.ink)
+            if (locked) Text(TOO_LONG_TO_REPEAT, style = CalendarType.whoHint, color = c.mute, modifier = Modifier.testTag("${tag}_note"))
+        }
     }
 }
 

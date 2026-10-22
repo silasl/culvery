@@ -118,6 +118,24 @@ class RepeatsPaneTest {
     }
 
     @Test
+    fun aRepeatTheSpanRulesOutIsLockedWithItsLine() {
+        show(guitar { chooseAllDay(true); pickEndDate(saturday.plusDays(7)) })
+        listOf("Daily", "Weekly").forEach { name ->
+            node("repeat_$name").assertIsNotEnabled()
+            part("repeat_${name}_note").assertTextEquals("Too long to repeat that often.")
+            node("repeat_$name").performClick()
+        }
+        assertThat(form.repeat).isEqualTo(RepeatChoice.Never)
+        listOf("Never", "Fortnightly", "MonthlyOnWeekday", "Yearly").forEach { name ->
+            node("repeat_$name").assertIsEnabled()
+            part("repeat_${name}_note").assertDoesNotExist()
+        }
+        node("repeat_Fortnightly").performClick()
+        assertThat(form.repeat).isEqualTo(RepeatChoice.Fortnightly)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
     fun doesntRepeatMovesOnAndARepeatDoesNot() {
         show()
         compose.waitForIdle()

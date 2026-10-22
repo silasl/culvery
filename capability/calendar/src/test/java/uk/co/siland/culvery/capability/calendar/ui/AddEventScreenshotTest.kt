@@ -150,18 +150,33 @@ class AddEventScreenshotTest {
         snap("add_event_all_day_dark")
     }
 
+    private fun camp() = editorForm().apply {
+        updateTitle("Camp")
+        toggleWho(SampleUi.sam.id)
+        timedAt(LocalDate.of(2026, 10, 23), 18)
+        pickEndDate(LocalDate.of(2026, 10, 25))
+        repeat(3) { stepEnd(ClockField.Hour, up = false) }
+    }
+
     /** Camp for Sam, Fri 23 Oct 18:00 to Sun 25 Oct 16:00, on the end's steppers. */
     @Test
     fun addEventSpanDark() {
-        val form = editorForm().apply {
-            updateTitle("Camp")
-            toggleWho(SampleUi.sam.id)
-            timedAt(LocalDate.of(2026, 10, 23), 18)
-            pickEndDate(LocalDate.of(2026, 10, 25))
-            repeat(3) { stepEnd(ClockField.Hour, up = false) }
-        }
-        show(form, dark = true, start = EditorStep.EndTime)
+        show(camp(), dark = true, start = EditorStep.EndTime)
         snap("add_event_span_dark")
+    }
+
+    /** The camp's Repeats: every day is locked with its reason, Every Friday chosen. */
+    @Test
+    fun addEventRepeatsTooLongDark() {
+        show(camp().apply { chooseRepeat(RepeatChoice.Weekly) }, dark = true, start = EditorStep.Repeats)
+        snap("add_event_repeats_too_long_dark")
+    }
+
+    /** The camp every Friday on Check: a chip per weekend, and the week's bar. */
+    @Test
+    fun addEventCheckSpanDark() {
+        show(camp().apply { chooseRepeat(RepeatChoice.Weekly); stopsAfter() }, dark = true, start = EditorStep.Check)
+        snap("add_event_check_span_dark")
     }
 
     /** The sample week with Mia's Piano, 15:30–16:15, on Sat 26 Sep: hours 15 and 16 are busy. */
