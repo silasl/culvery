@@ -56,8 +56,10 @@ data class EventWhen(
         val first = startDate ?: return null
         val days = ChronoUnit.DAYS.between(first, date)
         if (days !in 0..MAX_SPAN_DAYS - 1) return null
+        // The inert end clock of an all-day value must not read as a midnight end when All day goes off.
+        if (allDay) return copy(endDays = days.toInt(), endClock = hourAfter(startClock).second.takeIf { it != LocalTime.MIDNIGHT } ?: LAST_MINUTE)
         val picked = copy(endDays = days.toInt())
-        return if (!allDay && picked.endDays == 0 && !endClock.isAfter(startClock)) picked.withEndAnHourAfterStart() else picked
+        return if (picked.endDays == 0 && !endClock.isAfter(startClock)) picked.withEndAnHourAfterStart() else picked
     }
 
     /** A Starts step wraps within the day; the end follows, keeping the length. */
@@ -99,6 +101,7 @@ data class EventWhen(
         private const val QUARTER = 15
         private val MORNING: LocalTime = LocalTime.of(9, 0)
         private const val LAST_START_HOUR = 23
+        private val LAST_MINUTE: LocalTime = LocalTime.of(23, 59)
 
         /** All day off; the next whole hour when [startDate] is today (never past 23:00), else 09:00; an hour long. */
         fun defaults(startDate: LocalDate?, today: LocalDate, now: LocalTime): EventWhen {

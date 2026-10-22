@@ -217,6 +217,24 @@ class EventWhenTest {
     }
 
     @Test
+    fun anEndsDatePickedWhileAllDayAfterAMidnightEndKeepsItsDate() {
+        val midnight = timed(at(23), at(0), endDays = 1).withAllDay(true)
+        val back = checkNotNull(midnight.pickEndDate(sat.plusDays(2))).withAllDay(false)
+        assertThat(back.endDate).isEqualTo(sat.plusDays(2))
+        assertThat(back.endDays).isEqualTo(2)
+        assertThat(back.capError).isNull()
+        assertThat(back.span(london)).isInstanceOf(EventSpan.Timed::class.java)
+    }
+
+    @Test
+    fun theMaximumEndsDatePickedWhileAllDayAfterAMidnightEndIsNotOverTheCap() {
+        val midnight = timed(at(22), at(0), endDays = 1).withAllDay(true)
+        val back = checkNotNull(midnight.pickEndDate(sat.plusDays(59))).withAllDay(false)
+        assertThat(back.endDays).isEqualTo(59)
+        assertThat(back.capError).isNull()
+    }
+
+    @Test
     fun aSpanOverTheAutumnClockChangeWhoseWallEndIsBeforeItsStartOpensValid() {
         val day = LocalDate.of(2026, 10, 25)
         val start = ZonedDateTime.of(day, at(1, 45), london).withEarlierOffsetAtOverlap()
