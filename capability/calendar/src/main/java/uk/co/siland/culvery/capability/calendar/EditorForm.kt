@@ -94,8 +94,8 @@ class EditorForm(
     var eventWhen: EventWhen by mutableStateOf(openingWhen)
         private set
 
-    /** A time or the Ends date was chosen, so a Starts date pick keeps the times rather than that day's defaults. */
-    var timesTouched: Boolean = false
+    /** An edit, or a time or the Ends date chosen: a Starts date pick keeps the times and length, not that day's defaults (9c §3.3). */
+    var timesTouched: Boolean = original != null
         private set
 
     private inline fun editWhen(change: () -> Unit) = edit {

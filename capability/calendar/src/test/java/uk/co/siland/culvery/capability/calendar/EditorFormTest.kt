@@ -283,6 +283,15 @@ class EditorFormTest {
         assertThat(span.edited).isTrue()
     }
 
+    /** Before there is a Starts date the clocks show nothing, so stepping them isn't an edit. */
+    @Test
+    fun clockStepsWithoutADayAreNotAnEdit() {
+        val form = new()
+        form.stepStart(ClockField.Hour, up = true)
+        form.stepEnd(ClockField.Minute, up = true)
+        assertThat(form.edited).isFalse()
+    }
+
     @Test
     fun aReorderedSetIsNotTouched() {
         val form = editTimed(today.atTime(18, 0), 60, forPerson = "mia,sam")
@@ -323,6 +332,39 @@ class EditorFormTest {
         assertThat(long.title).hasLength(119)
         long.updateTitle("b".repeat(121))
         assertThat(long.title).hasLength(119)
+    }
+
+    /** A Starts pick on an edit moves the event and keeps its times and length (9c §3.3). */
+    @Test
+    fun aChangesStartsDatePickKeepsItsTimesAndLength() {
+        val dinner = editTimed(today.atTime(19, 30), 90)
+        dinner.pickStartDate(today.plusDays(1))
+        val moved = today.plusDays(1)
+        assertThat(dinner.span()).isEqualTo(
+            EventTime.Timed(moved.atTime(19, 30).atZone(london).toInstant()) to EventTime.Timed(moved.atTime(21, 0).atZone(london).toInstant()),
+        )
+        val camp = timedSpan(day(23).atTime(18, 0), day(25).atTime(16, 0))
+        camp.pickStartDate(day(30))
+        assertThat(camp.eventWhen).isEqualTo(EventWhen(false, day(30), LocalTime.of(18, 0), 2, LocalTime.of(16, 0)))
+        val halfTerm = halfTerm()
+        halfTerm.chooseAllDay(false)
+        val clocks = halfTerm.eventWhen
+        halfTerm.pickStartDate(day(26))
+        assertThat(halfTerm.eventWhen).isEqualTo(clocks.copy(startDate = day(26)))
+        assertThat(halfTerm.eventWhen.endDays).isEqualTo(4)
+    }
+
+    /** All day keeps the dates the rows show: a timed end at midnight belongs to the day before. */
+    @Test
+    fun allDayOnAMidnightEndIsOneDayAndOffRestoresTheTimes() {
+        val form = ready(day = mon19)
+        repeat(14) { form.stepStart(ClockField.Hour, up = true) }
+        val late = form.eventWhen
+        assertThat(late).isEqualTo(EventWhen(false, mon19, LocalTime.of(23, 0), 1, LocalTime.MIDNIGHT))
+        form.chooseAllDay(true)
+        assertThat(form.span()).isEqualTo(allDay(mon19, day(20)))
+        form.chooseAllDay(false)
+        assertThat(form.eventWhen).isEqualTo(late)
     }
 
     @Test

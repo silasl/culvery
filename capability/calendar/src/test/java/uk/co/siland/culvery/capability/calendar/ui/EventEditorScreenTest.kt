@@ -591,6 +591,17 @@ class EventEditorScreenTest {
     }
 
     @Test
+    fun allDayMovesAnOpenTimePaneToItsDate() {
+        show(newWithTitleWhoAndDay(), start = EditorStep.StartTime)
+        compose.onNodeWithTag("editor_all_day").performClick()
+        assertThat(flow.active).isEqualTo(EditorStep.StartDate)
+        compose.onNodeWithTag("editor_all_day").performClick()
+        compose.runOnIdle { flow.open(EditorStep.EndTime) }
+        compose.onNodeWithTag("editor_all_day").performClick()
+        assertThat(flow.active).isEqualTo(EditorStep.EndDate)
+    }
+
+    @Test
     fun withTheKeyboardUpTheAllDayRowHidesAndNothingIsCut() {
         show(keyboard = KEYBOARD)
         for (s in listOf(1f, 1.3f, 1.5f)) {

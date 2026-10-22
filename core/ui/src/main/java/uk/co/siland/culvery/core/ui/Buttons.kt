@@ -253,7 +253,7 @@ private fun Modifier.heldClickable(onClick: () -> Unit, enabled: Boolean): Modif
  * A sheet's footer: a Primary [HhButton] at [ButtonSize.Large] across the width, tagged [tag]. Disabled with a [reason], the
  * reason shows above it (`${tag}_reason`) and is the button's state for TalkBack, so it is heard once ("Add event, Add a
  * title first, disabled"). The reason is optional (9 §6.4). With [below], the reason sits under the button instead, with
- * the `info` icon, and while enabled the [hint] does (`${tag}_hint`, "Time and repeats are optional"). While [busy] the
+ * the `info` icon, and while enabled the [hint] does (`${tag}_hint`, "Repeats are optional"). While [busy] the
  * button is drawn busy and the line stays as it was, so nothing under or beside it moves.
  */
 @Composable

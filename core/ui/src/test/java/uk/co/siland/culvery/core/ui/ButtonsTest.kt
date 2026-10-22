@@ -174,7 +174,7 @@ class ButtonsTest {
         compose.setContent {
             CulveryTheme(dark = false) {
                 Column(Modifier.width(507.dp)) {
-                    HhFooterButton("Add event", {}, "footer", enabled = enabled, reason = "Needs a day", below = true, hint = "Time and repeats are optional")
+                    HhFooterButton("Add event", {}, "footer", enabled = enabled, reason = "Needs a day", below = true, hint = "Repeats are optional")
                 }
             }
         }
@@ -192,7 +192,7 @@ class ButtonsTest {
         compose.onNodeWithTag("footer_reason", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("footer_hint", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("footer_hint_icon", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNode(hasText("Time and repeats are optional") and hasAnyAncestor(hasTestTag("footer_hint")), useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasText("Repeats are optional") and hasAnyAncestor(hasTestTag("footer_hint")), useUnmergedTree = true).assertIsDisplayed()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -216,7 +216,7 @@ class ButtonsTest {
         compose.setContent {
             CulveryTheme(dark = false) {
                 Column(Modifier.width(507.dp)) {
-                    HhFooterButton("Save changes", {}, "footer", enabled = !busy, below = true, hint = "Time and repeats are optional", busy = busy)
+                    HhFooterButton("Save changes", {}, "footer", enabled = !busy, below = true, hint = "Repeats are optional", busy = busy)
                 }
             }
         }
