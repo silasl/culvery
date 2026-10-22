@@ -37,7 +37,7 @@ Each target opens its own pane on the right, with the question as its title (`pa
 | Ends time | "What time does it end?" | The steppers, and the clash line. |
 
 - **The steppers sit in the pane.** There is no Cancel / Set: each step changes the form at once, and Next moves on. Use one shared stepper composable for this pane and for `TimePickerCard`, which stays for nothing else unless the plan finds another caller (the "Other time" and "Until…" pickers go).
-- **Each stepper changes only its own field,** as `TimePickerCard`'s do today: the hour wraps 23 ↔ 00 (`hourStep`) and the minute 45 ↔ 00 (`minuteStep`), with no carry into the hour or the date. Starts and Ends behave the same way. *(My call, so both steppers match.)*
+- **The steppers work like a clock** (the user, 2026-10-22, at the plan review). Minutes carry into the hour both ways: 11:00 down gives 10:45, and 10:45 up gives 11:00. Hours step by 1. **No step ever changes a date**; the date changes only from a date pick. At the day's edges a Starts step wraps within the day (23:45 up → 00:00, 00:00 down → 23:45). An Ends step that would leave the end's day, or reach the start, is disabled. Starts and Ends behave the same way.
 - **Quick picks** show only after a suggestion (§4.4). Otherwise the date panes are the grid alone.
 
 ### 3.3 How Starts and Ends move together
@@ -161,7 +161,8 @@ To be built with this, each with a failing test first:
 ## 8. Calls I made (check these)
 1. All day starts off for a new event; the default time is the next hour (today) or 09:00, for an hour.
 2. One shared stepper in the pane, live, with no Cancel / Set; the "Other time" and "Until…" pickers go.
-3. Each stepper changes only its own field (no carry); an end on a later day is set with the Ends date; a stepper button that would put the end at or before the start is disabled.
+3. Superseded at the plan review: the steppers work like a clock (minutes carry into the hour, no step changes a date; §3.2). An end on a later day is set with the Ends date, and a stepper button that would put the end at or before the start is disabled.
+10. (The user, at the plan review.) Suggestions show to anyone at the wall, with no PIN. Hidden calendars' titles are never remembered or suggested.
 4. Busy hours go with the chips; the clash line names up to two busy people.
 5. A timed span made elsewhere is no longer locked.
 6. Suggestions: at most 3, from 2 characters, title-start before word matches, 12 months, deleted with their connection.
