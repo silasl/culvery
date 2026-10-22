@@ -109,9 +109,18 @@ internal fun DateGrid(
                 Row(Modifier.fillMaxWidth()) {
                     week.forEachIndexed { column, date ->
                         DayCell(
-                            date, column, today, month, date in chosen, band, allowed(date), dots[date].orEmpty(), spoken(date),
-                            Modifier.weight(1f),
-                        ) { onPick(date) }
+                            date = date,
+                            column = column,
+                            today = today,
+                            month = month,
+                            isChosen = date in chosen,
+                            band = band,
+                            allowed = allowed(date),
+                            on = dots[date].orEmpty(),
+                            spokenExtra = spoken(date),
+                            modifier = Modifier.weight(1f),
+                            onTap = { onPick(date) },
+                        )
                     }
                 }
             }

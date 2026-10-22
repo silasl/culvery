@@ -50,7 +50,9 @@ internal class WhenContext(
     val except: EventRef?,
     val zone: ZoneId,
     val today: LocalDate,
-)
+) {
+    fun nameOf(id: PersonId): String = household.byId[id]?.name.orEmpty()
+}
 
 /**
  * The month of days for the start (9c §3.1), opening on the start's month, with a dot for each person already busy that
@@ -61,7 +63,7 @@ internal fun StartDatePane(eventWhen: EventWhen, context: WhenContext, banner: S
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap)) {
         if (banner != null) CopiedBanner(banner)
         if (quickPicks.isNotEmpty()) QuickPicks(quickPicks, onPick)
-        WhenDateGrid(eventWhen, context, "starts_date_pane", opensOn = eventWhen.startDate, allowed = { true }, onPick = onPick)
+        WhenDateGrid(eventWhen, context, "starts_date_pane", opensOn = eventWhen.startDate, onPick = onPick)
     }
 }
 
@@ -95,12 +97,8 @@ private fun QuickPicks(days: List<LocalDate>, onPick: (LocalDate) -> Unit) {
 
 /** Hour and minute steppers for the start; the end follows. Under them, whether the people are free, and the nearest free starts. */
 @Composable
-internal fun StartTimePane(eventWhen: EventWhen, context: WhenContext, onStep: (ClockField, Boolean) -> Unit, onFreeStart: (LocalTime) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap), modifier = Modifier.testTag("starts_time_pane")) {
-        TimeSteppers(eventWhen.startClock, "start_", onStep = onStep, modifier = Modifier.fillMaxWidth())
-        WhenClash(eventWhen, context, onFreeStart)
-    }
-}
+internal fun StartTimePane(eventWhen: EventWhen, context: WhenContext, onStep: (ClockField, Boolean) -> Unit, onFreeStart: (LocalTime) -> Unit) =
+    WhenTimePane(eventWhen, context, "starts_time_pane", eventWhen.startClock, "start_", onStep, onFreeStart = onFreeStart)
 
 /**
  * The month of days for the end, opening on the end's month: only the start's day and the 59 after it can be picked,
@@ -119,9 +117,22 @@ internal fun EndDatePane(eventWhen: EventWhen, context: WhenContext, onPick: (Lo
 
 /** Steppers for the end, with any step that would reach the start or leave the end's day dimmed. */
 @Composable
-internal fun EndTimePane(eventWhen: EventWhen, context: WhenContext, onStep: (ClockField, Boolean) -> Unit, onFreeStart: (LocalTime) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap), modifier = Modifier.testTag("ends_time_pane")) {
-        TimeSteppers(eventWhen.endClock, "end_", onStep = onStep, enabled = eventWhen::canStepEnd, modifier = Modifier.fillMaxWidth())
+internal fun EndTimePane(eventWhen: EventWhen, context: WhenContext, onStep: (ClockField, Boolean) -> Unit, onFreeStart: (LocalTime) -> Unit) =
+    WhenTimePane(eventWhen, context, "ends_time_pane", eventWhen.endClock, "end_", onStep, eventWhen::canStepEnd, onFreeStart)
+
+@Composable
+private fun WhenTimePane(
+    eventWhen: EventWhen,
+    context: WhenContext,
+    tag: String,
+    clock: LocalTime,
+    stepperPrefix: String,
+    onStep: (ClockField, Boolean) -> Unit,
+    enabled: (ClockField, Boolean) -> Boolean = { _, _ -> true },
+    onFreeStart: (LocalTime) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap), modifier = Modifier.testTag(tag)) {
+        TimeSteppers(clock, stepperPrefix, onStep = onStep, enabled = enabled, modifier = Modifier.fillMaxWidth())
         WhenClash(eventWhen, context, onFreeStart)
     }
 }
@@ -132,7 +143,7 @@ private fun WhenDateGrid(
     context: WhenContext,
     tag: String,
     opensOn: LocalDate?,
-    allowed: (LocalDate) -> Boolean,
+    allowed: (LocalDate) -> Boolean = { true },
     onPick: (LocalDate) -> Unit,
 ) {
     var month by remember { mutableStateOf(YearMonth.from(opensOn ?: context.today)) }
@@ -166,7 +177,7 @@ private fun WhenClash(eventWhen: EventWhen, context: WhenContext, onFreeStart: (
         who = context.who,
         overDays = eventWhen.overDays(context.zone),
         zone = context.zone,
-        nameOf = { id -> context.household.byId[id]?.name.orEmpty() },
+        nameOf = context::nameOf,
         onFreeStart = onFreeStart,
     )
 }

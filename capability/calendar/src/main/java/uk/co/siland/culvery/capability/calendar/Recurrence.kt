@@ -207,6 +207,9 @@ fun choiceOf(rule: String, start: LocalDate): RepeatChoice? =
 // A phone says "last" for a 4th weekday that is also the last of its month; the editor says 4th.
 internal fun isLastOfWeekday(day: LocalDate): Boolean = day.plusWeeks(1).month != day.month
 
-/** Which of its weekday [rule] repeats on from [start]: −1 for a phone's "last", else [start]'s own place in its month. */
+/**
+ * Which of its weekday [rule] repeats on from [start]: −1 for a phone's "last", else [start]'s own place in its month.
+ * Only meaningful once [choiceOf] has read [rule] as a choice.
+ */
 fun nthOf(rule: String, start: LocalDate): Int =
     if (ruleParts(rule)?.get("BYDAY")?.startsWith("$LAST") == true) LAST else nthWeekday(start)
