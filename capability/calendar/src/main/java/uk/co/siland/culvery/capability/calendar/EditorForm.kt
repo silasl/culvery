@@ -6,9 +6,12 @@ import androidx.compose.runtime.setValue
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.MonthDay
+import java.time.temporal.ChronoUnit
 import java.time.ZoneId
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.plural
+
+private const val FORTNIGHT_DAYS = 14L
 
 /** The longest an event may last, in days (the first and last day count). */
 const val MAX_SPAN_DAYS = 60L
@@ -180,7 +183,8 @@ class EditorForm(
         val s = usedSuggestion?.takeIf { CopiedRow.Repeats in copied } ?: return true
         val anchor = s.anchor()
         return when (repeat) {
-            RepeatChoice.Weekly, RepeatChoice.Fortnightly -> date.dayOfWeek == anchor.dayOfWeek
+            RepeatChoice.Weekly -> date.dayOfWeek == anchor.dayOfWeek
+            RepeatChoice.Fortnightly -> Math.floorMod(ChronoUnit.DAYS.between(anchor, date), FORTNIGHT_DAYS) == 0L
             RepeatChoice.MonthlyOnWeekday -> date.dayOfWeek == anchor.dayOfWeek && nthOn(date) == s.nth()
             RepeatChoice.Monthly -> date.dayOfMonth == anchor.dayOfMonth
             RepeatChoice.Yearly -> MonthDay.from(date) == MonthDay.from(anchor)

@@ -147,6 +147,18 @@ class CalendarEditorTest {
     }
 
     @Test
+    fun theAddedToastWordsALastWeekdayRuleAsLast() = runTest {
+        val access = testAccess(household)
+        access.answer(TestAccess.ALEX)
+        val editor = editor(access)
+        val start = LocalDate.of(2026, 9, 26).atTime(10, 0).atZone(london).toInstant()
+        val draft = EventDraft("Guitar", EventTime.Timed(start), EventTime.Timed(start.plusSeconds(2700)), PersonId.FAMILY.value, null)
+            .copy(recurrence = Recurrence("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1SA", london))
+        assertThat(editor.create(draft)).isEqualTo(EditResult.Done)
+        assertThat(access.toasts.messages.single()).contains("on the last Saturday")
+    }
+
+    @Test
     fun aMultiDayAllDayEventIsWrittenWithItsExclusiveEnd() = runTest {
         val access = testAccess(household)
         access.answer(TestAccess.ALEX)

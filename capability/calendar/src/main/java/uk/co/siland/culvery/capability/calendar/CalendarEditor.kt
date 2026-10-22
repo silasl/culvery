@@ -148,7 +148,7 @@ class CalendarEditor internal constructor(
     private suspend fun addedLineFor(draft: EventDraft): String {
         val (day, last) = daySpan(draft.start, draft.end, zone.current())
         val today = today()
-        val wording = draft.recurrence?.let { choiceOf(it.rule, day) }?.wording(day)
+        val wording = draft.recurrence?.let { choiceOf(it.rule, day) }?.wording(day, nthOf(draft.recurrence.rule, day))
         return addedLine(draft.title, wording, day.takeIf { weeksTo(today, day) == null }, through = last)
     }
 

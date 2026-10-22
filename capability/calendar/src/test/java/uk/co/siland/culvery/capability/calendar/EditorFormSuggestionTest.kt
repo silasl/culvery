@@ -136,6 +136,16 @@ class EditorFormSuggestionTest {
     }
 
     @Test
+    fun aFortnightlyRepeatStaysCopiedOnlyInTheSeriesOwnFortnight() {
+        val form = new()
+        form.use(guitar(rule = "RRULE:FREQ=WEEKLY;INTERVAL=2"))
+        form.pickStartDate(day(10, 3))
+        assertThat(form.copied).contains(CopiedRow.Repeats)
+        form.pickStartDate(day(9, 26))
+        assertThat(form.copied).doesNotContain(CopiedRow.Repeats)
+    }
+
+    @Test
     fun aLastWeekdayRuleIsSavedAsLast() {
         val lastSaturday = guitar(rule = "RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1SA").copy(seriesStart = day(7, 25))
         val form = new()

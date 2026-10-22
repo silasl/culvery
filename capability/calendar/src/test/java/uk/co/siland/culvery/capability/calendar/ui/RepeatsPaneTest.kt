@@ -24,7 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,6 +38,7 @@ import uk.co.siland.culvery.capability.calendar.MAX_TIMES
 import uk.co.siland.culvery.capability.calendar.MIN_TIMES
 import uk.co.siland.culvery.capability.calendar.RepeatChoice
 import uk.co.siland.culvery.capability.calendar.RepeatEnd
+import uk.co.siland.culvery.capability.calendar.Suggestion
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
@@ -87,6 +90,17 @@ class RepeatsPaneTest {
     private fun repeating(setUp: EditorForm.() -> Unit = {}) = guitar {
         chooseRepeat(RepeatChoice.Weekly)
         setUp()
+    }
+
+    @Test
+    fun aCopiedLastWeekdayReadsLastInTheOptions() {
+        val lastSaturday = Suggestion(
+            "Guitar lesson", "mia", false, LocalTime.of(10, 0), Duration.ofMinutes(45), null, "RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1SA",
+            LocalDate.of(2026, 7, 25), LocalDate.of(2026, 8, 29),
+        )
+        show(guitar(day = null) { use(lastSaturday); pickStartDate(saturday) })
+        node("repeat_MonthlyOnWeekday").assertTextEquals("Every month, on the last Saturday")
+        node("repeat_MonthlyOnWeekday").assertIsSelected()
     }
 
     @Test

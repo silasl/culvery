@@ -73,7 +73,7 @@ internal fun RepeatsPane(form: EditorForm, service: String, onPicked: () -> Unit
         Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.repeatRowGap), modifier = Modifier.selectableGroup()) {
             EDITOR_REPEATS.forEach { choice ->
                 val locked = !choice.fitsLength(form.eventWhen.repeatLength)
-                RepeatRow(choice.wording(day), selected = form.repeat == choice, tag = "repeat_${choice.name}", locked = locked) {
+                RepeatRow(choice.wording(day, form.nthOn(day)), selected = form.repeat == choice, tag = "repeat_${choice.name}", locked = locked) {
                     form.chooseRepeat(choice)
                     if (choice == RepeatChoice.Never) onPicked()
                 }
