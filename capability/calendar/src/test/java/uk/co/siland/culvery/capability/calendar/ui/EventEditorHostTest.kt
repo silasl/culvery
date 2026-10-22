@@ -635,6 +635,23 @@ class EventEditorHostTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    @Test
+    fun thePaneBehindThePinPadIsTheOneItWasOn() {
+        newEvent(day)
+        waitForText("Add event")
+        fillTitleAndAlex()
+        compose.onNodeWithTag("editor_row_day").performClick()
+        compose.onNodeWithTag("day_quick_1").performClick()
+        // Within the 250 ms move-on of that pick; nobody is signed in, so the PIN pad opens.
+        compose.onNodeWithTag("editor_save").performClick()
+        compose.waitUntil(5_000) { access.requests.isNotEmpty() }
+        compose.mainClock.advanceTimeBy(300)
+        compose.onNodeWithTag("editor_row_day").assertIsSelected()
+        compose.runOnIdle { access.prompt.cancel() }
+        compose.mainClock.advanceTimeBy(300)
+        compose.onNodeWithTag("editor_row_day").assertIsSelected()
+    }
+
     /** A save that ends without closing (a cancelled PIN, a refusal) lets the form change again. */
     @Test
     fun aCancelledPinOrARefusedSaveLetsTheDayChangeAgain() {

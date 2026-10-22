@@ -158,6 +158,7 @@ internal fun EventEditorScreen(
         // Under a picker only the picker is heard.
         Column(Modifier.fillMaxSize().then(if (picker != EditorPicker.None) Modifier.clearAndSetSemantics {} else Modifier)) {
             TopBar(heading, context) {
+                flow.stay()
                 closeKeyboard()
                 if (form.edited) discarding = true else onClose()
             }
@@ -214,9 +215,11 @@ internal fun EventEditorScreen(
                                     else -> TIME_OPTIONAL_HINT
                                 }
                                 Foot(form, savesTo, hint, busy, failure, onSave = {
+                                    flow.stay()
                                     closeKeyboard()
                                     onSave()
                                 }, onDelete = {
+                                    flow.stay()
                                     closeKeyboard()
                                     onDelete()
                                 })

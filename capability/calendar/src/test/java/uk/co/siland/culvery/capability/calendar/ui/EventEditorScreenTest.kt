@@ -1,13 +1,18 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -506,6 +511,34 @@ class EventEditorScreenTest {
         compose.onNodeWithTag("editor_row_day").performClick()
         assertThat(flow.active).isEqualTo(before)
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** A pin of current behaviour, not a fix: one show() on open, and none when the editor is covered and uncovered. The walk-through will try to reproduce the keyboard note. */
+    @Test
+    fun theKeyboardIsAskedForOncePerOpening() {
+        val keyboard = object : SoftwareKeyboardController {
+            var shown = 0
+            override fun show() { shown++ }
+            override fun hide() {}
+        }
+        var covered by mutableStateOf(false)
+        use(editorForm())
+        compose.setContent {
+            CompositionLocalProvider(LocalSoftwareKeyboardController provides keyboard) {
+                // As the shell's OverlayLayer(hidden = ...) holds the editor under the PIN pad: composed, not heard.
+                Box(Modifier.then(if (covered) Modifier.clearAndSetSemantics {} else Modifier)) {
+                    ShowEditor(form, flow)
+                }
+            }
+        }
+        compose.runOnIdle { assertThat(keyboard.shown).isEqualTo(1) }
+        compose.onNodeWithTag("editor_row_who").performClick()
+        node("editor_title").assertIsNotFocused()
+        covered = true
+        compose.waitForIdle()
+        covered = false
+        compose.waitForIdle()
+        compose.runOnIdle { assertThat(keyboard.shown).isEqualTo(1) }
     }
 
     @Test

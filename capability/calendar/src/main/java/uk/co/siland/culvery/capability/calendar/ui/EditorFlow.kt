@@ -48,6 +48,11 @@ class EditorFlow(val steps: List<EditorStep>, initial: EditorStep) {
         nextStep?.let(::open)
     }
 
+    /** Drops a pending [moveOnSoon], for an action that leaves the person where they are (Add event, Delete, close). */
+    fun stay() {
+        generation++
+    }
+
     fun moveOnSoon() {
         moves.trySend(generation)
     }
