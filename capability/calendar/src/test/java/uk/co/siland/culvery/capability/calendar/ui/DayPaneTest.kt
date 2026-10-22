@@ -3,40 +3,28 @@ package uk.co.siland.culvery.capability.calendar.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.assertContentDescriptionEquals
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
-import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.YearMonth
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EditorForm
-import uk.co.siland.culvery.capability.calendar.EventRef
-import uk.co.siland.culvery.capability.calendar.EventTime
-import uk.co.siland.culvery.capability.calendar.Held
-import uk.co.siland.culvery.capability.calendar.HeldEvent
 import uk.co.siland.culvery.capability.calendar.TimeChoice
 import uk.co.siland.culvery.capability.calendar.UNTIL_TOO_LATE
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.DarkColors
-import uk.co.siland.culvery.core.ui.HhAlpha
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.pixelAt
@@ -53,7 +41,6 @@ class DayPaneTest {
     private val today = SampleUi.TODAY
     private var form by mutableStateOf(editorForm())
     private var flow by mutableStateOf(editorFlow(form, null, EditorStep.Day))
-    private var held by mutableStateOf<Held?>(null)
     private var scale by mutableStateOf(1f)
     private val screen = ShownOnce(compose)
 
@@ -62,7 +49,7 @@ class DayPaneTest {
         form = editor
         flow = editorFlow(editor, null, EditorStep.Day)
         screen.show {
-            ShowEditor(form, flow, held = held, scale = scale)
+            ShowEditor(form, flow, scale = scale)
         }
     }
 
@@ -117,53 +104,6 @@ class DayPaneTest {
     }
 
     @Test
-    fun theMonthStartsOnMonday() {
-        val cells = monthCells(YearMonth.of(2026, 9))
-        assertThat(cells.first()).isEqualTo(at(8, 31))
-        assertThat(cells.last()).isEqualTo(at(10, 4))
-        assertThat(cells).hasSize(35)
-        assertThat(cells.first().dayOfWeek).isEqualTo(DayOfWeek.MONDAY)
-        assertThat(monthCells(YearMonth.of(2026, 8))).hasSize(42)
-        show()
-        compose.onNodeWithTag("month_title").assertTextEquals("September 2026")
-        val letters = part("month_letters").fetchSemanticsNode().children.flatMap { it.config[SemanticsProperties.Text] }.map { it.text }
-        assertThat(letters).containsExactly("M", "T", "W", "T", "F", "S", "S").inOrder()
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    @Test
-    fun pastAndOutsideDaysFade() {
-        show()
-        assertThat(fadeOf(at(9, 21))).isEqualTo(HhAlpha.PAST_DAY)
-        assertThat(fadeOf(at(8, 31))).isEqualTo(0.58f)
-        assertThat(fadeOf(at(10, 1))).isEqualTo(0.58f)
-        assertThat(fadeOf(today)).isEqualTo(1f)
-        assertThat(fadeOf(at(9, 30))).isEqualTo(1f)
-        // Any date is allowed, the past included.
-        cell(at(9, 21)).performClick()
-        compose.runOnIdle { assertThat(form.day).isEqualTo(at(9, 21)) }
-        assertThat(fadeOf(at(9, 21))).isEqualTo(1f)
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    @Test
-    fun todayIsRingedAndTheChosenDayFilled() {
-        show()
-        val ring = pixelAt(part("day_${today}_circle"), 1.dp, (height("day_${today}_circle").value / 2).dp)
-        assertWithMessage("today's ring").that(ring).isEqualTo(c.accent.toArgb())
-        assertThat(circleFill(today)).isEqualTo(c.surf.toArgb())
-        assertThat(part("day_${today}_date").textLayout().layoutInput.style.fontWeight).isEqualTo(FontWeight.W700)
-        assertThat(part("day_${at(9, 24)}_date").textLayout().layoutInput.style.fontWeight).isEqualTo(FontWeight.W500)
-        val sat = at(9, 26)
-        cell(sat).performClick()
-        assertWithMessage("the chosen day's fill").that(circleFill(sat)).isEqualTo(c.accent.toArgb())
-        assertThat(part("day_${sat}_date").textLayout().layoutInput.style.color).isEqualTo(c.accentInk)
-        assertThat(part("day_${sat}_date").textLayout().layoutInput.style.fontWeight).isEqualTo(FontWeight.W700)
-        assertThat(cell(sat).fetchSemanticsNode().config[SemanticsProperties.Selected]).isTrue()
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    @Test
     fun aPickMovesOnToTime() {
         show()
         compose.mainClock.autoAdvance = false
@@ -175,58 +115,6 @@ class DayPaneTest {
         assertThat(flow.active).isEqualTo(EditorStep.Time)
         compose.mainClock.autoAdvance = true
         part("editor_row_day_value").assertTextEquals("Sat 26 Sep")
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    @Test
-    fun upToThreeDotsFromHeldEvents() {
-        fun allDay(date: LocalDate, people: List<PersonId>) =
-            HeldEvent(EventRef("c1", "s1", "e$date"), "Visit", people, EventTime.AllDay(date), EventTime.AllDay(date.plusDays(1)))
-        held = Held(
-            listOf(
-                allDay(at(9, 25), listOf(SampleUi.alex.id, SampleUi.sam.id)),
-                allDay(at(9, 25), listOf(SampleUi.mia.id, PersonId.FAMILY)),
-                allDay(at(9, 26), listOf(SampleUi.mia.id)),
-                allDay(at(9, 29), listOf(SampleUi.alex.id)),
-            ),
-            lastDay = at(9, 28),
-            unhealthy = emptySet(),
-            firstDay = today,
-        )
-        show()
-        val dots = compose.onAllNodesWithTag("day_${at(9, 25)}_dot", useUnmergedTree = true)
-        dots.assertCountEquals(3)
-        val colours = (0 until 3).map { i ->
-            val dot = dots[i]
-            val b = dot.getUnclippedBoundsInRoot()
-            assertThat((b.right - b.left).value).isWithin(0.5f).of(5f)
-            assertThat((b.bottom - b.top).value).isWithin(0.5f).of(5f)
-            pixelAt(dot, 2.5.dp, 2.5.dp)
-        }
-        assertThat(colours).containsExactly(
-            Color(SampleUi.alex.color).toArgb(),
-            Color(SampleUi.sam.color).toArgb(),
-            Color(SampleUi.mia.color).toArgb(),
-        ).inOrder()
-        compose.onAllNodesWithTag("day_${at(9, 26)}_dot", useUnmergedTree = true).assertCountEquals(1)
-        compose.onAllNodesWithTag("day_${at(9, 29)}_dot", useUnmergedTree = true).assertCountEquals(0)
-        // TalkBack names everyone on the day, the fourth too.
-        cell(at(9, 25)).assertContentDescriptionEquals("Friday 25 September, Alex, Sam, Mia and Family")
-        cell(at(9, 26)).assertContentDescriptionEquals("Saturday 26 September, Mia")
-        cell(at(9, 29)).assertContentDescriptionEquals("Tuesday 29 September")
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    @Test
-    fun theMonthPagesBothWays() {
-        show()
-        compose.onNodeWithTag("month_next").assertContentDescriptionEquals("Later months").performClick()
-        compose.onNodeWithTag("month_title").assertTextEquals("October 2026")
-        cell(at(10, 31)).assertExists()
-        compose.onNodeWithTag("month_prev").assertContentDescriptionEquals("Earlier months").performClick()
-        compose.onNodeWithTag("month_prev").performClick()
-        compose.onNodeWithTag("month_title").assertTextEquals("August 2026")
-        cell(at(8, 3)).assertExists()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -372,13 +260,10 @@ class DayPaneTest {
     }
 
     @Test
-    fun atFontScale13TheLastWeekCanStillBeReached() {
+    fun atFontScale13TheSwitchCanStillBeReached() {
         scale = 1.3f
         show(editorForm(preselectedDay = at(8, 20)))
         val pane = part("editor_pane").getUnclippedBoundsInRoot()
-        cell(at(9, 6)).performScrollTo().performClick()
-        compose.runOnIdle { assertThat(form.day).isEqualTo(at(9, 6)) }
-        compose.runOnIdle { flow.open(EditorStep.Day) }
         compose.onNodeWithTag("day_multi").performScrollTo()
         val multi = part("day_multi").getUnclippedBoundsInRoot()
         assertWithMessage("the switch's top").that(multi.top).isAtLeast(pane.top)

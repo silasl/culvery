@@ -1,29 +1,19 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsEqualTo
-import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.click
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onChild
-import androidx.compose.ui.test.onFirst
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -34,8 +24,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
-import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
-import uk.co.siland.culvery.core.ui.test.isReadAsOne
 
 @RunWith(AndroidJUnit4::class)
 class PickersTest {
@@ -122,27 +110,6 @@ class PickersTest {
     }
 
     @Test
-    fun theStepButtonsSayWhichValueAndWhichWay() {
-        showTime(LocalTime.of(9, 0))
-        listOf("Hour up", "Hour down", "Minute up", "Minute down").forEach { compose.onNodeWithContentDescription(it).assert(isButton) }
-        compose.assertAccessible()
-    }
-
-    /** TalkBack heard "Minute 0", "Hour 14" as the picker opened, a "Colon" stop, and both up buttons before either value. */
-    @Test
-    fun theTimePickerReadsEachColumnInTurnAndSpeaksAValueOnlyOnceItChanges() {
-        showTime(LocalTime.of(9, 0))
-        compose.onNodeWithText(":", useUnmergedTree = true).assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
-        listOf("hour", "minute").forEach { column ->
-            compose.onNodeWithTag("${column}_value").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
-                .onParent().assert(isReadAsOne)
-        }
-        compose.onNodeWithTag("hour_up").performClick()
-        compose.onNodeWithTag("hour_value").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
-        compose.onNodeWithTag("minute_value").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
-    }
-
-    @Test
     fun theTimePickersTitleIsAHeading() {
         showTime(LocalTime.of(9, 0))
         compose.onNodeWithText("Pick a time").assert(isHeading())
@@ -152,15 +119,5 @@ class PickersTest {
     fun theTimePickerIsAPane() {
         showTime(LocalTime.of(9, 0))
         compose.onNodeWithTag("time_picker").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Pick a time"))
-    }
-
-    @Test
-    fun eachStepperValueIsSpokenWithItsNameAndNoLeadingZero() {
-        showTime(LocalTime.of(7, 0))
-        compose.onNodeWithTag("hour_value")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Hour 7")))
-        compose.onNodeWithTag("hour_up").performClick()
-        compose.onNodeWithTag("hour_value").assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Hour 8")))
-        compose.onNodeWithTag("minute_value").assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Minute 0")))
     }
 }

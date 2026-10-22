@@ -17,7 +17,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -26,15 +25,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.hideFromAccessibility
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import java.time.LocalTime
+import uk.co.siland.culvery.capability.calendar.ClockField
 import uk.co.siland.culvery.capability.calendar.HOURS_PER_DAY
 import uk.co.siland.culvery.capability.calendar.MINUTES_PER_HOUR
 import uk.co.siland.culvery.core.ui.ButtonSize
@@ -42,12 +38,7 @@ import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
-import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
-import uk.co.siland.culvery.core.ui.hhClickable
-import uk.co.siland.culvery.core.ui.quietFill
-import uk.co.siland.culvery.core.ui.readAsOne
 
 /** The time picker's minute step (hand-off §7). */
 internal const val MINUTE_STEP = 15
@@ -87,18 +78,16 @@ internal fun TimePickerCard(initial: LocalTime, onSet: (LocalTime) -> Unit, onCa
     var minute by remember { mutableIntStateOf(initial.minute) }
     PickerCard(CalendarDimens.timePickerWidth, CalendarDimens.timePickerGap, "time_picker", paneTitle = "Pick a time") {
         Text("Pick a time", style = CalendarType.pickerTitle, color = c.ink, modifier = Modifier.semantics { heading() })
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(CalendarDimens.timeColumnGap, Alignment.CenterHorizontally),
+        TimeSteppers(
+            LocalTime.of(hour, minute),
+            onStep = { field, up ->
+                when (field) {
+                    ClockField.Hour -> hour = hourStep(hour, up)
+                    ClockField.Minute -> minute = minuteStep(minute, up)
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
-        ) {
-            Stepper(hour, "hour", "Hour", onUp = { hour = hourStep(hour, up = true) }, onDown = { hour = hourStep(hour, up = false) })
-            Text(
-                ":", style = CalendarType.timeColon, color = c.ink,
-                modifier = Modifier.padding(bottom = CalendarDimens.colonBottom).semantics { hideFromAccessibility() },
-            )
-            Stepper(minute, "minute", "Minute", onUp = { minute = minuteStep(minute, up = true) }, onDown = { minute = minuteStep(minute, up = false) })
-        }
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.timeButtonGap)) {
             HhButton("Cancel", onCancel, Modifier.weight(1f).testTag("picker_cancel"), size = ButtonSize.Large, on = ButtonSurface.Surf)
             HhButton(
@@ -124,46 +113,4 @@ internal fun PickerCard(width: Dp, gap: Dp, tag: String, paneTitle: String, cont
             .padding(CalendarDimens.pickerPadding),
         content = content,
     )
-}
-
-@Composable
-private fun Stepper(value: Int, tag: String, name: String, onUp: () -> Unit, onDown: () -> Unit) {
-    val c = Culvery.colors
-    var stepped by remember { mutableStateOf(false) }
-    // Read up, value, down, then the next column.
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(CalendarDimens.stepperGap),
-        modifier = Modifier.readAsOne(),
-    ) {
-        StepButton(Icons.EXPAND_LESS, "${tag}_up", "$name up") { stepped = true; onUp() }
-        Text(
-            value.toString().padStart(2, '0'),
-            style = CalendarType.timeValue,
-            color = c.ink,
-            // "Hour 7", not "zero seven"; spoken as it changes, not as the picker opens.
-            modifier = Modifier.testTag("${tag}_value").semantics {
-                contentDescription = "$name $value"
-                if (stepped) liveRegion = LiveRegionMode.Polite
-            },
-        )
-        StepButton(Icons.EXPAND_MORE, "${tag}_down", "$name down") { stepped = true; onDown() }
-    }
-}
-
-/** On the picker card (`surf`), so the quiet fill on `surf`. */
-@Composable
-private fun StepButton(icon: String, tag: String, label: String, onClick: () -> Unit) {
-    val c = Culvery.colors
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .testTag(tag)
-            .size(CalendarDimens.stepperWidth, CalendarDimens.stepperHeight)
-            .clip(RoundedCornerShape(CalendarDimens.stepperRadius))
-            .background(quietFill(ButtonSurface.Surf, c))
-            .hhClickable(onClick),
-    ) {
-        HhIcon(icon, size = CalendarDimens.stepperIcon, tint = c.ink, contentDescription = label)
-    }
 }
