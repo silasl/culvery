@@ -173,14 +173,14 @@ class ClashTest {
     fun aSpanOverSeveralDaysNamesTheFirstClashWithItsDay() {
         val sat24 = LocalDate.of(2026, 10, 24)
         val dentist = timed("Dentist", sat24, "12:30", "13:00", forPerson = sam.id.value)
-        val lesson = timed("Piano", sat24, "12:45", "13:30")
+        val lesson = timed("Piano", sat24, "12:15", "12:45")
         val h = held(lesson, dentist, lastDay = LocalDate.of(2026, 11, 30))
         val from = sat24.minusDays(1).atTime(10, 0)
         val check = h.check(listOf(sam.id, mia.id), from, from.plusDays(2), london, null, order) as FreeCheck.Busy
-        assertThat(check).isEqualTo(FreeCheck.Busy(listOf(Clash(sam.id, dentist)), 0, emptyList()))
-        assertThat(clashLine(check, single = false, overDays = true, names, london)).isEqualTo("Sam has Dentist, Sat 24 Oct 12:30–13:00")
-        val one = h.check(listOf(sam.id), from, from.plusDays(2), london, null, order) as FreeCheck.Busy
-        assertThat(clashLine(one, single = true, overDays = true, names, london)).isEqualTo("Overlaps Dentist, Sat 24 Oct 12:30–13:00")
+        assertThat(check).isEqualTo(FreeCheck.Busy(listOf(Clash(mia.id, lesson)), 0, emptyList()))
+        assertThat(clashLine(check, single = false, overDays = true, names, london)).isEqualTo("Mia has Piano, Sat 24 Oct 12:15–12:45")
+        val one = h.check(listOf(mia.id), from, from.plusDays(2), london, null, order) as FreeCheck.Busy
+        assertThat(clashLine(one, single = true, overDays = true, names, london)).isEqualTo("Overlaps Piano, Sat 24 Oct 12:15–12:45")
     }
 
     @Test
