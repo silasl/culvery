@@ -88,7 +88,7 @@ class EditorForm(
 
     /** Everyone replaces the set and a person replaces Everyone; the last person can be cleared, which Save then waits on. */
     fun toggleWho(person: PersonId) = edit {
-        copied -= CopiedRow.Who
+        changed(CopiedRow.Who)
         who = toggled(who, person, mayClear = true).sortedBy(order::rankOf)
     }
 
@@ -112,13 +112,13 @@ class EditorForm(
 
     /** Both dates stay; the times hide, and come back as they were (9c §3.1). */
     fun chooseAllDay(on: Boolean) = editWhen {
-        copied -= CopiedRow.Starts
+        changed(CopiedRow.Starts)
         eventWhen = eventWhen.withAllDay(on)
     }
 
     fun pickStartDate(date: LocalDate) = editWhen {
         eventWhen = eventWhen.pickStartDate(date, defaults = !timesTouched, today, now)
-        if (!fitsCopiedRepeat(date)) copied -= CopiedRow.Repeats
+        if (!fitsCopiedRepeat(date)) changed(CopiedRow.Repeats)
     }
 
     /** A day outside the start's day and the 59 after it changes nothing. */
@@ -133,7 +133,7 @@ class EditorForm(
     fun useFreeStart(clock: LocalTime) = editWhen { touchWhen(eventWhen.withStart(clock)) }
 
     private fun touchWhen(next: EventWhen) {
-        copied -= CopiedRow.Starts
+        changed(CopiedRow.Starts)
         eventWhen = next
         timesTouched = true
     }
@@ -158,28 +158,38 @@ class EditorForm(
     }
 
     private fun dropRepeat() {
-        copied -= CopiedRow.Repeats
-        repeat = RepeatChoice.Never
-        repeatEnd = RepeatEnd.Never
+        setRepeat(RepeatChoice.Never)
         repeatTooLong = true
+    }
+
+    private fun setRepeat(choice: RepeatChoice, end: RepeatEnd = RepeatEnd.Never) {
+        repeat = choice
+        repeatEnd = end
+        copiedRepeat = null
     }
 
     var repeatEnd: RepeatEnd by mutableStateOf(RepeatEnd.Never)
         private set
 
-    /** What [use] filled in, until each row changes (9c §4.4). */
-    var copied: Set<CopiedRow> by mutableStateOf(emptySet())
+    private var copiedRows: Set<CopiedRow> by mutableStateOf(emptySet())
+
+    /** The suggestion whose repeat [use] filled in, until Repeats changes. */
+    var copiedRepeat: Suggestion? by mutableStateOf(null)
         private set
 
-    // The copied monthly repeat's place in the month: a phone's "last" rule stays last on a date that is its weekday's last.
-    private var copiedNth: Int? = null
+    /** What [use] filled in, until each row changes (9c §4.4). */
+    val copied: Set<CopiedRow> get() = if (copiedRepeat != null) copiedRows + CopiedRow.Repeats else copiedRows
 
-    /** The place in its month a monthly-on-a-weekday repeat takes for [day]: the copied "last", or [day]'s own. */
+    private fun changed(row: CopiedRow) {
+        if (row == CopiedRow.Repeats) copiedRepeat = null else copiedRows -= row
+    }
+
+    /** The place in its month a monthly-on-a-weekday repeat takes for [day]: a copied "last", or [day]'s own. */
     fun nthOn(day: LocalDate): Int =
-        if (repeat == RepeatChoice.MonthlyOnWeekday && copiedNth == LAST && CopiedRow.Repeats in copied && isLastOfWeekday(day)) LAST else nthWeekday(day)
+        if (repeat == RepeatChoice.MonthlyOnWeekday && copiedRepeat?.nth() == LAST && isLastOfWeekday(day)) LAST else nthWeekday(day)
 
     private fun fitsCopiedRepeat(date: LocalDate): Boolean {
-        val s = usedSuggestion?.takeIf { CopiedRow.Repeats in copied } ?: return true
+        val s = copiedRepeat ?: return true
         val anchor = s.anchor()
         return when (repeat) {
             RepeatChoice.Weekly -> date.dayOfWeek == anchor.dayOfWeek
@@ -203,23 +213,17 @@ class EditorForm(
         if (mode != Mode.New) return@edit
         title = s.title.take(MAX_TITLE_LENGTH)
         if (childOnly == null) who = resolveIds(s.forPerson, PersonId.FAMILY, order)
-        eventWhen = eventWhen.copiedFrom(s)
-        timesTouched = true
+        touchWhen(eventWhen.copiedFrom(s))
         val filled = s.choice()?.takeIf { canRepeat && childOnly == null && it.fitsLength(eventWhen.repeatLength) }
         if (filled != null) {
-            repeat = filled
-            copiedNth = s.nth()
-            repeatEnd = RepeatEnd.Never
+            setRepeat(filled)
             repeatTooLong = false
             repeatsAnswered = true
         } else if (!repeat.fitsLength(eventWhen.repeatLength)) {
             dropRepeat()
         }
-        copied = buildSet {
-            if (childOnly == null) add(CopiedRow.Who)
-            add(CopiedRow.Starts)
-            if (filled != null) add(CopiedRow.Repeats)
-        }
+        copiedRows = if (childOnly == null) setOf(CopiedRow.Who, CopiedRow.Starts) else setOf(CopiedRow.Starts)
+        copiedRepeat = s.takeIf { filled != null }
         usedSuggestion = s
     }
 
@@ -228,9 +232,7 @@ class EditorForm(
         if (!canRepeat) return@edit
         openRepeats()
         if (choice == repeat || !choice.fitsLength(eventWhen.repeatLength)) return@edit
-        copied -= CopiedRow.Repeats
-        repeat = choice
-        if (choice == RepeatChoice.Never) repeatEnd = RepeatEnd.Never
+        setRepeat(choice, if (choice == RepeatChoice.Never) RepeatEnd.Never else repeatEnd)
     }
 
     /** Choosing it while it is chosen keeps the count. */

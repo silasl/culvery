@@ -404,7 +404,7 @@ private fun Rows(
         set = form.who.isNotEmpty(),
         typing = typing,
         onClick = { onOpen(EditorStep.Who) },
-        tag = if (CopiedRow.Who in form.copied) copiedTag() else null,
+        tag = form.copiedTag(CopiedRow.Who),
     )
     val w = form.eventWhen
     if (form.datesLocked) {
@@ -427,7 +427,7 @@ private fun Rows(
             typing = typing,
             onDate = { onOpen(EditorStep.StartDate) },
             onTime = { onOpen(EditorStep.StartTime) },
-            tag = startsTag(clash = if (clash) clashTag() else null, copied = if (CopiedRow.Starts in form.copied) copiedTag() else null),
+            tag = startsTag(clash = if (clash) clashTag() else null, copied = form.copiedTag(CopiedRow.Starts)),
         )
         val end = w.endDate
         EditorWhenRow(
@@ -454,7 +454,7 @@ private fun Rows(
             set = editing || form.repeat != RepeatChoice.Never,
             typing = typing,
             onClick = { onOpen(EditorStep.Repeats) },
-            tag = if (form.repeatTooLong) tooLongTag() else if (CopiedRow.Repeats in form.copied) copiedTag() else null,
+            tag = if (form.repeatTooLong) tooLongTag() else form.copiedTag(CopiedRow.Repeats),
         )
     }
 }

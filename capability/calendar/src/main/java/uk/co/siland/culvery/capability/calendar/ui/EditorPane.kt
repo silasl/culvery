@@ -29,7 +29,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import java.time.LocalDate
-import uk.co.siland.culvery.capability.calendar.CopiedRow
 import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.capability.calendar.Held
 import uk.co.siland.culvery.capability.calendar.bannerLine
@@ -218,5 +217,4 @@ private fun SkipButton(onClick: () -> Unit) {
 private fun copiedBanner(form: EditorForm): String? = form.usedSuggestion?.takeIf { form.copied.isNotEmpty() }?.let { bannerLine(it, form.copied, form.today) }
 
 // Only a repeat that was filled in gives dates to pick.
-private fun copiedQuickPicks(form: EditorForm): List<LocalDate> =
-    form.usedSuggestion?.takeIf { CopiedRow.Repeats in form.copied }?.let { quickPicksFor(it, form.today) }.orEmpty()
+private fun copiedQuickPicks(form: EditorForm): List<LocalDate> = form.copiedRepeat?.let { quickPicksFor(it, form.today) }.orEmpty()

@@ -29,6 +29,8 @@ import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.calendar.CHOOSE_A_DAY
+import uk.co.siland.culvery.capability.calendar.CopiedRow
+import uk.co.siland.culvery.capability.calendar.EditorForm
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhAlpha
 import uk.co.siland.culvery.core.ui.HhIcon
@@ -61,13 +63,17 @@ internal fun clashTag(): RowTag {
     return RowTag(CLASH, Icons.WARNING, c.weather.copy(alpha = HhAlpha.clash(c)).compositeOver(c.surf), c.weather)
 }
 
-/** What "Use this" filled in (9c §4.4): the Clash tag's shape in `accentSoft` and `accent`. */
+// The Clash tag's shape in `accentSoft` and `accent`.
 @Composable
-internal fun copiedTag(): RowTag = Culvery.colors.let { RowTag(COPIED, Icons.CONTENT_COPY, it.accentSoft, it.accent) }
+private fun accentTag(text: String, icon: String): RowTag = Culvery.colors.let { RowTag(text, icon, it.accentSoft, it.accent) }
+
+/** What "Use this" filled in (9c §4.4), while [row] is still as it was copied. */
+@Composable
+internal fun EditorForm.copiedTag(row: CopiedRow): RowTag? = if (row in copied) accentTag(COPIED, Icons.CONTENT_COPY) else null
 
 /** The Repeats row's tag when a change to the When ruled out the chosen repeat (9c §3.3): the Copied tag's colours. */
 @Composable
-internal fun tooLongTag(): RowTag = Culvery.colors.let { RowTag(TOO_LONG, Icons.INFO, it.accentSoft, it.accent) }
+internal fun tooLongTag(): RowTag = accentTag(TOO_LONG, Icons.INFO)
 
 /**
  * One of the event's rows (handoff §1 Layout): an [icon], the [label] over the [value] on one line, an optional [tag],

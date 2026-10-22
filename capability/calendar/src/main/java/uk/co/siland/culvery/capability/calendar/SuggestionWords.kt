@@ -10,7 +10,7 @@ import uk.co.siland.culvery.core.ui.clockText
 import uk.co.siland.culvery.core.ui.plural
 
 /** What "Use this" filled in, each cleared when its row changes (9c §4.4). */
-enum class CopiedRow { Who, Starts, Repeats }
+enum class CopiedRow(val word: String) { Who("who"), Starts("time"), Repeats("repeats") }
 
 private const val PICKS = 3
 private const val MINUTES_PER_DAY = 24 * 60L
@@ -96,13 +96,7 @@ fun spokenSuggestion(s: Suggestion, people: List<Person>, childOnly: Boolean): S
 
 /** The banner over the Starts date pane after "Use this" (9c §4.4). */
 fun bannerLine(s: Suggestion, copied: Set<CopiedRow>, today: LocalDate): String {
-    val names = CopiedRow.entries.filter { it in copied }.map {
-        when (it) {
-            CopiedRow.Who -> "who"
-            CopiedRow.Starts -> "time"
-            CopiedRow.Repeats -> "repeats"
-        }
-    }
+    val names = CopiedRow.entries.filter { it in copied }.map { it.word }
     val what = if (names.isEmpty()) "" else ": ${spokenNames(names)}"
     return "Copied from ${s.title} (${s.lastOrNext(today)})$what. Tap any row to change it. The date is never copied."
 }
