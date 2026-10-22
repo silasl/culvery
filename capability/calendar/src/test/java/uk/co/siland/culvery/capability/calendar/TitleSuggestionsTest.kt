@@ -9,11 +9,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.RememberedTitleEntity
-import uk.co.siland.culvery.core.household.HouseholdRepository
-import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
-import uk.co.siland.culvery.core.plugin.WallClock
 
 @RunWith(AndroidJUnit4::class)
 class TitleSuggestionsTest {
@@ -25,7 +22,7 @@ class TitleSuggestionsTest {
     fun setUp() {
         db = calendarDb()
         store = CalendarStore(db)
-        suggestions = TitleSuggestions(store, HouseholdZone(HouseholdRepository(householdDb())), WallClock { 0L })
+        suggestions = TitleSuggestions(store)
     }
 
     @After

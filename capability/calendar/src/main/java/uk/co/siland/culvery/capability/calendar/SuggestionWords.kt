@@ -23,6 +23,8 @@ private fun Suggestion.anchor(): LocalDate = seriesStart ?: rememberedDate
 
 private fun Suggestion.choice(): RepeatChoice? = rule?.let { choiceOf(it, anchor()) }?.takeIf { it != RepeatChoice.Never }
 
+private fun Suggestion.nth(): Int = rule?.let { nthOf(it, anchor()) } ?: nthWeekday(anchor())
+
 private fun Suggestion.eventLength(): Duration? = if (allDay) days?.let { Duration.ofDays(it.toLong()) } else length
 
 // Dropped when the event is longer than the repeat allows (9c §3.3).
@@ -67,15 +69,20 @@ fun patternLine(s: Suggestion, people: List<Person>, today: LocalDate): String {
     }
     val anchor = s.anchor()
     val time = s.timeWords(spoken = false)
-    val pattern = if (choice == RepeatChoice.Weekly) "${weekdayName(anchor)}s $time" else "${choice.wording(anchor)}, $time"
+    val pattern = if (choice == RepeatChoice.Weekly) "${weekdayName(anchor)}s $time" else "${choice.wording(anchor, s.nth())}, $time"
     return listOf(who, pattern, s.lastOrNext(today)).joinToString(" · ")
 }
 
 private fun fills(s: Suggestion, people: List<Person>, childOnly: Boolean, spoken: Boolean): String {
     val who = s.whoNow(people).let { if (it.singleOrNull()?.isFamily == true) EVERYONE else whoLine(it) }
-    val repeat = s.filledRepeat()?.let { lowerFirst(it.wording(s.anchor())) }
-    val parts = if (childOnly) listOf(s.timeWords(spoken)) else listOfNotNull(who, s.timeWords(spoken), repeat)
-    return "Fills in ${spokenNames(parts)}"
+    val repeat = s.filledRepeat()?.let { lowerFirst(it.wording(s.anchor(), s.nth())) }
+    val time = s.timeWords(spoken)
+    return when {
+        childOnly -> "Fills in $time"
+        // An all-day phrase follows who with a comma: "Fills in Sam, all day for 3 days".
+        s.allDay -> "Fills in $who, ${spokenNames(listOfNotNull(time, repeat))}"
+        else -> "Fills in ${spokenNames(listOfNotNull(who, time, repeat))}"
+    }
 }
 
 /** The accent line (9c §4.3): "Fills in Mia, 10:00–10:45 and every Saturday". A child's leaves out who and the repeat. */
@@ -112,7 +119,7 @@ fun quickPicksFor(s: Suggestion, today: LocalDate): List<LocalDate> {
             occurrences(choice, onFortnight, PICKS)
         }
         // One more than wanted, since this month's date may be before today.
-        RepeatChoice.MonthlyOnWeekday -> occurrences(choice, firstWeekday, PICKS + 1, nthWeekday(anchor)).filter { it >= today }.take(PICKS)
+        RepeatChoice.MonthlyOnWeekday -> occurrences(choice, firstWeekday, PICKS + 1, s.nth()).filter { it >= today }.take(PICKS)
         RepeatChoice.Yearly -> listOfNotNull(
             (today.year..today.year + LEAP_GAP_YEARS).firstNotNullOfOrNull { year ->
                 MonthDay.from(anchor).takeIf { it.isValidYear(year) }?.atYear(year)?.takeIf { it >= today }

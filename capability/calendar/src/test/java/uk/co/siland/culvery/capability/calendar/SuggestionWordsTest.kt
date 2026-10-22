@@ -89,8 +89,8 @@ class SuggestionWordsTest {
     fun theFillLineListsWhoTimeAndTheRepeat() {
         assertThat(fillLine(guitar(), household, childOnly = false)).isEqualTo("Fills in Mia, 10:00–10:45 and every Saturday")
         assertThat(fillLine(oneOff(), household, childOnly = false)).isEqualTo("Fills in Everyone and 10:30–12:00")
-        assertThat(fillLine(allDay(3), household, childOnly = false)).isEqualTo("Fills in Sam and all day for 3 days")
-        assertThat(fillLine(allDay(1), household, childOnly = false)).isEqualTo("Fills in Sam and all day")
+        assertThat(fillLine(allDay(3), household, childOnly = false)).isEqualTo("Fills in Sam, all day for 3 days")
+        assertThat(fillLine(allDay(1), household, childOnly = false)).isEqualTo("Fills in Sam, all day")
     }
 
     @Test
@@ -104,7 +104,7 @@ class SuggestionWordsTest {
     fun aRepeatLongerThanItsGapIsNotFilled() {
         val daily = "RRULE:FREQ=DAILY;INTERVAL=1"
         val twoDays = Suggestion("Camp", "mia", true, null, null, 2, daily, day(9, 1), day(9, 2))
-        assertThat(fillLine(twoDays, household, childOnly = false)).isEqualTo("Fills in Mia and all day for 2 days")
+        assertThat(fillLine(twoDays, household, childOnly = false)).isEqualTo("Fills in Mia, all day for 2 days")
     }
 
     @Test
@@ -163,6 +163,14 @@ class SuggestionWordsTest {
         assertThat(picks(series("RRULE:FREQ=YEARLY;INTERVAL=1", day(2, 29, 2024)))).containsExactly(day(2, 29, 2028))
         assertThat(picks(series("RRULE:FREQ=DAILY;INTERVAL=1", day(9, 22)))).isEmpty()
         assertThat(picks(series(null, day(9, 22)))).isEmpty()
+    }
+
+    @Test
+    fun aPhonesLastThursdayIsWordedAndPickedAsLast() {
+        val lastThursday = series("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1TH", day(9, 24), first = day(9, 24))
+        assertThat(patternLine(lastThursday, household, today)).isEqualTo("Family · Every month, on the last Thursday, 10:00–11:00 · next on Thu 24 Sep")
+        assertThat(fillLine(lastThursday, household, childOnly = false)).isEqualTo("Fills in Everyone, 10:00–11:00 and every month, on the last Thursday")
+        assertThat(quickPicksFor(lastThursday, today)).containsExactly(day(9, 24), day(10, 29), day(11, 26)).inOrder()
     }
 
     @Test

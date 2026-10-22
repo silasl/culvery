@@ -94,7 +94,7 @@ private fun EventRow.remembered(zone: ZoneId): RememberedTitleEntity? {
 /** The repeat the editor offers, written with no end and no first date; null for any other, or one that can't be read. */
 private fun keptRule(rule: String, start: LocalDate): String? {
     val choice = runCatching { choiceOf(rule, start) }.getOrNull()?.takeIf { it != RepeatChoice.Never } ?: return null
-    return recurrenceRule(choice, RepeatEnd.Never, start)
+    return recurrenceRule(choice, RepeatEnd.Never, start, nthOf(rule, start))
 }
 
 /**

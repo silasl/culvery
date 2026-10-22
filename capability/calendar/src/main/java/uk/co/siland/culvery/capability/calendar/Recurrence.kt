@@ -52,13 +52,13 @@ private const val FIFTH = 5
 internal fun weekdayName(day: LocalDate): String = day.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
 
 /** "Every Saturday", "Every 2 weeks, on Saturday", "Every month, on the 4th Saturday", "Every year, on 26 September"… */
-fun RepeatChoice.wording(day: LocalDate): String = when (this) {
+fun RepeatChoice.wording(day: LocalDate, nth: Int = nthWeekday(day)): String = when (this) {
     RepeatChoice.Never -> DOESNT_REPEAT
     RepeatChoice.Daily -> "Every day"
     RepeatChoice.Weekly -> "Every ${weekdayName(day)}"
     RepeatChoice.Fortnightly -> "Every 2 weeks, on ${weekdayName(day)}"
     RepeatChoice.Monthly -> "Every month, on the ${ordinal(day.dayOfMonth)}"
-    RepeatChoice.MonthlyOnWeekday -> "Every month, on the ${ordinal(nthWeekday(day))} ${weekdayName(day)}"
+    RepeatChoice.MonthlyOnWeekday -> "Every month, on the ${ordinal(nth)} ${weekdayName(day)}"
     RepeatChoice.Yearly -> "Every year, on ${day.format(DATE_IN_YEAR)}"
 }
 
@@ -140,9 +140,9 @@ private const val SERIES_START = "DTSTART:"
  * [RepeatChoice.MonthlyOnWeekday] first adds `BYDAY` for [day]'s place in its month ("4SA", "-1TH"). Null for
  * [RepeatChoice.Never].
  */
-fun recurrenceRule(choice: RepeatChoice, end: RepeatEnd, day: LocalDate): String? {
+fun recurrenceRule(choice: RepeatChoice, end: RepeatEnd, day: LocalDate, nth: Int = nthWeekday(day)): String? {
     val freq = choice.freq ?: return null
-    val byDay = if (choice == RepeatChoice.MonthlyOnWeekday) ";BYDAY=${nthWeekday(day)}${day.dayOfWeek.code()}" else ""
+    val byDay = if (choice == RepeatChoice.MonthlyOnWeekday) ";BYDAY=$nth${day.dayOfWeek.code()}" else ""
     val ending = when (end) {
         RepeatEnd.Never -> ""
         is RepeatEnd.After -> ";COUNT=${end.times}"
@@ -192,7 +192,7 @@ internal fun readChoice(parts: Map<String, String>, start: LocalDate): RepeatCho
         }
         "MONTHLY" -> when {
             interval != 1 || (byDay != null && byMonthDay != null) -> null
-            byDay != null -> RepeatChoice.MonthlyOnWeekday.takeIf { byDay == "${nthWeekday(start)}$weekday" }
+            byDay != null -> RepeatChoice.MonthlyOnWeekday.takeIf { byDay == "${nthWeekday(start)}$weekday" || (byDay == "$LAST$weekday" && isLastOfWeekday(start)) }
             else -> RepeatChoice.Monthly.takeIf { byMonthDay == null || byMonthDay == start.dayOfMonth.toString() }
         }
         "YEARLY" -> RepeatChoice.Yearly.takeIf { rest.isEmpty() && interval == 1 }
@@ -203,3 +203,10 @@ internal fun readChoice(parts: Map<String, String>, start: LocalDate): RepeatCho
 /** The editor's choice that [rule] is, read from the series' [start]; null for anything the editor can't make. */
 fun choiceOf(rule: String, start: LocalDate): RepeatChoice? =
     ruleParts(rule)?.let { readChoice(it, start) }?.takeIf { it in EDITOR_REPEATS }
+
+// A phone says "last" for a 4th weekday that is also the last of its month; the editor says 4th.
+private fun isLastOfWeekday(day: LocalDate): Boolean = day.plusWeeks(1).month != day.month
+
+/** Which of its weekday [rule] repeats on from [start]: −1 for a phone's "last", else [start]'s own place in its month. */
+fun nthOf(rule: String, start: LocalDate): Int =
+    if (ruleParts(rule)?.get("BYDAY")?.startsWith("$LAST") == true) LAST else nthWeekday(start)

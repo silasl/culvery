@@ -81,6 +81,13 @@ class RememberedTitlesTest {
     }
 
     @Test
+    fun aPhonesLastThursdayKeepsItsLast() {
+        val rule = "DTSTART:20260924\nRRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1TH"
+        val kept = remembered(timed("a", "Club", day(9, 24), rule = rule, seriesId = "a")).single()
+        assertThat(kept.rule).isEqualTo("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1TH")
+    }
+
+    @Test
     fun aRuleTheEditorDoesNotOfferIsNotKept() {
         val every3 = timed("a", "Club", day(9, 5), rule = "RRULE:FREQ=WEEKLY;INTERVAL=3", seriesId = "a")
         val unreadable = timed("b", "Choir", day(9, 5), rule = "RRULE:FREQ", seriesId = "b")

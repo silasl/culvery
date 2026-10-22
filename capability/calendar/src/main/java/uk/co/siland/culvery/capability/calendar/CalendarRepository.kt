@@ -43,7 +43,7 @@ class CalendarRepository @Inject constructor(
     }
 
     /** Titles remembered from visible calendars, matched as a new event's title is typed (9c §4). */
-    val suggestions = TitleSuggestions(store, zone, clock)
+    val suggestions = TitleSuggestions(store)
 
     val hasConnections: Flow<Boolean> = store.connectionIds().map { it.isNotEmpty() }.distinctUntilChanged()
 

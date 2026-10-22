@@ -4,8 +4,6 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import uk.co.siland.culvery.capability.calendar.db.RememberedTitleEntity
-import uk.co.siland.culvery.core.household.HouseholdZone
-import uk.co.siland.culvery.core.plugin.WallClock
 
 private const val MIN_TYPED = 2
 private const val MINUTES_PER_HOUR = 60
@@ -24,7 +22,7 @@ data class Suggestion(
 )
 
 /** Matches what is typed in a new event's title against the titles of visible calendars (9c §4.2). */
-class TitleSuggestions(private val store: CalendarStore, private val zone: HouseholdZone, private val clock: WallClock) {
+class TitleSuggestions(private val store: CalendarStore) {
     /**
      * Up to [max] titles whose key starts with what is typed, then those with a word that does; the latest date first
      * in each, one per title across connections. Nothing for under two characters.

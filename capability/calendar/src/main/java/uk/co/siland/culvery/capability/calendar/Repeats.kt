@@ -22,17 +22,9 @@ fun repeatsLabel(rule: String?, start: EventTime, zone: ZoneId): String {
     val first = seriesStart(rule)
     val day = first ?: start.instantIn(zone).atZone(zone).toLocalDate()
     val choice = readChoice(parts, day)
-    val lastWeekday = choice == null && isLastWeekday(parts, day)
-    val words = when {
-        choice != null -> choice.wording(day)
-        lastWeekday -> "Every month, on the last ${weekdayName(day)}"
-        else -> otherInterval(parts, day) ?: return REPEATS_YES
-    }
-    val dates: ((LocalDate, Int) -> List<LocalDate>)? = when {
-        choice != null -> { from, n -> occurrences(choice, from, n) }
-        lastWeekday -> { from, n -> occurrences(RepeatChoice.MonthlyOnWeekday, from, n, nth = -1) }
-        else -> null
-    }
+    val nth = nthOf(rule, day)
+    val words = if (choice != null) choice.wording(day, nth) else otherInterval(parts, day) ?: return REPEATS_YES
+    val dates: ((LocalDate, Int) -> List<LocalDate>)? = choice?.let { c -> { from, n -> occurrences(c, from, n, nth) } }
     val count = parts["COUNT"]?.toIntOrNull()?.takeIf { it >= 1 }?.let { n ->
         val last = if (dates != null && first != null) " · last on ${dates(first, n).last().format(SHORT_DAY)}" else ""
         " · ${plural(n.toLong(), "time")}$last"
@@ -40,13 +32,6 @@ fun repeatsLabel(rule: String?, start: EventTime, zone: ZoneId): String {
     val until = parts["UNTIL"]?.let { untilDay(it, zone) }?.let { " · until ${it.format(SHORT_DAY)}" }.orEmpty()
     return words + count + until
 }
-
-/** Monthly on the last of [day]'s weekday, from a 4th that is also the last: a phone writes this, the editor never does. */
-private fun isLastWeekday(parts: Map<String, String>, day: LocalDate): Boolean =
-    parts["FREQ"] == "MONTHLY" &&
-        (parts["INTERVAL"] ?: "1") == "1" &&
-        (parts - BOUNDING_PARTS) == mapOf("BYDAY" to "-1${day.dayOfWeek.code()}") &&
-        day.plusWeeks(1).month != day.month
 
 /** "Every 3 months": an interval no choice writes, when its BYDAY or BYMONTHDAY is [day]'s own. */
 private fun otherInterval(parts: Map<String, String>, day: LocalDate): String? {

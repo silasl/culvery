@@ -100,8 +100,20 @@ class RecurrenceTest {
         }
         // By date, or by a weekday the start isn't on, is nothing the editor makes.
         assertThat(choiceOf("RRULE:FREQ=MONTHLY;BYMONTHDAY=26", saturday)).isNull()
-        assertThat(choiceOf("RRULE:FREQ=MONTHLY;BYDAY=-1SA", saturday)).isNull()
+        assertThat(choiceOf("RRULE:FREQ=MONTHLY;BYDAY=-1SA", LocalDate.of(2026, 9, 19))).isNull()
         assertThat(choiceOf("RRULE:FREQ=WEEKLY;BYDAY=MO,WE", saturday)).isNull()
+    }
+
+    @Test
+    fun aPhonesLastWeekdayIsMonthlyOnWeekdayWithNthMinusOne() {
+        val lastThursday = LocalDate.of(2026, 9, 24)
+        val rule = "RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1TH"
+        assertThat(choiceOf(rule, lastThursday)).isEqualTo(RepeatChoice.MonthlyOnWeekday)
+        assertThat(nthOf(rule, lastThursday)).isEqualTo(-1)
+        assertThat(choiceOf(rule, LocalDate.of(2026, 9, 17))).isNull()
+        assertThat(RepeatChoice.MonthlyOnWeekday.wording(lastThursday, nthOf(rule, lastThursday))).isEqualTo("Every month, on the last Thursday")
+        assertThat(nthOf("RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=4TH", lastThursday)).isEqualTo(4)
+        assertThat(recurrenceRule(RepeatChoice.MonthlyOnWeekday, RepeatEnd.Never, lastThursday, nth = -1)).isEqualTo(rule)
     }
 
     /** Never "Yes": whatever either editor writes, the detail sheet's Repeats row starts with the words for it. */
