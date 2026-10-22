@@ -160,7 +160,6 @@ private fun WhenClash(eventWhen: EventWhen, context: WhenContext, onFreeStart: (
         context.held?.checkWhen(eventWhen, context.who, context.zone, context.except, order) ?: FreeCheck.None
     }
     ClashResult(
-        summary = null,
         check = check,
         who = context.who,
         overDays = eventWhen.overDays(context.zone),

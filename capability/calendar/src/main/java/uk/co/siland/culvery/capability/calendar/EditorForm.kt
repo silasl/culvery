@@ -16,7 +16,7 @@ private const val FORTNIGHT_DAYS = 14L
 /** The longest an event may last, in days (the first and last day count). */
 const val MAX_SPAN_DAYS = 60L
 
-/** 2b-2 design D8: a title is at most 100 characters. */
+/** A title is at most 100 characters. */
 const val MAX_TITLE_LENGTH = 100
 
 /** What Add event still waits for, in the order the foot names them. */
@@ -178,7 +178,6 @@ class EditorForm(
     fun nthOn(day: LocalDate): Int =
         if (repeat == RepeatChoice.MonthlyOnWeekday && copiedNth == LAST && CopiedRow.Repeats in copied && isLastOfWeekday(day)) LAST else nthWeekday(day)
 
-    // Whether [date] is a day the copied repeat falls on, so the Copied tag is still true of it.
     private fun fitsCopiedRepeat(date: LocalDate): Boolean {
         val s = usedSuggestion?.takeIf { CopiedRow.Repeats in copied } ?: return true
         val anchor = s.anchor()

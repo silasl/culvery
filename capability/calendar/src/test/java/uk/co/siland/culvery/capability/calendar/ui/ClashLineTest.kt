@@ -46,7 +46,7 @@ class ClashLineTest {
         val check = earlyPiano.checkWhen(eventWhen, who, LONDON, null, household.order)
         compose.setContent {
             CulveryTheme(dark = true) {
-                ClashResult(null, check, who, eventWhen.overDays(LONDON), LONDON, { household.byId[it]?.name.orEmpty() }, {})
+                ClashResult(check, who, eventWhen.overDays(LONDON), LONDON, { household.byId[it]?.name.orEmpty() }, {})
             }
         }
         return check

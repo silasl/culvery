@@ -206,7 +206,6 @@ internal fun EventEditorScreen(
                             if (!busy) {
                                 closeKeyboard()
                                 form.chooseAllDay(on)
-                                // The time panes go with the times.
                                 when (flow.active) {
                                     EditorStep.StartTime -> flow.open(EditorStep.StartDate)
                                     EditorStep.EndTime -> flow.open(EditorStep.EndDate)

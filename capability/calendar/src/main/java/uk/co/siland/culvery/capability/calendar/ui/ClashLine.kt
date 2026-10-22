@@ -62,13 +62,12 @@ internal fun EventWhen.overDays(zone: ZoneId): Boolean {
 }
 
 /**
- * Under a rule: [summary] (when there is one) and what the tablet knows of the time, said as it changes: "Mia is free then"
- * in `accent`, or the clash in `weather`, then the nearest free starts for the same length; nothing past what it holds
- * (9 §3.1). Without a [summary] and with nothing to say, nothing is drawn.
+ * Under a rule: what the tablet knows of the time, said as it changes: "Mia is free then" in `accent`, or the clash in
+ * `weather`, then the nearest free starts for the same length; nothing past what it holds (9 §3.1). With nothing to say,
+ * nothing is drawn.
  */
 @Composable
 internal fun ClashResult(
-    summary: String?,
     check: FreeCheck,
     who: List<PersonId>,
     overDays: Boolean,
@@ -81,7 +80,7 @@ internal fun ClashResult(
         is FreeCheck.Busy -> clashLine(check, single = who.size == 1, overDays = overDays, nameOf, zone)
         FreeCheck.None -> null
     }
-    if (summary == null && line == null) return
+    if (line == null) return
     val c = Culvery.colors
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.resultTop)) {
         Box(Modifier.fillMaxWidth().height(EditorDimens.resultRule).background(c.surf3))
@@ -90,7 +89,6 @@ internal fun ClashResult(
             horizontalArrangement = Arrangement.spacedBy(EditorDimens.resultGap),
             modifier = Modifier.testTag("time_result").semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
         ) {
-            if (summary != null) Text(summary, style = CalendarType.timeResult, color = c.ink, maxLines = 1)
             val icon = checkIcon(check)
             if (line != null && icon != null) {
                 val tint = if (check is FreeCheck.Busy) c.weather else c.accent
