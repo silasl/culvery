@@ -25,10 +25,15 @@ fun lowerFirst(s: String): String = s.replaceFirstChar { it.lowercase() }
 /** "Mia is free then", "Sam and Mia are free then". */
 fun freeLine(check: FreeCheck.Free, names: (PersonId) -> String): String = "${subject(check.people.map(names))} free then"
 
-/** "Overlaps Piano, 15:30–16:15" when one person is chosen ([single]); otherwise who: "Sam has Dentist, 12:30–13:00". */
-fun clashLine(check: FreeCheck.Busy, single: Boolean, names: (PersonId) -> String, zone: ZoneId): String {
-    val what = "${check.event.title}, ${clockRange(check.event, zone)}"
-    return if (single) "Overlaps $what" else "${names(check.person)} has $what"
+/**
+ * "Overlaps Piano, 15:30–16:15" when one person is chosen ([single]); otherwise who, up to two: "Sam has Dentist, 12:30–13:00;
+ * Mia has Piano, 12:45–13:30", then " … and 1 more". Over several days ([overDays]) a one-day event reads with its date.
+ */
+fun clashLine(check: FreeCheck.Busy, single: Boolean, overDays: Boolean, names: (PersonId) -> String, zone: ZoneId): String {
+    fun what(event: HeldEvent) = "${event.title}, ${clockRange(event, zone, withDate = overDays)}"
+    if (single) return "Overlaps ${what(check.clashes.first().event)}"
+    val named = check.clashes.joinToString("; ") { "${names(it.person)} has ${what(it.event)}" }
+    return if (check.more > 0) "$named … and ${check.more} more" else named
 }
 
 /** "Mia is free at", "Sam and Mia are free at": what the free start chips follow. */
@@ -36,12 +41,14 @@ fun freeAtLine(people: List<String>): String = "${subject(people)} free at"
 
 private fun subject(names: List<String>) = "${spokenNames(names)} ${if (names.size == 1) "is" else "are"}"
 
-// An event over several days names its days: "Fri 18:00 – Sun 16:00".
-private fun clockRange(event: HeldEvent, zone: ZoneId): String {
+// An event over several days names its days: "Fri 18:00 – Sun 16:00"; [withDate] dates a one-day event: "Sat 24 Oct 12:30–13:00".
+private fun clockRange(event: HeldEvent, zone: ZoneId, withDate: Boolean): String {
     val from = event.start.instantIn(zone).atZone(zone)
     val to = event.end.instantIn(zone).atZone(zone)
     val (first, last) = daySpan(event.start, event.end, zone)
-    return if (first == last) "${from.format(HOURS_MINUTES)}–${to.format(HOURS_MINUTES)}" else "${from.format(DAY_AND_CLOCK)} – ${to.format(DAY_AND_CLOCK)}"
+    if (first != last) return "${from.format(DAY_AND_CLOCK)} – ${to.format(DAY_AND_CLOCK)}"
+    val date = if (withDate) "${from.format(SHORT_DAY)} " else ""
+    return "$date${from.format(HOURS_MINUTES)}–${to.format(HOURS_MINUTES)}"
 }
 
 /** The Who row: "Choose who", "Everyone", "Sam + Mia". */

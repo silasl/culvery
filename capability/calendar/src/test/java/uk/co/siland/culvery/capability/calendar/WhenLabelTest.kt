@@ -51,6 +51,19 @@ class WhenLabelTest {
         assertThat(whenLabel(at(23, 22), at(24, 1), london, today)).isEqualTo("Today 22:00 – Tomorrow 01:00")
     }
 
+    @Test
+    fun theDetailReadsATimedSpanInSpanWords() {
+        val start = LocalDateTime.of(2026, 10, 23, 18, 0).atZone(london)
+        val end = LocalDateTime.of(2026, 10, 25, 16, 0).atZone(london)
+        val label = whenLabel(EventTime.Timed(start.toInstant()), EventTime.Timed(end.toInstant()), london, today)
+        assertThat(label).isEqualTo(spanWords(EventSpan.Timed(start, end), london))
+    }
+
+    @Test
+    fun theDetailKeepsItsOwnAllDayForm() {
+        assertThat(whenLabel(allDay(10, 19), allDay(10, 24), london, today)).isEqualTo("Mon 19 Oct – Fri 23 Oct · All day")
+    }
+
     private fun ui(syncing: Boolean = false, readOnly: ReadOnlyReason? = null, recurring: Boolean = false) = EventUi(
         EventRef("c", "s", "e"), "Swim", "16:00–17:00", "16:00", listOf(Person.Family),
         allDay = false, recurring = recurring, startSort = 0, readOnlyReason = readOnly, syncing = syncing,

@@ -91,11 +91,22 @@ class EditorWordsTest {
         assertThat(freeLine(FreeCheck.Free(listOf(mia.id)), names)).isEqualTo("Mia is free then")
         assertThat(freeLine(FreeCheck.Free(listOf(sam.id, mia.id)), names)).isEqualTo("Sam and Mia are free then")
         val piano = held("Piano", LocalDate.of(2026, 10, 1), "15:30", "16:15", mia)
-        assertThat(clashLine(FreeCheck.Busy(mia.id, piano, emptyList()), single = true, names, london)).isEqualTo("Overlaps Piano, 15:30–16:15")
+        assertThat(clashLine(FreeCheck.Busy(listOf(Clash(mia.id, piano)), 0, emptyList()), single = true, overDays = false, names, london)).isEqualTo("Overlaps Piano, 15:30–16:15")
         val dentist = held("Dentist", LocalDate.of(2026, 10, 1), "12:30", "13:00", sam)
-        assertThat(clashLine(FreeCheck.Busy(sam.id, dentist, emptyList()), single = false, names, london)).isEqualTo("Sam has Dentist, 12:30–13:00")
+        assertThat(clashLine(FreeCheck.Busy(listOf(Clash(sam.id, dentist)), 0, emptyList()), single = false, overDays = false, names, london)).isEqualTo("Sam has Dentist, 12:30–13:00")
         assertThat(freeAtLine(listOf("Mia"))).isEqualTo("Mia is free at")
         assertThat(freeAtLine(listOf("Sam", "Mia"))).isEqualTo("Sam and Mia are free at")
+    }
+
+    @Test
+    fun spanWordsReadsEachForm() {
+        val timed = { from: LocalDateTime, to: LocalDateTime -> EventSpan.Timed(from.atZone(london), to.atZone(london)) }
+        assertThat(spanWords(timed(sat26.atTime(10, 0), sat26.atTime(10, 45)), london)).isEqualTo("Sat 26 Sep, 10:00–10:45")
+        val fri23 = LocalDate.of(2026, 10, 23)
+        assertThat(spanWords(timed(fri23.atTime(18, 0), fri23.plusDays(2).atTime(16, 0)), london)).isEqualTo("Fri 23 Oct 18:00 – Sun 25 Oct 16:00")
+        val mon19 = LocalDate.of(2026, 10, 19)
+        assertThat(spanWords(EventSpan.AllDay(mon19, fri23.plusDays(1)), london)).isEqualTo("Mon 19 – Fri 23 Oct, all day")
+        assertThat(spanWords(EventSpan.AllDay(sat26, sat26.plusDays(1)), london)).isEqualTo("Sat 26 Sep, all day")
     }
 
     @Test

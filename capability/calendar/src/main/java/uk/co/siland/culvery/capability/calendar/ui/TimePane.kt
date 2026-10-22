@@ -47,6 +47,7 @@ import uk.co.siland.culvery.capability.calendar.freeAtLine
 import uk.co.siland.culvery.capability.calendar.freeLine
 import uk.co.siland.culvery.capability.calendar.lengthChip
 import uk.co.siland.culvery.capability.calendar.lengthLabel
+import uk.co.siland.culvery.capability.calendar.spansDays
 import uk.co.siland.culvery.capability.calendar.timeValue
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.ControlType
@@ -89,9 +90,16 @@ internal fun rememberTimeCheck(form: EditorForm, held: Held?, order: List<Person
     return remember(held, who, day, start, length, order) {
         if (held == null || day == null) return@remember NO_CHECK
         val except = (form.mode as? EditorForm.Mode.Edit)?.original?.ref
-        val (busyHours, result) = held.busyHoursAndCheck(who, day, start, length, form.zone, except, order)
+        val from = start?.let(day::atTime)
+        val (busyHours, result) = held.busyHoursAndCheck(who, day, from, (from ?: day.atStartOfDay()) + length, form.zone, except, order)
         TimeCheck(busyHours, result)
     }
+}
+
+private fun overDays(form: EditorForm): Boolean {
+    val day = form.day ?: return false
+    val from = day.atTime(form.startTime ?: return false)
+    return spansDays(from, from + form.length)
 }
 
 /** The result line's icon: `check_circle` when free, `warning` on a clash, none when the tablet can't say. */
@@ -277,7 +285,7 @@ private fun Result(form: EditorForm, check: FreeCheck, nameOf: (PersonId) -> Str
             Text(timeValue(form), style = CalendarType.timeResult, color = c.ink, maxLines = 1)
             val line = when (check) {
                 is FreeCheck.Free -> freeLine(check, nameOf)
-                is FreeCheck.Busy -> clashLine(check, single = form.who.size == 1, nameOf, form.zone)
+                is FreeCheck.Busy -> clashLine(check, single = form.who.size == 1, overDays = overDays(form), nameOf, form.zone)
                 FreeCheck.None -> null
             }
             val icon = checkIcon(check)

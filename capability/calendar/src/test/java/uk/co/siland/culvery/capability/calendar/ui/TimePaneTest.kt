@@ -296,7 +296,7 @@ class TimePaneTest {
         val line = compose.onNode(hasText("Overlaps Piano, 15:30–16:15"), useUnmergedTree = true).textLayout().layoutInput.style
         assertThat(line.color).isEqualTo(c.weather)
         assertThat(anyPixel(part("time_result_icon"), c.weather)).isTrue()
-        val busy = compose.runOnIdle { held!!.check(form.who, saturday, LocalTime.of(15, 0), Duration.ofMinutes(45), LONDON, null, form.who) }
+        val busy = compose.runOnIdle { held!!.check(form.who, saturday.atTime(15, 0), saturday.atTime(15, 45), LONDON, null, form.who) }
         assertThat(checkIcon(busy)).isEqualTo(Icons.WARNING)
         part("time_free_at").assertTextEquals("Mia is free at")
         node("time_free_1445").assertTextEquals("14:45")

@@ -49,7 +49,7 @@ class ClashTest {
         Held(events.toList(), lastDay, unhealthy, firstDay = today)
 
     private fun Held.check(people: List<Person>, day: LocalDate, start: String, length: Duration = fortyFive, except: EventRef? = null) =
-        check(people.map { it.id }, day, LocalTime.parse(start), length, london, except, order)
+        check(people.map { it.id }, day.atTime(LocalTime.parse(start)), day.atTime(LocalTime.parse(start)) + length, london, except, order)
 
     private fun Held.busy(people: List<Person>, day: LocalDate, except: EventRef? = null) = busyHours(people.map { it.id }, day, london, except)
 
@@ -77,7 +77,7 @@ class ClashTest {
         val cinema = timed("Cinema", sat26, "19:00", "21:00", forPerson = "${sam.id.value},${mia.id.value}")
         val h = held(cinema)
         assertThat(h.busy(listOf(sam), sat26)).containsExactly(19, 20)
-        assertThat(h.check(listOf(sam), sat26, "19:30")).isEqualTo(FreeCheck.Busy(sam.id, cinema, listOf(LocalTime.of(18, 15), LocalTime.of(21, 0))))
+        assertThat(h.check(listOf(sam), sat26, "19:30")).isEqualTo(FreeCheck.Busy(listOf(Clash(sam.id, cinema)), 0, listOf(LocalTime.of(18, 15), LocalTime.of(21, 0))))
     }
 
     @Test
@@ -85,7 +85,7 @@ class ClashTest {
         val swim = timed("Swimming", sat26, "10:00", "11:00", forPerson = null, sourcePerson = mia.id)
         val h = held(swim)
         assertThat(h.busy(listOf(mia), sat26)).containsExactly(10)
-        assertThat((h.check(listOf(mia), sat26, "10:00") as FreeCheck.Busy).event).isEqualTo(swim)
+        assertThat((h.check(listOf(mia), sat26, "10:00") as FreeCheck.Busy).clashes.single().event).isEqualTo(swim)
     }
 
     @Test
@@ -94,8 +94,8 @@ class ClashTest {
         val check = held(tea, piano).check(listOf(mia), thu1, "15:00")
         assertThat(check).isInstanceOf(FreeCheck.Busy::class.java)
         check as FreeCheck.Busy
-        assertThat(check.person).isEqualTo(mia.id)
-        assertThat(check.event).isEqualTo(piano)
+        assertThat(check.clashes).containsExactly(Clash(mia.id, piano))
+        assertThat(check.more).isEqualTo(0)
     }
 
     @Test
@@ -112,9 +112,11 @@ class ClashTest {
     }
 
     @Test
-    fun theCheckStopsAtMidnight() {
+    fun aTimedSpanPastMidnightChecksTheNextDay() {
         val early = timed("Ferry", thu1.plusDays(1), "00:15", "01:00")
-        assertThat(held(early).check(listOf(mia), thu1, "22:30", Duration.ofHours(2))).isEqualTo(FreeCheck.Free(listOf(mia.id)))
+        assertThat(held(early).check(listOf(mia), thu1, "22:30", Duration.ofHours(1))).isEqualTo(FreeCheck.Free(listOf(mia.id)))
+        val past = held(early).check(listOf(mia), thu1, "22:30", Duration.ofHours(2))
+        assertThat(past).isEqualTo(FreeCheck.Busy(listOf(Clash(mia.id, early)), 0, emptyList()))
         val late = timed("Film", thu1, "23:45", "23:59")
         assertThat(held(late).check(listOf(mia), thu1, "22:30", Duration.ofHours(2))).isInstanceOf(FreeCheck.Busy::class.java)
     }
@@ -140,9 +142,71 @@ class ClashTest {
     fun severalPeopleNameTheBusyOneInHouseholdOrder() {
         val dentist = timed("Dentist", thu1, "12:30", "13:00", forPerson = sam.id.value)
         val lunch = timed("Lunch", thu1, "12:00", "13:00")
-        val check = held(lunch, dentist).check(listOf(mia, sam), thu1, "12:00") as FreeCheck.Busy
-        assertThat(check.person).isEqualTo(sam.id)
-        assertThat(check.event).isEqualTo(dentist)
+        val check = held(lunch, dentist).check(listOf(mia, sam), thu1, "12:30") as FreeCheck.Busy
+        assertThat(check.clashes).containsExactly(Clash(sam.id, dentist), Clash(mia.id, lunch)).inOrder()
+    }
+
+    private val names = { id: PersonId -> listOf(alex, sam, mia).single { it.id == id }.name }
+
+    @Test
+    fun everyBusyPersonIsNamedUpToTwo() {
+        val dentist = timed("Dentist", thu1, "12:30", "13:00", forPerson = sam.id.value)
+        val lesson = timed("Piano", thu1, "12:45", "13:30")
+        val check = held(lesson, dentist).check(listOf(mia, sam), thu1, "12:30") as FreeCheck.Busy
+        assertThat(check.more).isEqualTo(0)
+        assertThat(clashLine(check, single = false, overDays = false, names, london)).isEqualTo("Sam has Dentist, 12:30–13:00; Mia has Piano, 12:45–13:30")
+    }
+
+    @Test
+    fun aThirdBusyPersonIsCounted() {
+        val walk = timed("Walk", thu1, "12:15", "12:45", forPerson = alex.id.value)
+        val dentist = timed("Dentist", thu1, "12:30", "13:00", forPerson = sam.id.value)
+        val lesson = timed("Piano", thu1, "12:45", "13:30")
+        val check = held(walk, dentist, lesson).check(listOf(alex, sam, mia), thu1, "12:30") as FreeCheck.Busy
+        assertThat(check.clashes.map { it.person }).containsExactly(alex.id, sam.id).inOrder()
+        assertThat(check.more).isEqualTo(1)
+        assertThat(clashLine(check, single = false, overDays = false, names, london))
+            .isEqualTo("Alex has Walk, 12:15–12:45; Sam has Dentist, 12:30–13:00 … and 1 more")
+    }
+
+    @Test
+    fun aSpanOverSeveralDaysNamesTheFirstClashWithItsDay() {
+        val sat24 = LocalDate.of(2026, 10, 24)
+        val dentist = timed("Dentist", sat24, "12:30", "13:00", forPerson = sam.id.value)
+        val lesson = timed("Piano", sat24, "12:45", "13:30")
+        val h = held(lesson, dentist, lastDay = LocalDate.of(2026, 11, 30))
+        val from = sat24.minusDays(1).atTime(10, 0)
+        val check = h.check(listOf(sam.id, mia.id), from, from.plusDays(2), london, null, order) as FreeCheck.Busy
+        assertThat(check).isEqualTo(FreeCheck.Busy(listOf(Clash(sam.id, dentist)), 0, emptyList()))
+        assertThat(clashLine(check, single = false, overDays = true, names, london)).isEqualTo("Sam has Dentist, Sat 24 Oct 12:30–13:00")
+        val one = h.check(listOf(sam.id), from, from.plusDays(2), london, null, order) as FreeCheck.Busy
+        assertThat(clashLine(one, single = true, overDays = true, names, london)).isEqualTo("Overlaps Dentist, Sat 24 Oct 12:30–13:00")
+    }
+
+    @Test
+    fun aClashingEventThatSpansDaysKeepsItsOwnForm() {
+        val fri = LocalDate.of(2026, 10, 2)
+        val camp = timed("Camp", fri, "18:00", "16:00", endDay = fri.plusDays(2))
+        val check = held(camp).check(listOf(mia), fri.plusDays(1), "10:00") as FreeCheck.Busy
+        assertThat(clashLine(check, single = true, overDays = true, names, london)).isEqualTo("Overlaps Camp, Fri 18:00 – Sun 16:00")
+    }
+
+    @Test
+    fun aSpanReachingPastTheHeldWindowHasNoLine() {
+        val from = sat26.atTime(22, 0)
+        assertThat(held(lastDay = sat26).check(listOf(mia.id), from, from.plusHours(3), london, null, order)).isEqualTo(FreeCheck.None)
+    }
+
+    @Test
+    fun anElevenToMidnightCheckIsOneDay() {
+        val sun27 = sat26.plusDays(1)
+        val ferry = timed("Ferry", sun27, "00:15", "01:00")
+        val from = sat26.atTime(23, 0)
+        val free = held(ferry, lastDay = sat26).check(listOf(mia.id), from, sun27.atStartOfDay(), london, null, order)
+        assertThat(free).isEqualTo(FreeCheck.Free(listOf(mia.id)))
+        val film = timed("Film", sat26, "23:30", "23:45")
+        val busy = held(film, lastDay = sat26).check(listOf(mia.id), from, sun27.atStartOfDay(), london, null, order)
+        assertThat(busy).isEqualTo(FreeCheck.Busy(listOf(Clash(mia.id, film)), 0, listOf(LocalTime.of(22, 0))))
     }
 
     @Test

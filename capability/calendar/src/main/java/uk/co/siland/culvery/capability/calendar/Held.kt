@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.calendar
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -25,6 +26,7 @@ internal fun StoredEvent.toHeld(people: Map<PersonId, Person>, order: List<Perso
     HeldEvent(ref, title, resolvePeople(forPerson, sourcePerson, people, order).map { it.id }, start, end)
 
 internal const val MAX_DOTS = 3
+private const val MAX_NAMED_CLASHES = 2
 private const val QUARTER_MINUTES = 15L
 private val FIRST_FREE_START: LocalTime = LocalTime.of(7, 0)
 private val LAST_FREE_END: LocalTime = LocalTime.of(23, 0)
@@ -52,7 +54,7 @@ internal fun dotColours(people: List<Person>): List<Long> = people.map { it.colo
 
 /** The hours of [day] in which any of [people] is busy (9 §3.4); none when the tablet can't know. */
 fun Held.busyHours(people: List<PersonId>, day: LocalDate, zone: ZoneId, except: EventRef?): Set<Int> =
-    if (canCheck(people, day)) busyHoursOf(busyEvents(people, except), day, zone) else emptySet()
+    if (canCheck(people, day, day)) busyHoursOf(busyEvents(people, except), day, zone) else emptySet()
 
 private fun busyHoursOf(busy: List<HeldEvent>, day: LocalDate, zone: ZoneId): Set<Int> {
     // Each hour's start, then the next midnight.
@@ -60,65 +62,81 @@ private fun busyHoursOf(busy: List<HeldEvent>, day: LocalDate, zone: ZoneId): Se
     return (0 until HOURS_PER_DAY).filterTo(mutableSetOf()) { h -> busy.any { it.overlaps(bounds[h], bounds[h + 1]) } }
 }
 
-/** [busyHours], and [check] when there is a [start], with the busy events found once: what the Time pane reads. */
+/** [busyHours], and [check] when there is a [from], with the busy events found once: what the Time pane reads. */
 internal fun Held.busyHoursAndCheck(
     people: List<PersonId>,
     day: LocalDate,
-    start: LocalTime?,
-    length: Duration,
+    from: LocalDateTime?,
+    to: LocalDateTime,
     zone: ZoneId,
     except: EventRef?,
     order: List<PersonId>,
 ): Pair<Set<Int>, FreeCheck> {
-    if (!canCheck(people, day)) return emptySet<Int>() to FreeCheck.None
     val busy = busyEvents(people, except)
-    return busyHoursOf(busy, day, zone) to (start?.let { checkOf(busy, people, day, it, length, zone, order) } ?: FreeCheck.None)
+    val hours = if (canCheck(people, day, day)) busyHoursOf(busy, day, zone) else emptySet()
+    val check = if (from != null && canCheck(people, from.toLocalDate(), lastDay(from, to))) checkOf(busy, people, from, to, zone, order) else FreeCheck.None
+    return hours to check
 }
 
-/** The clash check's answer: nothing to say, everyone chosen is free, or who is busy with what and the nearest free starts. */
+/** One chosen person's first overlapping event. */
+data class Clash(val person: PersonId, val event: HeldEvent)
+
+/**
+ * The clash check's answer: nothing to say, everyone chosen is free, or who is busy with what. [Busy.clashes] holds up
+ * to two busy people, the rest counted in [Busy.more]; the nearest free starts are for a span on one day only.
+ */
 sealed interface FreeCheck {
     data object None : FreeCheck
 
     data class Free(val people: List<PersonId>) : FreeCheck
 
-    data class Busy(val person: PersonId, val event: HeldEvent, val freeStarts: List<LocalTime>) : FreeCheck
+    data class Busy(val clashes: List<Clash>, val more: Int, val freeStarts: List<LocalTime>) : FreeCheck
 }
 
+/** The last day a span covers: one ending at exactly midnight ends on the day before. */
+private fun lastDay(from: LocalDateTime, to: LocalDateTime): LocalDate =
+    if (to.toLocalTime() == LocalTime.MIDNIGHT && to.toLocalDate().isAfter(from.toLocalDate())) to.toLocalDate().minusDays(1) else to.toLocalDate()
+
+/** Whether the span from [from] to [to] reaches past its first day. */
+internal fun spansDays(from: LocalDateTime, to: LocalDateTime): Boolean = lastDay(from, to) != from.toLocalDate()
+
 /**
- * Whether [people] are free from [start] on [day] for [length], ending at midnight at most as the draft does (9 §3.1).
- * [None] for nobody, for Everyone, outside the held days, or when anyone chosen may be missing events.
+ * Whether [people] are free from [from] to [to], wall times in [zone] (9c §3.5).
+ * [None] for nobody, for Everyone, when any day of the span is outside the held days, or when anyone chosen may be missing events.
  */
 fun Held.check(
     people: List<PersonId>,
-    day: LocalDate,
-    start: LocalTime,
-    length: Duration,
+    from: LocalDateTime,
+    to: LocalDateTime,
     zone: ZoneId,
     except: EventRef?,
     order: List<PersonId>,
-): FreeCheck = if (canCheck(people, day)) checkOf(busyEvents(people, except), people, day, start, length, zone, order) else FreeCheck.None
+): FreeCheck =
+    if (canCheck(people, from.toLocalDate(), lastDay(from, to))) checkOf(busyEvents(people, except), people, from, to, zone, order) else FreeCheck.None
 
 // [busy] is [busyEvents] for [people].
 private fun checkOf(
     busy: List<HeldEvent>,
     people: List<PersonId>,
-    day: LocalDate,
-    start: LocalTime,
-    length: Duration,
+    from: LocalDateTime,
+    to: LocalDateTime,
     zone: ZoneId,
     order: List<PersonId>,
 ): FreeCheck {
     val chosen = people.distinct().sortedBy(order::rankOf)
-    val (from, to) = draftSpan(day, start, length, zone)
-    for (person in chosen) {
-        val clash = busy.filter { person in it.people && it.overlaps(from, to) }.minByOrNull { it.start.instantIn(zone) } ?: continue
-        return FreeCheck.Busy(person, clash, freeStarts(busy, day, start, length, zone))
+    val start = from.atZone(zone).toInstant()
+    val end = to.atZone(zone).toInstant()
+    val clashes = chosen.mapNotNull { person ->
+        busy.filter { person in it.people && it.overlaps(start, end) }.minByOrNull { it.start.instantIn(zone) }?.let { Clash(person, it) }
     }
-    return FreeCheck.Free(chosen)
+    if (clashes.isEmpty()) return FreeCheck.Free(chosen)
+    if (spansDays(from, to)) return FreeCheck.Busy(listOf(clashes.minBy { it.event.start.instantIn(zone) }), 0, emptyList())
+    val starts = freeStarts(busy, from.toLocalDate(), from.toLocalTime(), Duration.between(start, end), zone)
+    return FreeCheck.Busy(clashes.take(MAX_NAMED_CLASHES), (clashes.size - MAX_NAMED_CLASHES).coerceAtLeast(0), starts)
 }
 
-private fun Held.canCheck(people: List<PersonId>, day: LocalDate): Boolean =
-    people.isNotEmpty() && PersonId.FAMILY !in people && holds(day) && people.none { it in unhealthy }
+private fun Held.canCheck(people: List<PersonId>, first: LocalDate, last: LocalDate): Boolean =
+    people.isNotEmpty() && PersonId.FAMILY !in people && holds(first) && holds(last) && people.none { it in unhealthy }
 
 // Family and all-day events make nobody busy (9 §3.4).
 private fun Held.busyEvents(people: List<PersonId>, except: EventRef?): List<HeldEvent> = events.filter { e ->

@@ -289,6 +289,24 @@ fun whenLabel(start: EventTime, end: EventTime, zone: ZoneId, today: LocalDate):
     }
 }
 
+/** A span as the editor and Check word it: "Sat 26 Sep, 10:00–10:45", "Fri 23 Oct 18:00 – Sun 25 Oct 16:00", "Mon 19 – Fri 23 Oct, all day". */
+fun spanWords(span: EventSpan, zone: ZoneId): String = when (span) {
+    is EventSpan.AllDay -> {
+        val last = maxOf(span.first, span.endExclusive.minusDays(1))
+        val days = if (last == span.first) span.first.format(SHORT_DAY) else dayRange(span.first, last)
+        "$days, ${lowerFirst(ALL_DAY_LABEL)}"
+    }
+    is EventSpan.Timed -> {
+        val from = span.start.withZoneSameInstant(zone)
+        val to = span.end.withZoneSameInstant(zone)
+        if (lastDayOf(from, to) == from.toLocalDate()) {
+            "${from.format(SHORT_DAY)}, ${from.format(HOURS_MINUTES)}–${to.format(HOURS_MINUTES)}"
+        } else {
+            "${from.format(SHORT_DAY)} ${from.format(HOURS_MINUTES)} – ${to.format(SHORT_DAY)} ${to.format(HOURS_MINUTES)}"
+        }
+    }
+}
+
 private class Slice(val timeLabel: String, val startLabel: String, val allDay: Boolean)
 
 /** How the event reads on [date]. A timed event over several days reads "22:00–", then "All day", then "until 01:00". */
