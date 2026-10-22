@@ -2,7 +2,12 @@ package uk.co.siland.culvery.shell.ui
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.Text
@@ -46,6 +51,7 @@ import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhSheet
+import uk.co.siland.culvery.core.ui.KeepsToastsAbove
 import uk.co.siland.culvery.shell.OverlayState
 import uk.co.siland.culvery.shell.ToastMessage
 
@@ -161,6 +167,67 @@ class OverlayLayersTest {
         val toast = compose.onNodeWithTag("toast").getUnclippedBoundsInRoot()
         // Hand-off §7: 28 dp above the keyboard, which puts it about 340 dp from the bottom.
         assertThat(toast.bottom.value).isWithin(0.5f).of((screen.bottom - keyboard - 28.dp).value)
+    }
+
+    private var foot by mutableStateOf(true)
+    private var card by mutableStateOf(false)
+    private var footClicks = 0
+
+    private fun showWithFoot() {
+        overlay.showFullScreen {
+            Column(Modifier.fillMaxSize()) {
+                Spacer(Modifier.weight(1f))
+                if (foot) KeepsToastsAbove(Modifier.fillMaxWidth().height(100.dp).testTag("foot")) {
+                    Box(Modifier.fillMaxSize().testTag("foot_button").clickable { footClicks++ })
+                }
+                if (card) KeepsToastsAbove(Modifier.fillMaxWidth().height(160.dp).testTag("card")) { Box(Modifier.fillMaxSize()) }
+            }
+        }
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ShellLayers(
+                    overlay = overlay, toast = toast, onToastHidden = {}, pinShowing = false, pinPad = {},
+                    activity = activity, onTouch = activity::touch,
+                ) { Text("Home") }
+            }
+        }
+        compose.waitForIdle()
+    }
+
+    private fun gapAbove(tag: String): Float =
+        compose.onNodeWithTag(tag).getUnclippedBoundsInRoot().top.value - compose.onNodeWithTag("toast").getUnclippedBoundsInRoot().bottom.value
+
+    @Test
+    fun aToastSitsAboveAFootThatKeepsToastsAbove() {
+        toast = ToastMessage(1, "Added Piano.", "info", action = ToastAction("Undo") {})
+        showWithFoot()
+        assertThat(gapAbove("foot")).isAtLeast(11.5f)
+        assertThat(gapAbove("foot")).isAtMost(12.5f)
+        compose.onNodeWithTag("foot_button").performClick()
+        assertThat(footClicks).isEqualTo(1)
+    }
+
+    @Test
+    fun whenTheFootGoesTheToastReturnsToItsPlace() {
+        toast = ToastMessage(1, "Added Piano.", "info")
+        showWithFoot()
+        foot = false
+        compose.waitForIdle()
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        assertThat(compose.onNodeWithTag("toast").getUnclippedBoundsInRoot().bottom.value).isWithin(0.5f).of((screen.bottom - 28.dp).value)
+    }
+
+    @Test
+    fun aFootReplacedByItsCardKeepsTheToastAbove() {
+        toast = ToastMessage(1, "Added Piano.", "info")
+        showWithFoot()
+        compose.runOnIdle { foot = false; card = true }
+        compose.waitForIdle()
+        assertThat(gapAbove("card")).isAtLeast(11.5f)
+        assertThat(gapAbove("card")).isAtMost(12.5f)
+        compose.runOnIdle { card = false; foot = true }
+        compose.waitForIdle()
+        assertThat(gapAbove("foot")).isAtLeast(11.5f)
     }
 
     @Test

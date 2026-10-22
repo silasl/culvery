@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -50,6 +51,8 @@ import uk.co.siland.culvery.capability.calendar.WriteProblem
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.LocalToastClearance
+import uk.co.siland.culvery.core.ui.ToastClearance
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.pixelAt
@@ -375,6 +378,37 @@ class EventEditorScreenTest {
         node("editor_title").assertIsNotFocused()
         listOf("who", "day", "time").forEach { compose.onNodeWithTag("editor_row_$it").assertIsNotSelected() }
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** The foot keeps toasts above it (9c §5): the clearance is its top, and the discard card's after the close button. */
+    @Test
+    fun theFootKeepsToastsAbove() {
+        val clearance = ToastClearance()
+        use(editorDinnerOf(Duration.ofHours(1)))
+        compose.setContent {
+            CompositionLocalProvider(LocalToastClearance provides clearance) {
+                ShowEditor(form, flow, savesTo = null)
+            }
+        }
+        compose.waitForIdle()
+        assertThat(clearance.top).isEqualTo(node("editor_save").fetchSemanticsNode().positionInWindow.y)
+        compose.runOnIdle { form.updateTitle("Dinner at Gran’s") }
+        compose.onNodeWithTag("sheet_close").performClick()
+        compose.waitForIdle()
+        assertThat(clearance.top).isEqualTo(node("editor_discard").fetchSemanticsNode().positionInWindow.y)
+    }
+
+    /** The busy foot keeps its buttons and its hint where they were. */
+    @Test
+    fun theFootButtonsKeepTheirPlacesWhileBusy() {
+        var busy by mutableStateOf(false)
+        use(editorDinnerOf(Duration.ofHours(1)))
+        compose.setContent { ShowEditor(form, flow, busy = busy) }
+        val tags = listOf("editor_save", "editor_delete", "editor_save_hint")
+        val before = tags.map { bounds(it) }
+        busy = true
+        compose.waitForIdle()
+        assertThat(tags.map { bounds(it) }).isEqualTo(before)
     }
 
     @Test

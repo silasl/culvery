@@ -61,7 +61,7 @@ internal fun PersonDots(people: List<Person>, dot: Dp, ring: Color, dotTag: Stri
 
 /** A sheet's Delete (hand-off §7): the danger tone, large, on the sheet's `bg`. Disabled, grey like every button. */
 @Composable
-internal fun DeleteButton(enabled: Boolean, tag: String, onClick: () -> Unit) = HhButton(
+internal fun DeleteButton(enabled: Boolean, tag: String, onClick: () -> Unit, busy: Boolean = false) = HhButton(
     "Delete", onClick, Modifier.testTag(tag),
-    tone = ButtonTone.Danger, size = ButtonSize.Large, icon = Icons.DELETE, enabled = enabled, on = ButtonSurface.Bg,
+    tone = ButtonTone.Danger, size = ButtonSize.Large, icon = Icons.DELETE, enabled = enabled, on = ButtonSurface.Bg, busy = busy,
 )

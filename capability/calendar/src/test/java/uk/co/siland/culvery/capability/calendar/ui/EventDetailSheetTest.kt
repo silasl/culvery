@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -37,6 +38,8 @@ import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
+import uk.co.siland.culvery.core.ui.LocalToastClearance
+import uk.co.siland.culvery.core.ui.ToastClearance
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.pixelAt
@@ -230,6 +233,40 @@ class EventDetailSheetTest {
         show(SampleUi.detailEditable)
         compose.onNodeWithTag("detail_confirm_delete").assertIsNotEnabled()
         compose.onNodeWithTag("detail_keep").assertIsNotEnabled()
+    }
+
+    /** The foot keeps toasts above it (9c §5): the clearance is its top, and the confirm card's after Delete. */
+    @Test
+    fun theFootKeepsToastsAbove() {
+        val clearance = ToastClearance()
+        compose.setContent {
+            CompositionLocalProvider(LocalToastClearance provides clearance) {
+                CulveryTheme(dark = true) {
+                    EventDetailSheet(
+                        detail = SampleUi.detailEditable, people = SampleUi.household, mode = mode, busy = false,
+                        onClose = {}, onDelete = { mode = DetailMode.ConfirmingDelete }, onKeep = {}, onConfirmDelete = {},
+                        onChoosePerson = {}, onAssign = {}, onEdit = {}, onChangeWho = {},
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        assertThat(clearance.top).isEqualTo(compose.onNodeWithTag("detail_delete").fetchSemanticsNode().positionInWindow.y)
+        compose.onNodeWithTag("detail_delete").performClick()
+        compose.waitForIdle()
+        assertThat(clearance.top).isEqualTo(compose.onNodeWithTag("detail_confirm").fetchSemanticsNode().positionInWindow.y)
+    }
+
+    /** Busy changes only what is drawn inside Delete and Change: neither moves or resizes. */
+    @Test
+    fun theFootButtonsKeepTheirPlacesWhileBusy() {
+        show(SampleUi.detailEditable)
+        val tags = listOf("detail_delete", "detail_edit")
+        val before = tags.map { compose.onNodeWithTag(it).getUnclippedBoundsInRoot() }
+        busy = true
+        compose.waitForIdle()
+        assertThat(tags.map { compose.onNodeWithTag(it).getUnclippedBoundsInRoot() }).isEqualTo(before)
+        tags.forEach { assertThat(compose.onNodeWithTag(it).fetchSemanticsNode().config[SemanticsProperties.StateDescription]).isEqualTo("Saving") }
     }
 
     @Test

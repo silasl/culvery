@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -24,7 +26,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -37,6 +43,8 @@ import uk.co.siland.culvery.core.ui.Countdown
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhToast
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.LocalToastClearance
+import uk.co.siland.culvery.core.ui.ToastClearance
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.toastMillis
 import uk.co.siland.culvery.display.ui.CameraMark
@@ -81,26 +89,29 @@ fun ShellLayers(
     val touched by rememberUpdatedState(onTouch)
     val settingsClosingSoon = rememberClosingSoon(settingsExpiresAt, nowMillis)
     val sheetWarningEndsAt = rememberSheetClosingSoon(overlay, activity, closes = overlaysCloseWhenIdle, nowMillis)
-    Box(Modifier.fillMaxSize().graphicsLayer {}) {
-        Box(Modifier.fillMaxSize().countsTouches { touched() }) {
-            // A TalkBack double-tap is an action, not a touch, so a scrim can't stop it: what is covered leaves the tree.
-            Box(Modifier.fillMaxSize().then(if (overlay.isShowing || pinShowing || sleeping || alert != null) Modifier.clearAndSetSemantics {} else Modifier)) { shell() }
-            OverlayLayer(overlay, hidden = pinShowing || sleeping || alert != null)
+    val clearance = remember { ToastClearance() }
+    CompositionLocalProvider(LocalToastClearance provides clearance) {
+        Box(Modifier.fillMaxSize().graphicsLayer {}) {
+            Box(Modifier.fillMaxSize().countsTouches { touched() }) {
+                // A TalkBack double-tap is an action, not a touch, so a scrim can't stop it: what is covered leaves the tree.
+                Box(Modifier.fillMaxSize().then(if (overlay.isShowing || pinShowing || sleeping || alert != null) Modifier.clearAndSetSemantics {} else Modifier)) { shell() }
+                OverlayLayer(overlay, hidden = pinShowing || sleeping || alert != null)
+            }
+            // Outside the counting box: a ring's card is not someone using the sheet or Settings beneath.
+            if (alert != null) AlertLayer(alert, hidden = pinShowing || sleeping)
+            // Outside the counting box too: the waking tap only wakes the screen (8 §4.1).
+            sleep()
+            Box(Modifier.fillMaxSize().then(if (pinShowing) Modifier.countsTouches { touched() } else Modifier)) { pinPad() }
+            // Held while asleep, not dropped: a toast's timer starts only once it is drawn.
+            if (!sleeping) ToastLayer(toast, activity, onHidden = onToastHidden)
+            // One warning at a time, and Settings' first: Settings closing takes any open sheet with it. Both keep the wall awake.
+            when {
+                settingsClosingSoon && settingsExpiresAt != null ->
+                    ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning", settingsExpiresAt, nowMillis)
+                sheetWarningEndsAt != null -> ClosingWarningLayer(SHEET_CLOSING, "sheet_warning", sheetWarningEndsAt, nowMillis)
+            }
+            if (cameraMark) CameraMark()
         }
-        // Outside the counting box: a ring's card is not someone using the sheet or Settings beneath.
-        if (alert != null) AlertLayer(alert, hidden = pinShowing || sleeping)
-        // Outside the counting box too: the waking tap only wakes the screen (8 §4.1).
-        sleep()
-        Box(Modifier.fillMaxSize().then(if (pinShowing) Modifier.countsTouches { touched() } else Modifier)) { pinPad() }
-        // Held while asleep, not dropped: a toast's timer starts only once it is drawn.
-        if (!sleeping) ToastLayer(toast, activity, onHidden = onToastHidden)
-        // One warning at a time, and Settings' first: Settings closing takes any open sheet with it. Both keep the wall awake.
-        when {
-            settingsClosingSoon && settingsExpiresAt != null ->
-                ClosingWarningLayer(SETTINGS_CLOSING, "settings_warning", settingsExpiresAt, nowMillis)
-            sheetWarningEndsAt != null -> ClosingWarningLayer(SHEET_CLOSING, "sheet_warning", sheetWarningEndsAt, nowMillis)
-        }
-        if (cameraMark) CameraMark()
     }
 }
 
@@ -194,14 +205,21 @@ private fun rememberSheetClosingSoon(overlay: OverlayState, activity: UserActivi
     return endsAt
 }
 
-/** Where toasts and warnings sit: bottom-centre, 28 dp above the bottom or above the on-screen keyboard (hand-off §7). */
+/**
+ * Where toasts and warnings sit: bottom-centre, 28 dp above the bottom or above the on-screen keyboard (hand-off §7), and at
+ * least [ShellTokens.toastAboveFoot] above the highest foot that keeps toasts above it (9c §5).
+ */
 @Composable
 private fun ToastSlot(keyboard: WindowInsets, content: @Composable () -> Unit) {
+    val footTop = LocalToastClearance.current?.top
+    var bottom by remember { mutableFloatStateOf(0f) }
+    val aboveFoot = if (footTop == null) 0.dp else with(LocalDensity.current) { (bottom - footTop).coerceAtLeast(0f).toDp() } + ShellTokens.toastAboveFoot
     Box(
         Modifier
             .fillMaxSize()
             .windowInsetsPadding(keyboard.only(WindowInsetsSides.Bottom))
-            .padding(bottom = ShellTokens.toastBottom),
+            .onGloballyPositioned { bottom = it.positionInWindow().y + it.size.height }
+            .padding(bottom = maxOf(ShellTokens.toastBottom, aboveFoot)),
         contentAlignment = Alignment.BottomCenter,
     ) {
         content()

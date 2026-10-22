@@ -66,6 +66,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhFooterButton
+import uk.co.siland.culvery.core.ui.KeepsToastsAbove
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
 
@@ -191,33 +192,35 @@ internal fun EventEditorScreen(
                     }
                     if (!typing) {
                         Spacer(Modifier.weight(1f))
-                        if (discarding) {
-                            HhConfirmCard(
-                                tag = "editor_discard",
-                                title = if (isNew) DISCARD_NEW else DISCARD_CHANGES,
-                                keep = KEEP_EDITING,
-                                keepTag = "editor_discard_keep",
-                                confirm = DISCARD,
-                                confirmTag = "editor_discard_confirm",
-                                busy = busy,
-                                onKeep = { discarding = false },
-                                onConfirm = onClose,
-                                confirmIcon = discardIcon(form.mode),
-                            )
-                        } else {
-                            val hint = when {
-                                clash -> CLASH_HINT
-                                flow.active == EditorStep.Check -> ALL_SET_HINT
-                                EditorStep.Repeats in flow.steps -> OPTIONAL_HINT
-                                else -> TIME_OPTIONAL_HINT
+                        KeepsToastsAbove {
+                            if (discarding) {
+                                HhConfirmCard(
+                                    tag = "editor_discard",
+                                    title = if (isNew) DISCARD_NEW else DISCARD_CHANGES,
+                                    keep = KEEP_EDITING,
+                                    keepTag = "editor_discard_keep",
+                                    confirm = DISCARD,
+                                    confirmTag = "editor_discard_confirm",
+                                    busy = busy,
+                                    onKeep = { discarding = false },
+                                    onConfirm = onClose,
+                                    confirmIcon = discardIcon(form.mode),
+                                )
+                            } else {
+                                val hint = when {
+                                    clash -> CLASH_HINT
+                                    flow.active == EditorStep.Check -> ALL_SET_HINT
+                                    EditorStep.Repeats in flow.steps -> OPTIONAL_HINT
+                                    else -> TIME_OPTIONAL_HINT
+                                }
+                                Foot(form, savesTo, hint, busy, failure, onSave = {
+                                    closeKeyboard()
+                                    onSave()
+                                }, onDelete = {
+                                    closeKeyboard()
+                                    onDelete()
+                                })
                             }
-                            Foot(form, savesTo, hint, busy, failure, onSave = {
-                                closeKeyboard()
-                                onSave()
-                            }, onDelete = {
-                                closeKeyboard()
-                                onDelete()
-                            })
                         }
                     }
                 }
@@ -402,7 +405,7 @@ private fun Foot(form: EditorForm, savesTo: String?, hint: String, busy: Boolean
         if (failure != null) FailureCard(failure)
         if (savesTo != null) SavesTo(savesToLine(savesTo))
         Row(horizontalArrangement = Arrangement.spacedBy(EditorDimens.footGap), modifier = Modifier.fillMaxWidth()) {
-            if (form.mode is EditorForm.Mode.Edit) DeleteButton(enabled = !busy, tag = "editor_delete", onClick = onDelete)
+            if (form.mode is EditorForm.Mode.Edit) DeleteButton(enabled = !busy, busy = busy, tag = "editor_delete", onClick = onDelete)
             HhFooterButton(
                 text = when {
                     failure != null -> "Try again"
@@ -417,6 +420,7 @@ private fun Foot(form: EditorForm, savesTo: String?, hint: String, busy: Boolean
                 reason = form.reason,
                 below = true,
                 hint = hint,
+                busy = busy,
             )
         }
     }

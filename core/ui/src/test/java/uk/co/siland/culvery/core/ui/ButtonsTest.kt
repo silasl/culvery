@@ -209,4 +209,33 @@ class ButtonsTest {
         assertThat(label.textLayout().layoutInput.style.color).isEqualTo(LightColors.mute)
         compose.assertClickablesHaveRoleAndLabel()
     }
+
+    @Test
+    fun aBusyFooterButtonKeepsItsLineAndItsPlace() {
+        var busy by mutableStateOf(false)
+        compose.setContent {
+            CulveryTheme(dark = false) {
+                Column(Modifier.width(507.dp)) {
+                    HhFooterButton("Save changes", {}, "footer", enabled = !busy, below = true, hint = "Time and repeats are optional", busy = busy)
+                }
+            }
+        }
+        val top = compose.onNodeWithTag("footer").getUnclippedBoundsInRoot().top
+        val line = compose.onNodeWithTag("footer_hint", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        busy = true
+        compose.waitForIdle()
+        compose.onNodeWithTag("footer").assertIsNotEnabled()
+        assertThat(compose.onNodeWithTag("footer").getUnclippedBoundsInRoot().top).isEqualTo(top)
+        assertThat(compose.onNodeWithTag("footer_hint", useUnmergedTree = true).getUnclippedBoundsInRoot()).isEqualTo(line)
+        assertThat(compose.onNodeWithTag("footer").fetchSemanticsNode().config[SemanticsProperties.StateDescription]).isEqualTo("Saving")
+    }
+
+    /** Pin: with no line to keep, an idle footer button is as tall as before. */
+    @Test
+    fun anIdleFooterButtonWithNoLineIsAsTallAsBefore() {
+        compose.setContent {
+            CulveryTheme(dark = false) { Column(Modifier.width(507.dp).testTag("column")) { HhFooterButton("Save changes", {}, "footer", below = true) } }
+        }
+        compose.onNodeWithTag("column").assertHeightIsEqualTo(60.dp)
+    }
 }

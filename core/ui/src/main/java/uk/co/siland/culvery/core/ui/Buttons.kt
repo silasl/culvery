@@ -103,6 +103,8 @@ internal fun buttonColors(tone: ButtonTone, enabled: Boolean, on: ButtonSurface,
     }
 }
 
+internal const val BUSY_STATE = "Saving"
+
 /** A button's spoken name, kept apart from other descriptions so the shared test helper can check it starts with the label. */
 val SpokenNameKey = SemanticsPropertyKey<String>("SpokenName")
 
@@ -112,7 +114,8 @@ val SpokenNameKey = SemanticsPropertyKey<String>("SpokenName")
  * along a list: it starts with [text] and adds the subject ("Disconnect Google Calendar, alex@example.com"). [compact]
  * narrows a Regular button's side padding so its label fits a crowded row. [clickLabel] is what TalkBack offers when
  * the name doesn't say what a tap does; [secondLine] shows a state under the label ("Holiday mode", "Off"), and
- * [spokenName] then reads both as one ("Holiday mode, off").
+ * [spokenName] then reads both as one ("Holiday mode, off"). [busy] changes only what is drawn inside: its icon becomes
+ * `schedule` and its state "Saving", so the button keeps its size and place; the caller still disables it.
  */
 @Composable
 fun HhButton(
@@ -129,6 +132,7 @@ fun HhButton(
     clickLabel: String? = null,
     secondLine: String? = null,
     trailingIcon: String? = null,
+    busy: Boolean = false,
 ) {
     val (fill, ink, outline) = buttonColors(tone, enabled, on, Culvery.colors)
     val large = size == ButtonSize.Large
@@ -165,10 +169,18 @@ fun HhButton(
                     Modifier
                 },
             )
+            .then(if (busy) Modifier.semantics { stateDescription = BUSY_STATE } else Modifier)
             .hhClickable(onClick, label = clickLabel, enabled = enabled)
             .padding(start = start, end = end),
     ) {
-        if (icon != null) HhIcon(icon, size = ButtonTokens.icon, tint = ink)
+        if (icon != null && !busy) HhIcon(icon, size = ButtonTokens.icon, tint = ink)
+        // The busy glyph is drawn over the idle one's space, so the button keeps its width.
+        if (icon != null && busy) {
+            Box(contentAlignment = Alignment.Center) {
+                HhIcon(icon, size = ButtonTokens.icon, tint = Color.Transparent)
+                HhIcon(Icons.SCHEDULE, size = ButtonTokens.icon, tint = ink, modifier = Modifier.matchParentSize())
+            }
+        }
         val shown = Modifier.weight(1f, fill = false).then(if (spokenName != null) Modifier.shownNotSpoken() else Modifier)
         val style = if (large) ControlType.button else HhType.buttonLabel
         if (secondLine == null) {
@@ -241,7 +253,8 @@ private fun Modifier.heldClickable(onClick: () -> Unit, enabled: Boolean): Modif
  * A sheet's footer: a Primary [HhButton] at [ButtonSize.Large] across the width, tagged [tag]. Disabled with a [reason], the
  * reason shows above it (`${tag}_reason`) and is the button's state for TalkBack, so it is heard once ("Add event, Add a
  * title first, disabled"). The reason is optional (9 §6.4). With [below], the reason sits under the button instead, with
- * the `info` icon, and while enabled the [hint] does (`${tag}_hint`, "Time and repeats are optional").
+ * the `info` icon, and while enabled the [hint] does (`${tag}_hint`, "Time and repeats are optional"). While [busy] the
+ * button is drawn busy and the line stays as it was, so nothing under or beside it moves.
  */
 @Composable
 fun HhFooterButton(
@@ -254,6 +267,7 @@ fun HhFooterButton(
     reason: String? = null,
     below: Boolean = false,
     hint: String? = null,
+    busy: Boolean = false,
 ) {
     Column(modifier) {
         if (!below && !enabled && reason != null) {
@@ -275,17 +289,18 @@ fun HhFooterButton(
             Modifier
                 .fillMaxWidth()
                 .testTag(tag)
-                .semantics { if (!enabled && reason != null) stateDescription = reason },
+                .semantics { if (!busy && !enabled && reason != null) stateDescription = reason },
             tone = ButtonTone.Primary,
             size = ButtonSize.Large,
             icon = icon,
             enabled = enabled,
             on = ButtonSurface.Bg,
+            busy = busy,
         )
         if (below) {
             when {
                 !enabled && reason != null -> FooterNote(reason, "${tag}_reason", spoken = false)
-                enabled && hint != null -> FooterNote(hint, "${tag}_hint", spoken = true)
+                (enabled || busy) && hint != null -> FooterNote(hint, "${tag}_hint", spoken = true)
             }
         }
     }

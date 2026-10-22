@@ -25,11 +25,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +43,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -75,8 +80,41 @@ object ShellTokens {
     val toastActionGap = 16.dp
     val toastActionHeight = 48.dp
 
+    /** The least gap between a toast and the foot of a sheet or editor it sits above (9c §5). */
+    val toastAboveFoot = 12.dp
+
     /** Home's cards (9 §4.2). */
     val homeCardRadius = 24.dp
+}
+
+/**
+ * Where the feet that keep toasts above them (see [KeepsToastsAbove]) have their tops, in window px, each under its own
+ * owner key so a foot that goes takes away only its own.
+ */
+class ToastClearance {
+    private val tops = mutableStateMapOf<Any, Float>()
+
+    /** The highest reported top (the smallest y), or null when no foot is shown. */
+    val top: Float? get() = tops.values.minOrNull()
+
+    internal fun report(owner: Any, top: Float) {
+        if (tops[owner] != top) tops[owner] = top
+    }
+
+    internal fun clear(owner: Any) {
+        tops.remove(owner)
+    }
+}
+
+val LocalToastClearance = staticCompositionLocalOf<ToastClearance?> { null }
+
+/** Draws [content] and tells the toast layer where its top is, so a toast sits above it instead of over its buttons. */
+@Composable
+fun KeepsToastsAbove(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val clearance = LocalToastClearance.current
+    val owner = remember { Any() }
+    DisposableEffect(clearance, owner) { onDispose { clearance?.clear(owner) } }
+    Box(modifier.onGloballyPositioned { clearance?.report(owner, it.positionInWindow().y) }) { content() }
 }
 
 /** Shell text styles, derived from HhType. */

@@ -54,6 +54,7 @@ import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhPersonChip
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.KeepsToastsAbove
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 
@@ -140,36 +141,38 @@ fun EventDetailSheet(
             }
         }
         if (e.editable) {
-            if (mode == DetailMode.ConfirmingDelete) {
-                HhConfirmCard(
-                    tag = "detail_confirm",
-                    title = DELETE_QUESTION,
-                    keep = KEEP, keepTag = "detail_keep",
-                    confirm = "Delete event", confirmTag = "detail_confirm_delete", confirmIcon = Icons.DELETE_FOREVER,
-                    busy = busy, onKeep = onKeep, onConfirm = onConfirmDelete,
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.noteIconGap)) {
-                        HhIcon(Icons.DELETE, size = CalendarDimens.footerIcon, tint = c.danger)
-                        Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.noteTextGap)) {
-                            Text(DELETE_QUESTION, style = ControlType.confirmTitle, color = c.ink)
-                            Text(
-                                "“${e.title}” will be removed from ${e.serviceName} for everyone.",
-                                style = CalendarType.noteBody,
-                                color = c.mute,
-                                // A title synced from a phone can be any length; past three lines it would push Keep off the sheet.
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+            KeepsToastsAbove {
+                if (mode == DetailMode.ConfirmingDelete) {
+                    HhConfirmCard(
+                        tag = "detail_confirm",
+                        title = DELETE_QUESTION,
+                        keep = KEEP, keepTag = "detail_keep",
+                        confirm = "Delete event", confirmTag = "detail_confirm_delete", confirmIcon = Icons.DELETE_FOREVER,
+                        busy = busy, onKeep = onKeep, onConfirm = onConfirmDelete,
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.noteIconGap)) {
+                            HhIcon(Icons.DELETE, size = CalendarDimens.footerIcon, tint = c.danger)
+                            Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.noteTextGap)) {
+                                Text(DELETE_QUESTION, style = ControlType.confirmTitle, color = c.ink)
+                                Text(
+                                    "“${e.title}” will be removed from ${e.serviceName} for everyone.",
+                                    style = CalendarType.noteBody,
+                                    color = c.mute,
+                                    // A title synced from a phone can be any length; past three lines it would push Keep off the sheet.
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
-                }
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
-                    DeleteButton(enabled = !busy, tag = "detail_delete", onClick = onDelete)
-                    HhButton(
-                        "Change", onEdit, Modifier.weight(1f).testTag("detail_edit"),
-                        tone = ButtonTone.Primary, size = ButtonSize.Large, icon = Icons.EDIT, enabled = !busy, on = ButtonSurface.Bg,
-                    )
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(CalendarDimens.footerGap), modifier = Modifier.fillMaxWidth()) {
+                        DeleteButton(enabled = !busy, busy = busy, tag = "detail_delete", onClick = onDelete)
+                        HhButton(
+                            "Change", onEdit, Modifier.weight(1f).testTag("detail_edit"),
+                            tone = ButtonTone.Primary, size = ButtonSize.Large, icon = Icons.EDIT, enabled = !busy, on = ButtonSurface.Bg, busy = busy,
+                        )
+                    }
                 }
             }
         }
