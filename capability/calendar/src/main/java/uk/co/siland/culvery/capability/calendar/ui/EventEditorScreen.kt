@@ -264,14 +264,15 @@ internal fun EventEditorScreen(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .then(
-                            if (!leavesTitleOnTap) Modifier else Modifier.pointerInput(Unit) {
+                        // Keyed, not added and removed: dropping the node mid-press would cancel the tap underneath.
+                        .pointerInput(leavesTitleOnTap) {
+                            if (leavesTitleOnTap) {
                                 awaitEachGesture {
                                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                                     closeKeyboard()
                                 }
-                            },
-                        ),
+                            }
+                        },
                 ) {
                     if (titleFocused && suggestions.isNotEmpty()) {
                         // Next here is the keyboard's Next: leave the title for Who.
