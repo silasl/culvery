@@ -508,13 +508,38 @@ For the end-of-v1 design review:
 
 Test flakes seen during the fixes (each green on a rerun): `CameraAccessTest`, `DoorRecorderTest`, `BridgesTest`, plus the known `DoorTabTest` and `LightsActionsTest`.
 
+## Plans 9c-1, 9c-1b and 9c-1c: emulator walk-through (2026-10-22)
+
+On `culvery-5` (debug build), driven by Claude with the user watching.
+1. Re-checks of what changed in 9c-1 and 9c-1b (the week, toasts, the grey frame, detail chips, the PIN pad, Starts and Ends, clashes, repeats with a span, Check, suggestions): passed, apart from faults 2, 6 and 7 below.
+2. Idle close: an untouched editor closes at 2 minutes; an edited one warns at 9:40 and closes at 10.
+3. "4th Saturday" and "last Thursday": land on Sat 24 Oct and Thu 29 Oct and nowhere else seen. The week view stops 3 weeks ahead, so the November dates (26 and 28 Nov) weren't seen.
+4. Counted series: the detail reads "Every Saturday · 12 times · last on Sat 9 Jan"; Check says "…from 24 Oct to 9 Jan. 12 times in all."
+5. Undo offline: the queued series was removed and nothing came back once the sample calendar was online. The emulator's wifi doesn't take the sample calendar offline; the debug offline broadcast does.
+6. Undo by another person: refused, "Alex can only change events they created."
+7. "Day 2 of 3" on Home: with the date set to Sat 31 Oct, "Half term · Day 2 of 3 · Family". The date was put back.
+8. A timed span over midnight: Fri 23 22:00 to Sat 24 01:00 shows "22:00–" on Friday and "until 01:00" on Saturday.
+9. Person and Favourites sheets: the wider sheet. Favourites lists the real Sonos favourites; none were tapped.
+
+Faults found:
+- Fault 1, some screens are blank for about a second before they fill (the Calendar tab after a restart, Settings › Calendars, Home location, People, Home's Today card). Left for the Home slow-fill check on the tablet below.
+- Fault 2, the quick picks offered today after the copied start (16:00) had passed. ecea7c3 starts them tomorrow once a timed start is past the time the editor opened; all-day keeps today. Re-checked at 20:36: Swimming's picks start Thu 29 Oct.
+- Fault 6, the keyboard stayed up after leaving the title, over the date grid and over the week once the editor closed. Compose's `hide()` did nothing once focus had cleared. c7279a9 hides it through the window, and a touch on the pane leaves the title before the pane acts on it; 3a73ffa and d91ec64 tidy it (the handler stays keyed, since removing it mid-press cancelled the tap underneath). Re-checked: one tap on a Who card chooses the person and puts the keyboard away.
+- Fault 7, with "From before" showing and the keyboard up, the first ✕ only left the title. Gone with fault 6; a9e99fc pins one tap on close asking to discard.
+
+For the end-of-v1 design review:
+- Copying a suggestion from a series that is still running makes a duplicate that clashes with itself.
+- The toast for an event over several days or past midnight gives no dates or times ("Added Late gig.").
+- Undo's refusal reads oddly for an admin, beside the role line "Adult — can add and change any event".
+- The clash wording; the lane bar showing dates only; the "Too long" tag staying after the event is shortened again; the Ends grid opening on the end's month.
+
 ## Left out of Plan 9c-1c on purpose (2026-10-22)
 - **Choosing the destination calendar per event:** an event still saves to the household's one destination calendar. Picking another calendar for one event is a later change.
 - **A year-long fetch of past events:** the tablet still keeps about a day of past events. Title suggestions use a remembered list that sync builds up over time, so "From before" starts sparse and fills in over the following weeks.
 
 ## To check when the tablet is next plugged in
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
-- **Home slow to fill (9c walk-through, 2026-10-22):** on the emulator, Home's cards took a moment to fill after opening. Time it on the tablet (cold start and return from the Calendar tab) before deciding whether anything needs fixing.
+- **Home slow to fill (9c walk-through, 2026-10-22):** on the emulator, Home's cards took a moment to fill after opening. Time it on the tablet (cold start and return from the Calendar tab) before deciding whether anything needs fixing. The same walk-through saw it on the Calendar tab after a restart, Settings › Calendars, Home location and People (fault 1); time those too.
 
 ## Feature ideas (2026-10-02, after v1)
 
