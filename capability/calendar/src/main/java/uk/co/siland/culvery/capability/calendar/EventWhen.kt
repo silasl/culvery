@@ -12,7 +12,9 @@ internal const val UNTIL_TOO_LATE = "An event can last up to $MAX_SPAN_DAYS days
 
 /** What an event covers: two wall times in the household zone, or whole days with the end exclusive. */
 sealed interface EventSpan {
-    data class Timed(val start: ZonedDateTime, val end: ZonedDateTime) : EventSpan
+    data class Timed(val start: ZonedDateTime, val end: ZonedDateTime) : EventSpan {
+        fun localRange(): Pair<LocalDateTime, LocalDateTime> = start.toLocalDateTime() to end.toLocalDateTime()
+    }
     data class AllDay(val first: LocalDate, val endExclusive: LocalDate) : EventSpan
 }
 
@@ -27,6 +29,12 @@ data class EventWhen(
     val endClock: LocalTime,
 ) {
     val endDate: LocalDate? get() = startDate?.plusDays(endDays.toLong())
+
+    // The last day's date minus the start's: a timed end at exactly midnight belongs to the day before.
+    private val lastDays: Int get() = if (!allDay && endDays > 0 && endClock == LocalTime.MIDNIGHT) endDays - 1 else endDays
+
+    /** The last day the event covers. */
+    val lastDay: LocalDate? get() = startDate?.plusDays(lastDays.toLong())
 
     /** Wall-clock time from the start to the end. */
     val length: Duration
@@ -110,9 +118,8 @@ data class EventWhen(
     /** Both dates stay and the clocks are kept; a midnight end belongs to the day before while All day is on. */
     fun withAllDay(on: Boolean): EventWhen {
         if (on == allDay) return this
-        val midnightEnd = endClock == LocalTime.MIDNIGHT
-        if (on) return copy(allDay = true, endDays = if (midnightEnd) endDays - 1 else endDays)
-        val back = copy(allDay = false, endDays = if (midnightEnd) endDays + 1 else endDays)
+        if (on) return copy(allDay = true, endDays = lastDays)
+        val back = copy(allDay = false, endDays = if (endClock == LocalTime.MIDNIGHT) endDays + 1 else endDays)
         return if (back.endDays == 0 && !back.endClock.isAfter(back.startClock)) back.withEndAnHourAfterStart() else back
     }
 
@@ -158,18 +165,11 @@ data class EventWhen(
         }
 
         /** From provider times; a mixed pair (the editor locks these) reads by the start's kind. */
-        fun of(start: EventTime, end: EventTime, zone: ZoneId): EventWhen = when (start) {
-            is EventTime.AllDay -> {
-                val last = when (end) {
-                    is EventTime.AllDay -> end.date.minusDays(1)
-                    is EventTime.Timed -> daySpan(start, end, zone).second
-                }
-                of(EventSpan.AllDay(start.date, maxOf(start.date, last).plusDays(1)), zone)
-            }
-            is EventTime.Timed -> of(
-                EventSpan.Timed(start.instant.atZone(zone), end.instantIn(zone).atZone(zone)),
-                zone,
-            )
+        fun of(start: EventTime, end: EventTime, zone: ZoneId): EventWhen {
+            val span = spanOf(start, end, zone)
+            if (start !is EventTime.AllDay || span is EventSpan.AllDay) return of(span, zone)
+            val last = daysOf(span, zone).second
+            return of(EventSpan.AllDay(start.date, maxOf(start.date, last).plusDays(1)), zone)
         }
 
         private fun hourAfter(start: LocalTime): Pair<Int, LocalTime> {

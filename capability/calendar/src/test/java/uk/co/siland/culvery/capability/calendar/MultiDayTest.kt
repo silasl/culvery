@@ -150,4 +150,20 @@ class MultiDayTest {
         assertThat(oneDay.isMultiDay(london)).isFalse()
         assertThat(EventSpan.Timed(from, from.plusDays(1).plusHours(1)).isMultiDay(london)).isTrue()
     }
+
+    @Test
+    fun theLastDayLeavesAMidnightEndOnTheDayBefore() {
+        val fri = LocalDateTime.of(2026, 10, 23, 18, 0)
+        assertThat(lastDayOf(fri, LocalDateTime.of(2026, 10, 25, 0, 0))).isEqualTo(date(10, 24))
+        assertThat(lastDayOf(fri, LocalDateTime.of(2026, 10, 25, 0, 1))).isEqualTo(date(10, 25))
+        assertThat(lastDayOf(fri.toLocalDate().atStartOfDay(), fri.toLocalDate().atStartOfDay())).isEqualTo(date(10, 23))
+    }
+
+    @Test
+    fun providerTimesReadTheirDaysAsASpanDoes() {
+        assertThat(daySpan(allDay(10, 19), allDay(10, 23), london)).isEqualTo(date(10, 19) to date(10, 22))
+        assertThat(daySpan(allDay(10, 19), allDay(10, 19), london)).isEqualTo(date(10, 19) to date(10, 19))
+        assertThat(daySpan(at(10, 23, 18), at(10, 25, 0), london)).isEqualTo(date(10, 23) to date(10, 24))
+        assertThat(daySpan(allDay(10, 23), at(10, 24, 12), london)).isEqualTo(date(10, 23) to date(10, 24))
+    }
 }

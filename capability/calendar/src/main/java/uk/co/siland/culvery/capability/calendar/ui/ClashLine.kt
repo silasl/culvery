@@ -51,14 +51,14 @@ internal fun checkIcon(check: FreeCheck): String? = when (check) {
 
 /** Whether [who] are free over a timed [eventWhen] (9c §3.5); [FreeCheck.None] for All day or no start date. */
 internal fun Held.checkWhen(eventWhen: EventWhen, who: List<PersonId>, zone: ZoneId, except: EventRef?, order: List<PersonId>): FreeCheck {
-    val span = eventWhen.span(zone) as? EventSpan.Timed ?: return FreeCheck.None
-    return check(who, span.start.toLocalDateTime(), span.end.toLocalDateTime(), zone, except, order)
+    val (from, to) = (eventWhen.span(zone) as? EventSpan.Timed)?.localRange() ?: return FreeCheck.None
+    return check(who, from, to, zone, except, order)
 }
 
 /** Whether a timed [eventWhen] reaches past its first day, so a clash names its date. */
 internal fun EventWhen.overDays(zone: ZoneId): Boolean {
-    val span = span(zone) as? EventSpan.Timed ?: return false
-    return spansDays(span.start.toLocalDateTime(), span.end.toLocalDateTime())
+    val (from, to) = (span(zone) as? EventSpan.Timed)?.localRange() ?: return false
+    return spansDays(from, to)
 }
 
 /**

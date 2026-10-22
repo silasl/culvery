@@ -24,25 +24,23 @@ data class SpanUi(
     val spoken: String,
 )
 
-/** The first and last dates of an event lasting more than a day (9 §2.1); null for one that doesn't. */
-private fun StoredEvent.multiDaySpan(zone: ZoneId): Pair<LocalDate, LocalDate>? {
-    val span = daySpan(start, end, zone)
-    if (span.first == span.second) return null
-    if (start is EventTime.AllDay && end is EventTime.AllDay) return span
-    val from = start.instantIn(zone).atZone(zone)
-    val to = end.instantIn(zone).atZone(zone)
+/**
+ * The first and last dates of a span the week draws as a lane bar (9 §2.1): two or more dates, a timed one ending a
+ * calendar day or more after it starts; null for one that doesn't.
+ */
+private fun EventSpan.multiDays(zone: ZoneId): Pair<LocalDate, LocalDate>? {
+    val days = daysOf(this, zone)
+    if (days.first == days.second) return null
     // A calendar day on, not 24 hours: noon to noon over the spring change counts.
-    return span.takeIf { !to.isBefore(from.plusDays(1)) }
+    return days.takeIf { this !is EventSpan.Timed || !end.isBefore(start.plusDays(1)) }
 }
+
+internal fun EventSpan.isMultiDay(zone: ZoneId): Boolean = multiDays(zone) != null
+
+private fun StoredEvent.multiDaySpan(zone: ZoneId): Pair<LocalDate, LocalDate>? = spanOf(start, end, zone).multiDays(zone)
 
 /** An all-day event over two or more dates, or a timed one ending a calendar day or more after it starts. */
 fun StoredEvent.isMultiDay(zone: ZoneId): Boolean = multiDaySpan(zone) != null
-
-/** Whether the week draws an event over [this] as a lane bar: two or more dates, a timed one ending a calendar day or more after it starts. */
-internal fun EventSpan.isMultiDay(zone: ZoneId): Boolean = when (this) {
-    is EventSpan.AllDay -> daysOf(this, zone).let { it.first != it.second }
-    is EventSpan.Timed -> daysOf(this, zone).let { it.first != it.second } && !end.isBefore(start.plusDays(1))
-}
 
 /** Which day of its span [date] is; null unless the event is multi-day and on [date]. */
 fun StoredEvent.dayOfSpan(date: LocalDate, zone: ZoneId): DaySpan? {

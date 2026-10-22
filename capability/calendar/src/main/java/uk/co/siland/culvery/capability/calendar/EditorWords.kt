@@ -1,7 +1,6 @@
 package uk.co.siland.culvery.capability.calendar
 
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -97,7 +96,7 @@ private fun seriesTime(form: EditorForm): String {
     return when {
         w.allDay && days > 1 -> "for $days days, ${lowerFirst(ALL_DAY_LABEL)}"
         w.allDay -> lowerFirst(ALL_DAY_LABEL)
-        w.endDays == 0 || (w.endDays == 1 && w.endClock == LocalTime.MIDNIGHT) -> "${clockText(w.startClock)}–${clockText(w.endClock)}"
+        w.lastDay == w.startDate -> "${clockText(w.startClock)}–${clockText(w.endClock)}"
         else -> "${clockText(w.startClock)} – ${checkNotNull(w.endDate).format(WEEKDAY)} ${clockText(w.endClock)}"
     }
 }

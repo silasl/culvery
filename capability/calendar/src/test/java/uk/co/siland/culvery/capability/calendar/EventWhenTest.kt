@@ -358,4 +358,13 @@ class EventWhenTest {
         assertThat(w.clocks()).isEqualTo(at(23, 30) to at(1))
         assertThat(w.endDays).isEqualTo(1)
     }
+
+    @Test
+    fun theLastDayLeavesATimedMidnightEndOnTheDayBefore() {
+        assertThat(timed(at(18), at(0), endDays = 1).lastDay).isEqualTo(sat)
+        assertThat(timed(at(18), at(0), endDays = 2).lastDay).isEqualTo(sat.plusDays(1))
+        assertThat(timed(at(18), at(1), endDays = 1).lastDay).isEqualTo(sat.plusDays(1))
+        assertThat(timed(at(18), at(0), endDays = 1).withAllDay(true).lastDay).isEqualTo(sat)
+        assertThat(timed(at(18), at(0), endDays = 1, date = null).lastDay).isNull()
+    }
 }

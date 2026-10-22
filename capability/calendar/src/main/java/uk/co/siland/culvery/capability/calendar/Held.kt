@@ -67,12 +67,8 @@ sealed interface FreeCheck {
     data class Busy(val clashes: List<Clash>, val more: Int, val freeStarts: List<LocalTime>) : FreeCheck
 }
 
-/** The last day a span covers: one ending at exactly midnight ends on the day before. */
-private fun lastDay(from: LocalDateTime, to: LocalDateTime): LocalDate =
-    if (to.toLocalTime() == LocalTime.MIDNIGHT && to.toLocalDate().isAfter(from.toLocalDate())) to.toLocalDate().minusDays(1) else to.toLocalDate()
-
 /** Whether the span from [from] to [to] reaches past its first day. */
-internal fun spansDays(from: LocalDateTime, to: LocalDateTime): Boolean = lastDay(from, to) != from.toLocalDate()
+internal fun spansDays(from: LocalDateTime, to: LocalDateTime): Boolean = lastDayOf(from, to) != from.toLocalDate()
 
 /**
  * Whether [people] are free from [from] to [to], wall times in [zone] (9c §3.5).
@@ -85,18 +81,9 @@ fun Held.check(
     zone: ZoneId,
     except: EventRef?,
     order: List<PersonId>,
-): FreeCheck =
-    if (canCheck(people, from.toLocalDate(), lastDay(from, to))) checkOf(busyEvents(people, except), people, from, to, zone, order) else FreeCheck.None
-
-// [busy] is [busyEvents] for [people].
-private fun checkOf(
-    busy: List<HeldEvent>,
-    people: List<PersonId>,
-    from: LocalDateTime,
-    to: LocalDateTime,
-    zone: ZoneId,
-    order: List<PersonId>,
 ): FreeCheck {
+    if (!canCheck(people, from.toLocalDate(), lastDayOf(from, to))) return FreeCheck.None
+    val busy = busyEvents(people, except)
     val chosen = people.distinct().sortedBy(order::rankOf)
     val start = from.atZone(zone).toInstant()
     val end = to.atZone(zone).toInstant()

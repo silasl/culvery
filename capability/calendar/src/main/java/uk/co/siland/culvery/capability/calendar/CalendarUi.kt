@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.calendar
 
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -248,11 +249,11 @@ fun addedLine(title: String, wording: String?, beyond: LocalDate?, through: Loca
     return "Added $title$repeats$day."
 }
 
-/** An event ending at exactly midnight ends on the day before. */
-private fun lastDayOf(from: ZonedDateTime, to: ZonedDateTime): LocalDate {
-    val endsAtMidnight = to.toLocalTime() == LocalTime.MIDNIGHT
-    return if (endsAtMidnight && to.toLocalDate().isAfter(from.toLocalDate())) to.toLocalDate().minusDays(1) else to.toLocalDate()
-}
+/** The last day from [from] to [to] covers: one ending at exactly midnight ends on the day before. */
+internal fun lastDayOf(from: LocalDateTime, to: LocalDateTime): LocalDate =
+    if (to.toLocalTime() == LocalTime.MIDNIGHT && to.toLocalDate().isAfter(from.toLocalDate())) to.toLocalDate().minusDays(1) else to.toLocalDate()
+
+private fun lastDayOf(from: ZonedDateTime, to: ZonedDateTime): LocalDate = lastDayOf(from.toLocalDateTime(), to.toLocalDateTime())
 
 internal fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
     today -> "Today"
@@ -261,14 +262,16 @@ internal fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
     else -> date.format(SHORT_DAY)
 }
 
-/** An event's first and last day in [zone]. An all-day end is exclusive; a timed end at exactly midnight belongs to the day before. */
-internal fun daySpan(start: EventTime, end: EventTime, zone: ZoneId): Pair<LocalDate, LocalDate> =
+/** Provider times as a span in [zone]: whole days when both are all day, else wall times. */
+internal fun spanOf(start: EventTime, end: EventTime, zone: ZoneId): EventSpan =
     if (start is EventTime.AllDay && end is EventTime.AllDay) {
-        start.date to maxOf(start.date, end.date.minusDays(1))
+        EventSpan.AllDay(start.date, end.date)
     } else {
-        val from = start.instantIn(zone).atZone(zone)
-        from.toLocalDate() to lastDayOf(from, end.instantIn(zone).atZone(zone))
+        EventSpan.Timed(start.instantIn(zone).atZone(zone), end.instantIn(zone).atZone(zone))
     }
+
+/** An event's first and last day in [zone], as [daysOf] reads them. */
+internal fun daySpan(start: EventTime, end: EventTime, zone: ZoneId): Pair<LocalDate, LocalDate> = daysOf(spanOf(start, end, zone), zone)
 
 /** The detail sheet's "When": "Today · 19:30–21:00", "Sat 26 Sep · All day", or the span of a longer event. */
 fun whenLabel(start: EventTime, end: EventTime, zone: ZoneId, today: LocalDate): String {
