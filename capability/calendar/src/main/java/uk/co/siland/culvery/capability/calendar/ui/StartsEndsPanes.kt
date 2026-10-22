@@ -139,12 +139,14 @@ private fun WhenDateGrid(
     val dots = rememberGridDots(context.held, month, context.household, context.zone)
     val first = eventWhen.startDate
     val last = eventWhen.endDate
+    val chosen = remember(first, last) { setOfNotNull(first, last) }
+    val band = remember(first, last) { if (first != null && last != null && last > first) first..last else null }
     DateGrid(
         month = month,
         onMonth = { month = it },
         today = context.today,
-        chosen = setOfNotNull(first, last),
-        band = if (first != null && last != null && last > first) first..last else null,
+        chosen = chosen,
+        band = band,
         allowed = allowed,
         dots = dots,
         spoken = { spokenWho(dots[it].orEmpty()) },

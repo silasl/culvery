@@ -18,6 +18,12 @@ private const val KEPT_MONTHS = 12L
 fun titleKey(title: String): String =
     Normalizer.normalize(title.trim().replace(WHITESPACE, " "), Normalizer.Form.NFD).replace(MARKS, "").lowercase(Locale.ROOT)
 
+/** [titleKey], worked out once per distinct title: for one sync's many reads of the same titles. */
+internal fun titleKeys(): (String) -> String {
+    val keys = HashMap<String, String>()
+    return { title -> keys.getOrPut(title) { titleKey(title) } }
+}
+
 /** The date a title is remembered by: the later of two on or before [today], else the earlier of two after it. */
 fun better(a: LocalDate, b: LocalDate, today: LocalDate): LocalDate = when {
     a <= today && b <= today -> maxOf(a, b)
@@ -39,9 +45,9 @@ private data class Supplier(val connectionId: String, val sourceId: String, val 
  * occurrence with the best date; where several events share a title the best date wins; a blank title, an event that
  * can't be read and a date before the 12 months are left out. An unreadable repeat is kept as none.
  */
-internal fun rememberedFrom(rows: List<EventRow>, zone: ZoneId, today: LocalDate): List<RememberedTitleEntity> {
+internal fun rememberedFrom(rows: List<EventRow>, zone: ZoneId, today: LocalDate, keyOf: (String) -> String = ::titleKey): List<RememberedTitleEntity> {
     val cutoff = rememberedCutoff(today).toString()
-    return rows.mapNotNull { runCatching { it.remembered(zone) }.getOrNull() }
+    return rows.mapNotNull { runCatching { it.remembered(zone, keyOf) }.getOrNull() }
         .groupBy { Supplier(it.connectionId, it.sourceId, it.sourceEventId, it.titleKey) }
         .values
         .map { supplied -> supplied.reduce { a, b -> if (isBetter(b.date(), a.date(), today)) b else a } }
@@ -54,8 +60,8 @@ internal fun rememberedFrom(rows: List<EventRow>, zone: ZoneId, today: LocalDate
 private fun RememberedTitleEntity.date(): LocalDate = LocalDate.parse(rememberedDate)
 
 /** Null for a blank title; throws for an event whose times can't be read. */
-private fun EventRow.remembered(zone: ZoneId): RememberedTitleEntity? {
-    val key = titleKey(event.title)
+private fun EventRow.remembered(zone: ZoneId, keyOf: (String) -> String): RememberedTitleEntity? {
+    val key = keyOf(event.title)
     if (key.isEmpty()) return null
     val allDay = event.startInstant == null
     val startDate: LocalDate

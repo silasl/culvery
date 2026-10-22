@@ -145,6 +145,9 @@ data class EventRow(
 
 data class SeriesInstance(val remoteId: String, val recurrenceRule: String?)
 
+/** What a removed or retitled event says about the remembered titles: its id, its series and its title. */
+data class EventTitle(val remoteId: String, val seriesId: String?, val title: String)
+
 @Dao
 interface CalendarDao {
     @Query("SELECT * FROM remembered_titles")
@@ -159,8 +162,8 @@ interface CalendarDao {
     )
     suspend fun visibleRemembered(): List<RememberedTitleEntity>
 
-    @Query("SELECT * FROM remembered_titles WHERE connectionId = :connectionId AND titleKey = :titleKey")
-    suspend fun remembered(connectionId: String, titleKey: String): RememberedTitleEntity?
+    @Query("SELECT * FROM remembered_titles WHERE connectionId = :connectionId AND titleKey IN (:keys)")
+    suspend fun rememberedWithKeys(connectionId: String, keys: List<String>): List<RememberedTitleEntity>
 
     @Query("SELECT COUNT(*) FROM remembered_titles WHERE connectionId = :connectionId")
     suspend fun countRememberedOf(connectionId: String): Int
@@ -175,8 +178,8 @@ interface CalendarDao {
     )
     suspend fun supplierTitles(connectionId: String, sourceId: String, supplierId: String): List<String>
 
-    @Query("SELECT * FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId")
-    suspend fun eventsOfSource(connectionId: String, sourceId: String): List<EventEntity>
+    @Query("SELECT remoteId, seriesId, title FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId")
+    suspend fun eventTitlesOfSource(connectionId: String, sourceId: String): List<EventTitle>
 
     @Query("SELECT * FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId AND remoteId IN (:ids)")
     suspend fun eventsByIds(connectionId: String, sourceId: String, ids: List<String>): List<EventEntity>

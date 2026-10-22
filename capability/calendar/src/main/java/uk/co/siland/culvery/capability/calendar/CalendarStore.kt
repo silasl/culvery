@@ -16,6 +16,7 @@ import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.ConnectionEntity
 import uk.co.siland.culvery.capability.calendar.db.EventEntity
 import uk.co.siland.culvery.capability.calendar.db.EventRow
+import uk.co.siland.culvery.capability.calendar.db.EventTitle
 import uk.co.siland.culvery.capability.calendar.db.OutboxEntity
 import uk.co.siland.culvery.capability.calendar.db.RememberedTitleEntity
 import uk.co.siland.culvery.capability.calendar.db.SourceEntity
@@ -270,22 +271,23 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
             // A source removed while this sync was in flight: no orphan events or stale cursor.
             val source = dao.source(connectionId, sourceId) ?: return@withTransaction
             dao.clearReadProblem(connectionId, sourceId)
+            val keyOf = titleKeys()
             val entities = result.upserts.map { it.toEntity(connectionId, sourceId, range.zone) }
-            val kept = entities.associate { it.remoteId to titleKey(it.title) }
+            val kept = entities.associate { it.remoteId to it.title }
             // What this result removes or retitles: the only events whose titles it may take from the remembered ones.
             val leaving = if (result.fullReplace) {
-                dao.eventsOfSource(connectionId, sourceId)
+                dao.eventTitlesOfSource(connectionId, sourceId)
             } else {
-                (result.removedIds + entities.map { it.remoteId }).distinct().chunked(REMOVE_CHUNK).flatMap { dao.eventsByIds(connectionId, sourceId, it) }
-            }.filter { kept[it.remoteId] != titleKey(it.title) }
+                (result.removedIds + entities.map { it.remoteId }).distinct().chunked(REMOVE_CHUNK).flatMap { dao.eventsByIds(connectionId, sourceId, it) }.titled()
+            }.filter { e -> kept[e.remoteId].let { it == null || (it != e.title && keyOf(it) != keyOf(e.title)) } }
             if (result.fullReplace) {
                 dao.deleteEventsForSource(connectionId, sourceId)
             } else {
                 result.removedIds.chunked(REMOVE_CHUNK).forEach { dao.deleteEvents(connectionId, sourceId, it) }
             }
             dao.upsertEvents(entities)
-            forgetUnheld(connectionId, sourceId, leaving, today, range.zone)
-            if (source.visible) remember(rememberedFrom(entities.map { EventRow(it, source.personId) }, range.zone, today), today)
+            forgetUnheld(connectionId, sourceId, leaving, today, range.zone, keyOf)
+            if (source.visible) remember(connectionId, rememberedFrom(entities.map { EventRow(it, source.personId) }, range.zone, today, keyOf), today)
             dao.pruneRemembered(rememberedCutoff(today).toString())
             // An incremental result keeps what the full sync read: only a full sync reads a new range (4c ruling 1).
             val key = if (result.fullReplace) range.cursorKey() else dao.syncState(connectionId, sourceId)?.rangeStart ?: range.cursorKey()
@@ -325,22 +327,37 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
      * Fills a connection's remembered titles from the events it already holds, once: when it has none (9c §4.1).
      * Writes nothing once the connection is gone.
      */
-    suspend fun seedRememberedTitles(connectionId: String, today: LocalDate, zone: ZoneId) = db.withTransaction {
-        dao.connection(connectionId) ?: return@withTransaction
-        if (dao.countRememberedOf(connectionId) > 0) return@withTransaction
-        rememberedFrom(dao.visibleEventRows(connectionId), zone, today).forEach { dao.upsertRemembered(it) }
+    suspend fun seedRememberedTitles(connectionId: String, today: LocalDate, zone: ZoneId) {
+        if (dao.countRememberedOf(connectionId) > 0) return
+        db.withTransaction {
+            dao.connection(connectionId) ?: return@withTransaction
+            // A sync may have remembered titles since the count.
+            if (dao.countRememberedOf(connectionId) > 0) return@withTransaction
+            rememberedFrom(dao.visibleEventRows(connectionId), zone, today).forEach { dao.upsertRemembered(it) }
+        }
     }
 
     /** A calendar that has become visible: its stored events are remembered, as they were not while it was hidden. */
     private suspend fun rememberSource(connectionId: String, sourceId: String, today: LocalDate, zone: ZoneId) =
-        remember(rememberedFrom(dao.eventRowsOfSource(connectionId, sourceId), zone, today), today)
+        remember(connectionId, rememberedFrom(dao.eventRowsOfSource(connectionId, sourceId), zone, today), today)
 
-    /** Merges titles read from visible calendars into the rows; a row of a hidden calendar gives way to any of them. */
-    private suspend fun remember(read: List<RememberedTitleEntity>, today: LocalDate) {
+    /**
+     * Merges titles [read] from [connectionId]'s visible calendars into its rows; a row of a hidden calendar gives way to
+     * any of them. A row the merge leaves as it was isn't written.
+     */
+    private suspend fun remember(connectionId: String, read: List<RememberedTitleEntity>, today: LocalDate) {
+        if (read.isEmpty()) return
+        val visible = dao.sources(connectionId).filter { it.visible }.mapTo(HashSet()) { it.sourceId }
+        val rows = read.map { it.titleKey }.distinct().chunked(REMOVE_CHUNK)
+            .flatMap { dao.rememberedWithKeys(connectionId, it) }
+            .associateByTo(HashMap()) { it.titleKey }
         read.forEach { new ->
-            val old = dao.remembered(new.connectionId, new.titleKey)
-            val oldHidden = old != null && dao.source(old.connectionId, old.sourceId)?.visible != true
-            mergedTitle(old, new, today, oldHidden)?.let { dao.upsertRemembered(it) }
+            val old = rows[new.titleKey]
+            val merged = mergedTitle(old, new, today, oldHidden = old != null && old.sourceId !in visible)
+            if (merged != null && merged != old) {
+                dao.upsertRemembered(merged)
+                rows[new.titleKey] = merged
+            }
         }
     }
 
@@ -349,27 +366,35 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
      * series the row came from and it no longer holds the title. Only these are checked: an event pruned from the
      * window is not a removed one.
      */
-    private suspend fun forgetUnheld(connectionId: String, sourceId: String, gone: List<EventEntity>, today: LocalDate, zone: ZoneId) {
-        val removedSuppliers = gone.map { it.seriesId ?: it.remoteId }.toSet()
+    private suspend fun forgetUnheld(
+        connectionId: String,
+        sourceId: String,
+        gone: List<EventTitle>,
+        today: LocalDate,
+        zone: ZoneId,
+        keyOf: (String) -> String = titleKeys(),
+    ) {
+        if (gone.isEmpty()) return
+        val removedSuppliers = gone.mapTo(HashSet()) { it.seriesId ?: it.remoteId }
+        val rows = dao.rememberedOfSource(connectionId, sourceId).associateBy { it.titleKey }
         val forgotten = gone.map { it.title }.distinct().filter { title ->
-            val key = titleKey(title)
-            val row = if (key.isEmpty()) null else dao.remembered(connectionId, key)
-            row != null && row.sourceId == sourceId && row.sourceEventId in removedSuppliers &&
-                dao.supplierTitles(connectionId, sourceId, row.sourceEventId).none { titleKey(it) == key }
+            val key = keyOf(title)
+            val row = rows[key]?.takeIf { key.isNotEmpty() && it.sourceEventId in removedSuppliers } ?: return@filter false
+            dao.supplierTitles(connectionId, sourceId, row.sourceEventId).none { keyOf(it) == key }
         }
-        forget(connectionId, forgotten, today, zone)
+        forget(connectionId, forgotten, today, zone, keyOf)
     }
 
     /**
      * Deletes the rows for [titles], then supplies each again from another visible stored event with that title, if
      * any. Letters of another case match; a variant in accents or spacing is remembered again when its event next syncs.
      */
-    private suspend fun forget(connectionId: String, titles: List<String>, today: LocalDate, zone: ZoneId) {
+    private suspend fun forget(connectionId: String, titles: List<String>, today: LocalDate, zone: ZoneId, keyOf: (String) -> String = titleKeys()) {
         if (titles.isEmpty()) return
-        val keys = titles.map(::titleKey).distinct()
+        val keys = titles.map(keyOf).distinct()
         keys.chunked(REMOVE_CHUNK).forEach { dao.deleteRemembered(connectionId, it) }
         val others = titles.distinct().chunked(REMOVE_CHUNK).flatMap { dao.visibleEventRowsTitled(connectionId, it) }
-        rememberedFrom(others, zone, today).filter { it.titleKey in keys }.forEach { dao.upsertRemembered(it) }
+        rememberedFrom(others, zone, today, keyOf).filter { it.titleKey in keys }.forEach { dao.upsertRemembered(it) }
     }
 
     fun eventsBetween(startMillis: Long, endMillis: Long): Flow<List<StoredEvent>> =
@@ -391,7 +416,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
             val before = dao.eventsByIds(connectionId, sourceId, listOf(event.remoteId)).filter { titleKey(it.title) != titleKey(event.title) }
             dao.upsertEvents(listOf(event.toEntity(connectionId, sourceId, zone)))
             completing?.let { dao.deleteOutbox(it) }
-            forgetUnheld(connectionId, sourceId, before, today, zone)
+            forgetUnheld(connectionId, sourceId, before.titled(), today, zone)
         }
 
     /** Shows an accepted series assign on every occurrence of [seriesId] held and, if it came from the outbox, completes it. */
@@ -406,7 +431,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         val gone = dao.eventsByIds(ref.connectionId, ref.sourceId, listOf(ref.remoteId))
         dao.deleteEvents(ref.connectionId, ref.sourceId, listOf(ref.remoteId))
         completing?.let { dao.deleteOutbox(it) }
-        forgetUnheld(ref.connectionId, ref.sourceId, gone, today, zone)
+        forgetUnheld(ref.connectionId, ref.sourceId, gone.titled(), today, zone)
     }
 
     /** Removes an accepted series delete from the mirror: the series and every occurrence of it held. */
@@ -414,7 +439,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         db.withTransaction {
             val gone = dao.eventsOfSeries(connectionId, sourceId, seriesId)
             dao.deleteSeries(connectionId, sourceId, seriesId)
-            forgetUnheld(connectionId, sourceId, gone, today, zone)
+            forgetUnheld(connectionId, sourceId, gone.titled(), today, zone)
         }
 
     suspend fun enqueue(change: PendingChange): Long = dao.insertOutbox(change.toEntity())
@@ -623,3 +648,5 @@ private fun OutboxEntity.toPending() = PendingChange(
     clientKey = clientKey,
     fields = decodeFields(fields),
 )
+
+private fun List<EventEntity>.titled(): List<EventTitle> = map { EventTitle(it.remoteId, it.seriesId, it.title) }

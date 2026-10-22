@@ -101,6 +101,18 @@ class TitleSuggestionsTest {
     }
 
     @Test
+    fun anEditorReadsTheTitlesOnItsFirstLookupOfTwoCharacters() = runTest {
+        connect("c1", "s1" to true)
+        val lookUp = suggestions.forEditor()
+        assertThat(lookUp("s")).isEmpty()
+        remember("Swim", "2026-09-05")
+        assertThat(lookUp("sw").map { it.title }).containsExactly("Swim")
+        remember("Swimming gala", "2026-09-19")
+        assertThat(lookUp("swim").map { it.title }).containsExactly("Swim")
+        assertThat(suggestions.forEditor()("swim").map { it.title }).containsExactly("Swimming gala", "Swim").inOrder()
+    }
+
+    @Test
     fun aHiddenCalendarsTitlesAreNotSuggested() = runTest {
         connect("c1", "s1" to true, "s2" to false)
         remember("Swim", "2026-09-05", source = "s1")

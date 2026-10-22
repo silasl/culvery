@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
@@ -59,13 +60,15 @@ sealed interface EditorRequest {
 
 /**
  * Everything the editor needs that loads once, read before the editor is shown ([loadEditor]) so its first frame is
- * the full editor. [held] is only the first value; the host keeps it live. [childOnly] is the child signed in as it opened.
+ * the full editor. [held] is the first value of [heldUpdates], which the host keeps collecting. [childOnly] is the
+ * child signed in as it opened.
  */
 internal class Opened(
     val request: EditorRequest,
     val form: EditorForm,
     val flow: EditorFlow,
     val members: List<Member>,
+    val heldUpdates: Flow<Held>,
     val held: Held,
     val service: String,
     val calendar: String? = null,
@@ -92,7 +95,8 @@ internal suspend fun loadEditor(request: EditorRequest, repo: CalendarRepository
     )
     val flow = editorFlow(form, child, (request as? EditorRequest.Edit)?.start)
     val masterName = if (request is EditorRequest.New) repo.masterCalendarName.first() else null
-    return Opened(request, form, flow, repo.members.first(), repo.held(form.today).first(), service, original?.sourceName, masterName, child)
+    val held = repo.held(form.today)
+    return Opened(request, form, flow, repo.members.first(), held, held.first(), service, original?.sourceName, masterName, child)
 }
 
 /**
@@ -153,7 +157,7 @@ internal fun EventEditorHost(
     val request = opened.request
     val form = opened.form
     val household: List<Member> by repo.members.collectAsState(initial = opened.members)
-    val held: Held by remember(opened) { repo.held(form.today) }.collectAsState(initial = opened.held)
+    val held: Held by opened.heldUpdates.collectAsState(initial = opened.held)
     // Only a new event says where it saves; a change names its own calendar.
     val master: String? by remember(opened) { if (request is EditorRequest.New) repo.masterCalendarName else flowOf(null) }.collectAsState(initial = opened.masterName)
     val session by editor.session.collectAsState()
@@ -224,7 +228,7 @@ internal fun EventEditorHost(
     }
 
     val child = session?.takeIf { it.role == Role.CHILD }?.person
-    val suggest: suspend (String) -> List<Suggestion> = if (request is EditorRequest.New) repo.suggestions::matching else { _ -> emptyList() }
+    val suggest: suspend (String) -> List<Suggestion> = remember(opened) { if (request is EditorRequest.New) repo.suggestions.forEditor() else { _ -> emptyList() } }
     // A new opening is a new editor: its focus and title state don't carry over from the last one.
     key(opened) {
         EventEditorScreen(
