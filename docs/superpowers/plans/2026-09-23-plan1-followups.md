@@ -510,6 +510,7 @@ Test flakes seen during the fixes (each green on a rerun): `CameraAccessTest`, `
 
 ## To check when the tablet is next plugged in
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
+- **Home slow to fill (9c walk-through, 2026-10-22):** on the emulator, Home's cards took a moment to fill after opening. Time it on the tablet (cold start and return from the Calendar tab) before deciding whether anything needs fixing.
 
 ## Feature ideas (2026-10-02, after v1)
 
