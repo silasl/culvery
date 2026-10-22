@@ -42,6 +42,9 @@ class CalendarRepository @Inject constructor(
             .forEach { Log.w(TAG, "${it.descriptor.id} declares WRITE but binds no CalendarWriter; its events are read-only") }
     }
 
+    /** Titles remembered from visible calendars, matched as a new event's title is typed (9c §4). */
+    val suggestions = TitleSuggestions(store, zone, clock)
+
     val hasConnections: Flow<Boolean> = store.connectionIds().map { it.isNotEmpty() }.distinctUntilChanged()
 
     /** The household's people, for the detail sheet's chips for choosing who it's for and the add/edit sheet's Who chips. */
