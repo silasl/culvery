@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -81,6 +82,7 @@ object ControlTokens {
     val chipGap = 8.dp
     val chipIconGap = 8.dp
     val chipDot = 12.dp
+    val chipBusyIcon = 16.dp
     val chipIcon = 20.dp
 
     // A segmented control (handoff 6e): its chips 4 inside a `surf2` pill.
@@ -399,7 +401,8 @@ fun HhStatusLine(
 
 /**
  * Hand-off §7 person chip: a chip's size and shape, `surf`, a 12 dp dot in the person's [color] 8 from their [name].
- * A toggle, filled in `accent` while [selected].
+ * A toggle, filled in `accent` while [selected]. [busy] swaps the dot for the `schedule` glyph and the state for "Saving",
+ * so the chip keeps its size; the caller still disables it.
  */
 @Composable
 fun HhPersonChip(
@@ -408,9 +411,11 @@ fun HhPersonChip(
     tag: String,
     enabled: Boolean,
     selected: Boolean,
+    busy: Boolean = false,
     onClick: () -> Unit,
 ) {
     val c = Culvery.colors
+    val ink = if (selected) c.accentInk else c.ink
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipIconGap),
@@ -419,12 +424,18 @@ fun HhPersonChip(
             .height(ControlTokens.chipHeight)
             .clip(RoundedCornerShape(ControlTokens.chipRadius))
             .background(if (selected) c.accent else c.surf)
-            .semantics { stateDescription = if (selected) CHOSEN else NOT_CHOSEN }
+            .semantics { stateDescription = if (busy) BUSY_STATE else if (selected) CHOSEN else NOT_CHOSEN }
             .toggleable(value = selected, enabled = enabled, role = Role.Checkbox, onValueChange = { onClick() })
             .padding(horizontal = ControlTokens.chipPaddingH),
     ) {
-        Box(Modifier.size(ControlTokens.chipDot).clip(CircleShape).background(color))
-        Text(name, style = ControlType.chip, color = if (selected) c.accentInk else c.ink, maxLines = 1)
+        Box(Modifier.size(ControlTokens.chipDot), contentAlignment = Alignment.Center) {
+            if (busy) {
+                HhIcon(Icons.SCHEDULE, size = ControlTokens.chipBusyIcon, tint = ink, modifier = Modifier.requiredSize(ControlTokens.chipBusyIcon))
+            } else {
+                Box(Modifier.fillMaxSize().clip(CircleShape).background(color))
+            }
+        }
+        Text(name, style = ControlType.chip, color = ink, maxLines = 1)
     }
 }
 

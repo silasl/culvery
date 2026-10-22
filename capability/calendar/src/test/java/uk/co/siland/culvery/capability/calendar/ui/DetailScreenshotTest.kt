@@ -17,6 +17,7 @@ import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.EventDetailUi
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.ui.PinPadSheet
+import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.ShellTokens
@@ -34,6 +35,7 @@ class DetailScreenshotTest {
         detail: EventDetailUi,
         mode: DetailMode = DetailMode.Idle,
         fontScale: Float = 1f,
+        saving: PersonId? = null,
         over: @Composable () -> Unit = {},
     ) {
         compose.setContent {
@@ -42,7 +44,7 @@ class DetailScreenshotTest {
                     Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) {
                         Box(Modifier.fillMaxSize().background(ShellTokens.sheetScrim))
                         Box(Modifier.align(Alignment.CenterEnd)) {
-                            EventDetailSheet(detail, SampleUi.household, mode, busy = false, {}, {}, {}, {}, {}, {}, {}, {})
+                            EventDetailSheet(detail, SampleUi.household, mode, busy = saving != null, {}, {}, {}, {}, {}, {}, {}, {}, saving = saving)
                         }
                         over()
                     }
@@ -63,6 +65,9 @@ class DetailScreenshotTest {
     @Test fun untaggedDark() = snap("detail_untagged_dark", true, SampleUi.detailUntagged, DetailMode.ChoosingPerson)
     @Test fun untaggedLight() = snap("detail_untagged_light", false, SampleUi.detailUntagged, DetailMode.ChoosingPerson)
     @Test fun chooseSharedDark() = snap("detail_choose_shared_dark", true, SampleUi.detailSharedRecurring, DetailMode.ChoosingPerson)
+    @Test
+    fun whoBusyDark() = snap("detail_who_busy_dark", true, SampleUi.detailSharedRecurring, DetailMode.ChoosingPerson, saving = SampleUi.sam.id)
+
     @Test fun syncingDark() = snap("detail_syncing_dark", true, SampleUi.detailSyncing)
     @Test fun syncingLight() = snap("detail_syncing_light", false, SampleUi.detailSyncing)
     @Test fun fontScale15() = snap("detail_fs15", false, SampleUi.detailLongTitle, fontScale = 1.5f)

@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -37,10 +38,13 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.pixelAt
 
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ControlsTest {
     @get:Rule val compose = createComposeRule()
 
@@ -285,5 +289,22 @@ class ControlsTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.Off))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "not chosen"))
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aBusyPersonChipSaysSaving() {
+        val dot = Color(0xFF5B9BE0)
+        var busy by mutableStateOf(false)
+        show { HhPersonChip("Sam", dot, "assign_Sam", enabled = !busy, selected = true, busy = busy) {} }
+        // Where the dot is: 18 dp of padding and half its 12 dp.
+        assertThat(pixelAt(compose.onNodeWithTag("assign_Sam"), 24.dp, 24.dp)).isEqualTo(dot.toArgb())
+        busy = true
+        compose.waitForIdle()
+        compose.onNodeWithTag("assign_Sam")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Saving"))
+            .assertIsNotEnabled()
+        val inked = (18..30).flatMap { x -> (18..30).map { y -> pixelAt(compose.onNodeWithTag("assign_Sam"), x.dp, y.dp) } }
+        assertThat(inked).contains(DarkColors.accentInk.toArgb())
+        assertThat(inked).doesNotContain(dot.toArgb())
     }
 }

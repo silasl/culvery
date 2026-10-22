@@ -56,8 +56,9 @@ internal fun EventDetailHost(
         LaunchedEffect(ref) { onClose() }
         return
     }
-    // The set just written, until the detail re-collected from the store shows it: a quick next tap builds on it.
-    var written by remember(detail) { mutableStateOf<List<PersonId>?>(null) }
+    // The set the chips show: the one just tapped until the detail re-collected from the store shows it, so a quick next tap builds on it.
+    var shown by remember(detail) { mutableStateOf<List<PersonId>?>(null) }
+    var saving by remember(detail) { mutableStateOf<PersonId?>(null) }
 
     EventDetailSheet(
         detail = detail,
@@ -79,18 +80,30 @@ internal fun EventDetailHost(
         },
         onChoosePerson = { mode = DetailMode.ChoosingPerson },
         onAssign = { person ->
-            val current = written ?: chosenFor(detail.event)
+            val current = shown ?: chosenFor(detail.event)
             val next = toggled(current, person.id)
-            if (next.toSet() != current.toSet()) {
+            if (next.toSet() == current.toSet()) {
+                if (person.id in current) editor.needsAPerson()
+            } else {
+                shown = next
+                saving = person.id
                 action.run {
-                    when (editor.assign(ref, next)) {
-                        EditResult.Done, EditResult.Queued -> written = next
-                        is EditResult.Rejected, EditResult.Cancelled -> Unit
-                        EditResult.NotEditable -> onClose()
+                    var kept = false
+                    try {
+                        when (editor.assign(ref, next)) {
+                            EditResult.Done, EditResult.Queued -> kept = true
+                            is EditResult.Rejected, EditResult.Cancelled -> Unit
+                            EditResult.NotEditable -> onClose()
+                        }
+                    } finally {
+                        saving = null
+                        if (!kept) shown = null
                     }
                 }
             }
         },
+        chosen = shown ?: chosenFor(detail.event),
+        saving = saving,
         onEdit = { action.run { onEdit() } },
         onChangeWho = { action.run { onChangeWho() } },
     )

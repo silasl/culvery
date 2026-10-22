@@ -4,6 +4,7 @@ import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -355,5 +356,80 @@ class EventDetailHostTest {
         waitUntil { compose.onAllNodes(hasText("For") and hasText("Family")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("assign_Family").assertIsOn()
         compose.onNodeWithTag("assign_Sam").assertIsOff()
+    }
+
+    private fun stateOf(name: String) = compose.onNodeWithTag("assign_$name").fetchSemanticsNode().config[SemanticsProperties.StateDescription]
+
+    @Test
+    fun aTappedChipIsBusyAndChosenAtOnce() {
+        val gate = CompletableDeferred<Unit>()
+        writer.gate = gate
+        access.answer(TestAccess.ALEX)
+        chooseFor(ids(access.sam, access.mia))
+        tap("Alex")
+        compose.onNodeWithTag("assign_Alex").assertIsOn().assertIsNotEnabled()
+        assertThat(stateOf("Alex")).isEqualTo("Saving")
+        assertThat(stateOf("Sam")).isEqualTo("chosen")
+        gate.complete(Unit)
+        waitForText("Alex, Sam +1")
+        waitUntil { compose.onAllNodes(hasTestTag("assign_Alex") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        assertThat(stateOf("Alex")).isEqualTo("chosen")
+    }
+
+    /** Pin: a refused or cancelled tap already left the chips as they were. */
+    @Test
+    fun aRefusedOrCancelledPinPutsTheChipsBack() {
+        access.answer(TestAccess.MIA)
+        chooseFor(ids(access.mia))
+        tap("Sam")
+        waitUntil { access.toasts.messages.isNotEmpty() }
+        waitUntil { compose.onAllNodes(hasTestTag("assign_Sam") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("assign_Sam").assertIsOff()
+        compose.onNodeWithTag("assign_Mia").assertIsOn()
+        assertThat(stateOf("Sam")).isEqualTo("not chosen")
+        assertThat(access.toasts.messages).containsExactly(ASK_AN_ADULT)
+    }
+
+    @Test
+    fun aCancelledPinPadPutsTheChipsBack() {
+        access.answer(null)
+        chooseFor(ids(access.mia))
+        tap("Sam")
+        waitUntil { access.requests.isNotEmpty() }
+        waitUntil { compose.onAllNodes(hasTestTag("assign_Sam") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("assign_Sam").assertIsOff()
+        compose.onNodeWithTag("assign_Mia").assertIsOn()
+        assertThat(stateOf("Sam")).isEqualTo("not chosen")
+        assertThat(writer.calls).isEmpty()
+    }
+
+    @Test
+    fun clearingTheLastPersonSaysWhy() {
+        access.answer(TestAccess.ALEX)
+        chooseFor(ids(access.mia))
+        tap("Mia")
+        waitUntil { access.toasts.messages.isNotEmpty() }
+        assertThat(access.toasts.messages).containsExactly("An event needs at least one person.")
+        assertThat(access.requests).isEmpty()
+        assertThat(writer.calls).isEmpty()
+        compose.onNodeWithTag("assign_Mia").assertIsOn()
+        assertThat(tagOf(swim)).isEqualTo(ids(access.mia))
+    }
+
+    @Test
+    fun aQuickSecondTapIsJudgedOnTheSetOnScreen() {
+        val gate = CompletableDeferred<Unit>()
+        writer.gate = gate
+        access.answer(TestAccess.ALEX)
+        chooseFor(ids(access.sam, access.mia))
+        tap("Mia")
+        compose.onNodeWithTag("assign_Mia").assertIsOff()
+        gate.complete(Unit)
+        waitUntil { compose.onAllNodes(hasTestTag("assign_Sam") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        tap("Sam")
+        waitUntil { access.toasts.messages.isNotEmpty() }
+        assertThat(access.toasts.messages).containsExactly("An event needs at least one person.")
+        assertThat(writer.calls).containsExactly("assignSeries:swim")
+        compose.onNodeWithTag("assign_Sam").assertIsOn()
     }
 }

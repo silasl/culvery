@@ -74,7 +74,7 @@ internal fun calendarLabel(event: EventUi): String = when (event.readOnlyReason)
  * Hand-off §7 "Sheet 1 — Event detail". Stateless: the host decides [mode] and [busy]. Buttons are never hidden
  * for permission reasons; the checks happen when they are tapped. Delete runs the guard ([onDelete]); only the
  * confirmation's "Delete event" deletes ([onConfirmDelete]). Change ([onEdit]) shows exactly where Delete does and
- * opens the editor without a PIN (2b-2 design D12); on an event it can change, the For row opens it on Who ([onChangeWho], 9 §3.3).
+ * opens the editor without a PIN (2b-2 design D12); [chosen] is the set the chips show (the host passes the one just tapped, before it is written) and [saving] the chip being written; on an event it can change, the For row opens it on Who ([onChangeWho], 9 §3.3).
  */
 @Composable
 fun EventDetailSheet(
@@ -91,6 +91,8 @@ fun EventDetailSheet(
     onEdit: () -> Unit,
     onChangeWho: () -> Unit,
     modifier: Modifier = Modifier,
+    chosen: List<PersonId> = chosenFor(detail.event),
+    saving: PersonId? = null,
 ) {
     val c = Culvery.colors
     val e = detail.event
@@ -126,7 +128,7 @@ fun EventDetailSheet(
                     body = "Change repeating events in ${e.serviceName} on your phone." +
                         if (e.assignable) " Choosing who it’s for changes every time it repeats." else "",
                 ) {
-                    if (e.assignable) ChooseWho(people, chosenFor(e), mode, busy, onChoosePerson, onAssign)
+                    if (e.assignable) ChooseWho(people, chosen, saving, mode, busy, onChoosePerson, onAssign)
                 }
                 // A phone event keeps its chips once the first tap tags it, so a set can be built (9 §3.4).
                 e.untagged || (mode == DetailMode.ChoosingPerson && e.editable) -> Note(
@@ -136,7 +138,7 @@ fun EventDetailSheet(
                     background = c.accentSoft,
                     iconTint = c.accent,
                 ) {
-                    ChooseWho(people, chosenFor(e), mode, busy, onChoosePerson, onAssign)
+                    ChooseWho(people, chosen, saving, mode, busy, onChoosePerson, onAssign)
                 }
             }
         }
@@ -187,6 +189,7 @@ internal fun chosenFor(event: EventUi): List<PersonId> = if (event.untagged) emp
 private fun ChooseWho(
     people: List<Person>,
     chosen: List<PersonId>,
+    saving: PersonId?,
     mode: DetailMode,
     busy: Boolean,
     onChoosePerson: () -> Unit,
@@ -199,7 +202,7 @@ private fun ChooseWho(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
         ) {
             (people + Person.Family).forEach { person ->
-                HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy, selected = person.id in chosen) { onAssign(person) }
+                HhPersonChip(person.name, Color(person.color), "assign_${person.name}", enabled = !busy, selected = person.id in chosen, busy = person.id == saving) { onAssign(person) }
             }
         }
     } else {

@@ -60,6 +60,8 @@ data class AddedEvent(
     val service: String,
 )
 
+const val NEEDS_A_PERSON = "An event needs at least one person."
+
 /** 3a design §3.12: the add/edit sheet couldn't load what it needs, so it closed. */
 const val COULD_NOT_OPEN = "Couldn’t open the event — try again."
 
@@ -156,6 +158,9 @@ class CalendarEditor internal constructor(
 
     /** The editor's Delete failed before it could ask to confirm (a store failure): the detail sheet's delete wording. */
     internal fun couldNotDelete(label: String) = toaster.show(couldNotDelete(label, WriteProblem.Tablet), urgent = true)
+
+    /** A tap would have cleared an event's last person: nothing is written, and the toast says why. */
+    internal fun needsAPerson() = toaster.show(NEEDS_A_PERSON, urgent = true)
 
     /** The delete guard, run before the confirmation appears: true when this person may delete [ref]. */
     suspend fun mayDelete(ref: EventRef): Boolean {
