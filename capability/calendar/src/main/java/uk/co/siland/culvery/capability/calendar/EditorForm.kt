@@ -24,8 +24,6 @@ sealed interface TimeChoice {
 /** The longest an event may last, in days (the first and last day count). */
 const val MAX_SPAN_DAYS = 60L
 
-internal const val UNTIL_TOO_LATE = "An event can last up to $MAX_SPAN_DAYS days. Pick an earlier last day."
-
 /** 2b-2 design D8: a title is at most 100 characters. */
 const val MAX_TITLE_LENGTH = 100
 
