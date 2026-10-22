@@ -59,7 +59,7 @@ class CalendarRepositoryTest {
             listOf(CalendarSource("s-alex", "Alex", writable = false), CalendarSource("s-family", "Family", writable = false)),
             mapOf("s-alex" to SourceMapping(alex.id, visible = true)),
         )
-        store.setMaster("c1", "s-family")
+        store.setMaster("c1", "s-family", TEST_TODAY, TEST_ZONE)
     }
 
     @After

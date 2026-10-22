@@ -97,6 +97,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     ): SourcesRefreshed = db.withTransaction {
         // Removed while the provider was being read: no orphan sources.
         dao.connection(connectionId) ?: return@withTransaction SourcesRefreshed(masterCleared = false, droppedChanges = 0)
+        val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
         val stored = dao.sources(connectionId).associateBy { it.sourceId }
         // A repeated id would break the insert's primary key on every pass.
         val listed = sources.distinctBy { it.id }.associateBy { it.id }
@@ -104,7 +105,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         var dropped = 0
         stored.values.filter { it.sourceId !in listed }.forEach { gone ->
             if (gone.isMaster) masterCleared = true
-            dropped += removeSourceRows(connectionId, gone.sourceId, Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate(), zone)
+            dropped += removeSourceRows(connectionId, gone.sourceId, today, zone)
         }
         listed.values.forEach { s ->
             val existing = stored[s.id]
@@ -119,6 +120,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
                     else -> tick
                 }
                 dao.updateSource(connectionId, s.id, s.name, s.writable, visible, tick)
+                if (visible && !existing.visible) rememberSource(connectionId, s.id, today, zone)
                 if (existing.isMaster && !s.writable) {
                     dao.clearMaster()
                     masterCleared = true
@@ -154,9 +156,11 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
      * Makes this source the one master calendar, and shows it, clearing any other master, in one transaction. It also records the
      * source as writable: only CalendarSetup.setMaster calls this, after checking the provider says it is.
      */
-    suspend fun setMaster(connectionId: String, sourceId: String) = db.withTransaction {
+    suspend fun setMaster(connectionId: String, sourceId: String, today: LocalDate, zone: ZoneId) = db.withTransaction {
+        val wasHidden = dao.source(connectionId, sourceId)?.visible == false
         dao.clearMaster()
         require(dao.markMaster(connectionId, sourceId) == 1) { "The master calendar isn't among the connection's calendars" }
+        if (wasHidden) rememberSource(connectionId, sourceId, today, zone)
     }
 
     /**
@@ -167,7 +171,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         val row = requireNotNull(dao.source(connectionId, sourceId)) { "No such calendar" }
         require(visible || !row.isMaster) { "The master calendar is always shown" }
         dao.setMapping(connectionId, sourceId, person.value, visible)
-        if (visible && !row.visible) remember(rememberedFrom(dao.eventRowsOfSource(connectionId, sourceId), zone, today), today)
+        if (visible && !row.visible) rememberSource(connectionId, sourceId, today, zone)
         // A hidden calendar isn't read, so its problem has no news (4c ruling 12).
         if (!visible) dao.clearReadProblem(connectionId, sourceId)
     }
@@ -327,6 +331,10 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         rememberedFrom(dao.visibleEventRows(connectionId), zone, today).forEach { dao.upsertRemembered(it) }
     }
 
+    /** A calendar that has become visible: its stored events are remembered, as they were not while it was hidden. */
+    private suspend fun rememberSource(connectionId: String, sourceId: String, today: LocalDate, zone: ZoneId) =
+        remember(rememberedFrom(dao.eventRowsOfSource(connectionId, sourceId), zone, today), today)
+
     /** Merges titles read from visible calendars into the rows; a row of a hidden calendar gives way to any of them. */
     private suspend fun remember(read: List<RememberedTitleEntity>, today: LocalDate) {
         read.forEach { new ->
@@ -337,14 +345,16 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     }
 
     /**
-     * Forgets the titles of [gone] events, just removed from [sourceId], that the event or series supplying them no
-     * longer holds. Only these are checked: an event pruned from the window is not a removed one.
+     * Forgets the titles of [gone] events, just removed or retitled in [sourceId], when one of them is the event or
+     * series the row came from and it no longer holds the title. Only these are checked: an event pruned from the
+     * window is not a removed one.
      */
     private suspend fun forgetUnheld(connectionId: String, sourceId: String, gone: List<EventEntity>, today: LocalDate, zone: ZoneId) {
+        val removedSuppliers = gone.map { it.seriesId ?: it.remoteId }.toSet()
         val forgotten = gone.map { it.title }.distinct().filter { title ->
             val key = titleKey(title)
             val row = if (key.isEmpty()) null else dao.remembered(connectionId, key)
-            row != null && row.sourceId == sourceId &&
+            row != null && row.sourceId == sourceId && row.sourceEventId in removedSuppliers &&
                 dao.supplierTitles(connectionId, sourceId, row.sourceEventId).none { titleKey(it) == key }
         }
         forget(connectionId, forgotten, today, zone)
@@ -375,11 +385,13 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
      * Puts a write the provider accepted into the mirror and, if it came from the outbox, completes it. Writes nothing
      * once the source is gone: its queued changes went with it.
      */
-    suspend fun applyAccepted(connectionId: String, sourceId: String, event: RemoteEvent, zone: ZoneId, completing: Long? = null) =
+    suspend fun applyAccepted(connectionId: String, sourceId: String, event: RemoteEvent, today: LocalDate, zone: ZoneId, completing: Long? = null) =
         db.withTransaction {
             if (dao.source(connectionId, sourceId) == null) return@withTransaction
+            val before = dao.eventsByIds(connectionId, sourceId, listOf(event.remoteId)).filter { titleKey(it.title) != titleKey(event.title) }
             dao.upsertEvents(listOf(event.toEntity(connectionId, sourceId, zone)))
             completing?.let { dao.deleteOutbox(it) }
+            forgetUnheld(connectionId, sourceId, before, today, zone)
         }
 
     /** Shows an accepted series assign on every occurrence of [seriesId] held and, if it came from the outbox, completes it. */

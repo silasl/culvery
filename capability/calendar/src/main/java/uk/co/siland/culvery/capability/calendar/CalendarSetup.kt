@@ -1,6 +1,8 @@
 package uk.co.siland.culvery.capability.calendar
 
 import android.util.Log
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.CoroutineContext
@@ -153,7 +155,7 @@ class CalendarSetup(
      * WRITE and report the source as writable now. That is recorded too, because an install from before 2b-1
      * stored every source's writability as it was then.
      */
-    suspend fun setMaster(connectionId: String, sourceId: String) {
+    suspend fun setMaster(connectionId: String, sourceId: String, today: LocalDate, zone: ZoneId) {
         val connection = store.connectionsNow().firstOrNull { it.connection.id == connectionId }?.connection
             ?: throw IllegalArgumentException("No connection $connectionId")
         val provider = providerFor(connection.providerId)
@@ -161,7 +163,7 @@ class CalendarSetup(
         val source = callProvider { provider.sources(connection) }.firstOrNull { it.id == sourceId }
             ?: throw IllegalArgumentException("The master calendar isn't among the connection's calendars")
         require(source.writable) { "The master calendar is read-only" }
-        store.setMaster(connectionId, sourceId)
+        store.setMaster(connectionId, sourceId, today, zone)
         requestSync()
     }
 

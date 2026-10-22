@@ -78,7 +78,7 @@ class CalendarReview @Inject constructor(
 
     /** CalendarSetup.setMaster checks with the provider that the calendar can be written, then shows it. */
     suspend fun makeMaster(source: StoredSource): Boolean = change {
-        setup.setMaster(source.connectionId, source.source.id)
+        setup.setMaster(source.connectionId, source.source.id, today(), zone.current())
         toaster.show(newEventsGoTo(source.source.name))
     }
 

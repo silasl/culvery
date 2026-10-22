@@ -126,6 +126,7 @@ class CalendarReviewTest {
         store.applyAccepted(
             "g1", family.id,
             RemoteEvent("e", "Walk", EventTime.Timed(Instant.ofEpochSecond(3_600)), EventTime.Timed(Instant.ofEpochSecond(7_200)), recurring = false),
+            TEST_TODAY,
             ZoneId.of("UTC"),
         )
         assertThat(store.eventsBetween(0, Long.MAX_VALUE).first()).hasSize(1)

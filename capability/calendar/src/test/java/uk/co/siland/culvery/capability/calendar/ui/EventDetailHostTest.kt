@@ -101,7 +101,7 @@ class EventDetailHostTest {
             listOf(CalendarSource("s-family", "Family calendar", writable = true)),
             emptyMap(),
         )
-        store.setMaster("c1", "s-family")
+        store.setMaster("c1", "s-family", TEST_TODAY, TEST_ZONE)
         store.applySync(
             "c1", "s-family", DateRange(today.minusDays(1), today.plusDays(14), london),
             SyncResult(

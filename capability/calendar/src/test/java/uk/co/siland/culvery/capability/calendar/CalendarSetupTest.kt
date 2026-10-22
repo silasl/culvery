@@ -92,7 +92,7 @@ class CalendarSetupTest {
         var syncs = 0
         val setup = setup(setOf(writable)) { syncs++ }
         setup.connect(Connection("c1", "calendar.w", "W", emptyMap()), emptyMap())
-        setup.setMaster("c1", "s2")
+        setup.setMaster("c1", "s2", TEST_TODAY, TEST_ZONE)
         assertThat(setup.master()?.source?.id).isEqualTo("s2")
         assertThat(syncs).isEqualTo(1)
     }
@@ -104,7 +104,7 @@ class CalendarSetupTest {
             listOf(CalendarSource("s2", "Family calendar", writable = false)),
             emptyMap(),
         )
-        setup(setOf(writable)).setMaster("c1", "s2")
+        setup(setOf(writable)).setMaster("c1", "s2", TEST_TODAY, TEST_ZONE)
         assertThat(store.source("c1", "s2")!!.source.writable).isTrue()
     }
 
@@ -113,8 +113,8 @@ class CalendarSetupTest {
         val setup = setup(setOf(writable, provider))
         setup.connect(Connection("c1", "calendar.w", "W", emptyMap()), emptyMap())
         setup.connect(Connection("c2", "calendar.a", "A", emptyMap()), emptyMap())
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { setup.setMaster("c1", "s1") } }
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { setup.setMaster("c2", "s2") } }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { setup.setMaster("c1", "s1", TEST_TODAY, TEST_ZONE) } }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { setup.setMaster("c2", "s2", TEST_TODAY, TEST_ZONE) } }
         assertThat(setup.master()).isNull()
     }
 

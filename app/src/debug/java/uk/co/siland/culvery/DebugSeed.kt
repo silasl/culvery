@@ -1,6 +1,8 @@
 package uk.co.siland.culvery
 
 import android.util.Log
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -75,7 +77,8 @@ class DebugSampleHousehold(
         )
         calendar.connect(Connection(DEBUG_CONNECTION_ID, FakeCalendarProvider.ID, "Sample calendar", emptyMap()), mapping)
         try {
-            calendar.setMaster(DEBUG_CONNECTION_ID, FakeCalendarProvider.SOURCE_FAMILY)
+            // The sample was just connected and holds no events yet, so the date and zone only satisfy the signature.
+            calendar.setMaster(DEBUG_CONNECTION_ID, FakeCalendarProvider.SOURCE_FAMILY, LocalDate.now(), ZoneId.systemDefault())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

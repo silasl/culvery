@@ -151,7 +151,7 @@ internal suspend fun CalendarStore.applyAcceptedWrite(
             applySeriesAssigned(connectionId, sourceId, requireNotNull(remoteId) { "A series assign needs its series" }, forPerson, completing)
         event == null ->
             applyDeleted(EventRef(connectionId, sourceId, requireNotNull(remoteId) { "An accepted delete needs its remoteId" }), today, zone, completing)
-        else -> applyAccepted(connectionId, sourceId, event, zone, completing)
+        else -> applyAccepted(connectionId, sourceId, event, today, zone, completing)
     }
 }
 

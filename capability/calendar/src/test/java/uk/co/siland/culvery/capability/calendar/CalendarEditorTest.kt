@@ -67,7 +67,7 @@ class CalendarEditorTest {
         household = HouseholdRepository(householdDb)
         household.setLocation(HomeLocation("London", 51.5, -0.12, "Europe/London"))
         store.addConnection(Connection("c1", "calendar.a", "Sample calendar", emptyMap()), listOf(family, school), emptyMap())
-        store.setMaster("c1", "s-family")
+        store.setMaster("c1", "s-family", TEST_TODAY, TEST_ZONE)
     }
 
     @After

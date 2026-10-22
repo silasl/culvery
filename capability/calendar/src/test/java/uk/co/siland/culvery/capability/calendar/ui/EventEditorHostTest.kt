@@ -145,7 +145,7 @@ class EventEditorHostTest {
             listOf(CalendarSource("s-family", "Family calendar", writable = true)),
             emptyMap(),
         )
-        store.setMaster("c1", "s-family")
+        store.setMaster("c1", "s-family", TEST_TODAY, TEST_ZONE)
         val start = day.atTime(19, 30).atZone(london).toInstant()
         val swimStart = day.atTime(7, 0).atZone(london).toInstant()
         store.applySync(

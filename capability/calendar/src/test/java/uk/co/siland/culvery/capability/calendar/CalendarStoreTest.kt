@@ -343,8 +343,8 @@ class CalendarStoreTest {
     @Test
     fun setMasterMarksOneSourceAsTheWritableMasterAndClearsTheOthers() = runTest {
         connect("s1", "s2")
-        store.setMaster("c1", "s1")
-        store.setMaster("c1", "s2")
+        store.setMaster("c1", "s1", TEST_TODAY, TEST_ZONE)
+        store.setMaster("c1", "s2", TEST_TODAY, TEST_ZONE)
         val master = store.master().first()!!
         assertThat(master.source.id).isEqualTo("s2")
         assertThat(master.source.writable).isTrue()
@@ -356,8 +356,8 @@ class CalendarStoreTest {
     @Test
     fun setMasterForAnUnknownSourceChangesNothing() = runTest {
         connect("s1")
-        store.setMaster("c1", "s1")
-        assertThrows(IllegalArgumentException::class.java) { runBlocking { store.setMaster("c1", "nope") } }
+        store.setMaster("c1", "s1", TEST_TODAY, TEST_ZONE)
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { store.setMaster("c1", "nope", TEST_TODAY, TEST_ZONE) } }
         assertThat(store.master().first()!!.source.id).isEqualTo("s1")
     }
 
@@ -505,7 +505,7 @@ class CalendarStoreTest {
     @Test
     fun aConnectionAndEverythingItHoldsIsRemovedTogether() = runTest {
         connect("s1", "s2")
-        store.setMaster("c1", "s1")
+        store.setMaster("c1", "s1", TEST_TODAY, TEST_ZONE)
         store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)), TEST_TODAY)
         store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null))
         store.removeConnection("c1")
@@ -555,7 +555,7 @@ class CalendarStoreTest {
     @Test
     fun refreshingWithoutTheMasterClearsItAndRemovesItsRows() = runTest {
         connect("s1", "s2")
-        store.setMaster("c1", "s1")
+        store.setMaster("c1", "s1", TEST_TODAY, TEST_ZONE)
         store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)), TEST_TODAY)
         store.enqueue(change(ChangeKind.DELETE, remoteId = "a", draft = null))
         val cleared = store.refreshSources("c1", listOf(listed("s2")), 5_000L, TEST_ZONE, mapping("mia"))
@@ -567,7 +567,7 @@ class CalendarStoreTest {
     @Test
     fun aMasterThatBecomesReadOnlyIsClearedButStays() = runTest {
         connect("s1")
-        store.setMaster("c1", "s1")
+        store.setMaster("c1", "s1", TEST_TODAY, TEST_ZONE)
         val cleared = store.refreshSources("c1", listOf(listed("s1", writable = false)), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(cleared.masterCleared).isTrue()
         assertThat(store.master().first()).isNull()
@@ -577,7 +577,7 @@ class CalendarStoreTest {
     @Test
     fun aWritableMasterStaysTheMasterThroughARefresh() = runTest {
         connect("s1")
-        store.setMaster("c1", "s1")
+        store.setMaster("c1", "s1", TEST_TODAY, TEST_ZONE)
         assertThat(store.refreshSources("c1", listOf(listed("s1", writable = true)), 5_000L, TEST_ZONE, mapping("mia")).masterCleared).isFalse()
         assertThat(store.master().first()?.source?.id).isEqualTo("s1")
     }
@@ -596,7 +596,7 @@ class CalendarStoreTest {
         val queued = store.enqueue(change(ChangeKind.UPDATE, remoteId = "a"))
         store.removeConnection("c1")
         store.applySync("c1", "s1", window, full(timed("a", "Walk", 23, 9)), TEST_TODAY)
-        store.applyAccepted("c1", "s1", timed("a", "Walk", 23, 9), zone, completing = queued)
+        store.applyAccepted("c1", "s1", timed("a", "Walk", 23, 9), TEST_TODAY, zone, completing = queued)
         assertThat(eventRows("s1")).isEqualTo(0L)
         assertThat(store.cursor("c1", "s1", window)).isNull()
     }
@@ -660,7 +660,7 @@ class CalendarStoreTest {
     @Test
     fun theMasterStaysShownWhateverTheServiceSays() = runTest {
         connect("s1")
-        store.setMaster("c1", "s1")
+        store.setMaster("c1", "s1", TEST_TODAY, TEST_ZONE)
         store.refreshSources("c1", listOf(listed("s1", writable = true, shown = false)), 5_000L, TEST_ZONE, mapping("mia"))
         assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
     }
@@ -675,7 +675,7 @@ class CalendarStoreTest {
     @Test
     fun theMasterCannotBeHidden() = runTest {
         connect("s1")
-        store.setMaster("c1", "s1")
+        store.setMaster("c1", "s1", TEST_TODAY, TEST_ZONE)
         assertThrows(IllegalArgumentException::class.java) {
             runBlocking { store.setMapping("c1", "s1", PersonId.FAMILY, visible = false, TEST_TODAY, TEST_ZONE) }
         }
@@ -686,7 +686,7 @@ class CalendarStoreTest {
     fun makingAHiddenCalendarTheMasterShowsIt() = runTest {
         connect("s1")
         store.setMapping("c1", "s1", PersonId.FAMILY, visible = false, TEST_TODAY, TEST_ZONE)
-        store.setMaster("c1", "s1")
+        store.setMaster("c1", "s1", TEST_TODAY, TEST_ZONE)
         assertThat(store.source("c1", "s1")!!.mapping.visible).isTrue()
     }
 
@@ -870,7 +870,7 @@ class CalendarStoreTest {
         connect("s1")
         store.applySync("c1", "s1", window, full(timed("e1", "Swim", 23, 9)), TEST_TODAY)
         val id = store.enqueue(change(ChangeKind.UPDATE))
-        store.applyAccepted("c1", "s1", timed("e1", "Swim", 23, 9).copy(forPerson = "sam-id"), zone, completing = id)
+        store.applyAccepted("c1", "s1", timed("e1", "Swim", 23, 9).copy(forPerson = "sam-id"), TEST_TODAY, zone, completing = id)
         assertThat(store.eventNow(EventRef("c1", "s1", "e1"))!!.forPerson).isEqualTo("sam-id")
         assertThat(store.pendingNow()).isEmpty()
     }
@@ -889,7 +889,7 @@ class CalendarStoreTest {
     fun applyWithoutCompletingLeavesTheQueue() = runTest {
         connect("s1")
         val id = store.enqueue(change(ChangeKind.DELETE, remoteId = "other", draft = null))
-        store.applyAccepted("c1", "s1", timed("e1", "Swim", 23, 9), zone)
+        store.applyAccepted("c1", "s1", timed("e1", "Swim", 23, 9), TEST_TODAY, zone)
         assertThat(store.pendingNow().map { it.id }).containsExactly(id)
     }
 

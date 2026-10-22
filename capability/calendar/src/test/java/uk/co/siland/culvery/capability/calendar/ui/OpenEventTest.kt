@@ -22,6 +22,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.calendar.TEST_ZONE
 import uk.co.siland.culvery.capability.calendar.TEST_TODAY
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
@@ -99,7 +100,7 @@ class OpenEventTest {
 
     /** The Family calendar as a writable master whose provider has a writer, so the add entry points show. */
     private fun makeFamilyTheWritableMaster() {
-        runBlocking { store.setMaster("c1", "s-family") }
+        runBlocking { store.setMaster("c1", "s-family", TEST_TODAY, TEST_ZONE) }
         repo = CalendarRepository(store, household, zone, emptySet(), setOf(ScriptedWriter("calendar.test")))
         editor = stubEditor(store, zone, WallClock { SampleUi.NOW })
     }
@@ -170,7 +171,7 @@ class OpenEventTest {
 
     @Test
     fun withAMasterWhoseProviderHasNoWriterThereIsNowhereToAdd() {
-        runBlocking { store.setMaster("c1", "s-family") }
+        runBlocking { store.setMaster("c1", "s-family", TEST_TODAY, TEST_ZONE) }
         showBothHosts()
         assertNowhereToAdd()
     }

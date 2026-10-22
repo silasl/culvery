@@ -261,6 +261,44 @@ class CalendarStoreRememberedTest {
         assertThat(keys()).containsExactly("dentist")
     }
 
+    @Test
+    fun removingAnotherEventWithTheTitleLeavesAPrunedSuppliersRowAlone() = runTest {
+        connect()
+        store.applySync("c1", "s1", window, full(timed("a", "Dentist", sept(20)), timed("b", "Dentist", sept(28))), sept(25))
+        assertThat(store.rememberedTitles().single().sourceEventId).isEqualTo("a")
+        store.prune("c1", "s1", later)
+        store.applySync("c1", "s1", later, changes(removed = listOf("b")), sept(25))
+        assertThat(keys()).containsExactly("dentist")
+    }
+
+    @Test
+    fun aTitleCorrectedOnTheTabletForgetsItsOldSpelling() = runTest {
+        connect()
+        sync("s1", full(timed("a", "Dentsit", sept(23))))
+        store.applyAccepted("c1", "s1", timed("a", "Dentist", sept(23)), today, zone)
+        sync("s1", changes(timed("a", "Dentist", sept(23))))
+        assertThat(everything().map { it.title }).containsExactly("Dentist")
+    }
+
+    @Test
+    fun aCalendarTickedAgainInTheServiceIsRememberedFromItsStoredEvents() = runTest {
+        connect(sourceIds = listOf("s1", "s2"), hidden = setOf("s2"))
+        sync("s2", full(timed("party", "Surprise party", sept(23))))
+        val s1 = CalendarSource("s1", "S1", writable = false, primary = true)
+        store.refreshSources("c1", listOf(s1, CalendarSource("s2", "S2", writable = false, shown = false)), 5_000L, zone) { SourceMapping.Default }
+        assertThat(everything()).isEmpty()
+        store.refreshSources("c1", listOf(s1, CalendarSource("s2", "S2", writable = false, shown = true)), 6_000L, zone) { SourceMapping.Default }
+        assertThat(store.rememberedTitles().map { it.title }).containsExactly("Surprise party")
+    }
+
+    @Test
+    fun aHiddenCalendarMadeTheMasterIsRememberedFromItsStoredEvents() = runTest {
+        connect(sourceIds = listOf("s1", "s2"), hidden = setOf("s2"))
+        sync("s2", full(timed("party", "Surprise party", sept(23))))
+        store.setMaster("c1", "s2", today, zone)
+        assertThat(store.rememberedTitles().map { it.title }).containsExactly("Surprise party")
+    }
+
     // calendars shown and hidden
 
     @Test
