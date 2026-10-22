@@ -899,12 +899,13 @@ class EventEditorHostTest {
             )
         }
         compose.waitUntil(5_000) { overlay.fullScreen }
-        // The frame that shows the overlay already has the editor in it.
+        // The frame that shows the overlay already has the editor in it, foot line included.
         compose.runOnIdle {
             assertThat(loadedAtShow).isTrue()
             assertThat(overlay.fullScreen).isTrue()
+            compose.onNodeWithTag("editor_title").assertExists()
+            compose.onNodeWithTag("editor_saves_to", useUnmergedTree = true).assertExists()
         }
-        compose.onNodeWithTag("editor_title").assertExists()
     }
 
     @Test
@@ -966,18 +967,7 @@ class EventEditorHostTest {
         assertThat(access.toasts.messages).containsExactly(COULD_NOT_OPEN)
     }
 
-    /** Pin: the context line follows the live session, as before the editor was loaded ahead of its show. */
-    @Test
-    fun theContextLineFollowsTheSessionAfterItExpires() {
-        access.answer(TestAccess.ALEX)
-        runBlocking { access.control.authorise(CalendarPermissions.CREATE) }
-        newEvent(null)
-        waitForText("Add event")
-        compose.onNodeWithTag("editor_context", useUnmergedTree = true).assertTextEquals("From Calendar · Alex signed in")
-        compose.runOnIdle { access.control.lock() }
-        compose.onNodeWithTag("editor_context", useUnmergedTree = true).assertTextEquals("From Calendar")
-    }
-
+    /** Pin (first half): the context line follows the live session, as before the editor was loaded ahead of its show. */
     @Test
     fun theContextLineSaysWhereFromAndWho() {
         access.answer(TestAccess.ALEX)

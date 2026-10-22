@@ -68,6 +68,7 @@ internal class Opened(
     val held: Held,
     val service: String,
     val calendar: String? = null,
+    val masterName: String? = null,
     val childOnly: PersonId? = null,
 )
 
@@ -89,7 +90,8 @@ internal suspend fun loadEditor(request: EditorRequest, repo: CalendarRepository
         repeats = child == null,
     )
     val flow = editorFlow(form, child, (request as? EditorRequest.Edit)?.start)
-    return Opened(request, form, flow, repo.members.first(), repo.held(form.today).first(), service, original?.sourceName, child)
+    val masterName = if (request is EditorRequest.New) repo.masterCalendarName.first() else null
+    return Opened(request, form, flow, repo.members.first(), repo.held(form.today).first(), service, original?.sourceName, masterName, child)
 }
 
 /**
@@ -152,7 +154,7 @@ internal fun EventEditorHost(
     val household: List<Member> by repo.members.collectAsState(initial = opened.members)
     val held: Held by remember(opened) { repo.held(form.today) }.collectAsState(initial = opened.held)
     // Only a new event says where it saves; a change names its own calendar.
-    val master: String? by remember(opened) { if (request is EditorRequest.New) repo.masterCalendarName else flowOf(null) }.collectAsState(initial = null)
+    val master: String? by remember(opened) { if (request is EditorRequest.New) repo.masterCalendarName else flowOf(null) }.collectAsState(initial = opened.masterName)
     val session by editor.session.collectAsState()
     val navigator = if (request.from == EditorFrom.Home) LocalShellNavigator.current else null
     var failure by remember(opened) { mutableStateOf<SaveFailure?>(null) }
