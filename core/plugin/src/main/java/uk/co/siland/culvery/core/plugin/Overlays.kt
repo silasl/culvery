@@ -26,6 +26,9 @@ interface OverlayHost {
     fun markEdited(edited: Boolean)
 
     fun dismiss()
+
+    /** Counts the overlays shown so far, so a caller can tell whether another was shown since it last looked. */
+    val generation: Int get() = 0
 }
 
 val LocalOverlayHost = staticCompositionLocalOf<OverlayHost> {

@@ -16,14 +16,22 @@ class RecordingOverlay : OverlayHost {
     var fullScreen = false
         private set
 
+    override var generation = 0
+        private set
+
     override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) {
         this.content = content
         this.closesWhenIdle = closesWhenIdle
         edited = false
         fullScreen = false
+        generation++
     }
 
+    /** Called as [showFullScreen] is entered, to record what was true at that moment. */
+    var onShowFullScreen: () -> Unit = {}
+
     override fun showFullScreen(content: @Composable () -> Unit) {
+        onShowFullScreen()
         show(content = content)
         fullScreen = true
     }

@@ -7,8 +7,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -16,6 +16,7 @@ import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.calendar.CALENDAR_TAB_ID
 import uk.co.siland.culvery.capability.calendar.CalendarEditor
 import uk.co.siland.culvery.capability.calendar.CalendarRepository
@@ -33,6 +34,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "EventEditorHost"
@@ -55,24 +57,26 @@ sealed interface EditorRequest {
 }
 
 /**
- * The form once loaded for [request], with the service the change goes to and the calendar a change is saved to; [form]
- * is null when there is nothing to open: the event has gone, or there is no master. [childOnly] is the child signed in
- * as it opened.
+ * Everything the editor needs that loads once, read before the editor is shown ([loadEditor]) so its first frame is
+ * the full editor. [held] is only the first value; the host keeps it live. [childOnly] is the child signed in as it opened.
  */
-private class Opened(
+internal class Opened(
     val request: EditorRequest,
-    val form: EditorForm?,
+    val form: EditorForm,
+    val flow: EditorFlow,
+    val members: List<Member>,
+    val held: Held,
     val service: String,
     val calendar: String? = null,
     val childOnly: PersonId? = null,
 )
 
-private suspend fun open(request: EditorRequest, repo: CalendarRepository, editor: CalendarEditor): Opened {
-    val service = repo.masterService.first() ?: return Opened(request, null, "")
+/** The editor's data for [request], or null when there is nothing to open: no master calendar, or the event has gone. */
+internal suspend fun loadEditor(request: EditorRequest, repo: CalendarRepository, editor: CalendarEditor): Opened? {
+    val service = repo.masterService.first() ?: return null
     val at = editor.openedAt()
-    val session = editor.session.value
-    val child = session?.takeIf { it.role == Role.CHILD }?.person?.id
-    val original = (request as? EditorRequest.Edit)?.let { repo.editable(it.ref).first() ?: return Opened(request, null, service) }
+    val child = editor.session.value?.takeIf { it.role == Role.CHILD }?.person?.id
+    val original = (request as? EditorRequest.Edit)?.let { repo.editable(it.ref).first() ?: return null }
     val form = EditorForm(
         mode = original?.let { EditorForm.Mode.Edit(it) } ?: EditorForm.Mode.New,
         today = at.toLocalDate(),
@@ -84,21 +88,58 @@ private suspend fun open(request: EditorRequest, repo: CalendarRepository, edito
         calendarPerson = original?.calendarPerson,
         repeats = child == null,
     )
-    return Opened(request, form, service, original?.sourceName, child)
+    val flow = editorFlow(form, child, (request as? EditorRequest.Edit)?.start)
+    return Opened(request, form, flow, repo.members.first(), repo.held(form.today).first(), service, original?.sourceName, child)
+}
+
+/**
+ * Loads the editor, then shows it full screen, so it draws complete in its first frame. Shows nothing when there is
+ * nothing to open, and says so only when the load fails. An overlay shown meanwhile (generation changed) is left alone.
+ */
+internal suspend fun OverlayHost.openEditor(
+    request: EditorRequest,
+    today: LocalDate,
+    repo: CalendarRepository,
+    editor: CalendarEditor,
+    weekFocus: WeekFocus,
+    load: suspend () -> Opened? = { loadEditor(request, repo, editor) },
+) {
+    val before = generation
+    val opened = try {
+        load()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.w(TAG, "Couldn't open the editor (${e::class.simpleName})")
+        editor.couldNotOpen()
+        null
+    } ?: return
+    if (generation != before) return
+    showFullScreen {
+        EventEditorHost(
+            opened = opened,
+            repo = repo,
+            editor = editor,
+            weekFocus = weekFocus,
+            onClose = { dismiss() },
+            onDeleteAuthorised = { ref -> showDetail(ref, today, repo, editor, weekFocus, request.from, DetailMode.ConfirmingDelete) },
+            onEdited = ::markEdited,
+        )
+    }
 }
 
 /**
  * The full-screen Add event and Change event (9 §3.1). It owns the form for this opening, runs Save and Delete one at a
- * time (Save is disabled while one runs), and closes itself when there is nothing to edit. An unchanged edit closes
+ * time (Save is disabled while one runs). An unchanged edit closes
  * with no PIN. A refusal keeps the editor open with the failure card, and so does the tablet failing before the write; a
  * queued or saved change closes it, and a new event then shows on the Calendar tab's week that holds it ([weekFocus]),
  * from Home too, unless no week shown holds it. Nothing in the form changes while a save runs. Delete authorises, then [onDeleteAuthorised] swaps to the detail sheet asking to confirm. A signed-in
  * Child's other Who tiles are locked while their session lasts. Try again after a tablet failure reuses the create's key.
- * An editor that can't load closes with a toast.
+ * [opened] is already loaded by [openEditor].
  */
 @Composable
 internal fun EventEditorHost(
-    request: EditorRequest,
+    opened: Opened,
     repo: CalendarRepository,
     editor: CalendarEditor,
     weekFocus: WeekFocus,
@@ -106,42 +147,23 @@ internal fun EventEditorHost(
     onDeleteAuthorised: (EventRef) -> Unit,
     onEdited: (Boolean) -> Unit = {},
 ) {
-    val opened: Opened? by produceState<Opened?>(null, request) {
-        value = try {
-            open(request, repo, editor)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // The editor closes (no form) and says so, instead of the store failure killing the app.
-            Log.w(TAG, "Couldn't open the editor (${e::class.simpleName})")
-            editor.couldNotOpen()
-            Opened(request, null, "")
-        }
-    }
-    val members: List<Member>? by repo.members.collectAsState(initial = null)
+    val request = opened.request
+    val form = opened.form
+    val household: List<Member> by repo.members.collectAsState(initial = opened.members)
+    val held: Held by remember(opened) { repo.held(form.today) }.collectAsState(initial = opened.held)
     // Only a new event says where it saves; a change names its own calendar.
-    val master: String? by remember(request) { if (request is EditorRequest.New) repo.masterCalendarName else flowOf(null) }.collectAsState(initial = null)
+    val master: String? by remember(opened) { if (request is EditorRequest.New) repo.masterCalendarName else flowOf(null) }.collectAsState(initial = null)
     val session by editor.session.collectAsState()
     val navigator = if (request.from == EditorFrom.Home) LocalShellNavigator.current else null
-    var failure by remember(request) { mutableStateOf<SaveFailure?>(null) }
-    var picker by remember(request) { mutableStateOf(EditorPicker.None) }
+    var failure by remember(opened) { mutableStateOf<SaveFailure?>(null) }
+    var picker by remember(opened) { mutableStateOf(EditorPicker.None) }
     // Kept only after the tablet failed (WriteProblem.Tablet), so Try again can't make a second event (3a design §3.12).
-    var createKey by remember(request) { mutableStateOf(newClientKey()) }
-    val action = rememberSingleAction(request) { e ->
+    var createKey by remember(opened) { mutableStateOf(newClientKey()) }
+    val action = rememberSingleAction(opened) { e ->
         Log.w(TAG, "Couldn't save (${e::class.simpleName})")
-        failure = SaveFailure(opened?.service.orEmpty(), WriteProblem.Tablet)
+        failure = SaveFailure(opened.service, WriteProblem.Tablet)
     }
-
-    // Swapped straight to another request, the last form shows until this one's loads: wait instead.
-    val loaded = opened?.takeIf { it.request == request } ?: return
-    val form = loaded.form
-    if (form == null) {
-        LaunchedEffect(request) { onClose() }
-        return
-    }
-    val household = members ?: return
-    val held: Held? by remember(form.today) { repo.held(form.today) }.collectAsState(initial = null)
-    val flow = remember(form) { editorFlow(form, loaded.childOnly, (request as? EditorRequest.Edit)?.start) }
+    val flow = opened.flow
     // Saving counts as edited, so the idle close never cuts a save off half done.
     val edited by rememberUpdatedState(onEdited)
     LaunchedEffect(form) { snapshotFlow { form.edited || action.busy }.collect { edited(it) } }
@@ -178,7 +200,7 @@ internal fun EventEditorHost(
                     if (form.mode == EditorForm.Mode.New) showAdded(daySpan(draft.start, draft.end, form.zone).first)
                 }
                 EditResult.NotEditable -> onClose()
-                is EditResult.Rejected -> failure = SaveFailure(loaded.service, result.problem)
+                is EditResult.Rejected -> failure = SaveFailure(opened.service, result.problem)
                 EditResult.Cancelled -> Unit
             }
         }
@@ -194,21 +216,21 @@ internal fun EventEditorHost(
             } catch (e: Exception) {
                 // A delete, so the detail sheet's wording rather than the Save failure card.
                 Log.w(TAG, "Couldn't start a delete (${e::class.simpleName})")
-                editor.couldNotDelete(loaded.service)
+                editor.couldNotDelete(opened.service)
             }
         }
     }
 
     val child = session?.takeIf { it.role == Role.CHILD }?.person
-    // A new request is a new editor: its focus and title state don't carry over from the last one.
-    key(request) {
+    // A new opening is a new editor: its focus and title state don't carry over from the last one.
+    key(opened) {
         EventEditorScreen(
             form = form,
             flow = flow,
             members = household,
             context = contextLine(request.from, session?.person?.name),
-            savesTo = if (form.mode == EditorForm.Mode.New) master else loaded.calendar,
-            service = loaded.service,
+            savesTo = if (form.mode == EditorForm.Mode.New) master else opened.calendar,
+            service = opened.service,
             busy = action.busy,
             failure = failure,
             picker = picker,
@@ -235,11 +257,26 @@ internal fun rememberEventAdder(
     weekFocus: WeekFocus,
     today: LocalDate,
     from: EditorFrom,
+    load: suspend (EditorRequest) -> Opened? = { loadEditor(it, repo, editor) },
 ): ((LocalDate?) -> Unit)? {
     val overlay = LocalOverlayHost.current
+    val scope = rememberCoroutineScope()
+    var loading by remember { mutableStateOf(false) }
     val addTo: String? by repo.masterService.collectAsState(initial = null)
-    val add: (LocalDate?) -> Unit = remember(overlay, repo, editor, weekFocus, today, from) {
-        { day -> overlay.showEditor(EditorRequest.New(day, from), today, repo, editor, weekFocus) }
+    val add: (LocalDate?) -> Unit = remember(overlay, repo, editor, weekFocus, today, from, load) {
+        { day ->
+            if (!loading) {
+                loading = true
+                scope.launch {
+                    try {
+                        val request = EditorRequest.New(day, from)
+                        overlay.openEditor(request, today, repo, editor, weekFocus) { load(request) }
+                    } finally {
+                        loading = false
+                    }
+                }
+            }
+        }
     }
     return add.takeIf { addTo != null }
 }

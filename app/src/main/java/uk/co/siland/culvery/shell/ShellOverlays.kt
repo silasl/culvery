@@ -48,6 +48,9 @@ class OverlayState : OverlayHost {
 
     val isShowing: Boolean get() = content != null
 
+    override var generation = 0
+        private set
+
     override fun show(closesWhenIdle: Boolean, content: @Composable () -> Unit) = open(closesWhenIdle, fullScreen = false, content)
 
     override fun showFullScreen(content: @Composable () -> Unit) = open(closesWhenIdle = true, fullScreen = true, content)
@@ -57,6 +60,7 @@ class OverlayState : OverlayHost {
         edited = false
         this.fullScreen = fullScreen
         this.content = content
+        generation++
     }
 
     override fun markEdited(edited: Boolean) {

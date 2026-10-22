@@ -32,7 +32,7 @@ private class Loaded(val detail: EventDetailUi?)
  * Only one action runs at a time; while one runs, further taps are ignored, and one that fails before the editor's
  * write (the tablet's store) is logged rather than crashing the app. The editor toasts each outcome; the host only
  * decides whether the sheet stays open. [initialMode] is ConfirmingDelete when the editor's Delete handed over
- * (2b-2 design D4); [onEdit] swaps to the editor, and [onChangeWho] to the editor asking who it is for.
+ * (2b-2 design D4); [onEdit] loads the editor and swaps to it, and [onChangeWho] does so asking who it is for; each runs as the one action, so taps are ignored while it loads.
  */
 @Composable
 internal fun EventDetailHost(
@@ -42,8 +42,8 @@ internal fun EventDetailHost(
     editor: CalendarEditor,
     onClose: () -> Unit,
     initialMode: DetailMode = DetailMode.Idle,
-    onEdit: () -> Unit,
-    onChangeWho: () -> Unit,
+    onEdit: suspend () -> Unit,
+    onChangeWho: suspend () -> Unit,
 ) {
     val loaded: Loaded? by remember(ref, today) { repo.event(ref, today).map { Loaded(it) } }.collectAsState(initial = null)
     val people: List<Person> by repo.people.collectAsState(initial = emptyList())
@@ -91,8 +91,8 @@ internal fun EventDetailHost(
                 }
             }
         },
-        onEdit = onEdit,
-        onChangeWho = onChangeWho,
+        onEdit = { action.run { onEdit() } },
+        onChangeWho = { action.run { onChangeWho() } },
     )
 }
 

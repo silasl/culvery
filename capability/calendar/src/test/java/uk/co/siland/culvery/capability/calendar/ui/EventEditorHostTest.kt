@@ -1,8 +1,10 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -37,6 +39,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -122,8 +125,6 @@ class EventEditorHostTest {
     private val overlay = RecordingOverlay()
     private val navigator = RecordingNavigator()
     private val weekFocus = WeekFocus()
-    private var closed = 0
-    private val deleting = mutableListOf<EventRef>()
 
     /** The editor's "now": a fixed morning on Wednesday 23 September; a test may move it. */
     private var now: Long = millisAt(day, 9, 0)
@@ -166,11 +167,13 @@ class EventEditorHostTest {
         householdDb.close()
     }
 
-    private fun showEditor(request: EditorRequest) = compose.setContent {
-        CompositionLocalProvider(LocalShellNavigator provides navigator) {
-            CulveryTheme(dark = true) {
-                EventEditorHost(request, repo, editor, weekFocus, onClose = { closed++ }, onDeleteAuthorised = { deleting += it })
-            }
+    private fun showEditor(request: EditorRequest) = showOverlay { open(request) }
+
+    /** What the app's entry points do: load the editor, then show it. */
+    private fun open(request: EditorRequest, load: (suspend () -> Opened?)? = null, then: () -> Unit = {}) {
+        scope.launch {
+            if (load == null) overlay.openEditor(request, day, repo, editor, weekFocus) else overlay.openEditor(request, day, repo, editor, weekFocus, load)
+            then()
         }
     }
 
@@ -196,7 +199,7 @@ class EventEditorHostTest {
     private fun showWeek() = showOverlay(under = { WeekViewHost(repo, editor, weekFocus, day, nowMillis = now, onReconnect = {}) })
 
     private fun newEvent(on: LocalDate?, from: EditorFrom = EditorFrom.Calendar) =
-        showOverlay { showEditor(EditorRequest.New(on, from), day, repo, editor, weekFocus) }
+        showOverlay { open(EditorRequest.New(on, from)) }
 
     private fun waitForText(text: String) =
         compose.waitUntil(5_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
@@ -295,7 +298,7 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_title").assertIsFocused()
         fillTitleAndAlex("Parents evening")
         compose.onNodeWithTag("editor_save").performClick()
-        compose.waitUntil(5_000) { closed > 0 }
+        compose.waitUntil(5_000) { overlay.dismissed > 0 }
         assertThat(writer.calls).containsExactly("create:Parents evening")
         assertThat(writer.drafts.single().createdBy).isEqualTo(access.alex.id.value)
         assertThat(writer.drafts.single().forPerson).isEqualTo(access.alex.id.value)
@@ -317,7 +320,7 @@ class EventEditorHostTest {
         compose.onNodeWithTag("day_quick_1").assertTextEquals("Tomorrow").performClick()
         now = millisAt(LocalDate.of(2026, 10, 25), 0, 5)
         compose.onNodeWithTag("editor_save").performClick()
-        compose.waitUntil(5_000) { closed > 0 }
+        compose.waitUntil(5_000) { overlay.dismissed > 0 }
         assertThat(writer.drafts.single().start).isEqualTo(EventTime.AllDay(LocalDate.of(2026, 10, 25)))
         compose.assertClickablesHaveRoleAndLabel()
     }
@@ -328,7 +331,7 @@ class EventEditorHostTest {
         access.answer(TestAccess.ALEX)
         showWeek()
         waitForTag("week_add_event")
-        compose.runOnIdle { overlay.showEditor(EditorRequest.New(day.plusDays(9), EditorFrom.Calendar), day, repo, editor, weekFocus) }
+        compose.runOnIdle { open(EditorRequest.New(day.plusDays(9), EditorFrom.Calendar)) }
         waitForTag("editor_title")
         fillTitleAndAlex()
         compose.onNodeWithTag("editor_save").performClick()
@@ -346,7 +349,7 @@ class EventEditorHostTest {
         access.answer(TestAccess.ALEX)
         showWeek()
         waitForTag("week_add_event")
-        compose.runOnIdle { overlay.showEditor(EditorRequest.New(day.plusDays(40), EditorFrom.Calendar), day, repo, editor, weekFocus) }
+        compose.runOnIdle { open(EditorRequest.New(day.plusDays(40), EditorFrom.Calendar)) }
         waitForTag("editor_title")
         fillTitleAndAlex()
         compose.onNodeWithTag("editor_save").performClick()
@@ -532,12 +535,12 @@ class EventEditorHostTest {
         waitForText("Try again")
         compose.onNodeWithText(couldNotSave("Sample calendar", WriteProblem.Refused("calendar is full"))).assertExists()
         compose.onNodeWithTag("editor_title").assertTextEquals("Parents evening")
-        assertThat(closed).isEqualTo(0)
+        assertThat(overlay.dismissed).isEqualTo(0)
         assertThat(access.toasts.messages).isEmpty()
         writer.failWith = null
         compose.onNodeWithTag("editor_save").performClick()
         compose.onNodeWithTag("editor_failure").assertDoesNotExist()
-        compose.waitUntil(5_000) { closed > 0 }
+        compose.waitUntil(5_000) { overlay.dismissed > 0 }
         assertThat(writer.created).hasSize(1)
         assertThat(access.toasts.messages).containsExactly("Added Parents evening.")
         compose.assertClickablesHaveRoleAndLabel()
@@ -564,7 +567,7 @@ class EventEditorHostTest {
         waitForText(couldNotSave("Sample calendar", WriteProblem.Tablet))
         compose.onNodeWithTag("editor_failure").assertExists()
         compose.onNodeWithTag("editor_save").assertIsEnabled()
-        assertThat(closed).isEqualTo(0)
+        assertThat(overlay.dismissed).isEqualTo(0)
         assertThat(writer.calls).isEmpty()
         compose.assertClickablesHaveRoleAndLabel()
     }
@@ -574,7 +577,7 @@ class EventEditorHostTest {
         showEditor(EditorRequest.Edit(dinner, EditorFrom.Calendar))
         waitForText("Change event")
         compose.onNodeWithTag("editor_save").performClick()
-        compose.waitUntil(5_000) { closed > 0 }
+        compose.waitUntil(5_000) { overlay.dismissed > 0 }
         assertThat(access.requests).isEmpty()
         assertThat(writer.calls).isEmpty()
         compose.assertClickablesHaveRoleAndLabel()
@@ -588,7 +591,7 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_row_time").performClick()
         compose.onNodeWithTag("length_120").performClick()
         compose.onNodeWithTag("editor_save").performClick()
-        compose.waitUntil(5_000) { closed > 0 }
+        compose.waitUntil(5_000) { overlay.dismissed > 0 }
         assertThat(writer.calls).containsExactly("update:dinner")
         // Only the length was changed, so only the times are sent (3a design C3).
         assertThat(writer.fieldSets.single()).containsExactly(EventField.TIMES)
@@ -624,7 +627,7 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_row_day").assertIsSelected()
         compose.assertClickablesHaveRoleAndLabel()
         gate.complete(Unit)
-        compose.waitUntil(5_000) { closed > 0 }
+        compose.waitUntil(5_000) { overlay.dismissed > 0 }
         assertThat(writer.calls).containsExactly("create:Parents evening")
         assertThat(writer.drafts.single().start).isEqualTo(EventTime.AllDay(day.plusDays(9)))
         // The week goes to the date that was saved.
@@ -659,7 +662,7 @@ class EventEditorHostTest {
     @Test
     fun deleteStillAsksForAPinThenHandsOverToTheDetailSheet() {
         access.answer(TestAccess.ALEX)
-        showOverlay { showEditor(EditorRequest.Edit(dinner, EditorFrom.Calendar), day, repo, editor, weekFocus) }
+        showOverlay { open(EditorRequest.Edit(dinner, EditorFrom.Calendar)) }
         waitForText("Change event")
         compose.onNodeWithTag("editor_delete").performClick()
         waitForText("Delete this event?")
@@ -681,16 +684,21 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_delete").performClick()
         compose.waitUntil(5_000) { access.toasts.messages.isNotEmpty() }
         assertThat(access.toasts.messages).containsExactly("Mia can only change events they created.")
-        assertThat(deleting).isEmpty()
+        assertThat(overlay.fullScreen).isTrue()
         compose.onNodeWithText("Change event").assertExists()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** Pin: a gone event opens nothing and says nothing, as when the editor opened and closed itself. */
     @Test
-    fun theEditorClosesWhenItsEventHasGone() {
-        showEditor(EditorRequest.Edit(EventRef("c1", "s-family", "nope"), EditorFrom.Calendar))
-        compose.waitUntil(5_000) { closed > 0 }
-        compose.assertClickablesHaveRoleAndLabel()
+    fun aGoneEventClosesSilently() {
+        val open = CompletableDeferred<Unit>()
+        showOverlay { open(EditorRequest.Edit(EventRef("c1", "s-family", "nope"), EditorFrom.Calendar), then = { open.complete(Unit) }) }
+        compose.waitUntil(5_000) { open.isCompleted }
+        compose.waitForIdle()
+        assertThat(overlay.fullScreen).isFalse()
+        assertThat(overlay.content).isNull()
+        assertThat(access.toasts.messages).isEmpty()
     }
 
     @Test
@@ -702,7 +710,7 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_row_time").performClick()
         compose.onNodeWithTag("length_120").performClick()
         compose.onNodeWithTag("editor_save").performClick()
-        compose.waitUntil(5_000) { closed > 0 }
+        compose.waitUntil(5_000) { overlay.dismissed > 0 }
         assertThat(access.requests).isEmpty()
         assertThat(access.toasts.messages).isEmpty()
         compose.assertClickablesHaveRoleAndLabel()
@@ -755,11 +763,11 @@ class EventEditorHostTest {
         waitForText("Add event")
         compose.onNodeWithTag("editor_title").performTextInput("Half-typed")
         compose.onNodeWithTag("who_Sam").performClick()
-        compose.runOnIdle { overlay.showEditor(EditorRequest.Edit(dinner, EditorFrom.Calendar), day, repo, editor, weekFocus) }
+        compose.runOnIdle { open(EditorRequest.Edit(dinner, EditorFrom.Calendar)) }
         waitForText("Change event")
         compose.onNodeWithTag("editor_title").assertTextEquals("Dinner with Jo & Priya").assertIsNotFocused()
         rowValue("time").assertTextEquals("19:30–21:00")
-        compose.runOnIdle { overlay.showEditor(EditorRequest.New(null, EditorFrom.Calendar), day, repo, editor, weekFocus) }
+        compose.runOnIdle { open(EditorRequest.New(null, EditorFrom.Calendar)) }
         waitForText("Add event")
         compose.onNodeWithTag("editor_title").assertIsFocused()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
@@ -785,7 +793,7 @@ class EventEditorHostTest {
         waitForText(couldNotSave("Sample calendar", WriteProblem.Tablet))
         runBlocking { calendar.useWriterConnection { it.execSQL("DROP TRIGGER fail_outbox") } }
         compose.onNodeWithTag("editor_save").performClick()
-        compose.waitUntil(5_000) { closed > 0 }
+        compose.waitUntil(5_000) { overlay.dismissed > 0 }
         // The same key both times: the provider returned the event it had made.
         assertThat(writer.calls).containsExactly("create:Parents evening", "create:Parents evening")
         assertThat(writer.created).hasSize(1)
@@ -804,8 +812,11 @@ class EventEditorHostTest {
                 )
             }
         }
-        showEditor(EditorRequest.Edit(EventRef("c1", "s-family", "broken"), EditorFrom.Calendar))
-        compose.waitUntil(5_000) { closed > 0 }
+        val open = CompletableDeferred<Unit>()
+        showOverlay { open(EditorRequest.Edit(EventRef("c1", "s-family", "broken"), EditorFrom.Calendar), then = { open.complete(Unit) }) }
+        compose.waitUntil(5_000) { open.isCompleted }
+        compose.waitForIdle()
+        assertThat(overlay.content).isNull()
         assertThat(access.toasts.messages).containsExactly(COULD_NOT_OPEN)
         assertThat(access.toasts.urgent).isEqualTo(access.toasts.messages)
         compose.assertClickablesHaveRoleAndLabel()
@@ -830,7 +841,7 @@ class EventEditorHostTest {
         assertThat(access.toasts.messages).containsExactly(couldNotDelete("Sample calendar", WriteProblem.Tablet))
         assertThat(access.toasts.urgent).isEqualTo(access.toasts.messages)
         compose.onNodeWithTag("editor_failure").assertDoesNotExist()
-        assertThat(deleting).isEmpty()
+        assertThat(overlay.fullScreen).isTrue()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -849,7 +860,7 @@ class EventEditorHostTest {
     /** While the PIN pad of a Save or Delete is up the editor counts as edited, so the shell gives it the longer wait. */
     @Test
     fun anEditorWaitingOnItsPinPadCountsAsEditedUntilThePadGoes() {
-        showOverlay { showEditor(EditorRequest.Edit(dinner, EditorFrom.Calendar), day, repo, editor, weekFocus) }
+        showOverlay { open(EditorRequest.Edit(dinner, EditorFrom.Calendar)) }
         waitForText("Change event")
         assertThat(overlay.edited).isFalse()
         compose.onNodeWithTag("editor_delete").performClick()
@@ -857,7 +868,7 @@ class EventEditorHostTest {
         compose.waitUntil(5_000) { overlay.edited }
         compose.runOnIdle { access.prompt.cancel() }
         compose.waitUntil(5_000) { !overlay.edited }
-        assertThat(deleting).isEmpty()
+        assertThat(overlay.fullScreen).isTrue()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -877,6 +888,97 @@ class EventEditorHostTest {
     }
 
     @Test
+    fun theEditorIsComposedWhenItIsShown() {
+        val loaded = CompletableDeferred<Unit>()
+        var loadedAtShow: Boolean? = null
+        overlay.onShowFullScreen = { loadedAtShow = loaded.isCompleted }
+        showOverlay {
+            open(
+                EditorRequest.New(day, EditorFrom.Calendar),
+                load = { loadEditor(EditorRequest.New(day, EditorFrom.Calendar), repo, editor).also { loaded.complete(Unit) } },
+            )
+        }
+        compose.waitUntil(5_000) { overlay.fullScreen }
+        // The frame that shows the overlay already has the editor in it.
+        compose.runOnIdle {
+            assertThat(loadedAtShow).isTrue()
+            assertThat(overlay.fullScreen).isTrue()
+        }
+        compose.onNodeWithTag("editor_title").assertExists()
+    }
+
+    @Test
+    fun aSecondTapWhileLoadingOpensOneEditor() {
+        val release = CompletableDeferred<Unit>()
+        var loads = 0
+        showOverlay(
+            under = {
+                val add = rememberEventAdder(repo, editor, weekFocus, day, EditorFrom.Calendar) { request ->
+                    loads++
+                    release.await()
+                    loadEditor(request, repo, editor)
+                }
+                waitingFor(add)
+            },
+        )
+        waitForTag("add_twice")
+        compose.onNodeWithTag("add_twice").performClick()
+        compose.runOnIdle { release.complete(Unit) }
+        compose.waitUntil(5_000) { overlay.fullScreen }
+        compose.waitForIdle()
+        assertThat(loads).isEqualTo(1)
+        assertThat(overlay.generation).isEqualTo(1)
+    }
+
+    /** A button that taps the adder twice before the first load can finish. */
+    @Composable
+    private fun waitingFor(add: ((LocalDate?) -> Unit)?) {
+        if (add != null) {
+            androidx.compose.foundation.layout.Box(
+                androidx.compose.ui.Modifier.testTag("add_twice").clickable {
+                    add(null)
+                    add(null)
+                },
+            )
+        }
+    }
+
+    @Test
+    fun aSheetOpenedDuringTheLoadIsNotClosed() {
+        val release = CompletableDeferred<Unit>()
+        val request = EditorRequest.New(null, EditorFrom.Calendar)
+        val done = CompletableDeferred<Unit>()
+        showOverlay { open(request, { release.await(); loadEditor(request, repo, editor) }, then = { done.complete(Unit) }) }
+        compose.runOnIdle { overlay.show { Box {} } }
+        compose.runOnIdle { release.complete(Unit) }
+        compose.waitUntil(5_000) { done.isCompleted }
+        compose.waitForIdle()
+        assertThat(overlay.fullScreen).isFalse()
+        assertThat(overlay.content).isNotNull()
+    }
+
+    @Test
+    fun aLoadThatThrowsSaysItCouldNotOpen() {
+        val done = CompletableDeferred<Unit>()
+        showOverlay { open(EditorRequest.New(null, EditorFrom.Calendar), { error("disk") }, then = { done.complete(Unit) }) }
+        compose.waitUntil(5_000) { done.isCompleted }
+        assertThat(overlay.content).isNull()
+        assertThat(access.toasts.messages).containsExactly(COULD_NOT_OPEN)
+    }
+
+    /** Pin: the context line follows the live session, as before the editor was loaded ahead of its show. */
+    @Test
+    fun theContextLineFollowsTheSessionAfterItExpires() {
+        access.answer(TestAccess.ALEX)
+        runBlocking { access.control.authorise(CalendarPermissions.CREATE) }
+        newEvent(null)
+        waitForText("Add event")
+        compose.onNodeWithTag("editor_context", useUnmergedTree = true).assertTextEquals("From Calendar · Alex signed in")
+        compose.runOnIdle { access.control.lock() }
+        compose.onNodeWithTag("editor_context", useUnmergedTree = true).assertTextEquals("From Calendar")
+    }
+
+    @Test
     fun theContextLineSaysWhereFromAndWho() {
         access.answer(TestAccess.ALEX)
         runBlocking { access.control.authorise(CalendarPermissions.CREATE) }
@@ -885,7 +987,7 @@ class EventEditorHostTest {
         compose.onNodeWithTag("editor_context", useUnmergedTree = true).assertTextEquals("From Calendar · Alex signed in")
         compose.runOnIdle { access.control.lock() }
         compose.onNodeWithTag("editor_context", useUnmergedTree = true).assertTextEquals("From Calendar")
-        compose.runOnIdle { overlay.showEditor(EditorRequest.New(null, EditorFrom.Home), day, repo, editor, weekFocus) }
+        compose.runOnIdle { open(EditorRequest.New(null, EditorFrom.Home)) }
         waitForText("From Home")
         assertThat(contextLine(EditorFrom.Home, null)).isEqualTo("From Home")
         assertThat(contextLine(EditorFrom.Home, "Sam")).isEqualTo("From Home · Sam signed in")
@@ -898,7 +1000,7 @@ class EventEditorHostTest {
         waitForText("Add event")
         compose.onNodeWithTag("editor_saves_to", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Saves to the Family calendar", useUnmergedTree = true).assertExists()
-        compose.runOnIdle { overlay.showEditor(EditorRequest.Edit(dinner, EditorFrom.Calendar), day, repo, editor, weekFocus) }
+        compose.runOnIdle { open(EditorRequest.Edit(dinner, EditorFrom.Calendar)) }
         waitForText("Change event")
         compose.onNodeWithText("Saves to the Family calendar", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("editor_row_who").assertIsNotSelected()
