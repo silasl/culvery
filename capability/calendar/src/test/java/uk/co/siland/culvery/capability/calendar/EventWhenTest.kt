@@ -235,6 +235,15 @@ class EventWhenTest {
     }
 
     @Test
+    fun anEndsDatePickedWhileAllDayKeepsAnEndTimeThatIsNotMidnight() {
+        val allDay = timed(at(10), at(15)).withAllDay(true)
+        val back = checkNotNull(allDay.pickEndDate(sat.plusDays(2))).withAllDay(false)
+        assertThat(back.endDays).isEqualTo(2)
+        assertThat(back.endClock).isEqualTo(at(15))
+        assertThat(back.capError).isNull()
+    }
+
+    @Test
     fun aSpanOverTheAutumnClockChangeWhoseWallEndIsBeforeItsStartOpensValid() {
         val day = LocalDate.of(2026, 10, 25)
         val start = ZonedDateTime.of(day, at(1, 45), london).withEarlierOffsetAtOverlap()

@@ -56,8 +56,12 @@ data class EventWhen(
         val first = startDate ?: return null
         val days = ChronoUnit.DAYS.between(first, date)
         if (days !in 0..MAX_SPAN_DAYS - 1) return null
-        // The inert end clock of an all-day value must not read as a midnight end when All day goes off.
-        if (allDay) return copy(endDays = days.toInt(), endClock = hourAfter(startClock).second.takeIf { it != LocalTime.MIDNIGHT } ?: LAST_MINUTE)
+        if (allDay) {
+            // A midnight end left from the timed values would add a day when All day goes off.
+            if (endClock != LocalTime.MIDNIGHT) return copy(endDays = days.toInt())
+            val afterStart = hourAfter(startClock).second
+            return copy(endDays = days.toInt(), endClock = if (afterStart == LocalTime.MIDNIGHT) LAST_MINUTE else afterStart)
+        }
         val picked = copy(endDays = days.toInt())
         return if (picked.endDays == 0 && !endClock.isAfter(startClock)) picked.withEndAnHourAfterStart() else picked
     }
