@@ -8,7 +8,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -21,6 +23,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -62,8 +65,10 @@ class FromBeforePaneTest {
     private var asked = mutableListOf<String>()
     private var answer: suspend (String) -> List<Suggestion> = { typed -> remembered.filter { typed.length >= 2 && it.title.startsWith(typed, ignoreCase = true) } }
 
+    private lateinit var flow: EditorFlow
+
     private fun show(form: EditorForm = editorForm(), keyboard: Int = 0, start: EditorStep? = null) {
-        val flow = editorFlow(form, null, start)
+        flow = editorFlow(form, null, start)
         compose.setContent {
             ShowEditor(
                 form, flow, scale = scale, keyboard = WindowInsets(bottom = keyboard.dp),
@@ -142,6 +147,52 @@ class FromBeforePaneTest {
     }
 
     @Test
+    fun threeRowsFitAboveTheKeyboardAtTheDefaultScaleWithoutTheMutedLine() {
+        show(keyboard = 320)
+        type("G")
+        answer = { remembered }
+        type("u")
+        compose.waitForIdle()
+        val pane = compose.onNodeWithTag("editor_pane").getUnclippedBoundsInRoot()
+        repeat(3) { i ->
+            row(i).assertIsDisplayed()
+            assertWithMessage("row $i").that(row(i).getUnclippedBoundsInRoot().bottom.value).isAtMost(pane.bottom.value)
+            compose.onNodeWithTag("suggestion_${i}_pattern", useUnmergedTree = true).assertDoesNotExist()
+        }
+        // What TalkBack hears keeps the full wording.
+        assertThat(row(0).fetchSemanticsNode().config[SemanticsProperties.ContentDescription])
+            .containsExactly("Guitar lesson. Fills in Mia, 10:00 to 10:45 and every Saturday")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun nextInTheListDoesWhatTheKeyboardsNextDoes() {
+        show()
+        type("Gui")
+        compose.waitForIdle()
+        compose.onNodeWithTag("editor_next").assertTextEquals("Next: Who")
+        compose.onNodeWithTag("editor_next").performClick()
+        compose.onNodeWithTag("editor_title").assertIsNotFocused()
+        assertThat(flow.active).isEqualTo(EditorStep.Who)
+        question().assertTextEquals("Who’s it for?")
+        row(0).assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aFailedLookupIsNoSuggestionsAndTheNextKeystrokeStillAsks() {
+        answer = { typed -> if (typed.contains('x')) error("boom") else remembered.filter { it.title.startsWith(typed, ignoreCase = true) } }
+        show()
+        type("x")
+        compose.waitForIdle()
+        question().assertTextEquals("Who’s it for?")
+        compose.onNodeWithTag("editor_title").performTextReplacement("Gui")
+        compose.waitForIdle()
+        question().assertTextEquals("From before")
+        row(0).assertExists()
+    }
+
+    @Test
     fun threeRowsAtFontScale13ScrollAndNoneIsCutMidRow() {
         scale = 1.3f
         show(keyboard = 320)
@@ -158,7 +209,7 @@ class FromBeforePaneTest {
             val paneBounds = pane.getUnclippedBoundsInRoot()
             assertWithMessage("row $i").that(bounds.top.value).isAtLeast(paneBounds.top.value)
             assertWithMessage("row $i").that(bounds.bottom.value).isAtMost(paneBounds.bottom.value)
-            for (part in listOf("title", "pattern", "fill")) {
+            for (part in listOf("title", "fill")) {
                 val layout = compose.onNodeWithTag("suggestion_${i}_$part", useUnmergedTree = true).fetchSemanticsNode().let { n ->
                     val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                     n.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action?.invoke(results)

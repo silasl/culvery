@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +51,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
 import uk.co.siland.culvery.capability.calendar.ALL_DAY_LABEL
 import uk.co.siland.culvery.capability.calendar.CopiedRow
@@ -90,6 +92,7 @@ internal const val REPEATS_OPTIONAL_HINT = "Repeats are optional"
 internal const val CLASH_HINT = "Clashes are allowed; both show on the week"
 internal const val ALL_SET_HINT = "Everything’s set"
 
+private const val TAG = "EventEditorScreen"
 private const val CALENDAR_SUFFIX = " calendar"
 
 /** "Saves to the Family calendar", from a calendar named "Family" or "Family calendar" (9 §3.1). */
@@ -142,7 +145,7 @@ internal fun EventEditorScreen(
     LaunchedEffect(form) {
         if (form.mode != EditorForm.Mode.New) return@LaunchedEffect
         snapshotFlow { titleFocused to form.title }.collectLatest { (focused, title) ->
-            suggestions = if (focused) ask(title) else emptyList()
+            suggestions = if (focused) lookUp(ask, title) else emptyList()
         }
     }
     LaunchedEffect(Unit) {
@@ -250,8 +253,13 @@ internal fun EventEditorScreen(
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     if (titleFocused && suggestions.isNotEmpty()) {
-                        EditorPane(FROM_BEFORE, flow, skip = null) {
-                            FromBeforePane(suggestions, household.people, form.today, childOnly != null) { s ->
+                        // Next here is the keyboard's Next: leave the title for Who.
+                        val toWho = PaneNext(nextLabelFor(EditorStep.Who)) {
+                            closeKeyboard()
+                            flow.open(EditorStep.Who)
+                        }
+                        EditorPane(FROM_BEFORE, flow, skip = null, next = toWho) {
+                            FromBeforePane(suggestions, household.people, form.today, childOnly != null, compact = typing) { s ->
                                 if (!busy) {
                                     form.use(s)
                                     closeKeyboard()
@@ -266,6 +274,16 @@ internal fun EventEditorScreen(
             }
         }
     }
+}
+
+/** A failed lookup (a read, a stored date) is no suggestions; the log line names no title. */
+private suspend fun lookUp(ask: suspend (String) -> List<Suggestion>, title: String): List<Suggestion> = try {
+    ask(title)
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Exception) {
+    Log.w(TAG, "Couldn't look up suggestions (${e::class.simpleName})")
+    emptyList()
 }
 
 /** The foot's one hint, first match wins (9c §3.7): a clash; Repeats still unanswered on a new event that can be added; Check on a new event. */

@@ -125,6 +125,33 @@ class EditorFormSuggestionTest {
     }
 
     @Test
+    fun aDatePickOffTheCopiedWeekdayClearsTheCopiedRepeats() {
+        val form = new()
+        form.use(guitar())
+        form.pickStartDate(day(9, 26))
+        assertThat(form.copied).contains(CopiedRow.Repeats)
+        form.pickStartDate(day(9, 27))
+        assertThat(form.copied).containsExactly(CopiedRow.Who, CopiedRow.Starts)
+        assertThat(form.repeat).isEqualTo(RepeatChoice.Weekly)
+    }
+
+    @Test
+    fun aLastWeekdayRuleIsSavedAsLast() {
+        val lastSaturday = guitar(rule = "RRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=-1SA").copy(seriesStart = day(7, 25))
+        val form = new()
+        form.use(lastSaturday)
+        assertThat(form.repeatsValue).isEqualTo("Every month, on the last Saturday")
+        form.pickStartDate(day(9, 26))
+        assertThat(form.repeatsValue).isEqualTo("Every month, on the last Saturday")
+        assertThat(form.draft(null).recurrence!!.rule).contains("BYDAY=-1SA")
+        assertThat(form.copied).contains(CopiedRow.Repeats)
+        // A Saturday that is not the last of its month is not what was copied.
+        form.pickStartDate(day(9, 19))
+        assertThat(form.copied).doesNotContain(CopiedRow.Repeats)
+        assertThat(form.draft(null).recurrence!!.rule).contains("BYDAY=3SA")
+    }
+
+    @Test
     fun aCopiedTagGoesWhenItsRowChanges() {
         val whoChanged = new().apply { use(guitar()); toggleWho(sam) }
         assertThat(whoChanged.copied).containsExactly(CopiedRow.Starts, CopiedRow.Repeats)
@@ -137,6 +164,18 @@ class EditorFormSuggestionTest {
 
         val repeatChanged = new().apply { use(guitar()); chooseRepeat(RepeatChoice.Daily) }
         assertThat(repeatChanged.copied).containsExactly(CopiedRow.Who, CopiedRow.Starts)
+
+        val datePicked = new().apply { use(guitar()); pickStartDate(day(9, 26)) }
+        assertThat(datePicked.copied).containsExactly(CopiedRow.Who, CopiedRow.Starts, CopiedRow.Repeats)
+
+        val endStepped = new().apply { use(guitar()); stepEnd(ClockField.Minute, up = true) }
+        assertThat(endStepped.copied).containsExactly(CopiedRow.Who, CopiedRow.Repeats)
+
+        val endDatePicked = new().apply { use(guitar()); pickStartDate(day(9, 26)); pickEndDate(day(9, 27)) }
+        assertThat(endDatePicked.copied).containsExactly(CopiedRow.Who, CopiedRow.Repeats)
+
+        val freeStart = new().apply { use(guitar()); useFreeStart(LocalTime.of(11, 0)) }
+        assertThat(freeStart.copied).containsExactly(CopiedRow.Who, CopiedRow.Repeats)
     }
 
     @Test

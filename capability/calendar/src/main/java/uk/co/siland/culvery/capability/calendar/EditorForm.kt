@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.MonthDay
 import java.time.ZoneId
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.ui.plural
@@ -112,7 +113,10 @@ class EditorForm(
         eventWhen = eventWhen.withAllDay(on)
     }
 
-    fun pickStartDate(date: LocalDate) = editWhen { eventWhen = eventWhen.pickStartDate(date, defaults = !timesTouched, today, now) }
+    fun pickStartDate(date: LocalDate) = editWhen {
+        eventWhen = eventWhen.pickStartDate(date, defaults = !timesTouched, today, now)
+        if (!fitsCopiedRepeat(date)) copied -= CopiedRow.Repeats
+    }
 
     /** A day outside the start's day and the 59 after it changes nothing. */
     fun pickEndDate(date: LocalDate) = editWhen { eventWhen.pickEndDate(date)?.let(::touchWhen) }
@@ -164,6 +168,26 @@ class EditorForm(
     var copied: Set<CopiedRow> by mutableStateOf(emptySet())
         private set
 
+    // The copied monthly repeat's place in the month: a phone's "last" rule stays last on a date that is its weekday's last.
+    private var copiedNth: Int? = null
+
+    /** The place in its month a monthly-on-a-weekday repeat takes for [day]: the copied "last", or [day]'s own. */
+    fun nthOn(day: LocalDate): Int =
+        if (repeat == RepeatChoice.MonthlyOnWeekday && copiedNth == LAST && CopiedRow.Repeats in copied && isLastOfWeekday(day)) LAST else nthWeekday(day)
+
+    // Whether [date] is a day the copied repeat falls on, so the Copied tag is still true of it.
+    private fun fitsCopiedRepeat(date: LocalDate): Boolean {
+        val s = usedSuggestion?.takeIf { CopiedRow.Repeats in copied } ?: return true
+        val anchor = s.anchor()
+        return when (repeat) {
+            RepeatChoice.Weekly, RepeatChoice.Fortnightly -> date.dayOfWeek == anchor.dayOfWeek
+            RepeatChoice.MonthlyOnWeekday -> date.dayOfWeek == anchor.dayOfWeek && nthOn(date) == s.nth()
+            RepeatChoice.Monthly -> date.dayOfMonth == anchor.dayOfMonth
+            RepeatChoice.Yearly -> MonthDay.from(date) == MonthDay.from(anchor)
+            else -> true
+        }
+    }
+
     /** The suggestion last used, which the banner names. */
     var usedSuggestion: Suggestion? by mutableStateOf(null)
         private set
@@ -181,6 +205,7 @@ class EditorForm(
         val filled = s.choice()?.takeIf { canRepeat && childOnly == null && it.fitsLength(eventWhen.repeatLength) }
         if (filled != null) {
             repeat = filled
+            copiedNth = s.nth()
             repeatEnd = RepeatEnd.Never
             repeatTooLong = false
             repeatsAnswered = true
@@ -230,7 +255,7 @@ class EditorForm(
         get() {
             val end = repeatEnd as? RepeatEnd.After ?: return null
             val first = eventWhen.startDate ?: return null
-            return "${plural(end.times.toLong(), "time")} · last on ${occurrences(repeat, first, end.times).last().format(SHORT_DAY)}"
+            return "${plural(end.times.toLong(), "time")} · last on ${occurrences(repeat, first, end.times, nthOn(first)).last().format(SHORT_DAY)}"
         }
 
     /** The Repeats row: "Doesn’t repeat", "Every Saturday", or "Every Saturday · 12 times". */
@@ -240,7 +265,7 @@ class EditorForm(
             // The pane offers repeats only once there is a day; a copied one is worded from the suggestion's own rule until then.
             val copiedFrom = usedSuggestion?.takeIf { first == null && repeat != RepeatChoice.Never }
             val words = when {
-                first != null -> repeat.wording(first)
+                first != null -> repeat.wording(first, nthOn(first))
                 copiedFrom != null -> repeat.wording(copiedFrom.anchor(), copiedFrom.nth())
                 else -> return DOESNT_REPEAT
             }
@@ -308,7 +333,7 @@ class EditorForm(
         check(canSave) { "Nothing to save: $reason" }
         val first = checkNotNull(eventWhen.startDate)
         val (start, end) = checkNotNull(times())
-        val rule = recurrenceRule(repeat, repeatEnd, first)
+        val rule = recurrenceRule(repeat, repeatEnd, first, nthOn(first))
         // An edit whose set wasn't changed keeps its tag exactly, so an untagged event stays untagged.
         val forPerson = if (original != null && !whoChanged) original.forPerson else tagFor(who, order)
         return EventDraft(title.trim(), start, end, forPerson, createdBy, recurrence = rule?.let { Recurrence(it, zone) })

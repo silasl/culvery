@@ -113,7 +113,13 @@ internal fun EditorPaneFor(
  * one as the pane changes (9 §3.1).
  */
 @Composable
-internal fun EditorPane(question: String, flow: EditorFlow, skip: (() -> Unit)?, body: @Composable ColumnScope.() -> Unit) {
+internal fun EditorPane(
+    question: String,
+    flow: EditorFlow,
+    skip: (() -> Unit)?,
+    next: PaneNext? = flow.nextStep?.let { PaneNext(flow.nextLabel(), flow::next) },
+    body: @Composable ColumnScope.() -> Unit,
+) {
     val c = Culvery.colors
     Column(
         verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap),
@@ -146,10 +152,10 @@ internal fun EditorPane(question: String, flow: EditorFlow, skip: (() -> Unit)?,
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EditorDimens.paneButtonGap)) {
                 if (skip != null) SkipButton(skip)
-                if (flow.nextStep != null) {
+                if (next != null) {
                     HhButton(
-                        flow.nextLabel(),
-                        flow::next,
+                        next.label,
+                        next.onClick,
                         Modifier.testTag("editor_next"),
                         trailingIcon = Icons.ARROW_FORWARD,
                         on = ButtonSurface.Surf,
@@ -160,6 +166,9 @@ internal fun EditorPane(question: String, flow: EditorFlow, skip: (() -> Unit)?,
         body()
     }
 }
+
+/** What the pane's quiet Next says and does. */
+internal class PaneNext(val label: String, val onClick: () -> Unit)
 
 /** A heading in capitals, heard as the word. */
 @Composable

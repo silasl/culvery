@@ -46,7 +46,7 @@ fun RepeatChoice.fitsLength(length: Duration): Boolean = when (this) {
 const val DOESNT_REPEAT = "Doesn’t repeat"
 
 private val DATE_IN_YEAR: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale.ENGLISH)
-private const val LAST = -1
+internal const val LAST = -1
 private const val FIFTH = 5
 
 internal fun weekdayName(day: LocalDate): String = day.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
@@ -205,7 +205,7 @@ fun choiceOf(rule: String, start: LocalDate): RepeatChoice? =
     ruleParts(rule)?.let { readChoice(it, start) }?.takeIf { it in EDITOR_REPEATS }
 
 // A phone says "last" for a 4th weekday that is also the last of its month; the editor says 4th.
-private fun isLastOfWeekday(day: LocalDate): Boolean = day.plusWeeks(1).month != day.month
+internal fun isLastOfWeekday(day: LocalDate): Boolean = day.plusWeeks(1).month != day.month
 
 /** Which of its weekday [rule] repeats on from [start]: −1 for a phone's "last", else [start]'s own place in its month. */
 fun nthOf(rule: String, start: LocalDate): Int =
