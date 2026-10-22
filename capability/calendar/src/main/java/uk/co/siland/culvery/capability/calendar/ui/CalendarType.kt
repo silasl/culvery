@@ -274,7 +274,7 @@ internal object EditorDimens {
     val checkDot = 8.dp
     val checkDotGap = 7.dp
     val checkChipWidth = 150.dp
-    const val checkBarMaxDays = 3
+    val checkBarMaxDays = 3
 }
 
 /** Layout values from Culvery.dc.html, named once so no card or view carries magic numbers. */

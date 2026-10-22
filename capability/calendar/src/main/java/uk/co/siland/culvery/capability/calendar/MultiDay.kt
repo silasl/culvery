@@ -41,7 +41,7 @@ fun StoredEvent.isMultiDay(zone: ZoneId): Boolean = multiDaySpan(zone) != null
 /** Whether the week draws an event over [this] as a lane bar: two or more dates, a timed one ending a calendar day or more after it starts. */
 internal fun EventSpan.isMultiDay(zone: ZoneId): Boolean = when (this) {
     is EventSpan.AllDay -> daysOf(this, zone).let { it.first != it.second }
-    is EventSpan.Timed -> !end.isBefore(start.plusDays(1))
+    is EventSpan.Timed -> daysOf(this, zone).let { it.first != it.second } && !end.isBefore(start.plusDays(1))
 }
 
 /** Which day of its span [date] is; null unless the event is multi-day and on [date]. */

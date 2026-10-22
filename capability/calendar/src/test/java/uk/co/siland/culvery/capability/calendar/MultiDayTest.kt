@@ -142,4 +142,12 @@ class MultiDayTest {
         assertThat(span.people.map { it.name }).containsExactly("Sam", "Mia").inOrder()
         assertThat(span.spoken).isEqualTo("Half term, Sam and Mia, Monday 19 October to Thursday 22 October")
     }
+
+    @Test
+    fun aTimedSpanFromMidnightToMidnightIsOneDayNotMultiDay() {
+        val from = date(10, 23).atStartOfDay(london)
+        val oneDay = EventSpan.Timed(from, from.plusDays(1))
+        assertThat(oneDay.isMultiDay(london)).isFalse()
+        assertThat(EventSpan.Timed(from, from.plusDays(1).plusHours(1)).isMultiDay(london)).isTrue()
+    }
 }

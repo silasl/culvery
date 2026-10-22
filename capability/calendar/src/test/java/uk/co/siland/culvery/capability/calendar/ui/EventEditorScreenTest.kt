@@ -232,6 +232,7 @@ class EventEditorScreenTest {
         show(newWithTitleWhoAndDay())
         compose.onNodeWithTag("editor_save_hint").assertTextEquals("Repeats are optional")
         compose.runOnIdle { flow.open(EditorStep.Check) }
+        // The Repeats branch comes before Check's, so an unvisited Repeats still shows here.
         compose.onNodeWithTag("editor_save_hint").assertTextEquals("Repeats are optional")
         compose.runOnIdle { flow.open(EditorStep.Repeats) }
         compose.runOnIdle { form.chooseRepeat(RepeatChoice.Never) }
