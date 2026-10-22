@@ -543,6 +543,7 @@ For the end-of-v1 design review:
 
 Fault found:
 - Fault A, while adding an event (title typed), a tap on a start date closed the editor and an existing event's details opened. Not reproduced; no crash and no warning in the log. Nothing in the editor opens an event, so the editor closed first and a tap reached the week or Home behind it; the idle close (10 min once edited, warned at 9:40) and a session ending don't fit. Next time: note the minute, the entry point and where the opened event sat, and read logcat at once.
+- Fault B (Plan 6, Sonos), Favourites lists "Discover Sonos Radio" and "Trending now", which do nothing when tapped. Likely Sonos Radio browse entries saved as favourites with nothing playable behind them. Decide whether to leave them out of the list or make them play.
 
 ## Left out of Plan 9c-1c on purpose (2026-10-22)
 - **Choosing the destination calendar per event:** an event still saves to the household's one destination calendar. Picking another calendar for one event is a later change.
