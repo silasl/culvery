@@ -68,6 +68,7 @@ class TimeSteppersTest {
         assertThat(stepped).isEmpty()
         compose.onNodeWithTag("hour_down").assertIsEnabled().performClick()
         assertThat(stepped).containsExactly(ClockField.Hour to false)
+        compose.assertAccessible()
     }
 
     @Test

@@ -60,6 +60,8 @@ class DateGridTest {
     private var month by mutableStateOf(YearMonth.from(today))
     private var picked by mutableStateOf<LocalDate?>(null)
     private var onDay by mutableStateOf<Map<LocalDate, List<Person>>>(emptyMap())
+    private var band: ClosedRange<LocalDate>? = null
+    private var chosen: Set<LocalDate>? = null
     private var allowed: (LocalDate) -> Boolean = { true }
     private val taps = mutableListOf<LocalDate>()
 
@@ -72,8 +74,8 @@ class DateGridTest {
                             month = month,
                             onMonth = { month = it },
                             today = today,
-                            chosen = setOfNotNull(picked),
-                            band = null,
+                            chosen = chosen ?: setOfNotNull(picked),
+                            band = band,
                             allowed = { allowed(it) },
                             dots = onDay,
                             spoken = { spokenWho(onDay[it].orEmpty()) },
@@ -114,6 +116,24 @@ class DateGridTest {
         assertThat(fadeOf(at(9, 25))).isEqualTo(1f)
         cell(at(9, 25)).assertIsEnabled().performClick()
         assertThat(taps).containsExactly(at(9, 25))
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aDayInTheBandThatIsNotAllowedStaysNotAvailable() {
+        allowed = { it != at(9, 28) }
+        band = at(9, 26)..at(9, 30)
+        chosen = setOf(at(9, 26), at(9, 30))
+        show()
+        cell(at(9, 26)).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "first day")).assertIsEnabled()
+        cell(at(9, 30)).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "last day"))
+        cell(at(9, 27)).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "in the range"))
+        assertThat(circleFill(at(9, 26))).isEqualTo(c.accent.toArgb())
+        cell(at(9, 28)).assertIsNotEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "not available"))
+        assertThat(fadeOf(at(9, 28))).isEqualTo(HhAlpha.PAST_DAY)
+        cell(at(9, 28)).performClick()
+        assertThat(taps).isEmpty()
         compose.assertClickablesHaveRoleAndLabel()
     }
 

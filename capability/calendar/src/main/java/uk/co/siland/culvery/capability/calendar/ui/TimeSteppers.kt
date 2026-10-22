@@ -36,8 +36,6 @@ import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.quietFill
 import uk.co.siland.culvery.core.ui.readAsOne
 
-private const val NOT_AVAILABLE = "not available"
-
 /**
  * Hour and minute steppers around a colon, on a `surf` card. [onStep] says which field moved and which way; the caller does the
  * arithmetic. A button [enabled] says false for is dimmed, cannot be pressed and is spoken as "not available".

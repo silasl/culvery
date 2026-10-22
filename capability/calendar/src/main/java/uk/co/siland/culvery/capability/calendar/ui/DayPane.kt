@@ -32,12 +32,6 @@ internal const val TAP_FIRST_THEN_LAST = "Tap the first day, then the last"
 
 private const val PICK_TODAY = "Today"
 private const val PICK_TOMORROW = "Tomorrow"
-private const val EARLIER_MONTHS = "Earlier months"
-private const val LATER_MONTHS = "Later months"
-private const val IN_THE_RANGE = "in the range"
-private const val FIRST_DAY = "first day"
-private const val LAST_DAY = "last day"
-private val MONTH_YEAR: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
 private val FULL_WEEKDAY_NAME: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)
 private val WEEKEND = setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)
 

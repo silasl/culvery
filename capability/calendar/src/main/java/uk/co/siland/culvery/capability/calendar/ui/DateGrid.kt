@@ -50,12 +50,13 @@ import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
 
+/** What TalkBack hears for something that cannot be used now. */
+internal const val NOT_AVAILABLE = "not available"
 private const val EARLIER_MONTHS = "Earlier months"
 private const val LATER_MONTHS = "Later months"
 private const val IN_THE_RANGE = "in the range"
 private const val FIRST_DAY = "first day"
 private const val LAST_DAY = "last day"
-private const val NOT_AVAILABLE = "not available"
 private val MONTH_YEAR: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
 
 /** The alpha a day cell draws at, for tests: [HhAlpha.PAST_DAY], [HhAlpha.OUTSIDE_MONTH] or 1. */
