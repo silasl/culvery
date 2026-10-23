@@ -105,7 +105,8 @@ internal object SonosXml {
         val root = parse(answer)
         val total = root.text("TotalMatches")?.toIntOrNull() ?: throw SonosXmlException()
         val result = root.text("Result") ?: return BrowseResult(emptyList(), total)
-        val items = parse(result).all("item").map { item ->
+        // Favourites are items; Sonos playlists (SQ:) are containers.
+        val items = parse(result).children("item", "container").map { item ->
             val metadata = item.text("resMD")
             DidlItem(item.getAttribute("id"), item.text("title").orEmpty(), item.text("albumArtURI"), item.text("res"), metadata, didlItem(metadata)?.text("class"))
         }
@@ -236,8 +237,8 @@ internal object SonosXml {
 
     private fun Element.first(localName: String): Element? = getElementsByTagNameNS("*", localName).item(0) as Element?
 
-    private fun Element.children(localName: String): List<Element> =
-        (0 until childNodes.length).map(childNodes::item).filterIsInstance<Element>().filter { it.localName == localName }
+    private fun Element.children(vararg localNames: String): List<Element> =
+        (0 until childNodes.length).map(childNodes::item).filterIsInstance<Element>().filter { it.localName in localNames }
 
     /** The first [localName]'s text, trimmed; null when missing, empty or Sonos's NOT_IMPLEMENTED. */
     private fun Element.text(localName: String): String? =

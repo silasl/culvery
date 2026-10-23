@@ -105,6 +105,9 @@ interface MusicSystem {
 
     suspend fun favourites(): List<Favourite>
 
+    /** The household's own playlists, [FavouriteKind.QUEUED]; those already among the [favourites] last read are left out. */
+    suspend fun playlists(): List<Favourite>
+
     suspend fun playFavourite(group: SpeakerGroup, favourite: Favourite)
 
     suspend fun shuffleEverything(group: SpeakerGroup)

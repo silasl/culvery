@@ -21,36 +21,38 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.launch
-import uk.co.siland.culvery.capability.music.FAVOURITES_LABEL
+import uk.co.siland.culvery.capability.music.FAVOURITES_SHEET_TITLE
 import uk.co.siland.culvery.capability.music.Favourite
 import uk.co.siland.culvery.capability.music.FavouritesLoad
 import uk.co.siland.culvery.capability.music.GETTING_FAVOURITES
 import uk.co.siland.culvery.capability.music.MusicActions
 import uk.co.siland.culvery.capability.music.NO_FAVOURITES
+import uk.co.siland.culvery.capability.music.PLAYLISTS
 import uk.co.siland.culvery.capability.music.SpeakerGroup
 import uk.co.siland.culvery.capability.music.playInAction
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhMessageLine
+import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.ListRowTokens
 
 /**
- * The Favourites sheet (6 §5.3): the household's Sonos Favourites by name, with art; a tap plays one in [groupName]'s
- * group. [load] is null while they are read; [line] says a Favourite couldn't play here (6 §6).
+ * The Favourites and playlists sheet (6 §5.3): the household's Sonos Favourites, then its playlists, by name, with art; a tap
+ * plays one in [groupName]'s group. [load] is null while they are read; [line] says a Favourite couldn't play here (6 §6).
  */
 @Composable
 fun FavouritesSheet(groupName: String, load: FavouritesLoad?, line: String?, onPick: (Favourite) -> Unit, onClose: () -> Unit) {
     val c = Culvery.colors
     HhSheet(
         padding = PaddingValues(horizontal = MusicDimens.sheetPaddingH, vertical = MusicDimens.sheetPaddingV),
-        modifier = Modifier.testTag("favourites_sheet").semantics { paneTitle = FAVOURITES_LABEL },
+        modifier = Modifier.testTag("favourites_sheet").semantics { paneTitle = FAVOURITES_SHEET_TITLE },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(FAVOURITES_LABEL, style = HhType.sectionTitle, color = c.ink, modifier = Modifier.semantics { heading() })
+                Text(FAVOURITES_SHEET_TITLE, style = HhType.sectionTitle, color = c.ink, modifier = Modifier.semantics { heading() })
                 Text(groupName, style = HhType.body, color = c.mute)
             }
             HhCloseButton(onClose)
@@ -59,23 +61,30 @@ fun FavouritesSheet(groupName: String, load: FavouritesLoad?, line: String?, onP
         when (load) {
             null -> Text(GETTING_FAVOURITES, style = HhType.body, color = c.mute)
             is FavouritesLoad.Failed -> MusicStatusLine(load.line)
-            is FavouritesLoad.Ready -> if (load.favourites.isEmpty()) {
+            is FavouritesLoad.Ready -> if (load.favourites.isEmpty() && load.playlists.isEmpty()) {
                 Text(NO_FAVOURITES, style = HhType.body, color = c.mute, modifier = Modifier.testTag("favourites_empty"))
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(ListRowTokens.belowGap), modifier = Modifier.weight(1f)) {
-                    items(load.favourites, key = { it.id }) { favourite ->
-                        HhListRow(
-                            title = favourite.name,
-                            modifier = Modifier.testTag("favourite_${favourite.id}"),
-                            leading = { ArtImage(favourite.artUrl, MusicDimens.favouriteArt) },
-                            onClick = { onPick(favourite) },
-                            clickLabel = playInAction(groupName),
-                        )
+                    items(load.favourites, key = { it.id }) { PickRow(it, "favourite", groupName, onPick) }
+                    if (load.playlists.isNotEmpty()) {
+                        item { HhSectionLabel(PLAYLISTS) }
+                        items(load.playlists, key = { it.id }) { PickRow(it, "playlist", groupName, onPick) }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun PickRow(favourite: Favourite, tag: String, groupName: String, onPick: (Favourite) -> Unit) {
+    HhListRow(
+        title = favourite.name,
+        modifier = Modifier.testTag("${tag}_${favourite.id}"),
+        leading = { ArtImage(favourite.artUrl, MusicDimens.favouriteArt) },
+        onClick = { onPick(favourite) },
+        clickLabel = playInAction(groupName),
+    )
 }
 
 /** Reads the Favourites as it opens (6 §4.5); a tap plays and closes, or says why and stays. */

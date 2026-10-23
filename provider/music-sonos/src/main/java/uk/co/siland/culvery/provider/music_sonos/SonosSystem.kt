@@ -44,6 +44,15 @@ internal fun kindOf(item: DidlItem): FavouriteKind {
     return if (container) FavouriteKind.QUEUED else FavouriteKind.STREAM
 }
 
+private const val PLAYLIST_CLASS = "object.container.playlistContainer"
+
+/** What Sonos wants with a playlist it queues: a browse of SQ: carries none, so it is built as a Favourite's is. */
+private fun playlistMetadata(item: DidlItem) =
+    """<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r=""" +
+        """"urn:schemas-rinconnetworks-com:metadata-1-0/" xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/">""" +
+        """<item id="${escapeXml(item.id)}" parentID="$PLAYLISTS" restricted="true"><dc:title>${escapeXml(item.title)}</dc:title>""" +
+        """<upnp:class>$PLAYLIST_CLASS</upnp:class></item></DIDL-Lite>"""
+
 /** A group's GetMediaInfo, read again only when its track or transport state changes (6 §4.2). */
 private data class Media(val trackUri: String?, val state: PlayState, val info: MediaInfo)
 
@@ -73,6 +82,7 @@ internal class SonosSystem(
 
     @Volatile private var link = link
     @Volatile private var favouriteItems: Map<String, DidlItem> = emptyMap()
+    @Volatile private var playlistItems: Map<String, DidlItem> = emptyMap()
     private var lastScanMillis: Long? = null
     private val recovering = Mutex()
 
@@ -178,9 +188,19 @@ internal class SonosSystem(
         return items.map { Favourite(it.id, it.title, artUrl(it.artUri, link.address), kindOf(it)) }
     }
 
+    /** The Sonos playlists, less those already among the Favourites last read, whose rows stay there. */
+    override suspend fun playlists(): List<Favourite> {
+        val taken = favouriteItems.values.mapNotNull { it.uri }.toSet()
+        val items = toRooms { client.browse(link.address, PLAYLISTS, 0, FAVOURITES_PAGE).items }
+            .filter { !it.uri.isNullOrBlank() && it.uri !in taken }
+            .map { it.copy(metadata = playlistMetadata(it)) }
+        playlistItems = items.associateBy { it.id }
+        return items.map { Favourite(it.id, it.title, artUrl(it.artUri, link.address), FavouriteKind.QUEUED) }
+    }
+
     /** 6 §4.5: a station is set and played; a playlist or album replaces the queue (§4.4 steps 1, 2, 3 and 5), leaving the play mode. */
     override suspend fun playFavourite(group: SpeakerGroup, favourite: Favourite) {
-        val item = favouriteItems[favourite.id] ?: favourites().let { favouriteItems[favourite.id] } ?: throw MusicRefusedException()
+        val item = favouriteItems[favourite.id] ?: playlistItems[favourite.id] ?: favourites().let { favouriteItems[favourite.id] } ?: throw MusicRefusedException()
         val uri = item.uri ?: throw MusicRefusedException()
         val metadata = item.metadata.orEmpty()
         command(group.id, { it }) { g ->

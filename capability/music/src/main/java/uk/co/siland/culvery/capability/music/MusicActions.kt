@@ -18,7 +18,7 @@ private const val TAG = "MusicActions"
 enum class MusicCommand { PLAY, PAUSE, NEXT, GROUP_VOLUME, ROOM_VOLUME, SHUFFLE, FAVOURITES, FAVOURITE }
 
 sealed interface FavouritesLoad {
-    data class Ready(val favourites: List<Favourite>) : FavouritesLoad
+    data class Ready(val favourites: List<Favourite>, val playlists: List<Favourite> = emptyList()) : FavouritesLoad
 
     data class Failed(val line: String) : FavouritesLoad
 }
@@ -50,10 +50,10 @@ class MusicActions internal constructor(private val system: () -> MusicSystem?, 
 
     fun shuffleEverything(group: SpeakerGroup) = send(group, MusicCommand.SHUFFLE) { it.shuffleEverything(group) }
 
-    /** Read each time the sheet opens (6 §4.5). */
+    /** Favourites then playlists, read each time the sheet opens (6 §4.5); either failing fails the sheet. */
     suspend fun favourites(): FavouritesLoad {
         val s = system() ?: return FavouritesLoad.Failed(CANT_REACH_SONOS)
-        return attempt({ FavouritesLoad.Ready(s.favourites()) }) { e ->
+        return attempt({ FavouritesLoad.Ready(s.favourites(), s.playlists()) }) { e ->
             logFailure(MusicCommand.FAVOURITES, e)
             FavouritesLoad.Failed(sheetLine(e, SONOS_REFUSED))
         }

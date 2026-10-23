@@ -68,8 +68,10 @@ fun volumeName(name: String) = "$name volume"
 fun percentWords(percent: Int) = "$percent percent"
 
 internal const val FAVOURITES_LABEL = "Favourites"
+internal const val FAVOURITES_SHEET_TITLE = "Favourites and playlists"
+internal const val PLAYLISTS = "Playlists"
 internal const val PLAY_LAST = "Play last"
-internal const val NO_FAVOURITES = "No Sonos Favourites yet. Add them in the Sonos app."
+internal const val NO_FAVOURITES = "No Sonos Favourites or playlists yet. Add them in the Sonos app."
 internal const val GETTING_FAVOURITES = "Getting your Favourites…"
 
 fun favouritesSpoken(name: String) = "$FAVOURITES_LABEL for $name"

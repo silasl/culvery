@@ -32,6 +32,7 @@ internal class FakeSpeaker : AutoCloseable {
 
     private val server = MockWebServer()
     private val answers = ConcurrentHashMap<String, MockResponse>()
+    private val browses = ConcurrentHashMap<String, MockResponse>()
     private val dropOnce = ConcurrentHashMap.newKeySet<String>()
     val received = CopyOnWriteArrayList<Received>()
 
@@ -43,9 +44,11 @@ internal class FakeSpeaker : AutoCloseable {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val soapAction = request.getHeader("SOAPACTION").orEmpty()
                 val action = soapAction.trim('"').substringAfter('#')
-                received += Received(request.path.orEmpty(), soapAction, action, request.body.readUtf8())
+                val body = request.body.readUtf8()
+                received += Received(request.path.orEmpty(), soapAction, action, body)
                 if (silent) return MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
                 if (dropOnce.remove(action)) return MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)
+                if (action == "Browse") browses[objectId(body)]?.let { return it }
                 return answers[action] ?: MockResponse().setResponseCode(500).setBody(SonosFixtures.fault(401))
             }
         }
@@ -60,6 +63,13 @@ internal class FakeSpeaker : AutoCloseable {
     fun answer(action: String, body: String) {
         answers[action] = MockResponse().setBody(body)
     }
+
+    /** Answers a Browse of [objectId] (FV:2, SQ:); a Browse of any other object gets the answer given for "Browse". */
+    fun answerBrowse(objectId: String, body: String) {
+        browses[objectId] = MockResponse().setBody(body)
+    }
+
+    private fun objectId(body: String): String = Regex("<ObjectID>([^<]*)</ObjectID>").find(body)?.groupValues?.get(1).orEmpty()
 
     /** Answers [action], then closes the connection without saying so, as a speaker drops an idle keep-alive. */
     fun answerThenHangUp(action: String, body: String) {

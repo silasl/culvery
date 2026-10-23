@@ -352,6 +352,39 @@ class SonosSystemTest {
         assertThat(kitchen.bodyOf("AddURIToQueue")).contains("<EnqueuedURI>file:///jffs/settings/savedqueues.rsq#3</EnqueuedURI>")
     }
 
+    /** Sonos playlists in Sonos's order, less any already a Favourite; art is the speaker's /getaa. */
+    @Test
+    fun playlistsLeaveOutTheOnesThatAreFavourites() = runTest {
+        val s = checked()
+        kitchen.answerBrowse("FV:2", SonosFixtures.favourites)
+        kitchen.answerBrowse("SQ:", SonosFixtures.playlists)
+        s.favourites()
+        val playlists = s.playlists()
+        assertThat(playlists.map { it.id to it.kind }).containsExactly("SQ:0" to FavouriteKind.QUEUED, "SQ:5" to FavouriteKind.QUEUED).inOrder()
+        assertThat(playlists[0].artUrl).isEqualTo("http://${kitchen.address}/getaa?u=x-file-cifs%3a%2f%2fnas%2fa&v=1")
+        assertThat(playlists[1].artUrl).isNull()
+    }
+
+    /** A playlist replaces the group's queue as a favourited one does, naming itself to Sonos as SQ:n. */
+    @Test
+    fun aPlaylistReplacesTheQueueAndLeavesThePlayMode() = runTest {
+        val s = checked()
+        kitchen.answerBrowse("FV:2", SonosFixtures.favourites)
+        kitchen.answerBrowse("SQ:", SonosFixtures.playlists)
+        s.favourites()
+        val rainy = s.playlists()[1]
+        kitchen.received.clear()
+        s.playFavourite(s.groups.value[0], rainy)
+        assertThat(kitchen.actions().take(4)).containsExactly("RemoveAllTracksFromQueue", "AddURIToQueue", "SetAVTransportURI", "Play").inOrder()
+        assertThat(kitchen.actions()).doesNotContain("SetPlayMode")
+        val add = kitchen.bodyOf("AddURIToQueue")
+        assertThat(add).contains("<EnqueuedURI>file:///jffs/settings/savedqueues.rsq#5</EnqueuedURI>")
+        assertThat(add).contains("&lt;item id=&quot;SQ:5&quot; parentID=&quot;SQ:&quot; restricted=&quot;true&quot;&gt;")
+        assertThat(add).contains("&lt;dc:title&gt;Rainy &amp;quot;day&amp;quot; &amp;lt;mix&amp;gt;&lt;/dc:title&gt;")
+        assertThat(add).contains("object.container.playlistContainer")
+        assertThat(kitchen.bodyOf("SetAVTransportURI")).contains("<CurrentURI>x-rincon-queue:$KITCHEN#0</CurrentURI>")
+    }
+
     /** A Sonos Radio shortcut saved as a Favourite opens a page in the Sonos app; it has no link to play. */
     @Test
     fun aFavouriteWithNothingToPlayIsLeftOut() = runTest {

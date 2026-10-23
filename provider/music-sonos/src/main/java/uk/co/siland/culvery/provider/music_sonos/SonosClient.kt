@@ -28,6 +28,7 @@ internal const val MAX_ART_BYTES = 2L * 1024 * 1024
 
 internal const val LIBRARY = "A:TRACKS"
 internal const val FAVOURITES = "FV:2"
+internal const val PLAYLISTS = "SQ:"
 internal const val FAVOURITES_PAGE = 100
 internal const val SHUFFLE_NOREPEAT = "SHUFFLE_NOREPEAT"
 internal const val QUEUE_PREFIX = "x-rincon-queue:"

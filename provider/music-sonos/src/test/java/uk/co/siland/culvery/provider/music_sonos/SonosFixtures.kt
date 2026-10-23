@@ -148,6 +148,18 @@ internal object SonosFixtures {
             """<res protocolInfo="x-file-cifs:*:audio/flac:*">$TRACK_URI</res><r:resMD>${escape(LIBRARY_TRACK)}</r:resMD></item>""",
     )
 
+    /** The household's Sonos playlists (SQ:): containers with no r:resMD, as Sonos returns them. "Sunday & slow" is also a Favourite. */
+    val playlists = browse(
+        total = 3,
+        """<container id="SQ:0" parentID="SQ:" restricted="true"><dc:title>Party mode</dc:title><res protocolInfo="file:*:audio/mpegurl:*">file:///jffs/settings/savedqueues.rsq#0</res>""" +
+            """<upnp:class>object.container.playlistContainer</upnp:class><upnp:albumArtURI>/getaa?u=x-file-cifs%3a%2f%2fnas%2fa&amp;v=1</upnp:albumArtURI>""" +
+            """<upnp:albumArtURI>/getaa?u=x-file-cifs%3a%2f%2fnas%2fb&amp;v=2</upnp:albumArtURI></container>""",
+        """<container id="SQ:3" parentID="SQ:" restricted="true"><dc:title>Sunday &amp; slow</dc:title><res protocolInfo="file:*:audio/mpegurl:*">file:///jffs/settings/savedqueues.rsq#3</res>""" +
+            """<upnp:class>object.container.playlistContainer</upnp:class></container>""",
+        """<container id="SQ:5" parentID="SQ:" restricted="true"><dc:title>Rainy "day" &lt;mix&gt;</dc:title><res protocolInfo="file:*:audio/mpegurl:*">file:///jffs/settings/savedqueues.rsq#5</res>""" +
+            """<upnp:class>object.container.playlistContainer</upnp:class></container>""",
+    )
+
     fun library(total: Int) = browse(total = total, *(if (total == 0) emptyArray() else arrayOf(
         """<item id="S://nas/music/Artist/Album/01%20Song.flac" parentID="A:TRACKS" restricted="true"><res protocolInfo="x-file-cifs:*:audio/flac:*">$TRACK_URI</res><dc:title>Song</dc:title><upnp:class>object.item.audioItem.musicTrack</upnp:class></item>""",
     )))
