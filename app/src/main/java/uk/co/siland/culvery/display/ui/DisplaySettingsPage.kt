@@ -4,17 +4,13 @@ import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalTime
 import javax.inject.Inject
@@ -29,7 +25,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.FROM
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
-import uk.co.siland.culvery.core.ui.HhPercentSlider
+import uk.co.siland.culvery.core.ui.HhSliderRow
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhTimeStepperRow
@@ -45,12 +41,10 @@ import uk.co.siland.culvery.display.CANT_OPEN_ANDROIDS_SETTINGS
 import uk.co.siland.culvery.display.CameraAccess
 import uk.co.siland.culvery.display.CameraState
 import uk.co.siland.culvery.display.DAYTIME
-import uk.co.siland.culvery.display.DAYTIME_BRIGHTNESS
 import uk.co.siland.culvery.display.DISPLAY
 import uk.co.siland.culvery.display.DisplayPrefs
 import uk.co.siland.culvery.display.DisplaySettings
 import uk.co.siland.culvery.display.EVENING
-import uk.co.siland.culvery.display.EVENING_BRIGHTNESS
 import uk.co.siland.culvery.display.NIGHT_CLOCK
 import uk.co.siland.culvery.display.NIGHT_END
 import uk.co.siland.culvery.display.NIGHT_START
@@ -113,8 +107,8 @@ fun DisplaySettingsScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions
         HhTimeStepperRow(FROM, NIGHT_START, prefs.nightFrom, "display_from") { actions.onNight(it, prefs.nightUntil) }
         HhTimeStepperRow(UNTIL, NIGHT_END, prefs.nightUntil, "display_until") { actions.onNight(prefs.nightFrom, it) }
         HhSectionLabel(BRIGHTNESS)
-        BrightnessRow(DAYTIME, DAYTIME_BRIGHTNESS, prefs.dayPercent, "display_day", actions.onDay)
-        BrightnessRow(EVENING, EVENING_BRIGHTNESS, prefs.eveningPercent, "display_evening", actions.onEvening)
+        BrightnessRow(DAYTIME, prefs.dayPercent, "display_day", actions.onDay)
+        BrightnessRow(EVENING, prefs.eveningPercent, "display_evening", actions.onEvening)
         if (!ui.sunKnown) {
             Text(NO_SUN_TIMES, style = HhType.body, color = c.mute, modifier = Modifier.testTag("display_no_sun"))
         }
@@ -131,18 +125,8 @@ fun DisplaySettingsScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions
 
 /** Saved when the slider is let go, not at each step of a drag. */
 @Composable
-private fun BrightnessRow(name: String, spokenName: String, percent: Int, tag: String, onLetGo: (Int) -> Unit) {
-    val c = Culvery.colors
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
-        Text(name, style = HhType.rowTitle, color = c.ink, modifier = Modifier.width(DisplayDimens.sliderNameWidth))
-        HhPercentSlider(
-            name, percent, tag, Modifier.weight(1f),
-            range = BRIGHTNESS_RANGE, spokenName = spokenName,
-            label = { shown -> Text("${shown.coerceIn(BRIGHTNESS_RANGE)} %", style = HhType.body, color = c.mute, textAlign = TextAlign.End, modifier = Modifier.width(DisplayDimens.sliderValueWidth)) },
-            onLetGo = onLetGo,
-        )
-    }
-}
+private fun BrightnessRow(name: String, percent: Int, tag: String, onLetGo: (Int) -> Unit) =
+    HhSliderRow(name, percent, tag, onLetGo, range = BRIGHTNESS_RANGE)
 
 @Composable
 private fun CameraRow(ui: DisplaySettingsUi, actions: DisplaySettingsActions) {

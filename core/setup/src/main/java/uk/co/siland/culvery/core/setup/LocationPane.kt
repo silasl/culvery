@@ -126,17 +126,6 @@ internal fun LocationContent(
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap)) {
         if (showCurrent && current != null) PlaceRow(current.name, ticked = true, tag = "location_current", onClick = null)
         HhTextField(query, onQuery, TOWN_OR_CITY, TOWN_OR_CITY, "location_query", capitalization = KeyboardCapitalization.Words)
-        if (results is TownResults.Found) {
-            Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.rowGap)) {
-                results.places.forEachIndexed { i, place ->
-                    PlaceRow(place.label, ticked = current.isAt(place), tag = "place_$i", onClick = if (busy) null else ({
-                        // Choosing ends the typing, so the keyboard goes too.
-                        focusManager.clearFocus()
-                        onChoose(place)
-                    }))
-                }
-            }
-        }
         val status = statusLine(results, saveFailed)
         HhMessageLine(
             status.text,
@@ -147,6 +136,17 @@ internal fun LocationContent(
         )
         if (results is TownResults.Failed && !saveFailed) {
             HhButton(TRY_AGAIN, onRetry, Modifier.testTag("location_retry"), on = ButtonSurface.Bg)
+        }
+        if (results is TownResults.Found) {
+            Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.rowGap)) {
+                results.places.forEachIndexed { i, place ->
+                    PlaceRow(place.label, ticked = current.isAt(place), tag = "place_$i", onClick = if (busy) null else ({
+                        // Choosing ends the typing, so the keyboard goes too.
+                        focusManager.clearFocus()
+                        onChoose(place)
+                    }))
+                }
+            }
         }
         Text(USED_FOR, style = SetupType.secondary, color = c.mute)
     }

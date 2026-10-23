@@ -20,6 +20,4 @@ object DisplayDimens {
     val glyphFallbackEnd = 28.dp
     val glyphFallbackTop = 14.dp
     val settingsGap = 16.dp
-    val sliderNameWidth = 200.dp
-    val sliderValueWidth = 56.dp
 }

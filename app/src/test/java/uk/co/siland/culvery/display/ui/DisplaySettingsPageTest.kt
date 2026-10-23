@@ -4,6 +4,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.unit.height
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
@@ -109,13 +111,27 @@ class DisplaySettingsPageTest {
     @Test
     fun theBrightnessSlidersSaveWhenLetGo() {
         show(prefs = DisplayPrefs(dayPercent = 70, eveningPercent = 25))
-        assertThat(spoken("display_day")).isEqualTo("Daytime brightness, 70 percent")
-        assertThat(spoken("display_evening")).isEqualTo("Evening brightness, 25 percent")
+        assertThat(spoken("display_day")).isEqualTo("Daytime, 70 percent")
+        assertThat(spoken("display_evening")).isEqualTo("Evening, from sunset, 25 percent")
         compose.onNodeWithTag("display_day").performSemanticsAction(SemanticsActions.SetProgress) { it(40f) }
         compose.waitForIdle()
         assertThat(days).isNotEmpty()
         assertThat(days.last()).isEqualTo(40)
         assertThat(evenings).isEmpty()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if a brightness slider is not the shared 69 dp row with its value on the right. */
+    @Test
+    fun theBrightnessRowsAreSliderRows() {
+        show(prefs = DisplayPrefs(dayPercent = 40, eveningPercent = 25))
+        listOf("display_day" to "40 %", "display_evening" to "25 %").forEach { (tag, value) ->
+            assertThat(compose.onNodeWithTag("${tag}_row").getUnclippedBoundsInRoot().height.value).isWithin(1f).of(69f)
+            compose.onNodeWithTag("${tag}_value", useUnmergedTree = true).assertTextEquals(value)
+        }
+        compose.onNodeWithTag("display_day").performSemanticsAction(SemanticsActions.SetProgress) { it(60f) }
+        compose.waitForIdle()
+        assertThat(days.last()).isEqualTo(60)
         compose.assertClickablesHaveRoleAndLabel()
     }
 

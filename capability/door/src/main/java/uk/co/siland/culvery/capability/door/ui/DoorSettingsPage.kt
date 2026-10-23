@@ -3,21 +3,13 @@ package uk.co.siland.culvery.capability.door.ui
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,6 +51,7 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhSectionLabel
+import uk.co.siland.culvery.core.ui.HhSliderRow
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhTimeStepperRow
 import uk.co.siland.culvery.core.ui.HhPageTitle
@@ -129,26 +122,8 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
 
 /** Saved when the slider is let go, not at each step of a drag. */
 @Composable
-private fun VolumeRow(volume: Float, onVolume: (Float) -> Unit) {
-    val c = Culvery.colors
-    var dragging by remember { mutableStateOf<Float?>(null) }
-    val shown = dragging ?: volume
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ListRowTokens.trailingGap)) {
-        Text(CHIME_VOLUME, style = HhType.rowTitle, color = c.ink)
-        Slider(
-            value = shown,
-            onValueChange = { dragging = it },
-            onValueChangeFinished = {
-                dragging?.let(onVolume)
-                dragging = null
-            },
-            steps = DoorDimens.VOLUME_STEPS,
-            colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.surf3),
-            modifier = Modifier.weight(1f).testTag("door_volume").semantics { contentDescription = CHIME_VOLUME },
-        )
-        Text("${(shown * 100).roundToInt()} %", style = HhType.body, color = c.mute)
-    }
-}
+private fun VolumeRow(volume: Float, onVolume: (Float) -> Unit) =
+    HhSliderRow(CHIME_VOLUME, (volume * 100).roundToInt(), "door_volume", onLetGo = { onVolume(it / 100f) }, steps = DoorDimens.VOLUME_STEPS)
 
 /** A connect step (5 §5.5), ticked when done. */
 @Composable

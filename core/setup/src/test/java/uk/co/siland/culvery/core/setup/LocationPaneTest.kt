@@ -15,7 +15,14 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.dp
+import org.robolectric.annotation.GraphicsMode
+import uk.co.siland.culvery.core.ui.DarkColors
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.pixelAt
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.IOException
@@ -283,5 +290,64 @@ class LocationPaneTest {
         type("Xqz")
         advance(500)
         compose.onNodeWithTag("location_status").assertTextContains("Xqz", substring = true).assert(polite)
+    }
+
+    private fun assertDirectlyUnderTheField() {
+        val field = compose.onNodeWithTag("location_query").getUnclippedBoundsInRoot()
+        val status = compose.onNodeWithTag("location_status").getUnclippedBoundsInRoot()
+        assertThat(status.top.value).isAtLeast(field.bottom.value)
+        assertThat(status.top.value - field.bottom.value).isLessThan(40f)
+    }
+
+    private fun assertAbove(upper: String, lower: String) {
+        val a = compose.onNodeWithTag(upper).getUnclippedBoundsInRoot()
+        val b = compose.onNodeWithTag(lower).getUnclippedBoundsInRoot()
+        assertThat(a.bottom.value).isAtMost(b.top.value)
+    }
+
+    @Test
+    fun aFailedSearchSaysSoUnderTheField() {
+        search.answer = { throw LocationSearchException("offline") }
+        show()
+        type("Can")
+        advance(500)
+        compose.onNodeWithTag("location_status").assertTextEquals("Couldn’t search for towns — check the tablet’s Wi-Fi, then try again.")
+        assertDirectlyUnderTheField()
+        assertAbove("location_status", "location_retry")
+        assertThat(compose.onNodeWithTag("location_status").textLayout().layoutInput.style.color).isEqualTo(DarkColors.danger)
+        compose.onNodeWithTag("location_retry").assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aSearchInProgressAndAFailedSaveShowInTheSameSpot() {
+        search.answer = { listOf(brighton) }
+        saveFails = true
+        show()
+        type("Can")
+        advance(100)
+        compose.onNodeWithTag("location_status").assertTextEquals("Searching…")
+        assertThat(compose.onNodeWithTag("location_status").textLayout().layoutInput.style.color).isEqualTo(DarkColors.mute)
+        assertDirectlyUnderTheField()
+        advance(500)
+        compose.onNodeWithTag("place_0").performClick()
+        advance(100)
+        compose.onNodeWithTag("location_status").assertTextEquals("Couldn’t save the home location — try again.")
+        assertDirectlyUnderTheField()
+        assertAbove("location_status", "place_0")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: neither error is the text's fault, so the field keeps no danger ring. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun theFieldHasNoRingForASearchFailure() {
+        search.answer = { throw LocationSearchException("offline") }
+        show()
+        type("Can")
+        advance(500)
+        compose.onNodeWithTag("location_status").assertExists()
+        assertThat(pixelAt(compose.onNodeWithTag("location_query"), 1.dp, 30.dp)).isNotEqualTo(DarkColors.danger.toArgb())
+        compose.assertClickablesHaveRoleAndLabel()
     }
 }

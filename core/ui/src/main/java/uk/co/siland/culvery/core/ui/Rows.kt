@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +24,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,6 +72,63 @@ fun HhSwitchRow(
             if (line != null) Text(line, style = HhType.secondary, color = c.mute)
         }
         HhSwitch(checked, onCheckedChange = null, tag = "${tag}_switch", enabled = enabled)
+    }
+}
+
+/** How long a Settings slider keeps the value let go while its save is on the way; a refused save then shows the stored value (9 §4.12). */
+const val SETTINGS_HOLD_MS = 2_000L
+
+/** A slider row's columns: the title takes one share, the track 1.5, and the value keeps room for "100 %". No vertical padding: the 48 dp track centres in the 69 dp row. */
+object SliderRowTokens {
+    const val TITLE_WEIGHT = 1f
+    const val TRACK_WEIGHT = 1.5f
+    val valueMinWidth = 56.dp
+}
+
+/**
+ * One slider for Settings in [HhListRow]'s container: [title] left, [HhPercentSlider] (tag [tag]) in the middle, the value
+ * ([valueLabel], `{tag}_value`) right. The row is `{tag}_row`. Saved on let go through [onLetGo]; a value that doesn't
+ * come back as [percent] within [SETTINGS_HOLD_MS] is shown as [percent] again. Spoken "[title], [spokenState]".
+ */
+@Composable
+fun HhSliderRow(
+    title: String,
+    percent: Int,
+    tag: String,
+    onLetGo: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    range: IntRange = 0..100,
+    steps: Int = 0,
+    enabled: Boolean = true,
+    spokenState: (Int) -> String = { "$it percent" },
+    valueLabel: (Int) -> String = { "$it %" },
+) {
+    val c = Culvery.colors
+    val shape = RoundedCornerShape(ListRowTokens.radius)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ListRowTokens.trailingGap),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = ListRowTokens.minHeight)
+            .clip(shape)
+            .border(CardTokens.edge, c.border, shape)
+            .background(c.surf)
+            .testTag("${tag}_row")
+            .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd),
+    ) {
+        Text(title, style = ListRowTokens.titleStyle, color = c.ink, modifier = Modifier.weight(SliderRowTokens.TITLE_WEIGHT))
+        HhPercentSlider(
+            title, percent, tag, Modifier.weight(SliderRowTokens.TRACK_WEIGHT),
+            range = range, steps = steps, spokenState = spokenState, enabled = enabled, holdCeilingMs = SETTINGS_HOLD_MS,
+            label = { shown ->
+                Text(
+                    valueLabel(shown.coerceIn(range)), style = HhType.body, color = c.mute, textAlign = TextAlign.End,
+                    modifier = Modifier.widthIn(min = SliderRowTokens.valueMinWidth).testTag("${tag}_value"),
+                )
+            },
+            onLetGo = onLetGo,
+        )
     }
 }
 

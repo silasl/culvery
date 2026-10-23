@@ -1,7 +1,15 @@
 package uk.co.siland.culvery.capability.door.ui
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.unit.height
+import uk.co.siland.culvery.core.ui.SETTINGS_HOLD_MS
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
@@ -120,13 +128,68 @@ class DoorSettingsPageTest {
         assertThat(chime.volumes).containsExactly(0.4f)
     }
 
-    /** Fails if the slider's value never reaches the settings. */
+    private fun spokenVolume(): String {
+        val config = compose.onNodeWithTag("door_volume").fetchSemanticsNode().config
+        return config[SemanticsProperties.ContentDescription].single() + ", " + config[SemanticsProperties.StateDescription]
+    }
+
+    private var stored by mutableFloatStateOf(1.0f)
+
+    private fun showScreen(volume: Float, onVolume: (Float) -> Unit) {
+        stored = volume
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                InSettingsPane {
+                    DoorSettingsScreen(
+                        DoorSettingsUi("Ring", null, stored, false, LocalTime.of(21, 0), LocalTime.of(7, 0), null, "", true, true, false),
+                        DoorSettingsActions(onVolume, {}, { _, _, _ -> }, {}, {}),
+                    )
+                }
+            }
+        }
+    }
+
+    /** Runs the virtual clock to [ms] since the start, drawing every frame on the way. */
+    private fun at(ms: Long) {
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(ms - compose.mainClock.currentTime)
+        compose.waitForIdle()
+    }
+
+    private fun letGoAt(percent: Float): Long {
+        compose.onNodeWithTag("door_volume").performSemanticsAction(SemanticsActions.SetProgress) { it(percent) }
+        at(compose.mainClock.currentTime + 16)
+        return compose.mainClock.currentTime
+    }
+
+    /** Review Focus 5: tens, spoken with the name, saved once on let go, in the 69 dp row. Fails on a free Float slider. */
     @Test
-    fun theVolumeIsSavedWhenTheSliderIsLetGo() {
-        showHost()
-        compose.onNodeWithTag("door_volume").performSemanticsAction(SemanticsActions.SetProgress) { it(0.3f) }
-        waitFor { prefs().volume != 1.0f }
-        assertThat(prefs().volume).isEqualTo(0.3f)
+    fun theVolumeStepsInTensAndSavesOnLetGo() {
+        val saved = mutableListOf<Float>()
+        showScreen(0.3f) { saved += it }
+        at(16)
+        assertThat(spokenVolume()).isEqualTo("Chime volume, 30 percent")
+        assertThat(compose.onNodeWithTag("door_volume_row").getUnclippedBoundsInRoot().height.value).isWithin(1f).of(69f)
+        stored = 1.0f
+        at(32)
+        letGoAt(30f)
+        assertThat(saved).containsExactly(0.3f)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Review Focus 5: the store refuses, so the slider goes back to the stored volume once the hold ends. */
+    @Test
+    fun aFailedSaveReturnsTheSliderToTheStoredVolume() {
+        showScreen(1.0f) {}
+        at(16)
+        val start = letGoAt(30f)
+        assertThat(spokenVolume()).isEqualTo("Chime volume, 30 percent")
+        at(start + SETTINGS_HOLD_MS - 16)
+        assertThat(spokenVolume()).isEqualTo("Chime volume, 30 percent")
+        at(start + SETTINGS_HOLD_MS + 16)
+        assertThat(spokenVolume()).isEqualTo("Chime volume, 100 percent")
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Half an hour at a time. Fails if Later moves quiet hours by anything but 30 minutes. */

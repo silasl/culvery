@@ -10,6 +10,9 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.unit.height
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -70,6 +73,20 @@ class MusicSettingsPageTest {
         compose.onNodeWithText("0 % (muted)").assertExists()
         assertThat(calls).containsExactly("usual RINCON_B", "lower 0").inOrder()
         compose.assertAccessible()
+    }
+
+    /** Fails if the lower-to control is not the shared 69 dp slider row, or loses its 5 % steps or its words. */
+    @Test
+    fun lowerMusicToIsASliderRow() {
+        show(connected)
+        assertThat(compose.onNodeWithTag("music_lower_to_row").getUnclippedBoundsInRoot().height.value).isWithin(1f).of(69f)
+        compose.onNodeWithTag("music_lower_to_value", useUnmergedTree = true).assertTextEquals("20 % of its volume")
+        val range = compose.onNodeWithTag("music_lower_to").fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo]
+        assertThat(range.steps).isEqualTo(9)
+        compose.onNodeWithTag("music_lower_to").performSemanticsAction(SemanticsActions.SetProgress) { it(25f) }
+        compose.waitForIdle()
+        assertThat(calls).containsExactly("lower 25")
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** 6 §5.4: 0 % mutes. */

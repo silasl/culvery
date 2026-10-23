@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -12,6 +13,10 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.center
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
@@ -90,6 +95,36 @@ class RowLookTest {
             CulveryTheme(dark = true) { HhSwitchRow("All day", null, checked = false, tag = "row", onChange = {}, minHeight = 77.dp) }
         }
         assertAbout(height("row"), 77.dp)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aSliderRowSaysItsValueAndLetsGo() {
+        val letGo = mutableListOf<Int>()
+        compose.setContent {
+            CulveryTheme(dark = true) { HhSliderRow("Chime volume", 30, "x", steps = 9, onLetGo = { letGo += it }) }
+        }
+        val config = compose.onNodeWithTag("x").fetchSemanticsNode().config
+        assertThat(config[SemanticsProperties.ContentDescription].single() + ", " + config[SemanticsProperties.StateDescription])
+            .isEqualTo("Chime volume, 30 percent")
+        compose.onNodeWithText("30 %").assertExists()
+        assertAbout(height("x_row"), 69.dp)
+        compose.onNodeWithTag("x").performSemanticsAction(SemanticsActions.SetProgress) { it(50f) }
+        compose.waitForIdle()
+        assertThat(letGo).containsExactly(50)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aSliderRowCanBeDisabled() {
+        val letGo = mutableListOf<Int>()
+        compose.setContent {
+            CulveryTheme(dark = true) { HhSliderRow("Chime volume", 30, "x", enabled = false, onLetGo = { letGo += it }) }
+        }
+        assertThat(compose.onNodeWithTag("x").fetchSemanticsNode().config.contains(SemanticsActions.SetProgress)).isFalse()
+        compose.onNodeWithTag("x").performTouchInput { click(center) }
+        compose.waitForIdle()
+        assertThat(letGo).isEmpty()
         compose.assertClickablesHaveRoleAndLabel()
     }
 }

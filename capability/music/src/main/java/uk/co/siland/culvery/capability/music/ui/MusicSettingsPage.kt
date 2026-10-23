@@ -14,7 +14,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -60,12 +59,11 @@ import uk.co.siland.culvery.core.ui.HhAddressSheet
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhMessageLine
-import uk.co.siland.culvery.core.ui.HhPercentSlider
+import uk.co.siland.culvery.core.ui.HhSliderRow
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
-import uk.co.siland.culvery.core.ui.ListRowTokens
 
 private const val TAG = "MusicSettings"
 
@@ -136,19 +134,10 @@ fun MusicSettingsScreen(ui: MusicSettingsUi, actions: MusicSettingsActions) {
 
 /** 0–50 % in 5 % steps, saved when let go (6 §5.4). */
 @Composable
-private fun LowerToRow(lowerTo: Int, onLowerTo: (Int) -> Unit) {
-    val c = Culvery.colors
-    Column(verticalArrangement = Arrangement.spacedBy(ListRowTokens.lineGap)) {
-        Text(LOWER_MUSIC_TO, style = HhType.rowTitle, color = c.ink)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ListRowTokens.trailingGap)) {
-            HhPercentSlider(
-                LOWER_MUSIC_TO, lowerTo, "music_lower_to", Modifier.weight(1f),
-                range = 0..MAX_LOWER_TO, steps = MusicDimens.LOWER_STEPS, spokenName = LOWER_MUSIC_TO, spokenState = ::lowerToWords,
-                label = { Text(lowerToWords(it), style = HhType.body, color = c.mute) }, onLetGo = onLowerTo,
-            )
-        }
-    }
-}
+private fun LowerToRow(lowerTo: Int, onLowerTo: (Int) -> Unit) = HhSliderRow(
+    LOWER_MUSIC_TO, lowerTo, "music_lower_to", onLowerTo,
+    range = 0..MAX_LOWER_TO, steps = MusicDimens.LOWER_STEPS, spokenState = ::lowerToWords, valueLabel = ::lowerToWords,
+)
 
 /** Enter a speaker's address (6 §4.1): [onConnect] answers null when connected, else the line to show. */
 @Composable
