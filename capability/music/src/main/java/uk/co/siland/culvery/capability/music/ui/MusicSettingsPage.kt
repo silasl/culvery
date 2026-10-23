@@ -17,8 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.music.ADDRESS_EXAMPLE
@@ -64,6 +62,7 @@ import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhMessageLine
 import uk.co.siland.culvery.core.ui.HhPercentSlider
 import uk.co.siland.culvery.core.ui.HhSectionLabel
+import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
@@ -105,7 +104,7 @@ class MusicSettingsActions(
 fun MusicSettingsScreen(ui: MusicSettingsUi, actions: MusicSettingsActions) {
     val c = Culvery.colors
     Column(verticalArrangement = Arrangement.spacedBy(MusicDimens.settingsGap), modifier = Modifier.testTag("settings_music")) {
-        Text(MUSIC, style = HhType.screenTitle, color = c.ink, modifier = Modifier.semantics { heading() })
+        HhPageTitle(MUSIC)
         HhSectionLabel(SONOS)
         if (ui.status != null) {
             MusicStatusLine(ui.status)

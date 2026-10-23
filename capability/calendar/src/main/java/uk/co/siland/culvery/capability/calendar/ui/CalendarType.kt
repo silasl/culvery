@@ -88,9 +88,6 @@ internal object CalendarType {
     /** 22 sp / 700: "Connecting to Google Calendar…" and Settings' "Calendars" (3a design §4). */
     val blockTitle = HhType.sectionTitle
 
-    /** 34 sp / 700: "Your calendars" and "Calendars", as the wizard's and Settings' titles (4a design §4.5). */
-    val reviewTitle = HhType.screenTitle
-
     /** 13 sp / 700: the "Main" badge. */
     val badge = syncingPill
 

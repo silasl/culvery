@@ -77,9 +77,14 @@ fun SettingsScreen(
                 .width(SetupDimens.settingsList)
                 .fillMaxHeight()
                 .background(c.surf)
-                .padding(horizontal = SetupDimens.settingsListPaddingH, vertical = SetupDimens.settingsListPaddingV),
+                .padding(
+                    start = SetupDimens.settingsListPaddingH,
+                    top = SetupDimens.settingsListPaddingTop,
+                    end = SetupDimens.settingsListPaddingH,
+                    bottom = SetupDimens.settingsListPaddingBottom,
+                ),
         ) {
-            Text(SETTINGS, style = SetupType.title, color = c.ink, modifier = Modifier.semantics { heading() })
+            Text(SETTINGS, style = SetupType.listTitle, color = c.ink, modifier = Modifier.semantics { heading() })
             Spacer(Modifier.height(SetupDimens.settingsTitleGap))
             Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.settingsItemGap), modifier = Modifier.selectableGroup()) {
                 pages.forEach { p -> PageItem(p.title, chosen = p.id == page?.id, tag = "settings_page_${p.id}") { chosen = p.id } }

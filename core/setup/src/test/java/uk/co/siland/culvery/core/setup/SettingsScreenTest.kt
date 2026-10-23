@@ -24,6 +24,7 @@ import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -171,6 +172,40 @@ class SettingsScreenTest {
         val width = compose.onNodeWithTag("settings_pane").getUnclippedBoundsInRoot().width.value
         assertThat(width).isAtMost(720f)
         assertThat(width).isGreaterThan(700f)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    private fun showOnCanvas(vararg pages: SettingsPage) = compose.setContent {
+        CulveryTheme(dark = true) {
+            CompositionLocalProvider(LocalShellNavigator provides navigator) {
+                Box(Modifier.size(1280.dp, 800.dp)) { SettingsScreen(pages.toList(), onClose = {}) }
+            }
+        }
+    }
+
+    @Test
+    fun theListIsTheHandoffsPanel() {
+        showOnCanvas(page("a", "Alpha", 0), page("b", "Beta", 1), page("c", "Gamma", 2))
+        val a = compose.onNodeWithTag("settings_page_a").getUnclippedBoundsInRoot()
+        val b = compose.onNodeWithTag("settings_page_b").getUnclippedBoundsInRoot()
+        val c = compose.onNodeWithTag("settings_page_c").getUnclippedBoundsInRoot()
+        assertThat(a.height.value).isWithin(0.5f).of(52f)
+        assertThat(b.top.value - a.bottom.value).isWithin(0.5f).of(7f)
+        assertThat(c.top.value - b.bottom.value).isWithin(0.5f).of(7f)
+        assertThat(a.left.value).isWithin(0.5f).of(28f)
+        assertThat(a.width.value).isWithin(0.5f).of(320f - 2 * 28f)
+        val close = compose.onNodeWithTag("settings_close").getUnclippedBoundsInRoot()
+        assertThat(close.height.value).isWithin(0.5f).of(48f)
+        assertThat(close.bottom.value).isWithin(0.5f).of(800f - 28f)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun thePageIsPaddedAsDrawn() {
+        showOnCanvas(page("a", "Alpha", 0))
+        val pane = compose.onNodeWithTag("settings_pane").getUnclippedBoundsInRoot()
+        assertThat(pane.left.value).isWithin(0.5f).of(320f + 48f)
+        assertThat(pane.top.value).isWithin(0.5f).of(43f)
         compose.assertClickablesHaveRoleAndLabel()
     }
 }

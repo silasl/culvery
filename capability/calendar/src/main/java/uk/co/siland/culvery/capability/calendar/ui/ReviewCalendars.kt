@@ -28,7 +28,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
@@ -56,6 +55,7 @@ import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhConfirmCard
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
+import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.HhSwitch
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.PersonChipInk
@@ -195,7 +195,7 @@ internal fun ReviewCalendars(
     line: String? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.reviewBlockGap), modifier = Modifier.testTag("review_calendars")) {
-        Text(title, style = CalendarType.reviewTitle, color = Culvery.colors.ink, modifier = Modifier.semantics { heading() })
+        HhPageTitle(title)
         if (line != null) Text(line, style = CalendarType.subtitle, color = Culvery.colors.mute)
         if (connections.isEmpty()) {
             Text(

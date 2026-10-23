@@ -18,8 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -70,6 +68,7 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhChoiceChip
 import uk.co.siland.culvery.core.ui.HhMessageLine
 import uk.co.siland.culvery.core.ui.HhSectionLabel
+import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 
@@ -115,7 +114,7 @@ fun LightsSettingsPage(
 ) {
     val c = Culvery.colors
     Column(verticalArrangement = Arrangement.spacedBy(LightsDimens.settingsGap), modifier = Modifier.testTag("settings_lights")) {
-        Text(LIGHTS, style = HhType.screenTitle, color = c.ink, modifier = Modifier.semantics { heading() })
+        HhPageTitle(LIGHTS)
         HhSectionLabel(HUE_BRIDGE)
         if (ui.status != null) {
             Text(ui.status, style = HhType.body, color = c.danger, modifier = Modifier.testTag("lights_status"))

@@ -48,24 +48,25 @@ internal object SetupDimens {
     val pinHintGap = 13.dp
     val footerGap = 10.dp
 
-    // Settings (§4.6): the left column 320 wide. Not in the spec: `surf`, padding 32×28; the title 24 above the list;
-    // items 56 dp, radius 16, padding 0 18, 4 apart; the page padded 40×48, at most [settingsPane] wide.
+    // Settings (9 §4.12, handoff 2c's panel): 320 wide on `surf`, padded 35 top and 28 at the sides and foot; the title 25
+    // above the list; items 52 dp, radius 16, padding 0 19, 7 apart. The page is padded 43 × 48, at most [settingsPane] wide.
     val settingsList = 320.dp
-    val settingsListPaddingV = 32.dp
+    val settingsListPaddingTop = 35.dp
     val settingsListPaddingH = 28.dp
-    val settingsTitleGap = 24.dp
-    val settingsItemHeight = 56.dp
+    val settingsListPaddingBottom = 28.dp
+    val settingsTitleGap = 25.dp
+    val settingsItemHeight = 52.dp
     val settingsItemRadius = 16.dp
-    val settingsItemPaddingH = 18.dp
-    val settingsItemGap = 4.dp
-    val pagePaddingV = 40.dp
+    val settingsItemPaddingH = 19.dp
+    val settingsItemGap = 7.dp
+    val pagePaddingV = 43.dp
     val pagePaddingH = 48.dp
 }
 
 /** Setup and Settings text styles, derived from HhType. */
 internal object SetupType {
-    /** 34 sp / 700: a step's or page's title. */
-    val title = HhType.screenTitle
+    /** 35 sp / 700, −0.5 tracking: the Settings list's title (handoff 2c). */
+    val listTitle = HhType.screenTitle.copy(fontSize = 35.sp, letterSpacing = (-0.5).sp)
 
     /** 16 sp / 400: a title's line, and body text. */
     val line = HhType.body

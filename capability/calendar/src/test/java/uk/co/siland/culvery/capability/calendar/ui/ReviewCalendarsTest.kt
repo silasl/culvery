@@ -1,8 +1,12 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -14,6 +18,8 @@ import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -21,7 +27,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -42,6 +50,7 @@ import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 @RunWith(AndroidJUnit4::class)
@@ -110,6 +119,30 @@ class ReviewCalendarsTest {
                 actions = ReviewActions(onShown = { source, visible -> shown = source.source.id to visible }),
             )
         }
+    }
+
+    @Test
+    fun theTitleIsTheSharedPageTitle() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                Column {
+                    Box(Modifier.testTag("reference")) { HhPageTitle("Reference") }
+                    Box(Modifier.testTag("review")) {
+                        ReviewCalendars(
+                            title = "Calendars", connections = emptyList(), people = listOf(Person.Family), nowMillis = now, busy = false,
+                            picking = null, confirming = null, connectable = emptyList(), actions = ReviewActions(),
+                        )
+                    }
+                }
+            }
+        }
+        fun size(tag: String): TextUnit {
+            val layouts = mutableListOf<TextLayoutResult>()
+            compose.onAllNodes(isHeading() and hasAnyAncestor(hasTestTag(tag)))[0].fetchSemanticsNode()
+                .config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+            return layouts.single().layoutInput.style.fontSize
+        }
+        assertThat(size("review")).isEqualTo(size("reference"))
     }
 
     /** D6: the row says so and offers Hide; the connection's line stays "Updated 2 minutes ago". */

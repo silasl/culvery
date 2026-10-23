@@ -1,6 +1,43 @@
 package uk.co.siland.culvery
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isHeading
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.sp
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import java.time.LocalTime
+import kotlinx.coroutines.flow.MutableStateFlow
+import org.junit.Rule
+import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.door.ui.DoorSettingsActions
+import uk.co.siland.culvery.capability.door.ui.DoorSettingsScreen
+import uk.co.siland.culvery.capability.door.ui.DoorSettingsUi
+import uk.co.siland.culvery.capability.lights.ui.LightsSettingsPage
+import uk.co.siland.culvery.capability.lights.ui.LightsSettingsUi
+import uk.co.siland.culvery.capability.music.ui.MusicSettingsActions
+import uk.co.siland.culvery.capability.music.ui.MusicSettingsScreen
+import uk.co.siland.culvery.capability.music.ui.MusicSettingsUi
+import uk.co.siland.culvery.core.plugin.HomeApp
+import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
+import uk.co.siland.culvery.core.setup.pages.KioskPage
+import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.HhPageTitle
+import uk.co.siland.culvery.display.CameraState
+import uk.co.siland.culvery.display.DisplayPrefs
+import uk.co.siland.culvery.display.ui.DisplaySettingsActions
+import uk.co.siland.culvery.display.ui.DisplaySettingsScreen
+import uk.co.siland.culvery.display.ui.DisplaySettingsUi
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -43,7 +80,10 @@ private class WithSetup(private val steps: List<SetupStep>, private val pages: L
     override fun TabContent() = Unit
 }
 
+@RunWith(AndroidJUnit4::class)
 class SetupWiringTest {
+    @get:Rule val compose = createComposeRule()
+
     private val calendar = WithSetup(listOf(Step("calendar.review", 410), Step("calendar.connect", 400)), listOf(Page("calendars", 400)))
 
     @Test
@@ -130,5 +170,57 @@ class SetupWiringTest {
         assertThat(access.expiryChecks).isEqualTo(1)
         owner.registry.currentState = Lifecycle.State.RESUMED
         assertThat(access.expiryChecks).isEqualTo(2)
+    }
+
+    private fun SemanticsNodeInteraction.fontSize() = mutableListOf<TextLayoutResult>()
+        .also { fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(it) }
+        .single().layoutInput.style.fontSize
+
+    /** Home location and People draw their title through the same `HhPageTitle` as the wizard's steps; Calendars is checked in its module. */
+    @Test
+    fun everySettingsPageTitleIsTheSharedTitle() {
+        val pages: List<Pair<String, @Composable () -> Unit>> = listOf(
+            "display" to {
+                DisplaySettingsScreen(
+                    DisplaySettingsUi(DisplayPrefs(), CameraState.ALLOWED, sunKnown = true),
+                    DisplaySettingsActions({ _, _ -> }, {}, {}, {}, {}, {}, {}),
+                )
+            },
+            "door" to {
+                DoorSettingsScreen(
+                    DoorSettingsUi("Ring", null, 0.5f, false, LocalTime.of(22, 0), LocalTime.of(7, 0), null, "never", true, true, false),
+                    DoorSettingsActions({}, {}, { _, _, _ -> }, {}, {}),
+                )
+            },
+            "lights" to {
+                LightsSettingsPage(
+                    LightsSettingsUi(true, null, null, false, emptyList(), null, emptySet(), 0, null, emptySet()),
+                    {}, {}, {}, {}, {},
+                )
+            },
+            "music" to {
+                MusicSettingsScreen(
+                    MusicSettingsUi(true, null, null, false, emptyList(), null, 50),
+                    MusicSettingsActions({}, {}, {}, {}),
+                )
+            },
+            "kiosk" to { KioskPage(object : HomeApp { override val isDefault = MutableStateFlow(false) }).Content() },
+        )
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
+                    Column {
+                        Box(Modifier.testTag("reference")) { HhPageTitle("Reference") }
+                        pages.forEach { (id, page) -> Box(Modifier.testTag("page_$id")) { page() } }
+                    }
+                }
+            }
+        }
+        val shared = compose.onAllNodes(isHeading() and hasAnyAncestor(hasTestTag("reference")))[0].fontSize()
+        assertThat(shared).isEqualTo(37.sp)
+        pages.forEach { (id, _) ->
+            val title = compose.onAllNodes(isHeading() and hasAnyAncestor(hasTestTag("page_$id")))[0]
+            assertThat(title.fontSize()).isEqualTo(shared)
+        }
     }
 }

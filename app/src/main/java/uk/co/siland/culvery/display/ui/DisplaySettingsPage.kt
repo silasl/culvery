@@ -14,8 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalTime
@@ -35,6 +33,7 @@ import uk.co.siland.culvery.core.ui.HhPercentSlider
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhTimeStepperRow
+import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.UNTIL
 import uk.co.siland.culvery.display.ALLOW_THE_CAMERA
@@ -108,7 +107,7 @@ fun DisplaySettingsScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions
     val c = Culvery.colors
     val prefs = ui.prefs
     Column(verticalArrangement = Arrangement.spacedBy(DisplayDimens.settingsGap), modifier = Modifier.testTag("settings_display")) {
-        Text(DISPLAY, style = HhType.screenTitle, color = c.ink, modifier = Modifier.semantics { heading() })
+        HhPageTitle(DISPLAY)
         HhSectionLabel(NIGHT_CLOCK)
         Text(nightClockLine(prefs.nightFrom, prefs.nightUntil), style = HhType.body, color = c.mute, modifier = Modifier.testTag("display_night_line"))
         HhTimeStepperRow(FROM, NIGHT_START, prefs.nightFrom, "display_from") { actions.onNight(it, prefs.nightUntil) }
