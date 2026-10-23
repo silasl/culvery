@@ -194,7 +194,7 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
     }
 }
 
-private const val SENT_ADDS_KEPT = 50
+private const val SENT_ADDS_KEPT = QUEUE_MAX
 
 /** An add's [QueuedEntity.excludeIds], as the ids it holds. */
 internal fun splitIds(excludeIds: String?): Set<String> = excludeIds?.split(',')?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
