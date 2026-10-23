@@ -114,6 +114,15 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
         if (row != null && itemId != null) dao.setItemIdAfter(row.clientKey, seq, itemId)
     }
 
+    /** The queued adds of [text]'s key made after [afterSeq] must never match [itemId], which a tick just put off the list. */
+    suspend fun excludeFromLaterAdds(afterSeq: Long, text: String, itemId: String) = db.withTransaction {
+        val key = textKey(text)
+        for (row in dao.queueNow()) {
+            if (row.kind != QueuedKind.ADD.name || row.seq <= afterSeq || textKey(row.text) != key) continue
+            dao.setExcluded(row.seq, joinIds(splitIds(row.excludeIds) + itemId))
+        }
+    }
+
     suspend fun failed(seq: Long, nextAtMillis: Long) = dao.markFailed(seq, nextAtMillis)
 
     suspend fun drop(seq: Long) = dao.deleteQueued(seq)
@@ -168,6 +177,11 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
         dao.trimLearned(LEARNED_MAX)
     }
 }
+
+/** An add's [QueuedEntity.excludeIds], as the ids it holds. */
+internal fun splitIds(excludeIds: String?): Set<String> = excludeIds?.split(',')?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+
+internal fun joinIds(ids: Set<String>): String? = ids.takeIf { it.isNotEmpty() }?.joinToString(",")
 
 private fun ConnectionEntity.toStored() = StoredShopping(
     connection = Connection(id, providerId, label, decodeConfig(configJson)),
