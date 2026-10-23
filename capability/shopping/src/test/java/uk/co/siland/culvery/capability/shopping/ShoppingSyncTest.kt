@@ -346,10 +346,12 @@ class ShoppingSyncTest : ShoppingTestBase() {
         runCurrent()
         // Production connecting takes ShoppingLock, so it waits for the row in flight; this goes round it to test the stop.
         rig.store.connect(Connection("c2", rig.conn.providerId, rig.conn.label, emptyMap()))
+        // Connecting clears the queue, so a row made for the new connection is what the old pass must leave alone.
+        rig.enqueue(QueuedKind.TICK, "t3", "Eggs", itemId = "g3")
         gate.complete(Unit)
         pass.await()
         assertThat(rig.provider.calls).containsExactly("tick g1")
-        assertThat(rig.store.queueNow()).isEmpty()
+        assertThat(rig.store.queueNow().map { it.itemId }).containsExactly("g3")
     }
 
     @Test
