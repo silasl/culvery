@@ -545,6 +545,15 @@ Fault found:
 - Fault A, while adding an event (title typed), a tap on a start date closed the editor and an existing event's details opened. Not reproduced; no crash and no warning in the log. Nothing in the editor opens an event, so the editor closed first and a tap reached the week or Home behind it; the idle close (10 min once edited, warned at 9:40) and a session ending don't fit. Next time: note the minute, the entry point and where the opened event sat, and read logcat at once.
 - Fault B (Plan 6, Sonos), Favourites lists "Discover Sonos Radio" and "Trending now", which do nothing when tapped. Likely Sonos Radio browse entries saved as favourites with nothing playable behind them. Decide whether to leave them out of the list or make them play.
 
+## From Plans 9c-1b and 9c-1c
+- **Choosing the destination calendar per event:** every new event still goes to the household's one destination calendar.
+- **Skipping one date of a series** from the event's details.
+- **An undone create whose drain delete is lost on restart:** `UndoneKeys` lives in memory, so after a restart the create can still land; if it does, its title is remembered too. Related (final review M2): an Undo that races a drain create landing in the same moment leaves the event on the week until the next sync, and the key stays in `UndoneKeys` until restart.
+- **Home slow to fill:** cold start 2.2–2.9 s to Home filled on the tablet, the Hue bridge's first read the slowest part (Task 16, above); the return from the Calendar tab is quick. Decide whether Lights should show its last known rooms while it connects.
+- **Hiding a calendar can hide a title another visible calendar still has** (final review M1): hiding folds nothing back, so a title supplied by the hidden calendar's event drops out of "From before" until the visible calendar's event next changes or the next full sync. Re-supply on hide, as `forget` does.
+- **A phone's counted series is expanded in full** on every detail update (final review M3, `Repeats.kt:28`); cap it or work out the last date directly.
+- **End-of-v1 design review:** 9c-1b's notes (the plan's "Notes for the end-of-v1 design review" and the ledger's "provisional for the design review" lines) and this plan's (the walk-through list above; the ledger's copy at `culvery-notes/sdd-ledger-plan-9c1c.md`).
+
 ## Left out of Plan 9c-1c on purpose (2026-10-22)
 - **Choosing the destination calendar per event:** an event still saves to the household's one destination calendar. Picking another calendar for one event is a later change.
 - **A year-long fetch of past events:** the tablet still keeps about a day of past events. Title suggestions use a remembered list that sync builds up over time, so "From before" starts sparse and fills in over the following weeks.
