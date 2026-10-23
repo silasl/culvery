@@ -39,7 +39,7 @@ class StatusLineTest {
 
     @Test
     fun aFieldErrorIsDangerWithTheErrorIcon() {
-        show { HhStatusLine("Someone is already called Sam.", "x", icon = Icons.ERROR, style = ControlType.fieldError) }
+        show { HhStatusLine("Someone is already called Sam.", "x", icon = Icons.ERROR, field = true) }
         compose.onNodeWithTag("x").assertIsDisplayed().assert(liveRegion)
         val text = compose.onNode(hasText("Someone is already called Sam."), useUnmergedTree = true)
         assertThat(text.textLayout().layoutInput.style.color).isEqualTo(DarkColors.danger)
@@ -55,7 +55,7 @@ class StatusLineTest {
 
     @Test
     fun aFieldsOwnErrorIsHiddenFromTalkBack() {
-        show { HhStatusLine("Someone is already called Sam.", "x", icon = Icons.ERROR, style = ControlType.fieldError, spoken = false) }
+        show { HhStatusLine("Someone is already called Sam.", "x", icon = Icons.ERROR, field = true, spoken = false) }
         compose.onNodeWithTag("x").assertIsDisplayed()
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))

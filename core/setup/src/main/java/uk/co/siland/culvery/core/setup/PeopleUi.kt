@@ -79,6 +79,7 @@ internal fun PersonRow(
         modifier = Modifier.testTag("person_$name").semantics { if (moves.isNotEmpty()) customActions = moves },
         leading = { Box(Modifier.size(SetupDimens.rowDot).clip(CircleShape).background(Color(member.person.color))) },
         subtitle = "${member.role.label} · ${pinState(member)}",
+        minHeight = SetupDimens.personRowHeight,
         trailing = {
             if (reorderable) {
                 MoveButton(Icons.ARROW_UPWARD, moveUpLabel(name), "person_up_$name", onUp, atEnd = ALREADY_FIRST)
@@ -91,11 +92,11 @@ internal fun PersonRow(
     )
 }
 
-/** An Admin's PIN state, or what an Adult or Child without one can't do. */
+/** Whether they have a PIN; an Adult or Child without one can only look, and the line says so. */
 private fun pinState(member: Member): String = when {
     member.hasPin -> PIN_SET
     member.role == Role.ADMIN -> NO_PIN
-    else -> NO_PIN_CANT_ADD
+    else -> noPinYet(member.person.name)
 }
 
 /** A Move up or Move down button; at the list's ends disabled and faint, saying why ([atEnd]), so focus has a place to stay. */

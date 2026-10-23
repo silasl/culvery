@@ -1,10 +1,12 @@
 package uk.co.siland.culvery.capability.music.ui
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
@@ -16,11 +18,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.music.MusicConnect
 import uk.co.siland.culvery.capability.music.MusicFixture
 import uk.co.siland.culvery.capability.music.MusicLink
@@ -31,7 +35,10 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.pixelAt
 import uk.co.siland.culvery.core.ui.test.waitFor
 
 /** 6 §5.4: Sonos, the usual room and the doorbell's share. */
@@ -120,6 +127,20 @@ class MusicSettingsPageTest {
         compose.waitFor { sent.isNotEmpty() }
         compose.onNodeWithTag("music_address_line").assertTextEquals("Type the address as four numbers, like 192.168.1.20.")
         assertThat(sent).containsExactly("192.168.1.20:1400")
+    }
+
+    /** A failed connect isn't the text's fault: its line shows once and the field keeps its own edge. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun aFailedConnectShowsItsLineOnceAndDoesNotRingTheField() {
+        compose.setContent { CulveryTheme(dark = true) { AddressSheet(onConnect = { "Type the address as four numbers, like 192.168.1.20." }, onEdited = {}, onClose = {}) } }
+        compose.onNodeWithTag("music_address_field").performTextInput("192.168.1.20:1400")
+        compose.onNodeWithTag("music_address_connect").performClick()
+        compose.waitFor { compose.onAllNodesWithText("Type the address as four numbers, like 192.168.1.20.").fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodesWithText("Type the address as four numbers, like 192.168.1.20.").assertCountEquals(1)
+        compose.onNodeWithTag("music_address_line").assertTextEquals("Type the address as four numbers, like 192.168.1.20.")
+        assertThat(pixelAt(compose.onNodeWithTag("music_address_field"), 1.dp, 30.dp)).isNotEqualTo(DarkColors.danger.toArgb())
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** A Find that found nothing stops being the page's line once a typed address connects. */

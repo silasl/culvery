@@ -18,6 +18,7 @@ internal const val WHOS_SETTING_UP = "Who’s setting this up?"
 internal const val YOU_LINE = "You’ll be the Admin — you can change settings and people. Admins need a PIN."
 internal const val SET_YOUR_PIN = "Set your PIN"
 internal const val WHO_ELSE = "Who else lives here?"
+internal const val WHO_ELSE_LINE = "Everyone gets a colour on the calendar. A PIN lets them add events."
 internal const val CULVERY_IS_READY = "Culvery is ready"
 internal const val OPEN_CULVERY = "Open Culvery"
 
@@ -38,7 +39,7 @@ internal fun townsFound(count: Int): String = if (count == 1) "1 town found" els
 internal const val ADD_PERSON = "Add person"
 internal const val PIN_SET = "PIN set"
 internal const val NO_PIN = "No PIN"
-internal const val NO_PIN_CANT_ADD = "No PIN — can’t add events"
+internal fun noPinYet(name: String): String = "no PIN yet, so $name can only look"
 
 /** An Adult or Child without a PIN can't be told apart from anyone, so they can only look. */
 internal fun canOnlyLook(name: String): String =
@@ -59,7 +60,7 @@ internal const val PIN_TAKEN = "That PIN is taken — choose another."
 internal const val ADMIN_NEEDS_PIN = "An Admin needs a PIN."
 internal const val NEEDS_AN_ADMIN = "Culvery needs at least one Admin with a PIN."
 
-internal fun someoneCalled(name: String): String = "Someone is already called $name."
+internal fun someoneCalled(name: String): String = "Someone is already called $name. Try “$name B” or a nickname."
 
 // A failure names what wasn't saved (4d-2 §7.2).
 internal fun couldNotSaveDetails(name: String?): String =

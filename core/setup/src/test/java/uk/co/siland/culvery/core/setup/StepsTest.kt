@@ -208,8 +208,8 @@ class StepsTest {
         you.form.name = "Family"
         you.form.pin = "1234"
         assertThat(you.onNext()).isFalse()
-        assertThat(you.form.message).isEqualTo("Someone is already called Family.")
-        assertThat(you.form.nameError).isEqualTo("Someone is already called Family.")
+        assertThat(you.form.message).isNull()
+        assertThat(you.form.nameError).isEqualTo(someoneCalled("Family"))
         assertThat(household.members.first()).isEmpty()
     }
 

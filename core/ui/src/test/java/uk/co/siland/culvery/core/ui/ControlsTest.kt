@@ -15,10 +15,13 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -205,6 +208,40 @@ class ControlsTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, "Someone is already called Alex."))
     }
 
+    @Test
+    fun anErrorRingsTheFieldAndSitsUnderIt() {
+        var error by mutableStateOf<String?>("Someone is already called Sam. Try “Sam B” or a nickname.")
+        show { HhTextField("Sam", {}, placeholder = "Name", label = "Name", tag = "x", error = error) }
+        val field = compose.onNodeWithTag("x")
+        assertThat(pixelAt(field, 1.dp, 30.dp)).isEqualTo(DarkColors.danger.toArgb())
+        val gap = compose.onNodeWithTag("x_error").assertIsDisplayed().getUnclippedBoundsInRoot().top -
+            field.getUnclippedBoundsInRoot().bottom
+        assertThat(gap.value).isWithin(0.5f).of(8f)
+        error = null
+        compose.onNodeWithTag("x_error").assertDoesNotExist()
+        assertThat(pixelAt(field, 1.dp, 30.dp)).isNotEqualTo(DarkColors.danger.toArgb())
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theErrorIsSaidOnce() {
+        val sentence = "Someone is already called Sam. Try “Sam B” or a nickname."
+        show { HhTextField("Sam", {}, placeholder = "Name", label = "Name", tag = "x", error = sentence) }
+        compose.onNodeWithTag("x").assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, sentence))
+        compose.onNodeWithTag("x_error")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
+        val saysIt = SemanticsMatcher("says the sentence to TalkBack") { node ->
+            val config = node.config
+            val said = config.getOrNull(SemanticsProperties.Text).orEmpty().any { it.text.contains(sentence) } ||
+                config.getOrNull(SemanticsProperties.Error)?.contains(sentence) == true
+            said && !config.contains(SemanticsProperties.HideFromAccessibility)
+        }
+        compose.onAllNodes(saysIt).assertCountEquals(1)
+        compose.onNodeWithTag("x").assert(saysIt)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
     /** Compose speaks a live region only when a node it already has changes, so the line must be there while empty. */
     @Test
     fun aMessageLineIsInTheTreeAndOneLineTallBeforeItHasAMessage() {
@@ -218,20 +255,6 @@ class ControlsTest {
         compose.onNodeWithTag("line")
             .assertTextEquals("Couldn’t save — try again.")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("said: Couldn’t save — try again.")))
-    }
-
-    /** The same words as a field's error: TalkBack says the error as it appears, so the line stays quiet. */
-    @Test
-    fun aMessageLineShowingItsFieldsErrorHasNoLiveRegion() {
-        show {
-            HhMessageLine(
-                "Someone is already called Alex.", ControlType.chip, Color.Red, "line",
-                fieldError = "Someone is already called Alex.",
-            )
-        }
-        compose.onNodeWithTag("line")
-            .assertTextEquals("Someone is already called Alex.")
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
     }
 
     @Test

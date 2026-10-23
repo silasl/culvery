@@ -117,6 +117,7 @@ object ControlTokens {
     // A field's error (9 §4.8): a filled 17 dp icon 5 from its words.
     val fieldErrorIcon = 17.dp
     val fieldErrorGap = 5.dp
+    val fieldErrorTop = 8.dp
 
     // A locked chip (9 §4.8): no fill, a 1 dp `surf3` edge.
     val lockedEdge = 1.dp
@@ -275,7 +276,9 @@ const val NOT_CHOSEN = "not chosen"
 
 /**
  * 64 dp, `surf`, 22 sp / 600, one line; [placeholder] while empty; the keyboard's Done calls [onDone] and never saves.
- * [label] is its name for TalkBack once text hides the placeholder; [error] is read with it.
+ * [label] is its name for TalkBack once text hides the placeholder. While [error] is set the field has a `danger` ring in
+ * place of its focus ring, and the error shows 8 dp under it as `{tag}_error`; TalkBack reads it with the field, once.
+ * [modifier] goes on the field itself.
  */
 @Composable
 fun HhTextField(
@@ -293,57 +296,62 @@ fun HhTextField(
     val c = Culvery.colors
     val focusManager = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
+    val ring = if (error != null) c.danger else if (focused) c.accent else null
     val shape = RoundedCornerShape(ControlTokens.fieldRadius)
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        singleLine = true,
-        readOnly = readOnly,
-        textStyle = ControlType.field.copy(color = c.ink),
-        cursorBrush = SolidColor(c.accent),
-        keyboardOptions = KeyboardOptions(capitalization = capitalization, imeAction = ImeAction.Done),
-        // Leaving the field closes the keyboard: a KeyboardActions onDone replaces Compose's own closing.
-        keyboardActions = KeyboardActions(onDone = {
-            onDone()
-            focusManager.clearFocus()
-        }),
-        modifier = modifier
-            .testTag(tag)
-            .semantics {
-                contentDescription = label
-                if (error != null) error(error)
-            }
-            .fillMaxWidth()
-            .height(ControlTokens.fieldHeight)
-            .onFocusChanged { focused = it.isFocused },
-        decorationBox = { inner ->
-            Box(
-                contentAlignment = Alignment.CenterStart,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(shape)
-                    .background(c.surf)
-                    .then(if (focused) Modifier.border(ControlTokens.fieldBorder, c.accent, shape) else Modifier)
-                    .padding(horizontal = ControlTokens.fieldPaddingH),
-            ) {
-                // A placeholder that only repeats the label would be read after it; a different one is a useful hint.
-                if (value.isEmpty()) {
-                    Text(
-                        placeholder, style = ControlType.field, color = c.mute, maxLines = 1,
-                        modifier = if (placeholder == label) Modifier.shownNotSpoken() else Modifier,
-                    )
+    Column(verticalArrangement = Arrangement.spacedBy(ControlTokens.fieldErrorTop)) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            readOnly = readOnly,
+            textStyle = ControlType.field.copy(color = c.ink),
+            cursorBrush = SolidColor(c.accent),
+            keyboardOptions = KeyboardOptions(capitalization = capitalization, imeAction = ImeAction.Done),
+            // Leaving the field closes the keyboard: a KeyboardActions onDone replaces Compose's own closing.
+            keyboardActions = KeyboardActions(onDone = {
+                onDone()
+                focusManager.clearFocus()
+            }),
+            modifier = modifier
+                .testTag(tag)
+                .semantics {
+                    contentDescription = label
+                    if (error != null) error(error)
                 }
-                inner()
-            }
-        },
-    )
+                .fillMaxWidth()
+                .height(ControlTokens.fieldHeight)
+                .onFocusChanged { focused = it.isFocused },
+            decorationBox = { inner ->
+                Box(
+                    contentAlignment = Alignment.CenterStart,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(shape)
+                        .background(c.surf)
+                        .then(ring?.let { Modifier.border(ControlTokens.fieldBorder, it, shape) } ?: Modifier)
+                        .padding(horizontal = ControlTokens.fieldPaddingH),
+                ) {
+                    // A placeholder that only repeats the label would be read after it; a different one is a useful hint.
+                    if (value.isEmpty()) {
+                        Text(
+                            placeholder, style = ControlType.field, color = c.mute, maxLines = 1,
+                            modifier = if (placeholder == label) Modifier.shownNotSpoken() else Modifier,
+                        )
+                    }
+                    inner()
+                }
+            },
+        )
+        if (error != null) {
+            HhStatusLine(error, "${tag}_error", icon = Icons.ERROR, field = true, spoken = false)
+        }
+    }
 }
 
 /**
  * An in-page message that TalkBack hears appear. Compose speaks a live region only when a node it already has changes,
  * and leaves a node with no size out of the tree, so the line is always composed and one line tall while empty.
- * [spoken] is its description when it differs from what shows ("3 towns found" under a list). Not live while it shows
- * [fieldError], a field's error that TalkBack already says as it appears.
+ * [spoken] is its description when it differs from what shows ("3 towns found" under a list).
  */
 @Composable
 fun HhMessageLine(
@@ -353,14 +361,13 @@ fun HhMessageLine(
     tag: String,
     modifier: Modifier = Modifier,
     spoken: String? = message,
-    fieldError: String? = null,
 ) {
     Text(
         message.orEmpty(),
         style = style,
         color = color,
         modifier = modifier.testTag(tag).semantics {
-            if (message == null || message != fieldError) liveRegion = LiveRegionMode.Polite
+            liveRegion = LiveRegionMode.Polite
             if (spoken != null && spoken != message) contentDescription = spoken
         },
     )
@@ -368,19 +375,19 @@ fun HhMessageLine(
 
 /**
  * The one line saying what is wrong and how to fix it, in `danger` with an [icon]; TalkBack hears it appear. Under a field
- * it takes [ControlType.fieldError], which sizes the icon 17 dp and its gap 5 dp (else 20 and 8), and [Icons.ERROR], drawn filled; [spoken] false hides it from TalkBack and makes it
- * not live, for a field that already carries its error.
+ * ([field]) it takes [ControlType.fieldError] and a 17 dp icon 5 dp from its words (else 20 and 8), drawn filled for
+ * [Icons.ERROR]; [spoken] false hides it from TalkBack and makes it not live, for a field that already carries its error.
  */
 @Composable
 fun HhStatusLine(
     text: String,
     tag: String,
     icon: String = Icons.INFO,
-    style: TextStyle = HhType.body,
+    field: Boolean = false,
+    style: TextStyle = if (field) ControlType.fieldError else HhType.body,
     spoken: Boolean = true,
 ) {
     val c = Culvery.colors
-    val field = style == ControlType.fieldError
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (field) ControlTokens.fieldErrorGap else ControlTokens.statusGap),

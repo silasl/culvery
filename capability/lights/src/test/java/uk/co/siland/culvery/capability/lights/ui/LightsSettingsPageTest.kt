@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.lights.ui
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -13,10 +14,12 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
@@ -32,6 +35,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.lights.AWAY
 import uk.co.siland.culvery.capability.lights.BridgeFound
 import uk.co.siland.culvery.capability.lights.Bridges
@@ -52,7 +56,9 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.pixelAt
 import uk.co.siland.culvery.core.ui.test.waitFor
 
 private val SEEN = listOf(room("Lounge"), room("Kitchen"), room("Garden"))
@@ -154,6 +160,20 @@ class LightsSettingsPageTest {
         compose.waitFor { sent.isNotEmpty() }
         compose.onNodeWithTag("lights_address_line").assertTextEquals("Type the address as four numbers, like 192.168.1.30.")
         assertThat(sent).containsExactly("192.168.1.30:80")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** A failed connect isn't the text's fault: its line shows once and the field keeps its own edge. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun aFailedConnectShowsItsLineOnceAndDoesNotRingTheField() {
+        compose.setContent { CulveryTheme(dark = true) { AddressSheet(onConnect = { "Type the address as four numbers, like 192.168.1.30." }, onEdited = {}, onClose = {}) } }
+        compose.onNodeWithTag("lights_address_field").performTextInput("192.168.1.30:80")
+        compose.onNodeWithTag("lights_address_pair").performClick()
+        compose.waitFor { compose.onAllNodesWithText("Type the address as four numbers, like 192.168.1.30.").fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodesWithText("Type the address as four numbers, like 192.168.1.30.").assertCountEquals(1)
+        compose.onNodeWithTag("lights_address_line").assertTextEquals("Type the address as four numbers, like 192.168.1.30.")
+        assertThat(pixelAt(compose.onNodeWithTag("lights_address_field"), 1.dp, 30.dp)).isNotEqualTo(DarkColors.danger.toArgb())
         compose.assertClickablesHaveRoleAndLabel()
     }
 

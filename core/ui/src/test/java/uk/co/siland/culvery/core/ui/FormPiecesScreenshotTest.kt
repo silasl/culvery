@@ -36,7 +36,7 @@ class FormPiecesScreenshotTest {
                 ) {
                     HhFooterButton("Add event", {}, "enabled", icon = Icons.CHECK)
                     HhFooterButton("Add event", {}, "disabled", enabled = false, reason = "Add a title first")
-                    HhStatusLine("Someone is already called Sam.", "error", icon = Icons.ERROR, style = ControlType.fieldError)
+                    HhStatusLine("Someone is already called Sam.", "error", icon = Icons.ERROR, field = true)
                     HhStatusLine("Can’t reach the bridge.", "info")
                     Row(horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
                         listOf(false, true).forEach { chosen ->

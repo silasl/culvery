@@ -7,14 +7,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import javax.inject.Inject
@@ -66,6 +71,14 @@ internal class YouForm {
     var pin by mutableStateOf<String?>(null)
     var message by mutableStateOf<String?>(null)
     var nameError by mutableStateOf<String?>(null)
+    var nameFocusRequests by mutableIntStateOf(0)
+        private set
+
+    /** Shows [error] under the name and asks for focus there, so the fix is one keystroke away. */
+    fun refuseName(error: String) {
+        nameError = error
+        nameFocusRequests++
+    }
 
     val ready: Boolean get() = name.isNotBlank() && pin != null
 }
@@ -100,8 +113,7 @@ class YouStep @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: DuplicateNameException) {
-            form.message = someoneCalled(e.name)
-            form.nameError = form.message
+            form.refuseName(someoneCalled(e.name))
             false
         } catch (e: PinInUseException) {
             form.message = PIN_TAKEN
@@ -151,6 +163,8 @@ class YouStep @Inject constructor(
 @Composable
 internal fun YouFormContent(form: YouForm, onSetPin: () -> Unit) {
     val c = Culvery.colors
+    val nameFocus = remember { FocusRequester() }
+    LaunchedEffect(form.nameFocusRequests) { if (form.nameFocusRequests > 0) nameFocus.requestFocus() }
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap)) {
         HhTextField(
             value = form.name,
@@ -162,6 +176,7 @@ internal fun YouFormContent(form: YouForm, onSetPin: () -> Unit) {
             placeholder = NAME,
             label = YOUR_NAME,
             tag = "you_name",
+            modifier = Modifier.focusRequester(nameFocus),
             capitalization = KeyboardCapitalization.Words,
             error = form.nameError,
         )
@@ -170,6 +185,6 @@ internal fun YouFormContent(form: YouForm, onSetPin: () -> Unit) {
             HhButton(if (form.pin == null) SET_YOUR_PIN else CHANGE_PIN, onSetPin, Modifier.testTag("you_set_pin"), on = ButtonSurface.Bg)
             if (form.pin != null) Text(PIN_SET, style = SetupType.secondary, color = c.mute, modifier = Modifier.testTag("you_pin_set"))
         }
-        HhMessageLine(form.message, SetupType.message, c.danger, "you_message", fieldError = form.nameError)
+        HhMessageLine(form.message, SetupType.message, c.danger, "you_message")
     }
 }

@@ -72,7 +72,7 @@ class SetupScreenshotTest {
 
     private fun people(name: String, dark: Boolean) = snap(name, dark) {
         WizardFrame(7, 3, back = {}, forward = Forward.Next("Next", enabled = true), busy = false, onForward = {}, onSkip = {}) {
-            StepTitle("Who else lives here?")
+            StepTitle(WHO_ELSE, WHO_ELSE_LINE)
             PeopleList(listOf(alex, sam, mia), onEdit = {}, onAdd = {}, onMove = null)
         }
     }
@@ -117,7 +117,7 @@ class SetupScreenshotTest {
         true,
         PersonForm(existing = null, taken = mapOf(PersonPalette.colors[0] to "Alex", PersonPalette.colors[1] to "Sam")).apply {
             name = "Sam"
-            message = "Someone is already called Sam."
+            message = someoneCalled("Sam")
         },
     )
 
@@ -150,6 +150,12 @@ class SetupScreenshotTest {
     private fun you(name: String, dark: Boolean) = step(name, dark, 2, Forward.Next("Next", enabled = true)) {
         StepTitle(WHOS_SETTING_UP, YOU_LINE)
         YouFormContent(YouForm().apply { this.name = "Alex"; pin = "1234" }, onSetPin = {})
+    }
+
+    @Test
+    fun youNameTakenDark() = step("you_name_taken_dark", true, 2, Forward.Next("Next", enabled = false)) {
+        StepTitle(WHOS_SETTING_UP, YOU_LINE)
+        YouFormContent(YouForm().apply { name = "Sam"; refuseName(someoneCalled("Sam")) }, onSetPin = {})
     }
 
     private fun done(name: String, dark: Boolean) = step(name, dark, 6, Forward.Next("Open Culvery", enabled = true)) {

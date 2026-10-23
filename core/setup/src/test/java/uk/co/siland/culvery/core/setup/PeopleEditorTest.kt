@@ -111,7 +111,7 @@ class PeopleEditorTest {
     fun aNameInUseIsRefusedAndNothingChanges() = runTest {
         start()
         val sam = sam()
-        assertThat(editor.save(sam.id, draft("ALEX", 1))).isEqualTo(PeopleOutcome.Refused("Someone is already called ALEX.", nameTaken = true))
+        assertThat(editor.save(sam.id, draft("ALEX", 1))).isEqualTo(PeopleOutcome.Refused(someoneCalled("ALEX"), nameTaken = true))
         assertThat(household.person(sam.id)?.name).isEqualTo("Sam")
     }
 

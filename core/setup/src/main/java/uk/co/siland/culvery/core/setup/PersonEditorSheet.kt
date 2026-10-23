@@ -246,7 +246,8 @@ internal fun PersonEditorSheet(
                     }
                 }
             }
-            HhMessageLine(form.message, SetupType.message, c.danger, "person_message", fieldError = form.nameError)
+            // The name's error already shows under its field.
+            HhMessageLine(form.message.takeIf { it != form.nameError }, SetupType.message, c.danger, "person_message")
             if (confirmingRemove && existing != null) {
                 HhConfirmCard(
                     tag = "person_confirm",

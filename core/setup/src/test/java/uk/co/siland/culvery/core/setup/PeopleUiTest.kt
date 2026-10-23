@@ -1,16 +1,24 @@
 package uk.co.siland.culvery.core.setup
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -22,6 +30,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +46,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.MAX_PEOPLE
@@ -43,10 +55,14 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.setup.steps.HouseholdStep
+import uk.co.siland.culvery.core.ui.ButtonTone
+import uk.co.siland.culvery.core.ui.ButtonToneKey
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
 /** The people list and sheet over the real editor; Alex is in the setup session, so no PIN pad shows. */
 @RunWith(AndroidJUnit4::class)
@@ -77,12 +93,12 @@ class PeopleUiTest {
     }
 
     /** The list reads Room: wait for Alex's row before the first check or tap. */
-    private fun show() {
+    private fun show(content: @Composable () -> Unit = { PeoplePane(editor, reorder = true) }) {
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {
                     Box {
-                        PeoplePane(editor, reorder = true)
+                        content()
                         overlay.content?.invoke()
                     }
                 }
@@ -96,10 +112,65 @@ class PeopleUiTest {
     @Test
     fun theListShowsEachPersonsRoleAndWhetherTheyHaveAPin() {
         addSam()
+        runBlocking { access.pins.addPerson("Mia", PersonPalette.colors[2], Role.ADMIN, null) }
         show()
-        compose.awaitText("Adult · No PIN — can’t add events")
+        compose.awaitText("Adult · no PIN yet, so Sam can only look")
         compose.onNodeWithText("Admin · PIN set").assertExists()
-        compose.onNodeWithText("Adult · No PIN — can’t add events").assertExists()
+        compose.onNodeWithText("Adult · no PIN yet, so Sam can only look").assertExists()
+        compose.onNodeWithText("Admin · No PIN").assertExists()
+    }
+
+    /** Pin: Task 2 made Add person quiet with its icon, and Task 3 keeps it so. */
+    @Test
+    fun addPersonIsQuietWithItsIcon() {
+        show()
+        compose.onNodeWithTag("people_add").assertHeightIsEqualTo(48.dp)
+            .assert(SemanticsMatcher.expectValue(ButtonToneKey, ButtonTone.Quiet))
+        // The icon's glyph is hidden from TalkBack, so it is the one node without text.
+        val parts = compose.onAllNodes(hasAnyAncestor(hasTestTag("people_add")), useUnmergedTree = true).fetchSemanticsNodes()
+        val label = parts.single { node -> node.config.getOrNull(SemanticsProperties.Text)?.any { it.text == "Add person" } == true }
+        val icon = parts.single { node -> node.config.getOrNull(SemanticsProperties.Text) == null }
+        assertThat(icon.boundsInRoot.left).isLessThan(label.boundsInRoot.left)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aPersonRowIsSeventyFiveHigh() {
+        addSam()
+        show()
+        compose.awaitTag("person_Sam")
+        assertThat(compose.onNodeWithTag("person_Sam").getUnclippedBoundsInRoot().height.value).isWithin(1f).of(75f)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun aLongNameAtLargeTextGrowsTheRowAndEndsInAnEllipsis() {
+        val long = "Alexandrina Montgomery-Feather"
+        runBlocking { access.pins.addPerson(long, PersonPalette.colors[1], Role.ADULT, null) }
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalOverlayHost provides overlay, LocalDensity provides Density(LocalDensity.current.density, 1.3f)) {
+                    Box(Modifier.width(360.dp)) { PeoplePane(editor, reorder = true) }
+                }
+            }
+        }
+        compose.awaitTag("person_$long")
+        val row = compose.onNodeWithTag("person_$long").getUnclippedBoundsInRoot()
+        val subtitle = compose.onNodeWithText("Adult · no PIN yet, so $long can only look", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertThat(row.height.value).isGreaterThan(76f)
+        assertThat(subtitle.bottom.value).isAtMost(row.bottom.value)
+        val layout = compose.onNodeWithText(long, useUnmergedTree = true).textLayout()
+        assertThat(layout.isLineEllipsized(layout.lineCount - 1)).isTrue()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theHouseholdStepSaysWhyColoursAndPins() {
+        show(content = { HouseholdStep(editor).Content(onNext = {}) })
+        compose.onNodeWithText("Who else lives here?").assertExists()
+        compose.onNodeWithText(WHO_ELSE_LINE).assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -191,12 +262,13 @@ class PeopleUiTest {
         compose.onNodeWithTag("people_add").performClick()
         compose.onNodeWithTag("person_name").performTextInput("alex")
         compose.onNodeWithTag("person_save").performClick()
-        compose.waitUntil(5_000) { compose.onNodeWithTag("person_message").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text.orEmpty().isNotEmpty() }
-        compose.onNodeWithTag("person_message").assert(hasText("Someone is already called alex."))
-        // TalkBack says the field's error as it appears; a live line would say the same words again.
-        compose.onNodeWithTag("person_message").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("person_name_error").fetchSemanticsNodes().isNotEmpty() }
+        val taken = someoneCalled("alex")
+        // The name's own error says it, under the field; the sheet's message stays empty rather than repeat it.
+        compose.onNodeWithTag("person_name_error").assert(hasText(taken))
+        compose.onNodeWithTag("person_message").assert(hasText(""))
         compose.onNodeWithTag("person_name")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, "Someone is already called alex."))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, taken))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Name")))
         compose.onNodeWithTag("person_name").assert(hasText("alex"))
     }

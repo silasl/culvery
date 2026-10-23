@@ -18,6 +18,13 @@ class SetupCopyTest {
     }
 
     @Test
+    fun someoneCalledSuggestsAnotherName() {
+        assertThat(someoneCalled("Sam")).isEqualTo("Someone is already called Sam. Try “Sam B” or a nickname.")
+        assertThat(noPinYet("Sam")).isEqualTo("no PIN yet, so Sam can only look")
+        assertThat(WHO_ELSE_LINE).isEqualTo("Everyone gets a colour on the calendar. A PIN lets them add events.")
+    }
+
+    @Test
     fun toastsEndWithAFullStop() {
         assertThat(removed("Sam")).isEqualTo("Sam removed.")
         assertThat(movedUp("Sam")).isEqualTo("Sam moved up.")

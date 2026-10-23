@@ -72,9 +72,9 @@ fun HhAddressSheet(
                 onEdited(it.isNotEmpty())
             },
             placeholder = words.example, label = words.label, tag = "${tag}_field",
-            capitalization = KeyboardCapitalization.None, error = line, onDone = ::connect,
+            capitalization = KeyboardCapitalization.None, onDone = ::connect,
         )
-        HhMessageLine(line, HhType.body, c.danger, "${tag}_line", fieldError = line)
+        HhMessageLine(line, HhType.body, c.danger, "${tag}_line")
         HhButton(
             if (checking) words.checking else words.button, ::connect, Modifier.testTag(buttonTag),
             tone = ButtonTone.Primary, enabled = !checking && typed.isNotBlank(), on = ButtonSurface.Bg,
