@@ -27,8 +27,8 @@ internal object SetupDimens {
     // The home-app prompt (4c §5.1; not in the spec): its button 12 below its line.
     val homeAppPromptGap = 12.dp
 
-    // List rows are ListRowTokens'. Not in the spec: 10 between rows. A person's row is 75 dp with a 15 dp colour dot (9 §4.11).
-    val rowGap = 10.dp
+    // List rows are ListRowTokens'. Not in the spec: 12 between rows. A person's row is 75 dp with a 15 dp colour dot (9 §4.11).
+    val rowGap = 12.dp
     val personRowHeight = 75.dp
     val rowDot = 15.dp
     val rowDotGap = 16.dp

@@ -166,6 +166,38 @@ class PeopleUiTest {
     }
 
     @Test
+    fun personRowsSitTwelveApart() {
+        addSam()
+        show()
+        compose.awaitTag("person_Sam")
+        val gap = compose.onNodeWithTag("person_Sam").getUnclippedBoundsInRoot().top - compose.onNodeWithTag("person_Alex").getUnclippedBoundsInRoot().bottom
+        assertThat(gap.value).isWithin(0.5f).of(12f)
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun aLongNameInTheWizardColumnAtLargeTextGrowsTheRowAndCutsNothing() {
+        val long = "Alexandrina Montgomery-Feather"
+        runBlocking { access.pins.addPerson(long, PersonPalette.colors[1], Role.ADULT, null) }
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalOverlayHost provides overlay, LocalDensity provides Density(LocalDensity.current.density, 1.3f)) {
+                    Box(Modifier.width(SetupDimens.wizardColumn)) { PeoplePane(editor, reorder = false) }
+                }
+            }
+        }
+        compose.awaitTag("person_$long")
+        val row = compose.onNodeWithTag("person_$long").getUnclippedBoundsInRoot()
+        val title = compose.onNodeWithText(long, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val subtitle = compose.onNodeWithText("Adult · no PIN yet, so $long can only look", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertThat(row.height.value).isGreaterThan(76f)
+        assertThat(title.top.value).isAtLeast(row.top.value)
+        assertThat(subtitle.bottom.value).isAtMost(row.bottom.value)
+        assertThat(compose.onNodeWithText(long, useUnmergedTree = true).textLayout().isLineEllipsized(0)).isFalse()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
     fun theHouseholdStepSaysWhyColoursAndPins() {
         show(content = { HouseholdStep(editor).Content(onNext = {}) })
         compose.onNodeWithText("Who else lives here?").assertExists()

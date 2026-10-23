@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
@@ -278,7 +280,7 @@ const val NOT_CHOSEN = "not chosen"
  * 64 dp, `surf`, 22 sp / 600, one line; [placeholder] while empty; the keyboard's Done calls [onDone] and never saves.
  * [label] is its name for TalkBack once text hides the placeholder. While [error] is set the field has a `danger` ring in
  * place of its focus ring, and the error shows 8 dp under it as `{tag}_error`; TalkBack reads it with the field, once.
- * [modifier] goes on the field itself.
+ * A new error scrolls the field and its error into view. [modifier] goes on the field itself.
  */
 @Composable
 fun HhTextField(
@@ -298,7 +300,9 @@ fun HhTextField(
     var focused by remember { mutableStateOf(false) }
     val ring = if (error != null) c.danger else if (focused) c.accent else null
     val shape = RoundedCornerShape(ControlTokens.fieldRadius)
-    Column(verticalArrangement = Arrangement.spacedBy(ControlTokens.fieldErrorTop)) {
+    val bringIntoView = remember { BringIntoViewRequester() }
+    LaunchedEffect(error) { if (error != null) bringIntoView.bringIntoView() }
+    Column(verticalArrangement = Arrangement.spacedBy(ControlTokens.fieldErrorTop), modifier = Modifier.bringIntoViewRequester(bringIntoView)) {
         BasicTextField(
             value = value,
             onValueChange = onValueChange,

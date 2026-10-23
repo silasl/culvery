@@ -1,7 +1,12 @@
 package uk.co.siland.culvery.core.ui
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +28,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -220,6 +226,24 @@ class ControlsTest {
         error = null
         compose.onNodeWithTag("x_error").assertDoesNotExist()
         assertThat(pixelAt(field, 1.dp, 30.dp)).isNotEqualTo(DarkColors.danger.toArgb())
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun anErrorScrollsItsFieldIntoView() {
+        var error by mutableStateOf<String?>(null)
+        show {
+            Column(Modifier.height(300.dp).verticalScroll(rememberScrollState())) {
+                Spacer(Modifier.height(900.dp))
+                HhTextField("Sam", {}, placeholder = "Name", label = "Name", tag = "x", error = error)
+                Spacer(Modifier.height(900.dp))
+            }
+        }
+        compose.onNodeWithTag("x").assertIsNotDisplayed()
+        error = "Someone is already called Sam. Try “Sam B” or a nickname."
+        compose.waitForIdle()
+        compose.onNodeWithTag("x").assertIsDisplayed()
+        compose.onNodeWithTag("x_error").assertIsDisplayed()
         compose.assertClickablesHaveRoleAndLabel()
     }
 

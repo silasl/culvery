@@ -164,7 +164,9 @@ class YouStep @Inject constructor(
 internal fun YouFormContent(form: YouForm, onSetPin: () -> Unit) {
     val c = Culvery.colors
     val nameFocus = remember { FocusRequester() }
-    LaunchedEffect(form.nameFocusRequests) { if (form.nameFocusRequests > 0) nameFocus.requestFocus() }
+    // Only a refusal made while this is showing moves focus; coming back to the step doesn't.
+    val seenRequests = remember { form.nameFocusRequests }
+    LaunchedEffect(form.nameFocusRequests) { if (form.nameFocusRequests > seenRequests) nameFocus.requestFocus() }
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap)) {
         HhTextField(
             value = form.name,

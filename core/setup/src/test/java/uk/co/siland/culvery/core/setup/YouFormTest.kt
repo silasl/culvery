@@ -1,5 +1,8 @@
 package uk.co.siland.culvery.core.setup
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -52,6 +55,20 @@ class YouFormTest {
         compose.onNodeWithTag("you_name").assertIsNotFocused()
         compose.runOnIdle { form.refuseName(someoneCalled("Sam")) }
         compose.onNodeWithTag("you_name").assertIsFocused()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun comingBackToTheStepDoesNotRefocusTheName() {
+        val form = YouForm().apply { name = "Sam" }
+        var shown by mutableStateOf(true)
+        compose.setContent { CulveryTheme(dark = true) { if (shown) YouFormContent(form, onSetPin = {}) } }
+        compose.runOnIdle { form.refuseName(someoneCalled("Sam")) }
+        compose.onNodeWithTag("you_name").assertIsFocused()
+        compose.runOnIdle { shown = false }
+        compose.onNodeWithTag("you_name").assertDoesNotExist()
+        compose.runOnIdle { shown = true }
+        compose.onNodeWithTag("you_name").assertIsNotFocused()
         compose.assertClickablesHaveRoleAndLabel()
     }
 
