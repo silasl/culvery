@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -54,24 +53,20 @@ fun HhSwitchRow(
     minHeight: Dp = ListRowTokens.minHeight,
 ) {
     val c = Culvery.colors
-    val shape = RoundedCornerShape(ListRowTokens.radius)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = minHeight)
-            .clip(shape)
-            .border(CardTokens.edge, c.border, shape)
-            .background(c.surf)
+            .listRowCard(c, minHeight)
             .testTag(tag)
-            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = { if (enabled) onChange(it) })
+            .hhToggleable(checked, enabled, onValueChange = onChange)
             .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd, top = ListRowTokens.paddingV, bottom = ListRowTokens.paddingV),
     ) {
         Column(Modifier.weight(1f)) {
             Text(title, style = ListRowTokens.titleStyle, color = c.ink)
             if (line != null) Text(line, style = HhType.secondary, color = c.mute)
         }
-        HhSwitch(checked, onCheckedChange = null, tag = "${tag}_switch", enabled = enabled)
+        HhSwitch(checked, tag = "${tag}_switch", enabled = enabled)
     }
 }
 
@@ -105,16 +100,12 @@ fun HhSliderRow(
     valueLabel: (Int) -> String = { "$it %" },
 ) {
     val c = Culvery.colors
-    val shape = RoundedCornerShape(ListRowTokens.radius)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(ListRowTokens.trailingGap),
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = ListRowTokens.minHeight)
-            .clip(shape)
-            .border(CardTokens.edge, c.border, shape)
-            .background(c.surf)
+            .listRowCard(c)
             .testTag("${tag}_row")
             .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd),
     ) {
@@ -137,6 +128,7 @@ fun HhSliderRow(
 object RadioRowTokens {
     val minHeight = 59.dp
     val radius = 16.dp
+    val shape = RoundedCornerShape(radius)
     val paddingH = 17.dp
     val paddingV = 9.dp
     val radio = 20.dp
@@ -157,7 +149,7 @@ object RadioRowTokens {
 @Composable
 fun HhRadioRow(title: String, line: String? = null, selected: Boolean, tag: String, locked: Boolean = false, onClick: () -> Unit) {
     val c = Culvery.colors
-    val shape = RoundedCornerShape(RadioRowTokens.radius)
+    val shape = RadioRowTokens.shape
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(RadioRowTokens.radioGap),

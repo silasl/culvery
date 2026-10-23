@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -46,6 +47,27 @@ class ClickableTest {
         assertThat(clickLabel("labelled")).isEqualTo("open event details")
         compose.onNodeWithTag("off").assertIsNotEnabled().performClick()
         assertThat(taps).isEqualTo(1)
+    }
+
+    @Test
+    fun aToggleReportsTheNewStateWhileEnabled() {
+        val changes = mutableListOf<Boolean>()
+        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(48.dp).testTag("on").hhToggleable(false, onValueChange = changes::add)) } }
+        compose.onNodeWithTag("on").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch)).performClick()
+        assertThat(changes).containsExactly(true)
+    }
+
+    @Test
+    fun aDisabledToggleKeepsItsStateAndOffersNoAction() {
+        val changes = mutableListOf<Boolean>()
+        compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(48.dp).testTag("off").hhToggleable(true, enabled = false, onValueChange = changes::add)) } }
+        compose.onNodeWithTag("off")
+            .assertIsNotEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.On))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+            .performClick()
+        assertThat(changes).isEmpty()
     }
 
     @Test

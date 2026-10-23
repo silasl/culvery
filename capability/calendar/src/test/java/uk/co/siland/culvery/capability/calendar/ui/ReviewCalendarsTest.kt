@@ -274,6 +274,7 @@ class ReviewCalendarsTest {
             .assertIsNotEnabled()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Show Family")))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, ALWAYS_SHOWN))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.On))
         compose.onNodeWithTag("review_show_switch_family", useUnmergedTree = true).assertExists()
         compose.onNode(hasText("Show") and hasAnyAncestor(hasTestTag("review_show_chores")), useUnmergedTree = true).assertExists()
         compose.assertClickablesHaveRoleAndLabel()
@@ -282,10 +283,7 @@ class ReviewCalendarsTest {
     @Test
     fun theMainCalendarsSwitchCannotBeToggled() {
         show()
-        compose.onNodeWithTag("review_show_family").performClick()
-        compose.runOnUiThread {
-            compose.onNodeWithTag("review_show_family").fetchSemanticsNode().config.getOrNull(SemanticsActions.OnClick)?.action?.invoke()
-        }
+        compose.onNodeWithTag("review_show_family").performClick().assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
         assertThat(shown).isNull()
         compose.assertClickablesHaveRoleAndLabel()
     }

@@ -50,11 +50,11 @@ import uk.co.siland.culvery.core.ui.FROM
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
+import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSliderRow
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhTimeStepperRow
-import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
@@ -105,7 +105,10 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
     ) {
         HhPageTitle(DOOR)
         HhSectionLabel(CHIME)
-        VolumeRow(ui.volume, actions.onVolume)
+        HhSliderRow(
+            CHIME_VOLUME, (ui.volume * 100).roundToInt(), "door_volume",
+            onLetGo = { actions.onVolume(it / 100f) }, steps = DoorDimens.VOLUME_STEPS,
+        )
         HhButton(PLAY_CHIME, actions.onPlayChime, Modifier.testTag("door_play_chime"), icon = Icons.DOORBELL, on = ButtonSurface.Bg)
         HhSectionLabel(QUIET_HOURS)
         HhSwitchRow(QUIET_HOURS, quietHoursLine(ui.quietFrom, ui.quietUntil), ui.quietOn, "door_quiet", onChange = { actions.onQuietHours(it, ui.quietFrom, ui.quietUntil) })
@@ -119,11 +122,6 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
         HhSwitchRow(checkNotifications(ui.service), CAPTURE_LINE, ui.capturing, "door_capture", actions.onCapture)
     }
 }
-
-/** Saved when the slider is let go, not at each step of a drag. */
-@Composable
-private fun VolumeRow(volume: Float, onVolume: (Float) -> Unit) =
-    HhSliderRow(CHIME_VOLUME, (volume * 100).roundToInt(), "door_volume", onLetGo = { onVolume(it / 100f) }, steps = DoorDimens.VOLUME_STEPS)
 
 /** A connect step (5 §5.5), ticked when done. */
 @Composable

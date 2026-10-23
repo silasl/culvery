@@ -57,6 +57,7 @@ fun HhCard(
 /** List rows: people, towns, connections, calendars (9 §4.12). Lists put 10 between rows. */
 object ListRowTokens {
     val radius = 19.dp
+    val shape = RoundedCornerShape(radius)
     val paddingStart = 20.dp
     val paddingEnd = 16.dp
     val paddingV = 12.dp
@@ -68,6 +69,13 @@ object ListRowTokens {
     val belowGap = 12.dp
     val icon = 24.dp
 }
+
+/** A list row's card: at least [minHeight] tall, clipped to [ListRowTokens.shape], with the hairline edge, filled `surf`. */
+fun Modifier.listRowCard(colors: HhColors, minHeight: Dp = ListRowTokens.minHeight): Modifier = this
+    .heightIn(min = minHeight)
+    .clip(ListRowTokens.shape)
+    .border(CardTokens.edge, colors.border, ListRowTokens.shape)
+    .background(colors.surf)
 
 /**
  * One list row: [title] and [subtitle] one line each, cut with "…"; [trailing] keeps its size and the text takes what's
@@ -88,15 +96,11 @@ fun HhListRow(
     minHeight: Dp = ListRowTokens.minHeight,
 ) {
     val c = Culvery.colors
-    val shape = RoundedCornerShape(ListRowTokens.radius)
     Column(
         verticalArrangement = Arrangement.spacedBy(ListRowTokens.belowGap, Alignment.CenterVertically),
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = minHeight)
-            .clip(shape)
-            .border(CardTokens.edge, c.border, shape)
-            .background(c.surf)
+            .listRowCard(c, minHeight)
             .then(if (onClick != null) Modifier.hhClickable(onClick, label = clickLabel) else Modifier)
             .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd, top = ListRowTokens.paddingV, bottom = ListRowTokens.paddingV),
     ) {

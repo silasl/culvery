@@ -35,6 +35,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.ListRowTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 
 /** One ring, movement or notice in the Door tab (9 §4.6): the kind's icon circle, what and when, NEW, and its picture. */
@@ -48,7 +49,7 @@ internal fun DoorRow(event: DoorEvent, zone: ZoneId, isNew: Boolean, onOpenSnaps
         modifier = modifier
             .testTag("door_row_${event.id}")
             .fillMaxWidth()
-            .clip(RoundedCornerShape(DoorDimens.rowRadius))
+            .clip(ListRowTokens.shape)
             .background(c.surf)
             .padding(horizontal = DoorDimens.rowPaddingH, vertical = DoorDimens.rowPaddingV),
     ) {

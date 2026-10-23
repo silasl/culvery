@@ -22,9 +22,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
+import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhButton
-import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.HhPercentSlider
 import uk.co.siland.culvery.core.ui.HhRadioRow
 import uk.co.siland.culvery.core.ui.HhSheet
@@ -169,7 +169,7 @@ class AppContentTest {
         compose.onNodeWithTag("stand_in_slider").performTouchInput { swipeRight() }
         compose.waitForIdle()
         assertThat(letGo).isNotEmpty()
-        assertThat(access.touches).isGreaterThan(before)
+        assertThat(access.touches).isEqualTo(before + 1)
     }
 
     @Test

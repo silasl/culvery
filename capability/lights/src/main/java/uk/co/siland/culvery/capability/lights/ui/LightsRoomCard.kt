@@ -65,7 +65,7 @@ internal fun LightsRoomCard(room: LightRoom, line: String?, actions: RoomActions
                     )
                     Text(cardStatus(room), style = HhType.body.copy(fontSize = LightsDimens.statusSize), color = c.mute, maxLines = 1)
                 }
-                HhSwitch(room.on, onCheckedChange = null, tag = "${tag}_toggle")
+                HhSwitch(room.on, tag = "${tag}_toggle")
             }
             if (room.dimmable) {
                 BrightnessRow(

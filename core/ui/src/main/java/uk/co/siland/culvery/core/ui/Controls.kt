@@ -33,7 +33,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -68,6 +67,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -105,9 +105,10 @@ object ControlTokens {
     val confirmButtonGap = 12.dp
 
     // Colour swatch (9 §4.11, handoff 5b): a 51 dp circle, 12 apart; chosen, a 3 dp `bg` gap, a 3 dp `ink` ring and a 25 dp
-    // check; taken, at 38% with a 23 dp block.
+    // check; taken, at 38% with a 23 dp block. The ring and its gap sit inside the 63 dp slot, so slots touch.
     val swatch = 51.dp
-    val swatchGap = 12.dp
+    val swatchSlot = 63.dp
+    val swatchSpacing = 0.dp
     val swatchRing = 3.dp
     val swatchRingGap = 3.dp
     val swatchCheck = 25.dp
@@ -494,7 +495,7 @@ fun HhConfirmCard(
 
 /**
  * A person colour to pick (9 §4.11): ringed, with a tick, when [chosen]; [takenBy] someone else, faded with a block,
- * disabled and said. The ring and its gap sit inside the swatch's box, so circles are [ControlTokens.swatchGap] apart.
+ * disabled and said. The ring and its gap sit inside the swatch's [ControlTokens.swatchSlot].
  */
 @Composable
 fun HhSwatch(color: Color, name: String, chosen: Boolean, takenBy: String?, tag: String, onClick: () -> Unit) {
@@ -508,7 +509,7 @@ fun HhSwatch(color: Color, name: String, chosen: Boolean, takenBy: String?, tag:
                 contentDescription = name
                 if (takenBy != null) stateDescription = "used by $takenBy"
             }
-            .size(ControlTokens.swatch + swatchOutside * 2)
+            .size(ControlTokens.swatchSlot)
             .then(if (chosen) Modifier.border(ControlTokens.swatchRing, c.ink, CircleShape) else Modifier)
             .clip(CircleShape)
             .selectable(selected = chosen, enabled = !taken, role = Role.RadioButton, onClick = onClick),
@@ -528,15 +529,12 @@ fun HhSwatch(color: Color, name: String, chosen: Boolean, takenBy: String?, tag:
     }
 }
 
-private val swatchOutside get() = ControlTokens.swatchRing + ControlTokens.swatchRingGap
-
 /** The person colours to pick from, a radio group, wrapping; swatch i is tagged [tagPrefix] + i. [taken] maps a colour to who has it. */
 @Composable
 fun HhSwatchGrid(chosen: Long?, taken: Map<Long, String>, tagPrefix: String, onPick: (Long) -> Unit) {
-    val between = (ControlTokens.swatchGap - swatchOutside * 2).coerceAtLeast(0.dp)
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(between),
-        verticalArrangement = Arrangement.spacedBy(between),
+        horizontalArrangement = Arrangement.spacedBy(ControlTokens.swatchSpacing),
+        verticalArrangement = Arrangement.spacedBy(ControlTokens.swatchSpacing),
         modifier = Modifier.selectableGroup(),
     ) {
         PersonPalette.colors.forEachIndexed { i, colour ->
@@ -555,11 +553,11 @@ object SwitchTokens {
 
 /**
  * A switch drawn in the theme's colours: `accent` track and `accentInk` knob when on, `surf3` and `mute` when off. A
- * disabled one that is on stays `accent` at the disabled fade. With [onCheckedChange] null it only draws: the row
- * around it is the switch TalkBack and the finger use. The knob slides on a change, never on first composition.
+ * disabled one that is on stays `accent` at the disabled fade. It only draws: the row around it is the switch
+ * TalkBack and the finger use. The knob slides on a change, never on first composition.
  */
 @Composable
-fun HhSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, tag: String, enabled: Boolean = true) {
+fun HhSwitch(checked: Boolean, tag: String, enabled: Boolean = true) {
     val c = Culvery.colors
     val knobX by animateDpAsState(
         if (checked) SwitchTokens.width - SwitchTokens.knob - SwitchTokens.inset else SwitchTokens.inset,
@@ -573,13 +571,6 @@ fun HhSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, tag: Strin
     Box(
         Modifier
             .testTag(tag)
-            .then(
-                if (onCheckedChange == null) Modifier
-                else Modifier.toggleable(
-                    value = checked, enabled = enabled, role = Role.Switch,
-                    onValueChange = { if (enabled) onCheckedChange(it) },
-                ),
-            )
             .size(SwitchTokens.width, SwitchTokens.height)
             .alpha(if (enabled || checked) 1f else ControlTokens.DISABLED_ALPHA)
             .clip(CircleShape)
@@ -588,7 +579,7 @@ fun HhSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, tag: Strin
         Box(
             Modifier
                 .align(Alignment.CenterStart)
-                .offset(x = knobX)
+                .offset { IntOffset(knobX.roundToPx(), 0) }
                 .size(SwitchTokens.knob)
                 .background(if (checked) c.accentInk else c.mute, CircleShape),
         )
@@ -625,10 +616,9 @@ fun HhPercentSlider(
     var dragging by remember { mutableStateOf<Float?>(null) }
     // The value let go stays until [percent] changes, so the thumb doesn't jump back while the command is on its way.
     var held by remember(if (holdCeilingMs > 0) null else percent) { mutableStateOf<Float?>(null) }
-    var letGos by remember { mutableIntStateOf(0) }
     if (holdCeilingMs > 0) {
-        LaunchedEffect(letGos) {
-            if (letGos > 0) {
+        LaunchedEffect(held) {
+            if (held != null) {
                 delay(holdCeilingMs)
                 held = null
             }
@@ -653,7 +643,6 @@ fun HhPercentSlider(
         onValueChangeFinished = {
             dragging?.let {
                 held = it
-                letGos++
                 onLetGo(it.roundToInt())
             }
             dragging = null

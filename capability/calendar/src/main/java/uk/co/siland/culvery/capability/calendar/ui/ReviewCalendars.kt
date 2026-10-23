@@ -2,7 +2,6 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import android.util.Log
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -37,6 +35,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
@@ -55,7 +54,6 @@ import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
-import uk.co.siland.culvery.core.ui.CardTokens
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
@@ -69,6 +67,8 @@ import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
 import uk.co.siland.culvery.core.ui.PersonChipInk
 import uk.co.siland.culvery.core.ui.hhClickable
+import uk.co.siland.culvery.core.ui.hhToggleable
+import uk.co.siland.culvery.core.ui.listRowCard
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
@@ -143,9 +143,10 @@ internal fun ConnectedStepCard(rows: List<CalendarRow>) {
 @Composable
 internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarConnections, clock: HouseholdClock, title: String, offerConnect: Boolean, line: String? = null) {
     // Null until the store answers, so the page draws nothing rather than "Connect…" first.
-    val list = review.connections.collectAsState<List<ReviewConnection>, List<ReviewConnection>?>(initial = null).value
-    val people by review.people.collectAsState(initial = listOf(Person.Family))
-    val connectable = connections.connectable.collectAsState<List<CalendarProvider>, List<CalendarProvider>?>(initial = null).value
+    val list by review.connections.collectAsStateWithLifecycle<List<ReviewConnection>?>(null)
+    val people by review.people.collectAsStateWithLifecycle(listOf(Person.Family))
+    val connectable by connections.connectable.collectAsStateWithLifecycle<List<CalendarProvider>?>(null)
+    val descriptors = remember(connectable, offerConnect) { if (offerConnect) connectable.orEmpty().map { it.descriptor } else emptyList() }
     val connector = rememberConnector(connections)
     var picking by remember { mutableStateOf<String?>(null) }
     var confirming by remember { mutableStateOf<Confirming?>(null) }
@@ -158,7 +159,7 @@ internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarCo
         busy = action.busy,
         picking = picking,
         confirming = confirming,
-        connectable = if (offerConnect) connectable.orEmpty().map { it.descriptor } else emptyList(),
+        connectable = descriptors,
         line = line,
         actions = ReviewActions(
             onConnect = { connector.connect(it.id) },
@@ -287,15 +288,12 @@ private fun CalendarRowCard(
     val main = source.isMaster
     // A person removed since is Family until HouseholdFollower catches up.
     val person = people.firstOrNull { it.id == source.mapping.person } ?: Person.Family
-    val shape = RoundedCornerShape(ListRowTokens.radius)
     val offersMakeMain = !main && source.source.writable
     Column(
         Modifier
             .testTag("review_source_$id")
             .fillMaxWidth()
-            .clip(shape)
-            .border(CardTokens.edge, c.border, shape)
-            .background(c.surf),
+            .listRowCard(c),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -427,16 +425,10 @@ private fun ShowSwitch(source: StoredSource, busy: Boolean, onShown: (StoredSour
                 contentDescription = "$SHOW ${source.source.name}"
                 if (main) stateDescription = ALWAYS_SHOWN
             }
-            .toggleable(
-                value = source.mapping.visible,
-                enabled = toggles,
-                role = Role.Switch,
-                // A disabled toggleable still offers TalkBack its action.
-                onValueChange = { if (toggles) onShown(source, it) },
-            ),
+            .hhToggleable(source.mapping.visible, enabled = toggles) { onShown(source, it) },
     ) {
         Text(if (main) ALWAYS_SHOWN_LABEL else SHOW, style = CalendarType.reviewSmall, color = Culvery.colors.mute, modifier = Modifier.shownNotSpoken())
-        HhSwitch(source.mapping.visible, onCheckedChange = null, tag = "review_show_switch_${source.source.id}", enabled = toggles)
+        HhSwitch(source.mapping.visible, tag = "review_show_switch_${source.source.id}", enabled = toggles)
     }
 }
 

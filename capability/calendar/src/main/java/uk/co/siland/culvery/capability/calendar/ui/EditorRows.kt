@@ -35,6 +35,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhAlpha
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.ListRowTokens
 import uk.co.siland.culvery.core.ui.hhClickable
 
 /** A row's paint (handoff §1): the one the pane asks about, one that is answered, or one still on its placeholder. */
@@ -95,7 +96,7 @@ internal fun EditorRow(
 ) {
     val c = Culvery.colors
     val state = rowState(active, set)
-    val shape = RoundedCornerShape(EditorDimens.rowRadius)
+    val shape = ListRowTokens.shape
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(EditorDimens.rowIconGap),
@@ -111,7 +112,7 @@ internal fun EditorRow(
                 if (onClick == null) stateDescription = LOCKED_SPAN
             }
             .then(if (onClick != null) Modifier.hhClickable(onClick) else Modifier)
-            .padding(start = EditorDimens.rowPaddingStart, end = EditorDimens.rowPaddingEnd),
+            .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd),
     ) {
         HhIcon(icon, size = EditorDimens.rowIcon, tint = if (state == RowState.NotYet) c.mute else c.accent, modifier = Modifier.testTag("${testTag}_icon"))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(EditorDimens.rowLabelGap)) {
@@ -169,7 +170,7 @@ internal fun EditorWhenRow(
     }
     val c = Culvery.colors
     val state = rowState(active, set)
-    val shape = RoundedCornerShape(EditorDimens.rowRadius)
+    val shape = ListRowTokens.shape
     val waiting = date == null && onDate == null
     val height = if (typing) EditorDimens.rowHeightTyping else EditorDimens.rowHeight
     Row(
@@ -186,7 +187,7 @@ internal fun EditorWhenRow(
             .then(
                 if (waiting) Modifier.semantics(mergeDescendants = true) { contentDescription = "$label, $CHOOSE_A_START_DAY_FIRST" } else Modifier,
             )
-            .padding(start = EditorDimens.rowPaddingStart, end = EditorDimens.rowPaddingEnd),
+            .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd),
     ) {
         HhIcon(icon, size = EditorDimens.rowIcon, tint = if (state == RowState.NotYet) c.mute else c.accent, modifier = Modifier.testTag("${testTag}_icon"))
         if (waiting) {

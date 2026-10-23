@@ -18,9 +18,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
@@ -83,16 +81,14 @@ fun HhPageHeader(
     modifier: Modifier = Modifier,
     under: (@Composable () -> Unit)? = null,
     footer: (@Composable () -> Unit)? = null,
-    subtitleStyle: TextStyle = PageHeaderTokens.subtitleStyle,
-    subtitleGap: Dp = PageHeaderTokens.subtitleGap,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     Column(modifier.fillMaxWidth().padding(bottom = PageHeaderTokens.below)) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(PageHeaderTokens.trailingGap)) {
             Column(Modifier.weight(1f).align(Alignment.Top)) {
                 title()
-                if (subtitle != null || under != null) Spacer(Modifier.height(subtitleGap))
-                if (subtitle != null) Text(subtitle, style = subtitleStyle, color = Culvery.colors.mute)
+                if (subtitle != null || under != null) Spacer(Modifier.height(PageHeaderTokens.subtitleGap))
+                if (subtitle != null) Text(subtitle, style = PageHeaderTokens.subtitleStyle, color = Culvery.colors.mute)
                 under?.invoke()
             }
             trailing()
@@ -104,13 +100,13 @@ fun HhPageHeader(
 /** A wizard step's or Settings page's title (a heading) with its [line] under it, in the one page-title look (9 §4.11, §4.12). */
 @Composable
 fun HhPageTitle(title: String, line: String? = null, modifier: Modifier = Modifier) {
-    HhPageHeader(
-        title = { Text(title, style = PageHeaderTokens.pageTitleStyle, color = Culvery.colors.ink, modifier = Modifier.semantics { heading() }) },
-        subtitle = line,
-        modifier = modifier,
-        subtitleStyle = PageHeaderTokens.pageTitleLineStyle,
-        subtitleGap = PageHeaderTokens.pageTitleLineGap,
-    )
+    Column(modifier.fillMaxWidth().padding(bottom = PageHeaderTokens.below)) {
+        Text(title, style = PageHeaderTokens.pageTitleStyle, color = Culvery.colors.ink, modifier = Modifier.semantics { heading() })
+        if (line != null) {
+            Spacer(Modifier.height(PageHeaderTokens.pageTitleLineGap))
+            Text(line, style = PageHeaderTokens.pageTitleLineStyle, color = Culvery.colors.mute)
+        }
+    }
 }
 
 /**

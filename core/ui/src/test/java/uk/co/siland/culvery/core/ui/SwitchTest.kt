@@ -7,18 +7,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.semantics.getOrNull
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.isNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -38,12 +32,12 @@ class SwitchTest {
     // A switch with an action has no name of its own (its row names it), so those tests skip assertClickablesHaveRoleAndLabel.
     private val sw get() = compose.onNodeWithTag("sw", useUnmergedTree = true)
 
-    private fun show(checked: Boolean, enabled: Boolean = true, onChange: ((Boolean) -> Unit)? = null) {
+    private fun show(checked: Boolean, enabled: Boolean = true) {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             CulveryTheme(dark = true) {
-                Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) { HhSwitch(checked, onChange, "sw", enabled) }
-    }
+                Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) { HhSwitch(checked, "sw", enabled) }
+            }
         }
         compose.mainClock.advanceTimeBy(300)
     }
@@ -88,34 +82,10 @@ class SwitchTest {
     }
 
     @Test
-    fun aDisabledSwitchDoesNotToggle() {
-        val changes = mutableListOf<Boolean>()
-        show(checked = false, enabled = false, onChange = changes::add)
-        sw.performClick()
-        sw.fetchSemanticsNode().config.getOrNull(SemanticsActions.OnClick)?.action?.invoke()
-        assertThat(changes).isEmpty()
-    }
-
-    @Test
-    fun anEnabledSwitchReportsTheNewState() {
-        val changes = mutableListOf<Boolean>()
-        show(checked = false, onChange = changes::add)
-        sw.performClick()
-        assertThat(changes).containsExactly(true)
-    }
-
-    @Test
-    fun aDisabledOnSwitchStaysOnAndIsNamedAsDisabled() {
-        show(checked = true, enabled = false, onChange = {})
-        assertThat(sw.fetchSemanticsNode().config[SemanticsProperties.ToggleableState]).isEqualTo(ToggleableState.On)
-        sw.assert(isNotEnabled())
-    }
-
-    @Test
     fun theKnobDoesNotAnimateOnFirstShow() {
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            CulveryTheme(dark = true) { Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) { HhSwitch(true, null, "sw") } }
+            CulveryTheme(dark = true) { Box(Modifier.fillMaxSize().background(Culvery.colors.bg)) { HhSwitch(true, "sw") } }
         }
         assertPixel(pixelAt(sw, 50.dp, 16.dp), DarkColors.accentInk)
         compose.assertClickablesHaveRoleAndLabel()

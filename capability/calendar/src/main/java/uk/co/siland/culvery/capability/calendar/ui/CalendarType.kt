@@ -5,7 +5,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import uk.co.siland.culvery.core.ui.ControlType
 import uk.co.siland.culvery.core.ui.HhType
-import uk.co.siland.culvery.core.ui.ListRowTokens
 import uk.co.siland.culvery.core.ui.ShellTokens
 
 /** Calendar text styles from the hand-off and Culvery.dc.html that HhType has no name for; all derived from HhType. */
@@ -178,9 +177,6 @@ internal object EditorDimens {
     val rowGap = 9.dp
     val rowHeight = 77.dp
     val rowHeightTyping = 61.dp
-    val rowRadius = ListRowTokens.radius
-    val rowPaddingStart = ListRowTokens.paddingStart
-    val rowPaddingEnd = ListRowTokens.paddingEnd
     val rowTimePaddingH = 12.dp
     val rowIcon = 25.dp
     val rowIconGap = 15.dp

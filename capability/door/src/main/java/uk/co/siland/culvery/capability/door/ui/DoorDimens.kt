@@ -31,7 +31,6 @@ internal object DoorDimens {
     // The tab (handoff 3c): its rows, a day's label, the icon circle, the NEW tag, and the thumbnails, decoded at 1.5 px per dp.
     val rowGap = 10.dp
     val sectionTop = 18.dp
-    val rowRadius = 19.dp
     val rowPaddingV = 15.dp
     val rowPaddingH = 20.dp
     val rowInnerGap = 15.dp
