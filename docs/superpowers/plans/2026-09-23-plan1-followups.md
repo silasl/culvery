@@ -540,6 +540,7 @@ For the end-of-v1 design review:
 - Home's speed, cold start (stop, start, screenshots about every 0.8 s), three runs: splash by 0.2 s; Music's card by 1.5 s; Today filled by 1.3–1.5 s (once still empty at 1.8 s); Lights read "Looking for the lights…" until 2.2, 2.5 and 2.9 s. Home filled by 2.2–2.9 s, the Hue bridge's first read the slowest part. Return from the Calendar tab, three runs: filled in the first frame, about 1 s after the tap command (most of it the command itself).
 - Each relaunch shows Android's "App is pinned" dialog; expected without device owner (release.md §6). Stopping Culvery while the lock screen sits behind it lets the lock screen's 5 s timeout put the tablet to sleep; a test artefact, not a fault.
 - At the wall (the user, a quick look, not the full Step 3 list): everything seemed fine. The full Step 3 checks are still to do.
+- At the wall, 2026-10-23 (the user): the Step 3 checks all passed, done lightly rather than thoroughly; household use is the main testing from here, so faults may still show up there. Fault A didn't recur.
 
 Fault found:
 - Fault A, while adding an event (title typed), a tap on a start date closed the editor and an existing event's details opened. Not reproduced; no crash and no warning in the log. Nothing in the editor opens an event, so the editor closed first and a tap reached the week or Home behind it; the idle close (10 min once edited, warned at 9:40) and a session ending don't fit. Next time: note the minute, the entry point and where the opened event sat, and read logcat at once.
