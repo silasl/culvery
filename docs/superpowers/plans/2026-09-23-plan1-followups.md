@@ -601,6 +601,20 @@ Fault found:
 - **The One-tap tray:** not built; Shopping is widened into its space in Home's utility row until it exists.
 - **Quantities, prices, aisles, categories, more than one list:** not in v1.
 
+## Plan 10 (The Shopping list): emulator walk-through (2026-10-23)
+- **All nine steps work:** adding, suggestions and favourites, ticking with Undo, a tick then an add of the same item, Forget, Home's card with "+n more · Open Shopping", a phone's add within the minute's check, Stop using, and Clear suggestions.
+- **Fixed at e9c1d5de:**
+  - Forget, Clear, Stop and turning on all showed "Enter your PIN to connect calendars and services." Forget and Clear now have their own permission and say "…to forget Butter" and "…to clear suggestions";
+  - adds past the limit were refused without a word, and the next item was typed onto the end of the box. The limit is now 3 a second and 60 a minute, with "Adding too fast. Wait a moment, then add {item} again.";
+  - the per-second toast can't be reached through adb, so only the unit test shows it.
+- **Notes, for the tablet or the design review:**
+  - a ticked item shows as a favourite chip while it is still struck in the list;
+  - an undone item comes back at the top of the list. Check whether Google Tasks does the same;
+  - when a ticked item leaves, about a second later, the rows move up, so a quick second tap can land on the wrong item;
+  - with the keyboard up, the toast covers the chip row, and the keyboard covers most of the list;
+  - Home's card on its own splits 16 items 15 and 1, and the tab splits 4 items 2/2/0;
+  - the one-frame flicker under "To watch" below was not seen.
+
 ## From Plan 10
 - **End-of-v1 design review:**
   - Home's Shopping rows are the handoff's 31 dp, under the house's 48 dp touch height (the row is the target);
