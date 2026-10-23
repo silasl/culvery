@@ -35,4 +35,15 @@ internal object ShoppingDimens {
     val circleGap = 12.dp
     val itemName = 18.sp
     val listFade = 48.dp
+
+    // The Home card (10 §4.9): the header, then two columns of 31 dp rows with the 20 dp circle and a 2 dp ring.
+    val cardTitle = 20.sp
+    val cardCount = 14.sp
+    val cardTitleGap = 8.dp
+    val cardHeaderGap = 12.dp
+    val cardRowHeight = 31.dp
+    val cardCircleGap = 11.dp
+    val cardColumnGap = 12.dp
+    val cardName = 16.sp
+    val cardFoot = 13.sp
 }

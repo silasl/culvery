@@ -20,7 +20,6 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -28,12 +27,10 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -64,36 +61,12 @@ import uk.co.siland.culvery.core.plugin.test.soon
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.assertFitsTheCard
 
 // The card's Home size: app's HomeGridTest pins the same value.
 private val rightHalfSize = DpSize(701.dp, 285.5.dp)
 
 private val rowCardSize = DpSize(343.dp, 212.dp)
-
-/** Every clickable and text lies inside the card, no two clickables overlap, and no text line is clipped (ending in … is not). */
-private fun ComposeContentTestRule.assertFitsTheCard() {
-    val card = onNodeWithTag("fit_card").fetchSemanticsNode().boundsInRoot
-    val texts = onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text), useUnmergedTree = true).fetchSemanticsNodes().filter { !it.boundsInRoot.isEmpty }
-    val clickables = onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick)).fetchSemanticsNodes()
-    assertThat(texts).isNotEmpty()
-    assertThat(clickables).isNotEmpty()
-    for (node in texts + clickables) {
-        val b = node.boundsInRoot
-        assertThat(b.left).isAtLeast(card.left - 0.5f)
-        assertThat(b.top).isAtLeast(card.top - 0.5f)
-        assertThat(b.right).isAtMost(card.right + 0.5f)
-        assertThat(b.bottom).isAtMost(card.bottom + 0.5f)
-    }
-    for (i in clickables.indices) for (j in i + 1 until clickables.size) {
-        assertWithMessage("clickables ${clickables[i].boundsInRoot} and ${clickables[j].boundsInRoot} overlap")
-            .that(clickables[i].boundsInRoot.deflate(0.5f).overlaps(clickables[j].boundsInRoot.deflate(0.5f))).isFalse()
-    }
-    for (node in texts) {
-        val results = mutableListOf<TextLayoutResult>()
-        node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action?.invoke(results)
-        results.forEach { assertWithMessage("\"${node.config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text }}\" is cut at ${node.boundsInRoot} in $card").that(it.didOverflowHeight && !it.isLineEllipsized(it.lineCount - 1)).isFalse() }
-    }
-}
 
 /** 7 §5.1, §5.4: the Home card's states, its controls and their words; it follows the rooms while it shows. */
 @RunWith(AndroidJUnit4::class)
@@ -229,23 +202,23 @@ class LightsCardTest {
         for (theme in listOf(true, false)) {
             dark = theme
             compose.waitForIdle()
-            compose.assertFitsTheCard()
+            compose.assertFitsTheCard(textStaysOffControls = false)
             holidayOn = true
             compose.waitForIdle()
-            compose.assertFitsTheCard()
+            compose.assertFitsTheCard(textStaysOffControls = false)
             for (message in listOf(
                 "2 rooms didn’t turn off. Try again.",
                 "Lights are off, but Culvery couldn’t start Mimic presence. Start it in the Hue app.",
             )) {
                 line = message
                 compose.waitForIdle()
-                compose.assertFitsTheCard()
+                compose.assertFitsTheCard(textStaysOffControls = false)
             }
             line = null
             holidayOn = false
             main = room("Lounge", on = false)
             compose.waitForIdle()
-            compose.assertFitsTheCard()
+            compose.assertFitsTheCard(textStaysOffControls = false)
             main = room("Upstairs landing and hallway", on = true, brightness = 70)
         }
     }

@@ -494,7 +494,7 @@ class ShoppingTabTest {
 }
 
 /** The real shopping classes over an in-memory database on real dispatchers; nothing drains the queue. */
-private class UiRig {
+internal class UiRig {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val db = Room.inMemoryDatabaseBuilder(context, ShoppingDatabase::class.java).allowMainThreadQueries().build()
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

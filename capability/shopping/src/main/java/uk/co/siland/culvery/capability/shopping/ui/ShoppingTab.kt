@@ -72,13 +72,13 @@ import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.PageHeaderTokens
 import uk.co.siland.culvery.core.ui.hhToggleable
 
-private const val SHOPPING = "Shopping"
+internal const val SHOPPING = "Shopping"
 private const val ADD = "Add"
-private const val ADD_LABEL = "Add to the shopping list"
+internal const val ADD_LABEL = "Add to the shopping list"
 private const val EMPTY_LIST = "Nothing on the list. Add something above, or tap a favourite."
 private const val FAVOURITES_HINT = "Favourites appear as you add things."
-private const val TICKED = "ticked"
-private const val NOT_TICKED = "not ticked"
+internal const val TICKED = "ticked"
+internal const val NOT_TICKED = "not ticked"
 
 /**
  * The Shopping tab (10 §4.8, layout B revised): the header, the add card (the box with Add, then one line of suggestions
