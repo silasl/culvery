@@ -20,8 +20,8 @@ import uk.co.siland.culvery.core.setup.OPEN_CULVERY
 import uk.co.siland.culvery.core.setup.SetupDimens
 import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupState
-import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.ui.ButtonTone
+import uk.co.siland.culvery.core.ui.HhPageTitle
 
 /** 4a design §3.3, §4.2: "Culvery is ready", and the home-app prompt (4c §5.1). Never done, so a resume that gets this far stops here. */
 @Singleton
@@ -60,7 +60,7 @@ class DoneStep @Inject constructor(
         val navigator = LocalShellNavigator.current
         val isHome by homeApp.isDefault.collectAsState()
         Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap)) {
-            StepTitle(CULVERY_IS_READY)
+            HhPageTitle(CULVERY_IS_READY)
             if (!isHome) HomeAppPrompt(onChoose = navigator::chooseHomeApp, tone = ButtonTone.Quiet)
         }
     }

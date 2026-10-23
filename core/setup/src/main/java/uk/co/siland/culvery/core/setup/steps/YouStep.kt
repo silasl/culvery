@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,6 +39,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.setup.CHANGE_PIN
 import uk.co.siland.culvery.core.setup.NAME
+import uk.co.siland.culvery.core.setup.OnNewRefusal
 import uk.co.siland.culvery.core.setup.PIN_SET
 import uk.co.siland.culvery.core.setup.PIN_TAKEN
 import uk.co.siland.culvery.core.setup.PeopleEditor
@@ -48,7 +48,6 @@ import uk.co.siland.culvery.core.setup.SET_YOUR_PIN
 import uk.co.siland.culvery.core.setup.SetupDimens
 import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupType
-import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.WHOS_SETTING_UP
 import uk.co.siland.culvery.core.setup.YOUR_DETAILS_NOT_SAVED
 import uk.co.siland.culvery.core.setup.YOUR_NAME
@@ -59,6 +58,7 @@ import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhMessageLine
+import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.HhSwatchGrid
 import uk.co.siland.culvery.core.ui.HhTextField
 import uk.co.siland.culvery.core.ui.PersonPalette
@@ -134,7 +134,7 @@ class YouStep @Inject constructor(
         val overlay = LocalOverlayHost.current
         // A PIN typed but never confirmed with Next isn't kept once the step is left (Back).
         DisposableEffect(Unit) { onDispose { form.pin = null } }
-        StepTitle(WHOS_SETTING_UP, YOU_LINE)
+        HhPageTitle(WHOS_SETTING_UP, YOU_LINE)
         if (admin != null) {
             // Ruling 18: once made, the Admin is edited in the sheet like anyone else.
             PersonRow(admin) { overlay.showPersonEditor(editor, admin, members) }
@@ -164,9 +164,7 @@ class YouStep @Inject constructor(
 internal fun YouFormContent(form: YouForm, onSetPin: () -> Unit) {
     val c = Culvery.colors
     val nameFocus = remember { FocusRequester() }
-    // Only a refusal made while this is showing moves focus; coming back to the step doesn't.
-    val seenRequests = remember { form.nameFocusRequests }
-    LaunchedEffect(form.nameFocusRequests) { if (form.nameFocusRequests > seenRequests) nameFocus.requestFocus() }
+    OnNewRefusal(form, form.nameFocusRequests) { nameFocus.requestFocus() }
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap)) {
         HhTextField(
             value = form.name,

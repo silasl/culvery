@@ -23,6 +23,7 @@ import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.setup.pages.KioskPage
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.PersonPalette
 
 @RunWith(AndroidJUnit4::class)
@@ -38,14 +39,14 @@ class SettingsScreenshotTest {
 
     private val pages = listOf(
         StillPage("location", "Home location", 0) {
-            StepTitle("Home location")
+            HhPageTitle("Home location")
             LocationContent("", {}, TownResults.Idle, brighton.toHome(), showCurrent = true, busy = false, onChoose = {})
         },
         StillPage("people", "People", 100) {
-            StepTitle("People")
+            HhPageTitle("People")
             PeopleList(people, onEdit = {}, onAdd = {}, onMove = { _, _ -> })
         },
-        StillPage("calendars", "Calendars", 400) { StepTitle("Calendars") },
+        StillPage("calendars", "Calendars", 400) { HhPageTitle("Calendars") },
         KioskPage(FakeHomeApp(default = false)),
     )
 
@@ -72,10 +73,10 @@ class SettingsScreenshotTest {
     @Test
     fun allPagesDark() {
         val all = pages + listOf(
-            StillPage("display", "Display", 440) { StepTitle("Display") },
-            StillPage("music", "Music", 450) { StepTitle("Music") },
-            StillPage("lights", "Lights", 470) { StepTitle("Lights") },
-            StillPage("door", "Door", 500) { StepTitle("Door") },
+            StillPage("display", "Display", 440) { HhPageTitle("Display") },
+            StillPage("music", "Music", 450) { HhPageTitle("Music") },
+            StillPage("lights", "Lights", 470) { HhPageTitle("Lights") },
+            StillPage("door", "Door", 500) { HhPageTitle("Door") },
         )
         snap("settings_all_pages_dark", true, "location", all.sortedBy { it.order })
     }

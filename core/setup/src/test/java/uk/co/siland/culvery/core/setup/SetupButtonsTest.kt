@@ -20,8 +20,8 @@ import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Dp
@@ -39,16 +39,15 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.setup.pages.KioskPage
 import uk.co.siland.culvery.core.setup.steps.WelcomeContent
-import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhToast
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.LocalToastClearance
+import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.ToastClearance
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
-import uk.co.siland.culvery.core.ui.PersonPalette
 
 /** Every button in the wizard, Settings and the person sheet is the shared one: a button, 48 dp, or 60 in a footer. */
 @RunWith(AndroidJUnit4::class)
@@ -81,10 +80,11 @@ class SetupButtonsTest {
         }
         listOf("wizard_back", "wizard_next").forEach { assertButton(it, 60.dp) }
         listOf("welcome_sample", "people_add").forEach { assertButton(it, 48.dp) }
-        // A Large button without an icon ends 26 dp after its label; the arrow and its gap make more.
-        val label = compose.onNode(hasText("Next") and hasAnyAncestor(hasTestTag("wizard_next")), useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val whole = compose.onNodeWithTag("wizard_next").getUnclippedBoundsInRoot()
-        assertThat((whole.right - label.right).value).isGreaterThan(ButtonTokens.largePaddingH.value)
+        // The arrow (an icon with no semantics of its own) is the one node inside Next that is not its label, and follows it.
+        val inNext = hasAnyAncestor(hasTestTag("wizard_next"))
+        val label = compose.onNode(hasText("Next") and inNext, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val arrow = compose.onAllNodes(inNext and !hasText("Next"), useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
+        assertThat(arrow.map { it.left >= label.right }).contains(true)
         compose.assertClickablesHaveRoleAndLabel()
     }
 

@@ -4,17 +4,24 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
-import uk.co.siland.culvery.core.ui.HhPageTitle
 
-/** A step's or page's title, with an optional line under it in `mute`. */
+/**
+ * Runs [act] when [count] of [owner]'s refusals has risen since this entered composition, so a refusal identical to the
+ * last still counts. One already held when it appears does not.
+ */
 @Composable
-internal fun StepTitle(title: String, line: String? = null) = HhPageTitle(title, line)
+internal fun OnNewRefusal(owner: Any, count: Int, act: suspend () -> Unit) {
+    val seen = remember(owner) { count }
+    LaunchedEffect(owner, count) { if (count > seen) act() }
+}
 
 /** 4c design §5.1: shown while Culvery isn't the home app, in the wizard's Done step and Settings › Tablet lock. */
 @Composable

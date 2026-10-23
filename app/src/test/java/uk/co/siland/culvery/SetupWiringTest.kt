@@ -2,8 +2,8 @@ package uk.co.siland.culvery
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
@@ -14,10 +14,17 @@ import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
 import java.time.LocalTime
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Rule
+import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.door.ui.DoorSettingsActions
 import uk.co.siland.culvery.capability.door.ui.DoorSettingsScreen
@@ -27,8 +34,12 @@ import uk.co.siland.culvery.capability.lights.ui.LightsSettingsUi
 import uk.co.siland.culvery.capability.music.ui.MusicSettingsActions
 import uk.co.siland.culvery.capability.music.ui.MusicSettingsScreen
 import uk.co.siland.culvery.capability.music.ui.MusicSettingsUi
+import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeApp
+import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
+import uk.co.siland.culvery.core.plugin.SettingsPage
+import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.setup.pages.KioskPage
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -38,17 +49,6 @@ import uk.co.siland.culvery.display.DisplayPrefs
 import uk.co.siland.culvery.display.ui.DisplaySettingsActions
 import uk.co.siland.culvery.display.ui.DisplaySettingsScreen
 import uk.co.siland.culvery.display.ui.DisplaySettingsUi
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
-import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
-import org.junit.Test
-import uk.co.siland.culvery.core.plugin.Capability
-import uk.co.siland.culvery.core.plugin.HomeCard
-import uk.co.siland.culvery.core.plugin.SettingsPage
-import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.shell.FakeAccessControl
 import uk.co.siland.culvery.shell.FakeCapability
 
@@ -176,7 +176,7 @@ class SetupWiringTest {
         .also { fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(it) }
         .single().layoutInput.style.fontSize
 
-    /** Home location and People draw their title through the same `HhPageTitle` as the wizard's steps; Calendars is checked in its module. */
+    /** Display, Door, Lights, Music and Tablet lock draw their title through the same `HhPageTitle` as the wizard's steps; Home location and People are checked in core:setup, Calendars in core:ui. */
     @Test
     fun everySettingsPageTitleIsTheSharedTitle() {
         val pages: List<Pair<String, @Composable () -> Unit>> = listOf(

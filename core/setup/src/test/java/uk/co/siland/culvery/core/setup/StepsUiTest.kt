@@ -45,8 +45,8 @@ import uk.co.siland.culvery.core.setup.steps.YouStep
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ButtonToneKey
 import uk.co.siland.culvery.core.ui.CulveryTheme
-import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.PersonPalette
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
 @RunWith(AndroidJUnit4::class)
 class StepsUiTest {

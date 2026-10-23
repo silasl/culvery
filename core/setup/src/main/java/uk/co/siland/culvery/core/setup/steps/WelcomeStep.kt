@@ -19,12 +19,12 @@ import uk.co.siland.culvery.core.setup.SampleHousehold
 import uk.co.siland.culvery.core.setup.SetupSessionGate
 import uk.co.siland.culvery.core.setup.SetupState
 import uk.co.siland.culvery.core.setup.START
-import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.USE_SAMPLE_HOUSEHOLD
 import uk.co.siland.culvery.core.setup.WELCOME
 import uk.co.siland.culvery.core.setup.WELCOME_LINE
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 /** 4a design §4.2: what setup covers, and Start. Done once passed, so a start after a kill resumes past it (§6). */
@@ -78,6 +78,6 @@ class WelcomeStep @Inject constructor(
 /** [onSample] is null except in a debug build with nobody set up yet (4a design D11). */
 @Composable
 internal fun WelcomeContent(onSample: (() -> Unit)?, busy: Boolean) {
-    StepTitle(WELCOME, WELCOME_LINE)
+    HhPageTitle(WELCOME, WELCOME_LINE)
     if (onSample != null) HhButton(USE_SAMPLE_HOUSEHOLD, onSample, Modifier.testTag("welcome_sample"), enabled = !busy, on = ButtonSurface.Bg)
 }

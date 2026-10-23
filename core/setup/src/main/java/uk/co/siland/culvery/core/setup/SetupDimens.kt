@@ -65,8 +65,8 @@ internal object SetupDimens {
 
 /** Setup and Settings text styles, derived from HhType. */
 internal object SetupType {
-    /** 35 sp / 700, −0.5 tracking: the Settings list's title (handoff 2c). */
-    val listTitle = HhType.screenTitle.copy(fontSize = 35.sp, letterSpacing = (-0.5).sp)
+    /** 35 sp / 700, −0.5 tracking: the Settings list's title and the person sheet's heading (handoff 2c, 5b). */
+    val panelTitle = HhType.screenTitle.copy(fontSize = 35.sp, letterSpacing = (-0.5).sp)
 
     /** 16 sp / 400: a title's line, and body text. */
     val line = HhType.body
@@ -79,9 +79,6 @@ internal object SetupType {
 
     /** 14 sp / 400: a line beside or under a control (PIN set, what the town is for). */
     val secondary = HhType.secondary
-
-    /** 35 sp / 700, −0.5 tracking: the person sheet's heading (handoff 5b). */
-    val sheetTitle = HhType.screenTitle.copy(fontSize = 35.sp, letterSpacing = (-0.5).sp)
 
     /** 13 sp / 400: the taken colours under the swatches. */
     val takenLine = HhType.secondary.copy(fontSize = 13.sp)

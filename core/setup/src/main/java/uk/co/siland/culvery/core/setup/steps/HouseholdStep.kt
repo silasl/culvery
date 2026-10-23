@@ -8,9 +8,9 @@ import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.setup.PeopleEditor
 import uk.co.siland.culvery.core.setup.PeoplePane
-import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.WHO_ELSE
 import uk.co.siland.culvery.core.setup.WHO_ELSE_LINE
+import uk.co.siland.culvery.core.ui.HhPageTitle
 
 /** 4a design §4.2: everyone else. Always passable: "Skip for now" while only you live here. */
 @Singleton
@@ -22,7 +22,7 @@ class HouseholdStep @Inject constructor(private val editor: PeopleEditor) : Setu
 
     @Composable
     override fun Content(onNext: () -> Unit) {
-        StepTitle(WHO_ELSE, WHO_ELSE_LINE)
+        HhPageTitle(WHO_ELSE, WHO_ELSE_LINE)
         PeoplePane(editor, reorder = false)
     }
 }

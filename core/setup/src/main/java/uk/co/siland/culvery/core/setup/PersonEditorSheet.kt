@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
+import kotlin.reflect.KProperty
 import uk.co.siland.culvery.core.access.ui.ChoosePinPad
 import uk.co.siland.culvery.core.household.Member
 import uk.co.siland.culvery.core.household.Role
@@ -49,6 +50,7 @@ import uk.co.siland.culvery.core.plugin.OverlayHost
 import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
+import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhCloseButton
@@ -80,30 +82,9 @@ internal class PersonForm(val existing: Member?, taken: Map<Long, String>) {
     var taken by mutableStateOf(taken)
         private set
 
-    private var nameState by mutableStateOf(existing?.person?.name.orEmpty())
-    private var colorState by mutableStateOf(existing?.person?.color ?: PersonPalette.firstFree(taken.keys))
-    private var roleState by mutableStateOf(existing?.role ?: Role.ADULT)
-
-    var name: String
-        get() = nameState
-        set(value) {
-            nameState = value
-            refusal = null
-        }
-
-    var color: Long?
-        get() = colorState
-        set(value) {
-            colorState = value
-            refusal = null
-        }
-
-    var role: Role
-        get() = roleState
-        set(value) {
-            roleState = value
-            refusal = null
-        }
+    var name by Edit(existing?.person?.name.orEmpty())
+    var color: Long? by Edit(existing?.person?.color ?: PersonPalette.firstFree(taken.keys))
+    var role by Edit(existing?.role ?: Role.ADULT)
 
     var newPin by mutableStateOf<String?>(null)
         private set
@@ -113,6 +94,9 @@ internal class PersonForm(val existing: Member?, taken: Map<Long, String>) {
     /** What the last Save or Remove was refused for; null once anything changes. */
     var refusal by mutableStateOf<PeopleOutcome.Refused?>(null)
         private set
+
+    /** What [field] was refused for, if that was the last refusal. */
+    fun errorFor(field: PersonField): String? = refusal?.takeIf { it.field == field }?.message
 
     /** How many refusals there have been, so an identical one still counts as new. */
     var refusals by mutableIntStateOf(0)
@@ -126,16 +110,28 @@ internal class PersonForm(val existing: Member?, taken: Map<Long, String>) {
     val hasPin: Boolean get() = newPin != null || (existing?.hasPin == true && !removePin)
     val canSave: Boolean get() = name.isNotBlank() && color != null && color !in taken.keys
 
-    fun choosePin(pin: String) {
+    fun choosePin(pin: String) = edit {
         newPin = pin
         removePin = false
+    }
+
+    fun clearPin() = edit {
+        newPin = null
+        removePin = existing?.hasPin == true
+    }
+
+    private fun edit(change: () -> Unit) {
+        change()
         refusal = null
     }
 
-    fun clearPin() {
-        newPin = null
-        removePin = existing?.hasPin == true
-        refusal = null
+    /** A value that clears the [refusal] when it is set. */
+    private inner class Edit<T>(initial: T) {
+        private var value by mutableStateOf(initial)
+
+        operator fun getValue(owner: Any?, property: KProperty<*>): T = value
+
+        operator fun setValue(owner: Any?, property: KProperty<*>, new: T) = edit { value = new }
     }
 
     private var submittedColour: Long? = null
@@ -238,18 +234,16 @@ internal fun PersonEditorSheet(
 ) {
     val c = Culvery.colors
     val existing = form.existing
-    val views = remember { PersonField.entries.associateWith { BringIntoViewRequester() } }
+    // Name's text field scrolls itself.
+    val views = remember { (PersonField.entries - PersonField.NAME).associateWith { BringIntoViewRequester() } }
     val focus = remember { PersonField.entries.associateWith { FocusRequester() } }
-    // Only a refusal made while the sheet shows moves focus; a form reopened with one held doesn't.
-    val seen = remember(form) { form.refusals }
-    LaunchedEffect(form, form.refusals) {
-        val field = form.refusal?.field
-        if (field != null && form.refusals > seen) {
-            views.getValue(field).bringIntoView()
-            focus.getValue(field).requestFocus()
+    val takenLine = remember(form.taken) { takenLine(form.taken) }
+    OnNewRefusal(form, form.refusals) {
+        form.refusal?.field?.let {
+            views[it]?.bringIntoView()
+            focus.getValue(it).requestFocus()
         }
     }
-    fun errorFor(field: PersonField): String? = form.refusal?.takeIf { it.field == field }?.message
     Box(Modifier.fillMaxHeight().width(ShellTokens.sheetWidth).semantics { paneTitle = existing?.person?.name ?: ADD_PERSON }) {
         HhSheet(
             PaddingValues(
@@ -264,7 +258,7 @@ internal fun PersonEditorSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     existing?.person?.name ?: ADD_PERSON,
-                    style = SetupType.sheetTitle,
+                    style = SetupType.panelTitle,
                     color = c.ink,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -276,7 +270,7 @@ internal fun PersonEditorSheet(
                 verticalArrangement = Arrangement.spacedBy(SetupDimens.sectionGap),
                 modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
             ) {
-                Section(NAME, views.getValue(PersonField.NAME)) {
+                Section(NAME, null, form, views, focus) {
                     HhTextField(
                         value = form.name,
                         onValueChange = { form.name = it },
@@ -285,12 +279,12 @@ internal fun PersonEditorSheet(
                         tag = "person_name",
                         modifier = Modifier.focusRequester(focus.getValue(PersonField.NAME)),
                         capitalization = KeyboardCapitalization.Words,
-                        error = errorFor(PersonField.NAME),
+                        error = form.errorFor(PersonField.NAME),
                     )
                 }
-                Section(COLOUR, views.getValue(PersonField.COLOUR), errorFor(PersonField.COLOUR), "person_colour_error", focus.getValue(PersonField.COLOUR)) {
+                Section(COLOUR, PersonField.COLOUR, form, views, focus) {
                     HhSwatchGrid(form.color, form.taken, tagPrefix = "swatch_") { form.color = it }
-                    takenLine(form.taken)?.let {
+                    takenLine?.let {
                         Text(
                             it,
                             style = SetupType.takenLine,
@@ -299,18 +293,20 @@ internal fun PersonEditorSheet(
                         )
                     }
                 }
-                Section(ROLE, views.getValue(PersonField.ROLE), errorFor(PersonField.ROLE), "person_role_error", focus.getValue(PersonField.ROLE)) {
+                Section(ROLE, PersonField.ROLE, form, views, focus) {
                     Column(verticalArrangement = Arrangement.spacedBy(RadioRowTokens.gap), modifier = Modifier.selectableGroup()) {
                         Role.entries.forEach { role ->
                             HhRadioRow(role.label, roleWhat(role), selected = form.role == role, tag = "role_${role.name}") { form.role = role }
                         }
                     }
                 }
-                Section(PIN, views.getValue(PersonField.PIN), errorFor(PersonField.PIN), "person_pin_error", focus.getValue(PersonField.PIN)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SetupDimens.pinHintGap)) {
+                Section(PIN, PersonField.PIN, form, views, focus) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         if (form.hasPin) {
-                            HhButton(CHANGE_PIN, onChoosePin, Modifier.testTag("person_change_pin"), enabled = !busy, on = ButtonSurface.Bg)
-                            HhButton(REMOVE_PIN, form::clearPin, Modifier.testTag("person_remove_pin"), enabled = !busy, on = ButtonSurface.Bg)
+                            Row(horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap)) {
+                                HhButton(CHANGE_PIN, onChoosePin, Modifier.testTag("person_change_pin"), enabled = !busy, on = ButtonSurface.Bg)
+                                HhButton(REMOVE_PIN, form::clearPin, Modifier.testTag("person_remove_pin"), enabled = !busy, on = ButtonSurface.Bg)
+                            }
                         } else {
                             HhButton(SET_PIN, onChoosePin, Modifier.testTag("person_set_pin"), enabled = !busy, on = ButtonSurface.Bg)
                         }
@@ -319,7 +315,7 @@ internal fun PersonEditorSheet(
                                 canOnlyLook(form.name),
                                 style = SetupType.secondary,
                                 color = c.mute,
-                                modifier = Modifier.weight(1f).testTag("person_look_only"),
+                                modifier = Modifier.padding(start = SetupDimens.pinHintGap).weight(1f).testTag("person_look_only"),
                             )
                         }
                     }
@@ -359,21 +355,32 @@ internal fun PersonEditorSheet(
     }
 }
 
-/** A labelled part of the sheet: [content], then its refusal ([error], as [errorTag]), focusable so focus can move to it. */
+/**
+ * A labelled part of the sheet: [content], then the refusal about [field] (null for Name, whose field shows its own),
+ * focusable so focus can move to it.
+ */
 @Composable
 private fun Section(
     label: String,
-    view: BringIntoViewRequester,
-    error: String? = null,
-    errorTag: String = "",
-    errorFocus: FocusRequester? = null,
+    field: PersonField?,
+    form: PersonForm,
+    views: Map<PersonField, BringIntoViewRequester>,
+    focus: Map<PersonField, FocusRequester>,
     content: @Composable () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.labelGap), modifier = Modifier.bringIntoViewRequester(view)) {
+    val error = field?.let(form::errorFor)
+    val view = field?.let { views[it] }
+    Column(
+        verticalArrangement = Arrangement.spacedBy(SetupDimens.labelGap),
+        modifier = if (view != null) Modifier.bringIntoViewRequester(view) else Modifier,
+    ) {
         HhSectionLabel(label)
         content()
-        if (error != null && errorFocus != null) {
-            HhStatusLine(error, errorTag, icon = Icons.ERROR, field = true, modifier = Modifier.focusRequester(errorFocus).focusable())
+        if (field != null && error != null) {
+            HhStatusLine(
+                error, "person_${field.name.lowercase()}_error", icon = Icons.ERROR, field = true,
+                modifier = Modifier.focusRequester(focus.getValue(field)).focusable(),
+            )
         }
     }
 }

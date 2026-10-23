@@ -4,8 +4,6 @@ import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,7 +18,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.household.HomeLocation
@@ -137,8 +134,8 @@ internal fun LocationContent(
                 if (status.isSave) SetupType.message else SetupType.line,
                 if (status.isError) c.danger else c.mute,
                 "location_status",
-                modifier = if (status.text != null) Modifier.padding(top = SetupDimens.blockGap) else Modifier.height(0.dp),
                 spoken = status.spoken,
+                gapAbove = SetupDimens.blockGap,
             )
         }
         if (results is TownResults.Failed && !saveFailed) {

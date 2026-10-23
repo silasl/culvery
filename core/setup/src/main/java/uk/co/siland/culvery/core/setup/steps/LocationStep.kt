@@ -13,10 +13,10 @@ import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.setup.LocationPane
 import uk.co.siland.culvery.core.setup.LocationSearch
 import uk.co.siland.culvery.core.setup.PlaceMatch
-import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.WHERES_HOME
 import uk.co.siland.culvery.core.setup.mayChangeSetup
 import uk.co.siland.culvery.core.setup.toHome
+import uk.co.siland.culvery.core.ui.HhPageTitle
 
 /** 4a design §4.3, D2: the home town, or Skip for now (the tablet's own time zone). */
 @Singleton
@@ -33,7 +33,7 @@ class LocationStep @Inject constructor(
     @Composable
     override fun Content(onNext: () -> Unit) {
         val current by household.location.collectAsState(initial = null)
-        StepTitle(WHERES_HOME)
+        HhPageTitle(WHERES_HOME)
         LocationPane(search, current, showCurrent = false, save = ::saveHome)
     }
 

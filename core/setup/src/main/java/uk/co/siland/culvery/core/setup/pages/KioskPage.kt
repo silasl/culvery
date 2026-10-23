@@ -16,7 +16,6 @@ import uk.co.siland.culvery.core.setup.CHANGE_HOME_APP
 import uk.co.siland.culvery.core.setup.HOME_APP_HOW_TO
 import uk.co.siland.culvery.core.setup.HomeAppPrompt
 import uk.co.siland.culvery.core.setup.SetupType
-import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.TABLET_LOCK
 import uk.co.siland.culvery.core.setup.TABLET_LOCK_LINE
 import uk.co.siland.culvery.core.setup.USE_OTHER_APPS
@@ -24,6 +23,7 @@ import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhPageTitle
 
 /**
  * Settings › Tablet lock (4a design §4.7, 4c §5.1; 4d-2 Decision 2b): the home app — Choose it while Culvery isn't,
@@ -39,7 +39,7 @@ class KioskPage @Inject constructor(private val homeApp: HomeApp) : SettingsPage
     override fun Content() {
         val navigator = LocalShellNavigator.current
         val isHome by homeApp.isDefault.collectAsState()
-        StepTitle(TABLET_LOCK, TABLET_LOCK_LINE)
+        HhPageTitle(TABLET_LOCK, TABLET_LOCK_LINE)
         if (isHome) {
             HhButton(CHANGE_HOME_APP, navigator::changeHomeApp, Modifier.testTag("settings_change_home_app"), on = ButtonSurface.Bg)
         } else {

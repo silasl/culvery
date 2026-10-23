@@ -29,6 +29,7 @@ import uk.co.siland.culvery.core.setup.steps.YouFormContent
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.PersonPalette
 import uk.co.siland.culvery.core.ui.ShellTokens
 
@@ -56,7 +57,7 @@ class SetupScreenshotTest {
             onForward = {},
             onSkip = {},
         ) {
-            StepTitle(WHOS_SETTING_UP, "The step's content goes here.")
+            HhPageTitle(WHOS_SETTING_UP, "The step's content goes here.")
         }
     }
 
@@ -72,7 +73,7 @@ class SetupScreenshotTest {
 
     private fun people(name: String, dark: Boolean) = snap(name, dark) {
         WizardFrame(7, 3, back = {}, forward = Forward.Next("Next", enabled = true), busy = false, onForward = {}, onSkip = {}) {
-            StepTitle(WHO_ELSE, WHO_ELSE_LINE)
+            HhPageTitle(WHO_ELSE, WHO_ELSE_LINE)
             PeopleList(listOf(alex, sam, mia), onEdit = {}, onAdd = {}, onMove = null)
         }
     }
@@ -152,23 +153,23 @@ class SetupScreenshotTest {
     /** The forward button the real step shows: Next once a home is saved, Skip for now without one. */
     private fun location(name: String, dark: Boolean, results: TownResults, current: HomeLocation? = brighton.toHome()) =
         step(name, dark, 1, WizardRules.forward(skippable = true, NEXT_LABEL, StepStatus(shown = true, done = current != null, canGoOn = current != null, skippable = true))) {
-            StepTitle(WHERES_HOME)
+            HhPageTitle(WHERES_HOME)
             LocationContent("Brigh", {}, results, current = current, showCurrent = false, busy = false, onChoose = {})
         }
 
     private fun you(name: String, dark: Boolean) = step(name, dark, 2, Forward.Next("Next", enabled = true)) {
-        StepTitle(WHOS_SETTING_UP, YOU_LINE)
+        HhPageTitle(WHOS_SETTING_UP, YOU_LINE)
         YouFormContent(YouForm().apply { this.name = "Alex"; pin = "1234" }, onSetPin = {})
     }
 
     @Test
     fun youNameTakenDark() = step("you_name_taken_dark", true, 2, Forward.Next("Next", enabled = false)) {
-        StepTitle(WHOS_SETTING_UP, YOU_LINE)
+        HhPageTitle(WHOS_SETTING_UP, YOU_LINE)
         YouFormContent(YouForm().apply { name = "Sam"; refuseName(someoneCalled("Sam")) }, onSetPin = {})
     }
 
     private fun done(name: String, dark: Boolean) = step(name, dark, 6, Forward.Next("Open Culvery", enabled = true)) {
-        StepTitle("Culvery is ready")
+        HhPageTitle("Culvery is ready")
         HomeAppPrompt(onChoose = {}, tone = ButtonTone.Quiet)
     }
 

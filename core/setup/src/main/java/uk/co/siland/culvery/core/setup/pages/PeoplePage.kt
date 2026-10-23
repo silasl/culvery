@@ -8,7 +8,7 @@ import uk.co.siland.culvery.core.plugin.SettingsPageIds
 import uk.co.siland.culvery.core.setup.PEOPLE
 import uk.co.siland.culvery.core.setup.PeopleEditor
 import uk.co.siland.culvery.core.setup.PeoplePane
-import uk.co.siland.culvery.core.setup.StepTitle
+import uk.co.siland.culvery.core.ui.HhPageTitle
 
 /** Settings › People (4a design §4.4): the Household step's list and sheet, and reordering (4c §7.1). */
 @Singleton
@@ -19,7 +19,7 @@ class PeoplePage @Inject constructor(private val editor: PeopleEditor) : Setting
 
     @Composable
     override fun Content() {
-        StepTitle(PEOPLE)
+        HhPageTitle(PEOPLE)
         PeoplePane(editor, reorder = true)
     }
 }

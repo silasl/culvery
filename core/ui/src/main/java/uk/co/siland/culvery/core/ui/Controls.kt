@@ -352,7 +352,8 @@ fun HhTextField(
 /**
  * An in-page message that TalkBack hears appear. Compose speaks a live region only when a node it already has changes,
  * and leaves a node with no size out of the tree, so the line is always composed and one line tall while empty.
- * [spoken] is its description when it differs from what shows ("3 towns found" under a list).
+ * [spoken] is its description when it differs from what shows ("3 towns found" under a list). With [gapAbove] the line
+ * takes room only while it has text: that gap above it, then its height; empty, none.
  */
 @Composable
 fun HhMessageLine(
@@ -362,15 +363,19 @@ fun HhMessageLine(
     tag: String,
     modifier: Modifier = Modifier,
     spoken: String? = message,
+    gapAbove: Dp? = null,
 ) {
     Text(
         message.orEmpty(),
         style = style,
         color = color,
-        modifier = modifier.testTag(tag).semantics {
-            liveRegion = LiveRegionMode.Polite
-            if (spoken != null && spoken != message) contentDescription = spoken
-        },
+        modifier = modifier
+            .then(if (gapAbove == null) Modifier else if (message != null) Modifier.padding(top = gapAbove) else Modifier.height(0.dp))
+            .testTag(tag)
+            .semantics {
+                liveRegion = LiveRegionMode.Polite
+                if (spoken != null && spoken != message) contentDescription = spoken
+            },
     )
 }
 

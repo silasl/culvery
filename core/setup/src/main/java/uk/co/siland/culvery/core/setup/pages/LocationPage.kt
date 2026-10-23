@@ -14,8 +14,8 @@ import uk.co.siland.culvery.core.setup.HOME_LOCATION
 import uk.co.siland.culvery.core.setup.LocationPane
 import uk.co.siland.culvery.core.setup.LocationSearch
 import uk.co.siland.culvery.core.setup.PlaceMatch
-import uk.co.siland.culvery.core.setup.StepTitle
 import uk.co.siland.culvery.core.setup.toHome
+import uk.co.siland.culvery.core.ui.HhPageTitle
 
 /** Settings › Home location (4a design §4.3): the saved home above the search. */
 @Singleton
@@ -31,7 +31,7 @@ class LocationPage @Inject constructor(
     @Composable
     override fun Content() {
         val current by household.location.collectAsState(initial = null)
-        StepTitle(HOME_LOCATION)
+        HhPageTitle(HOME_LOCATION)
         LocationPane(search, current, showCurrent = true, save = ::saveHome)
     }
 

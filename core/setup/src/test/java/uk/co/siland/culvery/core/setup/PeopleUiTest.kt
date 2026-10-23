@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.core.setup
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
@@ -37,7 +38,9 @@ import uk.co.siland.culvery.core.ui.test.pixelAt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -65,6 +68,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.sp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
@@ -87,6 +91,8 @@ import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.setup.pages.LocationPage
+import uk.co.siland.culvery.core.setup.pages.PeoplePage
 import uk.co.siland.culvery.core.setup.steps.HouseholdStep
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ButtonToneKey
@@ -107,6 +113,7 @@ class PeopleUiTest {
     private lateinit var editor: PeopleEditor
     private val overlay = RecordingOverlay()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+    private lateinit var focusManager: FocusManager
 
     @Before
     fun setUp() {
@@ -404,6 +411,7 @@ class PeopleUiTest {
         canRemove: Boolean = form.existing != null,
     ) {
         compose.setContent {
+            focusManager = LocalFocusManager.current
             CulveryTheme(dark = true) {
                 WithFontScale(scale) {
                     Box(Modifier.size(1280.dp, 800.dp)) {
@@ -436,6 +444,50 @@ class PeopleUiTest {
         compose.waitForIdle()
         compose.onNodeWithTag("person_pin_error").assertIsDisplayed()
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theSameNameRefusalAgainBringsTheNameBackAndFocusesIt() {
+        val form = PersonForm(existing = null, taken = emptyMap())
+        showSheet(form, scale = 1.3f, keyboard = 320.dp)
+        val refusal = PeopleOutcome.Refused(someoneCalled("Sam"), PersonField.NAME)
+        compose.runOnIdle { form.refuse(refusal) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("person_name").assertIsDisplayed().assertIsFocused()
+        compose.onNodeWithTag("person_set_pin").performScrollTo()
+        compose.onNodeWithTag("person_name").assertIsNotDisplayed()
+        compose.runOnIdle { focusManager.clearFocus() }
+        compose.runOnIdle { form.refuse(refusal) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("person_name").assertIsDisplayed().assertIsFocused()
+        compose.onNodeWithTag("person_name_error").assertIsDisplayed()
+    }
+
+    @Test
+    fun theSameColourRefusalAgainBringsTheColourBackAndFocusesIt() {
+        val form = PersonForm(existing = null, taken = emptyMap())
+        showSheet(form, scale = 1.3f, keyboard = 320.dp)
+        val refusal = PeopleOutcome.Refused(COLOUR_TAKEN, PersonField.COLOUR)
+        compose.runOnIdle { form.refuse(refusal) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("person_colour_error").assertIsDisplayed().assertIsFocused()
+        compose.onNodeWithTag("person_set_pin").performScrollTo()
+        compose.onNodeWithTag("person_colour_error").assertIsNotDisplayed()
+        compose.runOnIdle { focusManager.clearFocus() }
+        compose.runOnIdle { form.refuse(refusal) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("person_colour_error").assertIsDisplayed().assertIsFocused()
+    }
+
+    @Test
+    fun theLocationAndPeoplePageTitlesAreTheSharedPageTitle() {
+        val noTowns = object : LocationSearch {
+            override suspend fun search(query: String) = emptyList<PlaceMatch>()
+        }
+        show { Column { PeoplePage(editor).Content(); LocationPage(household, noTowns, access.control).Content() } }
+        listOf(HOME_LOCATION, PEOPLE).forEach { title ->
+            assertThat(compose.onNode(isHeading() and hasText(title)).textLayout().layoutInput.style.fontSize).isEqualTo(37.sp)
+        }
     }
 
     @Test
