@@ -46,7 +46,6 @@ class ShoppingConnections @Inject constructor(
     fun connected(connection: Connection) {
         scope.launch {
             lock.withLock { store.connect(connection) }
-            loop.wake()
             readAfterConnecting()
         }
     }

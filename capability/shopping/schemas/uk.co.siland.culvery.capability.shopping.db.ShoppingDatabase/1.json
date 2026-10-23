@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "da9dd47a135a1ac840379b93222c513e",
+    "identityHash": "a10dc41de99b255419d0b66c2726d165",
     "entities": [
       {
         "tableName": "shopping_connection",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`slot` INTEGER NOT NULL, `id` TEXT NOT NULL, `providerId` TEXT NOT NULL, `label` TEXT NOT NULL, `configJson` TEXT NOT NULL, `health` TEXT NOT NULL, `lastReadMillis` INTEGER, `lastHistoryMillis` INTEGER, `seeded` INTEGER NOT NULL, PRIMARY KEY(`slot`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`slot` INTEGER NOT NULL, `id` TEXT NOT NULL, `providerId` TEXT NOT NULL, `label` TEXT NOT NULL, `configJson` TEXT NOT NULL, `health` TEXT NOT NULL, `lastReadMillis` INTEGER, `lastHistoryMillis` INTEGER, PRIMARY KEY(`slot`))",
         "fields": [
           {
             "fieldPath": "slot",
@@ -53,12 +53,6 @@
             "fieldPath": "lastHistoryMillis",
             "columnName": "lastHistoryMillis",
             "affinity": "INTEGER"
-          },
-          {
-            "fieldPath": "seeded",
-            "columnName": "seeded",
-            "affinity": "INTEGER",
-            "notNull": true
           }
         ],
         "primaryKey": {
@@ -237,7 +231,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'da9dd47a135a1ac840379b93222c513e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a10dc41de99b255419d0b66c2726d165')"
     ]
   }
 }

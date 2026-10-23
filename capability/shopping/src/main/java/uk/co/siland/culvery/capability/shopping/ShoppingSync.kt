@@ -7,8 +7,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.capability.shopping.db.QueuedEntity
@@ -196,7 +197,7 @@ class ShoppingSync @Inject constructor(
     private suspend fun succeeded(stored: StoredShopping, change: (List<ShoppingItem>) -> List<ShoppingItem>) {
         if (stored.health != ShoppingHealth.OK) store.setHealth(ShoppingHealth.OK)
         val readAt = stored.lastReadMillis ?: return
-        store.saveRead(change(store.items.first()), ShoppingHealth.OK, readAt)
+        store.saveRead(change(store.itemsNow()), ShoppingHealth.OK, readAt)
     }
 
     /** A tick or untick whose add is gone from the queue can never be sent; one whose add is queued waits for it. */
@@ -252,12 +253,19 @@ class ShoppingSync @Inject constructor(
             (stored.lastHistoryMillis ?: now) - HISTORY_OVERLAP_MS
         }
         var what = Step.ITEMS
-        val items: List<ShoppingItem>
-        val ticked: List<ShoppingItem>
-        try {
-            items = provider.items(stored.connection)
-            what = Step.HISTORY
-            ticked = provider.history(stored.connection, Instant.ofEpochMilli(since))
+        val (items, ticked) = try {
+            // Both reads go at once; a failure is named as the one-after-the-other reads would name it.
+            supervisorScope {
+                val reading = async { provider.items(stored.connection) }
+                val history = async { provider.history(stored.connection, Instant.ofEpochMilli(since)) }
+                try {
+                    val open = reading.await()
+                    what = Step.HISTORY
+                    open to history.await()
+                } finally {
+                    history.cancel()
+                }
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -267,13 +275,13 @@ class ShoppingSync @Inject constructor(
         }
         // An item matching a queued add is the add's own, or the add will find it; counting it now would count it twice.
         val queuedAdds = store.queueNow().filter { it.kind == QueuedKind.ADD.name }.map { textKey(it.text) }.toSet()
-        learning.seen(items.filter { textKey(it.text) !in queuedAdds })
-        learning.seen(ticked)
-        // A year of seed history would date every item's last use today.
-        if (!seeding) ticked.forEach { learning.ticked(it.text) }
-        store.setHistoryRead(now)
-        if (seeding) store.markSeeded()
-        store.saveRead(items, ShoppingHealth.OK, now)
+        store.inTransaction {
+            learning.seen(items.filter { textKey(it.text) !in queuedAdds }, ticked)
+            // A year of seed history would date every item's last use today.
+            if (!seeding) ticked.forEach { learning.ticked(it.text) }
+            store.setHistoryRead(now)
+            store.saveRead(items, ShoppingHealth.OK, now)
+        }
         learning.pruneIfDue()
     }
 }

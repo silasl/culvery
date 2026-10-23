@@ -9,7 +9,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -92,7 +91,7 @@ class ShoppingActions @Inject constructor(
         if (cleaned.isEmpty()) return AddResult.Empty
         val key = textKey(cleaned)
         val queue = store.queueNow()
-        val rows = shown(store.items.first(), queue, _undoable.value)
+        val rows = shown(store.itemsNow(), queue, _undoable.value)
         rows.firstOrNull { !it.ticked && textKey(it.text) == key }?.let { there ->
             flash(there.key)
             checks.askNow()
@@ -121,7 +120,7 @@ class ShoppingActions @Inject constructor(
 
     private suspend fun tickLocked(row: ShownItem): Ticked? {
         val queue = store.queueNow()
-        val rows = shown(store.items.first(), queue, _undoable.value)
+        val rows = shown(store.itemsNow(), queue, _undoable.value)
         val index = rows.indexOfFirst { it.key == row.key }
         // The list moved under the tap, or the row is already ticked.
         if (index < 0 || rows[index].ticked) return null

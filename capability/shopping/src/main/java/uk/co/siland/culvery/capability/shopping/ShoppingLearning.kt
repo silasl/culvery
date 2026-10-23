@@ -44,13 +44,15 @@ internal fun betterText(old: String, new: String): String {
 class ShoppingLearning @Inject constructor(private val store: ShoppingStore, private val clock: WallClock) {
     val learned: Flow<List<Learned>> = store.learned
 
+    // Read and set by checks only, which hold ShoppingLock.
     private var lastPruneMillis: Long? = null
 
     suspend fun added(text: String) = store.learnUse(text, clock.nowMillis())
 
     suspend fun ticked(text: String) = store.touchLearned(text, clock.nowMillis())
 
-    suspend fun seen(items: List<ShoppingItem>) = store.learnSeen(items, clock.nowMillis())
+    /** Each batch is counted in date order, then the next. */
+    suspend fun seen(vararg batches: List<ShoppingItem>) = store.learnSeen(batches.asList(), clock.nowMillis())
 
     suspend fun markSeen(id: String) = store.markSeen(id, clock.nowMillis())
 
@@ -62,8 +64,8 @@ class ShoppingLearning @Inject constructor(private val store: ShoppingStore, pri
         val now = clock.nowMillis()
         val last = lastPruneMillis
         if (last != null && now - last < COUNT_ONCE_PER_MS) return
-        lastPruneMillis = now
         val cutoff = Instant.ofEpochMilli(now).atZone(ZoneOffset.UTC).minusMonths(LEARNED_KEEP_MONTHS).toInstant()
         store.pruneUnusedBefore(cutoff.toEpochMilli())
+        lastPruneMillis = now
     }
 }

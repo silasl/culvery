@@ -21,8 +21,6 @@ data class ConnectionEntity(
     val health: String,
     val lastReadMillis: Long?,
     val lastHistoryMillis: Long?,
-    /** Whether the first history read has been counted for suggestions. */
-    val seeded: Boolean,
 ) {
     // The config holds the account's email, which shows on Settings only.
     override fun toString() = "ConnectionEntity(id=$id, providerId=$providerId, health=$health)"
@@ -103,11 +101,11 @@ interface ShoppingDao {
     @Query("UPDATE shopping_connection SET lastHistoryMillis = :atMillis")
     suspend fun setHistoryRead(atMillis: Long)
 
-    @Query("UPDATE shopping_connection SET seeded = 1")
-    suspend fun markSeeded()
-
     @Query("SELECT * FROM shopping_item ORDER BY position")
     fun items(): Flow<List<ItemEntity>>
+
+    @Query("SELECT * FROM shopping_item ORDER BY position")
+    suspend fun itemsNow(): List<ItemEntity>
 
     @Query("DELETE FROM shopping_item")
     suspend fun deleteItems()

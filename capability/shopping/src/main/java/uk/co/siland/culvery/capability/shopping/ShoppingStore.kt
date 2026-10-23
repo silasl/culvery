@@ -22,8 +22,10 @@ data class StoredShopping(
     val health: ShoppingHealth,
     val lastReadMillis: Long?,
     val lastHistoryMillis: Long?,
-    val seeded: Boolean,
 ) {
+    /** Whether the first history read has been counted for suggestions: it is the read that sets [lastHistoryMillis]. */
+    val seeded: Boolean get() = lastHistoryMillis != null
+
     // The connection's config holds the account's email.
     override fun toString() = "StoredShopping(id=${connection.id}, health=$health, seeded=$seeded)"
 }
@@ -48,11 +50,9 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
                 health = ShoppingHealth.OK.name,
                 lastReadMillis = null,
                 lastHistoryMillis = null,
-                seeded = false,
             ),
         )
-        dao.deleteItems()
-        dao.deleteQueue()
+        clearReadAndQueue()
     }
 
     /** The same connection with new settings (a remade list); the read, the health and the queue stay. */
@@ -64,6 +64,10 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
     /** Stops using the list: the connection, what was read and the queue go; what was learned stays. */
     suspend fun stop() = db.withTransaction {
         dao.deleteConnection()
+        clearReadAndQueue()
+    }
+
+    private suspend fun clearReadAndQueue() {
         dao.deleteItems()
         dao.deleteQueue()
     }
@@ -71,18 +75,20 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
     /** The open items as last read, in the provider's order. */
     val items: Flow<List<ShoppingItem>> = dao.items().map { rows -> rows.map { it.toItem() } }
 
+    suspend fun itemsNow(): List<ShoppingItem> = dao.itemsNow().map { it.toItem() }
+
     /** The open items as the provider listed them, replacing the last read in one transaction. */
     suspend fun saveRead(items: List<ShoppingItem>, health: ShoppingHealth, atMillis: Long) = db.withTransaction {
-        dao.deleteItems()
-        dao.insertItems(items.mapIndexed { position, item -> ItemEntity(item.id, item.text, position, item.changedAt.toEpochMilli()) })
+        if (itemsNow() != items) {
+            dao.deleteItems()
+            dao.insertItems(items.mapIndexed { position, item -> ItemEntity(item.id, item.text, position, item.changedAt.toEpochMilli()) })
+        }
         dao.setRead(health.name, atMillis)
     }
 
     suspend fun setHealth(health: ShoppingHealth) = dao.setHealth(health.name)
 
     suspend fun setHistoryRead(atMillis: Long) = dao.setHistoryRead(atMillis)
-
-    suspend fun markSeeded() = dao.markSeeded()
 
     val queue: Flow<List<QueuedEntity>> = dao.queue()
 
@@ -150,13 +156,20 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
     val learned: Flow<List<Learned>> = dao.learned().map { rows -> rows.map { Learned(it.key, it.text, it.count, it.lastMillis) } }
 
     /** One use of [text] at [atMillis]: counts unless that key was counted in the 24 h before (10 §4.7). */
-    suspend fun learnUse(text: String, atMillis: Long) = db.withTransaction { use(text, atMillis) }
+    suspend fun learnUse(text: String, atMillis: Long) = db.withTransaction {
+        if (use(text, atMillis)) dao.trimLearned(LEARNED_MAX)
+    }
 
-    /** Counts each item whose id was never seen, dated by its own change so a year of history counts per day. */
-    suspend fun learnSeen(items: List<ShoppingItem>, nowMillis: Long) = db.withTransaction {
-        for (item in items.sortedBy { it.changedAt }) {
-            if (dao.insertSeenIfNew(SeenEntity(item.id, nowMillis)) != -1L) use(item.text, item.changedAt.toEpochMilli())
+    /**
+     * Counts each item whose id was never seen, dated by its own change so a year of history counts per day. Each of
+     * [batches] is counted in date order, one after the other.
+     */
+    suspend fun learnSeen(batches: List<List<ShoppingItem>>, nowMillis: Long) = db.withTransaction {
+        var newKey = false
+        for (item in batches.flatMap { batch -> batch.sortedBy { it.changedAt } }) {
+            if (dao.insertSeenIfNew(SeenEntity(item.id, nowMillis)) != -1L && use(item.text, item.changedAt.toEpochMilli())) newKey = true
         }
+        if (newKey) dao.trimLearned(LEARNED_MAX)
     }
 
     suspend fun markSeen(id: String, atMillis: Long) {
@@ -176,9 +189,10 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
         dao.pruneSeen(cutoffMillis)
     }
 
-    private suspend fun use(text: String, atMillis: Long) {
+    /** True when [text]'s key is new, so the caller trims to [LEARNED_MAX]. */
+    private suspend fun use(text: String, atMillis: Long): Boolean {
         val key = textKey(text)
-        if (key.isEmpty()) return
+        if (key.isEmpty()) return false
         val shown = text.trim()
         val old = dao.learnedRow(key)
         val row = if (old == null) {
@@ -194,7 +208,7 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
             )
         }
         dao.upsertLearned(row)
-        dao.trimLearned(LEARNED_MAX)
+        return old == null
     }
 }
 
@@ -210,7 +224,6 @@ private fun ConnectionEntity.toStored() = StoredShopping(
     health = ShoppingHealth.valueOf(health),
     lastReadMillis = lastReadMillis,
     lastHistoryMillis = lastHistoryMillis,
-    seeded = seeded,
 )
 
 private fun ItemEntity.toItem() = ShoppingItem(id, text, Instant.ofEpochMilli(changedAtMillis))

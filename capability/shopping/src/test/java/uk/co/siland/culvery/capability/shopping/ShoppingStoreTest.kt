@@ -47,7 +47,7 @@ class ShoppingStoreTest {
     @Test
     fun aConnectionIsKeptAndReplaced() = runTest {
         store.connect(c1)
-        assertThat(store.connectionNow()).isEqualTo(StoredShopping(c1, ShoppingHealth.OK, null, null, seeded = false))
+        assertThat(store.connectionNow()).isEqualTo(StoredShopping(c1, ShoppingHealth.OK, null, null))
         val c2 = Connection("c2", "shopping.sample", "the sample list", mapOf("list" to "b"))
         store.connect(c2)
         assertThat(store.connectionNow()?.connection).isEqualTo(c2)
@@ -66,7 +66,7 @@ class ShoppingStoreTest {
     fun connectingStartsAgainFromHealthyAndUnseeded() = runTest {
         store.connect(c1)
         store.saveRead(emptyList(), ShoppingHealth.CANT_REACH, 5_000)
-        store.markSeeded()
+        store.setHistoryRead(5_000)
         store.connect(c1)
         val stored = store.connectionNow()!!
         assertThat(stored.health).isEqualTo(ShoppingHealth.OK)
@@ -103,8 +103,7 @@ class ShoppingStoreTest {
         store.connect(c1)
         store.setHealth(ShoppingHealth.LIST_GONE)
         store.setHistoryRead(7_000)
-        store.markSeeded()
-        assertThat(store.connectionNow()).isEqualTo(StoredShopping(c1, ShoppingHealth.LIST_GONE, null, 7_000, seeded = true))
+        assertThat(store.connectionNow()).isEqualTo(StoredShopping(c1, ShoppingHealth.LIST_GONE, null, 7_000))
     }
 
     @Test
@@ -207,7 +206,7 @@ class ShoppingStoreTest {
             QueuedEntity(1, "ADD", "k1", null, "Milk", 1_000, 0, 0, "g1").toString(),
             LearnedEntity("milk", "Milk", 1, 1_000, 1_000).toString(),
             ItemEntity("g1", "Milk", 0, 1_000).toString(),
-            StoredShopping(Connection("c1", "shopping.sample", "the sample list", mapOf(SHOPPING_CONFIG_ACCOUNT to "family@example.com")), ShoppingHealth.OK, null, null, false).toString(),
+            StoredShopping(Connection("c1", "shopping.sample", "the sample list", mapOf(SHOPPING_CONFIG_ACCOUNT to "family@example.com")), ShoppingHealth.OK, null, null).toString(),
         )
         printed.forEach { assertThat(it.lowercase()).doesNotContain("milk") }
         assertThat(printed.last()).doesNotContain("family@example.com")
