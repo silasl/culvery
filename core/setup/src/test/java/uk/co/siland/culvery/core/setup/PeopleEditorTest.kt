@@ -111,7 +111,7 @@ class PeopleEditorTest {
     fun aNameInUseIsRefusedAndNothingChanges() = runTest {
         start()
         val sam = sam()
-        assertThat(editor.save(sam.id, draft("ALEX", 1))).isEqualTo(PeopleOutcome.Refused(someoneCalled("ALEX"), nameTaken = true))
+        assertThat(editor.save(sam.id, draft("ALEX", 1))).isEqualTo(PeopleOutcome.Refused(someoneCalled("ALEX"), PersonField.NAME))
         assertThat(household.person(sam.id)?.name).isEqualTo("Sam")
     }
 
@@ -119,23 +119,23 @@ class PeopleEditorTest {
     fun aTakenColourIsRefused() = runTest {
         start()
         val sam = sam()
-        assertThat(editor.save(sam.id, draft("Sam", 0))).isEqualTo(PeopleOutcome.Refused("That colour is taken — choose another."))
+        assertThat(editor.save(sam.id, draft("Sam", 0))).isEqualTo(PeopleOutcome.Refused("That colour is taken — choose another.", PersonField.COLOUR))
     }
 
     @Test
     fun aTakenPinIsRefusedAndNobodyIsAdded() = runTest {
         start()
         access.answer("1234")
-        assertThat(editor.add(draft("Sam", 1, pin = "1234"))).isEqualTo(PeopleOutcome.Refused("That PIN is taken — choose another."))
+        assertThat(editor.add(draft("Sam", 1, pin = "1234"))).isEqualTo(PeopleOutcome.Refused("That PIN is taken — choose another.", PersonField.PIN))
         assertThat(household.members.first()).hasSize(1)
     }
 
     @Test
     fun anAdminWithoutAPinIsRefusedBeforeAnyPinPad() = runTest {
         start()
-        assertThat(editor.add(draft("Sam", 1, Role.ADMIN))).isEqualTo(PeopleOutcome.Refused("An Admin needs a PIN."))
+        assertThat(editor.add(draft("Sam", 1, Role.ADMIN))).isEqualTo(PeopleOutcome.Refused("An Admin needs a PIN.", PersonField.PIN))
         val sam = sam(pin = "2468", role = Role.ADMIN)
-        assertThat(editor.save(sam.id, draft("Sam", 1, Role.ADMIN).copy(removePin = true))).isEqualTo(PeopleOutcome.Refused("An Admin needs a PIN."))
+        assertThat(editor.save(sam.id, draft("Sam", 1, Role.ADMIN).copy(removePin = true))).isEqualTo(PeopleOutcome.Refused("An Admin needs a PIN.", PersonField.PIN))
         assertThat(access.requests).isEmpty()
     }
 
@@ -143,9 +143,9 @@ class PeopleEditorTest {
     fun theLastAdminCannotBeDemotedRemovedOrLoseTheirPin() = runTest {
         start()
         access.answer("1234", "1234")
-        val refused = PeopleOutcome.Refused("Culvery needs at least one Admin with a PIN.")
-        assertThat(editor.save(alex.id, draft("Alex", 0, Role.ADULT).copy(removePin = true))).isEqualTo(refused)
-        assertThat(editor.remove(alex.id)).isEqualTo(refused)
+        assertThat(editor.save(alex.id, draft("Alex", 0, Role.ADULT).copy(removePin = true)))
+            .isEqualTo(PeopleOutcome.Refused("Culvery needs at least one Admin with a PIN.", PersonField.ROLE))
+        assertThat(editor.remove(alex.id)).isEqualTo(PeopleOutcome.Refused("Culvery needs at least one Admin with a PIN."))
         assertThat(household.member(alex.id)?.isActiveAdmin).isTrue()
     }
 
@@ -251,7 +251,7 @@ class PeopleEditorTest {
         start()
         val sam = sam()
         access.answer("1234")
-        assertThat(editor.save(sam.id, draft("Sam", 1, pin = "1234"))).isEqualTo(PeopleOutcome.Refused("That PIN is taken — choose another."))
+        assertThat(editor.save(sam.id, draft("Sam", 1, pin = "1234"))).isEqualTo(PeopleOutcome.Refused("That PIN is taken — choose another.", PersonField.PIN))
         assertThat(household.member(sam.id)?.hasPin).isFalse()
     }
 
@@ -265,5 +265,20 @@ class PeopleEditorTest {
         assertThat(editor.remove(sam.id)).isEqualTo(PeopleOutcome.Cancelled)
         assertThat(household.member(sam.id)).isNotNull()
         assertThat(access.toasts.messages).isEmpty()
+    }
+
+    /** Only Save's refusals name a field; Remove's and Move's belong above the footer. */
+    @Test
+    fun eachRefusalNamesItsField() = runTest {
+        start()
+        val sam = sam()
+        assertThat((editor.save(sam.id, draft("ALEX", 1)) as PeopleOutcome.Refused).field).isEqualTo(PersonField.NAME)
+        assertThat((editor.save(sam.id, draft("Sam", 0)) as PeopleOutcome.Refused).field).isEqualTo(PersonField.COLOUR)
+        assertThat((editor.add(draft("Mia", 2, Role.ADMIN)) as PeopleOutcome.Refused).field).isEqualTo(PersonField.PIN)
+        access.answer("1234")
+        assertThat((editor.save(alex.id, draft("Alex", 0, Role.ADULT)) as PeopleOutcome.Refused).field).isEqualTo(PersonField.ROLE)
+        access.answer("1234")
+        assertThat((editor.remove(alex.id) as PeopleOutcome.Refused).field).isNull()
+        assertThat((editor.move(PersonId("gone"), up = true) as PeopleOutcome.Refused).field).isNull()
     }
 }

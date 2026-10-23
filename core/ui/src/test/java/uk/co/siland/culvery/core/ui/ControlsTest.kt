@@ -73,6 +73,37 @@ class ControlsTest {
             .assertIsNotEnabled()
             .performClick()
         assertThat(taps).isEqualTo(0)
+        compose.onNodeWithTag("swatch_block", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("swatch_check", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun aChosenSwatchShowsATickAndNoBlock() {
+        show { HhSwatch(Color(0xFF5B9BE0), "Blue", chosen = true, takenBy = null, tag = "swatch") {} }
+        compose.onNodeWithTag("swatch", useUnmergedTree = true).assertIsSelected()
+        compose.onNodeWithTag("swatch_check", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("swatch_block", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun aRadioRowIsOneRadioNodeAndALockedOneDoesNotSelect() {
+        var taps = 0
+        var selected by mutableStateOf(false)
+        show {
+            Column {
+                HhRadioRow("Adult", "Can add and change any event", selected = selected, tag = "row") { taps++ }
+                HhRadioRow("Weekly", "Too long", selected = true, tag = "locked", locked = true) { taps++ }
+            }
+        }
+        compose.onNodeWithTag("row").assert(radio).assertIsNotSelected().assertTextEquals("Adult", "Can add and change any event")
+        selected = true
+        compose.onNodeWithTag("row").assertIsSelected()
+        compose.onNodeWithTag("row").performClick()
+        assertThat(taps).isEqualTo(1)
+        compose.onNodeWithTag("locked").assert(radio).assertIsSelected().assertIsNotEnabled().performClick()
+        assertThat(taps).isEqualTo(1)
+        compose.onNodeWithTag("row").assertHeightIsEqualTo(RadioRowTokens.minHeight)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test

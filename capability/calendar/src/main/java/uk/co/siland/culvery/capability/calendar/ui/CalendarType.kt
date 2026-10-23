@@ -137,8 +137,7 @@ internal object CalendarType {
     val timeCheck = HhType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.W600)
     val timeFreeAt = HhType.secondary
 
-    /** 17 sp / 600: a Repeats option, and the stepper's count in tabular figures (handoff 6f). */
-    val repeatOption = HhType.rowTitle
+    /** 17 sp / 600: the Repeats stepper's count in tabular figures (handoff 6f). */
     val repeatCount = HhType.rowTitle.copy(fontFeatureSettings = "tnum")
 
     /** 19 sp / 600 the title, 14 sp the muted line, 13 sp / 600 the fill line, 15 sp / 700 the pill: a suggestion (handoff 6a). */
@@ -269,15 +268,8 @@ internal object EditorDimens {
     val checkIconGap = 5.dp
     val freeGap = 8.dp
 
-    // The Repeats pane: options 56 tall, 7 apart, radius 15, 19 in at the sides, a 20 radio with a 10 dot 13 before the
-    // words; the stepper's 48 buttons 8 either side of its count, a 48 pill 19 in at its sides.
-    val repeatRowHeight = 56.dp
-    val repeatRowGap = 7.dp
-    val repeatRowRadius = 15.dp
-    val repeatRowPaddingH = 19.dp
-    val radio = 20.dp
-    val radioDot = 10.dp
-    val radioGap = 13.dp
+    // The Repeats pane (its options are HhRadioRows): the stepper's 48 buttons 8 either side of its count, a 48 pill 19 in at
+    // its sides.
     val stepperGap = 8.dp
     val stepperPaddingH = 19.dp
 

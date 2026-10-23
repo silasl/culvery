@@ -41,9 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.layout
@@ -106,11 +104,14 @@ object ControlTokens {
     val confirmGap = 16.dp
     val confirmButtonGap = 12.dp
 
-    // Colour swatch (4a; not in the spec): a 44 dp circle, 12 apart; chosen, a 3 dp `ink` ring 3 dp outside it; taken,
-    // at 38% with a 2 dp `ink` line across it.
-    val swatch = 44.dp
+    // Colour swatch (9 §4.11, handoff 5b): a 51 dp circle, 12 apart; chosen, a 3 dp `bg` gap, a 3 dp `ink` ring and a 25 dp
+    // check; taken, at 38% with a 23 dp block.
+    val swatch = 51.dp
     val swatchGap = 12.dp
     val swatchRing = 3.dp
+    val swatchRingGap = 3.dp
+    val swatchCheck = 25.dp
+    val swatchBlock = 23.dp
 
     // A status line: a 20 dp info icon 8 from its words.
     val statusIcon = 20.dp
@@ -123,11 +124,6 @@ object ControlTokens {
 
     // A locked chip (9 §4.8): no fill, a 1 dp `surf3` edge.
     val lockedEdge = 1.dp
-    val swatchRingGap = 3.dp
-    val swatchStrike = 2.dp
-
-    /** Where the taken line starts and ends, as a share of the swatch: on the circle, corner to corner. */
-    const val STRIKE_INSET = 0.15f
 }
 
 /** Control text styles, derived from HhType. */
@@ -390,12 +386,13 @@ fun HhStatusLine(
     field: Boolean = false,
     style: TextStyle = if (field) ControlType.fieldError else HhType.body,
     spoken: Boolean = true,
+    modifier: Modifier = Modifier,
 ) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (field) ControlTokens.fieldErrorGap else ControlTokens.statusGap),
-        modifier = Modifier.testTag(tag).semantics(mergeDescendants = true) {
+        modifier = modifier.testTag(tag).semantics(mergeDescendants = true) {
             if (spoken) liveRegion = LiveRegionMode.Polite else hideFromAccessibility()
         },
     ) {
@@ -495,12 +492,14 @@ fun HhConfirmCard(
     }
 }
 
-/** A person colour to pick (4a design §4.4): ringed when [chosen]; [takenBy] someone else, struck through, disabled and said. */
+/**
+ * A person colour to pick (9 §4.11): ringed, with a tick, when [chosen]; [takenBy] someone else, faded with a block,
+ * disabled and said. The ring and its gap sit inside the swatch's box, so circles are [ControlTokens.swatchGap] apart.
+ */
 @Composable
 fun HhSwatch(color: Color, name: String, chosen: Boolean, takenBy: String?, tag: String, onClick: () -> Unit) {
     val c = Culvery.colors
     val taken = takenBy != null
-    val outside = ControlTokens.swatchRing + ControlTokens.swatchRingGap
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -509,7 +508,7 @@ fun HhSwatch(color: Color, name: String, chosen: Boolean, takenBy: String?, tag:
                 contentDescription = name
                 if (takenBy != null) stateDescription = "used by $takenBy"
             }
-            .size(ControlTokens.swatch + outside * 2)
+            .size(ControlTokens.swatch + swatchOutside * 2)
             .then(if (chosen) Modifier.border(ControlTokens.swatchRing, c.ink, CircleShape) else Modifier)
             .clip(CircleShape)
             .selectable(selected = chosen, enabled = !taken, role = Role.RadioButton, onClick = onClick),
@@ -517,27 +516,27 @@ fun HhSwatch(color: Color, name: String, chosen: Boolean, takenBy: String?, tag:
         Box(
             Modifier
                 .size(ControlTokens.swatch)
-                // Before the alpha, so the line stays solid over the faded colour.
-                .drawWithContent {
-                    drawContent()
-                    if (taken) {
-                        val inset = size.width * ControlTokens.STRIKE_INSET
-                        drawLine(c.ink, Offset(inset, inset), Offset(size.width - inset, size.height - inset), ControlTokens.swatchStrike.toPx())
-                    }
-                }
                 .alpha(if (taken) ControlTokens.DISABLED_ALPHA else 1f)
                 .clip(CircleShape)
                 .background(color),
         )
+        if (taken) {
+            HhIcon(Icons.BLOCK, size = ControlTokens.swatchBlock, tint = PersonChipInk, modifier = Modifier.testTag("${tag}_block"))
+        } else if (chosen) {
+            HhIcon(Icons.CHECK, size = ControlTokens.swatchCheck, tint = PersonChipInk, modifier = Modifier.testTag("${tag}_check"))
+        }
     }
 }
 
-/** The person colours to pick from, a radio group, wrapping, 12 apart; swatch i is tagged [tagPrefix] + i. [taken] maps a colour to who has it. */
+private val swatchOutside get() = ControlTokens.swatchRing + ControlTokens.swatchRingGap
+
+/** The person colours to pick from, a radio group, wrapping; swatch i is tagged [tagPrefix] + i. [taken] maps a colour to who has it. */
 @Composable
 fun HhSwatchGrid(chosen: Long?, taken: Map<Long, String>, tagPrefix: String, onPick: (Long) -> Unit) {
+    val between = (ControlTokens.swatchGap - swatchOutside * 2).coerceAtLeast(0.dp)
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(ControlTokens.swatchGap),
-        verticalArrangement = Arrangement.spacedBy(ControlTokens.swatchGap),
+        horizontalArrangement = Arrangement.spacedBy(between),
+        verticalArrangement = Arrangement.spacedBy(between),
         modifier = Modifier.selectableGroup(),
     ) {
         PersonPalette.colors.forEachIndexed { i, colour ->

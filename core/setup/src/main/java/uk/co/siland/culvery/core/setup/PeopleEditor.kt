@@ -27,10 +27,12 @@ sealed interface PeopleOutcome {
     /** The PIN pad was cancelled, or the person may not do this; nothing changed. */
     data object Cancelled : PeopleOutcome
 
-    /** Nothing changed; the sheet shows [message] and keeps what was typed. */
-    /** [nameTaken] marks the name field as well as saying it. */
-    data class Refused(val message: String, val nameTaken: Boolean = false) : PeopleOutcome
+    /** Nothing changed; the sheet shows [message] under [field], or above its footer when null, and keeps what was typed. */
+    data class Refused(val message: String, val field: PersonField? = null) : PeopleOutcome
 }
+
+/** The part of the person sheet a refusal is about. */
+enum class PersonField { NAME, COLOUR, ROLE, PIN }
 
 /** A person as the sheet has them. [newPin] is a PIN chosen in the sheet; [removePin] is Remove PIN tapped. */
 data class PersonDraft(
@@ -39,7 +41,10 @@ data class PersonDraft(
     val role: Role,
     val newPin: String? = null,
     val removePin: Boolean = false,
-)
+) {
+    // The PIN stays out of every string.
+    override fun toString(): String = "PersonDraft(name=$name, color=$color, role=$role, newPin=${newPin != null}, removePin=$removePin)"
+}
 
 /**
  * The people editor's rules (4a design §3.5, §3.7, §4.4, D6): renaming and recolouring take the open session
@@ -56,9 +61,9 @@ class PeopleEditor @Inject constructor(
     val members: Flow<List<Member>> = household.members
 
     suspend fun add(draft: PersonDraft): PeopleOutcome {
-        if (draft.role == Role.ADMIN && draft.newPin == null) return PeopleOutcome.Refused(ADMIN_NEEDS_PIN)
+        if (draft.role == Role.ADMIN && draft.newPin == null) return PeopleOutcome.Refused(ADMIN_NEEDS_PIN, PersonField.PIN)
         access.authorise(CorePermissions.PEOPLE_MANAGE) ?: return PeopleOutcome.Cancelled
-        return saving(couldNotSaveDetails(draft.name.trim().ifEmpty { null })) { pins.addPerson(draft.name, draft.color, draft.role, draft.newPin) }
+        return saving(couldNotSaveDetails(draft.name.trim().ifEmpty { null }), named = true) { pins.addPerson(draft.name, draft.color, draft.role, draft.newPin) }
     }
 
     suspend fun save(id: PersonId, draft: PersonDraft): PeopleOutcome {
@@ -66,10 +71,10 @@ class PeopleEditor @Inject constructor(
         val roleChanged = draft.role != before.role
         val pinChanged = draft.newPin != null || draft.removePin
         val keepsAPin = draft.newPin != null || (before.hasPin && !draft.removePin)
-        if (draft.role == Role.ADMIN && !keepsAPin) return PeopleOutcome.Refused(ADMIN_NEEDS_PIN)
+        if (draft.role == Role.ADMIN && !keepsAPin) return PeopleOutcome.Refused(ADMIN_NEEDS_PIN, PersonField.PIN)
         val permission = if (roleChanged || pinChanged) CorePermissions.PEOPLE_MANAGE else CorePermissions.SETTINGS_MANAGE
         access.authorise(permission) ?: return PeopleOutcome.Cancelled
-        val outcome = saving(couldNotSaveDetails(before.person.name)) {
+        val outcome = saving(couldNotSaveDetails(before.person.name), named = true) {
             val pin = when {
                 draft.newPin != null -> pins.changeTo(draft.newPin, owner = id)
                 draft.removePin -> PinChange.Remove
@@ -116,24 +121,27 @@ class PeopleEditor @Inject constructor(
         if (isSignedIn(id)) access.lock()
     }
 
-    private suspend fun saving(failure: String, block: suspend () -> Unit): PeopleOutcome =
-        try {
+    /** Runs [block]; when [named], a refusal says which field it is about, else it belongs above the sheet's footer. */
+    private suspend fun saving(failure: String, named: Boolean = false, block: suspend () -> Unit): PeopleOutcome {
+        fun refused(message: String, field: PersonField) = PeopleOutcome.Refused(message, field.takeIf { named })
+        return try {
             block()
             PeopleOutcome.Done
         } catch (e: CancellationException) {
             throw e
         } catch (e: DuplicateNameException) {
-            PeopleOutcome.Refused(someoneCalled(e.name), nameTaken = true)
+            refused(someoneCalled(e.name), PersonField.NAME)
         } catch (e: ColourInUseException) {
-            PeopleOutcome.Refused(COLOUR_TAKEN)
+            refused(COLOUR_TAKEN, PersonField.COLOUR)
         } catch (e: PinInUseException) {
-            PeopleOutcome.Refused(PIN_TAKEN)
+            refused(PIN_TAKEN, PersonField.PIN)
         } catch (e: LastAdminException) {
-            PeopleOutcome.Refused(NEEDS_AN_ADMIN)
+            refused(NEEDS_AN_ADMIN, PersonField.ROLE)
         } catch (e: Exception) {
             failed(e)
             PeopleOutcome.Refused(failure)
         }
+    }
 
     private suspend fun <T> orNull(block: suspend () -> T?): T? =
         try {

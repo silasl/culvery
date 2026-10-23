@@ -111,13 +111,22 @@ class SetupScreenshotTest {
     @Test fun personNewDark() = sheet("person_new_dark", true, newPerson())
     @Test fun personNewLight() = sheet("person_new_light", false, newPerson())
 
+    /** Handoff 5b: "Sam" is taken, so are green and blue, and Adult is chosen. */
+    private fun nameTaken() = PersonForm(existing = null, taken = mapOf(PersonPalette.colors[0] to "Alex", PersonPalette.colors[1] to "Sam")).apply {
+        name = "Sam"
+        refuse(PeopleOutcome.Refused(someoneCalled("Sam"), PersonField.NAME))
+    }
+
+    @Test fun personNameTakenDark() = sheet("person_name_taken_dark", true, nameTaken())
+    @Test fun personNameTakenLight() = sheet("person_name_taken_light", false, nameTaken())
+
     @Test
     fun personErrorDark() = sheet(
         "person_error_dark",
         true,
         PersonForm(existing = null, taken = mapOf(PersonPalette.colors[0] to "Alex", PersonPalette.colors[1] to "Sam")).apply {
-            name = "Sam"
-            message = someoneCalled("Sam")
+            name = "Alex"
+            refuse(PeopleOutcome.Refused(couldNotSaveDetails(null)))
         },
     )
 

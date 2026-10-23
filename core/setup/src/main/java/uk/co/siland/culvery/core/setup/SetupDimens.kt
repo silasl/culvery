@@ -36,14 +36,16 @@ internal object SetupDimens {
     // Move up / Move down (4c §7.1; not in the spec): 48 dp touch targets around the row's 24 dp icon.
     val moveButton = 48.dp
 
-    // The person sheet (§4.4: HhSheet, 600 dp), padded as the calendar's sheets (28×30×26). Not in the spec: sections 20
-    // apart, a label 10 above its controls; role chips 10 apart; footer buttons 10 apart.
-    val sheetPaddingTop = 28.dp
-    val sheetPaddingH = 30.dp
-    val sheetPaddingBottom = 26.dp
-    val sectionGap = 20.dp
-    val labelGap = 10.dp
-    val roleGap = 10.dp
+    // The person sheet (9 §4.11: HhSheet, 613 dp), padded as handoff 5b: 29 top, 32 at the sides, 27 foot. Sections 16 apart,
+    // a label 8 above its control; the taken line 9 under the swatches; the PIN hint 13 after Set PIN. Not in the spec:
+    // footer buttons 10 apart.
+    val sheetPaddingTop = 29.dp
+    val sheetPaddingH = 32.dp
+    val sheetPaddingBottom = 27.dp
+    val sectionGap = 16.dp
+    val labelGap = 8.dp
+    val takenLineGap = 9.dp
+    val pinHintGap = 13.dp
     val footerGap = 10.dp
 
     // Settings (§4.6): the left column 320 wide. Not in the spec: `surf`, padding 32×28; the title 24 above the list;
@@ -77,8 +79,11 @@ internal object SetupType {
     /** 14 sp / 400: a line beside or under a control (PIN set, what the town is for). */
     val secondary = HhType.secondary
 
-    /** 30 sp / 700, −0.5 tracking: the person sheet's heading (the calendar editor's title). */
-    val sheetTitle = HhType.screenTitle.copy(fontSize = 30.sp, letterSpacing = (-0.5).sp)
+    /** 35 sp / 700, −0.5 tracking: the person sheet's heading (handoff 5b). */
+    val sheetTitle = HhType.screenTitle.copy(fontSize = 35.sp, letterSpacing = (-0.5).sp)
+
+    /** 13 sp / 400: the taken colours under the swatches. */
+    val takenLine = HhType.secondary.copy(fontSize = 13.sp)
 
     /** 14 sp / 700: a refusal in `danger`. */
     val message = HhType.secondary.copy(fontWeight = FontWeight.W700)

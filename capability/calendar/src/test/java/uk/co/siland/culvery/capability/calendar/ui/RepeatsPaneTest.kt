@@ -117,7 +117,8 @@ class RepeatsPaneTest {
         val tags = EDITOR_REPEATS.map { "repeat_${it.name}" }
         tags.zip(words).forEach { (tag, word) ->
             node(tag).assertTextEquals(word)
-            assertWithMessage("$tag's height").that(height(tag)).isWithin(0.01f).of(56f)
+            // 59 dp is 88.5 px at this density, which Compose rounds up.
+            assertWithMessage("$tag's height").that(height(tag)).isWithin(0.5f).of(59f)
         }
         assertWithMessage("in EDITOR_REPEATS order, one under another").that(tags.map(::top)).isInStrictOrder()
         node("repeat_Weekly").assertIsSelected()

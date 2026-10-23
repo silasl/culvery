@@ -1,17 +1,13 @@
 package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,9 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import uk.co.siland.culvery.capability.calendar.CHOOSE_A_DAY
 import uk.co.siland.culvery.capability.calendar.EDITOR_REPEATS
@@ -40,10 +34,11 @@ import uk.co.siland.culvery.core.ui.ButtonTokens
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhRadioRow
 import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.HhSegmented
 import uk.co.siland.culvery.core.ui.Icons
-import uk.co.siland.culvery.core.ui.hhClickable
+import uk.co.siland.culvery.core.ui.RadioRowTokens
 
 internal const val KEEPS_GOING = "Keeps going"
 internal const val STOPS_AFTER = "Stops after"
@@ -70,10 +65,16 @@ internal fun RepeatsPane(form: EditorForm, service: String, onPicked: () -> Unit
         return
     }
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap)) {
-        Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.repeatRowGap), modifier = Modifier.selectableGroup()) {
+        Column(verticalArrangement = Arrangement.spacedBy(RadioRowTokens.gap), modifier = Modifier.selectableGroup()) {
             EDITOR_REPEATS.forEach { choice ->
                 val locked = !choice.fitsLength(form.eventWhen.repeatLength)
-                RepeatRow(choice.wording(day, form.nthOn(day)), selected = form.repeat == choice, tag = "repeat_${choice.name}", locked = locked) {
+                HhRadioRow(
+                    choice.wording(day, form.nthOn(day)),
+                    line = TOO_LONG_TO_REPEAT.takeIf { locked },
+                    selected = form.repeat == choice,
+                    tag = "repeat_${choice.name}",
+                    locked = locked,
+                ) {
                     form.chooseRepeat(choice)
                     if (choice == RepeatChoice.Never) onPicked()
                 }
@@ -98,41 +99,6 @@ private fun NeedsADay(onChooseDay: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(EditorDimens.paneGap)) {
         Text(CHOOSE_A_DAY_FIRST, style = CalendarType.whoHint, color = Culvery.colors.mute, modifier = Modifier.testTag("repeats_need_day"))
         HhButton(CHOOSE_A_DAY, onChooseDay, Modifier.testTag("repeats_choose_day"), icon = Icons.CALENDAR_MONTH, on = ButtonSurface.Surf)
-    }
-}
-
-/**
- * 56 dp, `surf2`, a radio then the words; chosen, `accentSoft` with a 2 dp `accent` ring inside. [locked] is a repeat the
- * span rules out: muted, not tappable, with its reason under the words.
- */
-@Composable
-private fun RepeatRow(words: String, selected: Boolean, tag: String, locked: Boolean, onClick: () -> Unit) {
-    val c = Culvery.colors
-    val shape = RoundedCornerShape(EditorDimens.repeatRowRadius)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(EditorDimens.radioGap),
-        modifier = Modifier
-            .testTag(tag)
-            .semantics { this.selected = selected }
-            .hhClickable(onClick, role = Role.RadioButton, enabled = !locked)
-            .fillMaxWidth()
-            .heightIn(min = EditorDimens.repeatRowHeight)
-            .clip(shape)
-            .background(if (selected) c.accentSoft else c.surf2)
-            .then(if (selected) Modifier.border(EditorDimens.ring, c.accent, shape) else Modifier)
-            .padding(horizontal = EditorDimens.repeatRowPaddingH),
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.size(EditorDimens.radio).border(EditorDimens.ring, if (selected && !locked) c.accent else c.mute, CircleShape),
-        ) {
-            if (selected) Box(Modifier.size(EditorDimens.radioDot).clip(CircleShape).background(c.accent))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(words, style = CalendarType.repeatOption, color = if (locked) c.mute else c.ink)
-            if (locked) Text(TOO_LONG_TO_REPEAT, style = CalendarType.whoHint, color = c.mute, modifier = Modifier.testTag("${tag}_note"))
-        }
     }
 }
 

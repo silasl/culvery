@@ -1,6 +1,8 @@
 package uk.co.siland.culvery.core.setup
 
+import java.util.Locale
 import uk.co.siland.culvery.core.household.Role
+import uk.co.siland.culvery.core.ui.PersonPalette
 
 // 4a design §4. Ruling 11 and 18 name the strings the spec doesn't give.
 
@@ -95,11 +97,25 @@ internal fun changeDetailsLabel(name: String): String = "change $name’s detail
 
 internal const val USE_AS_HOME = "use as home"
 
-internal fun roleLine(role: Role): String = when (role) {
-    Role.ADMIN -> "Admin — can change settings and people"
-    Role.ADULT -> "Adult — can add and change any event"
-    Role.CHILD -> "Child — can add their own events"
+internal fun roleWhat(role: Role): String = when (role) {
+    Role.ADMIN -> "Can change settings and people"
+    Role.ADULT -> "Can add and change any event"
+    Role.CHILD -> "Can add their own events"
 }
+
+/** Who a colour that was taken while the sheet was open belongs to is not known. */
+internal const val SOMEONE_ELSE = "someone else"
+
+/** "Green and blue are taken by Alex and Sam.", colours and people in palette order; null when nothing is taken. */
+internal fun takenLine(taken: Map<Long, String>): String? {
+    val held = PersonPalette.colors.indices.mapNotNull { i -> taken[PersonPalette.colors[i]]?.let { PersonPalette.names[i] to it } }
+    if (held.isEmpty()) return null
+    val colours = held.mapIndexed { i, (colour, _) -> if (i == 0) colour else colour.lowercase(Locale.UK) }
+    return "${inWords(colours)} ${if (held.size == 1) "is" else "are"} taken by ${inWords(held.map { it.second })}."
+}
+
+private fun inWords(items: List<String>): String =
+    if (items.size == 1) items.single() else "${items.dropLast(1).joinToString(", ")} and ${items.last()}"
 
 // Settings (§4.6, §4.7)
 internal const val MAKE_HOME_APP = "Make Culvery the home app so it comes back after a restart."
