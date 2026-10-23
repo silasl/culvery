@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.lights.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uk.co.siland.culvery.capability.lights.HouseRun
 import uk.co.siland.culvery.capability.lights.LIGHTS
@@ -35,7 +37,8 @@ import uk.co.siland.culvery.core.ui.ShellTokens
 
 /**
  * The REGULAR Home card (9 §4.2): the main room as a toggle with a › to its tab, its brightness, All lights off and Holiday mode. With a
- * problem, the §6 line and no controls; before the first read, that it is looking.
+ * problem, the §6 line and no controls; before the first read, that it is looking. In the side-by-side row (10 §4.9) a line
+ * under the buttons takes the two gaps and shows on one line, ending in … if longer.
  */
 @Composable
 fun LightsCard(
@@ -49,9 +52,27 @@ fun LightsCard(
     house: HouseActions,
     modifier: Modifier = Modifier,
 ) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val squeezed = line != null && maxHeight <= LightsDimens.rowCardMaxHeight
+        LightsCardContent(main, holidayOn, allOffLit, run, status, line, squeezed, mainRoom, house)
+    }
+}
+
+@Composable
+private fun LightsCardContent(
+    main: LightRoom?,
+    holidayOn: Boolean,
+    allOffLit: Boolean,
+    run: HouseRun?,
+    status: String?,
+    line: String?,
+    squeezed: Boolean,
+    mainRoom: MainRoomActions,
+    house: HouseActions,
+) {
     val c = Culvery.colors
     HhCard(
-        modifier = modifier.fillMaxSize().testTag("lights_card"),
+        modifier = Modifier.fillMaxSize().testTag("lights_card"),
         radius = ShellTokens.homeCardRadius,
         padding = PaddingValues(horizontal = LightsDimens.cardPaddingH, vertical = LightsDimens.cardPaddingV),
     ) {
@@ -68,15 +89,18 @@ fun LightsCard(
         Spacer(Modifier.weight(1f))
         if (main.dimmable) {
             BrightnessRow(main, "lights_card_slider", mainRoom.onDrag, mainRoom.onLetGo)
-            Spacer(Modifier.height(LightsDimens.bottomGap))
+            if (!squeezed) Spacer(Modifier.height(LightsDimens.bottomGap))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(LightsDimens.buttonGap)) {
             AllOffButton(allOffLit, house.onAllOff, Modifier.weight(1f))
             HolidayButton(holidayOn, run, house.onHoliday)
         }
         if (line != null) {
-            Spacer(Modifier.height(LightsDimens.lineGap))
-            Text(line, style = HhType.secondary, color = c.danger, maxLines = 2, modifier = Modifier.testTag("lights_card_line"))
+            if (!squeezed) Spacer(Modifier.height(LightsDimens.lineGap))
+            Text(
+                line, style = HhType.secondary, color = c.danger, maxLines = if (squeezed) 1 else 2, overflow = if (squeezed) TextOverflow.Ellipsis else TextOverflow.Clip,
+                modifier = Modifier.testTag("lights_card_line"),
+            )
         }
     }
 }

@@ -16,6 +16,9 @@ internal object LightsDimens {
     val sliderIcon = 24.dp
     val bottomGap = 15.dp
 
+    // At or below this height (the side-by-side row is 212) a line under the buttons takes the gaps and shows on one line.
+    val rowCardMaxHeight = 240.dp
+
     // A room's row is at least a touch target tall, as the card's › (HhRoundButton's 48 dp).
     val chevron = 48.dp
 

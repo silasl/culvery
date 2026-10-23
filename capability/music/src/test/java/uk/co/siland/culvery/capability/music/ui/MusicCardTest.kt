@@ -60,7 +60,7 @@ import uk.co.siland.culvery.core.ui.test.waitFor
 
 private val rowCardSize = DpSize(343.dp, 212.dp)
 
-/** Every clickable and text lies inside the card, no two clickables overlap, and no text line is clipped (ending in … is not). */
+/** Every clickable and text lies inside the card, no two clickables overlap, no text runs across a control it isn't the label of, and no text line is clipped (ending in … is not). */
 private fun ComposeContentTestRule.assertFitsTheCard() {
     val card = onNodeWithTag("fit_card").fetchSemanticsNode().boundsInRoot
     val texts = onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text), useUnmergedTree = true).fetchSemanticsNodes().filter { !it.boundsInRoot.isEmpty }
@@ -77,6 +77,12 @@ private fun ComposeContentTestRule.assertFitsTheCard() {
     for (i in clickables.indices) for (j in i + 1 until clickables.size) {
         assertWithMessage("clickables ${clickables[i].boundsInRoot} and ${clickables[j].boundsInRoot} overlap")
             .that(clickables[i].boundsInRoot.deflate(0.5f).overlaps(clickables[j].boundsInRoot.deflate(0.5f))).isFalse()
+    }
+    for (text in texts) for (click in clickables) {
+        val t = text.boundsInRoot
+        val c = click.boundsInRoot
+        val inside = t.left >= c.left - 0.5f && t.top >= c.top - 0.5f && t.right <= c.right + 0.5f && t.bottom <= c.bottom + 0.5f
+        assertWithMessage("text at $t runs across the control at $c").that(inside || !t.deflate(0.5f).overlaps(c)).isTrue()
     }
     for (node in texts) {
         val results = mutableListOf<TextLayoutResult>()

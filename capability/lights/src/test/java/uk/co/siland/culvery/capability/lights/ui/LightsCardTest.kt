@@ -213,16 +213,17 @@ class LightsCardTest {
         compose.assertAccessible()
     }
 
-    /** The card in the side-by-side row (10 §4.9). Fails if a control or line spills, overlaps or is cut at 343 x 212. */
+    /** The card in the side-by-side row (10 §4.9). Fails if a control or line spills, overlaps or is cut at 343 x 212, with or without a line. */
     @Test
     @Config(qualifiers = "w1280dp-h800dp")
     fun theCardFitsTheSideBySideRow() {
         var dark by mutableStateOf(true)
         var main by mutableStateOf(room("Upstairs landing and hallway", on = true, brightness = 70))
         var holidayOn by mutableStateOf(false)
+        var line by mutableStateOf<String?>(null)
         compose.setContent {
             CulveryTheme(dark = dark) {
-                Box(Modifier.size(rowCardSize).testTag("fit_card")) { LightsCard(main, holidayOn, true, null, null, null, mainRoom, house) }
+                Box(Modifier.size(rowCardSize).testTag("fit_card")) { LightsCard(main, holidayOn, true, null, null, line, mainRoom, house) }
             }
         }
         for (theme in listOf(true, false)) {
@@ -232,6 +233,15 @@ class LightsCardTest {
             holidayOn = true
             compose.waitForIdle()
             compose.assertFitsTheCard()
+            for (message in listOf(
+                "2 rooms didn’t turn off. Try again.",
+                "Lights are off, but Culvery couldn’t start Mimic presence. Start it in the Hue app.",
+            )) {
+                line = message
+                compose.waitForIdle()
+                compose.assertFitsTheCard()
+            }
+            line = null
             holidayOn = false
             main = room("Lounge", on = false)
             compose.waitForIdle()
