@@ -1,8 +1,10 @@
 # Culvery — Plan 9c-2: The redesign, the setup wizard and the Settings pages Implementation Plan
 
+> Refreshed against `main` 89a53c06 on 2026-10-23 (`.superpowers/sdd/2026-10-20-culvery-09c2-redesign-wizard-settings/refresh-findings.md` and the ledger's R-rulings).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tasks 1–7 are subagent tasks; Task 8 is the controller on the `culvery-5` AVD with the user; Tasks 9–10 need the user and the son's SM-T510.
 >
-> **9c is split in two.** **9c-1** (`docs/superpowers/plans/2026-10-20-culvery-09c-redesign-forms.md`) covers the shared sheet and form pieces and Add event, and merges first. This plan, **9c-2**, covers the setup wizard and the Settings pages, on a branch cut from `main` after 9c-1's merge.
+> **9c is split in two.** **9c-1** (`docs/superpowers/plans/2026-10-20-culvery-09c-redesign-forms.md`) covers the shared sheet and form pieces. 9c-1b and 9c-1c then made Add event the full-screen editor (`EventEditorScreen`). All three have merged. This plan, **9c-2**, covers the setup wizard and the Settings pages, on a branch cut from `main` at 89a53c06, after 9c-1, 9c-1b and 9c-1c.
 
 **Goal:** The setup wizard and the Settings pages look as the October redesign draws them.
 
@@ -48,11 +50,11 @@ The drawings are the handoff `docs/design/2026-10-redesign/handoff.md` and its `
 
 The full HTML export is in `C:\Users\si\code\siland\culvery-notes\design-handoff-2026-10\`. Where the spec and the handoff disagree, the spec wins. Read all three with this plan.
 
-**Previous plans (format, shared parts, rulings):** 9c-1 (its shared pieces), `docs/superpowers/plans/2026-10-20-culvery-09b-redesign-tabs.md`, and `docs/superpowers/plans/2026-10-19-culvery-09a-redesign-home.md`.
+**Previous plans (format, shared parts, rulings):** 9c-1 (its shared pieces), `docs/superpowers/plans/2026-10-21-culvery-09c1b-calendar-update.md` (see its "Shared components 9c-2 reuses"), `docs/superpowers/plans/2026-10-22-culvery-09c1c-when-and-suggestions.md`, `docs/superpowers/plans/2026-10-20-culvery-09b-redesign-tabs.md`, and `docs/superpowers/plans/2026-10-19-culvery-09a-redesign-home.md`.
 
 **Follow-ups:** `docs/superpowers/plans/2026-09-23-plan1-followups.md`.
 
-**Builds on:** branch `plan-9c2-wizard-settings` in the one checkout `C:\Users\si\code\siland\culvery`. There are no worktrees; the branch is cut from `main` once 9c-1 is merged. Work only there. Never push.
+**Builds on:** branch `plan-9c2-wizard-settings` in the one checkout `C:\Users\si\code\siland\culvery`. There are no worktrees; the branch is cut from `main` at 89a53c06, after 9c-1, 9c-1b and 9c-1c. Work only there. Never push.
 
 | # | Task | Review |
 |---|---|---|
@@ -89,7 +91,7 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
    - at least 69 dp high, with the content centred;
    - title 18 sp W600, subtitle 14 sp.
 
-   Every list row in the app moves with it: people, towns, connections, Door's steps, Favourites, and Display's and Door's switch rows. It stays one row, as 4d-1 made it. `PersonRow` passes `minHeight = 75.dp` (5a's 112 px).
+   Every list row in the app moves with it: people, towns, connections, Door's steps, Favourites, and Display's and Door's switch rows. It stays one row, as 4d-1 made it. `PersonRow` passes `minHeight = 75.dp` (5a's 112 px), and its name uses the row title like every row (18 sp W600), not 5a's 19. `HhSwitchRow` gains `enabled` and `minHeight`; the editor's All day row passes `EditorDimens.rowHeight` (77), so the editor's five rows stay level.
 3. **The switch** (the user, 2026-10-20). `HhSwitch` becomes the handoff's 88 × 50 px switch, drawn here, replacing Material's 52 × 32 one:
    - 59 × 33 dp, knob 25, inset 4;
    - on: `accent`, with an `accentInk` knob;
@@ -102,9 +104,9 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
    - With `onCheckedChange` set, it is `toggleable(enabled = enabled, role = Role.Switch)`. Disabled means it doesn't toggle by touch or by TalkBack. Material's `enabled` was behaviour as well as look, and the redraw must keep that.
    - With `onCheckedChange` null, it only draws; the row is the switch.
    - The knob animates only on a change, never on first composition.
-4. **The main calendar's switch** reads "Always shown" beside it, in place of "Show" (note 46). It is drawn disabled-on at the app's 38 %, not the handoff's 45 %. The row's `toggleable` is `enabled = false` there, as today.
+4. **The main calendar's switch** reads "Always shown" beside it, in place of "Show" (note 46). It is drawn disabled-on at the app's 38 %, not the handoff's 45 %. The row's `toggleable` is `enabled = false` there, as today. Its spoken state stays `ALWAYS_SHOWN` ("always shown: it’s the main calendar"), which says why; the visible text is "Always shown".
 5. **One page title** for wizard steps and Settings pages (the user, 2026-10-20).
-   - **What it is:** `HhPageTitle(title, line)`, a thin call of 9b's `HhPageHeader`, which gains `titleStyle` and `subtitleStyle` parameters (defaults unchanged). It draws 37 sp W700 (Settings' 56 px), with its line in 16 sp `mute` 8 below. The heading semantics and gaps exist once.
+   - **What it is:** `HhPageTitle(title, line)` calls the slot overload of `HhPageHeader` (`title: @Composable () -> Unit`, 9c-1b) with `Text(title, PageHeaderTokens.pageTitleStyle, heading())`. The slot overload gains `subtitleStyle` and `subtitleGap` (defaults unchanged, 4 dp), and `HhPageTitle` passes 8. There is no `titleStyle` parameter. It draws 37 sp W700 (Settings' 56 px), with its line in 16 sp `mute` 8 below. The heading semantics and gaps exist once.
    - **Why 37 for the wizard too:** the wizard's 60 px (40 sp) is drawn at 37, because the Connect and Your calendars steps are the same composables as Settings › Calendars.
    - **Where it goes:** it is built in Task 2 for `StepTitle`. Task 5 moves every Settings page to it, including `ReviewCalendars`' title; only Task 5 changes that title.
 6. **The wizard column is 640 dp** (960 px). **Settings' pane keeps 720 dp**, as its own `SetupDimens.settingsPane` (today both read `wizardColumn`) (the user, 2026-10-20).
@@ -116,7 +118,7 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
    The pill's width tells the current step without colour, which the 1.5 dp rings used to do. They are spoken "Step 3 of 7", as today.
 8. **Back and Next** (note 42) are `ButtonSize.Large` (60 dp; the handoff's 61, per 9c-1 ruling 5) at the foot of the 640 dp column:
    - Back on the left, quiet;
-   - Next on the right, primary, with `arrow_forward` after the label;
+   - Next on the right, primary: `HhButton(…, size = ButtonSize.Large, trailingIcon = Icons.ARROW_FORWARD, busy = busy)`, which keeps its width while busy;
    - Skip for now is the same size, quiet.
 9. **One green button per screen** (note 41).
    - **Made quiet:**
@@ -129,7 +131,8 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
    - **Accepted exception:** Review calendars' Reconnect stays primary even beside Next. It is the fix, and it shows only while a connection needs signing in again, so that step can have two green buttons.
    - **Tests:** count primaries through a semantics property `ButtonToneKey` that `HhButton` sets (as `SpokenNameKey` is set today), on fixed tags.
 10. **Errors under their field, where you can see them** (note 43; security review).
-    - **The text field:** `HhTextField(error)` draws a 2 dp `danger` ring (3 px), in place of the focus ring while there is an error. Under it, 8 dp down, it draws `HhStatusLine(error, "${tag}_error", icon = ERROR, style = ControlType.fieldError, spoken = false)` (9c-1), composed only while shown. The field carries the error in its semantics, so TalkBack says it once.
+    - **The text field:** `HhTextField(error)` draws a 2 dp `danger` ring (3 px), in place of the focus ring while there is an error. Under it, 8 dp down, it draws `HhStatusLine(error, "${tag}_error", icon = ERROR, field = true, spoken = false)`, composed only while shown. `HhStatusLine` takes an explicit `field: Boolean = false` in place of comparing `style` with `ControlType.fieldError`, so the text field's caller can't drift. The field carries the error in its semantics, so TalkBack says it once.
+    - **The address sheets:** `AddressSheet` (Lights and Music) stops passing `error = line` and keeps its `_line` message, because a failed connect isn't the text's fault (ruling 20). A mistyped address gets no ring.
     - **Focus:** on a refusal, the sheet or step moves focus to the errored field, so TalkBack reads the error there, and scrolls it into view.
     - **The name taken** reads "`Someone is already called {name}. Try “{name} B” or a nickname.`" (handoff; `someoneCalled`).
     - **Person sheet, save refusals:** each goes under the section it is about, as an announced `HhStatusLine` composed only while shown. The section is scrolled into view, and focus moves to that line (made focusable):
@@ -138,8 +141,8 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
       - "Culvery needs at least one Admin with a PIN." from Save goes under Role.
     - **Above the footer:** refusals from **Remove** and **Move** (`remove()`, `move()`), and "Couldn’t save …" (no field), show in `person_message` above the footer. A Remove refused for the last Admin closes the confirm card and shows the reason there, so it is never out of sight.
     - **The type:** `PeopleOutcome.Refused` carries `field: PersonField?` in place of `nameTaken`.
-11. **Role radio rows** (note 44) are `RoleRow(role, selected, onClick)`, private to `:core:setup`: there is one caller. They sit in a `selectableGroup`.
-    - **Titles:** `roleName` ("Admin").
+11. **Role radio rows** (note 44) are `HhRadioRow(title, line: String? = null, selected, tag, locked = false, onClick)` in `core/ui`, with `RadioRowTokens`. It is `RepeatRow` (`capability/calendar/.../ui/RepeatsPane.kt`, 9c-1b) moved there; `RepeatsPane` and the person sheet are its two callers. It has one set of sizes, handoff 5b's (Units: min 59, r16, dot 6, 8 apart), so the editor's Repeats rows take them too and `EditorDimens.repeatRow*`, `radio` and `radioDot` go. The rows sit in a `selectableGroup`.
+    - **Titles:** `Role.label` (`:core:household`), as `PersonRow` already uses ("Admin").
     - **Lines:** "Can change settings and people", "Can add and change any event", "Can add their own events" (`roleWhat`). `roleLine` goes if it is unused.
 12. **Swatches** (note 45) are 51 dp, 12 apart.
     - **Taken:** at the app's 38 %, with the `block` icon in `PersonChipInk` in place of the strike. It stays not selectable (`selectable(enabled = false)`), as today.
@@ -173,7 +176,7 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
     - Show.
 
     **Under the line,** each only when it applies:
-    - the person chips, while the dropdown is open;
+    - the person chips, while the dropdown is open: `HhChoiceChip`s in a `selectableGroup` (`review_pick_{name}`), one person per calendar. They are not `HhPersonChip`, which is a multi-select for an event's set;
     - "Use for new events" (quiet, 48 dp), on writable calendars that aren't the main one;
     - at the very foot, the read problem strip: full width, `dangerSoft`, with `sync_problem`, the message in `ink`, and "Hide this calendar" on `surf` inside it for a calendar that isn't the main one.
 
@@ -206,7 +209,7 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
     - **No saved state:** the new form state (`refusal`, the field focus) stays plain in-memory state, never `rememberSaveable`, so no name or PIN goes into a Bundle.
     - **The PIN never prints:** `PersonDraft.toString()` leaves out the PIN, because `PersonDraft` is a data class holding `newPin`.
     - **Pins kept as they are:** the PIN pad over the person sheet keeps hiding the sheet from TalkBack, and `form.edited` keeps its fields.
-23. **The shell variable for prediction lists is `$LISTS`** (`C:/t9`). It is a plain shell variable for list files only, never exported.
+23. **The shell variable for prediction lists is `$LISTS`** (`C:/t9`). It is a plain shell variable for list files only, never exported. Each task writes both `expected-baselines.txt` and `expected-prefixes.txt` afresh (an empty file for the one it doesn't use), because `C:/t9` still holds older lists.
 
 ## Notes for the end-of-v1 design review
 
@@ -215,11 +218,12 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
 - one 59 × 33 dp switch everywhere, the Lights room card included;
 - the disabled fade stays 38 %;
 - one 37 sp page title for wizard steps and Settings pages;
-- the Settings pane stays 720 dp, and the wizard column is 640 dp;
-- the Until chip reads "Until" (9c-1).
+- the Settings pane stays 720 dp, and the wizard column is 640 dp.
 
 **Also for that review** (this plan's calls):
 - Back, Next and Save person are at Large's 60 dp with a 17 sp label;
+- people rows use the one row title, 18 sp, against the handoff's 19;
+- Settings › Calendars says "Family" for a calendar's household-wide tag, where New event's Who says "Everyone" (Family vs Everyone);
 - the chosen Settings item stays bold;
 - the 45 % "Always shown" switch is drawn at 38 %.
 
@@ -232,9 +236,9 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
 | Page title | Settings 56/700, wizard 60/700; line 24 muted | 37 sp W700 (ruling 5); 16 sp `mute`, 8 below |
 | Wizard | column 960; dots 16, pill 44 × 16, gap 14; padding top 56; dots to step 64 | 640; 11, 29 × 11, 9; 37; 43 |
 | Back · Next | 92, Next arrow 34 | `ButtonSize.Large` 60, icon 24 |
-| Person rows | 112, r 28, dot 22, gap 22, name 28/600, sub 21, › 36; 18 apart | 75, r 19, dot 15, gap 15, 19 sp W600, 14 sp, 24; 12 apart |
+| Person rows | 112, r 28, dot 22, gap 22, name 28/600, sub 21, › 36; 18 apart | 75, r 19, dot 15, gap 15, 18 sp W600, 14 sp, 24; 12 apart |
 | Add person | 72 quiet, `person_add` 32 | 48 quiet, icon 24 |
-| Field error | ring 3 px inset; message 21/600 + `error` 26 | ring 2; `HhStatusLine(icon = ERROR, style = fieldError)` (9c-1) |
+| Field error | ring 3 px inset; message 21/600 + `error` 26 | ring 2; `HhStatusLine(icon = ERROR, field = true)` |
 | Swatches | 76, gap 18, taken .3 + block 34, chosen 5 gap + 4 ring + check 38 | 51, 12, 38 % + block 23, 3 gap + 3 ring + check 25 |
 | Taken line | 20 muted | 13 sp `mute`, 9 under |
 | Radio rows | min 88, r 24, padding 14/26, radio 30 (ring 3, selected 9), gap 20, name 25/700, line 20; 12 apart; selected `accentSoft` + 3 ring | min 59, r 16, padding 9 × 17, radio 20 (ring 2, selected 6), gap 13, 17 sp W700, 13 sp; 8 apart; `accentSoft` + 2 `accent` |
@@ -295,13 +299,21 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
 - **Tests that can fail:**
   - every new test fails before its change; a test that passes before it is labelled **pin**;
   - timer tests run on virtual time; UI timers run under `compose.mainClock`, one frame before the boundary and at the boundary plus one frame. A test that toggles the switch then reads pixels advances `mainClock` past the knob's animation;
-  - colour checks read a pixel inside a fill but clear of its content, through 9c-1's `pixelAt(node, dx, dy)`, never the centre of something with a label;
+  - colour checks read a pixel inside a fill but clear of its content, through `pixelAt(node, dx, dy)` (`core/ui/src/testFixtures/.../test/PixelAt.kt`), never the centre of something with a label. Every test that reads pixels is `@GraphicsMode(GraphicsMode.Mode.NATIVE)`;
   - tokens aren't asserted against the literals that set them.
 - **Every UI task ends the same way:**
   1. Run `compareRoborazziDebug`.
   2. Open each `*_compare.png`, and each new image, against the handoff section the task names.
   3. Record.
-  4. Run the baseline check: put the predicted names or prefixes in `$LISTS/expected-baselines.txt` / `$LISTS/expected-prefixes.txt`, and check them as in Plan 9a's Global Constraints. Anything outside the prediction stops the task.
+  4. Run the baseline check. Write both `$LISTS/expected-baselines.txt` (exact names, one per line) and `$LISTS/expected-prefixes.txt` (name prefixes) afresh, with an empty file for the one the task doesn't use. Then:
+```bash
+git status --porcelain -- "*.png" | sed 's#.*/##; s#\.png$##' | sort -u > "$LISTS/changed.txt"
+echo "changed but not listed:"; comm -23 "$LISTS/changed.txt" <(sort -u "$LISTS/expected-baselines.txt")
+echo "listed but unchanged:"; comm -13 "$LISTS/changed.txt" <(sort -u "$LISTS/expected-baselines.txt")
+echo "changed but not predicted:"; grep -v -f <(sed 's/^/^/' "$LISTS/expected-prefixes.txt") "$LISTS/changed.txt"
+echo "predicted but unchanged:"; while read -r p; do grep -q "^$p" "$LISTS/changed.txt" || echo "$p"; done < "$LISTS/expected-prefixes.txt"
+```
+     Both lists of each pair must be empty, or stop. Anything outside the prediction stops the task. (An empty expected file makes its pair print everything changed; read only the pair that applies.)
   5. Run the gate.
   6. Commit.
 
@@ -311,7 +323,7 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
   - every changed screen's test ends with `compose.assertClickablesHaveRoleAndLabel()`;
   - TalkBack names follow the copy.
 - **Code:**
-  - icons come from `Icons`; a new one goes in `tools/fonts/icons.txt`, and the subset is rebuilt from the full font at 608ce00;
+  - icons come from `Icons`; a new one goes in `tools/fonts/icons.txt`, and the subset is rebuilt from the full font at 608ce00 (`git cat-file blob 608ce00:core/ui/src/main/res/font/material_symbols_rounded.ttf > "$LISTS/material-symbols-full.ttf"`, then `python tools/fonts/subset.py --source "$LISTS/material-symbols-full.ttf"`; the full font is already at `C:/t9/material-symbols-full.ttf`);
   - layout numbers are named in the module's dimens object;
   - comments say what the code can't, in one line, with spec refs as `(9 §4.12)`; no plan task or ruling numbers;
   - no personal data: sample names only (Alex, Sam, Mia, Lounge, Kitchen, Hall, Garden, Front Door, Back Garden);
@@ -339,7 +351,7 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
      - the Remove refusal shows above the footer.
    - **Tests:**
      - Task 3:
-       - `TextFieldTest.anErrorRingsTheFieldAndSitsUnderIt`, `theErrorIsSaidOnce`;
+       - `ControlsTest.anErrorRingsTheFieldAndSitsUnderIt`, `theErrorIsSaidOnce`;
        - `YouFormTest.aTakenNameIsAnErrorOnTheNamedFieldAndSaidOnce` (extended), `aTakenNameMovesFocusToTheNameField`.
      - Task 4, in `PeopleUiTest`:
        - `aTakenNameShowsUnderTheNameAndTypingClearsIt`, `aTakenNameMovesFocusToTheNameField`;
@@ -365,7 +377,7 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
      - the chips sit under the line, and the strip at the very foot, with no Hide button and "To hide it, choose another main calendar first.";
      - the hidden calendar shows no strip;
      - Show doesn't toggle.
-   - **Tests** (Task 6): `ReviewCalendarsTest.theStripSitsAtTheFootUnderTheChips`, `theMainCalendarsProblemSaysChooseAnotherFirst`, `aHiddenCalendarShowsNoStrip` (**pin**), `theMainCalendarsSwitchCannotBeToggled`.
+   - **Tests** (Task 6): `ReviewCalendarsTest.theStripSitsAtTheFootUnderTheChips`, `theMainCalendarsProblemSaysChooseAnotherFirst`, `aHiddenCalendarShowsNoReadProblem` (existing **pin**), `theMainCalendarsSwitchCannotBeToggled`.
 4. **The wizard with the keyboard up, and the steps' green buttons.**
    - **Cases:**
      - the You step's name field focused, with a 320 dp keyboard, at font scale 1.3;
@@ -375,7 +387,9 @@ These are the places where the spec leaves a choice open, or where it doesn't fi
    - **Expected:**
      - Back and Next stay above the keyboard, inside the 640 dp column;
      - at most one primary on each step, except Review's accepted Reconnect beside Next.
-   - **Tests** (Task 2): `SetupButtonsTest.theWizardsButtonsStayAboveTheKeyboard` (extended to 1.3), `backAndNextSitInsideTheColumn`; `StepsUiTest.eachStepHasAtMostOneGreenButton`.
+   - **Tests:**
+     - Task 2: `SetupButtonsTest.theWizardsButtonsStayAboveTheKeyboard` (extended to 1.3), `backAndNextSitInsideTheColumn`, `aToastSitsAboveTheWizardsNext`; `StepsUiTest.eachStepHasAtMostOneGreenButton` (Welcome, Household, Done).
+     - Task 6: `ReviewCalendarsTest.aConnectionNeedingSignInHasOneGreenButton`.
 5. **Settings' idle close, and sliders that save.**
    - **Cases:**
      - a tap on a Settings switch, a radio row or a slider drag while Settings is open;
@@ -398,12 +412,12 @@ The spec's own tests (§7):
 ## File Structure
 
 ```
-core/ui/.../Icons.kt, tools/fonts/icons.txt, the font; Components.kt (HhListRow, ListRowTokens), Rows.kt (HhSwitchRow), Controls.kt (HhSwitch) (Task 1)
-core/ui/.../PageHeader.kt (HhPageHeader styles, HhPageTitle), Buttons.kt (ButtonToneKey); core/setup/.../SetupWizard.kt, SetupDimens.kt, SetupUi.kt, steps/DoneStep.kt, pages/KioskPage.kt (Task 2)
-core/ui/.../Controls.kt (HhTextField's error); core/setup/.../PeopleUi.kt, SetupCopy.kt, steps/HouseholdStep.kt, steps/YouStep.kt (Task 3)
-core/ui/.../Controls.kt (HhSwatch, HhSwatchGrid); core/setup/.../PersonEditorSheet.kt (RoleRow), PeopleEditor.kt (PersonField, PersonDraft), SetupCopy.kt (Task 4)
+core/ui/.../Icons.kt, tools/fonts/icons.txt, the font; Components.kt (HhListRow, ListRowTokens), Rows.kt (HhSwitchRow), Controls.kt (HhSwitch); capability/calendar/.../CalendarType.kt (EditorDimens), EventEditorScreen.kt (All day row) (Task 1)
+core/ui/.../PageHeader.kt (the slot overload's subtitle styles, HhPageTitle), Buttons.kt (ButtonToneKey); core/setup/.../SetupWizard.kt, SetupDimens.kt, SetupUi.kt, steps/DoneStep.kt, pages/KioskPage.kt (Task 2)
+core/ui/.../Controls.kt (HhTextField's error, HhStatusLine's `field`), AddressSheet.kt; core/setup/.../PeopleUi.kt, SetupCopy.kt, steps/HouseholdStep.kt, steps/YouStep.kt (Task 3)
+core/ui/.../Controls.kt (HhSwatch, HhSwatchGrid), Rows.kt (HhRadioRow); capability/calendar/.../RepeatsPane.kt, CalendarType.kt; core/setup/.../PersonEditorSheet.kt, PeopleEditor.kt (PersonField, PersonDraft), SetupCopy.kt (Task 4)
 core/setup/.../SettingsScreen.kt, pages/*.kt; app/.../display/ui/DisplaySettingsPage.kt; capability/{door,lights,music}/.../ui/*SettingsPage.kt; capability/calendar/.../ui/ReviewCalendars.kt (title) (Task 5)
-capability/calendar/.../ui/ReviewCalendars.kt, ui/CalendarType.kt (Task 6)
+capability/calendar/.../ui/ReviewCalendars.kt (incl. ReviewCalendarsHost), ui/CalendarType.kt (Task 6)
 core/ui/.../Rows.kt (HhSliderRow); capability/door/.../ui/DoorSettingsPage.kt; app/.../DisplaySettingsPage.kt; capability/music/.../MusicSettingsPage.kt; core/setup/.../LocationPane.kt (Task 7)
 docs/superpowers/plans/2026-09-23-plan1-followups.md (Tasks 8–10)
 ```
@@ -416,14 +430,17 @@ docs/superpowers/plans/2026-09-23-plan1-followups.md (Tasks 8–10)
 
 **Files:**
 - Modify:
-  - `core/ui/.../Icons.kt`, `tools/fonts/icons.txt`, and the font (regenerated as in 9c-1 Task 1).
+  - `core/ui/.../Icons.kt`, `tools/fonts/icons.txt`, and the font (regenerated from the full font as in Global Constraints). Only `block` and `person_add` are added.
   - `core/ui/.../Components.kt`: `ListRowTokens`, and `HhListRow(minHeight)`.
-  - `core/ui/.../Rows.kt`: `HhSwitchRow`. Its `ListRowTokens.paddingH` at :43 becomes `paddingStart`/`paddingEnd`.
+  - `core/ui/.../Rows.kt`: `HhSwitchRow`. Its `ListRowTokens.paddingH` at :43 becomes `paddingStart`/`paddingEnd`. It gains `enabled` and `minHeight`.
+  - `capability/calendar/.../ui/CalendarType.kt`: `EditorDimens.rowRadius`, `rowPaddingStart` and `rowPaddingEnd` point at `ListRowTokens` (no pixel change), so it stays one look.
+  - `capability/calendar/.../ui/EventEditorScreen.kt:439`: the All day row passes `minHeight = EditorDimens.rowHeight`.
   - `core/ui/.../Controls.kt`: `HhSwitch`, `SwitchTokens`.
 - Test:
   - `core/ui/src/test/.../IconFontTest.kt`.
   - Create `RowLookTest.kt` and `SwitchTest.kt`.
-  - `RowStylesTest` in `core/setup`: a **pin**; it still passes.
+  - Change to 18 sp (not pins): `RowStylesTest.assertRowTitle` in `core/setup`, `ListRowAndLabelTest.aRowsTitleAndSubtitleAreOneLineInTheSharedStyles` in `core/ui`, and `ReviewCalendarsTest.connectionAndCalendarRowsUseTheSharedRowStyles` in `capability/calendar`.
+  - Pins that stay green: `RowsTest.aSwitchRowIsOneSwitch` and `EventEditorScreenTest`.
   - A new `rows_dark`/`rows_light` screenshot in core/ui.
 
 **Interfaces:**
@@ -435,7 +452,7 @@ docs/superpowers/plans/2026-09-23-plan1-followups.md (Tasks 8–10)
     - `minHeight = 69.dp`;
     - `titleStyle = HhType.rowTitle.copy(fontSize = 18.sp)`.
   - **`HhListRow(…, minHeight: Dp = ListRowTokens.minHeight)`**, with the `border` edge.
-  - **`HhSwitchRow`**, in the same container. Its `toggleable` passes `enabled`.
+  - **`HhSwitchRow(title, line, checked, tag, onChange, enabled: Boolean = true, minHeight: Dp = ListRowTokens.minHeight)`**, in the same container. Its `toggleable` passes `enabled`. The editor's All day row passes `minHeight = EditorDimens.rowHeight` (77), so its five rows stay level.
   - **`HhSwitch(checked, onCheckedChange, tag, enabled)`**, drawn per ruling 3:
     - `SwitchTokens.width = 59.dp`, `height = 33.dp`, `knob = 25.dp`, `inset = 4.dp`;
     - the knob slides with `animateDpAsState`, but not on first composition.
@@ -446,6 +463,7 @@ docs/superpowers/plans/2026-09-23-plan1-followups.md (Tasks 8–10)
     - `aListRowIsAtLeastSixtyNineHigh`: a one-line `HhListRow` is 69 dp ±1; a `minHeight = 75.dp` row is 75 dp. The title's text is 3 dp below the row's top padding (a layout relationship, not a token).
     - `aListRowHasTheCardEdgeInLight`: in the light theme, `pixelAt(row, 0.dp, 30.dp)` is `border` (0xFFD5DCD8); in dark it is the row's `surf`.
     - `aSwitchRowIsTheSameRow`: a one-line `HhSwitchRow` is 69 dp and is still one `Role.Switch` node.
+    - `aSwitchRowTakesAMinHeight`: with `minHeight = 77.dp` it is 77 dp.
   - **`SwitchTest`:** toggles run with `mainClock.autoAdvance = false`, advancing 300 ms before reading.
     - `theSwitchIsFiftyNineByThirtyThree`: the switch is 59 × 33 dp.
       - On: `pixelAt(switch, 50.dp, 16.dp)` is `accentInk` and `pixelAt(switch, 6.dp, 16.dp)` is `accent`.
@@ -456,16 +474,17 @@ docs/superpowers/plans/2026-09-23-plan1-followups.md (Tasks 8–10)
     - `aDisabledOnSwitchStaysOnAndIsNamedAsDisabled`: the switch reads `ToggleableState.On` and `isNotEnabled`.
     - `theKnobDoesNotAnimateOnFirstShow`: at frame 0, an on switch's knob is already on the right.
 
-  Run `./gradlew :core:ui:testDebugUnitTest --tests '*RowLook*' --tests '*SwitchTest*' --tests '*IconFont*' :core:setup:testDebugUnitTest --tests '*RowStyles*'`. Expected: FAIL.
+  Run `./gradlew :core:ui:testDebugUnitTest --tests '*RowLook*' --tests '*SwitchTest*' --tests '*IconFont*' --tests '*ListRowAndLabel*' --tests '*RowsTest*' :core:setup:testDebugUnitTest --tests '*RowStyles*' :capability:calendar:testDebugUnitTest --tests '*ReviewCalendarsTest*' --tests '*EventEditorScreenTest*'`. Expected: FAIL.
 - [ ] **Step 2: Implement** per the Interfaces and Units.
 - [ ] **Step 3: Images.**
   - **Predicted prefixes:** every list row, switch row or switch:
-    - wizard: `people_list_`, `location_`, `you_`, `done_`, `connected_step_`;
+    - wizard: `people_list_`, `location_`, `you_`, `done_`;
     - Settings: `settings_`, `review_`;
-    - other screens: `favourites_sheet_`, `lights_tab_`, `lights_grid_`, `lights_room_`, `tab_lights_`.
+    - other screens: `favourites_sheet_`, `lights_tab_`, `lights_grid_`, `lights_room_`, `tab_lights_`;
+    - calendar editor (the All day row): `add_event_`, `change_event_`.
   - **New images:** `rows_dark`, `rows_light`.
   - **Refine** from the compare report before re-recording, and stop on anything outside it.
-  - **Check against** 5c's rows.
+  - **Check against** 5c's rows, and the editor's rows.
 ```bash
 git add core/ui core/setup capability app tools/fonts/icons.txt
 git commit -m "Give list and switch rows the redesign's row, and make the switch the redesign's size"
@@ -479,10 +498,10 @@ git commit -m "Give list and switch rows the redesign's row, and make the switch
 
 **Files:**
 - Modify, in `core/ui`:
-  - `.../PageHeader.kt`: `HhPageHeader(titleStyle, subtitleStyle)`; create `HhPageTitle` and `PageHeaderTokens.pageTitleStyle`.
+  - `.../PageHeader.kt`: the slot overload of `HhPageHeader` gains `subtitleStyle` and `subtitleGap`; create `HhPageTitle` and `PageHeaderTokens.pageTitleStyle`.
   - `.../Buttons.kt`: `ButtonToneKey`, set by `HhButton` and `HhRoundButton`.
 - Modify, in `core/setup`:
-  - `SetupWizard.kt`: `WizardFrame`, `Dots`.
+  - `SetupWizard.kt`: `WizardFrame`, `Dots`, and the Back / Skip / Next row inside `KeepsToastsAbove`.
   - `SetupDimens.kt`:
     - `wizardColumn = 640.dp`;
     - `settingsPane = 720.dp`;
@@ -500,9 +519,9 @@ git commit -m "Give list and switch rows the redesign's row, and make the switch
   - `core/ui` `PageHeaderTest.kt`.
 
 **Interfaces:**
-- Consumes: `ButtonSize.Large`; `Icons.ARROW_FORWARD`.
+- Consumes: `ButtonSize.Large`; `Icons.ARROW_FORWARD`; `HhButton(trailingIcon, busy)`; `KeepsToastsAbove`.
 - Produces:
-  - `HhPageHeader(…, titleStyle: TextStyle = PageHeaderTokens.titleStyle, subtitleStyle: TextStyle = PageHeaderTokens.subtitleStyle)`.
+  - The slot overload `HhPageHeader(…, subtitleStyle: TextStyle = PageHeaderTokens.subtitleStyle, subtitleGap: Dp = PageHeaderTokens.subtitleGap)`.
   - `@Composable fun HhPageTitle(title: String, line: String? = null, modifier: Modifier = Modifier)`.
   - `val ButtonToneKey: SemanticsPropertyKey<ButtonTone>`.
   - `SetupDimens.settingsPane`.
@@ -511,7 +530,7 @@ git commit -m "Give list and switch rows the redesign's row, and make the switch
 - [ ] **Step 1: The failing tests.** Each ends with `assertClickablesHaveRoleAndLabel()`.
   - **`PageHeaderTest`:**
     - `aPageTitleIsAHeadingWithItsLineUnderIt`: "Calendars" is a heading; its line's top is 8 dp below the title's bottom (±1).
-    - `theTabsHeaderIsUnchanged`: a **pin**; 9b's `HhPageHeader` call keeps its images.
+    - `theStringTitleIsUnchanged` and `aComposableTitleSitsWhereTheStringOneDoes` already pin the header (**pins**). Both stay green.
   - **`WizardDotsTest`:**
     - `doneHereAndToGo` replaces `theCurrentStepIsAFilledDotAndTheOthersAreRings`. With 7 dots at index 3:
       - dots 0–2 are `accent` and 11 dp (`pixelAt` at their centre; the dots carry no text);
@@ -525,22 +544,24 @@ git commit -m "Give list and switch rows the redesign's row, and make the switch
       - `wizard_next` has `arrow_forward` after its label.
     - `backAndNextSitInsideTheColumn` (Review Focus 4): at 1280 × 800 dp, `wizard_back`'s left equals `wizard_step`'s left, and `wizard_next`'s right equals its right (±1 dp). `wizard_step` is 640 dp wide.
     - `theWizardsButtonsStayAboveTheKeyboard` (extended, Review Focus 4): at font scale 1.0 and 1.3.
+    - `aToastSitsAboveTheWizardsNext`: a toast's bottom is at least `ShellTokens.toastAboveFoot` above `wizard_next`.
   - **`StepsUiTest.eachStepHasAtMostOneGreenButton`** (Review Focus 4). Count the nodes whose `ButtonToneKey` is `Primary`:
     - **Welcome:** 1 (`wizard_next`).
     - **Household, with only you:** 0. `people_add` and `wizard_skip` are `Quiet`.
     - **Done, with the home-app prompt showing:** 1 (`wizard_next`). `choose_home_app` is `Quiet`.
-    - **Review calendars, with a `NeedsSignIn` connection:** 2 (`settings_reconnect` and `wizard_next`), the accepted exception.
+
+    Review calendars' count is checked in Task 6, because `:core:setup` doesn't depend on `:capability:calendar` and `WizardFrame` is `internal`.
   - **`KioskPageTest.chooseHomeAppIsTheGreenButtonThere`:** `choose_home_app`'s `ButtonToneKey` is `Primary`.
   - **`SettingsScreenTest.thePaneStaysSevenTwentyWide`** (a **pin** of ruling 6): `settings_pane` is at most 720 dp on a 1280 dp screen.
 
   Run `./gradlew :core:ui:testDebugUnitTest --tests '*PageHeader*' :core:setup:testDebugUnitTest --tests '*WizardDots*' --tests '*SetupButtons*' --tests '*StepsUi*' --tests '*KioskPage*' --tests '*SettingsScreen*'`. Expected: FAIL.
-- [ ] **Step 2: Implement** per rulings 5–9 and Units. The buttons' row moves inside the column's `Box`, at its foot, `width(wizardColumn)`, centred. `enabled = forward.enabled && !busy` and the saved `current` step stay as they are.
+- [ ] **Step 2: Implement** per rulings 5–9 and Units. The buttons' row moves inside the column's `Box`, at its foot, `width(wizardColumn)`, centred. `enabled = forward.enabled && !busy` and the saved `current` step stay as they are. Next also passes `busy = busy`, so it keeps its width.
 - [ ] **Step 3: Images.**
   - **Predicted prefixes:**
-    - wizard steps: `wizard_frame_`, `welcome_`, `location_`, `you_`, `done_`, `connect_step_`, `connected_step_`;
+    - wizard steps: `wizard_frame_`, `welcome_`, `location_`, `you_`, `done_`;
     - also `people_list_`, if it is drawn in the frame (refine);
     - Settings pages: `settings_kiosk_`, `settings_location_`, `settings_people_`, `settings_all_pages_` (each through `StepTitle`).
-  - **Must not change:** `wizard_pin_gate_`, `review_` (its title waits for Task 5), and 9b's `page_header_`.
+  - **Must not change:** `wizard_pin_gate_`, `review_` (its title waits for Task 5), `connect_step_`, `connected_step_` (they draw only a card), and 9b's `page_header_`, `week_`, `door_tab_`, `lights_tab_` (Task 2 only) and `music_tab_`.
   - **Check against** 5a.
 ```bash
 git add core/ui core/setup
@@ -555,7 +576,8 @@ git commit -m "Lay the wizard in a 640 dp column with done, here and to-go dots,
 
 **Files:**
 - Modify:
-  - `core/ui/.../Controls.kt`: `HhTextField`'s error ring and the line under it (ruling 10).
+  - `core/ui/.../Controls.kt`: `HhTextField`'s error ring and the line under it (ruling 10); `HhStatusLine` takes `field: Boolean = false` in place of its `style == ControlType.fieldError` test.
+  - `core/ui/.../AddressSheet.kt`: drops `error = line`; its `_line` message stays (ruling 10). Its tests live in `capability/lights/.../ui/LightsSettingsPageTest.kt`, `capability/music/.../ui/MusicSettingsPageTest.kt` and their `*SettingsScreenshotTest.kt`: check what they assert about the address sheet's error and keep them green.
   - `core/setup/.../PeopleUi.kt`:
     - `PeopleList`: Add person goes quiet, with `PERSON_ADD`;
     - `PersonRow(minHeight = 75.dp)`, with the dot at 15;
@@ -568,22 +590,24 @@ git commit -m "Lay the wizard in a 640 dp column with done, here and to-go dots,
     - `HhMessageLine` keeps only the messages that aren't about a field.
   - `PersonEditorSheet.kt`: `person_message` shows nothing while it equals the name error, so the error isn't shown twice before Task 4.
 - Test:
-  - `core/ui` `TextFieldTest.kt` (create).
+  - `core/ui` `ControlsTest.kt`, beside `aFilledTextFieldKeepsItsNameAndCarriesItsError` (:201), and `StatusLineTest.kt` (`aFieldsOwnErrorIsHiddenFromTalkBack`, :57). No new file.
+  - The Lights and Music address sheets' tests.
   - `PeopleUiTest.kt`: `theListShowsEachPersonsRoleAndWhetherTheyHaveAPin`.
-  - `YouFormTest.kt`, `SetupCopyTest.kt`, `PeopleEditorTest.kt:114`, `StepsTest.kt:212`.
+  - `YouFormTest.kt:26, 32`, `SetupCopyTest.kt`, `PeopleEditorTest.kt:114`, `StepsTest.kt:211–212`, `PeopleUiTest.kt:195, 199`.
   - `RowStylesTest.kt` (**pin**).
-  - `SetupScreenshotTest.kt`.
+  - `SetupScreenshotTest.kt:119`.
 
 **Interfaces:**
-- Consumes: `HhStatusLine(icon, style, spoken)` (9c-1 Task 3); `HhListRow(minHeight)`, `Icons.PERSON_ADD` (Task 1).
+- Consumes: `HhStatusLine(icon, field, spoken)`; `HhListRow(minHeight)`, `Icons.PERSON_ADD` (Task 1).
 - Produces:
+  - `HhStatusLine(…, field: Boolean = false)`.
   - `HhTextField(error)` keeps its signature. While `error != null`, it draws the ring and `${tag}_error` under the field.
   - `internal fun someoneCalled(name: String): String = "Someone is already called $name. Try “$name B” or a nickname."`.
   - `internal const val WHO_ELSE_LINE`.
   - `internal fun noPinYet(name: String): String = "no PIN yet, so $name can only look"`.
 
 - [ ] **Step 1: The failing tests.** Each ends with `assertClickablesHaveRoleAndLabel()`.
-  - **`TextFieldTest`:**
+  - **`ControlsTest` (text field):**
     - `anErrorRingsTheFieldAndSitsUnderIt` (Review Focus 1). With `error = someoneCalled("Sam")`:
       - `pixelAt(field, 1.dp, 30.dp)` is `danger`;
       - `x_error` is displayed, its top 8 dp under the field's bottom.
@@ -592,6 +616,7 @@ git commit -m "Lay the wizard in a 640 dp column with done, here and to-go dots,
       - the field's semantics carry the error;
       - `x_error` has `HideFromAccessibility` and no live region;
       - the only node whose text or error contains the sentence is the field.
+  - **Address sheets:** `aFailedConnectShowsItsLineOnceAndDoesNotRingTheField` (Lights and Music): the sheet's `_line` shows the message once, and the field has no `danger` edge.
   - **`PeopleUiTest`:**
     - `theListShowsEachPersonsRoleAndWhetherTheyHaveAPin` (changed, ruling 14):
       - Alex reads "Admin · PIN set";
@@ -607,13 +632,14 @@ git commit -m "Lay the wizard in a 640 dp column with done, here and to-go dots,
     - `aTakenNameIsAnErrorOnTheNamedFieldAndSaidOnce` (extended, Review Focus 1). A taken "Sam" shows `you_name_error` with the suggestion, `you_message` is empty, and typing clears both.
     - `aTakenNameMovesFocusToTheNameField` (Review Focus 1): after Next is refused, `you_name` `assertIsFocused`.
   - **Copy tests:**
-    - `PeopleEditorTest:114` and `StepsTest:212` expect the new `someoneCalled`.
+    - These expect the new `someoneCalled`: `PeopleEditorTest:114`, `StepsTest:211–212`, `YouFormTest:26, 32` and `PeopleUiTest:195, 199`. `SetupScreenshotTest:119` is a literal; it changes to `someoneCalled("Sam")` so `person_error_` shows the suggestion.
     - `SetupCopyTest.someoneCalledSuggestsAnotherName`.
 
-  Run `./gradlew :core:ui:testDebugUnitTest --tests '*TextField*' :core:setup:testDebugUnitTest --tests '*PeopleUi*' --tests '*YouForm*' --tests '*SetupCopy*' --tests '*PeopleEditor*' --tests '*StepsTest*' --tests '*RowStyles*'`. Expected: FAIL.
+  Run `./gradlew :core:ui:testDebugUnitTest --tests '*ControlsTest*' --tests '*StatusLine*' (and the address sheets' tests) :core:setup:testDebugUnitTest --tests '*PeopleUi*' --tests '*YouForm*' --tests '*SetupCopy*' --tests '*PeopleEditor*' --tests '*StepsTest*' --tests '*RowStyles*'`. Expected: FAIL.
 - [ ] **Step 2: Implement** per the Interfaces and Units.
 - [ ] **Step 3: Images.**
   - Predicted: `people_list_`, `you_`, `settings_people_`, `person_error_` (the ring and the line; it moves again in Task 4).
+  - **Must not change:** `lights_address_sheet_`, `music_address_sheet_` (dropping `error = line` keeps them as they are).
   - New: `you_name_taken_dark`.
   - Check against 5a and 5b's name error.
 ```bash
@@ -630,31 +656,36 @@ git commit -m "Make Add person a quiet button, give each person's row the redesi
 **Files:**
 - Modify:
   - `core/ui/.../Controls.kt`: `HhSwatch`, `HhSwatchGrid`, `ControlTokens.swatch*`.
+  - `core/ui/.../Rows.kt`: create `HhRadioRow` and `RadioRowTokens` from `RepeatRow`.
+  - `capability/calendar/.../ui/RepeatsPane.kt`: `RepeatRow` goes and it calls `HhRadioRow`. `ui/CalendarType.kt`: `EditorDimens.repeatRow*`, `radio` and `radioDot` go.
   - `core/setup/.../PersonEditorSheet.kt`:
     - `PersonForm`'s refusals by field;
-    - a private `RoleRow`;
-    - the header and padding, as 9c-1's Add event (35 sp title; padding 29/32/27; `SetupType.sheetTitle`);
+    - the role rows as `HhRadioRow`s;
+    - the header and padding as handoff 5b: title 35 sp W700 (`SetupType.sheetTitle` → 35 sp; fix its stale comment "(the calendar editor's title)"), padding 29 top, 32 sides, 27 bottom (`SetupDimens.sheetPadding*`);
     - the sections, 16 apart, with the label 8 from its control;
-    - the PIN row and the footer;
+    - the PIN row and the footer: Save person / Save changes is `HhFooterButton(…, tag = "person_save", busy = busy)` in a Row after Remove person (Large, `ButtonTone.Danger`), as the editor's `Foot`;
+    - the foot and the confirm card inside `KeepsToastsAbove`;
     - `BringIntoViewRequester` and a `FocusRequester` per section.
   - `PeopleEditor.kt`:
     - `PeopleOutcome.Refused(message, field)`;
     - `enum class PersonField { NAME, COLOUR, ROLE, PIN }`;
     - `PersonDraft.toString`.
   - `SetupCopy.kt`: `takenLine`, `roleWhat`.
-  - `SetupDimens.kt`.
+  - `SetupDimens.kt`: the sheet is `ShellTokens.sheetWidth` (613 dp), so the comment "(§4.4: HhSheet, 600 dp)" changes.
 - Test:
   - `PeopleUiTest.kt`. The kept halves of the replaced tests stay:
     - from `aRefusalShowsInTheSheetAndKeepsWhatWasTyped`, that what was typed is kept;
     - from `aNewPersonStartsOnTheFirstFreeColourWithTakenOnesStruck`, that a new person starts on the first free colour.
   - `PeopleEditorTest.kt`, `PersonFormTest.kt`, `SetupCopyTest.kt`.
   - `SetupButtonsTest.kt`: `person_save` and `person_remove` at 60 dp.
-  - `core/ui`'s swatch test.
+  - `core/ui` `ControlsTest.kt`: the swatch tests (`aTakenSwatchIsNamedDisabledAndSaysWhoHasIt` :57, `theSwatchesAreARadioGroupWithTheChosenOneSelected` :70) and the radio-row test.
+  - `capability/calendar` `RepeatsPaneTest.kt`.
   - `SetupScreenshotTest.kt`.
 
 **Interfaces:**
-- Consumes: `HhTextField(error)` (Task 3); `HhFooterButton`, `HhStatusLine` (9c-1 Task 3); `Icons.BLOCK` (Task 1).
+- Consumes: `HhTextField(error)` (Task 3); `HhFooterButton`, `HhStatusLine`, `KeepsToastsAbove` (on main); `Icons.BLOCK` (Task 1).
 - Produces:
+  - **`HhRadioRow(title, line: String? = null, selected: Boolean, tag: String, locked: Boolean = false, onClick: () -> Unit)`** and `RadioRowTokens` (Units: min 59, r16, dot 6, 8 apart).
   - **`PeopleOutcome.Refused(val message: String, val field: PersonField? = null)`.** `nameTaken` goes. From `add`/`save`, the messages map to fields as follows; everything else, including every outcome of `remove()` and `move()`, gets `null`:
 
     | Message | Field |
@@ -696,10 +727,13 @@ git commit -m "Make Add person a quiet button, give each person's row the redesi
     - `editingYourselfNeverListsYourOwnColour`: Sam's own sheet shows his blue unblocked and chosen, and the line names only Alex.
   - **The PIN row:**
     - `thePinHintSitsBesideSetPin`: a new Adult named Sam shows "Without a PIN, Sam can only look." to the right of `person_set_pin`, level with it.
-    - With a 30-character name at font scale 1.3, the hint wraps and `person_set_pin` keeps its 48 dp.
+    - With a 30-character name at font scale 1.3, the hint wraps and `person_set_pin` keeps its 48 dp. The sheet is 613 dp wide (`ShellTokens.sheetWidth`).
   - **The footer:** `saveFillsTheFooter` (note 45):
     - `person_save` "Save person" is 60 dp and spans the body;
-    - for an existing person, Remove person is on its left and Save changes fills the rest.
+    - for an existing person, Remove person is on its left and Save changes fills the rest;
+    - `theFootDoesNotMoveWhileSaving`: with `busy`, `person_save` and `person_remove` keep their bounds.
+  - **Toasts:** `aToastSitsAboveThePersonSheetsFoot`: a toast's bottom is at least `ShellTokens.toastAboveFoot` above `person_save`.
+  - **Radio row** (`ControlsTest`): `aRadioRowIsOneRadioNodeAndALockedOneDoesNotSelect`: one node with `Role.RadioButton` whose `selected` follows the argument; with `locked = true` a tap doesn't call `onClick`. `RepeatsPaneTest` stays green on `HhRadioRow`.
   - **The PIN pad:** `thePinPadHidesTheSheetFromTalkBack` is a **pin**. While `choosingPin`, the sheet's nodes are gone from the tree.
   - **`PersonFormTest`:**
     - `refusalsDoNotCountAsEdits`: a refusal leaves `edited` unchanged.
@@ -709,14 +743,14 @@ git commit -m "Make Add person a quiet button, give each person's row the redesi
     - `SetupCopyTest.takenLineNamesColoursAndPeopleInPaletteOrder`: one, two, three and five taken; empty gives null. Sam holding green and Alex blue gives "Green and blue are taken by Sam and Alex."
     - `aNewPersonWithNoFreeColourStartsUnchosen`: with all six colours taken, no swatch is chosen and Save waits.
 
-  Run `./gradlew :core:ui:testDebugUnitTest --tests '*Swatch*' :core:setup:testDebugUnitTest --tests '*PeopleUi*' --tests '*PeopleEditor*' --tests '*PersonForm*' --tests '*SetupCopy*' --tests '*SetupButtons*'`. Expected: FAIL.
+  Run `./gradlew :core:ui:testDebugUnitTest --tests '*ControlsTest*' :core:setup:testDebugUnitTest --tests '*PeopleUi*' --tests '*PeopleEditor*' --tests '*PersonForm*' --tests '*SetupCopy*' --tests '*SetupButtons*' :capability:calendar:testDebugUnitTest --tests '*RepeatsPane*'`. Expected: FAIL.
 - [ ] **Step 2: Implement** per rulings 10–13 and 22, and Units.
 - [ ] **Step 3: Images.**
-  - Predicted: `person_`, `you_` (the swatches).
+  - Predicted: `person_`, `you_` (the swatches), `add_event_repeats_dark`, `add_event_repeats_too_long_dark` (the Repeats rows take `HhRadioRow`'s sizes).
   - New: `person_name_taken_dark`, `person_name_taken_light`. This is 5b's state: "Sam" is taken, green and blue are taken, and Adult is chosen.
   - Check against 5b.
 ```bash
-git add core/ui core/setup
+git add core/ui core/setup capability/calendar
 git commit -m "Redraw the person sheet: errors under the field they're about and moved into view, roles as radio rows, taken colours blocked and named, and a full-width Save person"
 ```
 
@@ -759,7 +793,7 @@ git commit -m "Redraw the person sheet: errors under the field they're about and
   Run `./gradlew :core:setup:testDebugUnitTest --tests '*SettingsScreen*' :app:testDebugUnitTest --tests '*AppContentTest*' --tests '*SetupWiringTest*'`. Expected: FAIL.
 - [ ] **Step 2: Implement** per Units and ruling 5.
 - [ ] **Step 3: Images.**
-  - Predicted prefixes: `settings_` (every module), `review_`, `connect_step_`, `connected_step_` (the title).
+  - Predicted prefixes: `settings_` (every module), `review_` (the title).
   - Check against 2c's panel and 5c's page header.
 ```bash
 git add core/setup app capability
@@ -779,8 +813,9 @@ git commit -m "Style the Settings list as the redesign's panel and give every Se
     - `SourceRow` becomes `CalendarRowCard`, and it gets the connection's row;
     - `ReadProblem` becomes the strip;
     - the copy changes.
+  - `ReviewCalendarsHost` collects `connections` from null, as `ConnectStepHost` does, and draws nothing until they answer. This removes the "Connect…" flash on opening.
   - `ui/CalendarType.kt`: the 5c values from Units.
-- Test: `ui/ReviewCalendarsTest.kt`, `ui/ReviewScreenshotTest.kt`.
+- Test: `ui/ReviewCalendarsTest.kt`, `ui/ReviewScreenshotTest.kt`. Build `CalendarReview` as `CalendarReviewTest` does: it takes `zone: HouseholdZone` and `clock: WallClock`.
 
 **Interfaces:**
 - Consumes: `HhSwitch` (Task 1); `Icons.SYNC_PROBLEM`, `EXPAND_MORE`.
@@ -802,7 +837,7 @@ git commit -m "Style the Settings list as the redesign's panel and give every Se
     - `theMainCalendarSaysAlwaysShown` (note 46):
       - "Always shown" shows beside its switch, and there is no "Show" there;
       - the switch is disabled-on;
-      - it is spoken "Show Family, Always shown".
+      - it is spoken "Show Family, always shown: it’s the main calendar" (`ALWAYS_SHOWN`, kept: it says why), and the visible text is "Always shown".
     - `theMainCalendarsSwitchCannotBeToggled` (Review Focus 3): taps on `review_show_{id}` and TalkBack's toggle never call `onShown`.
   - **The person dropdown:** `thePersonPillOpensTheChipsUnderTheLine`:
     - a tap on `review_person_{id}` shows the chips below the 69 dp line;
@@ -812,15 +847,22 @@ git commit -m "Style the Settings list as the redesign's panel and give every Se
     - `theStripSitsAtTheFootUnderTheChips` (Review Focus 3): with a read problem and the dropdown open, `review_read_problem_{id}` sits below the chips. Its bottom equals the card's bottom, and its left and right equal the card's (full width).
     - `theMainCalendarsProblemSaysChooseAnotherFirst` (Review Focus 3): the main calendar with a problem shows "Can’t read this calendar. Check it’s still shared with family@example.com. To hide it, choose another main calendar first.", and there is no `review_hide_{id}`.
     - `aCalendarsProblemOffersHideInsideTheStrip`: for a calendar that isn't the main one, `review_hide_{id}` is inside the strip, and a tap calls `onShown(source, false)`.
-    - `aHiddenCalendarShowsNoStrip` (**pin**, Review Focus 3).
+    - `aHiddenCalendarShowsNoReadProblem` (:126; the existing **pin**, Review Focus 3). No new test.
     - `aProblemWithNoAccountSaysThisAccount`: with no `CONFIG_ACCOUNT`, the text reads "…shared with this account."
     - `theReadProblemIsNotToasted`: a recording toaster receives nothing while the strip shows.
   - **Use for new events:** `useForNewEventsSitsUnderTheLine`. A writable calendar that isn't the main one has `review_make_master_{id}` under the line, 48 dp. The main calendar has none.
+  - **Green buttons:** `aConnectionNeedingSignInHasOneGreenButton` (Review Focus 4): with a `NeedsSignIn` connection, only `settings_reconnect` has `ButtonToneKey = Primary`. With the wizard's own Next that is the accepted two.
+  - **Before the connections answer:** `nothingShowsUntilTheConnectionsAnswer`: while `connections` is null, neither `review_none` nor any `review_source_*` row is displayed. Once it answers with an empty list, `review_none` shows.
+  - **Existing tests to keep or rewrite:**
+    - `aHiddenCalendarShowsNoReadProblem` (:126) is the pin above. Keep it.
+    - Rewrite `aCalendarThatCantBeReadSaysSoAndOffersToHideIt` (:117), `theMasterThatCantBeReadAsksForAnotherMasterFirst` (:133) and `theMasterIsMarkedAndAlwaysShown` (:157) for `cantRead`, the strip and the inline badge.
+    - Keep `showIsOneNamedSwitchAndTheMainCalendarsSaysWhyItIsOff` (:254): `ALWAYS_SHOWN`'s spoken words stay.
+    - `connectionAndCalendarRowsUseTheSharedRowStyles` (:233) moves to 18 sp in Task 1.
 
   Run `./gradlew :capability:calendar:testDebugUnitTest --tests '*ReviewCalendarsTest*'`. Expected: FAIL.
 - [ ] **Step 2: Implement** per rulings 16–18 and Units. Show stays one toggleable node around its label and the draw-only `HhSwitch`, with `enabled = !main && !busy`.
 - [ ] **Step 3: Images.**
-  - Predicted: `review_`, `settings_calendars_`, and `connected_step_` if it draws a source row (refine).
+  - Predicted: `review_`, `settings_calendars_`.
   - New: `review_strip_open_dark` (the main calendar's problem with the chips open).
   - Check against 5c.
 ```bash
@@ -844,7 +886,7 @@ git commit -m "Redraw Settings › Calendars as fixed rows with the Main badge i
   - Each module's dimens: the unused slider widths go.
 - Test:
   - `core/ui` `RowLookTest.kt`.
-  - `capability/door/src/test/.../ui/DoorSettingsPageTest.kt:118–127`.
+  - `capability/door/src/test/.../ui/DoorSettingsPageTest.kt`: `theVolumeIsSavedWhenTheSliderIsLetGo` (:122–128). `playChimePlaysAtTheChosenVolume` (:114–120) stays.
   - `app/src/test/.../display/ui/DisplaySettingsPageTest.kt`.
   - `capability/music/src/test/.../ui/MusicSettingsPageTest.kt`.
   - `core/setup/.../LocationPaneTest.kt`.
@@ -863,7 +905,7 @@ git commit -m "Redraw Settings › Calendars as fixed rows with the Main badge i
     - `aSliderRowSaysItsValueAndLetsGo`: `HhSliderRow("Chime volume", 30, "x", steps = 9)` is spoken "Chime volume, 30 percent" and shows "30 %" on the right. `SetProgress(50f)` calls `onLetGo(50)`.
     - `aSliderRowCanBeDisabled`: with `enabled = false`, there is no `SetProgress` action and touch does nothing.
   - **`DoorSettingsPageTest`:**
-    - `theVolumeStepsInTensAndSavesOnLetGo` (Review Focus 5) replaces the `SetProgress(0.3f)` lines:
+    - `theVolumeStepsInTensAndSavesOnLetGo` (Review Focus 5) replaces `theVolumeIsSavedWhenTheSliderIsLetGo` (:122–128), whose `SetProgress(0.3f)` is at :125:
       - `door_volume` is spoken "Chime volume, 30 percent" at 0.3;
       - `SetProgress(30f)` calls `onVolume(0.3f)` once, on let go;
       - the row is the 69 dp row.
@@ -917,12 +959,15 @@ git commit -m "Put Settings' sliders in rows, step the chime volume in tens, and
   3. Settings:
      - the list panel;
      - every page's title is the same size;
-     - switches are the new size.
+     - switches are the new size;
+     - move Sam below Mia in Settings › People: a Sam + Mia event reads "Mia + Sam" and its stripes swap (put it back).
   4. Settings › Calendars:
      - the fixed rows, with the Main badge inline;
      - the person dropdown;
      - "Always shown", and that switch can't be moved;
-     - a calendar unshared in Google (or the fake's read problem) shows the strip, with Hide inside it.
+     - a calendar unshared in Google (or the fake's read problem) shows the strip, with Hide inside it;
+     - hide a calendar, then check New event's From before no longer offers its titles; Show brings them back;
+     - "Use for new events": New event's foot then names the new calendar.
   5. Other Settings pages:
      - Settings › Door: the chime volume steps in tens;
      - Display and Music: the sliders sit in rows;
