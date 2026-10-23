@@ -73,6 +73,17 @@ class ShoppingViewTest {
     }
 
     @Test
+    fun anUntickIsHiddenWhileATickFollowsItAndTickedWhileUndoable() {
+        val queue = listOf(
+            queued(1, QueuedKind.UNTICK, "u1", "Milk", itemId = "g1"),
+            queued(2, QueuedKind.TICK, "t1", "Milk", itemId = "g1"),
+        )
+        assertThat(shown(emptyList(), queue, null)).isEmpty()
+        val untick = listOf(queued(1, QueuedKind.UNTICK, "u1", "Milk", itemId = "g1"))
+        assertThat(shown(emptyList(), untick, milkTicked()).single().ticked).isTrue()
+    }
+
+    @Test
     fun aPhonesDuplicateShowsAsTwoRows() {
         val rows = shown(listOf(item("g1", "Milk"), item("g5", "Milk")), emptyList(), null)
         assertThat(rows.map { it.key }).containsExactly("g1", "g5").inOrder()

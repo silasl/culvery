@@ -105,7 +105,7 @@ class ShoppingActions @Inject constructor(
 
         // This add must never be matched to an item the house just ticked off (10 §4.6).
         val ticking = queue.filter { it.kind == QueuedKind.TICK.name && textKey(it.text) == key }.mapNotNull { it.itemId }
-        val undoing = _undoable.value?.takeIf { textKey(it.text) == key }?.itemId
+        val undoing = _undoable.value?.takeIf { textKey(it.text) == key }?.let { it.itemId ?: store.idOfSentAdd(it.clientKey) }
         store.enqueue(QueuedKind.ADD, newShoppingKey(), null, cleaned, now, joinIds((ticking + listOfNotNull(undoing)).toSet()))
         recentAdds.addLast(now)
         learning.added(cleaned)
@@ -146,11 +146,18 @@ class ShoppingActions @Inject constructor(
     internal suspend fun undo(latest: Ticked) = lock.withLock {
         if (_undoable.value != latest) return@withLock
         _undoable.value = null
-        val queued = store.queueNow().firstOrNull { it.kind == QueuedKind.TICK.name && it.clientKey == latest.clientKey }
+        val queue = store.queueNow()
+        val queued = queue.firstOrNull { it.kind == QueuedKind.TICK.name && it.clientKey == latest.clientKey }
+        // A tick on a queued add had no id until the add was sent.
+        val itemId = latest.itemId ?: queued?.itemId ?: store.idOfSentAdd(latest.clientKey)
+        // Putting it back as it was: an add made after the tick would leave a second one.
+        if (itemId != null) {
+            queue.filter { it.kind == QueuedKind.ADD.name && itemId in splitIds(it.excludeIds) }.forEach { store.drop(it.seq) }
+        }
         if (queued != null) {
             store.drop(queued.seq)
-        } else if (latest.itemId != null) {
-            store.enqueue(QueuedKind.UNTICK, newShoppingKey(), latest.itemId, latest.text, clock.nowMillis())
+        } else if (itemId != null) {
+            store.enqueue(QueuedKind.UNTICK, newShoppingKey(), itemId, latest.text, clock.nowMillis())
             loop.wake()
         }
     }

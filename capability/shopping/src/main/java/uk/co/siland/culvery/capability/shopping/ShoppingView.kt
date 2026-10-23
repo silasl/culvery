@@ -55,8 +55,8 @@ internal fun shown(read: List<ShoppingItem>, queue: List<QueuedEntity>, undoable
     val readIds = read.map { it.id }.toSet()
 
     val comingBack = queue
-        .filter { it.kind == QueuedKind.UNTICK.name && it.itemId !in readIds }
-        .map { ShownItem(it.itemId!!, it.text, ticked = false, queued = true) }
+        .filter { it.kind == QueuedKind.UNTICK.name && it.itemId !in readIds && it.itemId !in tickedIds }
+        .map { ShownItem(it.itemId!!, it.text, ticked = undoable?.itemId == it.itemId, queued = true) }
         .asReversed()
     val queuedAdds = adds.asReversed().mapNotNull { add ->
         val key = QUEUED_KEY_PREFIX + add.clientKey

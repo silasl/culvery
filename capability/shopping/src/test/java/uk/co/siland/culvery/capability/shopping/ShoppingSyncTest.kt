@@ -7,6 +7,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
@@ -343,6 +344,7 @@ class ShoppingSyncTest : ShoppingTestBase() {
         rig.provider.tickGate = gate
         val pass = async { rig.sync.drain() }
         runCurrent()
+        // Production connecting takes ShoppingLock, so it waits for the row in flight; this goes round it to test the stop.
         rig.store.connect(Connection("c2", rig.conn.providerId, rig.conn.label, emptyMap()))
         gate.complete(Unit)
         pass.await()
@@ -387,6 +389,75 @@ class ShoppingSyncTest : ShoppingTestBase() {
         rig.sync.drain()
         assertThat(rig.provider.calls.none { it.startsWith("tick") }).isTrue()
         assertThat(rig.store.queueNow()).hasSize(2)
+    }
+
+    /**
+     * Another pass ticks Milk after this pass read the list; without one pass at a time, the add queued later matches
+     * the stale Milk and is lost. The test holds the lock between rows to line the passes up.
+     */
+    @Test
+    fun twoPassesAtOnceDoNotLoseAnAdd() = runTest {
+        val rig = rig(open = listOf("Milk"))
+        rig.connect()
+        rig.enqueue(QueuedKind.ADD, "kb", "Bread")
+        rig.enqueue(QueuedKind.TICK, "t1", "Milk", itemId = "g1")
+        val first = CompletableDeferred<Unit>()
+        val second = CompletableDeferred<Unit>()
+        val holdFirst = async { rig.lock.withLock { first.await() } }
+        runCurrent()
+        val a = async { rig.sync.drain() }
+        runCurrent()
+        val b = async { rig.sync.drain() }
+        runCurrent()
+        val holdSecond = async { rig.lock.withLock { second.await() } }
+        runCurrent()
+        first.complete(Unit)
+        runCurrent()
+        // Every row that could be sent before the second hold has been; the late add arrives now.
+        rig.enqueue(QueuedKind.ADD, "km", "Milk")
+        second.complete(Unit)
+        listOf(holdFirst, a, b, holdSecond).forEach { it.await() }
+        assertThat(rig.openTexts()).containsExactly("Milk", "Bread")
+        assertThat(rig.store.queueNow()).isEmpty()
+    }
+
+    /** The same lining up, with the add landing but failing: a stale pass would not see it and add a second Milk. */
+    @Test
+    fun twoPassesAtOnceDoNotDoubleAnAdd() = runTest {
+        val rig = rig()
+        rig.connect()
+        rig.provider.failAfterWrite = true
+        // The first row is dropped (the item is gone) without a write, so the cut-off write is the add's.
+        rig.enqueue(QueuedKind.TICK, "t1", "Eggs", itemId = "g9")
+        rig.enqueue(QueuedKind.ADD, "km", "Milk")
+        val first = CompletableDeferred<Unit>()
+        val second = CompletableDeferred<Unit>()
+        val holdFirst = async { rig.lock.withLock { first.await() } }
+        runCurrent()
+        val a = async { rig.sync.drain() }
+        runCurrent()
+        val b = async { rig.sync.drain() }
+        runCurrent()
+        val holdSecond = async { rig.lock.withLock { second.await() } }
+        runCurrent()
+        first.complete(Unit)
+        runCurrent()
+        advanceTimeBy(30_000)
+        second.complete(Unit)
+        listOf(holdFirst, a, b, holdSecond).forEach { it.await() }
+        advanceTimeBy(60_000)
+        rig.sync.drain()
+        assertThat(rig.openTexts()).containsExactly("Milk")
+    }
+
+    @Test
+    fun aTickWaitingForItsAddBehindItBacksOffInsteadOfSpinning() = runTest {
+        val rig = rig()
+        rig.connect()
+        rig.enqueue(QueuedKind.TICK, "k1", "Milk")
+        rig.enqueue(QueuedKind.ADD, "k1", "Milk")
+        assertThat(rig.sync.drain()).isEqualTo(30_000)
+        assertThat(rig.provider.calls).isEmpty()
     }
 
     @Test

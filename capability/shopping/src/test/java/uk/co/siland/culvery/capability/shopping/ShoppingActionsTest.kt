@@ -242,6 +242,61 @@ class ShoppingActionsTest : ShoppingTestBase() {
     }
 
     @Test
+    fun undoOfATickOnAQueuedAddStillUntickstAfterBothAreSent() = runTest {
+        val rig = rig()
+        rig.connect()
+        val actions = rig.actions()
+        actions.add("Milk")
+        actions.tick(ShownItem("q:" + rig.store.queueNow().single().clientKey, "Milk", ticked = false, queued = true))
+        rig.sync.drain()
+        assertThat(rig.openTexts()).isEmpty()
+        actions.undo(actions.undoable.value!!)
+        rig.sync.drain()
+        assertThat(rig.openTexts()).containsExactly("Milk")
+        assertThat(rig.store.queueNow()).isEmpty()
+    }
+
+    @Test
+    fun anAddAfterATickOfASentQueuedAddNeverTakesItsItem() = runTest {
+        val rig = rig()
+        rig.connect()
+        val actions = rig.actions()
+        actions.add("Milk")
+        actions.tick(ShownItem("q:" + rig.store.queueNow().single().clientKey, "Milk", ticked = false, queued = true))
+        rig.sync.drain()
+        advanceTimeBy(1_001)
+        assertThat(actions.add("Milk")).isEqualTo(AddResult.Added)
+        assertThat(rig.store.queueNow().single().excludeIds).isEqualTo("g1")
+    }
+
+    @Test
+    fun undoBeforeTheTickIsSentAlsoDropsTheReAdd() = runTest {
+        val rig = rig(open = listOf("Milk"))
+        rig.readTheList()
+        val actions = rig.actions()
+        actions.tick(milk)
+        actions.add("Milk")
+        actions.undo(actions.undoable.value!!)
+        assertThat(rig.store.queueNow()).isEmpty()
+        rig.sync.drain()
+        assertThat(rig.openTexts()).containsExactly("Milk")
+    }
+
+    @Test
+    fun undoAfterTheTickIsSentAlsoDropsTheReAdd() = runTest {
+        val rig = rig(open = listOf("Milk"))
+        rig.readTheList()
+        val actions = rig.actions()
+        actions.tick(milk)
+        rig.sync.drain()
+        actions.add("Milk")
+        actions.undo(actions.undoable.value!!)
+        assertThat(rig.store.queueNow().map { it.kind }).containsExactly("UNTICK")
+        rig.sync.drain()
+        assertThat(rig.openTexts()).containsExactly("Milk")
+    }
+
+    @Test
     fun tickingARowTheListHasMovedPastDoesNothing() = runTest {
         val rig = rig(open = listOf("Milk"))
         rig.readTheList()

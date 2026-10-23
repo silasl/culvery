@@ -107,12 +107,28 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
         ),
     )
 
-    /** The row went through. An add's [itemId] reaches every later row of the same client key. */
+    /** The row went through. An add's [itemId] reaches every later row of the same client key, and is kept for [idOfSentAdd]. */
     suspend fun sent(seq: Long, itemId: String?) = db.withTransaction {
         val row = dao.queued(seq)
         dao.deleteQueued(seq)
-        if (row != null && itemId != null) dao.setItemIdAfter(row.clientKey, seq, itemId)
+        if (row != null && itemId != null) {
+            dao.setItemIdAfter(row.clientKey, seq, itemId)
+            if (row.kind == QueuedKind.ADD.name) rememberSentAdd(row.clientKey, itemId)
+        }
     }
+
+    /** Runs [block] as one transaction, so a row leaving the queue and the read following it are seen together. */
+    suspend fun <T> inTransaction(block: suspend () -> T): T = db.withTransaction { block() }
+
+    // Only the latest tick can be undone, so a few recent adds are enough; a restart forgets them with the Undo itself.
+    private val sentAdds = object : LinkedHashMap<String, String>() {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>) = size > SENT_ADDS_KEPT
+    }
+
+    private fun rememberSentAdd(clientKey: String, itemId: String) = synchronized(sentAdds) { sentAdds[clientKey] = itemId }
+
+    /** The id the add of [clientKey] got when it was sent, while that is recent; null if it is not known. */
+    fun idOfSentAdd(clientKey: String): String? = synchronized(sentAdds) { sentAdds[clientKey] }
 
     /** The queued adds of [text]'s key made after [afterSeq] must never match [itemId], which a tick just put off the list. */
     suspend fun excludeFromLaterAdds(afterSeq: Long, text: String, itemId: String) = db.withTransaction {
@@ -177,6 +193,8 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
         dao.trimLearned(LEARNED_MAX)
     }
 }
+
+private const val SENT_ADDS_KEPT = 50
 
 /** An add's [QueuedEntity.excludeIds], as the ids it holds. */
 internal fun splitIds(excludeIds: String?): Set<String> = excludeIds?.split(',')?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
