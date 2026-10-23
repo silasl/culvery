@@ -88,7 +88,7 @@ object SliderRowTokens {
 /**
  * One slider for Settings in [HhListRow]'s container: [title] left, [HhPercentSlider] (tag [tag]) in the middle, the value
  * ([valueLabel], `{tag}_value`) right. The row is `{tag}_row`. Saved on let go through [onLetGo]; a value that doesn't
- * come back as [percent] within [SETTINGS_HOLD_MS] is shown as [percent] again. Spoken "[title], [spokenState]".
+ * come back as [percent] within [SETTINGS_HOLD_MS] is shown as [percent] again. Spoken "[spokenName], [spokenState]".
  */
 @Composable
 fun HhSliderRow(
@@ -100,6 +100,7 @@ fun HhSliderRow(
     range: IntRange = 0..100,
     steps: Int = 0,
     enabled: Boolean = true,
+    spokenName: String = title,
     spokenState: (Int) -> String = { "$it percent" },
     valueLabel: (Int) -> String = { "$it %" },
 ) {
@@ -120,7 +121,7 @@ fun HhSliderRow(
         Text(title, style = ListRowTokens.titleStyle, color = c.ink, modifier = Modifier.weight(SliderRowTokens.TITLE_WEIGHT))
         HhPercentSlider(
             title, percent, tag, Modifier.weight(SliderRowTokens.TRACK_WEIGHT),
-            range = range, steps = steps, spokenState = spokenState, enabled = enabled, holdCeilingMs = SETTINGS_HOLD_MS,
+            range = range, steps = steps, spokenName = spokenName, spokenState = spokenState, enabled = enabled, holdCeilingMs = SETTINGS_HOLD_MS,
             label = { shown ->
                 Text(
                     valueLabel(shown.coerceIn(range)), style = HhType.body, color = c.mute, textAlign = TextAlign.End,

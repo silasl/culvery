@@ -41,10 +41,12 @@ import uk.co.siland.culvery.display.CANT_OPEN_ANDROIDS_SETTINGS
 import uk.co.siland.culvery.display.CameraAccess
 import uk.co.siland.culvery.display.CameraState
 import uk.co.siland.culvery.display.DAYTIME
+import uk.co.siland.culvery.display.DAYTIME_BRIGHTNESS
 import uk.co.siland.culvery.display.DISPLAY
 import uk.co.siland.culvery.display.DisplayPrefs
 import uk.co.siland.culvery.display.DisplaySettings
 import uk.co.siland.culvery.display.EVENING
+import uk.co.siland.culvery.display.EVENING_BRIGHTNESS
 import uk.co.siland.culvery.display.NIGHT_CLOCK
 import uk.co.siland.culvery.display.NIGHT_END
 import uk.co.siland.culvery.display.NIGHT_START
@@ -107,8 +109,8 @@ fun DisplaySettingsScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions
         HhTimeStepperRow(FROM, NIGHT_START, prefs.nightFrom, "display_from") { actions.onNight(it, prefs.nightUntil) }
         HhTimeStepperRow(UNTIL, NIGHT_END, prefs.nightUntil, "display_until") { actions.onNight(prefs.nightFrom, it) }
         HhSectionLabel(BRIGHTNESS)
-        BrightnessRow(DAYTIME, prefs.dayPercent, "display_day", actions.onDay)
-        BrightnessRow(EVENING, prefs.eveningPercent, "display_evening", actions.onEvening)
+        BrightnessRow(DAYTIME, DAYTIME_BRIGHTNESS, prefs.dayPercent, "display_day", actions.onDay)
+        BrightnessRow(EVENING, EVENING_BRIGHTNESS, prefs.eveningPercent, "display_evening", actions.onEvening)
         if (!ui.sunKnown) {
             Text(NO_SUN_TIMES, style = HhType.body, color = c.mute, modifier = Modifier.testTag("display_no_sun"))
         }
@@ -125,8 +127,8 @@ fun DisplaySettingsScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions
 
 /** Saved when the slider is let go, not at each step of a drag. */
 @Composable
-private fun BrightnessRow(name: String, percent: Int, tag: String, onLetGo: (Int) -> Unit) =
-    HhSliderRow(name, percent, tag, onLetGo, range = BRIGHTNESS_RANGE)
+private fun BrightnessRow(name: String, spokenName: String, percent: Int, tag: String, onLetGo: (Int) -> Unit) =
+    HhSliderRow(name, percent, tag, onLetGo, range = BRIGHTNESS_RANGE, spokenName = spokenName)
 
 @Composable
 private fun CameraRow(ui: DisplaySettingsUi, actions: DisplaySettingsActions) {

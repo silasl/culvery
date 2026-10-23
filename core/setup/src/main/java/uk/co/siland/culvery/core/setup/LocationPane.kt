@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import uk.co.siland.culvery.core.household.HomeLocation
@@ -125,15 +128,19 @@ internal fun LocationContent(
     val focusManager = LocalFocusManager.current
     Column(verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap)) {
         if (showCurrent && current != null) PlaceRow(current.name, ticked = true, tag = "location_current", onClick = null)
-        HhTextField(query, onQuery, TOWN_OR_CITY, TOWN_OR_CITY, "location_query", capitalization = KeyboardCapitalization.Words)
+        // The line takes room only while it has text; field and line are one block so the empty line adds no gap.
         val status = statusLine(results, saveFailed)
-        HhMessageLine(
-            status.text,
-            if (status.isSave) SetupType.message else SetupType.line,
-            if (status.isError) c.danger else c.mute,
-            "location_status",
-            spoken = status.spoken,
-        )
+        Column {
+            HhTextField(query, onQuery, TOWN_OR_CITY, TOWN_OR_CITY, "location_query", capitalization = KeyboardCapitalization.Words)
+            HhMessageLine(
+                status.text,
+                if (status.isSave) SetupType.message else SetupType.line,
+                if (status.isError) c.danger else c.mute,
+                "location_status",
+                modifier = if (status.text != null) Modifier.padding(top = SetupDimens.blockGap) else Modifier.height(0.dp),
+                spoken = status.spoken,
+            )
+        }
         if (results is TownResults.Failed && !saveFailed) {
             HhButton(TRY_AGAIN, onRetry, Modifier.testTag("location_retry"), on = ButtonSurface.Bg)
         }

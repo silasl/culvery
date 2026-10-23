@@ -4,11 +4,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.unit.height
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -16,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalTime
@@ -111,8 +111,8 @@ class DisplaySettingsPageTest {
     @Test
     fun theBrightnessSlidersSaveWhenLetGo() {
         show(prefs = DisplayPrefs(dayPercent = 70, eveningPercent = 25))
-        assertThat(spoken("display_day")).isEqualTo("Daytime, 70 percent")
-        assertThat(spoken("display_evening")).isEqualTo("Evening, from sunset, 25 percent")
+        assertThat(spoken("display_day")).isEqualTo("Daytime brightness, 70 percent")
+        assertThat(spoken("display_evening")).isEqualTo("Evening brightness, 25 percent")
         compose.onNodeWithTag("display_day").performSemanticsAction(SemanticsActions.SetProgress) { it(40f) }
         compose.waitForIdle()
         assertThat(days).isNotEmpty()

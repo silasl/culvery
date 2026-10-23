@@ -6,19 +6,17 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.unit.height
-import uk.co.siland.culvery.core.ui.SETTINGS_HOLD_MS
-import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalTime
@@ -50,7 +48,9 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SETTINGS_HOLD_MS
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
 /** 5 §5.4, §5.5: the chime, quiet hours, Ring's status and steps, and the capture switch. */
 @RunWith(AndroidJUnit4::class)
@@ -171,8 +171,10 @@ class DoorSettingsPageTest {
         at(16)
         assertThat(spokenVolume()).isEqualTo("Chime volume, 30 percent")
         assertThat(compose.onNodeWithTag("door_volume_row").getUnclippedBoundsInRoot().height.value).isWithin(1f).of(69f)
+        // Moving to 30 from the stored 100 is a change; setting the value it already has saves nothing.
         stored = 1.0f
         at(32)
+        assertThat(compose.onNodeWithTag("door_volume").fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].steps).isEqualTo(9)
         letGoAt(30f)
         assertThat(saved).containsExactly(0.3f)
         compose.assertClickablesHaveRoleAndLabel()

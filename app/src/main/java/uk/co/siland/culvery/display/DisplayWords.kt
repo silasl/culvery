@@ -19,6 +19,8 @@ fun nightClockLine(from: LocalTime, until: LocalTime): String =
 
 internal const val DAYTIME = "Daytime"
 internal const val EVENING = "Evening, from sunset"
+internal const val DAYTIME_BRIGHTNESS = "Daytime brightness"
+internal const val EVENING_BRIGHTNESS = "Evening brightness"
 internal const val NO_SUN_TIMES = "Until the home location is set, the daytime level applies all day."
 
 internal const val SLEEP_WHEN_ALONE = "Sleep when nobody’s around"

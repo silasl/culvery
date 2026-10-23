@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.setup
 
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -11,18 +12,14 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
-import org.robolectric.annotation.GraphicsMode
-import uk.co.siland.culvery.core.ui.DarkColors
-import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
-import uk.co.siland.culvery.core.ui.test.pixelAt
+import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.io.IOException
@@ -32,9 +29,13 @@ import kotlinx.coroutines.awaitCancellation
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.household.HomeLocation
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.DarkColors
 import uk.co.siland.culvery.core.ui.test.TouchModeRule
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
+import uk.co.siland.culvery.core.ui.test.pixelAt
 
 @RunWith(AndroidJUnit4::class)
 class LocationPaneTest {
@@ -305,16 +306,25 @@ class LocationPaneTest {
         assertThat(a.bottom.value).isAtMost(b.top.value)
     }
 
+    /** A failed save over results puts the line above the first town; a failed search then keeps the line, in danger, with Try again. */
     @Test
     fun aFailedSearchSaysSoUnderTheField() {
-        search.answer = { throw LocationSearchException("offline") }
+        search.answer = { q -> if (q == "Can") listOf(brighton) else throw LocationSearchException("offline") }
+        saveFails = true
         show()
         type("Can")
         advance(500)
+        assertThat(compose.onNodeWithTag("location_status").getUnclippedBoundsInRoot().height.value).isEqualTo(0f)
+        compose.onNodeWithTag("place_0").performClick()
+        advance(100)
+        assertDirectlyUnderTheField()
+        assertAbove("location_status", "place_0")
+        type("x")
+        advance(500)
         compose.onNodeWithTag("location_status").assertTextEquals("Couldn’t search for towns — check the tablet’s Wi-Fi, then try again.")
+        assertThat(compose.onNodeWithTag("location_status").textLayout().layoutInput.style.color).isEqualTo(DarkColors.danger)
         assertDirectlyUnderTheField()
         assertAbove("location_status", "location_retry")
-        assertThat(compose.onNodeWithTag("location_status").textLayout().layoutInput.style.color).isEqualTo(DarkColors.danger)
         compose.onNodeWithTag("location_retry").assertExists()
         compose.assertClickablesHaveRoleAndLabel()
     }
