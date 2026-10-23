@@ -172,7 +172,8 @@ internal class SonosSystem(
     }
 
     override suspend fun favourites(): List<Favourite> {
-        val items = toRooms { client.browse(link.address, FAVOURITES, 0, FAVOURITES_PAGE).items }
+        // A Sonos Radio shortcut ("Trending now") opens a page in the Sonos app and has no link to play.
+        val items = toRooms { client.browse(link.address, FAVOURITES, 0, FAVOURITES_PAGE).items }.filterNot { it.uri.isNullOrBlank() }
         favouriteItems = items.associateBy { it.id }
         return items.map { Favourite(it.id, it.title, artUrl(it.artUri, link.address), kindOf(it)) }
     }

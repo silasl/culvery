@@ -352,6 +352,23 @@ class SonosSystemTest {
         assertThat(kitchen.bodyOf("AddURIToQueue")).contains("<EnqueuedURI>file:///jffs/settings/savedqueues.rsq#3</EnqueuedURI>")
     }
 
+    /** A Sonos Radio shortcut saved as a Favourite opens a page in the Sonos app; it has no link to play. */
+    @Test
+    fun aFavouriteWithNothingToPlayIsLeftOut() = runTest {
+        val s = checked()
+        kitchen.answer(
+            "Browse",
+            SonosFixtures.browse(
+                total = 2,
+                """<item id="FV:2/20" parentID="FV:2" restricted="false"><dc:title>Trending now</dc:title><upnp:class>object.itemobject.item.sonos-favorite</upnp:class>""" +
+                    """<res></res><r:type>shortcut</r:type></item>""",
+                """<item id="FV:2/5" parentID="FV:2" restricted="false"><dc:title>Culvery FM</dc:title><upnp:class>object.itemobject.item.sonos-favorite</upnp:class>""" +
+                    """<r:type>instantPlay</r:type><res protocolInfo="x-rincon-mp3radio:*:*:*">${SonosFixtures.escape(SonosFixtures.RADIO_URI)}</res></item>""",
+            ),
+        )
+        assertThat(s.favourites().map { it.name }).containsExactly("Culvery FM")
+    }
+
     /** 6 §6: a fault is "Sonos didn’t do that", and the group is checked again. */
     @Test
     fun aFaultIsRefusedAndTheGroupIsCheckedAgain() = runTest {
