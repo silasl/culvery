@@ -32,6 +32,13 @@ class IconFontTest {
     }
 
     @Test
+    fun theShoppingCartIsInTheFont() {
+        assertThat(Icons.SHOPPING_CART).isEqualTo("shopping_cart")
+        assertThat(font.has("shopping_cart")).isTrue()
+        assertThat(font.hasFilledForm("shopping_cart")).isTrue()
+    }
+
+    @Test
     fun everyNamedIconIsALigatureInTheFont() {
         assertWithMessage("Icons with no ligature in the font").that(named.filterNot(font::has)).isEmpty()
     }

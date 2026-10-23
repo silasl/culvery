@@ -108,6 +108,16 @@ class ModuleBoundariesTest {
         banned(":provider:lights-hue", ":provider:music-sonos")
     }
 
+    /** Pin: the Shopping pair follows the Lights rules, and the Google sign-in is core, so the Tasks provider may use it. */
+    @Test
+    fun theShoppingPairKeepsToItsFamily() {
+        allowed(":provider:shopping-google-tasks", ":capability:shopping")
+        allowed(":provider:shopping-google-tasks", ":core:google")
+        banned(":provider:shopping-google-tasks", ":provider:calendar-google")
+        banned(":provider:shopping-google-tasks", ":capability:calendar")
+        banned(":capability:shopping", ":capability:calendar")
+    }
+
     @Test
     fun theNetworkModuleIsCore() {
         allowed(":provider:music-sonos", ":core:net")

@@ -72,6 +72,7 @@ object Icons {
     const val SCHEDULE = "schedule"
     const val SEARCH = "search"
     const val SETTINGS = "settings"
+    const val SHOPPING_CART = "shopping_cart"
     const val SHUFFLE = "shuffle"
     const val SKIP_NEXT = "skip_next"
     const val SPEAKER = "speaker"

@@ -59,6 +59,7 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 | `:capability:calendar` | Calendar contract (read and write), `calendar.db` cache and outbox, 5-minute sync, event editor, Home cards, Calendar tab, event detail and add/edit sheets |
 | `:capability:calendar-testkit` | `CalendarProviderContractTest`, the tests every calendar provider must pass |
 | `:capability:weather` | Weather contract (`WeatherProvider`), `weather.db` (the last forecast, for the place it was fetched for), the 30-minute fetch, the header item, the Forecast card, today's sun times (`Daylight`) |
+| `:capability:shopping` | Shopping contract (`ShoppingProvider`), `shopping.db` (the connection, the last read, the queue of unsent changes, what is learned), `ShoppingLock` |
 | `:provider:calendar-fake` | Debug-only sample calendar (the hand-off's week, relative to today) |
 | `:provider:calendar-google` | Google Calendar API v3 over OkHttp; sign-in and tokens through Play services, nothing stored |
 | `:provider:weather-openmeteo` | Town search (geocoding) and the forecast through Open-Meteo (no key) |

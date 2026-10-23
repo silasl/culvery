@@ -67,6 +67,7 @@ repeat
 schedule
 search
 settings
+shopping_cart
 shuffle
 skip_next
 speaker

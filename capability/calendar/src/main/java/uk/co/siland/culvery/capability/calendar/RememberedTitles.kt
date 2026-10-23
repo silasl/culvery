@@ -1,22 +1,18 @@
 package uk.co.siland.culvery.capability.calendar
 
-import java.text.Normalizer
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 import uk.co.siland.culvery.capability.calendar.db.EventRow
 import uk.co.siland.culvery.capability.calendar.db.RememberedTitleEntity
+import uk.co.siland.culvery.core.plugin.textKey
 
-private val WHITESPACE = Regex("\\s+")
-private val MARKS = Regex("\\p{Mn}+")
 private const val MILLIS_PER_MINUTE = 60_000L
 private const val KEPT_MONTHS = 12L
 
-/** What two titles must share to be one: trimmed, single-spaced, lower case, accents dropped. */
-fun titleKey(title: String): String =
-    Normalizer.normalize(title.trim().replace(WHITESPACE, " "), Normalizer.Form.NFD).replace(MARKS, "").lowercase(Locale.ROOT)
+/** What two titles must share to be one (the shared text key). */
+fun titleKey(title: String): String = textKey(title)
 
 /** [titleKey], worked out once per distinct title: for one sync's many reads of the same titles. */
 internal fun titleKeys(): (String) -> String {
