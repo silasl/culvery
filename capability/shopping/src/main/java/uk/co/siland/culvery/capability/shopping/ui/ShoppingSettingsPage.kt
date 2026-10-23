@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,6 +77,9 @@ internal sealed interface SettingsState {
     /** The provider's own screens are up; [existing] is the stored connection when the permission is being given again. */
     data class Connecting(override val provider: ShoppingProvider, val account: String?, val existing: Connection? = null) : SettingsState
 
+    /** Connected in the provider's screens and waiting for the store to hold it. */
+    data class Finishing(override val provider: ShoppingProvider, val account: String?) : SettingsState
+
     data class On(override val provider: ShoppingProvider, val account: String?, val health: ShoppingHealth, val lastReadMillis: Long?) : SettingsState
 
     data class ConfirmingStop(val on: On, val queued: Int) : SettingsState {
@@ -116,6 +120,8 @@ internal fun ShoppingSettings(state: SettingsState, nowMillis: Long, busy: Boole
                 HhSwitchRow(useService(service), state.account, checked = true, tag = "shopping_use", onChange = {}, enabled = false)
                 state.provider.ConnectScreen(state.account, state.existing, actions.onConnected, actions.onCancelConnect)
             }
+            is SettingsState.Finishing ->
+                HhSwitchRow(useService(service), state.account, checked = true, tag = "shopping_use", onChange = {}, enabled = false)
             is SettingsState.On -> On(state, service, null, busy, nowMillis, actions)
             is SettingsState.ConfirmingStop -> On(state.on, service, state, busy, nowMillis, actions)
             is SettingsState.ConfirmingClear -> On(state.on, service, state, busy, nowMillis, actions)
@@ -224,6 +230,8 @@ private sealed interface Step {
 
     data class Connecting(val account: String?, val existing: Connection?) : Step
 
+    data class Finishing(val account: String?) : Step
+
     data class ConfirmStop(val queued: Int) : Step
 
     data object ConfirmClear : Step
@@ -242,12 +250,14 @@ internal fun ShoppingSettingsHost(connections: ShoppingConnections, store: Shopp
     val action = rememberSingleAction(Unit) { e -> Log.w(TAG, "A shopping change failed (${e::class.simpleName})") }
     val nowMillis = rememberNowMillis(clock)
     val stored = (known ?: return).stored
+    LaunchedEffect(stored) { if (stored != null && step is Step.Finishing) step = Step.Idle }
     val offered = accounts ?: return
 
     val state = when {
         stored == null -> when (val s = step) {
             is Step.Choosing -> SettingsState.ChoosingAccount(provider, (offered as? ProviderAccounts.Ready)?.accounts.orEmpty(), s.chosen)
             is Step.Connecting -> SettingsState.Connecting(provider, s.account, null)
+            is Step.Finishing -> SettingsState.Finishing(provider, s.account)
             else -> SettingsState.Off(provider, offered)
         }
         else -> {
@@ -275,9 +285,13 @@ internal fun ShoppingSettingsHost(connections: ShoppingConnections, store: Shopp
             onChoose = { account -> step = Step.Choosing(account) },
             onUseChosen = { (step as? Step.Choosing)?.chosen?.let { step = Step.Connecting(it, null) } },
             onConnected = { connection ->
-                val reallowing = stored != null
-                step = Step.Idle
-                if (reallowing) connections.reallowed(connection) else connections.connected(connection)
+                if (stored != null) {
+                    step = Step.Idle
+                    connections.reallowed(connection)
+                } else {
+                    step = Step.Finishing(connection.config[SHOPPING_CONFIG_ACCOUNT])
+                    connections.connected(connection)
+                }
             },
             onCancelConnect = { step = Step.Idle },
             onAllow = {

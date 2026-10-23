@@ -2,6 +2,7 @@ package uk.co.siland.culvery.capability.shopping
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import java.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
@@ -51,6 +52,11 @@ class SampleShoppingProvider(
     /** What was called, such as "items", "add", "tick g1", "history". */
     val calls: List<String> get() = _calls
 
+    private var composed = 0
+
+    /** How many times [ConnectScreen] has entered a composition. */
+    val connectScreensComposed: Int get() = composed
+
     private var made = 0
     private val openItems = mutableListOf<ShoppingItem>()
     private val history = mutableListOf<ShoppingItem>()
@@ -92,6 +98,7 @@ class SampleShoppingProvider(
 
     @Composable
     override fun ConnectScreen(account: String?, existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
+        remember { composed++ }
         LaunchedEffect(Unit) {
             val config = if (account != null) mapOf(SHOPPING_CONFIG_ACCOUNT to account) else emptyMap()
             onConnected(Connection("c1", descriptor.id, descriptor.displayName, config))

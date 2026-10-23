@@ -37,7 +37,7 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
 
     suspend fun connectionNow(): StoredShopping? = dao.connectionNow()?.toStored()
 
-    /** Replaces any connection, healthy and not yet seeded. The old read goes; the queue stays, so nothing added is lost. */
+    /** Replaces any connection, healthy and not yet seeded. The old read goes, and so does any queue left over: off means an empty queue. */
     suspend fun connect(connection: Connection) = db.withTransaction {
         dao.putConnection(
             ConnectionEntity(
@@ -52,6 +52,7 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
             ),
         )
         dao.deleteItems()
+        dao.deleteQueue()
     }
 
     /** The same connection with new settings (a remade list); the read, the health and the queue stay. */

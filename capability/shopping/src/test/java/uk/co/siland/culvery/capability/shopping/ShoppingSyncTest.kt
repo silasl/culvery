@@ -349,7 +349,7 @@ class ShoppingSyncTest : ShoppingTestBase() {
         gate.complete(Unit)
         pass.await()
         assertThat(rig.provider.calls).containsExactly("tick g1")
-        assertThat(rig.store.queueNow().map { it.itemId }).containsExactly("g2")
+        assertThat(rig.store.queueNow()).isEmpty()
     }
 
     @Test

@@ -73,14 +73,14 @@ class ShoppingStoreTest {
         assertThat(stored.seeded).isFalse()
     }
 
-    /** The queue outlives a new connection; the old read does not. */
+    /** Off means an empty queue, so neither the old read nor a leftover queue reaches a new connection. */
     @Test
-    fun connectingKeepsTheQueueAndClearsTheItems() = runTest {
+    fun connectingClearsTheQueueAndTheItems() = runTest {
         store.connect(c1)
         store.saveRead(listOf(ShoppingItem("g1", "Milk", at)), ShoppingHealth.OK, 2_000)
         store.enqueue(QueuedKind.ADD, "k1", null, "Bread", 3_000)
         store.connect(Connection("c2", "shopping.sample", "the sample list", emptyMap()))
-        assertThat(store.queueNow()).hasSize(1)
+        assertThat(store.queueNow()).isEmpty()
         assertThat(store.items.first()).isEmpty()
     }
 

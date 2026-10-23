@@ -17,7 +17,6 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
-import java.lang.reflect.Proxy
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -28,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -81,8 +81,11 @@ import uk.co.siland.culvery.capability.weather.DailyWeather
 import uk.co.siland.culvery.capability.weather.HeaderWeather
 import uk.co.siland.culvery.capability.weather.ui.WeatherHeaderItem
 import uk.co.siland.culvery.core.access.AccessControl
-import uk.co.siland.culvery.core.access.PinError
+import uk.co.siland.culvery.core.access.Authorised
+import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.access.PinReason
+import uk.co.siland.culvery.core.access.Refusal
+import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.access.ui.PinPadSheet
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
@@ -285,10 +288,7 @@ class ShellScreenshotTest {
         }
         val checks = ShoppingChecks(store, sync, host, shoppingScope)
         val actions = ShoppingActions(store, learning, lock, loop, checks, toaster, wall, shoppingScope)
-        // The card never asks for a PIN, so access is never called.
-        val access = Proxy.newProxyInstance(AccessControl::class.java.classLoader, arrayOf(AccessControl::class.java)) { _, _, _ ->
-            error("The Home card does not use access")
-        } as AccessControl
+        val access = NoAccess()
         val capability = ShoppingCapability(
             store = store,
             providers = setOf(provider),
@@ -312,7 +312,7 @@ class ShellScreenshotTest {
     }
 
     private fun realShoppingHome(dark: Boolean) = calendarHome(dark).copy(
-        tabs = allTabs,
+        tabs = allTabs.toMutableList().apply { add(1, TabItem("shopping", "Shopping", Icons.SHOPPING_CART)) },
         homeCards = HomeCardPlacer.place(homeCardList() + realShoppingCard()),
     )
 
@@ -549,4 +549,27 @@ class ShellScreenshotTest {
 
     @Test
     fun homeShoppingAloneLight() = snap("home_shopping_alone_light", dark = false, state = shoppingHome(dark = false, lights = false, music = false))
+}
+
+/** Access for a scene that never asks for a PIN: every request is cancelled. */
+private class NoAccess : AccessControl {
+    override val session: StateFlow<Identified?> = MutableStateFlow(null)
+    override val expiresAt: StateFlow<Long?> = MutableStateFlow(null)
+
+    override suspend fun authorise(
+        vararg anyOf: String,
+        reason: PinReason,
+        allow: (Identified, Set<String>) -> Boolean,
+        refusal: Refusal,
+    ): Authorised? = null
+
+    override fun beginSetupSession(person: Identified) = Unit
+
+    override fun endSetupSession() = Unit
+
+    override fun touch(holdForEdits: Boolean) = Unit
+
+    override fun checkExpiry() = Unit
+
+    override fun lock() = Unit
 }

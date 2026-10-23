@@ -74,7 +74,7 @@ class ShoppingConnectionsTest : ShoppingTestBase() {
     }
 
     @Test
-    fun anItemQueuedBeforeConnectingDrainsAfterConnecting() = runTest {
+    fun aLeftoverQueueIsClearedOnConnect() = runTest {
         val c = connections()
         c.rig.enqueue(QueuedKind.ADD, "k1", "Milk")
         c.loop.start()
@@ -84,7 +84,7 @@ class ShoppingConnectionsTest : ShoppingTestBase() {
         c.connections.connected(c.rig.conn)
         pump()
 
-        assertThat(c.rig.openTexts()).containsExactly("Milk")
+        assertThat(c.rig.openTexts()).isEmpty()
         assertThat(c.rig.store.queueNow()).isEmpty()
     }
 

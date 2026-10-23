@@ -12,7 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasClickAction
@@ -27,12 +30,14 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import java.time.ZoneOffset
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -172,9 +177,49 @@ class ShoppingSettingsTest {
         awaitThat { rig.access.asked.isNotEmpty() }
         compose.waitForIdle()
 
-        compose.onNodeWithTag("shopping_use").assertIsDisplayed()
+        assertThat(rig.provider.connectScreensComposed).isEqualTo(0)
+        compose.onNodeWithTag("shopping_use").assertIsEnabled()
+        compose.onNodeWithTag("shopping_use").assertIsOff()
         assertThat(compose.onAllNodes(hasTestTag("shopping_stop")).fetchSemanticsNodes()).isEmpty()
         assertThat(runBlocking { rig.store.connectionNow() }).isNull()
+    }
+
+    @Test
+    fun aRefusedPinDoesNotReallow() {
+        val rig = rig(admin = false)
+        runBlocking {
+            rig.store.connect(rig.connection)
+            rig.store.setHealth(ShoppingHealth.NEEDS_PERMISSION)
+        }
+        setHost(rig)
+        awaitTag("shopping_allow")
+        compose.onNodeWithTag("shopping_allow").performClick()
+        awaitThat { rig.access.asked.isNotEmpty() }
+        compose.waitForIdle()
+
+        assertThat(rig.provider.connectScreensComposed).isEqualTo(0)
+        compose.onNodeWithTag("shopping_allow").assertIsEnabled()
+        assertThat(runBlocking { rig.store.connectionNow() }!!.health).isEqualTo(ShoppingHealth.NEEDS_PERMISSION)
+    }
+
+    @Test
+    fun theSwitchStaysOnAndDisabledUntilTheConnectionIsStored() {
+        val rig = rig()
+        val held = CompletableDeferred<Unit>()
+        rig.holdLockUntil(held)
+        setHost(rig)
+        awaitTag("shopping_use")
+        compose.onNodeWithTag("shopping_use").performClick()
+        // connected() is waiting for the lock, so nothing is stored yet.
+        awaitThat { rig.provider.connectScreensComposed == 1 }
+        compose.waitForIdle()
+        compose.onNodeWithTag("shopping_use").assertIsNotEnabled()
+        compose.onNodeWithTag("shopping_use").assertIsOn()
+        assertThat(runBlocking { rig.store.connectionNow() }).isNull()
+
+        held.complete(Unit)
+        awaitTag("shopping_stop")
+        assertThat(runBlocking { rig.store.connectionNow() }).isNotNull()
     }
 
     @Test
@@ -366,6 +411,13 @@ internal class SettingsRig(accounts: ProviderAccounts, admin: Boolean) {
     val loop = ShoppingDrainLoop(sync, clock, scope)
     val connections = ShoppingConnections(store, setOf(provider), sync, lock, loop, learning, access, toasts, scope)
     val householdClock = HouseholdClock(flowOf(ZoneOffset.UTC), clock, scope, ticks = emptyFlow())
+
+    /** Takes the shopping lock until [release] completes, so a write that needs it waits. */
+    fun holdLockUntil(release: CompletableDeferred<Unit>) {
+        val taken = CompletableDeferred<Unit>()
+        scope.launch { lock.withLock { taken.complete(Unit); release.await() } }
+        runBlocking { taken.await() }
+    }
 
     fun close() {
         scope.cancel()
