@@ -138,14 +138,17 @@ internal class PersonForm(val existing: Member?, taken: Map<Long, String>) {
         refusal = null
     }
 
-    /** Shows [outcome]; a refused colour is taken from now on. */
+    private var submittedColour: Long? = null
+
+    /** Shows [outcome]; the colour last sent in a [draft] is taken from now on if that is what was refused. */
     fun refuse(outcome: PeopleOutcome.Refused) {
         refusal = outcome
         refusals++
-        if (outcome.field == PersonField.COLOUR) color?.let { taken = taken + (it to SOMEONE_ELSE) }
+        if (outcome.field == PersonField.COLOUR) submittedColour?.let { taken = taken + (it to SOMEONE_ELSE) }
     }
 
-    fun draft(): PersonDraft = PersonDraft(name, checkNotNull(color), role, newPin, removePin)
+    /** What a save sends. Swatches stay live while it is in flight, so the colour is kept for a refusal to block. */
+    fun draft(): PersonDraft = PersonDraft(name, checkNotNull(color), role, newPin, removePin).also { submittedColour = it.color }
 }
 
 /**

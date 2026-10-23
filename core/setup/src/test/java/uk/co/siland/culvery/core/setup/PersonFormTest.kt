@@ -42,12 +42,27 @@ class PersonFormTest {
     fun aColourRefusalBlocksThatColourAndAnyChangeClearsTheRefusal() {
         val form = PersonForm(existing = null, taken = emptyMap())
         val chosen = form.color
+        form.name = "Mia"
+        form.draft()
         form.refuse(PeopleOutcome.Refused(COLOUR_TAKEN, PersonField.COLOUR))
         assertThat(form.taken.keys).containsExactly(chosen)
         assertThat(form.canSave).isFalse()
         form.color = PersonPalette.colors[2]
         assertThat(form.refusal).isNull()
         form.name = "Mia"
+        assertThat(form.canSave).isTrue()
+    }
+
+    @Test
+    fun aColourRefusalBlocksTheColourThatWasSubmittedNotOneTappedSince() {
+        val form = PersonForm(existing = null, taken = emptyMap())
+        val submitted = form.color
+        val tappedSince = PersonPalette.colors[2]
+        form.name = "Mia"
+        form.draft()
+        form.color = tappedSince
+        form.refuse(PeopleOutcome.Refused(COLOUR_TAKEN, PersonField.COLOUR))
+        assertThat(form.taken.keys).containsExactly(submitted)
         assertThat(form.canSave).isTrue()
     }
 
