@@ -23,7 +23,7 @@ const val ADD_MAX_CHARS = 100
 
 /** Adds past either rate are refused, so a stuck key or a bored child can't fill the list (10 §4.11). */
 const val ADDS_PER_SECOND = 3
-const val ADDS_PER_MINUTE = 20
+const val ADDS_PER_MINUTE = 60
 
 /** How long the row an add matched shows in the accent colour (10 §4.6). */
 const val FLASH_MS = 1_200L
@@ -94,7 +94,10 @@ class ShoppingActions @Inject constructor(
         }
         val now = clock.nowMillis()
         while (recentAdds.isNotEmpty() && now - recentAdds.first() >= ONE_MINUTE_MS) recentAdds.removeFirst()
-        if (recentAdds.count { now - it < ONE_SECOND_MS } >= ADDS_PER_SECOND || recentAdds.size >= ADDS_PER_MINUTE) return AddResult.TooFast
+        if (recentAdds.count { now - it < ONE_SECOND_MS } >= ADDS_PER_SECOND || recentAdds.size >= ADDS_PER_MINUTE) {
+            toaster.show(tooFast(cleaned))
+            return AddResult.TooFast
+        }
         if (queue.size >= QUEUE_MAX && store.connectionNow()?.health in UNFIXED_HEALTHS) return AddResult.Full
 
         // This add must never be matched to an item the house just ticked off (10 §4.6).

@@ -23,6 +23,7 @@ private object NobodyMay : AccessControl {
         reason: PinReason,
         allow: (Identified, Set<String>) -> Boolean,
         refusal: Refusal,
+        label: String?,
     ): Authorised? = null
 
     override fun lock() = Unit

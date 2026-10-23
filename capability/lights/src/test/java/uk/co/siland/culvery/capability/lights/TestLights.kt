@@ -214,6 +214,7 @@ internal class TestAccess(var role: Role?) : AccessControl {
         reason: PinReason,
         allow: (Identified, Set<String>) -> Boolean,
         refusal: Refusal,
+        label: String?,
     ): Authorised? {
         asked += anyOf.toList()
         val role = role ?: return null

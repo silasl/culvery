@@ -561,6 +561,7 @@ private class NoAccess : AccessControl {
         reason: PinReason,
         allow: (Identified, Set<String>) -> Boolean,
         refusal: Refusal,
+        label: String?,
     ): Authorised? = null
 
     override fun beginSetupSession(person: Identified) = Unit

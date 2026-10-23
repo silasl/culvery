@@ -189,8 +189,13 @@ class ShoppingConnectionsTest : ShoppingTestBase() {
         assertThat(c.rig.store.queueNow()).hasSize(1)
         assertThat(c.rig.learnedCounts()).containsExactly("Butter", 1)
         assertThat(c.toasts.messages).isEmpty()
-        assertThat(c.access.asked).hasSize(3)
-        assertThat(c.access.asked.flatten().toSet()).containsExactly(CorePermissions.CONNECTIONS_MANAGE)
+        assertThat(c.access.asked).containsExactly(
+            listOf(CorePermissions.CONNECTIONS_MANAGE),
+            listOf(ShoppingPermissions.SUGGESTIONS),
+            listOf(ShoppingPermissions.SUGGESTIONS),
+        ).inOrder()
+        // The pad names the item being forgotten; Clear uses the permission's own label.
+        assertThat(c.access.labels).containsExactly(null, "Forget Butter", null).inOrder()
     }
 
     @Test

@@ -29,6 +29,9 @@ const val QUEUE_FULL = "Shopping can’t hold more until it’s fixed in Setting
 
 const val UNDO = "Undo"
 
+/** The toast when an add is past the rate limit; the item stays in the box. */
+fun tooFast(text: String): String = "Adding too fast. Wait a moment, then add $text again."
+
 /** The toast after a tick. */
 fun ticked(text: String): String = "Ticked $text"
 

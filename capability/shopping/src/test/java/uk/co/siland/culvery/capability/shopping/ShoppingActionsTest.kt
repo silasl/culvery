@@ -106,23 +106,25 @@ class ShoppingActionsTest : ShoppingTestBase() {
     fun addsAreRateLimited() = runTest {
         val rig = rig()
         rig.connect()
-        val actions = rig.actions()
+        val toasts = ToastLog()
+        val actions = rig.actions(toasts)
         assertThat(actions.add("Milk")).isEqualTo(AddResult.Added)
         assertThat(actions.add("Bread")).isEqualTo(AddResult.Added)
         assertThat(actions.add("Eggs")).isEqualTo(AddResult.Added)
         advanceTimeBy(999)
         assertThat(actions.add("Butter")).isEqualTo(AddResult.TooFast)
+        assertThat(toasts.messages).containsExactly("Adding too fast. Wait a moment, then add Butter again.")
         advanceTimeBy(2)
         assertThat(actions.add("Butter")).isEqualTo(AddResult.Added)
-        // Nineteen more would make twenty in the minute; spread out so the per-second limit never bites.
-        for (i in 5..20) {
+        // Fifty-six more make sixty in the minute; spread out so the per-second limit never bites.
+        for (i in 5..60) {
             advanceTimeBy(1_001)
             assertThat(actions.add("Item $i")).isEqualTo(AddResult.Added)
         }
         advanceTimeBy(1_001)
-        assertThat(actions.add("Item 21")).isEqualTo(AddResult.TooFast)
+        assertThat(actions.add("Item 61")).isEqualTo(AddResult.TooFast)
         advanceTimeBy(60_001 - currentTime)
-        assertThat(actions.add("Item 22")).isEqualTo(AddResult.Added)
+        assertThat(actions.add("Item 62")).isEqualTo(AddResult.Added)
     }
 
     @Test

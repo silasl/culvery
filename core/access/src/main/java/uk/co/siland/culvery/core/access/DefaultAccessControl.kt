@@ -63,6 +63,7 @@ class DefaultAccessControl @Inject constructor(
         reason: PinReason,
         allow: (Identified, Set<String>) -> Boolean,
         refusal: Refusal,
+        label: String?,
     ): Authorised? {
         require(anyOf.isNotEmpty()) { "authorise needs at least one permission" }
         val defs = anyOf.map(registry::require)
@@ -90,7 +91,7 @@ class DefaultAccessControl @Inject constructor(
                 }
             }
             try {
-                promptUntilResolved(defs.first().label, reason, anyOf, allow, refusal)
+                promptUntilResolved(label ?: defs.first().label, reason, anyOf, allow, refusal)
             } finally {
                 prompt.dismiss()
             }

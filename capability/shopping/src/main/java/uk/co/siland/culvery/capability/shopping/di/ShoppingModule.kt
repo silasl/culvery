@@ -17,6 +17,8 @@ import uk.co.siland.culvery.capability.shopping.ShoppingProvider
 import uk.co.siland.culvery.capability.shopping.db.ShoppingDatabase
 import uk.co.siland.culvery.capability.shopping.ShoppingAccountUse
 import uk.co.siland.culvery.capability.shopping.ShoppingCapability
+import uk.co.siland.culvery.capability.shopping.ShoppingPermissionSource
+import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.plugin.AccountUse
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
@@ -43,6 +45,10 @@ abstract class ShoppingModule {
     @Binds
     @IntoSet
     abstract fun checks(impl: ShoppingChecks): Startable
+
+    @Binds
+    @IntoSet
+    abstract fun permissions(impl: ShoppingPermissionSource): PermissionSource
 
     companion object {
         @Provides

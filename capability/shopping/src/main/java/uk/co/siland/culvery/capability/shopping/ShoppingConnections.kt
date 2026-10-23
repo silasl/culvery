@@ -105,14 +105,14 @@ class ShoppingConnections @Inject constructor(
     }
 
     suspend fun forget(item: Learned): Boolean {
-        if (!mayConnect()) return false
+        if (access.authorise(ShoppingPermissions.SUGGESTIONS, label = "Forget ${item.text}") == null) return false
         learning.forget(item.key)
         toaster.show("Forgot ${item.text}.")
         return true
     }
 
     suspend fun clearSuggestions(): Boolean {
-        if (!mayConnect()) return false
+        if (access.authorise(ShoppingPermissions.SUGGESTIONS) == null) return false
         learning.clear()
         toaster.show("Suggestions cleared.")
         return true

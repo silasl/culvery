@@ -13,9 +13,10 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 
-/** Access that answers every PIN pad the same way: an Admin ([admin]) or a cancel. [asked] holds each call's permissions. */
+/** Access that answers every PIN pad the same way: an Admin ([admin]) or a cancel. [asked] holds each call's permissions, [labels] its label. */
 internal class FakeAccess(var admin: Boolean = true) : AccessControl {
     val asked: MutableList<List<String>> = CopyOnWriteArrayList()
+    val labels: MutableList<String?> = CopyOnWriteArrayList()
     private val person = Person(PersonId("alex"), "Alex", 0)
 
     override val session: StateFlow<Identified?> = MutableStateFlow(null)
@@ -26,8 +27,10 @@ internal class FakeAccess(var admin: Boolean = true) : AccessControl {
         reason: PinReason,
         allow: (Identified, Set<String>) -> Boolean,
         refusal: Refusal,
+        label: String?,
     ): Authorised? {
         asked += anyOf.toList()
+        labels += label
         return if (admin) Authorised(person, Role.ADMIN, anyOf.toSet()) else null
     }
 

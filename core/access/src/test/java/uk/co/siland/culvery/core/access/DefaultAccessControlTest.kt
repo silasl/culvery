@@ -86,8 +86,8 @@ class DefaultAccessControlTest {
     }
 
     /** Starts [permission] and returns the first PIN pad request it shows, then cancels it. */
-    private suspend fun TestScope.firstPromptFor(access: DefaultAccessControl, permission: String): PinRequest {
-        val job = launch { access.authorise(permission) }
+    private suspend fun TestScope.firstPromptFor(access: DefaultAccessControl, permission: String, label: String? = null): PinRequest {
+        val job = launch { access.authorise(permission, label = label) }
         val request = prompt.request.filterNotNull().first()
         job.cancel()
         return request
@@ -410,6 +410,13 @@ class DefaultAccessControlTest {
         access.authorise(CorePermissions.SETTINGS_MANAGE)
         val request = firstPromptFor(access, CorePermissions.CONNECTIONS_MANAGE)
         assertThat(request.label).isEqualTo("Connect calendars and services")
+    }
+
+    @Test
+    fun aGivenLabelNamesTheActionOnThePad() = runTest {
+        person("Alex", Role.ADMIN, "1234")
+        val request = firstPromptFor(access(), CorePermissions.CONNECTIONS_MANAGE, label = "Forget Butter")
+        assertThat(request.label).isEqualTo("Forget Butter")
     }
 
     @Test
