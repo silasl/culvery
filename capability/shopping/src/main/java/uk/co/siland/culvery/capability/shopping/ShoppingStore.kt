@@ -139,6 +139,9 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
         }
     }
 
+    /** Every queued change is due now, as when what held them back has been fixed. Nothing is dropped. */
+    suspend fun makeQueueDue() = dao.makeAllDue()
+
     suspend fun failed(seq: Long, nextAtMillis: Long) = dao.markFailed(seq, nextAtMillis)
 
     suspend fun drop(seq: Long) = dao.deleteQueued(seq)

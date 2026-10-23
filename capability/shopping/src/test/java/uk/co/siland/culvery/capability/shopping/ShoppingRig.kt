@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -32,10 +33,15 @@ internal class ToastLog : Toaster {
  * test moves it, and the sample provider. The clock reads the scheduler.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-internal class ShoppingRig(private val test: TestScope, private val fileName: String? = null, open: List<String> = emptyList()) {
+internal class ShoppingRig(
+    private val test: TestScope,
+    private val fileName: String? = null,
+    open: List<String> = emptyList(),
+    accounts: Flow<ProviderAccounts> = flowOf(ProviderAccounts.Ready(emptyList())),
+) {
     private val context: Context = ApplicationProvider.getApplicationContext()
     val clock = WallClock { test.testScheduler.currentTime }
-    val provider = SampleShoppingProvider(open = open, clock = clock)
+    val provider = SampleShoppingProvider(open = open, clock = clock, accounts = accounts)
     val conn = Connection("c1", SAMPLE_DESCRIPTOR.id, "the sample list", emptyMap())
     val lock = ShoppingLock()
 
@@ -97,8 +103,11 @@ internal class ShoppingRig(private val test: TestScope, private val fileName: St
 abstract class ShoppingTestBase {
     private val rigs = mutableListOf<ShoppingRig>()
 
-    internal fun TestScope.rig(fileName: String? = null, open: List<String> = emptyList()) =
-        ShoppingRig(this, fileName, open).also { rigs += it }
+    internal fun TestScope.rig(
+        fileName: String? = null,
+        open: List<String> = emptyList(),
+        accounts: Flow<ProviderAccounts> = flowOf(ProviderAccounts.Ready(emptyList())),
+    ) = ShoppingRig(this, fileName, open, accounts).also { rigs += it }
 
     @After
     fun closeRigs() = rigs.forEach { it.close() }

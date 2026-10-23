@@ -139,6 +139,9 @@ interface ShoppingDao {
     @Query("UPDATE shopping_queue SET excludeIds = :excludeIds WHERE seq = :seq")
     suspend fun setExcluded(seq: Long, excludeIds: String?)
 
+    @Query("UPDATE shopping_queue SET nextAtMillis = 0")
+    suspend fun makeAllDue()
+
     @Query("UPDATE shopping_queue SET attempts = attempts + 1, nextAtMillis = :nextAtMillis WHERE seq = :seq")
     suspend fun markFailed(seq: Long, nextAtMillis: Long)
 

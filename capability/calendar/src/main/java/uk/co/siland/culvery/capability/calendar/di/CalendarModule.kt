@@ -22,6 +22,7 @@ import uk.co.siland.culvery.capability.calendar.StoredSeries
 import uk.co.siland.culvery.capability.calendar.db.ALL_MIGRATIONS
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.core.access.PermissionSource
+import uk.co.siland.culvery.core.plugin.AccountUse
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
 
@@ -33,6 +34,10 @@ abstract class CalendarModule {
 
     @Multibinds
     abstract fun writers(): Set<CalendarWriter>
+
+    // Shopping binds one; the disconnect question asks them all (10 §4.10).
+    @Multibinds
+    abstract fun accountUses(): Set<AccountUse>
 
     @Binds
     abstract fun storedSeries(impl: CalendarStore): StoredSeries

@@ -75,11 +75,14 @@ dependencies {
     implementation(project(":provider:weather-openmeteo"))
     // Sample data only, in debug builds.
     debugImplementation(project(":provider:calendar-fake"))
+    debugImplementation(testFixtures(project(":capability:shopping")))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
     implementation(libs.kotlinx.coroutines.core)
+    // The Home screenshot builds the real Shopping card over an in-memory database.
+    testImplementation(libs.room.runtime)
     testImplementation(libs.roborazzi.core)
     testImplementation(libs.roborazzi.compose)
 }

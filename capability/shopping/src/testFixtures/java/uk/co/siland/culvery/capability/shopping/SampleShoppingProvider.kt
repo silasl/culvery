@@ -31,8 +31,8 @@ class SampleShoppingProvider(
     private val clock: WallClock,
     override val descriptor: ProviderDescriptor = SAMPLE_DESCRIPTOR,
     override val accounts: Flow<ProviderAccounts> = flowOf(ProviderAccounts.Ready(emptyList())),
+    override val accountGoneLine: String = "The sample account was disconnected.",
 ) : ShoppingProvider {
-    override val accountGoneLine: String = "The sample account was disconnected."
 
     /** The next call fails with this, once. */
     var failNext: Exception? = null

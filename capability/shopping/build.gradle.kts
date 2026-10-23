@@ -27,4 +27,6 @@ dependencies {
     testFixturesImplementation(project(":core:ui"))
     testImplementation(libs.roborazzi.core)
     testImplementation(libs.roborazzi.compose)
+    // Settings' frame, for the Shopping page's screenshots.
+    testImplementation(project(":core:setup"))
 }

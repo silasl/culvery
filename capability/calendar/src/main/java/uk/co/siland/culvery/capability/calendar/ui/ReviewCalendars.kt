@@ -107,8 +107,8 @@ internal fun serviceAndAccount(row: CalendarRow): String = row.connection.config
 /** Which calendar's person chips are open; NUL never appears in a provider id. */
 internal fun sourceKey(source: StoredSource): String = "${source.connectionId}\u0000${source.source.id}"
 
-/** The disconnect being confirmed, with the queued changes it would drop. */
-internal data class Confirming(val row: CalendarRow, val queued: Int)
+/** The disconnect being confirmed, with the queued changes it would drop and whether Shopping uses the account. */
+internal data class Confirming(val row: CalendarRow, val queued: Int, val shoppingUses: Boolean = false)
 
 /**
  * The wizard's Connect step: the Home screen's Connect card at about its Home size (4a design §3.9), or, once a calendar
@@ -171,7 +171,7 @@ internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarCo
             },
             onShown = { source, shown -> action.run { review.setShown(source, shown) } },
             onMakeMaster = { source -> action.run { review.makeMaster(source) } },
-            onDisconnect = { row -> action.run { confirming = Confirming(row, review.queuedChanges(row.connection.id)) } },
+            onDisconnect = { row -> action.run { confirming = Confirming(row, review.queuedChanges(row.connection.id), review.shoppingUses(row)) } },
             onKeep = { confirming = null },
             onConfirmDisconnect = { row -> action.run { if (review.disconnect(row)) confirming = null } },
         ),
@@ -225,7 +225,7 @@ internal fun ReviewCalendars(
             if (confirming != null && confirming.row.connection.id == connection.row.connection.id) {
                 HhConfirmCard(
                     tag = "review_confirm",
-                    title = disconnectQuestion(confirming.row.service, confirming.queued),
+                    title = disconnectQuestion(confirming.row.service, confirming.queued, confirming.shoppingUses),
                     keep = KEEP, keepTag = "review_keep",
                     confirm = DISCONNECT, confirmTag = "review_confirm_disconnect",
                     busy = busy, onKeep = actions.onKeep, onConfirm = { actions.onConfirmDisconnect(confirming.row) },

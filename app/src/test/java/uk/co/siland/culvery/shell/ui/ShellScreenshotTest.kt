@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.shell.ui
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.foundation.layout.Box
@@ -9,13 +10,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
+import java.lang.reflect.Proxy
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneOffset
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,22 +60,45 @@ import uk.co.siland.culvery.capability.music.ui.GroupActions
 import uk.co.siland.culvery.capability.music.ui.LocalArtSource
 import uk.co.siland.culvery.capability.music.ui.MusicCard
 import uk.co.siland.culvery.capability.music.ui.MusicTab
+import uk.co.siland.culvery.capability.shopping.SAMPLE_DESCRIPTOR
+import uk.co.siland.culvery.capability.shopping.SampleShoppingProvider
+import uk.co.siland.culvery.capability.shopping.ShoppingActions
+import uk.co.siland.culvery.capability.shopping.ShoppingCapability
+import uk.co.siland.culvery.capability.shopping.ShoppingChecks
+import uk.co.siland.culvery.capability.shopping.ShoppingConnections
+import uk.co.siland.culvery.capability.shopping.ShoppingDrainLoop
+import uk.co.siland.culvery.capability.shopping.ShoppingFocus
+import uk.co.siland.culvery.capability.shopping.ShoppingHealth
+import uk.co.siland.culvery.capability.shopping.ShoppingItem
+import uk.co.siland.culvery.capability.shopping.ShoppingLearning
+import uk.co.siland.culvery.capability.shopping.ShoppingLock
+import uk.co.siland.culvery.capability.shopping.ShoppingStore
+import uk.co.siland.culvery.capability.shopping.ShoppingSync
+import uk.co.siland.culvery.capability.shopping.ShoppingView
+import uk.co.siland.culvery.capability.shopping.db.ShoppingDatabase
 import uk.co.siland.culvery.capability.weather.Condition
 import uk.co.siland.culvery.capability.weather.DailyWeather
 import uk.co.siland.culvery.capability.weather.HeaderWeather
 import uk.co.siland.culvery.capability.weather.ui.WeatherHeaderItem
+import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.PinError
 import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.ui.PinPadSheet
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
+import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.CLOSING_WARNING_MS
+import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.RailBadge
+import uk.co.siland.culvery.core.plugin.ToastAction
+import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.Culvery
@@ -79,6 +118,15 @@ class ShellScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
     private val at = LocalDateTime.of(2026, 9, 23, 11, 54)
+
+    private val shoppingScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var shoppingDb: ShoppingDatabase? = null
+
+    @After
+    fun closeShopping() {
+        shoppingScope.cancel()
+        shoppingDb?.close()
+    }
 
     private val alex = Person(PersonId("alex"), "Alex", 0xFF4CB387)
     private val sam = Person(PersonId("sam"), "Sam", 0xFF5B9BE0)
@@ -206,6 +254,68 @@ class ShellScreenshotTest {
         ),
     )
 
+    /**
+     * The Shopping capability's own card, over the sample provider and an in-memory list of Milk, Bread and Eggs, in the
+     * utility slot with Lights and Music beneath (10 §4.9). Nothing reads the list: the checks never run, so the card
+     * shows what was stored.
+     */
+    private fun realShoppingCard(): HomeCard {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, ShoppingDatabase::class.java).allowMainThreadQueries().build()
+        shoppingDb = db
+        val wall = WallClock { System.currentTimeMillis() }
+        val provider = SampleShoppingProvider(clock = wall)
+        val store = ShoppingStore(db)
+        val learning = ShoppingLearning(store, wall)
+        val lock = ShoppingLock()
+        val sync = ShoppingSync(store, setOf(provider), learning, lock, wall)
+        val loop = ShoppingDrainLoop(sync, wall, shoppingScope)
+        val toaster = object : Toaster {
+            override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) = Unit
+        }
+        val host = object : AlertHost {
+            override val inFront = MutableStateFlow(false)
+            override val lowered = MutableStateFlow(false)
+
+            override fun show(loud: Boolean, content: @Composable () -> Unit) = Unit
+
+            override suspend fun quieted() = Unit
+
+            override fun dismiss() = Unit
+        }
+        val checks = ShoppingChecks(store, sync, host, shoppingScope)
+        val actions = ShoppingActions(store, learning, lock, loop, checks, toaster, wall, shoppingScope)
+        // The card never asks for a PIN, so access is never called.
+        val access = Proxy.newProxyInstance(AccessControl::class.java.classLoader, arrayOf(AccessControl::class.java)) { _, _, _ ->
+            error("The Home card does not use access")
+        } as AccessControl
+        val capability = ShoppingCapability(
+            store = store,
+            providers = setOf(provider),
+            view = ShoppingView(store, actions, setOf(provider), shoppingScope),
+            actions = actions,
+            learning = learning,
+            checks = checks,
+            focus = ShoppingFocus(),
+            connections = ShoppingConnections(store, setOf(provider), sync, lock, loop, learning, access, toaster, shoppingScope),
+            clock = HouseholdClock(MutableStateFlow(ZoneOffset.UTC), wall, shoppingScope, ticks = emptyFlow()),
+        )
+        runBlocking {
+            store.connect(Connection("c1", SAMPLE_DESCRIPTOR.id, "the sample list", emptyMap()))
+            store.saveRead(
+                listOf("Milk", "Bread", "Eggs").mapIndexed { i, text -> ShoppingItem("g$i", text, Instant.EPOCH) },
+                ShoppingHealth.OK,
+                wall.nowMillis(),
+            )
+        }
+        return runBlocking { capability.cards().first().single() }
+    }
+
+    private fun realShoppingHome(dark: Boolean) = calendarHome(dark).copy(
+        tabs = allTabs,
+        homeCards = HomeCardPlacer.place(homeCardList() + realShoppingCard()),
+    )
+
     private fun fullHome(dark: Boolean) = weatherHome(dark).copy(tabs = allTabs, homeCards = homeCards())
 
     private fun lightsHome(dark: Boolean, music: Boolean) = calendarHome(dark).copy(tabs = allTabs, homeCards = homeCards(music))
@@ -216,6 +326,7 @@ class ShellScreenshotTest {
         state: ShellUiState = ShellUiState(dark = dark),
         fontScale: Float = 1f,
         watching: Boolean = false,
+        ready: () -> Unit = {},
         tabContent: @Composable (String) -> Unit = {},
         overlay: @Composable () -> Unit = {},
     ) {
@@ -241,6 +352,7 @@ class ShellScreenshotTest {
                 }
             }
         }
+        ready()
         compose.onRoot().captureRoboImage("src/test/screenshots/$name.png")
     }
 
@@ -404,6 +516,18 @@ class ShellScreenshotTest {
 
     @Test
     fun homeShoppingLight() = snap("home_shopping_light", dark = false, state = shoppingHome(dark = false))
+
+    /** The capability's own card: Milk, Bread and Eggs over the sample provider (10 §4.9). */
+    @Test
+    fun homeShoppingCardDark() = snap("home_shopping_card_dark", dark = true, state = realShoppingHome(dark = true), ready = ::awaitShoppingCard)
+
+    @Test
+    fun homeShoppingCardLight() = snap("home_shopping_card_light", dark = false, state = realShoppingHome(dark = false), ready = ::awaitShoppingCard)
+
+    private fun awaitShoppingCard() = compose.waitUntil(5_000) {
+        compose.waitForIdle()
+        compose.onAllNodes(hasText("3 items")).fetchSemanticsNodes().isNotEmpty()
+    }
 
     /** Without Lights, Music takes the row's whole width. */
     @Test

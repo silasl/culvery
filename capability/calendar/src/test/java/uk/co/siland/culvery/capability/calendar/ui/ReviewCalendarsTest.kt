@@ -460,6 +460,21 @@ class ReviewCalendarsTest {
     }
 
     @Test
+    fun disconnectSaysWhenShoppingUsesTheAccount() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ReviewCalendars(
+                    "Calendars", listOf(ReviewConnection(row(), listOf(family))), listOf(Person.Family), now, false, null,
+                    Confirming(row(), 0, shoppingUses = true), emptyList(), ReviewActions(),
+                )
+            }
+        }
+        compose.onNodeWithText(
+            "Disconnect Google Calendar? Its calendars stop showing here. Shopping uses this account too, and stops until it’s connected again.",
+        ).assertExists()
+    }
+
+    @Test
     fun disconnectAndMakeMasterAreButtons() {
         show()
         listOf("review_disconnect_g1", "review_make_master_chores").forEach {

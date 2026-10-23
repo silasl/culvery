@@ -14,6 +14,7 @@ import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.Person
+import uk.co.siland.culvery.core.plugin.AccountUse
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -33,11 +34,12 @@ fun newEventsGoTo(calendar: String): String = "New events now go to $calendar."
 fun disconnected(service: String): String = "$service disconnected."
 
 /** One change reads in the singular; "will be lost", never "dropped" (4d-2 Decision 2c). */
-fun disconnectQuestion(service: String, queued: Int): String = "Disconnect $service? Its calendars stop showing here" + when (queued) {
-    0 -> "."
-    1 -> ", and 1 change not yet saved to $service will be lost."
-    else -> ", and $queued changes not yet saved to $service will be lost."
-}
+fun disconnectQuestion(service: String, queued: Int, shoppingUses: Boolean = false): String =
+    "Disconnect $service? Its calendars stop showing here" + when (queued) {
+        0 -> "."
+        1 -> ", and 1 change not yet saved to $service will be lost."
+        else -> ", and $queued changes not yet saved to $service will be lost."
+    } + if (shoppingUses) " Shopping uses this account too, and stops until it’s connected again." else ""
 
 /**
  * Review calendars (4a design §3.9, D13, D14), for the wizard and Settings › Calendars: who each calendar is for, whether
@@ -54,6 +56,7 @@ class CalendarReview @Inject constructor(
     private val toaster: Toaster,
     private val zone: HouseholdZone,
     private val clock: WallClock,
+    private val accountUses: Set<@JvmSuppressWildcards AccountUse> = emptySet(),
 ) {
     val connections: Flow<List<ReviewConnection>> = combine(calendarConnections.rows, store.sources()) { rows, sources ->
         rows.map { row -> ReviewConnection(row, sources.filter { it.connectionId == row.connection.id }) }
@@ -84,6 +87,12 @@ class CalendarReview @Inject constructor(
 
     /** For the disconnect confirmation; changes nothing, so it asks for no PIN. */
     suspend fun queuedChanges(connectionId: String): Int = store.queuedChanges(connectionId)
+
+    /** Whether another capability (Shopping) works through the account [row] is connected for, so the disconnect can say so. */
+    suspend fun shoppingUses(row: CalendarRow): Boolean {
+        val account = row.connection.config[CONFIG_ACCOUNT] ?: return false
+        return accountUses.any { it.uses(account) }
+    }
 
     /** D14: the connection with its calendars, events and queued changes. The grant in the Google account stays. */
     suspend fun disconnect(row: CalendarRow): Boolean = change {

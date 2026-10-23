@@ -23,6 +23,7 @@ import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
+import uk.co.siland.culvery.core.plugin.AccountUse
 import uk.co.siland.culvery.core.plugin.COULD_NOT_SAVE
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
@@ -59,12 +60,12 @@ class CalendarReviewTest {
         people.close()
     }
 
-    private suspend fun TestScope.review(): Pair<CalendarReview, TestAccess> {
+    private suspend fun TestScope.review(uses: Set<AccountUse> = emptySet()): Pair<CalendarReview, TestAccess> {
         val access = testAccess(household)
         val setup = CalendarSetup(store, setOf(google), { household.people.first() }, toaster, WallClock { 0L }, EmptyCoroutineContext)
         val connections = CalendarConnections(store, setup, access.control, setOf(google), backgroundScope)
         store.addConnection(connection, google.sourceList, emptyMap(), masterSourceId = family.id)
-        return CalendarReview(store, setup, connections, household, access.control, toaster, HouseholdZone(household), WallClock { 0L }) to access
+        return CalendarReview(store, setup, connections, household, access.control, toaster, HouseholdZone(household), WallClock { 0L }, uses) to access
     }
 
     private suspend fun source(id: String): StoredSource = store.source("g1", id)!!
@@ -139,6 +140,38 @@ class CalendarReviewTest {
         assertThat(store.sources().first()).isEmpty()
         assertThat(store.eventsBetween(0, Long.MAX_VALUE).first()).isEmpty()
         assertThat(toaster.messages).containsExactly("Google Calendar disconnected.")
+    }
+
+    @Test
+    fun disconnectingAnAccountShoppingUsesSaysSo() = runTest {
+        val usesFamily = AccountUse { it.equals("FAMILY@example.com", ignoreCase = true) }
+
+        val (review, _) = review(setOf(AccountUse { it == "sam@example.com" }, usesFamily))
+        val row = review.connections.first().single().row
+        assertThat(review.shoppingUses(row)).isTrue()
+        assertThat(disconnectQuestion("Google Calendar", 2, review.shoppingUses(row)))
+            .isEqualTo(
+                "Disconnect Google Calendar? Its calendars stop showing here, and 2 changes not yet saved to Google Calendar will be lost." +
+                    " Shopping uses this account too, and stops until it’s connected again.",
+            )
+
+        // A connection that names no account can't be one Shopping uses.
+        assertThat(review.shoppingUses(row.copy(connection = row.connection.copy(config = emptyMap())))).isFalse()
+    }
+
+    @Test
+    fun anAccountShoppingDoesNotUseIsNotWarnedAbout() = runTest {
+        val (review, _) = review(setOf(AccountUse { it == "sam@example.com" }))
+        val row = review.connections.first().single().row
+        assertThat(review.shoppingUses(row)).isFalse()
+    }
+
+    @Test
+    fun withNothingUsingTheAccountTheQuestionIsUnchanged() = runTest {
+        val (review, _) = review()
+        val row = review.connections.first().single().row
+        assertThat(review.shoppingUses(row)).isFalse()
+        assertThat(disconnectQuestion("Google Calendar", 0, review.shoppingUses(row))).isEqualTo("Disconnect Google Calendar? Its calendars stop showing here.")
     }
 
     @Test

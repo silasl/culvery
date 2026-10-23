@@ -15,6 +15,10 @@ import uk.co.siland.culvery.capability.shopping.ShoppingChecks
 import uk.co.siland.culvery.capability.shopping.ShoppingDrainLoop
 import uk.co.siland.culvery.capability.shopping.ShoppingProvider
 import uk.co.siland.culvery.capability.shopping.db.ShoppingDatabase
+import uk.co.siland.culvery.capability.shopping.ShoppingAccountUse
+import uk.co.siland.culvery.capability.shopping.ShoppingCapability
+import uk.co.siland.culvery.core.plugin.AccountUse
+import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
 
 @Module
@@ -27,6 +31,14 @@ abstract class ShoppingModule {
     @Binds
     @IntoSet
     abstract fun drainLoop(impl: ShoppingDrainLoop): Startable
+
+    @Binds
+    @IntoSet
+    abstract fun capability(impl: ShoppingCapability): Capability
+
+    @Binds
+    @IntoSet
+    abstract fun accountUse(impl: ShoppingAccountUse): AccountUse
 
     @Binds
     @IntoSet
