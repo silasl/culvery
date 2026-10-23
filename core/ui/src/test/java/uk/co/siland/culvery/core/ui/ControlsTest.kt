@@ -28,6 +28,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -38,7 +40,10 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -189,6 +194,59 @@ class ControlsTest {
         show { HhChoiceChip("Morning", selected = true, tag = "slot", onClick = {}, secondary = "09:00") }
         val colour = compose.onNodeWithText("09:00", useUnmergedTree = true).textLayout().layoutInput.style.color
         assertThat(colour).isEqualTo(DarkColors.accentInk)
+    }
+
+    /** Pin for the default; the second field fails without `clearsFocusOnDone`. */
+    @Test
+    fun aFieldCanKeepFocusAfterDone() {
+        var keptDone = 0
+        var clearedDone = 0
+        show {
+            Column {
+                HhTextField("", {}, placeholder = "Kept", label = "Kept", tag = "kept", onDone = { keptDone++ }, clearsFocusOnDone = false)
+                HhTextField("", {}, placeholder = "Cleared", label = "Cleared", tag = "cleared", onDone = { clearedDone++ })
+            }
+        }
+        compose.onNodeWithTag("kept").performClick().performImeAction()
+        compose.onNodeWithTag("kept").assertIsFocused()
+        assertThat(keptDone).isEqualTo(1)
+        compose.onNodeWithTag("cleared").performClick().performImeAction()
+        compose.onNodeWithTag("cleared").assertIsNotFocused()
+        assertThat(clearedDone).isEqualTo(1)
+    }
+
+    /** Fails without `onLongClick`; the second chip is the pin of today's chip, which has no long press. */
+    @Test
+    fun aChipCanBeLongPressed() {
+        var taps = 0
+        var holds = 0
+        show {
+            Row {
+                HhChoiceChip("Eggs", selected = false, tag = "held", onClick = { taps++ }, role = Role.Button, onLongClick = { holds++ }, longClickLabel = "Forget Eggs")
+                HhChoiceChip("Tea", selected = false, tag = "plain", onClick = {}, role = Role.Button)
+            }
+        }
+        compose.onNodeWithTag("held").performTouchInput { longClick() }
+        assertThat(holds).isEqualTo(1)
+        assertThat(taps).isEqualTo(0)
+        assertThat(compose.onNodeWithTag("held").fetchSemanticsNode().config[SemanticsActions.OnLongClick].label).isEqualTo("Forget Eggs")
+        compose.onNodeWithTag("plain").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnLongClick))
+    }
+
+    /** Fails if a field can't be told apart from the `surf` card it sits on. */
+    @Test
+    fun aTextFieldCanBeFilledOtherThanSurf() {
+        lateinit var colors: HhColors
+        show {
+            colors = Culvery.colors
+            Column {
+                HhTextField("", {}, placeholder = "Add", label = "Add", tag = "plain")
+                Spacer(Modifier.height(16.dp))
+                HhTextField("", {}, placeholder = "Add", label = "Add", tag = "filled", fill = Culvery.colors.surf2)
+            }
+        }
+        assertThat(pixelAt(compose.onNodeWithTag("plain"), 4.dp, 32.dp)).isEqualTo(colors.surf.toArgb())
+        assertThat(pixelAt(compose.onNodeWithTag("filled"), 4.dp, 32.dp)).isEqualTo(colors.surf2.toArgb())
     }
 
     @Test

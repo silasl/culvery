@@ -3,6 +3,7 @@ package uk.co.siland.culvery.core.ui
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -154,7 +155,8 @@ object ControlType {
  * a chip that opens something is `Role.Button`. [trailing] follows the label (an expand arrow) and, as [leading], is given the ink. [spokenName] is what TalkBack reads when that isn't the label. A disabled chip is drawn at 38% but stays tappable, so a tap can
  * explain why: TalkBack hears "not available" and "double-tap to find out why". A [locked] chip (9 §4.8) says the same
  * but isn't faded: the `lock` icon first, no fill, a `surf3` edge and a `mute` label, or selected, filled as chosen.
- * [labelStyle] can ask for tabular figures; a chip stretched wider than its contents centres them.
+ * [labelStyle] can ask for tabular figures; a chip stretched wider than its contents centres them. [onLongClick] adds a
+ * long press, offered to TalkBack as the action [longClickLabel].
  */
 @Composable
 fun HhChoiceChip(
@@ -176,6 +178,8 @@ fun HhChoiceChip(
     trailing: (@Composable (ink: Color) -> Unit)? = null,
     locked: Boolean = false,
     labelStyle: TextStyle = ControlType.chip,
+    onLongClick: (() -> Unit)? = null,
+    longClickLabel: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val c = Culvery.colors
@@ -206,7 +210,7 @@ fun HhChoiceChip(
                 if (bare) Modifier.border(ControlTokens.lockedEdge, c.surf3, shape) else Modifier.background(if (selected) selectedColor else unselectedFill),
             )
             // Never `enabled = false`: that would stop the explaining tap.
-            .hhClickable(onClick, label = clickLabel ?: FIND_OUT_WHY.takeIf { unavailable }, role = role, spoken = spokenName)
+            .chipClickable(onClick, clickLabel ?: FIND_OUT_WHY.takeIf { unavailable }, role, spokenName, onLongClick, longClickLabel)
             .padding(horizontal = ControlTokens.chipPaddingH),
     ) {
         if (locked) HhIcon(Icons.LOCK, size = ControlTokens.chipIcon, tint = ink, modifier = Modifier.testTag("${tag}_lock"))
@@ -217,6 +221,21 @@ fun HhChoiceChip(
         }
         trailing?.invoke(ink)
     }
+}
+
+/** [hhClickable], plus a long press with its TalkBack action [longClickLabel] when [onLongClick] is given. */
+private fun Modifier.chipClickable(
+    onClick: () -> Unit,
+    label: String?,
+    role: Role,
+    spoken: String?,
+    onLongClick: (() -> Unit)?,
+    longClickLabel: String?,
+): Modifier = if (onLongClick == null) {
+    hhClickable(onClick, label = label, role = role, spoken = spoken)
+} else {
+    then(if (spoken != null) Modifier.semantics { contentDescription = spoken } else Modifier)
+        .combinedClickable(onClickLabel = label, role = role, onLongClickLabel = longClickLabel, onLongClick = onLongClick, onClick = onClick)
 }
 
 /** Under an unbounded width (a LazyRow's) the label's weight would get none, so the chip is bounded at its natural width. */
@@ -274,7 +293,9 @@ const val CHOSEN = "chosen"
 const val NOT_CHOSEN = "not chosen"
 
 /**
- * 64 dp, `surf`, 22 sp / 600, one line; [placeholder] while empty; the keyboard's Done calls [onDone] and never saves.
+ * 64 dp, `surf`, 22 sp / 600, one line; [placeholder] while empty; the keyboard's Done calls [onDone] and never saves, and
+ * leaves the field's focus unless [clearsFocusOnDone] is false (a field for the next entry). [fill] is `surf2` for a field
+ * on a `surf` card, where `surf` would vanish.
  * [label] is its name for TalkBack once text hides the placeholder. While [error] is set the field has a `danger` ring in
  * place of its focus ring, and the error shows 8 dp under it as `{tag}_error`; TalkBack reads it with the field, once.
  * A new error scrolls the field and its error into view. [modifier] goes on the field itself.
@@ -291,6 +312,8 @@ fun HhTextField(
     capitalization: KeyboardCapitalization = KeyboardCapitalization.Sentences,
     error: String? = null,
     onDone: () -> Unit = {},
+    clearsFocusOnDone: Boolean = true,
+    fill: Color? = null,
 ) {
     val c = Culvery.colors
     val focusManager = LocalFocusManager.current
@@ -311,7 +334,7 @@ fun HhTextField(
             // Leaving the field closes the keyboard: a KeyboardActions onDone replaces Compose's own closing.
             keyboardActions = KeyboardActions(onDone = {
                 onDone()
-                focusManager.clearFocus()
+                if (clearsFocusOnDone) focusManager.clearFocus()
             }),
             modifier = modifier
                 .testTag(tag)
@@ -328,7 +351,7 @@ fun HhTextField(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(shape)
-                        .background(c.surf)
+                        .background(fill ?: c.surf)
                         .then(ring?.let { Modifier.border(ControlTokens.fieldBorder, it, shape) } ?: Modifier)
                         .padding(horizontal = ControlTokens.fieldPaddingH),
                 ) {
