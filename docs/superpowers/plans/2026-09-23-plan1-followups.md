@@ -544,14 +544,14 @@ For the end-of-v1 design review:
 
 Fault found:
 - Fault A, while adding an event (title typed), a tap on a start date closed the editor and an existing event's details opened. Not reproduced; no crash and no warning in the log. Nothing in the editor opens an event, so the editor closed first and a tap reached the week or Home behind it; the idle close (10 min once edited, warned at 9:40) and a session ending don't fit. Next time: note the minute, the entry point and where the opened event sat, and read logcat at once.
-- Fault B (Plan 6, Sonos), Favourites lists "Discover Sonos Radio" and "Trending now", which do nothing when tapped. Likely Sonos Radio browse entries saved as favourites with nothing playable behind them. Decide whether to leave them out of the list or make them play.
+- Fault B (Plan 6, Sonos), Favourites lists "Discover Sonos Radio" and "Trending now", which do nothing when tapped. **Fixed 2026-10-23:** they are Sonos Radio shortcuts with no link to play, now left out.
 
 ## From Plans 9c-1b and 9c-1c
 - **Choosing the destination calendar per event:** every new event still goes to the household's one destination calendar.
 - **Skipping one date of a series** from the event's details.
 - **An undone create whose drain delete is lost on restart:** `UndoneKeys` lives in memory, so after a restart the create can still land; if it does, its title is remembered too. Related (final review M2): an Undo that races a drain create landing in the same moment leaves the event on the week until the next sync, and the key stays in `UndoneKeys` until restart.
 - **Home slow to fill:** cold start 2.2–2.9 s to Home filled on the tablet, the Hue bridge's first read the slowest part (Task 16, above); the return from the Calendar tab is quick. Decide whether Lights should show its last known rooms while it connects.
-- **Hiding a calendar can hide a title another visible calendar still has** (final review M1): hiding folds nothing back, so a title supplied by the hidden calendar's event drops out of "From before" until the visible calendar's event next changes or the next full sync. Re-supply on hide, as `forget` does.
+- **Hiding a calendar can hide a title another visible calendar still has** (final review M1): hiding folds nothing back, so a title supplied by the hidden calendar's event drops out of "From before" until the visible calendar's event next changes or the next full sync. Re-supply on hide, as `forget` does. **Fixed 2026-10-23.**
 - **A phone's counted series is expanded in full** on every detail update (final review M3, `Repeats.kt:28`); cap it or work out the last date directly.
 - **End-of-v1 design review:** 9c-1b's notes (the plan's "Notes for the end-of-v1 design review" and the ledger's "provisional for the design review" lines) and this plan's (the walk-through list above; the ledger's copy at `culvery-notes/sdd-ledger-plan-9c1c.md`).
 
@@ -567,6 +567,16 @@ Fault found:
 - **Not tried with TalkBack:** focus moving to a refused field in the person sheet, and "N towns found" being spoken from the collapsed status line. Check both on the tablet.
 - **No faults.**
 
+## Plan 9c-2 and the Sonos and calendar fixes: on the tablet (2026-10-23)
+- **The release from 85c49493** (9c-2 plus the fixes branch) is installed with `install -r`. The mapping is at `culvery-notes/mappings/mapping-85c4949.txt`.
+- **The user found it all good:** Settings, Sonos Favourites without the two shortcuts, and the playlists showing and playing in a room. The logs show no Culvery errors; the one native crash was Google Play services' zygote.
+- **Not tried (TalkBack was off):**
+  - focus moving to a refused section of the person sheet, and whether its line is spoken twice;
+  - TalkBack on a locked role row or a taken swatch;
+  - "N towns found" spoken from Home location's status line.
+  The user will raise them if they show in use.
+- **Not tried either:** "Use for new events" with real calendars, and a new Sonos playlist appearing on the next open.
+
 ## Left out of Plan 9c-2 on purpose (2026-10-23)
 - **Settings › Calendars keeps "Family"** for the household's calendars; "Family" or "Everyone" is for the design review.
 - **The calendar editor's title field keeps its own ring:** folding it into the shared text field's error ring is deferred.
@@ -580,13 +590,11 @@ Fault found:
   - Show's group width and the person pill's gap, read from 5c;
   - the Set PIN pill clipped by a few px at the sheet's scroll edge on an 800 dp screen;
   - "When the doorbell rings, lower music to" wrapping to two lines;
-  - the Repeats rows a few dp taller, taking the radio row's sizes.
+  - the Repeats rows a few dp taller, taking the radio row's sizes;
+  - the person pill on Settings › Calendars is capped at 140 dp, which leaves a calendar's name about 27 dp at font 1.3 in the wizard column.
+- **Sonos playlists:** the sheet removes duplicate favourites using the favourites read just before. It relies on that order, which `MusicActions` keeps.
 
 ## To check when the tablet is next plugged in
-- **Sonos (branch fixes-sonos-shortcuts-hidden-titles, 2026-10-23):**
-  - "Discover Sonos Radio" and "Trending Now" are gone from Favourites.
-  - The six Sonos playlists show under Playlists, and one plays in a room. The queue metadata is built to the known shape but has not been checked on a speaker.
-  - A playlist made in the Sonos app appears the next time the sheet opens.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
 - **Home slow to fill (9c walk-through, 2026-10-22):** on the emulator, Home's cards took a moment to fill after opening. Time it on the tablet (cold start and return from the Calendar tab) before deciding whether anything needs fixing. The same walk-through saw it on the Calendar tab after a restart, Settings › Calendars, Home location and People (fault 1); time those too.
 
