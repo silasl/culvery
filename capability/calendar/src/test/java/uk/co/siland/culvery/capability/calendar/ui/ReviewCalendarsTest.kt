@@ -2,6 +2,15 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasText
+import uk.co.siland.culvery.core.ui.ButtonTone
+import uk.co.siland.culvery.core.ui.ButtonToneKey
+import uk.co.siland.culvery.core.ui.WithFontScale
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -10,6 +19,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.unit.height
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -24,6 +35,8 @@ import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
@@ -37,6 +50,7 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.capability.calendar.CalendarSource
@@ -54,6 +68,7 @@ import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ReviewCalendarsTest {
     @get:Rule val compose = createComposeRule()
 
@@ -105,7 +120,7 @@ class ReviewCalendarsTest {
         }
     }
 
-    private fun showSources(vararg sources: StoredSource) = compose.setContent {
+    private fun showSources(vararg sources: StoredSource, picking: String? = null) = compose.setContent {
         CulveryTheme(dark = true) {
             ReviewCalendars(
                 title = "Calendars",
@@ -113,7 +128,7 @@ class ReviewCalendarsTest {
                 people = listOf(Person.Family, mia),
                 nowMillis = now,
                 busy = false,
-                picking = null,
+                picking = picking,
                 confirming = null,
                 connectable = emptyList(),
                 actions = ReviewActions(onShown = { source, visible -> shown = source.source.id to visible }),
@@ -145,28 +160,79 @@ class ReviewCalendarsTest {
         assertThat(size("review")).isEqualTo(size("reference"))
     }
 
-    /** D6: the row says so and offers Hide; the connection's line stays "Updated 2 minutes ago". */
+    /** The strip says so and offers Hide inside it; the connection's line stays "Updated 2 minutes ago". */
     @Test
     fun aCalendarThatCantBeReadSaysSoAndOffersToHideIt() {
         showSources(family, swim.copy(readProblem = READ_REFUSED))
-        compose.onNodeWithText("Can’t read this calendar — check it’s still shared with this account.").assertExists()
+        compose.onNodeWithText("Can’t read this calendar. Check it’s still shared with family@example.com.").assertExists()
         compose.onNodeWithText("Updated 2 minutes ago").assertExists()
         compose.onNodeWithText("Hide this calendar").performClick()
         assertThat(shown).isEqualTo("swim" to false)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
     fun aHiddenCalendarShowsNoReadProblem() {
         showSources(family, swim.copy(mapping = swim.mapping.copy(visible = false), readProblem = READ_REFUSED))
-        compose.onNodeWithText("Can’t read this calendar — check it’s still shared with this account.").assertDoesNotExist()
+        compose.onNodeWithTag("review_read_problem_swim").assertDoesNotExist()
         compose.onNodeWithText("Hide this calendar").assertDoesNotExist()
     }
 
     @Test
-    fun theMasterThatCantBeReadAsksForAnotherMasterFirst() {
+    fun theMainCalendarsProblemSaysChooseAnotherFirst() {
         showSources(family.copy(readProblem = READ_REFUSED), swim)
-        compose.onNodeWithText("Choose another main calendar first.").assertExists()
+        compose.onNodeWithText(
+            "Can’t read this calendar. Check it’s still shared with family@example.com. To hide it, choose another main calendar first.",
+        ).assertExists()
+        compose.onNodeWithTag("review_hide_family").assertDoesNotExist()
         compose.onNodeWithText("Hide this calendar").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aCalendarsProblemOffersHideInsideTheStrip() {
+        showSources(family, swim.copy(readProblem = READ_REFUSED))
+        compose.onNode(hasTestTag("review_hide_swim") and hasAnyAncestor(hasTestTag("review_read_problem_swim"))).assertExists().performClick()
+        assertThat(shown).isEqualTo("swim" to false)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aProblemWithNoAccountSaysThisAccount() {
+        val unnamed = google.copy(config = emptyMap())
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ReviewCalendars(
+                    "Calendars",
+                    listOf(ReviewConnection(CalendarRow(unnamed, "Google Calendar", "calendar_month", ConnectionHealth.Ok, now - 2 * 60_000), listOf(family, swim.copy(readProblem = READ_REFUSED)))),
+                    listOf(Person.Family, mia), now, false, null, null, emptyList(), ReviewActions(),
+                )
+            }
+        }
+        compose.onNodeWithText("Can’t read this calendar. Check it’s still shared with this account.").assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun cantReadNamesTheAccountAndTheMainCalendarsWayOut() {
+        assertThat(cantRead("family@example.com", main = false)).isEqualTo("Can’t read this calendar. Check it’s still shared with family@example.com.")
+        assertThat(cantRead(null, main = true)).isEqualTo(
+            "Can’t read this calendar. Check it’s still shared with this account. To hide it, choose another main calendar first.",
+        )
+    }
+
+    @Test
+    fun theStripSitsAtTheFootUnderTheChips() {
+        val problem = swim.copy(readProblem = READ_REFUSED)
+        showSources(family, problem, picking = sourceKey(problem))
+        val card = compose.onNodeWithTag("review_source_swim").getBoundsInRoot()
+        val strip = compose.onNodeWithTag("review_read_problem_swim").getBoundsInRoot()
+        val chips = compose.onNodeWithTag("review_pick_Mia").getBoundsInRoot()
+        assertThat(strip.top.value).isAtLeast(chips.bottom.value)
+        assertThat(strip.bottom.value).isWithin(1f).of(card.bottom.value)
+        assertThat(strip.left.value).isWithin(1f).of(card.left.value)
+        assertThat(strip.right.value).isWithin(1f).of(card.right.value)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -187,15 +253,135 @@ class ReviewCalendarsTest {
     }
 
     @Test
-    fun theMasterIsMarkedAndAlwaysShown() {
+    fun theMainBadgeIsInline() {
         show()
-        compose.onNodeWithText("Main").assertExists()
-        compose.onNodeWithText("New events go here").assertExists()
-        compose.onNodeWithTag("review_show_family").assertIsNotEnabled()
-        // 48 tall: the draw-only switch no longer brings Material's touch size.
+        val badge = compose.onNodeWithTag("review_main_family").getBoundsInRoot()
+        val name = compose.onAllNodesWithText("Family", useUnmergedTree = true).onFirst().getBoundsInRoot()
+        compose.onNodeWithTag("review_main_family").assert(hasAnyDescendant(hasText(MAIN_NEW_EVENTS_GO_HERE)))
+        assertThat(badge.left.value).isAtLeast(name.right.value)
+        assertThat((badge.top + badge.bottom).value / 2).isWithin(2f).of((name.top + name.bottom).value / 2)
+        compose.onNodeWithText("New events go here").assertDoesNotExist()
+        compose.onNodeWithTag("review_main_swim").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theMainCalendarSaysAlwaysShown() {
+        show()
+        compose.onNodeWithText("Always shown", useUnmergedTree = true).assertExists()
+        compose.onNode(hasText("Show") and hasAnyAncestor(hasTestTag("review_show_family")), useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("review_show_family")
+            .assertIsNotEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Show Family")))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, ALWAYS_SHOWN))
+        compose.onNodeWithTag("review_show_switch_family", useUnmergedTree = true).assertExists()
+        compose.onNode(hasText("Show") and hasAnyAncestor(hasTestTag("review_show_chores")), useUnmergedTree = true).assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theMainCalendarsSwitchCannotBeToggled() {
+        show()
+        compose.onNodeWithTag("review_show_family").performClick()
+        compose.runOnUiThread {
+            compose.onNodeWithTag("review_show_family").fetchSemanticsNode().config.getOrNull(SemanticsActions.OnClick)?.action?.invoke()
+        }
+        assertThat(shown).isNull()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun otherCalendarsToggleShownAtFortyEightDpHigh() {
+        show()
         compose.onNodeWithTag("review_show_chores").assertHeightIsAtLeast(48.dp)
         compose.onNodeWithTag("review_show_chores").assertIsEnabled().performClick()
         assertThat(shown).isEqualTo("chores" to true)
+    }
+
+    @Test
+    fun aCalendarsLineIsSixtyNineHigh() {
+        show()
+        listOf("family", "swim", "chores").forEach {
+            assertThat(compose.onNodeWithTag("review_line_$it").getBoundsInRoot().height.value).isWithin(1f).of(69f)
+        }
+        compose.onNodeWithTag("settings_row_g1").assertHeightIsAtLeast(75.dp)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aLongNameWithTheBadgeFitsAtLargeFont() {
+        val long = "Birthdays, holidays and school term dates"
+        assertThat(long.length).isAtLeast(40)
+        var pane by mutableStateOf(720.dp)
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                WithFontScale(1.3f) {
+                    Box(Modifier.width(pane)) {
+                        ReviewCalendars(
+                            "Calendars", listOf(ReviewConnection(row(), listOf(family.copy(source = family.source.copy(name = long))))),
+                            listOf(Person.Family, mia), now, false, null, null, emptyList(), ReviewActions(),
+                        )
+                    }
+                }
+            }
+        }
+        listOf(720.dp, 640.dp).forEach { width ->
+            pane = width
+            compose.waitForIdle()
+            val name = compose.onNodeWithText(long, useUnmergedTree = true)
+            val boxes = listOf(
+                name.getBoundsInRoot(),
+                compose.onNodeWithTag("review_main_family").getBoundsInRoot(),
+                compose.onNodeWithTag("review_person_family").getBoundsInRoot(),
+                compose.onNodeWithTag("review_show_family").getBoundsInRoot(),
+            )
+            boxes.forEachIndexed { i, a ->
+                boxes.drop(i + 1).forEach { b ->
+                    assertThat(a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom).isFalse()
+                }
+            }
+            assertThat(name.textLayout().isLineEllipsized(0)).isTrue()
+            val badge = compose.onNodeWithText(MAIN_NEW_EVENTS_GO_HERE, useUnmergedTree = true).textLayout()
+            assertThat(badge.lineCount).isEqualTo(1)
+            assertThat(badge.isLineEllipsized(0)).isFalse()
+            compose.assertClickablesHaveRoleAndLabel()
+        }
+    }
+
+    @Test
+    fun useForNewEventsSitsUnderTheLine() {
+        show()
+        val line = compose.onNodeWithTag("review_line_chores").getBoundsInRoot()
+        val button = compose.onNodeWithTag("review_make_master_chores")
+        button.assertHeightIsEqualTo(48.dp)
+        assertThat(button.getBoundsInRoot().top.value).isAtLeast(line.bottom.value)
+        compose.onNodeWithTag("review_make_master_family").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun aConnectionNeedingSignInHasOneGreenButton() {
+        show(ConnectionHealth.NeedsSignIn)
+        val primaries = compose.onAllNodes(SemanticsMatcher("is primary") { it.config.getOrNull(ButtonToneKey) == ButtonTone.Primary })
+        primaries.assertCountEquals(1)
+        primaries[0].assert(hasTestTag("settings_reconnect"))
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun nothingShowsUntilTheConnectionsAnswer() {
+        var answer by mutableStateOf<List<ReviewConnection>?>(null)
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ReviewCalendars("Calendars", answer, listOf(Person.Family, mia), now, false, null, null, emptyList(), ReviewActions())
+            }
+        }
+        compose.onNodeWithTag("review_none").assertDoesNotExist()
+        compose.onNodeWithTag("review_source_family").assertDoesNotExist()
+        compose.onNodeWithText("Calendars").assertDoesNotExist()
+        answer = emptyList()
+        compose.onNodeWithTag("review_none").assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -313,6 +499,25 @@ class ReviewCalendarsTest {
         chip.performClick()
         compose.onNodeWithTag("review_person_swim").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "expanded"))
         compose.onNodeWithTag("review_pick_Mia").onParent().assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
+    }
+
+    @Test
+    fun thePersonPillOpensTheChipsUnderTheLine() {
+        var picking by mutableStateOf<String?>(null)
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ReviewCalendars(
+                    "Calendars", listOf(ReviewConnection(row(), listOf(swim))), listOf(Person.Family, mia), now, false, picking, null, emptyList(),
+                    ReviewActions(onPick = { picking = if (picking == it) null else it }),
+                )
+            }
+        }
+        compose.onNodeWithTag("review_person_swim").assertHeightIsEqualTo(48.dp).performClick()
+        compose.onNodeWithTag("review_person_swim").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "expanded"))
+        val line = compose.onNodeWithTag("review_line_swim").getBoundsInRoot()
+        assertThat(line.height.value).isWithin(1f).of(69f)
+        assertThat(compose.onNodeWithTag("review_pick_Mia").getBoundsInRoot().top.value).isAtLeast(line.bottom.value)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test

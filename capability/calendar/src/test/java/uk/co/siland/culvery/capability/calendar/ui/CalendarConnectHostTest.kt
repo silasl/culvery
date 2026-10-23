@@ -225,6 +225,31 @@ class CalendarConnectHostTest {
     }
 
     @Test
+    fun theCalendarsPageDrawsNothingUntilTheStoreAnswers() {
+        compose.mainClock.autoAdvance = false
+        showSettingsCalendars()
+        // The first frame, before the store has answered.
+        compose.onAllNodesWithText("Calendars").assertCountEquals(0)
+        compose.onAllNodesWithTag("review_none").assertCountEquals(0)
+        compose.mainClock.autoAdvance = true
+        waitFor { compose.onAllNodesWithTag("review_none").fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    @Test
+    fun aReadProblemShowsInTheStripAndIsNotToasted() {
+        val family = CalendarSource("family@example.com", "Family", writable = true, primary = true)
+        val swim = CalendarSource("swim", "Swimming", writable = false)
+        runBlocking {
+            store.addConnection(googleConnection, listOf(family, swim), emptyMap(), masterSourceId = family.id)
+            store.markReadRefused(googleConnection.id, swim.id)
+        }
+        showSettingsCalendars()
+        waitFor { compose.onAllNodesWithTag("review_read_problem_swim").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Can’t read this calendar. Check it’s still shared with family@example.com.").assertExists()
+        assertThat(access.toasts.messages).isEmpty()
+    }
+
+    @Test
     fun onceConnectedTheWizardsConnectStepSaysSo() {
         google.connectsAs = googleConnection
         access.answer(TestAccess.ALEX)

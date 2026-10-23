@@ -2,14 +2,19 @@ package uk.co.siland.culvery.capability.calendar.ui
 
 import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
@@ -30,6 +35,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarConnections
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
@@ -48,6 +55,7 @@ import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.rememberNowMillis
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
+import uk.co.siland.culvery.core.ui.CardTokens
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
@@ -58,7 +66,9 @@ import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhPageTitle
 import uk.co.siland.culvery.core.ui.HhSwitch
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.ListRowTokens
 import uk.co.siland.culvery.core.ui.PersonChipInk
+import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
@@ -66,17 +76,19 @@ import uk.co.siland.culvery.core.ui.shownNotSpoken
 internal const val NEEDS_RECONNECTING = "Needs reconnecting"
 internal const val STOPPED_UPDATING = "Stopped updating — disconnect and connect again."
 
-// 4a design §4.5; 4d-2 Decision 2a.
+// 4a design §4.5; 4d-2 Decision 2a; 9 §4.12.
 internal const val DISCONNECT = "Disconnect"
 internal const val SHOW = "Show"
-internal const val MAIN = "Main"
-internal const val NEW_EVENTS_GO_HERE = "New events go here"
+internal const val ALWAYS_SHOWN_LABEL = "Always shown"
+internal const val MAIN_NEW_EVENTS_GO_HERE = "Main · new events go here"
 internal const val USE_FOR_NEW_EVENTS = "Use for new events"
-
-// 4c design §6.4.
-internal const val CANT_READ_CALENDAR = "Can’t read this calendar — check it’s still shared with this account."
 internal const val HIDE_THIS_CALENDAR = "Hide this calendar"
-internal const val CHOOSE_ANOTHER_MAIN = "Choose another main calendar first."
+
+/** The read problem's sentence (9 §4.12); screen text only, never a toast or a log. */
+internal fun cantRead(account: String?, main: Boolean): String {
+    val sentence = "Can’t read this calendar. Check it’s still shared with ${account ?: "this account"}."
+    return if (main) "$sentence To hide it, choose another main calendar first." else sentence
+}
 
 private const val TAG = "ReviewCalendars"
 
@@ -130,22 +142,23 @@ internal fun ConnectedStepCard(rows: List<CalendarRow>) {
 
 @Composable
 internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarConnections, clock: HouseholdClock, title: String, offerConnect: Boolean, line: String? = null) {
-    val list by review.connections.collectAsState(initial = emptyList())
+    // Null until the store answers, so the page draws nothing rather than "Connect…" first.
+    val list = review.connections.collectAsState<List<ReviewConnection>, List<ReviewConnection>?>(initial = null).value
     val people by review.people.collectAsState(initial = listOf(Person.Family))
-    val connectable by connections.connectable.collectAsState(initial = emptyList())
+    val connectable = connections.connectable.collectAsState<List<CalendarProvider>, List<CalendarProvider>?>(initial = null).value
     val connector = rememberConnector(connections)
     var picking by remember { mutableStateOf<String?>(null) }
     var confirming by remember { mutableStateOf<Confirming?>(null) }
     val action = rememberSingleAction(Unit) { e -> Log.w(TAG, "A calendar change failed (${e::class.simpleName})") }
     ReviewCalendars(
         title = title,
-        connections = list,
+        connections = if (connectable == null) null else list,
         people = people,
         nowMillis = rememberNowMillis(clock),
         busy = action.busy,
         picking = picking,
         confirming = confirming,
-        connectable = if (offerConnect) connectable.map { it.descriptor } else emptyList(),
+        connectable = if (offerConnect) connectable.orEmpty().map { it.descriptor } else emptyList(),
         line = line,
         actions = ReviewActions(
             onConnect = { connector.connect(it.id) },
@@ -178,13 +191,14 @@ internal class ReviewActions(
 )
 
 /**
- * 4a design §4.5: per connection, "{Service} · {account}", its health, Reconnect when needed and Disconnect (confirmed
- * first); per calendar, its name, who it is for (tap for Family and the people), Show, and Main or Use for new events.
+ * 9 §4.12: per connection, "{Service} · {account}", its health, Reconnect when needed and Disconnect (confirmed first);
+ * per calendar, a card: its name and, on the main one, the badge; who it is for (a dropdown of Family and the people);
+ * Show; Use for new events; and a read problem in a strip at the foot. Draws nothing while [connections] is null.
  */
 @Composable
 internal fun ReviewCalendars(
     title: String,
-    connections: List<ReviewConnection>,
+    connections: List<ReviewConnection>?,
     people: List<Person>,
     nowMillis: Long,
     busy: Boolean,
@@ -194,6 +208,7 @@ internal fun ReviewCalendars(
     actions: ReviewActions,
     line: String? = null,
 ) {
+    if (connections == null) return
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.reviewBlockGap), modifier = Modifier.testTag("review_calendars")) {
         HhPageTitle(title)
         if (line != null) Text(line, style = CalendarType.subtitle, color = Culvery.colors.mute)
@@ -217,7 +232,7 @@ internal fun ReviewCalendars(
                 )
             }
             connection.sources.forEach { source ->
-                SourceRow(source, people, busy, picking == sourceKey(source), actions.onPick, actions.onPerson, actions.onShown, actions.onMakeMaster)
+                CalendarRowCard(source, connection.row, people, busy, picking == sourceKey(source), actions.onPick, actions.onPerson, actions.onShown, actions.onMakeMaster)
             }
         }
         connectable.forEach { d ->
@@ -238,6 +253,7 @@ private fun ConnectionHeader(row: CalendarRow, nowMillis: Long, busy: Boolean, o
         modifier = Modifier.testTag("settings_row_${row.connection.id}"),
         leading = { HhIcon(row.icon, size = CalendarDimens.settingsIcon, tint = c.ink) },
         subtitle = healthWords(row, nowMillis),
+        minHeight = CalendarDimens.accountRowMinHeight,
         subtitleColor = if (needsReconnect) c.danger else c.mute,
         trailing = {
             if (needsReconnect) {
@@ -255,8 +271,9 @@ private fun ConnectionHeader(row: CalendarRow, nowMillis: Long, busy: Boolean, o
 }
 
 @Composable
-private fun SourceRow(
+private fun CalendarRowCard(
     source: StoredSource,
+    connection: CalendarRow,
     people: List<Person>,
     busy: Boolean,
     picking: Boolean,
@@ -267,114 +284,190 @@ private fun SourceRow(
 ) {
     val c = Culvery.colors
     val id = source.source.id
+    val main = source.isMaster
     // A person removed since is Family until HouseholdFollower catches up.
     val person = people.firstOrNull { it.id == source.mapping.person } ?: Person.Family
-    val showToggles = !source.isMaster && !busy
-    HhListRow(
-        title = source.source.name,
-        modifier = Modifier.testTag("review_source_$id"),
-        trailing = {
-            HhChoiceChip(
-                person.name,
-                selected = false,
-                tag = "review_person_$id",
-                onClick = { onPick(sourceKey(source)) },
-                role = Role.Button,
-                clickLabel = changeWhoFor(source.source.name),
-                stateDescription = if (picking) EXPANDED else COLLAPSED,
-                leading = { _ -> Dot(person) },
-            )
-            // Text and switch are one switch: named for the calendar, with why the main one can't be hidden (4a design §3.9).
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(CalendarDimens.reviewItemGap),
-                modifier = Modifier
-                    .testTag("review_show_$id")
-                    .heightIn(min = CalendarDimens.reviewShowMinHeight)
-                    .semantics {
-                        contentDescription = "$SHOW ${source.source.name}"
-                        if (source.isMaster) stateDescription = ALWAYS_SHOWN
-                    }
-                    .toggleable(
-                        value = source.mapping.visible,
-                        enabled = showToggles,
-                        role = Role.Switch,
-                        onValueChange = { onShown(source, it) },
-                    ),
-            ) {
-                Text(SHOW, style = CalendarType.subtitle, color = c.mute, modifier = Modifier.shownNotSpoken())
-                HhSwitch(source.mapping.visible, onCheckedChange = null, tag = "review_show_switch_$id", enabled = showToggles)
-            }
-        },
-        below = {
-            if (source.isMaster) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CalendarDimens.reviewItemGap)) {
-                    Text(
-                        MAIN,
-                        style = CalendarType.badge,
-                        color = c.accent,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(CalendarDimens.badgeRadius))
-                            .background(c.accentSoft)
-                            .padding(horizontal = CalendarDimens.badgePaddingH, vertical = CalendarDimens.badgePaddingV),
-                    )
-                    Text(NEW_EVENTS_GO_HERE, style = CalendarType.subtitle, color = c.mute)
-                }
-            } else if (source.source.writable) {
-                HhButton(
-                    USE_FOR_NEW_EVENTS, { onMakeMaster(source) }, Modifier.testTag("review_make_master_$id"),
-                    enabled = !busy, on = ButtonSurface.Surf, spokenName = withSubject(USE_FOR_NEW_EVENTS, source.source.name),
+    val shape = RoundedCornerShape(ListRowTokens.radius)
+    val offersMakeMain = !main && source.source.writable
+    Column(
+        Modifier
+            .testTag("review_source_$id")
+            .fillMaxWidth()
+            .clip(shape)
+            .border(CardTokens.edge, c.border, shape)
+            .background(c.surf),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .testTag("review_line_$id")
+                .fillMaxWidth()
+                .heightIn(min = ListRowTokens.minHeight)
+                .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd),
+        ) {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    source.source.name,
+                    style = ListRowTokens.titleStyle,
+                    color = c.ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
-            }
-            // A calendar the service hid on its tick has no problem to show, and no Hide to offer.
-            if (source.readProblem != null && source.mapping.visible) ReadProblem(source, busy, onShown)
-            if (picking) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
-                    verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
-                    modifier = Modifier.selectableGroup(),
-                ) {
-                    people.forEach { p ->
-                        val selected = p.id == source.mapping.person
-                        HhChoiceChip(
-                            p.name,
-                            selected = selected,
-                            tag = "review_pick_${p.name}",
-                            onClick = { onPerson(source, p) },
-                            enabled = !busy,
-                            selectedColor = Color(p.color),
-                            selectedInk = PersonChipInk,
-                            leading = { ink -> if (selected) HhIcon(Icons.CHECK, size = ControlTokens.chipIcon, tint = ink) else Dot(p) },
-                        )
-                    }
+                if (main) {
+                    Spacer(Modifier.width(CalendarDimens.mainBadgeGap))
+                    MainBadge(id)
                 }
             }
-        },
-    )
+            Spacer(Modifier.width(CalendarDimens.reviewItemGap))
+            PersonPill(source, person, picking, onPick)
+            Spacer(Modifier.width(CalendarDimens.reviewItemGap))
+            ShowSwitch(source, busy, onShown)
+        }
+        if (picking || offersMakeMain) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(CalendarDimens.belowGap),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = CalendarDimens.belowPaddingStart, end = CalendarDimens.belowPaddingEnd, bottom = CalendarDimens.belowPaddingBottom),
+            ) {
+                if (picking) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
+                        verticalArrangement = Arrangement.spacedBy(ControlTokens.chipGap),
+                        modifier = Modifier.selectableGroup(),
+                    ) {
+                        people.forEach { p ->
+                            val selected = p.id == source.mapping.person
+                            HhChoiceChip(
+                                p.name,
+                                selected = selected,
+                                tag = "review_pick_${p.name}",
+                                onClick = { onPerson(source, p) },
+                                enabled = !busy,
+                                selectedColor = Color(p.color),
+                                selectedInk = PersonChipInk,
+                                leading = { ink -> if (selected) HhIcon(Icons.CHECK, size = ControlTokens.chipIcon, tint = ink) else Dot(p, ControlTokens.chipDot) },
+                            )
+                        }
+                    }
+                }
+                if (offersMakeMain) {
+                    HhButton(
+                        USE_FOR_NEW_EVENTS, { onMakeMaster(source) }, Modifier.testTag("review_make_master_$id"),
+                        enabled = !busy, on = ButtonSurface.Surf, spokenName = withSubject(USE_FOR_NEW_EVENTS, source.source.name),
+                    )
+                }
+            }
+        }
+        // A calendar the service hid on its tick has no problem to show, and no Hide to offer.
+        if (source.readProblem != null && source.mapping.visible) {
+            ReadProblemStrip(source, connection.connection.config[CONFIG_ACCOUNT], busy, onShown)
+        }
+    }
 }
 
 @Composable
-private fun Dot(person: Person) {
-    Box(Modifier.size(ControlTokens.chipDot).clip(CircleShape).background(Color(person.color)))
+private fun MainBadge(id: String) {
+    val c = Culvery.colors
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .testTag("review_main_$id")
+            .heightIn(min = CalendarDimens.badgeHeight)
+            .clip(RoundedCornerShape(CalendarDimens.badgeRadius))
+            .background(c.accentSoft)
+            .padding(horizontal = CalendarDimens.badgePaddingH),
+    ) {
+        Text(MAIN_NEW_EVENTS_GO_HERE, style = CalendarType.badge, color = c.accent)
+    }
 }
 
-/** 4c design §6.4, D6: one calendar that can't be read; Hide it, or, for the master, choose another first. */
+/** 37 dp drawn in a 48 dp tap: the dropdown that opens the person chips. */
 @Composable
-private fun ReadProblem(source: StoredSource, busy: Boolean, onShown: (StoredSource, Boolean) -> Unit) {
+private fun PersonPill(source: StoredSource, person: Person, picking: Boolean, onPick: (String) -> Unit) {
+    val c = Culvery.colors
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .testTag("review_person_${source.source.id}")
+            .heightIn(min = CalendarDimens.reviewTapHeight)
+            .semantics { stateDescription = if (picking) EXPANDED else COLLAPSED }
+            .hhClickable({ onPick(sourceKey(source)) }, label = changeWhoFor(source.source.name), role = Role.Button),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(CalendarDimens.pillGap),
+            modifier = Modifier
+                .heightIn(min = CalendarDimens.pillHeight)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(c.surf2)
+                .padding(horizontal = CalendarDimens.personPillPaddingH),
+        ) {
+            Dot(person, CalendarDimens.pillDot)
+            Text(person.name, style = CalendarType.personPill, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            HhIcon(Icons.EXPAND_MORE, size = CalendarDimens.pillChevron, tint = c.mute)
+        }
+    }
+}
+
+/** Text and switch are one switch: named for the calendar, with why the main one can't be hidden (4a design §3.9). */
+@Composable
+private fun ShowSwitch(source: StoredSource, busy: Boolean, onShown: (StoredSource, Boolean) -> Unit) {
+    val main = source.isMaster
+    val toggles = !main && !busy
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.showLabelGap, Alignment.End),
+        modifier = Modifier
+            .testTag("review_show_${source.source.id}")
+            .widthIn(min = CalendarDimens.showGroupMinWidth)
+            .heightIn(min = CalendarDimens.reviewTapHeight)
+            .semantics {
+                contentDescription = "$SHOW ${source.source.name}"
+                if (main) stateDescription = ALWAYS_SHOWN
+            }
+            .toggleable(
+                value = source.mapping.visible,
+                enabled = toggles,
+                role = Role.Switch,
+                // A disabled toggleable still offers TalkBack its action.
+                onValueChange = { if (toggles) onShown(source, it) },
+            ),
+    ) {
+        Text(if (main) ALWAYS_SHOWN_LABEL else SHOW, style = CalendarType.reviewSmall, color = Culvery.colors.mute, modifier = Modifier.shownNotSpoken())
+        HhSwitch(source.mapping.visible, onCheckedChange = null, tag = "review_show_switch_${source.source.id}", enabled = toggles)
+    }
+}
+
+@Composable
+private fun Dot(person: Person, size: Dp) {
+    Box(Modifier.size(size).clip(CircleShape).background(Color(person.color)))
+}
+
+/** One calendar that can't be read, full width at the card's foot; Hide it, or, for the main one, choose another first (9 §4.12). */
+@Composable
+private fun ReadProblemStrip(source: StoredSource, account: String?, busy: Boolean, onShown: (StoredSource, Boolean) -> Unit) {
     val c = Culvery.colors
     val id = source.source.id
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.reviewItemGap),
-        modifier = Modifier.testTag("review_read_problem_$id"),
+        horizontalArrangement = Arrangement.spacedBy(CalendarDimens.stripGap),
+        modifier = Modifier
+            .testTag("review_read_problem_$id")
+            .fillMaxWidth()
+            .background(c.dangerSoft)
+            .padding(
+                start = CalendarDimens.stripPaddingStart, end = CalendarDimens.stripPaddingEnd,
+                top = CalendarDimens.stripPaddingV, bottom = CalendarDimens.stripPaddingV,
+            ),
     ) {
-        Text(CANT_READ_CALENDAR, style = CalendarType.subtitle, color = c.danger, modifier = Modifier.weight(1f))
-        if (source.isMaster) {
-            Text(CHOOSE_ANOTHER_MAIN, style = CalendarType.subtitle, color = c.mute)
-        } else {
+        HhIcon(Icons.SYNC_PROBLEM, size = CalendarDimens.stripIcon, tint = c.danger)
+        Text(cantRead(account, source.isMaster), style = CalendarType.reviewSmall, color = c.ink, modifier = Modifier.weight(1f))
+        if (!source.isMaster) {
             HhButton(
                 HIDE_THIS_CALENDAR, { onShown(source, false) }, Modifier.testTag("review_hide_$id"),
-                enabled = !busy, on = ButtonSurface.Surf, spokenName = withSubject(HIDE_THIS_CALENDAR, source.source.name),
+                enabled = !busy, on = ButtonSurface.DangerSoft, spokenName = withSubject(HIDE_THIS_CALENDAR, source.source.name),
             )
         }
     }

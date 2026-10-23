@@ -88,8 +88,14 @@ internal object CalendarType {
     /** 22 sp / 700: "Connecting to Google Calendar…" and Settings' "Calendars" (3a design §4). */
     val blockTitle = HhType.sectionTitle
 
-    /** 13 sp / 700: the "Main" badge. */
-    val badge = syncingPill
+    /** 12 sp / 700: the "Main · new events go here" badge (9 §4.12). */
+    val badge = HhType.labelSmall
+
+    /** 15 sp / 600: the person pill's name on a calendar's line. */
+    val personPill = HhType.label.copy(fontSize = 15.sp, fontWeight = FontWeight.W600)
+
+    /** 14 sp / 400: Show's label and the read problem strip's words. */
+    val reviewSmall = HhType.secondary
 
     /** 29 sp / 700 and 14 sp: the full-screen editor's "New event" and its context line (9 §3.1). */
     val editorBarTitle = HhType.screenTitle.copy(fontSize = 29.sp)
@@ -493,15 +499,45 @@ internal object CalendarDimens {
     // Settings' Calendars block (3a design §4.1): rows are ListRowTokens'; a connection's 26 dp icon leads it.
     val settingsIcon = 26.dp
 
-    // Review calendars (4a design §4.5; not in the spec): blocks 12 apart; a calendar row's parts 12 apart; the Main badge
-    // `accentSoft`, radius 12, padding 4×10. The wizard's Connect card 380×460, about a Home card's size.
+    // Settings › Calendars (9 §4.12): blocks 12 apart; a calendar is a 69 dp line (an account row 75) in the shared row look.
     val reviewBlockGap = 12.dp
     val reviewItemGap = 12.dp
-    /** The Show row's touch height: its switch is draw-only, so it brings no touch size of its own. */
-    val reviewShowMinHeight = 48.dp
+    val accountRowMinHeight = 75.dp
+
+    /** The touch height of the person pill and of Show: their drawn parts are smaller or draw-only. */
+    val reviewTapHeight = 48.dp
+
+    // The inline "Main · new events go here" badge: 24 high, radius 12, padding 0 × 9, 9 from the name.
+    val badgeHeight = 24.dp
     val badgeRadius = 12.dp
-    val badgePaddingV = 4.dp
-    val badgePaddingH = 10.dp
+    val badgePaddingH = 9.dp
+    val mainBadgeGap = 9.dp
+
+    // The person pill: 37 drawn in the 48 tap, padding 0 × 13, a 9 dp dot, a 17 dp chevron.
+    val pillHeight = 37.dp
+    val personPillPaddingH = 13.dp
+    val pillGap = 6.dp
+    val pillDot = 9.dp
+    val pillChevron = 17.dp
+
+    // Show: its label 8 from the switch; the group at least 127 wide so the switches line up down the page.
+    val showGroupMinWidth = 127.dp
+    val showLabelGap = 8.dp
+
+    // Under the line: padding 0 16 16 20, 12 between parts.
+    val belowPaddingStart = 20.dp
+    val belowPaddingEnd = 16.dp
+    val belowPaddingBottom = 16.dp
+    val belowGap = 12.dp
+
+    // The read problem strip: padding 11 16 11 20, a 20 dp `sync_problem` 11 from its words.
+    val stripPaddingStart = 20.dp
+    val stripPaddingEnd = 16.dp
+    val stripPaddingV = 11.dp
+    val stripIcon = 20.dp
+    val stripGap = 11.dp
+
+    // The wizard's Connect card 380×460, about a Home card's size.
     val connectStepWidth = 380.dp
     val connectStepHeight = 460.dp
 }

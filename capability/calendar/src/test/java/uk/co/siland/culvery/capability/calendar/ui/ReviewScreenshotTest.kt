@@ -120,6 +120,23 @@ class ReviewScreenshotTest {
     @Test fun reviewReadProblemDark() = readProblem("review_read_problem_dark", true)
     @Test fun reviewReadProblemLight() = readProblem("review_read_problem_light", false)
 
+    /** The main calendar's problem with its person chips open: the strip sits under the chips. */
+    @Test
+    fun reviewStripOpenDark() = snap("review_strip_open_dark", true) {
+        Box(Modifier.padding(MARGIN).width(COLUMN_W)) {
+            ReviewCalendars(
+                "Calendars",
+                listOf(
+                    ReviewConnection(
+                        CalendarRow(google, "Google Calendar", "calendar_month", ConnectionHealth.Ok, now - 2 * 60_000),
+                        listOf(sources[0].copy(readProblem = READ_REFUSED), sources[1], sources[2]),
+                    ),
+                ),
+                listOf(Person.Family, sam, mia), now, false, sourceKey(sources[0]), null, emptyList(), ReviewActions(),
+            )
+        }
+    }
+
     private fun connectStep(name: String, dark: Boolean) = snap(name, dark) {
         Box(Modifier.padding(MARGIN)) { ConnectStepCard(connectService = "Google Calendar", onConnect = {}) }
     }
