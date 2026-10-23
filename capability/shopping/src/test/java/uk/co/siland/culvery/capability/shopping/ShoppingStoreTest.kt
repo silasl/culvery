@@ -12,6 +12,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.capability.shopping.db.ItemEntity
 import uk.co.siland.culvery.capability.shopping.db.LearnedEntity
 import uk.co.siland.culvery.capability.shopping.db.QueuedEntity
 import uk.co.siland.culvery.capability.shopping.db.SeenEntity
@@ -70,6 +71,31 @@ class ShoppingStoreTest {
         val stored = store.connectionNow()!!
         assertThat(stored.health).isEqualTo(ShoppingHealth.OK)
         assertThat(stored.seeded).isFalse()
+    }
+
+    /** The queue outlives a new connection; the old read does not. */
+    @Test
+    fun connectingKeepsTheQueueAndClearsTheItems() = runTest {
+        store.connect(c1)
+        store.saveRead(listOf(ShoppingItem("g1", "Milk", at)), ShoppingHealth.OK, 2_000)
+        store.enqueue(QueuedKind.ADD, "k1", null, "Bread", 3_000)
+        store.connect(Connection("c2", "shopping.sample", "the sample list", emptyMap()))
+        assertThat(store.queueNow()).hasSize(1)
+        assertThat(store.items.first()).isEmpty()
+    }
+
+    @Test
+    fun replacingAConnectionThatIsNotStoredFails() = runTest {
+        store.connect(c1)
+        val failure = runCatching { store.replaceConnection(c1.copy(id = "c9")) }.exceptionOrNull()
+        assertThat(failure).isInstanceOf(IllegalStateException::class.java)
+    }
+
+    @Test
+    fun readItemsKeepTheirDates() = runTest {
+        store.connect(c1)
+        store.saveRead(listOf(ShoppingItem("g1", "Milk", Instant.ofEpochMilli(4_321))), ShoppingHealth.OK, 5_000)
+        assertThat(store.items.first().single().changedAt).isEqualTo(Instant.ofEpochMilli(4_321))
     }
 
     @Test
@@ -180,7 +206,10 @@ class ShoppingStoreTest {
             ShoppingItem("g1", "Milk", at).toString(),
             QueuedEntity(1, "ADD", "k1", null, "Milk", 1_000, 0, 0, "g1").toString(),
             LearnedEntity("milk", "Milk", 1, 1_000, 1_000).toString(),
+            ItemEntity("g1", "Milk", 0, 1_000).toString(),
+            StoredShopping(Connection("c1", "shopping.sample", "the sample list", mapOf(SHOPPING_CONFIG_ACCOUNT to "family@example.com")), ShoppingHealth.OK, null, null, false).toString(),
         )
         printed.forEach { assertThat(it.lowercase()).doesNotContain("milk") }
+        assertThat(printed.last()).doesNotContain("family@example.com")
     }
 }

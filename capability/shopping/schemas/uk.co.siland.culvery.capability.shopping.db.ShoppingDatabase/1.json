@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "7fe94182ad1afd22e216760464164d59",
+    "identityHash": "da9dd47a135a1ac840379b93222c513e",
     "entities": [
       {
         "tableName": "shopping_connection",
@@ -70,7 +70,7 @@
       },
       {
         "tableName": "shopping_item",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `text` TEXT NOT NULL, `position` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `text` TEXT NOT NULL, `position` INTEGER NOT NULL, `changedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -87,6 +87,12 @@
           {
             "fieldPath": "position",
             "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "changedAtMillis",
+            "columnName": "changedAtMillis",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -231,7 +237,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7fe94182ad1afd22e216760464164d59')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'da9dd47a135a1ac840379b93222c513e')"
     ]
   }
 }

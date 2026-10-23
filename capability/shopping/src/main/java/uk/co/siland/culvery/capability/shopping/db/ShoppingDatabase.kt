@@ -28,12 +28,13 @@ data class ConnectionEntity(
     override fun toString() = "ConnectionEntity(id=$id, providerId=$providerId, health=$health)"
 }
 
-/** An open item as last read; [position] is the order the provider gave. */
+/** An open item as last read; [position] is the order the provider gave, [changedAtMillis] when it last changed. */
 @Entity(tableName = "shopping_item")
 data class ItemEntity(
     @PrimaryKey val id: String,
     val text: String,
     val position: Int,
+    val changedAtMillis: Long,
 ) {
     override fun toString() = "ItemEntity(id=$id, position=$position)"
 }
@@ -91,7 +92,7 @@ interface ShoppingDao {
     suspend fun deleteConnection()
 
     @Query("UPDATE shopping_connection SET providerId = :providerId, label = :label, configJson = :configJson WHERE id = :id")
-    suspend fun updateConnection(id: String, providerId: String, label: String, configJson: String)
+    suspend fun updateConnection(id: String, providerId: String, label: String, configJson: String): Int
 
     @Query("UPDATE shopping_connection SET health = :health")
     suspend fun setHealth(health: String)

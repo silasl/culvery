@@ -15,7 +15,7 @@ const val SHOPPING_CONFIG_ACCOUNT = "account"
 /** The most unsent changes the queue holds (10 §4.11). */
 const val QUEUE_MAX = 300
 
-/** One item on the list. [changedAt] is when it was added, or for a history item when it was ticked. */
+/** One item on the list. [changedAt] is when it was last changed; for a history item, when it was ticked. */
 data class ShoppingItem(val id: String, val text: String, val changedAt: Instant) {
     override fun toString(): String = "ShoppingItem(id=$id, changedAt=$changedAt)"
 }

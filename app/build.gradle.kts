@@ -68,7 +68,7 @@ dependencies {
     // Wired by Hilt alone, as the door and music (7 §3).
     implementation(project(":capability:lights"))
     implementation(project(":provider:lights-hue"))
-    // Wired by Hilt alone, as the lights.
+    // Wired by Hilt alone, as the lights (10 §4.1).
     implementation(project(":capability:shopping"))
     implementation(project(":provider:calendar-google"))
     implementation(project(":provider:weather-openmeteo"))

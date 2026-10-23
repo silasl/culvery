@@ -10,7 +10,6 @@ import org.json.JSONObject
 import uk.co.siland.culvery.capability.shopping.db.ConnectionEntity
 import uk.co.siland.culvery.capability.shopping.db.ItemEntity
 import uk.co.siland.culvery.capability.shopping.db.QueuedEntity
-import uk.co.siland.culvery.capability.shopping.db.ShoppingDao
 import uk.co.siland.culvery.capability.shopping.db.ShoppingDatabase
 import uk.co.siland.culvery.core.plugin.Connection
 
@@ -21,18 +20,21 @@ data class StoredShopping(
     val lastReadMillis: Long?,
     val lastHistoryMillis: Long?,
     val seeded: Boolean,
-)
+) {
+    // The connection's config holds the account's email.
+    override fun toString() = "StoredShopping(id=${connection.id}, health=$health, seeded=$seeded)"
+}
 
 /** The only writer of shopping.db. Callers hold [ShoppingLock] (10 §4.5). */
 @Singleton
-class ShoppingStore internal constructor(private val db: ShoppingDatabase, private val dao: ShoppingDao) {
-    @Inject constructor(db: ShoppingDatabase) : this(db, db.shoppingDao())
+class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
+    private val dao = db.shoppingDao()
 
     val connection: Flow<StoredShopping?> = dao.connection().map { it?.toStored() }
 
     suspend fun connectionNow(): StoredShopping? = dao.connectionNow()?.toStored()
 
-    /** Replaces any connection, healthy and not yet seeded. What was read from the old one goes; the queue stays, so nothing added is lost. */
+    /** Replaces any connection, healthy and not yet seeded. The old read goes; the queue stays, so nothing added is lost. */
     suspend fun connect(connection: Connection) = db.withTransaction {
         dao.putConnection(
             ConnectionEntity(
@@ -50,8 +52,10 @@ class ShoppingStore internal constructor(private val db: ShoppingDatabase, priva
     }
 
     /** The same connection with new settings (a remade list); the read, the health and the queue stay. */
-    suspend fun replaceConnection(connection: Connection) =
-        dao.updateConnection(connection.id, connection.providerId, connection.label, encodeConfig(connection.config))
+    suspend fun replaceConnection(connection: Connection) {
+        val count = dao.updateConnection(connection.id, connection.providerId, connection.label, encodeConfig(connection.config))
+        check(count == 1) { "replaceConnection: no stored connection with that id" }
+    }
 
     /** Stops using the list: the connection, what was read and the queue go; what was learned stays. */
     suspend fun stop() = db.withTransaction {
@@ -60,13 +64,13 @@ class ShoppingStore internal constructor(private val db: ShoppingDatabase, priva
         dao.deleteQueue()
     }
 
-    /** The open items as last read, in the provider's order; [ShoppingItem.changedAt] is not stored. */
+    /** The open items as last read, in the provider's order. */
     val items: Flow<List<ShoppingItem>> = dao.items().map { rows -> rows.map { it.toItem() } }
 
     /** The open items as the provider listed them, replacing the last read in one transaction. */
     suspend fun saveRead(items: List<ShoppingItem>, health: ShoppingHealth, atMillis: Long) = db.withTransaction {
         dao.deleteItems()
-        dao.insertItems(items.mapIndexed { position, item -> ItemEntity(item.id, item.text, position) })
+        dao.insertItems(items.mapIndexed { position, item -> ItemEntity(item.id, item.text, position, item.changedAt.toEpochMilli()) })
         dao.setRead(health.name, atMillis)
     }
 
@@ -120,7 +124,7 @@ private fun ConnectionEntity.toStored() = StoredShopping(
     seeded = seeded,
 )
 
-private fun ItemEntity.toItem() = ShoppingItem(id, text, Instant.EPOCH)
+private fun ItemEntity.toItem() = ShoppingItem(id, text, Instant.ofEpochMilli(changedAtMillis))
 
 private fun encodeConfig(config: Map<String, String>): String = JSONObject(config).toString()
 
