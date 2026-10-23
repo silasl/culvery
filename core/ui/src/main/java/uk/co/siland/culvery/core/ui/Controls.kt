@@ -3,7 +3,6 @@ package uk.co.siland.culvery.core.ui
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -211,7 +210,10 @@ fun HhChoiceChip(
                 if (bare) Modifier.border(ControlTokens.lockedEdge, c.surf3, shape) else Modifier.background(if (selected) selectedColor else unselectedFill),
             )
             // Never `enabled = false`: that would stop the explaining tap.
-            .chipClickable(onClick, clickLabel ?: FIND_OUT_WHY.takeIf { unavailable }, role, spokenName, onLongClick, longClickLabel)
+            .hhClickable(
+                onClick, label = clickLabel ?: FIND_OUT_WHY.takeIf { unavailable }, role = role, spoken = spokenName,
+                onLongClick = onLongClick, longClickLabel = longClickLabel,
+            )
             .padding(horizontal = ControlTokens.chipPaddingH),
     ) {
         if (locked) HhIcon(Icons.LOCK, size = ControlTokens.chipIcon, tint = ink, modifier = Modifier.testTag("${tag}_lock"))
@@ -222,21 +224,6 @@ fun HhChoiceChip(
         }
         trailing?.invoke(ink)
     }
-}
-
-/** [hhClickable], plus a long press with its TalkBack action [longClickLabel] when [onLongClick] is given. */
-private fun Modifier.chipClickable(
-    onClick: () -> Unit,
-    label: String?,
-    role: Role,
-    spoken: String?,
-    onLongClick: (() -> Unit)?,
-    longClickLabel: String?,
-): Modifier = if (onLongClick == null) {
-    hhClickable(onClick, label = label, role = role, spoken = spoken)
-} else {
-    then(if (spoken != null) Modifier.semantics { contentDescription = spoken } else Modifier)
-        .combinedClickable(onClickLabel = label, role = role, onLongClickLabel = longClickLabel, onLongClick = onLongClick, onClick = onClick)
 }
 
 /** Under an unbounded width (a LazyRow's) the label's weight would get none, so the chip is bounded at its natural width. */
