@@ -2,13 +2,6 @@ package uk.co.siland.culvery.provider.calendar_google
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-
-/** The one JSON setup (3a design §3.1): unknown keys ignored; a null field is left out unless a PATCH sends it. */
-internal val GoogleJson = Json {
-    ignoreUnknownKeys = true
-    explicitNulls = false
-}
 
 /** [items] has no default: an answer without it is a bad read, never "the account has no calendars" (review H2). */
 @Serializable
@@ -60,18 +53,3 @@ internal data class ExtendedProperties(@SerialName("private") val privatePropert
 
 @Serializable
 internal data class CalendarResource(val id: String)
-
-@Serializable
-internal data class ErrorBody(val error: ErrorDetail? = null)
-
-/** [errors] is Google's classic list of reasons; [details] its newer one (e.g. ACCESS_TOKEN_SCOPE_INSUFFICIENT). */
-@Serializable
-internal data class ErrorDetail(
-    val code: Int? = null,
-    val message: String? = null,
-    val errors: List<ErrorItem> = emptyList(),
-    val details: List<ErrorItem> = emptyList(),
-)
-
-@Serializable
-internal data class ErrorItem(val reason: String? = null, val message: String? = null)

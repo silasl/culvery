@@ -30,6 +30,8 @@ import uk.co.siland.culvery.capability.shopping.ShoppingItem
 import uk.co.siland.culvery.capability.shopping.ShoppingProvider
 import uk.co.siland.culvery.capability.shopping.ShoppingRejectedException
 import uk.co.siland.culvery.core.google.Authorizer
+import uk.co.siland.culvery.core.google.GoogleAnswer
+import uk.co.siland.culvery.core.google.GoogleJson
 import uk.co.siland.culvery.core.google.GoogleAccounts
 import uk.co.siland.culvery.core.google.PlayServicesCheck
 import uk.co.siland.culvery.core.google.rememberGoogleScreens
@@ -142,7 +144,7 @@ class GoogleTasksProvider @Inject constructor(
 
     override suspend fun add(conn: Connection, text: String, clientKey: String): ShoppingItem {
         val account = accountOf(conn)
-        val body = TasksJson.encodeToJsonElement(NewTask.serializer(), NewTask(text))
+        val body = GoogleJson.encodeToJsonElement(NewTask.serializer(), NewTask(text))
         val answer = api.send(account, "POST", listUrl(conn, "tasks"), TasksCall.TASKS_INSERT, body)
         if (answer.code == 404) {
             logAnswer(TasksCall.TASKS_INSERT, answer)
@@ -190,7 +192,7 @@ class GoogleTasksProvider @Inject constructor(
         return tasks
     }
 
-    private fun logAnswer(what: TasksCall, answer: TasksAnswer) {
+    private fun logAnswer(what: TasksCall, answer: GoogleAnswer) {
         Log.w(TAG, "${what.label}: Google Tasks answered ${answer.code} (${answer.reason})")
     }
 

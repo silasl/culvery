@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import uk.co.siland.culvery.capability.shopping.SHOPPING_CONFIG_ACCOUNT
 import uk.co.siland.culvery.core.google.Authorization
 import uk.co.siland.culvery.core.google.Authorizer
+import uk.co.siland.culvery.core.google.GoogleJson
 import uk.co.siland.culvery.core.google.PlayServicesCheck
 import uk.co.siland.culvery.core.google.PlayServicesStatusException
 import uk.co.siland.culvery.core.google.UPDATE_PLAY_SERVICES
@@ -51,7 +52,7 @@ internal suspend fun TasksApi.findOrMakeShoppingList(account: String): String {
         page.items.firstOrNull { textKey(it.title.orEmpty()) == textKey(SHOPPING_LIST_TITLE) }?.let { return it.id }
         pageToken = page.nextPageToken
     } while (pageToken != null)
-    val body = TasksJson.encodeToJsonElement(NewTaskList.serializer(), NewTaskList(SHOPPING_LIST_TITLE))
+    val body = GoogleJson.encodeToJsonElement(NewTaskList.serializer(), NewTaskList(SHOPPING_LIST_TITLE))
     return send(account, "POST", url("users", "@me", "lists"), TasksCall.TASKLISTS_INSERT, body)
         .readOrUnreachable(TasksCall.TASKLISTS_INSERT)
         .decode(TaskListDto.serializer(), TasksCall.TASKLISTS_INSERT)

@@ -34,6 +34,7 @@ import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.instantIn
 import uk.co.siland.culvery.capability.calendar.withSeriesStart
 import uk.co.siland.culvery.core.google.Authorizer
+import uk.co.siland.culvery.core.google.GoogleAnswer
 import uk.co.siland.culvery.core.google.PlayServicesCheck
 import uk.co.siland.culvery.core.google.rememberGoogleScreens
 import uk.co.siland.culvery.core.plugin.Connection
@@ -337,7 +338,7 @@ class GoogleCalendarProvider @Inject constructor(
         get(account, source, remoteId)?.readOrUnreachable(GoogleCall.EVENT_GET)?.decode(GoogleEvent.serializer(), GoogleCall.EVENT_GET)
 
     /** events.get's answer; null for 404 or 410. */
-    private suspend fun get(account: String, source: CalendarSource, remoteId: String): GoogleResponse? =
+    private suspend fun get(account: String, source: CalendarSource, remoteId: String): GoogleAnswer? =
         api.send(account, "GET", api.url("calendars", source.id, "events", remoteId)).takeUnless { it.isGoneStatus }
 
     /**

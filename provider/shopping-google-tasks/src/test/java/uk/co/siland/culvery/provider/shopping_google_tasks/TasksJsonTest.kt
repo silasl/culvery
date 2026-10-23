@@ -2,9 +2,11 @@ package uk.co.siland.culvery.provider.shopping_google_tasks
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import uk.co.siland.culvery.core.google.GoogleAnswer
+import uk.co.siland.culvery.core.google.GoogleJson
 
 class TasksJsonTest {
-    private fun tasks(file: String) = TasksJson.decodeFromString(TasksPage.serializer(), resource(file))
+    private fun tasks(file: String) = GoogleJson.decodeFromString(TasksPage.serializer(), resource(file))
 
     @Test
     fun theFirstPageHoldsMilkBreadAndABlankTitle() {
@@ -30,22 +32,22 @@ class TasksJsonTest {
 
     @Test
     fun listsDecodeAndAnAnswerWithoutItemsIsEmpty() {
-        val lists = TasksJson.decodeFromString(TaskListsPage.serializer(), resource("tasklists.json"))
+        val lists = GoogleJson.decodeFromString(TaskListsPage.serializer(), resource("tasklists.json"))
         assertThat(lists.items.map { it.title }).containsExactly("Groceries", "shopping").inOrder()
-        assertThat(TasksJson.decodeFromString(TaskListsPage.serializer(), resource("tasklists_none.json")).items).isEmpty()
+        assertThat(GoogleJson.decodeFromString(TaskListsPage.serializer(), resource("tasklists_none.json")).items).isEmpty()
     }
 
     @Test
     fun anInsertedTaskAndTheErrorsDecode() {
-        assertThat(TasksJson.decodeFromString(TaskDto.serializer(), resource("task_inserted.json")).id).isEqualTo("t-new")
-        assertThat(TasksAnswer(404, resource("error_404.json")).reason).isEqualTo("notFound")
-        assertThat(TasksAnswer(403, resource("error_scope.json")).reasons)
+        assertThat(GoogleJson.decodeFromString(TaskDto.serializer(), resource("task_inserted.json")).id).isEqualTo("t-new")
+        assertThat(GoogleAnswer(404, resource("error_404.json")).reason).isEqualTo("notFound")
+        assertThat(GoogleAnswer(403, resource("error_scope.json")).reasons)
             .containsExactly("insufficientPermissions", "ACCESS_TOKEN_SCOPE_INSUFFICIENT").inOrder()
     }
 
     @Test
     fun anUnknownFieldIsIgnored() {
-        val task = TasksJson.decodeFromString(TaskDto.serializer(), """{"id":"t1","title":"Milk","somethingNew":{"a":1}}""")
+        val task = GoogleJson.decodeFromString(TaskDto.serializer(), """{"id":"t1","title":"Milk","somethingNew":{"a":1}}""")
         assertThat(task.id).isEqualTo("t1")
     }
 
@@ -57,6 +59,6 @@ class TasksJsonTest {
 
     @Test
     fun aNewTaskEncodesAsJustItsTitle() {
-        assertThat(TasksJson.encodeToString(NewTask.serializer(), NewTask("Milk"))).isEqualTo("""{"title":"Milk"}""")
+        assertThat(GoogleJson.encodeToString(NewTask.serializer(), NewTask("Milk"))).isEqualTo("""{"title":"Milk"}""")
     }
 }

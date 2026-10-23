@@ -2,6 +2,7 @@ plugins {
     id("culvery.android.library")
     id("culvery.android.compose")
     id("culvery.hilt")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -11,6 +12,8 @@ android {
 
 dependencies {
     api(project(":core:plugin"))
+    implementation(libs.okhttp)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.play.services.auth)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.androidx.activity.compose)
@@ -18,4 +21,5 @@ dependencies {
     testFixturesImplementation(platform(libs.androidx.compose.bom))
     testFixturesImplementation(libs.androidx.compose.ui)
     testImplementation(testFixtures(project(":core:plugin")))
+    testImplementation(libs.okhttp.mockwebserver)
 }

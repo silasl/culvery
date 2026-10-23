@@ -12,15 +12,23 @@ import kotlinx.serialization.json.JsonElement
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.HttpUrl
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
+import uk.co.siland.culvery.core.google.GoogleAnswer
+import uk.co.siland.culvery.core.google.GoogleCallLabel
+import uk.co.siland.culvery.core.google.GoogleFault
+import uk.co.siland.culvery.core.google.GoogleService
 import uk.co.siland.culvery.core.google.TokenSource
+import uk.co.siland.culvery.core.google.asUnreachable
+import uk.co.siland.culvery.core.google.child
+import uk.co.siland.culvery.core.google.decode
+import uk.co.siland.culvery.core.google.fault
+import uk.co.siland.culvery.core.google.googleRequest
+import uk.co.siland.culvery.core.google.readOrUnreachable
+import uk.co.siland.culvery.core.google.sendRetrying401
 
 const val GOOGLE_CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3/"
 
@@ -32,7 +40,7 @@ internal const val TAG = "GoogleCalendar"
 
 /** Which call a log line is about: a fixed name such as "events.list", never a calendar, an email or an id. */
 @JvmInline
-internal value class GoogleCall private constructor(val label: String) {
+internal value class GoogleCall private constructor(override val label: String) : GoogleCallLabel {
     companion object {
         val CALENDAR_LIST = GoogleCall("calendarList.list")
         val EVENTS_LIST = GoogleCall("events.list")
@@ -47,13 +55,10 @@ internal value class GoogleCall private constructor(val label: String) {
     }
 }
 
-private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
+private val SERVICE = GoogleService(TAG, "Google Calendar")
 
-/** 403 reasons that mean "try later": Google's rate limits and its quotas (3a design §3.7). */
-private val RATE_LIMITS = setOf("rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded", "dailyLimitExceeded", "calendarUsageLimitsExceeded")
-
-/** 403 reasons that mean the grant lacks a calendar scope: the account must approve it again (3a design §3.7). */
-private val SCOPE_MISSING = setOf("insufficientPermissions", "ACCESS_TOKEN_SCOPE_INSUFFICIENT")
+/** Calendar's own 403 quota reason, besides Google's (3a design �3.7). */
+private val CALENDAR_RATE_LIMITS = setOf("calendarUsageLimitsExceeded")
 
 /** Path segments that are Google's words rather than ids, and the ones after which an id always follows. */
 private val PATH_WORDS = setOf("calendar", "v3", "users", "me", "calendarList", "calendars", "events")
@@ -76,7 +81,7 @@ internal fun pathTemplate(url: HttpUrl): String {
  * never the caller's, and inside the cancellable region: cancelling the coroutine cancels the call, which ends a
  * stalled body read at once, and the caller sees the cancellation straight away.
  */
-internal suspend fun Call.await(): GoogleResponse = suspendCancellableCoroutine { cont ->
+internal suspend fun Call.await(): GoogleAnswer = suspendCancellableCoroutine { cont ->
     cont.invokeOnCancellation { cancel() }
     enqueue(
         object : Callback {
@@ -86,7 +91,7 @@ internal suspend fun Call.await(): GoogleResponse = suspendCancellableCoroutine 
 
             override fun onResponse(call: Call, response: Response) {
                 val answer = try {
-                    response.use { GoogleResponse(it.code, it.body?.string().orEmpty()) }
+                    response.use { GoogleAnswer(it.code, it.body?.string().orEmpty()) }
                 } catch (e: Throwable) {
                     // After a cancel, this is the closed socket; the continuation has already been cancelled. Anything
                     // else goes to the caller too: OkHttp would rethrow it on its own thread and the caller would hang.
@@ -99,45 +104,15 @@ internal suspend fun Call.await(): GoogleResponse = suspendCancellableCoroutine 
     )
 }
 
-/** What Google answered: the status, the body, and Google's error reasons (for the log) and message (never logged). */
-internal class GoogleResponse(val code: Int, val body: String) {
-    val isSuccessful: Boolean get() = code in 200..299
+/** 404 or 410: the event (or calendar) isn't there. */
+internal val GoogleAnswer.isGoneStatus: Boolean get() = code == 404 || code == 410
 
-    /** 404 or 410: the event (or calendar) isn't there. */
-    val isGoneStatus: Boolean get() = code == 404 || code == 410
+internal fun <T> GoogleAnswer.decode(deserializer: DeserializationStrategy<T>, what: GoogleCall): T = decode(deserializer, SERVICE, what)
 
-    private val error: ErrorDetail? by lazy {
-        runCatching { GoogleJson.decodeFromString(ErrorBody.serializer(), body).error }.getOrNull()
-    }
-
-    /** Every reason Google gave: its classic errors[].reason, then its newer details[].reason. */
-    val reasons: List<String> by lazy { error?.let { e -> (e.errors + e.details).mapNotNull { it.reason } }.orEmpty() }
-    val reason: String? get() = reasons.firstOrNull()
-    val message: String? get() = error?.message
-}
-
-/**
- * A successful answer as [deserializer] reads it; a body that doesn't parse means try later (3a design §3.7).
- * [what] is logged, so it names the request and never a calendar, an email or an id.
- */
-internal fun <T> GoogleResponse.decode(deserializer: DeserializationStrategy<T>, what: GoogleCall): T =
-    try {
-        GoogleJson.decodeFromString(deserializer, body)
-    } catch (e: IllegalArgumentException) {
-        // Not the exception itself: kotlinx.serialization quotes the body, which can hold emails (P8).
-        Log.w(TAG, "${what.label}: Google Calendar sent a body the tablet can't read (${e::class.simpleName})")
-        throw UnreachableException("Google Calendar sent an answer the tablet can't read")
-    }
-
-/** A read's answer: success, or "try later" for any status the caller didn't handle, logged with Google's reason ([what] as for [decode]). */
-internal fun GoogleResponse.readOrUnreachable(what: GoogleCall): GoogleResponse {
-    if (isSuccessful) return this
-    Log.w(TAG, "${what.label}: Google Calendar answered ${this.code} (${this.reason})")
-    throw UnreachableException("Google Calendar answered $code")
-}
+internal fun GoogleAnswer.readOrUnreachable(what: GoogleCall): GoogleAnswer = readOrUnreachable(SERVICE, what)
 
 /** A write's refusal in the tablet's own words (3a design §3.7, R8); Google's reason is logged ([what] as for [decode]). */
-internal fun GoogleResponse.refusal(what: GoogleCall): WriteRejectedException {
+internal fun GoogleAnswer.refusal(what: GoogleCall): WriteRejectedException {
     Log.w(TAG, "${what.label}: Google Calendar refused it with ${this.code} (${this.reason})")
     return WriteRejectedException(if (code == 403) READ_ONLY_HERE else null)
 }
@@ -156,51 +131,41 @@ class GoogleApi(private val baseUrl: HttpUrl, private val tokens: TokenSource, c
     private val client: OkHttpClient by clients
 
     /** [segments] below the base URL, each encoded (calendar ids hold '@' and '#'), with the non-null [query] values. */
-    fun url(vararg segments: String, query: Map<String, String?> = emptyMap()): HttpUrl {
-        val builder = baseUrl.newBuilder()
-        segments.forEach { builder.addPathSegment(it) }
-        query.forEach { (key, value) -> if (value != null) builder.addQueryParameter(key, value) }
-        return builder.build()
-    }
+    fun url(vararg segments: String, query: Map<String, String?> = emptyMap()): HttpUrl = baseUrl.child(*segments, query = query)
 
-    internal suspend fun send(account: String, method: String, url: HttpUrl, body: JsonElement? = null): GoogleResponse {
-        val first = tokens.token(account, CALENDAR_SCOPES)
-        val answer = execute(first, method, url, body)
-        if (answer.code != 401) return answer
-        tokens.invalidate(first)
-        val second = execute(tokens.token(account, CALENDAR_SCOPES), method, url, body)
-        if (second.code == 401) throw NeedsSignInException("Google refused the account's token twice")
-        return second
-    }
+    internal suspend fun send(account: String, method: String, url: HttpUrl, body: JsonElement? = null): GoogleAnswer =
+        tokens.sendRetrying401(
+            account,
+            CALENDAR_SCOPES,
+            refusedTwice = { throw NeedsSignInException("Google refused the account's token twice") },
+        ) { token -> execute(token, method, url, body) }
 
     /** With a token already in hand: the connect flow's, before the account is known. */
-    internal suspend fun sendWithToken(token: String, method: String, url: HttpUrl): GoogleResponse {
+    internal suspend fun sendWithToken(token: String, method: String, url: HttpUrl): GoogleAnswer {
         val answer = execute(token, method, url, null)
         if (answer.code == 401) throw NeedsSignInException("Google refused the new token")
         return answer
     }
 
-    private suspend fun execute(token: String, method: String, url: HttpUrl, body: JsonElement?): GoogleResponse {
-        val request = Request.Builder()
-            .url(url)
-            .header("Authorization", "Bearer $token")
-            .method(method, body?.toString()?.toRequestBody(JSON_TYPE))
-            .build()
+    private suspend fun execute(token: String, method: String, url: HttpUrl, body: JsonElement?): GoogleAnswer {
+        val request = googleRequest(url, token, method, body)
         val answer = try {
             client.newCall(request).await()
         } catch (e: IOException) {
             // A cancelled caller gets its cancellation, never "unreachable".
             currentCoroutineContext().ensureActive()
-            throw UnreachableException("Couldn't reach Google Calendar", e)
+            throw e.asUnreachable(SERVICE, offlineOnUnknownHost = false)
         }
-        if (answer.code == 403 && answer.reasons.any { it in SCOPE_MISSING }) {
-            Log.w(TAG, "${request.method} ${pathTemplate(request.url)}: Google Calendar says the grant lacks a calendar scope (${answer.reason})")
-            throw NeedsSignInException("Google Calendar needs the calendar scopes approved again")
+        when (answer.fault(CALENDAR_RATE_LIMITS)) {
+            GoogleFault.SCOPE_MISSING -> {
+                Log.w(TAG, "${request.method} ${pathTemplate(request.url)}: Google Calendar says the grant lacks a calendar scope (${answer.reason})")
+                throw NeedsSignInException("Google Calendar needs the calendar scopes approved again")
+            }
+            GoogleFault.TRY_LATER -> {
+                Log.w(TAG, "${request.method} ${pathTemplate(request.url)}: Google Calendar said try later: ${answer.code} (${answer.reason})")
+                throw UnreachableException("Google Calendar asked to try later (${answer.code})")
+            }
+            null -> return answer
         }
-        if (answer.code == 429 || answer.code >= 500 || (answer.code == 403 && answer.reasons.any { it in RATE_LIMITS })) {
-            Log.w(TAG, "${request.method} ${pathTemplate(request.url)}: Google Calendar said try later: ${answer.code} (${answer.reason})")
-            throw UnreachableException("Google Calendar asked to try later (${answer.code})")
-        }
-        return answer
     }
 }
