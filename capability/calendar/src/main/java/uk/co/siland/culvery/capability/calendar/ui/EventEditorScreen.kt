@@ -436,7 +436,7 @@ private fun Rows(
         EditorWhenRow("editor_starts", Icons.CALENDAR_MONTH, STARTS, dates, null, null, active = false, set = true, typing = typing, onDate = null, onTime = null, locked = true)
         EditorWhenRow("editor_ends", Icons.EVENT_AVAILABLE, ENDS, dates, null, null, active = false, set = true, typing = typing, onDate = null, onTime = null, locked = true)
     } else {
-        if (!typing) HhSwitchRow(ALL_DAY_LABEL, null, w.allDay, "editor_all_day", onAllDay)
+        if (!typing) HhSwitchRow(ALL_DAY_LABEL, null, w.allDay, "editor_all_day", onAllDay, minHeight = EditorDimens.rowHeight)
         val start = w.startDate
         EditorWhenRow(
             testTag = "editor_starts",

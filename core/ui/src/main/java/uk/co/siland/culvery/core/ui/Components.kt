@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +26,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.util.Locale
 
 object CardTokens {
@@ -52,11 +54,14 @@ fun HhCard(
     )
 }
 
-/** List rows: people, towns, connections, calendars (4d-1 §4.2). Lists put 10 between rows. */
+/** List rows: people, towns, connections, calendars (9 §4.12). Lists put 10 between rows. */
 object ListRowTokens {
-    val radius = 18.dp
-    val paddingV = 16.dp
-    val paddingH = 20.dp
+    val radius = 19.dp
+    val paddingStart = 20.dp
+    val paddingEnd = 16.dp
+    val paddingV = 12.dp
+    val minHeight = 69.dp
+    val titleStyle = HhType.rowTitle.copy(fontSize = 18.sp)
     val leadingGap = 16.dp
     val lineGap = 2.dp
     val trailingGap = 12.dp
@@ -80,16 +85,20 @@ fun HhListRow(
     onClick: (() -> Unit)? = null,
     clickLabel: String? = null,
     below: (@Composable ColumnScope.() -> Unit)? = null,
+    minHeight: Dp = ListRowTokens.minHeight,
 ) {
     val c = Culvery.colors
+    val shape = RoundedCornerShape(ListRowTokens.radius)
     Column(
-        verticalArrangement = Arrangement.spacedBy(ListRowTokens.belowGap),
+        verticalArrangement = Arrangement.spacedBy(ListRowTokens.belowGap, Alignment.CenterVertically),
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(ListRowTokens.radius))
+            .heightIn(min = minHeight)
+            .clip(shape)
+            .border(CardTokens.edge, c.border, shape)
             .background(c.surf)
             .then(if (onClick != null) Modifier.hhClickable(onClick, label = clickLabel) else Modifier)
-            .padding(horizontal = ListRowTokens.paddingH, vertical = ListRowTokens.paddingV),
+            .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd, top = ListRowTokens.paddingV, bottom = ListRowTokens.paddingV),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (leading != null) {
@@ -98,7 +107,7 @@ fun HhListRow(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ListRowTokens.lineGap)) {
                 Text(
-                    title, style = HhType.rowTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    title, style = ListRowTokens.titleStyle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 if (subtitle != null) {
                     Text(

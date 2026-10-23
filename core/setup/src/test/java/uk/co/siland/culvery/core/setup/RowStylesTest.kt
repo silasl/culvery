@@ -28,7 +28,7 @@ class RowStylesTest {
     private fun style(text: String): TextStyle = compose.onNodeWithText(text, useUnmergedTree = true).textLayout().layoutInput.style
 
     private fun assertRowTitle(text: String) {
-        assertWithMessage("$text size").that(style(text).fontSize).isEqualTo(17.sp)
+        assertWithMessage("$text size").that(style(text).fontSize).isEqualTo(18.sp)
         assertWithMessage("$text weight").that(style(text).fontWeight).isEqualTo(FontWeight.W600)
     }
 

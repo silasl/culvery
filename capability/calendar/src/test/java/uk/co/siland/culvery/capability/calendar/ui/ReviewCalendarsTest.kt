@@ -231,7 +231,7 @@ class ReviewCalendarsTest {
         show()
         fun style(text: String) = compose.onNodeWithText(text, useUnmergedTree = true).textLayout().layoutInput.style
         listOf("Google Calendar · family@example.com", "Chores").forEach {
-            assertThat(style(it).fontSize).isEqualTo(17.sp)
+            assertThat(style(it).fontSize).isEqualTo(18.sp)
             assertThat(style(it).fontWeight).isEqualTo(FontWeight.W600)
         }
         assertThat(style("Updated 2 minutes ago").fontSize).isEqualTo(14.sp)

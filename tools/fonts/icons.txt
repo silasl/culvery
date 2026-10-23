@@ -7,6 +7,7 @@ arrow_forward
 arrow_upward
 backspace
 bedtime
+block
 brightness_high
 brightness_low
 calendar_add_on
@@ -53,6 +54,7 @@ partly_cloudy_day
 partly_cloudy_night
 pause
 person
+person_add
 photo_camera
 play_arrow
 power_settings_new

@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.core.ui
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
@@ -25,8 +27,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -535,31 +535,54 @@ fun HhSwatchGrid(chosen: Long?, taken: Map<Long, String>, tagPrefix: String, onP
     }
 }
 
+/** The switch's size (9 §4.12, the handoff's 88 x 50 px). */
+object SwitchTokens {
+    val width = 59.dp
+    val height = 33.dp
+    val knob = 25.dp
+    val inset = 4.dp
+}
+
 /**
- * A Show-style switch in the theme's colours: `accent` when on; a disabled one that is on stays faded `accent`. With
- * [onCheckedChange] null it only draws: the row around it is the switch TalkBack and the finger use.
+ * A switch drawn in the theme's colours: `accent` track and `accentInk` knob when on, `surf3` and `mute` when off. A
+ * disabled one that is on stays `accent` at the disabled fade. With [onCheckedChange] null it only draws: the row
+ * around it is the switch TalkBack and the finger use. The knob slides on a change, never on first composition.
  */
 @Composable
 fun HhSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, tag: String, enabled: Boolean = true) {
     val c = Culvery.colors
-    val faded = c.accent.copy(alpha = ControlTokens.DISABLED_ALPHA)
-    Switch(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        enabled = enabled,
-        modifier = Modifier.testTag(tag),
-        colors = SwitchDefaults.colors(
-            checkedThumbColor = c.accentInk,
-            checkedTrackColor = c.accent,
-            checkedBorderColor = c.accent,
-            uncheckedThumbColor = c.mute,
-            uncheckedTrackColor = c.surf2,
-            uncheckedBorderColor = c.mute,
-            disabledCheckedThumbColor = c.accentInk,
-            disabledCheckedTrackColor = faded,
-            disabledCheckedBorderColor = faded,
-        ),
+    val knobX by animateDpAsState(
+        if (checked) SwitchTokens.width - SwitchTokens.knob - SwitchTokens.inset else SwitchTokens.inset,
+        label = "switchKnob",
     )
+    val track = when {
+        !checked -> c.surf3
+        enabled -> c.accent
+        else -> c.accent.copy(alpha = ControlTokens.DISABLED_ALPHA)
+    }
+    Box(
+        Modifier
+            .testTag(tag)
+            .then(
+                if (onCheckedChange == null) Modifier
+                else Modifier.toggleable(
+                    value = checked, enabled = enabled, role = Role.Switch,
+                    onValueChange = { if (enabled) onCheckedChange(it) },
+                ),
+            )
+            .size(SwitchTokens.width, SwitchTokens.height)
+            .alpha(if (enabled || checked) 1f else ControlTokens.DISABLED_ALPHA)
+            .clip(CircleShape)
+            .background(track),
+    ) {
+        Box(
+            Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = knobX)
+                .size(SwitchTokens.knob)
+                .background(if (checked) c.accentInk else c.mute, CircleShape),
+        )
+    }
 }
 
 /**

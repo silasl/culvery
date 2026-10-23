@@ -53,7 +53,7 @@ class ListRowAndLabelTest {
         compose.setContent { CulveryTheme(dark = true) { HhListRow("Alex", subtitle = "Admin · PIN set") } }
         val title = compose.onNodeWithText("Alex", useUnmergedTree = true).textLayout()
         val subtitle = compose.onNodeWithText("Admin · PIN set", useUnmergedTree = true).textLayout()
-        assertThat(title.layoutInput.style.fontSize).isEqualTo(17.sp)
+        assertThat(title.layoutInput.style.fontSize).isEqualTo(18.sp)
         assertThat(title.layoutInput.style.fontWeight).isEqualTo(FontWeight.W600)
         assertThat(title.layoutInput.maxLines).isEqualTo(1)
         assertThat(subtitle.layoutInput.style.fontSize).isEqualTo(14.sp)

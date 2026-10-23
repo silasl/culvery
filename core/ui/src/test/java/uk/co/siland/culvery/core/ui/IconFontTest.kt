@@ -23,6 +23,15 @@ class IconFontTest {
     }
 
     @Test
+    fun theWizardAndSettingsGlyphsAreInTheFont() {
+        assertThat(Icons.BLOCK).isEqualTo("block")
+        assertThat(Icons.PERSON_ADD).isEqualTo("person_add")
+        assertThat(font.has("block")).isTrue()
+        assertThat(font.has("person_add")).isTrue()
+        assertThat(font.hasFilledForm("person_add")).isTrue()
+    }
+
+    @Test
     fun everyNamedIconIsALigatureInTheFont() {
         assertWithMessage("Icons with no ligature in the font").that(named.filterNot(font::has)).isEmpty()
     }

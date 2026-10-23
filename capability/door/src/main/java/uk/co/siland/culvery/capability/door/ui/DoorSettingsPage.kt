@@ -115,7 +115,7 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
         VolumeRow(ui.volume, actions.onVolume)
         HhButton(PLAY_CHIME, actions.onPlayChime, Modifier.testTag("door_play_chime"), icon = Icons.DOORBELL, on = ButtonSurface.Bg)
         HhSectionLabel(QUIET_HOURS)
-        HhSwitchRow(QUIET_HOURS, quietHoursLine(ui.quietFrom, ui.quietUntil), ui.quietOn, "door_quiet") { actions.onQuietHours(it, ui.quietFrom, ui.quietUntil) }
+        HhSwitchRow(QUIET_HOURS, quietHoursLine(ui.quietFrom, ui.quietUntil), ui.quietOn, "door_quiet", onChange = { actions.onQuietHours(it, ui.quietFrom, ui.quietUntil) })
         HhTimeStepperRow(FROM, "quiet hours start", ui.quietFrom, "door_from") { actions.onQuietHours(ui.quietOn, it, ui.quietUntil) }
         HhTimeStepperRow(UNTIL, "quiet hours end", ui.quietUntil, "door_until") { actions.onQuietHours(ui.quietOn, ui.quietFrom, it) }
         HhSectionLabel(ui.service)
