@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.shopping.ADD_MAX_CHARS
@@ -244,7 +245,16 @@ private fun ListCard(state: ShoppingState, onTick: (ShownItem) -> Unit, modifier
             repeat(ShoppingDimens.COLUMNS) { i ->
                 Column(Modifier.weight(1f)) {
                     columns.getOrNull(i)?.forEach { item ->
-                        key(item.key) { ItemRow(item, flashing = item.key == state.flashing, onTick = { onTick(item) }) }
+                        key(item.key) {
+                            TickRow(
+                                item, ShoppingDimens.itemHeight, ShoppingDimens.circleGap, ShoppingDimens.itemName, "shopping_item_${item.key}",
+                                onTick = { onTick(item) },
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(ShoppingDimens.itemRadius))
+                                    .background(if (item.key == state.flashing) c.accentSoft else Color.Transparent),
+                                circleTag = "shopping_circle_${item.key}",
+                            )
+                        }
                     }
                 }
             }
@@ -255,24 +265,33 @@ private fun ListCard(state: ShoppingState, onTick: (ShownItem) -> Unit, modifier
     }
 }
 
+/** A row of the list, on the tab or the card: the circle and the name, and a tap anywhere on it ticks it. */
 @Composable
-private fun ItemRow(item: ShownItem, flashing: Boolean, onTick: () -> Unit) {
+internal fun TickRow(
+    item: ShownItem,
+    height: Dp,
+    circleGap: Dp,
+    nameSize: TextUnit,
+    tag: String,
+    onTick: () -> Unit,
+    modifier: Modifier = Modifier,
+    circleTag: String? = null,
+) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(ShoppingDimens.circleGap),
+        horizontalArrangement = Arrangement.spacedBy(circleGap),
         modifier = Modifier
             .fillMaxWidth()
-            .height(ShoppingDimens.itemHeight)
-            .clip(RoundedCornerShape(ShoppingDimens.itemRadius))
-            .background(if (flashing) c.accentSoft else Color.Transparent)
-            .testTag("shopping_item_${item.key}")
+            .height(height)
+            .then(modifier)
+            .testTag(tag)
             .hhToggleable(item.ticked, role = Role.Checkbox) { onTick() }
             .semantics { stateDescription = if (item.ticked) TICKED else NOT_TICKED },
     ) {
         Box(
             Modifier
-                .testTag("shopping_circle_${item.key}")
+                .then(if (circleTag != null) Modifier.testTag(circleTag) else Modifier)
                 .size(ShoppingDimens.circle)
                 .clip(CircleShape)
                 .then(
@@ -285,7 +304,7 @@ private fun ItemRow(item: ShownItem, flashing: Boolean, onTick: () -> Unit) {
         )
         Text(
             item.text,
-            style = HhType.body.copy(fontSize = ShoppingDimens.itemName),
+            style = HhType.body.copy(fontSize = nameSize),
             color = if (item.ticked) c.mute else c.ink,
             textDecoration = if (item.ticked) TextDecoration.LineThrough else null,
             maxLines = 1,
@@ -304,6 +323,15 @@ private fun Modifier.pullLeft(by: Dp): Modifier = layout { measurable, constrain
 
 private fun card() = RoundedCornerShape(ShoppingDimens.cardRadius)
 
+/** The list is read while this is shown (10 §4.4). */
+@Composable
+internal fun WatchShopping(checks: ShoppingChecks) {
+    DisposableEffect(checks) {
+        val stop = checks.watch()
+        onDispose(stop)
+    }
+}
+
 /**
  * The tab as the rail opens it. Watches the list while shown (10 §4.4), and takes Home's + once to focus the box. A
  * tap on Add or Done adds what is typed; the box clears only if the add took, and only if nothing was typed since.
@@ -318,10 +346,7 @@ internal fun ShoppingTabHost(
     onForget: (Learned) -> Unit,
     nowMillis: Long,
 ) {
-    DisposableEffect(checks) {
-        val stop = checks.watch(checkNow = true)
-        onDispose(stop)
-    }
+    WatchShopping(checks)
     val focusAdd = remember { focus.takeAddAsk() }
     val scope = rememberCoroutineScope()
     var typed by remember { mutableStateOf("") }

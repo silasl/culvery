@@ -371,8 +371,8 @@ class ShoppingSettingsTest {
             on(rig, ShoppingHealth.LIST_GONE),
             on(rig, ShoppingHealth.ACCOUNT_GONE),
             on(rig, ShoppingHealth.CANT_REACH),
-            SettingsState.ConfirmingStop(on(rig), 2),
-            SettingsState.ConfirmingClear(on(rig)),
+            on(rig).copy(confirm = Confirm.Stop(2)),
+            on(rig).copy(confirm = Confirm.Clear),
         )
         var shown by mutableStateOf<SettingsState>(states.first())
         setContent { ShoppingSettings(shown, NOW, false, ShoppingSettingsActions()) }

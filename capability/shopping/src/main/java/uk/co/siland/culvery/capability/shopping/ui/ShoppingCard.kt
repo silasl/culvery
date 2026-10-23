@@ -1,9 +1,6 @@
 package uk.co.siland.culvery.capability.shopping.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,23 +9,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
@@ -48,7 +38,6 @@ import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ShellTokens
 import uk.co.siland.culvery.core.ui.hhClickable
-import uk.co.siland.culvery.core.ui.hhToggleable
 import uk.co.siland.culvery.core.ui.plural
 
 private const val EMPTY = "Nothing on the list"
@@ -123,7 +112,14 @@ private fun CardBody(state: ShoppingState, rows: Int, onTick: (ShownItem) -> Uni
                     Column(Modifier.weight(1f)) {
                         val from = minOf(column * gridRows, shown)
                         val to = minOf((column + 1) * gridRows, shown)
-                        state.items.subList(from, to).forEach { item -> CardItem(item, onTick = { onTick(item) }) }
+                        state.items.subList(from, to).forEach { item ->
+                            key(item.key) {
+                                TickRow(
+                                    item, ShoppingDimens.cardRowHeight, ShoppingDimens.cardCircleGap, ShoppingDimens.cardName,
+                                    "shopping_card_item_${item.key}", onTick = { onTick(item) },
+                                )
+                            }
+                        }
                         if (more > 0 && column == SECOND_COLUMN) {
                             CardLine(Modifier.hhClickable(onOpen).testTag("shopping_card_more")) {
                                 Text(moreLine(more), style = footStyle(), color = c.mute, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -151,44 +147,10 @@ private fun CardLine(modifier: Modifier, content: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().height(ShoppingDimens.cardRowHeight).then(modifier), verticalAlignment = Alignment.CenterVertically) { content() }
 }
 
-@Composable
-private fun CardItem(item: ShownItem, onTick: () -> Unit) {
-    val c = Culvery.colors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(ShoppingDimens.cardRowHeight)
-            .testTag("shopping_card_item_${item.key}")
-            .hhToggleable(item.ticked, role = Role.Checkbox) { onTick() }
-            .semantics { stateDescription = if (item.ticked) TICKED else NOT_TICKED },
-    ) {
-        Box(
-            Modifier
-                .size(ShoppingDimens.circle)
-                .clip(CircleShape)
-                .then(if (item.ticked) Modifier.background(c.accent) else Modifier.border(ShoppingDimens.circleRing, c.surf3, CircleShape)),
-        )
-        Spacer(Modifier.width(ShoppingDimens.cardCircleGap))
-        Text(
-            item.text,
-            style = HhType.body.copy(fontSize = ShoppingDimens.cardName),
-            color = if (item.ticked) c.mute else c.ink,
-            textDecoration = if (item.ticked) TextDecoration.LineThrough else null,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
 /** The card over the view; while it shows the list is watched (10 §4.4). The + asks the tab for the box, then opens it. */
 @Composable
 internal fun ShoppingCardHost(view: ShoppingView, actions: ShoppingActions, checks: ShoppingChecks, focus: ShoppingFocus) {
-    DisposableEffect(checks) {
-        val stop = checks.watch(checkNow = true)
-        onDispose(stop)
-    }
+    WatchShopping(checks)
     val navigator = LocalShellNavigator.current
     val scope = rememberCoroutineScope()
     val state by view.state.collectAsStateWithLifecycle()

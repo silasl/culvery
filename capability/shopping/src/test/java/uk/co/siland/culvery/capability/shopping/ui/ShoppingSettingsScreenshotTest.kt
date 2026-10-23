@@ -93,6 +93,6 @@ class ShoppingSettingsScreenshotTest {
     @Test fun listGoneLight() = snap("settings_shopping_list_gone", false, on(ShoppingHealth.LIST_GONE))
     @Test fun accountGoneDark() = snap("settings_shopping_account_gone", true, on(ShoppingHealth.ACCOUNT_GONE))
     @Test fun accountGoneLight() = snap("settings_shopping_account_gone", false, on(ShoppingHealth.ACCOUNT_GONE))
-    @Test fun stopDark() = snap("settings_shopping_stop", true, SettingsState.ConfirmingStop(on(), 2))
-    @Test fun stopLight() = snap("settings_shopping_stop", false, SettingsState.ConfirmingStop(on(), 2))
+    @Test fun stopDark() = snap("settings_shopping_stop", true, on().copy(confirm = Confirm.Stop(2)))
+    @Test fun stopLight() = snap("settings_shopping_stop", false, on().copy(confirm = Confirm.Stop(2)))
 }

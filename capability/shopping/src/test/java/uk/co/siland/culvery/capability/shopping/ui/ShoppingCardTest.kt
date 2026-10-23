@@ -37,7 +37,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
-import uk.co.siland.culvery.capability.shopping.ShoppingHealth
 import uk.co.siland.culvery.capability.shopping.ShoppingState
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
@@ -187,7 +186,7 @@ class ShoppingCardTest {
     /** Fails if a card with no room for a row, and a problem, throws. */
     @Test
     fun aCardWithNoRoomForRowsDoesNotCrash() {
-        show(stateOf(items(3), problem = PERMISSION_LINE, health = ShoppingHealth.NEEDS_PERMISSION), DpSize(701.dp, 100.dp))
+        show(stateOf(items(3), problem = PERMISSION_LINE), DpSize(701.dp, 100.dp))
         compose.onNodeWithTag("shopping_card_add").assertIsDisplayed()
     }
 
@@ -207,7 +206,7 @@ class ShoppingCardTest {
     /** Fails if a problem's line isn't shown under the items. */
     @Test
     fun aProblemShowsOnTheCard() {
-        show(stateOf(items(3), problem = PERMISSION_LINE, health = ShoppingHealth.NEEDS_PERMISSION))
+        show(stateOf(items(3), problem = PERMISSION_LINE))
         compose.onNodeWithText(PERMISSION_LINE).assertIsDisplayed()
         assertThat(bounds("shopping_card_status").top).isGreaterThan(bounds(itemTag(3)).top)
         compose.assertFitsTheCard()
@@ -216,7 +215,7 @@ class ShoppingCardTest {
     /** Fails if the problem line doesn't take the last row, "+n more" doesn't move up a slot, or n leaves out an item. */
     @Test
     fun aProblemTakesTheLastRowAndTheFooterMovesUp() {
-        show(stateOf(items(20), problem = PERMISSION_LINE, health = ShoppingHealth.NEEDS_PERMISSION))
+        show(stateOf(items(20), problem = PERMISSION_LINE))
         compose.onNodeWithTag(itemTag(13)).assertIsDisplayed()
         compose.onNodeWithTag(itemTag(14)).assertDoesNotExist()
         compose.onNodeWithText("+7 more · Open Shopping").assertIsDisplayed()
@@ -245,7 +244,7 @@ class ShoppingCardTest {
         val states = listOf(
             stateOf(items(20)),
             stateOf(emptyList()),
-            stateOf(items(3), problem = PERMISSION_LINE, health = ShoppingHealth.NEEDS_PERMISSION),
+            stateOf(items(3), problem = PERMISSION_LINE),
         )
         var shown by mutableStateOf(states.first())
         setCard(CARD_WIDE) {

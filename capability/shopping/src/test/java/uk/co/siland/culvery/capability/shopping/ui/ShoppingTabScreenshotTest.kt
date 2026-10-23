@@ -13,7 +13,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.shopping.Learned
-import uk.co.siland.culvery.capability.shopping.ShoppingHealth
 import uk.co.siland.culvery.capability.shopping.ShoppingState
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -55,17 +54,11 @@ class ShoppingTabScreenshotTest {
     private val typing = Scene(stateOf(items(3)), typed = "bu", suggestions = listOf(learned("Butter", 9)), favourites = favourites.drop(2))
     private val offList = favourites.drop(2)
     private val ticked = Scene(stateOf(items(5).map { if (it.text == "Bananas") it.copy(ticked = true) else it }), favourites = offList)
-    private fun problem(health: ShoppingHealth, line: String) = Scene(stateOf(items(5), problem = line, health = health), favourites = offList)
-    private val cantReach = problem(ShoppingHealth.CANT_REACH, "Can’t reach Google Tasks. Items you add are kept and sent when it’s back.")
-    private val permission = problem(ShoppingHealth.NEEDS_PERMISSION, "Allow Google Tasks in Settings › Shopping")
-    private val listGone = problem(
-        ShoppingHealth.LIST_GONE,
-        "The Shopping list isn’t in Google Tasks any more. Make a new one in Settings › Shopping.",
-    )
-    private val accountGone = problem(
-        ShoppingHealth.ACCOUNT_GONE,
-        "Shopping’s Google account was disconnected. Connect it again in Settings › Calendars.",
-    )
+    private fun problem(line: String) = Scene(stateOf(items(5), problem = line), favourites = offList)
+    private val cantReach = problem("Can’t reach Google Tasks. Items you add are kept and sent when it’s back.")
+    private val permission = problem("Allow Google Tasks in Settings › Shopping")
+    private val listGone = problem("The Shopping list isn’t in Google Tasks any more. Make a new one in Settings › Shopping.")
+    private val accountGone = problem("Shopping’s Google account was disconnected. Connect it again in Settings › Calendars.")
 
     @Test fun emptyDark() = snap("shopping_tab_empty", true, empty)
     @Test fun emptyLight() = snap("shopping_tab_empty", false, empty)

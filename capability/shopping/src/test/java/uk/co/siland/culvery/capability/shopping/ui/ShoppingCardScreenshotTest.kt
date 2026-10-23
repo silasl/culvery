@@ -13,7 +13,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
-import uk.co.siland.culvery.capability.shopping.ShoppingHealth
 import uk.co.siland.culvery.capability.shopping.ShoppingState
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
@@ -43,7 +42,6 @@ class ShoppingCardScreenshotTest {
     private val cantReach = stateOf(
         items(5),
         problem = "Can’t reach Google Tasks. Items you add are kept and sent when it’s back.",
-        health = ShoppingHealth.CANT_REACH,
     )
 
     @Test fun wideDark() = snap("shopping_card_wide", true, wide)

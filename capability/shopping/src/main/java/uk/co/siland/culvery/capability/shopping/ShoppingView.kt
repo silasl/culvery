@@ -34,7 +34,6 @@ internal data class Ticked(val itemId: String?, val clientKey: String, val text:
 data class ShoppingState(
     val items: List<ShownItem>,
     val open: Int,
-    val health: ShoppingHealth,
     val lastReadMillis: Long?,
     val service: String,
     val problem: String?,
@@ -101,7 +100,6 @@ class ShoppingView @Inject constructor(
         ShoppingState(
             items = rows,
             open = rows.count { !it.ticked },
-            health = stored.health,
             lastReadMillis = stored.lastReadMillis,
             service = provider?.descriptor?.displayName ?: stored.connection.label,
             problem = if (full) QUEUE_FULL else provider?.let { problemLine(stored.health, it) },

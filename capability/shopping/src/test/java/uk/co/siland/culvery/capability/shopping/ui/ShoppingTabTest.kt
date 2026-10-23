@@ -70,7 +70,6 @@ import uk.co.siland.culvery.capability.shopping.ShoppingActions
 import uk.co.siland.culvery.capability.shopping.ShoppingChecks
 import uk.co.siland.culvery.capability.shopping.ShoppingDrainLoop
 import uk.co.siland.culvery.capability.shopping.ShoppingFocus
-import uk.co.siland.culvery.capability.shopping.ShoppingHealth
 import uk.co.siland.culvery.capability.shopping.ShoppingLearning
 import uk.co.siland.culvery.capability.shopping.ShoppingLock
 import uk.co.siland.culvery.capability.shopping.ShoppingState
@@ -106,10 +105,9 @@ internal fun row(n: Int, text: String = "Item $n", ticked: Boolean = false, queu
 internal fun stateOf(
     items: List<ShownItem>,
     problem: String? = null,
-    health: ShoppingHealth = ShoppingHealth.OK,
     flashing: String? = null,
     lastReadMillis: Long? = NOW,
-) = ShoppingState(items, items.count { !it.ticked }, health, lastReadMillis, "Google Tasks", problem, flashing)
+) = ShoppingState(items, items.count { !it.ticked }, lastReadMillis, "Google Tasks", problem, flashing)
 
 private val milk = row(1, "Milk")
 private val eggs = Learned("eggs", "Eggs", 3, 0)
@@ -356,7 +354,7 @@ class ShoppingTabTest {
     @Test
     fun aProblemShowsUnderTheAddCard() {
         var adds = 0
-        showTab(stateOf(listOf(milk), problem = CANT_REACH_LINE, health = ShoppingHealth.CANT_REACH), onAdd = { adds++ })
+        showTab(stateOf(listOf(milk), problem = CANT_REACH_LINE), onAdd = { adds++ })
         compose.onNodeWithTag("shopping_status").assertTextEquals(CANT_REACH_LINE)
         val status = compose.onNodeWithTag("shopping_status").getUnclippedBoundsInRoot()
         assertThat(status.top).isAtLeast(compose.onNodeWithTag("shopping_add").getUnclippedBoundsInRoot().bottom)
@@ -476,7 +474,7 @@ class ShoppingTabTest {
         val states = listOf(
             stateOf((1..9).map { row(it) }),
             stateOf(emptyList()),
-            stateOf(listOf(milk, row(2, "Bread", ticked = true)), problem = CANT_REACH_LINE, health = ShoppingHealth.CANT_REACH),
+            stateOf(listOf(milk, row(2, "Bread", ticked = true)), problem = CANT_REACH_LINE),
         )
         var shown by mutableStateOf(states.first())
         setTab { ShoppingTab(shown, "b", {}, {}, listOf(butter), listOf(eggs), {}, {}, {}, focusAdd = false, nowMillis = NOW) }

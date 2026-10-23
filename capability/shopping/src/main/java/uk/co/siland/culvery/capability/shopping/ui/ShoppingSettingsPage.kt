@@ -65,7 +65,14 @@ class ShoppingPage internal constructor(private val content: @Composable () -> U
     override fun Content() = content()
 }
 
-/** What Settings › Shopping shows. [On] is the page itself; the confirmations draw over its foot. */
+/** A question the page asks before it acts; it draws over the page's foot. */
+internal sealed interface Confirm {
+    data class Stop(val queued: Int) : Confirm
+
+    data object Clear : Confirm
+}
+
+/** What Settings › Shopping shows. [On] is the page itself, with [On.confirm] when a question is up. */
 internal sealed interface SettingsState {
     val provider: ShoppingProvider
 
@@ -80,15 +87,13 @@ internal sealed interface SettingsState {
     /** Connected in the provider's screens and waiting for the store to hold it. */
     data class Finishing(override val provider: ShoppingProvider, val account: String?) : SettingsState
 
-    data class On(override val provider: ShoppingProvider, val account: String?, val health: ShoppingHealth, val lastReadMillis: Long?) : SettingsState
-
-    data class ConfirmingStop(val on: On, val queued: Int) : SettingsState {
-        override val provider get() = on.provider
-    }
-
-    data class ConfirmingClear(val on: On) : SettingsState {
-        override val provider get() = on.provider
-    }
+    data class On(
+        override val provider: ShoppingProvider,
+        val account: String?,
+        val health: ShoppingHealth,
+        val lastReadMillis: Long?,
+        val confirm: Confirm? = null,
+    ) : SettingsState
 }
 
 /** What Settings › Shopping's taps do; each does nothing unless given, so a test or screenshot passes only what it checks. */
@@ -117,23 +122,25 @@ internal fun ShoppingSettings(state: SettingsState, nowMillis: Long, busy: Boole
             is SettingsState.Off -> Off(state, service, busy, actions)
             is SettingsState.ChoosingAccount -> Choosing(state, service, busy, actions)
             is SettingsState.Connecting -> {
-                HhSwitchRow(useService(service), state.account, checked = true, tag = "shopping_use", onChange = {}, enabled = false)
+                LockedUseRow(service, state.account, checked = true)
                 state.provider.ConnectScreen(state.account, state.existing, actions.onConnected, actions.onCancelConnect)
             }
-            is SettingsState.Finishing ->
-                HhSwitchRow(useService(service), state.account, checked = true, tag = "shopping_use", onChange = {}, enabled = false)
-            is SettingsState.On -> On(state, service, null, busy, nowMillis, actions)
-            is SettingsState.ConfirmingStop -> On(state.on, service, state, busy, nowMillis, actions)
-            is SettingsState.ConfirmingClear -> On(state.on, service, state, busy, nowMillis, actions)
+            is SettingsState.Finishing -> LockedUseRow(service, state.account, checked = true)
+            is SettingsState.On -> On(state, service, busy, nowMillis, actions)
         }
     }
 }
+
+/** The switch while it can't be used: connecting is blocked, or under way. */
+@Composable
+private fun LockedUseRow(service: String, account: String?, checked: Boolean) =
+    HhSwitchRow(useService(service), account, checked = checked, tag = "shopping_use", onChange = {}, enabled = false)
 
 @Composable
 private fun Off(state: SettingsState.Off, service: String, busy: Boolean, actions: ShoppingSettingsActions) {
     when (val accounts = state.accounts) {
         is ProviderAccounts.Blocked -> {
-            HhSwitchRow(useService(service), null, checked = false, tag = "shopping_use", onChange = {}, enabled = false)
+            LockedUseRow(service, null, checked = false)
             Text(accounts.line, style = HhType.body, color = Culvery.colors.mute, modifier = Modifier.testTag("shopping_blocked"))
         }
         is ProviderAccounts.Ready -> HhSwitchRow(
@@ -158,45 +165,39 @@ private fun Choosing(state: SettingsState.ChoosingAccount, service: String, busy
 }
 
 @Composable
-private fun On(
-    state: SettingsState.On,
-    service: String,
-    confirming: SettingsState?,
-    busy: Boolean,
-    nowMillis: Long,
-    actions: ShoppingSettingsActions,
-) {
+private fun On(state: SettingsState.On, service: String, busy: Boolean, nowMillis: Long, actions: ShoppingSettingsActions) {
     val c = Culvery.colors
+    val confirm = state.confirm
     HhSwitchRow(
         useService(service), state.account, checked = true, tag = "shopping_use",
-        onChange = { if (!it) actions.onAskStop() }, enabled = !busy && confirming == null,
+        onChange = { if (!it) actions.onAskStop() }, enabled = !busy && confirm == null,
     )
     Health(state, service, nowMillis)
     when (state.health) {
         ShoppingHealth.NEEDS_PERMISSION -> HhButton(
             allow(service), actions.onAllow, Modifier.testTag("shopping_allow"),
-            tone = ButtonTone.Primary, enabled = !busy && confirming == null, on = ButtonSurface.Bg,
+            tone = ButtonTone.Primary, enabled = !busy && confirm == null, on = ButtonSurface.Bg,
         )
         ShoppingHealth.LIST_GONE -> HhButton(
             MAKE_A_NEW_LIST, actions.onMakeList, Modifier.testTag("shopping_make_list"),
-            tone = ButtonTone.Primary, enabled = !busy && confirming == null, on = ButtonSurface.Bg,
+            tone = ButtonTone.Primary, enabled = !busy && confirm == null, on = ButtonSurface.Bg,
         )
         else -> Unit
     }
-    when (confirming) {
-        is SettingsState.ConfirmingStop -> HhConfirmCard(
-            tag = "shopping_confirm", title = stopQuestion(service, confirming.queued),
+    when (confirm) {
+        is Confirm.Stop -> HhConfirmCard(
+            tag = "shopping_confirm", title = stopQuestion(service, confirm.queued),
             keep = KEEP, keepTag = "shopping_keep",
             confirm = stopUsing(service), confirmTag = "shopping_confirm_stop",
             busy = busy, onKeep = actions.onKeep, onConfirm = actions.onConfirmStop,
         )
-        is SettingsState.ConfirmingClear -> HhConfirmCard(
+        Confirm.Clear -> HhConfirmCard(
             tag = "shopping_confirm", title = CLEAR_QUESTION,
             keep = KEEP, keepTag = "shopping_keep",
             confirm = CLEAR_SUGGESTIONS, confirmTag = "shopping_confirm_clear",
             busy = busy, onKeep = actions.onKeep, onConfirm = actions.onConfirmClear,
         )
-        else -> {
+        null -> {
             HhButton(CLEAR_SUGGESTIONS, actions.onAskClear, Modifier.testTag("shopping_clear"), enabled = !busy, on = ButtonSurface.Bg)
             HhButton(stopUsing(service), actions.onAskStop, Modifier.testTag("shopping_stop"), enabled = !busy, on = ButtonSurface.Bg)
         }
@@ -232,9 +233,7 @@ private sealed interface Step {
 
     data class Finishing(val account: String?) : Step
 
-    data class ConfirmStop(val queued: Int) : Step
-
-    data object ConfirmClear : Step
+    data class Asking(val confirm: Confirm) : Step
 }
 
 /** What the store holds, once it has answered: a bare null would be "not connected" before it is known. */
@@ -264,8 +263,7 @@ internal fun ShoppingSettingsHost(connections: ShoppingConnections, store: Shopp
             val on = SettingsState.On(provider, stored.connection.config[SHOPPING_CONFIG_ACCOUNT], stored.health, stored.lastReadMillis)
             when (val s = step) {
                 is Step.Connecting -> SettingsState.Connecting(provider, s.account, s.existing)
-                is Step.ConfirmStop -> SettingsState.ConfirmingStop(on, s.queued)
-                Step.ConfirmClear -> SettingsState.ConfirmingClear(on)
+                is Step.Asking -> on.copy(confirm = s.confirm)
                 else -> on
             }
         }
@@ -302,13 +300,13 @@ internal fun ShoppingSettingsHost(connections: ShoppingConnections, store: Shopp
                 }
             },
             onMakeList = { action.run { connections.remakeList() } },
-            onAskStop = { action.run { step = Step.ConfirmStop(connections.queued()) } },
+            onAskStop = { action.run { step = Step.Asking(Confirm.Stop(connections.queued())) } },
             onConfirmStop = {
                 action.run {
                     if (connections.stop()) step = Step.Idle
                 }
             },
-            onAskClear = { step = Step.ConfirmClear },
+            onAskClear = { step = Step.Asking(Confirm.Clear) },
             onConfirmClear = {
                 action.run {
                     if (connections.clearSuggestions()) step = Step.Idle
