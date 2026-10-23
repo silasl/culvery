@@ -598,6 +598,16 @@ Fault found:
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
 - **Home slow to fill (9c walk-through, 2026-10-22):** on the emulator, Home's cards took a moment to fill after opening. Time it on the tablet (cold start and return from the Calendar tab) before deciding whether anything needs fixing. The same walk-through saw it on the Calendar tab after a restart, Settings › Calendars, Home location and People (fault 1); time those too.
 
+## Bugs (2026-10-23)
+The open faults after the redesign phase. Details are in the plan sections above.
+- **Fault A:** a start-date tap once closed the Add event editor and opened an existing event. Not reproduced.
+- **M2:** an Undo racing a drain create leaves the event on the week until the next sync; `UndoneKeys` is lost on restart.
+- **M3:** a phone's counted series is expanded in full on every detail update (`Repeats.kt:28`).
+- **Home slow to fill:** 2.2–2.9 s from a cold start, with the Hue bridge the slowest. One option is for Lights to show its last known rooms while it connects.
+- **Doorbell missed on 21 Oct:** the logs from then are gone. Read logcat the same day if it happens again.
+- **Not tried yet:** "Use for new events" with real calendars, and a new Sonos playlist appearing on the next open.
+- **TalkBack checks from 9c-2:** dropped; the user will raise them if they show in use.
+
 ## Feature ideas (2026-10-02, after v1)
 
 **Each its own spec → plan cycle; not in 4c, 4d or 4e**
