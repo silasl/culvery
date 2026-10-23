@@ -559,6 +559,14 @@ Fault found:
 - **Choosing the destination calendar per event:** an event still saves to the household's one destination calendar. Picking another calendar for one event is a later change.
 - **A year-long fetch of past events:** the tablet still keeps about a day of past events. Title suggestions use a remembered list that sync builds up over time, so "From before" starts sparse and fills in over the following weeks.
 
+## Plan 9c-2 (Redesign: the wizard and Settings): emulator walk-through (2026-10-23)
+- **The wizard** was walked from cleared app data and is fine. It was a light pass by the user; the duplicate-name and taken-colour checks were not reported one by one.
+- **Settings** are fine: the list panel, the titles, People and its sheet, Calendars, the slider rows on Door, Display and Music, and the closing ring.
+- **Home location** with Wi-Fi and data off: the reason shows under the field, with no red ring.
+- **"Use for new events"** can't show with the sample calendars, because the only writable one is the main calendar. Check it on the tablet with real calendars.
+- **Not tried with TalkBack:** focus moving to a refused field in the person sheet, and "N towns found" being spoken from the collapsed status line. Check both on the tablet.
+- **No faults.**
+
 ## Left out of Plan 9c-2 on purpose (2026-10-23)
 - **Settings › Calendars keeps "Family"** for the household's calendars; "Family" or "Everyone" is for the design review.
 - **The calendar editor's title field keeps its own ring:** folding it into the shared text field's error ring is deferred.
