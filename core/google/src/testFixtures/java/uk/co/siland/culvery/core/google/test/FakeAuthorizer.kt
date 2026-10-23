@@ -29,7 +29,7 @@ class FakeAuthorizer : Authorizer {
 
     override fun authorizationFrom(data: Intent?): Authorization {
         readFromScreens++
-        return fromScreens ?: granted("token-after-screens", scopesAsked.last())
+        return fromScreens ?: granted("token-after-screens", scopesAsked.lastOrNull() ?: error("authorize before the screens"))
     }
 
     override suspend fun clearToken(token: String) {

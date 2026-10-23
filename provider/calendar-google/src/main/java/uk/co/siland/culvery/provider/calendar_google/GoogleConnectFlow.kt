@@ -11,11 +11,11 @@ import uk.co.siland.culvery.core.google.Authorizer
 import uk.co.siland.culvery.core.google.PlayServicesCheck
 import uk.co.siland.culvery.core.google.PlayServicesStatusException
 import uk.co.siland.culvery.core.google.UPDATE_PLAY_SERVICES
-import uk.co.siland.culvery.core.google.couldNotConnect
 import uk.co.siland.culvery.core.google.isUserCancel
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.UnreachableException
+import uk.co.siland.culvery.core.plugin.couldNotConnect
 
 /** Stored with every Google connection: never change it. */
 const val GOOGLE_PROVIDER_ID = "calendar.google"

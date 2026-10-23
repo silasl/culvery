@@ -21,13 +21,13 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.db.CalendarDao
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.db.ConnectionEntity
-import uk.co.siland.culvery.core.google.couldNotConnect
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.couldNotConnect
 
 @RunWith(AndroidJUnit4::class)
 class CalendarSetupTest {

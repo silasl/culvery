@@ -18,10 +18,10 @@ import uk.co.siland.culvery.core.google.Authorization
 import uk.co.siland.culvery.core.google.PlayServicesCheck
 import uk.co.siland.culvery.core.google.UPDATE_PLAY_SERVICES
 import uk.co.siland.culvery.core.google.authorizationFailure
-import uk.co.siland.culvery.core.google.couldNotConnect
 import uk.co.siland.culvery.core.google.test.FakeAuthorizer
 import uk.co.siland.culvery.core.google.test.FakeTokenSource
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.couldNotConnect
 
 private val COULD_NOT_CONNECT = couldNotConnect(GOOGLE_DISPLAY_NAME, unreachable = false)
 private val COULD_NOT_REACH = couldNotConnect(GOOGLE_DISPLAY_NAME, unreachable = true)

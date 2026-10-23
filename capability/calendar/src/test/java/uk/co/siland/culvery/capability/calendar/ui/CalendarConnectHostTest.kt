@@ -47,7 +47,6 @@ import uk.co.siland.culvery.capability.calendar.stubEditor
 import uk.co.siland.culvery.capability.calendar.testAccess
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.PinError
-import uk.co.siland.culvery.core.google.couldNotConnect
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
@@ -59,6 +58,7 @@ import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.LocalUserActivity
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.couldNotConnect
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme

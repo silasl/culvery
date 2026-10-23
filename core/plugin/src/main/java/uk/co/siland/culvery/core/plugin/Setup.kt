@@ -22,6 +22,10 @@ const val CHECKING = "Checking…"
 /** A typed address that isn't four numbers on the home network; [example] is the field's placeholder. */
 fun typeFourNumbers(example: String): String = "Type the address as four numbers, like $example."
 
+/** A service that couldn’t be reached says check the Wi-Fi; any other failure, try again. */
+fun couldNotConnect(service: String, unreachable: Boolean): String =
+    if (unreachable) "Couldn’t reach $service — check the tablet’s Wi-Fi, then try again." else "Couldn’t connect to $service — try again."
+
 /** Runs [write]; a setting that didn't save is [log]ged and says [COULD_NOT_SAVE], and nothing changed. */
 suspend fun Toaster.save(write: suspend () -> Unit, log: (IOException) -> Unit) {
     try {

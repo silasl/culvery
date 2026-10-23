@@ -6,7 +6,7 @@ import java.net.SocketException
 import java.net.UnknownHostException
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Test
-import uk.co.siland.culvery.core.google.couldNotConnect
+import uk.co.siland.culvery.core.plugin.couldNotConnect
 
 /** 4d-2 §7.2: each failure says what went wrong, by its cause, and what to do. */
 class WriteCopyTest {
