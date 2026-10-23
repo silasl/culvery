@@ -22,6 +22,9 @@ internal object ShoppingDimens {
     val ruleGap = 6.dp
     val chipRowHeight = 48.dp
 
+    /** A full row holds about 15 chips, so more favourites than this are never placed. */
+    const val FAVOURITES_SHOWN_MAX = 40
+
     // The list: three columns, rows 48, a 20 circle with a 2 ring, the name 18 sp 12 after it.
     const val COLUMNS = 3
     val columnGap = 15.dp

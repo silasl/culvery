@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -41,6 +42,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.shopping.ADD_MAX_CHARS
@@ -96,6 +98,7 @@ internal fun ShoppingTab(
     onTick: (ShownItem) -> Unit,
     focusAdd: Boolean,
     nowMillis: Long,
+    nothingLearned: Boolean = false,
 ) {
     val c = Culvery.colors
     val box = remember { FocusRequester() }
@@ -120,7 +123,7 @@ internal fun ShoppingTab(
                 )
             },
         )
-        AddCard(typed, onTyped, onAdd, suggestions, favourites, onChip, onForget, box)
+        AddCard(typed, onTyped, onAdd, suggestions, favourites, nothingLearned, onChip, onForget, box)
         HhMessageLine(state.problem, HhType.body, c.danger, "shopping_status", gapAbove = ShoppingDimens.cardGap)
         ListCard(state, onTick, Modifier.weight(1f).padding(top = ShoppingDimens.cardGap))
     }
@@ -133,6 +136,7 @@ private fun AddCard(
     onAdd: () -> Unit,
     suggestions: List<Learned>,
     favourites: List<Learned>,
+    nothingLearned: Boolean,
     onChip: (Learned) -> Unit,
     onForget: (Learned) -> Unit,
     box: FocusRequester,
@@ -166,15 +170,22 @@ private fun AddCard(
                 modifier = Modifier.testTag("shopping_add"),
             )
         }
-        ChipRow(typed, suggestions, favourites, onChip, onForget)
+        ChipRow(typed, suggestions, favourites, nothingLearned, onChip, onForget)
     }
 }
 
 @Composable
-private fun ChipRow(typed: String, suggestions: List<Learned>, favourites: List<Learned>, onChip: (Learned) -> Unit, onForget: (Learned) -> Unit) {
+private fun ChipRow(
+    typed: String,
+    suggestions: List<Learned>,
+    favourites: List<Learned>,
+    nothingLearned: Boolean,
+    onChip: (Learned) -> Unit,
+    onForget: (Learned) -> Unit,
+) {
     val c = Culvery.colors
     Box(Modifier.fillMaxWidth().heightIn(min = ShoppingDimens.chipRowHeight), contentAlignment = Alignment.CenterStart) {
-        if (typed.isEmpty() && suggestions.isEmpty() && favourites.isEmpty()) {
+        if (typed.isEmpty() && nothingLearned) {
             Text(FAVOURITES_HINT, style = HhType.body, color = c.mute, modifier = Modifier.testTag("shopping_favourites_hint"))
             return@Box
         }
@@ -183,21 +194,22 @@ private fun ChipRow(typed: String, suggestions: List<Learned>, favourites: List<
                 key("suggest_${learned.key}") {
                     HhChoiceChip(
                         learned.text, selected = false, tag = "shopping_suggest_${learned.key}", onClick = { onChip(learned) },
-                        unselectedFill = c.accentSoft, unselectedInk = c.accent, role = Role.Button,
+                        unselectedFill = c.accentSoft, unselectedInk = c.accent, role = Role.Button, maxLines = 1,
                     )
                 }
             }
             favourites.forEachIndexed { i, learned ->
                 key("favourite_${learned.key}") {
                     // The rule and the first favourite are one piece, so a rule is never left at the line's end.
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (i == 0 && suggestions.isNotEmpty()) {
-                            Box(Modifier.size(ShoppingDimens.ruleWidth, ShoppingDimens.ruleHeight).background(c.surf3))
+                    val ruled = i == 0 && suggestions.isNotEmpty()
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = if (ruled) Modifier.pullLeft(ShoppingDimens.chipGap - ShoppingDimens.ruleGap) else Modifier) {
+                        if (ruled) {
+                            Box(Modifier.size(ShoppingDimens.ruleWidth, ShoppingDimens.ruleHeight).background(c.surf3).testTag("shopping_chip_rule"))
                             Spacer(Modifier.width(ShoppingDimens.ruleGap))
                         }
                         HhChoiceChip(
                             learned.text, selected = false, tag = "shopping_favourite_${learned.key}", onClick = { onChip(learned) },
-                            unselectedFill = c.surf2, unselectedInk = c.ink, role = Role.Button,
+                            unselectedFill = c.surf2, unselectedInk = c.ink, role = Role.Button, maxLines = 1,
                             onLongClick = { onForget(learned) }, longClickLabel = "Forget ${learned.text}",
                         )
                     }
@@ -283,6 +295,13 @@ private fun ItemRow(item: ShownItem, flashing: Boolean, onTick: () -> Unit) {
     }
 }
 
+/** Draws a child [by] to the left of its slot and gives that much back to its neighbour, so the gap before it is [by] smaller. */
+private fun Modifier.pullLeft(by: Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val back = by.roundToPx()
+    layout(placeable.width - back, placeable.height) { placeable.place(-back, 0) }
+}
+
 private fun card() = RoundedCornerShape(ShoppingDimens.cardRadius)
 
 /**
@@ -307,11 +326,12 @@ internal fun ShoppingTabHost(
     val scope = rememberCoroutineScope()
     var typed by remember { mutableStateOf("") }
     val state by view.state.collectAsStateWithLifecycle()
-    val learned by learning.learned.collectAsStateWithLifecycle(emptyList())
+    val learnedOrNull by learning.learned.collectAsStateWithLifecycle<List<Learned>?>(null)
+    val learned = learnedOrNull.orEmpty()
     val shown = state ?: return
     val onList = remember(shown.items) { shown.items.filter { !it.ticked }.mapTo(HashSet()) { textKey(it.text) } }
     val suggestions = remember(typed, learned, onList) { suggest(typed, learned, onList) }
-    val favourites = remember(learned, onList, suggestions) { favourites(learned, onList, suggestions.mapTo(HashSet()) { it.key }) }
+    val favourites = remember(learned, onList, suggestions) { favourites(learned, onList, suggestions.mapTo(HashSet()) { it.key }).take(ShoppingDimens.FAVOURITES_SHOWN_MAX) }
 
     // [boxAtTap] is what the box held when the add began, or null when the box has nothing to do with it.
     fun add(text: String, boxAtTap: String?) {
@@ -333,5 +353,6 @@ internal fun ShoppingTabHost(
         onTick = { row -> scope.launch { actions.tick(row) } },
         focusAdd = focusAdd,
         nowMillis = nowMillis,
+        nothingLearned = learnedOrNull?.isEmpty() == true,
     )
 }

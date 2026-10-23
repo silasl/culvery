@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -231,6 +232,24 @@ class ControlsTest {
         assertThat(taps).isEqualTo(0)
         assertThat(compose.onNodeWithTag("held").fetchSemanticsNode().config[SemanticsActions.OnLongClick].label).isEqualTo("Forget Eggs")
         compose.onNodeWithTag("plain").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnLongClick))
+    }
+
+    /** Pin: a long label takes two lines by default; it takes one, ending in …, when asked. */
+    @Test
+    fun aChipCanBeKeptToOneLine() {
+        show {
+            Column {
+                HhChoiceChip("W".repeat(40), selected = false, tag = "two", onClick = {}, role = Role.Button, modifier = Modifier.width(160.dp))
+                HhChoiceChip("W".repeat(40), selected = false, tag = "one", onClick = {}, role = Role.Button, maxLines = 1, modifier = Modifier.width(160.dp))
+            }
+        }
+        fun lines(tag: String): Int {
+            val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action!!(results)
+            return results.first().lineCount
+        }
+        assertThat(lines("two")).isEqualTo(2)
+        assertThat(lines("one")).isEqualTo(1)
     }
 
     /** Fails if a field can't be told apart from the `surf` card it sits on. */

@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -258,9 +260,90 @@ class ShoppingTabTest {
 
     @Test
     fun nothingLearnedSaysHowFavouritesCome() {
-        showTab(stateOf(listOf(milk)))
+        showHost(rig())
+        compose.waitFor { compose.onAllNodes(hasTestTag("shopping_favourites_hint")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("shopping_favourites_hint").assertTextEquals("Favourites appear as you add things.")
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if the hint shows when the house has learned things that are all on the list. */
+    @Test
+    fun theHintDoesNotShowWhenEverythingLearnedIsOnTheList() {
+        val rig = rig()
+        showHost(rig)
+        waitForField()
+        runBlocking { rig.actions.add("Milk") }
+        compose.waitFor { compose.onAllNodes(hasTestTag("shopping_item_q:${rig.queuedKeys().single()}")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("shopping_favourites_hint").assertDoesNotExist()
+        compose.onNodeWithTag("shopping_favourite_milk").assertDoesNotExist()
+    }
+
+    /** Fails if a learned item that is on the list still gets a chip. */
+    @Test
+    fun anItemOnTheListHasNoFavouriteChip() {
+        val rig = rig()
+        runBlocking {
+            rig.store.learnUse("Milk", 0)
+            rig.store.learnUse("Eggs", 0)
+        }
+        showHost(rig)
+        waitForField()
+        runBlocking { rig.actions.add("Milk") }
+        compose.waitFor { compose.onAllNodes(hasTestTag("shopping_item_q:${rig.queuedKeys().single()}")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("shopping_favourite_eggs").assertExists()
+        compose.onNodeWithTag("shopping_favourite_milk").assertDoesNotExist()
+    }
+
+    /** A ticked item is not on the list while its Undo lasts (10 ruling 10), so it may be added again. */
+    @Test
+    fun aTickedItemKeepsItsFavouriteChip() {
+        val rig = rig()
+        runBlocking { rig.store.learnUse("Milk", 0) }
+        showHost(rig)
+        waitForField()
+        runBlocking { rig.actions.add("Milk") }
+        compose.waitFor { rig.view.state.value?.items?.isNotEmpty() == true }
+        compose.waitFor { compose.onAllNodes(hasTestTag("shopping_favourite_milk")).fetchSemanticsNodes().isEmpty() }
+        runBlocking { rig.actions.tick(rig.view.state.value!!.items.single()) }
+        compose.waitFor { rig.view.state.value?.items?.singleOrNull()?.ticked == true }
+        compose.waitFor { compose.onAllNodes(hasTestTag("shopping_favourite_milk")).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    /** Fails if every learned item is composed and measured on each keystroke. */
+    @Test
+    fun onlyFortyFavouritesAreComposed() {
+        val rig = rig()
+        runBlocking { (1..60).forEach { rig.store.learnUse("Item $it", 0) } }
+        showHost(rig)
+        waitForField()
+        compose.waitFor { favouriteChips() > 0 }
+        assertThat(favouriteChips()).isEqualTo(40)
+    }
+
+    private fun favouriteChips() = compose.onAllNodes(
+        SemanticsMatcher("a favourite chip") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("shopping_favourite_") == true },
+    ).fetchSemanticsNodes().size
+
+    /** Fails unless the rule is 6 dp from the last suggestion and 6 dp from the first favourite. */
+    @Test
+    fun theRuleIsSixDpFromEachSide() {
+        showTab(stateOf(listOf(milk)), typed = "b", suggestions = listOf(butter), favourites = listOf(eggs))
+        val before = compose.onNodeWithTag("shopping_suggest_butter").getUnclippedBoundsInRoot()
+        val rule = compose.onNodeWithTag("shopping_chip_rule").getUnclippedBoundsInRoot()
+        val after = compose.onNodeWithTag("shopping_favourite_eggs").getUnclippedBoundsInRoot()
+        assertThat((rule.left - before.right).value).isWithin(0.5f).of(6f)
+        assertThat((after.left - rule.right).value).isWithin(0.5f).of(6f)
+    }
+
+    /** Fails if a long chip label wraps to a second line. */
+    @Test
+    fun aLongChipLabelIsOneLine() {
+        val long = Learned("w", "W".repeat(100), 1, 0)
+        showTab(stateOf(listOf(milk)), typed = "w", suggestions = listOf(long))
+        val bounds = compose.onNodeWithTag("shopping_suggest_w").getUnclippedBoundsInRoot()
+        assertThat(bounds.height.value).isWithin(1f).of(48f)
+        assertThat(textLayout("shopping_suggest_w").lineCount).isEqualTo(1)
+        assertThat(bounds.width.value).isAtMost(TAB_WIDTH.value)
     }
 
     @Test
@@ -428,6 +511,8 @@ private class UiRig {
     init {
         runBlocking { store.connect(Connection("c1", SAMPLE_DESCRIPTOR.id, "the sample list", emptyMap())) }
     }
+
+    fun queuedKeys(): List<String> = runBlocking { store.queueNow() }.filter { it.kind == QueuedKind.ADD.name }.map { it.clientKey }
 
     fun queuedAdds(): List<String> = runBlocking { store.queueNow() }.filter { it.kind == QueuedKind.ADD.name }.map { it.text }
 

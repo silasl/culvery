@@ -156,7 +156,7 @@ object ControlType {
  * explain why: TalkBack hears "not available" and "double-tap to find out why". A [locked] chip (9 §4.8) says the same
  * but isn't faded: the `lock` icon first, no fill, a `surf3` edge and a `mute` label, or selected, filled as chosen.
  * [labelStyle] can ask for tabular figures; a chip stretched wider than its contents centres them. [onLongClick] adds a
- * long press, offered to TalkBack as the action [longClickLabel].
+ * long press, offered to TalkBack as the action [longClickLabel]. [maxLines] is how many lines a long label takes before …
  */
 @Composable
 fun HhChoiceChip(
@@ -180,6 +180,7 @@ fun HhChoiceChip(
     labelStyle: TextStyle = ControlType.chip,
     onLongClick: (() -> Unit)? = null,
     longClickLabel: String? = null,
+    maxLines: Int = 2,
     modifier: Modifier = Modifier,
 ) {
     val c = Culvery.colors
@@ -215,7 +216,7 @@ fun HhChoiceChip(
     ) {
         if (locked) HhIcon(Icons.LOCK, size = ControlTokens.chipIcon, tint = ink, modifier = Modifier.testTag("${tag}_lock"))
         leading?.invoke(ink)
-        Text(label, style = labelStyle, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        Text(label, style = labelStyle, color = ink, maxLines = maxLines, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         if (secondary != null) {
             Text(secondary, style = ControlType.chipSecondary, color = ink, maxLines = 1)
         }
