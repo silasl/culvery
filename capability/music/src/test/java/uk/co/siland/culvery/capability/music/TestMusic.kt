@@ -93,6 +93,7 @@ internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : Music
     /** What playingNow() answers; null answers the playing ones of [groups]. */
     var playingNowAnswer: List<SpeakerGroup>? = null
     var favouriteList: List<Favourite> = emptyList()
+    var playlistList: List<Favourite> = emptyList()
 
     private suspend fun record(call: String) {
         calls += call
@@ -132,6 +133,11 @@ internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : Music
     override suspend fun favourites(): List<Favourite> {
         record("favourites")
         return favouriteList
+    }
+
+    override suspend fun playlists(): List<Favourite> {
+        record("playlists")
+        return playlistList
     }
 
     override suspend fun playFavourite(group: SpeakerGroup, favourite: Favourite) = record("playFavourite ${group.id} ${favourite.id}")

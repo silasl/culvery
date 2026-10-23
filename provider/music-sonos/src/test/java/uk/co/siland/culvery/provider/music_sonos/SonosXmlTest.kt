@@ -116,6 +116,20 @@ class SonosXmlTest {
         assertThat(result.items.first().metadata).contains("<dc:title>Culvery FM</dc:title>")
     }
 
+    /** Sonos playlists (SQ:) come back as containers: id, title, link and the first of their art. */
+    @Test
+    fun playlistContainers() {
+        val result = SonosXml.browse(SonosFixtures.playlists)
+        assertThat(result.total).isEqualTo(3)
+        assertThat(result.items.map { listOf(it.id, it.title, it.uri) }).containsExactly(
+            listOf("SQ:0", "Party mode", "file:///jffs/settings/savedqueues.rsq#0"),
+            listOf("SQ:3", "Sunday & slow", "file:///jffs/settings/savedqueues.rsq#3"),
+            listOf("SQ:5", "Rainy \"day\" <mix>", "file:///jffs/settings/savedqueues.rsq#5"),
+        ).inOrder()
+        assertThat(result.items[0].artUri).isEqualTo("/getaa?u=x-file-cifs%3a%2f%2fnas%2fa&v=1")
+        assertThat(result.items[1].artUri).isNull()
+    }
+
     @Test
     fun theLibraryBrowseCountsItsTracks() {
         assertThat(SonosXml.browse(SonosFixtures.library(total = 23_456)).total).isEqualTo(23_456)

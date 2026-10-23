@@ -78,6 +78,17 @@ class MusicActionsTest {
         assertThat(actions.favourites()).isEqualTo(FavouritesLoad.Failed("Sonos didn’t do that. Try again."))
     }
 
+    @Test
+    fun playlistsLoadWithTheFavouritesAndFailThemTogether() = runTest {
+        val actions = actions()
+        val party = Favourite("SQ:0", "Party mode", null, FavouriteKind.QUEUED)
+        system.favouriteList = listOf(station)
+        system.playlistList = listOf(party)
+        assertThat(actions.favourites()).isEqualTo(FavouritesLoad.Ready(listOf(station), listOf(party)))
+        system.failures["playlists"] = MusicRefusedException()
+        assertThat(actions.favourites()).isEqualTo(FavouritesLoad.Failed("Sonos didn’t do that. Try again."))
+    }
+
     /** 6 §6: "Sonos couldn’t play this here." and the sheet stays; null closes it. */
     @Test
     fun aFavouriteThatCanNotPlayHereSaysSo() = runTest {

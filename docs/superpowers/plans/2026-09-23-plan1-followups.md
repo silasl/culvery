@@ -583,6 +583,10 @@ Fault found:
   - the Repeats rows a few dp taller, taking the radio row's sizes.
 
 ## To check when the tablet is next plugged in
+- **Sonos (branch fixes-sonos-shortcuts-hidden-titles, 2026-10-23):**
+  - "Discover Sonos Radio" and "Trending Now" are gone from Favourites.
+  - The six Sonos playlists show under Playlists, and one plays in a room. The queue metadata is built to the known shape but has not been checked on a speaker.
+  - A playlist made in the Sonos app appears the next time the sheet opens.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
 - **Home slow to fill (9c walk-through, 2026-10-22):** on the emulator, Home's cards took a moment to fill after opening. Time it on the tablet (cold start and return from the Calendar tab) before deciding whether anything needs fixing. The same walk-through saw it on the Calendar tab after a restart, Settings › Calendars, Home location and People (fault 1); time those too.
 

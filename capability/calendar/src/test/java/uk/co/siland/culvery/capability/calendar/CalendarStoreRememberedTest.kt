@@ -329,6 +329,36 @@ class CalendarStoreRememberedTest {
         assertThat(store.rememberedTitles().single().sourceEventId).isEqualTo("a")
     }
 
+    @Test
+    fun aCalendarHiddenHandsItsTitlesToAVisibleCalendarThatHasThem() = runTest {
+        connect(sourceIds = listOf("s1", "s2"))
+        sync("s1", full(timed("a", "Swim", sept(10))))
+        sync("s2", full(timed("b", "Swim", sept(21))))
+        store.setMapping("c1", "s2", PersonId.FAMILY, visible = false, today, zone)
+        assertThat(store.rememberedTitles().map { it.sourceId to it.sourceEventId }).containsExactly("s1" to "a")
+    }
+
+    @Test
+    fun aTitleOnlyTheHiddenCalendarHadWaitsForItToBeShownAgain() = runTest {
+        connect(sourceIds = listOf("s1", "s2"))
+        sync("s1", full(timed("a", "Swim", sept(10))))
+        sync("s2", full(timed("b", "Surprise party", sept(21))))
+        store.setMapping("c1", "s2", PersonId.FAMILY, visible = false, today, zone)
+        assertThat(store.rememberedTitles().map { it.title }).containsExactly("Swim")
+        assertThat(keys()).contains(titleKey("Surprise party"))
+    }
+
+    @Test
+    fun aCalendarUntickedInTheServiceHandsItsTitlesOn() = runTest {
+        connect(sourceIds = listOf("s1", "s2"))
+        sync("s1", full(timed("a", "Swim", sept(10))))
+        sync("s2", full(timed("b", "Swim", sept(21))))
+        val s1 = CalendarSource("s1", "S1", writable = false, primary = true)
+        store.refreshSources("c1", listOf(s1, CalendarSource("s2", "S2", writable = false, shown = true)), 5_000L, zone) { SourceMapping.Default }
+        store.refreshSources("c1", listOf(s1, CalendarSource("s2", "S2", writable = false, shown = false)), 6_000L, zone) { SourceMapping.Default }
+        assertThat(store.rememberedTitles().map { it.sourceId to it.sourceEventId }).containsExactly("s1" to "a")
+    }
+
     // age
 
     @Test

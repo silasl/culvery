@@ -122,6 +122,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
                 }
                 dao.updateSource(connectionId, s.id, s.name, s.writable, visible, tick)
                 if (visible && !existing.visible) rememberSource(connectionId, s.id, today, zone)
+                if (!visible && existing.visible) handOnTitles(connectionId, s.id, today, zone)
                 if (existing.isMaster && !s.writable) {
                     dao.clearMaster()
                     masterCleared = true
@@ -173,6 +174,7 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
         require(visible || !row.isMaster) { "The master calendar is always shown" }
         dao.setMapping(connectionId, sourceId, person.value, visible)
         if (visible && !row.visible) rememberSource(connectionId, sourceId, today, zone)
+        if (!visible && row.visible) handOnTitles(connectionId, sourceId, today, zone)
         // A hidden calendar isn't read, so its problem has no news (4c ruling 12).
         if (!visible) dao.clearReadProblem(connectionId, sourceId)
     }
@@ -341,6 +343,18 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
     /** A calendar that has become visible: its stored events are remembered, as they were not while it was hidden. */
     private suspend fun rememberSource(connectionId: String, sourceId: String, today: LocalDate, zone: ZoneId) =
         remember(connectionId, rememberedFrom(dao.eventRowsOfSource(connectionId, sourceId), zone, today), today)
+
+    /**
+     * A calendar just hidden: each title it supplied that a visible calendar's event also has is remembered from that
+     * event. The rest stay, not offered, until the calendar is shown again.
+     */
+    private suspend fun handOnTitles(connectionId: String, sourceId: String, today: LocalDate, zone: ZoneId) {
+        val titles = dao.rememberedOfSource(connectionId, sourceId).map { it.title }.distinct()
+        if (titles.isEmpty()) return
+        val keys = titles.mapTo(HashSet(), ::titleKey)
+        val others = titles.chunked(REMOVE_CHUNK).flatMap { dao.visibleEventRowsTitled(connectionId, it) }
+        remember(connectionId, rememberedFrom(others, zone, today).filter { it.titleKey in keys }, today)
+    }
 
     /**
      * Merges titles [read] from [connectionId]'s visible calendars into its rows; a row of a hidden calendar gives way to

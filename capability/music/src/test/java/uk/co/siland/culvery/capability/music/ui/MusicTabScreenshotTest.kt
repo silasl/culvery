@@ -54,7 +54,7 @@ class MusicTabScreenshotTest {
     @Test
     fun tabStatusDark() = tab("music_tab_status_dark", true, status = "Culvery can’t reach Sonos. Check the speakers are on and the tablet is on the home Wi-Fi.")
 
-    private fun sheet(name: String, load: FavouritesLoad) = snap(name, true) {
+    private fun sheet(name: String, load: FavouritesLoad, dark: Boolean = true) = snap(name, dark) {
         Box(Modifier.size(1_116.dp, 700.dp), contentAlignment = Alignment.CenterEnd) { FavouritesSheet("Kitchen", load, null, {}, {}) }
     }
 
@@ -69,6 +69,21 @@ class MusicTabScreenshotTest {
             ),
         ),
     )
+
+    private val withPlaylists = FavouritesLoad.Ready(
+        listOf(
+            Favourite("FV:2/1", "Culvery FM", "art", FavouriteKind.STREAM),
+            Favourite("FV:2/2", "Sunday morning", "art", FavouriteKind.QUEUED),
+        ),
+        listOf(
+            Favourite("SQ:0", "Party mode", "art", FavouriteKind.QUEUED),
+            Favourite("SQ:5", "Rainy day", null, FavouriteKind.QUEUED),
+        ),
+    )
+
+    @Test fun sheetWithPlaylistsDark() = sheet("favourites_sheet_playlists_dark", withPlaylists)
+
+    @Test fun sheetWithPlaylistsLight() = sheet("favourites_sheet_playlists_light", withPlaylists, dark = false)
 
     @Test fun sheetEmptyDark() = sheet("favourites_sheet_empty_dark", FavouritesLoad.Ready(emptyList()))
 }
