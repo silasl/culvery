@@ -504,7 +504,8 @@ internal class UiRig {
     val learning = ShoppingLearning(store, clock)
     val lock = ShoppingLock()
     val checks = ShoppingChecks(flowOf(false), MutableStateFlow(false), {}, scope)
-    val actions = ShoppingActions(store, learning, lock, ShoppingDrainLoop({ null }, { clock.nowMillis() }, scope), checks, ToastLog(), clock, scope)
+    val toasts = ToastLog()
+    val actions = ShoppingActions(store, learning, lock, ShoppingDrainLoop({ null }, { clock.nowMillis() }, scope), checks, toasts, clock, scope)
     val view = ShoppingView(store, actions, setOf(provider), scope)
     val focus = ShoppingFocus()
 

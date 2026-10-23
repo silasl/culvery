@@ -18,6 +18,9 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -28,6 +31,7 @@ import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -176,7 +180,28 @@ class ShoppingCardTest {
         show(stateOf(emptyList()))
         compose.onNodeWithText("Nothing on the list").assertIsDisplayed()
         compose.onNodeWithTag("shopping_card_add").assertIsDisplayed()
+        compose.onNodeWithTag("shopping_card_count", useUnmergedTree = true).assertDoesNotExist()
         compose.assertFitsTheCard()
+    }
+
+    /** Fails if a card with no room for a row, and a problem, throws. */
+    @Test
+    fun aCardWithNoRoomForRowsDoesNotCrash() {
+        show(stateOf(items(3), problem = PERMISSION_LINE, health = ShoppingHealth.NEEDS_PERMISSION), DpSize(701.dp, 100.dp))
+        compose.onNodeWithTag("shopping_card_add").assertIsDisplayed()
+    }
+
+    /** Pin: a tick through the host shows the Undo toast. */
+    @Test
+    fun aTickOnHomeOffersUndo() {
+        val rig = rig()
+        runBlocking { rig.actions.add("Milk") }
+        setCard(CARD_WIDE) { ShoppingCardHost(rig.view, rig.actions, rig.checks, rig.focus) }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Milk")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Milk").performClick()
+        compose.waitUntil(5_000) { rig.toasts.messages.isNotEmpty() }
+        assertThat(rig.toasts.messages).containsExactly("Ticked Milk")
+        assertThat(rig.toasts.actions.single()?.label).isEqualTo("Undo")
     }
 
     /** Fails if a problem's line isn't shown under the items. */
@@ -246,8 +271,8 @@ class ShoppingCardTest {
         assertThat(overlay.shown).isEqualTo(0)
     }
 
-    private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTagExists(tag: String) =
-        onAllNodes(androidx.compose.ui.test.hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty()
+    private fun ComposeContentTestRule.onAllNodesWithTagExists(tag: String) =
+        onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty()
 }
 
 class CardSlotsTest {

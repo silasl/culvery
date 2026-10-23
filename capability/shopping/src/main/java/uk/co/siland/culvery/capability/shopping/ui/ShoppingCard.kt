@@ -97,10 +97,12 @@ private fun CardHeader(open: Int, onOpen: () -> Unit, onAdd: () -> Unit) {
                 SHOPPING, style = HhType.cardTitle.copy(fontSize = ShoppingDimens.cardTitle), color = c.ink,
                 modifier = Modifier.semantics { heading() },
             )
-            Text(
-                plural(open.toLong(), "item"), style = HhType.secondary.copy(fontSize = ShoppingDimens.cardCount), color = c.mute,
-                modifier = Modifier.testTag("shopping_card_count"),
-            )
+            if (open > 0) {
+                Text(
+                    plural(open.toLong(), "item"), style = HhType.secondary.copy(fontSize = ShoppingDimens.cardCount), color = c.mute,
+                    modifier = Modifier.testTag("shopping_card_count"),
+                )
+            }
         }
         HhRoundButton(Icons.ADD, ADD_LABEL, onAdd, Modifier.testTag("shopping_card_add"), on = ButtonSurface.Surf)
     }
@@ -110,7 +112,7 @@ private fun CardHeader(open: Int, onOpen: () -> Unit, onAdd: () -> Unit) {
 private fun CardBody(state: ShoppingState, rows: Int, onTick: (ShownItem) -> Unit, onOpen: () -> Unit) {
     val c = Culvery.colors
     val problem = state.problem
-    val gridRows = rows - if (problem != null) 1 else 0
+    val gridRows = (rows - if (problem != null) 1 else 0).coerceAtLeast(0)
     val (shown, more) = cardSlots(state.items.size, gridRows)
     Column {
         if (state.items.isEmpty()) {
