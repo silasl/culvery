@@ -9,9 +9,12 @@ import kotlinx.coroutines.flow.map
 import org.json.JSONObject
 import uk.co.siland.culvery.capability.shopping.db.ConnectionEntity
 import uk.co.siland.culvery.capability.shopping.db.ItemEntity
+import uk.co.siland.culvery.capability.shopping.db.LearnedEntity
+import uk.co.siland.culvery.capability.shopping.db.SeenEntity
 import uk.co.siland.culvery.capability.shopping.db.QueuedEntity
 import uk.co.siland.culvery.capability.shopping.db.ShoppingDatabase
 import uk.co.siland.culvery.core.plugin.Connection
+import uk.co.siland.culvery.core.plugin.textKey
 
 /** The stored connection with how it stands and what has been read. */
 data class StoredShopping(
@@ -114,6 +117,56 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
     suspend fun failed(seq: Long, nextAtMillis: Long) = dao.markFailed(seq, nextAtMillis)
 
     suspend fun drop(seq: Long) = dao.deleteQueued(seq)
+
+    val learned: Flow<List<Learned>> = dao.learned().map { rows -> rows.map { Learned(it.key, it.text, it.count, it.lastMillis) } }
+
+    /** One use of [text] at [atMillis]: counts unless that key was counted in the 24 h before (10 §4.7). */
+    suspend fun learnUse(text: String, atMillis: Long) = db.withTransaction { use(text, atMillis) }
+
+    /** Counts each item whose id was never seen, dated by its own change so a year of history counts per day. */
+    suspend fun learnSeen(items: List<ShoppingItem>, nowMillis: Long) = db.withTransaction {
+        for (item in items.sortedBy { it.changedAt }) {
+            if (dao.insertSeenIfNew(SeenEntity(item.id, nowMillis)) != -1L) use(item.text, item.changedAt.toEpochMilli())
+        }
+    }
+
+    suspend fun markSeen(id: String, atMillis: Long) {
+        dao.insertSeenIfNew(SeenEntity(id, atMillis))
+    }
+
+    /** Moves the date of a key already learned; an unknown key stays unknown. */
+    suspend fun touchLearned(text: String, atMillis: Long) = dao.touchLearned(textKey(text), atMillis)
+
+    suspend fun forgetLearned(key: String) = dao.deleteLearned(key)
+
+    /** Every learned row goes; `seen` stays, so what is open is not counted again. */
+    suspend fun clearLearned() = dao.deleteAllLearned()
+
+    suspend fun pruneUnusedBefore(cutoffMillis: Long) = db.withTransaction {
+        dao.pruneLearned(cutoffMillis)
+        dao.pruneSeen(cutoffMillis)
+    }
+
+    private suspend fun use(text: String, atMillis: Long) {
+        val key = textKey(text)
+        if (key.isEmpty()) return
+        val shown = text.trim()
+        val old = dao.learnedRow(key)
+        val row = if (old == null) {
+            LearnedEntity(key, shown, 1, atMillis, atMillis)
+        } else {
+            val counts = atMillis - old.countedMillis >= COUNT_ONCE_PER_MS
+            LearnedEntity(
+                key = key,
+                text = betterText(old.text, shown),
+                count = if (counts) old.count + 1 else old.count,
+                lastMillis = maxOf(old.lastMillis, atMillis),
+                countedMillis = if (counts) atMillis else old.countedMillis,
+            )
+        }
+        dao.upsertLearned(row)
+        dao.trimLearned(LEARNED_MAX)
+    }
 }
 
 private fun ConnectionEntity.toStored() = StoredShopping(

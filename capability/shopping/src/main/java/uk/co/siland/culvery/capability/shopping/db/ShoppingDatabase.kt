@@ -145,6 +145,38 @@ interface ShoppingDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertLearned(row: LearnedEntity)
 
+    @Query("SELECT * FROM shopping_learned")
+    fun learned(): Flow<List<LearnedEntity>>
+
+    @Query("SELECT * FROM shopping_learned WHERE `key` = :key")
+    suspend fun learnedRow(key: String): LearnedEntity?
+
+    @Query("UPDATE shopping_learned SET lastMillis = MAX(lastMillis, :atMillis) WHERE `key` = :key")
+    suspend fun touchLearned(key: String, atMillis: Long)
+
+    @Query("DELETE FROM shopping_learned WHERE `key` = :key")
+    suspend fun deleteLearned(key: String)
+
+    @Query("DELETE FROM shopping_learned")
+    suspend fun deleteAllLearned()
+
+    /** Keeps the [max] best rows: highest count, then latest use, then key. */
+    @Query(
+        "DELETE FROM shopping_learned WHERE `key` NOT IN " +
+            "(SELECT `key` FROM shopping_learned ORDER BY `count` DESC, lastMillis DESC, `key` ASC LIMIT :max)",
+    )
+    suspend fun trimLearned(max: Int)
+
+    @Query("DELETE FROM shopping_learned WHERE lastMillis < :cutoffMillis")
+    suspend fun pruneLearned(cutoffMillis: Long)
+
+    @Query("DELETE FROM shopping_seen WHERE atMillis < :cutoffMillis")
+    suspend fun pruneSeen(cutoffMillis: Long)
+
+    /** Returns -1 when the id was already seen. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertSeenIfNew(row: SeenEntity): Long
+
     @Query("SELECT * FROM shopping_seen")
     suspend fun allSeen(): List<SeenEntity>
 
