@@ -8,7 +8,7 @@ import org.junit.Test
 class ShoppingViewTest {
     private fun item(id: String, text: String) = ShoppingItem(id, text, Instant.EPOCH)
 
-    private fun milkTicked(index: Int = 0) = Ticked("g1", "g1", "t1", "Milk", index, 0)
+    private fun milkTicked(index: Int = 0) = Ticked("g1", "t1", "Milk", index)
 
     @Test
     fun queuedAddsShowFirstNewestFirst() {
@@ -56,7 +56,7 @@ class ShoppingViewTest {
     fun aTickedQueuedAddIsHiddenUnlessUndoable() {
         val queue = listOf(queued(1, QueuedKind.ADD, "k1", "Milk"), queued(2, QueuedKind.TICK, "k1", "Milk"))
         assertThat(shown(emptyList(), queue, null)).isEmpty()
-        val undoable = Ticked("q:k1", null, "k1", "Milk", 0, 0)
+        val undoable = Ticked(null, "k1", "Milk", 0)
         assertThat(shown(emptyList(), queue, undoable).single().ticked).isTrue()
     }
 
@@ -98,6 +98,6 @@ class ShoppingViewTest {
     @Test
     fun noTextInAToString() {
         assertThat(ShownItem("g1", "Bin bags", ticked = false, queued = false).toString()).doesNotContain("Bin bags")
-        assertThat(Ticked("g1", "g1", "t1", "Bin bags", 0, 0).toString()).doesNotContain("Bin bags")
+        assertThat(Ticked("g1", "t1", "Bin bags", 0).toString()).doesNotContain("Bin bags")
     }
 }

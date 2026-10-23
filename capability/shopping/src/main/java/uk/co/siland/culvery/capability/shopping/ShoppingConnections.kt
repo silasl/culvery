@@ -70,7 +70,7 @@ class ShoppingConnections @Inject constructor(
     suspend fun remakeList(): Boolean {
         if (!mayConnect()) return false
         val stored = store.connectionNow() ?: return false
-        val provider = providers.firstOrNull { it.descriptor.id == stored.connection.providerId } ?: return false
+        val provider = providers.forConnection(stored.connection) ?: return false
         return try {
             replace(provider.remakeList(stored.connection))
             true
@@ -105,7 +105,7 @@ class ShoppingConnections @Inject constructor(
     suspend fun stop(): Boolean {
         if (!mayConnect()) return false
         val service = store.connectionNow()?.let { stored ->
-            providers.firstOrNull { it.descriptor.id == stored.connection.providerId }?.descriptor?.displayName ?: stored.connection.label
+            providers.forConnection(stored.connection)?.descriptor?.displayName ?: stored.connection.label
         }
         lock.withLock { store.stop() }
         if (service != null) toaster.show("Stopped using $service.")

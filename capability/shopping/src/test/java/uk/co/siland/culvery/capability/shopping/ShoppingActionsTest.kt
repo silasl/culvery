@@ -233,7 +233,7 @@ class ShoppingActionsTest : ShoppingTestBase() {
         actions.tick(ShownItem("g2", "Bread", ticked = false, queued = false))
         assertThat(actions.undoable.value!!.text).isEqualTo("Bread")
         val first = rig.store.queueNow().first()
-        actions.undo(Ticked("g1", "g1", first.clientKey, "Milk", 0, 0))
+        actions.undo(Ticked("g1", first.clientKey, "Milk", 0))
         assertThat(rig.store.queueNow()).hasSize(2)
         advanceTimeBy(TOAST_WITH_ACTION_MS - 1)
         assertThat(actions.undoable.value!!.text).isEqualTo("Bread")

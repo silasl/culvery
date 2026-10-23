@@ -11,8 +11,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.TOAST_WITH_ACTION_MS
 import uk.co.siland.culvery.core.plugin.ToastAction
@@ -65,35 +63,32 @@ class ShoppingActions @Inject constructor(
     private val clock: WallClock,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
-    private val adding = Mutex()
     private val recentAdds = ArrayDeque<Long>()
 
-    private val _undoable = MutableStateFlow<Ticked?>(null)
+    private val latestTick = Expiring<Ticked>(scope, TOAST_WITH_ACTION_MS)
 
     /** The latest tick while Undo can still take it back. */
-    internal val undoable: StateFlow<Ticked?> = _undoable.asStateFlow()
-    private var undoClear: Job? = null
+    internal val undoable: StateFlow<Ticked?> = latestTick.value
 
-    private val _flashing = MutableStateFlow<String?>(null)
+    private val matched = Expiring<String>(scope, FLASH_MS)
 
     /** The row key an add just matched, for [FLASH_MS]. */
-    internal val flashing: StateFlow<String?> = _flashing.asStateFlow()
-    private var flashClear: Job? = null
+    internal val flashing: StateFlow<String?> = matched.value
 
     /**
      * Queues [text] unless it is empty, already on the list, too fast, or the queue is full. One at a time, and the queue
      * is read under the lock, so two taps at once queue one add.
      */
-    suspend fun add(text: String): AddResult = adding.withLock { lock.withLock { addLocked(text) } }
+    suspend fun add(text: String): AddResult = lock.withLock { addLocked(text) }
 
     private suspend fun addLocked(text: String): AddResult {
         val cleaned = text.trim().take(ADD_MAX_CHARS).trimEnd()
         if (cleaned.isEmpty()) return AddResult.Empty
         val key = textKey(cleaned)
         val queue = store.queueNow()
-        val rows = shown(store.itemsNow(), queue, _undoable.value)
+        val rows = shown(store.itemsNow(), queue, undoable.value)
         rows.firstOrNull { !it.ticked && textKey(it.text) == key }?.let { there ->
-            flash(there.key)
+            matched.set(there.key)
             checks.askNow()
             return AddResult.AlreadyThere(there.key)
         }
@@ -104,10 +99,12 @@ class ShoppingActions @Inject constructor(
 
         // This add must never be matched to an item the house just ticked off (10 §4.6).
         val ticking = queue.filter { it.kind == QueuedKind.TICK.name && textKey(it.text) == key }.mapNotNull { it.itemId }
-        val undoing = _undoable.value?.takeIf { textKey(it.text) == key }?.let { it.itemId ?: store.idOfSentAdd(it.clientKey) }
-        store.enqueue(QueuedKind.ADD, newShoppingKey(), null, cleaned, now, joinIds((ticking + listOfNotNull(undoing)).toSet()))
+        val undoing = undoable.value?.takeIf { textKey(it.text) == key }?.let { it.itemId ?: store.idOfSentAdd(it.clientKey) }
+        store.inTransaction {
+            store.enqueue(QueuedKind.ADD, newShoppingKey(), null, cleaned, now, joinIds((ticking + listOfNotNull(undoing)).toSet()))
+            learning.added(cleaned)
+        }
         recentAdds.addLast(now)
-        learning.added(cleaned)
         loop.wake()
         return AddResult.Added
     }
@@ -120,31 +117,27 @@ class ShoppingActions @Inject constructor(
 
     private suspend fun tickLocked(row: ShownItem): Ticked? {
         val queue = store.queueNow()
-        val rows = shown(store.itemsNow(), queue, _undoable.value)
+        val rows = shown(store.itemsNow(), queue, undoable.value)
         val index = rows.indexOfFirst { it.key == row.key }
         // The list moved under the tap, or the row is already ticked.
         if (index < 0 || rows[index].ticked) return null
         val queuedAdd = row.key.startsWith(QUEUED_KEY_PREFIX)
         val clientKey = if (queuedAdd) row.key.removePrefix(QUEUED_KEY_PREFIX) else newShoppingKey()
         val itemId = if (queuedAdd) null else row.key
-        val now = clock.nowMillis()
-        store.enqueue(QueuedKind.TICK, clientKey, itemId, row.text, now)
-        learning.ticked(row.text)
-        val latest = Ticked(row.key, itemId, clientKey, row.text, index, now)
-        _undoable.value = latest
-        undoClear?.cancel()
-        undoClear = scope.launch {
-            delay(TOAST_WITH_ACTION_MS)
-            _undoable.update { if (it === latest) null else it }
+        store.inTransaction {
+            store.enqueue(QueuedKind.TICK, clientKey, itemId, row.text, clock.nowMillis())
+            learning.ticked(row.text)
         }
+        val latest = Ticked(itemId, clientKey, row.text, index)
+        latestTick.set(latest)
         loop.wake()
         return latest
     }
 
     /** Takes back [latest]: its tick is dropped if still queued, else an untick is queued. Only the latest tick can be taken back. */
     internal suspend fun undo(latest: Ticked) = lock.withLock {
-        if (_undoable.value != latest) return@withLock
-        _undoable.value = null
+        if (undoable.value != latest) return@withLock
+        latestTick.clear()
         val queue = store.queueNow()
         val queued = queue.firstOrNull { it.kind == QueuedKind.TICK.name && it.clientKey == latest.clientKey }
         // A tick on a queued add had no id until the add was sent.
@@ -160,13 +153,24 @@ class ShoppingActions @Inject constructor(
             loop.wake()
         }
     }
+}
 
-    private fun flash(key: String) {
-        _flashing.value = key
-        flashClear?.cancel()
-        flashClear = scope.launch {
-            delay(FLASH_MS)
-            _flashing.update { if (it == key) null else it }
+/** A value that goes back to null [lifeMillis] after it was set, unless it is set again first. */
+private class Expiring<T : Any>(private val scope: CoroutineScope, private val lifeMillis: Long) {
+    private val held = MutableStateFlow<T?>(null)
+    val value: StateFlow<T?> = held.asStateFlow()
+    private var expiry: Job? = null
+
+    fun set(value: T) {
+        held.value = value
+        expiry?.cancel()
+        expiry = scope.launch {
+            delay(lifeMillis)
+            held.update { if (it == value) null else it }
         }
+    }
+
+    fun clear() {
+        held.value = null
     }
 }

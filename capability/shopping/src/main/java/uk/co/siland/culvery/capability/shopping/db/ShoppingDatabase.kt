@@ -113,6 +113,16 @@ interface ShoppingDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertItems(rows: List<ItemEntity>)
 
+    @Query("DELETE FROM shopping_item WHERE id = :id")
+    suspend fun deleteItem(id: String)
+
+    /** Above every other row; nothing when [id] is already there. */
+    @Query(
+        "INSERT OR IGNORE INTO shopping_item (id, text, position, changedAtMillis) " +
+            "SELECT :id, :text, COALESCE(MIN(position), 0) - 1, :changedAtMillis FROM shopping_item",
+    )
+    suspend fun insertItemOnTop(id: String, text: String, changedAtMillis: Long)
+
     @Query("SELECT * FROM shopping_queue ORDER BY seq")
     fun queue(): Flow<List<QueuedEntity>>
 

@@ -19,16 +19,15 @@ data class ShownItem(val key: String, val text: String, val ticked: Boolean, val
     override fun toString() = "ShownItem(key=$key, ticked=$ticked, queued=$queued)"
 }
 
-/** The latest tick, which Undo can take back for [TOAST_WITH_ACTION_MS][uk.co.siland.culvery.core.plugin.TOAST_WITH_ACTION_MS]. */
-internal data class Ticked(
-    val key: String,
-    val itemId: String?,
-    val clientKey: String,
-    val text: String,
-    val index: Int,
-    val atMillis: Long,
-) {
-    override fun toString() = "Ticked(key=$key, itemId=$itemId, index=$index, atMillis=$atMillis)"
+/**
+ * The latest tick, which Undo can take back for [TOAST_WITH_ACTION_MS][uk.co.siland.culvery.core.plugin.TOAST_WITH_ACTION_MS].
+ * [itemId] is null when the row was a queued add; [index] is where the row was.
+ */
+internal data class Ticked(val itemId: String?, val clientKey: String, val text: String, val index: Int) {
+    /** The ticked row's [ShownItem.key]. */
+    val key: String get() = itemId ?: (QUEUED_KEY_PREFIX + clientKey)
+
+    override fun toString() = "Ticked(key=$key, itemId=$itemId, index=$index)"
 }
 
 /** What the screens show. [open] counts the rows not ticked; [problem] is the health's line or the queue-full line. */
@@ -96,7 +95,7 @@ class ShoppingView @Inject constructor(
         actions.flashing,
     ) { stored, read, queue, undoable, flashing ->
         if (stored == null) return@combine null
-        val provider = providers.firstOrNull { it.descriptor.id == stored.connection.providerId }
+        val provider = providers.forConnection(stored.connection)
         val rows = shown(read, queue, undoable)
         val full = queue.size >= QUEUE_MAX && stored.health in UNFIXED_HEALTHS
         ShoppingState(

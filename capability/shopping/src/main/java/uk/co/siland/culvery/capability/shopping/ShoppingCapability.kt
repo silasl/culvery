@@ -42,7 +42,7 @@ class ShoppingCapability @Inject constructor(
 
     /** A stored connection whose provider is bound; one whose provider is gone from the build has nothing to show. */
     override val hasTab: Flow<Boolean> = store.connection
-        .map { stored -> stored != null && providers.any { it.descriptor.id == stored.connection.providerId } }
+        .map { stored -> stored != null && providers.forConnection(stored.connection) != null }
         .distinctUntilChanged()
 
     private val pages: List<SettingsPage> = if (providers.isEmpty()) {

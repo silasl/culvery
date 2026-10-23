@@ -81,3 +81,7 @@ interface ShoppingProvider {
 
     suspend fun history(conn: Connection, since: Instant): List<ShoppingItem>
 }
+
+/** The bound provider [connection] was made with; null when it is gone from the build. */
+internal fun Iterable<ShoppingProvider>.forConnection(connection: Connection): ShoppingProvider? =
+    firstOrNull { it.descriptor.id == connection.providerId }

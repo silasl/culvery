@@ -86,6 +86,12 @@ class ShoppingStore @Inject constructor(private val db: ShoppingDatabase) {
         dao.setRead(health.name, atMillis)
     }
 
+    /** A sent tick's item leaves the last read. */
+    suspend fun dropFromRead(id: String) = dao.deleteItem(id)
+
+    /** A sent add's or untick's item goes on top of the last read, unless it is there. */
+    suspend fun putOnTopOfRead(item: ShoppingItem) = dao.insertItemOnTop(item.id, item.text, item.changedAt.toEpochMilli())
+
     suspend fun setHealth(health: ShoppingHealth) = dao.setHealth(health.name)
 
     suspend fun setHistoryRead(atMillis: Long) = dao.setHistoryRead(atMillis)

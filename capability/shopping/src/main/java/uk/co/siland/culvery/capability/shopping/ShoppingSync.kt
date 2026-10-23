@@ -8,8 +8,8 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.capability.shopping.db.QueuedEntity
@@ -57,8 +57,7 @@ private fun QueuedKind.step() = when (this) {
  * One run through the queue. [open] is the match set an add looks in: the list as read at the pass's start, then
  * what the pass itself adds and ticks. [ticked] are the ids this pass ticked; no add may match one.
  */
-private class Pass {
-    var connectionId: String? = null
+private class Pass(val connectionId: String) {
     var open: MutableList<ShoppingItem>? = null
     var historyFrom: Long? = null
     val ticked = mutableSetOf<String>()
@@ -94,7 +93,7 @@ class ShoppingSync @Inject constructor(
      * empty, else when its head is next due.
      */
     suspend fun drain(): Long? = passes.withLock {
-        val pass = Pass()
+        val pass = Pass(store.connectionNow()?.connection?.id ?: return@withLock null)
         var drained: Drained
         do {
             drained = lock.withLock { drainLocked(pass) }
@@ -108,15 +107,12 @@ class ShoppingSync @Inject constructor(
         lock.withLock { readLocked() }
     }
 
-    private fun providerOf(stored: StoredShopping) = providers.firstOrNull { it.descriptor.id == stored.connection.providerId }
-
     /** Deals with the head of the queue if it is due. The lock is held. */
     private suspend fun drainLocked(pass: Pass): Drained {
         val stored = store.connectionNow() ?: return Drained.Done(null)
         val conn = stored.connection
-        if (pass.connectionId == null) pass.connectionId = conn.id
         if (conn.id != pass.connectionId) return Drained.Done(null)
-        val provider = providerOf(stored) ?: return Drained.Done(null)
+        val provider = providers.forConnection(conn) ?: return Drained.Done(null)
         val queue = store.queueNow()
         val head = queue.firstOrNull() ?: return Drained.Done(null)
         val now = clock.nowMillis()
@@ -131,28 +127,8 @@ class ShoppingSync @Inject constructor(
             pass.step = kind.step()
             when (kind) {
                 QueuedKind.ADD -> sendAdd(pass, stored, provider, head, queue)
-                QueuedKind.TICK -> {
-                    provider.tick(conn, itemId!!)
-                    withContext(NonCancellable) {
-                        pass.ticked += itemId
-                        pass.open?.removeAll { it.id == itemId }
-                        store.inTransaction {
-                            store.sent(head.seq, null)
-                            store.excludeFromLaterAdds(head.seq, head.text, itemId)
-                            succeeded(stored) { read -> read.filter { it.id != itemId } }
-                        }
-                    }
-                }
-                QueuedKind.UNTICK -> {
-                    provider.untick(conn, itemId!!)
-                    withContext(NonCancellable) {
-                        val back = ShoppingItem(itemId, head.text, Instant.ofEpochMilli(now))
-                        store.inTransaction {
-                            store.sent(head.seq, null)
-                            succeeded(stored) { read -> if (read.any { it.id == itemId }) read else listOf(back) + read }
-                        }
-                    }
-                }
+                QueuedKind.TICK -> sendTick(pass, stored, provider, head, itemId!!)
+                QueuedKind.UNTICK -> sendUntick(pass, stored, provider, head, itemId!!, now)
             }
             return Drained.More
         } catch (e: CancellationException) {
@@ -182,23 +158,51 @@ class ShoppingSync @Inject constructor(
         }
         val key = textKey(head.text)
         val never = splitIds(head.excludeIds) + pass.ticked + queue.mapNotNull { if (it.kind == QueuedKind.TICK.name) it.itemId else null }
-        val item = open.firstOrNull { it.id !in never && textKey(it.text) == key }
-            ?: provider.add(conn, head.text, head.clientKey).also { open += it }
-        withContext(NonCancellable) {
-            store.inTransaction {
-                store.sent(head.seq, item.id)
-                learning.markSeen(item.id)
-                succeeded(stored) { read -> if (read.any { it.id == item.id }) read else listOf(item) + read }
-            }
-        }
+        val item = open.firstOrNull { it.id !in never && textKey(it.text) == key } ?: provider.add(conn, head.text, head.clientKey)
+        applySent(pass, stored, head, back = item)
     }
 
-    /** Health is fine again, and the last read follows the change, so the list doesn't flicker until the next read. */
-    private suspend fun succeeded(stored: StoredShopping, change: (List<ShoppingItem>) -> List<ShoppingItem>) {
-        if (stored.health != ShoppingHealth.OK) store.setHealth(ShoppingHealth.OK)
-        val readAt = stored.lastReadMillis ?: return
-        store.saveRead(change(store.itemsNow()), ShoppingHealth.OK, readAt)
+    private suspend fun sendTick(pass: Pass, stored: StoredShopping, provider: ShoppingProvider, head: QueuedEntity, itemId: String) {
+        provider.tick(stored.connection, itemId)
+        applySent(pass, stored, head, gone = itemId)
     }
+
+    private suspend fun sendUntick(
+        pass: Pass,
+        stored: StoredShopping,
+        provider: ShoppingProvider,
+        head: QueuedEntity,
+        itemId: String,
+        nowMillis: Long,
+    ) {
+        provider.untick(stored.connection, itemId)
+        applySent(pass, stored, head, back = ShoppingItem(itemId, head.text, Instant.ofEpochMilli(nowMillis)))
+    }
+
+    /**
+     * [head] went through: it leaves the queue, health is fine again, and the last read follows it so the list doesn't
+     * flicker until the next read. [gone] (a tick's item) leaves the read and the match set, and no later add may match
+     * it; [back] goes on top of the read unless it is there, and into the match set only when it is an add's.
+     */
+    private suspend fun applySent(pass: Pass, stored: StoredShopping, head: QueuedEntity, gone: String? = null, back: ShoppingItem? = null) =
+        withContext(NonCancellable) {
+            val added = back?.takeIf { head.kind == QueuedKind.ADD.name }
+            if (gone != null) {
+                pass.ticked += gone
+                pass.open?.removeAll { it.id == gone }
+            }
+            if (added != null && pass.open?.none { it.id == added.id } == true) pass.open?.add(added)
+            store.inTransaction {
+                store.sent(head.seq, added?.id)
+                if (gone != null) store.excludeFromLaterAdds(head.seq, head.text, gone)
+                if (added != null) learning.markSeen(added.id)
+                if (stored.health != ShoppingHealth.OK) store.setHealth(ShoppingHealth.OK)
+                if (stored.lastReadMillis != null) {
+                    if (gone != null) store.dropFromRead(gone)
+                    if (back != null) store.putOnTopOfRead(back)
+                }
+            }
+        }
 
     /** A tick or untick whose add is gone from the queue can never be sent; one whose add is queued waits for it. */
     private suspend fun unplaced(head: QueuedEntity, queue: List<QueuedEntity>): Drained {
@@ -206,45 +210,40 @@ class ShoppingSync @Inject constructor(
             store.drop(head.seq)
             return Drained.More
         }
-        val next = clock.nowMillis() + backoffMillis(head.attempts + 1)
-        store.failed(head.seq, next)
-        return Drained.Done(next)
+        return retryLater(head, backoffMillis(head.attempts + 1))
     }
 
     private suspend fun failed(head: QueuedEntity, kind: QueuedKind, e: Exception, what: Step): Drained {
-        val now = clock.nowMillis()
         val own = what == kind.step()
-        when {
-            // A deleted list took its items with it, so a tick or untick for one has nothing left to do (10 §4.5).
-            kind != QueuedKind.ADD && e is ListGoneException -> {
+        // A deleted list took its items with it, so a tick or untick for one has nothing left to do (10 §4.5).
+        if (kind != QueuedKind.ADD && (e is ListGoneException || own && (e is ItemGoneException || e is ShoppingRejectedException))) {
+            if (e is ListGoneException) {
                 Log.w(TAG, "Shopping drain: the ${what.label} is dropped, the list has gone")
-                store.drop(head.seq)
-                store.setHealth(ShoppingHealth.LIST_GONE)
-                return Drained.More
-            }
-            kind != QueuedKind.ADD && own && (e is ItemGoneException || e is ShoppingRejectedException) -> {
+            } else {
                 Log.w(TAG, "Shopping drain: the ${what.label} is dropped, it can't be sent (${e::class.simpleName})")
-                store.drop(head.seq)
-                return Drained.More
             }
-            kind == QueuedKind.ADD && own && e is ShoppingRejectedException -> {
-                Log.w(TAG, "Shopping drain: the ${what.label} waits (${e::class.simpleName})")
-                val next = now + SHOPPING_BACKOFF_MS.last()
-                store.failed(head.seq, next)
-                return Drained.Done(next)
-            }
+            store.drop(head.seq)
+            if (e is ListGoneException) store.setHealth(ShoppingHealth.LIST_GONE)
+            return Drained.More
         }
         Log.w(TAG, "Shopping drain: the ${what.label} waits (${e::class.simpleName})")
-        val next = now + backoffMillis(head.attempts + 1)
-        store.failed(head.seq, next)
+        if (kind == QueuedKind.ADD && own && e is ShoppingRejectedException) return retryLater(head, SHOPPING_BACKOFF_MS.last())
+        val waiting = retryLater(head, backoffMillis(head.attempts + 1))
         store.setHealth(healthOf(e))
+        return waiting
+    }
+
+    /** [head] counts a failure and waits [millis]. */
+    private suspend fun retryLater(head: QueuedEntity, millis: Long): Drained {
+        val next = clock.nowMillis() + millis
+        store.failed(head.seq, next)
         return Drained.Done(next)
     }
 
     /** Reads the list and the items ticked since the last read, learns from them, and keeps the read. The lock is held. */
     private suspend fun readLocked() {
         val stored = store.connectionNow() ?: return
-        val provider = providerOf(stored) ?: return
+        val provider = providers.forConnection(stored.connection) ?: return
         val now = clock.nowMillis()
         val seeding = !stored.seeded
         val since = if (seeding) {
