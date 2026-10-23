@@ -48,8 +48,8 @@ import uk.co.siland.culvery.core.ui.HhRadioRow
 import uk.co.siland.culvery.core.ui.HhStatusLine
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhType
-import uk.co.siland.culvery.core.ui.agoWords
 import uk.co.siland.culvery.core.ui.rememberSingleAction
+import uk.co.siland.culvery.core.ui.updatedLabel
 
 private const val TAG = "ShoppingSettings"
 
@@ -218,8 +218,7 @@ private fun Health(state: SettingsState.On, service: String, nowMillis: Long) {
     if (problem != null) {
         HhStatusLine(problem, "shopping_health")
     } else {
-        val words = state.lastReadMillis?.let { "Updated ${agoWords(it, nowMillis)}" } ?: "Not updated yet"
-        Text(words, style = HhType.body, color = Culvery.colors.mute, modifier = Modifier.testTag("shopping_health"))
+        Text(updatedLabel(state.lastReadMillis, nowMillis), style = HhType.body, color = Culvery.colors.mute, modifier = Modifier.testTag("shopping_health"))
     }
 }
 

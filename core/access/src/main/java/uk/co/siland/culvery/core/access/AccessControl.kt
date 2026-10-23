@@ -47,6 +47,9 @@ sealed interface Refusal {
 fun refusedHere(openToAdults: Boolean): String =
     if (openToAdults) "That PIN can’t do this. Ask a grown-up." else "That PIN can’t do this. Ask an Admin."
 
+/** connections.manage: an Admin's fresh PIN every time. */
+suspend fun AccessControl.mayManageConnections(): Boolean = authorise(CorePermissions.CONNECTIONS_MANAGE) != null
+
 interface AccessControl {
     /** The person currently identified, or null once the session has timed out or been locked. */
     val session: StateFlow<Identified?>

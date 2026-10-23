@@ -13,6 +13,7 @@ import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.agoWords
+import uk.co.siland.culvery.core.ui.updatedLabel
 
 const val ALL_DAY_LABEL = "All day"
 const val STALE_AFTER_MS = 30 * 60_000L
@@ -124,13 +125,6 @@ fun EventUi.badges(): List<Badge> = listOfNotNull(
         else -> null
     },
 )
-
-/** "Updated 5 minutes ago", "Updated from Google Calendar 5 minutes ago", or "Not updated yet" (4d-2 §7.3: full words). */
-fun updatedLabel(lastSyncMillis: Long?, nowMillis: Long, service: String? = null): String {
-    if (lastSyncMillis == null) return "Not updated yet"
-    val ago = agoWords(lastSyncMillis, nowMillis)
-    return if (service == null) "Updated $ago" else "Updated from $service $ago"
-}
 
 fun isStale(lastSyncMillis: Long?, nowMillis: Long): Boolean =
     lastSyncMillis != null && nowMillis - lastSyncMillis > STALE_AFTER_MS

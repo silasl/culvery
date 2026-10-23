@@ -3,14 +3,15 @@ package uk.co.siland.culvery.capability.shopping
 import android.util.Log
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.OUTBOX_BACKOFF_MS
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.attempt
 
 private const val TAG = "ShoppingDrainLoop"
 
@@ -49,12 +50,8 @@ class ShoppingDrainLoop internal constructor(
     }
 
     /** How long until the next drain: null until woken when the queue is empty. */
-    private suspend fun pass(): Long? = try {
-        drain()?.let { (it - nowMillis()).coerceAtLeast(MIN_WAIT_MS) }
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
+    private suspend fun pass(): Long? = attempt({ drain()?.let { (it - nowMillis()).coerceAtLeast(MIN_WAIT_MS) } }) { e ->
         Log.w(TAG, "Shopping drain failed (${e::class.simpleName})")
-        SHOPPING_BACKOFF_MS.first()
+        OUTBOX_BACKOFF_MS.first()
     }
 }

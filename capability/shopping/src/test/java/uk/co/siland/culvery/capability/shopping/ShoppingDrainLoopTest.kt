@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.plugin.OUTBOX_BACKOFF_MS
 import uk.co.siland.culvery.core.plugin.UnreachableException
 
 /** 10 §4.5: the queue is sent on start, when something is queued, and when the head comes due. */
@@ -66,7 +67,7 @@ class ShoppingDrainLoopTest : ShoppingTestBase() {
         val loop = ShoppingDrainLoop({ drains++; error("database locked") }, { 0L }, backgroundScope)
         loop.start()
         runCurrent()
-        advanceTimeBy(SHOPPING_BACKOFF_MS.first())
+        advanceTimeBy(OUTBOX_BACKOFF_MS.first())
         runCurrent()
         assertThat(drains).isEqualTo(2)
     }

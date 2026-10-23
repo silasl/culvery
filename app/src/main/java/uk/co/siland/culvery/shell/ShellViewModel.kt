@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import uk.co.siland.culvery.FrontTracker
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.CorePermissions
+import uk.co.siland.culvery.core.access.mayManageConnections
 import uk.co.siland.culvery.core.household.label
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Daylight
@@ -214,7 +215,7 @@ class ShellViewModel @Inject constructor(
     /** Leaving Culvery unpinned is a way out of the kiosk: a fresh Admin PIN, as Change home app asks; nothing opens without it. */
     override fun openSystemScreen(intents: List<Intent>, missing: String) {
         viewModelScope.launch {
-            access.authorise(CorePermissions.CONNECTIONS_MANAGE) ?: return@launch
+            if (!access.mayManageConnections()) return@launch
             systemScreenEvents.send(SystemScreenRequest(intents, missing))
         }
     }

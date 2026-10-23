@@ -11,3 +11,10 @@ fun agoWords(thenMillis: Long, nowMillis: Long): String {
         else -> plural(hours / 24, "day") + " ago"
     }
 }
+
+/** "Updated 5 minutes ago", "Updated from Google Calendar 5 minutes ago", or "Not updated yet" (4d-2 §7.3: full words). */
+fun updatedLabel(lastMillis: Long?, nowMillis: Long, service: String? = null): String {
+    if (lastMillis == null) return "Not updated yet"
+    val ago = agoWords(lastMillis, nowMillis)
+    return if (service == null) "Updated $ago" else "Updated from $service $ago"
+}

@@ -4,7 +4,6 @@ import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +19,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Startable
+import uk.co.siland.culvery.core.plugin.attempt
 
 /** How often the list is read while a screen that shows it is on (10 §4.4). */
 const val SHOPPING_CHECK_MS = 60_000L
@@ -80,12 +80,6 @@ class ShoppingChecks internal constructor(
 
     /** A failed check shows in the list's problem line; the next one tries again. */
     private suspend fun safely() {
-        try {
-            check()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.w(TAG, "A shopping check failed (${e::class.simpleName})")
-        }
+        attempt({ check() }) { e -> Log.w(TAG, "A shopping check failed (${e::class.simpleName})") }
     }
 }

@@ -14,11 +14,11 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.capability.shopping.db.QueuedEntity
 import uk.co.siland.culvery.core.plugin.NeedsSignInException
+import uk.co.siland.culvery.core.plugin.OUTBOX_BACKOFF_MS
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.attempt
+import uk.co.siland.culvery.core.plugin.backoffMillis
 import uk.co.siland.culvery.core.plugin.textKey
-
-/** How long a change waits after its 1st, 2nd, 3rd… failure; the last step repeats (10 §4.5). */
-val SHOPPING_BACKOFF_MS = listOf(30_000L, 60_000L, 120_000L, 300_000L)
 
 /** A check asks for the ticked items from this long before the last such read, so one ticked while it ran is not missed (10 §4.4). */
 const val HISTORY_OVERLAP_MS = 10 * 60_000L
@@ -35,8 +35,6 @@ internal fun healthOf(e: Exception): ShoppingHealth = when (e) {
     // Unreachable and Offline, and anything a provider throws that the seam doesn't name: the change is kept and tried again.
     else -> ShoppingHealth.CANT_REACH
 }
-
-internal fun backoffMillis(failures: Int): Long = SHOPPING_BACKOFF_MS[(failures - 1).coerceIn(0, SHOPPING_BACKOFF_MS.lastIndex)]
 
 /** The provider call being made, so a log line names it without naming an item. */
 private enum class Step(val label: String) {
@@ -227,7 +225,7 @@ class ShoppingSync @Inject constructor(
             return Drained.More
         }
         Log.w(TAG, "Shopping drain: the ${what.label} waits (${e::class.simpleName})")
-        if (kind == QueuedKind.ADD && own && e is ShoppingRejectedException) return retryLater(head, SHOPPING_BACKOFF_MS.last())
+        if (kind == QueuedKind.ADD && own && e is ShoppingRejectedException) return retryLater(head, OUTBOX_BACKOFF_MS.last())
         val waiting = retryLater(head, backoffMillis(head.attempts + 1))
         store.setHealth(healthOf(e))
         return waiting
@@ -252,7 +250,7 @@ class ShoppingSync @Inject constructor(
             (stored.lastHistoryMillis ?: now) - HISTORY_OVERLAP_MS
         }
         var what = Step.ITEMS
-        val (items, ticked) = try {
+        val (items, ticked) = attempt({
             // Both reads go at once; a failure is named as the one-after-the-other reads would name it.
             supervisorScope {
                 val reading = async { provider.items(stored.connection) }
@@ -265,9 +263,7 @@ class ShoppingSync @Inject constructor(
                     history.cancel()
                 }
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
+        }) { e ->
             Log.w(TAG, "Shopping check: the ${what.label} failed (${e::class.simpleName})")
             store.setHealth(healthOf(e))
             return

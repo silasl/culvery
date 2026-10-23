@@ -44,7 +44,6 @@ import uk.co.siland.culvery.capability.calendar.CalendarRow
 import uk.co.siland.culvery.capability.calendar.ReviewConnection
 import uk.co.siland.culvery.capability.calendar.StoredSource
 import uk.co.siland.culvery.capability.calendar.disconnectQuestion
-import uk.co.siland.culvery.capability.calendar.updatedLabel
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.ConnectionHealth
@@ -71,6 +70,7 @@ import uk.co.siland.culvery.core.ui.hhToggleable
 import uk.co.siland.culvery.core.ui.listRowCard
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 import uk.co.siland.culvery.core.ui.shownNotSpoken
+import uk.co.siland.culvery.core.ui.updatedLabel
 
 /** 3a design §4.1: a status ("Needs reconnecting") or a sentence that says what to do. */
 internal const val NEEDS_RECONNECTING = "Needs reconnecting"

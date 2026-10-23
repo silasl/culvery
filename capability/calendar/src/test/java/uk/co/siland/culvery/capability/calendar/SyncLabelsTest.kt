@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.calendar
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import uk.co.siland.culvery.capability.calendar.ui.reconnectLabel
+import uk.co.siland.culvery.core.ui.updatedLabel
 
 class SyncLabelsTest {
     private val now = 1_000_000_000_000L

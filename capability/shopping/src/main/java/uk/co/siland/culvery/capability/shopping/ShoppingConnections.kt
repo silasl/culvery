@@ -3,16 +3,16 @@ package uk.co.siland.culvery.capability.shopping
 import android.util.Log
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.AccessControl
-import uk.co.siland.culvery.core.access.CorePermissions
+import uk.co.siland.culvery.core.access.mayManageConnections
 import uk.co.siland.culvery.core.plugin.AccountUse
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.UnreachableException
+import uk.co.siland.culvery.core.plugin.attempt
 import uk.co.siland.culvery.core.plugin.couldNotConnect
 
 private const val TAG = "ShoppingConnections"
@@ -37,7 +37,7 @@ class ShoppingConnections @Inject constructor(
     val offered: ShoppingProvider? = providers.firstOrNull { !it.descriptor.userConnectable } ?: providers.firstOrNull()
 
     /** connections.manage: an Admin's fresh PIN every time. */
-    suspend fun mayConnect(): Boolean = access.authorise(CorePermissions.CONNECTIONS_MANAGE) != null
+    suspend fun mayConnect(): Boolean = access.mayManageConnections()
 
     /**
      * Stores what the provider's screen connected, on the application scope so leaving Settings can't cancel it, then
@@ -50,15 +50,9 @@ class ShoppingConnections @Inject constructor(
         }
     }
 
+    // A failed first read is made again by the next check.
     private suspend fun readAfterConnecting() {
-        try {
-            sync.check()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // The list is read again by the next check.
-            Log.w(TAG, "The first read after connecting failed (${e::class.simpleName})")
-        }
+        attempt({ sync.check() }) { e -> Log.w(TAG, "The first read after connecting failed (${e::class.simpleName})") }
     }
 
     /** The permission is given again for the same connection: the queue is untouched and drains. */
@@ -71,12 +65,10 @@ class ShoppingConnections @Inject constructor(
         if (!mayConnect()) return false
         val stored = store.connectionNow() ?: return false
         val provider = providers.forConnection(stored.connection) ?: return false
-        return try {
+        return attempt({
             replace(provider.remakeList(stored.connection))
             true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
+        }) { e ->
             Log.w(TAG, "Couldn't make the list again (${e::class.simpleName})")
             toaster.show(couldNotConnect(provider.descriptor.displayName, unreachable = e is UnreachableException), urgent = true)
             false

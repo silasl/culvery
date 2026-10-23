@@ -25,6 +25,12 @@ inline fun <T> attempt(block: () -> T, orElse: (Exception) -> T): T = try {
     orElse(e)
 }
 
+/** Waits after an outbox's nth failed send: 30 s, 1 min, 2 min, then 5 min (the calendar's and the shopping list's). */
+val OUTBOX_BACKOFF_MS: List<Long> = listOf(30_000L, 60_000L, 120_000L, 300_000L)
+
+/** The wait after failure number [attempts] (from 1); the last step repeats. */
+fun backoffMillis(attempts: Int): Long = OUTBOX_BACKOFF_MS[(attempts - 1).coerceIn(0, OUTBOX_BACKOFF_MS.lastIndex)]
+
 /** The wait before retrying after failure number [attempt] (from 0): 1 s, doubling each time, at most 60 s. */
 fun retryDelayMillis(attempt: Long): Long =
     (FIRST_RETRY_MS shl attempt.coerceAtMost(MAX_DOUBLINGS).toInt()).coerceAtMost(LAST_RETRY_MS)

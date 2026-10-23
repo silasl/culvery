@@ -15,11 +15,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import uk.co.siland.culvery.core.plugin.Connection
 
-/** Waits after the nth failed attempt: 30 s, 1 min, 2 min, then 5 min. */
-val OUTBOX_BACKOFF_MS: List<Long> = listOf(30_000L, 60_000L, 120_000L, 300_000L)
-
-internal fun backoffMillis(attempts: Int): Long = OUTBOX_BACKOFF_MS[(attempts - 1).coerceIn(0, OUTBOX_BACKOFF_MS.lastIndex)]
-
 /** A queued change still unsent this long after it was made is dropped, with a toast. */
 const val OUTBOX_MAX_AGE_MS = 48 * 60 * 60_000L
 
