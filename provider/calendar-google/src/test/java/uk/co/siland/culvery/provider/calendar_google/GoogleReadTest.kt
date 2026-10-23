@@ -37,6 +37,8 @@ import uk.co.siland.culvery.capability.calendar.StoredSeries
 import uk.co.siland.culvery.capability.calendar.SyncCursor
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.core.google.test.FakeTokenSource
+import uk.co.siland.culvery.core.google.test.assertLogsHoldNoPersonalData
+import uk.co.siland.culvery.core.google.test.failureOf
 import uk.co.siland.culvery.core.plugin.Connection
 
 @RunWith(AndroidJUnit4::class)

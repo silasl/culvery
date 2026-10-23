@@ -14,6 +14,7 @@ import uk.co.siland.culvery.capability.calendar.CalendarSource
 import uk.co.siland.culvery.capability.calendar.DateRange
 import uk.co.siland.culvery.capability.calendar_testkit.CalendarProviderContractTest
 import uk.co.siland.culvery.core.google.test.FakeTokenSource
+import uk.co.siland.culvery.core.google.test.assertLogsHoldNoPersonalData
 import uk.co.siland.culvery.core.plugin.Connection
 
 /** The shared contract, against Google through the fake server (3a design D15). */

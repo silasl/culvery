@@ -1,10 +1,6 @@
 package uk.co.siland.culvery.provider.shopping_google_tasks
 
-import android.app.PendingIntent
-import android.content.Intent
-import androidx.test.core.app.ApplicationProvider
 import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.coroutines.cancellation.CancellationException
 import okhttp3.HttpUrl
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -18,24 +14,9 @@ internal const val ACCOUNT = "family@example.com"
 /** The connection a provider test uses: Google's list "L1" for [ACCOUNT]. */
 internal val CONNECTION = Connection("c1", TASKS_PROVIDER_ID, "Google Tasks", mapOf(SHOPPING_CONFIG_ACCOUNT to ACCOUNT, CONFIG_LIST to "L1"))
 
-/** What [block] threw, or null if it returned; a cancellation is never swallowed. */
-internal suspend fun failureOf(block: suspend () -> Unit): Throwable? =
-    try {
-        block()
-        null
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        e
-    }
-
 /** A file of Google's answers under src/test/resources/tasks. */
 internal fun resource(name: String): String =
     checkNotNull(object {}.javaClass.classLoader?.getResource("tasks/$name")) { "missing tasks/$name" }.readText()
-
-/** Stands in for Play services' account chooser and consent screens; needs Robolectric. */
-internal fun screens(): PendingIntent =
-    PendingIntent.getActivity(ApplicationProvider.getApplicationContext(), 0, Intent(), PendingIntent.FLAG_IMMUTABLE)
 
 /** A request as it arrived: what the server saw, with its body read once. */
 internal class Seen(val method: String, val path: String, val query: HttpUrl, val body: String, val auth: String?)

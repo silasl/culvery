@@ -14,6 +14,8 @@ import uk.co.siland.culvery.core.google.PlayServicesCheck
 import uk.co.siland.culvery.core.google.test.FakeAuthorizer
 import uk.co.siland.culvery.core.google.test.FakeGoogleAccounts
 import uk.co.siland.culvery.core.google.test.FakeTokenSource
+import uk.co.siland.culvery.core.google.test.assertLogsHoldNoPersonalData
+import uk.co.siland.culvery.core.google.test.failureOf
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 
 @RunWith(AndroidJUnit4::class)
@@ -41,16 +43,11 @@ class GoogleTasksLogTest {
         failureOf { provider.items(CONNECTION) }
         failureOf { provider.tick(CONNECTION, "t1") }
 
+        assertLogsHoldNoPersonalData("Bin bags", "Tea bags", minLines = 3)
         val logs = ShadowLog.getLogs()
         assertThat(logs.map { it.tag }.toSet()).containsExactly("GoogleTasks")
-        assertThat(logs.size).isAtLeast(3)
         logs.forEach { log ->
-            val text = "${log.msg} ${log.throwable}"
-            assertWithMessage(text).that(text).doesNotContain("Bin bags")
-            assertWithMessage(text).that(text).doesNotContain("Tea bags")
-            assertWithMessage(text).that(text).doesNotContain(ACCOUNT)
-            assertWithMessage(text).that(text).doesNotContain("token-")
-            assertWithMessage(text).that(listOf("tasks.insert", "tasks.list", "tasks.patch").any { it in log.msg }).isTrue()
+            assertWithMessage(log.msg).that(listOf("tasks.insert", "tasks.list", "tasks.patch").any { it in log.msg }).isTrue()
         }
     }
 }

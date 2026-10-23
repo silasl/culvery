@@ -22,6 +22,7 @@ import uk.co.siland.culvery.core.google.PlayServicesCheck
 import uk.co.siland.culvery.core.google.test.FakeAuthorizer
 import uk.co.siland.culvery.core.google.test.FakeGoogleAccounts
 import uk.co.siland.culvery.core.google.test.FakeTokenSource
+import uk.co.siland.culvery.core.google.test.failureOf
 import uk.co.siland.culvery.core.plugin.NeedsSignInException
 import uk.co.siland.culvery.core.plugin.UnreachableException
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
