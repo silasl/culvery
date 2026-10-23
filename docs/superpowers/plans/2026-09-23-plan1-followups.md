@@ -604,7 +604,7 @@ The open faults after the redesign phase. Details are in the plan sections above
 - **M2:** an Undo racing a drain create leaves the event on the week until the next sync; `UndoneKeys` is lost on restart.
 - **M3:** a phone's counted series is expanded in full on every detail update (`Repeats.kt:28`).
 - **Home slow to fill:** 2.2–2.9 s from a cold start, with the Hue bridge the slowest. One option is for Lights to show its last known rooms while it connects.
-- **Doorbell missed on 21 Oct:** the logs from then are gone. Read logcat the same day if it happens again.
+- **Doorbell missed (21 Oct; again 23 Oct at 16:02), cause found:** Android holds at most 25 notifications per app. Nothing on the wall clears Ring's, and Culvery's listener doesn't cancel them, so Ring's motion and ring notifications pile up. Once 25 are held, Android drops every new one ("Package has already posted or enqueued 25 notifications. Not showing more. package=com.ringapp"), and Culvery never sees the ring. On 23 Oct the tablet held 25 Ring notifications, most of them motion; posts were dropped at 15:12, 15:23 and 16:02. Fix: `RingNotificationListener` cancels each Ring notification once it has read it.
 - **Not tried yet:** "Use for new events" with real calendars, and a new Sonos playlist appearing on the next open.
 - **TalkBack checks from 9c-2:** dropped; the user will raise them if they show in use.
 
