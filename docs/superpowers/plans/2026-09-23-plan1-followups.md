@@ -594,6 +594,26 @@ Fault found:
   - the person pill on Settings › Calendars is capped at 140 dp, which leaves a calendar's name about 27 dp at font 1.3 in the wizard column.
 - **Sonos playlists:** the sheet removes duplicate favourites using the favourites read just before. It relies on that order, which `MusicActions` keeps.
 
+## Left out of Plan 10 (the Shopping list) on purpose (2026-10-23)
+- **Who added an item:** Google Tasks doesn't record it, so there is no "added by" label and no "added from phones" footer on Home's card.
+- **Todoist:** Google Tasks is first, behind a provider seam so Todoist can replace it.
+- **Waitrose:** no link; the house's shop rules are judgement calls.
+- **The One-tap tray:** not built; Shopping is widened into its space in Home's utility row until it exists.
+- **Quantities, prices, aisles, categories, more than one list:** not in v1.
+
+## From Plan 10
+- **End-of-v1 design review:**
+  - Home's Shopping rows are the handoff's 31 dp, under the house's 48 dp touch height (the row is the target);
+  - the Undo strip is the house toast, bottom-centre, not a strip across the tab's foot;
+  - the chip row never wraps; chips that don't fit are left off;
+  - Home's card shows "{n} items", with no "added from phones" footer;
+  - Lights and Music at 343 × 212 dp side by side, against their 701 × 285.5 dp look without Shopping;
+  - Lights squeezed in that row with a problem line: its gaps drop, the line is one line ending in "…", and the slider sits about 1 px above Holiday mode;
+  - the card's + is drawn at 48 dp, as on Lights and Music, not the handoff's 40 dp in a 48 dp tap;
+  - Settings › Shopping says "Not updated yet" before the first read, and shows "Allow Google Tasks in Settings › Shopping" on that page itself.
+- **To watch:** a row added on the wall may vanish for one frame as Google answers (two Room flows); check on the walk-through before fixing.
+- **Ideas the simplify left out** (each would redesign tested behaviour): one persisted "ticked" table in place of the add's exclusions, the pass's tick set and the sent-adds memory; backoff kept on the connection instead of per row; skipping a list check when the last one was under 15 s ago.
+
 ## To check when the tablet is next plugged in
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
 - **Home slow to fill (9c walk-through, 2026-10-22):** on the emulator, Home's cards took a moment to fill after opening. Time it on the tablet (cold start and return from the Calendar tab) before deciding whether anything needs fixing. The same walk-through saw it on the Calendar tab after a restart, Settings › Calendars, Home location and People (fault 1); time those too.
