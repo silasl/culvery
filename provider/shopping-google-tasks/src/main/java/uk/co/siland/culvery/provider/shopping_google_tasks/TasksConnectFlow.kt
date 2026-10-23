@@ -29,7 +29,7 @@ internal const val SHOPPING_LIST_TITLE = "Shopping"
 /** The [Connection.config] key holding the Google task list's id. */
 internal const val CONFIG_LIST = "list"
 
-private const val PAGE_SIZE = "100"
+internal const val PAGE_SIZE = "100"
 
 /** One step of connecting: done, screens the user must see, or stopped (after saying why, if there is a why). */
 internal sealed interface TasksConnectStep {
@@ -71,6 +71,7 @@ internal class TasksConnectFlow(
     private val playServices: PlayServicesCheck,
 ) {
     suspend fun start(account: String, existing: Connection?): TasksConnectStep {
+        val account = accountOf(account, existing)
         if (!playServices.usable()) {
             Log.w(TAG, "Play services can't run Google's sign-in on this tablet; nothing started")
             toaster.show(UPDATE_PLAY_SERVICES, urgent = true)
@@ -80,7 +81,10 @@ internal class TasksConnectFlow(
     }
 
     suspend fun afterScreens(account: String, existing: Connection?, data: Intent?): TasksConnectStep =
-        step(account, existing, screensAllowed = false) { authorizer.authorizationFrom(data) }
+        step(accountOf(account, existing), existing, screensAllowed = false) { authorizer.authorizationFrom(data) }
+
+    /** A re-allow is for the connection's own account, whatever was chosen. */
+    private fun accountOf(chosen: String, existing: Connection?): String = existing?.config?.get(SHOPPING_CONFIG_ACCOUNT) ?: chosen
 
     private suspend fun step(account: String, existing: Connection?, screensAllowed: Boolean, ask: suspend () -> Authorization): TasksConnectStep =
         try {
@@ -116,9 +120,8 @@ internal class TasksConnectFlow(
         }
         val list = existing?.config?.get(CONFIG_LIST) ?: api.findOrMakeShoppingList(account)
         val id = existing?.id ?: UUID.randomUUID().toString()
-        return TasksConnectStep.Done(
-            Connection(id, TASKS_PROVIDER_ID, TASKS_DISPLAY_NAME, mapOf(SHOPPING_CONFIG_ACCOUNT to account, CONFIG_LIST to list)),
-        )
+        val config = existing?.config.orEmpty() + (SHOPPING_CONFIG_ACCOUNT to account) + (CONFIG_LIST to list)
+        return TasksConnectStep.Done(Connection(id, TASKS_PROVIDER_ID, TASKS_DISPLAY_NAME, config))
     }
 
     private fun stopWithToast(unreachable: Boolean = false): TasksConnectStep {

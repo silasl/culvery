@@ -113,6 +113,14 @@ class TasksConnectFlowTest {
     }
 
     @Test
+    fun aReAllowUsesTheConnectionsOwnAccountAndKeepsItsOtherKeys() = runTest {
+        val existing = Connection("c7", TASKS_PROVIDER_ID, "Google Tasks", mapOf(SHOPPING_CONFIG_ACCOUNT to SAM, CONFIG_LIST to "L7", "extra" to "kept"))
+        val done = flow.start("family@example.com", existing) as TasksConnectStep.Done
+        assertThat(authorizer.accounts).containsExactly(SAM)
+        assertThat(done.connection).isEqualTo(existing)
+    }
+
+    @Test
     fun aReAllowWithoutTheScopeStillStops() = runTest {
         val existing = Connection("c7", TASKS_PROVIDER_ID, "Google Tasks", mapOf(SHOPPING_CONFIG_ACCOUNT to SAM, CONFIG_LIST to "L7"))
         authorizer.next = granted("t", emptyList())

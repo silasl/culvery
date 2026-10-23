@@ -40,7 +40,6 @@ import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.UnreachableException
 import uk.co.siland.culvery.core.ui.Icons
 
-private const val PAGE_SIZE = "100"
 private const val OPEN_FIELDS = "items(id,title,status,updated,parent,position),nextPageToken"
 private const val HISTORY_FIELDS = "items(id,title,status,completed),nextPageToken"
 private const val NO_ACCOUNTS_LINE = "Connect Google Calendar first. Shopping uses the same account."
@@ -80,7 +79,7 @@ class GoogleTasksProvider @Inject constructor(
 
     @Composable
     override fun ConnectScreen(account: String?, existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
-        val chosen = account ?: existing?.config?.get(SHOPPING_CONFIG_ACCOUNT)
+        val chosen = existing?.config?.get(SHOPPING_CONFIG_ACCOUNT) ?: account
         val flow = remember { TasksConnectFlow(authorizer, api, toaster, playServices) }
         val scope = rememberCoroutineScope()
         val connected by rememberUpdatedState(onConnected)
@@ -149,9 +148,9 @@ class GoogleTasksProvider @Inject constructor(
             logAnswer(TasksCall.TASKS_INSERT, answer)
             throw ListGoneException("The Shopping list is gone")
         }
-        if (answer.code in 400..499) {
+        if (answer.code == 400) {
             logAnswer(TasksCall.TASKS_INSERT, answer)
-            throw ShoppingRejectedException("Google Tasks refused the item (${answer.code})")
+            throw ShoppingRejectedException("Google Tasks refused the item")
         }
         val task = answer.readOrUnreachable(TasksCall.TASKS_INSERT).decode(TaskDto.serializer(), TasksCall.TASKS_INSERT)
         return ShoppingItem(task.id, text, instantOf(task.updated))
@@ -168,7 +167,7 @@ class GoogleTasksProvider @Inject constructor(
         logAnswer(TasksCall.TASKS_PATCH, answer)
         when (answer.code) {
             404, 410 -> throw ItemGoneException("The item is gone")
-            in 400..499 -> throw ShoppingRejectedException("Google Tasks refused the change (${answer.code})")
+            400 -> throw ShoppingRejectedException("Google Tasks refused the change")
             else -> throw UnreachableException("Google Tasks answered ${answer.code}")
         }
     }
@@ -223,7 +222,7 @@ private fun inGoogleOrder(open: List<TaskDto>): List<TaskDto> {
 
 private fun TaskDto.toItem(changedAt: String?): ShoppingItem? {
     val text = title.orEmpty()
-    if (text.isBlank() || deleted == true) return null
+    if (text.isBlank()) return null
     return ShoppingItem(id, text, instantOf(changedAt))
 }
 

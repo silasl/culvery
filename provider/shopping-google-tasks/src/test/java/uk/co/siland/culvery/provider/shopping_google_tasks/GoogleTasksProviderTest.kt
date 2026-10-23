@@ -173,6 +173,32 @@ class GoogleTasksProviderTest {
     }
 
     @Test
+    fun onlyA400IsRejectedEveryOtherRefusalIsTryLater() = runTest {
+        val unknown403 = google.json("""{"error":{"code":403,"errors":[{"reason":"accessNotConfigured"}]}}""", 403)
+        val unparseable403 = google.json("<html>Forbidden</html>", 403)
+        for (answer in listOf(unknown403, unparseable403, google.json("{}", 408))) {
+            google.on("PATCH", "$LIST_PATH/t1", answer, once = true)
+            assertThat(failureOf { provider.tick(CONNECTION, "t1") }).isInstanceOf(UnreachableException::class.java)
+            google.on("PATCH", "$LIST_PATH/t1", answer, once = true)
+            assertThat(failureOf { provider.untick(CONNECTION, "t1") }).isInstanceOf(UnreachableException::class.java)
+            google.on("POST", LIST_PATH, answer, once = true)
+            assertThat(failureOf { provider.add(CONNECTION, "Milk", "k") }).isInstanceOf(UnreachableException::class.java)
+        }
+    }
+
+    @Test
+    fun theFieldsAskedForCoverEveryFieldTheMappingReadsAndThePageToken() = runTest {
+        serveOpenTasks()
+        provider.items(CONNECTION)
+        val open = google.seen.first().query.queryParameter("fields").orEmpty()
+        listOf("id", "title", "status", "updated", "parent", "position", "nextPageToken").forEach { assertThat(open).contains(it) }
+        google.seen.clear()
+        provider.history(CONNECTION, Instant.EPOCH)
+        val history = google.seen.first().query.queryParameter("fields").orEmpty()
+        listOf("id", "title", "status", "completed", "nextPageToken").forEach { assertThat(history).contains(it) }
+    }
+
+    @Test
     fun anAccountNoLongerConnectedIsAccountGone() = runTest {
         accounts.connected.value = emptyList()
         assertThat(failureOf { provider.items(CONNECTION) }).isInstanceOf(AccountGoneException::class.java)
