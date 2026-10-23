@@ -250,6 +250,15 @@ class CalendarStoreRememberedTest {
         assertThat(keys()).containsExactly("dentist")
     }
 
+    /** A sync's own pass applies before it prunes: a full read of a later window ages out what it no longer reads. */
+    @Test
+    fun aFullSyncOfALaterWindowKeepsTheTitlesItNoLongerReads() = runTest {
+        connect()
+        store.applySync("c1", "s1", window, full(timed("dentist", "Dentist", sept(20)), timed("swim", "Swim", sept(26))), sept(20))
+        store.applySync("c1", "s1", later, full(), sept(25))
+        assertThat(keys()).containsExactly("dentist")
+    }
+
     @Test
     fun deletingAnotherEventLeavesAPrunedTitleAlone() = runTest {
         connect()

@@ -178,8 +178,14 @@ interface CalendarDao {
     )
     suspend fun supplierTitles(connectionId: String, sourceId: String, supplierId: String): List<String>
 
-    @Query("SELECT remoteId, seriesId, title FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId")
-    suspend fun eventTitlesOfSource(connectionId: String, sourceId: String): List<EventTitle>
+    /** Events inside [start, end): what pruneEvents keeps. */
+    @Query(
+        """
+        SELECT remoteId, seriesId, title FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId
+        AND NOT (startSort >= :end OR (endSort <= :start AND startSort < :start))
+        """,
+    )
+    suspend fun eventTitlesOfSourceWithin(connectionId: String, sourceId: String, start: Long, end: Long): List<EventTitle>
 
     @Query("SELECT * FROM event WHERE connectionId = :connectionId AND sourceId = :sourceId AND remoteId IN (:ids)")
     suspend fun eventsByIds(connectionId: String, sourceId: String, ids: List<String>): List<EventEntity>

@@ -275,8 +275,9 @@ class CalendarStore internal constructor(private val db: CalendarDatabase, priva
             val entities = result.upserts.map { it.toEntity(connectionId, sourceId, range.zone) }
             val kept = entities.associate { it.remoteId to it.title }
             // What this result removes or retitles: the only events whose titles it may take from the remembered ones.
+            // A full read drops what lies outside its range too, but that is ageing out, not removed.
             val leaving = if (result.fullReplace) {
-                dao.eventTitlesOfSource(connectionId, sourceId)
+                dao.eventTitlesOfSourceWithin(connectionId, sourceId, range.startInstant.toEpochMilli(), range.endExclusive.atStartOfDay(range.zone).toInstant().toEpochMilli())
             } else {
                 (result.removedIds + entities.map { it.remoteId }).distinct().chunked(REMOVE_CHUNK).flatMap { dao.eventsByIds(connectionId, sourceId, it) }.titled()
             }.filter { e -> kept[e.remoteId].let { it == null || (it != e.title && keyOf(it) != keyOf(e.title)) } }
