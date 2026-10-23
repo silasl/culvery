@@ -559,6 +559,21 @@ Fault found:
 - **Choosing the destination calendar per event:** an event still saves to the household's one destination calendar. Picking another calendar for one event is a later change.
 - **A year-long fetch of past events:** the tablet still keeps about a day of past events. Title suggestions use a remembered list that sync builds up over time, so "From before" starts sparse and fills in over the following weeks.
 
+## Left out of Plan 9c-2 on purpose (2026-10-23)
+- **Settings › Calendars keeps "Family"** for the household's calendars; "Family" or "Everyone" is for the design review.
+- **The calendar editor's title field keeps its own ring:** folding it into the shared text field's error ring is deferred.
+- **A colour the editor refuses names "someone else":** the sheet's list of taken colours is the one it opened with, so a colour taken since then has no owner's name. Building the list from the live household instead is a later change.
+- **The Home location field never turns red** for a failed search, and the Hue address field never does for a failed connect: they show the reason under the field, because the text isn't wrong.
+
+## From Plan 9c-2
+- **End-of-v1 design review:**
+  - people rows' names at 18 sp, not the handoff's 19;
+  - 35 dp under a page title;
+  - Show's group width and the person pill's gap, read from 5c;
+  - the Set PIN pill clipped by a few px at the sheet's scroll edge on an 800 dp screen;
+  - "When the doorbell rings, lower music to" wrapping to two lines;
+  - the Repeats rows a few dp taller, taking the radio row's sizes.
+
 ## To check when the tablet is next plugged in
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
 - **Home slow to fill (9c walk-through, 2026-10-22):** on the emulator, Home's cards took a moment to fill after opening. Time it on the tablet (cold start and return from the Calendar tab) before deciding whether anything needs fixing. The same walk-through saw it on the Calendar tab after a restart, Settings › Calendars, Home location and People (fault 1); time those too.
