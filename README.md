@@ -62,6 +62,7 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 | `:capability:shopping` | Shopping contract (`ShoppingProvider`), `shopping.db` (the connection, the last read, the queue of unsent changes, what is learned), `ShoppingLock` |
 | `:provider:calendar-fake` | Debug-only sample calendar (the hand-off's week, relative to today) |
 | `:provider:calendar-google` | Google Calendar API v3 over OkHttp; sign-in and tokens through Play services, nothing stored |
+| `:provider:shopping-google-tasks` | The shopping list in Google Tasks over OkHttp: a list called Shopping, found or made when it is turned on; sign-in through `:core:google` |
 | `:provider:weather-openmeteo` | Town search (geocoding) and the forecast through Open-Meteo (no key) |
 
 Rules, enforced when Gradle configures the project (`build-logic/convention/src/main/kotlin/ModuleBoundaries.kt`):

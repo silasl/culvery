@@ -1,0 +1,10 @@
+{
+  "kind": "tasks#tasks",
+  "etag": "\"page1\"",
+  "nextPageToken": "page2",
+  "items": [
+    {"kind": "tasks#task", "id": "t2", "etag": "\"a\"", "title": "Bread", "updated": "2026-10-20T08:00:00.000Z", "selfLink": "https://tasks.googleapis.com/tasks/v1/lists/L1/tasks/t2", "position": "00000000000000000002", "status": "needsAction", "links": [], "webViewLink": "https://tasks.google.com/task/t2"},
+    {"kind": "tasks#task", "id": "t1", "etag": "\"b\"", "title": "Milk", "updated": "2026-10-21T09:30:00.000Z", "position": "00000000000000000001", "status": "needsAction"},
+    {"kind": "tasks#task", "id": "t9", "etag": "\"c\"", "title": "", "updated": "2026-10-21T09:31:00.000Z", "position": "00000000000000000005", "status": "needsAction"}
+  ]
+}

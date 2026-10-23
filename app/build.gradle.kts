@@ -71,6 +71,7 @@ dependencies {
     // Wired by Hilt alone, as the lights (10 §4.1).
     implementation(project(":capability:shopping"))
     implementation(project(":provider:calendar-google"))
+    implementation(project(":provider:shopping-google-tasks"))
     implementation(project(":provider:weather-openmeteo"))
     // Sample data only, in debug builds.
     debugImplementation(project(":provider:calendar-fake"))

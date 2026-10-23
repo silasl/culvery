@@ -43,4 +43,11 @@ The emulator (or tablet) needs Google Play services: an image with **Google Play
 
 Release builds need the second Android client from section 4. On the kiosk, **Connect** and **Reconnect** ask for an Admin's PIN every time, even mid-session, because Google's screens can lead out of the app. If Google Play services can't sign in, Culvery says "Update Google Play services on this tablet, then try again." and starts nothing. While Google's account chooser and consent screens show, Culvery leaves screen pinning, and pins again as soon as it is back in front, whatever they answered (as device owner it stays in lock-task, with Play services allowed in it only while those screens show).
 
+## Shopping (Google Tasks)
+The shopping list lives in a Google Tasks list called **Shopping**. To let the tablet use it, in the same Cloud project:
+1. **APIs & Services › Library**: search for **Google Tasks API** and click **Enable**.
+2. **Google Auth Platform › Data access › Add or remove scopes**: add `https://www.googleapis.com/auth/tasks`.
+
+The app stays unverified, so the first time someone allows Google Tasks, Google shows the same "Google hasn't verified this app" screen as for the calendar. Households that never turn Shopping on are never asked for this scope. Turn it on in Settings › Shopping (it offers the accounts already connected under Settings › Calendars); Culvery uses the account's list called "Shopping", or makes one.
+
 **Emulator note.** Play services 26.34 on Android 15 (API 35) emulator images can crash-loop with `NetworkCapability 37 out of range` after a network change, which blocks sign-in ("Google needs reconnecting" or "Can't reach"). To test offline, turn Wi-Fi and mobile data off (`adb shell svc wifi disable`, `adb shell svc data disable`) rather than airplane mode. If the crash loop starts, `adb shell pm uninstall-system-updates com.google.android.gms` restores the image's own Play services; the account may then ask you to sign in again.

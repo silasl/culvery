@@ -1,0 +1,8 @@
+{
+  "kind": "tasks#taskLists",
+  "etag": "\"lists\"",
+  "items": [
+    {"kind": "tasks#taskList", "id": "G1", "etag": "\"x\"", "title": "Groceries", "updated": "2026-09-01T10:00:00.000Z", "selfLink": "https://tasks.googleapis.com/tasks/v1/users/@me/lists/G1"},
+    {"kind": "tasks#taskList", "id": "S1", "etag": "\"y\"", "title": "shopping", "updated": "2026-09-02T10:00:00.000Z"}
+  ]
+}
