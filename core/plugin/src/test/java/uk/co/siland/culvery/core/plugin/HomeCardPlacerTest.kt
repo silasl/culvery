@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import uk.co.siland.culvery.core.plugin.HomeCardSize.REGULAR
 import uk.co.siland.culvery.core.plugin.HomeCardSize.TALL
+import uk.co.siland.culvery.core.plugin.HomeCardSize.UTILITY
 import uk.co.siland.culvery.core.plugin.HomeCardSize.WIDE
 
 class HomeCardPlacerTest {
@@ -50,5 +51,34 @@ class HomeCardPlacerTest {
     fun aSecondWideCardIsDropped() {
         val layout = HomeCardPlacer.place(listOf(card("b", WIDE, 10), card("a", WIDE, 10), card("c", WIDE, 5)))
         assertThat(layout.right.map { it.id }).containsExactly("a")
+    }
+
+    @Test
+    fun shoppingTakesTheTopAndLightsAndMusicShareARow() {
+        val layout = HomeCardPlacer.place(
+            listOf(
+                card("today", TALL, 100), card("comingUp", WIDE, 50), card("shopping", UTILITY, 40),
+                card("lights", REGULAR, 35), card("music", REGULAR, 30),
+            ),
+        )
+        assertThat(layout.left?.id).isEqualTo("today")
+        assertThat(layout.utility?.id).isEqualTo("shopping")
+        assertThat(layout.right.map { it.id }).containsExactly("lights", "music").inOrder()
+    }
+
+    @Test
+    fun comingUpNeverShowsWithShopping() {
+        val layout = HomeCardPlacer.place(
+            listOf(card("today", TALL, 100), card("comingUp", WIDE, 50), card("shopping", UTILITY, 40)),
+        )
+        assertThat(layout.utility?.id).isEqualTo("shopping")
+        assertThat(layout.right).isEmpty()
+    }
+
+    @Test
+    fun aSecondUtilityCardIsDropped() {
+        val layout = HomeCardPlacer.place(listOf(card("b", UTILITY, 10), card("a", UTILITY, 40)))
+        assertThat(layout.utility?.id).isEqualTo("a")
+        assertThat(layout.right).isEmpty()
     }
 }

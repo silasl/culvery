@@ -39,6 +39,7 @@ class HomeGridTest {
     private val comingUp = box("comingUp", HomeCardSize.WIDE, 50)
     private val lights = box("lights", HomeCardSize.REGULAR, 35)
     private val music = box("music", HomeCardSize.REGULAR, 30)
+    private val shopping = box("shopping", HomeCardSize.UTILITY, 40)
 
     private fun show(vararg cards: HomeCard) {
         val state = ShellUiState(homeCards = HomeCardPlacer.place(cards.toList()))
@@ -92,5 +93,48 @@ class HomeGridTest {
         assertThat(bounds("today").height.value).isWithin(1f).of(todayCardSize.height.value)
         assertThat(bounds("lights").width.value).isWithin(1f).of(rightHalfSize.width.value)
         assertThat(bounds("lights").height.value).isWithin(1f).of(rightHalfSize.height.value)
+    }
+
+    @Test
+    fun shoppingSitsAboveARowOfLightsAndMusic() {
+        show(today, shopping, lights, music)
+        val top = bounds("shopping")
+        val l = bounds("lights")
+        val m = bounds("music")
+        val column = bounds("today")
+        assertThat(top.top.value).isEqualTo(column.top.value)
+        assertThat(top.width.value).isWithin(1f).of(701f)
+        assertThat(top.height.value).isWithin(1f).of(359f)
+        val half = (701f - 15f) / 2
+        for (b in listOf(l, m)) {
+            assertThat(b.height.value).isWithin(0.5f).of(212f)
+            assertThat(b.width.value).isWithin(1f).of(half)
+        }
+        assertThat(m.left.value - l.right.value).isWithin(0.5f).of(15f)
+        assertThat(l.left.value).isEqualTo(top.left.value)
+        assertThat(m.right.value).isWithin(0.5f).of(top.right.value)
+        assertThat(m.bottom.value).isWithin(0.5f).of(column.bottom.value)
+        assertThat(l.top.value - top.bottom.value).isWithin(0.5f).of(15f)
+    }
+
+    @Test
+    fun oneOfLightsOrMusicTakesTheRowsWidth() {
+        show(today, shopping, music)
+        assertThat(bounds("music").width.value).isWithin(1f).of(701f)
+        assertThat(bounds("music").height.value).isWithin(0.5f).of(212f)
+    }
+
+    @Test
+    fun lightsAloneTakesTheRowsWidth() {
+        show(today, shopping, lights)
+        assertThat(bounds("lights").width.value).isWithin(1f).of(701f)
+        assertThat(bounds("lights").height.value).isWithin(0.5f).of(212f)
+    }
+
+    @Test
+    fun shoppingAloneFillsTheColumn() {
+        show(today, shopping)
+        assertThat(bounds("shopping").width.value).isWithin(1f).of(701f)
+        assertThat(bounds("shopping").height.value).isWithin(1f).of(586f)
     }
 }

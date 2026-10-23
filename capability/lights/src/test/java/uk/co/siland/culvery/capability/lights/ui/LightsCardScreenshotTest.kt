@@ -40,6 +40,11 @@ class LightsCardScreenshotTest {
         Box(Modifier.size(701.dp, 285.5.dp)) { LightsCard(main, holidayOn, main?.on == true, run, status, line, NO_MAIN_ROOM_ACTIONS, NO_HOUSE_ACTIONS) }
     }
 
+    /** The card in the 343 × 212 half of the row beneath a utility card (10 §4.9); app's HomeGridTest pins the size. */
+    private fun snapRow(name: String, dark: Boolean) = compose.snap(name, dark, Modifier.padding(16.dp)) {
+        Box(Modifier.size(343.dp, 212.dp)) { LightsCard(lounge, false, true, null, null, null, NO_MAIN_ROOM_ACTIONS, NO_HOUSE_ACTIONS) }
+    }
+
     @Test fun onDark() = snap("lights_card_on_dark", true)
 
     @Test fun onLight() = snap("lights_card_on_light", false)
@@ -53,4 +58,8 @@ class LightsCardScreenshotTest {
     @Test fun turningOnDark() = snap("lights_card_turning_on_dark", true, run = HouseRun.TURNING_ON)
 
     @Test fun problemDark() = snap("lights_card_problem_dark", true, status = problemLine(LightsProblem.UNREACHABLE))
+
+    @Test fun rowDark() = snapRow("lights_card_row_dark", true)
+
+    @Test fun rowLight() = snapRow("lights_card_row_light", false)
 }

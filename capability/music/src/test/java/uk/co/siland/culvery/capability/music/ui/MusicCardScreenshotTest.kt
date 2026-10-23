@@ -40,6 +40,11 @@ class MusicCardScreenshotTest {
         Box(Modifier.size(rightHalfSize)) { MusicCard(pick, status, null, GroupActions.None) }
     }
 
+    /** The card in the 343 × 212 half of the row beneath a utility card (10 §4.9); app's HomeGridTest pins the size. */
+    private fun snapRow(name: String, dark: Boolean) = compose.snap(name, dark, Modifier.padding(16.dp)) {
+        Box(Modifier.size(343.dp, 212.dp)) { MusicCard(HomePick(kitchen, false), null, null, GroupActions.None) }
+    }
+
     @Test fun playingDark() = snap("music_card_playing_dark", true, HomePick(kitchen, false))
 
     @Test fun playingLight() = snap("music_card_playing_light", false, HomePick(kitchen, false))
@@ -72,4 +77,8 @@ class MusicCardScreenshotTest {
         assertThat((inCard.right - inCard.left).value).isWithin(0.01f).of((free.right - free.left).value)
         assertThat((inCard.bottom - inCard.top).value).isAtLeast(48f)
     }
+
+    @Test fun rowDark() = snapRow("music_card_row_dark", true)
+
+    @Test fun rowLight() = snapRow("music_card_row_light", false)
 }

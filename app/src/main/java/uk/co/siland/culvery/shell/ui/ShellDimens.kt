@@ -58,6 +58,7 @@ internal object ShellDimens {
     val dividerWidth = 1.dp
 
     val gridGap = 15.dp
+    val cardRow = 212.dp
     val leftColumn = 400.dp
     val clockToDate = 15.dp
 

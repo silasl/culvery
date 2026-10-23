@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -61,7 +62,10 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
+import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.HhCard
+import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.WithFontScale
 import uk.co.siland.culvery.shell.SessionUi
@@ -175,16 +179,30 @@ class ShellScreenshotTest {
      * Every card wanting to show, at the capabilities' sizes and priorities: Lights (35) above Music (30) on the right.
      * Coming up is always offered, so the placer is what leaves it out beside a REGULAR card.
      */
-    private fun homeCards(music: Boolean = true) = HomeCardPlacer.place(
-        listOfNotNull(
-            HomeCard("calendar.today", HomeCardSize.TALL, 100) { TodayCard(today) },
-            HomeCard("calendar.comingUp", HomeCardSize.WIDE, 50) { ComingUpCard(comingUp) },
-            HomeCard("lights.card", HomeCardSize.REGULAR, 35) {
-                LightsCard(rooms[0], holidayOn = false, allOffLit = true, run = null, status = null, line = null, MainRoomActions({}, {}), noHouse)
-            },
-            HomeCard("music.card", HomeCardSize.REGULAR, 30) {
-                MusicCard(HomePick(groups[0], nothingPlaying = false), null, null, GroupActions.None)
-            }.takeIf { music },
+    private fun homeCardList(lights: Boolean = true, music: Boolean = true) = listOfNotNull(
+        HomeCard("calendar.today", HomeCardSize.TALL, 100) { TodayCard(today) },
+        HomeCard("calendar.comingUp", HomeCardSize.WIDE, 50) { ComingUpCard(comingUp) },
+        HomeCard("lights.card", HomeCardSize.REGULAR, 35) {
+            LightsCard(rooms[0], holidayOn = false, allOffLit = true, run = null, status = null, line = null, MainRoomActions({}, {}), noHouse)
+        }.takeIf { lights },
+        HomeCard("music.card", HomeCardSize.REGULAR, 30) {
+            MusicCard(HomePick(groups[0], nothingPlaying = false), null, null, GroupActions.None)
+        }.takeIf { music },
+    )
+
+    private fun homeCards(music: Boolean = true) = HomeCardPlacer.place(homeCardList(music = music))
+
+    /**
+     * Today with a utility card on top and Lights and Music in a row beneath (10 §4.9); the card is a tagged placeholder
+     * until the Shopping card is wired in.
+     */
+    private fun shoppingHome(dark: Boolean, lights: Boolean = true, music: Boolean = true) = calendarHome(dark).copy(
+        tabs = allTabs,
+        homeCards = HomeCardPlacer.place(
+            homeCardList(lights, music) +
+                HomeCard("shopping.placeholder", HomeCardSize.UTILITY, 40) {
+                    HhCard(Modifier.fillMaxSize()) { Text("Shopping", style = HhType.cardTitle, color = Culvery.colors.ink) }
+                },
         ),
     )
 
@@ -379,4 +397,32 @@ class ShellScreenshotTest {
         "tab_lights_light", dark = false, state = fullHome(dark = false).copy(selectedTabId = "lights"),
         tabContent = { LightsTab(rooms, false, allOffLit = true, null, null, null, emptyMap(), null, {}, noHouse, RoomActions.None) },
     )
+
+    /** Shopping above Lights and Music side by side; Coming up gone (10 §4.9). */
+    @Test
+    fun homeShoppingDark() = snap("home_shopping_dark", dark = true, state = shoppingHome(dark = true))
+
+    @Test
+    fun homeShoppingLight() = snap("home_shopping_light", dark = false, state = shoppingHome(dark = false))
+
+    /** Without Lights, Music takes the row's whole width. */
+    @Test
+    fun homeShoppingNoLightsDark() = snap("home_shopping_no_lights_dark", dark = true, state = shoppingHome(dark = true, lights = false))
+
+    @Test
+    fun homeShoppingNoLightsLight() = snap("home_shopping_no_lights_light", dark = false, state = shoppingHome(dark = false, lights = false))
+
+    /** Without Music, Lights takes the row's whole width. */
+    @Test
+    fun homeShoppingLightsOnlyDark() = snap("home_shopping_lights_only_dark", dark = true, state = shoppingHome(dark = true, music = false))
+
+    @Test
+    fun homeShoppingLightsOnlyLight() = snap("home_shopping_lights_only_light", dark = false, state = shoppingHome(dark = false, music = false))
+
+    /** Shopping fills the right column when neither Lights nor Music shows. */
+    @Test
+    fun homeShoppingAloneDark() = snap("home_shopping_alone_dark", dark = true, state = shoppingHome(dark = true, lights = false, music = false))
+
+    @Test
+    fun homeShoppingAloneLight() = snap("home_shopping_alone_light", dark = false, state = shoppingHome(dark = false, lights = false, music = false))
 }
