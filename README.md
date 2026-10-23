@@ -52,6 +52,7 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 | `:app` | Activity, kiosk mode, nav rail, Home grid, wiring only |
 | `:core:ui` | Design tokens, DM Sans, Material Symbols, shared components |
 | `:core:plugin` | `Capability`, `SetupStep`, `SettingsPage`, `HomeCard`, `HeaderItem`, `Daylight`, `HouseholdClock` (the one minute ticker, in the household's zone), `FirstDraw`, `HomeApp`, `ProviderDescriptor`, `Connection`, `ConnectionHealth`, `ShellNavigator`, `OverlayHost`, `Toaster`, `Startable` |
+| `:core:google` | The Google sign-in the calendar and the shopping list share: `Authorizer`, `TokenSource` (scopes per call), `GoogleAccounts`, `rememberGoogleScreens`; Play services, nothing stored |
 | `:core:household` | People (with role and PIN hash), Family, home location, the household's time zone (`HouseholdZone`) — `household.db` |
 | `:core:access` | Permissions, PIN hashing, lockout, 2-minute session, PIN pad |
 | `:core:setup` | The first-run wizard, two-pane Settings, the core pages (Home location, People, Tablet lock), `SetupState`, `LocationSearch` |

@@ -7,6 +7,11 @@ import com.google.common.truth.Truth.assertWithMessage
 import kotlin.coroutines.cancellation.CancellationException
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.StoredSeries
+import uk.co.siland.culvery.core.google.Authorization
+import uk.co.siland.culvery.core.google.Authorizer
+import uk.co.siland.culvery.core.google.PlayServicesCheck
+import uk.co.siland.culvery.core.google.test.FakeAuthorizer
+import uk.co.siland.culvery.core.google.test.granted
 import uk.co.siland.culvery.core.plugin.ToastAction
 import uk.co.siland.culvery.core.plugin.Toaster
 
@@ -20,6 +25,9 @@ internal suspend fun failureOf(block: suspend () -> Unit): Throwable? =
     } catch (e: Exception) {
         e
     }
+
+/** A grant of both calendar scopes. */
+internal fun granted(token: String): Authorization = granted(token, CALENDAR_SCOPES)
 
 /** Toasts nobody reads. */
 internal object NoToasts : Toaster {

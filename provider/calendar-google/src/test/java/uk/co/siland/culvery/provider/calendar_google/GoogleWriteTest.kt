@@ -34,6 +34,7 @@ import uk.co.siland.culvery.capability.calendar.RepeatEnd
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.recurrenceRule
+import uk.co.siland.culvery.core.google.test.FakeTokenSource
 import uk.co.siland.culvery.core.plugin.Connection
 
 @RunWith(AndroidJUnit4::class)

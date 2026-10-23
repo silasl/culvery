@@ -54,6 +54,8 @@ dependencies {
     implementation(project(":core:household"))
     implementation(project(":core:access"))
     implementation(project(":core:setup"))
+    // Wired by Hilt alone: the Google sign-in the calendar and the shopping list share (10 §4.1).
+    implementation(project(":core:google"))
     implementation(project(":capability:calendar"))
     // Wired by Hilt alone: :app's own code never names it (4b design D6).
     implementation(project(":capability:weather"))

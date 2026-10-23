@@ -39,6 +39,7 @@ import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
+import uk.co.siland.culvery.core.google.test.FakeTokenSource
 
 private const val ACCOUNT = "family@example.com"
 
@@ -77,6 +78,13 @@ class GoogleApiTest {
         assertThat(api.send(ACCOUNT, "GET", calendarList).code).isEqualTo(200)
         assertThat(tokens.asked).containsExactly(ACCOUNT)
         assertThat(google.requests.single().getHeader("Authorization")).isEqualTo("Bearer token-1")
+    }
+
+    @Test
+    fun theCalendarAsksOnlyForTheCalendarScopes() = runTest {
+        api.send(ACCOUNT, "GET", calendarList)
+        assertThat(tokens.scopesAsked).isNotEmpty()
+        tokens.scopesAsked.forEach { assertThat(it).isEqualTo(CALENDAR_SCOPES) }
     }
 
     @Test

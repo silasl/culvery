@@ -123,17 +123,10 @@ data class EventDraft(
 /** What an update changes (3a design C3): the title, the start and end together, or who the event is for. */
 enum class EventField { TITLE, TIMES, FOR_PERSON }
 
-/** The connection's sign-in has expired or been revoked (Google: 401, or a refused token refresh). */
-class NeedsSignInException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
-
-/**
- * The provider couldn't be reached, or asked to be tried later: network errors, and for Google 429, 403
- * rate-limit reasons (rateLimitExceeded, userRateLimitExceeded) and every 5xx. The engine retries with backoff.
- */
-open class UnreachableException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
-
-/** The tablet itself has no network (5 §A.3): what a provider throws when it knows, rather than leaving it to a cause. */
-class OfflineException(message: String? = null, cause: Throwable? = null) : UnreachableException(message, cause)
+// Shared with the other Google-backed capabilities (:core:plugin); the calendar keeps its names.
+typealias NeedsSignInException = uk.co.siland.culvery.core.plugin.NeedsSignInException
+typealias UnreachableException = uk.co.siland.culvery.core.plugin.UnreachableException
+typealias OfflineException = uk.co.siland.culvery.core.plugin.OfflineException
 
 /**
  * The source isn't there any more (Google: 404, or a 403 that isn't a rate limit, on events.list). The engine

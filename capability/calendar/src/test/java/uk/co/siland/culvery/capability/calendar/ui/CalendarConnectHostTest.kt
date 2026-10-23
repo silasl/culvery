@@ -41,13 +41,13 @@ import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WeekFocus
 import uk.co.siland.culvery.capability.calendar.YOUR_CALENDARS_LINE
 import uk.co.siland.culvery.capability.calendar.calendarDb
-import uk.co.siland.culvery.capability.calendar.couldNotConnect
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.capability.calendar.householdDb
 import uk.co.siland.culvery.capability.calendar.stubEditor
 import uk.co.siland.culvery.capability.calendar.testAccess
 import uk.co.siland.culvery.core.access.CorePermissions
 import uk.co.siland.culvery.core.access.PinError
+import uk.co.siland.culvery.core.google.couldNotConnect
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase

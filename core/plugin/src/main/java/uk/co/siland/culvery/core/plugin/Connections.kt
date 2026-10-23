@@ -36,3 +36,20 @@ sealed interface ConnectionHealth {
     data object NeedsSignIn : ConnectionHealth
     data class Error(val message: String) : ConnectionHealth
 }
+
+/** The connection's sign-in has expired or been revoked (Google: 401, or a refused token refresh). */
+class NeedsSignInException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+
+/**
+ * The provider couldn't be reached, or asked to be tried later: network errors, and for Google 429, 403
+ * rate-limit reasons (rateLimitExceeded, userRateLimitExceeded) and every 5xx. The engine retries with backoff.
+ */
+open class UnreachableException(message: String? = null, cause: Throwable? = null) : Exception(message, cause)
+
+/** The tablet itself has no network (5 §A.3): what a provider throws when it knows, rather than leaving it to a cause. */
+class OfflineException(message: String? = null, cause: Throwable? = null) : UnreachableException(message, cause)
+
+/** Whether a capability uses a connected account; bound into a set, so a disconnect can say who else depends on it. */
+fun interface AccountUse {
+    suspend fun uses(account: String): Boolean
+}

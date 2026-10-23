@@ -20,6 +20,8 @@ dependencies {
     api(project(":core:household"))
     implementation(project(":core:ui"))
     implementation(project(":core:access"))
+    // couldNotConnect, the words every Google sign-in failure shares.
+    implementation(project(":core:google"))
     testImplementation(libs.roborazzi.core)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.room.testing)

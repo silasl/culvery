@@ -19,7 +19,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
-import uk.co.siland.culvery.capability.calendar.couldNotConnect
+import uk.co.siland.culvery.core.google.Authorization
+import uk.co.siland.culvery.core.google.authorizationFailure
+import uk.co.siland.culvery.core.google.couldNotConnect
+import uk.co.siland.culvery.core.google.test.FakeAuthorizer
+import uk.co.siland.culvery.core.google.test.FakeTokenSource
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator

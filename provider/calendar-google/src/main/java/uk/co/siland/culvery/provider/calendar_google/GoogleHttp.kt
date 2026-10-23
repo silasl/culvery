@@ -20,6 +20,7 @@ import okhttp3.Response
 import uk.co.siland.culvery.capability.calendar.NeedsSignInException
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
+import uk.co.siland.culvery.core.google.TokenSource
 
 const val GOOGLE_CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3/"
 
@@ -163,11 +164,11 @@ class GoogleApi(private val baseUrl: HttpUrl, private val tokens: TokenSource, c
     }
 
     internal suspend fun send(account: String, method: String, url: HttpUrl, body: JsonElement? = null): GoogleResponse {
-        val first = tokens.token(account)
+        val first = tokens.token(account, CALENDAR_SCOPES)
         val answer = execute(first, method, url, body)
         if (answer.code != 401) return answer
         tokens.invalidate(first)
-        val second = execute(tokens.token(account), method, url, body)
+        val second = execute(tokens.token(account, CALENDAR_SCOPES), method, url, body)
         if (second.code == 401) throw NeedsSignInException("Google refused the account's token twice")
         return second
     }

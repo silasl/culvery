@@ -6,10 +6,16 @@ import android.util.Log
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
-import uk.co.siland.culvery.capability.calendar.UnreachableException
-import uk.co.siland.culvery.capability.calendar.couldNotConnect
+import uk.co.siland.culvery.core.google.Authorization
+import uk.co.siland.culvery.core.google.Authorizer
+import uk.co.siland.culvery.core.google.PlayServicesCheck
+import uk.co.siland.culvery.core.google.PlayServicesStatusException
+import uk.co.siland.culvery.core.google.UPDATE_PLAY_SERVICES
+import uk.co.siland.culvery.core.google.couldNotConnect
+import uk.co.siland.culvery.core.google.isUserCancel
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.plugin.UnreachableException
 
 /** Stored with every Google connection: never change it. */
 const val GOOGLE_PROVIDER_ID = "calendar.google"
@@ -50,7 +56,7 @@ internal class GoogleConnectFlow(
             toaster.show(UPDATE_PLAY_SERVICES, urgent = true)
             return ConnectStep.Stopped
         }
-        return step(existing, screensAllowed = true) { authorizer.authorize(existing?.config?.get(CONFIG_ACCOUNT)) }
+        return step(existing, screensAllowed = true) { authorizer.authorize(existing?.config?.get(CONFIG_ACCOUNT), CALENDAR_SCOPES) }
     }
 
     suspend fun afterScreens(existing: Connection?, data: Intent?): ConnectStep =
@@ -97,7 +103,7 @@ internal class GoogleConnectFlow(
             return ConnectStep.Stopped
         }
         // Every later call asks for this email silently; an alias Play services doesn't know would need the user forever.
-        if (authorizer.authorize(email) !is Authorization.Granted) {
+        if (authorizer.authorize(email, CALENDAR_SCOPES) !is Authorization.Granted) {
             Log.w(TAG, "Play services won't grant the primary calendar's account silently; nothing stored")
             return stopWithToast()
         }

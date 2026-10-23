@@ -3,6 +3,7 @@ package uk.co.siland.culvery.provider.calendar_google
 import com.google.common.truth.Truth.assertThat
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Test
+import uk.co.siland.culvery.core.google.test.FakeTokenSource
 
 class PathTemplateTest {
     private val api = GoogleApi("https://www.googleapis.com/calendar/v3/".toHttpUrl(), FakeTokenSource(), okhttp3.OkHttpClient())

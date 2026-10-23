@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import uk.co.siland.culvery.core.google.couldNotConnect
 import uk.co.siland.culvery.core.household.HouseholdRepository
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.plugin.Connection
@@ -23,10 +24,6 @@ import uk.co.siland.culvery.core.plugin.WallClock
 fun connected(service: String): String = "$service connected."
 
 fun reconnected(service: String): String = "$service reconnected."
-
-/** A service that couldn't be reached says check the Wi-Fi; any other failure, try again. */
-fun couldNotConnect(service: String, unreachable: Boolean): String =
-    if (unreachable) "Couldn’t reach $service — check the tablet’s Wi-Fi, then try again." else "Couldn’t connect to $service — try again."
 
 /**
  * Adds and reconnects provider connections and chooses the master calendar: Settings, the Connect card and the

@@ -2,9 +2,6 @@ package uk.co.siland.culvery.provider.calendar_google
 
 import android.app.Activity
 import android.util.Log
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,9 +33,11 @@ import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.capability.calendar.WriteRejectedException
 import uk.co.siland.culvery.capability.calendar.instantIn
 import uk.co.siland.culvery.capability.calendar.withSeriesStart
+import uk.co.siland.culvery.core.google.Authorizer
+import uk.co.siland.culvery.core.google.PlayServicesCheck
+import uk.co.siland.culvery.core.google.rememberGoogleScreens
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
-import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.ui.Icons
@@ -91,42 +90,30 @@ class GoogleCalendarProvider @Inject constructor(
     @Composable
     override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
         val flow = remember { GoogleConnectFlow(authorizer, api, toaster, playServices) }
-        val navigator = LocalShellNavigator.current
         val scope = rememberCoroutineScope()
         val connected by rememberUpdatedState(onConnected)
         val cancelled by rememberUpdatedState(onCancel)
-        val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            // Whatever the answer, Google's screens are over (or never opened): restore the kiosk (4c §5.3).
-            navigator.returnToPinning()
-            // Backed out of the chooser or the consent screen: the card closes with nothing said (3a design §3.2).
-            if (result.resultCode != Activity.RESULT_OK) {
-                cancelled()
-                return@rememberLauncherForActivityResult
-            }
-            scope.launch {
-                // Play services has its answer now; screens asked for a second time read as a stop.
-                when (val step = flow.afterScreens(existing, result.data)) {
-                    is ConnectStep.Done -> connected(step.connection)
-                    else -> cancelled()
+        val screens = rememberGoogleScreens(
+            onAnswer = { resultCode, data ->
+                // Backed out of the chooser or the consent screen: the card closes with nothing said (3a design §3.2).
+                if (resultCode != Activity.RESULT_OK) {
+                    cancelled()
+                } else {
+                    scope.launch {
+                        // Play services has its answer now; screens asked for a second time read as a stop.
+                        when (val step = flow.afterScreens(existing, data)) {
+                            is ConnectStep.Done -> connected(step.connection)
+                            else -> cancelled()
+                        }
+                    }
                 }
-            }
-        }
+            },
+            onNotOpened = { cancelled() },
+        )
         LaunchedEffect(existing) {
             when (val step = flow.start(existing)) {
                 is ConnectStep.Done -> connected(step.connection)
-                is ConnectStep.ShowScreens -> {
-                    // A pinned app can't open another app's screens (4c §5.3); Culvery pins again when it is back in front.
-                    navigator.leavePinning()
-                    try {
-                        launcher.launch(IntentSenderRequest.Builder(step.intent.intentSender).build())
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Google's screens couldn't open (${e::class.simpleName})")
-                        navigator.returnToPinning()
-                        cancelled()
-                    }
-                }
+                is ConnectStep.ShowScreens -> screens.show(step.intent)
                 ConnectStep.Stopped -> cancelled()
             }
         }

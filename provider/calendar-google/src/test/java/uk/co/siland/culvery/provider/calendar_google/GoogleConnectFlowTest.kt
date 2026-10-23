@@ -14,7 +14,13 @@ import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.UnreachableException
-import uk.co.siland.culvery.capability.calendar.couldNotConnect
+import uk.co.siland.culvery.core.google.Authorization
+import uk.co.siland.culvery.core.google.PlayServicesCheck
+import uk.co.siland.culvery.core.google.UPDATE_PLAY_SERVICES
+import uk.co.siland.culvery.core.google.authorizationFailure
+import uk.co.siland.culvery.core.google.couldNotConnect
+import uk.co.siland.culvery.core.google.test.FakeAuthorizer
+import uk.co.siland.culvery.core.google.test.FakeTokenSource
 import uk.co.siland.culvery.core.plugin.Connection
 
 private val COULD_NOT_CONNECT = couldNotConnect(GOOGLE_DISPLAY_NAME, unreachable = false)
@@ -56,6 +62,15 @@ class GoogleConnectFlowTest {
         assertThat(toasts.messages).containsExactly(UPDATE_PLAY_SERVICES)
         assertThat(toasts.urgent).isEqualTo(toasts.messages)
         assertThat(authorizer.accounts).isEmpty()
+    }
+
+    @Test
+    fun connectingAsksOnlyForTheCalendarScopes() = runTest {
+        google.addCalendar("family@example.com", "Family", primary = true)
+        flow.start(existing = null)
+        // The first ask and the silent re-ask for the email.
+        assertThat(authorizer.scopesAsked).hasSize(2)
+        authorizer.scopesAsked.forEach { assertThat(it).isEqualTo(CALENDAR_SCOPES) }
     }
 
     @Test

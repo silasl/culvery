@@ -1,4 +1,4 @@
-package uk.co.siland.culvery.provider.calendar_google
+package uk.co.siland.culvery.core.google
 
 import android.content.Context
 import com.google.android.gms.common.ConnectionResult
