@@ -2,6 +2,8 @@ package uk.co.siland.culvery.core.setup
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
@@ -22,6 +24,7 @@ import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -33,6 +36,7 @@ import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.setup.pages.KioskPage
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertAccessible
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.isReadAsOne
 
 @RunWith(AndroidJUnit4::class)
@@ -150,5 +154,23 @@ class SettingsScreenTest {
     fun settingsIsAPane() {
         show(page("a", "Alpha", 0))
         compose.onNodeWithTag("settings").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Settings"))
+    }
+
+    /** Pin: Settings' pane keeps its 720 dp when the wizard's column narrows to 640. */
+    @Test
+    fun thePaneStaysSevenTwentyWide() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                CompositionLocalProvider(LocalShellNavigator provides navigator) {
+                    Box(Modifier.size(1280.dp, 800.dp)) {
+                        SettingsScreen(listOf(StillPage("a", "Alpha", 0) { Box(Modifier.fillMaxWidth().height(20.dp)) }), onClose = {})
+                    }
+                }
+            }
+        }
+        val width = compose.onNodeWithTag("settings_pane").getUnclippedBoundsInRoot().width.value
+        assertThat(width).isAtMost(720f)
+        assertThat(width).isGreaterThan(700f)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 }

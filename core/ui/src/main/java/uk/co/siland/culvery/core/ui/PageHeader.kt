@@ -18,7 +18,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
@@ -28,6 +30,11 @@ object PageHeaderTokens {
     val titleStyle = HhType.screenTitle.copy(fontSize = 45.sp, fontWeight = FontWeight.W700, letterSpacing = (-0.7).sp)
     val subtitleStyle = HhType.date.copy(fontSize = 15.sp)
     val subtitleGap = 4.dp
+
+    /** A wizard step's or Settings page's title, with its 16 sp line 8 below (9 §4.11, §4.12). */
+    val pageTitleStyle = titleStyle.copy(fontSize = 37.sp, letterSpacing = (-0.6).sp)
+    val pageTitleLineStyle = HhType.body
+    val pageTitleLineGap = 8.dp
     val below = 15.dp
     val trailingGap = 8.dp
 
@@ -76,20 +83,34 @@ fun HhPageHeader(
     modifier: Modifier = Modifier,
     under: (@Composable () -> Unit)? = null,
     footer: (@Composable () -> Unit)? = null,
+    subtitleStyle: TextStyle = PageHeaderTokens.subtitleStyle,
+    subtitleGap: Dp = PageHeaderTokens.subtitleGap,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     Column(modifier.fillMaxWidth().padding(bottom = PageHeaderTokens.below)) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(PageHeaderTokens.trailingGap)) {
             Column(Modifier.weight(1f).align(Alignment.Top)) {
                 title()
-                if (subtitle != null || under != null) Spacer(Modifier.height(PageHeaderTokens.subtitleGap))
-                if (subtitle != null) Text(subtitle, style = PageHeaderTokens.subtitleStyle, color = Culvery.colors.mute)
+                if (subtitle != null || under != null) Spacer(Modifier.height(subtitleGap))
+                if (subtitle != null) Text(subtitle, style = subtitleStyle, color = Culvery.colors.mute)
                 under?.invoke()
             }
             trailing()
         }
         footer?.invoke()
     }
+}
+
+/** A wizard step's or Settings page's title (a heading) with its [line] under it, in the one page-title look (9 §4.11, §4.12). */
+@Composable
+fun HhPageTitle(title: String, line: String? = null, modifier: Modifier = Modifier) {
+    HhPageHeader(
+        title = { Text(title, style = PageHeaderTokens.pageTitleStyle, color = Culvery.colors.ink, modifier = Modifier.semantics { heading() }) },
+        subtitle = line,
+        modifier = modifier,
+        subtitleStyle = PageHeaderTokens.pageTitleLineStyle,
+        subtitleGap = PageHeaderTokens.pageTitleLineGap,
+    )
 }
 
 /**

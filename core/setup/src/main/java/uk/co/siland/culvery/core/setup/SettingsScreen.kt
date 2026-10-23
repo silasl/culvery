@@ -98,7 +98,7 @@ fun SettingsScreen(
             ) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap),
-                    modifier = Modifier.widthIn(max = SetupDimens.wizardColumn).testTag("settings_pane"),
+                    modifier = Modifier.widthIn(max = SetupDimens.settingsPane).testTag("settings_pane"),
                 ) {
                     page?.Content()
                 }

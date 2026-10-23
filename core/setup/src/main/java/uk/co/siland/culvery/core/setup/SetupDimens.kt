@@ -7,23 +7,22 @@ import uk.co.siland.culvery.core.ui.HhType
 
 /** Layout values for the wizard and Settings (4a design §4), named once; those the spec doesn't give say so. */
 internal object SetupDimens {
-    // Wizard frame (§4.1): the step in a centred column 720 wide. Not in the spec: padding 36 top, 32 bottom, 48 at the
-    // sides; dots 10 dp, 10 apart, 32 above the step; 24 above the buttons.
-    val wizardColumn = 720.dp
-    val wizardPaddingTop = 36.dp
+    // Wizard frame (9 §4.11): the step in a centred column 640 wide; Settings' pane keeps 720. Not in the spec: padding
+    // 37 top, 32 bottom, 48 at the sides; dots 11 dp, 9 apart, the current one a 29 dp pill, 43 above the step; 24
+    // above the buttons.
+    val wizardColumn = 640.dp
+    val settingsPane = 720.dp
+    val wizardPaddingTop = 37.dp
     val wizardPaddingBottom = 32.dp
     val wizardPaddingH = 48.dp
-    val dot = 10.dp
-    val dotGap = 10.dp
-
-    // The other steps' dots are 1.5 dp `mute` rings: outline against fill tells the current step without colour.
-    val dotOutline = 1.5.dp
-    val dotsBottom = 32.dp
+    val dot = 11.dp
+    val dotCurrentWidth = 29.dp
+    val dotGap = 9.dp
+    val dotsBottom = 43.dp
     val buttonsTop = 24.dp
 
-    // A step or page (not in the spec): blocks 20 apart; a title's line 8 below it.
+    // A step or page (not in the spec): blocks 20 apart.
     val blockGap = 20.dp
-    val titleLineGap = 8.dp
 
     // The home-app prompt (4c §5.1; not in the spec): its button 12 below its line.
     val homeAppPromptGap = 12.dp
@@ -47,7 +46,7 @@ internal object SetupDimens {
     val footerGap = 10.dp
 
     // Settings (§4.6): the left column 320 wide. Not in the spec: `surf`, padding 32×28; the title 24 above the list;
-    // items 56 dp, radius 16, padding 0 18, 4 apart; the page padded 40×48, at most the wizard's 720 wide.
+    // items 56 dp, radius 16, padding 0 18, 4 apart; the page padded 40×48, at most [settingsPane] wide.
     val settingsList = 320.dp
     val settingsListPaddingV = 32.dp
     val settingsListPaddingH = 28.dp

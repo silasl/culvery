@@ -2,7 +2,10 @@ package uk.co.siland.culvery.core.setup
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -13,7 +16,10 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.setup.pages.KioskPage
+import uk.co.siland.culvery.core.ui.ButtonTone
+import uk.co.siland.culvery.core.ui.ButtonToneKey
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
 @RunWith(AndroidJUnit4::class)
 class KioskPageTest {
@@ -60,5 +66,12 @@ class KioskPageTest {
         compose.onNodeWithText(howTo).assertExists()
         home.isDefault.value = true
         compose.onNodeWithText(howTo).assertExists()
+    }
+
+    @Test
+    fun chooseHomeAppIsTheGreenButtonThere() {
+        show()
+        compose.onNodeWithTag("choose_home_app").assert(SemanticsMatcher.expectValue(ButtonToneKey, ButtonTone.Primary))
+        compose.assertClickablesHaveRoleAndLabel()
     }
 }

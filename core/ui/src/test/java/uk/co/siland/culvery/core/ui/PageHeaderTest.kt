@@ -77,6 +77,17 @@ class PageHeaderTest {
     }
 
     @Test
+    fun aPageTitleIsAHeadingWithItsLineUnderIt() {
+        show { HhPageTitle("Calendars", "Connect and choose.") }
+        compose.onNodeWithText("Calendars").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        val title = compose.onNodeWithText("Calendars").getUnclippedBoundsInRoot()
+        val line = compose.onNodeWithText("Connect and choose.").getUnclippedBoundsInRoot()
+        assertThat(line.top.value - title.bottom.value).isWithin(1f).of(8f)
+        assertThat(compose.onNodeWithText("Calendars").textLayout().layoutInput.style.fontSize).isEqualTo(37.sp)
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
     fun aSubtitleAddsItsLineAndGap() {
         var subtitle by mutableStateOf<String?>(null)
         show { Header(subtitle) }

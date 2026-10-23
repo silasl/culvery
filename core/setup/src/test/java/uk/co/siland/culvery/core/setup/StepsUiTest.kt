@@ -7,6 +7,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -35,9 +38,14 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.setup.steps.DoneStep
+import uk.co.siland.culvery.core.setup.steps.HouseholdStep
+import uk.co.siland.culvery.core.setup.steps.WelcomeContent
 import uk.co.siland.culvery.core.setup.steps.WelcomeStep
 import uk.co.siland.culvery.core.setup.steps.YouStep
+import uk.co.siland.culvery.core.ui.ButtonTone
+import uk.co.siland.culvery.core.ui.ButtonToneKey
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.PersonPalette
 
 @RunWith(AndroidJUnit4::class)
@@ -183,5 +191,46 @@ class StepsUiTest {
         home.isDefault.value = true
         compose.waitForIdle()
         compose.onNodeWithText("Choose home app").assertDoesNotExist()
+    }
+
+    private fun greenButtons() = compose.onAllNodes(SemanticsMatcher.expectValue(ButtonToneKey, ButtonTone.Primary))
+
+    private fun inFrame(forward: Forward, content: @Composable () -> Unit) = compose.setContent {
+        CompositionLocalProvider(LocalOverlayHost provides overlay, LocalShellNavigator provides RecordingNavigator()) {
+            CulveryTheme(dark = true) {
+                WizardFrame(5, 1, back = {}, forward = forward, busy = false, onForward = {}, onSkip = {}) { content() }
+            }
+        }
+    }
+
+    /** One green button per screen (9 §4.11). Review calendars' count is in its own module's test. */
+    @Test
+    fun eachStepHasAtMostOneGreenButton() {
+        inFrame(Forward.Next("Next", enabled = true)) { WelcomeContent(onSample = {}, busy = false) }
+        greenButtons().assertCountEquals(1)
+        compose.onNodeWithTag("wizard_next").assert(SemanticsMatcher.expectValue(ButtonToneKey, ButtonTone.Primary))
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun householdWithOnlyYouHasNoGreenButton() {
+        runBlocking { access.pins.addPerson("Alex", PersonPalette.colors[0], Role.ADMIN, null) }
+        inFrame(Forward.Skip) { HouseholdStep(editor).Content(onNext = {}) }
+        compose.awaitTag("people_add")
+        greenButtons().assertCountEquals(0)
+        listOf("people_add", "wizard_skip").forEach {
+            compose.onNodeWithTag(it).assert(SemanticsMatcher.expectValue(ButtonToneKey, ButtonTone.Quiet))
+        }
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun doneWithTheHomeAppPromptHasOneGreenButton() {
+        val done = DoneStep(runBlocking { states.start() }, access.control, SetupSessionGate(household, access.control), FakeHomeApp(default = false))
+        inFrame(Forward.Next(OPEN_CULVERY, enabled = true)) { done.Content(onNext = {}) }
+        compose.onNodeWithTag("choose_home_app").assert(SemanticsMatcher.expectValue(ButtonToneKey, ButtonTone.Quiet))
+        greenButtons().assertCountEquals(1)
+        compose.onNodeWithTag("wizard_next").assert(SemanticsMatcher.expectValue(ButtonToneKey, ButtonTone.Primary))
+        compose.assertClickablesHaveRoleAndLabel()
     }
 }

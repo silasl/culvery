@@ -27,7 +27,6 @@ import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.household.label
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.ButtonSurface
-import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.ControlTokens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
@@ -57,7 +56,7 @@ internal fun PeopleList(members: List<Member>, onEdit: (Member) -> Unit, onAdd: 
                 )
             }
         }
-        if (onAdd != null) HhButton(ADD_PERSON, onAdd, Modifier.testTag("people_add"), tone = ButtonTone.Primary, on = ButtonSurface.Bg)
+        if (onAdd != null) HhButton(ADD_PERSON, onAdd, Modifier.testTag("people_add"), icon = Icons.PERSON_ADD, on = ButtonSurface.Bg)
     }
 }
 

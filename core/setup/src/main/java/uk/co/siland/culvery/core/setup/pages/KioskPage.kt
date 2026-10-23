@@ -21,6 +21,7 @@ import uk.co.siland.culvery.core.setup.TABLET_LOCK
 import uk.co.siland.culvery.core.setup.TABLET_LOCK_LINE
 import uk.co.siland.culvery.core.setup.USE_OTHER_APPS
 import uk.co.siland.culvery.core.ui.ButtonSurface
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 
@@ -42,7 +43,7 @@ class KioskPage @Inject constructor(private val homeApp: HomeApp) : SettingsPage
         if (isHome) {
             HhButton(CHANGE_HOME_APP, navigator::changeHomeApp, Modifier.testTag("settings_change_home_app"), on = ButtonSurface.Bg)
         } else {
-            HomeAppPrompt(onChoose = navigator::chooseHomeApp)
+            HomeAppPrompt(onChoose = navigator::chooseHomeApp, tone = ButtonTone.Primary)
         }
         // Shown whether or not Culvery is the home app: the page is where there is time to read it.
         Text(HOME_APP_HOW_TO, style = SetupType.secondary, color = Culvery.colors.mute, modifier = Modifier.testTag("kiosk_how_to"))

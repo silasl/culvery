@@ -108,6 +108,9 @@ internal const val BUSY_STATE = "Saving"
 /** A button's spoken name, kept apart from other descriptions so the shared test helper can check it starts with the label. */
 val SpokenNameKey = SemanticsPropertyKey<String>("SpokenName")
 
+/** A button's tone, set by [HhButton] and [HhRoundButton] so a test can count the green ones on a screen. */
+val ButtonToneKey = SemanticsPropertyKey<ButtonTone>("ButtonTone")
+
 /**
  * The one button (4d-1 §4.1): a pill at least [size]'s height, a one-line label, an optional icon before it and an optional
  * [trailingIcon] after it ("Door history ›"). Disabled, every tone is an outline with a `mute` label (9 §6.4) and does nothing. [spokenName] names a button whose label repeats
@@ -158,6 +161,7 @@ fun HhButton(
         modifier = modifier
             .heightIn(min = if (large) ButtonTokens.largeHeight else ButtonTokens.regularHeight)
             .buttonFill(fill, outline, pill)
+            .semantics { this[ButtonToneKey] = tone }
             .then(
                 if (spokenName != null) {
                     Modifier.semantics {
@@ -219,7 +223,10 @@ fun HhRoundButton(
         modifier = modifier
             .size(size)
             .buttonFill(fill, outline, CircleShape)
-            .semantics { contentDescription = spoken }
+            .semantics {
+                contentDescription = spoken
+                this[ButtonToneKey] = tone
+            }
             .then(if (repeatWhileHeld) Modifier.heldClickable(onClick, enabled) else Modifier.hhClickable(onClick, enabled = enabled)),
     ) {
         HhIcon(icon, size = iconSize, tint = ink)

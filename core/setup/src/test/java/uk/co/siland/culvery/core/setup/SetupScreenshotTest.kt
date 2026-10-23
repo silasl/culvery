@@ -26,6 +26,7 @@ import uk.co.siland.culvery.core.plugin.NEXT_LABEL
 import uk.co.siland.culvery.core.setup.steps.WelcomeContent
 import uk.co.siland.culvery.core.setup.steps.YouForm
 import uk.co.siland.culvery.core.setup.steps.YouFormContent
+import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.PersonPalette
@@ -153,7 +154,7 @@ class SetupScreenshotTest {
 
     private fun done(name: String, dark: Boolean) = step(name, dark, 6, Forward.Next("Open Culvery", enabled = true)) {
         StepTitle("Culvery is ready")
-        HomeAppPrompt(onChoose = {})
+        HomeAppPrompt(onChoose = {}, tone = ButtonTone.Quiet)
     }
 
     @Test fun welcomeDark() = welcome("welcome_dark", true, sample = false)

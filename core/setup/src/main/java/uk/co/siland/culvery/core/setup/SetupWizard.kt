@@ -2,7 +2,6 @@ package uk.co.siland.culvery.core.setup
 
 import android.util.Log
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,10 +50,13 @@ import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.CONTINUE_SETUP
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SetupStep
+import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.KeepsToastsAbove
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "SetupWizard"
@@ -151,7 +153,7 @@ private fun Steps(steps: List<SetupStep>, statuses: List<StepStatus>, current: I
     }
 }
 
-/** 4a design §4.1: dots at the top centre, the step in a 720 dp column, Back left and the forward button right. */
+/** 9 §4.11: dots at the top centre, the step in a 640 dp column, and Back left and the forward button right at its foot. */
 @Composable
 internal fun WizardFrame(
     dotCount: Int,
@@ -179,36 +181,48 @@ internal fun WizardFrame(
         Dots(dotCount, dotIndex)
         Spacer(Modifier.height(SetupDimens.dotsBottom))
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap),
-                modifier = Modifier
-                    .testTag("wizard_step")
-                    .width(SetupDimens.wizardColumn)
-                    .fillMaxHeight()
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                content()
-            }
-        }
-        Spacer(Modifier.height(SetupDimens.buttonsTop))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            if (back != null) HhButton(BACK, back, Modifier.testTag("wizard_back"), enabled = !busy, on = ButtonSurface.Bg)
-            Spacer(Modifier.weight(1f))
-            when (forward) {
-                Forward.Skip -> HhButton(SKIP_FOR_NOW, onSkip, Modifier.testTag("wizard_skip"), enabled = !busy, on = ButtonSurface.Bg)
-                is Forward.Next -> HhButton(
-                    forward.label,
-                    onForward,
-                    Modifier.testTag("wizard_next"),
-                    tone = ButtonTone.Primary,
-                    enabled = forward.enabled && !busy,
-                    on = ButtonSurface.Bg,
-                )
+            Column(Modifier.width(SetupDimens.wizardColumn).fillMaxHeight()) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(SetupDimens.blockGap),
+                    modifier = Modifier
+                        .testTag("wizard_step")
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    content()
+                }
+                Spacer(Modifier.height(SetupDimens.buttonsTop))
+                KeepsToastsAbove {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        if (back != null) {
+                            HhButton(BACK, back, Modifier.testTag("wizard_back"), size = ButtonSize.Large, enabled = !busy, on = ButtonSurface.Bg)
+                        }
+                        Spacer(Modifier.weight(1f))
+                        when (forward) {
+                            Forward.Skip -> HhButton(
+                                SKIP_FOR_NOW, onSkip, Modifier.testTag("wizard_skip"), size = ButtonSize.Large, enabled = !busy, on = ButtonSurface.Bg,
+                            )
+                            is Forward.Next -> HhButton(
+                                forward.label,
+                                onForward,
+                                Modifier.testTag("wizard_next"),
+                                tone = ButtonTone.Primary,
+                                size = ButtonSize.Large,
+                                trailingIcon = Icons.ARROW_FORWARD,
+                                enabled = forward.enabled && !busy,
+                                on = ButtonSurface.Bg,
+                                busy = busy,
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
+/** Done steps and the current one in `accent`, the current one a pill so its place shows without colour; the rest `surf3` (9 §4.11). */
 @Composable
 private fun Dots(count: Int, index: Int) {
     val c = Culvery.colors
@@ -217,14 +231,13 @@ private fun Dots(count: Int, index: Int) {
         modifier = Modifier.fillMaxWidth().testTag("wizard_dots").semantics { contentDescription = stepOf(index, count) },
     ) {
         repeat(count) { i ->
-            val current = i == index
             Box(
                 Modifier
                     .testTag("wizard_dot")
                     .semantics { hideFromAccessibility() }
-                    .size(SetupDimens.dot)
+                    .size(if (i == index) SetupDimens.dotCurrentWidth else SetupDimens.dot, SetupDimens.dot)
                     .clip(CircleShape)
-                    .then(if (current) Modifier.background(c.accent) else Modifier.border(SetupDimens.dotOutline, c.mute, CircleShape)),
+                    .background(if (i <= index) c.accent else c.surf3),
             )
         }
     }
