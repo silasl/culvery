@@ -144,7 +144,7 @@ internal fun ConnectedStepCard(rows: List<CalendarRow>) {
 internal fun ReviewCalendarsHost(review: CalendarReview, connections: CalendarConnections, clock: HouseholdClock, title: String, offerConnect: Boolean, line: String? = null) {
     // Null until the store answers, so the page draws nothing rather than "Connect…" first.
     val list by review.connections.collectAsStateWithLifecycle<List<ReviewConnection>?>(null)
-    val people by review.people.collectAsStateWithLifecycle(listOf(Person.Family))
+    val people by review.people.collectAsStateWithLifecycle<List<Person>?>(null)
     val connectable by connections.connectable.collectAsStateWithLifecycle<List<CalendarProvider>?>(null)
     val descriptors = remember(connectable, offerConnect) { if (offerConnect) connectable.orEmpty().map { it.descriptor } else emptyList() }
     val connector = rememberConnector(connections)
@@ -194,13 +194,13 @@ internal class ReviewActions(
 /**
  * 9 §4.12: per connection, "{Service} · {account}", its health, Reconnect when needed and Disconnect (confirmed first);
  * per calendar, a card: its name and, on the main one, the badge; who it is for (a dropdown of Family and the people);
- * Show; Use for new events; and a read problem in a strip at the foot. Draws nothing while [connections] is null.
+ * Show; Use for new events; and a read problem in a strip at the foot. Draws nothing while [connections] or [people] is null.
  */
 @Composable
 internal fun ReviewCalendars(
     title: String,
     connections: List<ReviewConnection>?,
-    people: List<Person>,
+    people: List<Person>?,
     nowMillis: Long,
     busy: Boolean,
     picking: String?,
@@ -209,10 +209,9 @@ internal fun ReviewCalendars(
     actions: ReviewActions,
     line: String? = null,
 ) {
-    if (connections == null) return
+    if (connections == null || people == null) return
     Column(verticalArrangement = Arrangement.spacedBy(CalendarDimens.reviewBlockGap), modifier = Modifier.testTag("review_calendars")) {
-        HhPageTitle(title)
-        if (line != null) Text(line, style = CalendarType.subtitle, color = Culvery.colors.mute)
+        HhPageTitle(title, line)
         if (connections.isEmpty()) {
             Text(
                 "Connect your family’s Google Calendar to see it on Home.",
@@ -398,6 +397,7 @@ private fun PersonPill(source: StoredSource, person: Person, picking: Boolean, o
             horizontalArrangement = Arrangement.spacedBy(CalendarDimens.pillGap),
             modifier = Modifier
                 .heightIn(min = CalendarDimens.pillHeight)
+                .widthIn(max = CalendarDimens.personPillMaxWidth)
                 .clip(RoundedCornerShape(percent = 50))
                 .background(c.surf2)
                 .padding(horizontal = CalendarDimens.personPillPaddingH),

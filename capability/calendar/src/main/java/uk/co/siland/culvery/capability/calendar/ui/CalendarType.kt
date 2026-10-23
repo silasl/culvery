@@ -513,6 +513,7 @@ internal object CalendarDimens {
     val pillHeight = 37.dp
     val personPillPaddingH = 13.dp
     val pillGap = 6.dp
+    val personPillMaxWidth = 140.dp
     val pillDot = 9.dp
     val pillChevron = 17.dp
 

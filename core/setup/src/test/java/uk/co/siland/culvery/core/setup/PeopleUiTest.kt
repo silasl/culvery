@@ -480,6 +480,21 @@ class PeopleUiTest {
     }
 
     @Test
+    fun aColourRefusalIsNotShownBesideAFreeColourChosenWhileSaving() {
+        val form = PersonForm(existing = null, taken = emptyMap()).apply { name = "Sam" }
+        val sent = checkNotNull(form.draft().color)
+        val free = PersonPalette.colors.first { it != sent }
+        form.color = free
+        form.refuse(PeopleOutcome.Refused(COLOUR_TAKEN, PersonField.COLOUR))
+        assertThat(form.errorFor(PersonField.COLOUR)).isNull()
+        assertThat(form.taken).containsKey(sent)
+        assertThat(form.canSave).isTrue()
+        form.color = sent
+        form.refuse(PeopleOutcome.Refused(COLOUR_TAKEN, PersonField.COLOUR))
+        assertThat(form.errorFor(PersonField.COLOUR)).isEqualTo(COLOUR_TAKEN)
+    }
+
+    @Test
     fun theLocationAndPeoplePageTitlesAreTheSharedPageTitle() {
         val noTowns = object : LocationSearch {
             override suspend fun search(query: String) = emptyList<PlaceMatch>()

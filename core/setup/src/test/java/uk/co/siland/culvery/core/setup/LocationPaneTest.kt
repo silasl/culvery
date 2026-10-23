@@ -240,6 +240,18 @@ class LocationPaneTest {
         compose.onNodeWithTag("location_query").assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Town or city")))
     }
 
+    /** Compose leaves a zero-size node out of TalkBack's tree, and its count and a later failed save would go unspoken. */
+    @Test
+    fun theStatusNodeKeepsASizeInTheFoundStateSoTalkBackKeepsIt() {
+        search.answer = { listOf(brighton) }
+        show()
+        type("Can")
+        advance(500)
+        val status = compose.onNodeWithTag("location_status").assert(polite)
+        status.assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("1 town found")))
+        assertThat(status.getUnclippedBoundsInRoot().height.value).isAtLeast(1f)
+    }
+
     @Test
     fun aSearchSaysSoWhileItRuns() {
         search.answer = { awaitCancellation() }
@@ -314,7 +326,7 @@ class LocationPaneTest {
         show()
         type("Can")
         advance(500)
-        assertThat(compose.onNodeWithTag("location_status").getUnclippedBoundsInRoot().height.value).isEqualTo(0f)
+        assertThat(compose.onNodeWithTag("location_status").getUnclippedBoundsInRoot().height.value).isAtMost(2f)
         compose.onNodeWithTag("place_0").performClick()
         advance(100)
         assertDirectlyUnderTheField()

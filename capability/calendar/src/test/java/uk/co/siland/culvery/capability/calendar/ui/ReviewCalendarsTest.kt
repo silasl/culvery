@@ -310,39 +310,49 @@ class ReviewCalendarsTest {
     fun aLongNameWithTheBadgeFitsAtLargeFont() {
         val long = "Birthdays, holidays and school term dates"
         assertThat(long.length).isAtLeast(40)
+        val longPerson = Person(PersonId("long"), "Bartholomew Featherstonehaugh", 0xFF4F8EF7)
         var pane by mutableStateOf(720.dp)
+        var who by mutableStateOf(Person.Family)
         compose.setContent {
             CulveryTheme(dark = true) {
                 WithFontScale(1.3f) {
                     Box(Modifier.width(pane)) {
+                        val source = family.copy(source = family.source.copy(name = long), mapping = SourceMapping(who.id, visible = true))
                         ReviewCalendars(
-                            "Calendars", listOf(ReviewConnection(row(), listOf(family.copy(source = family.source.copy(name = long))))),
-                            listOf(Person.Family, mia), now, false, null, null, emptyList(), ReviewActions(),
+                            "Calendars", listOf(ReviewConnection(row(), listOf(source))),
+                            listOf(Person.Family, longPerson), now, false, null, null, emptyList(), ReviewActions(),
                         )
                     }
                 }
             }
         }
-        listOf(720.dp, 640.dp).forEach { width ->
-            pane = width
-            compose.waitForIdle()
-            val name = compose.onNodeWithText(long, useUnmergedTree = true)
-            val boxes = listOf(
-                name.getBoundsInRoot(),
-                compose.onNodeWithTag("review_main_family").getBoundsInRoot(),
-                compose.onNodeWithTag("review_person_family").getBoundsInRoot(),
-                compose.onNodeWithTag("review_show_family").getBoundsInRoot(),
-            )
-            boxes.forEachIndexed { i, a ->
-                boxes.drop(i + 1).forEach { b ->
-                    assertThat(a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom).isFalse()
+        listOf(Person.Family, longPerson).forEach { person ->
+            listOf(720.dp, 640.dp).forEach { width ->
+                who = person
+                pane = width
+                compose.waitForIdle()
+                val name = compose.onNodeWithText(long, useUnmergedTree = true)
+                val boxes = listOf(
+                    name.getBoundsInRoot(),
+                    compose.onNodeWithTag("review_main_family").getBoundsInRoot(),
+                    compose.onNodeWithTag("review_person_family").getBoundsInRoot(),
+                    compose.onNodeWithTag("review_show_family").getBoundsInRoot(),
+                )
+                boxes.forEachIndexed { i, a ->
+                    boxes.drop(i + 1).forEach { b ->
+                        assertThat(a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom).isFalse()
+                    }
                 }
+                assertThat(name.textLayout().isLineEllipsized(0)).isTrue()
+                assertThat(boxes[0].right.value - boxes[0].left.value).isAtLeast(if (width == 640.dp) 25f else 100f)
+                val badge = compose.onNodeWithText(MAIN_NEW_EVENTS_GO_HERE, useUnmergedTree = true).textLayout()
+                assertThat(badge.lineCount).isEqualTo(1)
+                assertThat(badge.isLineEllipsized(0)).isFalse()
+                if (person == longPerson) {
+                    assertThat(compose.onNodeWithText(person.name, useUnmergedTree = true).textLayout().isLineEllipsized(0)).isTrue()
+                }
+                compose.assertClickablesHaveRoleAndLabel()
             }
-            assertThat(name.textLayout().isLineEllipsized(0)).isTrue()
-            val badge = compose.onNodeWithText(MAIN_NEW_EVENTS_GO_HERE, useUnmergedTree = true).textLayout()
-            assertThat(badge.lineCount).isEqualTo(1)
-            assertThat(badge.isLineEllipsized(0)).isFalse()
-            compose.assertClickablesHaveRoleAndLabel()
         }
     }
 
@@ -369,17 +379,33 @@ class ReviewCalendarsTest {
     @Test
     fun nothingShowsUntilTheConnectionsAnswer() {
         var answer by mutableStateOf<List<ReviewConnection>?>(null)
+        var people by mutableStateOf<List<Person>?>(null)
         compose.setContent {
             CulveryTheme(dark = true) {
-                ReviewCalendars("Calendars", answer, listOf(Person.Family, mia), now, false, null, null, emptyList(), ReviewActions())
+                ReviewCalendars("Calendars", answer, people, now, false, null, null, emptyList(), ReviewActions())
             }
         }
         compose.onNodeWithTag("review_none").assertDoesNotExist()
         compose.onNodeWithTag("review_source_family").assertDoesNotExist()
         compose.onNodeWithText("Calendars").assertDoesNotExist()
         answer = emptyList()
+        compose.onNodeWithTag("review_none").assertDoesNotExist()
+        compose.onNodeWithText("Calendars").assertDoesNotExist()
+        people = listOf(Person.Family, mia)
         compose.onNodeWithTag("review_none").assertExists()
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theLineSitsUnderTheTitleInThePageTitleLook() {
+        compose.setContent {
+            CulveryTheme(dark = true) {
+                ReviewCalendars("Your calendars", emptyList(), listOf(Person.Family), now, false, null, null, emptyList(), ReviewActions(), line = "Pick who each one is for.")
+            }
+        }
+        val title = compose.onNodeWithText("Your calendars").getBoundsInRoot()
+        val line = compose.onNodeWithText("Pick who each one is for.").getBoundsInRoot()
+        assertThat(line.top.value - title.bottom.value).isWithin(1f).of(8f)
     }
 
     @Test
