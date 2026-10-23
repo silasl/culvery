@@ -12,6 +12,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.shopping.SHOPPING_CONFIG_ACCOUNT
 import uk.co.siland.culvery.core.google.Authorization
 import uk.co.siland.culvery.core.google.Authorizer
+import uk.co.siland.culvery.core.google.ConnectStep
 import uk.co.siland.culvery.core.google.PlayServicesCheck
 import uk.co.siland.culvery.core.google.UPDATE_PLAY_SERVICES
 import uk.co.siland.culvery.core.google.authorizationFailure
@@ -44,7 +45,7 @@ class TasksConnectFlowTest {
     @Test
     fun aGrantFindsTheShoppingList() = runTest {
         google.on("GET", LISTS, google.json(resource("tasklists.json")))
-        val done = flow.start(SAM, existing = null) as TasksConnectStep.Done
+        val done = flow.start(SAM, existing = null) as ConnectStep.Done
         assertThat(done.connection.providerId).isEqualTo(TASKS_PROVIDER_ID)
         assertThat(done.connection.label).isEqualTo("Google Tasks")
         assertThat(done.connection.config).containsExactly(SHOPPING_CONFIG_ACCOUNT, SAM, CONFIG_LIST, "S1")
@@ -56,7 +57,7 @@ class TasksConnectFlowTest {
     fun noShoppingListMakesOne() = runTest {
         google.on("GET", LISTS, google.json(resource("tasklists_none.json")))
         google.on("POST", LISTS, google.json("""{"id":"S9","title":"Shopping"}"""))
-        val done = flow.start(SAM, existing = null) as TasksConnectStep.Done
+        val done = flow.start(SAM, existing = null) as ConnectStep.Done
         assertThat(done.connection.config[CONFIG_LIST]).isEqualTo("S9")
         val posts = google.seen.filter { it.method == "POST" }
         assertThat(posts.map { it.body }).containsExactly("""{"title":"Shopping"}""")
@@ -65,7 +66,7 @@ class TasksConnectFlowTest {
     @Test
     fun withoutTheTasksScopeNothingIsStored() = runTest {
         authorizer.next = granted("t", listOf("https://www.googleapis.com/auth/calendar.events"))
-        assertThat(flow.start(SAM, existing = null)).isEqualTo(TasksConnectStep.Stopped)
+        assertThat(flow.start(SAM, existing = null)).isEqualTo(ConnectStep.Stopped)
         assertThat(toaster.shown).containsExactly("Google Tasks wasn’t allowed. Try again and tick Google Tasks.")
         assertThat(google.seen).isEmpty()
     }
@@ -74,8 +75,8 @@ class TasksConnectFlowTest {
     fun screensAreAskedForFirst() = runTest {
         google.on("GET", LISTS, google.json(resource("tasklists.json")))
         authorizer.next = Authorization.NeedsUser(screens())
-        assertThat(flow.start(SAM, existing = null)).isInstanceOf(TasksConnectStep.ShowScreens::class.java)
-        val done = flow.afterScreens(SAM, existing = null, data = Intent()) as TasksConnectStep.Done
+        assertThat(flow.start(SAM, existing = null)).isInstanceOf(ConnectStep.ShowScreens::class.java)
+        val done = flow.afterScreens(SAM, existing = null, data = Intent()) as ConnectStep.Done
         assertThat(done.connection.config[CONFIG_LIST]).isEqualTo("S1")
         assertThat(toaster.shown).isEmpty()
     }
@@ -85,14 +86,14 @@ class TasksConnectFlowTest {
         val cancelling = object : Authorizer by authorizer {
             override fun authorizationFrom(data: Intent?): Authorization = throw authorizationFailure(CommonStatusCodes.CANCELED)
         }
-        assertThat(flowWith(cancelling).afterScreens(SAM, existing = null, data = Intent())).isEqualTo(TasksConnectStep.Stopped)
+        assertThat(flowWith(cancelling).afterScreens(SAM, existing = null, data = Intent())).isEqualTo(ConnectStep.Stopped)
         assertThat(toaster.shown).isEmpty()
     }
 
     @Test
     fun screensThatStillDoNotGrantStopAndSaySo() = runTest {
         authorizer.fromScreens = Authorization.NeedsUser(screens())
-        assertThat(flow.afterScreens(SAM, existing = null, data = Intent())).isEqualTo(TasksConnectStep.Stopped)
+        assertThat(flow.afterScreens(SAM, existing = null, data = Intent())).isEqualTo(ConnectStep.Stopped)
         assertThat(toaster.shown).containsExactly(couldNotConnect("Google Tasks", unreachable = false))
     }
 
@@ -107,7 +108,7 @@ class TasksConnectFlowTest {
     @Test
     fun aReAllowKeepsTheListAndNeverLooksItUpOrMakesAnother() = runTest {
         val existing = Connection("c7", TASKS_PROVIDER_ID, "Google Tasks", mapOf(SHOPPING_CONFIG_ACCOUNT to SAM, CONFIG_LIST to "L7"))
-        val done = flow.start(SAM, existing) as TasksConnectStep.Done
+        val done = flow.start(SAM, existing) as ConnectStep.Done
         assertThat(done.connection).isEqualTo(existing)
         assertThat(google.seen).isEmpty()
     }
@@ -115,7 +116,7 @@ class TasksConnectFlowTest {
     @Test
     fun aReAllowUsesTheConnectionsOwnAccountAndKeepsItsOtherKeys() = runTest {
         val existing = Connection("c7", TASKS_PROVIDER_ID, "Google Tasks", mapOf(SHOPPING_CONFIG_ACCOUNT to SAM, CONFIG_LIST to "L7", "extra" to "kept"))
-        val done = flow.start("family@example.com", existing) as TasksConnectStep.Done
+        val done = flow.start("family@example.com", existing) as ConnectStep.Done
         assertThat(authorizer.accounts).containsExactly(SAM)
         assertThat(done.connection).isEqualTo(existing)
     }
@@ -124,21 +125,21 @@ class TasksConnectFlowTest {
     fun aReAllowWithoutTheScopeStillStops() = runTest {
         val existing = Connection("c7", TASKS_PROVIDER_ID, "Google Tasks", mapOf(SHOPPING_CONFIG_ACCOUNT to SAM, CONFIG_LIST to "L7"))
         authorizer.next = granted("t", emptyList())
-        assertThat(flow.start(SAM, existing)).isEqualTo(TasksConnectStep.Stopped)
+        assertThat(flow.start(SAM, existing)).isEqualTo(ConnectStep.Stopped)
         assertThat(toaster.shown).hasSize(1)
     }
 
     @Test
     fun aListLookupThatFailsSaysCouldNotConnect() = runTest {
         google.on("GET", LISTS, google.json("{}", 503))
-        assertThat(flow.start(SAM, existing = null)).isEqualTo(TasksConnectStep.Stopped)
+        assertThat(flow.start(SAM, existing = null)).isEqualTo(ConnectStep.Stopped)
         assertThat(toaster.shown).containsExactly(couldNotConnect("Google Tasks", unreachable = true))
     }
 
     @Test
     fun playServicesThatCantSignInStartNothing() = runTest {
         val stuck = flowWith(authorizer, PlayServicesCheck { false })
-        assertThat(stuck.start(SAM, existing = null)).isEqualTo(TasksConnectStep.Stopped)
+        assertThat(stuck.start(SAM, existing = null)).isEqualTo(ConnectStep.Stopped)
         assertThat(toaster.shown).containsExactly(UPDATE_PLAY_SERVICES)
         assertThat(authorizer.accounts).isEmpty()
     }

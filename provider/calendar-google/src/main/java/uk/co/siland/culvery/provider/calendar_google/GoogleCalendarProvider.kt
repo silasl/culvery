@@ -1,19 +1,13 @@
 package uk.co.siland.culvery.provider.calendar_google
 
-import android.app.Activity
 import android.util.Log
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
@@ -35,8 +29,8 @@ import uk.co.siland.culvery.capability.calendar.instantIn
 import uk.co.siland.culvery.capability.calendar.withSeriesStart
 import uk.co.siland.culvery.core.google.Authorizer
 import uk.co.siland.culvery.core.google.GoogleAnswer
+import uk.co.siland.culvery.core.google.GoogleConnectHost
 import uk.co.siland.culvery.core.google.PlayServicesCheck
-import uk.co.siland.culvery.core.google.rememberGoogleScreens
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
@@ -91,33 +85,13 @@ class GoogleCalendarProvider @Inject constructor(
     @Composable
     override fun ConnectScreen(existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
         val flow = remember { GoogleConnectFlow(authorizer, api, toaster, playServices) }
-        val scope = rememberCoroutineScope()
-        val connected by rememberUpdatedState(onConnected)
-        val cancelled by rememberUpdatedState(onCancel)
-        val screens = rememberGoogleScreens(
-            onAnswer = { resultCode, data ->
-                // Backed out of the chooser or the consent screen: the card closes with nothing said (3a design §3.2).
-                if (resultCode != Activity.RESULT_OK) {
-                    cancelled()
-                } else {
-                    scope.launch {
-                        // Play services has its answer now; screens asked for a second time read as a stop.
-                        when (val step = flow.afterScreens(existing, data)) {
-                            is ConnectStep.Done -> connected(step.connection)
-                            else -> cancelled()
-                        }
-                    }
-                }
-            },
-            onNotOpened = { cancelled() },
+        GoogleConnectHost(
+            key = existing,
+            onConnected = onConnected,
+            onCancel = onCancel,
+            start = { flow.start(existing) },
+            afterScreens = { flow.afterScreens(existing, it) },
         )
-        LaunchedEffect(existing) {
-            when (val step = flow.start(existing)) {
-                is ConnectStep.Done -> connected(step.connection)
-                is ConnectStep.ShowScreens -> screens.show(step.intent)
-                ConnectStep.Stopped -> cancelled()
-            }
-        }
     }
 
     override suspend fun sources(conn: Connection): List<CalendarSource> {

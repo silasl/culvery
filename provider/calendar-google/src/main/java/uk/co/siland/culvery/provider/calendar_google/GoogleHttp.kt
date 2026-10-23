@@ -57,7 +57,7 @@ internal value class GoogleCall private constructor(override val label: String) 
 
 private val SERVICE = GoogleService(TAG, "Google Calendar")
 
-/** Calendar's own 403 quota reason, besides Google's (3a design ง3.7). */
+/** Calendar's own 403 quota reason, besides Google's (3a design ยง3.7). */
 private val CALENDAR_RATE_LIMITS = setOf("calendarUsageLimitsExceeded")
 
 /** Path segments that are Google's words rather than ids, and the ones after which an id always follows. */

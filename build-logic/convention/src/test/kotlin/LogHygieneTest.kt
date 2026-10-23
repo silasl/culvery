@@ -87,14 +87,14 @@ internal object LogHygiene {
      *
      * `command.name` is a music command's name (`MusicCommand`, 6 §6: the command and its outcome only).
      *
-     * `service.displayName` is the Google API's fixed name, "Google Calendar" or "Google Tasks" (`core/google`).
+     * `service.displayName` is the Google API's fixed name, "Google Calendar" or "Google Tasks" (`core/google`); `this.logName` is the same, as the connect flow says it ("Google" or "Google Tasks").
      *
      * `heat.*` are the tablet's thermal status and battery numbers (8 §4.7).
      */
     val ALLOWED = setOf(
         "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",
         "step.id", "stored.connection.id", "this.id", "this.kind", "kind.name", "this.failedDrains", "this.reason",
-        "answer.reason", "what.label", "service.displayName", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
+        "answer.reason", "what.label", "service.displayName", "this.logName", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
         "post.captureLine", "reading.outcome", "command.name", "heat.status", "heat.batteryTenths", "heat.batteryPercent",
     )
 

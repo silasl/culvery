@@ -1,13 +1,8 @@
 package uk.co.siland.culvery.provider.shopping_google_tasks
 
-import android.app.Activity
 import android.util.Log
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
@@ -15,7 +10,6 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -30,11 +24,11 @@ import uk.co.siland.culvery.capability.shopping.ShoppingItem
 import uk.co.siland.culvery.capability.shopping.ShoppingProvider
 import uk.co.siland.culvery.capability.shopping.ShoppingRejectedException
 import uk.co.siland.culvery.core.google.Authorizer
-import uk.co.siland.culvery.core.google.GoogleAnswer
-import uk.co.siland.culvery.core.google.GoogleJson
 import uk.co.siland.culvery.core.google.GoogleAccounts
+import uk.co.siland.culvery.core.google.GoogleAnswer
+import uk.co.siland.culvery.core.google.GoogleConnectHost
+import uk.co.siland.culvery.core.google.GoogleJson
 import uk.co.siland.culvery.core.google.PlayServicesCheck
-import uk.co.siland.culvery.core.google.rememberGoogleScreens
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
@@ -81,38 +75,14 @@ class GoogleTasksProvider @Inject constructor(
 
     @Composable
     override fun ConnectScreen(account: String?, existing: Connection?, onConnected: (Connection) -> Unit, onCancel: () -> Unit) {
-        val chosen = existing?.config?.get(SHOPPING_CONFIG_ACCOUNT) ?: account
         val flow = remember { TasksConnectFlow(authorizer, api, toaster, playServices) }
-        val scope = rememberCoroutineScope()
-        val connected by rememberUpdatedState(onConnected)
-        val cancelled by rememberUpdatedState(onCancel)
-        val screens = rememberGoogleScreens(
-            onAnswer = { resultCode, data ->
-                // Backing out of the chooser or the consent screen closes the card with nothing said.
-                if (resultCode != Activity.RESULT_OK || chosen == null) {
-                    cancelled()
-                } else {
-                    scope.launch {
-                        when (val step = flow.afterScreens(chosen, existing, data)) {
-                            is TasksConnectStep.Done -> connected(step.connection)
-                            else -> cancelled()
-                        }
-                    }
-                }
-            },
-            onNotOpened = { cancelled() },
+        GoogleConnectHost(
+            key = account to existing,
+            onConnected = onConnected,
+            onCancel = onCancel,
+            start = { flow.start(account, existing) },
+            afterScreens = { flow.afterScreens(account, existing, it) },
         )
-        LaunchedEffect(chosen, existing) {
-            if (chosen == null) {
-                cancelled()
-                return@LaunchedEffect
-            }
-            when (val step = flow.start(chosen, existing)) {
-                is TasksConnectStep.Done -> connected(step.connection)
-                is TasksConnectStep.ShowScreens -> screens.show(step.intent)
-                TasksConnectStep.Stopped -> cancelled()
-            }
-        }
     }
 
     override suspend fun remakeList(conn: Connection): Connection {

@@ -15,6 +15,7 @@ import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.capability.calendar.CONFIG_ACCOUNT
 import uk.co.siland.culvery.capability.calendar.UnreachableException
 import uk.co.siland.culvery.core.google.Authorization
+import uk.co.siland.culvery.core.google.ConnectStep
 import uk.co.siland.culvery.core.google.PlayServicesCheck
 import uk.co.siland.culvery.core.google.UPDATE_PLAY_SERVICES
 import uk.co.siland.culvery.core.google.authorizationFailure
