@@ -60,6 +60,9 @@ internal object ShellDimens {
     val gridGap = 15.dp
     val cardRow = 212.dp
     val leftColumn = 400.dp
+
+    /** The One-tap tray beside Shopping; Shopping takes the rest of the right column (11 §4.4). */
+    val trayWidth = 333.dp
     val clockToDate = 15.dp
 
     val themeIcon = 20.dp

@@ -26,6 +26,9 @@ interface Capability : HomeCardContributor {
     /** Items on the right of Home's header, by [HeaderItem.order]: weather 10, later indoor climate 20. */
     fun headerItems(): Flow<List<HeaderItem>> = flowOf(emptyList())
 
+    /** Rows this capability adds to Home's One-tap tray (11 §4.4), by [TrayButton.order]. */
+    fun trayButtons(): Flow<List<TrayButton>> = flowOf(emptyList())
+
     /** The mark on this capability's rail tab (5 §3.3); none by default. */
     val badge: Flow<RailBadge?> get() = flowOf(null)
 }

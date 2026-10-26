@@ -2,6 +2,7 @@ package uk.co.siland.culvery.core.ui
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -124,6 +126,33 @@ fun HhTray(modifier: Modifier = Modifier, label: String? = null, content: @Compo
     ) {
         if (label != null) TrayLabel(label)
         content()
+    }
+}
+
+/** The One-tap tray on Home (11 §4.4): the same edge and colour as [HhTray], with the label on top. */
+object TrayTokens {
+    val radius = 24.dp
+    val padding = 11.dp
+    val gap = 8.dp
+}
+
+/**
+ * [HhTray]'s Home form: the [label] on top, not spoken, and the [rows] stacked under it at their own height, each tagged
+ * `tray_row_{key}`.
+ */
+@Composable
+fun HhTrayColumn(label: String, rows: List<Pair<String, @Composable () -> Unit>>, modifier: Modifier = Modifier) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(TrayTokens.gap),
+        modifier = modifier
+            .testTag("tray_column")
+            .border(PageHeaderTokens.trayEdge, Culvery.colors.surf3, RoundedCornerShape(TrayTokens.radius))
+            .padding(TrayTokens.padding),
+    ) {
+        TrayLabel(label)
+        rows.forEach { (id, content) ->
+            key(id) { Box(Modifier.fillMaxWidth().testTag("tray_row_$id")) { content() } }
+        }
     }
 }
 

@@ -17,6 +17,7 @@ import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.SunTimes
+import uk.co.siland.culvery.core.plugin.TrayButton
 
 class FakeCapability(
     override val id: String,
@@ -24,6 +25,7 @@ class FakeCapability(
     shown: Boolean,
     private val cardList: List<HomeCard> = emptyList(),
     private val headerList: List<HeaderItem> = emptyList(),
+    private val trayList: List<TrayButton> = emptyList(),
 ) : Capability {
     override val label = id.replaceFirstChar { it.uppercase() }
     override val icon = "star"
@@ -33,6 +35,7 @@ class FakeCapability(
     override val badge: Flow<RailBadge?> = badgeFlow
     override fun cards(): Flow<List<HomeCard>> = flowOf(cardList)
     override fun headerItems(): Flow<List<HeaderItem>> = flowOf(headerList)
+    override fun trayButtons(): Flow<List<TrayButton>> = flowOf(trayList)
     @Composable override fun TabContent() {}
 }
 

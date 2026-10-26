@@ -81,4 +81,36 @@ class HomeCardPlacerTest {
         assertThat(layout.utility?.id).isEqualTo("a")
         assertThat(layout.right).isEmpty()
     }
+
+    private fun button(id: String, order: Int) = TrayButton(id, order) {}
+
+    @Test
+    fun aTrayKeepsTheUtilityRow() {
+        val layout = HomeCardPlacer.place(
+            listOf(
+                card("today", TALL, 100), card("comingUp", WIDE, 50), card("lights", REGULAR, 35), card("music", REGULAR, 30),
+            ),
+            listOf(button("hoover", 20)),
+        )
+        assertThat(layout.tray.map { it.id }).containsExactly("hoover")
+        assertThat(layout.utility).isNull()
+        assertThat(layout.right.map { it.id }).containsExactly("lights", "music").inOrder()
+    }
+
+    @Test
+    fun trayButtonsAreInOrder() {
+        val layout = HomeCardPlacer.place(
+            emptyList(),
+            listOf(button("hoover", 20), button("holiday", 10), button("b", 30), button("a", 30)),
+        )
+        assertThat(layout.tray.map { it.id }).containsExactly("holiday", "hoover", "a", "b").inOrder()
+    }
+
+    /** Pin: with no tray buttons the layout is what it was before trays. */
+    @Test
+    fun noTrayIsAsBefore() {
+        val cards = listOf(card("today", TALL, 100), card("shopping", UTILITY, 40), card("lights", REGULAR, 35))
+        assertThat(HomeCardPlacer.place(cards)).isEqualTo(HomeCardPlacer.place(cards, emptyList()))
+        assertThat(HomeCardPlacer.place(cards).tray).isEmpty()
+    }
 }

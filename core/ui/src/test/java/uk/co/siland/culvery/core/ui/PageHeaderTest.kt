@@ -190,4 +190,26 @@ class PageHeaderTest {
         show { HhTray { HhButton("All lights off", {}, on = ButtonSurface.Bg) } }
         compose.onNodeWithTag("tray_label", useUnmergedTree = true).assertDoesNotExist()
     }
+
+    /** 11 §4.4. Fails if the label isn't on top and unspoken, or the rows aren't 8 apart at their own heights. */
+    @Test
+    fun theColumnTrayStacksRowsUnderItsLabel() {
+        show {
+            HhTrayColumn(
+                "One-tap",
+                listOf(
+                    "a" to { Box(Modifier.fillMaxWidth().height(40.dp)) },
+                    "b" to { Box(Modifier.fillMaxWidth().height(60.dp)) },
+                ),
+            )
+        }
+        val label = compose.onNodeWithTag("tray_label", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val a = compose.onNodeWithTag("tray_row_a").getUnclippedBoundsInRoot()
+        val b = compose.onNodeWithTag("tray_row_b").getUnclippedBoundsInRoot()
+        assertThat(a.top.value - label.bottom.value).isWithin(0.5f).of(8f)
+        assertThat(a.height.value).isWithin(0.5f).of(40f)
+        assertThat(b.top.value - a.bottom.value).isWithin(0.5f).of(8f)
+        assertThat(b.height.value).isWithin(0.5f).of(60f)
+        compose.onNodeWithTag("tray_label", useUnmergedTree = true).assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+    }
 }

@@ -51,6 +51,9 @@ import uk.co.siland.culvery.core.ui.test.assertFitsTheCard
 internal val CARD_WIDE = DpSize(701.dp, 359.dp)
 internal val CARD_TALL = DpSize(701.dp, 586.dp)
 
+/** The card when the One-tap tray shares its row (11 §4.4); app's HomeGridTest pins the same size. */
+internal val CARD_BESIDE_TRAY = DpSize(353.dp, 359.dp)
+
 private const val PERMISSION_LINE = "Allow Google Tasks in Settings › Shopping"
 
 @RunWith(AndroidJUnit4::class)
@@ -67,15 +70,15 @@ class ShoppingCardTest {
 
     private fun rig() = UiRig().also { rigs += it }
 
-    private fun setCard(size: DpSize, content: @Composable () -> Unit) = compose.setContent {
-        CulveryTheme(dark = true) {
+    private fun setCard(size: DpSize, dark: Boolean = true, content: @Composable () -> Unit) = compose.setContent {
+        CulveryTheme(dark = dark) {
             CompositionLocalProvider(LocalShellNavigator provides navigator, LocalOverlayHost provides overlay) {
                 Box(Modifier.size(size).testTag("fit_card")) { content() }
             }
         }
     }
 
-    private fun show(state: ShoppingState, size: DpSize = CARD_WIDE) = setCard(size) {
+    private fun show(state: ShoppingState, size: DpSize = CARD_WIDE, dark: Boolean = true) = setCard(size, dark) {
         ShoppingCard(
             state,
             onTick = { ticks += it.text },
@@ -268,6 +271,22 @@ class ShoppingCardTest {
         assertThat(navigator.systemScreens).isEmpty()
         assertThat(navigator.homeAppChoices).isEqualTo(0)
         assertThat(overlay.shown).isEqualTo(0)
+    }
+
+    /** Pin: built for 701 dp, the card beside the tray with 20 items cuts nothing and overlaps nothing. */
+    @Test
+    fun theCardFitsBesideTheTray() {
+        show(stateOf(items(20)), CARD_BESIDE_TRAY)
+        compose.assertFitsTheCard()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: the same in the light theme. */
+    @Test
+    fun theCardFitsBesideTheTrayInLight() {
+        show(stateOf(items(20)), CARD_BESIDE_TRAY, dark = false)
+        compose.assertFitsTheCard()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     private fun ComposeContentTestRule.onAllNodesWithTagExists(tag: String) =

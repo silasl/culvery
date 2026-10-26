@@ -40,6 +40,7 @@ import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.SettingsPageIds
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.SunTimes
+import uk.co.siland.culvery.core.plugin.TrayButton
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.shouldPin
 
@@ -487,6 +488,14 @@ class ShellViewModelTest {
         )
         vm.uiState.test {
             assertThat(expectMostRecentItem().headerItems.map { it.id }).containsExactly("weather", "climate").inOrder()
+        }
+    }
+
+    @Test
+    fun trayButtonsReachHome() = runTest {
+        val vm = vm(setOf(FakeCapability("hoover", order = 40, shown = false, trayList = listOf(TrayButton("hoover", 20) {}))))
+        vm.uiState.test {
+            assertThat(expectMostRecentItem().homeCards.tray.map { it.id }).containsExactly("hoover")
         }
     }
 

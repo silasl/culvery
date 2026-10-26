@@ -36,6 +36,7 @@ import uk.co.siland.culvery.core.plugin.HomeLayout
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.ShellNavigator
 import uk.co.siland.culvery.core.plugin.Toaster
+import uk.co.siland.culvery.core.plugin.TrayButton
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
 /** What Settings › Tablet lock or the Done step asked of Android (4c §5.1). */
@@ -111,19 +112,35 @@ class ShellViewModel @Inject constructor(
 
     private class PlacedCards(val layout: HomeLayout, val loaded: Boolean)
 
+    private val trayButtons: Flow<List<TrayButton>> =
+        if (ordered.isEmpty()) {
+            flowOf(emptyList())
+        } else {
+            combine(
+                ordered.map { cap ->
+                    cap.trayButtons()
+                        .retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its tray buttons (${it::class.simpleName}); retrying") }
+                        .onStart { emit(emptyList()) }
+                },
+            ) { lists -> lists.toList().flatten() }
+        }
+
     private val placements: Flow<PlacedCards> =
         if (ordered.isEmpty()) {
             flowOf(PlacedCards(HomeLayout.Empty, loaded = true))
         } else {
             combine(
-                ordered.map { cap ->
-                    cap.cards()
-                        .map<List<HomeCard>, List<HomeCard>?> { it }
-                        .retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its Home cards (${it::class.simpleName}); retrying") }
-                        // Null until this capability answers.
-                        .onStart { emit(null) }
-                },
-            ) { lists -> PlacedCards(HomeCardPlacer.place(lists.filterNotNull().flatten()), loaded = lists.none { it == null }) }
+                combine(
+                    ordered.map { cap ->
+                        cap.cards()
+                            .map<List<HomeCard>, List<HomeCard>?> { it }
+                            .retryWithBackoff { Log.w(TAG, "${cap.id}: couldn't read its Home cards (${it::class.simpleName}); retrying") }
+                            // Null until this capability answers.
+                            .onStart { emit(null) }
+                    },
+                ) { it.toList() },
+                trayButtons,
+            ) { lists, tray -> PlacedCards(HomeCardPlacer.place(lists.filterNotNull().flatten(), tray), loaded = lists.none { it == null }) }
         }
 
     private val headerItems: Flow<List<HeaderItem>> =

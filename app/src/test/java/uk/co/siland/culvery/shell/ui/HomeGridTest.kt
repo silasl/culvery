@@ -2,6 +2,8 @@ package uk.co.siland.culvery.shell.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -20,6 +22,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.TrayButton
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.shell.ShellUiState
 
@@ -41,8 +44,11 @@ class HomeGridTest {
     private val music = box("music", HomeCardSize.REGULAR, 30)
     private val shopping = box("shopping", HomeCardSize.UTILITY, 40)
 
-    private fun show(vararg cards: HomeCard) {
-        val state = ShellUiState(homeCards = HomeCardPlacer.place(cards.toList()))
+    /** A tray row 68 dp high, as the Hoover's (11 §4.4). */
+    private val trayButton = TrayButton("button", 10) { Box(Modifier.fillMaxWidth().height(68.dp).testTag("tray_button")) }
+
+    private fun show(vararg cards: HomeCard, tray: List<TrayButton> = emptyList()) {
+        val state = ShellUiState(homeCards = HomeCardPlacer.place(cards.toList(), tray))
         compose.setContent {
             CulveryTheme(dark = true) {
                 CulveryShell(state, { LocalDateTime.of(2026, 10, 19, 11, 54) }, {}, {}, {}, {}) {}
@@ -136,5 +142,50 @@ class HomeGridTest {
         show(today, shopping)
         assertThat(bounds("shopping").width.value).isWithin(1f).of(701f)
         assertThat(bounds("shopping").height.value).isWithin(1f).of(586f)
+    }
+
+    @Test
+    fun shoppingAndTheTrayShareTheRow() {
+        show(today, shopping, lights, music, tray = listOf(trayButton))
+        val s = bounds("shopping")
+        val t = bounds("home_tray")
+        val l = bounds("lights")
+        val m = bounds("music")
+        val column = bounds("today")
+        // The column is 700 dp at this density (the 701 elsewhere is within tolerance), so 700 − 15 − 333.
+        assertThat(s.width.value).isWithin(1f).of(352f)
+        assertThat(s.height.value).isWithin(1f).of(359f)
+        assertThat(s.top.value).isEqualTo(column.top.value)
+        assertThat(t.width.value).isWithin(0.5f).of(333f)
+        assertThat(t.top.value).isEqualTo(s.top.value)
+        assertThat(t.height.value).isWithin(0.5f).of(s.height.value)
+        assertThat(t.left.value - s.right.value).isWithin(0.5f).of(15f)
+        assertThat(t.right.value).isWithin(0.5f).of(m.right.value)
+        assertThat(l.left.value).isEqualTo(s.left.value)
+        assertThat(l.top.value - s.bottom.value).isWithin(0.5f).of(15f)
+        assertThat(l.height.value).isWithin(0.5f).of(212f)
+        assertThat(m.bottom.value).isWithin(0.5f).of(column.bottom.value)
+    }
+
+    @Test
+    fun withoutShoppingTheTrayTakesTheRowsLeft() {
+        show(today, lights, music, tray = listOf(trayButton))
+        val t = bounds("home_tray")
+        val l = bounds("lights")
+        assertThat(t.left.value).isEqualTo(l.left.value)
+        assertThat(t.width.value).isWithin(0.5f).of(333f)
+        assertThat(t.height.value).isWithin(1f).of(359f)
+        assertThat(l.height.value).isWithin(0.5f).of(212f)
+        assertThat(bounds("music").height.value).isWithin(0.5f).of(212f)
+        assertThat(l.top.value - t.bottom.value).isWithin(0.5f).of(15f)
+    }
+
+    @Test
+    fun theTrayAloneFillsTheColumnsHeight() {
+        show(today, tray = listOf(trayButton))
+        val t = bounds("home_tray")
+        assertThat(t.width.value).isWithin(0.5f).of(333f)
+        assertThat(t.height.value).isWithin(1f).of(586f)
+        assertThat(t.left.value - bounds("today").right.value).isWithin(0.5f).of(15f)
     }
 }

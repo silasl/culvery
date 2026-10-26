@@ -52,6 +52,8 @@ class ShoppingCardScreenshotTest {
     @Test fun overflowLight() = snap("shopping_card_overflow", false, overflow)
     @Test fun tallDark() = snap("shopping_card_tall", true, overflow, CARD_TALL)
     @Test fun tallLight() = snap("shopping_card_tall", false, overflow, CARD_TALL)
+    @Test fun besideTrayDark() = snap("shopping_card_beside_tray", true, overflow, CARD_BESIDE_TRAY)
+    @Test fun besideTrayLight() = snap("shopping_card_beside_tray", false, overflow, CARD_BESIDE_TRAY)
     @Test fun problemDark() = snap("shopping_card_problem", true, cantReach)
     @Test fun problemLight() = snap("shopping_card_problem", false, cantReach)
 }

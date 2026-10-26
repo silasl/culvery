@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -13,6 +15,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.unit.dp
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -96,6 +99,7 @@ import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.plugin.HomeCardPlacer
 import uk.co.siland.culvery.core.plugin.HomeCardSize
+import uk.co.siland.culvery.core.plugin.TrayButton
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.RailBadge
@@ -254,6 +258,24 @@ class ShellScreenshotTest {
                 HomeCard("shopping.placeholder", HomeCardSize.UTILITY, 40) {
                     HhCard(Modifier.fillMaxSize()) { Text("Shopping", style = HhType.cardTitle, color = Culvery.colors.ink) }
                 },
+        ),
+    )
+
+    /** One tagged tray row at a Hoover row's height, standing in for the capability's (11 §4.4). */
+    private val trayRow = TrayButton("tray.row", 20) {
+        HhCard(Modifier.fillMaxWidth().height(68.dp)) { Text("Tray row", style = HhType.cardTitle, color = Culvery.colors.ink) }
+    }
+
+    private fun trayHome(dark: Boolean, shopping: Boolean, lights: Boolean = true, music: Boolean = true) = calendarHome(dark).copy(
+        tabs = allTabs,
+        homeCards = HomeCardPlacer.place(
+            homeCardList(lights, music) +
+                listOfNotNull(
+                    HomeCard("shopping.placeholder", HomeCardSize.UTILITY, 40) {
+                        HhCard(Modifier.fillMaxSize()) { Text("Shopping", style = HhType.cardTitle, color = Culvery.colors.ink) }
+                    }.takeIf { shopping },
+                ),
+            listOf(trayRow),
         ),
     )
 
@@ -516,6 +538,25 @@ class ShellScreenshotTest {
 
     @Test
     fun homeShoppingLight() = snap("home_shopping_light", dark = false, state = shoppingHome(dark = false))
+
+    /** The One-tap tray beside Shopping, and at the row's left without it (11 §4.4). */
+    @Test
+    fun homeTrayShoppingDark() = snap("home_tray_shopping_dark", dark = true, state = trayHome(dark = true, shopping = true))
+
+    @Test
+    fun homeTrayShoppingLight() = snap("home_tray_shopping_light", dark = false, state = trayHome(dark = false, shopping = true))
+
+    @Test
+    fun homeTrayNoShoppingDark() = snap("home_tray_no_shopping_dark", dark = true, state = trayHome(dark = true, shopping = false))
+
+    @Test
+    fun homeTrayNoShoppingLight() = snap("home_tray_no_shopping_light", dark = false, state = trayHome(dark = false, shopping = false))
+
+    @Test
+    fun homeTrayAloneDark() = snap("home_tray_alone_dark", dark = true, state = trayHome(dark = true, shopping = false, lights = false, music = false))
+
+    @Test
+    fun homeTrayAloneLight() = snap("home_tray_alone_light", dark = false, state = trayHome(dark = false, shopping = false, lights = false, music = false))
 
     /** The capability's own card: Milk, Bread and Eggs over the sample provider (10 §4.9). */
     @Test
