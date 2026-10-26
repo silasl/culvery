@@ -108,6 +108,17 @@ class ModuleBoundariesTest {
         banned(":provider:lights-hue", ":provider:music-sonos")
     }
 
+    /** Pin: the rules are generic, so the Home Assistant modules already keep to their families. */
+    @Test
+    fun theHomeAssistantModulesKeepToTheirFamilies() {
+        allowed(":provider:hoover-homeassistant", ":capability:hoover")
+        allowed(":provider:hoover-homeassistant", ":core:homeassistant")
+        banned(":provider:hoover-homeassistant", ":capability:heating")
+        banned(":provider:hoover-homeassistant", ":provider:heating-homeassistant")
+        banned(":capability:hoover", ":capability:heating")
+        banned(":core:homeassistant", ":capability:hoover")
+    }
+
     /** Pin: the Shopping pair follows the Lights rules, and the Google sign-in is core, so the Tasks provider may use it. */
     @Test
     fun theShoppingPairKeepsToItsFamily() {

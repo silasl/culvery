@@ -72,6 +72,9 @@ dependencies {
     implementation(project(":provider:lights-hue"))
     // Wired by Hilt alone, as the lights (10 §4.1).
     implementation(project(":capability:shopping"))
+    // Wired by Hilt alone, as the lights (11 §4.2).
+    implementation(project(":capability:hoover"))
+    implementation(project(":capability:heating"))
     implementation(project(":provider:calendar-google"))
     implementation(project(":provider:shopping-google-tasks"))
     implementation(project(":provider:weather-openmeteo"))

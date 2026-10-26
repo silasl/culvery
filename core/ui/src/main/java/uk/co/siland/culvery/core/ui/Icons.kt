@@ -22,6 +22,7 @@ object Icons {
     const val CHEVRON_LEFT = "chevron_left"
     const val CHEVRON_RIGHT = "chevron_right"
     const val CLOSE = "close"
+    const val CLEANING_SERVICES = "cleaning_services"
     const val CLOUD = "cloud"
     const val CLOUD_OFF = "cloud_off"
     const val CLOUD_UPLOAD = "cloud_upload"

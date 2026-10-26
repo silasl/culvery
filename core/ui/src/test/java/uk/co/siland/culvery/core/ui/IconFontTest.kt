@@ -39,6 +39,13 @@ class IconFontTest {
     }
 
     @Test
+    fun theHooverIconIsInTheFont() {
+        assertThat(Icons.CLEANING_SERVICES).isEqualTo("cleaning_services")
+        assertThat(font.has("cleaning_services")).isTrue()
+        assertThat(font.hasFilledForm("cleaning_services")).isTrue()
+    }
+
+    @Test
     fun everyNamedIconIsALigatureInTheFont() {
         assertWithMessage("Icons with no ligature in the font").that(named.filterNot(font::has)).isEmpty()
     }

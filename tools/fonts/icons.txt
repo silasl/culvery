@@ -16,6 +16,7 @@ check
 check_circle
 chevron_left
 chevron_right
+cleaning_services
 close
 cloud
 cloud_off
