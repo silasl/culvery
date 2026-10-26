@@ -8,6 +8,9 @@ internal object HaFixtures {
     val API = text("api.json")
     val STATES = text("states.json")
     val ADDED = text("ws_entities_added.json")
+    val AUTH_REQUIRED = text("ws_auth_required.json")
+    val AUTH_OK = text("ws_auth_ok.json")
+    val AUTH_INVALID = text("ws_auth_invalid.json")
     val CHANGED = text("ws_entities_changed.json")
     val REMOVED = text("ws_entities_removed.json")
 }
