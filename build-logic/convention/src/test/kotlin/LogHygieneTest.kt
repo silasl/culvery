@@ -25,6 +25,7 @@ class LogHygieneTest {
         val sources = shippedSources()
         assertThat(sources.map { it.name }).contains("CalendarSync.kt")
         assertThat(sources.map { it.name }).contains("HomeAssistantClient.kt")
+        assertThat(sources.map { it.name }).contains("HomeAssistant.kt")
         // 77 calls when written; a floor well below that still fails if the scan stops finding them.
         assertThat(sources.sumOf { LogHygiene.callCount(it.readText()) }).isAtLeast(50)
     }
