@@ -113,4 +113,11 @@ class HomeCardPlacerTest {
         assertThat(HomeCardPlacer.place(cards)).isEqualTo(HomeCardPlacer.place(cards, emptyList()))
         assertThat(HomeCardPlacer.place(cards).tray).isEmpty()
     }
+
+    @Test
+    fun comingUpGivesWayToATrayAlone() {
+        val layout = HomeCardPlacer.place(listOf(card("today", TALL, 100), card("comingUp", WIDE, 50)), listOf(button("hoover", 20)))
+        assertThat(layout.right).isEmpty()
+        assertThat(layout.tray.map { it.id }).containsExactly("hoover")
+    }
 }

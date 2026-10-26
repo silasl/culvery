@@ -64,4 +64,3 @@ class PageHeaderScreenshotTest {
     @Test fun trayColumnDark() = snapColumn("page_header_tray_column_dark", true)
     @Test fun trayColumnLight() = snapColumn("page_header_tray_column_light", false)
 }
-

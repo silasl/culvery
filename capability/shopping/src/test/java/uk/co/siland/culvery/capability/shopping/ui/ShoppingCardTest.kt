@@ -51,8 +51,8 @@ import uk.co.siland.culvery.core.ui.test.assertFitsTheCard
 internal val CARD_WIDE = DpSize(701.dp, 359.dp)
 internal val CARD_TALL = DpSize(701.dp, 586.dp)
 
-/** The card when the One-tap tray shares its row (11 §4.4); app's HomeGridTest pins the same size. */
-internal val CARD_BESIDE_TRAY = DpSize(353.dp, 359.dp)
+/** The card beside the One-tap tray (11 §4.4): the 700 dp column less the 333 dp tray and the 15 dp gap, rounded down; HomeGridTest measures about 351.3. */
+internal val CARD_BESIDE_TRAY = DpSize(351.dp, 359.dp)
 
 private const val PERMISSION_LINE = "Allow Google Tasks in Settings › Shopping"
 
