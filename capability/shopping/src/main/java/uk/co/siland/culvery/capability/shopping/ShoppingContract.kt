@@ -45,7 +45,7 @@ class ShoppingRejectedException(message: String? = null, cause: Throwable? = nul
 enum class QueuedKind { ADD, TICK, UNTICK }
 
 /** How the list stands, worked out by the capability from what the provider throws. */
-enum class ShoppingHealth { OK, CANT_REACH, NEEDS_PERMISSION, LIST_GONE, ACCOUNT_GONE }
+enum class ShoppingHealth { OK, CANT_REACH, NEEDS_PERMISSION, LIST_GONE, ACCOUNT_GONE, REFUSED }
 
 /**
  * A shopping-list service (Google Tasks, Todoist…). Nothing service-specific crosses this seam: the list's own id

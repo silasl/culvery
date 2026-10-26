@@ -31,6 +31,8 @@ class ShoppingWordsTest {
             .isEqualTo("The Shopping list isn’t in Google Tasks any more. Make a new one in Settings › Shopping.")
         assertThat(problemLine(ShoppingHealth.ACCOUNT_GONE, google))
             .isEqualTo("Shopping’s Google account was disconnected. Connect it again in Settings › Calendars.")
+        assertThat(problemLine(ShoppingHealth.REFUSED, google))
+            .isEqualTo("Google Tasks refused one item. Tick it off on the list to send the rest.")
     }
 
     @Test

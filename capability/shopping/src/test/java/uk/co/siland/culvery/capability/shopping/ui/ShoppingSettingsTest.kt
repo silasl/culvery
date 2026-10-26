@@ -294,6 +294,15 @@ class ShoppingSettingsTest {
     }
 
     @Test
+    fun aRefusedItemSaysHowToSendTheRest() {
+        val rig = rig()
+        stateless(on(rig, ShoppingHealth.REFUSED))
+        compose.onNodeWithTag("shopping_health").assertTextEquals("Google Tasks refused one item. Tick it off on the list to send the rest.")
+        assertThat(compose.onAllNodes(hasTestTag("shopping_allow")).fetchSemanticsNodes()).isEmpty()
+        assertThat(compose.onAllNodes(hasTestTag("shopping_make_list")).fetchSemanticsNodes()).isEmpty()
+    }
+
+    @Test
     fun stopAsksFirstAndSaysWhatIsLost() {
         val rig = rig()
         runBlocking {

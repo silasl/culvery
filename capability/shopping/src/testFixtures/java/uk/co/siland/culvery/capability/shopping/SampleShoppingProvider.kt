@@ -47,6 +47,12 @@ class SampleShoppingProvider(
     /** A tick suspends on this before applying. */
     var tickGate: CompletableDeferred<Unit>? = null
 
+    /** A read of the open items takes its answer, then suspends on this before giving it. */
+    var itemsGate: CompletableDeferred<Unit>? = null
+
+    /** An add of this text is refused with [ShoppingRejectedException]. */
+    var refusing: String? = null
+
     private val _calls = mutableListOf<String>()
 
     /** What was called, such as "items", "add", "tick g1", "history". */
@@ -115,11 +121,14 @@ class SampleShoppingProvider(
 
     override suspend fun items(conn: Connection): List<ShoppingItem> {
         begin("items")
-        return openItems.toList()
+        val answer = openItems.toList()
+        itemsGate?.await()
+        return answer
     }
 
     override suspend fun add(conn: Connection, text: String, clientKey: String): ShoppingItem {
         begin("add")
+        if (text == refusing) throw ShoppingRejectedException()
         val item = make(text, now())
         openItems.add(0, item)
         afterWrite()

@@ -62,6 +62,12 @@ private class Pass(val connectionId: String) {
     var step = Step.ITEMS
 }
 
+/**
+ * Whether [head] is the add that was refused, given the health is REFUSED: only the head is ever tried, and the next
+ * try of any row sets the health again, so an add at the head that has been tried is the refused one.
+ */
+private fun isRefused(head: QueuedEntity) = head.kind == QueuedKind.ADD.name && head.attempts > 0
+
 private sealed interface Drained {
     /** A row was dealt with; more may be queued. */
     data object More : Drained
@@ -113,6 +119,18 @@ class ShoppingSync @Inject constructor(
         val provider = providers.forConnection(conn) ?: return Drained.Done(null)
         val queue = store.queueNow()
         val head = queue.firstOrNull() ?: return Drained.Done(null)
+        if (stored.health == ShoppingHealth.REFUSED && isRefused(head)) {
+            // Ticking the refused item off is how the house lets the rest go.
+            val tick = queue.firstOrNull { it.kind == QueuedKind.TICK.name && it.clientKey == head.clientKey }
+            if (tick != null) {
+                store.inTransaction {
+                    store.drop(tick.seq)
+                    store.drop(head.seq)
+                    store.setHealth(ShoppingHealth.OK)
+                }
+                return Drained.More
+            }
+        }
         val now = clock.nowMillis()
         if (head.nextAtMillis > now) return Drained.Done(head.nextAtMillis)
         val kind = QueuedKind.valueOf(head.kind)
@@ -225,7 +243,12 @@ class ShoppingSync @Inject constructor(
             return Drained.More
         }
         Log.w(TAG, "Shopping drain: the ${what.label} waits (${e::class.simpleName})")
-        if (kind == QueuedKind.ADD && own && e is ShoppingRejectedException) return retryLater(head, OUTBOX_BACKOFF_MS.last())
+        if (kind == QueuedKind.ADD && own && e is ShoppingRejectedException) {
+            // Kept and tried again, as the refusal may pass; the next row sees whether it was already ticked off.
+            retryLater(head, OUTBOX_BACKOFF_MS.last())
+            store.setHealth(ShoppingHealth.REFUSED)
+            return Drained.More
+        }
         val waiting = retryLater(head, backoffMillis(head.attempts + 1))
         store.setHealth(healthOf(e))
         return waiting
@@ -268,14 +291,16 @@ class ShoppingSync @Inject constructor(
             store.setHealth(healthOf(e))
             return
         }
+        val queue = store.queueNow()
         // An item matching a queued add is the add's own, or the add will find it; counting it now would count it twice.
-        val queuedAdds = store.queueNow().filter { it.kind == QueuedKind.ADD.name }.map { textKey(it.text) }.toSet()
+        val queuedAdds = queue.filter { it.kind == QueuedKind.ADD.name }.map { textKey(it.text) }.toSet()
+        val refused = stored.health == ShoppingHealth.REFUSED && queue.firstOrNull()?.let(::isRefused) == true
         store.inTransaction {
             learning.seen(items.filter { textKey(it.text) !in queuedAdds }, ticked)
             // A year of seed history would date every item's last use today.
             if (!seeding) ticked.forEach { learning.ticked(it.text) }
             store.setHistoryRead(now)
-            store.saveRead(items, ShoppingHealth.OK, now)
+            store.saveRead(items, if (refused) ShoppingHealth.REFUSED else ShoppingHealth.OK, now)
         }
         learning.pruneIfDue()
     }

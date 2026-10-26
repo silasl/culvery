@@ -472,4 +472,88 @@ class ShoppingSyncTest : ShoppingTestBase() {
         assertThat(rig.provider.calls).containsExactly("items", "add").inOrder()
         assertThat(rig.store.queueNow()).isEmpty()
     }
+
+    @Test
+    fun aRefusedAddSaysSoUntilARetryGoesThrough() = runTest {
+        val rig = rig(fileName = "refused.db", open = listOf("Bread"))
+        rig.connect()
+        rig.provider.refusing = "Milk"
+        rig.enqueue(QueuedKind.ADD, "k1", "Milk")
+        rig.enqueue(QueuedKind.ADD, "k2", "Eggs")
+        val view = ShoppingView(rig.store, rig.actions(), setOf(rig.provider), backgroundScope)
+        rig.sync.check()
+        runCurrent()
+        assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.REFUSED)
+        assertThat(view.state.value!!.problem).isEqualTo("the sample list refused one item. Tick it off on the list to send the rest.")
+
+        // A good read doesn't clear it while the refused add is queued, nor does a restart.
+        advanceTimeBy(60_000)
+        rig.sync.check()
+        assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.REFUSED)
+        rig.reopen()
+        advanceTimeBy(60_000)
+        rig.sync.check()
+        assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.REFUSED)
+        assertThat(rig.store.queueNow().map { it.text }).containsExactly("Milk", "Eggs").inOrder()
+
+        // The refusal may have been passing: it is tried again on the five-minute step.
+        rig.provider.refusing = null
+        advanceTimeBy(300_000)
+        rig.sync.check()
+        assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.OK)
+        assertThat(rig.openTexts()).containsExactly("Eggs", "Milk", "Bread").inOrder()
+    }
+
+    @Test
+    fun tickingTheRefusedItemOffSendsTheRest() = runTest {
+        val rig = rig(open = listOf("Bread"))
+        rig.connect()
+        rig.provider.refusing = "Milk"
+        val actions = rig.actions()
+        actions.add("Milk")
+        actions.add("Eggs")
+        rig.sync.check()
+        val milk = shown(rig.store.itemsNow(), rig.store.queueNow(), null).first { it.text == "Milk" }
+        actions.tick(milk)
+        rig.sync.drain()
+        assertThat(rig.store.queueNow()).isEmpty()
+        assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.OK)
+        assertThat(rig.openTexts()).containsExactly("Eggs", "Bread").inOrder()
+
+        // Undo once both are dropped: there is nothing to put back, and nothing is queued.
+        actions.undo(actions.undoable.value!!)
+        rig.sync.drain()
+        assertThat(rig.store.queueNow()).isEmpty()
+        assertThat(rig.openTexts()).containsExactly("Eggs", "Bread").inOrder()
+        assertThat(rig.provider.calls.count { it == "add" }).isEqualTo(2)
+    }
+
+    @Test
+    fun undoingTheTickOfTheRefusedItemBeforeItIsDroppedKeepsItWaiting() = runTest {
+        val rig = rig()
+        rig.connect()
+        rig.provider.refusing = "Milk"
+        val actions = rig.actions()
+        actions.add("Milk")
+        actions.add("Eggs")
+        rig.sync.check()
+        actions.tick(shown(rig.store.itemsNow(), rig.store.queueNow(), null).first { it.text == "Milk" })
+        actions.undo(actions.undoable.value!!)
+        assertThat(rig.store.queueNow().map { it.kind to it.text }).containsExactly("ADD" to "Milk", "ADD" to "Eggs").inOrder()
+        assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.REFUSED)
+    }
+
+    @Test
+    fun aRefusedAddTickedBeforeItWasSentIsDroppedWithItsTick() = runTest {
+        val rig = rig()
+        rig.connect()
+        rig.provider.refusing = "Milk"
+        rig.enqueue(QueuedKind.ADD, "k1", "Milk")
+        rig.enqueue(QueuedKind.TICK, "k1", "Milk")
+        rig.enqueue(QueuedKind.ADD, "k2", "Eggs")
+        assertThat(rig.sync.drain()).isNull()
+        assertThat(rig.store.queueNow()).isEmpty()
+        assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.OK)
+        assertThat(rig.openTexts()).containsExactly("Eggs")
+    }
 }

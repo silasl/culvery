@@ -22,6 +22,7 @@ fun problemLine(health: ShoppingHealth, provider: ShoppingProvider): String? {
         ShoppingHealth.NEEDS_PERMISSION -> "Allow $service in Settings › Shopping"
         ShoppingHealth.LIST_GONE -> "The Shopping list isn’t in $service any more. Make a new one in Settings › Shopping."
         ShoppingHealth.ACCOUNT_GONE -> provider.accountGoneLine
+        ShoppingHealth.REFUSED -> "$service refused one item. Tick it off on the list to send the rest."
     }
 }
 
