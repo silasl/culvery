@@ -32,13 +32,17 @@ class HooverActionsTest {
     /** Review Focus 3. Fails if a Child's PIN reaches the hoover. */
     @Test
     fun aChildsPinStartsNothing() = runTest {
-        assertThat(actions(TestAccess(Role.CHILD)).start()).isNull()
+        val access = TestAccess(Role.CHILD)
+        assertThat(actions(access).start()).isNull()
+        assertThat(access.asked).containsExactly(listOf("hoover.start"))
         assertThat(system.starts).isEqualTo(0)
     }
 
     @Test
     fun aCancelledPadStartsNothing() = runTest {
-        assertThat(actions(TestAccess(null)).start()).isNull()
+        val access = TestAccess(null)
+        assertThat(actions(access).start()).isNull()
+        assertThat(access.asked).containsExactly(listOf("hoover.start"))
         assertThat(system.starts).isEqualTo(0)
     }
 

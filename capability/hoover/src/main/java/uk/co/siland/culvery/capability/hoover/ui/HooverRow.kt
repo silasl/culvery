@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.capability.hoover.ui
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.delay
+import uk.co.siland.culvery.capability.hoover.CLEANING_WORD
 import uk.co.siland.culvery.capability.hoover.HOOVER
 import uk.co.siland.culvery.capability.hoover.HooverActions
 import uk.co.siland.culvery.capability.hoover.HooverActivity
@@ -49,10 +51,10 @@ import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
+private const val TAG = "HooverRow"
+
 /** How long a failed start's line stays on the row when the hoover does not move (11 §4.4). */
 const val START_LINE_MS = 300_000L
-
-private const val CLEANING_WORD = "Cleaning"
 
 /**
  * The tray row: the icon and words spoken as one group, then Start while the hoover is [STARTABLE], or the quiet
@@ -97,6 +99,7 @@ internal fun HooverRow(state: HooverState, line: String?, starting: Boolean, onS
                 onClick = onStart,
                 tone = ButtonTone.Primary,
                 icon = Icons.PLAY_ARROW,
+                enabled = !starting,
                 on = ButtonSurface.Surf,
                 spokenName = if (starting) null else START_SPOKEN,
                 modifier = Modifier.testTag("hoover_start"),
@@ -130,17 +133,26 @@ fun HooverRowHost(system: HooverSystem, actions: HooverActions) {
         val release = system.watch()
         onDispose(release)
     }
-    var line by remember { mutableStateOf<String?>(null) }
-    val action = rememberSingleAction(system) { line = NOT_STARTED }
+    var shown by remember { mutableStateOf<StartLine?>(null) }
+    val action = rememberSingleAction(system) { e ->
+        Log.w(TAG, "Hoover start failed: ${e::class.simpleName}")
+        shown = StartLine(NOT_STARTED)
+    }
     val current = state ?: return
-    LaunchedEffect(current.activity) { line = null }
-    LaunchedEffect(line) {
-        if (line != null) {
+    LaunchedEffect(current.activity) { shown = null }
+    LaunchedEffect(shown) {
+        if (shown != null) {
             delay(START_LINE_MS)
-            line = null
+            shown = null
         }
     }
-    HooverRow(current, line, action.busy) {
-        action.run { actions.start()?.let { line = resultLine(it) } }
+    HooverRow(current, shown?.text, action.busy) {
+        action.run {
+            shown = null
+            actions.start()?.let { result -> resultLine(result)?.let { shown = StartLine(it) } }
+        }
     }
 }
+
+/** A failed start's line; each failure is its own instance, so a repeat gets its own full time. */
+private class StartLine(val text: String)

@@ -6,13 +6,14 @@ const val HOOVER = "Hoover"
 const val START = "Start"
 const val START_SPOKEN = "Start cleaning"
 const val STARTING = "Starting…"
+const val CLEANING_WORD = "Cleaning"
 const val NOT_STARTED = "The hoover didn’t start. Check the Eufy app."
 const val STUCK = "Stuck. Check the Eufy app."
 const val NO_HOOVER_CHOSEN = "No hoover is chosen. Choose one in Settings › Other integrations."
 
 private fun HooverActivity.word() = when (this) {
     HooverActivity.DOCKED -> "Docked"
-    HooverActivity.CLEANING -> "Cleaning"
+    HooverActivity.CLEANING -> CLEANING_WORD
     HooverActivity.RETURNING -> "Going home"
     HooverActivity.PAUSED -> "Paused"
     HooverActivity.IDLE -> "Idle"

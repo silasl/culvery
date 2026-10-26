@@ -30,7 +30,7 @@ class HooverCapability @Inject constructor(
     @Composable
     override fun TabContent() = Unit
 
-    // The row shows while a hoover is chosen, whatever its state says.
+    // The row shows while the chosen hoover has a state, problems included.
     override fun trayButtons(): Flow<List<TrayButton>> {
         val system = systems.firstOrNull() ?: return flowOf(emptyList())
         val button = TrayButton("hoover.start", 20) { HooverRowHost(system, actions) }

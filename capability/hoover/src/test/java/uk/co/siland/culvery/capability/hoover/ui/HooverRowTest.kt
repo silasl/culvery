@@ -190,7 +190,7 @@ class HooverRowTest {
         compose.onNodeWithTag("hoover_start").assertContentDescriptionEquals("Start cleaning")
     }
 
-    /** 11 §4.4: the line stays until the hoover moves or START_LINE_MS pass. Fails one tick either side. */
+    /** 11 §4.4: the line stays until the hoover moves or START_LINE_MS pass. Fails if it goes 1 ms early or stays past START_LINE_MS. */
     @Test
     fun aFailedStartShowsItsLineUntilTheHooverMoves() {
         system.next = HooverResult.NotStarted
@@ -198,13 +198,37 @@ class HooverRowTest {
         compose.mainClock.autoAdvance = false
         val clock = compose.mainClock
         compose.onNodeWithTag("hoover_start").performClick()
-        val tappedAt = clock.currentTime
+        // The line is set at the tap's time; the frame after it only draws it.
+        val shownAt = clock.currentTime
         clock.advanceTimeByFrame()
         status().assertTextEquals(NOT_STARTED_LINE)
-        clock.advanceTimeBy(tappedAt + START_LINE_MS - 1 - clock.currentTime)
+        clock.advanceTimeBy(shownAt + START_LINE_MS - 1 - clock.currentTime, ignoreFrameDuration = true)
         status().assertTextEquals(NOT_STARTED_LINE)
-        clock.advanceTimeBy(1)
+        clock.advanceTimeBy(1, ignoreFrameDuration = true)
+        repeat(2) { clock.advanceTimeByFrame() }
+        status().assertTextEquals("Docked · 86%")
+    }
+
+    /** Fails if a second identical failure inherits the first one's timer instead of getting its own START_LINE_MS. */
+    @Test
+    fun aRepeatedFailureGetsItsFullTime() {
+        system.next = HooverResult.NotStarted
+        show()
+        compose.mainClock.autoAdvance = false
+        val clock = compose.mainClock
+        compose.onNodeWithTag("hoover_start").performClick()
         clock.advanceTimeByFrame()
+        clock.advanceTimeBy(START_LINE_MS / 2, ignoreFrameDuration = true)
+        status().assertTextEquals(NOT_STARTED_LINE)
+        compose.onNodeWithTag("hoover_start").performClick()
+        // The line is set at the tap's time; the frame after it only draws it.
+        val shownAt = clock.currentTime
+        clock.advanceTimeByFrame()
+        status().assertTextEquals(NOT_STARTED_LINE)
+        clock.advanceTimeBy(shownAt + START_LINE_MS - 1 - clock.currentTime, ignoreFrameDuration = true)
+        status().assertTextEquals(NOT_STARTED_LINE)
+        clock.advanceTimeBy(1, ignoreFrameDuration = true)
+        repeat(2) { clock.advanceTimeByFrame() }
         status().assertTextEquals("Docked · 86%")
     }
 

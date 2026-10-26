@@ -27,6 +27,7 @@ class LogHygieneTest {
         assertThat(sources.map { it.name }).contains("HomeAssistantClient.kt")
         assertThat(sources.map { it.name }).contains("HomeAssistant.kt")
         assertThat(sources.map { it.name }).contains("HooverSettings.kt")
+        assertThat(sources.map { it.name }).contains("HooverRow.kt")
         assertThat(sources.map { it.name }).contains("HeatingSettings.kt")
         assertThat(sources.map { it.name }).contains("HaHooverSystem.kt")
         assertThat(sources.map { it.name }).contains("HaHeatingSystem.kt")
