@@ -56,14 +56,14 @@ Done with the user during the brainstorm, so the build can test against it:
 - HACS, and from it `Eufy Robovac MQTT`: Start and Return to dock both worked from Home Assistant, and the Eufy app on the phone stayed signed in.
 - The Nest integration through its own Google Cloud project (not Culvery's), its consent screen **In production** (a Testing one would expire every 7 days), Device Access paid, and the Pub/Sub event feed. The thermostat ("Downstairs") shows; setting the preset to Eco and back to None worked and showed in the Google Home app.
 
-Still to do, during 11a: a Home Assistant user for Culvery and its token (§4.1).
+Also done (2026-10-26): the Home Assistant user **Culvery**, not an administrator, limited to logins from the local network. The entities are `vacuum.eufy_clean_x10_pro_omni` and its battery `sensor.eufy_clean_x10_pro_omni_battery`. Still to do, during 11a: Culvery's token (§4.1).
 
 ## 4. 11a: the Home Assistant link, the hoover and the heating
 
 ### 4.1 Linking Culvery to Home Assistant
 
 - **Settings › Other integrations** (admin-only, after Settings › Lights, order 480): the Home Assistant address (`http://[ha address]:8123`; `https://` also accepted), a **long-lived access token**, and **Check**. *(The user named the page, 2026-10-26: it will also hold later devices that come through Home Assistant, such as Arlo and smart plugs. "Home Assistant" appears on it as the source, the way "Hue Bridge" does on Settings › Lights.)*
-- The token belongs to a **separate, non-admin Home Assistant user named Culvery**, made in Home Assistant (Settings › People › Users), so it can be revoked on its own. The page's help text tells the person how: sign in to Home Assistant as Culvery, Profile › Security › Long-lived access tokens › Create. *(My call.)* The person types or pastes it; Culvery never sees a Home Assistant password.
+- The token belongs to a **separate, non-admin Home Assistant user named Culvery**, made in Home Assistant (Settings › People › Users), so it can be revoked on its own. The page's help text tells the person how: sign in to Home Assistant as Culvery, Profile › Security › Long-lived access tokens › Create. *(My call.)* The person types or pastes it; Culvery never sees a Home Assistant password. **Saving a new address or token asks for a fresh Admin PIN** (as connecting Google does), since the token reaches everything in Home Assistant. *(The user, plan review 2026-10-26.)* The help text also says to give the NAS a fixed address on the router.
 - **Check** calls `GET /api/` with the token; then the page lists the `vacuum.*` and `climate.*` entities from `GET /api/states` as two pickers, **Hoover** and **Thermostat**, each with "None". One of each is picked automatically when there is exactly one.
 - The connection (`home.homeassistant`, "Home Assistant") holds the address and token; the chosen entity ids sit in the capabilities' own settings. Both stores are excluded from cloud backup and device transfer, as Hue's key is (the builder checks 4e's extraction rules cover them).
 - **Plain HTTP on the home Wi-Fi.** The token crosses the home network unencrypted. The app's network security config already allows cleartext outside Google and Open-Meteo (Sonos needs it). Accepted for a home network, as with Sonos; HTTPS works if the household sets it up later. *(My call; the builder adds a line to the config file's comment.)*
@@ -76,7 +76,7 @@ Names are the builder's to adjust. The same capability/provider split as Lights 
 - **`:capability:hoover`**: `HooverSystem` — `state: Flow<HooverState?>` (activity, battery percent, an error flag) and `start(): HooverResult`. The tray row (§4.4). No tab (`hasTab` false).
 - **`:capability:heating`**: `HeatingSystem` — `state: Flow<HeatingState?>` (name, Eco on or off, current temperature, target, whether it's heating) and `setEco(on): HeatingResult`. No screen in 11a beyond Settings' status line; 11b's Holiday mode calls it.
 - **`:provider:hoover-homeassistant`** and **`:provider:heating-homeassistant`**: each implements its capability's seam against the shared client:
-  - Hoover: `vacuum.start` with the chosen entity. Activity from the entity's state (`docked`, `cleaning`, `returning`, `paused`, `idle`, `error`). **Battery from the integration's separate battery sensor**, found through the device registry: the vacuum entity's own `battery_level` attribute is **deprecated** in Home Assistant and not used.
+  - Hoover: `vacuum.start` with the chosen entity. Activity from the entity's state (`docked`, `cleaning`, `returning`, `paused`, `idle`, `error`). **Battery from the integration's separate battery sensor**, found by name in `/api/states` as `sensor.<the vacuum's object id>_battery` (the integration's naming, seen on the household's instance); no such sensor, no percentage. No registry read, so no question of what a non-admin user may list. *(My call, plan review 2026-10-26.)* The vacuum entity's own `battery_level` attribute is **deprecated** in Home Assistant and not used.
   - Heating: `climate.set_preset_mode` with `eco` or `none`. Eco from the entity's `preset_mode`; temperatures and `hvac_action` from its attributes.
 - **Rejected:** Culvery writing automations into Home Assistant (for example the 00:01 change). The house's logic stays in Culvery, where it's tested and visible on the wall. *(My call.)*
 
@@ -96,7 +96,7 @@ The handoff's tray (note 13): a 2 px outline, "ONE-TAP" label, rows of tiles. Th
 - **11a's only button, the Hoover row:** a `cleaning_services` icon, "Hoover" over its status, and a green "▶ Start" pill.
   - Status: "Docked · 86%", "Cleaning · 60%", "Going home · 40%", "Paused · 55%", "Stuck. Check the Eufy app." (error), "Can't reach Home Assistant" (§6).
   - **Start** is enabled while docked, idle or paused; while cleaning or going home it reads "Cleaning" and is inactive. *(My call: the user asked for Start only.)*
-  - **Anyone can press Start, no PIN**, like the lights. *(My call.)*
+  - **Start asks for a fresh Adult or Admin PIN** every time (permission `hoover.start`, "Start the hoover", default roles Admin and Adult, fresh PIN, as Holiday mode). A Child's PIN is refused. *(The user, plan review 2026-10-26: so the tray isn't a toy.)*
 - The tray shows only when it has a button: no hoover chosen, no tray, and Home stays as Plan 10 left it.
 
 ### 4.5 Heating in 11a
@@ -211,7 +211,7 @@ The tray row or tile shows a one-line message; Settings › Other integrations s
 - **Client** (MockWebServer): each service call's path and body, the bearer header, timeouts, 401, the socket's auth and reconnect.
 - **Tray:** the Hoover row in each state; Start enabled or not; no tray without a hoover; Shopping and the tray sharing the row, and Plan 10's layout when there's no tray.
 - **Holiday logic** (with a test clock): the steps in order on turning on; the sheet's calendar pick (none, one, several, half term starting tomorrow vs a holiday on today); the hoover at 10:00 the day before and skipped when missed; Eco off at 00:01 and caught up after a restart; across a BST change; retries every 5 minutes inside the window; turning off early clears Eco; each part missing (no Hue, no thermostat, no hoover); a failing part doesn't stop the others.
-- **Access:** Holiday mode asks for a fresh PIN both ways; a Child's PIN is refused; Start needs none; Settings is admin-only.
+- **Access:** Holiday mode asks for a fresh PIN both ways; a Child's PIN is refused; Start asks for a fresh Adult or Admin PIN and refuses a Child's; saving a new Home Assistant link asks for a fresh Admin PIN; Settings is admin-only.
 - **Door and screen:** silent while on (recorded, no chime, no card); `DisplayState` Asleep day and night while on, a tap wakes it.
 - **UI** (Robolectric; Roborazzi for the tray with the Hoover row, the Holiday tile off and on, the sheet with and without a calendar match, Settings › Other integrations): the TalkBack words.
 
