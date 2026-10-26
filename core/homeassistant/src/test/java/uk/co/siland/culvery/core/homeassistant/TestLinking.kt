@@ -78,7 +78,11 @@ internal class FakeDevice(
     override val watched: Flow<Set<String>> = watchedIds
     override val line: Flow<String?> = lineText
 
+    /** Thrown by [choose] when set. */
+    var failure: java.io.IOException? = null
+
     override suspend fun choose(entityId: String?) {
+        failure?.let { throw it }
         picks += entityId
         picked.value = entityId
     }

@@ -11,7 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -167,7 +166,7 @@ private fun DevicePicker(device: DeviceUi, onChoose: (String, String?) -> Unit) 
 /**
  * Settings › Other integrations with its data. The token lives in this composition only (plain `remember`, so it is
  * never saved with the screen's state) and is cleared once linked; the pickers read Home Assistant's entities as
- * the page opens and after each Check.
+ * the page opens and when the link changes.
  */
 @Composable
 internal fun OtherIntegrationsHost(
@@ -183,7 +182,6 @@ internal fun OtherIntegrationsHost(
     var token by remember { mutableStateOf("") }
     var checking by remember { mutableStateOf(false) }
     var checkLine by remember { mutableStateOf<String?>(null) }
-    var refresh by remember { mutableIntStateOf(0) }
     var choices by remember { mutableStateOf<Map<String, List<EntityChoice>>>(emptyMap()) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -192,16 +190,14 @@ internal fun OtherIntegrationsHost(
         val stop = ha.watch(watchedBy(sorted))
         onDispose(stop)
     }
-    LaunchedEffect(link, refresh) {
+    LaunchedEffect(link) {
         choices = emptyMap()
         if (link == null) return@LaunchedEffect
-        choices = sorted.mapNotNull { device ->
-            try {
-                device.domain to linking.entities(device.domain)
-            } catch (e: HomeAssistantException) {
-                null
-            }
-        }.toMap()
+        choices = try {
+            linking.entities(sorted.map { it.domain }.toSet())
+        } catch (e: HomeAssistantException) {
+            emptyMap()
+        }
     }
     val deviceUis by remember(sorted, choices) { deviceUis(sorted, choices) }.collectAsStateWithLifecycle(emptyList())
     val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a Home Assistant choice (${it::class.simpleName})") }
@@ -231,7 +227,6 @@ internal fun OtherIntegrationsHost(
                         CheckOutcome.Linked -> {
                             clearClipboardIfHolds(context, typed)
                             token = ""
-                            refresh++
                         }
                         is CheckOutcome.Failed -> checkLine = result.line
                         CheckOutcome.PinRefused, null -> Unit

@@ -1,5 +1,7 @@
 package uk.co.siland.culvery.core.homeassistant
 
+import android.util.Log
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
@@ -7,6 +9,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.mayManageConnections
+
+private const val TAG = "HomeAssistantLinking"
 
 /** What Check made of an address and a token. */
 sealed interface CheckOutcome {
@@ -62,9 +66,14 @@ class HomeAssistantLinking internal constructor(
         return CheckOutcome.Linked
     }
 
-    /** Every [domain] entity Home Assistant lists, by name; throws [HomeAssistantException]. */
-    suspend fun entities(domain: String): List<EntityChoice> =
-        ha.states().filter { it.domain == domain }.map { EntityChoice(it.entityId, it.friendlyName ?: it.entityId) }.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+    /** Each of [domains]' entities by name, from one read of Home Assistant; throws [HomeAssistantException]. */
+    suspend fun entities(domains: Set<String>): Map<String, List<EntityChoice>> {
+        val states = ha.states()
+        return domains.associateWith { domain ->
+            states.filter { it.domain == domain }.map { EntityChoice(it.entityId, it.friendlyName ?: it.entityId) }
+                .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        }
+    }
 
     // The cache follows the saved link a moment later; reading before it does would ask Home Assistant with the old one.
     private suspend fun pickTheOnlyOnes(link: HomeAssistantLink) {
@@ -77,7 +86,13 @@ class HomeAssistantLinking internal constructor(
             return
         }
         for (device in unchosen) {
-            states.singleOrNull { it.domain == device.domain }?.let { device.choose(it.entityId) }
+            val only = states.singleOrNull { it.domain == device.domain } ?: continue
+            // Best-effort: the link is saved, so a pick that can't be written is left for the household to choose.
+            try {
+                device.choose(only.entityId)
+            } catch (e: IOException) {
+                Log.w(TAG, "Couldn't save an automatic choice (${e::class.simpleName})")
+            }
         }
     }
 

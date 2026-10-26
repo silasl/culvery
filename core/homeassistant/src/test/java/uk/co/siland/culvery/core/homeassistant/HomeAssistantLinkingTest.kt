@@ -94,7 +94,7 @@ class HomeAssistantLinkingTest {
         assertThat(settings.link.first()).isNull()
     }
 
-    /** Fails if a refused address reaches Home Assistant or asks for the PIN (Review Focus 2). */
+    /** Fails if a refused address reaches Home Assistant or asks for the PIN. */
     @Test
     fun aRefusedAddressSendsNothing() = runTest {
         val linking = linking()
@@ -183,8 +183,40 @@ class HomeAssistantLinkingTest {
         oneOfEach()
         api.states["climate.attic"] = entityState("climate.attic", "off")
         val linking = linking(SAVED)
-        assertThat(linking.entities("climate").map { it.id to it.name })
+        assertThat(linking.entities(setOf("climate"))["climate"].orEmpty().map { it.id to it.name })
             .containsExactly("climate.attic" to "climate.attic", "climate.hall" to "Hall").inOrder()
+    }
+
+    /** Fails if one load of the pickers reads Home Assistant's states more than once. */
+    @Test
+    fun oneLoadOfEveryKindIsOneRead() = runTest {
+        oneOfEach()
+        val linking = linking(SAVED)
+        val before = api.calls.count { it == "states" }
+        val all = linking.entities(setOf("vacuum", "climate"))
+        assertThat(api.calls.count { it == "states" } - before).isEqualTo(1)
+        assertThat(all.keys).containsExactly("vacuum", "climate")
+    }
+
+    /** Fails if a pick that can't be written undoes a saved link's Linked. */
+    @Test
+    fun aFailedAutoPickStillLinks() = runTest {
+        oneOfEach()
+        val linking = linking(null, hoover.also { it.failure = java.io.IOException("x") }, thermostat)
+        assertThat(linking.check("192.168.1.20", "new-token")).isEqualTo(CheckOutcome.Linked)
+        assertThat(settings.link.first()?.token).isEqualTo("new-token")
+        assertThat(thermostat.picks).containsExactly("climate.hall")
+    }
+
+    /** Pin: a refused PIN leaves a refused token's problem in place. */
+    @Test
+    fun aRefusedPinKeepsTheTokenProblem() = runTest {
+        access.role = Role.ADULT
+        val linking = linking(SAVED)
+        api.failNext = HaProblem.TOKEN_REFUSED
+        runCatching { ha.read("vacuum.hoover") }
+        assertThat(linking.check("192.168.1.20", "new-token")).isEqualTo(CheckOutcome.PinRefused)
+        assertThat(ha.problem.value).isEqualTo(HaProblem.TOKEN_REFUSED)
     }
 
     /** Fails if a choice's text holds its id or name. */

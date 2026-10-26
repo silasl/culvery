@@ -173,6 +173,7 @@ class OtherIntegrationsTest {
         showHost()
         compose.waitFor { compose.onAllNodes(hasText("Hall")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("ha_device_vacuum").assertExists()
+        assertThat(api.calls.count { it == "states" }).isEqualTo(1)
         compose.onNodeWithTag("ha_choice_vacuum_0").assertTextEquals("Robot")
         compose.onNodeWithTag("ha_none_vacuum").assertTextEquals("None")
         compose.onNodeWithTag("ha_choice_climate_0").assertTextEquals("Hall")
@@ -219,6 +220,7 @@ class OtherIntegrationsTest {
         oneOfEach()
         linkedWithTokenOnTheClipboard("test-token")
         assertThat(clipboard().primaryClip).isNull()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -226,6 +228,7 @@ class OtherIntegrationsTest {
         oneOfEach()
         linkedWithTokenOnTheClipboard("Milk")
         assertThat(clipboard().primaryClip?.getItemAt(0)?.text?.toString()).isEqualTo("Milk")
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     @Test
@@ -271,5 +274,6 @@ class OtherIntegrationsTest {
         shown = false
         compose.waitFor { ha.watching == 0 }
         assertThat(ha.watching).isEqualTo(0)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 }
