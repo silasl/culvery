@@ -191,6 +191,21 @@ class OtherIntegrationsTest {
     }
 
     @Test
+    fun aSameLinkCheckReadsTheListsAgain() {
+        oneOfEach()
+        showHost()
+        compose.waitFor { compose.onAllNodes(hasText("Hall")).fetchSemanticsNodes().isNotEmpty() }
+        assertThat(api.calls.count { it == "states" }).isEqualTo(1)
+        api.states["climate.den"] = entityState("climate.den", "off", mapOf("friendly_name" to "Den"))
+        compose.onNodeWithTag("ha_address").performTextInput("")
+        compose.onNodeWithTag("ha_check").performScrollTo().performClick()
+        compose.waitFor { compose.onAllNodes(hasText("Den")).fetchSemanticsNodes().isNotEmpty() }
+        assertThat(api.calls.count { it == "states" }).isEqualTo(2)
+        assertThat(access.asked).isEmpty()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
     fun noThermostatSaysSo() {
         api.states["vacuum.hoover"] = entityState("vacuum.hoover", "docked", mapOf("friendly_name" to "Robot"))
         showHost()

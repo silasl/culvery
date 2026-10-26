@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -166,7 +167,7 @@ private fun DevicePicker(device: DeviceUi, onChoose: (String, String?) -> Unit) 
 /**
  * Settings › Other integrations with its data. The token lives in this composition only (plain `remember`, so it is
  * never saved with the screen's state) and is cleared once linked; the pickers read Home Assistant's entities as
- * the page opens and when the link changes.
+ * the page opens and and after each Linked Check.
  */
 @Composable
 internal fun OtherIntegrationsHost(
@@ -182,6 +183,7 @@ internal fun OtherIntegrationsHost(
     var token by remember { mutableStateOf("") }
     var checking by remember { mutableStateOf(false) }
     var checkLine by remember { mutableStateOf<String?>(null) }
+    var linkedCount by remember { mutableIntStateOf(0) }
     var choices by remember { mutableStateOf<Map<String, List<EntityChoice>>>(emptyMap()) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -190,9 +192,11 @@ internal fun OtherIntegrationsHost(
         val stop = ha.watch(watchedBy(sorted))
         onDispose(stop)
     }
-    LaunchedEffect(link) {
+    val isLinked = link != null
+    // Every Linked Check reads again: it is how the household refreshes the lists after adding a device.
+    LaunchedEffect(isLinked, linkedCount) {
         choices = emptyMap()
-        if (link == null) return@LaunchedEffect
+        if (!isLinked) return@LaunchedEffect
         choices = try {
             linking.entities(sorted.map { it.domain }.toSet())
         } catch (e: HomeAssistantException) {
@@ -227,6 +231,7 @@ internal fun OtherIntegrationsHost(
                         CheckOutcome.Linked -> {
                             clearClipboardIfHolds(context, typed)
                             token = ""
+                            linkedCount++
                         }
                         is CheckOutcome.Failed -> checkLine = result.line
                         CheckOutcome.PinRefused, null -> Unit
