@@ -40,12 +40,11 @@ class HaJsonTest {
         assertThat(states.getValue("climate.study").state).isEqualTo("unavailable")
     }
 
-    /** Fails if the ids split wrongly, or a list is kept as an attribute. */
+    /** Fails if the domain splits wrongly, or a list is kept as an attribute. */
     @Test
-    fun idsSplitAndOnlyTextAndNumbersAreKept() {
+    fun theDomainSplitsAndOnlyTextAndNumbersAreKept() {
         val hoover = states.getValue("vacuum.hoover")
         assertThat(hoover.domain).isEqualTo("vacuum")
-        assertThat(hoover.objectId).isEqualTo("hoover")
         val hall = states.getValue("climate.hall")
         assertThat(hall.texts).doesNotContainKey("preset_modes")
         assertThat(hall.numbers).doesNotContainKey("preset_modes")

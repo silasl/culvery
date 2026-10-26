@@ -206,7 +206,7 @@ class HomeAssistantTest {
         var result: EntityState? = null
         var finished = false
         launch {
-            result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it?.state == "cleaning" }
+            result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it.state == "cleaning" }
             finished = true
         }
         after(CONFIRM_EVERY_MS - 1)
@@ -230,7 +230,7 @@ class HomeAssistantTest {
         var result: EntityState? = null
         var finished = false
         launch {
-            result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it?.state == "cleaning" }
+            result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it.state == "cleaning" }
             finished = true
         }
         after(CONFIRM_FOR_MS - 1)
@@ -253,7 +253,7 @@ class HomeAssistantTest {
         var result: EntityState? = null
         var finished = false
         launch {
-            result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it?.state == "cleaning" }
+            result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it.state == "cleaning" }
             finished = true
         }
         after(2_000)

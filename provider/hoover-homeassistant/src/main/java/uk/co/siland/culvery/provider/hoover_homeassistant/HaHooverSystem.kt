@@ -24,6 +24,7 @@ import uk.co.siland.culvery.core.homeassistant.HaProblem
 import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantException
 import uk.co.siland.culvery.core.homeassistant.NOT_LINKED
+import uk.co.siland.culvery.core.homeassistant.entityTrouble
 import uk.co.siland.culvery.core.homeassistant.problemLine
 
 private const val TAG = "HaHooverSystem"
@@ -54,11 +55,8 @@ internal fun hooverState(
     problem: HaProblem?,
 ): HooverState? {
     val device = prefs.device?.takeIf { linked } ?: return null
-    if (problem != null) return problemState(problemLine(problem))
-    val vacuum = entities[device]
-    if (device in entities && vacuum == null) return problemState(GONE_HOOVER)
-    if (vacuum?.state == "unavailable") return problemState(HOOVER_UNREACHABLE)
-    val activity = vacuum?.let { activityOf(it.state) } ?: return HooverState(null, null, null)
+    entityTrouble(device, entities, problem, GONE_HOOVER, HOOVER_UNREACHABLE)?.let { return problemState(it) }
+    val activity = entities[device]?.let { activityOf(it.state) } ?: return HooverState(null, null, null)
     return HooverState(activity, batteryPercentOf(entities[batteryIdOf(device)]), null)
 }
 
@@ -107,7 +105,7 @@ class HaHooverSystem internal constructor(
                 Log.w(TAG, "Home Assistant refused the start")
                 return HooverResult.NotStarted
             }
-            val left = ha.awaitEntity(device, CONFIRM_FOR_MS) { s -> s?.let { activityOf(it.state) }?.let { it !in STARTABLE } == true }
+            val left = ha.awaitEntity(device, CONFIRM_FOR_MS) { activityOf(it.state)?.let { a -> a !in STARTABLE } == true }
             if (left != null && activityOf(left.state) != HooverActivity.ERROR) return HooverResult.Started
             Log.w(TAG, "The hoover did not leave the dock")
             return HooverResult.NotStarted

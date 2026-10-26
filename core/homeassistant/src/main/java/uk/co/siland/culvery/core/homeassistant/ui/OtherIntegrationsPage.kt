@@ -96,7 +96,6 @@ data class OtherIntegrationsUi(
     val linked: Boolean,
     /** The §6 line, which takes the connection line's place. */
     val status: String?,
-    val tokenSaved: Boolean,
     val checking: Boolean,
     val checkLine: String?,
     val devices: List<DeviceUi>,
@@ -116,16 +115,12 @@ fun OtherIntegrations(
     Column(verticalArrangement = Arrangement.spacedBy(HomeAssistantDimens.settingsGap), modifier = Modifier.testTag("settings_other")) {
         HhPageTitle(OTHER_INTEGRATIONS, OTHER_INTEGRATIONS_LINE)
         HhSectionLabel(HOME_ASSISTANT)
-        if (ui.status != null) {
-            Text(ui.status, style = HhType.body, color = c.danger, modifier = Modifier.testTag("ha_status"))
-        } else {
-            Text(if (ui.linked) LINKED else NOT_LINKED_YET, style = HhType.body, color = c.mute, modifier = Modifier.testTag("ha_status"))
-        }
-        HhTextField(address, onAddress, HA_ADDRESS_EXAMPLE, HA_ADDRESS, "ha_address", capitalization = KeyboardCapitalization.None)
-        HhTextField(
-            token, onToken, if (ui.tokenSaved) HA_TOKEN_SAVED else HA_TOKEN_PLACEHOLDER, HA_TOKEN, "ha_token",
-            capitalization = KeyboardCapitalization.None, secret = true,
+        Text(
+            ui.status ?: if (ui.linked) LINKED else NOT_LINKED_YET, style = HhType.body,
+            color = if (ui.status != null) c.danger else c.mute, modifier = Modifier.testTag("ha_status"),
         )
+        HhTextField(address, onAddress, HA_ADDRESS_EXAMPLE, HA_ADDRESS, "ha_address", capitalization = KeyboardCapitalization.None)
+        HhTextField(token, onToken, if (ui.linked) HA_TOKEN_SAVED else HA_TOKEN_PLACEHOLDER, HA_TOKEN, "ha_token", secret = true)
         Text(HA_HELP, style = HhType.body, color = c.mute, modifier = Modifier.testTag("ha_help"))
         HhButton(
             if (ui.checking) CHECKING else HA_CHECK, onCheck, Modifier.testTag("ha_check"),
@@ -167,7 +162,7 @@ private fun DevicePicker(device: DeviceUi, onChoose: (String, String?) -> Unit) 
 /**
  * Settings › Other integrations with its data. The token lives in this composition only (plain `remember`, so it is
  * never saved with the screen's state) and is cleared once linked; the pickers read Home Assistant's entities as
- * the page opens and and after each Linked Check.
+ * the page opens and after each Linked Check.
  */
 @Composable
 internal fun OtherIntegrationsHost(
@@ -193,7 +188,8 @@ internal fun OtherIntegrationsHost(
         onDispose(stop)
     }
     val isLinked = link != null
-    // Every Linked Check reads again: it is how the household refreshes the lists after adding a device.
+    // Linking reads the lists once through isLinked; a Linked Check made while linked reads them again, which is how
+    // the household refreshes them after adding a device.
     LaunchedEffect(isLinked, linkedCount) {
         choices = emptyMap()
         if (!isLinked) return@LaunchedEffect
@@ -203,13 +199,13 @@ internal fun OtherIntegrationsHost(
             emptyMap()
         }
     }
-    val deviceUis by remember(sorted, choices) { deviceUis(sorted, choices) }.collectAsStateWithLifecycle(emptyList())
+    val deviceUis by remember(sorted) { deviceUis(sorted) }.collectAsStateWithLifecycle(emptyList())
     val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a Home Assistant choice (${it::class.simpleName})") }
 
     OtherIntegrations(
         OtherIntegrationsUi(
-            linked = link != null, status = problem?.let(::problemLine), tokenSaved = link != null, checking = checking,
-            checkLine = checkLine, devices = deviceUis,
+            linked = isLinked, status = problem?.let(::problemLine), checking = checking, checkLine = checkLine,
+            devices = deviceUis.map { it.copy(choices = choices[it.domain]) },
         ),
         address = address, onAddress = { address = it },
         token = token, onToken = { token = it },
@@ -218,6 +214,7 @@ internal fun OtherIntegrationsHost(
                 checking = true
                 checkLine = null
                 val typed = token
+                val wasLinked = isLinked
                 scope.launch {
                     var outcome: CheckOutcome? = null
                     try {
@@ -231,7 +228,7 @@ internal fun OtherIntegrationsHost(
                         CheckOutcome.Linked -> {
                             clearClipboardIfHolds(context, typed)
                             token = ""
-                            linkedCount++
+                            if (wasLinked) linkedCount++
                         }
                         is CheckOutcome.Failed -> checkLine = result.line
                         CheckOutcome.PinRefused, null -> Unit
@@ -246,14 +243,15 @@ internal fun OtherIntegrationsHost(
 private fun watchedBy(devices: List<HomeAssistantDevice>): Flow<Set<String>> =
     if (devices.isEmpty()) flowOf(emptySet()) else combine(devices.map { it.watched }) { sets -> sets.flatMapTo(mutableSetOf()) { it } }
 
-private fun deviceUis(devices: List<HomeAssistantDevice>, choices: Map<String, List<EntityChoice>>): Flow<List<DeviceUi>> =
+/** Each device as it stands, without its [DeviceUi.choices]. */
+private fun deviceUis(devices: List<HomeAssistantDevice>): Flow<List<DeviceUi>> =
     if (devices.isEmpty()) {
         flowOf(emptyList())
     } else {
         combine(
             devices.map { device ->
                 combine(device.chosen, device.line) { chosen, line ->
-                    DeviceUi(device.title, device.domain, device.noneFound, choices[device.domain], chosen, line)
+                    DeviceUi(device.title, device.domain, device.noneFound, null, chosen, line)
                 }
             },
         ) { it.toList() }

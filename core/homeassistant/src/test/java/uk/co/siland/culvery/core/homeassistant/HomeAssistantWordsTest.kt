@@ -22,4 +22,18 @@ class HomeAssistantWordsTest {
     fun notLinkedSaysWhereToLinkIt() {
         assertThat(NOT_LINKED).isEqualTo("Home Assistant isn’t linked. Link it in Settings › Other integrations.")
     }
+
+    /** Fails if the order changes: the link's problem first, then a gone entity, then an unreachable one. */
+    @Test
+    fun anEntitysTroubleComesInOrder() {
+        val id = "vacuum.hoover"
+        val unavailable = EntityState(id, "unavailable", emptyMap(), emptyMap())
+        fun trouble(entities: Map<String, EntityState?>, problem: HaProblem? = null) = entityTrouble(id, entities, problem, "gone", "unreachable")
+
+        assertThat(trouble(mapOf(id to null), HaProblem.OFFLINE)).isEqualTo(problemLine(HaProblem.OFFLINE))
+        assertThat(trouble(mapOf(id to null))).isEqualTo("gone")
+        assertThat(trouble(mapOf(id to unavailable))).isEqualTo("unreachable")
+        assertThat(trouble(mapOf(id to unavailable.copy(state = "docked")))).isNull()
+        assertThat(trouble(emptyMap())).isNull()
+    }
 }

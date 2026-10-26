@@ -20,6 +20,7 @@ import uk.co.siland.culvery.core.homeassistant.HaProblem
 import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantException
 import uk.co.siland.culvery.core.homeassistant.NOT_LINKED
+import uk.co.siland.culvery.core.homeassistant.entityTrouble
 import uk.co.siland.culvery.core.homeassistant.problemLine
 
 private const val TAG = "HaHeatingSystem"
@@ -38,10 +39,8 @@ internal fun heatingState(
     problem: HaProblem?,
 ): HeatingState? {
     val device = prefs.device?.takeIf { linked } ?: return null
-    if (problem != null) return problemState(problemLine(problem))
+    entityTrouble(device, entities, problem, GONE_THERMOSTAT, THERMOSTAT_UNREACHABLE)?.let { return problemState(it) }
     val climate = entities[device]
-    if (device in entities && climate == null) return problemState(GONE_THERMOSTAT)
-    if (climate?.state == "unavailable") return problemState(THERMOSTAT_UNREACHABLE)
     return HeatingState(
         name = climate?.friendlyName ?: THERMOSTAT,
         eco = climate?.preset() == ECO,
@@ -75,7 +74,7 @@ class HaHeatingSystem internal constructor(
         val device = prefs.first().device ?: return HeatingResult.Failed(NO_THERMOSTAT_CHOSEN)
         try {
             ha.call("climate", "set_preset_mode", device, mapOf("preset_mode" to if (on) ECO else "none"))
-            val shown = ha.awaitEntity(device, CONFIRM_FOR_MS) { s -> s != null && (s.preset() == ECO) == on }
+            val shown = ha.awaitEntity(device, CONFIRM_FOR_MS) { (it.preset() == ECO) == on }
             if (shown != null) return HeatingResult.Done
             Log.w(TAG, "The preset did not change")
             HeatingResult.NotConfirmed

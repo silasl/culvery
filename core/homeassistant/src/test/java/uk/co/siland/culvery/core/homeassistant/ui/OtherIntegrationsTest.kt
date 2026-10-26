@@ -66,7 +66,7 @@ private const val HELP = "Give the NAS a fixed address on the router. Then sign 
     "open Profile › Security › Long-lived access tokens › Create token, and paste the token here."
 
 private val NOTHING_LINKED = OtherIntegrationsUi(
-    linked = false, status = null, tokenSaved = false, checking = false, checkLine = null, devices = emptyList(),
+    linked = false, status = null, checking = false, checkLine = null, devices = emptyList(),
 )
 
 /** 11 §4.1, §6: Settings › Other integrations: the address and the token, Check, and the two pickers. */
@@ -140,7 +140,7 @@ class OtherIntegrationsTest {
 
     @Test
     fun aSavedTokenSaysSoInItsPlaceholder() {
-        setPage { OtherIntegrations(NOTHING_LINKED.copy(linked = true, tokenSaved = true), "http://192.168.1.20:8123/", {}, "", {}, {}, { _, _ -> }) }
+        setPage { OtherIntegrations(NOTHING_LINKED.copy(linked = true), "http://192.168.1.20:8123/", {}, "", {}, {}, { _, _ -> }) }
         compose.onNodeWithTag("ha_status").assertTextEquals("Linked.")
         compose.onNodeWithText("Saved. Paste a new token to replace it.").assertExists()
         compose.onNodeWithText("http://192.168.1.20:8123/").assertExists()
@@ -203,6 +203,21 @@ class OtherIntegrationsTest {
         assertThat(api.calls.count { it == "states" }).isEqualTo(2)
         assertThat(access.asked).isEmpty()
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Pin: linking reads the lists once (Robolectric folds the link appearing and Check ending into one frame, so the doubled read does not show here). */
+    @Test
+    fun aFirstLinkReadsTheListsOnce() {
+        oneOfEach()
+        showHost(saved = false)
+        typeAddressAndToken()
+        compose.onNodeWithTag("ha_check").performClick()
+        compose.waitFor { compose.onAllNodes(hasText("Hall")).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { compose.onAllNodes(hasText("Check")).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitFor { hoover.picks.isNotEmpty() }
+        compose.waitForIdle()
+        // One read for Check's automatic picks, one for the lists.
+        assertThat(api.calls.count { it == "states" }).isEqualTo(2)
     }
 
     @Test

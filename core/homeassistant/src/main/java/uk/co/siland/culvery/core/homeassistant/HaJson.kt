@@ -21,7 +21,7 @@ internal class HaJsonException : IOException("A Home Assistant answer couldn't b
  * One entity as Home Assistant reports it: its attributes split by kind, any other kind dropped. [toString] names the
  * domain and the state only; the id and the name are the household's.
  */
-class EntityState(
+data class EntityState(
     val entityId: String,
     val state: String,
     val texts: Map<String, String>,
@@ -29,28 +29,17 @@ class EntityState(
 ) {
     val friendlyName: String? get() = texts["friendly_name"]
     val domain: String get() = entityId.substringBefore('.')
-    val objectId: String get() = entityId.substringAfter('.')
-
-    override fun equals(other: Any?) = other is EntityState && entityId == other.entityId && state == other.state &&
-        texts == other.texts && numbers == other.numbers
-
-    override fun hashCode() = listOf(entityId, state, texts, numbers).hashCode()
 
     override fun toString() = "EntityState(domain=$domain, state=$state)"
 }
 
 /** What a socket event changed about one entity: a null [state] is unchanged. */
-internal class EntityChange(
+internal data class EntityChange(
     val state: String?,
     val texts: Map<String, String>,
     val numbers: Map<String, Double>,
     val removedAttributes: Set<String>,
 ) {
-    override fun equals(other: Any?) = other is EntityChange && state == other.state && texts == other.texts &&
-        numbers == other.numbers && removedAttributes == other.removedAttributes
-
-    override fun hashCode() = listOf(state, texts, numbers, removedAttributes).hashCode()
-
     override fun toString() = "EntityChange"
 }
 
@@ -72,47 +61,36 @@ internal sealed interface SocketMessage {
 
     data object Other : SocketMessage
 
-    class Result(val id: Int, val success: Boolean) : SocketMessage {
-        override fun equals(other: Any?) = other is Result && id == other.id && success == other.success
-
-        override fun hashCode() = 31 * id + success.hashCode()
-
+    data class Result(val id: Int, val success: Boolean) : SocketMessage {
         override fun toString() = "Result"
     }
 
     /** A `subscribe_entities` event: the entities [added] whole, the [changed] ones in part, and the [removed] ids. */
-    class Entities(
+    data class Entities(
         val id: Int,
         val added: Map<String, EntityState>,
         val changed: Map<String, EntityChange>,
         val removed: Set<String>,
     ) : SocketMessage {
-        override fun equals(other: Any?) = other is Entities && id == other.id && added == other.added &&
-            changed == other.changed && removed == other.removed
-
-        override fun hashCode() = listOf(id, added, changed, removed).hashCode()
-
         override fun toString() = "Entities"
     }
 }
 
 /** Reads what Home Assistant answers over REST and the socket (11 §4.2, §4.3) and redacts it for the debug capture (11 §8.2). */
 internal object HaJson {
-    private val json = Json
-
     /** Whether [text] is Home Assistant's `GET /api/` answer; anything else, even unreadable, is not. */
     fun apiRunning(text: String): Boolean = try {
-        json.parseToJsonElement(text).jsonObject["message"]?.jsonPrimitive?.takeIf { it.isString }?.content == "API running."
+        Json.parseToJsonElement(text).jsonObject["message"]?.jsonPrimitive?.takeIf { it.isString }?.content == "API running."
     } catch (_: Exception) {
         false
     }
 
-    fun states(text: String): List<EntityState> = read { json.parseToJsonElement(text).jsonArray.map { entity(it.jsonObject) } }
+    fun states(text: String): List<EntityState> = read { Json.parseToJsonElement(text).jsonArray.map { entity(it.jsonObject) } }
 
-    fun state(text: String): EntityState = read { entity(json.parseToJsonElement(text).jsonObject) }
+    fun state(text: String): EntityState = read { entity(Json.parseToJsonElement(text).jsonObject) }
 
     fun socket(text: String): SocketMessage = read {
-        val message = json.parseToJsonElement(text).jsonObject
+        val message = Json.parseToJsonElement(text).jsonObject
         when (message["type"]?.jsonPrimitive?.content) {
             "auth_required" -> SocketMessage.AuthRequired
             "auth_ok" -> SocketMessage.AuthOk
@@ -174,7 +152,7 @@ internal object HaJson {
      */
     fun redact(text: String, keep: Set<String>): String {
         val element = try {
-            json.parseToJsonElement(text)
+            Json.parseToJsonElement(text)
         } catch (_: Exception) {
             return UNREADABLE
         }

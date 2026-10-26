@@ -24,8 +24,8 @@ private fun HooverActivity.word() = when (this) {
 fun hooverStatus(state: HooverState): String {
     state.problem?.let { return it }
     val activity = state.activity ?: return CHECKING
-    if (activity == HooverActivity.ERROR) return STUCK
-    return state.batteryPercent?.let { "${activity.word()} · $it%" } ?: activity.word()
+    val battery = state.batteryPercent?.takeIf { activity != HooverActivity.ERROR }
+    return battery?.let { "${activity.word()} · $it%" } ?: activity.word()
 }
 
 /** What TalkBack reads for the row (11 §4.4). */

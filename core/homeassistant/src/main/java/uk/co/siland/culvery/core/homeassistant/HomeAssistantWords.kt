@@ -11,6 +11,18 @@ fun problemLine(problem: HaProblem): String = when (problem) {
     HaProblem.BLOCKED -> "Home Assistant has blocked the tablet. Unblock its address in Home Assistant."
 }
 
+/**
+ * What is wrong with the chosen [entityId], in 11 §6's order: the link's [problem], then an entity Home Assistant no
+ * longer has ([gone]), then one it can't reach ([unreachable]); null when nothing is.
+ */
+fun entityTrouble(entityId: String, entities: Map<String, EntityState?>, problem: HaProblem?, gone: String, unreachable: String): String? =
+    when {
+        problem != null -> problemLine(problem)
+        entityId in entities && entities[entityId] == null -> gone
+        entities[entityId]?.state == "unavailable" -> unreachable
+        else -> null
+    }
+
 /** Settings › Other integrations (11 §4.1, §6). */
 const val OTHER_INTEGRATIONS = "Other integrations"
 const val OTHER_INTEGRATIONS_LINE = "Devices Culvery reaches through Home Assistant."

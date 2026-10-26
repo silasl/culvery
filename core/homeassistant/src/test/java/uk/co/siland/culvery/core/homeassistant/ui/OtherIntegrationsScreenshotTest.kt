@@ -36,8 +36,8 @@ class OtherIntegrationsScreenshotTest {
         "Thermostat", "climate", "Home Assistant has no thermostat.",
         listOf(EntityChoice("climate.hall", "Hall"), EntityChoice("climate.landing", "Landing")), "climate.hall", "Hall · 20.8 °C · heating to 21.2 °C",
     )
-    private val unlinked = OtherIntegrationsUi(linked = false, status = null, tokenSaved = false, checking = false, checkLine = null, devices = emptyList())
-    private val linked = unlinked.copy(linked = true, tokenSaved = true, devices = listOf(hoover, thermostat))
+    private val unlinked = OtherIntegrationsUi(linked = false, status = null, checking = false, checkLine = null, devices = emptyList())
+    private val linked = unlinked.copy(linked = true, devices = listOf(hoover, thermostat))
 
     private fun snap(name: String, dark: Boolean, ui: OtherIntegrationsUi, address: String = "", token: String = "") =
         compose.snap(name, dark, Modifier.size(960.dp, 900.dp)) {

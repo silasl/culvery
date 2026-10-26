@@ -19,11 +19,9 @@ sealed interface CheckOutcome {
     /** The Admin PIN was refused or cancelled: nothing was saved and there is nothing to say. */
     data object PinRefused : CheckOutcome
 
-    /** [line] says what to fix; [field] is where it shows. */
-    data class Failed(val line: String, val field: CheckField) : CheckOutcome
+    /** [line] says what to fix. */
+    data class Failed(val line: String) : CheckOutcome
 }
-
-enum class CheckField { ADDRESS, TOKEN, NONE }
 
 /** An entity a picker offers; [toString] names neither its id nor its name. */
 class EntityChoice(val id: String, val name: String) {
@@ -48,11 +46,11 @@ class HomeAssistantLinking internal constructor(
 
     /** A blank [token] keeps the saved one while the address is the saved one. A refused address sends nothing. */
     suspend fun check(address: String, token: String): CheckOutcome {
-        val base = url(address) ?: return CheckOutcome.Failed(ADDRESS_REFUSED, CheckField.ADDRESS)
+        val base = url(address) ?: return CheckOutcome.Failed(ADDRESS_REFUSED)
         val saved = settings.link.first()
         val typed = token.trim()
         val secret = typed.ifEmpty { saved?.takeIf { it.baseUrl == base }?.token }
-            ?: return CheckOutcome.Failed(PASTE_A_TOKEN, CheckField.TOKEN)
+            ?: return CheckOutcome.Failed(PASTE_A_TOKEN)
         val link = HomeAssistantLink(base, secret)
         try {
             ha.check(link)
@@ -97,9 +95,9 @@ class HomeAssistantLinking internal constructor(
     }
 
     private fun HaProblem.failure() = when (this) {
-        HaProblem.TOKEN_REFUSED -> CheckOutcome.Failed(TOKEN_NOT_ACCEPTED, CheckField.TOKEN)
-        HaProblem.NOT_HOME_ASSISTANT -> CheckOutcome.Failed(NOT_HOME_ASSISTANT_LINE, CheckField.ADDRESS)
-        else -> CheckOutcome.Failed(problemLine(this), CheckField.NONE)
+        HaProblem.TOKEN_REFUSED -> CheckOutcome.Failed(TOKEN_NOT_ACCEPTED)
+        HaProblem.NOT_HOME_ASSISTANT -> CheckOutcome.Failed(NOT_HOME_ASSISTANT_LINE)
+        else -> CheckOutcome.Failed(problemLine(this))
     }
 
     private companion object {

@@ -84,7 +84,7 @@ internal fun HooverRow(state: HooverState, line: String?, starting: Boolean, onS
                 Text(HOOVER, style = HhType.buttonLabel, color = colors.ink, maxLines = 1)
                 Text(
                     line ?: hooverStatus(state),
-                    style = HhType.secondary.copy(fontSize = HooverDimens.statusSize),
+                    style = HooverDimens.statusStyle,
                     color = colors.mute,
                     maxLines = HooverDimens.STATUS_LINES,
                     overflow = TextOverflow.Ellipsis,

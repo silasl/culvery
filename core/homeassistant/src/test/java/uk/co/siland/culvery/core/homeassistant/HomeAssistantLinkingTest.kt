@@ -98,7 +98,7 @@ class HomeAssistantLinkingTest {
     @Test
     fun aRefusedAddressSendsNothing() = runTest {
         val linking = linking()
-        assertThat(linking.check("http://ha.example.com", "new-token")).isEqualTo(CheckOutcome.Failed(ADDRESS_REFUSED, CheckField.ADDRESS))
+        assertThat(linking.check("http://ha.example.com", "new-token")).isEqualTo(CheckOutcome.Failed(ADDRESS_REFUSED))
         assertThat(api.calls).isEmpty()
         assertThat(access.asked).isEmpty()
     }
@@ -109,7 +109,7 @@ class HomeAssistantLinkingTest {
         api.failNext = HaProblem.TOKEN_REFUSED
         val linking = linking()
         assertThat(linking.check("192.168.1.20", "new-token"))
-            .isEqualTo(CheckOutcome.Failed("Home Assistant didn’t accept that token. Create a new one and paste it here.", CheckField.TOKEN))
+            .isEqualTo(CheckOutcome.Failed("Home Assistant didn’t accept that token. Create a new one and paste it here."))
         assertThat(settings.link.first()).isNull()
         assertThat(access.asked).isEmpty()
     }
@@ -120,7 +120,7 @@ class HomeAssistantLinkingTest {
         api.failNext = HaProblem.NOT_HOME_ASSISTANT
         val linking = linking()
         assertThat(linking.check("192.168.1.20", "new-token"))
-            .isEqualTo(CheckOutcome.Failed("Nothing at that address answered as Home Assistant. Check the address.", CheckField.ADDRESS))
+            .isEqualTo(CheckOutcome.Failed("Nothing at that address answered as Home Assistant. Check the address."))
         assertThat(access.asked).isEmpty()
     }
 
@@ -130,7 +130,7 @@ class HomeAssistantLinkingTest {
         val linking = linking()
         for (problem in listOf(HaProblem.UNREACHABLE, HaProblem.OFFLINE, HaProblem.BLOCKED)) {
             api.failNext = problem
-            assertThat(linking.check("192.168.1.20", "new-token")).isEqualTo(CheckOutcome.Failed(problemLine(problem), CheckField.NONE))
+            assertThat(linking.check("192.168.1.20", "new-token")).isEqualTo(CheckOutcome.Failed(problemLine(problem)))
         }
         assertThat(access.asked).isEmpty()
         assertThat(settings.link.first()).isNull()
@@ -152,7 +152,7 @@ class HomeAssistantLinkingTest {
     @Test
     fun aChangedAddressNeedsAToken() = runTest {
         val linking = linking(SAVED)
-        assertThat(linking.check("192.168.1.21", "")).isEqualTo(CheckOutcome.Failed("Paste a token for Culvery first.", CheckField.TOKEN))
+        assertThat(linking.check("192.168.1.21", "")).isEqualTo(CheckOutcome.Failed("Paste a token for Culvery first."))
         assertThat(api.calls).isEmpty()
     }
 

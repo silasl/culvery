@@ -285,6 +285,8 @@ internal val SecretKeyboardOptions = KeyboardOptions(
     imeAction = ImeAction.Done,
 )
 
+private val SecretTransformation = PasswordVisualTransformation()
+
 /** What TalkBack says of a choice's state, and a locked one's tap. */
 const val NOT_AVAILABLE = "not available"
 const val FIND_OUT_WHY = "find out why"
@@ -332,7 +334,7 @@ fun HhTextField(
             textStyle = ControlType.field.copy(color = c.ink),
             cursorBrush = SolidColor(c.accent),
             keyboardOptions = if (secret) SecretKeyboardOptions else KeyboardOptions(capitalization = capitalization, imeAction = ImeAction.Done),
-            visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
+            visualTransformation = if (secret) SecretTransformation else VisualTransformation.None,
             // Leaving the field closes the keyboard: a KeyboardActions onDone replaces Compose's own closing.
             keyboardActions = KeyboardActions(onDone = {
                 onDone()

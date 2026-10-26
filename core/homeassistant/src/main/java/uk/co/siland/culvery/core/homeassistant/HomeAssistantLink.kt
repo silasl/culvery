@@ -11,11 +11,7 @@ const val HOME_ASSISTANT_ID = "home.homeassistant"
 const val HOME_ASSISTANT_PORT = 8123
 
 /** The saved address and long-lived token; [toString] names neither. */
-class HomeAssistantLink(val baseUrl: HttpUrl, val token: String) {
-    override fun equals(other: Any?) = other is HomeAssistantLink && baseUrl == other.baseUrl && token == other.token
-
-    override fun hashCode() = 31 * baseUrl.hashCode() + token.hashCode()
-
+data class HomeAssistantLink(val baseUrl: HttpUrl, val token: String) {
     override fun toString() = "HomeAssistantLink"
 }
 
