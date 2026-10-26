@@ -26,6 +26,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 import uk.co.siland.culvery.core.net.homeHttpClient
 
 /** The test plays Home Assistant's end of the socket: each `after…` says what the server sends next. */
@@ -169,5 +170,41 @@ class HomeAssistantSocketTest {
             }.start()
         }
         assertThat(quick.follow(link, ids).firstReads(1)).hasSize(1)
+    }
+
+    private fun socketLines() = ShadowLog.getLogs().filter { it.tag == "HomeAssistantClient" }
+
+    @Test
+    fun endingTheSocketOurselvesLogsNothing() = runBlocking<Unit> {
+        ShadowLog.clear()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val read = CountDownLatch(1)
+        api.follow(link, ids).onEach { read.countDown() }.launchIn(scope)
+        assertThat(read.await(5, TimeUnit.SECONDS)).isTrue()
+        scope.cancel()
+        assertThat(serverClosed.await(5, TimeUnit.SECONDS)).isTrue()
+        Thread.sleep(300)
+        assertThat(socketLines()).isEmpty()
+    }
+
+    @Test
+    fun aRefusedAuthLogsOnceAndNothingPersonal() = runBlocking<Unit> {
+        ShadowLog.clear()
+        afterAuth = { it.send(HaFixtures.AUTH_INVALID) }
+        failureOf(api.follow(link, ids))
+        assertThat(serverClosed.await(5, TimeUnit.SECONDS)).isTrue()
+        Thread.sleep(300)
+        val lines = socketLines()
+        assertThat(lines).hasSize(1)
+        listOf("192.168", "127.0.0.1", "test-token", "hoover", "localhost").forEach { assertThat(lines.single().msg).doesNotContain(it) }
+    }
+
+    @Test
+    fun aServerClosingLogsOnce() = runBlocking<Unit> {
+        ShadowLog.clear()
+        afterSubscribe = { it.close(1001, null) }
+        failureOf(api.follow(link, ids))
+        Thread.sleep(300)
+        assertThat(socketLines()).hasSize(1)
     }
 }

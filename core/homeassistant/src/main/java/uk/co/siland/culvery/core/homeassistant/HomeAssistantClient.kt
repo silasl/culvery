@@ -119,7 +119,7 @@ class HomeAssistantClient internal constructor(
         val current = mutableMapOf<String, EntityState>()
         try {
             for (frame in inbox) {
-                if (frame is Frame.Ended) throw HomeAssistantException(frame.problem)
+                if (frame is Frame.Ended) socketEnded(frame)
                 val text = (frame as Frame.Text).text
                 capture(HaCall.SOCKET, text)
                 val entities = when (val message = socketMessage(text)) {
@@ -151,36 +151,39 @@ class HomeAssistantClient internal constructor(
     private sealed interface Frame {
         class Text(val text: String) : Frame
 
-        class Ended(val problem: HaProblem) : Frame
+        /** How the socket ended: an HTTP or close [code], or the [error] that broke it. Logged only if the collector is still there. */
+        class Ended(val problem: HaProblem, val code: Int?, val error: Throwable?) : Frame
     }
 
     /** Hands the socket's messages and its end to the collector, which owns all the state. */
-    private fun listener(inbox: Channel<Frame>): WebSocketListener {
-        val what = HaCall.SOCKET
-        return object : WebSocketListener() {
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                inbox.trySend(Frame.Text(text))
-            }
-
-            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                Log.w(TAG, "${what.label} closed by Home Assistant")
-                inbox.trySend(Frame.Ended(unreachableOrOffline()))
-            }
-
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                val problem = when (response?.code) {
-                    HTTP_UNAUTHORIZED -> HaProblem.TOKEN_REFUSED
-                    HTTP_FORBIDDEN -> HaProblem.BLOCKED
-                    else -> unreachableOrOffline()
-                }
-                if (response != null) {
-                    Log.w(TAG, "${what.label} failed (${response.code})")
-                } else {
-                    Log.w(TAG, "${what.label} failed (${t::class.simpleName})")
-                }
-                inbox.trySend(Frame.Ended(problem))
-            }
+    private fun listener(inbox: Channel<Frame>) = object : WebSocketListener() {
+        override fun onMessage(webSocket: WebSocket, text: String) {
+            inbox.trySend(Frame.Text(text))
         }
+
+        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+            inbox.trySend(Frame.Ended(unreachableOrOffline(), code, null))
+        }
+
+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            val problem = when (response?.code) {
+                HTTP_UNAUTHORIZED -> HaProblem.TOKEN_REFUSED
+                HTTP_FORBIDDEN -> HaProblem.BLOCKED
+                else -> unreachableOrOffline()
+            }
+            inbox.trySend(Frame.Ended(problem, response?.code, t))
+        }
+    }
+
+    private fun socketEnded(frame: Frame.Ended): Nothing {
+        val what = HaCall.SOCKET
+        val error = frame.error
+        if (frame.code != null) {
+            Log.w(TAG, "${what.label} ended (${frame.code})")
+        } else if (error != null) {
+            Log.w(TAG, "${what.label} failed (${error::class.simpleName})")
+        }
+        throw HomeAssistantException(frame.problem)
     }
 
     private fun authMessage(link: HomeAssistantLink): JsonObject = buildJsonObject {

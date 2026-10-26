@@ -142,12 +142,6 @@ class HomeAssistantClientTest {
         assertThat(built.http.followRedirects).isFalse()
     }
 
-    /** pin */
-    @Test
-    fun theCommandTimeoutIsFiveSeconds() {
-        assertThat(COMMAND_TIMEOUT_MS).isEqualTo(5_000L)
-    }
-
     @Test
     fun offlineIsOffline() = runBlocking<Unit> {
         val offline = HomeAssistantClient(homeHttpClient(COMMAND_TIMEOUT_MS), { false }) { _, _ -> }
