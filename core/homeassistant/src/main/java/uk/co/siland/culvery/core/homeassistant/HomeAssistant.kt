@@ -7,6 +7,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,10 +18,12 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Startable
@@ -106,6 +110,25 @@ class HomeAssistant(
     suspend fun call(domain: String, service: String, entityId: String, data: Map<String, String> = emptyMap()) = calling { link ->
         api.callService(link, domain, service, entityId, data)
     }
+
+    /**
+     * Waits until [done] holds for [entityId] (null: Home Assistant has none), reading it every [CONFIRM_EVERY_MS]
+     * and counting what the socket brings. False when [timeoutMs] pass first; a failed read is thrown.
+     */
+    suspend fun awaitEntity(entityId: String, timeoutMs: Long, done: (EntityState?) -> Boolean): Boolean =
+        withTimeoutOrNull(timeoutMs) {
+            coroutineScope {
+                val polling = launch {
+                    while (true) {
+                        delay(CONFIRM_EVERY_MS)
+                        read(entityId)
+                    }
+                }
+                _entities.first { entityId in it && done(it[entityId]) }
+                polling.cancel()
+                true
+            }
+        } ?: false
 
     /** A screen follows [ids] while it shows; call the result when it goes. */
     fun watch(ids: Flow<Set<String>>): () -> Unit {

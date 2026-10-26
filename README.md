@@ -65,6 +65,7 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 | `:capability:heating` | Heating contract (`HeatingSystem`), the chosen thermostat (`heating_settings`) |
 | `:provider:calendar-fake` | Debug-only sample calendar (the hand-off's week, relative to today) |
 | `:provider:calendar-google` | Google Calendar API v3 over OkHttp; sign-in and tokens through Play services, nothing stored |
+| `:provider:hoover-homeassistant` | The hoover from Home Assistant: its state, the battery sensor found by name, Start with its 30-second check, the Hoover picker |
 | `:provider:shopping-google-tasks` | The shopping list in Google Tasks over OkHttp: a list called Shopping, found or made when it is turned on; sign-in through `:core:google` |
 | `:provider:weather-openmeteo` | Town search (geocoding) and the forecast through Open-Meteo (no key) |
 

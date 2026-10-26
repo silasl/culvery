@@ -6,6 +6,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -195,6 +196,70 @@ class HomeAssistantTest {
         after(600_000)
         assertThat(ha.problem.value).isEqualTo(HaProblem.TOKEN_REFUSED)
         assertThat(api.follows).hasSize(1)
+    }
+
+    /** Fails if the wait reads sooner or later than every 5 s, or stops being a wait once the entity shows the change. */
+    @Test
+    fun awaitEntityReadsEveryFiveSecondsUntilItHolds() = runTest {
+        api.states["vacuum.hoover"] = hoover
+        val ha = ha()
+        var result: Boolean? = null
+        launch { result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it?.state == "cleaning" } }
+        after(CONFIRM_EVERY_MS - 1)
+        assertThat(api.calls).isEmpty()
+        after(1)
+        assertThat(api.calls).containsExactly("state vacuum.hoover")
+        assertThat(result).isNull()
+        api.states["vacuum.hoover"] = entityState("vacuum.hoover", "cleaning")
+        after(CONFIRM_EVERY_MS)
+        assertThat(api.calls).hasSize(2)
+        assertThat(result).isTrue()
+        after(CONFIRM_FOR_MS)
+        assertThat(api.calls).hasSize(2)
+    }
+
+    /** Fails if the wait gives up before the timeout, or goes on after it. */
+    @Test
+    fun awaitEntityGivesUpAtTheTimeout() = runTest {
+        api.states["vacuum.hoover"] = hoover
+        val ha = ha()
+        var result: Boolean? = null
+        launch { result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it?.state == "cleaning" } }
+        after(CONFIRM_FOR_MS - 1)
+        assertThat(result).isNull()
+        after(1)
+        assertThat(result).isFalse()
+        val reads = api.calls.size
+        after(CONFIRM_FOR_MS)
+        assertThat(api.calls).hasSize(reads)
+    }
+
+    /** Fails if a change the socket brings has to wait for the next read. */
+    @Test
+    fun awaitEntityCountsALiveChange() = runTest {
+        api.states["vacuum.hoover"] = hoover
+        val ha = ha()
+        ha.watch(flowOf(setOf("vacuum.hoover")))
+        runCurrent()
+        var result: Boolean? = null
+        launch { result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it?.state == "cleaning" } }
+        after(2_000)
+        assertThat(result).isNull()
+        api.socket.emit(mapOf("vacuum.hoover" to entityState("vacuum.hoover", "cleaning")))
+        runCurrent()
+        assertThat(result).isTrue()
+        assertThat(api.calls).isEmpty()
+    }
+
+    /** Fails if a read that fails in the wait is swallowed. */
+    @Test
+    fun awaitEntityPassesOnAFailedRead() = runTest {
+        val ha = ha()
+        api.failNext = HaProblem.UNREACHABLE
+        var problem: HaProblem? = null
+        launch { problem = refusal { ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { false } } }
+        after(CONFIRM_EVERY_MS)
+        assertThat(problem).isEqualTo(HaProblem.UNREACHABLE)
     }
 
     /** Fails if the fake lets a test drop a socket that has already closed. */
