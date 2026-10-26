@@ -615,6 +615,12 @@ Fault found:
   - Home's card on its own splits 16 items 15 and 1, and the tab splits 4 items 2/2/0;
   - the one-frame flicker under "To watch" below was not seen.
 
+## Plan 10 (The Shopping list): on the tablet (2026-10-23, evening)
+- **The release from 511b3758** is installed with `install -r`. The mapping is at `culvery-notes/mappings/mapping-511b375.txt`.
+- **The user found it all good:** turning it on with Google's Tasks permission, adds and ticks both ways between the wall and a phone, Undo reaching the phone, an add made offline reaching the phone once back online, the Disconnect question naming Shopping, the favourites, and Lights and Music side by side.
+- **One fault:** the keyboard is hard to dismiss on the tablet.
+- **The log scan** (2026-10-26, the log reaching back to 2026-10-23 14:31): no lines under GoogleTasks, ShoppingSync or ShoppingChecks, since a release logs only warnings and errors, and no item text anywhere in the log.
+
 ## From Plan 10
 - **End-of-v1 design review:**
   - Home's Shopping rows are the handoff's 31 dp, under the house's 48 dp touch height (the row is the target);
