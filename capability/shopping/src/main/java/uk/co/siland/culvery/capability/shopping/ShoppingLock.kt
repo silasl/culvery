@@ -5,7 +5,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** Held by everything that changes the queue, the connection or the read, so a read always follows the writes it could race (10 §4.4). */
+/** Held by everything that changes the queue, the connection or the read; never across a check's read of the list (10 §4.4). */
 @Singleton
 class ShoppingLock @Inject constructor() {
     private val mutex = Mutex()

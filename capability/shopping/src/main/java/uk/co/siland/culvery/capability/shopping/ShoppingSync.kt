@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.shopping
 import android.util.Log
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -53,11 +54,13 @@ private fun QueuedKind.step() = when (this) {
 
 /**
  * One run through the queue. [open] is the match set an add looks in: the list as read at the pass's start, then
- * what the pass itself adds and ticks. [ticked] are the ids this pass ticked; no add may match one.
+ * what the pass itself adds and ticks, and the [fromHistory] ids a retried add looked for. [ticked] are the ids this
+ * pass ticked; no add may match one.
  */
 private class Pass(val connectionId: String) {
     var open: MutableList<ShoppingItem>? = null
     var historyFrom: Long? = null
+    val fromHistory = mutableSetOf<String>()
     val ticked = mutableSetOf<String>()
     var step = Step.ITEMS
 }
@@ -92,6 +95,9 @@ class ShoppingSync @Inject constructor(
     // One pass at a time: a pass's match set lives across lock releases, so another pass's writes would leave it stale.
     private val passes = Mutex()
 
+    // Moves on with every send, connection change and kept read, so a read made across one of them is not kept.
+    private val writes = AtomicLong()
+
     /**
      * Sends what is due, one row at a time under the lock so a tap waits for at most one call. Null when the queue is
      * empty, else when its head is next due.
@@ -105,10 +111,18 @@ class ShoppingSync @Inject constructor(
         drained.nextAtMillis
     }
 
-    /** Sends what is due, then reads the list and the items ticked since, holding the lock so no write is read past (10 §4.4). */
+    /** The connection was made, remade or stopped, so a read already out is of the old one. The lock is held. */
+    fun connectionChanged() {
+        writes.incrementAndGet()
+    }
+
+    /**
+     * Sends what is due, then reads the list and the items ticked since (10 §4.4). When the read finds the list again
+     * after it couldn't, what waited out a backoff goes straight away.
+     */
     suspend fun check() {
         drain()
-        lock.withLock { readLocked() }
+        if (read()) drain()
     }
 
     /** Deals with the head of the queue if it is due. The lock is held. */
@@ -169,13 +183,16 @@ class ShoppingSync @Inject constructor(
             pass.step = Step.HISTORY
             val ticked = provider.history(conn, Instant.ofEpochMilli(head.madeAtMillis))
             pass.historyFrom = head.madeAtMillis
-            open += ticked.filter { t -> open.none { it.id == t.id } }
+            val fresh = ticked.filter { t -> open.none { it.id == t.id } }
+            open += fresh
+            pass.fromHistory += fresh.map { it.id }
             pass.step = Step.ADD
         }
         val key = textKey(head.text)
         val never = splitIds(head.excludeIds) + pass.ticked + queue.mapNotNull { if (it.kind == QueuedKind.TICK.name) it.itemId else null }
         val item = open.firstOrNull { it.id !in never && textKey(it.text) == key } ?: provider.add(conn, head.text, head.clientKey)
-        applySent(pass, stored, head, back = item)
+        // An item a phone has ticked since is the add done, but it isn't on the list.
+        applySent(pass, stored, head, added = item, back = item.takeIf { it.id !in pass.fromHistory })
     }
 
     private suspend fun sendTick(pass: Pass, stored: StoredShopping, provider: ShoppingProvider, head: QueuedEntity, itemId: String) {
@@ -198,11 +215,19 @@ class ShoppingSync @Inject constructor(
     /**
      * [head] went through: it leaves the queue, health is fine again, and the last read follows it so the list doesn't
      * flicker until the next read. [gone] (a tick's item) leaves the read and the match set, and no later add may match
-     * it; [back] goes on top of the read unless it is there, and into the match set only when it is an add's.
+     * it; [added] (an add's item) gives later rows its id, is seen and joins the match set; [back] goes on top of the
+     * read unless it is there.
      */
-    private suspend fun applySent(pass: Pass, stored: StoredShopping, head: QueuedEntity, gone: String? = null, back: ShoppingItem? = null) =
+    private suspend fun applySent(
+        pass: Pass,
+        stored: StoredShopping,
+        head: QueuedEntity,
+        gone: String? = null,
+        added: ShoppingItem? = null,
+        back: ShoppingItem? = null,
+    ) =
         withContext(NonCancellable) {
-            val added = back?.takeIf { head.kind == QueuedKind.ADD.name }
+            writes.incrementAndGet()
             if (gone != null) {
                 pass.ticked += gone
                 pass.open?.removeAll { it.id == gone }
@@ -261,10 +286,15 @@ class ShoppingSync @Inject constructor(
         return Drained.Done(next)
     }
 
-    /** Reads the list and the items ticked since the last read, learns from them, and keeps the read. The lock is held. */
-    private suspend fun readLocked() {
-        val stored = store.connectionNow() ?: return
-        val provider = providers.forConnection(stored.connection) ?: return
+    /**
+     * Reads the list and the items ticked since the last read without the lock, so a tap never waits on the network,
+     * then learns from them and keeps the read under it, unless something was sent or the connection changed meanwhile
+     * (the next check reads again). True when the read found the list after it couldn't, and the queue was made due.
+     */
+    private suspend fun read(): Boolean {
+        val noted = writes.get()
+        val stored = store.connectionNow() ?: return false
+        val provider = providers.forConnection(stored.connection) ?: return false
         val now = clock.nowMillis()
         val seeding = !stored.seeded
         val since = if (seeding) {
@@ -288,20 +318,32 @@ class ShoppingSync @Inject constructor(
             }
         }) { e ->
             Log.w(TAG, "Shopping check: the ${what.label} failed (${e::class.simpleName})")
-            store.setHealth(healthOf(e))
-            return
+            lock.withLock { if (writes.get() == noted) store.setHealth(healthOf(e)) }
+            return false
         }
+        return lock.withLock {
+            if (!writes.compareAndSet(noted, noted + 1)) return@withLock false
+            keepRead(items, ticked, seeding, now)
+        }
+    }
+
+    /** Learns from a read and keeps it; true when it found the list after it couldn't. The lock is held. */
+    private suspend fun keepRead(items: List<ShoppingItem>, ticked: List<ShoppingItem>, seeding: Boolean, now: Long): Boolean {
+        val stored = store.connectionNow() ?: return false
         val queue = store.queueNow()
         // An item matching a queued add is the add's own, or the add will find it; counting it now would count it twice.
         val queuedAdds = queue.filter { it.kind == QueuedKind.ADD.name }.map { textKey(it.text) }.toSet()
         val refused = stored.health == ShoppingHealth.REFUSED && queue.firstOrNull()?.let(::isRefused) == true
+        val found = stored.health != ShoppingHealth.OK && stored.health != ShoppingHealth.REFUSED
         store.inTransaction {
             learning.seen(items.filter { textKey(it.text) !in queuedAdds }, ticked)
             // A year of seed history would date every item's last use today.
             if (!seeding) ticked.forEach { learning.ticked(it.text) }
             store.setHistoryRead(now)
             store.saveRead(items, if (refused) ShoppingHealth.REFUSED else ShoppingHealth.OK, now)
+            if (found) store.makeQueueDue()
         }
         learning.pruneIfDue()
+        return found
     }
 }

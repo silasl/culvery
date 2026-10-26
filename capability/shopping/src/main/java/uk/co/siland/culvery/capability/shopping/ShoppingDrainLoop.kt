@@ -20,7 +20,7 @@ private const val MIN_WAIT_MS = 1_000L
 
 /**
  * Sends the queue when Culvery starts, whenever something is queued or connected ([wake]), and when the head of the
- * queue comes due, so an offline add goes out as soon as Google answers (10 §4.5).
+ * queue comes due (10 §4.5). A check that finds the list again after an outage sends what waited without this loop.
  */
 @Singleton
 class ShoppingDrainLoop internal constructor(

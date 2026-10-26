@@ -473,6 +473,110 @@ class ShoppingSyncTest : ShoppingTestBase() {
         assertThat(rig.store.queueNow()).isEmpty()
     }
 
+    /** A check's read can take a while when the internet is half up; the wall's taps must not wait for it. */
+    @Test
+    fun tapsDoNotWaitForACheckToRead() = runTest {
+        val rig = rig(open = listOf("Bread", "Eggs"))
+        rig.connect()
+        rig.sync.check()
+        val actions = rig.actions()
+        advanceTimeBy(1_000)
+        val gate = CompletableDeferred<Unit>()
+        rig.provider.itemsGate = gate
+        val check = async { rig.sync.check() }
+        runCurrent()
+        rig.provider.itemsGate = null
+
+        val add = async { actions.add("Milk") }
+        val tick = async { actions.tick(ShownItem("g2", "Eggs", ticked = false, queued = false)) }
+        runCurrent()
+        assertThat(add.isCompleted).isTrue()
+        assertThat(tick.isCompleted).isTrue()
+        val undo = async { actions.undo(actions.undoable.value!!) }
+        runCurrent()
+        assertThat(undo.isCompleted).isTrue()
+        assertThat(check.isActive).isTrue()
+
+        // Milk is sent while the read is out, so that read is not kept: it would take Milk off the wall.
+        rig.sync.drain()
+        gate.complete(Unit)
+        check.await()
+        assertThat(rig.store.items.first().map { it.text }).containsExactly("Milk", "Bread", "Eggs").inOrder()
+        assertThat(rig.store.connectionNow()!!.lastReadMillis).isEqualTo(0)
+
+        advanceTimeBy(60_000)
+        rig.sync.check()
+        assertThat(rig.store.items.first().map { it.text }).containsExactly("Milk", "Bread", "Eggs").inOrder()
+        assertThat(rig.store.connectionNow()!!.lastReadMillis).isEqualTo(currentTime)
+    }
+
+    @Test
+    fun aReadOfAListStoppedAndConnectedAgainMeanwhileIsNotKept() = runTest {
+        val rig = rig(open = listOf("Bread"))
+        rig.connect()
+        val gate = CompletableDeferred<Unit>()
+        rig.provider.itemsGate = gate
+        val check = async { rig.sync.check() }
+        runCurrent()
+        rig.lock.withLock {
+            rig.store.connect(rig.conn)
+            rig.sync.connectionChanged()
+        }
+        gate.complete(Unit)
+        check.await()
+        assertThat(rig.store.connectionNow()!!.lastReadMillis).isNull()
+        assertThat(rig.store.connectionNow()!!.seeded).isFalse()
+    }
+
+    @Test
+    fun aFailedFirstReadLeavesTheSeedingToTheNextCheck() = runTest {
+        val rig = rig()
+        rig.connect()
+        rig.provider.tickedOn("Milk", Instant.ofEpochMilli(currentTime))
+        rig.provider.failNext = UnreachableException()
+        rig.sync.check()
+        assertThat(rig.store.connectionNow()!!.seeded).isFalse()
+        assertThat(rig.store.learned.first()).isEmpty()
+        advanceTimeBy(60_000)
+        rig.sync.check()
+        assertThat(rig.store.connectionNow()!!.seeded).isTrue()
+        assertThat(rig.store.learned.first().associate { it.key to it.count }).containsExactly("milk", 1)
+    }
+
+    @Test
+    fun anAddHeldByAnOutageGoesAtTheNextGoodCheck() = runTest {
+        val rig = rig()
+        rig.connect()
+        rig.sync.check()
+        rig.provider.failAll = UnreachableException()
+        rig.enqueue(QueuedKind.ADD, "k1", "Milk")
+        repeat(3) { advanceTimeBy(rig.sync.drain()!! - currentTime) }
+        rig.sync.drain()
+        assertThat(rig.store.queueNow().single().nextAtMillis - currentTime).isEqualTo(300_000)
+        rig.provider.failAll = null
+        advanceTimeBy(60_000)
+        rig.sync.check()
+        assertThat(rig.store.queueNow()).isEmpty()
+        assertThat(rig.openTexts()).containsExactly("Milk")
+        assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.OK)
+    }
+
+    @Test
+    fun aRetriedAddMatchedInTheTickedItemsIsNotShownAsOpen() = runTest {
+        val rig = rig()
+        rig.connect()
+        rig.sync.check()
+        rig.provider.failAfterWrite = true
+        rig.enqueue(QueuedKind.ADD, "k1", "Milk")
+        rig.sync.drain()
+        rig.provider.tick(rig.conn, "g1")
+        advanceTimeBy(30_000)
+        rig.sync.drain()
+        assertThat(rig.store.queueNow()).isEmpty()
+        assertThat(rig.store.itemsNow()).isEmpty()
+        assertThat(rig.db.shoppingDao().allSeen().map { it.id }).contains("g1")
+    }
+
     @Test
     fun aRefusedAddSaysSoUntilARetryGoesThrough() = runTest {
         val rig = rig(fileName = "refused.db", open = listOf("Bread"))

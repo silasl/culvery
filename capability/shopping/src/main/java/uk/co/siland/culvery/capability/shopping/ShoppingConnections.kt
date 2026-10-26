@@ -45,7 +45,10 @@ class ShoppingConnections @Inject constructor(
      */
     fun connected(connection: Connection) {
         scope.launch {
-            lock.withLock { store.connect(connection) }
+            lock.withLock {
+                store.connect(connection)
+                sync.connectionChanged()
+            }
             readAfterConnecting()
         }
     }
@@ -81,6 +84,7 @@ class ShoppingConnections @Inject constructor(
             val present = store.connectionNow()?.connection?.id == connection.id
             if (present) {
                 store.replaceConnection(connection)
+                sync.connectionChanged()
                 store.setHealth(ShoppingHealth.OK)
                 // What waited out a backoff for the missing permission or list can go now.
                 store.makeQueueDue()
@@ -99,7 +103,10 @@ class ShoppingConnections @Inject constructor(
         val service = store.connectionNow()?.let { stored ->
             providers.forConnection(stored.connection)?.descriptor?.displayName ?: stored.connection.label
         }
-        lock.withLock { store.stop() }
+        lock.withLock {
+            store.stop()
+            sync.connectionChanged()
+        }
         if (service != null) toaster.show("Stopped using $service.")
         return true
     }
