@@ -182,6 +182,34 @@ class HomeAssistantTest {
         assertThat(api.calls).containsExactly("check")
     }
 
+    /** Fails if a later failure replaces a refused token, which would reopen the socket and send the token again. */
+    @Test
+    fun aRefusedTokenOutlastsOtherFailures() = runTest {
+        val ha = ha()
+        ha.watch(flowOf(setOf("vacuum.hoover")))
+        runCurrent()
+        api.dropSocket(HaProblem.TOKEN_REFUSED)
+        runCurrent()
+        ha.failed(HaProblem.BLOCKED)
+        ha.failed(HaProblem.UNREACHABLE)
+        after(600_000)
+        assertThat(ha.problem.value).isEqualTo(HaProblem.TOKEN_REFUSED)
+        assertThat(api.follows).hasSize(1)
+    }
+
+    /** Fails if the fake lets a test drop a socket that has already closed. */
+    @Test
+    fun droppingAClosedSocketFails() = runTest {
+        val ha = ha()
+        val stop = ha.watch(flowOf(setOf("vacuum.hoover")))
+        runCurrent()
+        stop()
+        runCurrent()
+        assertThat(api.cancels).isEqualTo(1)
+        val e = runCatching { api.dropSocket(HaProblem.UNREACHABLE) }.exceptionOrNull()
+        assertThat(e).isInstanceOf(IllegalStateException::class.java)
+    }
+
     /** Fails if a good Check of the saved token leaves the line or the socket closed. */
     @Test
     fun aGoodCheckOfTheSameTokenReopensTheSocket() = runTest {

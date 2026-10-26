@@ -121,8 +121,9 @@ class HomeAssistant(
         }
     }
 
+    /** Records a link problem; a refused token stays until a Check or a new link, whatever fails after it. */
     internal fun failed(problem: HaProblem) {
-        if (problem in LINK_PROBLEMS) _problem.value = problem
+        if (problem in LINK_PROBLEMS) _problem.update { if (it == HaProblem.TOKEN_REFUSED) it else problem }
     }
 
     override fun start() {

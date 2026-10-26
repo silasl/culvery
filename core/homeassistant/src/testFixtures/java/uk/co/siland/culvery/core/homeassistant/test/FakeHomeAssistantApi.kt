@@ -85,6 +85,8 @@ class FakeHomeAssistantApi : HomeAssistantApi {
         } catch (e: CancellationException) {
             cancels++
             throw e
+        } finally {
+            if (drop === dropped) drop = null
         }
         throw HomeAssistantException(problem)
     }
