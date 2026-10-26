@@ -17,6 +17,7 @@ import org.junit.runner.RunWith
 import uk.co.siland.culvery.core.plugin.Connection
 import uk.co.siland.culvery.core.plugin.NeedsSignInException
 import uk.co.siland.culvery.core.plugin.OfflineException
+import uk.co.siland.culvery.core.plugin.TOAST_WITH_ACTION_MS
 import uk.co.siland.culvery.core.plugin.UnreachableException
 
 /** 10 §4.4, §4.5: the queue is sent in order, an add never lands twice or goes missing, and the read follows the writes. */
@@ -619,15 +620,13 @@ class ShoppingSyncTest : ShoppingTestBase() {
         rig.sync.check()
         val milk = shown(rig.store.itemsNow(), rig.store.queueNow(), null).first { it.text == "Milk" }
         actions.tick(milk)
+        // The tick waits out its Undo before both go.
+        rig.sync.drain()
+        assertThat(rig.store.queueNow().map { it.kind to it.text }).containsExactly("ADD" to "Milk", "ADD" to "Eggs", "TICK" to "Milk").inOrder()
+        advanceTimeBy(TOAST_WITH_ACTION_MS)
         rig.sync.drain()
         assertThat(rig.store.queueNow()).isEmpty()
         assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.OK)
-        assertThat(rig.openTexts()).containsExactly("Eggs", "Bread").inOrder()
-
-        // Undo once both are dropped: there is nothing to put back, and nothing is queued.
-        actions.undo(actions.undoable.value!!)
-        rig.sync.drain()
-        assertThat(rig.store.queueNow()).isEmpty()
         assertThat(rig.openTexts()).containsExactly("Eggs", "Bread").inOrder()
         assertThat(rig.provider.calls.count { it == "add" }).isEqualTo(2)
     }
@@ -642,9 +641,27 @@ class ShoppingSyncTest : ShoppingTestBase() {
         actions.add("Eggs")
         rig.sync.check()
         actions.tick(shown(rig.store.itemsNow(), rig.store.queueNow(), null).first { it.text == "Milk" })
+        rig.sync.drain()
         actions.undo(actions.undoable.value!!)
         assertThat(rig.store.queueNow().map { it.kind to it.text }).containsExactly("ADD" to "Milk", "ADD" to "Eggs").inOrder()
         assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.REFUSED)
+    }
+
+    @Test
+    fun anUndoThatTakesBackTheRefusedAddClearsTheRefusal() = runTest {
+        val rig = rig(open = listOf("Bread"))
+        rig.connect()
+        rig.sync.check()
+        val actions = rig.actions()
+        actions.tick(shown(rig.store.itemsNow(), rig.store.queueNow(), null).first { it.text == "Bread" })
+        rig.provider.refusing = "Bread"
+        actions.add("Bread")
+        rig.sync.drain()
+        assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.REFUSED)
+        // Putting the tick back drops the re-add, so nothing refused is left waiting.
+        actions.undo(actions.undoable.value!!)
+        assertThat(rig.store.queueNow().map { it.kind to it.text }).containsExactly("UNTICK" to "Bread")
+        assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.OK)
     }
 
     @Test
@@ -655,6 +672,7 @@ class ShoppingSyncTest : ShoppingTestBase() {
         rig.enqueue(QueuedKind.ADD, "k1", "Milk")
         rig.enqueue(QueuedKind.TICK, "k1", "Milk")
         rig.enqueue(QueuedKind.ADD, "k2", "Eggs")
+        advanceTimeBy(TOAST_WITH_ACTION_MS)
         assertThat(rig.sync.drain()).isNull()
         assertThat(rig.store.queueNow()).isEmpty()
         assertThat(rig.store.connectionNow()!!.health).isEqualTo(ShoppingHealth.OK)

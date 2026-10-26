@@ -147,7 +147,10 @@ class ShoppingActions @Inject constructor(
         val itemId = latest.itemId ?: queued?.itemId ?: store.idOfSentAdd(latest.clientKey)
         // Putting it back as it was: an add made after the tick would leave a second one.
         if (itemId != null) {
-            queue.filter { it.kind == QueuedKind.ADD.name && itemId in splitIds(it.excludeIds) }.forEach { store.drop(it.seq) }
+            val reAdds = queue.filter { it.kind == QueuedKind.ADD.name && itemId in splitIds(it.excludeIds) }
+            reAdds.forEach { store.drop(it.seq) }
+            // The refusal was the head add's; with it gone, nothing refused is waiting.
+            if (queue.firstOrNull() in reAdds && store.connectionNow()?.health == ShoppingHealth.REFUSED) store.setHealth(ShoppingHealth.OK)
         }
         if (queued != null) {
             store.drop(queued.seq)

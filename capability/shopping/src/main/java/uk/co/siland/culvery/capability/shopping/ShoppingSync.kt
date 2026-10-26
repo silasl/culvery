@@ -16,6 +16,7 @@ import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.capability.shopping.db.QueuedEntity
 import uk.co.siland.culvery.core.plugin.NeedsSignInException
 import uk.co.siland.culvery.core.plugin.OUTBOX_BACKOFF_MS
+import uk.co.siland.culvery.core.plugin.TOAST_WITH_ACTION_MS
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.attempt
 import uk.co.siland.culvery.core.plugin.backoffMillis
@@ -133,10 +134,13 @@ class ShoppingSync @Inject constructor(
         val provider = providers.forConnection(conn) ?: return Drained.Done(null)
         val queue = store.queueNow()
         val head = queue.firstOrNull() ?: return Drained.Done(null)
+        val now = clock.nowMillis()
         if (stored.health == ShoppingHealth.REFUSED && isRefused(head)) {
-            // Ticking the refused item off is how the house lets the rest go.
+            // Ticking the refused item off is how the house lets the rest go, once the tick's Undo has gone.
             val tick = queue.firstOrNull { it.kind == QueuedKind.TICK.name && it.clientKey == head.clientKey }
             if (tick != null) {
+                val undoGoneAt = tick.madeAtMillis + TOAST_WITH_ACTION_MS
+                if (now < undoGoneAt) return Drained.Done(undoGoneAt)
                 store.inTransaction {
                     store.drop(tick.seq)
                     store.drop(head.seq)
@@ -145,7 +149,6 @@ class ShoppingSync @Inject constructor(
                 return Drained.More
             }
         }
-        val now = clock.nowMillis()
         if (head.nextAtMillis > now) return Drained.Done(head.nextAtMillis)
         val kind = QueuedKind.valueOf(head.kind)
         val itemId = head.itemId
