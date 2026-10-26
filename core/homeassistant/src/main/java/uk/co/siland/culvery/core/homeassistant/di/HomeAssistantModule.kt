@@ -10,6 +10,8 @@ import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantClient
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantDevice
+import uk.co.siland.culvery.core.homeassistant.ui.OtherIntegrationsPage
+import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Startable
 
 @Module
@@ -25,4 +27,8 @@ abstract class HomeAssistantModule {
     @Binds
     @IntoSet
     abstract fun follow(impl: HomeAssistant): Startable
+
+    @Binds
+    @IntoSet
+    abstract fun otherIntegrations(impl: OtherIntegrationsPage): SettingsPage
 }

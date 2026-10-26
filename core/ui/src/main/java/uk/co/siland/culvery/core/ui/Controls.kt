@@ -65,6 +65,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -274,6 +277,14 @@ fun HhSegmented(
     }
 }
 
+/** A secret's keyboard: no capitals, no correction, and the password type so keyboards don't learn or suggest it. */
+internal val SecretKeyboardOptions = KeyboardOptions(
+    capitalization = KeyboardCapitalization.None,
+    autoCorrectEnabled = false,
+    keyboardType = KeyboardType.Password,
+    imeAction = ImeAction.Done,
+)
+
 /** What TalkBack says of a choice's state, and a locked one's tap. */
 const val NOT_AVAILABLE = "not available"
 const val FIND_OUT_WHY = "find out why"
@@ -287,6 +298,7 @@ const val NOT_CHOSEN = "not chosen"
  * [label] is its name for TalkBack once text hides the placeholder. While [error] is set the field has a `danger` ring in
  * place of its focus ring, and the error shows 8 dp under it as `{tag}_error`; TalkBack reads it with the field, once.
  * A new error scrolls the field and its error into view. [modifier] goes on the field itself.
+ * A [secret] field shows dots, is a password to TalkBack, and its keyboard doesn't learn or correct it.
  */
 @Composable
 fun HhTextField(
@@ -302,6 +314,7 @@ fun HhTextField(
     onDone: () -> Unit = {},
     clearsFocusOnDone: Boolean = true,
     fill: Color? = null,
+    secret: Boolean = false,
 ) {
     val c = Culvery.colors
     val focusManager = LocalFocusManager.current
@@ -318,7 +331,8 @@ fun HhTextField(
             readOnly = readOnly,
             textStyle = ControlType.field.copy(color = c.ink),
             cursorBrush = SolidColor(c.accent),
-            keyboardOptions = KeyboardOptions(capitalization = capitalization, imeAction = ImeAction.Done),
+            keyboardOptions = if (secret) SecretKeyboardOptions else KeyboardOptions(capitalization = capitalization, imeAction = ImeAction.Done),
+            visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
             // Leaving the field closes the keyboard: a KeyboardActions onDone replaces Compose's own closing.
             keyboardActions = KeyboardActions(onDone = {
                 onDone()

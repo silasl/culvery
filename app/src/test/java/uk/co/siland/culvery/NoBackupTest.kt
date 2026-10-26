@@ -39,6 +39,17 @@ class NoBackupTest {
         }
     }
 
+    /** Pin (11 §4.1): the Home Assistant token sits in the datastore folder, which the files domain's rule leaves out of both. */
+    @Test
+    fun theHomeAssistantTokenIsKeptWhereTheRulesExclude() {
+        val settings = File("../core/homeassistant/src/main/java/uk/co/siland/culvery/core/homeassistant/HomeAssistantSettings.kt").readText()
+        assertThat(settings).contains("context.preferencesDataStoreFile(FILE)")
+        val rules = root("src/main/res/xml/data_extraction_rules.xml")
+        for (section in rules.children()) {
+            assertThat(section.children().filter { it.getAttribute("domain") == "file" }.map { it.getAttribute("path") }).containsExactly(".")
+        }
+    }
+
     private companion object {
         const val ANDROID = "http://schemas.android.com/apk/res/android"
         val DOMAINS = listOf(

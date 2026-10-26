@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 6 §3.2: the speakers answer plain HTTP on port 1400 at whatever address the router gives them, which this file can't
-     name; the internet services Culvery uses stay HTTPS-only. -->
+     name; the internet services Culvery uses stay HTTPS-only. Home Assistant (11 §4.1) answers plain HTTP on the home
+     network too; its token crosses the home Wi-Fi unencrypted, and https:// works if the household sets it up. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true" />
     <domain-config cleartextTrafficPermitted="false">

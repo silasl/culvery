@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
@@ -320,6 +321,24 @@ class ControlsTest {
         compose.onNodeWithTag("field")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Name")))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, "Someone is already called Alex."))
+    }
+
+    @Test
+    fun aSecretFieldIsMaskedAndNotLearned() {
+        show {
+            Column {
+                HhTextField("test-token", {}, placeholder = "Token", label = "Token", tag = "secret", secret = true)
+                HhTextField("plain", {}, placeholder = "Name", label = "Name", tag = "plain")
+            }
+        }
+        val secret = compose.onNodeWithTag("secret").fetchSemanticsNode().config
+        assertThat(secret.contains(SemanticsProperties.Password)).isTrue()
+        assertThat(secret[SemanticsProperties.EditableText].text).isNotEqualTo("test-token")
+        assertThat(SecretKeyboardOptions.keyboardType).isEqualTo(KeyboardType.Password)
+        assertThat(SecretKeyboardOptions.autoCorrectEnabled).isFalse()
+        val plain = compose.onNodeWithTag("plain").fetchSemanticsNode().config
+        assertThat(plain.contains(SemanticsProperties.Password)).isFalse()
+        assertThat(plain[SemanticsProperties.EditableText].text).isEqualTo("plain")
     }
 
     @Test
