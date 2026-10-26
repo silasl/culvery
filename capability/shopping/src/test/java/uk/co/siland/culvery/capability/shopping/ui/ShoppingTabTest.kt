@@ -411,6 +411,38 @@ class ShoppingTabTest {
     }
 
     @Test
+    fun doneOnAnEmptyBoxClosesTheKeyboard() {
+        val rig = rig()
+        showHost(rig)
+        waitForField()
+        compose.onNodeWithTag("shopping_field").performClick()
+        compose.onNodeWithTag("shopping_field").assertIsFocused()
+        compose.onNodeWithTag("shopping_field").performImeAction()
+        compose.onNodeWithTag("shopping_field").assertIsNotFocused()
+        assertThat(rig.queuedAdds()).isEmpty()
+    }
+
+    @Test
+    fun aTapOutsideTheAddBoxClosesTheKeyboard() {
+        val ticked = mutableListOf<String>()
+        showTab(stateOf(listOf(milk)), favourites = listOf(eggs), onTick = { ticked += it.text })
+        fun focusBox() = compose.onNodeWithTag("shopping_field").performClick().assertIsFocused()
+
+        focusBox()
+        compose.onNodeWithTag("shopping_favourite_eggs").performClick()
+        compose.onNodeWithTag("shopping_field").assertIsFocused()
+
+        compose.onNodeWithTag("shopping_title").performClick()
+        compose.onNodeWithTag("shopping_field").assertIsNotFocused()
+
+        // A tick still ticks, and the keyboard goes with it.
+        focusBox()
+        compose.onNodeWithTag("shopping_item_g1").performClick()
+        compose.onNodeWithTag("shopping_field").assertIsNotFocused()
+        assertThat(ticked).containsExactly("Milk")
+    }
+
+    @Test
     fun suggestionsComeFirstThenFavourites() {
         val rig = rig()
         val day = 24 * 60 * 60_000L

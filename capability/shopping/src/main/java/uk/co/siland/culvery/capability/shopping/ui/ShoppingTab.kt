@@ -2,6 +2,8 @@ package uk.co.siland.culvery.capability.shopping.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,8 +35,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -104,13 +112,22 @@ internal fun ShoppingTab(
     val c = Culvery.colors
     val box = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     LaunchedEffect(focusAdd) {
         if (focusAdd) {
             box.requestFocus()
             keyboard?.show()
         }
     }
-    Column(Modifier.fillMaxSize().testTag("shopping_tab")) {
+    val addCardBounds = remember { mutableStateOf(Rect.Zero) }
+    // Pinned, the tablet has no navigation bar to close the keyboard: a touch anywhere but the add card closes it.
+    val closesKeyboardOutsideAdd = Modifier.pointerInput(focusManager) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (down.position !in addCardBounds.value) focusManager.clearFocus()
+        }
+    }
+    Column(Modifier.fillMaxSize().testTag("shopping_tab").then(closesKeyboardOutsideAdd)) {
         HhPageHeader(
             title = SHOPPING,
             subtitle = null,
@@ -124,7 +141,10 @@ internal fun ShoppingTab(
                 )
             },
         )
-        AddCard(typed, onTyped, onAdd, suggestions, favourites, nothingLearned, onChip, onForget, box)
+        AddCard(
+            typed, onTyped, onAdd, suggestions, favourites, nothingLearned, onChip, onForget, box,
+            Modifier.onGloballyPositioned { addCardBounds.value = it.boundsInParent() },
+        )
         HhMessageLine(state.problem, HhType.body, c.danger, "shopping_status", gapAbove = ShoppingDimens.cardGap)
         ListCard(state, onTick, Modifier.weight(1f).padding(top = ShoppingDimens.cardGap))
     }
@@ -141,10 +161,12 @@ private fun AddCard(
     onChip: (Learned) -> Unit,
     onForget: (Learned) -> Unit,
     box: FocusRequester,
+    modifier: Modifier = Modifier,
 ) {
+    val focusManager = LocalFocusManager.current
     Column(
         verticalArrangement = Arrangement.spacedBy(ShoppingDimens.addCardGap),
-        modifier = Modifier.fillMaxWidth().clip(card()).background(Culvery.colors.surf).padding(ShoppingDimens.cardPaddingH, ShoppingDimens.cardPaddingV),
+        modifier = modifier.fillMaxWidth().clip(card()).background(Culvery.colors.surf).padding(ShoppingDimens.cardPaddingH, ShoppingDimens.cardPaddingV),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ShoppingDimens.addGap)) {
             Box(Modifier.weight(1f)) {
@@ -155,7 +177,8 @@ private fun AddCard(
                     label = ADD_LABEL,
                     tag = "shopping_field",
                     modifier = Modifier.focusRequester(box),
-                    onDone = onAdd,
+                    // Done on an empty box closes the keyboard; with text it adds and stays for the next item.
+                    onDone = { if (typed.isBlank()) focusManager.clearFocus() else onAdd() },
                     clearsFocusOnDone = false,
                     fill = Culvery.colors.surf2,
                 )
