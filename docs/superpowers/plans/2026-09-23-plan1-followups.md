@@ -621,6 +621,14 @@ Fault found:
 - **One fault:** the keyboard is hard to dismiss on the tablet.
 - **The log scan** (2026-10-26, the log reaching back to 2026-10-23 14:31): no lines under GoogleTasks, ShoppingSync or ShoppingChecks, since a release logs only warnings and errors, and no item text anywhere in the log.
 
+## Plan 10 (The Shopping list): after the tablet (2026-10-26)
+- **The keyboard fault is fixed** at 0ac43289: a touch outside the add box, or Done on an empty box, closes the keyboard; Add and Done with text keep it up for the next item.
+- **The final review** (With fixes; no item lost or doubled) found two Important faults, fixed at the user's word:
+  - an add Google refuses stalled the queue without a word. Now the tab, card and Settings say "Google Tasks refused one item. Tick it off on the list to send the rest.", and ticking it off (after its 8-second Undo) sends the rest;
+  - each minute's check held the lock across its reads, so with the internet down but Wi-Fi up, taps waited seconds. Reads now go without the lock and are kept only if nothing was sent meanwhile.
+- **Also fixed:** queued changes go as soon as a check reaches Google again; an item a phone ticked no longer comes back on the wall; the account email stays out of `toString`.
+- **Declined:** an internal constructor for `GoogleService`, so the log allow-list's names are enforced rather than promised (both call sites pass fixed names).
+
 ## From Plan 10
 - **End-of-v1 design review:**
   - Home's Shopping rows are the handoff's 31 dp, under the house's 48 dp touch height (the row is the target);
