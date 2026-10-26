@@ -628,6 +628,7 @@ Fault found:
   - each minute's check held the lock across its reads, so with the internet down but Wi-Fi up, taps waited seconds. Reads now go without the lock and are kept only if nothing was sent meanwhile.
 - **Also fixed:** queued changes go as soon as a check reaches Google again; an item a phone ticked no longer comes back on the wall; the account email stays out of `toString`.
 - **Declined:** an internal constructor for `GoogleService`, so the log allow-list's names are enforced rather than promised (both call sites pass fixed names).
+- **Merged to main** at 91f4054b (fast-forward, not pushed); the gate and the convention tests pass on main. The release is on the tablet with `install -r`; the mapping is at `culvery-notes/mappings/mapping-91f4054.txt`. Not yet checked there: the keyboard fix and a refused add's line.
 
 ## From Plan 10
 - **End-of-v1 design review:**
