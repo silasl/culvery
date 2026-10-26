@@ -62,7 +62,7 @@ Still to do, during 11a: a Home Assistant user for Culvery and its token (§4.1)
 
 ### 4.1 Linking Culvery to Home Assistant
 
-- **Settings › Hoover and heating** (admin-only, after Settings › Lights, order 480): the Home Assistant address (`http://[ha address]:8123`; `https://` also accepted), a **long-lived access token**, and **Check**. *(My call on the page's name: it says what it's for; "Home Assistant" appears as the source, the way "Hue Bridge" does on Settings › Lights.)*
+- **Settings › Other integrations** (admin-only, after Settings › Lights, order 480): the Home Assistant address (`http://[ha address]:8123`; `https://` also accepted), a **long-lived access token**, and **Check**. *(The user named the page, 2026-10-26: it will also hold later devices that come through Home Assistant, such as Arlo and smart plugs. "Home Assistant" appears on it as the source, the way "Hue Bridge" does on Settings › Lights.)*
 - The token belongs to a **separate, non-admin Home Assistant user named Culvery**, made in Home Assistant (Settings › People › Users), so it can be revoked on its own. The page's help text tells the person how: sign in to Home Assistant as Culvery, Profile › Security › Long-lived access tokens › Create. *(My call.)* The person types or pastes it; Culvery never sees a Home Assistant password.
 - **Check** calls `GET /api/` with the token; then the page lists the `vacuum.*` and `climate.*` entities from `GET /api/states` as two pickers, **Hoover** and **Thermostat**, each with "None". One of each is picked automatically when there is exactly one.
 - The connection (`home.homeassistant`, "Home Assistant") holds the address and token; the chosen entity ids sit in the capabilities' own settings. Both stores are excluded from cloud backup and device transfer, as Hue's key is (the builder checks 4e's extraction rules cover them).
@@ -101,7 +101,7 @@ The handoff's tray (note 13): a 2 px outline, "ONE-TAP" label, rows of tiles. Th
 
 ### 4.5 Heating in 11a
 
-No button. Settings › Hoover and heating shows the thermostat's line: "Downstairs · 20.8 °C · heating to 21.2 °C" or "· Eco". 11a builds and tests `setEco`; the person can't trigger it from the wall until 11b.
+No button. Settings › Other integrations shows the thermostat's line: "Downstairs · 20.8 °C · heating to 21.2 °C" or "· Eco". 11a builds and tests `setEco`; the person can't trigger it from the wall until 11b.
 
 ### 4.6 TalkBack
 
@@ -190,14 +190,14 @@ Holiday's own settings store: on, the back date, when it was turned on, and per 
 
 ## 6. When things go wrong
 
-The tray row or tile shows a one-line message; Settings › Hoover and heating shows the same.
+The tray row or tile shows a one-line message; Settings › Other integrations shows the same.
 
 | What happens | How Culvery notices | What it says |
 |---|---|---|
 | Home Assistant doesn't answer | Timeout (5 s) or refused | "Can't reach Home Assistant. Check the NAS is on." |
 | The tablet is offline | Android reports no network | "The tablet is offline. Check the Wi-Fi." |
-| The token was revoked | 401 | "Home Assistant no longer accepts Culvery's token. Add a new one in Settings › Hoover and heating." |
-| A chosen entity is gone | Not in the states | "Home Assistant has no hoover called that any more. Choose it again in Settings › Hoover and heating." (and the same for the thermostat) |
+| The token was revoked | 401 | "Home Assistant no longer accepts Culvery's token. Add a new one in Settings › Other integrations." |
+| A chosen entity is gone | Not in the states | "Home Assistant has no hoover called that any more. Choose it again in Settings › Other integrations." (and the same for the thermostat) |
 | Eufy's cloud is down or the integration broke | The vacuum entity is `unavailable` | "Home Assistant can't reach the hoover. Check the Eufy app." |
 | The Nest link expired or Google is down | The climate entity is `unavailable` | "Home Assistant can't reach the thermostat. Check the Nest integration." |
 | The hoover refuses to start | It doesn't leave docked/idle within 30 s, or reports `error` | "The hoover didn't start. Check the Eufy app." |
@@ -213,7 +213,7 @@ The tray row or tile shows a one-line message; Settings › Hoover and heating s
 - **Holiday logic** (with a test clock): the steps in order on turning on; the sheet's calendar pick (none, one, several, half term starting tomorrow vs a holiday on today); the hoover at 10:00 the day before and skipped when missed; Eco off at 00:01 and caught up after a restart; across a BST change; retries every 5 minutes inside the window; turning off early clears Eco; each part missing (no Hue, no thermostat, no hoover); a failing part doesn't stop the others.
 - **Access:** Holiday mode asks for a fresh PIN both ways; a Child's PIN is refused; Start needs none; Settings is admin-only.
 - **Door and screen:** silent while on (recorded, no chime, no card); `DisplayState` Asleep day and night while on, a tap wakes it.
-- **UI** (Robolectric; Roborazzi for the tray with the Hoover row, the Holiday tile off and on, the sheet with and without a calendar match, Settings › Hoover and heating): the TalkBack words.
+- **UI** (Robolectric; Roborazzi for the tray with the Hoover row, the Holiday tile off and on, the sheet with and without a calendar match, Settings › Other integrations): the TalkBack words.
 
 ## 8. Rollout
 
