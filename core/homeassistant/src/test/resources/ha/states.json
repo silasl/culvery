@@ -1,0 +1,243 @@
+[
+ {
+  "entity_id": "vacuum.hoover",
+  "state": "docked",
+  "attributes": {
+   "friendly_name": "Hoover",
+   "battery_level": 86,
+   "fan_speed": "standard",
+   "supported_features": 12316
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "vacuum.v_cleaning",
+  "state": "cleaning",
+  "attributes": {
+   "friendly_name": "Hoover Cleaning",
+   "battery_level": 50
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "vacuum.v_returning",
+  "state": "returning",
+  "attributes": {
+   "friendly_name": "Hoover Returning",
+   "battery_level": 50
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "vacuum.v_paused",
+  "state": "paused",
+  "attributes": {
+   "friendly_name": "Hoover Paused",
+   "battery_level": 50
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "vacuum.v_idle",
+  "state": "idle",
+  "attributes": {
+   "friendly_name": "Hoover Idle",
+   "battery_level": 50
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "vacuum.v_error",
+  "state": "error",
+  "attributes": {
+   "friendly_name": "Hoover Error",
+   "battery_level": 50
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "vacuum.v_unavailable",
+  "state": "unavailable",
+  "attributes": {
+   "friendly_name": "Hoover Unavailable",
+   "battery_level": 50
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "vacuum.v_unknown",
+  "state": "unknown",
+  "attributes": {
+   "friendly_name": "Hoover Unknown",
+   "battery_level": 50
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "sensor.hoover_battery",
+  "state": "86",
+  "attributes": {
+   "friendly_name": "Hoover battery",
+   "unit_of_measurement": "%",
+   "device_class": "battery",
+   "state_class": "measurement"
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "climate.hall",
+  "state": "heat",
+  "attributes": {
+   "friendly_name": "Hall",
+   "hvac_modes": [
+    "off",
+    "heat"
+   ],
+   "preset_modes": [
+    "eco",
+    "none"
+   ],
+   "preset_mode": "eco",
+   "hvac_action": "heating",
+   "current_temperature": 20.8,
+   "temperature": 21.2,
+   "min_temp": 9,
+   "max_temp": 32,
+   "supported_features": 401
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "climate.landing",
+  "state": "heat",
+  "attributes": {
+   "friendly_name": "Landing",
+   "preset_modes": [
+    "eco",
+    "none"
+   ],
+   "preset_mode": "none",
+   "hvac_action": "idle",
+   "current_temperature": 19.5,
+   "temperature": 18.0
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "climate.study",
+  "state": "unavailable",
+  "attributes": {
+   "friendly_name": "Study"
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "person.alex",
+  "state": "home",
+  "attributes": {
+   "friendly_name": "Alex",
+   "latitude": 51.5072,
+   "longitude": -0.1276,
+   "gps_accuracy": 10,
+   "source": "device_tracker.alex_phone"
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ },
+ {
+  "entity_id": "device_tracker.alex_phone",
+  "state": "home",
+  "attributes": {
+   "friendly_name": "Alex phone",
+   "source_type": "gps",
+   "latitude": 51.5072,
+   "longitude": -0.1276,
+   "gps_accuracy": 10,
+   "battery_level": 71
+  },
+  "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_updated": "2026-10-26T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000ST01",
+   "parent_id": null,
+   "user_id": "0123456789abcdef0123456789abcdef"
+  }
+ }
+]

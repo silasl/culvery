@@ -1,0 +1,1 @@
+{"id":1,"type":"event","event":{"c":{"vacuum.hoover":{"+":{"s":"cleaning","a":{"battery_level":80},"c":"01J9ZQ0000000000000000CHG1","lc":1761470000.1,"lu":1761470000.1},"-":{"a":["fan_speed"]}},"climate.hall":{"+":{"a":{"current_temperature":20.9}}}}}}
