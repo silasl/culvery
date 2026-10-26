@@ -127,6 +127,7 @@ internal fun ShoppingTab(
             if (down.position !in addCardBounds.value) focusManager.clearFocus()
         }
     }
+    // The touch and the card's bounds are both in the Column's own space: no padding or scroll may follow the handler.
     Column(Modifier.fillMaxSize().testTag("shopping_tab").then(closesKeyboardOutsideAdd)) {
         HhPageHeader(
             title = SHOPPING,

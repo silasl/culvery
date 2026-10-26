@@ -193,6 +193,18 @@ class ShoppingActionsTest : ShoppingTestBase() {
     }
 
     @Test
+    fun aUsedUndoDoesNothingTheSecondTime() = runTest {
+        val rig = rig(open = listOf("Milk"))
+        rig.readTheList()
+        val actions = rig.actions()
+        actions.tick(milk)
+        val latest = actions.undoable.value!!
+        actions.undo(latest)
+        actions.undo(latest)
+        assertThat(rig.store.queueNow()).isEmpty()
+    }
+
+    @Test
     fun undoAfterTheTickIsSentUnticks() = runTest {
         val rig = rig(open = listOf("Milk"))
         rig.readTheList()
@@ -244,7 +256,7 @@ class ShoppingActionsTest : ShoppingTestBase() {
     }
 
     @Test
-    fun undoOfATickOnAQueuedAddStillUntickstAfterBothAreSent() = runTest {
+    fun undoOfATickOnAQueuedAddStillUnticksAfterBothAreSent() = runTest {
         val rig = rig()
         rig.connect()
         val actions = rig.actions()
