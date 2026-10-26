@@ -106,6 +106,21 @@ class HaJsonTest {
         assertThat(after.numbers["temperature"]).isEqualTo(21.2)
     }
 
+    /** Fails if an attribute a change sets to null, a flag or a list keeps its old value in the cache. */
+    @Test
+    fun anAttributeChangedToNothingIsDropped() {
+        val hall = (HaJson.socket(HaFixtures.ADDED) as SocketMessage.Entities).added.getValue("climate.hall")
+        val change = (
+            HaJson.socket("""{"id":1,"type":"event","event":{"c":{"climate.hall":{"+":{"a":{"preset_mode":null,"temperature":false,"hvac_action":["x"]}}}}}}""")
+                as SocketMessage.Entities
+            ).changed.getValue("climate.hall")
+        val after = hall.apply(change)
+        assertThat(after.texts).doesNotContainKey("preset_mode")
+        assertThat(after.texts).doesNotContainKey("hvac_action")
+        assertThat(after.numbers).doesNotContainKey("temperature")
+        assertThat(after.numbers["current_temperature"]).isEqualTo(20.8)
+    }
+
     /** Fails if a removed entity's id isn't read. */
     @Test
     fun removedIdsAreRead() {

@@ -133,8 +133,11 @@ internal object HaJson {
         val changed = event["c"]?.jsonObject.orEmpty().mapValues { (_, value) ->
             val body = value.jsonObject
             val plus = body["+"]?.jsonObject
-            val (texts, numbers) = attributes(plus?.get("a")?.jsonObject)
-            val gone = body["-"]?.jsonObject?.get("a")?.jsonArray.orEmpty().map { it.jsonPrimitive.content }.toSet()
+            val set = plus?.get("a")?.jsonObject
+            val (texts, numbers) = attributes(set)
+            // An attribute set to null, a flag or a list is absent from a full read, so it must leave the cache too.
+            val unreadable = set.orEmpty().keys - texts.keys - numbers.keys
+            val gone = body["-"]?.jsonObject?.get("a")?.jsonArray.orEmpty().map { it.jsonPrimitive.content }.toSet() + unreadable
             EntityChange(plus?.get("s")?.jsonPrimitive?.content, texts, numbers, gone)
         }
         val removed = event["r"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content }.toSet()
