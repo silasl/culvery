@@ -203,17 +203,21 @@ class HomeAssistantTest {
     fun awaitEntityReadsEveryFiveSecondsUntilItHolds() = runTest {
         api.states["vacuum.hoover"] = hoover
         val ha = ha()
-        var result: Boolean? = null
-        launch { result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it?.state == "cleaning" } }
+        var result: EntityState? = null
+        var finished = false
+        launch {
+            result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it?.state == "cleaning" }
+            finished = true
+        }
         after(CONFIRM_EVERY_MS - 1)
         assertThat(api.calls).isEmpty()
         after(1)
         assertThat(api.calls).containsExactly("state vacuum.hoover")
-        assertThat(result).isNull()
+        assertThat(finished).isFalse()
         api.states["vacuum.hoover"] = entityState("vacuum.hoover", "cleaning")
         after(CONFIRM_EVERY_MS)
         assertThat(api.calls).hasSize(2)
-        assertThat(result).isTrue()
+        assertThat(result?.state).isEqualTo("cleaning")
         after(CONFIRM_FOR_MS)
         assertThat(api.calls).hasSize(2)
     }
@@ -223,12 +227,17 @@ class HomeAssistantTest {
     fun awaitEntityGivesUpAtTheTimeout() = runTest {
         api.states["vacuum.hoover"] = hoover
         val ha = ha()
-        var result: Boolean? = null
-        launch { result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it?.state == "cleaning" } }
+        var result: EntityState? = null
+        var finished = false
+        launch {
+            result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it?.state == "cleaning" }
+            finished = true
+        }
         after(CONFIRM_FOR_MS - 1)
-        assertThat(result).isNull()
+        assertThat(finished).isFalse()
         after(1)
-        assertThat(result).isFalse()
+        assertThat(finished).isTrue()
+        assertThat(result).isNull()
         val reads = api.calls.size
         after(CONFIRM_FOR_MS)
         assertThat(api.calls).hasSize(reads)
@@ -241,13 +250,17 @@ class HomeAssistantTest {
         val ha = ha()
         ha.watch(flowOf(setOf("vacuum.hoover")))
         runCurrent()
-        var result: Boolean? = null
-        launch { result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it?.state == "cleaning" } }
+        var result: EntityState? = null
+        var finished = false
+        launch {
+            result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it?.state == "cleaning" }
+            finished = true
+        }
         after(2_000)
-        assertThat(result).isNull()
+        assertThat(finished).isFalse()
         api.socket.emit(mapOf("vacuum.hoover" to entityState("vacuum.hoover", "cleaning")))
         runCurrent()
-        assertThat(result).isTrue()
+        assertThat(result?.state).isEqualTo("cleaning")
         assertThat(api.calls).isEmpty()
     }
 

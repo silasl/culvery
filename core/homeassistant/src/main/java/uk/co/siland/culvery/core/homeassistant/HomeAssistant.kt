@@ -113,9 +113,10 @@ class HomeAssistant(
 
     /**
      * Waits until [done] holds for [entityId] (null: Home Assistant has none), reading it every [CONFIRM_EVERY_MS]
-     * and counting what the socket brings. False when [timeoutMs] pass first; a failed read is thrown.
+     * and counting what the socket brings. Returns the state that satisfied it, null when [timeoutMs] pass first
+     * (or when [done] accepted an entity Home Assistant doesn't have); a failed read is thrown.
      */
-    suspend fun awaitEntity(entityId: String, timeoutMs: Long, done: (EntityState?) -> Boolean): Boolean =
+    suspend fun awaitEntity(entityId: String, timeoutMs: Long, done: (EntityState?) -> Boolean): EntityState? =
         withTimeoutOrNull(timeoutMs) {
             coroutineScope {
                 val polling = launch {
@@ -124,11 +125,11 @@ class HomeAssistant(
                         read(entityId)
                     }
                 }
-                _entities.first { entityId in it && done(it[entityId]) }
+                val matched = _entities.first { entityId in it && done(it[entityId]) }[entityId]
                 polling.cancel()
-                true
+                matched
             }
-        } ?: false
+        }
 
     /** A screen follows [ids] while it shows; call the result when it goes. */
     fun watch(ids: Flow<Set<String>>): () -> Unit {

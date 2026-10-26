@@ -76,6 +76,7 @@ dependencies {
     implementation(project(":capability:hoover"))
     implementation(project(":capability:heating"))
     implementation(project(":provider:hoover-homeassistant"))
+    implementation(project(":provider:heating-homeassistant"))
     implementation(project(":provider:calendar-google"))
     implementation(project(":provider:shopping-google-tasks"))
     implementation(project(":provider:weather-openmeteo"))

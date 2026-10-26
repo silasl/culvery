@@ -108,8 +108,7 @@ class HaHooverSystem internal constructor(
                 return HooverResult.NotStarted
             }
             val left = ha.awaitEntity(device, CONFIRM_FOR_MS) { s -> s?.let { activityOf(it.state) }?.let { it !in STARTABLE } == true }
-            val activity = ha.entities.value[device]?.let { activityOf(it.state) }
-            if (left && activity != HooverActivity.ERROR) return HooverResult.Started
+            if (left != null && activityOf(left.state) != HooverActivity.ERROR) return HooverResult.Started
             Log.w(TAG, "The hoover did not leave the dock")
             return HooverResult.NotStarted
         } catch (e: HomeAssistantException) {
