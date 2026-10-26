@@ -23,7 +23,10 @@ data class ShoppingItem(val id: String, val text: String, val changedAt: Instant
 /** Which accounts a provider can be turned on for, or why it can't yet (10 §4.10). */
 sealed interface ProviderAccounts {
     /** An empty list means the provider has no account to pick. */
-    data class Ready(val accounts: List<String>) : ProviderAccounts
+    data class Ready(val accounts: List<String>) : ProviderAccounts {
+        // Accounts are email addresses, which show on Settings only.
+        override fun toString() = "Ready(accounts=${accounts.size})"
+    }
 
     /** [line] is what to tell the user, e.g. to connect the calendar first. */
     data class Blocked(val line: String) : ProviderAccounts

@@ -72,20 +72,26 @@ internal sealed interface Confirm {
     data object Clear : Confirm
 }
 
-/** What Settings › Shopping shows. [On] is the page itself, with [On.confirm] when a question is up. */
+/** What Settings › Shopping shows. [On] is the page itself, with [On.confirm] when a question is up. No toString prints the account. */
 internal sealed interface SettingsState {
     val provider: ShoppingProvider
 
     data class Off(override val provider: ShoppingProvider, val accounts: ProviderAccounts) : SettingsState
 
     /** More than one account: [chosen] is null until one is picked. */
-    data class ChoosingAccount(override val provider: ShoppingProvider, val accounts: List<String>, val chosen: String?) : SettingsState
+    data class ChoosingAccount(override val provider: ShoppingProvider, val accounts: List<String>, val chosen: String?) : SettingsState {
+        override fun toString() = "ChoosingAccount(accounts=${accounts.size}, chosen=${chosen != null})"
+    }
 
     /** The provider's own screens are up; [existing] is the stored connection when the permission is being given again. */
-    data class Connecting(override val provider: ShoppingProvider, val account: String?, val existing: Connection? = null) : SettingsState
+    data class Connecting(override val provider: ShoppingProvider, val account: String?, val existing: Connection? = null) : SettingsState {
+        override fun toString() = "Connecting(existing=${existing?.id})"
+    }
 
     /** Connected in the provider's screens and waiting for the store to hold it. */
-    data class Finishing(override val provider: ShoppingProvider, val account: String?) : SettingsState
+    data class Finishing(override val provider: ShoppingProvider, val account: String?) : SettingsState {
+        override fun toString() = "Finishing"
+    }
 
     data class On(
         override val provider: ShoppingProvider,
@@ -93,7 +99,9 @@ internal sealed interface SettingsState {
         val health: ShoppingHealth,
         val lastReadMillis: Long?,
         val confirm: Confirm? = null,
-    ) : SettingsState
+    ) : SettingsState {
+        override fun toString() = "On(health=$health, lastReadMillis=$lastReadMillis, confirm=$confirm)"
+    }
 }
 
 /** What Settings › Shopping's taps do; each does nothing unless given, so a test or screenshot passes only what it checks. */
@@ -226,11 +234,17 @@ private fun Health(state: SettingsState.On, service: String, nowMillis: Long) {
 private sealed interface Step {
     data object Idle : Step
 
-    data class Choosing(val chosen: String?) : Step
+    data class Choosing(val chosen: String?) : Step {
+        override fun toString() = "Choosing(chosen=${chosen != null})"
+    }
 
-    data class Connecting(val account: String?, val existing: Connection?) : Step
+    data class Connecting(val account: String?, val existing: Connection?) : Step {
+        override fun toString() = "Connecting(existing=${existing?.id})"
+    }
 
-    data class Finishing(val account: String?) : Step
+    data class Finishing(val account: String?) : Step {
+        override fun toString() = "Finishing"
+    }
 
     data class Asking(val confirm: Confirm) : Step
 }

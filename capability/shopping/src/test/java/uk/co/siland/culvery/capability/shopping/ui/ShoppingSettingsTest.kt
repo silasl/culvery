@@ -294,6 +294,20 @@ class ShoppingSettingsTest {
     }
 
     @Test
+    fun noAccountInAToString() {
+        val rig = rig()
+        val states = listOf(
+            ProviderAccounts.Ready(listOf(FAMILY)),
+            SettingsState.Off(rig.provider, ProviderAccounts.Ready(listOf(FAMILY))),
+            SettingsState.ChoosingAccount(rig.provider, listOf(FAMILY, SAM), FAMILY),
+            SettingsState.Connecting(rig.provider, FAMILY, rig.connection),
+            SettingsState.Finishing(rig.provider, FAMILY),
+            on(rig),
+        )
+        states.forEach { assertThat(it.toString()).doesNotContain("example.com") }
+    }
+
+    @Test
     fun aRefusedItemSaysHowToSendTheRest() {
         val rig = rig()
         stateless(on(rig, ShoppingHealth.REFUSED))
