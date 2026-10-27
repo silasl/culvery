@@ -299,7 +299,7 @@ class HaHooverSystemTest {
         assertThat(ha.problem.value).isNull()
     }
 
-    /** Fails if a service that can't be reached isn't a failure with its line, and the link's problem. */
+    /** Fails if a service that can't be reached isn't a failure with its line, or becomes the link's problem while the socket is live. */
     @Test
     fun anUnreachableServiceFailsWithItsLine() = runTest {
         val ha = ha()
@@ -307,7 +307,7 @@ class HaHooverSystemTest {
         live(system, "docked")
         api.failNext = HaProblem.UNREACHABLE
         assertThat(system.start()).isEqualTo(HooverResult.Failed(problemLine(HaProblem.UNREACHABLE)))
-        assertThat(ha.problem.value).isEqualTo(HaProblem.UNREACHABLE)
+        assertThat(ha.problem.value).isNull()
     }
 
     /** Fails if a check whose every read can't reach Home Assistant is called not started, or ends before 30 s. */
@@ -337,6 +337,19 @@ class HaHooverSystemTest {
         api.states["vacuum.hoover"] = vacuum("cleaning")
         after(5_000)
         assertThat(result.await()).isEqualTo(HooverResult.Started)
+    }
+
+    /** Fails if a confirm read that times out while the socket is live takes the row's status and Start away. */
+    @Test
+    fun aTimedOutConfirmReadKeepsStartWhileTheSocketIsLive() = runTest {
+        val system = system()
+        live(system, "docked")
+        val result = async { system.start() }
+        runCurrent()
+        api.failNext = HaProblem.UNREACHABLE
+        after(5_000)
+        assertThat(system.state.first()).isEqualTo(HooverState(HooverActivity.DOCKED, null, null))
+        result.cancel()
     }
 
     /** Fails if cancelling a Start mid-check leaves the lock held. */

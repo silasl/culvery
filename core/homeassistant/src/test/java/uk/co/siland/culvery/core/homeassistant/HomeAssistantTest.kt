@@ -163,6 +163,42 @@ class HomeAssistantTest {
         assertThat(ha.entities.value).containsExactly("vacuum.hoover", hoover)
     }
 
+    /** Fails if one REST call that times out while the socket is live puts a line up that nothing would clear. */
+    @Test
+    fun aFailedCallWhileTheSocketIsLiveLeavesNoProblem() = runTest {
+        val ha = ha()
+        ha.watch(flowOf(setOf("vacuum.hoover")))
+        runCurrent()
+        api.socket.emit(mapOf("vacuum.hoover" to hoover))
+        runCurrent()
+        listOf(HaProblem.UNREACHABLE, HaProblem.OFFLINE).forEach { problem ->
+            api.failNext = problem
+            assertThat(refusal { ha.read("vacuum.hoover") }).isEqualTo(problem)
+            assertThat(ha.problem.value).isNull()
+        }
+        inFront.value = false
+        runCurrent()
+        api.failNext = HaProblem.UNREACHABLE
+        refusal { ha.read("vacuum.hoover") }
+        assertThat(ha.problem.value).isEqualTo(HaProblem.UNREACHABLE)
+    }
+
+    /** Fails if a live socket hides a refused token or a blocked tablet that REST reports. */
+    @Test
+    fun aRefusedTokenFromRestStillCountsWhileTheSocketIsLive() = runTest {
+        val ha = ha()
+        ha.watch(flowOf(setOf("vacuum.hoover")))
+        runCurrent()
+        api.socket.emit(mapOf("vacuum.hoover" to hoover))
+        runCurrent()
+        api.failNext = HaProblem.BLOCKED
+        refusal { ha.read("vacuum.hoover") }
+        assertThat(ha.problem.value).isEqualTo(HaProblem.BLOCKED)
+        api.failNext = HaProblem.TOKEN_REFUSED
+        refusal { ha.read("vacuum.hoover") }
+        assertThat(ha.problem.value).isEqualTo(HaProblem.TOKEN_REFUSED)
+    }
+
     /** Fails if a refused token reopens the socket, or lets a read or a service call reach Home Assistant. */
     @Test
     fun aRefusedTokenStopsEverythingButCheck() = runTest {

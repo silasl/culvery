@@ -40,6 +40,9 @@ private const val TAG = "HomeAssistant"
 /** The problems that are the link's, not one device's or Check's. */
 private val LINK_PROBLEMS = setOf(HaProblem.UNREACHABLE, HaProblem.OFFLINE, HaProblem.TOKEN_REFUSED, HaProblem.BLOCKED)
 
+/** A REST call that met these while the socket is live is a busy NAS, not a lost one: the socket's ping would know. */
+private val PASSING_PROBLEMS = setOf(HaProblem.UNREACHABLE, HaProblem.OFFLINE)
+
 private class SocketEnded : Exception("The Home Assistant socket ended")
 
 /** What the socket follows, and for which link; a new generation reopens it. */
@@ -78,6 +81,9 @@ class HomeAssistant(
     val problem: StateFlow<HaProblem?> = _problem.asStateFlow()
 
     private val generation = MutableStateFlow(0)
+
+    /** What the open socket has reported since it opened; empty while none is. Guarded by [lock]. */
+    private var liveIds: Set<String> = emptySet()
     private val watchers = MutableStateFlow<Map<Int, Set<String>>>(emptyMap())
     private val nextWatcher = AtomicInteger()
 
@@ -186,7 +192,7 @@ class HomeAssistant(
     }
 
     /** The socket for [follow], reopened with backoff; its first event after each open is the full read (11 §4.3). */
-    private suspend fun following(follow: Follow) {
+    private suspend fun following(follow: Follow) = try {
         flow {
             emitAll(
                 api.follow(follow.link, follow.ids).catch { e ->
@@ -201,6 +207,7 @@ class HomeAssistant(
             throw SocketEnded()
         }
             .retryWithBackoff { e ->
+                socketClosed()
                 if (e is HomeAssistantException) record(follow.link, e.problem)
                 Log.w(TAG, "The socket dropped (${e::class.simpleName}); reopening")
             }
@@ -208,11 +215,16 @@ class HomeAssistant(
                 synchronized(lock) {
                     if (follow.link == _link.value) {
                         _entities.update { it + states }
+                        liveIds = follow.ids
                         cleared()
                     }
                 }
             }
+    } finally {
+        socketClosed()
     }
+
+    private fun socketClosed() = synchronized(lock) { liveIds = emptySet() }
 
     private suspend fun <T> calling(block: suspend (HomeAssistantLink) -> T): T {
         val link = _link.value
@@ -220,15 +232,16 @@ class HomeAssistant(
         val result = try {
             block(link)
         } catch (e: HomeAssistantException) {
-            record(link, e.problem)
+            record(link, e.problem, fromRest = true)
             throw e
         }
         synchronized(lock) { if (link == _link.value) cleared() }
         return result
     }
 
-    private fun record(link: HomeAssistantLink, problem: HaProblem) = synchronized(lock) {
-        if (link == _link.value) failed(problem)
+    private fun record(link: HomeAssistantLink, problem: HaProblem, fromRest: Boolean = false) = synchronized(lock) {
+        val passing = fromRest && liveIds.isNotEmpty() && problem in PASSING_PROBLEMS
+        if (link == _link.value && !passing) failed(problem)
     }
 
     /** A refused token stays until a Check: a call that raced it doesn't clear it. */
