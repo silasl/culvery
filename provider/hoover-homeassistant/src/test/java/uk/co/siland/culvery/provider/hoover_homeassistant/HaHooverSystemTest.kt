@@ -35,9 +35,10 @@ class HaHooverSystemTest {
     private val api = FakeHomeAssistantApi()
     private val link = MutableStateFlow<HomeAssistantLink?>(TEST_LINK)
     private val prefs = MutableStateFlow(HooverPrefs("vacuum.hoover"))
+    private val inFront = MutableStateFlow(true)
     private val start = "service vacuum/start vacuum.hoover"
 
-    private fun TestScope.ha(): HomeAssistant = testHomeAssistant(api, link, scope = backgroundScope).also { runCurrent() }
+    private fun TestScope.ha(): HomeAssistant = testHomeAssistant(api, link, inFront, backgroundScope).also { runCurrent() }
 
     private fun TestScope.system(ha: HomeAssistant = ha()) = HaHooverSystem(ha, prefs)
 
@@ -258,6 +259,20 @@ class HaHooverSystemTest {
         live(system, "cleaning")
         assertThat(system.start()).isEqualTo(HooverResult.NotStarted)
         assertThat(api.calls).isEmpty()
+    }
+
+    /** Fails if Start trusts a cleaning cached before the socket closed, rather than reading the hoover now docked. */
+    @Test
+    fun aStaleCleaningInTheCacheIsReadAgain() = runTest {
+        val system = system()
+        live(system, "cleaning")
+        inFront.value = false
+        runCurrent()
+        api.states["vacuum.hoover"] = vacuum("docked")
+        val result = async { system.start() }
+        runCurrent()
+        assertThat(api.calls).containsExactly("state vacuum.hoover", start).inOrder()
+        result.cancel()
     }
 
     /** Fails if Start with nothing cached sends before it has read the vacuum. */

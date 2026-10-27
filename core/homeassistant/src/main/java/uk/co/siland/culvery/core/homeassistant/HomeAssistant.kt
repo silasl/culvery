@@ -106,6 +106,13 @@ class HomeAssistant(
         api.state(link, entityId).also { state -> cache(link) { it + (entityId to state) } }
     }
 
+    /** [entityId] as it is now: from the cache while the open socket reports it, else read. */
+    suspend fun current(entityId: String): EntityState? {
+        val entities = _entities.value
+        val live = synchronized(lock) { entityId in liveIds }
+        return if (live && entityId in entities) entities[entityId] else read(entityId)
+    }
+
     /** Every entity; one cached but no longer listed is cached as gone. */
     suspend fun states(): List<EntityState> = calling { link ->
         api.states(link).also { states ->

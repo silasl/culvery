@@ -96,7 +96,7 @@ class HaHooverSystem internal constructor(
         if (ha.link.value == null) return HooverResult.Failed(NOT_LINKED)
         val device = prefs.first().device ?: return HooverResult.Failed(NO_HOOVER_CHOSEN)
         try {
-            val vacuum = ha.entities.value[device] ?: ha.read(device)
+            val vacuum = ha.current(device)
             if (vacuum?.let { activityOf(it.state) } !in STARTABLE) return HooverResult.NotStarted
             try {
                 ha.call("vacuum", "start", device)
