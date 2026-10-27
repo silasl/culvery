@@ -51,9 +51,9 @@ interface MultiDayEvents {
     suspend fun around(today: LocalDate): List<MultiDayEvent>
 }
 
-/** An all-day event over two or more days, [last] being its last day. [toString] leaves out [title]. */
+/** An all-day event over two or more days, [last] being its last day. [toString] leaves out the title and the days. */
 data class MultiDayEvent(val title: String, val first: LocalDate, val last: LocalDate) {
-    override fun toString() = "MultiDayEvent(first=$first, last=$last)"
+    override fun toString() = "MultiDayEvent"
 }
 
 object HousePermissions {

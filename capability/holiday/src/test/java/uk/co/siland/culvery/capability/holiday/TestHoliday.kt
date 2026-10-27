@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.holiday
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import java.io.IOException
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
@@ -27,13 +28,18 @@ import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
 
-/** A settings store in memory; null holds [data] back, as a file not yet read. */
+/** A settings store in memory; null holds [data] back, as a file not yet read. The next [failingWrites] writes throw. */
 internal class MemoryStore(initial: Preferences? = emptyPreferences()) : DataStore<Preferences> {
     val state = MutableStateFlow(initial)
+    @Volatile var failingWrites = 0
     private val mutex = Mutex()
     override val data: Flow<Preferences> = state.filterNotNull()
 
     override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences = mutex.withLock {
+        if (failingWrites > 0) {
+            failingWrites--
+            throw IOException("No space left")
+        }
         transform(state.value ?: emptyPreferences()).also { state.value = it }
     }
 }

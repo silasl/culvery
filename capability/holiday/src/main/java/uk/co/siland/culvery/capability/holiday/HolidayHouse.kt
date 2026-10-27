@@ -79,6 +79,9 @@ class HolidayHouse internal constructor(
     private var offLine: String? = null
     private var offAt = 0L
 
+    // Memory is the truth; true while the store holds an older record than it.
+    private var unsaved = false
+
     /** The steps turning on now would take, for the sheet. */
     suspend fun plan(back: LocalDate): List<HolidayStep> {
         val eco = ready(heating?.ready)
@@ -127,7 +130,9 @@ class HolidayHouse internal constructor(
     suspend fun tick() {
         if (!mutex.tryLock()) return
         try {
-            if (load().on) runDue() else if (offLine != null && !within(offAt, OFF_LINE_MS)) {
+            val away = load().on
+            if (unsaved) persist()
+            if (away) runDue() else if (offLine != null && !within(offAt, OFF_LINE_MS)) {
                 offLine = null
                 showLine()
             }
@@ -200,16 +205,25 @@ class HolidayHouse internal constructor(
         set(record.copy(steps = record.steps + (step to state)))
     }
 
-    /** Shows [record] and saves it; one that can't be saved still runs, and a restart reads the last one saved. */
     private fun resetRun() {
         lastTry.clear()
         failed.clear()
     }
 
+    /** Shows [record] and saves it; one that can't be saved still runs, and is saved again at each tick until it lands. */
     private suspend fun set(record: HolidayRecord) {
         publish(record)
-        attempt({ if (record.on) settings.save(record) else settings.clear() }) { e ->
-            Log.w(TAG, "Couldn't save the Holiday mode record (${e::class.simpleName})")
+        persist()
+    }
+
+    private suspend fun persist() {
+        val record = current.value ?: return
+        unsaved = attempt({
+            if (record.on) settings.save(record) else settings.clear()
+            false
+        }) { e ->
+            Log.w(TAG, "Couldn't save the Holiday mode record (${e::class.simpleName}); trying again at the next tick")
+            true
         }
     }
 

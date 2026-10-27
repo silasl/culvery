@@ -196,6 +196,37 @@ class HolidayHouseTest {
         assertThat(house.line.value).isNull()
     }
 
+    /** Fails if a clear that failed at turn-off isn't tried again, so a restart would bring Holiday mode back. */
+    @Test
+    fun aFailedClearAtTurnOffIsTriedAgainAtTheNextTick() = runTest {
+        val rig = rig()
+        val house = rig.house(hoover = null)
+        house.turnOn(SAT_31_OCT, adult())
+        rig.store.failingWrites = 1
+        house.turnOff(adult())
+        assertThat(rig.settings.prefs.first().on).isTrue()
+
+        house.tick()
+
+        assertThat(rig.settings.prefs.first()).isEqualTo(HolidayRecord())
+        assertThat(rig.restarted(hoover = null).also { it.tick() }.holiday.value).isFalse()
+    }
+
+    /** Fails if a save that failed at turn-on isn't tried again, so a restart would lose Holiday mode. */
+    @Test
+    fun aFailedSaveAtTurnOnIsTriedAgainAtTheNextTick() = runTest {
+        val rig = rig()
+        val house = rig.house(lights = null, heating = null, hoover = null)
+        rig.store.failingWrites = 1
+        house.turnOn(SAT_31_OCT, adult())
+        assertThat(rig.settings.prefs.first().on).isFalse()
+
+        house.tick()
+
+        assertThat(rig.settings.prefs.first()).isEqualTo(house.record.value)
+        assertThat(rig.restarted(lights = null, hoover = null).also { it.tick() }.holiday.value).isTrue()
+    }
+
     /** Fails if coming back early leaves the heating on Eco. */
     @Test
     fun turningOffEarlyTakesEcoOff() = runTest {
