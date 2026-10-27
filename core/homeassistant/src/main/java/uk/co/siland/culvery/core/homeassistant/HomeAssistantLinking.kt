@@ -49,6 +49,8 @@ class HomeAssistantLinking internal constructor(
         val base = url(address) ?: return CheckOutcome.Failed(ADDRESS_REFUSED)
         val saved = settings.link.first()
         val typed = token.trim()
+        // A pasted zero-width space or line break can't go in a header; refusing it here sends nothing.
+        if (typed.any { it !in '!'..'~' }) return CheckOutcome.Failed(TOKEN_CANT_BE_SENT)
         val secret = typed.ifEmpty { saved?.takeIf { it.baseUrl == base }?.token }
             ?: return CheckOutcome.Failed(PASTE_A_TOKEN)
         val link = HomeAssistantLink(base, secret)

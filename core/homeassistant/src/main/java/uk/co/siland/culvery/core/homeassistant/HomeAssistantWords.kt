@@ -44,5 +44,6 @@ const val HA_NONE = "None"
 
 const val ADDRESS_REFUSED = "Use an address on the home network, like http://192.168.1.20:8123, or one that starts https://."
 const val PASTE_A_TOKEN = "Paste a token for Culvery first."
+const val TOKEN_CANT_BE_SENT = "That token has characters it can’t contain. Copy it again from Home Assistant and paste it here."
 const val TOKEN_NOT_ACCEPTED = "Home Assistant didn’t accept that token. Create a new one and paste it here."
 const val NOT_HOME_ASSISTANT_LINE = "Nothing at that address answered as Home Assistant. Check the address."

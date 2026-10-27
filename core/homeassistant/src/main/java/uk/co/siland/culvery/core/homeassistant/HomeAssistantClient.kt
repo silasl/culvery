@@ -217,7 +217,12 @@ class HomeAssistantClient internal constructor(
     private fun request(link: HomeAssistantLink, vararg segments: String): Request.Builder {
         // The base's own path is "/", one empty segment, which the first added segment replaces.
         val url = link.baseUrl.newBuilder().apply { segments.forEach(::addPathSegment) }.build()
-        return Request.Builder().url(url).header("Authorization", "Bearer ${link.token}")
+        return try {
+            Request.Builder().url(url).header("Authorization", "Bearer ${link.token}")
+        } catch (e: IllegalArgumentException) {
+            // OkHttp refuses a header character; Check stops such a token, so only a future path gets here.
+            throw HomeAssistantException(HaProblem.TOKEN_REFUSED)
+        }
     }
 
     private suspend fun send(what: HaCall, builder: Request.Builder, missingIsNull: Boolean = false): Answer {

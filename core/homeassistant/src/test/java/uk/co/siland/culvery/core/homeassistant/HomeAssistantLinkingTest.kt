@@ -103,6 +103,18 @@ class HomeAssistantLinkingTest {
         assertThat(access.asked).isEmpty()
     }
 
+    /** Fails if a token with a character a header can't carry is sent, or isn't told to paste it again. */
+    @Test
+    fun aTokenThatCantBeSentSaysSoAndSendsNothing() = runTest {
+        val linking = linking()
+        val line = "That token has characters it can’t contain. Copy it again from Home Assistant and paste it here."
+        listOf("abc\u200Bdef", "abc\ndef", "abc def", "abc\u0007def", "abc\u00E9def").forEach { token ->
+            assertThat(linking.check("192.168.1.20", token)).isEqualTo(CheckOutcome.Failed(line))
+        }
+        assertThat(api.calls).isEmpty()
+        assertThat(access.asked).isEmpty()
+    }
+
     /** Fails if a refused token isn't told to make a new one, or is saved, or asks for the PIN. */
     @Test
     fun aRefusedTokenSaysMakeANewOne() = runTest {

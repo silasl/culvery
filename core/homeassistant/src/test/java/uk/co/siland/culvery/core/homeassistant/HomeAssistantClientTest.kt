@@ -180,6 +180,15 @@ class HomeAssistantClientTest {
         withTimeout(1_000) { while (patient.dispatcher.runningCallsCount() > 0) delay(10) }
     }
 
+    /** Fails if a token OkHttp can't put in a header crashes the call, or anything reaches the server. */
+    @Test
+    fun aTokenThatCantBeAHeaderIsAProblemNotACrash() = runBlocking<Unit> {
+        val odd = HomeAssistantLink(link.baseUrl, "abc\u200Bdef")
+        assertThat(problemOf { api.check(odd) }).isEqualTo(HaProblem.TOKEN_REFUSED)
+        assertThat(problemOf { api.states(odd) }).isEqualTo(HaProblem.TOKEN_REFUSED)
+        assertThat(server.requestCount).isEqualTo(0)
+    }
+
     @Test
     fun nothingPersonalReachesTheLog() = runBlocking<Unit> {
         ShadowLog.clear()
