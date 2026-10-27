@@ -97,8 +97,7 @@ class HolidayHouse internal constructor(
             if (load().on) return@exclusive
             val steps = plan(back)
             grant = by
-            lastTry.clear()
-            failed.clear()
+            resetRun()
             offLine = null
             set(HolidayRecord(on = true, back = back, since = wall.nowMillis(), steps = steps.associateWith { StepState.PENDING }))
             runDue()
@@ -117,8 +116,7 @@ class HolidayHouse internal constructor(
             val ecoLeft = heating != null && record.steps[ECO_OFF] == StepState.PENDING && answer { heating.setEco(false) } !is HouseStep.Done
             if (ecoLeft) Log.w(TAG, "The heating didn't come off Eco with Holiday mode")
             grant = null
-            lastTry.clear()
-            failed.clear()
+            resetRun()
             offLine = if (ecoLeft) HolidayWords.STILL_ON_ECO else if (lightsLeft) HolidayWords.LIGHTS_STILL_ON else null
             offAt = wall.nowMillis()
             set(HolidayRecord())
@@ -203,6 +201,11 @@ class HolidayHouse internal constructor(
     }
 
     /** Shows [record] and saves it; one that can't be saved still runs, and a restart reads the last one saved. */
+    private fun resetRun() {
+        lastTry.clear()
+        failed.clear()
+    }
+
     private suspend fun set(record: HolidayRecord) {
         publish(record)
         attempt({ if (record.on) settings.save(record) else settings.clear() }) { e ->

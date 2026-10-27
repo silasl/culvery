@@ -30,6 +30,7 @@ import uk.co.siland.culvery.capability.holiday.HolidayActions
 import uk.co.siland.culvery.capability.holiday.HolidayHouse
 import uk.co.siland.culvery.capability.holiday.HolidayStep
 import uk.co.siland.culvery.capability.holiday.HolidayWords
+import uk.co.siland.culvery.capability.holiday.backDateWindow
 import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.plugin.attempt
 import uk.co.siland.culvery.core.ui.ButtonSize
@@ -46,7 +47,6 @@ import uk.co.siland.culvery.core.ui.rememberSingleAction
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 private const val TAG = "HolidaySheet"
-private const val FURTHEST_DAYS = 90L
 
 /**
  * The "When are you back?" sheet (11 §5.2): the date, with the calendar's reason for it, then what Holiday mode will do
@@ -94,13 +94,15 @@ internal fun HolidaySheet(
                 Text(HolidayWords.fromCalendar(pick, today), style = HhType.body, color = c.mute, modifier = Modifier.testTag("holiday_from_calendar"))
             }
             if (choosing) {
+                val chosen = remember(back) { setOf(back) }
+                val allowed = remember(today) { { day: LocalDate -> day in backDateWindow(today) } }
                 HhDateGrid(
                     month = month,
                     onMonth = { month = it },
                     today = today,
-                    chosen = setOf(back),
+                    chosen = chosen,
                     band = null,
-                    allowed = { it in today.plusDays(1)..today.plusDays(FURTHEST_DAYS) },
+                    allowed = allowed,
                     dots = emptyMap(),
                     spoken = { "" },
                     onPick = onPickDate,

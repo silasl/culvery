@@ -97,9 +97,8 @@ class HaHooverSystem internal constructor(
         val device = prefs.first().device ?: return HooverResult.Failed(NO_HOOVER_CHOSEN)
         try {
             val vacuum = ha.current(device)
-            if (vacuum == null) return HooverResult.Failed(GONE_HOOVER)
-            if (vacuum.state == "unavailable") return HooverResult.Failed(HOOVER_UNREACHABLE)
-            val activity = activityOf(vacuum.state)
+            entityTrouble(device, mapOf(device to vacuum), null, GONE_HOOVER, HOOVER_UNREACHABLE)?.let { return HooverResult.Failed(it) }
+            val activity = vacuum?.let { activityOf(it.state) }
             if (activity == HooverActivity.CLEANING || activity == HooverActivity.RETURNING) return HooverResult.AlreadyRunning
             if (activity !in STARTABLE) return HooverResult.NotStarted
             try {

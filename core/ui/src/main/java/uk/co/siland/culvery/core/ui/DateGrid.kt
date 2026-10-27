@@ -175,7 +175,9 @@ private fun DayCell(
         else -> 1f
     }
     val isToday = date == today
-    val name = listOf(spokenDate(date, today), spokenExtra).filter { it.isNotEmpty() }.joinToString(", ")
+    val name = remember(date, today, spokenExtra) {
+        listOf(spokenDate(date, today), spokenExtra).filter { it.isNotEmpty() }.joinToString(", ")
+    }
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -210,7 +212,7 @@ private fun DayCell(
         ) {
             Text(
                 date.dayOfMonth.toString(),
-                style = DayDate.copy(fontWeight = if (isToday || isChosen) FontWeight.W700 else FontWeight.W500),
+                style = if (isToday || isChosen) DayDateBold else DayDate,
                 color = if (isChosen) c.accentInk else c.ink,
                 maxLines = 1,
                 modifier = Modifier.testTag("day_${date}_date").semantics { hideFromAccessibility() },
@@ -245,6 +247,7 @@ private fun spokenDate(date: LocalDate, today: LocalDate): String = date.format(
 
 private val MonthTitle = HhType.sectionTitle.copy(fontSize = 20.sp)
 private val DayDate = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W500)
+private val DayDateBold = DayDate.copy(fontWeight = FontWeight.W700)
 
 /** The month grid's layout: cells 56 tall, a 53 circle with a 2 today ring, up to three 5 dots 3 apart, a band's caps r 27. */
 object DateGridTokens {

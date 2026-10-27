@@ -67,14 +67,14 @@ internal fun HolidayTile(on: Boolean, back: LocalDate?, line: String?, running: 
                 )
                 .padding(horizontal = HolidayDimens.paddingH, vertical = HolidayDimens.paddingV),
         ) {
-            HhIcon(Icons.BEACH_ACCESS, size = HolidayDimens.icon, filled = true, tint = if (on) colors.accentInk else colors.accent)
+            HhIcon(Icons.BEACH_ACCESS, size = HolidayDimens.icon, filled = true, tint = if (on) ink else colors.accent)
             Column(Modifier.weight(1f).shownNotSpoken()) {
                 Text(HolidayWords.LABEL, style = HhType.buttonLabel, color = ink, maxLines = 1)
                 if (second != null) {
                     Text(
                         second,
-                        style = HolidayDimens.backStyle,
-                        color = if (on) colors.accentInk else colors.mute,
+                        style = HolidayDimens.secondStyle,
+                        color = if (on) ink else colors.mute,
                         maxLines = 1,
                         modifier = Modifier.testTag(secondTag),
                     )
@@ -85,7 +85,7 @@ internal fun HolidayTile(on: Boolean, back: LocalDate?, line: String?, running: 
         if (line != null) {
             Text(
                 line,
-                style = HolidayDimens.lineStyle,
+                style = HolidayDimens.secondStyle,
                 color = colors.danger,
                 modifier = Modifier
                     .padding(start = HolidayDimens.paddingH, end = HolidayDimens.paddingH, top = HolidayDimens.lineGap)
@@ -119,8 +119,6 @@ fun HolidayTileHost(actions: HolidayActions, house: HolidayHouse) {
     val overlay = LocalOverlayHost.current
     val action = rememberSingleAction(house) { e -> Log.w(TAG, "Holiday mode tile action failed: ${e::class.simpleName}") }
     HolidayTile(record?.on == true, record?.back, line, running) {
-        if (running == null) {
-            action.run { actions.toggle { by -> overlay.show { HolidaySheetHost(by, actions, house, overlay::dismiss) } } }
-        }
+        action.run { actions.toggle { by -> overlay.show { HolidaySheetHost(by, actions, house, overlay::dismiss) } } }
     }
 }

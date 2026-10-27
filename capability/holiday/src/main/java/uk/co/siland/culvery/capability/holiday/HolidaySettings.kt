@@ -12,7 +12,6 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.LocalDate
-import java.time.format.DateTimeParseException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -83,11 +82,7 @@ class HolidaySettings(private val store: DataStore<Preferences>, scope: Coroutin
         steps = this[STEPS].orEmpty().mapNotNull(::parseStep).toMap(),
     )
 
-    private fun parseDate(text: String): LocalDate? = try {
-        LocalDate.parse(text)
-    } catch (_: DateTimeParseException) {
-        null
-    }
+    private fun parseDate(text: String): LocalDate? = runCatching { LocalDate.parse(text) }.getOrNull()
 
     /** "HOOVER=DONE"; one this version doesn't know is skipped. */
     private fun parseStep(text: String): Pair<HolidayStep, StepState>? {

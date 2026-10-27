@@ -36,11 +36,10 @@ class HolidayActions internal constructor(
     /** The calendar's guess at the back date; none without a calendar, an event that fits, or an answer. */
     suspend fun pick(): BackDatePick? {
         val today = today()
-        return events?.let { calendar ->
-            attempt({ backDatePick(calendar.around(today), today) }) { e ->
-                Log.w(TAG, "Couldn't read the calendar for the back date (${e::class.simpleName})")
-                null
-            }
+        val calendar = events ?: return null
+        return attempt({ backDatePick(calendar.around(today), today) }) { e ->
+            Log.w(TAG, "Couldn't read the calendar for the back date (${e::class.simpleName})")
+            null
         }
     }
 

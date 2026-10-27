@@ -91,12 +91,15 @@ internal fun next(display: Display, prefs: DisplayPrefs?, now: LocalDateTime?, i
     )
 }
 
-internal fun Display.waiting(): Wait? = when {
-    screen != Screen.AWAKE || !inFront || held || prefs == null -> null
-    holiday == true -> Wait(prefs.sleepAfterMinutes * MS_PER_MINUTE, Screen.ASLEEP)
-    night == null -> null
-    night -> Wait(NIGHT_AWAKE_MS, Screen.NIGHT_CLOCK)
-    else -> Wait(prefs.sleepAfterMinutes * MS_PER_MINUTE, Screen.ASLEEP)
+internal fun Display.waiting(): Wait? {
+    if (screen != Screen.AWAKE || !inFront || held || prefs == null) return null
+    val toSleep = Wait(prefs.sleepAfterMinutes * MS_PER_MINUTE, Screen.ASLEEP)
+    return when {
+        holiday == true -> toSleep
+        night == null -> null
+        night -> Wait(NIGHT_AWAKE_MS, Screen.NIGHT_CLOCK)
+        else -> toSleep
+    }
 }
 
 /** Wanted only by day, in front, off the night clock, not on Holiday mode, and when allowed and switched on (8 §4.3). */
@@ -169,9 +172,9 @@ class DisplayState internal constructor(
     fun moved() = wake { it.holiday != true && it.night == false && it.screen != Screen.NIGHT_CLOCK }
 
     /**
- * Something on screen keeps the wall awake while [on], waking it as it starts; the wait starts again as it ends,
- * unless Holiday mode came on during the hold, when the screen goes dark as it ends.
- */
+     * Something on screen keeps the wall awake while [on], waking it as it starts; the wait starts again as it ends,
+     * unless Holiday mode came on during the hold, when the screen goes dark as it ends.
+     */
     fun held(on: Boolean) = change {
         val screen = when {
             on -> Screen.AWAKE

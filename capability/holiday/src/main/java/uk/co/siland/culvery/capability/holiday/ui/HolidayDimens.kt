@@ -12,9 +12,8 @@ internal object HolidayDimens {
     val paddingH = 12.dp
     val gap = 12.dp
     val icon = 24.dp
-    val backStyle = HhType.secondary.copy(fontSize = 12.sp)
+    val secondStyle = HhType.secondary.copy(fontSize = 12.sp)
     val lineGap = 6.dp
-    val lineStyle = HhType.secondary.copy(fontSize = 12.sp)
 
     val pillHeight = 24.dp
     val pillPaddingH = 10.dp

@@ -2,16 +2,16 @@ package uk.co.siland.culvery.capability.hoover
 
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.house.HouseHoover
+import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.house.HouseStep
+import uk.co.siland.culvery.core.house.chosen
 
 /** Holiday mode's way to the hoover (11 §5.1). */
 class HouseHooverSeam @Inject constructor(systems: Set<@JvmSuppressWildcards HooverSystem>) : HouseHoover {
     private val system = systems.firstOrNull()
 
-    override val ready: Flow<Boolean> = system?.state?.map { it != null } ?: flowOf(false)
+    override val ready: Flow<Boolean> = system?.state.chosen()
 
     override suspend fun start(): HouseStep {
         val system = system ?: return DIDNT_RUN
@@ -23,6 +23,6 @@ class HouseHooverSeam @Inject constructor(systems: Set<@JvmSuppressWildcards Hoo
     }
 
     private companion object {
-        val DIDNT_RUN = HouseStep.Failed("The hoover didn’t run.")
+        val DIDNT_RUN = HouseStep.Failed(HouseLines.HOOVER_DIDNT_RUN)
     }
 }

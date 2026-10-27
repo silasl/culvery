@@ -171,8 +171,6 @@ class CalendarRepository @Inject constructor(
         }
     }
 
-    private fun millis(date: LocalDate, z: ZoneId) = date.atStartOfDay(z).toInstant().toEpochMilli()
-
     private companion object {
         const val TAG = "CalendarRepository"
     }
@@ -180,6 +178,8 @@ class CalendarRepository @Inject constructor(
 
 /** Two days: more than any two zones' offsets differ. */
 internal const val ZONE_MARGIN_MS = 2 * 86_400_000L
+
+internal fun millis(date: LocalDate, z: ZoneId) = date.atStartOfDay(z).toInstant().toEpochMilli()
 
 // Their events may be missing rather than absent (9 §3.1); Out of date is the week's rule.
 private fun unhealthyPeople(sources: List<StoredSource>, connections: List<StoredConnection>, order: List<PersonId>, nowMillis: Long): Set<PersonId> {

@@ -4,6 +4,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import uk.co.siland.culvery.core.house.HouseLines
 
 /** Holiday mode's words (11 §5.2, §5.8). */
 object HolidayWords {
@@ -24,7 +25,6 @@ object HolidayWords {
     const val STILL_ON_ECO = "The heating is still on Eco. Turn it off in the Nest app."
     const val LIGHTS_STILL_ON = "Holiday lights are still on. Turn them off in the Lights tab."
     private const val LIGHTS_MISSED = "Holiday lights didn’t switch on. Turn them on in the Lights tab."
-    private const val HOOVER_MISSED = "The hoover didn’t run."
 
     private const val WEEKDAY_ALONE_DAYS = 6L
     private val SHORT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
@@ -42,16 +42,16 @@ object HolidayWords {
     /** The tile's line for a step that was missed; none for Eco on, since Eco off still runs. */
     fun missedLine(step: HolidayStep): String? = when (step) {
         HolidayStep.LIGHTS_ON -> LIGHTS_MISSED
-        HolidayStep.HOOVER -> HOOVER_MISSED
+        HolidayStep.HOOVER -> HouseLines.HOOVER_DIDNT_RUN
         HolidayStep.ECO_ON, HolidayStep.ECO_OFF -> null
     }
 
     /** The tile's line for a step that threw rather than answer with a line of its own. */
     fun failedLine(step: HolidayStep): String = when (step) {
         HolidayStep.LIGHTS_ON -> LIGHTS_MISSED
-        HolidayStep.ECO_ON -> "The heating didn’t go to Eco. Check the Nest app."
-        HolidayStep.HOOVER -> HOOVER_MISSED
-        HolidayStep.ECO_OFF -> "The heating didn’t come off Eco. Turn it off in the Nest app."
+        HolidayStep.ECO_ON -> HouseLines.ECO_ON_FAILED
+        HolidayStep.HOOVER -> HouseLines.HOOVER_DIDNT_RUN
+        HolidayStep.ECO_OFF -> HouseLines.ECO_OFF_FAILED
     }
 
     fun backShort(date: LocalDate) = "Back ${SHORT.format(date)}"

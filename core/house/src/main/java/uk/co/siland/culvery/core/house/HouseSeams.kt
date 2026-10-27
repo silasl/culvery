@@ -3,6 +3,8 @@ package uk.co.siland.culvery.core.house
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.access.Authorised
 
 /** What a device step did: [Failed.line] is the line to show. */
@@ -10,6 +12,16 @@ sealed interface HouseStep {
     data object Done : HouseStep
     data class Failed(val line: String) : HouseStep
 }
+
+/** The failure lines the seams and Holiday mode's tile both show (11 §6). */
+object HouseLines {
+    const val ECO_ON_FAILED = "The heating didn’t go to Eco. Check the Nest app."
+    const val ECO_OFF_FAILED = "The heating didn’t come off Eco. Turn it off in the Nest app."
+    const val HOOVER_DIDNT_RUN = "The hoover didn’t run."
+}
+
+/** Whether a seam's device is chosen: false with no system, else true while its state is known. */
+fun Flow<*>?.chosen(): Flow<Boolean> = this?.map { it != null } ?: flowOf(false)
 
 /** What Holiday mode reaches in the house; each is optional, and one that isn't [ready] is no step (11 §5.1). */
 interface HouseLights {

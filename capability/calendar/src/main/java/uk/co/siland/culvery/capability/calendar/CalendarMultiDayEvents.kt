@@ -15,8 +15,8 @@ class CalendarMultiDayEvents @Inject constructor(
     override suspend fun around(today: LocalDate): List<MultiDayEvent> {
         val z = zone.current()
         val tomorrow = today.plusDays(1)
-        val from = today.atStartOfDay(z).toInstant().toEpochMilli() - ZONE_MARGIN_MS
-        val to = tomorrow.plusDays(1).atStartOfDay(z).toInstant().toEpochMilli() + ZONE_MARGIN_MS
+        val from = millis(today, z) - ZONE_MARGIN_MS
+        val to = millis(tomorrow.plusDays(1), z) + ZONE_MARGIN_MS
         return store.eventsBetween(from, to).first().mapNotNull { event ->
             val start = event.start as? EventTime.AllDay ?: return@mapNotNull null
             val (first, last) = daySpan(start, event.end, z)
