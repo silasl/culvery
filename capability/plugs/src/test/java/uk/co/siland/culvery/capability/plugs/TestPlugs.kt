@@ -30,7 +30,7 @@ import uk.co.siland.culvery.core.household.Role
 
 /**
  * A settings store in memory; null holds [data] back, as a file not yet read. [writeGate] holds the next write until it
- * completes, [failOnWrite] makes that numbered write (from 1) throw, and [failReads] makes [data] throw.
+ * completes, [failOnWrite] makes that numbered write (from 1) throw, and [failReads] makes [data] throw; [writeCount] is the writes tried so far.
  */
 internal class MemoryStore(initial: Preferences? = emptyPreferences()) : DataStore<Preferences> {
     val state = MutableStateFlow(initial)
@@ -38,6 +38,7 @@ internal class MemoryStore(initial: Preferences? = emptyPreferences()) : DataSto
     @Volatile var failOnWrite: Int? = null
     @Volatile var failReads = false
     private val writes = AtomicInteger()
+    val writeCount: Int get() = writes.get()
     private val mutex = Mutex()
 
     override val data: Flow<Preferences> = flow {
