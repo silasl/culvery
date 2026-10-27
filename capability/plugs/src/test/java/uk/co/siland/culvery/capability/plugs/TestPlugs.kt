@@ -27,12 +27,10 @@ import uk.co.siland.culvery.core.access.Refusal
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
-import uk.co.siland.culvery.core.plugin.ToastAction
-import uk.co.siland.culvery.core.plugin.Toaster
 
 /**
  * A settings store in memory; null holds [data] back, as a file not yet read. [writeGate] holds the next write until it
- * completes, [failOnWrite] makes that numbered write (from 1) throw, and [failReads] makes [data] throw; [writeCount] is the writes tried so far.
+ * completes, [failOnWrite] makes that numbered write (from 1) throw, and [failReads] makes [data] and every write throw (a file that can't be read); [writeCount] is the writes tried so far.
  */
 internal class MemoryStore(initial: Preferences? = emptyPreferences()) : DataStore<Preferences> {
     val state = MutableStateFlow(initial)
@@ -49,6 +47,7 @@ internal class MemoryStore(initial: Preferences? = emptyPreferences()) : DataSto
     }
 
     override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences = mutex.withLock {
+        if (failReads) throw IOException("Unreadable")
         val number = writes.incrementAndGet()
         writeGate?.let {
             writeGate = null
@@ -139,13 +138,4 @@ internal class TestAccess(var role: Role?) : AccessControl {
     override fun checkExpiry() = Unit
 
     override fun lock() = Unit
-}
-
-/** A toaster that keeps what it was asked to show, in order. */
-internal class RecordingToaster : Toaster {
-    val shown: MutableList<String> = CopyOnWriteArrayList()
-
-    override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) {
-        shown += message
-    }
 }

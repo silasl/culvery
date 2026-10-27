@@ -74,7 +74,7 @@ class HaPlugSystemTest {
     }
 
     private fun plugOf(entities: Map<String, EntityState?>, id: String = "switch.lamp") =
-        plugStates(PlugPrefs(plugs = listOf(id)), true, entities, null)!!.single()
+        stateOf(id, entities, null)
 
     /** Fails if a home with no link has a tab, or one with a link and no plugs has anything but an empty list. */
     @Test
@@ -250,7 +250,7 @@ class HaPlugSystemTest {
     fun aGonePlugSaysSo() = runTest {
         seedAll()
         val system = system()
-        assertThat(system.switch("switch.desk", true)).isEqualTo(PlugResult.Failed(GONE_PLUG))
+        assertThat(system.switch("switch.desk", true)).isEqualTo(PlugResult.Failed(PlugsWords.GONE_PLUG))
         assertThat(api.calls.filter { it.startsWith("service") }).isEmpty()
     }
 

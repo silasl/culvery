@@ -108,18 +108,14 @@ class HolidayHouse internal constructor(
     suspend fun turnOn(back: LocalDate, by: Authorised) {
         require(HousePermissions.HOLIDAY_MODE in by.granted) { "Turning Holiday mode on needs its own grant" }
         exclusive(HolidayRun.TURNING_ON) {
-            if (load(clearOrphan = false).on) return@exclusive
+            if (load().on) return@exclusive
             val steps = plan(back)
             grant = by
             resetRun()
             offLine = null
-            if (plugs != null) {
-                // A run still begun from an earlier one would make the begin below a no-op (12 §5.2).
-                answer { plugs.leave(HouseModes.HOLIDAY) }
-                if (PLUGS_ON in steps) {
-                    attempt<Unit>({ plugs.begin(HouseModes.HOLIDAY, by) }) { e ->
-                        Log.w(TAG, "The plugs didn't begin for Holiday mode (${e::class.simpleName})")
-                    }
+            if (plugs != null && PLUGS_ON in steps) {
+                attempt<Unit>({ plugs.begin(HouseModes.HOLIDAY, by) }) { e ->
+                    Log.w(TAG, "The plugs didn't begin for Holiday mode (${e::class.simpleName})")
                 }
             }
             set(HolidayRecord(on = true, back = back, since = wall.nowMillis(), steps = steps.associateWith { StepState.PENDING }))
@@ -141,7 +137,12 @@ class HolidayHouse internal constructor(
             val plugsLine = plugs?.let { puttingBack(it) }
             grant = null
             resetRun()
-            offLine = if (ecoLeft) HolidayWords.STILL_ON_ECO else plugsLine ?: if (lightsLeft) HolidayWords.LIGHTS_STILL_ON else null
+            offLine = when {
+                ecoLeft -> HolidayWords.STILL_ON_ECO
+                plugsLine != null -> plugsLine
+                lightsLeft -> HolidayWords.LIGHTS_STILL_ON
+                else -> null
+            }
             offAt = wall.nowMillis()
             set(HolidayRecord())
         }
@@ -182,10 +183,10 @@ class HolidayHouse internal constructor(
         }
     }
 
-    /** The first read that finds Holiday mode off puts back plugs a cut-short turn-on left begun (12 §5.2); [clearOrphan] is false where the caller does it. */
-    private suspend fun load(clearOrphan: Boolean = true): HolidayRecord = current.value ?: settings.read.filterNotNull().first().also {
+    /** The first read that finds Holiday mode off puts back plugs a cut-short turn-on left begun (12 §5.2). */
+    private suspend fun load(): HolidayRecord = current.value ?: settings.read.filterNotNull().first().also {
         publish(it)
-        if (!it.on && clearOrphan && plugs != null) answer { plugs.leave(HouseModes.HOLIDAY) }
+        if (!it.on && plugs != null) answer { plugs.leave(HouseModes.HOLIDAY) }
     }
 
     private suspend fun runDue() {
@@ -214,18 +215,17 @@ class HolidayHouse internal constructor(
 
     /** No snapshot means the begin never landed, so there is nothing to retry (12 §5.2); a throw is retried. */
     private suspend fun runPlugs() {
-        var threw = false
-        val result = attempt({ plugs?.enter(HouseModes.HOLIDAY) }) { e ->
+        val result = attempt<HouseStep?>({
+            plugs?.enter(HouseModes.HOLIDAY) ?: run {
+                failed.remove(PLUGS_ON)
+                mark(PLUGS_ON, StepState.MISSED)
+                return
+            }
+        }) { e ->
             Log.w(TAG, "Holiday mode's plugs step threw ${e::class.simpleName}")
-            threw = true
             null
         }
-        if (result == null && !threw) {
-            failed.remove(PLUGS_ON)
-            mark(PLUGS_ON, StepState.MISSED)
-        } else {
-            settle(PLUGS_ON, result)
-        }
+        settle(PLUGS_ON, result)
     }
 
     private suspend fun settle(step: HolidayStep, result: HouseStep?) {
@@ -244,7 +244,7 @@ class HolidayHouse internal constructor(
         return when (step) {
             LIGHTS_ON -> grant?.let { lights?.setHoliday(true, it) } ?: gone
             ECO_ON -> heating?.setEco(true) ?: gone
-            PLUGS_ON -> gone
+            PLUGS_ON -> error("The plugs step runs through runPlugs")
             HOOVER -> hoover?.start() ?: gone
             ECO_OFF -> heating?.setEco(false) ?: gone
         }

@@ -16,23 +16,25 @@ import uk.co.siland.culvery.core.ui.Icons
 /** The Plugs tab, after the door (12 §4.3): shown once a plug system has a link, even with no plugs added. */
 @Singleton
 class PlugsCapability @Inject constructor(
-    private val systems: Set<@JvmSuppressWildcards PlugSystem>,
+    systems: Set<@JvmSuppressWildcards PlugSystem>,
     private val actions: PlugActions,
     private val settings: PlugSettings,
     private val modes: Set<@JvmSuppressWildcards HouseModeInfo>,
 ) : Capability {
+    private val system = systems.firstOrNull()
+
     override val id = "plugs"
     override val label = PlugsWords.PLUGS
     override val icon = Icons.POWER
     override val order = 55
 
     override val hasTab: Flow<Boolean> =
-        systems.firstOrNull()?.plugs?.map { it != null }?.distinctUntilChanged() ?: flowOf(false)
+        system?.plugs?.map { it != null }?.distinctUntilChanged() ?: flowOf(false)
 
     override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList())
 
     @Composable
     override fun TabContent() {
-        systems.firstOrNull()?.let { PlugsTabHost(it, actions, settings, modes) }
+        system?.let { PlugsTabHost(it, actions, settings, modes) }
     }
 }

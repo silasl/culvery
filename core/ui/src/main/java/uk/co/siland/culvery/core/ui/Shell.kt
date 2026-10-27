@@ -47,6 +47,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -183,6 +184,15 @@ fun HhCloseButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .hhClickable(onClick),
     ) {
         HhIcon(Icons.CLOSE, size = ShellTokens.closeIcon, tint = c.ink, contentDescription = "Close")
+    }
+}
+
+/** A sheet's title row: [title] as the heading, with the close button at the end. */
+@Composable
+fun HhSheetHeader(title: String, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = HhType.sectionTitle, color = Culvery.colors.ink, modifier = Modifier.weight(1f).semantics { heading() })
+        HhCloseButton(onClose)
     }
 }
 

@@ -50,15 +50,13 @@ import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhPageHeader
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.gridColumns
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 
 private const val TAG = "PlugsTab"
 
 /** Edit ends this long after the last change (12 §2.14). */
 internal const val EDIT_IDLE_MS = 120_000L
-
-/** 1–4 plugs two to a row, more three, as Lights' rooms. */
-private fun gridColumns(count: Int): Int = if (count <= 4) 2 else 3
 
 /**
  * The Plugs tab (12 §4.3): the title with how many are on and Add a plug, a card per plug that switches it, and on the
@@ -146,7 +144,7 @@ internal fun PlugsTabHost(system: PlugSystem, actions: PlugActions, settings: Pl
     val problem by system.problem.collectAsStateWithLifecycle(null)
     val prefs by settings.prefs.collectAsStateWithLifecycle(PlugPrefs())
     val switching by actions.switching.collectAsStateWithLifecycle()
-    val sorted = remember(modes) { modes.sortedBy { it.order } }
+    val shown = remember(modes) { modes.toList() }
 
     var editing by remember { mutableStateOf(false) }
     var changes by remember { mutableIntStateOf(0) }
@@ -161,7 +159,7 @@ internal fun PlugsTabHost(system: PlugSystem, actions: PlugActions, settings: Pl
     val scope = rememberCoroutineScope()
     val ask = rememberSingleAction(system) { e -> Log.w(TAG, "Asking for the plugs' PIN failed (${e::class.simpleName})") }
     PlugsTab(
-        plugs, prefs.needsPin, switching, problem, sorted, prefs, editing,
+        plugs, prefs.needsPin, switching, problem, shown, prefs, editing,
         onSwitch = actions::switch,
         onSettings = { plug ->
             ask.run { if (actions.mayManage()) overlay.show { PlugSettingsSheetHost(plug, actions, settings, scope, overlay::dismiss) } }

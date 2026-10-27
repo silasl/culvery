@@ -42,6 +42,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhBottomFade
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.gridColumns
 
 /**
  * The order the cards keep while the tab is open (9 §6.9): taken from the first non-empty list, on rooms first, each
@@ -56,9 +57,6 @@ internal fun openedOrder(previous: List<String>?, rooms: List<LightRoom>): List<
     val kept = previous.toSet()
     return previous.filter { it in listed } + ids.filter { it !in kept }
 }
-
-/** 1–4 rooms two to a row, more three (9 §4.4). */
-internal fun gridColumns(count: Int): Int = if (count <= 4) 2 else 3
 
 /** From seven rooms the rows keep a fixed height and scroll (9 §4.4). */
 internal fun scrolls(count: Int): Boolean = count >= 7

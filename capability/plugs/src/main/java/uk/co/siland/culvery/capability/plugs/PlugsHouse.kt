@@ -9,7 +9,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -46,7 +45,7 @@ class PlugsHouse internal constructor(
         if (system == null) flowOf(false) else settings.prefs.map { listed(it, modeId).isNotEmpty() }.distinctUntilChanged()
 
     override suspend fun preview(modeId: String): List<PlugChange> {
-        val prefs = settings.prefs.first()
+        val prefs = settings.current()
         return coroutineScope {
             listed(prefs, modeId).map { (id, on) -> async { PlugChange(read(id).name, on) } }.awaitAll()
         }
@@ -55,8 +54,9 @@ class PlugsHouse internal constructor(
     override suspend fun begin(modeId: String, by: Authorised) {
         require(modes.any { it.id == modeId && it.permission in by.granted }) { "A mode begins with its own grant" }
         mutex.withLock {
+            // A run still here is a leave whose last write threw: put it back before the new snapshot (12 §5.2).
+            if (modeId in settings.current().runs) leaveLocked(modeId)
             settings.update { p ->
-                if (modeId in p.runs) return@update p
                 val notes = p.notes.mapValues { (_, note) -> note.copy(holders = note.holders.filter { it.mode != modeId }) }
                     .filterValues { it.holders.isNotEmpty() }
                 p.copy(
@@ -69,22 +69,29 @@ class PlugsHouse internal constructor(
     }
 
     override suspend fun enter(modeId: String): HouseStep? = mutex.withLock {
-        val prefs = settings.prefs.first()
+        val prefs = settings.current()
         val run = prefs.runs[modeId] ?: return@withLock null
-        val missed = coroutineScope {
-            run.pending.entries.sortedBy { prefs.plugs.indexOf(it.key) }
-                .map { (id, wanted) -> async { reach(modeId, id, wanted) } }.awaitAll()
-        }.filterNotNull()
-        if (missed.isEmpty()) HouseStep.Done else HouseStep.Failed(PlugsWords.enterLine(missed))
+        fanOut(run.pending.entries.sortedBy { prefs.plugs.indexOf(it.key) }, PlugsWords::enterLine) { (id, wanted) ->
+            reach(modeId, id, wanted)
+        }
     }
 
-    override suspend fun leave(modeId: String): HouseStep = mutex.withLock {
-        val prefs = settings.prefs.first()
+    override suspend fun leave(modeId: String): HouseStep = mutex.withLock { leaveLocked(modeId) }
+
+    private suspend fun leaveLocked(modeId: String): HouseStep {
+        val prefs = settings.current()
         val held = prefs.plugs.filter { id -> prefs.notes[id]?.holders?.any { it.mode == modeId } == true }
-        val missed = coroutineScope { held.map { id -> async { putBack(modeId, id) } }.awaitAll() }.filterNotNull()
+        if (modeId !in prefs.runs && held.isEmpty()) return HouseStep.Done
+        val step = fanOut(held, PlugsWords::leaveLine) { putBack(modeId, it) }
         // Last, so a leave cut short runs again (12 §5.4).
         settings.update { it.copy(runs = it.runs - modeId) }
-        if (missed.isEmpty()) HouseStep.Done else HouseStep.Failed(PlugsWords.leaveLine(missed))
+        return step
+    }
+
+    /** [step] for each of [items] at once; Failed with [line] over the changes it returned, Done when it returned none. */
+    private suspend fun <T> fanOut(items: List<T>, line: (List<PlugChange>) -> String, step: suspend (T) -> PlugChange?): HouseStep {
+        val missed = coroutineScope { items.map { async { step(it) } }.awaitAll() }.filterNotNull()
+        return if (missed.isEmpty()) HouseStep.Done else HouseStep.Failed(line(missed))
     }
 
     /** The added plugs [modeId] sets to On or Off, in tab order. */
@@ -93,33 +100,33 @@ class PlugsHouse internal constructor(
 
     private suspend fun read(id: String) = system?.read(id) ?: PlugState(id, PlugsWords.A_PLUG, PlugPower.UNKNOWN, null)
 
-    /** The change for a plug [modeId] hasn't reached yet, null once it has. */
-    private suspend fun reach(modeId: String, id: String, wanted: Boolean): PlugChange? {
-        var name = PlugsWords.A_PLUG
-        val reached = try {
-            if (id !in settings.prefs.first().plugs) {
-                dropPending(modeId, id)
-                true
-            } else {
-                val state = read(id)
-                name = state.name
-                reachFrom(modeId, id, wanted, state).also { if (it) dropPending(modeId, id) }
-            }
+    /** What a guarded step knows of its plug when it ends: [name] once read, and the state it was after, [on]. */
+    private class Touched(var name: String = PlugsWords.A_PLUG, var on: Boolean)
+
+    /** The change for the plug [block] didn't get to, null when it did; a throw is logged and counts as not got to. */
+    private suspend fun guarded(on: Boolean, block: suspend (Touched) -> Boolean): PlugChange? {
+        val touched = Touched(on = on)
+        val done = try {
+            block(touched)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.w(TAG, "Plugs enter: some not switched (${e::class.simpleName})")
+            Log.w(TAG, "Plugs: a plug step threw (${e::class.simpleName})")
             false
         }
-        return if (reached) null else PlugChange(name, wanted)
+        return if (done) null else PlugChange(touched.name, touched.on)
     }
 
-    private suspend fun reachFrom(modeId: String, id: String, wanted: Boolean, state: PlugState): Boolean {
-        val now = when (state.power) {
-            PlugPower.ON -> true
-            PlugPower.OFF -> false
-            else -> return false
+    /** The change for a plug [modeId] hasn't reached yet, null once it has. */
+    private suspend fun reach(modeId: String, id: String, wanted: Boolean): PlugChange? =
+        guarded(wanted) { touched ->
+            val state = read(id)
+            touched.name = state.name
+            reachFrom(modeId, id, wanted, state).also { if (it) dropPending(modeId, id) }
         }
+
+    private suspend fun reachFrom(modeId: String, id: String, wanted: Boolean, state: PlugState): Boolean {
+        val now = state.isOn ?: return false
         var written: PlugNote? = null
         settings.update { p ->
             if (id !in p.plugs || modeId !in p.runs) return@update p
@@ -129,7 +136,7 @@ class PlugsHouse internal constructor(
         }
         val note = written ?: return true
         if (note.holders.last().mode != modeId || now == note.expected) return true
-        return send(id, note.expected, entering = true).let { it == null || it == PlugResult.Done }
+        return send(id, note.expected).let { it == null || it == PlugResult.Done }
     }
 
     /** The note after [modeId] reaches [id], which is [now] on or off (12 §2.12). */
@@ -143,52 +150,36 @@ class PlugsHouse internal constructor(
     }
 
     /** The change for a plug [modeId] didn't put back, null when it did or was left. */
-    private suspend fun putBack(modeId: String, id: String): PlugChange? {
-        var name = PlugsWords.A_PLUG
-        var target = false
-        val done = try {
-            val prefs = settings.prefs.first()
-            val note = prefs.notes[id]?.takeIf { n -> n.holders.any { it.mode == modeId } } ?: return null
+    private suspend fun putBack(modeId: String, id: String): PlugChange? =
+        guarded(on = false) { touched ->
+            val prefs = settings.current()
+            val note = prefs.notes[id]?.takeIf { n -> n.holders.any { it.mode == modeId } } ?: return@guarded true
             val state = read(id)
-            name = state.name
-            val remaining = note.holders.filter { it.mode != modeId }
-            target = remaining.lastOrNull()?.on ?: note.before
-            val now = when (state.power) {
-                PlugPower.ON -> true
-                PlugPower.OFF -> false
-                else -> null
-            }
+            touched.name = state.name
+            val target = note.holders.filter { it.mode != modeId }.lastOrNull()?.on ?: note.before
+            touched.on = target
+            val now = state.isOn
             val pending = prefs.runs.values.any { id in it.pending }
             when {
                 now == null -> false.also { dropHolder(id, modeId) }
                 !pending && now != note.expected -> true.also { settings.update { it.copy(notes = it.notes - id) } }
                 else -> {
-                    val result = if (note.holders.last().mode == modeId && now != target) send(id, target, entering = false) else null
+                    val result = if (note.holders.last().mode == modeId && now != target) send(id, target) else null
                     dropHolder(id, modeId)
                     result == null || result == PlugResult.Done
                 }
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.w(TAG, "Plugs leave: some not put back (${e::class.simpleName})")
-            false
         }
-        return if (done) null else PlugChange(name, target)
-    }
 
-    /** Null when the plug was removed, which a write queued behind it would show but a plain read wouldn't; a throw is not switched. */
-    private suspend fun send(id: String, on: Boolean, entering: Boolean): PlugResult? {
-        var added = false
-        settings.update { p -> p.also { added = id in p.plugs } }
-        if (!added) return null
+    /** Null when the plug was removed, which a read queued behind the removal shows; a throw is not switched. */
+    private suspend fun send(id: String, on: Boolean): PlugResult? {
+        if (id !in settings.current().plugs) return null
         return try {
             system?.switch(id, on) ?: PlugResult.Unreachable
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (entering) Log.w(TAG, "Plugs enter: some not switched (${e::class.simpleName})")
-            else Log.w(TAG, "Plugs leave: some not put back (${e::class.simpleName})")
+            Log.w(TAG, "Plugs: a switch threw (${e::class.simpleName})")
             PlugResult.NotSwitched
         }
     }

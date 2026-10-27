@@ -762,14 +762,15 @@ class HolidayHouseTest {
         assertThat(rig.plugs.calls).isEmpty()
     }
 
-    /** Fails if a run left begun by a leave whose last write failed stops the next turn-on beginning and entering. */
+    /** Fails if a run left begun by a leave whose last write failed stops the next turn-on beginning and entering, or turning on leaves first. */
     @Test
     fun aStuckRunIsClearedBeforeTheNextTurnOn() = runTest {
         val rig = rig()
         rig.plugs.readyNow.value = true
-        rig.plugs.begun += HouseModes.HOLIDAY
         val house = rig.house(hoover = null)
         val by = adult()
+        house.tick()
+        rig.plugs.begun += HouseModes.HOLIDAY
 
         house.turnOn(SAT_31_OCT, by)
 

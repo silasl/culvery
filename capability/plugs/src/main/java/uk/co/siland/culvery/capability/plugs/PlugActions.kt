@@ -8,18 +8,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Toaster
 
 private const val TAG = "PlugActions"
-
-/** The store retries a failing read for ever; past this the PIN setting counts as unreadable. */
-private const val PIN_RULE_READ_MS = 2_000L
 
 /**
  * What the Plugs tab does (12 §4.2): a switch by hand runs on the application scope, so its toast shows if the tab
@@ -50,17 +46,12 @@ class PlugActions internal constructor(
     /** Ignored unless the plug is On or Off and isn't already being switched. */
     fun switch(plug: PlugState) {
         val system = system ?: return
-        if (plug.power != PlugPower.ON && plug.power != PlugPower.OFF) return
-        var claimed = false
-        _switching.update {
-            claimed = plug.entityId !in it
-            if (claimed) it + plug.entityId else it
-        }
-        if (!claimed) return
+        val now = plug.isOn ?: return
+        if (plug.entityId in _switching.getAndUpdate { it + plug.entityId }) return
         scope.launch {
             try {
                 if (needsPin(plug.entityId)) access.authorise(PlugsPermissions.SWITCH) ?: return@launch
-                when (val result = system.switch(plug.entityId, on = plug.power == PlugPower.OFF)) {
+                when (val result = system.switch(plug.entityId, on = !now)) {
                     PlugResult.Unreachable -> toaster.show(PlugsWords.cantReach(plug.name), urgent = true)
                     PlugResult.NotSwitched -> toaster.show(PlugsWords.didntSwitch(plug.name), urgent = true)
                     is PlugResult.Failed -> toaster.show(result.line, urgent = true)
@@ -80,12 +71,7 @@ class PlugActions internal constructor(
     suspend fun mayManage(): Boolean = access.authorise(PlugsPermissions.MANAGE) != null
 
     /** A plug that was added before comes back on Leave everywhere (12 §2.4). */
-    suspend fun add(entityId: String) = write { prefs ->
-        if (entityId in prefs.plugs) prefs
-        else prefs.adding(entityId).let { added ->
-            added.copy(modes = added.modes.mapValues { (_, list) -> list - entityId }.filterValues { it.isNotEmpty() })
-        }
-    }
+    suspend fun add(entityId: String) = write { it.adding(entityId) }
 
     suspend fun remove(entityId: String) = write { it.without(entityId) }
 
@@ -99,7 +85,7 @@ class PlugActions internal constructor(
     }
 
     private suspend fun needsPin(entityId: String): Boolean = try {
-        withTimeoutOrNull(PIN_RULE_READ_MS) { entityId in settings.prefs.first().needsPin } ?: true
+        entityId in settings.current().needsPin
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {

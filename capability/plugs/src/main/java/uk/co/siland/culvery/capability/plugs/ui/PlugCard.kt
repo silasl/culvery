@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import uk.co.siland.culvery.capability.plugs.PlugPower
 import uk.co.siland.culvery.capability.plugs.PlugState
+import uk.co.siland.culvery.capability.plugs.isOn
 import uk.co.siland.culvery.capability.plugs.PlugsWords
 import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
@@ -47,8 +48,8 @@ internal fun PlugCard(
 ) {
     val c = Culvery.colors
     val tag = "plug_card_$index"
-    val on = plug.power == PlugPower.ON
-    val switchable = on || plug.power == PlugPower.OFF
+    val on = plug.isOn == true
+    val switchable = plug.isOn != null
     val trouble = plug.power == PlugPower.UNREACHABLE || plug.power == PlugPower.GONE
     HhCard(
         modifier = modifier

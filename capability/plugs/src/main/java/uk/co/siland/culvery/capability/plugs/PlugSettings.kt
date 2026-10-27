@@ -76,16 +76,19 @@ data class PlugPrefs(
         return copy(modes = if (list.isEmpty()) modes - modeId else modes + (modeId to list))
     }
 
-    fun adding(id: String) = if (!isPlugId(id) || id in plugs) this else copy(plugs = plugs + id)
+    /** A plug added again comes back on Leave in every mode (12 §2.4). */
+    fun adding(id: String) = if (!isPlugId(id) || id in plugs) this else copy(plugs = plugs + id, modes = dropModes(id))
 
     /** The plug itself is left as it is; a begun mode stays begun with one plug fewer to reach. */
     fun without(id: String) = copy(
         plugs = plugs - id,
         needsPin = needsPin - id,
-        modes = modes.mapValues { (_, list) -> list - id }.filterValues { it.isNotEmpty() },
+        modes = dropModes(id),
         runs = runs.mapValues { (_, run) -> run.copy(pending = run.pending - id) },
         notes = notes - id,
     )
+
+    private fun dropModes(id: String) = modes.mapValues { (_, list) -> list - id }.filterValues { it.isNotEmpty() }
 
     override fun toString() = "PlugPrefs"
 }
@@ -101,27 +104,31 @@ class PlugSettings(private val store: DataStore<Preferences>) {
         .map { it.toPlugPrefs() }
         .distinctUntilChanged()
 
+    /** The settings after any queued edits; throws if the store can't be read. It writes nothing: DataStore skips unchanged data. */
+    suspend fun current(): PlugPrefs = store.updateData { it }.toPlugPrefs()
+
     /** One transform in one edit, written whole over a cleared file, so removed keys go and no older copy comes back. */
     suspend fun update(change: (PlugPrefs) -> PlugPrefs) {
         store.edit { it.write(change(it.toPlugPrefs())) }
     }
 
     private fun Preferences.toPlugPrefs(): PlugPrefs {
-        val values = asMap().mapKeys { it.key.name }
-        fun entries(name: String) = (values[name] as? Set<*>).orEmpty().filterIsInstance<String>().mapNotNull(::parseEntry).toMap()
-        fun named(prefix: String) = values.keys.filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) }
+        val values = asMap()
+        fun strings(key: Preferences.Key<Set<String>>) = (values[key] as? Set<*>).orEmpty().filterIsInstance<String>()
+        fun entries(name: String) = strings(stringSetPreferencesKey(name)).mapNotNull(::parseEntry).toMap()
+        fun named(prefix: String) = values.keys.map { it.name }.filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) }
 
         return PlugPrefs(
-            plugs = (values[PLUGS.name] as? String).orEmpty().split(',').filter(::isPlugId).distinct(),
-            needsPin = (values[PIN.name] as? Set<*>).orEmpty().filterIsInstance<String>().filter(::isPlugId).toSet(),
+            plugs = (values[PLUGS] as? String).orEmpty().split(',').filter(::isPlugId).distinct(),
+            needsPin = strings(PIN).filter(::isPlugId).toSet(),
             modes = named("mode.").filter(::isModeId).associateWith { entries("mode.$it") }.filterValues { it.isNotEmpty() },
             runs = named("started.").filter(::isModeId).mapNotNull { mode ->
-                (values["started.$mode"] as? Long)?.let { mode to ModeRun(it, entries("pending.$mode")) }
+                (values[longPreferencesKey("started.$mode")] as? Long)?.let { mode to ModeRun(it, entries("pending.$mode")) }
             }.toMap(),
             notes = named("note.").filter(::isPlugId).mapNotNull { id ->
-                parseNote(values["note.$id"])?.let { id to it }
+                parseNote(values[stringPreferencesKey("note.$id")] as? String)?.let { id to it }
             }.toMap(),
-            next = values[NEXT.name] as? Long ?: 0,
+            next = values[NEXT] as? Long ?: 0,
         )
     }
 
@@ -136,13 +143,15 @@ class PlugSettings(private val store: DataStore<Preferences>) {
         }
         prefs.notes.forEach { (id, note) ->
             if (note.holders.isNotEmpty()) {
-                this[stringPreferencesKey("note.$id")] = "${word(note.before)};${note.holders.joinToString(",") { "${it.mode}=${word(it.on)}" }}"
+                this[stringPreferencesKey("note.$id")] = "${word(note.before)};${note.holders.joinToString(",") { entry(it.mode, it.on) }}"
             }
         }
         if (prefs.next != 0L) this[NEXT] = prefs.next
     }
 
-    private fun Map<String, Boolean>.toEntries() = map { (id, on) -> "$id=${word(on)}" }.toSet()
+    private fun Map<String, Boolean>.toEntries() = map { (id, on) -> entry(id, on) }.toSet()
+
+    private fun entry(id: String, on: Boolean) = "$id=${word(on)}"
 
     private fun word(on: Boolean) = if (on) "on" else "off"
 
@@ -152,17 +161,21 @@ class PlugSettings(private val store: DataStore<Preferences>) {
         else -> null
     }
 
+    /** [text] split at [separator] into exactly two parts, else null. */
+    private fun pair(text: String, separator: Char): Pair<String, String>? =
+        text.split(separator).takeIf { it.size == 2 }?.let { (left, right) -> left to right }
+
     /** "switch.lamp=on"; anything else is skipped. */
     private fun parseEntry(text: String): Pair<String, Boolean>? {
-        val (id, word) = text.split('=').takeIf { it.size == 2 } ?: return null
-        return if (isPlugId(id)) parseWord(word)?.let { id to it } else null
+        val (id, word) = pair(text, '=') ?: return null
+        return parseWord(word)?.takeIf { isPlugId(id) }?.let { id to it }
     }
 
     /** "off;holiday=on,party=off"; a note with a bad part, or no holder, is skipped whole. */
-    private fun parseNote(value: Any?): PlugNote? {
-        val (before, rest) = (value as? String)?.split(';')?.takeIf { it.size == 2 } ?: return null
+    private fun parseNote(text: String?): PlugNote? {
+        val (before, rest) = text?.let { pair(it, ';') } ?: return null
         val holders = rest.split(',').map { part ->
-            val (mode, word) = part.split('=').takeIf { it.size == 2 } ?: return null
+            val (mode, word) = pair(part, '=') ?: return null
             if (!isModeId(mode)) return null
             Holder(mode, parseWord(word) ?: return null)
         }

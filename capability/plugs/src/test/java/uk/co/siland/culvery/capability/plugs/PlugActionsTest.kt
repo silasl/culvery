@@ -23,6 +23,7 @@ import uk.co.siland.culvery.capability.plugs.PlugPower.UNREACHABLE
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.capability.plugs.PlugPower.OFF as OFF_NOW
 import uk.co.siland.culvery.capability.plugs.PlugPower.ON as ON_NOW
+import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)

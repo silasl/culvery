@@ -42,8 +42,8 @@ internal class FakeEvents(var events: List<MultiDayEvent> = emptyList()) : Multi
 }
 
 /**
- * A plug seam that behaves as the real one does about runs: [begin] of a begun mode does nothing, [enter] of one never
- * begun is null, [leave] ends the run. [calls] holds "begin:holiday", "enter:holiday" and "leave:holiday" in order.
+ * A plug seam that behaves as the real one does about runs: [begin] of a begun mode puts that run back and begins again,
+ * [enter] of one never begun is null, [leave] ends the run. [calls] holds "begin:holiday", "enter:holiday" and "leave:holiday" in order.
  * Plugs are off by default, so a rig's Holiday mode plans no plug step until a test turns [readyNow] on.
  */
 internal class FakePlugs : HousePlugs {
@@ -68,7 +68,8 @@ internal class FakePlugs : HousePlugs {
     override suspend fun begin(modeId: String, by: Authorised) {
         record("begin:$modeId")
         check(!throwOnBegin) { "The store is full" }
-        if (begun.add(modeId)) begins += by
+        begun += modeId
+        begins += by
     }
 
     override suspend fun enter(modeId: String): HouseStep? {

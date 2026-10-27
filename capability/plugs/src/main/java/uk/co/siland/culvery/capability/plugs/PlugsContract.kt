@@ -9,6 +9,14 @@ data class PlugState(val entityId: String, val name: String, val power: PlugPowe
     override fun toString() = "PlugState($power)"
 }
 
+/** True for On, false for Off, null for anything the plug can't be switched from. */
+val PlugState.isOn: Boolean?
+    get() = when (power) {
+        PlugPower.ON -> true
+        PlugPower.OFF -> false
+        else -> null
+    }
+
 sealed interface PlugResult {
     data object Done : PlugResult
     data object Unreachable : PlugResult

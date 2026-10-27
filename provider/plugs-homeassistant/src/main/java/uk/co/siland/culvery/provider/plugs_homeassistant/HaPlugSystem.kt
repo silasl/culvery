@@ -43,25 +43,30 @@ internal fun powerOf(state: String): PlugPower = when (state) {
 private fun wattsOf(sensor: EntityState?): Int? =
     sensor?.state?.toDoubleOrNull()?.takeIf { it in 0.0..100_000.0 }?.roundToInt()
 
+/** One plug. [switch] is what was read for it, and [answered] that Home Assistant has answered for it: no answer is Unknown, a null one Gone. */
+internal fun stateOf(
+    id: String,
+    entities: Map<String, EntityState?>,
+    problem: HaProblem?,
+    switch: EntityState? = entities[id],
+    answered: Boolean = id in entities,
+): PlugState {
+    val power = when {
+        problem != null -> PlugPower.UNKNOWN
+        answered && switch == null -> PlugPower.GONE
+        else -> switch?.let { powerOf(it.state) } ?: PlugPower.UNKNOWN
+    }
+    val watts = if (power == PlugPower.ON) wattsOf(entities[wattsIdOf(id)]) else null
+    return PlugState(id, switch?.friendlyName ?: PlugsWords.A_PLUG, power, watts)
+}
+
 /** The plugs' states, in the store's order; null with no link, so no tab (12 §4.3). */
 internal fun plugStates(
-    prefs: PlugPrefs,
+    ids: List<String>,
     linked: Boolean,
     entities: Map<String, EntityState?>,
     problem: HaProblem?,
-): List<PlugState>? {
-    if (!linked) return null
-    return prefs.plugs.map { id ->
-        val switch = entities[id]
-        val power = when {
-            problem != null -> PlugPower.UNKNOWN
-            id in entities && switch == null -> PlugPower.GONE
-            else -> switch?.let { powerOf(it.state) } ?: PlugPower.UNKNOWN
-        }
-        val watts = if (power == PlugPower.ON) wattsOf(entities[wattsIdOf(id)]) else null
-        PlugState(id, switch?.friendlyName ?: PlugsWords.A_PLUG, power, watts)
-    }
-}
+): List<PlugState>? = if (linked) ids.map { stateOf(it, entities, problem) } else null
 
 /** The plugs through Home Assistant (12 §4.1, §6). */
 @Singleton
@@ -74,13 +79,16 @@ class HaPlugSystem internal constructor(
 
     private val switching = mutableSetOf<String>()
 
+    /** A mode's or a PIN setting's write leaves it alone. */
+    private val plugIds = prefs.map { it.plugs }.distinctUntilChanged()
+
     override val plugs: Flow<List<PlugState>?> =
-        combine(prefs, ha.link, ha.entities, ha.problem) { p, link, entities, problem -> plugStates(p, link != null, entities, problem) }
+        combine(plugIds, ha.link, ha.entities, ha.problem) { ids, link, entities, problem -> plugStates(ids, link != null, entities, problem) }
             .distinctUntilChanged()
 
     override val problem: Flow<String?> = ha.problem.map { it?.let(::problemLine) }.distinctUntilChanged()
 
-    override fun watch(): () -> Unit = ha.watch(prefs.map { p -> p.plugs.flatMap { listOf(it, wattsIdOf(it)) }.toSet() })
+    override fun watch(): () -> Unit = ha.watch(plugIds.map { ids -> ids.flatMap { listOf(it, wattsIdOf(it)) }.toSet() })
 
     override suspend fun candidates(): PlugCandidates = try {
         PlugCandidates.Found(
@@ -94,8 +102,7 @@ class HaPlugSystem internal constructor(
     override suspend fun read(entityId: String): PlugState {
         val unreachable = PlugState(entityId, ha.entities.value[entityId]?.friendlyName ?: PlugsWords.A_PLUG, PlugPower.UNREACHABLE, null)
         return try {
-            val state = ha.current(entityId)
-            plugStates(PlugPrefs(plugs = listOf(entityId)), true, ha.entities.value + (entityId to state), null).orEmpty().single()
+            stateOf(entityId, ha.entities.value, null, switch = ha.current(entityId), answered = true)
         } catch (_: HomeAssistantException) {
             unreachable
         } catch (e: TimeoutCancellationException) {
@@ -118,7 +125,7 @@ class HaPlugSystem internal constructor(
         if (ha.savedLink() == null) return PlugResult.Failed(NOT_LINKED)
         val wanted = if (on) "on" else "off"
         try {
-            val now = ha.current(entityId) ?: return PlugResult.Failed(GONE_PLUG)
+            val now = ha.current(entityId) ?: return PlugResult.Failed(PlugsWords.GONE_PLUG)
             if (now.state == "unavailable") return PlugResult.Unreachable
             if (now.state == wanted) return PlugResult.Done
             try {

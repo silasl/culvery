@@ -22,14 +22,8 @@ object PlugsWords {
     const val OFF = "Off"
     const val EDIT = "Edit"
     const val DONE = "Done"
-    const val PLUGS_GO_BACK = "Plugs go back as they were when you turn it off."
-    const val PLUGS_THREW = "The plugs didn’t switch. They’ll keep trying."
-    const val PLUGS_MISSED = "The plugs didn’t switch. Switch them on the Plugs tab."
-    const val LEAVE_THREW = "Some plugs may not have gone back. Check them on the Plugs tab."
 
     fun settingsFor(name: String) = "Settings for $name"
-
-    fun switchLine(name: String, on: Boolean) = "Switch $name ${if (on) "on" else "off"}."
 
     fun plugsOn(plugs: List<PlugState>) = "${plugs.count { it.power == PlugPower.ON }} of ${plugs.size} on · Home Assistant"
 

@@ -79,20 +79,36 @@ class PlugsHouseTest {
         assertThat(rig.system.switches).containsExactly(FAN to false)
     }
 
-    /** 12 §5.2: fails if a second begin takes a new snapshot. */
+    /** 12 §5.2: fails if a begin over a leftover run leaves its plugs as they are, or keeps its snapshot instead of taking a new one. */
     @Test
-    fun beginTwiceKeepsTheFirstSnapshot() = runTest {
+    fun beginWithALeftoverRunPutsItBackThenSnapshots() = runTest {
         val rig = PlugsRig(lamp(ON_NOW))
         rig.holiday(lamp = OFF)
         val house = rig.house()
-
-        house.begin(HOLIDAY)
+        house.start(HOLIDAY)
+        assertThat(rig.system.states.value.getValue(LAMP).power).isEqualTo(OFF_NOW)
         rig.configure { it.with(HOLIDAY, LAMP, ON) }
+
         house.begin(HOLIDAY)
 
+        assertThat(rig.system.switches).containsExactly(LAMP to false, LAMP to true).inOrder()
         val prefs = rig.prefs()
-        assertThat(prefs.runs.getValue(HOLIDAY)).isEqualTo(ModeRun(0, mapOf(LAMP to false)))
-        assertThat(prefs.next).isEqualTo(1)
+        assertThat(prefs.runs.getValue(HOLIDAY)).isEqualTo(ModeRun(1, mapOf(LAMP to true)))
+        assertThat(prefs.next).isEqualTo(2)
+        assertThat(prefs.notes).isEmpty()
+    }
+
+    /** Fails if a leave for a mode with no run and no notes writes to the store or reads a plug. */
+    @Test
+    fun leaveWithNothingToPutBackWritesNothing() = runTest {
+        val rig = PlugsRig(lamp(ON_NOW))
+        rig.holiday(lamp = OFF)
+        val before = rig.store.state.value
+
+        assertThat(rig.house().leave(HOLIDAY)).isEqualTo(HouseStep.Done)
+
+        assertThat(rig.store.state.value).isSameInstanceAs(before)
+        assertThat(rig.system.reads).isEmpty()
     }
 
     /** 12 §5.2: fails if the note isn't stored before the switch is sent, or records anything but the state before. */
@@ -310,8 +326,8 @@ class PlugsHouseTest {
         rig.holiday(lamp = OFF)
         val house = rig.house()
         house.begin(HOLIDAY)
-        // The note, the check before the switch, then the pending entry.
-        rig.store.failOnWrite = rig.store.writeCount + 3
+        // The read of the run, the note, the check before the switch, then the pending entry.
+        rig.store.failOnWrite = rig.store.writeCount + 4
 
         assertThat(house.enter(HOLIDAY)).isEqualTo(HouseStep.Failed(offLine))
         assertThat(rig.prefs().runs.getValue(HOLIDAY).pending).containsExactly(LAMP, false)
@@ -400,9 +416,14 @@ class PlugsHouseTest {
         rig.holiday(lamp = OFF)
         val house = rig.house()
         house.begin(HOLIDAY)
-        val gate = CompletableDeferred<Unit>().also { rig.store.writeGate = it }
+        val read = CompletableDeferred<Unit>().also { rig.system.readGates[LAMP] = it }
+        val gate = CompletableDeferred<Unit>()
 
         val enter = async { house.enter(HOLIDAY) }
+        runCurrent()
+        // The next write is the note's; the remove queues behind it, ahead of the check before the switch.
+        rig.store.writeGate = gate
+        read.complete(Unit)
         runCurrent()
         val remove = launch { rig.configure { it.without(LAMP) } }
         runCurrent()

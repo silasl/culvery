@@ -36,11 +36,11 @@ import uk.co.siland.culvery.capability.plugs.PlugPower
 import uk.co.siland.culvery.capability.plugs.PlugPrefs
 import uk.co.siland.culvery.capability.plugs.PlugState
 import uk.co.siland.culvery.capability.plugs.PlugsRig
-import uk.co.siland.culvery.capability.plugs.RecordingToaster
 import uk.co.siland.culvery.capability.plugs.TestAccess
 import uk.co.siland.culvery.core.house.HouseModeInfo
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
+import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
