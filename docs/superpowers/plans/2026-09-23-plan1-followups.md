@@ -653,6 +653,13 @@ Fault found:
 - **Not reproduced:** a slow "Can't reach" line and the keyboard reopening after Check. Both were adb taps landing on the keyboard, which Escape doesn't close; the line shows about 4.5 s after Check.
 - **Left on the AVD:** the Home Assistant link with a live Culvery token (Settings has no way to remove a link). Delete that token in Home Assistant when the emulator no longer needs it.
 
+## Plan 11a (Home Assistant, the hoover, the heating link): on the tablet (2026-10-27)
+- **Installed:** the release from a0c5b956 (mapping `culvery-notes/mappings/mapping-a0c5b95.txt`). The install closed Culvery and the tablet went to Samsung's launcher, so Culvery isn't the home app at the moment.
+- **Work:** linking with the address and a token behind the Admin PIN; the hoover and thermostat picked; the thermostat line matches the Nest app; Home's tray beside Shopping with "Docked · 100%" and Start.
+- **Not run, by the user's ruling:** Start from the wall, and the row following the hoover off the dock and back. Still unchecked anywhere, along with the cleaning and returning states the fixtures keep from before the capture.
+- **The log scan:** the Home Assistant tags wrote nothing (a release logs only warnings and errors, and there were none). The whole log, 37,807 lines, has no address, token or device name in it.
+- **Fixtures:** rewritten from the emulator's capture (a0c5b956). The household's vacuum has no `battery_level` attribute; its battery is the separate sensor, which is what the app reads.
+
 ## From Plan 11a
 - **The PIN pad's reason when Shopping is turned off:** "Stop using the sample list" asks for a PIN "to connect calendars and services", though it disconnects. Older than Plan 11a; a one-line copy change.
 
