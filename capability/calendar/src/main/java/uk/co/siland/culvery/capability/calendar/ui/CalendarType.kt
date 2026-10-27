@@ -129,11 +129,6 @@ internal object CalendarType {
     /** 14 sp: the line under the Who pane. */
     val whoHint = HhType.secondary
 
-    /** 20 sp / 700, 12 sp / 700 and 18 sp: the Day pane's month, its weekday letters and a day's date (handoff 6c). */
-    val dayMonth = HhType.sectionTitle.copy(fontSize = 20.sp)
-    val dayLetter = HhType.labelSmall
-    val dayDate = HhType.body.copy(fontSize = 18.sp, fontWeight = FontWeight.W500)
-
     /** The Time pane (handoff 6e): a chip's 16 sp / 600 in tabular figures; the result's check 15 sp / 600; the free line 14 sp. */
     val timeChip = ControlType.chip.copy(fontSize = 14.sp, fontFeatureSettings = "tnum")
     val timeCheck = HhType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.W600)
@@ -246,17 +241,8 @@ internal object EditorDimens {
     val everyoneIcon = 24.dp
     val everyoneLineGap = 1.dp
 
-    // The Day pane: quick picks 8 apart; the month's header, letters and grid 6 apart. Cells 56 tall, a 53 circle with a
-    // 2 today ring, the date 3 above up to three 5 dots 3 apart; a range's band is the circle's height, its caps r 27.
+    // The Day pane: quick picks 8 apart; the month grid's own numbers are core:ui's DateGridTokens.
     val quickGap = 8.dp
-    val monthGap = 6.dp
-    val dayCell = 56.dp
-    val dayCircle = 53.dp
-    val todayRing = 2.dp
-    val dayDotsTop = 3.dp
-    val dayDot = 5.dp
-    val dayDotGap = 3.dp
-    val bandRadius = 27.dp
 
     // The Time pane's result under a 1 `surf3` rule, 15 below it, its check 16 after the range with a 19 icon 5 before its
     // words; the free starts 8 apart.
