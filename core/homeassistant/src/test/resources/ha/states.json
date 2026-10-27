@@ -3,17 +3,86 @@
   "entity_id": "vacuum.hoover",
   "state": "docked",
   "attributes": {
-   "friendly_name": "Hoover",
-   "battery_level": 86,
+   "fan_speed_list": [
+    "quiet",
+    "standard",
+    "turbo",
+    "max",
+    "boost"
+   ],
    "fan_speed": "standard",
+   "cleaning_time": 37,
+   "cleaning_area": 0,
+   "task_status": "idle",
+   "trigger_source": "app",
+   "error_code": 0,
+   "error_message": "",
+   "status_code": 0,
+   "work_mode": "auto",
+   "active_room_ids": [],
+   "active_zone_count": 0,
+   "rooms": [
+    {
+     "id": 1,
+     "name": "Room 1"
+    },
+    {
+     "id": 2,
+     "name": "Room 2"
+    },
+    {
+     "id": 3,
+     "name": "Room 3"
+    },
+    {
+     "id": 4,
+     "name": "Room 4"
+    },
+    {
+     "id": 5,
+     "name": "Room 5"
+    },
+    {
+     "id": 6,
+     "name": "Room 6"
+    }
+   ],
+   "segments": [
+    {
+     "id": 1,
+     "name": "Room 1"
+    },
+    {
+     "id": 2,
+     "name": "Room 2"
+    },
+    {
+     "id": 3,
+     "name": "Room 3"
+    },
+    {
+     "id": 4,
+     "name": "Room 4"
+    },
+    {
+     "id": 5,
+     "name": "Room 5"
+    },
+    {
+     "id": 6,
+     "name": "Room 6"
+    }
+   ],
+   "friendly_name": "Hoover",
    "supported_features": 12316
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
@@ -24,11 +93,12 @@
    "battery_level": 50
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
@@ -39,11 +109,12 @@
    "battery_level": 50
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
@@ -54,11 +125,12 @@
    "battery_level": 50
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
@@ -69,11 +141,12 @@
    "battery_level": 50
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
@@ -84,11 +157,12 @@
    "battery_level": 50
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
@@ -99,11 +173,12 @@
    "battery_level": 50
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
@@ -114,57 +189,62 @@
    "battery_level": 50
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
   "entity_id": "sensor.hoover_battery",
   "state": "86",
   "attributes": {
-   "friendly_name": "Hoover battery",
+   "state_class": "measurement",
    "unit_of_measurement": "%",
    "device_class": "battery",
-   "state_class": "measurement"
+   "icon": "mdi:battery",
+   "friendly_name": "Hoover battery"
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
   "entity_id": "climate.hall",
   "state": "heat",
   "attributes": {
-   "friendly_name": "Hall",
    "hvac_modes": [
-    "off",
-    "heat"
+    "heat",
+    "off"
    ],
-   "preset_modes": [
-    "eco",
-    "none"
-   ],
-   "preset_mode": "eco",
-   "hvac_action": "heating",
-   "current_temperature": 20.8,
-   "temperature": 21.2,
    "min_temp": 9,
    "max_temp": 32,
+   "preset_modes": [
+    "none",
+    "eco"
+   ],
+   "current_temperature": 20.8,
+   "temperature": 21.2,
+   "current_humidity": 45,
+   "hvac_action": "heating",
+   "preset_mode": "eco",
+   "friendly_name": "Hall",
    "supported_features": 401
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
@@ -182,11 +262,12 @@
    "temperature": 18.0
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
@@ -196,11 +277,12 @@
    "friendly_name": "Study"
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
@@ -214,11 +296,12 @@
    "source": "device_tracker.alex_phone"
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  },
  {
@@ -233,11 +316,12 @@
    "battery_level": 71
   },
   "last_changed": "2026-10-26T08:00:00+00:00",
+  "last_reported": "2026-10-26T08:00:00+00:00",
   "last_updated": "2026-10-26T08:00:00+00:00",
   "context": {
    "id": "01J9ZQ0000000000000000ST01",
    "parent_id": null,
-   "user_id": "0123456789abcdef0123456789abcdef"
+   "user_id": null
   }
  }
 ]

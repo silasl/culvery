@@ -43,8 +43,8 @@ class HaRedactTest {
             }
         }
         val states = HaJson.redact(HaFixtures.STATES, keep)
-        assertThat(states).contains("\"battery_level\":0")
-        assertThat(states).doesNotContain("\"battery_level\":86")
+        assertThat(states).contains("\"cleaning_time\":0")
+        assertThat(states).doesNotContain("\"cleaning_time\":37")
         assertThat(states).doesNotContain("\"returning\"")
         assertThat(states).doesNotContain("19.5")
     }

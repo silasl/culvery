@@ -75,7 +75,6 @@ class HaJsonTest {
     fun addedEntitiesAreReadWhole() {
         val added = (HaJson.socket(HaFixtures.ADDED) as SocketMessage.Entities).added
         assertThat(added.getValue("vacuum.hoover").state).isEqualTo("docked")
-        assertThat(added.getValue("vacuum.hoover").numbers["battery_level"]).isEqualTo(86.0)
         assertThat(added.getValue("climate.hall").texts["preset_mode"]).isEqualTo("eco")
         assertThat(added.getValue("sensor.hoover_battery").state).isEqualTo("86")
     }
