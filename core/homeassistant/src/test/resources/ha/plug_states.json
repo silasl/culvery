@@ -1,0 +1,82 @@
+[
+ {
+  "entity_id": "switch.lamp",
+  "state": "on",
+  "attributes": {
+   "device_class": "outlet",
+   "friendly_name": "Lamp"
+  },
+  "last_changed": "2026-10-27T08:00:00+00:00",
+  "last_reported": "2026-10-27T08:00:00+00:00",
+  "last_updated": "2026-10-27T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000PL01",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "switch.fan",
+  "state": "off",
+  "attributes": {
+   "device_class": "outlet",
+   "friendly_name": "Fan"
+  },
+  "last_changed": "2026-10-27T08:00:00+00:00",
+  "last_reported": "2026-10-27T08:00:00+00:00",
+  "last_updated": "2026-10-27T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000PL01",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "switch.fairy_lights",
+  "state": "unavailable",
+  "attributes": {
+   "friendly_name": "Fairy lights"
+  },
+  "last_changed": "2026-10-27T08:00:00+00:00",
+  "last_reported": "2026-10-27T08:00:00+00:00",
+  "last_updated": "2026-10-27T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000PL01",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "switch.lamp_led",
+  "state": "on",
+  "attributes": {
+   "friendly_name": "Lamp LED"
+  },
+  "last_changed": "2026-10-27T08:00:00+00:00",
+  "last_reported": "2026-10-27T08:00:00+00:00",
+  "last_updated": "2026-10-27T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000PL01",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "sensor.lamp_current_consumption",
+  "state": "182",
+  "attributes": {
+   "state_class": "measurement",
+   "unit_of_measurement": "W",
+   "device_class": "power",
+   "friendly_name": "Lamp Current consumption"
+  },
+  "last_changed": "2026-10-27T08:00:00+00:00",
+  "last_reported": "2026-10-27T08:00:00+00:00",
+  "last_updated": "2026-10-27T08:00:00+00:00",
+  "context": {
+   "id": "01J9ZQ0000000000000000PL01",
+   "parent_id": null,
+   "user_id": null
+  }
+ }
+]

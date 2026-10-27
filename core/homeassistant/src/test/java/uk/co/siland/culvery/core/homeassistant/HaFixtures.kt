@@ -13,4 +13,5 @@ internal object HaFixtures {
     val AUTH_INVALID = text("ws_auth_invalid.json")
     val CHANGED = text("ws_entities_changed.json")
     val REMOVED = text("ws_entities_removed.json")
+    val PLUG_STATES = text("plug_states.json")
 }

@@ -40,6 +40,18 @@ class HaJsonTest {
         assertThat(states.getValue("climate.study").state).isEqualTo("unavailable")
     }
 
+    /** Fails if a plug switch's state or name, or its power sensor's reading and unit, is misread. */
+    @Test
+    fun plugStatesRead() {
+        val plugs = HaJson.states(HaFixtures.PLUG_STATES).associateBy { it.entityId }
+        assertThat(plugs.getValue("switch.lamp").state).isEqualTo("on")
+        assertThat(plugs.getValue("switch.lamp").friendlyName).isEqualTo("Lamp")
+        assertThat(plugs.getValue("switch.fairy_lights").state).isEqualTo("unavailable")
+        val sensor = plugs.getValue("sensor.lamp_current_consumption")
+        assertThat(sensor.state).isEqualTo("182")
+        assertThat(sensor.texts["unit_of_measurement"]).isEqualTo("W")
+    }
+
     /** Fails if the domain splits wrongly, or a list is kept as an attribute. */
     @Test
     fun theDomainSplitsAndOnlyTextAndNumbersAreKept() {

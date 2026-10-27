@@ -84,4 +84,13 @@ class HaRedactTest {
         assertThat(text).contains("\"x\":0")
         assertThat(HaJson.redact("""{"entity_id":"vacuum.hoover","state":86}""", keep)).contains("\"state\":0")
     }
+
+    /** **pin**: Fails if a plug's name or its unnamed twin survives, or a state, a unit, a class, the watts or a kept id doesn't. */
+    @Test
+    fun plugNamesGo() {
+        val plugs = setOf("switch.lamp", "switch.fan", "switch.fairy_lights", "sensor.lamp_current_consumption")
+        val text = HaJson.redact(HaFixtures.PLUG_STATES, plugs)
+        listOf("Lamp", "Fan", "Fairy", "lamp_led", "LED").forEach { assertThat(text).doesNotContain(it) }
+        listOf("\"on\"", "\"off\"", "\"unavailable\"", "\"W\"", "\"power\"", "182", "\"switch.[1]\"").forEach { assertThat(text).contains(it) }
+    }
 }
