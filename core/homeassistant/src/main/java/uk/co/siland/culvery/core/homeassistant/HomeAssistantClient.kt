@@ -46,7 +46,7 @@ private const val NORMAL_CLOSURE = 1000
 private val JSON_TYPE = "application/json".toMediaType()
 
 /** Why a call to Home Assistant failed (11 §6). */
-enum class HaProblem { UNREACHABLE, OFFLINE, TOKEN_REFUSED, BLOCKED, NOT_HOME_ASSISTANT, REFUSED }
+enum class HaProblem { UNREACHABLE, OFFLINE, TOKEN_REFUSED, BLOCKED, NOT_HOME_ASSISTANT, REFUSED, NOT_LINKED }
 
 /** A failed call. The message is the problem alone and there is never a cause: either could quote the address or the token. */
 class HomeAssistantException(val problem: HaProblem) : Exception("Home Assistant: ${problem.name}")

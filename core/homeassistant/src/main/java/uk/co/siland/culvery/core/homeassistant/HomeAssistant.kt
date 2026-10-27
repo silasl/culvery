@@ -56,7 +56,7 @@ private data class Follow(val link: HomeAssistantLink, val generation: Int, val 
 @Singleton
 class HomeAssistant(
     private val api: HomeAssistantApi,
-    private val savedLink: Flow<HomeAssistantLink?>,
+    private val saved: Flow<HomeAssistantLink?>,
     private val inFront: StateFlow<Boolean>,
     private val scope: CoroutineScope,
 ) : Startable {
@@ -89,6 +89,9 @@ class HomeAssistant(
 
     /** How many screens watch, for their tests. */
     internal val watching: Int get() = watchers.value.size
+
+    /** The link in use, or else the saved one, which is there before [start] has collected the store. */
+    suspend fun savedLink(): HomeAssistantLink? = _link.value ?: saved.first()
 
     /** `GET /api/` with [link]. When [link] is the saved one, success clears the problem and reopens the socket. */
     suspend fun check(link: HomeAssistantLink) {
@@ -176,7 +179,7 @@ class HomeAssistant(
 
     override fun start() {
         scope.launch {
-            savedLink.collect { new ->
+            saved.collect { new ->
                 synchronized(lock) {
                     if (new != _link.value) {
                         _link.value = new
@@ -235,8 +238,8 @@ class HomeAssistant(
     private fun socketClosed() = synchronized(lock) { liveIds = emptySet() }
 
     private suspend fun <T> calling(block: suspend (HomeAssistantLink) -> T): T {
-        val link = _link.value
-        if (link == null || _problem.value == HaProblem.TOKEN_REFUSED) throw HomeAssistantException(HaProblem.TOKEN_REFUSED)
+        val link = savedLink() ?: throw HomeAssistantException(HaProblem.NOT_LINKED)
+        if (_problem.value == HaProblem.TOKEN_REFUSED) throw HomeAssistantException(HaProblem.TOKEN_REFUSED)
         val result = try {
             block(link)
         } catch (e: HomeAssistantException) {

@@ -252,13 +252,38 @@ class HaHooverSystemTest {
         assertThat(third.await()).isEqualTo(HooverResult.NotStarted)
     }
 
-    /** Fails if Start sends a service call while the hoover is cleaning. */
+    /** Fails if Start while the hoover is cleaning or going home is anything but already running, or sends a call. */
     @Test
-    fun startWhileCleaningSendsNothing() = runTest {
+    fun startWhileCleaningIsAlreadyRunning() = runTest {
         val system = system()
         live(system, "cleaning")
-        assertThat(system.start()).isEqualTo(HooverResult.NotStarted)
+        assertThat(system.start()).isEqualTo(HooverResult.AlreadyRunning)
+        live(system, "returning")
+        assertThat(system.start()).isEqualTo(HooverResult.AlreadyRunning)
         assertThat(api.calls).isEmpty()
+    }
+
+    /** Fails if a hoover Home Assistant no longer has, or can't reach, is called not started instead of saying why. */
+    @Test
+    fun aGoneOrUnavailableHooverSaysWhy() = runTest {
+        val system = system()
+        assertThat(system.start()).isEqualTo(HooverResult.Failed(GONE_HOOVER))
+        assertThat(system.start().let { it as HooverResult.Failed }.line)
+            .isEqualTo("Home Assistant has no hoover called that any more. Choose it again in Settings › Other integrations.")
+        api.states["vacuum.hoover"] = vacuum("unavailable")
+        assertThat(system.start()).isEqualTo(HooverResult.Failed("Home Assistant can’t reach the hoover. Check the Eufy app."))
+        assertThat(api.calls.none { it.startsWith("service") }).isTrue()
+    }
+
+    /** Fails if Start finds no link just because Home Assistant hasn't collected the saved one yet. */
+    @Test
+    fun aColdStartFindsTheLink() = runTest {
+        api.states["vacuum.hoover"] = vacuum("docked")
+        val cold = HomeAssistant(api, link, inFront, backgroundScope)
+        val result = async { HaHooverSystem(cold, prefs).start() }
+        runCurrent()
+        assertThat(api.calls).containsExactly("state vacuum.hoover", start).inOrder()
+        result.cancel()
     }
 
     /** Fails if Start trusts a cleaning cached before the socket closed, rather than reading the hoover now docked. */

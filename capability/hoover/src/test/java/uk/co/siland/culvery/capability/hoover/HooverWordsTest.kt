@@ -64,6 +64,12 @@ class HooverWordsTest {
         assertThat(resultLine(HooverResult.Busy)).isNull()
     }
 
+    /** Fails if a hoover that was already cleaning leaves a line on the row. */
+    @Test
+    fun alreadyRunningHasNoLine() {
+        assertThat(resultLine(HooverResult.AlreadyRunning)).isNull()
+    }
+
     /** Fails if a button or notice word differs from Copy. */
     @Test
     fun theWordsAreCopys() {

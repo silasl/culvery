@@ -41,5 +41,5 @@ fun hooverSpoken(state: HooverState): String {
 fun resultLine(result: HooverResult): String? = when (result) {
     HooverResult.NotStarted -> NOT_STARTED
     is HooverResult.Failed -> result.line
-    HooverResult.Started, HooverResult.Busy -> null
+    HooverResult.Started, HooverResult.Busy, HooverResult.AlreadyRunning -> null
 }

@@ -93,11 +93,15 @@ class HaHooverSystem internal constructor(
     }
 
     private suspend fun startOnce(): HooverResult {
-        if (ha.link.value == null) return HooverResult.Failed(NOT_LINKED)
+        if (ha.savedLink() == null) return HooverResult.Failed(NOT_LINKED)
         val device = prefs.first().device ?: return HooverResult.Failed(NO_HOOVER_CHOSEN)
         try {
             val vacuum = ha.current(device)
-            if (vacuum?.let { activityOf(it.state) } !in STARTABLE) return HooverResult.NotStarted
+            if (vacuum == null) return HooverResult.Failed(GONE_HOOVER)
+            if (vacuum.state == "unavailable") return HooverResult.Failed(HOOVER_UNREACHABLE)
+            val activity = activityOf(vacuum.state)
+            if (activity == HooverActivity.CLEANING || activity == HooverActivity.RETURNING) return HooverResult.AlreadyRunning
+            if (activity !in STARTABLE) return HooverResult.NotStarted
             try {
                 ha.call("vacuum", "start", device)
             } catch (e: HomeAssistantException) {

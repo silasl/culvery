@@ -283,6 +283,17 @@ class HaHeatingSystemTest {
         assertThat(api.calls).isEmpty()
     }
 
+    /** Fails if setEco finds no link just because Home Assistant hasn't collected the saved one yet. */
+    @Test
+    fun aColdStartFindsTheLink() = runTest {
+        api.states["climate.hall"] = hall()
+        val cold = HomeAssistant(api, link, MutableStateFlow(true), backgroundScope)
+        val result = async { HaHeatingSystem(cold, prefs).setEco(true) }
+        runCurrent()
+        assertThat(api.calls).containsExactly(set("eco"))
+        result.cancel()
+    }
+
     /** Fails if cancelling a change mid-check leaves the lock held. */
     @Test
     fun cancellingTheCheckReleasesTheLock() = runTest {

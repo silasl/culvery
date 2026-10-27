@@ -79,7 +79,7 @@ class HaHeatingSystem internal constructor(
 
     /** One change at a time, each checked for 30 s; the lock goes when the check ends or is cancelled. */
     override suspend fun setEco(on: Boolean): HeatingResult = changing.withLock {
-        if (ha.link.value == null) return HeatingResult.Failed(NOT_LINKED)
+        if (ha.savedLink() == null) return HeatingResult.Failed(NOT_LINKED)
         val device = prefs.first().device ?: return HeatingResult.Failed(NO_THERMOSTAT_CHOSEN)
         try {
             val preset = if (on) ECO else NONE

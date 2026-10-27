@@ -75,17 +75,26 @@ class HomeAssistantTest {
         assertThat(ha.problem.value).isNull()
     }
 
-    /** Fails if anything is called with no link saved. */
+    /** Fails if a call with no link saved is anything but Not linked, calls something, or becomes the link's problem. */
     @Test
-    fun noLinkIsTokenRefusedAndCallsNothing() = runTest {
+    fun noLinkIsNotLinkedNotTokenRefused() = runTest {
         val ha = ha(flowOf(null))
-        assertThat(refusal { ha.read("vacuum.hoover") }).isEqualTo(HaProblem.TOKEN_REFUSED)
-        assertThat(refusal { ha.states() }).isEqualTo(HaProblem.TOKEN_REFUSED)
-        assertThat(refusal { ha.call("vacuum", "start", "vacuum.hoover") }).isEqualTo(HaProblem.TOKEN_REFUSED)
+        assertThat(refusal { ha.read("vacuum.hoover") }).isEqualTo(HaProblem.NOT_LINKED)
+        assertThat(refusal { ha.states() }).isEqualTo(HaProblem.NOT_LINKED)
+        assertThat(refusal { ha.call("vacuum", "start", "vacuum.hoover") }).isEqualTo(HaProblem.NOT_LINKED)
+        assertThat(ha.problem.value).isNull()
         assertThat(api.calls).isEmpty()
         ha.watch(flowOf(setOf("vacuum.hoover")))
         after(60_000)
         assertThat(api.follows).isEmpty()
+    }
+
+    /** Fails if the saved link isn't found before start() has collected the settings. */
+    @Test
+    fun savedLinkReadsTheStoreBeforeStart() = runTest {
+        val cold = HomeAssistant(api, flowOf(TEST_LINK), inFront, backgroundScope)
+        assertThat(cold.link.value).isNull()
+        assertThat(cold.savedLink()).isEqualTo(TEST_LINK)
     }
 
     /** Fails if a new link keeps the old one's entities or problem. */

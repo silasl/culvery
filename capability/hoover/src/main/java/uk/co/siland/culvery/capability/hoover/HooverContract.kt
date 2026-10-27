@@ -14,6 +14,9 @@ sealed interface HooverResult {
     data object Started : HooverResult
     data object NotStarted : HooverResult
     data object Busy : HooverResult
+
+    /** Already cleaning or going home: nothing to start. */
+    data object AlreadyRunning : HooverResult
     data class Failed(val line: String) : HooverResult
 }
 
