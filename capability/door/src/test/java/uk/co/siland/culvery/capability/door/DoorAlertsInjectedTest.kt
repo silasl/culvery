@@ -7,12 +7,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.WallClock
 
@@ -40,6 +42,7 @@ class DoorAlertsInjectedTest {
         WallClock { NOW },
         scope,
         NightHours { night },
+        object : HouseMode { override val holiday = MutableStateFlow<Boolean?>(null) },
     )
 
     /** Fails if a ring just after a restart, when the night hours aren't known yet, raises a card or a chime. */

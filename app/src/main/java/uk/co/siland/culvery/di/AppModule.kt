@@ -25,7 +25,6 @@ import uk.co.siland.culvery.core.plugin.HomeApp
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.plugin.UserActivity
-import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.shell.ShellAlerts
 import uk.co.siland.culvery.shell.ShellToasts
 import uk.co.siland.culvery.shell.ShellUserActivity
@@ -70,9 +69,6 @@ abstract class AppModule {
         @Singleton
         @ApplicationScope
         fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default + LoggingExceptionHandler)
-
-        @Provides
-        fun wallClock(): WallClock = WallClock { System.currentTimeMillis() }
 
         @Provides
         @AppVersion

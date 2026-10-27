@@ -35,7 +35,8 @@ private class Wall(
     val touches = MutableStateFlow(0L)
     val inFront = MutableStateFlow(inFront)
     val camera = MutableStateFlow(camera)
-    val display = DisplayState(this.prefs, now, touches, this.inFront, this.camera, test.backgroundScope)
+    val holiday = MutableStateFlow<Boolean?>(null)
+    val display = DisplayState(this.prefs, now, touches, this.inFront, this.camera, holiday, test.backgroundScope)
 
     val screen: Screen get() = display.screen.value
     val wanted: Boolean get() = display.cameraWanted.value
@@ -79,6 +80,11 @@ private class Wall(
 
     fun set(prefs: DisplayPrefs?) {
         this.prefs.value = prefs
+        test.runCurrent()
+    }
+
+    fun away(on: Boolean?) {
+        holiday.value = on
         test.runCurrent()
     }
 
@@ -444,5 +450,93 @@ class DisplayStateTest {
         allowedLater.camera.value = CameraState.ALLOWED
         runCurrent()
         assertThat(allowedLater.wanted).isTrue()
+    }
+
+    /** 11 §5.6: Fails if Holiday mode turning on leaves the day screen up. */
+    @Test
+    fun holidayDarkensAtOnce() = runTest {
+        val wall = wall()
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        wall.away(true)
+        assertThat(wall.screen).isEqualTo(ASLEEP)
+    }
+
+    /** 11 §5.6: Fails if night coming on shows the clock while away. */
+    @Test
+    fun holidayNeverShowsTheNightClock() = runTest {
+        val wall = wall(at = DAY.atTime(21, 59))
+        wall.away(true)
+        wall.at(22, 0)
+        assertThat(wall.screen).isEqualTo(ASLEEP)
+        wall.tap()
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        wall.after(FIVE_MINUTES)
+        assertThat(wall.screen).isEqualTo(ASLEEP)
+        assertThat(wall(at = DAY.atTime(23, 0)).also { it.away(true) }.screen).isEqualTo(ASLEEP)
+    }
+
+    /** 11 §5.6: Fails if a tap while away doesn't wake, or the wake sleeps early, late or not at night. */
+    @Test
+    fun aTapWakesItAndItSleepsAgain() = runTest {
+        val day = wall()
+        day.away(true)
+        day.tap()
+        assertThat(day.screen).isEqualTo(AWAKE)
+        day.changesAt(FIVE_MINUTES, AWAKE, ASLEEP)
+
+        val night = wall(at = DAY.atTime(23, 0))
+        night.away(true)
+        night.tap()
+        assertThat(night.screen).isEqualTo(AWAKE)
+        night.changesAt(FIVE_MINUTES, AWAKE, ASLEEP)
+    }
+
+    /** 11 §5.6: Fails if the camera is wanted, or wakes the screen, while away. */
+    @Test
+    fun noCameraWhileAway() = runTest {
+        val wall = wall()
+        assertThat(wall.wanted).isTrue()
+        wall.away(true)
+        assertThat(wall.wanted).isFalse()
+        wall.move()
+        assertThat(wall.screen).isEqualTo(ASLEEP)
+    }
+
+    /** 11 §5.6: Fails if Holiday mode ending leaves the wall dark, or night after it skips the minute awake. */
+    @Test
+    fun holidayEndingWakesIt() = runTest {
+        val day = wall()
+        day.away(true)
+        day.away(false)
+        assertThat(day.screen).isEqualTo(AWAKE)
+        assertThat(day.wanted).isTrue()
+
+        val night = wall(at = DAY.atTime(23, 0))
+        night.away(true)
+        night.away(false)
+        assertThat(night.screen).isEqualTo(AWAKE)
+        night.changesAt(NIGHT_AWAKE_MS, AWAKE, NIGHT_CLOCK)
+    }
+
+    /** 11 §5.6: Fails if a PIN pad or sheet showing lets the wall go dark, or it stays up once released. */
+    @Test
+    fun heldStaysAwake() = runTest {
+        val wall = wall()
+        wall.hold(true)
+        wall.away(true)
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        wall.after(THIRTY_MINUTES)
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        wall.hold(false)
+        wall.changesAt(FIVE_MINUTES, AWAKE, ASLEEP)
+    }
+
+    /** Pin: Fails if a Holiday mode not yet read darkens the wall. */
+    @Test
+    fun holidayNotYetReadIsNotAway() = runTest {
+        val wall = wall()
+        wall.away(null)
+        wall.after(FIVE_MINUTES - 1)
+        assertThat(wall.screen).isEqualTo(AWAKE)
     }
 }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import uk.co.siland.culvery.capability.door.ui.DoorCardHost
 import uk.co.siland.culvery.capability.door.ui.DoorCardUi
+import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
@@ -31,7 +32,7 @@ data class ShowingRing(val eventId: Long, val card: DoorCardUi)
 /**
  * The alert decision (5 §4.6–4.7). A new ring, or an unrecognised alert, while Culvery is in front raises the card or
  * refreshes it (a loud alert: the shell turns music down while it shows, 6 §3.3), restarts its 60 seconds (9 §2.4), and chimes unless it is quiet hours or the last chime that played was under 10 seconds ago.
- * A re-post of the card's own ring updates the card only. Motion, and anything while Culvery isn't in front, or at night (8 §2.7), is
+ * A re-post of the card's own ring updates the card only. Motion, and anything while Culvery isn't in front, at night (8 §2.7), or while Holiday mode is on (11 §5.5), is
  * only stored. Every change to the card happens under one lock, so a close never takes a newer ring's card.
  * quieted() is awaited inside the lock, so a Got it tap in those 500 ms waits for them.
  */
@@ -45,6 +46,7 @@ class DoorAlerts internal constructor(
     private val clock: WallClock,
     private val scope: CoroutineScope,
     private val night: NightHours,
+    private val holiday: () -> Boolean?,
 ) {
     @Inject
     constructor(
@@ -56,7 +58,8 @@ class DoorAlerts internal constructor(
         clock: WallClock,
         @ApplicationScope scope: CoroutineScope,
         night: NightHours,
-    ) : this(host, store::markSeen, { settings.current.value }, chime, zone::current, clock, scope, night)
+        house: HouseMode,
+    ) : this(host, store::markSeen, { settings.current.value }, chime, zone::current, clock, scope, night, { house.holiday.value })
 
     private val lock = Mutex()
     private val _showing = MutableStateFlow<ShowingRing?>(null)
@@ -74,7 +77,7 @@ class DoorAlerts internal constructor(
             return@withLock
         }
         // Not known yet counts as night, so a ring just after a restart at night stays quiet.
-        if (!host.inFront.value || night.isNight() != false) return@withLock
+        if (!host.inFront.value || night.isNight() != false || holiday() == true) return@withLock
         val alreadyShowing = _showing.value != null
         _showing.value = ShowingRing(event.id, card)
         if (!alreadyShowing) host.show(loud = true) { DoorCardHost(this@DoorAlerts) }

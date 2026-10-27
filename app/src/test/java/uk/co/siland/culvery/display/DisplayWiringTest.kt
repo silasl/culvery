@@ -30,6 +30,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.SettingsPage
@@ -102,6 +103,7 @@ class DisplayWiringTest {
             MutableStateFlow(0L),
             MutableStateFlow(true),
             MutableStateFlow(CameraState.ALLOWED),
+            MutableStateFlow(null),
             backgroundScope,
         )
         runCurrent()
@@ -123,7 +125,7 @@ class DisplayWiringTest {
         }
         private val settings = displaySettings(folder.root, scope)
         private val clock = HouseholdClock(flowOf(ZoneOffset.UTC), { 0L }, scope, flowOf(ELEVEN_PM))
-        val display = DisplayState(settings, clock, FakeUserActivity(), alerts, CameraAccess({ true }, { true }, settings, scope), scope)
+        val display = DisplayState(settings, clock, FakeUserActivity(), alerts, CameraAccess({ true }, { true }, settings, scope), object : HouseMode { override val holiday = MutableStateFlow<Boolean?>(null) }, scope)
         val brightness = ScreenBrightness(display, alerts, clock, SunToday(null, scope), settings, scope)
 
         init {

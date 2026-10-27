@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.NightHours
@@ -51,6 +52,7 @@ internal data class Display(
     val night: Boolean?,
     val prefs: DisplayPrefs?,
     val seenFront: Boolean,
+    val holiday: Boolean? = null,
 )
 
 /** The idle wait running, if any: after [ms] with no activity the screen becomes [then]. */
@@ -61,30 +63,42 @@ internal val START = Display(Screen.AWAKE, held = false, inFront = false, night 
 
 /**
  * [display] with new inputs. Night starting, or the first arrival in front at night, shows the clock unless held; a
- * later return from other apps, leaving the front, or night ending, wakes.
+ * later return from other apps, leaving the front, or night ending, wakes. Holiday mode on darkens the screen at once
+ * unless held and never shows the clock; Holiday mode off wakes it (11 §5.6).
  */
-internal fun next(display: Display, prefs: DisplayPrefs?, now: LocalDateTime?, inFront: Boolean): Display {
+internal fun next(display: Display, prefs: DisplayPrefs?, now: LocalDateTime?, inFront: Boolean, holiday: Boolean?): Display {
     val night = nightAt(now, prefs)
     val starts = night == true && (display.night != true || !display.seenFront)
     val screen = when {
-        !inFront || night == null -> Screen.AWAKE
+        !inFront -> Screen.AWAKE
+        holiday == true -> when {
+            display.holiday != true || !display.seenFront -> if (display.held) Screen.AWAKE else Screen.ASLEEP
+            !display.inFront -> Screen.AWAKE
+            else -> display.screen
+        }
+        night == null -> Screen.AWAKE
+        display.holiday == true -> Screen.AWAKE
         !display.inFront && display.seenFront -> Screen.AWAKE
         starts -> if (display.held) Screen.AWAKE else Screen.NIGHT_CLOCK
         night == false && display.night == true -> Screen.AWAKE
         else -> display.screen
     }
-    return display.copy(screen = screen, inFront = inFront, night = night, prefs = prefs, seenFront = display.seenFront || inFront)
+    return display.copy(
+        screen = screen, inFront = inFront, night = night, prefs = prefs, seenFront = display.seenFront || inFront, holiday = holiday,
+    )
 }
 
 internal fun Display.waiting(): Wait? = when {
-    screen != Screen.AWAKE || !inFront || held || night == null || prefs == null -> null
+    screen != Screen.AWAKE || !inFront || held || prefs == null -> null
+    holiday == true -> Wait(prefs.sleepAfterMinutes * MS_PER_MINUTE, Screen.ASLEEP)
+    night == null -> null
     night -> Wait(NIGHT_AWAKE_MS, Screen.NIGHT_CLOCK)
     else -> Wait(prefs.sleepAfterMinutes * MS_PER_MINUTE, Screen.ASLEEP)
 }
 
-/** Wanted only by day, in front, off the night clock, and when allowed and switched on (8 §4.3). */
+/** Wanted only by day, in front, off the night clock, not on Holiday mode, and when allowed and switched on (8 §4.3). */
 internal fun Display.wantsCamera(camera: CameraState): Boolean =
-    inFront && night == false && screen != Screen.NIGHT_CLOCK && prefs?.wakesByCamera(camera) == true
+    inFront && night == false && holiday != true && screen != Screen.NIGHT_CLOCK && prefs?.wakesByCamera(camera) == true
 
 /**
  * Whether the wall is awake, asleep or showing the night clock (8 §4.1), and whether the camera may look (8 §4.3).
@@ -97,6 +111,7 @@ class DisplayState internal constructor(
     touches: Flow<Long>,
     shown: StateFlow<Boolean>,
     camera: StateFlow<CameraState>,
+    holiday: StateFlow<Boolean?>,
     scope: CoroutineScope,
 ) : NightHours {
     @Inject
@@ -106,11 +121,12 @@ class DisplayState internal constructor(
         activity: UserActivity,
         alerts: ShellAlerts,
         camera: CameraAccess,
+        house: HouseMode,
         @ApplicationScope scope: CoroutineScope,
-    ) : this(settings.read, clock.now, activity.touches, alerts.shown, camera.state, scope)
+    ) : this(settings.read, clock.now, activity.touches, alerts.shown, camera.state, house.holiday, scope)
 
     private val lock = Any()
-    private val state = MutableStateFlow(next(START, prefs.value, now.value, shown.value))
+    private val state = MutableStateFlow(next(START, prefs.value, now.value, shown.value, holiday.value))
     private val activity = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     val screen: StateFlow<Screen> = state.map { it.screen }.distinctUntilChanged()
@@ -125,7 +141,7 @@ class DisplayState internal constructor(
 
     init {
         scope.launch {
-            combine(prefs, now, shown, ::Triple).collect { (p, n, f) -> change { next(it, p, n, f) } }
+            combine(prefs, now, shown, holiday) { p, n, f, h -> change { next(it, p, n, f, h) } }.collect {}
         }
         scope.launch {
             touches.drop(1).collect { if (state.value.screen == Screen.AWAKE) activity.tryEmit(Unit) }
@@ -146,8 +162,8 @@ class DisplayState internal constructor(
     /** The sleep layer's own tap or TalkBack click: wakes the dark screen and the night clock. */
     fun tapped() = wake { true }
 
-    /** Someone moved in front of the camera: wakes the dark screen by day, never the night clock. */
-    fun moved() = wake { it.night == false && it.screen != Screen.NIGHT_CLOCK }
+    /** Someone moved in front of the camera: wakes the dark screen by day, never the night clock or on Holiday mode. */
+    fun moved() = wake { it.holiday != true && it.night == false && it.screen != Screen.NIGHT_CLOCK }
 
     /** Something on screen keeps the wall awake while [on], waking it as it starts; the wait starts again as it ends. */
     fun held(on: Boolean) = change { it.copy(screen = if (on) Screen.AWAKE else it.screen, held = on) }

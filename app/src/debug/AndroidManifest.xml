@@ -12,5 +12,14 @@
             android:name=".DebugShoppingReceiver"
             android:exported="true"
             android:permission="android.permission.DUMP" />
+        <!-- Debug walkthrough only: adb moves the wall's clock ahead by some minutes, 0 clearing it. -->
+        <receiver
+            android:name=".DebugClockReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="uk.co.siland.culvery.debug.CLOCK" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

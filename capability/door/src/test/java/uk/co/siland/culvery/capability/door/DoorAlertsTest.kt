@@ -27,9 +27,10 @@ class DoorAlertsTest {
     private var start = NOW
 
     private var night = false
+    private var holiday: Boolean? = null
 
     private fun TestScope.alerts() =
-        DoorAlerts(host, { seen += it }, { prefs }, chime, { london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { night })
+        DoorAlerts(host, { seen += it }, { prefs }, chime, { london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { night }, { holiday })
 
     private fun TestScope.rung(id: Long, isNew: Boolean = true, device: String = "Front Door", unrecognised: Boolean = false, snapshot: File? = null) =
         Recorded(DoorEvent(id, start + testScheduler.currentTime, DoorKind.RING, device, unrecognised, snapshot, seen = false), isNew)
@@ -125,7 +126,7 @@ class DoorAlertsTest {
     @Test
     fun aRingHoldingTheLockAsTheSixtySecondsEndKeepsItsCard() = runTest {
         var gate: CompletableDeferred<Unit>? = null
-        val alerts = DoorAlerts(host, { seen += it }, { prefs }, chime, { gate?.await(); london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { false })
+        val alerts = DoorAlerts(host, { seen += it }, { prefs }, chime, { gate?.await(); london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { false }, { null })
         alerts.onRecorded(rung(1))
         advanceTimeBy(CARD_MS - 1_000)
         gate = CompletableDeferred()
@@ -273,6 +274,27 @@ class DoorAlertsTest {
         assertThat(alerts.showing.value).isNull()
         assertThat(chime.volumes).isEmpty()
         assertThat(seen).isEmpty()
+    }
+
+    /** 11 §5.5: Fails if a ring while Holiday mode is on, by day and in front, raises a card or a chime. */
+    @Test
+    fun aRingWhileAwayIsRecordedQuietly() = runTest {
+        holiday = true
+        val alerts = alerts()
+        alerts.onRecorded(rung(1))
+        assertThat(host.shown).isEqualTo(0)
+        assertThat(alerts.showing.value).isNull()
+        assertThat(chime.volumes).isEmpty()
+    }
+
+    /** Pin, 11 §5.5: a Holiday mode not yet read alerts as at home. */
+    @Test
+    fun unknownIsNotAway() = runTest {
+        holiday = null
+        val alerts = alerts()
+        alerts.onRecorded(rung(1))
+        assertThat(host.shown).isEqualTo(1)
+        assertThat(chime.volumes).hasSize(1)
     }
 
     /** 8 §4.5: Fails if a card already showing is closed when night starts. */

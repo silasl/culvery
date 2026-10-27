@@ -11,6 +11,7 @@ dependencies {
     testImplementation(testFixtures(project(":core:plugin")))
     // Capability, RailBadge, AlertHost, ProviderDescriptor and Startable appear in this module's public API.
     api(project(":core:plugin"))
+    implementation(project(":core:house"))
     implementation(project(":core:household"))
     implementation(project(":core:ui"))
     implementation(libs.androidx.datastore.preferences)
