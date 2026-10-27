@@ -6,6 +6,7 @@ arrow_downward
 arrow_forward
 arrow_upward
 backspace
+beach_access
 bedtime
 block
 brightness_high

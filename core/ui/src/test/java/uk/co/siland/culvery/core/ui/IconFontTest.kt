@@ -46,6 +46,13 @@ class IconFontTest {
     }
 
     @Test
+    fun theHolidayIconIsInTheFont() {
+        assertThat(Icons.BEACH_ACCESS).isEqualTo("beach_access")
+        assertThat(font.has("beach_access")).isTrue()
+        assertThat(font.hasFilledForm("beach_access")).isTrue()
+    }
+
+    @Test
     fun everyNamedIconIsALigatureInTheFont() {
         assertWithMessage("Icons with no ligature in the font").that(named.filterNot(font::has)).isEmpty()
     }

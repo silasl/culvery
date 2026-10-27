@@ -7,6 +7,17 @@ import java.util.Locale
 
 /** Holiday mode's words (11 §5.2, §5.8). */
 object HolidayWords {
+    const val LABEL = "Holiday mode"
+    const val ON = "ON"
+    const val WHEN_BACK = "When are you back?"
+    const val CHANGE_DATE = "Change date"
+    const val WILL = "Holiday mode will:"
+    const val TURN_ON_BUTTON = "Turn on Holiday mode"
+    const val CANCEL = "Cancel"
+    const val TURNING_ON = "Turning on…"
+    const val TURNING_OFF = "Turning off…"
+    const val CLICK_ON = "Turn on"
+    const val CLICK_OFF = "Turn off"
     const val DOOR = "Keep the doorbell quiet. Rings and motion still show in the Door tab."
     const val SCREEN = "Turn the screen off until someone taps it."
     const val NO_PICK = "Pick the day you’re back."
@@ -59,4 +70,13 @@ object HolidayWords {
         back == null -> "Holiday mode, on."
         else -> "Holiday mode, on, back ${backSpoken(back)}."
     }
+
+    /** The tile's name while a change runs, when neither "on" nor "off" is yet true. */
+    fun runningSpoken(run: HolidayRun): String = when (run) {
+        HolidayRun.TURNING_ON -> "Holiday mode, turning on."
+        HolidayRun.TURNING_OFF -> "Holiday mode, turning off."
+    }
+
+    /** The sheet's title and date as one item for TalkBack. */
+    fun sheetSpoken(back: LocalDate) = "$WHEN_BACK ${backSpoken(back)}."
 }

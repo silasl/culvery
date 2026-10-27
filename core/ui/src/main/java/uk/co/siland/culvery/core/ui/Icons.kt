@@ -11,6 +11,7 @@ object Icons {
     const val ARROW_FORWARD = "arrow_forward"
     const val ARROW_UPWARD = "arrow_upward"
     const val BACKSPACE = "backspace"
+    const val BEACH_ACCESS = "beach_access"
     const val BEDTIME = "bedtime"
     const val BLOCK = "block"
     const val BRIGHTNESS_HIGH = "brightness_high"
