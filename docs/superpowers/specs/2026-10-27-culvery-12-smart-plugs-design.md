@@ -30,6 +30,9 @@ Done means: the household's plugs show on the Plugs tab through Home Assistant a
 10. **Holiday lights may use plugs later** (a lamp on a plug joining the mimic-presence lights). Not in this plan; to Feature ideas.
 11. **The PIN that turns a mode on covers every plug in its list for as long as the mode is on**, restarts included. "Needs a PIN to switch" applies only to switching a plug by hand on the Plugs tab. *(The user, after the builder check.)*
 12. **Two modes on at once:** each plug's state is remembered from before the **first** mode that touched it, and it is put back only when the **last** of those modes ends. *(The user, after the builder check.)*
+13. **Starting a mode's plug switching needs that mode's own grant.** Taking the mode's snapshot (`begin`, §5.1) takes the `Authorised` from the mode's fresh PIN (for Holiday, `holiday.mode`); retries of a mode already begun take none, so decision 11 still holds across restarts. *(The user, after the plan review, 2026-10-27.)*
+14. **Edit on the mode sections ends by itself after 2 idle minutes**, as the 2-minute session does, as well as on Done and on leaving the tab. *(The user, after the plan review, 2026-10-27.)*
+15. **The router plug is not special-cased in code.** At the walk-through Claude tells the household that switching the router plug off cuts Culvery off from switching it back on, and suggests setting Needs a PIN to switch on it. A plug that's never added, or is removed, is out of the tab and every mode; there is no Hide setting. *(The user, after the plan review, 2026-10-27.)*
 
 The brainstorm's mockups (`.superpowers/brainstorm/`, not committed): the tab with plug cards on the left and the mode sections on the right, v2 with Leave / On / Off. Visual details are provisional until the end-of-v1 design review.
 
@@ -78,7 +81,7 @@ A capability tab (`hasTab`), rail order after Door *(my call: order 55)*, icon a
 
 - **Header:** "Plugs", and "{on} of {n} on · Home Assistant" in muted, as the Lights tab's header. **Add a plug** sits on the right.
 - **Left: a card per plug** in a grid that grows like the Lights tab's rooms (note 20): the name, its state ("On · 182 W", "On", "Off", "Can't reach this plug"), and a large On / Off button. An on plug's card uses the accent fill, as an on room does. A plug set to need a PIN shows a padlock beside its button. An unreachable plug's button is inactive.
-- **Right: a section per mode** (Plan 12: Holiday mode only), titled with the mode's name. Each section lists every added plug with a three-way **Leave / On / Off** choice. **Edit** opens the sections for changes behind an Adult or Admin PIN; at rest they are read-only, so a stray tap changes nothing. *(My call on Edit.)*
+- **Right: a section per mode** (Plan 12: Holiday mode only), titled with the mode's name. Each section lists every added plug with a three-way **Leave / On / Off** choice. **Edit** opens the sections for changes behind an Adult or Admin PIN; at rest they are read-only, so a stray tap changes nothing. Edit ends on Done, on leaving the tab, or after 2 idle minutes (decision 14). *(My call on Edit.)*
 - **A plug's own settings** (a long press or a › on its card, the builder's choice): **Needs a PIN to switch** (off by default) and **Remove**, behind an Adult or Admin PIN.
 - Switching shows "Switching…" on the card until Home Assistant reports the change, not before, as Plan 11's hoover row. A failure shows a toast with the §6 line and the card keeps its real state.
 
@@ -105,17 +108,18 @@ The capability's own store: the added plugs in order (entity ids), each plug's P
 
 `:core:house` (Plan 11 §5.1) gains:
 
-- **`HouseModeInfo`**: a small contribution with the mode's id, its name as shown ("Holiday mode") and an order. A mode's capability binds one into a Hilt set. Holiday binds `holiday`; Party mode will bind `party`. The Plugs tab shows one section per contribution, in order.
+- **`HouseModeInfo`**: a small contribution with the mode's id, its name as shown ("Holiday mode"), an order, and the permission that turns it on (`holiday.mode`). A mode's capability binds one into a Hilt set. Holiday binds `holiday`; Party mode will bind `party`. The Plugs tab shows one section per contribution, in order.
 - **`HousePlugs`**, implemented by `:capability:plugs`:
   - `ready: Flow<Boolean>`: true once at least one added plug has On or Off in any list *(builder may narrow it to the given mode)*.
   - `preview(modeId): List<PlugChange>`: the plugs the mode will switch and to what, for a sheet's "will:" lines.
-  - `enter(modeId): HouseStep`: take the mode on (§5.3). Safe to call again: a retry switches only plugs not yet reached.
+  - `begin(modeId, by)`: take the mode's snapshot (§5.2), with the grant from the mode's fresh PIN (decision 13); nothing is switched yet.
+  - `enter(modeId): HouseStep?`: switch the plugs of a mode already begun (§5.3), with no grant. Safe to call again: a retry switches only plugs not yet reached. Null when the mode has no snapshot (never begun, or lost to a restart): nothing is switched.
   - `leave(modeId): HouseStep`: let it go (§5.4).
   - Optional (bound or not), like Plan 11's other seams.
 
-A new mode needs only its contribution and calls to `enter` and `leave`; the Plugs tab, the store and the put-back logic don't change. *(My call on the shape; decision 7.)*
+A new mode needs only its contribution and calls to `begin`, `enter` and `leave`; the Plugs tab, the store and the put-back logic don't change. *(My call on the shape; decision 7.)*
 
-**No grant on `enter` or `leave`** (decision 11). The mode's own fresh PIN at turn-on and turn-off is the authority; the mode's capability checks it (as Holiday already does) before calling. A retry after a restart, when Holiday has forgotten its grant (`HolidayHouse` keeps it in memory only), still switches plugs, including those set to need a PIN. This differs from the lights step, which Plan 11 marks missed after a restart.
+**A grant on `begin`, none on `enter` or `leave`** (decisions 11, 13). The mode's own fresh PIN at turn-on is passed to `begin`, which refuses a grant without the mode's permission; turn-off's PIN is checked by the mode's capability (as Holiday already does) before calling `leave`. A retry after a restart, when Holiday has forgotten its grant (`HolidayHouse` keeps it in memory only), still switches plugs, including those set to need a PIN. This differs from the lights step, which Plan 11 marks missed after a restart.
 
 ### 5.2 The memory: one note per plug
 
@@ -125,32 +129,32 @@ Each plug has at most one **note**, kept in the plug store so it survives a rest
 - **holders**: the modes that currently hold it, in the order they took it, each with what it set the plug to;
 - **expected**: what the plug should be now (the setting of the newest holder).
 
-A mode's list is **snapshotted when the mode turns on** (stored with the mode's place in the notes); edits to the list while it's on take effect next time. *(My call.)*
+A mode's list is **snapshotted when the mode turns on** (`begin`, stored with the mode's place in the notes); edits to the list while it's on take effect next time. *(My call.)* Holders are ordered by when their mode began, so a mode that reaches a plug late doesn't jump ahead of one that began after it.
 
 ### 5.3 Turning a mode on
 
 `enter(modeId)`, for each plug in the mode's snapshot that isn't Leave:
 
 1. **No note yet:** read the plug's state, write the note (before = that state, holders = this mode, expected = its setting), then switch it if it differs. A plug already as the mode wants is noted and not switched.
-2. **Already noted by another mode** (decision 12): add this mode as the newest holder; expected becomes this mode's setting; switch if the plug differs. *before* doesn't change.
+2. **Already noted by another mode** (decision 12): add this mode among the holders by when it began; expected is the newest holder's setting; switch only if this mode is the newest and the plug differs from expected. *before* doesn't change. If the plug already differs from expected (switched by hand before this mode came), the old note is dropped and a fresh one starts with before = its state now.
 3. **Can't be reached:** retried every 5 minutes while the mode stays on (Plan 11 §5.3's rule for failed steps); its note is written when it's first reached. *(My call.)*
 4. One plug failing doesn't stop the others or the mode; the step reports Failed with the §6 line.
 
 ### 5.4 Turning a mode off
 
-`leave(modeId)`, for each plug this mode holds:
+`leave(modeId)`, for each plug this mode holds (the mode's snapshot is removed last, so a leave cut short by a restart can be run again):
 
 - **Someone switched it by hand** while modes held it (its state differs from *expected*): drop the whole note and leave the plug as they set it. *(My call, 2026-10-27, played back to the user: a hand change wins over every mode.)*
 - **Other modes still hold it:** remove this mode from the holders. If this mode was the newest, expected becomes the next newest holder's setting and the plug is switched to it; otherwise nothing is switched. *(My call: the mode still on keeps its say.)*
 - **This was the last holder:** switch the plug back to *before*, and drop the note.
-- **Unreachable now:** it can't be switched; the step reports Failed and the note is dropped as if it had gone back. *(My call: the family are home and can switch it from the tab.)*
+- **Unreachable now** (or gone, or its state unknown): it can't be switched; the step reports Failed. This mode is dropped from the holders, and the note goes when no holder is left, as if it had gone back. *(My call: the family are home and can switch it from the tab.)*
 - **Never reached** while the mode was on: there's no note to act on.
 
 **Removing a plug** from the tab drops its note; the plug is left as it is. *(My call.)*
 
 ### 5.5 Holiday mode's part
 
-- **Turning on** (Plan 11 §5.3): a new step after Heating: `HousePlugs.enter("holiday")`. Holiday's record (Plan 11 §5.7) gains a plugs step, done or not, retried every 5 minutes like the others.
+- **Turning on** (Plan 11 §5.3): `HousePlugs.begin("holiday", by)` before Holiday's record is saved, then a new step after Heating: `HousePlugs.enter("holiday")`. A plugs step with no snapshot (`enter` null) is missed, as the lights step is after a restart. Holiday's record (Plan 11 §5.7) gains a plugs step, done or not, retried every 5 minutes like the others.
 - **The sheet's "Holiday mode will:"** lists the plug changes in plain words, only for plugs not on Leave: "Switch {name} off." / "Switch {name} on." When the plugs go back, it says "Plugs go back as they were when you turn it off." *(My call.)*
 - **Turning off** (Plan 11 §5.4): `HousePlugs.leave("holiday")` after the heating. **Plugs go back at tap-off**, not at 00:01 on the back day as the heating does: decision 6 ties putting back to the mode ending. *(My call, played back to the user.)*
 - Failure lines on the tile, §6.
