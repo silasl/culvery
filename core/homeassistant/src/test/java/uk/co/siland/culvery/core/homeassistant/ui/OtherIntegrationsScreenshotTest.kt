@@ -75,7 +75,7 @@ class OtherIntegrationsScreenshotTest {
     @Test fun noThermostatLight() = snap("settings_other_no_thermostat_light", false, noThermostat, "http://192.168.1.20:8123/")
 
     private val problem = linked.copy(
-        status = "Home Assistant no longer accepts Culvery’s token. Add a new one in Settings › Other integrations.",
+        status = "Home Assistant no longer accepts Culvery’s token. Paste a new one below, then Check.",
     )
 
     @Test fun problemDark() = snap("settings_other_problem_dark", true, problem, "http://192.168.1.20:8123/")

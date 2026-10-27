@@ -37,6 +37,7 @@ import uk.co.siland.culvery.core.homeassistant.HA_TOKEN
 import uk.co.siland.culvery.core.homeassistant.HA_TOKEN_PLACEHOLDER
 import uk.co.siland.culvery.core.homeassistant.HA_TOKEN_SAVED
 import uk.co.siland.culvery.core.homeassistant.HOME_ASSISTANT
+import uk.co.siland.culvery.core.homeassistant.HaProblem
 import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantDevice
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantException
@@ -45,6 +46,7 @@ import uk.co.siland.culvery.core.homeassistant.LINKED
 import uk.co.siland.culvery.core.homeassistant.NOT_LINKED_YET
 import uk.co.siland.culvery.core.homeassistant.OTHER_INTEGRATIONS
 import uk.co.siland.culvery.core.homeassistant.OTHER_INTEGRATIONS_LINE
+import uk.co.siland.culvery.core.homeassistant.TOKEN_REFUSED_ON_PAGE
 import uk.co.siland.culvery.core.homeassistant.problemLine
 import uk.co.siland.culvery.core.plugin.CHECKING
 import uk.co.siland.culvery.core.plugin.SettingsPage
@@ -128,13 +130,13 @@ fun OtherIntegrations(
         )
         HhMessageLine(ui.checkLine, HhType.body, c.danger, "ha_check_line")
         if (ui.linked) {
-            Column(verticalArrangement = Arrangement.spacedBy(HomeAssistantDimens.deviceGap)) { ui.devices.forEach { DevicePicker(it, onChoose) } }
+            Column(verticalArrangement = Arrangement.spacedBy(HomeAssistantDimens.deviceGap)) { ui.devices.forEach { DevicePicker(it, showLine = ui.status == null, onChoose) } }
         }
     }
 }
 
 @Composable
-private fun DevicePicker(device: DeviceUi, onChoose: (String, String?) -> Unit) {
+private fun DevicePicker(device: DeviceUi, showLine: Boolean, onChoose: (String, String?) -> Unit) {
     val c = Culvery.colors
     Column(verticalArrangement = Arrangement.spacedBy(HomeAssistantDimens.settingsGap), modifier = Modifier.testTag("ha_device_${device.domain}")) {
         HhSectionLabel(device.title)
@@ -155,7 +157,7 @@ private fun DevicePicker(device: DeviceUi, onChoose: (String, String?) -> Unit) 
                 HhChoiceChip(HA_NONE, selected = device.chosen == null, tag = "ha_none_${device.domain}", onClick = { onChoose(device.domain, null) })
             }
         }
-        device.line?.let { Text(it, style = HhType.body, color = c.mute, modifier = Modifier.testTag("ha_line_${device.domain}")) }
+        device.line?.takeIf { showLine }?.let { Text(it, style = HhType.body, color = c.mute, modifier = Modifier.testTag("ha_line_${device.domain}")) }
     }
 }
 
@@ -204,7 +206,7 @@ internal fun OtherIntegrationsHost(
 
     OtherIntegrations(
         OtherIntegrationsUi(
-            linked = isLinked, status = problem?.let(::problemLine), checking = checking, checkLine = checkLine,
+            linked = isLinked, status = problem?.let(::pageProblemLine), checking = checking, checkLine = checkLine,
             devices = deviceUis.map { it.copy(choices = choices[it.domain]) },
         ),
         address = address, onAddress = { address = it },
@@ -244,6 +246,9 @@ private fun watchedBy(devices: List<HomeAssistantDevice>): Flow<Set<String>> =
     if (devices.isEmpty()) flowOf(emptySet()) else combine(devices.map { it.watched }) { sets -> sets.flatMapTo(mutableSetOf()) { it } }
 
 /** Each device as it stands, without its [DeviceUi.choices]. */
+private fun pageProblemLine(problem: HaProblem): String =
+    if (problem == HaProblem.TOKEN_REFUSED) TOKEN_REFUSED_ON_PAGE else problemLine(problem)
+
 private fun deviceUis(devices: List<HomeAssistantDevice>): Flow<List<DeviceUi>> =
     if (devices.isEmpty()) {
         flowOf(emptyList())

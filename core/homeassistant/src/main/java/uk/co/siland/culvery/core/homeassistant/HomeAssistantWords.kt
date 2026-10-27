@@ -11,6 +11,9 @@ fun problemLine(problem: HaProblem): String = when (problem) {
     HaProblem.BLOCKED -> "Home Assistant has blocked the tablet. Unblock its address in Home Assistant."
 }
 
+/** Settings › Other integrations' own wording for a refused token: the page is where the new one goes. */
+const val TOKEN_REFUSED_ON_PAGE = "Home Assistant no longer accepts Culvery’s token. Paste a new one below, then Check."
+
 /**
  * What is wrong with the chosen [entityId], in 11 §6's order: the link's [problem], then an entity Home Assistant no
  * longer has ([gone]), then one it can't reach ([unreachable]); null when nothing is.

@@ -267,7 +267,24 @@ class OtherIntegrationsTest {
         showHost()
         compose.waitFor { ha.problem.value == HaProblem.TOKEN_REFUSED }
         compose.onNodeWithTag("ha_status")
-            .assertTextEquals("Home Assistant no longer accepts Culvery’s token. Add a new one in Settings › Other integrations.")
+            .assertTextEquals("Home Assistant no longer accepts Culvery’s token. Paste a new one below, then Check.")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** With a link-wide problem the page says it once, in the status, and the device sections stay quiet. */
+    @Test
+    fun aLinkWideProblemIsNotRepeatedUnderTheDevices() {
+        oneOfEach()
+        val sentence = "Home Assistant no longer accepts Culvery’s token. Add a new one in Settings › Other integrations."
+        hoover.lineText.value = sentence
+        thermostat.lineText.value = sentence
+        api.failAll = HaProblem.TOKEN_REFUSED
+        showHost()
+        compose.waitFor { ha.problem.value == HaProblem.TOKEN_REFUSED }
+        compose.onNodeWithTag("ha_device_vacuum").assertExists()
+        compose.onNodeWithTag("ha_line_vacuum").assertDoesNotExist()
+        compose.onNodeWithTag("ha_line_climate").assertDoesNotExist()
+        compose.onAllNodes(hasText("Add a new one in Settings", substring = true)).assertCountEquals(0)
         compose.assertClickablesHaveRoleAndLabel()
     }
 
