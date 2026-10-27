@@ -245,10 +245,10 @@ internal fun OtherIntegrationsHost(
 private fun watchedBy(devices: List<HomeAssistantDevice>): Flow<Set<String>> =
     if (devices.isEmpty()) flowOf(emptySet()) else combine(devices.map { it.watched }) { sets -> sets.flatMapTo(mutableSetOf()) { it } }
 
-/** Each device as it stands, without its [DeviceUi.choices]. */
 private fun pageProblemLine(problem: HaProblem): String =
     if (problem == HaProblem.TOKEN_REFUSED) TOKEN_REFUSED_ON_PAGE else problemLine(problem)
 
+/** Each device as it stands, without its [DeviceUi.choices]. */
 private fun deviceUis(devices: List<HomeAssistantDevice>): Flow<List<DeviceUi>> =
     if (devices.isEmpty()) {
         flowOf(emptyList())
