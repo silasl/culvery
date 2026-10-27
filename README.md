@@ -64,6 +64,7 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 | `:capability:shopping` | Shopping contract (`ShoppingProvider`), `shopping.db` (the connection, the last read, the queue of unsent changes, what is learned), `ShoppingLock` |
 | `:capability:hoover` | Hoover contract (`HooverSystem`), the chosen hoover (`hoover_settings`), the words for its states, the `hoover.start` permission, the Hoover capability (no tab) |
 | `:capability:heating` | Heating contract (`HeatingSystem`), the chosen thermostat (`heating_settings`) |
+| `:capability:holiday` | Holiday mode: its record (`holiday_settings`), `HolidayHouse` (turning on and off, the scheduled steps and their retries, `HouseMode`), the per-minute scheduler, the back date picked from the calendar, the `holiday.mode` permission |
 | `:provider:calendar-fake` | Debug-only sample calendar (the hand-off's week, relative to today) |
 | `:provider:calendar-google` | Google Calendar API v3 over OkHttp; sign-in and tokens through Play services, nothing stored |
 | `:provider:heating-homeassistant` | The thermostat from Home Assistant: its state and Eco line, `setEco` with its 30-second check, the Thermostat picker |

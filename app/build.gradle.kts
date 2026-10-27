@@ -76,6 +76,8 @@ dependencies {
     // Wired by Hilt alone, as the lights (11 §4.2).
     implementation(project(":capability:hoover"))
     implementation(project(":capability:heating"))
+    // Wired by Hilt alone, as the hoover and the heating (11 §5.1).
+    implementation(project(":capability:holiday"))
     implementation(project(":provider:hoover-homeassistant"))
     implementation(project(":provider:heating-homeassistant"))
     implementation(project(":provider:calendar-google"))

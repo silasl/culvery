@@ -33,6 +33,8 @@ class LogHygieneTest {
         assertThat(sources.map { it.name }).contains("HeatingSettings.kt")
         assertThat(sources.map { it.name }).contains("HaHooverSystem.kt")
         assertThat(sources.map { it.name }).contains("HaHeatingSystem.kt")
+        assertThat(sources.map { it.name }).contains("HolidayHouse.kt")
+        assertThat(sources.map { it.name }).contains("HolidaySettings.kt")
         // 77 calls when written; a floor well below that still fails if the scan stops finding them.
         assertThat(sources.sumOf { LogHygiene.callCount(it.readText()) }).isAtLeast(50)
     }
@@ -99,12 +101,15 @@ internal object LogHygiene {
      * `service.displayName` is the Google API's fixed name, "Google Calendar" or "Google Tasks" (`core/google`); `this.logName` is the same, as the connect flow says it ("Google" or "Google Tasks").
      *
      * `heat.*` are the tablet's thermal status and battery numbers (8 §4.7).
+     *
+     * `step.name` is a Holiday mode step's name (`HolidayStep`: LIGHTS_ON, ECO_ON, HOOVER, ECO_OFF), never a date (11 §6).
      */
     val ALLOWED = setOf(
         "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",
         "step.id", "stored.connection.id", "this.id", "this.kind", "kind.name", "this.failedDrains", "this.reason",
         "answer.reason", "what.label", "service.displayName", "this.logName", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
         "post.captureLine", "reading.outcome", "command.name", "heat.status", "heat.batteryTenths", "heat.batteryPercent",
+        "step.name",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|wtf|println)\(""")
