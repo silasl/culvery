@@ -199,6 +199,17 @@ class HomeAssistantTest {
         assertThat(ha.problem.value).isEqualTo(HaProblem.TOKEN_REFUSED)
     }
 
+    /** Fails if a subscription Home Assistant refuses leaves the row at Checking with no line. */
+    @Test
+    fun aRefusedSubscriptionShowsALine() = runTest {
+        val ha = ha()
+        ha.watch(flowOf(setOf("vacuum.hoover")))
+        runCurrent()
+        api.dropSocket(HaProblem.REFUSED)
+        runCurrent()
+        assertThat(ha.problem.value).isEqualTo(HaProblem.UNREACHABLE)
+    }
+
     /** Fails if a refused token reopens the socket, or lets a read or a service call reach Home Assistant. */
     @Test
     fun aRefusedTokenStopsEverythingButCheck() = runTest {

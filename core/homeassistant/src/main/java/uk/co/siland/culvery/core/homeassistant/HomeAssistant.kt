@@ -215,7 +215,8 @@ class HomeAssistant(
         }
             .retryWithBackoff { e ->
                 socketClosed()
-                if (e is HomeAssistantException) record(follow.link, e.problem)
+                // A refused subscription (too old a Home Assistant) would otherwise retry for ever behind Checking.
+                if (e is HomeAssistantException) record(follow.link, if (e.problem == HaProblem.REFUSED) HaProblem.UNREACHABLE else e.problem)
                 Log.w(TAG, "The socket dropped (${e::class.simpleName}); reopening")
             }
             .collect { states ->
