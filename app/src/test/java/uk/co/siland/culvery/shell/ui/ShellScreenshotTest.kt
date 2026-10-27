@@ -3,14 +3,19 @@ package uk.co.siland.culvery.shell.ui
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -266,6 +271,14 @@ class ShellScreenshotTest {
         HhCard(Modifier.fillMaxWidth().height(68.dp)) { Text("Tray row", style = HhType.cardTitle, color = Culvery.colors.ink) }
     }
 
+    /** The Holiday tile's place, first in the tray at its height (11 §5.2). */
+    private val trayHoliday = TrayButton("holiday.mode", 10) {
+        Box(
+            Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(17.dp)).background(Culvery.colors.surf2).padding(horizontal = 12.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) { Text("Holiday mode", style = HhType.cardTitle, color = Culvery.colors.ink) }
+    }
+
     private fun trayHome(dark: Boolean, shopping: Boolean, lights: Boolean = true, music: Boolean = true) = calendarHome(dark).copy(
         tabs = allTabs,
         homeCards = HomeCardPlacer.place(
@@ -275,7 +288,7 @@ class ShellScreenshotTest {
                         HhCard(Modifier.fillMaxSize()) { Text("Shopping", style = HhType.cardTitle, color = Culvery.colors.ink) }
                     }.takeIf { shopping },
                 ),
-            listOf(trayRow),
+            listOf(trayRow, trayHoliday),
         ),
     )
 

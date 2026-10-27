@@ -500,6 +500,19 @@ class ShellViewModelTest {
     }
 
     @Test
+    fun theHolidayTileComesFirst() = runTest {
+        val vm = vm(
+            setOf(
+                FakeCapability("hoover", order = 40, shown = false, trayList = listOf(TrayButton("hoover.start", 20) {})),
+                FakeCapability("holiday", order = 90, shown = false, trayList = listOf(TrayButton("holiday.mode", 10) {})),
+            ),
+        )
+        vm.uiState.test {
+            assertThat(expectMostRecentItem().homeCards.tray.map { it.id }).containsExactly("holiday.mode", "hoover.start").inOrder()
+        }
+    }
+
+    @Test
     fun headerItemsWhoseFlowFailsComeBackAfterTheRetry() = runTest {
         val vm = vm(setOf(FlakyHeaderCapability("weather", order = 60, listOf(HeaderItem("weather", 10) {}))))
         vm.uiState.test {

@@ -50,6 +50,14 @@ class NoBackupTest {
         }
     }
 
+    /** Pin (11 §4.2): Holiday mode's record, with its back date, is a datastore file, so the same rule keeps it off backups. */
+    @Test
+    fun holidayModesRecordIsKeptWhereTheRulesExclude() {
+        val settings = File("../capability/holiday/src/main/java/uk/co/siland/culvery/capability/holiday/HolidaySettings.kt").readText()
+        assertThat(settings).contains("context.preferencesDataStoreFile(FILE)")
+        assertThat(settings).contains("private const val FILE = \"holiday_settings\"")
+    }
+
     private companion object {
         const val ANDROID = "http://schemas.android.com/apk/res/android"
         val DOMAINS = listOf(
