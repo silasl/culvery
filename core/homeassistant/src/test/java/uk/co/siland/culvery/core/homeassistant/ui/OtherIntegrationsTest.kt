@@ -264,6 +264,17 @@ class OtherIntegrationsTest {
     }
 
     @Test
+    fun theClipboardIsClearedWhenThePageClosesWithTheToken() {
+        clipboard().setPrimaryClip(ClipData.newPlainText("copied", "test-token"))
+        var shown by mutableStateOf(true)
+        showHost(saved = false, shown = { shown })
+        typeAddressAndToken()
+        shown = false
+        compose.waitForIdle()
+        assertThat(clipboard().primaryClip).isNull()
+    }
+
+    @Test
     fun aProblemShowsInTheStatus() {
         api.failAll = HaProblem.TOKEN_REFUSED
         showHost()

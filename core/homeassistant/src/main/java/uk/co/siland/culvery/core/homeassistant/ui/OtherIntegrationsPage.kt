@@ -194,6 +194,8 @@ internal fun OtherIntegrationsHost(
         val stop = ha.watch(watchedBy(sorted))
         onDispose(stop)
     }
+    // A token pasted and then left behind a failed Check shouldn't wait on the shared tablet for the next paste.
+    DisposableEffect(context) { onDispose { clearClipboardIfHolds(context, token) } }
     val isLinked = link != null
     // Linking reads the lists once through isLinked; a Linked Check made while linked reads them again, which is how
     // the household refreshes them after adding a device.
