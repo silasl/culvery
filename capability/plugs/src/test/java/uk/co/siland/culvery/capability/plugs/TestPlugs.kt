@@ -27,6 +27,8 @@ import uk.co.siland.culvery.core.access.Refusal
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
+import uk.co.siland.culvery.core.plugin.ToastAction
+import uk.co.siland.culvery.core.plugin.Toaster
 
 /**
  * A settings store in memory; null holds [data] back, as a file not yet read. [writeGate] holds the next write until it
@@ -137,4 +139,13 @@ internal class TestAccess(var role: Role?) : AccessControl {
     override fun checkExpiry() = Unit
 
     override fun lock() = Unit
+}
+
+/** A toaster that keeps what it was asked to show, in order. */
+internal class RecordingToaster : Toaster {
+    val shown: MutableList<String> = CopyOnWriteArrayList()
+
+    override fun show(message: String, icon: String, urgent: Boolean, action: ToastAction?) {
+        shown += message
+    }
 }

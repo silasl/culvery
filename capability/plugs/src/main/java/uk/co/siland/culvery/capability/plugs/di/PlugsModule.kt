@@ -7,10 +7,12 @@ import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
 import uk.co.siland.culvery.capability.plugs.PlugSystem
+import uk.co.siland.culvery.capability.plugs.PlugsCapability
 import uk.co.siland.culvery.capability.plugs.PlugsHouse
 import uk.co.siland.culvery.capability.plugs.PlugsPermissionSource
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.house.HousePlugs
+import uk.co.siland.culvery.core.plugin.Capability
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -25,4 +27,8 @@ abstract class PlugsModule {
 
     @Binds
     abstract fun plugs(impl: PlugsHouse): HousePlugs
+
+    @Binds
+    @IntoSet
+    abstract fun capability(impl: PlugsCapability): Capability
 }

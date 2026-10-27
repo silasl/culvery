@@ -64,6 +64,7 @@ object Icons {
     const val PERSON_ADD = "person_add"
     const val PHOTO_CAMERA = "photo_camera"
     const val PLAY_ARROW = "play_arrow"
+    const val POWER = "power"
     const val POWER_SETTINGS_NEW = "power_settings_new"
     const val RAINY = "rainy"
     const val RAINY_HEAVY = "rainy_heavy"

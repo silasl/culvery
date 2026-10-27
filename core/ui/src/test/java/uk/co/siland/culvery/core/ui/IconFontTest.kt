@@ -53,6 +53,13 @@ class IconFontTest {
     }
 
     @Test
+    fun thePlugsIconIsInTheFont() {
+        assertThat(Icons.POWER).isEqualTo("power")
+        assertThat(font.has("power")).isTrue()
+        assertThat(font.hasFilledForm("power")).isTrue()
+    }
+
+    @Test
     fun everyNamedIconIsALigatureInTheFont() {
         assertWithMessage("Icons with no ligature in the font").that(named.filterNot(font::has)).isEmpty()
     }

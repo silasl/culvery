@@ -59,6 +59,7 @@ person
 person_add
 photo_camera
 play_arrow
+power
 power_settings_new
 rainy
 rainy_heavy

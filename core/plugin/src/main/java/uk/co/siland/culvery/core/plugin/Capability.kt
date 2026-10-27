@@ -9,7 +9,7 @@ interface Capability : HomeCardContributor {
     val label: String
     /** Material Symbols ligature name for the nav rail. */
     val icon: String
-    /** Rail position: Calendar 10, Music 30, Lights 40, Door 50, Weather 60, Hoover 70 (no tab). */
+    /** Rail position: Calendar 10, Music 30, Lights 40, Door 50, Plugs 55, Weather 60, Hoover 70 (no tab). */
     val order: Int
     /** True when at least one connection provides this capability and it has a tab. */
     val hasTab: Flow<Boolean>
