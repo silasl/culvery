@@ -668,7 +668,7 @@ Fault found:
   - Coming up gives way to the tray;
   - the hoover row's status wraps to two lines (a problem line in full);
   - the Start pill at the house's 48 dp, not 36.
-- **Before 11b is planned:** spec §8.2.1's Away check — does Home/Away Assist put Eco back after Culvery clears it while the house is still Away? Read Home Assistant's history the next time the family is out.
+- ~~**Before 11b is planned:** spec §8.2.1's Away check.~~ Dropped 2026-10-27: the user turned Home/Away Assist off in the Nest app (spec §2, decision 13).
 - **For the 11b plan (from the final review, 2026-10-27):** `start()` returns NotStarted for an already-cleaning, gone or unavailable vacuum (M2); `HomeAssistant.link` is null until the DataStore loads, so a call at app start reads as not linked (M3); `calling` throws TOKEN_REFUSED with no link saved (M4).
 - **Small, from the fix wave's re-review:** with the socket live, a failed list read on Settings shows each device's "has no…" text instead of the can't-reach line; a refused token or block after one good read during a confirm ends as NotConfirmed (the link problem is still recorded); every followed id counts as live once any socket event arrives; no test of a failed read before Start while the socket is down.
 - **The PIN pad's reason when Shopping is turned off:** "Stop using the sample list" asks for a PIN "to connect calendars and services", though it disconnects. Older than Plan 11a; a one-line copy change.
