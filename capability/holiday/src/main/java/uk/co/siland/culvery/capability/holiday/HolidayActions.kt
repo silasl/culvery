@@ -5,6 +5,8 @@ import java.time.LocalDate
 import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.house.HousePermissions
@@ -50,6 +52,7 @@ class HolidayActions internal constructor(
         if (house.running.value != null) return
         val on = house.holiday.value ?: return
         val by = ask() ?: return
-        if (on) house.turnOff(by) else open(by)
+        // A turn-off cut short by the tile leaving Home would leave some parts changed and the record on.
+        if (on) withContext(NonCancellable) { house.turnOff(by) } else open(by)
     }
 }

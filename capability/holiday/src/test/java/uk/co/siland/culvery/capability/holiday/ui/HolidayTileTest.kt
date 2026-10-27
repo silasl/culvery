@@ -109,7 +109,8 @@ class HolidayTileTest {
     fun tapsWhileTurningAreIgnored() {
         running = HolidayRun.TURNING_ON
         show()
-        compose.onNodeWithText("Turning on…", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("holiday_tile_state", useUnmergedTree = true).assertTextEquals("Turning on…")
+        compose.onNodeWithTag("holiday_tile_back", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("holiday_tile").performClick()
         assertThat(taps).isEqualTo(0)
 
@@ -117,7 +118,8 @@ class HolidayTileTest {
         back = LocalDate.of(2026, 10, 31)
         running = HolidayRun.TURNING_OFF
         compose.waitForIdle()
-        compose.onNodeWithText("Turning off…", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("holiday_tile_state", useUnmergedTree = true).assertTextEquals("Turning off…")
+        compose.onNodeWithTag("holiday_tile_back", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("holiday_tile").performClick()
         assertThat(taps).isEqualTo(0)
         compose.assertNothingReadTwice()

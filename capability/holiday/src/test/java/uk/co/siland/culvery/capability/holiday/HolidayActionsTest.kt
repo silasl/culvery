@@ -151,4 +151,25 @@ class HolidayActionsTest {
         assertThat(actions(TestAccess(Role.ADULT), rig, null).pick()).isNull()
         assertThat(actions(TestAccess(Role.ADULT), rig, FakeEvents()).pick()).isNull()
     }
+
+    /** Fails if the caller going away mid turn-off (the tile leaving Home) leaves Holiday mode on with some steps undone. */
+    @Test
+    fun turningOffCarriesOnWhenTheCallerGoesAway() = runTest {
+        val rig = rig()
+        val access = TestAccess(Role.ADULT)
+        rig.loaded()
+        rig.house.turnOn(back, access.authorise(HousePermissions.HOLIDAY_MODE)!!)
+        val gate = CompletableDeferred<Unit>()
+        rig.lights.gate = gate
+        val tap = launch { actions(access, rig).toggle { opened += it } }
+        runCurrent()
+        assertThat(rig.house.running.value).isEqualTo(HolidayRun.TURNING_OFF)
+
+        tap.cancel()
+        gate.complete(Unit)
+        runCurrent()
+
+        assertThat(rig.house.holiday.value).isFalse()
+        assertThat(rig.heating.calls).containsExactly(true, false).inOrder()
+    }
 }

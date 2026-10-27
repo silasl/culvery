@@ -48,6 +48,7 @@ internal fun HolidayTile(on: Boolean, back: LocalDate?, line: String?, running: 
         HolidayRun.TURNING_OFF -> HolidayWords.TURNING_OFF
         null -> if (on && back != null) HolidayWords.backShort(back) else null
     }
+    val secondTag = if (running != null) "holiday_tile_state" else "holiday_tile_back"
     val spoken = if (running != null) HolidayWords.runningSpoken(running) else HolidayWords.tileSpoken(on, back)
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -75,7 +76,7 @@ internal fun HolidayTile(on: Boolean, back: LocalDate?, line: String?, running: 
                         style = HolidayDimens.backStyle,
                         color = if (on) colors.accentInk else colors.mute,
                         maxLines = 1,
-                        modifier = Modifier.testTag("holiday_tile_back"),
+                        modifier = Modifier.testTag(secondTag),
                     )
                 }
             }

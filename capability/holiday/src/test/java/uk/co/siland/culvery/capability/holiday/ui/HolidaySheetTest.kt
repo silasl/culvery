@@ -164,6 +164,7 @@ class HolidaySheetTest {
         compose.waitFor { rig.lights.calls.size == 1 }
         compose.onNode(hasText("Turning on…") and hasAnyAncestor(hasTestTag("holiday_turn_on")), useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("holiday_turn_on").assertIsNotEnabled()
+        compose.onNodeWithTag("holiday_cancel").assertIsNotEnabled()
         assertThat(overlay.content).isNotNull()
 
         gate.complete(Unit)
@@ -185,5 +186,24 @@ class HolidaySheetTest {
         assertThat(rig.house.holiday.value).isFalse()
         assertThat(rig.lights.calls).isEmpty()
         assertThat(rig.heating.calls).isEmpty()
+    }
+
+    /** Fails if a day tapped on the grid while Holiday mode is turning on changes the date being turned on. */
+    @Test
+    fun aDayTappedWhileTurningOnChangesNothing() {
+        events.events = emptyList()
+        val gate = CompletableDeferred<Unit>()
+        rig.lights.gate = gate
+        open()
+        compose.onNodeWithTag("holiday_change_date").performClick()
+        compose.waitFor { has("day_${today.plusDays(2)}") }
+        compose.onNodeWithTag("holiday_turn_on").performClick()
+        compose.waitFor { rig.lights.calls.size == 1 }
+        day(today.plusDays(2)).performClick()
+        compose.waitForIdle()
+        compose.onNode(hasContentDescription("When are you back? Thursday 29 October.")).assertExists()
+        gate.complete(Unit)
+        compose.waitFor { overlay.content == null }
+        assertThat(rig.house.record.value!!.back).isEqualTo(today.plusDays(1))
     }
 }

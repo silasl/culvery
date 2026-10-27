@@ -121,7 +121,7 @@ internal fun HolidaySheet(
             )
             HhButton(
                 HolidayWords.CANCEL, onCancel, Modifier.fillMaxWidth().testTag("holiday_cancel"),
-                tone = ButtonTone.Quiet, size = ButtonSize.Large, on = ButtonSurface.Bg,
+                tone = ButtonTone.Quiet, size = ButtonSize.Large, enabled = !turning, on = ButtonSurface.Bg,
             )
         }
     }
@@ -156,8 +156,10 @@ internal fun HolidaySheetHost(by: Authorised, actions: HolidayActions, house: Ho
         back, today, pick, steps, choosing, turning = action.busy,
         onChangeDate = { choosing = true },
         onPickDate = {
-            chosen = it
-            choosing = false
+            if (!action.busy) {
+                chosen = it
+                choosing = false
+            }
         },
         onTurnOn = {
             action.run {
