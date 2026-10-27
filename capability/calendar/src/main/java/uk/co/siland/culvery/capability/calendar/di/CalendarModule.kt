@@ -12,6 +12,7 @@ import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
 import javax.inject.Singleton
 import uk.co.siland.culvery.capability.calendar.CalendarCapability
+import uk.co.siland.culvery.capability.calendar.CalendarMultiDayEvents
 import uk.co.siland.culvery.capability.calendar.CalendarPermissionSource
 import uk.co.siland.culvery.capability.calendar.CalendarProvider
 import uk.co.siland.culvery.capability.calendar.CalendarStore
@@ -22,6 +23,7 @@ import uk.co.siland.culvery.capability.calendar.StoredSeries
 import uk.co.siland.culvery.capability.calendar.db.ALL_MIGRATIONS
 import uk.co.siland.culvery.capability.calendar.db.CalendarDatabase
 import uk.co.siland.culvery.core.access.PermissionSource
+import uk.co.siland.culvery.core.house.MultiDayEvents
 import uk.co.siland.culvery.core.plugin.AccountUse
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
@@ -57,6 +59,9 @@ abstract class CalendarModule {
     @Binds
     @IntoSet
     abstract fun permissions(impl: CalendarPermissionSource): PermissionSource
+
+    @Binds
+    abstract fun multiDayEvents(impl: CalendarMultiDayEvents): MultiDayEvents
 
     companion object {
         @Provides

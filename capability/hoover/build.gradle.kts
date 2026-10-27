@@ -12,6 +12,7 @@ dependencies {
     api(project(":core:plugin"))
     implementation(project(":core:ui"))
     implementation(project(":core:access"))
+    implementation(project(":core:house"))
     implementation(libs.androidx.datastore.preferences)
     testImplementation(libs.roborazzi.core)
     testImplementation(libs.roborazzi.compose)

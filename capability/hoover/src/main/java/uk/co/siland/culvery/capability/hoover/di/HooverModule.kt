@@ -9,7 +9,9 @@ import dagger.multibindings.Multibinds
 import uk.co.siland.culvery.capability.hoover.HooverCapability
 import uk.co.siland.culvery.capability.hoover.HooverPermissionSource
 import uk.co.siland.culvery.capability.hoover.HooverSystem
+import uk.co.siland.culvery.capability.hoover.HouseHooverSeam
 import uk.co.siland.culvery.core.access.PermissionSource
+import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.plugin.Capability
 
 @Module
@@ -26,4 +28,7 @@ abstract class HooverModule {
     @Binds
     @IntoSet
     abstract fun permissions(impl: HooverPermissionSource): PermissionSource
+
+    @Binds
+    abstract fun house(impl: HouseHooverSeam): HouseHoover
 }

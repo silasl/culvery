@@ -6,5 +6,6 @@ plugins {
 dependencies {
     testImplementation(testFixtures(project(":core:plugin")))
     api(project(":core:plugin"))
+    implementation(project(":core:house"))
     implementation(libs.androidx.datastore.preferences)
 }

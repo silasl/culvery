@@ -53,6 +53,7 @@ dependencies {
     implementation(project(":core:plugin"))
     implementation(project(":core:household"))
     implementation(project(":core:access"))
+    implementation(project(":core:house"))
     implementation(project(":core:setup"))
     // Wired by Hilt alone: the Google sign-in the calendar and the shopping list share (10 §4.1).
     implementation(project(":core:google"))

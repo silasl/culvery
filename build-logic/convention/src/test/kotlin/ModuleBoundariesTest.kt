@@ -119,6 +119,17 @@ class ModuleBoundariesTest {
         banned(":core:homeassistant", ":capability:hoover")
     }
 
+    /** Pin: the seams are core, so the capabilities that implement them and Holiday mode that uses them keep to the rules. */
+    @Test
+    fun theHouseModulesKeepToTheirFamilies() {
+        allowed(":core:house", ":core:access", "api")
+        allowed(":capability:heating", ":core:house")
+        allowed(":capability:holiday", ":core:house", "api")
+        banned(":core:house", ":capability:heating")
+        banned(":capability:holiday", ":capability:lights")
+        banned(":capability:holiday", ":capability:hoover")
+    }
+
     /** Pin: the Shopping pair follows the Lights rules, and the Google sign-in is core, so the Tasks provider may use it. */
     @Test
     fun theShoppingPairKeepsToItsFamily() {

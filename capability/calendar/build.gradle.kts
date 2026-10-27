@@ -20,6 +20,7 @@ dependencies {
     api(project(":core:household"))
     implementation(project(":core:ui"))
     implementation(project(":core:access"))
+    implementation(project(":core:house"))
     testImplementation(libs.roborazzi.core)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.room.testing)

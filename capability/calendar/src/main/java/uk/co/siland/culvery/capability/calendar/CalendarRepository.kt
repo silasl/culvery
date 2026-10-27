@@ -175,11 +175,11 @@ class CalendarRepository @Inject constructor(
 
     private companion object {
         const val TAG = "CalendarRepository"
-
-        /** Two days: more than any two zones' offsets differ. */
-        const val ZONE_MARGIN_MS = 2 * 86_400_000L
     }
 }
+
+/** Two days: more than any two zones' offsets differ. */
+internal const val ZONE_MARGIN_MS = 2 * 86_400_000L
 
 // Their events may be missing rather than absent (9 §3.1); Out of date is the week's rule.
 private fun unhealthyPeople(sources: List<StoredSource>, connections: List<StoredConnection>, order: List<PersonId>, nowMillis: Long): Set<PersonId> {
