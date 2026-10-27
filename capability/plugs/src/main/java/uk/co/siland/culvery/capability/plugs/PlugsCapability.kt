@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import uk.co.siland.culvery.capability.plugs.ui.PlugsTabHost
 import uk.co.siland.culvery.core.house.HouseModeInfo
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
@@ -31,5 +32,7 @@ class PlugsCapability @Inject constructor(
     override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList())
 
     @Composable
-    override fun TabContent() = Unit
+    override fun TabContent() {
+        systems.firstOrNull()?.let { PlugsTabHost(it, actions, settings, modes) }
+    }
 }

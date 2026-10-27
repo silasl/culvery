@@ -77,7 +77,7 @@ internal class FakePlugSystem(initial: List<PlugState> = emptyList()) : PlugSyst
     val watchers: Int get() = watching.get()
 
     override val plugs: Flow<List<PlugState>?> = added
-    override val problem: Flow<String?> = MutableStateFlow(null)
+    override val problem = MutableStateFlow<String?>(null)
 
     override fun watch(): () -> Unit {
         watching.incrementAndGet()
