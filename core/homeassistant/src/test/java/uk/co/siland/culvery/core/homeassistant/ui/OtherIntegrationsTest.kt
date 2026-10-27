@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +43,7 @@ import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.homeassistant.EntityChoice
 import uk.co.siland.culvery.core.homeassistant.FakeDevice
 import uk.co.siland.culvery.core.homeassistant.HaProblem
 import uk.co.siland.culvery.core.homeassistant.HomeAssistant
@@ -311,6 +313,18 @@ class OtherIntegrationsTest {
         compose.onNodeWithTag("ha_check_line").assertTextEquals("")
         assertThat(ha.link.value).isNull()
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun theUiNamesNoEntity() {
+        val device = DeviceUi(
+            "Thermostat", "climate", "Home Assistant has no thermostat.",
+            listOf(EntityChoice("climate.hall", "Hall")), "climate.hall", "Hall · 20.8 °C · Eco",
+        )
+        val ui = NOTHING_LINKED.copy(linked = true, devices = listOf(device))
+        listOf(device.toString(), ui.toString()).forEach { text ->
+            listOf("climate.hall", "Hall").forEach { assertWithMessage(text).that(text).doesNotContain(it) }
+        }
     }
 
     @Test

@@ -84,7 +84,7 @@ class OtherIntegrationsPage @Inject constructor(
     override fun Content() = OtherIntegrationsHost(ha, linking, devices, toaster)
 }
 
-/** One kind of device: [choices] is null until Home Assistant has listed them. */
+/** One kind of device: [choices] is null until Home Assistant has listed them. [toString] leaves out [chosen] and [line]. */
 data class DeviceUi(
     val title: String,
     val domain: String,
@@ -92,8 +92,11 @@ data class DeviceUi(
     val choices: List<EntityChoice>?,
     val chosen: String?,
     val line: String?,
-)
+) {
+    override fun toString() = "DeviceUi(domain=$domain, choices=${choices?.size}, chosen=${chosen != null}, line=${line != null})"
+}
 
+/** [toString] counts the devices rather than naming them. */
 data class OtherIntegrationsUi(
     val linked: Boolean,
     /** The §6 line, which takes the connection line's place. */
@@ -101,7 +104,9 @@ data class OtherIntegrationsUi(
     val checking: Boolean,
     val checkLine: String?,
     val devices: List<DeviceUi>,
-)
+) {
+    override fun toString() = "OtherIntegrationsUi(linked=$linked, status=${status != null}, checking=$checking, devices=${devices.size})"
+}
 
 @Composable
 fun OtherIntegrations(
