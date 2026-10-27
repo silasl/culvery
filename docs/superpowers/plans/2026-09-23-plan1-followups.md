@@ -643,7 +643,11 @@ Fault found:
 - **To watch:** a row added on the wall may vanish for one frame as Google answers (two Room flows); check on the walk-through before fixing.
 - **Ideas the simplify left out** (each would redesign tested behaviour): one persisted "ticked" table in place of the add's exclusions, the pass's tick set and the sent-adds memory; backoff kept on the connection instead of per row; skipping a list check when the last one was under 15 s ago.
 
+## From Plan 11a
+- **The PIN pad's reason when Shopping is turned off:** "Stop using the sample list" asks for a PIN "to connect calendars and services", though it disconnects. Older than Plan 11a; a one-line copy change.
+
 ## To check when the tablet is next plugged in
+- **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
 - **Home slow to fill (9c walk-through, 2026-10-22):** on the emulator, Home's cards took a moment to fill after opening. Time it on the tablet (cold start and return from the Calendar tab) before deciding whether anything needs fixing. The same walk-through saw it on the Calendar tab after a restart, Settings › Calendars, Home location and People (fault 1); time those too.
 
