@@ -54,7 +54,7 @@ Done with the user during the brainstorm, so the build can test against it:
 
 - Home Assistant Container (`ghcr.io/home-assistant/home-assistant:stable`) under Synology Container Manager, host networking, `TZ=Europe/London`, config in the `docker/homeassistant` shared folder. Plain `http://` on port 8123 at the NAS's address (`[ha address]` in committed files).
 - HACS, and from it `Eufy Robovac MQTT`: Start and Return to dock both worked from Home Assistant, and the Eufy app on the phone stayed signed in.
-- The Nest integration through its own Google Cloud project (not Culvery's), its consent screen **In production** (a Testing one would expire every 7 days), Device Access paid, and the Pub/Sub event feed. The thermostat ("Downstairs") shows; setting the preset to Eco and back to None worked and showed in the Google Home app.
+- The Nest integration through its own Google Cloud project (not Culvery's), its consent screen **In production** (a Testing one would expire every 7 days), Device Access paid, and the Pub/Sub event feed. The thermostat ("Hall") shows; setting the preset to Eco and back to None worked and showed in the Google Home app.
 
 Also done (2026-10-26): the Home Assistant user **Culvery**, not an administrator, limited to logins from the local network. The entities are `vacuum.eufy_clean_x10_pro_omni` and its battery `sensor.eufy_clean_x10_pro_omni_battery`. Still to do, during 11a: Culvery's token (§4.1).
 
@@ -101,7 +101,7 @@ The handoff's tray (note 13): a 2 px outline, "ONE-TAP" label, rows of tiles. Th
 
 ### 4.5 Heating in 11a
 
-No button. Settings › Other integrations shows the thermostat's line: "Downstairs · 20.8 °C · heating to 21.2 °C" or "· Eco". 11a builds and tests `setEco`; the person can't trigger it from the wall until 11b.
+No button. Settings › Other integrations shows the thermostat's line: "Hall · 20.8 °C · heating to 21.2 °C" or "· Eco". 11a builds and tests `setEco`; the person can't trigger it from the wall until 11b.
 
 ### 4.6 TalkBack
 
