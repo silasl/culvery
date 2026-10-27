@@ -86,7 +86,7 @@ internal fun HooverRow(state: HooverState, line: String?, starting: Boolean, onS
                     line ?: hooverStatus(state),
                     style = HooverDimens.statusStyle,
                     color = colors.mute,
-                    maxLines = HooverDimens.STATUS_LINES,
+                    maxLines = if (state.problem != null) Int.MAX_VALUE else HooverDimens.STATUS_LINES,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("hoover_status"),
                 )

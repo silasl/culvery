@@ -255,12 +255,24 @@ class HooverRowTest {
         assertThat(system.cancelled).isEqualTo(1)
     }
 
-    /** The longest line the row can show fits two lines at 333 dp. */
+    /** A problem line wraps in full at 333 dp: no line cap, no ellipsis. */
     @Test
-    fun theLongestLineFitsTwoLines() {
+    fun aProblemLineWrapsInFull() {
         system.current.value = state(HooverActivity.DOCKED, 86, TOKEN_LINE)
         show()
         status().assertTextEquals(TOKEN_LINE)
+        val results = mutableListOf<TextLayoutResult>()
+        status().fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action!!(results)
+        val layout = results.single()
+        assertThat(layout.lineCount).isGreaterThan(2)
+        assertThat((0 until layout.lineCount).any { layout.isLineEllipsized(it) }).isFalse()
+    }
+
+    /** An ordinary status keeps its two-line cap. */
+    @Test
+    fun anOrdinaryLineKeepsTheCap() {
+        system.current.value = state(HooverActivity.DOCKED, 86)
+        show()
         assertThat(statusLines()).isAtMost(2)
     }
 

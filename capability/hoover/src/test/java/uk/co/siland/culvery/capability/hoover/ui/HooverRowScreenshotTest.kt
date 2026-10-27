@@ -32,6 +32,7 @@ class HooverRowScreenshotTest {
     private val cleaning = HooverState(HooverActivity.CLEANING, 60, null)
     private val stuck = HooverState(HooverActivity.ERROR, 40, null)
     private val cantReach = HooverState(null, null, "Can’t reach Home Assistant. Check the NAS is on.")
+    private val tokenRefused = HooverState(null, null, "Home Assistant no longer accepts Culvery’s token. Add a new one in Settings › Other integrations.")
     private val notStarted = "The hoover didn’t start. Check the Eufy app."
 
     @Test fun dockedDark() = snap("hoover_row_docked_dark", true, docked)
@@ -53,6 +54,10 @@ class HooverRowScreenshotTest {
     @Test fun cantReachDark() = snap("hoover_row_cant_reach_dark", true, cantReach)
 
     @Test fun cantReachLight() = snap("hoover_row_cant_reach_light", false, cantReach)
+
+    @Test fun tokenRefusedDark() = snap("hoover_row_token_refused_dark", true, tokenRefused)
+
+    @Test fun tokenRefusedLight() = snap("hoover_row_token_refused_light", false, tokenRefused)
 
     @Test fun notStartedDark() = snap("hoover_row_not_started_dark", true, docked, line = notStarted)
 
