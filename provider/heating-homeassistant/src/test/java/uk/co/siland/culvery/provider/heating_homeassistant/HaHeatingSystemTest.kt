@@ -3,6 +3,7 @@ package uk.co.siland.culvery.provider.heating_homeassistant
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -112,23 +113,52 @@ class HaHeatingSystemTest {
         assertThat(system.state.first()).isNull()
     }
 
-    /** Fails if setEco sends anything but the preset, or the wrong one. */
+    /** Fails if setEco sends anything but the preset, or the wrong one, or a preset that took isn't Done. */
     @Test
     fun setEcoSendsThePreset() = runTest {
         val ha = ha()
         val system = system(ha)
         live(ha, hall())
+        api.onService = { _, _, _, data -> api.states["climate.hall"] = hall(preset = data.getValue("preset_mode")) }
         val on = async { system.setEco(true) }
         runCurrent()
         assertThat(api.calls).containsExactly(set("eco"))
         after(30_000)
-        on.await()
-        live(ha, hall(preset = "eco"))
+        assertThat(on.await()).isEqualTo(HeatingResult.Done)
         val off = async { system.setEco(false) }
         runCurrent()
         assertThat(api.calls.last()).isEqualTo(set("none"))
         after(30_000)
-        off.await()
+        assertThat(off.await()).isEqualTo(HeatingResult.Done)
+    }
+
+    /** Leaves Eco cached, then Home Assistant reports the thermostat as [state] with no attributes once the call is made. */
+    private suspend fun TestScope.ecoOffWhileThermostatIs(state: String): Deferred<HeatingResult> {
+        val ha = ha()
+        val system = system(ha)
+        ha.cached(hall(preset = "eco"))
+        api.onService = { _, _, _, _ -> api.states["climate.hall"] = entityState("climate.hall", state) }
+        val result = async { system.setEco(false) }
+        for (read in 1..5) {
+            after(5_000)
+            assertThat(result.isCompleted).isFalse()
+        }
+        after(4_999)
+        assertThat(result.isCompleted).isFalse()
+        after(1)
+        return result
+    }
+
+    /** Fails if a thermostat Home Assistant can't reach counts as Eco off, or doesn't say so at the end. */
+    @Test
+    fun anUnavailableThermostatIsNotEcoOff() = runTest {
+        assertThat(ecoOffWhileThermostatIs("unavailable").await()).isEqualTo(HeatingResult.Failed(THERMOSTAT_UNREACHABLE))
+    }
+
+    /** Fails if a thermostat in an unknown state counts as Eco off. */
+    @Test
+    fun anUnknownThermostatIsNotEcoOff() = runTest {
+        assertThat(ecoOffWhileThermostatIs("unknown").await()).isEqualTo(HeatingResult.NotConfirmed)
     }
 
     /** Fails if Eco is called done before the preset shows, or not once it does. */

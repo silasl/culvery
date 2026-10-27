@@ -26,6 +26,11 @@ import uk.co.siland.culvery.core.homeassistant.problemLine
 private const val TAG = "HaHeatingSystem"
 
 private const val ECO = "eco"
+private const val NONE = "none"
+private const val UNAVAILABLE = "unavailable"
+
+/** States that carry no preset to believe. */
+private val NOT_READ = setOf(UNAVAILABLE, "unknown")
 
 private fun EntityState.preset() = texts["preset_mode"]
 
@@ -73,11 +78,12 @@ class HaHeatingSystem internal constructor(
         if (ha.link.value == null) return HeatingResult.Failed(NOT_LINKED)
         val device = prefs.first().device ?: return HeatingResult.Failed(NO_THERMOSTAT_CHOSEN)
         try {
-            ha.call("climate", "set_preset_mode", device, mapOf("preset_mode" to if (on) ECO else "none"))
-            val shown = ha.awaitEntity(device, CONFIRM_FOR_MS) { (it.preset() == ECO) == on }
+            val preset = if (on) ECO else NONE
+            ha.call("climate", "set_preset_mode", device, mapOf("preset_mode" to preset))
+            val shown = ha.awaitEntity(device, CONFIRM_FOR_MS) { it.state !in NOT_READ && it.preset() == preset }
             if (shown != null) return HeatingResult.Done
             Log.w(TAG, "The preset did not change")
-            HeatingResult.NotConfirmed
+            if (ha.entities.value[device]?.state == UNAVAILABLE) HeatingResult.Failed(THERMOSTAT_UNREACHABLE) else HeatingResult.NotConfirmed
         } catch (e: HomeAssistantException) {
             if (e.problem != HaProblem.REFUSED) return HeatingResult.Failed(problemLine(e.problem))
             Log.w(TAG, "Home Assistant refused the preset")
