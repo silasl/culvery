@@ -678,6 +678,12 @@ Fault found:
 - **As intended (the user, 2026-10-27):** after about 20 minutes idle with the sheet open, the screen dimmed, the sheet closed and Sam was signed out, as other sheets do.
 - **Shell rings:** "There is a ring at your Front Door" reads as an unknown alert (still recorded); "Someone is at your Front Door" reads as a ring.
 
+## Plan 11b (Holiday mode): on the tablet (2026-10-27)
+- **Installed:** the release from f4ea65e8 with `-r` (mapping `culvery-notes/mappings/mapping-f4ea65e.txt`); Culvery came back in front, pinned.
+- **Smoke test only (the user's ruling):** Holiday mode was not turned on, so the lights, Eco, the hoover at 10:00, Eco off at 00:01 and the quiet doorbell are unchecked on the tablet. The first real holiday is the check, alongside the Away check below.
+- **Seen:** the Holiday tile first in the tray above the hoover row; tapping it asks for a PIN "to turn Holiday mode on and off" (cancelled); the Lights tab and Home card read "Holiday lights · Off".
+- **The log scan:** no crash or ANR since the install; the Holiday and door tags wrote nothing (a release logs only warnings and errors); Culvery's lines hold no address, date, name or event title. The log is kept in `culvery-notes/plan11b-tablet-log.txt`.
+
 ## From Plan 11b
 - **End-of-v1 design review:** the mode tile's size against the handoff; the sheet's layout against the mockup; no way out of the date grid without picking a day; "Pick the day you're back." stays after a day is picked; the tile and sheet colours are provisional.
 
