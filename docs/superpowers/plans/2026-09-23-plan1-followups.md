@@ -643,6 +643,16 @@ Fault found:
 - **To watch:** a row added on the wall may vanish for one frame as Google answers (two Room flows); check on the walk-through before fixing.
 - **Ideas the simplify left out** (each would redesign tested behaviour): one persisted "ticked" table in place of the add's exclusions, the pass's tick set and the sent-adds memory; backoff kept on the connection instead of per row; skipping a list check when the last one was under 15 s ago.
 
+## Plan 11a (Home Assistant, the hoover, the heating link): emulator walk-through (2026-10-26 and 27)
+- **Work:** Home without a link; linking (a public `http://` address, an unreachable one, a bad token, then the real address and token behind the Admin PIN; "Linked.", the token field emptied, the hoover and thermostat picked, the thermostat line); the tray beside Shopping and, with Shopping off, at the row's left, with "Docked · {n}%" and the row's spoken labels (read from the accessibility tree, not TalkBack); a Child's PIN refused for Start; the offline line and recovery without a tap (the AVD's network off, not Home Assistant stopped); a deleted token on Home and Settings, and a new one linking again; None for the hoover removing the tray, and choosing it again bringing it back.
+- **Not run, by the user's ruling:** the hoover was never started, so an Adult's Start, "Starting…", "Cleaning", "Going home" and the dock return are unchecked, and the capture has no Start or return in it. The vacuum reported only `docked`.
+- **The capture** (`culvery-notes/ha-capture.txt`, no Start): every entity id and friendly name redacted; no address or token in it.
+- **Fixed:**
+  - Home's hoover row cut the token line at two lines; a problem line now wraps in full (08ad2dd1);
+  - Settings › Other integrations showed the token line three times and sent you to the page you were on; it now says it once, "…Paste a new one below, then Check.", and the device sections don't repeat a link-wide problem (26f82647, aea2af9c). The spec's sentence stays on Home.
+- **Not reproduced:** a slow "Can't reach" line and the keyboard reopening after Check. Both were adb taps landing on the keyboard, which Escape doesn't close; the line shows about 4.5 s after Check.
+- **Left on the AVD:** the Home Assistant link with a live Culvery token (Settings has no way to remove a link). Delete that token in Home Assistant when the emulator no longer needs it.
+
 ## From Plan 11a
 - **The PIN pad's reason when Shopping is turned off:** "Stop using the sample list" asks for a PIN "to connect calendars and services", though it disconnects. Older than Plan 11a; a one-line copy change.
 
