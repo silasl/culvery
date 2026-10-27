@@ -7,13 +7,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -113,22 +113,34 @@ class HomeAssistant(
 
     /**
      * Waits until [done] holds for [entityId], reading it every [CONFIRM_EVERY_MS] and counting what the socket
-     * brings. Returns the state that satisfied it, null when [timeoutMs] pass first; a failed read is thrown.
+     * brings. Only a state seen after the wait began counts. Returns the state that satisfied it, null when
+     * [timeoutMs] pass first; a failed read is ridden out, and thrown at the timeout only if no read succeeded.
      */
-    suspend fun awaitEntity(entityId: String, timeoutMs: Long, done: (EntityState) -> Boolean): EntityState? =
-        withTimeoutOrNull(timeoutMs) {
-            coroutineScope {
-                val polling = launch {
+    suspend fun awaitEntity(entityId: String, timeoutMs: Long, done: (EntityState) -> Boolean): EntityState? {
+        // A socket change or a read builds a new instance; an unrelated update carries this one along.
+        val before = _entities.value[entityId]
+        var readOnce = false
+        var failure: HomeAssistantException? = null
+        val matched = withTimeoutOrNull(timeoutMs) {
+            channelFlow {
+                launch {
                     while (true) {
                         delay(CONFIRM_EVERY_MS)
-                        read(entityId)
+                        val state = try {
+                            read(entityId).also { readOnce = true }
+                        } catch (e: HomeAssistantException) {
+                            failure = e
+                            null
+                        }
+                        state?.let { send(it) }
                     }
                 }
-                val matched = _entities.first { it[entityId]?.let(done) == true }[entityId]
-                polling.cancel()
-                matched
-            }
+                _entities.collect { entities -> entities[entityId]?.takeIf { it !== before }?.let { send(it) } }
+            }.first(done)
         }
+        if (matched == null && !readOnce) failure?.let { throw it }
+        return matched
+    }
 
     /** A screen follows [ids] while it shows; call the result when it goes. */
     fun watch(ids: Flow<Set<String>>): () -> Unit {

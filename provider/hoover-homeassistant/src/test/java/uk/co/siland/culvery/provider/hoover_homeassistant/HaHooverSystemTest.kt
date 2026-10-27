@@ -310,16 +310,33 @@ class HaHooverSystemTest {
         assertThat(ha.problem.value).isEqualTo(HaProblem.UNREACHABLE)
     }
 
-    /** Fails if a read in the check that can't reach Home Assistant is called not started. */
+    /** Fails if a check whose every read can't reach Home Assistant is called not started, or ends before 30 s. */
     @Test
-    fun anUnreachableReadDuringTheCheckFails() = runTest {
+    fun aCheckThatReachesNothingFails() = runTest {
+        val system = system()
+        live(system, "docked")
+        val result = async { system.start() }
+        runCurrent()
+        api.failAll = HaProblem.UNREACHABLE
+        after(29_999)
+        assertThat(result.isCompleted).isFalse()
+        after(1)
+        assertThat(result.await()).isEqualTo(HooverResult.Failed(problemLine(HaProblem.UNREACHABLE)))
+    }
+
+    /** Fails if one failed read in the check ends it, when the next read shows the hoover cleaning. */
+    @Test
+    fun oneFailedReadDuringTheCheckIsRiddenOut() = runTest {
         val system = system()
         live(system, "docked")
         val result = async { system.start() }
         runCurrent()
         api.failNext = HaProblem.UNREACHABLE
         after(5_000)
-        assertThat(result.await()).isEqualTo(HooverResult.Failed(problemLine(HaProblem.UNREACHABLE)))
+        assertThat(result.isCompleted).isFalse()
+        api.states["vacuum.hoover"] = vacuum("cleaning")
+        after(5_000)
+        assertThat(result.await()).isEqualTo(HooverResult.Started)
     }
 
     /** Fails if cancelling a Start mid-check leaves the lock held. */

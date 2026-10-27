@@ -165,6 +165,37 @@ class HaHeatingSystemTest {
         assertThat(result.await()).isEqualTo(HeatingResult.NotConfirmed)
     }
 
+    /** Fails if Eco cached before the call confirms Eco on, when Home Assistant now reads otherwise. */
+    @Test
+    fun aStaleCachedPresetIsNotConfirmation() = runTest {
+        val ha = ha()
+        val system = system(ha)
+        ha.cached(hall(preset = "eco"))
+        api.states["climate.hall"] = hall()
+        val result = async { system.setEco(true) }
+        runCurrent()
+        assertThat(result.isCompleted).isFalse()
+        after(29_999)
+        assertThat(result.isCompleted).isFalse()
+        after(1)
+        assertThat(result.await()).isEqualTo(HeatingResult.NotConfirmed)
+    }
+
+    /** Fails if a preset that was already set is confirmed without a read, or never confirmed. */
+    @Test
+    fun aPresetAlreadySetIsConfirmedByARead() = runTest {
+        val ha = ha()
+        val system = system(ha)
+        ha.cached(hall(preset = "eco"))
+        val result = async { system.setEco(true) }
+        runCurrent()
+        assertThat(result.isCompleted).isFalse()
+        after(4_999)
+        assertThat(result.isCompleted).isFalse()
+        after(1)
+        assertThat(result.await()).isEqualTo(HeatingResult.Done)
+    }
+
     /** Fails if a service Home Assistant refuses is anything but "didn't change", or sets the link's problem. */
     @Test
     fun aRefusedCallSaysTheThermostatDidntChange() = runTest {

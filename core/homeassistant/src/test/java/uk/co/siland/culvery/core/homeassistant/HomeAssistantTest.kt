@@ -264,15 +264,67 @@ class HomeAssistantTest {
         assertThat(api.calls).isEmpty()
     }
 
-    /** Fails if a read that fails in the wait is swallowed. */
+    /** Fails if a wait whose every read failed is swallowed, or gives up before the timeout. */
     @Test
-    fun awaitEntityPassesOnAFailedRead() = runTest {
+    fun awaitEntityPassesOnWhenEveryReadFails() = runTest {
         val ha = ha()
-        api.failNext = HaProblem.UNREACHABLE
+        api.failAll = HaProblem.UNREACHABLE
         var problem: HaProblem? = null
         launch { problem = refusal { ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { false } } }
-        after(CONFIRM_EVERY_MS)
+        after(CONFIRM_FOR_MS - 1)
+        assertThat(problem).isNull()
+        after(1)
         assertThat(problem).isEqualTo(HaProblem.UNREACHABLE)
+    }
+
+    /** Fails if one failed read ends the wait, rather than the next read that shows the change. */
+    @Test
+    fun awaitEntityRidesOutOneFailedRead() = runTest {
+        api.states["vacuum.hoover"] = entityState("vacuum.hoover", "cleaning")
+        val ha = ha()
+        api.failNext = HaProblem.UNREACHABLE
+        var result: EntityState? = null
+        launch { result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it.state == "cleaning" } }
+        after(CONFIRM_EVERY_MS)
+        assertThat(result).isNull()
+        after(CONFIRM_EVERY_MS)
+        assertThat(result?.state).isEqualTo("cleaning")
+    }
+
+    /** Fails if an entry cached before the wait confirms it, at once or when the socket brings another entity. */
+    @Test
+    fun awaitEntityIgnoresAnUnrelatedEmissionCarryingTheOldEntry() = runTest {
+        api.states["vacuum.hoover"] = entityState("vacuum.hoover", "cleaning")
+        val ha = ha()
+        ha.read("vacuum.hoover")
+        api.states["vacuum.hoover"] = hoover
+        ha.watch(flowOf(setOf("vacuum.hoover", "sensor.hoover_battery")))
+        runCurrent()
+        var finished = false
+        launch {
+            ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it.state == "cleaning" }
+            finished = true
+        }
+        runCurrent()
+        assertThat(finished).isFalse()
+        api.socket.emit(mapOf("sensor.hoover_battery" to battery))
+        runCurrent()
+        assertThat(finished).isFalse()
+        assertThat(ha.entities.value["vacuum.hoover"]?.state).isEqualTo("cleaning")
+    }
+
+    /** Fails if a read that shows what the cache already held doesn't confirm, as when the change was made elsewhere first. */
+    @Test
+    fun awaitEntityCountsAReadThatAgreesWithTheCache() = runTest {
+        api.states["vacuum.hoover"] = entityState("vacuum.hoover", "cleaning")
+        val ha = ha()
+        ha.read("vacuum.hoover")
+        var result: EntityState? = null
+        launch { result = ha.awaitEntity("vacuum.hoover", CONFIRM_FOR_MS) { it.state == "cleaning" } }
+        after(CONFIRM_EVERY_MS - 1)
+        assertThat(result).isNull()
+        after(1)
+        assertThat(result?.state).isEqualTo("cleaning")
     }
 
     /** Fails if the fake lets a test drop a socket that has already closed. */
