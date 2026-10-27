@@ -271,7 +271,7 @@ class ShellScreenshotTest {
         HhCard(Modifier.fillMaxWidth().height(68.dp)) { Text("Tray row", style = HhType.cardTitle, color = Culvery.colors.ink) }
     }
 
-    /** The Holiday tile's place, first in the tray at its height (11 ง5.2). */
+    /** The Holiday tile's place, first in the tray at its height (11 ยง5.2). */
     private val trayHoliday = TrayButton("holiday.mode", 10) {
         Box(
             Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(17.dp)).background(Culvery.colors.surf2).padding(horizontal = 12.dp),

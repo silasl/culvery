@@ -50,7 +50,7 @@ class NoBackupTest {
         }
     }
 
-    /** Pin (11 ง4.2): Holiday mode's record, with its back date, is a datastore file, so the same rule keeps it off backups. */
+    /** Pin (11 ยง4.2): Holiday mode's record, with its back date, is a datastore file, so the same rule keeps it off backups. */
     @Test
     fun holidayModesRecordIsKeptWhereTheRulesExclude() {
         val settings = File("../capability/holiday/src/main/java/uk/co/siland/culvery/capability/holiday/HolidaySettings.kt").readText()

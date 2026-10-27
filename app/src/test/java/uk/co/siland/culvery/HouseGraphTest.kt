@@ -14,7 +14,7 @@ import org.robolectric.annotation.Config
 import uk.co.siland.culvery.capability.holiday.HolidayScheduler
 import uk.co.siland.culvery.di.HouseGraphProbe
 
-/** The real Hilt graph, built by the real application, gives Holiday mode what it needs (11 §4.2). */
+/** The real Hilt graph, built by the real application, gives Holiday mode what it needs (11 §4.2); reads it through the debug source set's [HouseGraphProbe]. */
 @RunWith(AndroidJUnit4::class)
 @Config(application = CulveryApp::class)
 class HouseGraphTest {
@@ -36,10 +36,9 @@ class HouseGraphTest {
     }
 
     @Test
-    fun theSchedulerIsStartedWithTheOthersAndReadsTheRecord() = runBlocking {
-        val scheduler = probe.startables().filterIsInstance<HolidayScheduler>()
-        assertThat(scheduler).hasSize(1)
-        scheduler.single().start()
+    fun theAppStartsTheScheduler() = runBlocking {
+        assertThat(probe.startables().filterIsInstance<HolidayScheduler>()).hasSize(1)
+        // Nothing else reads the record: only the scheduler's own start, from CulveryApp.onCreate, makes it known.
         assertThat(withTimeout(10_000) { probe.houseMode().holiday.first { it != null } }).isFalse()
     }
 }
