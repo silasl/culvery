@@ -518,9 +518,9 @@ class DisplayStateTest {
         night.changesAt(NIGHT_AWAKE_MS, AWAKE, NIGHT_CLOCK)
     }
 
-    /** 11 §5.6: Fails if a PIN pad or sheet showing lets the wall go dark, or it stays up once released. */
+    /** 11 §5.3: Fails if the Holiday sheet closing leaves the wall awake for the usual wait. */
     @Test
-    fun heldStaysAwake() = runTest {
+    fun theSheetClosingDarkensAtOnce() = runTest {
         val wall = wall()
         wall.hold(true)
         wall.away(true)
@@ -528,6 +528,31 @@ class DisplayStateTest {
         wall.after(THIRTY_MINUTES)
         assertThat(wall.screen).isEqualTo(AWAKE)
         wall.hold(false)
+        assertThat(wall.screen).isEqualTo(ASLEEP)
+    }
+
+    /** 11 §5.6: Fails if a hold ending while already away blanks the screen at once instead of after the wait. */
+    @Test
+    fun heldStaysAwakeThenSleepsAfterTheUsualWait() = runTest {
+        val wall = wall()
+        wall.away(true)
+        wall.tap()
+        wall.hold(true)
+        wall.after(THIRTY_MINUTES)
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        wall.hold(false)
+        assertThat(wall.screen).isEqualTo(AWAKE)
+        wall.changesAt(FIVE_MINUTES, AWAKE, ASLEEP)
+    }
+
+    /** 11 §5.6: Fails if coming back from another app while away leaves the screen dark or awake for good. */
+    @Test
+    fun returningFromAnotherAppWhileAwayWakesThenSleeps() = runTest {
+        val wall = wall()
+        wall.away(true)
+        wall.front(false)
+        wall.front(true)
+        assertThat(wall.screen).isEqualTo(AWAKE)
         wall.changesAt(FIVE_MINUTES, AWAKE, ASLEEP)
     }
 

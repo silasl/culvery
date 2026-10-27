@@ -53,6 +53,8 @@ internal data class Display(
     val prefs: DisplayPrefs?,
     val seenFront: Boolean,
     val holiday: Boolean? = null,
+    /** Holiday mode came on during the current hold: the screen goes dark as the hold ends (11 §5.3). */
+    val darkenOnRelease: Boolean = false,
 )
 
 /** The idle wait running, if any: after [ms] with no activity the screen becomes [then]. */
@@ -85,6 +87,7 @@ internal fun next(display: Display, prefs: DisplayPrefs?, now: LocalDateTime?, i
     }
     return display.copy(
         screen = screen, inFront = inFront, night = night, prefs = prefs, seenFront = display.seenFront || inFront, holiday = holiday,
+        darkenOnRelease = holiday == true && display.held && (display.holiday != true || display.darkenOnRelease),
     )
 }
 
@@ -165,8 +168,18 @@ class DisplayState internal constructor(
     /** Someone moved in front of the camera: wakes the dark screen by day, never the night clock or on Holiday mode. */
     fun moved() = wake { it.holiday != true && it.night == false && it.screen != Screen.NIGHT_CLOCK }
 
-    /** Something on screen keeps the wall awake while [on], waking it as it starts; the wait starts again as it ends. */
-    fun held(on: Boolean) = change { it.copy(screen = if (on) Screen.AWAKE else it.screen, held = on) }
+    /**
+ * Something on screen keeps the wall awake while [on], waking it as it starts; the wait starts again as it ends,
+ * unless Holiday mode came on during the hold, when the screen goes dark as it ends.
+ */
+    fun held(on: Boolean) = change {
+        val screen = when {
+            on -> Screen.AWAKE
+            it.darkenOnRelease && it.inFront -> Screen.ASLEEP
+            else -> it.screen
+        }
+        it.copy(screen = screen, held = on, darkenOnRelease = it.darkenOnRelease && on)
+    }
 
     private fun wake(allowed: (Display) -> Boolean) = change {
         when {
