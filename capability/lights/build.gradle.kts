@@ -12,7 +12,8 @@ dependencies {
     api(project(":core:plugin"))
     implementation(project(":core:ui"))
     implementation(project(":core:access"))
-    implementation(project(":core:house"))
+    // HouseLights appears in LightsHouseSeam's public API.
+    api(project(":core:house"))
     implementation(libs.androidx.datastore.preferences)
     testImplementation(libs.roborazzi.core)
     testImplementation(libs.roborazzi.compose)

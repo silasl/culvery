@@ -2,6 +2,9 @@ package uk.co.siland.culvery.capability.lights
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -50,15 +53,25 @@ class LightsHouseSeamTest {
         assertThat(seam.setHoliday(true, houseAdult())).isEqualTo(HouseStep.Failed(HUE_REFUSED))
     }
 
-    /** Fails if turning off is skipped because the record says off: it always runs. */
+    /** 11 §5.4. Fails if turning off is skipped when the record says off: it still stops what Culvery started. */
     @Test
     fun offAlwaysRuns() = runTest {
-        soon { settings.setHolidayOn(true) }
+        soon { settings.setHolidayOn(false) }
         soon { settings.setHolidayStarted(setOf("mimic-id")) }
         system.automationList = listOf(MIMIC.copy(on = true))
         assertThat(seam.setHoliday(false, houseAdult())).isEqualTo(HouseStep.Done)
         assertThat(system.calls).contains("setAutomation mimic-id false")
-        assertThat(soon { settings.prefs.first() }.holidayOn).isFalse()
+    }
+
+    /** Fails if a run already holding the house is reported as Hue refusing, or the busy line is lost. */
+    @Test
+    fun busyIsFailed() = runTest {
+        val open = CompletableDeferred<Unit>().also { system.gates["allOff []"] = it }
+        val run = async { house.allOff() }
+        soon { while ("allOff []" !in system.calls) delay(5) }
+        assertThat(seam.setHoliday(true, houseAdult())).isEqualTo(HouseStep.Failed("The lights are busy. Culvery will try again in a few minutes."))
+        open.complete(Unit)
+        run.await()
     }
 
     /** Fails if ready is true before a bridge is paired, or doesn't follow pairing. */

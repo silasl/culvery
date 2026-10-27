@@ -21,7 +21,8 @@ class LightsHouseSeam @Inject constructor(
         return when (val result = house.setHoliday(on, by)) {
             HolidayResult.Done, is HolidayResult.Partly -> HouseStep.Done
             is HolidayResult.CantReach -> HouseStep.Failed(problemLine(result.problem))
-            HolidayResult.Busy, HolidayResult.Refused -> HouseStep.Failed(HUE_REFUSED)
+            HolidayResult.Busy -> HouseStep.Failed(LIGHTS_BUSY)
+            HolidayResult.Refused -> HouseStep.Failed(houseLine(result, house::nameOf) ?: HUE_REFUSED)
         }
     }
 }
