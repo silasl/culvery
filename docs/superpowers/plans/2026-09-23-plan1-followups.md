@@ -660,6 +660,27 @@ Fault found:
 - **The log scan:** the Home Assistant tags wrote nothing (a release logs only warnings and errors, and there were none). The whole log, 37,807 lines, has no address, token or device name in it.
 - **Fixtures:** rewritten from the emulator's capture (a0c5b956). The household's vacuum has no `battery_level` attribute; its battery is the separate sensor, which is what the app reads.
 
+## Plan 11b (Holiday mode): emulator walk-through (2026-10-27)
+- **Set-up:** the debug build from 7544e223, installed with `-r`. The AVD has no Home Assistant link, so Eco and the hoover are never among the steps; Hue is linked but out of reach from the AVD. Airplane mode was on from turning on to turning off (the user's ruling), so no lights could change, and off again at the end.
+- **Work:**
+  - the Lights tab's button reads "Holiday lights";
+  - the tile first in the One-tap tray;
+  - a fresh PIN asked with Alex signed in; a Child's PIN refused ("That PIN can't do this. Ask a grown-up."); an Adult's opens the sheet;
+  - the sheet with no multi-day event (tomorrow chosen, "Pick the day you're back.") and with a 27–31 Oct all-day event ("From the calendar: Cornwall, ends Saturday.", Saturday 31 October);
+  - Change date: today and before can't be picked, 25 January (90 days) is the last day;
+  - the steps listed: Holiday lights, the doorbell, the screen;
+  - turning on: the screen dark at once, black with no clock; a tap wakes it; the tile ON with "Back Sat 31 Oct" and the lights' offline line under it;
+  - a ring recorded with no card and the rail badge counting it;
+  - the clock moved to Friday 10:00 and Saturday 00:01: still on, nothing run (no hoover or Eco step without a link); at night the screen sleeps black, never the night clock;
+  - turning off with an Adult's PIN: the tile back to plain, no line (Holiday lights never came on), the record cleared on disk, a ring raising the card again.
+- **Not seen:** "Turning on…" (offline, the run ends at once); Settings › Lights' Holiday lights section (shown only with a paired bridge); the hoover at 10:00 and Eco off at 00:01 against a real link (unit-tested); the chime.
+- **Debug clock only, not a fault:** moving the clock back from Saturday 00:05 to the real time left the door recording only and Today missing its later events until the app restarted. Holiday mode on and off with the clock left alone brought the card back, so it's the clock jumping back, which only the debug offset does.
+- **To ask:** after about 20 minutes idle with the sheet open, the screen dimmed, the sheet closed and Sam was signed out. Other sheets do the same; is that right for this one?
+- **Shell rings:** "There is a ring at your Front Door" reads as an unknown alert (still recorded); "Someone is at your Front Door" reads as a ring.
+
+## From Plan 11b
+- **End-of-v1 design review:** the mode tile's size against the handoff; the sheet's layout against the mockup; no way out of the date grid without picking a day; "Pick the day you're back." stays after a day is picked; the tile and sheet colours are provisional.
+
 ## From Plan 11a
 - **End-of-v1 design review:**
   - the tray's edge at 1 dp (the header tray's), not 2 px;
