@@ -651,7 +651,7 @@ Fault found:
   - Home's hoover row cut the token line at two lines; a problem line now wraps in full (08ad2dd1);
   - Settings › Other integrations showed the token line three times and sent you to the page you were on; it now says it once, "…Paste a new one below, then Check.", and the device sections don't repeat a link-wide problem (26f82647, aea2af9c). The spec's sentence stays on Home.
 - **Not reproduced:** a slow "Can't reach" line and the keyboard reopening after Check. Both were adb taps landing on the keyboard, which Escape doesn't close; the line shows about 4.5 s after Check.
-- **Left on the AVD:** the Home Assistant link with a live Culvery token (Settings has no way to remove a link). Delete that token in Home Assistant when the emulator no longer needs it.
+- **Left on the AVD:** the Home Assistant link with a live Culvery token (Settings has no way to remove a link). The token stays: the tablet uses it too (the user, 2026-10-27).
 
 ## Plan 11a (Home Assistant, the hoover, the heating link): on the tablet (2026-10-27)
 - **Installed:** the release from a0c5b956 (mapping `culvery-notes/mappings/mapping-a0c5b95.txt`). The install closed Culvery and the tablet went to Samsung's launcher, so Culvery isn't the home app at the moment.
