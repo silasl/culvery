@@ -675,7 +675,7 @@ Fault found:
   - turning off with an Adult's PIN: the tile back to plain, no line (Holiday lights never came on), the record cleared on disk, a ring raising the card again.
 - **Not seen:** "Turning on…" (offline, the run ends at once); Settings › Lights' Holiday lights section (shown only with a paired bridge); the hoover at 10:00 and Eco off at 00:01 against a real link (unit-tested); the chime.
 - **Debug clock only, not a fault:** moving the clock back from Saturday 00:05 to the real time left the door recording only and Today missing its later events until the app restarted. Holiday mode on and off with the clock left alone brought the card back, so it's the clock jumping back, which only the debug offset does.
-- **To ask:** after about 20 minutes idle with the sheet open, the screen dimmed, the sheet closed and Sam was signed out. Other sheets do the same; is that right for this one?
+- **As intended (the user, 2026-10-27):** after about 20 minutes idle with the sheet open, the screen dimmed, the sheet closed and Sam was signed out, as other sheets do.
 - **Shell rings:** "There is a ring at your Front Door" reads as an unknown alert (still recorded); "Someone is at your Front Door" reads as a ring.
 
 ## From Plan 11b
