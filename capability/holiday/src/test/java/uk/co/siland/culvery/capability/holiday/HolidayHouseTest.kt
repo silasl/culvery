@@ -21,6 +21,7 @@ import uk.co.siland.culvery.capability.holiday.HolidayStep.ECO_OFF
 import uk.co.siland.culvery.capability.holiday.HolidayStep.ECO_ON
 import uk.co.siland.culvery.capability.holiday.HolidayStep.HOOVER
 import uk.co.siland.culvery.capability.holiday.HolidayStep.LIGHTS_ON
+import uk.co.siland.culvery.capability.holiday.HolidayStep.PLUGS_ON
 import uk.co.siland.culvery.capability.holiday.StepState.DONE
 import uk.co.siland.culvery.capability.holiday.StepState.MISSED
 import uk.co.siland.culvery.capability.holiday.StepState.PENDING
@@ -28,7 +29,9 @@ import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.house.HouseLights
+import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePermissions
+import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseStep
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -42,6 +45,7 @@ class HolidayHouseTest {
         val lights = FakeLights()
         val heating = FakeHeating()
         val hoover = FakeHoover()
+        val plugs = FakePlugs()
         var now: LocalDateTime? = THU_0900
         var wall = millis(THU_0900)
 
@@ -55,7 +59,8 @@ class HolidayHouseTest {
             heating: HouseHeating? = this.heating,
             hoover: HouseHoover? = this.hoover,
             settings: HolidaySettings = this.settings,
-        ) = HolidayHouse(settings, lights, heating, hoover, WallClock { wall }, { now })
+            plugs: HousePlugs? = this.plugs,
+        ) = HolidayHouse(settings, lights, heating, hoover, plugs, WallClock { wall }, { now })
 
         /** The process starting again: a new store over the same file, seams with nothing done, and a new house. */
         fun restarted(lights: HouseLights? = this.lights, hoover: HouseHoover? = this.hoover) =
@@ -478,6 +483,301 @@ class HolidayHouseTest {
         assertThat(rig.heating.calls).hasSize(2)
     }
 
+    /** Fails if the plugs' run isn't begun with the turn-on's own grant before the record is saved, or enter doesn't follow the heating. */
+    @Test
+    fun turnOnBeginsThePlugsWithItsGrantBeforeTheRecord() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        val house = rig.house()
+        val order = mutableListOf<String>()
+        rig.plugs.onCall = { order += "$it, saved ${rig.settings.prefs.first().on}" }
+        rig.lights.onCall = { order += "setHoliday(true)" }
+        rig.heating.onCall = { order += "setEco(true)" }
+        val by = adult()
+
+        house.turnOn(SAT_31_OCT, by)
+
+        assertThat(rig.plugs.begins).containsExactly(by)
+        assertThat(order).containsExactly(
+            "leave:holiday, saved false", "begin:holiday, saved false", "setHoliday(true)", "setEco(true)", "enter:holiday, saved true",
+        ).inOrder()
+        assertThat(house.record.value!!.steps)
+            .isEqualTo(mapOf(LIGHTS_ON to DONE, ECO_ON to DONE, PLUGS_ON to DONE, HOOVER to PENDING, ECO_OFF to PENDING))
+    }
+
+    /** Fails if plugs that aren't ready get a step, a begin or an enter, or turning off skips putting them back. */
+    @Test
+    fun noPlugsReadyNoStep() = runTest {
+        val rig = rig()
+        val house = rig.house()
+
+        assertThat(house.plan(SAT_31_OCT)).doesNotContain(PLUGS_ON)
+        house.turnOn(SAT_31_OCT, adult())
+        assertThat(house.record.value!!.steps).doesNotContainKey(PLUGS_ON)
+        assertThat(rig.plugs.calls).containsExactly("leave:holiday")
+        house.turnOff(adult())
+
+        assertThat(rig.plugs.calls).containsExactly("leave:holiday", "leave:holiday")
+        assertThat(rig.plugs.begins).isEmpty()
+    }
+
+    /** Fails if a begin that threw stops the record being saved, or the missing run isn't missed with its own line. */
+    @Test
+    fun aPlugsStepWithNoRunIsMissed() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        rig.plugs.throwOnBegin = true
+        val house = rig.house(hoover = null)
+
+        house.turnOn(SAT_31_OCT, adult())
+
+        assertThat(rig.settings.prefs.first().on).isTrue()
+        assertThat(rig.plugs.calls).containsExactly("leave:holiday", "begin:holiday", "enter:holiday").inOrder()
+        assertThat(house.record.value!!.steps[PLUGS_ON]).isEqualTo(MISSED)
+        assertThat(house.line.value).isEqualTo("The plugs didn’t switch. Switch them on the Plugs tab.")
+    }
+
+    /** Fails if a failed plugs step shows no line, is tried before five minutes or not at five, or keeps its line once it works. */
+    @Test
+    fun aFailedPlugsStepIsRetriedEveryFiveMinutes() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        val house = rig.house(hoover = null)
+        rig.plugs.enters += HouseStep.Failed(LAMP_LINE)
+
+        house.line.test {
+            assertThat(awaitItem()).isNull()
+            house.turnOn(SAT_31_OCT, adult())
+            assertThat(awaitItem()).isEqualTo(LAMP_LINE)
+            assertThat(house.record.value!!.steps[PLUGS_ON]).isEqualTo(PENDING)
+
+            val turnedOn = rig.wall
+            rig.now = THU_0900.plusMinutes(4)
+            rig.wall = turnedOn + HolidayHouse.RETRY_MS - 60_000
+            house.tick()
+            assertThat(rig.plugs.enterCount()).isEqualTo(1)
+
+            rig.now = THU_0900.plusMinutes(5)
+            rig.wall = turnedOn + HolidayHouse.RETRY_MS
+            house.tick()
+            assertThat(rig.plugs.enterCount()).isEqualTo(2)
+            assertThat(house.record.value!!.steps[PLUGS_ON]).isEqualTo(DONE)
+            assertThat(awaitItem()).isNull()
+        }
+    }
+
+    /** Fails if an enter that threw shows no line or isn't tried again. */
+    @Test
+    fun aPlugsStepThatThrowsShowsItsLine() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        rig.plugs.throwOnEnter = true
+        val house = rig.house(hoover = null)
+
+        house.turnOn(SAT_31_OCT, adult())
+        assertThat(house.line.value).isEqualTo("The plugs didn’t switch. They’ll keep trying.")
+        assertThat(house.record.value!!.steps[PLUGS_ON]).isEqualTo(PENDING)
+
+        rig.plugs.throwOnEnter = false
+        val turnedOn = rig.wall
+        rig.wall = turnedOn + HolidayHouse.RETRY_MS - 60_000
+        house.tick()
+        assertThat(rig.plugs.enterCount()).isEqualTo(1)
+        rig.wall = turnedOn + HolidayHouse.RETRY_MS
+        house.tick()
+
+        assertThat(rig.plugs.enterCount()).isEqualTo(2)
+        assertThat(house.record.value!!.steps[PLUGS_ON]).isEqualTo(DONE)
+        assertThat(house.line.value).isNull()
+    }
+
+    /** Pin: fails if the plugs step ever has a window that closes, through 00:01 on the back day and the day after. */
+    @Test
+    fun thePlugsStepIsNeverMissedByTime() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        rig.plugs.enterOtherwise = HouseStep.Failed(LAMP_LINE)
+        val house = rig.house(hoover = null)
+        house.turnOn(SAT_31_OCT, adult())
+
+        rig.at(SAT_31_OCT.atTime(0, 0))
+        house.tick()
+        assertThat(rig.plugs.enterCount()).isEqualTo(2)
+        rig.at(SAT_0001)
+        house.tick()
+        assertThat(rig.plugs.enterCount()).isEqualTo(2)
+        assertThat(house.record.value!!.steps[PLUGS_ON]).isEqualTo(PENDING)
+        rig.at(SAT_31_OCT.atTime(0, 6))
+        house.tick()
+        assertThat(rig.plugs.enterCount()).isEqualTo(3)
+        rig.at(SAT_31_OCT.plusDays(1).atTime(12, 0))
+        house.tick()
+
+        assertThat(rig.plugs.enterCount()).isEqualTo(4)
+        assertThat(house.record.value!!.steps[PLUGS_ON]).isEqualTo(PENDING)
+        assertThat(house.line.value).isEqualTo(LAMP_LINE)
+    }
+
+    /** Fails if a plug that won't switch stops the hoover at 10:00 or Eco off at 00:01. */
+    @Test
+    fun aFailedPlugDoesntStopHolidayMode() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        rig.plugs.enterOtherwise = HouseStep.Failed(LAMP_LINE)
+        val house = rig.house()
+        house.turnOn(SAT_31_OCT, adult())
+
+        rig.at(FRI_30_OCT.atTime(10, 0))
+        house.tick()
+        assertThat(rig.hoover.calls).hasSize(1)
+        rig.at(SAT_0001)
+        house.tick()
+
+        assertThat(rig.heating.calls).containsExactly(true, false).inOrder()
+        assertThat(house.record.value!!.steps[HOOVER]).isEqualTo(DONE)
+        assertThat(house.record.value!!.steps[ECO_OFF]).isEqualTo(DONE)
+    }
+
+    /** Fails if a plugs step left pending by a restart is skipped, or asks for a grant the restart forgot. */
+    @Test
+    fun aPendingPlugsStepIsRetriedAfterARestart() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        rig.settings.save(HolidayRecord(on = true, back = SAT_31_OCT, since = rig.wall, steps = mapOf(PLUGS_ON to PENDING)))
+        rig.plugs.begun += HouseModes.HOLIDAY
+        val house = rig.house()
+
+        house.tick()
+
+        assertThat(rig.plugs.calls).containsExactly("enter:holiday")
+        assertThat(rig.plugs.begins).isEmpty()
+        assertThat(house.record.value!!.steps[PLUGS_ON]).isEqualTo(DONE)
+    }
+
+    /** Fails if the plugs aren't put back after the heating and before the record clears, or are touched at 00:01. */
+    @Test
+    fun plugsGoBackAtTapOff() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        val house = rig.house(hoover = null)
+        house.turnOn(SAT_31_OCT, adult())
+        rig.at(SAT_0001)
+        house.tick()
+        assertThat(rig.plugs.calls).containsExactly("leave:holiday", "begin:holiday", "enter:holiday").inOrder()
+
+        val early = rig()
+        early.plugs.readyNow.value = true
+        val tapped = early.house(hoover = null)
+        tapped.turnOn(SAT_31_OCT, adult())
+        early.at(FRI_30_OCT.atTime(18, 0))
+        val order = mutableListOf<String>()
+        early.lights.onCall = { order += "setHoliday(false)" }
+        early.heating.onCall = { order += "setEco(false)" }
+        early.plugs.onCall = { order += "$it, record on ${early.settings.prefs.first().on}" }
+
+        tapped.turnOff(adult())
+
+        assertThat(order).containsExactly("setHoliday(false)", "setEco(false)", "leave:holiday, record on true").inOrder()
+        assertThat(early.settings.prefs.first()).isEqualTo(HolidayRecord())
+        assertThat(tapped.line.value).isNull()
+    }
+
+    /** Review Focus 5: fails if plugs that didn't go back stop Holiday mode ending, or their line doesn't show for ten minutes. */
+    @Test
+    fun turningOffWithPlugsFailingStillEnds() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        val house = rig.house(hoover = null)
+        house.turnOn(SAT_31_OCT, adult())
+        rig.plugs.leaves += HouseStep.Failed(LAMP_BACK_LINE)
+        rig.at(FRI_30_OCT.atTime(18, 0))
+        val off = rig.wall
+
+        house.turnOff(adult())
+
+        assertThat(house.holiday.value).isFalse()
+        assertThat(rig.settings.prefs.first()).isEqualTo(HolidayRecord())
+        assertThat(house.line.value).isEqualTo(LAMP_BACK_LINE)
+        rig.wall = off + HolidayHouse.OFF_LINE_MS - 60_000
+        house.tick()
+        assertThat(house.line.value).isEqualTo(LAMP_BACK_LINE)
+        rig.wall = off + HolidayHouse.OFF_LINE_MS
+        house.tick()
+        assertThat(house.line.value).isNull()
+
+        house.turnOn(SAT_31_OCT, adult())
+        rig.plugs.leaves += HouseStep.Failed(LAMP_BACK_LINE)
+        rig.heating.results += HouseStep.Failed("The heating didn’t come off Eco. Turn it off in the Nest app.")
+        house.turnOff(adult())
+
+        assertThat(house.line.value).isEqualTo(STILL_ON_ECO)
+    }
+
+    /** Review Focus 5: fails if a leave that threw stops Holiday mode ending, or shows no line. */
+    @Test
+    fun turningOffWithPlugsThrowingStillEnds() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        val house = rig.house(hoover = null)
+        house.turnOn(SAT_31_OCT, adult())
+        rig.plugs.throwOnLeave = true
+
+        house.turnOff(adult())
+
+        assertThat(house.holiday.value).isFalse()
+        assertThat(rig.settings.prefs.first()).isEqualTo(HolidayRecord())
+        assertThat(house.line.value).isEqualTo("Some plugs may not have gone back. Check them on the Plugs tab.")
+    }
+
+    /** Review Focus 4: fails if a run left by a turn-on that never saved isn't put back once, with no line, when the record loads as off. */
+    @Test
+    fun anOrphanRunIsPutBackWhenHolidayLoadsAsOff() = runTest {
+        val rig = rig()
+        rig.plugs.begun += HouseModes.HOLIDAY
+        val house = rig.house()
+
+        house.tick()
+        assertThat(rig.plugs.calls).containsExactly("leave:holiday")
+        assertThat(house.line.value).isNull()
+        assertThat(rig.plugs.begun).isEmpty()
+        house.tick()
+
+        assertThat(rig.plugs.calls).containsExactly("leave:holiday")
+    }
+
+    /** Pin: fails if a record saved before the plugs step existed no longer reads as saved. */
+    @Test
+    fun oldRecordsStillRead() = runTest {
+        val rig = rig()
+        val old = HolidayRecord(
+            on = true, back = SAT_31_OCT, since = rig.wall,
+            steps = mapOf(LIGHTS_ON to DONE, ECO_ON to DONE, HOOVER to PENDING, ECO_OFF to PENDING),
+        )
+        rig.settings.save(old)
+        val house = rig.house()
+
+        house.tick()
+
+        assertThat(house.record.value).isEqualTo(old)
+        assertThat(rig.plugs.calls).isEmpty()
+    }
+
+    /** Fails if a run left begun by a leave whose last write failed stops the next turn-on beginning and entering. */
+    @Test
+    fun aStuckRunIsClearedBeforeTheNextTurnOn() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        rig.plugs.begun += HouseModes.HOLIDAY
+        val house = rig.house(hoover = null)
+        val by = adult()
+
+        house.turnOn(SAT_31_OCT, by)
+
+        assertThat(rig.plugs.calls).containsExactly("leave:holiday", "begin:holiday", "enter:holiday").inOrder()
+        assertThat(rig.plugs.begins).containsExactly(by)
+        assertThat(house.record.value!!.steps[PLUGS_ON]).isEqualTo(DONE)
+    }
+
     private companion object {
         val LONDON: ZoneId = ZoneId.of("Europe/London")
         val THU_0900: LocalDateTime = LocalDateTime.of(2026, 10, 29, 9, 0)
@@ -486,6 +786,10 @@ class HolidayHouseTest {
         val SAT_0001: LocalDateTime = SAT_31_OCT.atTime(0, 1)
         const val ECO_ON_LINE = "The heating didn’t go to Eco. Check the Nest app."
         const val STILL_ON_ECO = "The heating is still on Eco. Turn it off in the Nest app."
+        const val LAMP_LINE = "Lamp didn’t switch off. It’ll keep trying."
+        const val LAMP_BACK_LINE = "Lamp didn’t switch back on. Switch it on the Plugs tab."
+
+        fun FakePlugs.enterCount() = calls.count { it == "enter:holiday" }
 
         fun millis(time: LocalDateTime) = time.atZone(LONDON).toInstant().toEpochMilli()
     }

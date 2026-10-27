@@ -36,6 +36,13 @@ class HouseGraphTest {
     }
 
     @Test
+    fun thePlugsAreInTheHouse() {
+        assertThat(probe.plugs().isPresent).isTrue()
+        val holiday = probe.modes().single { it.id == "holiday" }
+        assertThat(holiday.permission).isEqualTo("holiday.mode")
+    }
+
+    @Test
     fun theAppStartsTheScheduler() = runBlocking {
         assertThat(probe.startables().filterIsInstance<HolidayScheduler>()).hasSize(1)
         // Nothing else reads the record: only the scheduler's own start, from CulveryApp.onCreate, makes it known.

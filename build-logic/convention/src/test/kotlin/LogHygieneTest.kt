@@ -110,7 +110,7 @@ internal object LogHygiene {
      *
      * `heat.*` are the tablet's thermal status and battery numbers (8 §4.7).
      *
-     * `step.name` is a Holiday mode step's name (`HolidayStep`: LIGHTS_ON, ECO_ON, HOOVER, ECO_OFF), never a date (11 §6).
+     * `step.name` is a Holiday mode step's name (`HolidayStep`: LIGHTS_ON, ECO_ON, PLUGS_ON, HOOVER, ECO_OFF), never a date (11 §6).
      */
     val ALLOWED = setOf(
         "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",

@@ -54,7 +54,7 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 | `:core:plugin` | `Capability`, `SetupStep`, `SettingsPage`, `HomeCard`, `HeaderItem`, `Daylight`, `HouseholdClock` (the one minute ticker, in the household's zone), `FirstDraw`, `HomeApp`, `ProviderDescriptor`, `Connection`, `ConnectionHealth`, `ShellNavigator`, `OverlayHost`, `Toaster`, `Startable` |
 | `:core:google` | The Google sign-in the calendar and the shopping list share: `Authorizer`, `TokenSource` (scopes per call), `GoogleAccounts`, `rememberGoogleScreens`; Play services, nothing stored |
 | `:core:homeassistant` | The Home Assistant link the hoover and the heating share: the saved address and token (`HomeAssistantSettings`), the address rule, a reader for its answers (`HaJson`), a redacted debug capture |
-| `:core:house` | The seams Holiday mode reaches the lights, heating, hoover and calendar through (`HouseLights`, `HouseHeating`, `HouseHoover`, `MultiDayEvents`, `HouseMode`), and the `holiday.mode` permission name; no behaviour of its own |
+| `:core:house` | The seams Holiday mode reaches the lights, heating, hoover and calendar through (`HouseLights`, `HouseHeating`, `HouseHoover`, `MultiDayEvents`, `HouseMode`, `HousePlugs`), the modes that can list plugs (`HouseModeInfo`), and the `holiday.mode` permission name; no behaviour of its own |
 | `:core:household` | People (with role and PIN hash), Family, home location, the household's time zone (`HouseholdZone`) — `household.db` |
 | `:core:access` | Permissions, PIN hashing, lockout, 2-minute session, PIN pad |
 | `:core:setup` | The first-run wizard, two-pane Settings, the core pages (Home location, People, Tablet lock), `SetupState`, `LocationSearch` |
@@ -64,10 +64,12 @@ DM Sans is a variable font: `Font(resId, weight)` alone leaves its `wght` axis a
 | `:capability:shopping` | Shopping contract (`ShoppingProvider`), `shopping.db` (the connection, the last read, the queue of unsent changes, what is learned), `ShoppingLock` |
 | `:capability:hoover` | Hoover contract (`HooverSystem`), the chosen hoover (`hoover_settings`), the words for its states, the `hoover.start` permission, the Hoover capability (no tab) |
 | `:capability:heating` | Heating contract (`HeatingSystem`), the chosen thermostat (`heating_settings`) |
+| `:capability:plugs` | Plugs contract (`PlugSystem`), the added plugs, each mode's Leave, On or Off and the notes that put plugs back (`plug_settings`), `PlugsHouse` (`HousePlugs`), the `plugs.switch` and `plugs.manage` permissions, the Plugs tab (55) |
 | `:capability:holiday` | Holiday mode: its record (`holiday_settings`), `HolidayHouse` (turning on and off, the scheduled steps and their retries, `HouseMode`), the per-minute scheduler, the back date picked from the calendar, the `holiday.mode` permission |
 | `:provider:calendar-fake` | Debug-only sample calendar (the hand-off's week, relative to today) |
 | `:provider:calendar-google` | Google Calendar API v3 over OkHttp; sign-in and tokens through Play services, nothing stored |
 | `:provider:heating-homeassistant` | The thermostat from Home Assistant: its state and Eco line, `setEco` with its 30-second check, the Thermostat picker |
+| `:provider:plugs-homeassistant` | The plugs from Home Assistant: each switch's state and watts (the sensor found by name), the switch with its 30-second check, the list of switches to add |
 | `:provider:hoover-homeassistant` | The hoover from Home Assistant: its state, the battery sensor found by name, Start with its 30-second check, the Hoover picker |
 | `:provider:shopping-google-tasks` | The shopping list in Google Tasks over OkHttp: a list called Shopping, found or made when it is turned on; sign-in through `:core:google` |
 | `:provider:weather-openmeteo` | Town search (geocoding) and the forecast through Open-Meteo (no key) |

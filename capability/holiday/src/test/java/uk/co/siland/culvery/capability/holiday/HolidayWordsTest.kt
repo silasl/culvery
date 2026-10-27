@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.holiday
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
 import org.junit.Test
+import uk.co.siland.culvery.core.house.PlugChange
 
 class HolidayWordsTest {
     private val today = LocalDate.of(2026, 10, 28)
@@ -47,5 +48,39 @@ class HolidayWordsTest {
     fun theTileSpoken() {
         assertThat(HolidayWords.tileSpoken(false, null)).isEqualTo("Holiday mode, off.")
         assertThat(HolidayWords.tileSpoken(true, back)).isEqualTo("Holiday mode, on, back Saturday 31 October.")
+    }
+
+    /** Fails if the plug lines don't sit after the heating and before the hoover, or show with no changes. */
+    @Test
+    fun willLinesPutThePlugsAfterTheHeating() {
+        val steps = listOf(HolidayStep.LIGHTS_ON, HolidayStep.ECO_ON, HolidayStep.PLUGS_ON, HolidayStep.HOOVER, HolidayStep.ECO_OFF)
+        val plugs = listOf(PlugChange("Lamp", false), PlugChange("Desk", true))
+
+        assertThat(HolidayWords.willLines(steps, back, plugs)).containsExactly(
+            HolidayWords.stepLine(HolidayStep.LIGHTS_ON, back),
+            HolidayWords.stepLine(HolidayStep.ECO_ON, back),
+            "Switch Lamp off.",
+            "Switch Desk on.",
+            "Plugs go back as they were when you turn it off.",
+            HolidayWords.stepLine(HolidayStep.HOOVER, back),
+            HolidayWords.DOOR,
+            HolidayWords.SCREEN,
+        ).inOrder()
+        assertThat(HolidayWords.willLines(steps, back, emptyList())).containsExactly(
+            HolidayWords.stepLine(HolidayStep.LIGHTS_ON, back),
+            HolidayWords.stepLine(HolidayStep.ECO_ON, back),
+            HolidayWords.stepLine(HolidayStep.HOOVER, back),
+            HolidayWords.DOOR,
+            HolidayWords.SCREEN,
+        ).inOrder()
+    }
+
+    /** Fails if the plugs step lists a line of its own, or its missed, threw and turn-off lines differ from the copy. */
+    @Test
+    fun thePlugsStepsOtherLines() {
+        assertThat(HolidayWords.stepLine(HolidayStep.PLUGS_ON, back)).isNull()
+        assertThat(HolidayWords.missedLine(HolidayStep.PLUGS_ON)).isEqualTo("The plugs didn’t switch. Switch them on the Plugs tab.")
+        assertThat(HolidayWords.failedLine(HolidayStep.PLUGS_ON)).isEqualTo("The plugs didn’t switch. They’ll keep trying.")
+        assertThat(HolidayWords.PLUGS_LEAVE_THREW).isEqualTo("Some plugs may not have gone back. Check them on the Plugs tab.")
     }
 }

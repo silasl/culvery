@@ -32,6 +32,7 @@ import uk.co.siland.culvery.capability.holiday.HolidayStep
 import uk.co.siland.culvery.capability.holiday.HolidayWords
 import uk.co.siland.culvery.capability.holiday.backDateWindow
 import uk.co.siland.culvery.core.access.Authorised
+import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.plugin.attempt
 import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
@@ -50,7 +51,7 @@ private const val TAG = "HolidaySheet"
 
 /**
  * The "When are you back?" sheet (11 §5.2): the date, with the calendar's reason for it, then what Holiday mode will do
- * for [steps]. [choosing] swaps the steps for the month grid, which allows tomorrow to 90 days ahead.
+ * for [steps] and [plugs]. [choosing] swaps the steps for the month grid, which allows tomorrow to 90 days ahead.
  */
 @Composable
 internal fun HolidaySheet(
@@ -58,6 +59,7 @@ internal fun HolidaySheet(
     today: LocalDate,
     pick: BackDatePick?,
     steps: List<HolidayStep>,
+    plugs: List<PlugChange>,
     choosing: Boolean,
     turning: Boolean,
     onChangeDate: () -> Unit,
@@ -111,8 +113,7 @@ internal fun HolidaySheet(
             } else {
                 Text(HolidayWords.WILL, style = HhType.label, color = c.mute)
                 Column(verticalArrangement = Arrangement.spacedBy(HolidayDimens.stepGap), modifier = Modifier.testTag("holiday_steps")) {
-                    val lines = steps.mapNotNull { HolidayWords.stepLine(it, back) } + HolidayWords.DOOR + HolidayWords.SCREEN
-                    lines.forEach { Text(it, style = HhType.body, color = c.ink) }
+                    HolidayWords.willLines(steps, back, plugs).forEach { Text(it, style = HhType.body, color = c.ink) }
                 }
             }
         }
@@ -130,7 +131,7 @@ internal fun HolidaySheet(
 }
 
 /**
- * Reads the calendar's pick and the steps' readiness as it opens (11 §5.2). Turn on turns Holiday mode on, which carries on
+ * Reads the calendar's pick and the steps' and plugs' readiness as it opens (11 §5.2). Turn on turns Holiday mode on, which carries on
  * if the sheet closes meanwhile, then closes the sheet.
  */
 @Composable
@@ -141,6 +142,7 @@ internal fun HolidaySheetHost(by: Authorised, actions: HolidayActions, house: Ho
     var chosen by remember { mutableStateOf<LocalDate?>(null) }
     var choosing by remember { mutableStateOf(false) }
     var steps by remember { mutableStateOf(emptyList<HolidayStep>()) }
+    var plugs by remember { mutableStateOf(emptyList<PlugChange>()) }
     val action = rememberSingleAction(house) { e -> Log.w(TAG, "Turning Holiday mode on failed: ${e::class.simpleName}") }
     LaunchedEffect(Unit) {
         pick = actions.pick()
@@ -153,9 +155,13 @@ internal fun HolidaySheetHost(by: Authorised, actions: HolidayActions, house: Ho
             Log.w(TAG, "Couldn't read which steps Holiday mode will take (${e::class.simpleName})")
             emptyList()
         }
+        plugs = attempt({ house.plugChanges() }) { e ->
+            Log.w(TAG, "Couldn't read which plugs Holiday mode will switch (${e::class.simpleName})")
+            emptyList()
+        }
     }
     HolidaySheet(
-        back, today, pick, steps, choosing, turning = action.busy,
+        back, today, pick, steps, plugs, choosing, turning = action.busy,
         onChangeDate = { choosing = true },
         onPickDate = {
             if (!action.busy) {

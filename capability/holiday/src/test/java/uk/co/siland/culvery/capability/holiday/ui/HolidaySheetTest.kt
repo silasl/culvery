@@ -40,6 +40,7 @@ import uk.co.siland.culvery.capability.holiday.FakeEvents
 import uk.co.siland.culvery.capability.holiday.HolidayActions
 import uk.co.siland.culvery.capability.holiday.HouseRig
 import uk.co.siland.culvery.capability.holiday.TestAccess
+import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.household.Role as HouseRole
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.test.TestOverlay
@@ -151,6 +152,19 @@ class HolidaySheetTest {
         compose.onNodeWithText("Keep the doorbell quiet. Rings and motion still show in the Door tab.", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Turn the screen off until someone taps it.", useUnmergedTree = true).assertExists()
         compose.onAllNodes(hasText("Run the hoover", substring = true), useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    /** Fails if the plugs' changes, or the line that they go back, are missing from the steps. */
+    @Test
+    fun thePlugLinesShow() {
+        rig.plugs.readyNow.value = true
+        rig.plugs.changes = listOf(PlugChange("Lamp", false))
+        open()
+        compose.waitFor { shows("Switch Lamp off.") }
+        for (line in listOf("Switch Lamp off.", "Plugs go back as they were when you turn it off.")) {
+            compose.onNode(hasText(line) and hasAnyAncestor(hasTestTag("holiday_steps")), useUnmergedTree = true).assertExists()
+        }
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Review Focus 4. Fails if Turn on doesn't turn on once with the date shown, or the sheet closes before the change is made. */

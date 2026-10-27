@@ -29,7 +29,7 @@ private const val FILE = "holiday_settings"
 private const val TAG = "HolidaySettings"
 
 /** In the order they run; the tile's line looks at them the other way round (11 §5.3). */
-enum class HolidayStep { LIGHTS_ON, ECO_ON, HOOVER, ECO_OFF }
+enum class HolidayStep { LIGHTS_ON, ECO_ON, PLUGS_ON, HOOVER, ECO_OFF }
 
 enum class StepState { PENDING, DONE, MISSED }
 

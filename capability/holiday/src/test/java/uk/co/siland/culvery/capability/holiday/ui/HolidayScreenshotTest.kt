@@ -23,6 +23,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.capability.holiday.BackDatePick
 import uk.co.siland.culvery.capability.holiday.HolidayStep
+import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhTrayColumn
 import uk.co.siland.culvery.core.ui.HhType
@@ -59,10 +60,17 @@ class HolidayScreenshotTest {
         }
     }
 
-    private fun sheet(name: String, dark: Boolean, back: LocalDate, pick: BackDatePick?, choosing: Boolean = false) =
+    private fun sheet(
+        name: String,
+        dark: Boolean,
+        back: LocalDate,
+        pick: BackDatePick?,
+        choosing: Boolean = false,
+        plugs: List<PlugChange> = emptyList(),
+    ) =
         compose.snap(name, dark, Modifier.size(1_116.dp, 800.dp)) {
             Box(Modifier.size(1_116.dp, 800.dp), contentAlignment = Alignment.CenterEnd) {
-                HolidaySheet(back, today, pick, steps, choosing, turning = false, onChangeDate = {}, onPickDate = {}, onTurnOn = {}, onCancel = {})
+                HolidaySheet(back, today, pick, steps, plugs, choosing, turning = false, onChangeDate = {}, onPickDate = {}, onTurnOn = {}, onCancel = {})
             }
         }
 
@@ -94,7 +102,12 @@ class HolidayScreenshotTest {
 
     @Test fun sheetChangeDateLight() = sheet("holiday_sheet_change_date_light", false, cornwall.back, cornwall, choosing = true)
 
+    @Test fun sheetPlugsDark() = sheet("holiday_sheet_plugs_dark", true, cornwall.back, cornwall, plugs = PLUGS)
+
+    @Test fun sheetPlugsLight() = sheet("holiday_sheet_plugs_light", false, cornwall.back, cornwall, plugs = PLUGS)
+
     private companion object {
+        val PLUGS = listOf(PlugChange("Lamp", false), PlugChange("Fan", false), PlugChange("Desk", true))
         const val LINE = "The heating didn’t come off Eco. Turn it off in the Nest app."
     }
 }

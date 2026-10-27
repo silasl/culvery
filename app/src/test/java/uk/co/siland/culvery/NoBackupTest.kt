@@ -58,6 +58,14 @@ class NoBackupTest {
         assertThat(settings).contains("private const val FILE = \"holiday_settings\"")
     }
 
+    /** Pin (12 §4.5): the plugs' settings, with the plugs a mode switched and what they were, are a datastore file, so the same rule keeps it off backups. */
+    @Test
+    fun thePlugSettingsAreKeptWhereTheRulesExclude() {
+        val settings = File("../capability/plugs/src/main/java/uk/co/siland/culvery/capability/plugs/PlugSettings.kt").readText()
+        assertThat(settings).contains("context.preferencesDataStoreFile(FILE)")
+        assertThat(settings).contains("private const val FILE = \"plug_settings\"")
+    }
+
     private companion object {
         const val ANDROID = "http://schemas.android.com/apk/res/android"
         val DOMAINS = listOf(

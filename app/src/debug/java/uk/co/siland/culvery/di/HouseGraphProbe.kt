@@ -9,6 +9,8 @@ import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseMode
+import uk.co.siland.culvery.core.house.HouseModeInfo
+import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.MultiDayEvents
 import uk.co.siland.culvery.core.plugin.Startable
 
@@ -21,6 +23,8 @@ interface HouseGraphProbe {
     fun lights(): Optional<HouseLights>
     fun heating(): Optional<HouseHeating>
     fun hoover(): Optional<HouseHoover>
+    fun plugs(): Optional<HousePlugs>
+    fun modes(): Set<@JvmSuppressWildcards HouseModeInfo>
     fun multiDayEvents(): Optional<MultiDayEvents>
     fun startables(): Set<@JvmSuppressWildcards Startable>
 }

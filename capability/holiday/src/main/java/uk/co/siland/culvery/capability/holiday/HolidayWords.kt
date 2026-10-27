@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import uk.co.siland.culvery.core.house.HouseLines
+import uk.co.siland.culvery.core.house.PlugChange
 
 /** Holiday mode's words (11 §5.2, §5.8). */
 object HolidayWords {
@@ -24,25 +25,43 @@ object HolidayWords {
     const val NO_PICK = "Pick the day you’re back."
     const val STILL_ON_ECO = "The heating is still on Eco. Turn it off in the Nest app."
     const val LIGHTS_STILL_ON = "Holiday lights are still on. Turn them off in the Lights tab."
+    const val PLUGS_LEAVE_THREW = "Some plugs may not have gone back. Check them on the Plugs tab."
     private const val LIGHTS_MISSED = "Holiday lights didn’t switch on. Turn them on in the Lights tab."
+    private const val PLUGS_MISSED = "The plugs didn’t switch. Switch them on the Plugs tab."
+    private const val PLUGS_THREW = "The plugs didn’t switch. They’ll keep trying."
+    private const val PLUGS_BACK = "Plugs go back as they were when you turn it off."
 
     private const val WEEKDAY_ALONE_DAYS = 6L
     private val SHORT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
     private val FULL: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
     private val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)
 
-    /** The sheet's line for [step], or null for one the sheet doesn't list. */
+    /** The sheet's line for [step], or null for one the sheet doesn't list; the plugs' lines come from [willLines]. */
     fun stepLine(step: HolidayStep, back: LocalDate): String? = when (step) {
         HolidayStep.LIGHTS_ON -> "Switch on Holiday lights now."
         HolidayStep.ECO_ON -> "Put the heating on Eco now, and take it off Eco at 00:01 on ${backSpoken(back)}."
         HolidayStep.HOOVER -> "Run the hoover at 10:00 on ${backSpoken(back.minusDays(1))}."
-        HolidayStep.ECO_OFF -> null
+        HolidayStep.PLUGS_ON, HolidayStep.ECO_OFF -> null
+    }
+
+    /** The sheet's list for [steps] in the order they run, a line for each plug that will switch, then the door and the screen (12 §5.5). */
+    fun willLines(steps: List<HolidayStep>, back: LocalDate, plugs: List<PlugChange>): List<String> = buildList {
+        for (step in steps) {
+            stepLine(step, back)?.let(::add)
+            if (step == HolidayStep.PLUGS_ON && plugs.isNotEmpty()) {
+                plugs.forEach { add("Switch ${it.name} ${if (it.on) "on" else "off"}.") }
+                add(PLUGS_BACK)
+            }
+        }
+        add(DOOR)
+        add(SCREEN)
     }
 
     /** The tile's line for a step that was missed; none for Eco on, since Eco off still runs. */
     fun missedLine(step: HolidayStep): String? = when (step) {
         HolidayStep.LIGHTS_ON -> LIGHTS_MISSED
         HolidayStep.HOOVER -> HouseLines.HOOVER_DIDNT_RUN
+        HolidayStep.PLUGS_ON -> PLUGS_MISSED
         HolidayStep.ECO_ON, HolidayStep.ECO_OFF -> null
     }
 
@@ -50,6 +69,7 @@ object HolidayWords {
     fun failedLine(step: HolidayStep): String = when (step) {
         HolidayStep.LIGHTS_ON -> LIGHTS_MISSED
         HolidayStep.ECO_ON -> HouseLines.ECO_ON_FAILED
+        HolidayStep.PLUGS_ON -> PLUGS_THREW
         HolidayStep.HOOVER -> HouseLines.HOOVER_DIDNT_RUN
         HolidayStep.ECO_OFF -> HouseLines.ECO_OFF_FAILED
     }
