@@ -661,6 +661,16 @@ Fault found:
 - **Fixtures:** rewritten from the emulator's capture (a0c5b956). The household's vacuum has no `battery_level` attribute; its battery is the separate sensor, which is what the app reads.
 
 ## From Plan 11a
+- **End-of-v1 design review:**
+  - the tray's edge at 1 dp (the header tray's), not 2 px;
+  - one row at the tray's top, the rest empty until 11b;
+  - the utility row's right part empty when there's no Shopping;
+  - Coming up gives way to the tray;
+  - the hoover row's status wraps to two lines (a problem line in full);
+  - the Start pill at the house's 48 dp, not 36.
+- **Before 11b is planned:** spec §8.2.1's Away check — does Home/Away Assist put Eco back after Culvery clears it while the house is still Away? Read Home Assistant's history the next time the family is out.
+- **For the 11b plan (from the final review, 2026-10-27):** `start()` returns NotStarted for an already-cleaning, gone or unavailable vacuum (M2); `HomeAssistant.link` is null until the DataStore loads, so a call at app start reads as not linked (M3); `calling` throws TOKEN_REFUSED with no link saved (M4).
+- **Small, from the fix wave's re-review:** with the socket live, a failed list read on Settings shows each device's "has no…" text instead of the can't-reach line; a refused token or block after one good read during a confirm ends as NotConfirmed (the link problem is still recorded); every followed id counts as live once any socket event arrives; no test of a failed read before Start while the socket is down.
 - **The PIN pad's reason when Shopping is turned off:** "Stop using the sample list" asks for a PIN "to connect calendars and services", though it disconnects. Older than Plan 11a; a one-line copy change.
 
 ## To check when the tablet is next plugged in
@@ -704,4 +714,5 @@ The open faults after the redesign phase. Details are in the plan sections above
 - **Sonos playlists (2026-10-21):** show the household's Sonos playlists on the wall, either inside Favourites or behind their own button on the Music tab. **Done 2026-10-23:** a Playlists section in the Favourites sheet.
 - **The thermostat as an everyday control (the user, 2026-10-26):** Plan 11 uses the Nest only for Holiday mode; it may later become an extra control on the wall (temperature, boost).
 - **Settings' page list (the user, 2026-10-27, from the Plan 11a walk-through):** merge Home location, Display and Tablet lock into one app settings page; move Other integrations to the end of the list, perhaps renamed "Home Assistant".
+- **The Home Assistant token's reach (from Plan 11a):** Culvery's Home Assistant token reaches everything the Culvery user can see. To narrow it: put the NAS and the tablet on a guest or IoT network, move Home Assistant to https://, and hide entities from the Culvery user where Home Assistant allows.
 - **Ring through Home Assistant (2026-10-26, from the Plan 11 brainstorm):** if rings keep going missing, Home Assistant's Ring integration could replace reading Ring's notifications. It's unofficial and needs the Ring sign-in on the NAS.
