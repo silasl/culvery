@@ -27,6 +27,7 @@ import uk.co.siland.culvery.core.homeassistant.test.FakeHomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.test.TEST_LINK
 import uk.co.siland.culvery.core.homeassistant.test.entityState
 import uk.co.siland.culvery.core.homeassistant.test.testHomeAssistant
+import uk.co.siland.culvery.core.plugin.CHECKING
 
 /** 11 §4.2, §4.5, §6: the thermostat's state, and setEco with its check. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -89,7 +90,7 @@ class HaHeatingSystemTest {
         val ha = ha()
         ha.cached(hall(state = "unavailable"))
         assertThat(system(ha).state.first())
-            .isEqualTo(HeatingState(THERMOSTAT, false, null, null, false, THERMOSTAT_UNREACHABLE))
+            .isEqualTo(HeatingState(THERMOSTAT, null, null, null, false, THERMOSTAT_UNREACHABLE))
     }
 
     /** Fails if a thermostat deleted in Home Assistant doesn't say to choose it again. */
@@ -97,7 +98,25 @@ class HaHeatingSystemTest {
     fun aDeletedThermostatSaysChooseItAgain() = runTest {
         val ha = ha()
         assertThat(ha.read("climate.hall")).isNull()
-        assertThat(system(ha).state.first()).isEqualTo(HeatingState(THERMOSTAT, false, null, null, false, GONE_THERMOSTAT))
+        assertThat(system(ha).state.first()).isEqualTo(HeatingState(THERMOSTAT, null, null, null, false, GONE_THERMOSTAT))
+    }
+
+    /** Fails if the thermostat reads as a real state before anything is read, rather than Checking. */
+    @Test
+    fun nothingReadYetIsChecking() = runTest {
+        val state = system().state.first()
+        assertThat(state).isEqualTo(HeatingState(THERMOSTAT, null, null, null, false, null))
+        assertThat(heatingLine(checkNotNull(state))).isEqualTo(CHECKING)
+    }
+
+    /** Fails if a thermostat Home Assistant reports as unknown reads as Eco off, rather than Checking. */
+    @Test
+    fun anUnknownStateIsChecking() = runTest {
+        val ha = ha()
+        ha.cached(hall(state = "unknown"))
+        val state = system(ha).state.first()
+        assertThat(state).isEqualTo(HeatingState("Hall", null, null, null, false, null))
+        assertThat(heatingLine(checkNotNull(state))).isEqualTo(CHECKING)
     }
 
     /** Fails if a missing link or thermostat gives a state. */

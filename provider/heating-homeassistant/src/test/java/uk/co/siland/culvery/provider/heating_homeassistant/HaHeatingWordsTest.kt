@@ -7,7 +7,7 @@ import uk.co.siland.culvery.capability.heating.HeatingState
 /** 11 §4.1: the thermostat's line in Settings. */
 class HaHeatingWordsTest {
     private fun state(
-        eco: Boolean = false,
+        eco: Boolean? = false,
         current: Double? = 20.8,
         target: Double? = 21.2,
         heating: Boolean = true,
@@ -42,6 +42,12 @@ class HaHeatingWordsTest {
     @Test
     fun aWholeNumberKeepsOneDecimal() {
         assertThat(heatingLine(state(target = 21.0))).isEqualTo("Hall · 20.8 °C · heating to 21.0 °C")
+    }
+
+    /** Fails if a thermostat not read yet shows numbers or a preset rather than Checking. */
+    @Test
+    fun notKnownSaysChecking() {
+        assertThat(heatingLine(state(eco = null))).isEqualTo("Checking…")
     }
 
     /** Fails if a problem doesn't replace the line. */

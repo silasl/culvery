@@ -28,13 +28,15 @@ private const val TAG = "HaHeatingSystem"
 private const val ECO = "eco"
 private const val NONE = "none"
 private const val UNAVAILABLE = "unavailable"
+private const val UNKNOWN = "unknown"
 
 /** States that carry no preset to believe. */
-private val NOT_READ = setOf(UNAVAILABLE, "unknown")
+private val NOT_READ = setOf(UNAVAILABLE, UNKNOWN)
 
 private fun EntityState.preset() = texts["preset_mode"]
 
-private fun problemState(line: String) = HeatingState(THERMOSTAT, false, null, null, false, line)
+/** Nothing read that can be believed: [problem]'s line, or Checking without one. */
+private fun notKnown(name: String = THERMOSTAT, problem: String? = null) = HeatingState(name, null, null, null, false, problem)
 
 /** The thermostat's state; null with no link or no thermostat chosen (11 §4.5). */
 internal fun heatingState(
@@ -44,14 +46,16 @@ internal fun heatingState(
     problem: HaProblem?,
 ): HeatingState? {
     val device = prefs.device?.takeIf { linked } ?: return null
-    entityTrouble(device, entities, problem, GONE_THERMOSTAT, THERMOSTAT_UNREACHABLE)?.let { return problemState(it) }
-    val climate = entities[device]
+    entityTrouble(device, entities, problem, GONE_THERMOSTAT, THERMOSTAT_UNREACHABLE)?.let { return notKnown(problem = it) }
+    val climate = entities[device] ?: return notKnown()
+    val name = climate.friendlyName ?: THERMOSTAT
+    if (climate.state == UNKNOWN) return notKnown(name)
     return HeatingState(
-        name = climate?.friendlyName ?: THERMOSTAT,
-        eco = climate?.preset() == ECO,
-        currentC = climate?.numbers?.get("current_temperature"),
-        targetC = climate?.numbers?.get("temperature"),
-        heating = climate?.texts?.get("hvac_action") == "heating",
+        name = name,
+        eco = climate.preset() == ECO,
+        currentC = climate.numbers["current_temperature"],
+        targetC = climate.numbers["temperature"],
+        heating = climate.texts["hvac_action"] == "heating",
         problem = null,
     )
 }

@@ -2,10 +2,10 @@ package uk.co.siland.culvery.capability.heating
 
 import kotlinx.coroutines.flow.Flow
 
-/** [toString] leaves out [name]. */
+/** [eco] is null until the thermostat's preset is read. [toString] leaves out [name]. */
 data class HeatingState(
     val name: String,
-    val eco: Boolean,
+    val eco: Boolean?,
     val currentC: Double?,
     val targetC: Double?,
     val heating: Boolean,
