@@ -30,7 +30,7 @@
 
 The drawing is the handoff `docs/design/2026-10-redesign/handoff.md`, "One-tap tray (note 13)" and note 15. Where the spec and the handoff disagree, the spec wins.
 
-**Not this plan:** §8.2.1, which was dropped (Home/Away Assist is off, §2 decision 13); Party mode; Arlo; Settings › Home buttons; changing the back date while away.
+**Not this plan:** §8.2.1, which moved to the first real holiday (§2 decision 13); Party mode; Arlo; Settings › Home buttons; changing the back date while away.
 
 **Previous plans (format, shared parts):**
 - `docs/superpowers/plans/2026-10-26-culvery-11a-home-assistant-hoover-heating.md`: the house format, the tray, `HooverSystem`, `HeatingSystem`, the image routine and `TestAccess`.
@@ -44,7 +44,7 @@ The drawing is the handoff `docs/design/2026-10-redesign/handoff.md`, "One-tap t
 **From the spec, verbatim:**
 - §2.4 "**Holiday mode is explicit.** The wall never works out a holiday from the calendar on its own".
 - §2.6 "**Holiday mode ends only when someone taps it off** at home".
-- §2.13 Home/Away Assist is off, so Culvery turns Eco off **once**.
+- §2.13 Culvery turns Eco off **once**, at 00:01; Home/Away Assist stays on for now, and the first real holiday shows whether it puts Eco back.
 - §5.2 "a fresh Adult or Admin PIN (permission `holiday.mode`, "Turn Holiday mode on and off", default roles Admin and Adult, fresh PIN every time". The date picker runs "from tomorrow up to 90 days ahead". "**Tap, while on:** the same fresh PIN, then it turns off (§5.4). No sheet." "The sheet lists only the steps that will happen."
 - §5.3 "A step that fails while turning on … doesn't stop Holiday mode … the failed step is retried every 5 minutes until it succeeds or Holiday mode is turned off". The hoover is "due from 10:00 to 22:00 on the day before. Missed, it is skipped". Heating is "due from 00:01 on the back day until Holiday mode is turned off". "Changes of clock (BST) are handled by working in local dates and times". There are "no new Android permissions" and nothing uses `AlarmManager` or WorkManager.
 - §5.7 "if someone takes the Nest off Eco from their phone, Culvery doesn't put it back."
@@ -678,7 +678,7 @@ This run is real: Holiday lights, the thermostat's Eco and the hoover will act. 
 |---|---|
 | §2.3–§2.7, §2.11 the back day, explicit, the prefilled date, ends at home, the clean, the mockup's guesses | 5, 6, 7 |
 | §2.12 Holiday lights | 3 |
-| §2.13 Assist off, Eco off once | 5 |
+| §2.13 Eco off once | 5 |
 | §5.1 `:core:house`, the seams, optional parts | 2, 3, 5 |
 | §5.2 the tile, the PIN, the sheet, the calendar pick, the range | 5, 6 |
 | §5.3 turning on, failures retried, the hoover and Eco windows, the scheduler, BST | 5 |

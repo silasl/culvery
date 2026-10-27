@@ -9,7 +9,7 @@ One spec, built as two plans:
 - **11a:** the Home Assistant link, the hoover (Start from the One-tap tray) and the heating link (no screen of its own yet).
 - **11b:** the house Holiday mode, in the tray, driving lights, heating, hoover, door chime and the tablet's screen.
 
-11a merges before 11b is planned in detail. §8.2's Away check was dropped on 2026-10-27, when the user turned Home/Away Assist off (§2, decision 13).
+11a merges before 11b is planned in detail. §8.2's Away check moved to the first real holiday (§2, decision 13).
 
 ## 1. Purpose and outcome
 
@@ -35,7 +35,7 @@ Done means: 11a's Start works from the tray against the real X10 through the hou
 10. **One spec, two plans** (11a, 11b) as above. Arlo, Party mode, the sound pads and Settings › Home buttons are left for later.
 11. The Holiday mode mockup from the brainstorm (the tray, the "When are you back?" sheet, the tray while away), including the guesses on it, was accepted as drawn: PIN both ways, the clean at 10:00, the door chime silent, the screen dark, lights left as they are when it is tapped off.
 12. **Plan 7's lights-only Holiday mode becomes "Holiday lights"** (as the redesign's note 15 has it), everywhere it shows: the Lights tab's tray, Settings › Lights ("Holiday lights switch on"), TalkBack and messages. It keeps its own button and its `lights.holiday` permission for use on its own (an evening out); the house Holiday mode turns it on and off through `HouseLights` (§5.1). *(The user, after the builder check.)*
-13. **Home/Away Assist is turned off** in the Nest app (the user, 2026-10-27). Holiday mode is the only thing that puts the house on Eco for a long absence, and nothing on the Nest side puts Eco back after 00:01, so Culvery turns Eco off once. The cost, accepted: a holiday nobody switched on heats to schedule, and days out get no Eco.
+13. **Culvery turns Eco off once, at 00:01; Home/Away Assist stays on for now** (the user, 2026-10-27). The first time Holiday mode is used is the check: if Assist puts Eco back while the house is still Away, the family fix it from the Nest app, and the user then decides between turning Assist off and Culvery doing more. (Turning Assist off was weighed the same day: it costs Eco for a holiday nobody switched on and for days out.)
 
 ### What the devices allow (research, 2026-10-26)
 
@@ -140,7 +140,7 @@ On **Turn on Holiday mode**, in order:
 
 1. Save the record: on, the back date, and each step's state (not done).
 2. **Lights:** Holiday lights on (`setHoliday(true)`): all lights off, then the chosen Hue automations (Mimic presence). Already on: left as it is.
-3. **Heating:** Eco on. With Home/Away Assist off (§2, decision 13), nothing else does it.
+3. **Heating:** Eco on. A backstop: Home/Away Assist usually does it when the house empties.
 4. **Door chime:** silent (§5.5).
 5. **Screen:** goes dark once the sheet closes (§5.6).
 
@@ -224,7 +224,7 @@ On the `culvery-5` AVD (debug build) against the household's Home Assistant by a
 
 ### 8.2 Checks against the real devices
 
-1. **What Home Assistant sees when the house is Away.** Dropped on 2026-10-27: Home/Away Assist is off (§2, decision 13), so nothing on the Nest side sets or restores Eco.
+1. **What Home Assistant sees when the house is Away.** Moved to the first real holiday (§2, decision 13): Home Assistant's history for the thermostat shows whether Assist put Eco back after Culvery cleared it at 00:01.
 2. **Hoover battery sensor and states** from the real integration (the entity names, which states it reports while emptying the bin or washing the mop).
 3. **Captures:** a debug-only switch logs the shape of each answer with names, ids and addresses replaced; fixtures come from these after the names check.
 
@@ -234,7 +234,7 @@ A release `install -r`; never uninstall. 11a: link, Start the hoover from the wa
 
 ## 9. Not in this plan
 
-- **Re-applying Eco after 00:01:** settled by decision 13 (Assist is off); Culvery turns Eco off once.
+- **Re-applying Eco after 00:01:** Culvery turns Eco off once (decision 13); anything more waits for the first real holiday.
 - Day-to-day heating on the wall (temperature, boost, the schedule); UK hot water (SDM doesn't expose it).
 - Stopping or sending the hoover home, rooms, scenes, maps, mop and suction settings.
 - Arlo in Holiday mode (through Home Assistant's community Arlo integration, a later check), Party mode, the sound pads, Settings › Home buttons.
