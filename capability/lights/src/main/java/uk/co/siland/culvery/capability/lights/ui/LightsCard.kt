@@ -36,7 +36,7 @@ import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.ShellTokens
 
 /**
- * The REGULAR Home card (9 §4.2): the main room as a toggle with a › to its tab, its brightness, All lights off and Holiday mode. With a
+ * The REGULAR Home card (9 §4.2): the main room as a toggle with a › to its tab, its brightness, All lights off and Holiday lights. With a
  * problem, the §6 line and no controls; before the first read, that it is looking. In the side-by-side row (10 §4.9) a line
  * under the buttons takes the two gaps and shows on one line, ending in … if longer.
  */

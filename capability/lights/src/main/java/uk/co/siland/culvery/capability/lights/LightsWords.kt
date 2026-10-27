@@ -6,7 +6,7 @@ import uk.co.siland.culvery.core.ui.plural
 internal const val LIGHTS = "Lights"
 internal const val HUE_REFUSED = "Hue didn’t do that. Try again."
 internal const val ALL_LIGHTS_OFF = "All lights off"
-internal const val HOLIDAY_MODE = "Holiday mode"
+internal const val HOLIDAY_LIGHTS = "Holiday lights"
 internal const val ONE_TAP = "One-tap"
 internal const val ON = "On"
 internal const val OFF = "Off"
@@ -53,8 +53,8 @@ internal fun roomSpoken(room: LightRoom): String = when {
 /** What tapping the room's button does: "Turn the Lounge on" when [on] is the state it turns to. */
 internal fun turnSpoken(room: LightRoom, on: Boolean): String = "Turn the ${room.name} ${if (on) "on" else "off"}"
 
-/** What tapping Holiday mode does: "Turn Holiday mode on" when [on] is the state it turns to. */
-internal fun holidaySpoken(on: Boolean): String = "Turn $HOLIDAY_MODE ${if (on) "on" else "off"}"
+/** What tapping Holiday lights does: "Turn Holiday lights on" when [on] is the state it turns to. */
+internal fun holidaySpoken(on: Boolean): String = "Turn $HOLIDAY_LIGHTS ${if (on) "on" else "off"}"
 
 /** "Lounge brightness": the slider's name; its state is the percent (7 §5.4). */
 internal fun brightnessName(room: LightRoom): String = "${room.name} brightness"
@@ -64,15 +64,15 @@ internal fun sceneSpoken(scene: LightScene, room: LightRoom): String = "${scene.
 
 internal fun openRoomSpoken(room: LightRoom): String = "Open the ${room.name} on the Lights tab"
 
-/** Holiday mode's state under its name: its record, or what the run is doing (7 §2.6). */
+/** Holiday lights' state under its name: its record, or what the run is doing (7 §2.6). */
 internal fun holidayState(on: Boolean, run: HouseRun?): String = when (run) {
     HouseRun.TURNING_ON -> TURNING_ON
     HouseRun.TURNING_OFF -> TURNING_OFF
     HouseRun.ALL_OFF, null -> if (on) ON else OFF
 }
 
-/** "Holiday mode, off": the button's name before the action it does (7 §5.4). */
-internal fun holidayNamed(on: Boolean, run: HouseRun?): String = "$HOLIDAY_MODE, ${holidayState(on, run).removeSuffix("…").lowercase()}"
+/** "Holiday lights, off": the button's name before the action it does (7 §5.4). */
+internal fun holidayNamed(on: Boolean, run: HouseRun?): String = "$HOLIDAY_LIGHTS, ${holidayState(on, run).removeSuffix("…").lowercase()}"
 
 internal fun problemLine(problem: LightsProblem): String = when (problem) {
     LightsProblem.UNREACHABLE -> CANT_REACH_HUE
@@ -126,10 +126,10 @@ internal const val PAIRED_WITH_BRIDGE = "Paired with the Hue Bridge."
 internal const val NOT_PAIRED = "Not paired yet. Find Hue Bridge, or enter the bridge’s address."
 internal const val MAIN_ROOM = "Main room"
 internal const val LEFT_OUT_LABEL = "All lights off leaves out"
-internal const val HOLIDAY_SWITCHES_ON = "Holiday mode switches on"
+internal const val HOLIDAY_SWITCHES_ON = "Holiday lights switch on"
 internal const val ROOMS_AFTER_PAIRING = "The rooms appear here once the bridge is paired."
 internal const val NO_AUTOMATIONS = "No Hue automations yet. Set one up in the Hue app, such as Mimic presence."
-internal const val HOLIDAY_JUST_LIGHTS = "Holiday mode turns all lights off and shows On."
+internal const val HOLIDAY_JUST_LIGHTS = "Holiday lights turns all lights off and shows On."
 
 /** "1 room left out is no longer on the bridge." (7 §4.4) */
 internal fun goneLeftOutLine(count: Int): String =

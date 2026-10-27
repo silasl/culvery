@@ -14,7 +14,7 @@ class LightsSettingsTest {
     @get:Rule val lights = LightsFixture()
     private val settings get() = lights.settings
 
-    /** Fails if an unpaired home starts with a bridge, a main room, Holiday mode on, or anything left out. */
+    /** Fails if an unpaired home starts with a bridge, a main room, Holiday lights on, or anything left out. */
     @Test
     fun theDefaults() = runTest {
         val prefs = soon { settings.prefs.first() }

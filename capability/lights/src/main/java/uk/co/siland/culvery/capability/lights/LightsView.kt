@@ -22,7 +22,7 @@ fun mainRoom(rooms: List<LightRoom>, chosenId: String?): LightRoom? = rooms.firs
 /** Whether All lights off has a light to turn off: a room that is on and not left out (7 §2.5). */
 fun allOffLit(rooms: List<LightRoom>, leftOut: Set<String>): Boolean = rooms.any { it.on && it.id !in leftOut }
 
-/** What the screens show: the open system's rooms and problem, the main room and Holiday mode's record (7 §5). */
+/** What the screens show: the open system's rooms and problem, the main room and Holiday lights' record (7 §5). */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class LightsView @Inject constructor(bridges: Bridges, settings: LightsSettings, @ApplicationScope scope: CoroutineScope) {

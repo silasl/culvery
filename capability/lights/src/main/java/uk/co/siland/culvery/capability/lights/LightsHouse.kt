@@ -10,13 +10,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import uk.co.siland.culvery.core.access.Authorised
+import uk.co.siland.culvery.core.house.HousePermissions
 
 private const val TAG = "LightsHouse"
 
-/** What the one house-wide run is doing (7 §4.5): the Holiday mode button says "Turning on…" or "Turning off…". */
+/** What the one house-wide run is doing (7 §4.5): the Holiday lights button says "Turning on…" or "Turning off…". */
 enum class HouseRun { TURNING_ON, TURNING_OFF, ALL_OFF }
 
-/** How a Holiday mode run went (7 §4.5); [Busy] is a tap ignored while another run holds the house. */
+/** How a Holiday lights run went (7 §4.5); [Busy] is a tap ignored while another run holds the house. */
 sealed interface HolidayResult {
     data object Done : HolidayResult
 
@@ -25,7 +26,7 @@ sealed interface HolidayResult {
     /** Nothing changed. */
     data class CantReach(val problem: LightsProblem) : HolidayResult
 
-    /** Holiday mode is on, but [roomsLeftOn] rooms stayed on, or the automations in [notStarted], by id, didn't start. */
+    /** Holiday lights are on, but [roomsLeftOn] rooms stayed on, or the automations in [notStarted], by id, didn't start. */
     data class Partly(val roomsLeftOn: Int, val notStarted: List<String>) : HolidayResult
 
     /** Hue refused: All lights off when turning on (nothing changed), or a stop when turning off (still on). */
@@ -33,8 +34,8 @@ sealed interface HolidayResult {
 }
 
 /**
- * All lights off and Holiday mode (7 §4.4, §4.5), one run at a time across both: a call while another runs is ignored.
- * Holiday mode's on/off and the automations it started are Culvery's own record, whatever the bridge says later.
+ * All lights off and Holiday lights (7 §4.4, §4.5), one run at a time across both: a call while another runs is ignored.
+ * Holiday lights' on/off and the automations it started are Culvery's own record, whatever the bridge says later.
  */
 @Singleton
 class LightsHouse internal constructor(
@@ -57,9 +58,11 @@ class LightsHouse internal constructor(
     /** Every room off except those Settings › Lights leaves out; null when another run holds the house. */
     suspend fun allOff(): AllOffResult? = holding({ HouseRun.ALL_OFF }) { prefs, _ -> offExcept(prefs.leftOut) }
 
-    /** Turns Holiday mode [on] or off; null turns it the other way from the saved record, as read once this run holds the house. */
+    /** Turns Holiday lights [on] or off; null turns it the other way from the saved record, as read once this run holds the house. */
     suspend fun setHoliday(on: Boolean?, by: Authorised): HolidayResult {
-        require(LightsPermissions.HOLIDAY in by.granted) { "Holiday mode needs ${LightsPermissions.HOLIDAY}" }
+        require(LightsPermissions.HOLIDAY in by.granted || HousePermissions.HOLIDAY_MODE in by.granted) {
+            "Holiday lights needs ${LightsPermissions.HOLIDAY} or ${HousePermissions.HOLIDAY_MODE}"
+        }
         return holding({ if (on ?: !it.holidayOn) HouseRun.TURNING_ON else HouseRun.TURNING_OFF }) { prefs, run ->
             if (run == HouseRun.TURNING_ON) turnOn(prefs) else turnOff(prefs)
         } ?: HolidayResult.Busy
@@ -186,7 +189,7 @@ class LightsHouse internal constructor(
         try {
             write()
         } catch (e: IOException) {
-            Log.w(TAG, "Couldn't save Holiday mode (${e::class.simpleName})")
+            Log.w(TAG, "Couldn't save Holiday lights (${e::class.simpleName})")
         }
     }
 }

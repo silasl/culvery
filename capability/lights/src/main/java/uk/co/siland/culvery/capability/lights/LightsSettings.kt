@@ -32,7 +32,7 @@ data class LightsPrefs(
     val leftOut: Set<String> = emptySet(),
     val holidayAutomations: Set<String> = emptySet(),
     val holidayOn: Boolean = false,
-    /** The automations Holiday mode switched on, so that only those are switched off (7 §4.5). */
+    /** The automations Holiday lights switched on, so that only those are switched off (7 §4.5). */
     val holidayStarted: Set<String> = emptySet(),
 ) {
     /** The paired bridge; null before Find Hue Bridge. */
@@ -54,7 +54,7 @@ class LightsSettings(private val store: DataStore<Preferences>) {
         .map { it.toPrefs() }
         .distinctUntilChanged()
 
-    /** Pairing or a typed address found [link]; another bridge's choices aren't this one's, and Holiday mode starts off. */
+    /** Pairing or a typed address found [link]; another bridge's choices aren't this one's, and Holiday lights start off. */
     suspend fun connect(providerId: String, link: LightsLink) {
         store.edit {
             if (it[BRIDGE] != link.bridgeId) {

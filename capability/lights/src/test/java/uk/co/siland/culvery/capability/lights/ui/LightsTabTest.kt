@@ -205,9 +205,9 @@ class LightsTabTest {
         show(holidayOn = true)
         compose.onNodeWithText("All lights off", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("lights_tray_all_off").assert(clickLabelIs("Turn all lights off")).performClick()
-        compose.onNodeWithText("Holiday mode", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Holiday lights", useUnmergedTree = true).assertIsDisplayed()
         compose.onNode(hasText("On") and hasAnyAncestor(hasTestTag("lights_tray_holiday")), useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("lights_tray_holiday").assertContentDescriptionEquals("Holiday mode, on").assert(clickLabelIs("Turn Holiday mode off")).performClick()
+        compose.onNodeWithTag("lights_tray_holiday").assertContentDescriptionEquals("Holiday lights, on").assert(clickLabelIs("Turn Holiday lights off")).performClick()
         assertThat(calls).containsExactly("all off", "holiday").inOrder()
         val title = compose.onNodeWithText("Lights").fetchSemanticsNode().boundsInRoot
         val allOff = compose.onNodeWithTag("lights_tray_all_off").fetchSemanticsNode().boundsInRoot
@@ -232,7 +232,7 @@ class LightsTabTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Pin: Holiday mode from the tab asks for the fresh PIN, as Home does. Fails if the tray button asks for anything else. */
+    /** Pin: Holiday lights from the tab asks for the fresh PIN, as Home does. Fails if the tray button asks for anything else. */
     @Test
     fun theTrayHolidayAsksForTheFreshPin() = runBlocking {
         val access = TestAccess(null)
@@ -391,7 +391,7 @@ class LightsTabTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Fails if a room's own line shows anywhere but under that room, or the last All lights off or Holiday mode line is lost. */
+    /** Fails if a room's own line shows anywhere but under that room, or the last All lights off or Holiday lights line is lost. */
     @Test
     fun aCardsLineShowsUnderIt() {
         show(lines = mapOf("Kitchen-id" to "Hue didn’t do that. Try again."), houseLine = "2 rooms didn’t turn off. Try again.")

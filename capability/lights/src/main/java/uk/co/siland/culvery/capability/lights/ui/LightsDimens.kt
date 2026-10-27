@@ -22,7 +22,7 @@ internal object LightsDimens {
     // A room's row is at least a touch target tall, as the card's › (HhRoundButton's 48 dp).
     val chevron = 48.dp
 
-    // All lights off and Holiday mode side by side: Holiday mode keeps its width, All lights off takes the rest.
+    // All lights off and Holiday lights side by side: Holiday lights keep their width, All lights off takes the rest.
     val buttonGap = 8.dp
     val lineGap = 10.dp
 

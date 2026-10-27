@@ -64,7 +64,7 @@ import uk.co.siland.culvery.core.ui.test.waitFor
 private val SEEN = listOf(room("Lounge"), room("Kitchen"), room("Garden"))
 private val FOUND = BridgeFound("001788fffe00a1b2", "192.168.1.30")
 
-/** 7 §4.1, §5.3: Hue Bridge, the main room, the rooms All lights off leaves out and Holiday mode's automations. */
+/** 7 §4.1, §5.3: Hue Bridge, the main room, the rooms All lights off leaves out and Holiday lights' automations. */
 @RunWith(AndroidJUnit4::class)
 class LightsSettingsPageTest {
     @get:Rule val compose = createComposeRule()
@@ -232,11 +232,11 @@ class LightsSettingsPageTest {
         compose.onNodeWithTag("lights_gone_line").assertTextEquals("2 rooms left out are no longer on the bridge.")
     }
 
-    /** Fails if the note about Holiday mode is missing under an empty tick, or ticking doesn't save. */
+    /** Fails if the note about Holiday lights is missing under an empty tick, or ticking doesn't save. */
     @Test
     fun holidayAutomationsTicks() {
         show(paired)
-        compose.onNodeWithTag("lights_holiday_note").assertTextEquals("Holiday mode turns all lights off and shows On.")
+        compose.onNodeWithTag("lights_holiday_note").assertTextEquals("Holiday lights turns all lights off and shows On.")
         compose.onNodeWithTag("lights_automation_mimic-id").assert(checkbox()).performClick()
         assertThat(calls).containsExactly("holiday [mimic-id]")
         compose.assertClickablesHaveRoleAndLabel()

@@ -17,7 +17,7 @@ data class LightRoom(
     val dimmable: Boolean,
 )
 
-/** A Hue automation Holiday mode may start (7 §2.6); the provider decides what [on] means for it. */
+/** A Hue automation Holiday lights may start (7 §2.6); the provider decides what [on] means for it. */
 data class Automation(val id: String, val name: String, val on: Boolean)
 
 /** [CONFIRMED] when the bridge's read-back showed the new state (7 §4.5). */

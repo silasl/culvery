@@ -16,7 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import uk.co.siland.culvery.capability.lights.ALL_LIGHTS_OFF
-import uk.co.siland.culvery.capability.lights.HOLIDAY_MODE
+import uk.co.siland.culvery.capability.lights.HOLIDAY_LIGHTS
 import uk.co.siland.culvery.capability.lights.HouseRun
 import uk.co.siland.culvery.capability.lights.LightRoom
 import uk.co.siland.culvery.capability.lights.LightsFollow
@@ -43,7 +43,7 @@ import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
-/** What All lights off and Holiday mode do, on the card and the tab. */
+/** What All lights off and Holiday lights do, on the card and the tab. */
 class HouseActions(val onAllOff: () -> Unit, val onHoliday: () -> Unit)
 
 /** What the Home card's main room does: its toggle, its › to the tab, and its slider while moving and let go. */
@@ -135,7 +135,7 @@ internal fun AllOffButton(
     tone = ButtonTone.Primary, enabled = lit, icon = Icons.POWER_SETTINGS_NEW, on = surface, compact = true, clickLabel = TURN_ALL_OFF,
 )
 
-/** One button for both lines: TalkBack reads "Holiday mode, off" and offers [holidaySpoken] (7 §2.6, §5.4). */
+/** One button for both lines: TalkBack reads "Holiday lights, off" and offers [holidaySpoken] (7 §2.6, §5.4). */
 @Composable
 internal fun HolidayButton(
     on: Boolean,
@@ -145,7 +145,7 @@ internal fun HolidayButton(
     tag: String = "lights_card_holiday",
     surface: ButtonSurface = ButtonSurface.Surf,
 ) = HhButton(
-    HOLIDAY_MODE, onClick, modifier.testTag(tag),
+    HOLIDAY_LIGHTS, onClick, modifier.testTag(tag),
     tone = if (on) ButtonTone.Primary else ButtonTone.Quiet, icon = Icons.LUGGAGE, on = surface,
     spokenName = holidayNamed(on, run), compact = true, clickLabel = holidaySpoken(!on), secondLine = holidayState(on, run),
 )

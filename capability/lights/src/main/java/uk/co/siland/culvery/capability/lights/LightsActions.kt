@@ -27,7 +27,7 @@ enum class LightsCommand { ON, OFF, BRIGHTNESS, SCENE, ALL_OFF, HOLIDAY_ON, HOLI
 /**
  * The screens' commands (7 §4.3): each runs on the application scope, so leaving the screen doesn't cancel it. When Hue
  * refuses one, its room's row says so until that room's next command; the bridge not answering is the status line's to say.
- * The lights are free for everyone; Holiday mode asks for a fresh Adult or Admin PIN both ways (7 §2.8).
+ * The lights are free for everyone; Holiday lights asks for a fresh Adult or Admin PIN both ways (7 §2.8).
  */
 @Singleton
 class LightsActions internal constructor(
@@ -55,7 +55,7 @@ class LightsActions internal constructor(
 
     private val _houseLine = MutableStateFlow<String?>(null)
 
-    /** What went wrong in the last All lights off or Holiday mode run (7 §6); null when it went well. */
+    /** What went wrong in the last All lights off or Holiday lights run (7 §6); null when it went well. */
     val houseLine: StateFlow<String?> = _houseLine.asStateFlow()
 
     fun allOff() {
@@ -64,7 +64,7 @@ class LightsActions internal constructor(
         scope.launch { house.allOff()?.let { _houseLine.value = houseLine(it) } }
     }
 
-    /** Asks for the PIN, then turns Holiday mode the other way; a tap while a run is going asks nothing. */
+    /** Asks for the PIN, then turns Holiday lights the other way; a tap while a run is going asks nothing. */
     fun toggleHoliday() {
         val house = house ?: return
         val access = access ?: return

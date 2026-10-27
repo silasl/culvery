@@ -16,7 +16,7 @@ class LightsPermissionsTest {
     fun holidayModeIsForAdultsAndAdminsWithAFreshPin() {
         assertThat(rolesFor(LightsPermissions.HOLIDAY)).containsExactly(Role.ADMIN, Role.ADULT)
         val def = registry.require(LightsPermissions.HOLIDAY)
-        assertThat(def.label).isEqualTo("Turn Holiday mode on and off")
+        assertThat(def.label).isEqualTo("Turn Holiday lights on and off")
         assertThat(def.freshPin).isTrue()
     }
 }

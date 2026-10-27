@@ -10,10 +10,12 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import uk.co.siland.culvery.core.access.Authorised
+import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.test.soon
 import uk.co.siland.culvery.core.ui.test.waitFor
 
-/** 7 §4.4, §4.5: All lights off and Holiday mode, one run at a time, stopping only what Culvery started. */
+/** 7 §4.4, §4.5: All lights off and Holiday lights, one run at a time, stopping only what Culvery started. */
 @RunWith(AndroidJUnit4::class)
 class LightsHouseTest {
     @get:Rule val lights = LightsFixture()
@@ -63,7 +65,7 @@ class LightsHouseTest {
         assertThat(prefs.holidayStarted).containsExactly("mimic-id", "away-id")
     }
 
-    /** Fails if Holiday mode is saved on only after the automations, so a run cut short there shows it off. */
+    /** Fails if Holiday lights are saved on only after the automations, so a run cut short there shows it off. */
     @Test
     fun holidayModeIsSavedOnAsSoonAsTheLightsAreOff() = runTest {
         choose("mimic-id")
@@ -75,7 +77,7 @@ class LightsHouseTest {
         assertThat(run.await()).isEqualTo(HolidayResult.Done)
     }
 
-    /** Fails if All lights off refused by Hue still saves Holiday mode on or goes on to the automations. */
+    /** Fails if All lights off refused by Hue still saves Holiday lights on or goes on to the automations. */
     @Test
     fun aRefusedAllOffLeavesHolidayModeOff() = runTest {
         choose("mimic-id")
@@ -85,7 +87,7 @@ class LightsHouseTest {
         assertThat(system.calls).containsExactly("allOff []")
     }
 
-    /** Fails if an automation already on is recorded, started again, or stopped when Holiday mode ends. */
+    /** Fails if an automation already on is recorded, started again, or stopped when Holiday lights end. */
     @Test
     fun anAutomationAlreadyOnIsLeftOnWhenHolidayModeEnds() = runTest {
         system.automationList = listOf(MIMIC, AWAY.copy(on = true))
@@ -99,7 +101,7 @@ class LightsHouseTest {
         assertThat(system.automationList.single { it.id == "away-id" }.on).isTrue()
     }
 
-    /** Fails if Holiday mode off stops what is ticked now rather than what Culvery started. */
+    /** Fails if Holiday lights off stops what is ticked now rather than what Culvery started. */
     @Test
     fun anUntickedAutomationCulveryStartedIsStillStopped() = runTest {
         choose("mimic-id")
@@ -112,7 +114,7 @@ class LightsHouseTest {
         assertThat(prefs.holidayOn).isFalse()
     }
 
-    /** Fails if no automations chosen asks the bridge for them, or doesn't save Holiday mode on and then off. */
+    /** Fails if no automations chosen asks the bridge for them, or doesn't save Holiday lights on and then off. */
     @Test
     fun noAutomationsChosenIsLightsOffAndOn() = runTest {
         assertThat(house.setHoliday(true, adult())).isEqualTo(HolidayResult.Done)
@@ -122,7 +124,7 @@ class LightsHouseTest {
         assertThat(system.calls).containsExactly("allOff []")
     }
 
-    /** Fails if a start the read-back didn't confirm isn't recorded as sent, turns Holiday mode off, or loses its name. */
+    /** Fails if a start the read-back didn't confirm isn't recorded as sent, turns Holiday lights off, or loses its name. */
     @Test
     fun oneThatIsntConfirmedIsOnWithItsName() = runTest {
         choose("mimic-id")
@@ -135,7 +137,7 @@ class LightsHouseTest {
         assertThat(house.nameOf("gone-id")).isNull()
     }
 
-    /** Fails if a start sent but never confirmed is left running when Holiday mode goes off, or one that reads off is stopped (7 §4.5). */
+    /** Fails if a start sent but never confirmed is left running when Holiday lights go off, or one that reads off is stopped (7 §4.5). */
     @Test
     fun anUnconfirmedStartIsStillStoppedWhenHolidayModeGoesOff() = runTest {
         choose("mimic-id", "away-id")
@@ -162,7 +164,7 @@ class LightsHouseTest {
         assertThat(prefs().holidayStarted).containsExactly("mimic-id")
     }
 
-    /** Fails if a bridge that can't be reached still changes Holiday mode either way, or the run goes on to the automations. */
+    /** Fails if a bridge that can't be reached still changes Holiday lights either way, or the run goes on to the automations. */
     @Test
     fun anUnreachableBridgeChangesNothing() = runTest {
         choose("mimic-id")
@@ -180,7 +182,7 @@ class LightsHouseTest {
         assertThat(prefs.holidayStarted).containsExactly("mimic-id")
     }
 
-    /** Fails if the bridge dropping after the lights went off leaves Holiday mode off or says nothing about the automations. */
+    /** Fails if the bridge dropping after the lights went off leaves Holiday lights off or says nothing about the automations. */
     @Test
     fun aDropAfterTheLightsWentOffIsOnWithTheLine() = runTest {
         choose("mimic-id", "away-id")
@@ -195,7 +197,7 @@ class LightsHouseTest {
         assertThat(prefs.holidayStarted).isEmpty()
     }
 
-    /** Fails if Holiday mode off touches the lights, or is saved off before the last automation has stopped. */
+    /** Fails if Holiday lights off touches the lights, or is saved off before the last automation has stopped. */
     @Test
     fun holidayOffStopsWhatCulveryStartedAndLeavesTheLights() = runTest {
         choose("mimic-id", "away-id")
@@ -213,7 +215,7 @@ class LightsHouseTest {
         assertThat(prefs.holidayStarted).isEmpty()
     }
 
-    /** Fails if a stop that wasn't confirmed or was refused saves Holiday mode off or forgets the automation. */
+    /** Fails if a stop that wasn't confirmed or was refused saves Holiday lights off or forgets the automation. */
     @Test
     fun aStopThatIsntConfirmedKeepsItOn() = runTest {
         choose("mimic-id")
@@ -258,7 +260,7 @@ class LightsHouseTest {
         assertThat(system.calls).containsExactly("automations", "setAutomation mimic-id false").inOrder()
     }
 
-    /** Fails if a caller holding no Holiday mode permission can switch it, either way. */
+    /** Fails if a caller holding no Holiday lights permission can switch it, either way. */
     @Test
     fun aCallWithoutTheHolidayPermissionIsRefusedOutright() = runTest {
         assertThat(runCatching { house.setHoliday(true, nobody()) }.exceptionOrNull()).isInstanceOf(IllegalArgumentException::class.java)
@@ -267,7 +269,22 @@ class LightsHouseTest {
         assertThat(prefs().holidayOn).isFalse()
     }
 
-    /** Pin. Fails if the bridge reporting the automation stopped turns Holiday mode off, or makes Holiday mode off send a stop. */
+    /** 11 §5.1. Fails if the house's Holiday mode grant can't turn the lights on. */
+    @Test
+    fun theHouseGrantTurnsItOnToo() = runTest {
+        assertThat(house.setHoliday(true, houseAdult())).isEqualTo(HolidayResult.Done)
+        assertThat(prefs().holidayOn).isTrue()
+    }
+
+    /** Fails if a grant that is neither Holiday lights' nor the house's still reaches the bridge. */
+    @Test
+    fun anotherGrantIsRefused() = runTest {
+        val other = Authorised(nobody().person, Role.ADULT, setOf("hoover.start"))
+        assertThat(runCatching { house.setHoliday(true, other) }.exceptionOrNull()).isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(system.calls).isEmpty()
+    }
+
+    /** Pin. Fails if the bridge reporting the automation stopped turns Holiday lights off, or makes Holiday lights off send a stop. */
     @Test
     fun holidayModeIsCulverysOwnRecord() = runTest {
         choose("mimic-id")

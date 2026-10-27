@@ -18,6 +18,7 @@ import org.junit.runner.Description
 import org.junit.runners.model.Statement
 import uk.co.siland.culvery.core.access.AccessControl
 import uk.co.siland.culvery.core.access.Authorised
+import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.access.CorePermissionSource
 import uk.co.siland.culvery.core.access.Identified
 import uk.co.siland.culvery.core.access.PermissionRegistry
@@ -195,8 +196,11 @@ internal class TestLightsProvider(id: String = "lights.hue") : LightsProvider {
 
 private val person = Person(PersonId("p"), "P", 0)
 
-/** Someone who entered an Adult PIN for Holiday mode. */
+/** Someone who entered an Adult PIN for Holiday lights. */
 internal fun adult() = Authorised(person, Role.ADULT, setOf(LightsPermissions.HOLIDAY))
+
+/** Someone who entered an Adult PIN for the house's Holiday mode. */
+internal fun houseAdult() = Authorised(person, Role.ADULT, setOf(HousePermissions.HOLIDAY_MODE))
 
 /** Someone identified who holds nothing. */
 internal fun nobody() = Authorised(person, Role.ADULT, emptySet())

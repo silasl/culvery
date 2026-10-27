@@ -20,7 +20,7 @@ import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.test.soon
 import uk.co.siland.culvery.core.ui.test.waitFor
 
-/** 7 §2.8, §4.3, §6: commands to the system, the paced slider, the row's line when Hue refuses, the PIN for Holiday mode. */
+/** 7 §2.8, §4.3, §6: commands to the system, the paced slider, the row's line when Hue refuses, the PIN for Holiday lights. */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class LightsActionsTest {
@@ -180,7 +180,7 @@ class LightsActionsTest {
         assertThat(system.calls).containsExactly("recallScene Lounge-id relax-id")
     }
 
-    /** Fails if Holiday mode asks for no PIN, asks only one way, or asks for a permission other than Holiday mode's. */
+    /** Fails if Holiday lights asks for no PIN, asks only one way, or asks for a permission other than Holiday lights'. */
     @Test
     fun holidayModeAsksForTheFreshPinBothWays() = runTest {
         val access = TestAccess(Role.ADULT)
@@ -192,7 +192,7 @@ class LightsActionsTest {
         assertThat(access.asked).containsExactly(listOf(LightsPermissions.HOLIDAY), listOf(LightsPermissions.HOLIDAY)).inOrder()
     }
 
-    /** Fails if a Child's PIN, which doesn't hold Holiday mode, still reaches the bridge. */
+    /** Fails if a Child's PIN, which doesn't hold Holiday lights, still reaches the bridge. */
     @Test
     fun aChildsPinIsRefused() = runTest {
         val access = TestAccess(Role.CHILD)

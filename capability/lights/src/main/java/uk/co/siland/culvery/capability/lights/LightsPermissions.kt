@@ -9,9 +9,9 @@ object LightsPermissions {
     const val HOLIDAY = "lights.holiday"
 }
 
-/** The lights are free for everyone; only Holiday mode, both ways, needs an Adult or Admin PIN each time (7 §2.8). */
+/** The lights are free for everyone; only Holiday lights, both ways, needs an Adult or Admin PIN each time (7 §2.8). */
 class LightsPermissionSource @Inject constructor() : PermissionSource {
     override val permissions = listOf(
-        PermissionDef(LightsPermissions.HOLIDAY, "Turn Holiday mode on and off", setOf(Role.ADMIN, Role.ADULT), freshPin = true),
+        PermissionDef(LightsPermissions.HOLIDAY, "Turn Holiday lights on and off", setOf(Role.ADMIN, Role.ADULT), freshPin = true),
     )
 }

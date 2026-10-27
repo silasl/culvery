@@ -43,9 +43,9 @@ class RoomActions(
 }
 
 /**
- * The Lights tab (7 §5.2, 9 §4.4): the title with the rooms on and a tray of All lights off and Holiday mode, then the
+ * The Lights tab (7 §5.2, 9 §4.4): the title with the rooms on and a tray of All lights off and Holiday lights, then the
  * rooms' cards in [LightsGrid]. The status line shows only when something is wrong; [houseLine] is how the last All
- * lights off or Holiday mode went and [lines] each room's last refused command. A [focus] naming a listed room is
+ * lights off or Holiday lights went and [lines] each room's last refused command. A [focus] naming a listed room is
  * brought into view, then handed back through [onFocused].
  */
 @Composable

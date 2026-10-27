@@ -3,7 +3,7 @@ package uk.co.siland.culvery.capability.lights
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
-/** 7 §6: the lines All lights off and Holiday mode show. */
+/** 7 §6: the lines All lights off and Holiday lights show. */
 class LightsWordsTest {
     /** Fails if a problem's line isn't the spec's, word for word. */
     @Test
@@ -51,7 +51,7 @@ class LightsWordsTest {
         assertThat(houseLine(AllOffResult.CantReach(LightsProblem.UNREACHABLE))).isNull()
     }
 
-    /** Fails if a Holiday mode result's line is missing, wrong, or shown for a run that went well, was ignored or couldn't reach the bridge. */
+    /** Fails if a Holiday lights result's line is missing, wrong, or shown for a run that went well, was ignored or couldn't reach the bridge. */
     @Test
     fun holidayLines() {
         val names = mapOf("mimic-id" to "Mimic presence")
@@ -114,13 +114,13 @@ class LightsWordsTest {
         assertThat(turnSpoken(room("Lounge"), true)).isEqualTo("Turn the Lounge on")
         assertThat(turnSpoken(room("Lounge"), false)).isEqualTo("Turn the Lounge off")
         assertThat(TURN_ALL_OFF).isEqualTo("Turn all lights off")
-        assertThat(holidaySpoken(true)).isEqualTo("Turn Holiday mode on")
-        assertThat(holidaySpoken(false)).isEqualTo("Turn Holiday mode off")
+        assertThat(holidaySpoken(true)).isEqualTo("Turn Holiday lights on")
+        assertThat(holidaySpoken(false)).isEqualTo("Turn Holiday lights off")
         assertThat(openRoomSpoken(room("Lounge"))).isEqualTo("Open the Lounge on the Lights tab")
         assertThat(LOOKING_FOR_LIGHTS).isEqualTo("Looking for the lights…")
     }
 
-    /** Fails if a run doesn't replace Holiday mode's record with "Turning on…" or "Turning off…", or All lights off hides it. */
+    /** Fails if a run doesn't replace Holiday lights' record with "Turning on…" or "Turning off…", or All lights off hides it. */
     @Test
     fun holidayModesStateWhileItRuns() {
         assertThat(holidayState(false, null)).isEqualTo("Off")
@@ -128,7 +128,7 @@ class LightsWordsTest {
         assertThat(holidayState(false, HouseRun.TURNING_ON)).isEqualTo("Turning on…")
         assertThat(holidayState(true, HouseRun.TURNING_OFF)).isEqualTo("Turning off…")
         assertThat(holidayState(true, HouseRun.ALL_OFF)).isEqualTo("On")
-        assertThat(holidayNamed(false, null)).isEqualTo("Holiday mode, off")
-        assertThat(holidayNamed(false, HouseRun.TURNING_ON)).isEqualTo("Holiday mode, turning on")
+        assertThat(holidayNamed(false, null)).isEqualTo("Holiday lights, off")
+        assertThat(holidayNamed(false, HouseRun.TURNING_ON)).isEqualTo("Holiday lights, turning on")
     }
 }

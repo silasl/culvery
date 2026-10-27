@@ -27,7 +27,7 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.DarkColors
 
-/** All lights off is lit in the accent, as Holiday mode is when on, while a light it would turn off is on. Real graphics: this reads pixels. */
+/** All lights off is lit in the accent, as Holiday lights are when on, while a light it would turn off is on. Real graphics: this reads pixels. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class LightsAllOffLitTest {

@@ -123,25 +123,25 @@ class LightsCardTest {
         compose.assertAccessible()
     }
 
-    /** Fails if either button's name, label or action differs, or Holiday mode's two lines are wrong. */
+    /** Fails if either button's name, label or action differs, or Holiday lights' two lines are wrong. */
     @Test
     fun allLightsOffAndHolidayMode() {
         show()
         compose.onNodeWithText("All lights off", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("lights_card_all_off").assert(clickLabelIs("Turn all lights off")).performClick()
-        compose.onNodeWithText("Holiday mode", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Holiday lights", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithText("Off", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("lights_card_holiday").assert(clickLabelIs("Turn Holiday mode on")).performClick()
+        compose.onNodeWithTag("lights_card_holiday").assert(clickLabelIs("Turn Holiday lights on")).performClick()
         assertThat(calls).containsExactly("all off", "holiday").inOrder()
         compose.assertAccessible()
     }
 
-    /** Fails if Holiday mode while on doesn't show "On" and offer to turn off. */
+    /** Fails if Holiday lights while on doesn't show "On" and offer to turn off. */
     @Test
     fun holidayModeOn() {
         show(holidayOn = true)
         compose.onNodeWithText("On", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("lights_card_holiday").assertContentDescriptionEquals("Holiday mode, on").assert(clickLabelIs("Turn Holiday mode off"))
+        compose.onNodeWithTag("lights_card_holiday").assertContentDescriptionEquals("Holiday lights, on").assert(clickLabelIs("Turn Holiday lights off"))
         compose.assertAccessible()
     }
 
@@ -151,7 +151,7 @@ class LightsCardTest {
         var run by mutableStateOf<HouseRun?>(HouseRun.TURNING_ON)
         compose.setContent { CulveryTheme(dark = true) { Box(Modifier.size(rightHalfSize)) { LightsCard(lounge, false, true, run, null, null, mainRoom, house) } } }
         compose.onNodeWithText("Turning on…", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("lights_card_holiday").assertContentDescriptionEquals("Holiday mode, turning on")
+        compose.onNodeWithTag("lights_card_holiday").assertContentDescriptionEquals("Holiday lights, turning on")
         compose.assertAccessible()
         run = HouseRun.TURNING_OFF
         compose.onNodeWithText("Turning off…", useUnmergedTree = true).assertIsDisplayed()
@@ -419,7 +419,7 @@ class LightsCardTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Pin (9 §2.3, §6.2). Fails if the card's Holiday mode doesn't reach toggleHoliday and ask for the Holiday permission. */
+    /** Pin (9 §2.3, §6.2). Fails if the card's Holiday lights doesn't reach toggleHoliday and ask for the Holiday permission. */
     @Test
     fun holidayModeAsksForTheFreshPin() = runBlocking {
         val h = host(lounge)

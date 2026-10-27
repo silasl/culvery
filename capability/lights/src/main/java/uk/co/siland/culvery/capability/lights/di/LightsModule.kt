@@ -8,9 +8,11 @@ import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
 import uk.co.siland.culvery.capability.lights.LightsCapability
 import uk.co.siland.culvery.capability.lights.LightsFollow
+import uk.co.siland.culvery.capability.lights.LightsHouseSeam
 import uk.co.siland.culvery.capability.lights.LightsPermissionSource
 import uk.co.siland.culvery.capability.lights.LightsProvider
 import uk.co.siland.culvery.core.access.PermissionSource
+import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.Startable
 
@@ -32,4 +34,7 @@ abstract class LightsModule {
     @Binds
     @IntoSet
     abstract fun follow(impl: LightsFollow): Startable
+
+    @Binds
+    abstract fun house(impl: LightsHouseSeam): HouseLights
 }
