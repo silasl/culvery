@@ -130,6 +130,17 @@ class ModuleBoundariesTest {
         banned(":capability:holiday", ":capability:hoover")
     }
 
+    /** Pin: the plugs capability reaches modes only through the house seams, and its provider keeps to its own family. */
+    @Test
+    fun thePlugModulesKeepToTheirFamilies() {
+        allowed(":capability:plugs", ":core:house", "api")
+        allowed(":provider:plugs-homeassistant", ":capability:plugs")
+        allowed(":provider:plugs-homeassistant", ":core:homeassistant")
+        banned(":provider:plugs-homeassistant", ":capability:hoover")
+        banned(":capability:plugs", ":capability:holiday")
+        banned(":capability:holiday", ":capability:plugs")
+    }
+
     /** Pin: the Shopping pair follows the Lights rules, and the Google sign-in is core, so the Tasks provider may use it. */
     @Test
     fun theShoppingPairKeepsToItsFamily() {

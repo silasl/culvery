@@ -10,6 +10,8 @@ import uk.co.siland.culvery.core.access.Authorised
 /** What a device step did: [Failed.line] is the line to show. */
 sealed interface HouseStep {
     data object Done : HouseStep
+
+    /** [line] can hold plug names, so it is shown and never logged. */
     data class Failed(val line: String) : HouseStep
 }
 
@@ -45,6 +47,32 @@ interface HouseHoover {
 interface HouseMode {
     /** Null until it has been read. */
     val holiday: StateFlow<Boolean?>
+}
+
+/** A mode that can list plugs (12 §5.1): [order] sorts its section on the Plugs tab, [permission] is what turning it on takes. */
+data class HouseModeInfo(val id: String, val name: String, val order: Int, val permission: String)
+
+object HouseModes {
+    const val HOLIDAY = "holiday"
+}
+
+/** A plug a mode will switch, or put back, to [on]. [toString] leaves out the name. */
+data class PlugChange(val name: String, val on: Boolean) {
+    override fun toString() = "PlugChange"
+}
+
+/** What a mode reaches in the plugs; absent when no plug system is bound (12 §5.1). */
+interface HousePlugs {
+    /** True while [modeId]'s list has an On or Off for an added plug and a plug system is bound. */
+    fun ready(modeId: String): Flow<Boolean>
+    suspend fun preview(modeId: String): List<PlugChange>
+
+    /** Takes the mode's snapshot (12 §5.2); [by] must hold the mode's permission (12 §2.13). Switches nothing. */
+    suspend fun begin(modeId: String, by: Authorised)
+
+    /** Switches a begun mode's pending plugs, with no grant; null with no snapshot, and nothing switched. */
+    suspend fun enter(modeId: String): HouseStep?
+    suspend fun leave(modeId: String): HouseStep
 }
 
 interface MultiDayEvents {

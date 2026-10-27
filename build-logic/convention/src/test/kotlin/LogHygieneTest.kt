@@ -38,6 +38,7 @@ class LogHygieneTest {
         assertThat(sources.map { it.name }).contains("HolidayActions.kt")
         assertThat(sources.map { it.name }).contains("HolidayTile.kt")
         assertThat(sources.map { it.name }).contains("HolidaySheet.kt")
+        assertThat(sources.map { it.name }).contains("PlugSettings.kt")
         // 77 calls when written; a floor well below that still fails if the scan stops finding them.
         assertThat(sources.sumOf { LogHygiene.callCount(it.readText()) }).isAtLeast(50)
     }
