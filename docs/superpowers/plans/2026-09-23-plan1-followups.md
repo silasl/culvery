@@ -700,6 +700,23 @@ Fault found:
 - **Small, from the fix wave's re-review:** with the socket live, a failed list read on Settings shows each device's "has no…" text instead of the can't-reach line; a refused token or block after one good read during a confirm ends as NotConfirmed (the link problem is still recorded); every followed id counts as live once any socket event arrives; no test of a failed read before Start while the socket is down.
 - **The PIN pad's reason when Shopping is turned off:** "Stop using the sample list" asks for a PIN "to connect calendars and services", though it disconnects. Older than Plan 11a; a one-line copy change.
 
+## Plan 12 (smart plugs): the revision's walk-through (2026-10-28)
+- **Set-up:** the debug build of the revision on the emulator, linked to Home Assistant with one TP-Link plug.
+- **Work:**
+  - the stored plug choices kept their shape across the upgrade;
+  - Settings › Other integrations lists only the TP-Link plug, main switch only; hiding and showing it keeps Holiday's choice;
+  - the Plugs tab's row and Edit chips work; Edit ends after 2 idle minutes;
+  - with the user's go, the plug switched off and back on through the PIN; "Switching…" shows only after the PIN; a Child's PIN is refused;
+  - during a Home Assistant restart the row read "Can't reach Home Assistant", then On, and never gone;
+  - offline: no switch button; Holiday on and off gave the heating line only, stored no plug run, and nothing was retried back online;
+  - TalkBack reads each row and each Settings switch once, with the plug's name;
+  - the captures hold no names or ids; power readings are blank.
+- **Fixed after the walk-through:** the registry was read 5 times in about 20 seconds of tab and Settings use; a reconnect now skips the read when the last good one is under 5 minutes old.
+- **For the end-of-v1 design review:**
+  - "Checking…" was never seen on the device (Home Assistant came back with the plug loaded); unit-tested;
+  - the Settings Plugs section sits tight under the thermostat line, and plug names show as upper-case labels;
+  - the plug read "On · 0 W" all session, probably idle; check against a working load.
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
