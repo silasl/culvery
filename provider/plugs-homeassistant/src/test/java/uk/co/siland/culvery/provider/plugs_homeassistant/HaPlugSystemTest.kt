@@ -296,16 +296,42 @@ class HaPlugSystemTest {
         api.registryProblem = HaProblem.UNREACHABLE
         api.dropSocket(HaProblem.UNREACHABLE)
         runCurrent()
-        now = 10_000
+        now = REGISTRY_FRESH_MS
         after(retryDelayMillis(0))
         api.socket.emit(mapOf("switch.lamp" to lamp(), "sensor.lamp_current_consumption" to lampWatts("90")))
         runCurrent()
         assertThat(api.calls.count { it == "registry" }).isAtLeast(2)
-        now = 10_000 + GONE_AFTER_MS
+        now = REGISTRY_FRESH_MS + GONE_AFTER_MS
         val plug = system.plugs.first()!!.single()
         assertThat(plug.power).isEqualTo(PlugPower.ON)
         assertThat(plug.watts).isEqualTo(90)
         assertThat(api.follows.last()).contains("sensor.lamp_current_consumption")
+    }
+
+    /** Fails if a reconnect within 5 minutes of a good read reads the registry again, a later one doesn't, or Settings doesn't always read. */
+    @Test
+    fun aReconnectSoonAfterAReadSkipsTheRegistry() = runTest {
+        seedAll()
+        val system = system()
+        live(system)
+        fun reads() = api.calls.count { it == "registry" }
+        assertThat(reads()).isEqualTo(1)
+
+        suspend fun reconnect(at: Long, attempt: Long) {
+            api.dropSocket(HaProblem.UNREACHABLE)
+            runCurrent()
+            now = at
+            after(retryDelayMillis(attempt))
+            api.socket.emit(api.states.toMap())
+            runCurrent()
+        }
+        reconnect(REGISTRY_FRESH_MS - 1, attempt = 0)
+        assertThat(reads()).isEqualTo(1)
+        reconnect(REGISTRY_FRESH_MS, attempt = 1)
+        assertThat(reads()).isEqualTo(2)
+
+        system.available()
+        assertThat(reads()).isEqualTo(3)
     }
 
     /** Fails if the debug line carries more than counts, or shows when HaCapture isn't switched on. */

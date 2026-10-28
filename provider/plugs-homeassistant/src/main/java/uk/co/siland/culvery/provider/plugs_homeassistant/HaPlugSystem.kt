@@ -47,6 +47,9 @@ private const val TAG = "HaPlugSystem"
 /** How long the socket must have been steady before a plug missing from it is called gone (12 §6). */
 const val GONE_AFTER_MS = 120_000L
 
+/** A reconnect within this long of a good registry read keeps it; Settings always reads afresh. */
+const val REGISTRY_FRESH_MS = 300_000L
+
 private const val CAPTURE_TAG = "HaCapture"
 
 /** The plugs, and for each the id of its watts sensor (12 §4.1). */
@@ -126,11 +129,14 @@ class HaPlugSystem internal constructor(
     /** The last registry read; a failed read leaves it. */
     private val registry = MutableStateFlow<PlugRegistry?>(null)
 
+    @Volatile private var readAt: Long? = null
+
     init {
         scope.launch {
             ha.liveSince.filterNotNull().collect {
                 try {
-                    readRegistry()
+                    val last = readAt
+                    if (last == null || clock.nowMillis() - last >= REGISTRY_FRESH_MS) readRegistry()
                 } catch (e: HomeAssistantException) {
                     Log.w(TAG, "registry failed (${e::class.simpleName})")
                 }
@@ -142,6 +148,7 @@ class HaPlugSystem internal constructor(
         val entries = ha.registry()
         val read = plugRegistry(entries)
         registry.value = read
+        readAt = clock.nowMillis()
         if (Log.isLoggable(CAPTURE_TAG, Log.DEBUG)) {
             Log.d(CAPTURE_TAG, "registry: ${read.plugs.size} plugs, ${read.watts.size} with watts, ${entries.size} entries")
         }
