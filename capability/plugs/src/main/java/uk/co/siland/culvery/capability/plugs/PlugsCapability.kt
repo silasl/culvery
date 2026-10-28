@@ -13,7 +13,7 @@ import uk.co.siland.culvery.core.plugin.Capability
 import uk.co.siland.culvery.core.plugin.HomeCard
 import uk.co.siland.culvery.core.ui.Icons
 
-/** The Plugs tab, after the door (12 §4.3): shown once a plug system has a link, even with no plugs added. */
+/** The Plugs tab, after the door (12 §4.3): shown once Home Assistant is linked and at least one plug is shown. */
 @Singleton
 class PlugsCapability @Inject constructor(
     systems: Set<@JvmSuppressWildcards PlugSystem>,
@@ -29,7 +29,7 @@ class PlugsCapability @Inject constructor(
     override val order = 55
 
     override val hasTab: Flow<Boolean> =
-        system?.plugs?.map { it != null }?.distinctUntilChanged() ?: flowOf(false)
+        system?.plugs?.map { !it.isNullOrEmpty() }?.distinctUntilChanged() ?: flowOf(false)
 
     override fun cards(): Flow<List<HomeCard>> = flowOf(emptyList())
 

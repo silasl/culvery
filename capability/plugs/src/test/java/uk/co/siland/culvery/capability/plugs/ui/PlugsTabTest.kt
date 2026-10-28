@@ -7,17 +7,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
@@ -45,7 +50,7 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.waitFor
 
-/** 12 §4.3: the Plugs tab: its header, its cards, and Edit behind a PIN. */
+/** 12 §4.3: the Plugs tab: its header, its rows, and Edit behind a PIN. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlugsTabTest {
@@ -71,23 +76,21 @@ class PlugsTabTest {
 
     private fun count(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().size
 
-    /** Fails if the empty tab draws a card, a mode column or an Edit button. */
+    /** Fails if the header isn't "{on} of {n} on · Home Assistant" over plugs known to be On or Off, or isn't just "Home Assistant" with none known. */
     @Test
-    fun noPlugsDrawsNoCardsOrColumn() {
-        show(plugs = emptyList())
-        compose.onAllNodesWithTag("plug_card_0").assertCountEquals(0)
-        compose.onAllNodesWithTag("mode_holiday").assertCountEquals(0)
-        compose.onAllNodesWithTag("plugs_edit").assertCountEquals(0)
-        compose.assertClickablesHaveRoleAndLabel()
-    }
-
-    /** Fails if the header line isn't "{on} of {n} on · Home Assistant", counting only plugs known to be On or Off. */
-    @Test
-    fun theHeaderCountsWhatsOn() {
-        show(plugs = listOf(LAMP_ON, FAN_OFF, FAIRY_LOST, PlugState(DESK, "Desk", PlugPower.ON, null)))
+    fun theHeaderCountsKnownPlugsOnly() {
+        show(plugs = listOf(LAMP_ON, FAN_OFF, FAIRY_LOST, PlugState(DESK, "Desk", PlugPower.ON, null), PlugState(DESK + "2", "Hall", PlugPower.UNKNOWN, null)))
         compose.onNodeWithText("2 of 3 on · Home Assistant").assertIsDisplayed()
         compose.onNodeWithText("Plugs").assertIsDisplayed()
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if a tab with no plug's state known says anything but "Home Assistant". */
+    @Test
+    fun noStateKnownSaysJustHomeAssistant() {
+        show(plugs = listOf(FAIRY_LOST, PlugState(DESK, "Desk", PlugPower.UNKNOWN, null)))
+        compose.onNodeWithText("Home Assistant").assertIsDisplayed()
+        compose.onAllNodesWithText("of", substring = true).assertCountEquals(0)
     }
 
     /** Fails if a link problem doesn't show under the header. */
@@ -106,19 +109,38 @@ class PlugsTabTest {
         compose.onAllNodesWithTag("plugs_line").assertCountEquals(0)
     }
 
-    /** Fails if the sections aren't drawn for every mode, or each plug has no card. */
+    /** Fails if the rows aren't in the order given, each mode has no column heading, or a heading isn't over its cells. */
     @Test
-    fun aCardPerPlugAndASectionPerMode() {
-        show(plugs = listOf(LAMP_ON, FAN_OFF, DESK_OFF), modes = listOf(PARTY_MODE, HOLIDAY_MODE))
-        assertThat(listOf(count("plug_card_0"), count("plug_card_1"), count("plug_card_2"), count("plug_card_3"))).containsExactly(1, 1, 1, 0).inOrder()
-        assertThat(listOf(count("mode_holiday"), count("mode_party"))).containsExactly(1, 1)
+    fun aRowPerPlugInOrderAndAHeadingPerMode() {
+        show(plugs = listOf(FAN_OFF, LAMP_ON, DESK_OFF), modes = listOf(PARTY_MODE, HOLIDAY_MODE))
+        val tops = listOf(FAN, LAMP, DESK).map { compose.onNodeWithTag("plug_$it").fetchSemanticsNode().boundsInRoot.top }
+        assertThat(tops).isInOrder()
+        assertThat(count("plug_$FAN") + count("plug_$LAMP") + count("plug_$DESK")).isEqualTo(3)
+        assertThat(listOf(count("mode_heading_holiday"), count("mode_heading_party"))).containsExactly(1, 1)
+        for (mode in listOf("holiday", "party")) {
+            val heading = compose.onNodeWithTag("mode_heading_$mode").fetchSemanticsNode().boundsInRoot
+            val cell = compose.onNodeWithTag("mode_${mode}_$FAN", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            assertThat(cell.center.x).isWithin(1f).of(heading.center.x)
+            assertThat(heading.bottom).isAtMost(compose.onNodeWithTag("plug_$FAN").fetchSemanticsNode().boundsInRoot.top)
+        }
+        assertThat(compose.onNodeWithTag("mode_heading_holiday").fetchSemanticsNode().boundsInRoot.left)
+            .isLessThan(compose.onNodeWithTag("mode_heading_party").fetchSemanticsNode().boundsInRoot.left)
+    }
+
+    /** Fails if a tab with no plug at all draws an empty state, an Add button or a mode heading. */
+    @Test
+    fun noPlugsDrawsNoRows() {
+        show(plugs = emptyList())
+        compose.onAllNodesWithTag("plug_$LAMP").assertCountEquals(0)
+        compose.onNodeWithText("Add a plug").assertDoesNotExist()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if a tap on a plain plug's button doesn't hand that plug on once. */
     @Test
     fun aPlainPlugSwitchesOnTap() {
         show()
-        compose.onNodeWithTag("plug_card_1_switch").performClick()
+        compose.onNodeWithTag("plug_${FAN}_switch").performClick()
         assertThat(switched).containsExactly("Fan")
     }
 
@@ -148,12 +170,48 @@ class PlugsTabTest {
 
         fun prefs() = runBlocking { rig.prefs() }
 
-        fun chips() = count("mode_holiday_0_on") > 0
+        fun chips() = count("mode_holiday_${LAMP}_on") > 0
 
         fun edit() {
             compose.onNodeWithTag("plugs_edit").performClick()
             idle()
         }
+    }
+
+    private fun switchButton(id: String = FAN) = compose.onNodeWithTag("plug_${id}_switch")
+
+    /** Fails if the PIN plug says Switching… while the pad is up, doesn't once the PIN is in, or a tap during it reaches the system again. */
+    @Test
+    fun switchingShowsOnlyAfterThePin() {
+        val host = Host(Role.ADULT, FAN_OFF)
+        runBlocking { host.rig.configure { it.copy(needsPin = setOf(FAN)) } }
+        val pad = CompletableDeferred<Unit>().also { host.access.padGate = it }
+        val gate = CompletableDeferred<Unit>().also { host.rig.system.switchGates[FAN] = it }
+        compose.waitFor { count("plug_${FAN}_switch") > 0 }
+        switchButton().assertContentDescriptionEquals("Switch on, needs a PIN").performClick()
+        compose.waitFor { host.access.asked.size == 1 }
+        host.idle()
+        switchButton().assertContentDescriptionEquals("Switch on, needs a PIN")
+
+        pad.complete(Unit)
+        compose.waitFor { host.rig.system.switches.size == 1 }
+        compose.waitFor { count("plug_${FAN}_switch") > 0 && switchButton().fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() == "Switching…" }
+        gate.complete(Unit)
+        compose.waitFor { switchButton().fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() != "Switching…" }
+        assertThat(host.rig.system.switches).containsExactly(FAN to true)
+    }
+
+    /** Fails if a Child's PIN switches a plug that needs one. */
+    @Test
+    fun aChildPinIsRefused() {
+        val host = Host(Role.CHILD, FAN_OFF)
+        runBlocking { host.rig.configure { it.copy(needsPin = setOf(FAN)) } }
+        compose.waitFor { count("plug_${FAN}_switch") > 0 }
+        switchButton().performClick()
+        compose.waitFor { host.access.asked.size == 1 }
+        host.idle()
+        assertThat(host.rig.system.switches).isEmpty()
+        switchButton().assertContentDescriptionEquals("Switch on, needs a PIN")
     }
 
     /** Fails if Edit shows its chips without the manage grant being asked for, or a Child gets them. */
@@ -183,7 +241,7 @@ class PlugsTabTest {
     fun aChipTapIsSaved() {
         val host = Host(Role.ADULT, LAMP_ON)
         host.edit()
-        compose.onNodeWithTag("mode_holiday_0_off").performClick()
+        compose.onNodeWithTag("mode_holiday_${LAMP}_off").performClick()
         compose.waitFor { host.prefs().choice("holiday", LAMP) == ModeChoice.OFF }
     }
 
@@ -215,7 +273,7 @@ class PlugsTabTest {
         host.edit()
         compose.mainClock.autoAdvance = false
         compose.mainClock.advanceTimeBy(EDIT_IDLE_MS - 1_000, ignoreFrameDuration = true)
-        compose.onNodeWithTag("mode_holiday_0_on").performClick()
+        compose.onNodeWithTag("mode_holiday_${LAMP}_on").performClick()
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(EDIT_IDLE_MS - 1_000, ignoreFrameDuration = true)
         assertThat(host.chips()).isTrue()

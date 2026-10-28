@@ -57,7 +57,7 @@ class PlugActionsTest {
     @Test
     fun aPinPlugAsksForAFreshPin() = runTest {
         for (role in listOf(Role.ADULT, Role.ADMIN)) {
-            val rig = rig(role, pin = true)
+            val rig = rig(role, pin = true, state = fan(OFF_NOW))
             rig.actions.switch(fan(OFF_NOW))
             advanceUntilIdle()
 
@@ -151,6 +151,30 @@ class PlugActionsTest {
         advanceUntilIdle()
         assertThat(cancelled.actions.switching.value).isEmpty()
         assertThat(cancelled.plugs.system.switches).isEmpty()
+    }
+
+    /** Fails if the switch goes by the state at the tap instead of the state after the PIN, or still switches a plug that can no longer be switched. */
+    @Test
+    fun theSwitchUsesTheStateAfterThePin() = runTest {
+        val rig = rig(pin = true)
+        val pad = CompletableDeferred<Unit>().also { rig.access.padGate = it }
+        rig.actions.switch(fan(ON_NOW))
+        runCurrent()
+        rig.plugs.power(FAN, OFF_NOW)
+        pad.complete(Unit)
+        advanceUntilIdle()
+        assertThat(rig.plugs.system.switches).containsExactly(FAN to true)
+        assertThat(rig.actions.switching.value).isEmpty()
+
+        val lost = rig(pin = true)
+        val lostPad = CompletableDeferred<Unit>().also { lost.access.padGate = it }
+        lost.actions.switch(fan(ON_NOW))
+        runCurrent()
+        lost.plugs.power(FAN, UNREACHABLE)
+        lostPad.complete(Unit)
+        advanceUntilIdle()
+        assertThat(lost.plugs.system.switches).isEmpty()
+        assertThat(lost.actions.switching.value).isEmpty()
     }
 
     /** Review Focus 4: fails if a second tap while the pad is up asks again, and if Cancel doesn't free the button for the next tap. */

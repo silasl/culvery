@@ -46,15 +46,18 @@ class PlugActions internal constructor(
     /** Plugs tapped and not yet done, the PIN pad included: a tap on one of them does nothing. */
     private val asking: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
-    /** Ignored unless the plug is On or Off and isn't already being switched. */
+    /** Ignored unless the plug is On or Off and isn't already being switched; after a PIN the plug is read again and switched from that state. */
     fun switch(plug: PlugState) {
         val system = system ?: return
-        val now = plug.isOn ?: return
+        if (plug.isOn == null) return
         if (!asking.add(plug.entityId)) return
         scope.launch {
             try {
-                if (needsPin(plug.entityId)) access.authorise(PlugsPermissions.SWITCH) ?: return@launch
+                val asked = needsPin(plug.entityId)
+                if (asked) access.authorise(PlugsPermissions.SWITCH) ?: return@launch
                 _switching.update { it + plug.entityId }
+                // The plug may have changed while the pad was up: toggle from what it is now.
+                val now = (if (asked) system.read(plug.entityId) else plug).isOn ?: return@launch
                 when (val result = system.switch(plug.entityId, on = !now)) {
                     PlugResult.Unreachable -> toaster.show(PlugsWords.cantReach(plug.name), urgent = true)
                     PlugResult.NotSwitched -> toaster.show(PlugsWords.didntSwitch(plug.name), urgent = true)

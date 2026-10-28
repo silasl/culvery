@@ -20,15 +20,18 @@ class PlugsCapabilityTest {
         return PlugsCapability(setOfNotNull<PlugSystem>(system), actions, plugs.settings, MODES)
     }
 
-    /** 12 §4.3: fails if the tab shows with no Home Assistant link, or hides with a link and no plugs. */
+    /** 12 §4.3: fails if the tab shows with no Home Assistant link or with none shown, or hides with one shown. */
     @Test
-    fun theTabShowsOnceLinked() = runTest {
+    fun theTabShowsOnceAPlugIsShown() = runTest {
         val system = FakePlugSystem()
         system.added.value = null
         val capability = capability(system)
         assertThat(capability.hasTab.first()).isFalse()
 
         system.added.value = emptyList()
+        assertThat(capability.hasTab.first()).isFalse()
+
+        system.added.value = listOf(PlugState(LAMP, "Lamp", PlugPower.OFF, null))
         assertThat(capability.hasTab.first()).isTrue()
     }
 
