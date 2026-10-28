@@ -717,6 +717,12 @@ Fault found:
   - the Settings Plugs section sits tight under the thermostat line, and plug names show as upper-case labels;
   - the plug read "On · 0 W" all session, probably idle; check against a working load.
 
+## Plan 12 (smart plugs): on the tablet (2026-10-28)
+- **Installed:** the release from be27f7d8 with `-r` (mapping `culvery-notes/mappings/mapping-be27f7d.txt`). The tablet came back on its home screen; Culvery was opened again and is in front, not pinned (it pins only with setup complete and the kiosk not exited, so the kiosk was probably exited earlier; left as it was).
+- **Seen:** the user showed the plug in Settings › Other integrations; the Plugs tab appeared on the rail; one plug, off, matching the Tapo app (its evening schedule); header "0 of 1 on · Home Assistant"; Holiday on Ignore; no padlock.
+- **Not checked (the user's ruling):** the watts against the Tapo app (the plug was off, and switching it wasn't wanted); switching from the tablet; the router plug (not discoverable yet). Holiday mode with plugs waits for its first real use (spec §8.3).
+- **The log scan:** no crash or ANR since the install; the plug, Holiday and capture tags wrote nothing (a release logs only warnings and errors); Culvery's lines hold no plug id, name, address or token. The logs are kept in `culvery-notes/plan12-tablet-log.txt` and `plan12-tablet-pid-log.txt`.
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
