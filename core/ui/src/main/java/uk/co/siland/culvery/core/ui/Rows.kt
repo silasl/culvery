@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -41,7 +42,7 @@ private val CLOCK: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Loca
 
 fun clockText(time: LocalTime): String = time.format(CLOCK)
 
-/** One switch for TalkBack and the finger, in [HhListRow]'s container; [HhSwitch] only draws. */
+/** One switch for TalkBack and the finger, in [HhListRow]'s container; [HhSwitch] only draws. [spokenName] replaces what TalkBack reads for the row. */
 @Composable
 fun HhSwitchRow(
     title: String,
@@ -51,6 +52,7 @@ fun HhSwitchRow(
     onChange: (Boolean) -> Unit,
     enabled: Boolean = true,
     minHeight: Dp = ListRowTokens.minHeight,
+    spokenName: String? = null,
 ) {
     val c = Culvery.colors
     Row(
@@ -60,6 +62,7 @@ fun HhSwitchRow(
             .listRowCard(c, minHeight)
             .testTag(tag)
             .hhToggleable(checked, enabled, onValueChange = onChange)
+            .then(if (spokenName != null) Modifier.semantics { contentDescription = spokenName } else Modifier)
             .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd, top = ListRowTokens.paddingV, bottom = ListRowTokens.paddingV),
     ) {
         Column(Modifier.weight(1f)) {

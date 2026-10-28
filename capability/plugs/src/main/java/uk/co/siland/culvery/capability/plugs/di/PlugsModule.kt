@@ -10,7 +10,9 @@ import uk.co.siland.culvery.capability.plugs.PlugSystem
 import uk.co.siland.culvery.capability.plugs.PlugsCapability
 import uk.co.siland.culvery.capability.plugs.PlugsHouse
 import uk.co.siland.culvery.capability.plugs.PlugsPermissionSource
+import uk.co.siland.culvery.capability.plugs.ui.PlugsSettingsSection
 import uk.co.siland.culvery.core.access.PermissionSource
+import uk.co.siland.culvery.core.homeassistant.HomeAssistantSection
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.plugin.Capability
 
@@ -27,6 +29,11 @@ abstract class PlugsModule {
 
     @Binds
     abstract fun plugs(impl: PlugsHouse): HousePlugs
+
+    // Renders nothing with no system bound.
+    @Binds
+    @IntoSet
+    abstract fun settings(impl: PlugsSettingsSection): HomeAssistantSection
 
     @Binds
     @IntoSet

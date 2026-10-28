@@ -28,4 +28,8 @@ internal object PlugsDimens {
     val labelGap = 4.dp
     val rowHeight = 56.dp
     val chipGap = 8.dp
+
+    // Settings › Other integrations › Plugs: a block per plug under the section label, 16 apart as the page's own blocks.
+    val settingsGap = 16.dp
+    val settingsRowGap = 8.dp
 }

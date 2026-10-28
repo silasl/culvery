@@ -12,6 +12,8 @@ dependencies {
     api(project(":core:plugin"))
     implementation(project(":core:ui"))
     implementation(project(":core:access"))
+    // HomeAssistantSection is what Settings › Other integrations asks a provider for.
+    implementation(project(":core:homeassistant"))
     api(project(":core:house"))
     implementation(libs.androidx.datastore.preferences)
     testImplementation(libs.roborazzi.core)
