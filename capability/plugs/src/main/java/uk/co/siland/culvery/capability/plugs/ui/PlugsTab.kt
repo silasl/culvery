@@ -22,27 +22,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.plugs.ModeChoice
 import uk.co.siland.culvery.capability.plugs.PlugActions
-import uk.co.siland.culvery.capability.plugs.PlugCandidates
 import uk.co.siland.culvery.capability.plugs.PlugPrefs
 import uk.co.siland.culvery.capability.plugs.PlugSettings
 import uk.co.siland.culvery.capability.plugs.PlugState
 import uk.co.siland.culvery.capability.plugs.PlugSystem
 import uk.co.siland.culvery.capability.plugs.PlugsWords
 import uk.co.siland.culvery.core.house.HouseModeInfo
-import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
@@ -59,9 +55,8 @@ private const val TAG = "PlugsTab"
 internal const val EDIT_IDLE_MS = 120_000L
 
 /**
- * The Plugs tab (12 §4.3): the title with how many are on and Add a plug, a card per plug that switches it, and on the
- * right each mode's list with Leave, On or Off per plug, read-only until [editing]. With no plug there is only the line
- * saying how to add one. [problem] is the link's line, under the header.
+ * The Plugs tab (12 §4.3): the title with how many are on, a card per plug that switches it, and on the
+ * right each mode's list with Ignore, On or Off per plug, read-only until [editing]. [problem] is the link's line, under the header.
  */
 @Composable
 internal fun PlugsTab(
@@ -73,8 +68,6 @@ internal fun PlugsTab(
     prefs: PlugPrefs,
     editing: Boolean,
     onSwitch: (PlugState) -> Unit,
-    onSettings: (PlugState) -> Unit,
-    onAdd: () -> Unit,
     onEdit: () -> Unit,
     onDone: () -> Unit,
     onChoice: (modeId: String, entityId: String, ModeChoice) -> Unit,
@@ -82,17 +75,11 @@ internal fun PlugsTab(
 ) {
     val c = Culvery.colors
     Column(modifier.fillMaxSize().testTag("plugs_tab")) {
-        HhPageHeader(
-            PlugsWords.PLUGS, if (plugs.isEmpty()) null else PlugsWords.plugsOn(plugs),
-            trailing = { HhButton(PlugsWords.ADD_A_PLUG, onAdd, Modifier.testTag("plugs_add"), icon = Icons.ADD, on = ButtonSurface.Bg) },
-        )
+        HhPageHeader(PlugsWords.PLUGS, if (plugs.isEmpty()) null else PlugsWords.plugsOn(plugs))
         if (problem != null) {
             Text(problem, style = HhType.secondary, color = c.danger, modifier = Modifier.padding(bottom = PlugsDimens.lineGap).testTag("plugs_line"))
         }
-        if (plugs.isEmpty()) {
-            Text(PlugsWords.NO_PLUGS, style = HhType.body, color = c.mute, modifier = Modifier.testTag("plugs_empty"))
-            return@Column
-        }
+        if (plugs.isEmpty()) return@Column
         Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(PlugsDimens.gap)) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(gridColumns(plugs.size)),
@@ -101,7 +88,7 @@ internal fun PlugsTab(
                 modifier = Modifier.weight(1f).fillMaxHeight().testTag("plugs_grid"),
             ) {
                 itemsIndexed(plugs, key = { _, it -> it.entityId }) { i, plug ->
-                    PlugCard(plug, i, plug.entityId in needsPin, plug.entityId in switching, { onSwitch(plug) }, { onSettings(plug) })
+                    PlugCard(plug, i, plug.entityId in needsPin, plug.entityId in switching, { onSwitch(plug) })
                 }
             }
             if (modes.isNotEmpty()) ModeColumn(modes, plugs, prefs, editing, onEdit, onDone, onChoice, Modifier.width(PlugsDimens.modeColumn).fillMaxHeight())
@@ -155,39 +142,16 @@ internal fun PlugsTabHost(system: PlugSystem, actions: PlugActions, settings: Pl
         }
     }
 
-    val overlay = LocalOverlayHost.current
     val scope = rememberCoroutineScope()
     val ask = rememberSingleAction(system) { e -> Log.w(TAG, "Asking for the plugs' PIN failed (${e::class.simpleName})") }
     PlugsTab(
         plugs, prefs.needsPin, switching, problem, shown, prefs, editing,
         onSwitch = actions::switch,
-        onSettings = { plug ->
-            ask.run { if (actions.mayManage()) overlay.show { PlugSettingsSheetHost(plug, actions, settings, scope, overlay::dismiss) } }
-        },
-        onAdd = { ask.run { if (actions.mayManage()) overlay.show { AddPlugSheetHost(system, actions, settings, scope, overlay::dismiss) } } },
         onEdit = { ask.run { if (actions.mayManage()) editing = true } },
         onDone = { editing = false },
         onChoice = { mode, id, choice ->
             changes++
             scope.launch { actions.setChoice(mode, id, choice) }
         },
-    )
-}
-
-@Composable
-private fun AddPlugSheetHost(system: PlugSystem, actions: PlugActions, settings: PlugSettings, scope: CoroutineScope, onClose: () -> Unit) {
-    val candidates by produceState<PlugCandidates?>(null, system) { value = system.available() }
-    val prefs by settings.prefs.collectAsStateWithLifecycle(PlugPrefs())
-    AddPlugSheet(candidates, prefs.plugs, onPick = { scope.launch { actions.add(it.entityId) } }, onClose = onClose)
-}
-
-@Composable
-private fun PlugSettingsSheetHost(plug: PlugState, actions: PlugActions, settings: PlugSettings, scope: CoroutineScope, onClose: () -> Unit) {
-    val prefs by settings.prefs.collectAsStateWithLifecycle(PlugPrefs())
-    PlugSettingsSheet(
-        plug, plug.entityId in prefs.needsPin,
-        onNeedsPin = { scope.launch { actions.setNeedsPin(plug.entityId, it) } },
-        onRemove = { scope.launch { actions.remove(plug.entityId) } },
-        onClose = onClose,
     )
 }

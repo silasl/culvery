@@ -26,7 +26,7 @@ import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhType
 
 private fun word(choice: ModeChoice) = when (choice) {
-    ModeChoice.LEAVE -> PlugsWords.LEAVE
+    ModeChoice.IGNORE -> PlugsWords.IGNORE
     ModeChoice.ON -> PlugsWords.ON
     ModeChoice.OFF -> PlugsWords.OFF
 }
@@ -49,7 +49,7 @@ internal fun ModeSections(
 }
 
 /**
- * One mode's list (12 §2.4): each plug with the word it has for this mode, which Edit turns into Leave, On and Off
+ * One mode's list (12 §2.4): each plug with the word it has for this mode, which Edit turns into Ignore, On and Off
  * chips. The chips are spoken as the row ("Holiday mode, Lamp, on"), the chosen one by its radio state.
  */
 @Composable

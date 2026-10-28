@@ -34,8 +34,8 @@ internal class PlugsRig(vararg states: PlugState) {
     suspend fun configure(change: (PlugPrefs) -> PlugPrefs) = settings.update(change)
 
     /** Lamp and Fan added, holiday setting the plugs given. */
-    suspend fun holiday(lamp: ModeChoice = ModeChoice.LEAVE, fan: ModeChoice = ModeChoice.LEAVE) = configure {
-        it.adding(LAMP).adding(FAN).with(HOLIDAY, LAMP, lamp).with(HOLIDAY, FAN, fan)
+    suspend fun holiday(lamp: ModeChoice = ModeChoice.IGNORE, fan: ModeChoice = ModeChoice.IGNORE) = configure {
+        it.showing(LAMP).showing(FAN).with(HOLIDAY, LAMP, lamp).with(HOLIDAY, FAN, fan)
     }
 
     fun power(id: String, power: PlugPower) {

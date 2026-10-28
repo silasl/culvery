@@ -6,27 +6,35 @@ import uk.co.siland.culvery.core.plugin.CHECKING
 /** The Plugs tab's words (12 §2.5, §2.14). */
 object PlugsWords {
     const val PLUGS = "Plugs"
+    private const val HOME_ASSISTANT = "Home Assistant"
     const val A_PLUG = "A plug"
-    const val ADD_A_PLUG = "Add a plug"
-    const val NO_PLUGS = "No plugs yet. Add one from Home Assistant."
-    const val NOTHING_TO_ADD = "Home Assistant has no other switches."
     const val SWITCHING = "Switching…"
     const val SWITCH_ON = "Switch on"
     const val SWITCH_OFF = "Switch off"
-    const val CANT_REACH_HOME_ASSISTANT = "Can’t reach Home Assistant."
+    const val CANT_REACH_HA = "Can’t reach Home Assistant."
     const val CANT_REACH_THIS_PLUG = "Can’t reach this plug."
-    const val GONE_PLUG = "Home Assistant has no plug called that any more. Remove it or add it again."
+    const val GONE_PLUG = "Home Assistant has no plug called that any more. Turn it off in Settings."
     const val NEEDS_A_PIN = "Needs a PIN to switch"
-    const val REMOVE = "Remove"
-    const val LEAVE = "Leave"
+    const val SHOW_ON_TAB = "Show on the Plugs tab"
+    const val PLUGS_HELP = "Plugs from Home Assistant’s TP-Link integration. Turn one on to show it on the Plugs tab."
+    const val NO_TP_LINK_PLUGS = "Home Assistant has no TP-Link plugs. Add them in Home Assistant first."
+    const val CANT_LIST_PLUGS = "Can’t list the plugs. Check Home Assistant is up to date."
+    const val GONE_SHOWN = "Home Assistant has no plug called that any more."
+    const val IGNORE = "Ignore"
     const val ON = "On"
     const val OFF = "Off"
     const val EDIT = "Edit"
     const val DONE = "Done"
 
-    fun settingsFor(name: String) = "Settings for $name"
+    /** Counts the plugs known to be On or Off; with none known, just "Home Assistant". */
+    fun plugsOn(plugs: List<PlugState>): String {
+        val known = plugs.filter { it.isOn != null }
+        return if (known.isEmpty()) HOME_ASSISTANT else "${known.count { it.power == PlugPower.ON }} of ${known.size} on · $HOME_ASSISTANT"
+    }
 
-    fun plugsOn(plugs: List<PlugState>) = "${plugs.count { it.power == PlugPower.ON }} of ${plugs.size} on · Home Assistant"
+    fun showSpoken(name: String) = "$name, show on the Plugs tab"
+
+    fun needsPinSpoken(name: String) = "$name, needs a PIN to switch"
 
     fun plugStatus(state: PlugState) = when (state.power) {
         PlugPower.ON -> state.watts?.let { "$ON · $it W" } ?: ON
@@ -34,7 +42,7 @@ object PlugsWords {
         PlugPower.UNREACHABLE -> CANT_REACH_THIS_PLUG
         PlugPower.GONE -> GONE_PLUG
         PlugPower.UNKNOWN -> CHECKING
-        PlugPower.NO_LINK -> CANT_REACH_HOME_ASSISTANT
+        PlugPower.NO_LINK -> CANT_REACH_HA
     }
 
     /** What TalkBack reads for a card. */
@@ -56,14 +64,15 @@ object PlugsWords {
         return if (needsPin) "$action, needs a PIN" else action
     }
 
-    fun modeRowSpoken(mode: String, name: String, choice: ModeChoice): String {
-        val word = when (choice) {
-            ModeChoice.LEAVE -> "leave alone"
-            ModeChoice.ON -> "on"
-            ModeChoice.OFF -> "off"
-        }
-        return "$mode, $name, $word"
+    private fun spokenWord(choice: ModeChoice) = when (choice) {
+        ModeChoice.IGNORE -> "ignore"
+        ModeChoice.ON -> "on"
+        ModeChoice.OFF -> "off"
     }
+
+    fun modeRowSpoken(mode: String, name: String, choice: ModeChoice) = "$mode, $name, ${spokenWord(choice)}"
+
+    fun modeCellSpoken(mode: String, choice: ModeChoice) = "$mode, ${spokenWord(choice)}"
 
     fun cantReach(name: String) = "Can’t reach $name. Check it’s plugged in and the Tapo app can see it."
 

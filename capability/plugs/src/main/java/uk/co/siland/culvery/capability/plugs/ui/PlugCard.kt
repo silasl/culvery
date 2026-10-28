@@ -26,13 +26,12 @@ import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.HhRoundButton
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 /**
- * One plug (12 §4.3): its name and state, the › to its settings, the lock when it needs a PIN, and the button that
+ * One plug (12 §4.3): its name and state, the lock when it needs a PIN, and the button that
  * switches it. The button is inactive for a plug that can't be reached, is gone or hasn't been read, and reads
  * "Switching…" while a switch is out, when taps are ignored. An on card has the accent fill.
  */
@@ -43,7 +42,6 @@ internal fun PlugCard(
     needsPin: Boolean,
     switching: Boolean,
     onSwitch: () -> Unit,
-    onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = Culvery.colors
@@ -73,10 +71,6 @@ internal fun PlugCard(
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(PlugsDimens.footGap)) {
-            HhRoundButton(
-                Icons.CHEVRON_RIGHT, PlugsWords.settingsFor(plug.name), onSettings, Modifier.testTag("${tag}_settings"),
-                on = ButtonSurface.Surf, size = PlugsDimens.chevron,
-            )
             Spacer(Modifier.weight(1f))
             if (needsPin) HhIcon(Icons.LOCK, size = PlugsDimens.lock, tint = c.mute, modifier = Modifier.testTag("${tag}_lock"))
             val label = if (switching) PlugsWords.SWITCHING else if (on) PlugsWords.SWITCH_OFF else PlugsWords.SWITCH_ON

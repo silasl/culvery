@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.capability.plugs
 
 import android.util.Log
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -8,7 +9,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.core.access.AccessControl
@@ -40,17 +40,21 @@ class PlugActions internal constructor(
 
     private val _switching = MutableStateFlow<Set<String>>(emptySet())
 
-    /** Plugs held from the tap, PIN pad included, until the switch ends one way or another. */
+    /** Plugs being switched, from the PIN being accepted (at once for a plug that needs none) until the switch ends. */
     val switching: StateFlow<Set<String>> = _switching.asStateFlow()
+
+    /** Plugs tapped and not yet done, the PIN pad included: a tap on one of them does nothing. */
+    private val asking: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     /** Ignored unless the plug is On or Off and isn't already being switched. */
     fun switch(plug: PlugState) {
         val system = system ?: return
         val now = plug.isOn ?: return
-        if (plug.entityId in _switching.getAndUpdate { it + plug.entityId }) return
+        if (!asking.add(plug.entityId)) return
         scope.launch {
             try {
                 if (needsPin(plug.entityId)) access.authorise(PlugsPermissions.SWITCH) ?: return@launch
+                _switching.update { it + plug.entityId }
                 when (val result = system.switch(plug.entityId, on = !now)) {
                     PlugResult.Unreachable -> toaster.show(PlugsWords.cantReach(plug.name), urgent = true)
                     PlugResult.NotSwitched -> toaster.show(PlugsWords.didntSwitch(plug.name), urgent = true)
@@ -64,22 +68,21 @@ class PlugActions internal constructor(
                 toaster.show(PlugsWords.didntSwitch(plug.name), urgent = true)
             } finally {
                 _switching.update { it - plug.entityId }
+                asking.remove(plug.entityId)
             }
         }
     }
 
     suspend fun mayManage(): Boolean = access.authorise(PlugsPermissions.MANAGE) != null
 
-    /** A plug that was added before comes back on Leave everywhere (12 §2.4). */
-    suspend fun add(entityId: String) = write { it.adding(entityId) }
+    suspend fun show(entityId: String, on: Boolean) = write { if (on) it.showing(entityId) else it.hiding(entityId) }
 
-    suspend fun remove(entityId: String) = write { it.without(entityId) }
-
+    /** Nothing is written for a plug that isn't shown. */
     suspend fun setNeedsPin(entityId: String, on: Boolean) = write {
         if (entityId in it.plugs) it.copy(needsPin = if (on) it.needsPin + entityId else it.needsPin - entityId) else it
     }
 
-    /** Nothing is written for a plug that is no longer added: a chip tap can land after a Remove. */
+    /** Nothing is written for a plug that is no longer shown: a chip tap can land after it is hidden. */
     suspend fun setChoice(modeId: String, entityId: String, choice: ModeChoice) = write {
         if (entityId in it.plugs) it.with(modeId, entityId, choice) else it
     }

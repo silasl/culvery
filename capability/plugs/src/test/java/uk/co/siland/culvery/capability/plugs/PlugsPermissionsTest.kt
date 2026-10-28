@@ -16,7 +16,7 @@ class PlugsPermissionsTest {
         assertThat(PlugsPermissions.MANAGE).isEqualTo("plugs.manage")
         val labels = mapOf(
             PlugsPermissions.SWITCH to "Switch plugs that need a PIN",
-            PlugsPermissions.MANAGE to "Add, remove and set up plugs",
+            PlugsPermissions.MANAGE to "Choose what modes do with plugs",
         )
         for ((id, label) in labels) {
             assertThat(Role.entries.filter { registry.isGranted(it, id) }).containsExactly(Role.ADMIN, Role.ADULT)

@@ -19,7 +19,7 @@ import uk.co.siland.culvery.capability.plugs.PlugPower.ON as ON_NOW
 @RunWith(AndroidJUnit4::class)
 class PlugsHouseTwoModesTest {
     private suspend fun rig(a: ModeChoice, b: ModeChoice, lamp: PlugPower = OFF_NOW) = PlugsRig(lamp(lamp)).also { rig ->
-        rig.configure { it.adding(LAMP).with(HOLIDAY, LAMP, a).with(PARTY, LAMP, b) }
+        rig.configure { it.showing(LAMP).with(HOLIDAY, LAMP, a).with(PARTY, LAMP, b) }
     }
 
     private fun PlugsRig.lampIsOn() = system.states.value.getValue(LAMP).power == ON_NOW
@@ -192,7 +192,7 @@ class PlugsHouseTwoModesTest {
     @Test
     fun readyIsPerMode() = runTest {
         val rig = PlugsRig(lamp(OFF_NOW))
-        rig.configure { it.adding(LAMP).with(HOLIDAY, LAMP, OFF) }
+        rig.configure { it.showing(LAMP).with(HOLIDAY, LAMP, OFF) }
         val house = rig.house()
 
         assertThat(house.ready(PARTY).first()).isFalse()

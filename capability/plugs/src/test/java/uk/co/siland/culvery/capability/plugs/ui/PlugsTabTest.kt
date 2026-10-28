@@ -31,7 +31,6 @@ import uk.co.siland.culvery.capability.plugs.LAMP
 import uk.co.siland.culvery.capability.plugs.MODES
 import uk.co.siland.culvery.capability.plugs.ModeChoice
 import uk.co.siland.culvery.capability.plugs.PlugActions
-import uk.co.siland.culvery.capability.plugs.PlugCandidates
 import uk.co.siland.culvery.capability.plugs.PlugPower
 import uk.co.siland.culvery.capability.plugs.PlugPrefs
 import uk.co.siland.culvery.capability.plugs.PlugState
@@ -46,7 +45,7 @@ import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.core.ui.test.waitFor
 
-/** 12 §4.3: the Plugs tab: its header, its cards, and Add, settings and Edit behind a PIN. */
+/** 12 §4.3: the Plugs tab: its header, its cards, and Edit behind a PIN. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlugsTabTest {
@@ -64,7 +63,7 @@ class PlugsTabTest {
             Box(Modifier.size(1116.dp, 690.dp)) {
                 PlugsTab(
                     plugs, prefs.needsPin, emptySet(), problem, modes, prefs, editing,
-                    onSwitch = { switched += it.name }, onSettings = {}, onAdd = {}, onEdit = {}, onDone = {}, onChoice = { _, _, _ -> },
+                    onSwitch = { switched += it.name }, onEdit = {}, onDone = {}, onChoice = { _, _, _ -> },
                 )
             }
         }
@@ -72,22 +71,21 @@ class PlugsTabTest {
 
     private fun count(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().size
 
-    /** Fails if the empty tab doesn't say how to add a plug, offers no Add, or draws a mode column. */
+    /** Fails if the empty tab draws a card, a mode column or an Edit button. */
     @Test
-    fun noPlugsSaysHowToAdd() {
+    fun noPlugsDrawsNoCardsOrColumn() {
         show(plugs = emptyList())
-        compose.onNodeWithTag("plugs_empty").assertTextEquals("No plugs yet. Add one from Home Assistant.")
-        compose.onNodeWithTag("plugs_add").assertTextEquals("Add a plug")
+        compose.onAllNodesWithTag("plug_card_0").assertCountEquals(0)
         compose.onAllNodesWithTag("mode_holiday").assertCountEquals(0)
         compose.onAllNodesWithTag("plugs_edit").assertCountEquals(0)
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Fails if the header line isn't "{on} of {n} on · Home Assistant". */
+    /** Fails if the header line isn't "{on} of {n} on · Home Assistant", counting only plugs known to be On or Off. */
     @Test
     fun theHeaderCountsWhatsOn() {
         show(plugs = listOf(LAMP_ON, FAN_OFF, FAIRY_LOST, PlugState(DESK, "Desk", PlugPower.ON, null)))
-        compose.onNodeWithText("2 of 4 on · Home Assistant").assertIsDisplayed()
+        compose.onNodeWithText("2 of 3 on · Home Assistant").assertIsDisplayed()
         compose.onNodeWithText("Plugs").assertIsDisplayed()
         compose.assertClickablesHaveRoleAndLabel()
     }
@@ -133,8 +131,7 @@ class PlugsTabTest {
         var tabShown by mutableStateOf(true)
 
         init {
-            runBlocking { rig.configure { prefs -> states.fold(prefs) { acc, it -> acc.adding(it.entityId) } } }
-            rig.system.found = PlugCandidates.Found(CANDIDATES)
+            runBlocking { rig.configure { prefs -> states.fold(prefs) { acc, it -> acc.showing(it.entityId) } } }
             compose.setContent {
                 CulveryTheme(dark = true) {
                     CompositionLocalProvider(LocalOverlayHost provides overlay) {
@@ -157,69 +154,6 @@ class PlugsTabTest {
             compose.onNodeWithTag("plugs_edit").performClick()
             idle()
         }
-    }
-
-    /** Fails if Add a plug opens its sheet without the manage grant being asked for, or a Child gets it. */
-    @Test
-    fun addAsksBeforeTheSheet() {
-        val host = Host(Role.ADULT, LAMP_ON)
-        compose.onNodeWithTag("plugs_add").performClick()
-        compose.waitFor { count("add_plug_sheet") > 0 }
-        assertThat(host.access.asked).containsExactly(listOf("plugs.manage"))
-        compose.waitFor { count("add_plug_0") > 0 }
-        compose.onNodeWithTag("add_plug_0").assertTextEquals("Fan")
-    }
-
-    /** Fails if a Child's refused PIN still opens Add a plug. */
-    @Test
-    fun aChildGetsNoAddSheet() {
-        val host = Host(Role.CHILD, LAMP_ON)
-        compose.onNodeWithTag("plugs_add").performClick()
-        host.idle()
-        assertThat(host.access.asked).containsExactly(listOf("plugs.manage"))
-        assertThat(count("add_plug_sheet")).isEqualTo(0)
-    }
-
-    /** Fails if picking a switch doesn't add it to the tab and close the sheet. */
-    @Test
-    fun pickingAPlugAddsItAndClosesTheSheet() {
-        val host = Host(Role.ADULT, LAMP_ON)
-        compose.onNodeWithTag("plugs_add").performClick()
-        compose.waitFor { count("add_plug_0") > 0 }
-        compose.onNodeWithTag("add_plug_0").performClick()
-        compose.waitFor { count("add_plug_sheet") == 0 }
-        compose.waitFor { host.prefs().plugs == listOf(LAMP, FAN) }
-    }
-
-    /** Fails if the › opens the plug's settings without the manage grant, or a Child gets them. */
-    @Test
-    fun settingsAskBeforeTheSheet() {
-        val host = Host(Role.ADULT, LAMP_ON)
-        compose.onNodeWithTag("plug_card_0_settings").performClick()
-        compose.waitFor { count("plug_settings_sheet") > 0 }
-        assertThat(host.access.asked).containsExactly(listOf("plugs.manage"))
-        compose.onNodeWithTag("plug_settings_sheet").assertIsDisplayed()
-    }
-
-    /** Fails if a Child's refused PIN still opens a plug's settings. */
-    @Test
-    fun aChildGetsNoSettings() {
-        val host = Host(Role.CHILD, LAMP_ON)
-        compose.onNodeWithTag("plug_card_0_settings").performClick()
-        host.idle()
-        assertThat(host.access.asked).containsExactly(listOf("plugs.manage"))
-        assertThat(count("plug_settings_sheet")).isEqualTo(0)
-    }
-
-    /** Fails if Remove in the settings doesn't take the plug off the tab and close the sheet. */
-    @Test
-    fun removingFromTheSettingsTakesItOffTheTab() {
-        val host = Host(Role.ADULT, LAMP_ON)
-        compose.onNodeWithTag("plug_card_0_settings").performClick()
-        compose.waitFor { count("plug_settings_remove") > 0 }
-        compose.onNodeWithTag("plug_settings_remove").performClick()
-        compose.waitFor { count("plug_settings_sheet") == 0 }
-        compose.waitFor { host.prefs().plugs.isEmpty() }
     }
 
     /** Fails if Edit shows its chips without the manage grant being asked for, or a Child gets them. */

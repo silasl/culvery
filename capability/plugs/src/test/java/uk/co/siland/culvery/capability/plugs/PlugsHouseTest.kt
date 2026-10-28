@@ -13,7 +13,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
-import uk.co.siland.culvery.capability.plugs.ModeChoice.LEAVE
+import uk.co.siland.culvery.capability.plugs.ModeChoice.IGNORE
 import uk.co.siland.culvery.capability.plugs.ModeChoice.OFF
 import uk.co.siland.culvery.capability.plugs.ModeChoice.ON
 import uk.co.siland.culvery.capability.plugs.PlugPower.GONE
@@ -142,11 +142,11 @@ class PlugsHouseTest {
         assertThat(rig.prefs().runs.getValue(HOLIDAY).pending).isEmpty()
     }
 
-    /** 12 §2.4: fails if a plug set to Leave is read or switched. */
+    /** 12 §2.4: fails if a plug set to Ignore is read or switched. */
     @Test
-    fun leavePlugsAreUntouched() = runTest {
+    fun ignoredPlugsAreUntouched() = runTest {
         val rig = PlugsRig(lamp(ON_NOW), fan(ON_NOW))
-        rig.holiday(lamp = OFF, fan = LEAVE)
+        rig.holiday(lamp = OFF, fan = IGNORE)
         val house = rig.house()
 
         house.start(HOLIDAY)
@@ -200,6 +200,44 @@ class PlugsHouseTest {
 
         assertThat(rig.system.switches).containsExactly(LAMP to false)
         assertThat(rig.prefs().notes).isEmpty()
+    }
+
+    /** Pin, 12 §2.17: a plug's own Tapo schedule is a hand change too; fails if leave switches it back or keeps its note. */
+    @Test
+    fun aScheduleChangeCountsAsAHandChange() = runTest {
+        val rig = PlugsRig(lamp(ON_NOW))
+        rig.holiday(lamp = OFF)
+        val house = rig.house()
+        house.start(HOLIDAY)
+        assertThat(rig.prefs().notes).isNotEmpty()
+        rig.power(LAMP, ON_NOW)
+        rig.forgetCalls()
+
+        assertThat(house.leave(HOLIDAY)).isEqualTo(HouseStep.Done)
+
+        assertThat(rig.system.switches).isEmpty()
+        assertThat(rig.prefs().notes).isEmpty()
+    }
+
+    /** 12r Review Focus 2: fails if a plug hidden during a mode is put back or noted, or isn't snapshotted afresh once shown again. */
+    @Test
+    fun aHiddenPlugIsLeftOutOfTheNextSnapshot() = runTest {
+        val rig = PlugsRig(lamp(ON_NOW))
+        rig.holiday(lamp = OFF)
+        val house = rig.house()
+        house.start(HOLIDAY)
+        rig.configure { it.hiding(LAMP) }
+        rig.forgetCalls()
+
+        assertThat(house.leave(HOLIDAY)).isEqualTo(HouseStep.Done)
+        assertThat(rig.system.switches).isEmpty()
+        assertThat(rig.prefs().notes).isEmpty()
+
+        rig.configure { it.showing(LAMP) }
+        assertThat(rig.prefs().notes).isEmpty()
+        assertThat(rig.prefs().choice(HOLIDAY, LAMP)).isEqualTo(OFF)
+        house.begin(HOLIDAY)
+        assertThat(rig.prefs().runs.getValue(HOLIDAY).pending).containsExactly(LAMP, false)
     }
 
     /** 12 §5.3: fails if a plug never reached gets a note, or is switched at leave. */
@@ -370,7 +408,7 @@ class PlugsHouseTest {
         rig.holiday(lamp = OFF)
         val house = rig.house()
         house.start(HOLIDAY)
-        rig.configure { it.with(HOLIDAY, LAMP, LEAVE).with(HOLIDAY, FAN, OFF) }
+        rig.configure { it.with(HOLIDAY, LAMP, IGNORE).with(HOLIDAY, FAN, OFF) }
         rig.forgetCalls()
 
         house.enter(HOLIDAY)
@@ -380,28 +418,28 @@ class PlugsHouseTest {
         assertThat(rig.system.switches).containsExactly(LAMP to true)
     }
 
-    /** Review Focus 2: fails if a removed plug is put back at leave. */
+    /** Review Focus 2: fails if a hidden plug is put back at leave. */
     @Test
-    fun removeDropsTheNote() = runTest {
+    fun hidingDropsTheNote() = runTest {
         val rig = PlugsRig(lamp(ON_NOW))
         rig.holiday(lamp = OFF)
         val house = rig.house()
         house.start(HOLIDAY)
-        rig.configure { it.without(LAMP) }
+        rig.configure { it.hiding(LAMP) }
 
         assertThat(house.leave(HOLIDAY)).isEqualTo(HouseStep.Done)
 
         assertThat(rig.system.switches).containsExactly(LAMP to false)
     }
 
-    /** Review Focus 2: fails if a retry reads a plug removed since. */
+    /** Review Focus 2: fails if a retry reads a plug hidden since. */
     @Test
-    fun removingAPlugMidModeStopsItsRetries() = runTest {
+    fun hidingAPlugMidModeStopsItsRetries() = runTest {
         val rig = PlugsRig(lamp(UNREACHABLE))
         rig.holiday(lamp = OFF)
         val house = rig.house()
         assertThat(house.start(HOLIDAY)).isInstanceOf(HouseStep.Failed::class.java)
-        rig.configure { it.without(LAMP) }
+        rig.configure { it.hiding(LAMP) }
         rig.forgetCalls()
 
         assertThat(house.enter(HOLIDAY)).isEqualTo(HouseStep.Done)
@@ -409,9 +447,9 @@ class PlugsHouseTest {
         assertThat(rig.system.reads).isEmpty()
     }
 
-    /** Review Focus 2: fails if a remove landing after the note's write but before the switch still sends it, or leaves entries. */
+    /** Review Focus 2: fails if a hide landing after the note's write but before the switch still sends it, or leaves entries. */
     @Test
-    fun aRemoveBetweenTheNoteAndTheSwitchSendsNothing() = runTest {
+    fun aHideBetweenTheNoteAndTheSwitchSendsNothing() = runTest {
         val rig = PlugsRig(lamp(ON_NOW))
         rig.holiday(lamp = OFF)
         val house = rig.house()
@@ -425,7 +463,7 @@ class PlugsHouseTest {
         rig.store.writeGate = gate
         read.complete(Unit)
         runCurrent()
-        val remove = launch { rig.configure { it.without(LAMP) } }
+        val remove = launch { rig.configure { it.hiding(LAMP) } }
         runCurrent()
         gate.complete(Unit)
         joinAll(remove)
@@ -542,7 +580,7 @@ class PlugsHouseTest {
     @Test
     fun previewNamesComeFromARead() = runTest {
         val rig = PlugsRig(lamp(ON_NOW), fan(ON_NOW), desk(OFF_NOW))
-        rig.configure { it.adding(LAMP).adding(FAN).adding(DESK).with(HOLIDAY, LAMP, OFF).with(HOLIDAY, DESK, ON) }
+        rig.configure { it.showing(LAMP).showing(FAN).showing(DESK).with(HOLIDAY, LAMP, OFF).with(HOLIDAY, DESK, ON) }
         rig.system.added.value = emptyList()
 
         assertThat(rig.house().preview(HOLIDAY)).containsExactly(PlugChange("Lamp", false), PlugChange("Desk", true)).inOrder()

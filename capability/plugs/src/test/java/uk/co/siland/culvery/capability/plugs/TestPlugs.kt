@@ -108,8 +108,9 @@ private val person = Person(PersonId("p"), "P", 0)
 /** A grant that holds [permissions] only. */
 internal fun grant(vararg permissions: String) = Authorised(person, Role.ADULT, permissions.toSet())
 
-/** A PIN pad answered by someone with [role] (null: cancelled); [asked] holds each call's permissions in order. */
+/** A PIN pad answered by someone with [role] (null: cancelled); [asked] holds each call's permissions in order, and [padGate] holds the answer back. */
 internal class TestAccess(var role: Role?) : AccessControl {
+    @Volatile var padGate: CompletableDeferred<Unit>? = null
     private val registry = PermissionRegistry(setOf(CorePermissionSource(), PlugsPermissionSource()))
     val asked: MutableList<List<String>> = CopyOnWriteArrayList()
 
@@ -124,6 +125,7 @@ internal class TestAccess(var role: Role?) : AccessControl {
         label: String?,
     ): Authorised? {
         asked += anyOf.toList()
+        padGate?.await()
         val role = role ?: return null
         val granted = anyOf.filter { registry.isGranted(role, it) }.toSet()
         return if (granted.isEmpty()) null else Authorised(person, role, granted)

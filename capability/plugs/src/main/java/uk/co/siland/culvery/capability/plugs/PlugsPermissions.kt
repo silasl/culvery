@@ -14,6 +14,6 @@ object PlugsPermissions {
 class PlugsPermissionSource @Inject constructor() : PermissionSource {
     override val permissions = listOf(
         PermissionDef(PlugsPermissions.SWITCH, "Switch plugs that need a PIN", setOf(Role.ADMIN, Role.ADULT), freshPin = true),
-        PermissionDef(PlugsPermissions.MANAGE, "Add, remove and set up plugs", setOf(Role.ADMIN, Role.ADULT), freshPin = true),
+        PermissionDef(PlugsPermissions.MANAGE, "Choose what modes do with plugs", setOf(Role.ADMIN, Role.ADULT), freshPin = true),
     )
 }

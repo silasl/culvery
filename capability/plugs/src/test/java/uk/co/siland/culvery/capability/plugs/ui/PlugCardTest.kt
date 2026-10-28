@@ -39,7 +39,7 @@ class PlugCardTest {
     private fun show(plug: PlugState, needsPin: Boolean = false, switching: Boolean = false) = compose.setContent {
         CulveryTheme(dark = true) {
             Box(Modifier.size(360.dp, 180.dp)) {
-                PlugCard(plug, 0, needsPin, switching, onSwitch = { calls += "switch" }, onSettings = { calls += "settings" })
+                PlugCard(plug, 0, needsPin, switching, onSwitch = { calls += "switch" })
             }
         }
     }
@@ -82,12 +82,12 @@ class PlugCardTest {
         compose.onAllNodesWithTag("plug_card_0_lock", useUnmergedTree = true).assertCountEquals(0)
     }
 
-    /** Fails if a gone plug isn't told to be removed or added again, or its button works. */
+    /** Fails if a gone plug isn't told to turn it off in Settings, or its button works. */
     @Test
-    fun aGonePlugSaysRemoveItOrAddItAgain() {
+    fun aGonePlugSaysToTurnItOffInSettings() {
         show(PlugState(FAIRY, "Fairy lights", PlugPower.GONE, null))
-        status().assertTextEquals("Home Assistant has no plug called that any more. Remove it or add it again.")
-        card().assertContentDescriptionEquals("Plug Fairy lights. Home Assistant has no plug called that any more. Remove it or add it again.")
+        status().assertTextEquals("Home Assistant has no plug called that any more. Turn it off in Settings.")
+        card().assertContentDescriptionEquals("Plug Fairy lights. Home Assistant has no plug called that any more. Turn it off in Settings.")
         compose.onNodeWithTag("plug_card_0_switch").assertIsNotEnabled().performClick()
         assertThat(calls).isEmpty()
     }
@@ -115,14 +115,5 @@ class PlugCardTest {
         show(LAMP_ON)
         compose.onNodeWithTag("plug_card_0_switch").performClick()
         assertThat(calls).containsExactly("switch")
-    }
-
-    /** Fails if the › isn't named for its plug or doesn't open its settings. */
-    @Test
-    fun theSettingsButtonNamesThePlug() {
-        show(LAMP_ON)
-        compose.onNodeWithTag("plug_card_0_settings").assertContentDescriptionEquals("Settings for Lamp").performClick()
-        assertThat(calls).containsExactly("settings")
-        compose.assertClickablesHaveRoleAndLabel()
     }
 }

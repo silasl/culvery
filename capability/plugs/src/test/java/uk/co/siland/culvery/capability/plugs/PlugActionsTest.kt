@@ -14,7 +14,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
-import uk.co.siland.culvery.capability.plugs.ModeChoice.LEAVE
+import uk.co.siland.culvery.capability.plugs.ModeChoice.IGNORE
 import uk.co.siland.culvery.capability.plugs.ModeChoice.OFF
 import uk.co.siland.culvery.capability.plugs.ModeChoice.ON
 import uk.co.siland.culvery.capability.plugs.PlugPower.GONE
@@ -36,10 +36,10 @@ class PlugActionsTest {
         val actions = PlugActions(access, plugs.settings, plugs.system, toaster, CoroutineScope(StandardTestDispatcher(scope.testScheduler) + job))
     }
 
-    /** Fan added, set to need a PIN when [pin]. */
+    /** Fan shown, set to need a PIN when [pin]. */
     private suspend fun TestScope.rig(role: Role? = Role.ADULT, pin: Boolean = false, state: PlugState = fan(ON_NOW)) =
         Rig(this, role, state).also { rig ->
-            rig.plugs.configure { it.adding(FAN).copy(needsPin = if (pin) setOf(FAN) else emptySet()) }
+            rig.plugs.configure { it.showing(FAN).copy(needsPin = if (pin) setOf(FAN) else emptySet()) }
         }
 
     /** 12 §4.2: fails if a plug not set to need a PIN asks for one, or switches the wrong way. */
@@ -122,6 +122,54 @@ class PlugActionsTest {
         advanceUntilIdle()
 
         assertThat(rig.access.asked).containsExactly(listOf("plugs.switch"), listOf("plugs.switch"))
+    }
+
+    /** Review Focus 4: fails if Switching… shows while the pad is up, stays after Cancel, or doesn't show once the PIN is in. */
+    @Test
+    fun aPinPlugShowsSwitchingOnlyAfterThePin() = runTest {
+        val accepted = rig(pin = true)
+        val pad = CompletableDeferred<Unit>().also { accepted.access.padGate = it }
+        val gate = CompletableDeferred<Unit>().also { accepted.plugs.system.switchGates[FAN] = it }
+        accepted.actions.switch(fan(ON_NOW))
+        runCurrent()
+        assertThat(accepted.access.asked).hasSize(1)
+        assertThat(accepted.actions.switching.value).isEmpty()
+
+        pad.complete(Unit)
+        runCurrent()
+        assertThat(accepted.actions.switching.value).containsExactly(FAN)
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertThat(accepted.actions.switching.value).isEmpty()
+
+        val cancelled = rig(null, pin = true)
+        val cancelPad = CompletableDeferred<Unit>().also { cancelled.access.padGate = it }
+        cancelled.actions.switch(fan(ON_NOW))
+        runCurrent()
+        assertThat(cancelled.actions.switching.value).isEmpty()
+        cancelPad.complete(Unit)
+        advanceUntilIdle()
+        assertThat(cancelled.actions.switching.value).isEmpty()
+        assertThat(cancelled.plugs.system.switches).isEmpty()
+    }
+
+    /** Review Focus 4: fails if a second tap while the pad is up asks again, and if Cancel doesn't free the button for the next tap. */
+    @Test
+    fun aSecondTapWhileAskingDoesNothing() = runTest {
+        val rig = rig(null, pin = true)
+        val pad = CompletableDeferred<Unit>().also { rig.access.padGate = it }
+        rig.actions.switch(fan(ON_NOW))
+        runCurrent()
+        rig.actions.switch(fan(ON_NOW))
+        runCurrent()
+        assertThat(rig.access.asked).hasSize(1)
+
+        pad.complete(Unit)
+        advanceUntilIdle()
+        rig.access.padGate = null
+        rig.actions.switch(fan(ON_NOW))
+        advanceUntilIdle()
+        assertThat(rig.access.asked).hasSize(2)
     }
 
     /** Review Focus 3: fails if a tap while switching asks again or calls again, or Switching… doesn't clear. */
@@ -222,13 +270,13 @@ class PlugActionsTest {
         assertThat(rig(Role.CHILD).actions.mayManage()).isFalse()
     }
 
-    /** 12 §5.2: fails if add doubles, a Leave keeps its entry, or remove leaves the plug in a list. */
+    /** 12r §4.2: fails if show doubles, an Ignore keeps its entry, or hide loses the plug's choices or PIN setting. */
     @Test
-    fun addRemovePinAndChoiceReachTheStore() = runTest {
+    fun showHidePinAndChoiceReachTheStore() = runTest {
         val rig = Rig(this, Role.ADULT, fan(ON_NOW))
-        rig.actions.add(FAN)
-        rig.actions.add(FAN)
-        rig.actions.add(LAMP)
+        rig.actions.show(FAN, true)
+        rig.actions.show(FAN, true)
+        rig.actions.show(LAMP, true)
         rig.actions.setNeedsPin(FAN, true)
         rig.actions.setChoice(HOLIDAY, FAN, ON)
         rig.actions.setChoice(PARTY, FAN, OFF)
@@ -237,40 +285,36 @@ class PlugActionsTest {
         assertThat(rig.plugs.prefs().needsPin).containsExactly(FAN)
         assertThat(rig.plugs.prefs().choice(HOLIDAY, FAN)).isEqualTo(ON)
 
-        rig.actions.setChoice(HOLIDAY, FAN, LEAVE)
-        assertThat(rig.plugs.prefs().choice(HOLIDAY, FAN)).isEqualTo(LEAVE)
+        rig.actions.setChoice(HOLIDAY, FAN, IGNORE)
+        assertThat(rig.plugs.prefs().choice(HOLIDAY, FAN)).isEqualTo(IGNORE)
         rig.actions.setNeedsPin(FAN, false)
         assertThat(rig.plugs.prefs().needsPin).isEmpty()
 
         rig.actions.setChoice(HOLIDAY, FAN, ON)
-        rig.actions.remove(FAN)
-        val after = rig.plugs.prefs()
-        assertThat(after.plugs).containsExactly(LAMP)
-        assertThat(after.modes.values.flatMap { it.keys }).doesNotContain(FAN)
+        rig.actions.setNeedsPin(FAN, true)
+        rig.actions.show(FAN, false)
+        val hidden = rig.plugs.prefs()
+        assertThat(hidden.plugs).containsExactly(LAMP)
+        assertThat(hidden.choice(HOLIDAY, FAN)).isEqualTo(ON)
+        assertThat(hidden.choice(PARTY, FAN)).isEqualTo(OFF)
+        assertThat(hidden.needsPin).containsExactly(FAN)
+
+        rig.actions.show(FAN, true)
+        assertThat(rig.plugs.prefs().choice(HOLIDAY, FAN)).isEqualTo(ON)
     }
 
-    /** 12 §2.4: fails if a chip tap landing after a Remove writes an entry for a plug no longer added. */
+    /** Fails if a chip tap or a PIN switch landing after a hide writes for a plug that isn't shown. */
     @Test
-    fun aChoiceForARemovedPlugIsNotWritten() = runTest {
+    fun choiceAndPinAreOnlyWrittenWhileShown() = runTest {
         val rig = Rig(this, Role.ADULT, fan(ON_NOW))
-        rig.actions.add(FAN)
-        rig.actions.remove(FAN)
+        rig.actions.show(FAN, true)
+        rig.actions.show(FAN, false)
         rig.actions.setChoice(HOLIDAY, FAN, ON)
-
-        assertThat(rig.plugs.prefs().modes).isEmpty()
-    }
-
-    /** 12 §2.4: fails if adding a plug brings back an entry an earlier life of it left in a mode list. */
-    @Test
-    fun addingAPlugStartsOnLeaveEverywhere() = runTest {
-        val rig = Rig(this, Role.ADULT, fan(ON_NOW))
-        rig.plugs.configure { it.copy(modes = mapOf(HOLIDAY to mapOf(FAN to true, LAMP to false), PARTY to mapOf(FAN to false))) }
-        rig.actions.add(FAN)
+        rig.actions.setNeedsPin(FAN, true)
 
         val prefs = rig.plugs.prefs()
-        assertThat(prefs.choice(HOLIDAY, FAN)).isEqualTo(LEAVE)
-        assertThat(prefs.choice(PARTY, FAN)).isEqualTo(LEAVE)
-        assertThat(prefs.modes).containsExactly(HOLIDAY, mapOf(LAMP to false))
+        assertThat(prefs.modes).isEmpty()
+        assertThat(prefs.needsPin).isEmpty()
     }
 
     /** Fails if a write that throws escapes the tab. */
@@ -278,7 +322,7 @@ class PlugActionsTest {
     fun aFailedWriteIsLoggedNotThrown() = runTest {
         val rig = Rig(this, Role.ADULT, fan(ON_NOW))
         rig.plugs.store.failOnWrite = 1
-        rig.actions.add(FAN)
+        rig.actions.show(FAN, true)
 
         assertThat(rig.plugs.prefs().plugs).isEmpty()
     }

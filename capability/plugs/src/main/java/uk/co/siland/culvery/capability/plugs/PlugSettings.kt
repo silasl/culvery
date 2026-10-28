@@ -29,7 +29,7 @@ internal fun isPlugId(text: String) = PLUG_ID.matches(text)
 
 internal fun isModeId(text: String) = MODE_ID.matches(text)
 
-enum class ModeChoice { LEAVE, ON, OFF }
+enum class ModeChoice { IGNORE, ON, OFF }
 
 /** A mode that switched the plug it is noted on, to [on]. [toString] leaves out the mode. */
 data class Holder(val mode: String, val on: Boolean) {
@@ -61,14 +61,14 @@ data class PlugPrefs(
     fun choice(modeId: String, id: String): ModeChoice = when (modes[modeId]?.get(id)) {
         true -> ModeChoice.ON
         false -> ModeChoice.OFF
-        null -> ModeChoice.LEAVE
+        null -> ModeChoice.IGNORE
     }
 
     fun with(modeId: String, id: String, choice: ModeChoice): PlugPrefs {
         if (!isModeId(modeId) || !isPlugId(id)) return this
         val list = modes[modeId].orEmpty().let {
             when (choice) {
-                ModeChoice.LEAVE -> it - id
+                ModeChoice.IGNORE -> it - id
                 ModeChoice.ON -> it + (id to true)
                 ModeChoice.OFF -> it + (id to false)
             }
@@ -76,19 +76,14 @@ data class PlugPrefs(
         return copy(modes = if (list.isEmpty()) modes - modeId else modes + (modeId to list))
     }
 
-    /** A plug added again comes back on Leave in every mode (12 §2.4). */
-    fun adding(id: String) = if (!isPlugId(id) || id in plugs) this else copy(plugs = plugs + id, modes = dropModes(id))
+    fun showing(id: String) = if (!isPlugId(id) || id in plugs) this else copy(plugs = plugs + id)
 
-    /** The plug itself is left as it is; a begun mode stays begun with one plug fewer to reach. */
-    fun without(id: String) = copy(
+    /** Its choices and PIN setting stay for when it is shown again; the plug itself is left as it is, and a begun mode has one plug fewer to reach. */
+    fun hiding(id: String) = copy(
         plugs = plugs - id,
-        needsPin = needsPin - id,
-        modes = dropModes(id),
         runs = runs.mapValues { (_, run) -> run.copy(pending = run.pending - id) },
         notes = notes - id,
     )
-
-    private fun dropModes(id: String) = modes.mapValues { (_, list) -> list - id }.filterValues { it.isNotEmpty() }
 
     override fun toString() = "PlugPrefs"
 }

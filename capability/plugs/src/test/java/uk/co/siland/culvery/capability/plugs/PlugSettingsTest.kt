@@ -53,52 +53,68 @@ class PlugSettingsTest {
         second.cancel()
     }
 
-    /** 12 §2.4: fails if a new plug, or a mode not yet seen, starts on anything but Leave. */
+    /** Pin: a plug with no entry in a mode reads Ignore, as an old stored Leave did (the file keeps entries only for On and Off). */
     @Test
-    fun aNewPlugIsLeaveInEveryMode() {
-        val prefs = PlugPrefs().with("holiday", "switch.lamp", ModeChoice.ON).adding("switch.desk")
+    fun aStoredLeaveReadsAsIgnore() {
+        val prefs = PlugPrefs().with("holiday", "switch.lamp", ModeChoice.ON).showing("switch.desk")
 
-        assertThat(prefs.choice("holiday", "switch.desk")).isEqualTo(ModeChoice.LEAVE)
-        assertThat(prefs.choice("party", "switch.desk")).isEqualTo(ModeChoice.LEAVE)
+        assertThat(prefs.choice("holiday", "switch.desk")).isEqualTo(ModeChoice.IGNORE)
+        assertThat(prefs.choice("party", "switch.desk")).isEqualTo(ModeChoice.IGNORE)
         assertThat(prefs.choice("holiday", "switch.lamp")).isEqualTo(ModeChoice.ON)
     }
 
     @Test
-    fun settingLeaveRemovesTheEntry() {
+    fun settingIgnoreRemovesTheEntry() {
         val on = PlugPrefs().with("holiday", "switch.lamp", ModeChoice.OFF).with("holiday", "switch.fan", ModeChoice.ON)
         assertThat(on.choice("holiday", "switch.lamp")).isEqualTo(ModeChoice.OFF)
 
-        val left = on.with("holiday", "switch.lamp", ModeChoice.LEAVE)
-        assertThat(left.modes).isEqualTo(mapOf("holiday" to mapOf("switch.fan" to true)))
-        assertThat(left.with("holiday", "switch.fan", ModeChoice.LEAVE).modes).isEmpty()
+        val ignored = on.with("holiday", "switch.lamp", ModeChoice.IGNORE)
+        assertThat(ignored.modes).isEqualTo(mapOf("holiday" to mapOf("switch.fan" to true)))
+        assertThat(ignored.with("holiday", "switch.fan", ModeChoice.IGNORE).modes).isEmpty()
     }
 
-    /** 12 §5.2: fails if a removed plug leaves a trace in any field, or its note key in the file. */
+    /** 12r §4.2: fails if hiding keeps a note or a pending run, or loses the choices and PIN setting, or showing brings them back wrong. */
     @Test
-    fun removeDropsItEverywhere() = runTest {
+    fun hidingDropsTheNoteAndShowingKeepsTheChoice() = runTest {
         val store = MemoryStore()
         val settings = PlugSettings(store)
-        settings.update { full.with("holiday", "switch.fan", ModeChoice.ON) }
+        settings.update {
+            full.copy(needsPin = setOf("switch.lamp", "switch.fan"), plugs = listOf("switch.lamp", "switch.fan"))
+                .with("holiday", "switch.lamp", ModeChoice.ON)
+        }
 
-        settings.update { it.without("switch.lamp") }
+        settings.update { it.hiding("switch.lamp") }
 
-        val prefs = settings.prefs.first()
-        assertThat(prefs.plugs).containsExactly("switch.fan")
-        assertThat(prefs.needsPin).containsExactly("switch.fan")
-        assertThat(prefs.modes).isEqualTo(mapOf("holiday" to mapOf("switch.fan" to true)))
-        assertThat(prefs.runs).isEqualTo(mapOf("holiday" to ModeRun(3, emptyMap())))
-        assertThat(prefs.notes).isEmpty()
+        val hidden = settings.prefs.first()
+        assertThat(hidden.plugs).containsExactly("switch.fan")
+        assertThat(hidden.notes).isEmpty()
+        assertThat(hidden.runs).isEqualTo(mapOf("holiday" to ModeRun(3, emptyMap())))
+        assertThat(hidden.choice("holiday", "switch.lamp")).isEqualTo(ModeChoice.ON)
+        assertThat(hidden.needsPin).containsExactly("switch.lamp", "switch.fan")
         assertThat(store.state.value!!.asMap().keys.map { it.name }).doesNotContain("note.switch.lamp")
-        assertThat(store.state.value!!.asMap().values.toString()).doesNotContain("switch.lamp")
+
+        settings.update { it.showing("switch.lamp") }
+
+        val shown = settings.prefs.first()
+        assertThat(shown.plugs).containsExactly("switch.fan", "switch.lamp").inOrder()
+        assertThat(shown.choice("holiday", "switch.lamp")).isEqualTo(ModeChoice.ON)
+        assertThat(shown.needsPin).contains("switch.lamp")
+        assertThat(shown.notes).isEmpty()
+    }
+
+    @Test
+    fun showingAShownPlugChangesNothing() {
+        val prefs = PlugPrefs(plugs = listOf("switch.lamp", "switch.fan"))
+        assertThat(prefs.showing("switch.lamp")).isEqualTo(prefs)
     }
 
     @Test
     fun invalidIdsAreIgnored() {
         val prefs = PlugPrefs(plugs = listOf("switch.lamp"))
 
-        assertThat(prefs.adding("sensor.lamp")).isEqualTo(prefs)
-        assertThat(prefs.adding("switch.Lamp")).isEqualTo(prefs)
-        assertThat(prefs.adding("switch.lamp,fan")).isEqualTo(prefs)
+        assertThat(prefs.showing("sensor.lamp")).isEqualTo(prefs)
+        assertThat(prefs.showing("switch.Lamp")).isEqualTo(prefs)
+        assertThat(prefs.showing("switch.lamp,fan")).isEqualTo(prefs)
         assertThat(prefs.with("Holiday", "switch.lamp", ModeChoice.ON)).isEqualTo(prefs)
         assertThat(prefs.with("holiday", "sensor.lamp", ModeChoice.ON)).isEqualTo(prefs)
     }
@@ -137,11 +153,11 @@ class PlugSettingsTest {
         val store = MemoryStore().apply { failOnWrite = 1 }
         val settings = PlugSettings(store)
 
-        val failure = runCatching { settings.update { it.adding("switch.lamp") } }.exceptionOrNull()
+        val failure = runCatching { settings.update { it.showing("switch.lamp") } }.exceptionOrNull()
 
         assertThat(failure).isInstanceOf(IOException::class.java)
         assertThat(settings.prefs.first().plugs).isEmpty()
-        settings.update { it.adding("switch.lamp") }
+        settings.update { it.showing("switch.lamp") }
         assertThat(settings.prefs.first().plugs).containsExactly("switch.lamp")
     }
 }

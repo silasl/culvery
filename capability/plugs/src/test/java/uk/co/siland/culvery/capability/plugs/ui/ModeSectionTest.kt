@@ -31,13 +31,13 @@ import uk.co.siland.culvery.core.house.HouseModeInfo
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 
-/** 12 §2.4, §4.3: a mode's section lists each plug with its Leave, On or Off. */
+/** 12 §2.4, §4.3: a mode's section lists each plug with its Ignore, On or Off. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ModeSectionTest {
     @get:Rule val compose = createComposeRule()
     private val calls = mutableListOf<String>()
-    private val prefs = PlugPrefs().adding(LAMP).adding(FAN)
+    private val prefs = PlugPrefs().showing(LAMP).showing(FAN)
 
     private fun show(
         modes: List<HouseModeInfo> = listOf(HOLIDAY_MODE),
@@ -58,18 +58,18 @@ class ModeSectionTest {
     fun atRestARowIsReadOnly() {
         show(prefs = prefs.with(HOLIDAY, LAMP, ModeChoice.OFF))
         compose.onNodeWithTag("mode_holiday_0").assert(hasAnyDescendant(hasText("Lamp"))).assert(hasAnyDescendant(hasText("Off")))
-        compose.onNodeWithTag("mode_holiday_1").assert(hasAnyDescendant(hasText("Fan"))).assert(hasAnyDescendant(hasText("Leave")))
+        compose.onNodeWithTag("mode_holiday_1").assert(hasAnyDescendant(hasText("Fan"))).assert(hasAnyDescendant(hasText("Ignore")))
         compose.onNodeWithTag("mode_holiday").assert(!hasAnyDescendant(hasClickAction()))
         compose.onAllNodesWithTag("mode_holiday_0_on").assertCountEquals(0)
     }
 
     /** Fails if Edit doesn't offer three chips with the chosen one selected, spoken as the row, or a tap doesn't report the choice. */
     @Test
-    fun editOffersLeaveOnOff() {
+    fun editOffersIgnoreOnOff() {
         show(editing = true, prefs = prefs.with(HOLIDAY, LAMP, ModeChoice.OFF))
         compose.onNodeWithTag("mode_holiday_0_off").assert(selected(true))
         compose.onNodeWithTag("mode_holiday_0_on").assert(selected(false))
-        compose.onNodeWithTag("mode_holiday_0_leave").assert(selected(false))
+        compose.onNodeWithTag("mode_holiday_0_ignore").assert(selected(false))
         compose.onNodeWithTag("mode_holiday_0_on").assertContentDescriptionEquals("Holiday mode, Lamp, on").performClick()
         assertThat(calls).containsExactly("holiday switch.lamp ON")
         compose.assertClickablesHaveRoleAndLabel()
@@ -91,7 +91,7 @@ class ModeSectionTest {
         assertThat(holiday).isLessThan(party)
         compose.onNodeWithTag("mode_party_1_on").performClick()
         assertThat(calls).containsExactly("party switch.fan ON")
-        compose.onNodeWithTag("mode_holiday_0_leave").assert(selected(true))
-        compose.onNodeWithTag("mode_party_0_leave").assert(selected(true))
+        compose.onNodeWithTag("mode_holiday_0_ignore").assert(selected(true))
+        compose.onNodeWithTag("mode_party_0_ignore").assert(selected(true))
     }
 }
