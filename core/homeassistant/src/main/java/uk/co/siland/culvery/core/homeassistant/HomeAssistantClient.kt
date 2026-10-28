@@ -11,6 +11,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -69,6 +70,9 @@ interface HomeAssistantApi {
         data: Map<String, String> = emptyMap(),
     )
 
+    /** The entity registry as Home Assistant lists it for display (12 §4.1), read over its own short socket. */
+    suspend fun registry(link: HomeAssistantLink): List<RegistryEntry>
+
     /**
      * One socket: auth, `subscribe_entities` for [entityIds], then the followed entities after each event, a missing one
      * null. Ends by throwing [HomeAssistantException] when the socket closes.
@@ -83,11 +87,12 @@ interface HomeAssistantApi {
 class HomeAssistantClient internal constructor(
     internal val http: OkHttpClient,
     private val online: () -> Boolean,
+    private val registryTimeoutMs: Long = COMMAND_TIMEOUT_MS,
     private val capture: (HaCall, String) -> Unit,
 ) : HomeAssistantApi {
     @Inject
     constructor(@ApplicationContext context: Context) :
-        this(homeHttpClient(COMMAND_TIMEOUT_MS), AndroidNetwork(context)::online, HaCapture::log)
+        this(homeHttpClient(COMMAND_TIMEOUT_MS), AndroidNetwork(context)::online, capture = HaCapture::log)
 
     private val socketHttp = http.newBuilder().pingInterval(Duration.ofMillis(PING_MS)).build()
 
@@ -111,6 +116,44 @@ class HomeAssistantClient internal constructor(
             data.forEach { (name, value) -> put(name, value) }
         }
         send(HaCall.SERVICE, request(link, "api", "services", domain, service).post(body.toString().toRequestBody(JSON_TYPE)))
+    }
+
+    override suspend fun registry(link: HomeAssistantLink): List<RegistryEntry> {
+        val what = HaCall.REGISTRY
+        val inbox = Channel<Frame>(Channel.UNLIMITED)
+        val socket = socketHttp.newWebSocket(request(link, "api", "websocket").build(), listener(inbox))
+        try {
+            return withTimeoutOrNull(registryTimeoutMs) {
+                var entries: List<RegistryEntry>? = null
+                for (frame in inbox) {
+                    if (frame is Frame.Ended) socketEnded(frame)
+                    when (val message = socketMessage((frame as Frame.Text).text)) {
+                        SocketMessage.AuthRequired -> socket.send(authMessage(link).toString())
+                        SocketMessage.AuthOk -> socket.send(registryMessage().toString())
+                        SocketMessage.AuthInvalid -> socketFailure(HaProblem.TOKEN_REFUSED)
+                        is SocketMessage.Result -> {
+                            if (!message.success) socketFailure(HaProblem.REFUSED)
+                            entries = withContext(Dispatchers.Default) {
+                                try {
+                                    HaJson.registry(frame.text)
+                                } catch (e: HaJsonException) {
+                                    Log.w(TAG, "${what.label} failed (${e::class.simpleName})")
+                                    throw HomeAssistantException(HaProblem.UNREACHABLE)
+                                }
+                            }
+                            break
+                        }
+                        else -> Unit
+                    }
+                }
+                entries
+            } ?: run {
+                Log.w(TAG, "${what.label} timed out")
+                throw HomeAssistantException(unreachableOrOffline())
+            }
+        } finally {
+            socket.close(NORMAL_CLOSURE, null)
+        }
     }
 
     override fun follow(link: HomeAssistantLink, entityIds: Set<String>): Flow<Map<String, EntityState?>> = flow {
@@ -195,6 +238,11 @@ class HomeAssistantClient internal constructor(
         put("id", SUBSCRIPTION_ID)
         put("type", "subscribe_entities")
         put("entity_ids", buildJsonArray { entityIds.forEach { add(JsonPrimitive(it)) } })
+    }
+
+    private fun registryMessage(): JsonObject = buildJsonObject {
+        put("id", SUBSCRIPTION_ID)
+        put("type", "config/entity_registry/list_for_display")
     }
 
     private fun socketMessage(text: String): SocketMessage = try {

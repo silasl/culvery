@@ -27,6 +27,7 @@ import uk.co.siland.culvery.core.homeassistant.test.FakeHomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.test.TEST_LINK
 import uk.co.siland.culvery.core.homeassistant.test.entityState
 import uk.co.siland.culvery.core.homeassistant.test.testHomeAssistant
+import uk.co.siland.culvery.core.plugin.WallClock
 
 /** 11 §4.2–§4.4, §6: the hoover's state, its battery by name, and Start with its 30-second check. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -279,7 +280,7 @@ class HaHooverSystemTest {
     @Test
     fun aColdStartFindsTheLink() = runTest {
         api.states["vacuum.hoover"] = vacuum("docked")
-        val cold = HomeAssistant(api, link, inFront, backgroundScope)
+        val cold = HomeAssistant(api, link, inFront, WallClock { 0L }, backgroundScope)
         val result = async { HaHooverSystem(cold, prefs).start() }
         runCurrent()
         assertThat(api.calls).containsExactly("state vacuum.hoover", start).inOrder()

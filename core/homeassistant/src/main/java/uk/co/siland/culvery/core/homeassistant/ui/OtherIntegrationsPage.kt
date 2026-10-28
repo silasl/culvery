@@ -42,6 +42,7 @@ import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantDevice
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantException
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantLinking
+import uk.co.siland.culvery.core.homeassistant.HomeAssistantSection
 import uk.co.siland.culvery.core.homeassistant.LINKED
 import uk.co.siland.culvery.core.homeassistant.NOT_LINKED_YET
 import uk.co.siland.culvery.core.homeassistant.OTHER_INTEGRATIONS
@@ -74,6 +75,7 @@ class OtherIntegrationsPage @Inject constructor(
     private val ha: HomeAssistant,
     private val linking: HomeAssistantLinking,
     private val devices: Set<@JvmSuppressWildcards HomeAssistantDevice>,
+    private val sections: Set<@JvmSuppressWildcards HomeAssistantSection>,
     private val toaster: Toaster,
 ) : SettingsPage {
     override val id = OTHER_INTEGRATIONS_PAGE_ID
@@ -81,7 +83,7 @@ class OtherIntegrationsPage @Inject constructor(
     override val order = 480
 
     @Composable
-    override fun Content() = OtherIntegrationsHost(ha, linking, devices, toaster)
+    override fun Content() = OtherIntegrationsHost(ha, linking, devices, sections, toaster)
 }
 
 /** One kind of device: [choices] is null until Home Assistant has listed them. [toString] leaves out [chosen] and [line]. */
@@ -117,6 +119,7 @@ fun OtherIntegrations(
     onToken: (String) -> Unit,
     onCheck: () -> Unit,
     onChoose: (domain: String, entityId: String?) -> Unit,
+    sections: List<HomeAssistantSection> = emptyList(),
 ) {
     val c = Culvery.colors
     Column(verticalArrangement = Arrangement.spacedBy(HomeAssistantDimens.settingsGap), modifier = Modifier.testTag("settings_other")) {
@@ -136,6 +139,7 @@ fun OtherIntegrations(
         HhMessageLine(ui.checkLine, HhType.body, c.danger, "ha_check_line")
         if (ui.linked) {
             Column(verticalArrangement = Arrangement.spacedBy(HomeAssistantDimens.deviceGap)) { ui.devices.forEach { DevicePicker(it, showLine = ui.status == null, onChoose) } }
+            sections.forEach { it.Content() }
         }
     }
 }
@@ -176,9 +180,11 @@ internal fun OtherIntegrationsHost(
     ha: HomeAssistant,
     linking: HomeAssistantLinking,
     devices: Set<HomeAssistantDevice>,
+    sections: Set<HomeAssistantSection>,
     toaster: Toaster,
 ) {
     val sorted = remember(devices) { devices.sortedBy { it.order } }
+    val ordered = remember(sections) { sections.sortedBy { it.order } }
     val link by ha.link.collectAsStateWithLifecycle()
     val problem by ha.problem.collectAsStateWithLifecycle()
     var address by remember(link?.baseUrl) { mutableStateOf(link?.baseUrl?.toString().orEmpty()) }
@@ -246,6 +252,7 @@ internal fun OtherIntegrationsHost(
             }
         },
         onChoose = { domain, entityId -> sorted.firstOrNull { it.domain == domain }?.let { device -> change { device.choose(entityId) } } },
+        sections = ordered,
     )
 }
 

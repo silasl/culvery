@@ -10,6 +10,7 @@ import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantClient
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantDevice
+import uk.co.siland.culvery.core.homeassistant.HomeAssistantSection
 import uk.co.siland.culvery.core.homeassistant.ui.OtherIntegrationsPage
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Startable
@@ -23,6 +24,10 @@ abstract class HomeAssistantModule {
     // With no provider bound, Settings › Other integrations shows no pickers.
     @Multibinds
     abstract fun devices(): Set<HomeAssistantDevice>
+
+    // With no provider bound, Settings › Other integrations shows no extra sections.
+    @Multibinds
+    abstract fun sections(): Set<HomeAssistantSection>
 
     @Binds
     @IntoSet

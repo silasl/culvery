@@ -7,4 +7,5 @@ enum class HaCall(val label: String) {
     STATE("state"),
     SERVICE("service"),
     SOCKET("socket"),
+    REGISTRY("registry"),
 }

@@ -165,4 +165,33 @@ class HaJsonTest {
             listOf("hoover", "hall", "alex", "landing", "battery").forEach { word -> assertThat(text).doesNotContain(word) }
         }
     }
+
+    /** Fails if a plug, its config switch, its watts sensor or another integration's switch is misread, or a category isn't mapped. */
+    @Test
+    fun registryReadsPlugsDevicesAndCategories() {
+        val entries = HaJson.registry(HaFixtures.REGISTRY).associateBy { it.entityId }
+        assertThat(entries).hasSize(6)
+        assertThat(entries.getValue("switch.lamp_led").category).isEqualTo("config")
+        assertThat(entries.getValue("switch.lamp").category).isNull()
+        assertThat(entries.getValue("sensor.lamp_current_consumption").translationKey).isEqualTo("current_consumption")
+        assertThat(entries.getValue("switch.lamp").platform).isEqualTo("tplink")
+        assertThat(entries.getValue("switch.lamp").deviceId).isEqualTo("dev_lamp")
+        assertThat(entries.getValue("switch.lamp").domain).isEqualTo("switch")
+        assertThat(entries.getValue("switch.kitchen_crossfade").platform).isEqualTo("sonos")
+        assertThat(entries.getValue("switch.kitchen_crossfade").deviceId).isNull()
+    }
+
+    /** Fails if a registry entry's toString names the entity, the device or the category. */
+    @Test
+    fun aRegistryEntryNamesOnlyItsPlatform() {
+        HaJson.registry(HaFixtures.REGISTRY).forEach {
+            assertThat(it.toString()).isEqualTo("RegistryEntry(platform=${it.platform})")
+        }
+    }
+
+    /** Fails if an unreadable registry answer doesn't throw. */
+    @Test
+    fun anUnreadableRegistryThrows() {
+        assertThrows(HaJsonException::class.java) { HaJson.registry("""{"type":"result","success":true}""") }
+    }
 }

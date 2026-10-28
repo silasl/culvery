@@ -11,6 +11,7 @@ import uk.co.siland.culvery.core.homeassistant.HaProblem
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantException
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantLink
+import uk.co.siland.culvery.core.homeassistant.RegistryEntry
 
 /** Home Assistant in memory: [states] answers the reads, [socket] feeds every open follow, and each call is recorded. */
 class FakeHomeAssistantApi : HomeAssistantApi {
@@ -38,6 +39,12 @@ class FakeHomeAssistantApi : HomeAssistantApi {
 
     /** Runs as a service call succeeds; may throw. */
     var onService: (domain: String, service: String, entityId: String, data: Map<String, String>) -> Unit = { _, _, _, _ -> }
+
+    /** What [registry] returns, unless [registryProblem] is set. */
+    var registry: List<RegistryEntry> = emptyList()
+
+    /** [registry] fails with this when set. */
+    var registryProblem: HaProblem? = null
 
     /** What every open follow emits. */
     val socket = MutableSharedFlow<Map<String, EntityState?>>(extraBufferCapacity = 16)
@@ -74,6 +81,13 @@ class FakeHomeAssistantApi : HomeAssistantApi {
         _calls += (listOf("service $domain/$service $entityId") + data.map { (k, v) -> "$k=$v" }).joinToString(" ")
         failIfAsked()
         onService(domain, service, entityId, data)
+    }
+
+    override suspend fun registry(link: HomeAssistantLink): List<RegistryEntry> {
+        _calls += "registry"
+        failIfAsked()
+        registryProblem?.let { throw HomeAssistantException(it) }
+        return registry
     }
 
     override fun follow(link: HomeAssistantLink, entityIds: Set<String>): Flow<Map<String, EntityState?>> = channelFlow {

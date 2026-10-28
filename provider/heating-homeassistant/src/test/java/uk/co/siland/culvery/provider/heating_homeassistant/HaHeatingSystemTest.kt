@@ -28,6 +28,7 @@ import uk.co.siland.culvery.core.homeassistant.test.TEST_LINK
 import uk.co.siland.culvery.core.homeassistant.test.entityState
 import uk.co.siland.culvery.core.homeassistant.test.testHomeAssistant
 import uk.co.siland.culvery.core.plugin.CHECKING
+import uk.co.siland.culvery.core.plugin.WallClock
 
 /** 11 §4.2, §4.5, §6: the thermostat's state, and setEco with its check. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -287,7 +288,7 @@ class HaHeatingSystemTest {
     @Test
     fun aColdStartFindsTheLink() = runTest {
         api.states["climate.hall"] = hall()
-        val cold = HomeAssistant(api, link, MutableStateFlow(true), backgroundScope)
+        val cold = HomeAssistant(api, link, MutableStateFlow(true), WallClock { 0L }, backgroundScope)
         val result = async { HaHeatingSystem(cold, prefs).setEco(true) }
         runCurrent()
         assertThat(api.calls).containsExactly(set("eco"))

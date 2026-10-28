@@ -27,6 +27,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Startable
+import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.retryWithBackoff
 
 /** After a command, Home Assistant is read this often to see it take (11 §6). */
@@ -58,11 +59,17 @@ class HomeAssistant(
     private val api: HomeAssistantApi,
     private val saved: Flow<HomeAssistantLink?>,
     private val inFront: StateFlow<Boolean>,
+    private val clock: WallClock,
     private val scope: CoroutineScope,
 ) : Startable {
     @Inject
-    constructor(api: HomeAssistantApi, settings: HomeAssistantSettings, host: AlertHost, @ApplicationScope scope: CoroutineScope) :
-        this(api, settings.link, host.inFront, scope)
+    constructor(
+        api: HomeAssistantApi,
+        settings: HomeAssistantSettings,
+        host: AlertHost,
+        clock: WallClock,
+        @ApplicationScope scope: CoroutineScope,
+    ) : this(api, settings.link, host.inFront, clock, scope)
 
     // Guards the link against the cache and the problem, so nothing read under an old link lands after a new one.
     private val lock = Any()
@@ -84,6 +91,11 @@ class HomeAssistant(
 
     /** What the open socket has reported since it opened; empty while none is. Guarded by [lock]. */
     private var liveIds: Set<String> = emptySet()
+    private val _liveSince = MutableStateFlow<Long?>(null)
+
+    /** When the open socket reported its first event; null while no socket is live (12 §6). */
+    val liveSince: StateFlow<Long?> = _liveSince.asStateFlow()
+
     private val watchers = MutableStateFlow<Map<Int, Set<String>>>(emptyMap())
     private val nextWatcher = AtomicInteger()
 
@@ -115,6 +127,9 @@ class HomeAssistant(
         val live = synchronized(lock) { entityId in liveIds }
         return if (live && entityId in entities) entities[entityId] else read(entityId)
     }
+
+    /** The entity registry, read over its own socket. */
+    suspend fun registry(): List<RegistryEntry> = calling { link -> api.registry(link) }
 
     /** Every entity; one cached but no longer listed is cached as gone. */
     suspend fun states(): List<EntityState> = calling { link ->
@@ -226,6 +241,7 @@ class HomeAssistant(
                 synchronized(lock) {
                     if (follow.link == _link.value) {
                         _entities.update { it + states }
+                        if (liveIds.isEmpty()) _liveSince.value = clock.nowMillis()
                         liveIds = follow.ids
                         cleared()
                     }
@@ -235,7 +251,10 @@ class HomeAssistant(
         socketClosed()
     }
 
-    private fun socketClosed() = synchronized(lock) { liveIds = emptySet() }
+    private fun socketClosed() = synchronized(lock) {
+        liveIds = emptySet()
+        _liveSince.value = null
+    }
 
     private suspend fun <T> calling(block: suspend (HomeAssistantLink) -> T): T {
         val link = savedLink() ?: throw HomeAssistantException(HaProblem.NOT_LINKED)

@@ -1,0 +1,16 @@
+{
+ "id": 1,
+ "type": "result",
+ "success": true,
+ "result": {
+  "entity_categories": {"0": "config", "1": "diagnostic"},
+  "entities": [
+   {"ei": "switch.lamp", "pl": "tplink", "di": "dev_lamp"},
+   {"ei": "switch.lamp_led", "pl": "tplink", "di": "dev_lamp", "ec": 0},
+   {"ei": "switch.lamp_auto_off", "pl": "tplink", "di": "dev_lamp", "ec": 0},
+   {"ei": "sensor.lamp_current_consumption", "pl": "tplink", "di": "dev_lamp", "tk": "current_consumption"},
+   {"ei": "switch.fan", "pl": "tplink", "di": "dev_fan"},
+   {"ei": "switch.kitchen_crossfade", "pl": "sonos"}
+  ]
+ }
+}

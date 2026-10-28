@@ -12,7 +12,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -22,6 +25,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -48,6 +52,7 @@ import uk.co.siland.culvery.core.homeassistant.FakeDevice
 import uk.co.siland.culvery.core.homeassistant.HaProblem
 import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantLinking
+import uk.co.siland.culvery.core.homeassistant.HomeAssistantSection
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantSettings
 import uk.co.siland.culvery.core.homeassistant.MemoryStore
 import uk.co.siland.culvery.core.homeassistant.SAVED
@@ -98,11 +103,16 @@ class OtherIntegrationsTest {
         }
     }
 
-    private fun showHost(saved: Boolean = true, devices: List<FakeDevice> = listOf(hoover, thermostat), shown: () -> Boolean = { true }) {
+    private fun showHost(
+        saved: Boolean = true,
+        devices: List<FakeDevice> = listOf(hoover, thermostat),
+        sections: Set<HomeAssistantSection> = emptySet(),
+        shown: () -> Boolean = { true },
+    ) {
         runBlocking { if (saved) settings.save(SAVED) }
         ha = testHomeAssistant(api, settings.link, MutableStateFlow(true), scope)
         val linking = HomeAssistantLinking(ha, settings, access, devices.toSet()) { homeAssistantUrl(it) }
-        setPage { if (shown()) OtherIntegrationsHost(ha, linking, devices.toSet(), toaster) }
+        setPage { if (shown()) OtherIntegrationsHost(ha, linking, devices.toSet(), sections, toaster) }
         if (saved) compose.waitFor { ha.link.value != null }
     }
 
@@ -190,6 +200,32 @@ class OtherIntegrationsTest {
         compose.waitFor { hoover.picks.size == 2 }
         assertThat(hoover.picks).containsExactly("vacuum.hoover", null).inOrder()
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    private fun section(at: Int, label: String) = object : HomeAssistantSection {
+        override val order = at
+
+        @Composable
+        override fun Content() = Text(label, modifier = Modifier.testTag("section_$label"))
+    }
+
+    @Test
+    fun sectionsShowBelowThePickersWhenLinked() {
+        oneOfEach()
+        showHost(sections = setOf(section(20, "Second"), section(10, "First")))
+        compose.waitFor { compose.onAllNodes(hasText("Hall")).fetchSemanticsNodes().isNotEmpty() }
+        val first = compose.onNodeWithTag("section_First").fetchSemanticsNode().boundsInRoot.top
+        val second = compose.onNodeWithTag("section_Second").fetchSemanticsNode().boundsInRoot.top
+        val pickers = compose.onNodeWithTag("ha_device_climate").fetchSemanticsNode().boundsInRoot.bottom
+        assertThat(first).isAtLeast(pickers)
+        assertThat(second).isGreaterThan(first)
+    }
+
+    @Test
+    fun sectionsStayAwayWithoutALink() {
+        showHost(saved = false, sections = setOf(section(10, "First")))
+        compose.onNodeWithTag("settings_other").assertExists()
+        compose.onAllNodesWithTag("section_First").assertCountEquals(0)
     }
 
     @Test

@@ -85,12 +85,46 @@ class HaRedactTest {
         assertThat(HaJson.redact("""{"entity_id":"vacuum.hoover","state":86}""", keep)).contains("\"state\":0")
     }
 
-    /** **pin**: Fails if a plug's name or its unnamed twin survives, or a state, a unit, a class, the watts or a kept id doesn't. */
+    /** **pin**: Fails if a plug's name or its unnamed twin survives, or a state, a unit, a class or a kept id doesn't. */
     @Test
     fun plugNamesGo() {
         val plugs = setOf("switch.lamp", "switch.fan", "switch.fairy_lights", "sensor.lamp_current_consumption")
         val text = HaJson.redact(HaFixtures.PLUG_STATES, plugs)
         listOf("Lamp", "Fan", "Fairy", "lamp_led", "LED").forEach { assertThat(text).doesNotContain(it) }
-        listOf("\"on\"", "\"off\"", "\"unavailable\"", "\"W\"", "\"power\"", "182", "\"switch.[1]\"").forEach { assertThat(text).contains(it) }
+        listOf("\"on\"", "\"off\"", "\"unavailable\"", "\"W\"", "\"power\"", "\"switch.[1]\"").forEach { assertThat(text).contains(it) }
+    }
+
+    private val power = setOf("sensor.lamp_current_consumption", "sensor.lamp_energy", "sensor.hall_temperature")
+
+    /** Fails if a power or energy sensor's reading survives in a states answer. */
+    @Test
+    fun powerReadingsAreBlank() {
+        val energy = """{"entity_id":"sensor.lamp_energy","state":"4.2","attributes":{"device_class":"energy","unit_of_measurement":"kWh"}}"""
+        val text = HaJson.redact("[" + energy + "," + HaFixtures.PLUG_STATES.trim().removePrefix("[").removeSuffix("]") + "]", power)
+        assertThat(text).doesNotContain("182")
+        assertThat(text).doesNotContain("4.2")
+        assertThat(text).contains("\"state\":0")
+        assertThat(text).contains("\"kWh\"")
+    }
+
+    /** **pin**: Fails if a temperature sensor's state is blanked too. */
+    @Test
+    fun aTemperatureSensorIsKept() {
+        val body = """{"entity_id":"sensor.hall_temperature","state":"20.8","attributes":{"device_class":"temperature"}}"""
+        assertThat(HaJson.redact(body, power)).contains("\"state\":\"20.8\"")
+    }
+
+    /** Fails if a change message that omits the device class shows the reading the first message blanked. */
+    @Test
+    fun powerReadingsStayBlankAcrossChanges() {
+        val blanked = mutableSetOf<String>()
+        val added = """{"id":1,"type":"event","event":{"a":{"sensor.lamp_current_consumption":{"s":"182","a":{"device_class":"power","unit_of_measurement":"W"}}}}}"""
+        val changed = """{"id":1,"type":"event","event":{"c":{"sensor.lamp_current_consumption":{"+":{"s":"200"}}}}}"""
+        val first = HaJson.redact(added, power, blanked)
+        val second = HaJson.redact(changed, power, blanked)
+        assertThat(first).contains("\"s\":0")
+        assertThat(first).doesNotContain("182")
+        assertThat(second).contains("\"s\":0")
+        assertThat(second).doesNotContain("200")
     }
 }

@@ -10,6 +10,7 @@ import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantLink
 import uk.co.siland.culvery.core.homeassistant.homeAssistantUrl
+import uk.co.siland.culvery.core.plugin.WallClock
 
 val TEST_LINK = HomeAssistantLink(checkNotNull(homeAssistantUrl("http://192.168.1.20:8123/")), "test-token")
 
@@ -19,7 +20,8 @@ fun testHomeAssistant(
     link: Flow<HomeAssistantLink?> = flowOf(TEST_LINK),
     inFront: StateFlow<Boolean> = MutableStateFlow(true),
     scope: CoroutineScope,
-): HomeAssistant = HomeAssistant(api, link, inFront, scope).also { it.start() }
+    clock: WallClock = WallClock { 0L },
+): HomeAssistant = HomeAssistant(api, link, inFront, clock, scope).also { it.start() }
 
 /** An entity as Home Assistant would report it: text and number attributes kept, any other kind dropped (as `HaJson`). */
 fun entityState(id: String, state: String, attributes: Map<String, Any> = emptyMap()): EntityState = EntityState(

@@ -14,4 +14,5 @@ internal object HaFixtures {
     val CHANGED = text("ws_entities_changed.json")
     val REMOVED = text("ws_entities_removed.json")
     val PLUG_STATES = text("plug_states.json")
+    val REGISTRY = text("registry_display.json")
 }

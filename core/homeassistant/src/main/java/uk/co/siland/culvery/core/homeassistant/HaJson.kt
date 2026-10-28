@@ -8,8 +8,10 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -51,6 +53,22 @@ internal fun EntityState.apply(change: EntityChange): EntityState = EntityState(
     (numbers - change.texts.keys + change.numbers) - change.removedAttributes,
 )
 
+/**
+ * One entry of Home Assistant's entity registry (12 §4.1). [toString] names the platform only; the entity, its device and
+ * its category are the household's.
+ */
+data class RegistryEntry(
+    val entityId: String,
+    val platform: String,
+    val deviceId: String?,
+    val category: String?,
+    val translationKey: String?,
+) {
+    override fun toString() = "RegistryEntry(platform=$platform)"
+}
+
+val RegistryEntry.domain: String get() = entityId.substringBefore('.')
+
 /** A message on the WebSocket; [toString] names the type only. */
 internal sealed interface SocketMessage {
     data object AuthRequired : SocketMessage
@@ -88,6 +106,21 @@ internal object HaJson {
     fun states(text: String): List<EntityState> = read { Json.parseToJsonElement(text).jsonArray.map { entity(it.jsonObject) } }
 
     fun state(text: String): EntityState = read { entity(Json.parseToJsonElement(text).jsonObject) }
+
+    /** The `entities` of a `config/entity_registry/list_for_display` result, each `ec` mapped through the message's own categories. */
+    fun registry(text: String): List<RegistryEntry> = read {
+        val result = Json.parseToJsonElement(text).jsonObject.getValue("result").jsonObject
+        val categories = result["entity_categories"]?.jsonObject.orEmpty().mapValues { it.value.jsonPrimitive.content }
+        result.getValue("entities").jsonArray.map { it.jsonObject }.map { body ->
+            RegistryEntry(
+                entityId = body.getValue("ei").jsonPrimitive.content,
+                platform = body.getValue("pl").jsonPrimitive.content,
+                deviceId = body["di"]?.jsonPrimitive?.contentOrNull,
+                category = body["ec"]?.jsonPrimitive?.intOrNull?.let { categories[it.toString()] },
+                translationKey = body["tk"]?.jsonPrimitive?.contentOrNull,
+            )
+        }
+    }
 
     fun socket(text: String): SocketMessage = read {
         val message = Json.parseToJsonElement(text).jsonObject
@@ -148,15 +181,34 @@ internal object HaJson {
     /**
      * [text] with only what the capture may show (11 §8.2): entities not in [keep] are dropped, kept ones become
      * `<domain>.[n]`, text survives only under the keys that say a state, a mode or a unit, and a number only under the
-     * temperature keys, a message id and a kept sensor's state; every other number is 0.
+     * temperature keys, a message id and a kept sensor's state; every other number is 0. The state of a sensor whose
+     * `device_class` is `power` or `energy` is 0 as well (12 §6): its id goes into [blanked], which the caller keeps across
+     * messages, since a change carries no class.
      */
-    fun redact(text: String, keep: Set<String>): String {
+    fun redact(text: String, keep: Set<String>, blanked: MutableSet<String> = mutableSetOf()): String {
         val element = try {
             Json.parseToJsonElement(text)
         } catch (_: Exception) {
             return UNREADABLE
         }
-        return Redactor(keep).value(element, key = null, domain = null)?.toString() ?: EMPTY
+        learn(element, id = null, blanked)
+        return Redactor(keep, blanked).value(element, key = null, domain = null, id = null)?.toString() ?: EMPTY
+    }
+
+    private val BLANKED_CLASSES = setOf("power", "energy")
+
+    /** Adds to [blanked] every entity under [element] that says it is a power or energy sensor. */
+    private fun learn(element: JsonElement, id: String?, blanked: MutableSet<String>) {
+        when (element) {
+            is JsonObject -> {
+                val own = (element["entity_id"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: id
+                val reading = (element["device_class"] as? JsonPrimitive)?.takeIf { it.isString }?.content in BLANKED_CLASSES
+                if (reading && own != null) blanked += own
+                element.forEach { (name, child) -> learn(child, if ('.' in name) name else own, blanked) }
+            }
+            is JsonArray -> element.forEach { learn(it, id, blanked) }
+            else -> Unit
+        }
     }
 
     private const val UNREADABLE = "[unreadable]"
@@ -167,36 +219,38 @@ internal object HaJson {
     )
     private val KEEP_NUMBER = setOf("current_temperature", "temperature", "target_temp_low", "target_temp_high", "id")
 
-    private class Redactor(keep: Set<String>) {
+    private class Redactor(keep: Set<String>, private val blanked: Set<String>) {
         private val alias: Map<String, String> = keep.groupBy { it.substringBefore('.') }.flatMap { (domain, ids) ->
             ids.sorted().mapIndexed { i, id -> id to "$domain.[${i + 1}]" }
         }.toMap()
 
-        /** The redacted [element] under [key], or null when it is an entity that isn't kept. */
-        fun value(element: JsonElement, key: String?, domain: String?): JsonElement? = when (element) {
-            is JsonObject -> obj(element, domain)
-            is JsonArray -> JsonArray(element.mapNotNull { value(it, key, domain) })
+        /** The redacted [element] under [key] in entity [id], or null when it is an entity that isn't kept. */
+        fun value(element: JsonElement, key: String?, domain: String?, id: String?): JsonElement? = when (element) {
+            is JsonObject -> obj(element, domain, id)
+            is JsonArray -> JsonArray(element.mapNotNull { value(it, key, domain, id) })
             is JsonNull -> element
-            is JsonPrimitive -> primitive(element, key, domain)
+            is JsonPrimitive -> primitive(element, key, domain, id)
         }
 
-        private fun obj(element: JsonObject, domain: String?): JsonElement? {
+        private fun obj(element: JsonObject, domain: String?, id: String?): JsonElement? {
             val own = (element["entity_id"] as? JsonPrimitive)?.takeIf { it.isString }?.content
             if (own != null && own !in alias) return null
             val here = own?.substringBefore('.') ?: domain
+            val entity = own ?: id
             val out = LinkedHashMap<String, JsonElement>()
             for ((name, child) in element) {
                 if ('.' in name) {
                     val shown = alias[name] ?: continue
-                    value(child, name, name.substringBefore('.'))?.let { out[shown] = it }
+                    value(child, name, name.substringBefore('.'), name)?.let { out[shown] = it }
                 } else {
-                    value(child, name, here)?.let { out[name] = it }
+                    value(child, name, here, entity)?.let { out[name] = it }
                 }
             }
             return JsonObject(out)
         }
 
-        private fun primitive(element: JsonPrimitive, key: String?, domain: String?): JsonElement? {
+        private fun primitive(element: JsonPrimitive, key: String?, domain: String?, id: String?): JsonElement? {
+            if ((key == "state" || key == "s") && id in blanked) return JsonPrimitive(0)
             if (element.isString) {
                 alias[element.content]?.let { return JsonPrimitive(it) }
                 // An id in a removal list that isn't kept is dropped, not masked.

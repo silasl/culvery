@@ -17,6 +17,7 @@ import uk.co.siland.culvery.core.homeassistant.test.FakeHomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.test.TEST_LINK
 import uk.co.siland.culvery.core.homeassistant.test.entityState
 import uk.co.siland.culvery.core.homeassistant.test.testHomeAssistant
+import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.retryDelayMillis
 
 /** 11 §4.3, §6: one cache, one problem, one socket while a screen in front watches; a refused token stops all but Check. */
@@ -29,8 +30,11 @@ class HomeAssistantTest {
     private val battery = entityState("sensor.hoover_battery", "86")
     private val hall = entityState("climate.hall", "heat", mapOf("friendly_name" to "Hall"))
 
+    private var now = 1_000L
+    private val clock = WallClock { now }
+
     private fun TestScope.ha(link: Flow<HomeAssistantLink?> = flowOf(TEST_LINK)) =
-        testHomeAssistant(api, link, inFront, backgroundScope).also { runCurrent() }
+        testHomeAssistant(api, link, inFront, backgroundScope, clock).also { runCurrent() }
 
     private suspend fun TestScope.after(ms: Long) {
         advanceTimeBy(ms)
@@ -92,7 +96,7 @@ class HomeAssistantTest {
     /** Fails if the saved link isn't found before start() has collected the settings. */
     @Test
     fun savedLinkReadsTheStoreBeforeStart() = runTest {
-        val cold = HomeAssistant(api, flowOf(TEST_LINK), inFront, backgroundScope)
+        val cold = HomeAssistant(api, flowOf(TEST_LINK), inFront, clock, backgroundScope)
         assertThat(cold.link.value).isNull()
         assertThat(cold.savedLink()).isEqualTo(TEST_LINK)
     }
@@ -455,5 +459,44 @@ class HomeAssistantTest {
         ha.watch(flowOf(emptySet()))
         after(60_000)
         assertThat(api.follows).isEmpty()
+    }
+
+    /** Fails if liveSince isn't the wall time of the socket's first event, or moves on later events, a drop or a reopen. */
+    @Test
+    fun liveSinceMarksTheSocketsFirstEvent() = runTest {
+        val ha = ha()
+        assertThat(ha.liveSince.value).isNull()
+        ha.watch(flowOf(setOf("vacuum.hoover")))
+        runCurrent()
+        assertThat(ha.liveSince.value).isNull()
+        now = 5_000
+        api.socket.emit(mapOf("vacuum.hoover" to hoover))
+        runCurrent()
+        assertThat(ha.liveSince.value).isEqualTo(5_000L)
+        now = 9_000
+        api.socket.emit(mapOf("vacuum.hoover" to entityState("vacuum.hoover", "cleaning")))
+        runCurrent()
+        assertThat(ha.liveSince.value).isEqualTo(5_000L)
+        api.dropSocket(HaProblem.UNREACHABLE)
+        runCurrent()
+        assertThat(ha.liveSince.value).isNull()
+        now = 20_000
+        after(retryDelayMillis(0))
+        assertThat(ha.liveSince.value).isNull()
+        api.socket.emit(mapOf("vacuum.hoover" to hoover))
+        runCurrent()
+        assertThat(ha.liveSince.value).isEqualTo(20_000L)
+    }
+
+    /** Fails if the registry doesn't come through the link, or a failed read doesn't record its problem. */
+    @Test
+    fun theRegistryIsReadThroughTheLink() = runTest {
+        val ha = ha()
+        api.registry = HaJson.registry(HaFixtures.REGISTRY)
+        assertThat(ha.registry()).hasSize(6)
+        assertThat(api.calls).containsExactly("registry")
+        api.failNext = HaProblem.UNREACHABLE
+        assertThat(refusal { ha.registry() }).isEqualTo(HaProblem.UNREACHABLE)
+        assertThat(ha.problem.value).isEqualTo(HaProblem.UNREACHABLE)
     }
 }

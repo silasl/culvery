@@ -207,4 +207,39 @@ class HomeAssistantSocketTest {
         Thread.sleep(300)
         assertThat(socketLines()).hasSize(1)
     }
+
+    @Test
+    fun registryAsksAndCloses() = runBlocking<Unit> {
+        afterSubscribe = { it.send(HaFixtures.REGISTRY) }
+        val entries = withTimeout(5_000) { api.registry(link) }
+        assertThat(entries).hasSize(6)
+        assertThat(server.takeRequest().path).isEqualTo("/api/websocket")
+        assertThat(received.toList()).containsExactly(
+            """{"type":"auth","access_token":"test-token"}""",
+            """{"id":1,"type":"config/entity_registry/list_for_display"}""",
+        ).inOrder()
+        assertThat(serverClosed.await(5, TimeUnit.SECONDS)).isTrue()
+    }
+
+    @Test
+    fun aRefusedRegistryIsRefused() = runBlocking<Unit> {
+        afterSubscribe = { it.send("""{"id":1,"type":"result","success":false,"error":{"code":"unauthorized"}}""") }
+        val failure = runCatching { withTimeout(5_000) { api.registry(link) } }.exceptionOrNull() as HomeAssistantException
+        assertThat(failure.problem).isEqualTo(HaProblem.REFUSED)
+    }
+
+    @Test
+    fun aSocketClosedBeforeTheRegistryIsUnreachable() = runBlocking<Unit> {
+        afterSubscribe = { it.close(1001, null) }
+        val failure = runCatching { withTimeout(5_000) { api.registry(link) } }.exceptionOrNull() as HomeAssistantException
+        assertThat(failure.problem).isEqualTo(HaProblem.UNREACHABLE)
+    }
+
+    @Test
+    fun aRegistryThatNeverComesIsUnreachableAfterTheCommandTimeout() = runBlocking<Unit> {
+        val quick = HomeAssistantClient(homeHttpClient(COMMAND_TIMEOUT_MS), { true }, registryTimeoutMs = 200) { _, _ -> }
+        afterSubscribe = {}
+        val failure = runCatching { withTimeout(5_000) { quick.registry(link) } }.exceptionOrNull() as HomeAssistantException
+        assertThat(failure.problem).isEqualTo(HaProblem.UNREACHABLE)
+    }
 }

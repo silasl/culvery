@@ -41,6 +41,23 @@ class HaCaptureTest {
         listOf("hoover", "Hall", "alex", "latitude", "192.168").forEach { assertThat(text).doesNotContain(it) }
     }
 
+    /** Fails if a power reading blanked in one message shows in the next, or a new keep set doesn't forget it. */
+    @Test
+    fun blankedReadingsAreForgottenWhenKeepChanges() {
+        ShadowLog.clear()
+        ShadowLog.setLoggable("HaCapture", Log.DEBUG)
+        val power = "sensor.lamp_current_consumption"
+        val added = """{"id":1,"type":"event","event":{"a":{"$power":{"s":"182","a":{"device_class":"power"}}}}}"""
+        val changed = """{"id":1,"type":"event","event":{"c":{"$power":{"+":{"s":"200"}}}}}"""
+        HaCapture.keep = setOf(power)
+        HaCapture.log(HaCall.SOCKET, added)
+        HaCapture.log(HaCall.SOCKET, changed)
+        assertThat(ShadowLog.getLogsForTag("HaCapture").last().msg).contains("\"s\":0")
+        HaCapture.keep = setOf(power, "sensor.other")
+        HaCapture.log(HaCall.SOCKET, changed)
+        assertThat(ShadowLog.getLogsForTag("HaCapture").last().msg).contains("\"s\":\"200\"")
+    }
+
     /** Fails if an entity shows when none is watched. */
     @Test
     fun withNothingWatchedNoEntityShows() {
