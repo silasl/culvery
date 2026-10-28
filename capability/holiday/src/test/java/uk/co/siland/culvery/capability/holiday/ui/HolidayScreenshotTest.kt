@@ -90,6 +90,12 @@ class HolidayScreenshotTest {
     @Test
     fun tileLineLight() = tile("holiday_tile_line_light", false, on = true, line = LINE)
 
+    @Test
+    fun tileThreeLinesDark() = tile("holiday_tile_three_lines_dark", true, on = false, line = THREE_LINES)
+
+    @Test
+    fun tileThreeLinesLight() = tile("holiday_tile_three_lines_light", false, on = false, line = THREE_LINES)
+
     @Test fun sheetFromCalendarDark() = sheet("holiday_sheet_from_calendar_dark", true, cornwall.back, cornwall)
 
     @Test fun sheetFromCalendarLight() = sheet("holiday_sheet_from_calendar_light", false, cornwall.back, cornwall)
@@ -109,5 +115,10 @@ class HolidayScreenshotTest {
     private companion object {
         val PLUGS = listOf(PlugChange("Lamp", false), PlugChange("Fan", false), PlugChange("Desk", true))
         const val LINE = "The heating didn’t come off Eco. Turn it off in the Nest app."
+        val THREE_LINES = listOf(
+            "The heating is still on Eco. Turn it off in the Nest app.",
+            "Lamp didn’t switch back on. Switch it on the Plugs tab.",
+            "Holiday lights are still on. Turn them off in the Lights tab.",
+        ).joinToString("\n")
     }
 }

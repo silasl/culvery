@@ -710,7 +710,41 @@ class HolidayHouseTest {
         rig.heating.results += HouseStep.Failed("The heating didn’t come off Eco. Turn it off in the Nest app.")
         house.turnOff(adult())
 
-        assertThat(house.line.value).isEqualTo(STILL_ON_ECO)
+        assertThat(house.line.value).isEqualTo("$STILL_ON_ECO\n$LAMP_BACK_LINE")
+    }
+
+    /** Fails if tap-off shows only one failure, or shows them in another order than heating, plugs, lights (12 §5.5). */
+    @Test
+    fun tapOffShowsEveryFailureInOrder() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = true
+        val house = rig.house(hoover = null)
+        house.turnOn(SAT_31_OCT, adult())
+        rig.lights.results += HouseStep.Failed("The lights are busy. Try again in a minute.")
+        rig.heating.results += HouseStep.Failed("The heating didn’t come off Eco. Turn it off in the Nest app.")
+        rig.plugs.leaves += HouseStep.Failed(LAMP_BACK_LINE)
+        rig.at(FRI_30_OCT.atTime(18, 0))
+        val off = rig.wall
+
+        house.turnOff(adult())
+
+        assertThat(house.line.value).isEqualTo("$STILL_ON_ECO\n$LAMP_BACK_LINE\n${HolidayWords.LIGHTS_STILL_ON}")
+        rig.wall = off + HolidayHouse.OFF_LINE_MS
+        house.tick()
+        assertThat(house.line.value).isNull()
+    }
+
+    /** Pin: while Holiday mode is on the tile keeps its one latest line, even with two steps failing (12 §5.5). */
+    @Test
+    fun whileOnTheTileKeepsOneLine() = runTest {
+        val rig = rig()
+        val house = rig.house(hoover = null)
+        rig.lights.results += HouseStep.Failed("The lights are busy. Try again in a minute.")
+        rig.heating.results += HouseStep.Failed(ECO_ON_LINE)
+
+        house.turnOn(SAT_31_OCT, adult())
+
+        assertThat(house.line.value).isEqualTo(ECO_ON_LINE)
     }
 
     /** Review Focus 5: fails if a leave that threw stops Holiday mode ending, or shows no line. */

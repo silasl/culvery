@@ -137,12 +137,12 @@ class HolidayHouse internal constructor(
             val plugsLine = plugs?.let { puttingBack(it) }
             grant = null
             resetRun()
-            offLine = when {
-                ecoLeft -> HolidayWords.STILL_ON_ECO
-                plugsLine != null -> plugsLine
-                lightsLeft -> HolidayWords.LIGHTS_STILL_ON
-                else -> null
-            }
+            // Heating, then plugs, then lights, one per line (12 §5.5).
+            offLine = listOfNotNull(
+                HolidayWords.STILL_ON_ECO.takeIf { ecoLeft },
+                plugsLine,
+                HolidayWords.LIGHTS_STILL_ON.takeIf { lightsLeft },
+            ).joinToString("\n").ifEmpty { null }
             offAt = wall.nowMillis()
             set(HolidayRecord())
         }
