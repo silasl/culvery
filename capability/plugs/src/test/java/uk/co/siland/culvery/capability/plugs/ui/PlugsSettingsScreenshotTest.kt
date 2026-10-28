@@ -12,6 +12,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.GraphicsMode
+import uk.co.siland.culvery.capability.plugs.PlugCandidates
+import uk.co.siland.culvery.capability.plugs.PlugPrefs
 import uk.co.siland.culvery.capability.plugs.PlugsWords
 import uk.co.siland.culvery.core.ui.test.snap
 
@@ -29,6 +31,8 @@ class PlugsSettingsScreenshotTest {
         line = null,
     )
 
+    private val unreadable = plugsSettingsUi(PlugCandidates.Failed(PlugsWords.CANT_LIST_PLUGS), PlugPrefs().showing("switch.lamp"))
+
     private fun page(name: String, dark: Boolean, ui: PlugsSettingsUi) =
         compose.snap(name, dark, Modifier.width(900.dp)) {
             Column(Modifier.fillMaxWidth().padding(48.dp)) { PlugsSettings(ui, onShow = { _, _ -> }, onNeedsPin = { _, _ -> }) }
@@ -42,7 +46,7 @@ class PlugsSettingsScreenshotTest {
 
     @Test fun noneLight() = page("plugs_settings_none_light", false, PlugsSettingsUi(emptyList(), PlugsWords.NO_TP_LINK_PLUGS))
 
-    @Test fun unreadableDark() = page("plugs_settings_unreadable_dark", true, PlugsSettingsUi(emptyList(), PlugsWords.CANT_LIST_PLUGS))
+    @Test fun unreadableDark() = page("plugs_settings_unreadable_dark", true, unreadable)
 
-    @Test fun unreadableLight() = page("plugs_settings_unreadable_light", false, PlugsSettingsUi(emptyList(), PlugsWords.CANT_LIST_PLUGS))
+    @Test fun unreadableLight() = page("plugs_settings_unreadable_light", false, unreadable)
 }

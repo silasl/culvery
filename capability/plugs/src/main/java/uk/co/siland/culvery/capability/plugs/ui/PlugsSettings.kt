@@ -14,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import javax.inject.Inject
 import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.plugs.PlugActions
 import uk.co.siland.culvery.capability.plugs.PlugCandidates
@@ -22,27 +21,10 @@ import uk.co.siland.culvery.capability.plugs.PlugPrefs
 import uk.co.siland.culvery.capability.plugs.PlugSettings
 import uk.co.siland.culvery.capability.plugs.PlugSystem
 import uk.co.siland.culvery.capability.plugs.PlugsWords
-import uk.co.siland.culvery.core.homeassistant.HomeAssistantSection
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhType
-
-/** Plugs under the device pickers in Settings › Other integrations (12 §4.2); nothing without a plug system. */
-class PlugsSettingsSection @Inject constructor(
-    systems: Set<@JvmSuppressWildcards PlugSystem>,
-    private val actions: PlugActions,
-    private val settings: PlugSettings,
-) : HomeAssistantSection {
-    private val system = systems.firstOrNull()
-
-    override val order = 10
-
-    @Composable
-    override fun Content() {
-        system?.let { PlugsSettingsHost(it, actions, settings) }
-    }
-}
 
 /** One plug's row. [line] is set for a shown plug Home Assistant no longer has. */
 data class PlugRowUi(val entityId: String, val name: String, val shown: Boolean, val needsPin: Boolean, val line: String?) {
@@ -76,9 +58,9 @@ fun PlugsSettings(ui: PlugsSettingsUi, onShow: (String, Boolean) -> Unit, onNeed
     }
 }
 
-/** Reads Home Assistant's plugs as the section appears and after each Show change; the page lists them against the stored choices. */
+/** Settings' Plugs block over [system]; reads Home Assistant's plugs as the section appears and after each Show change; the page lists them against the stored choices. */
 @Composable
-internal fun PlugsSettingsHost(system: PlugSystem, actions: PlugActions, settings: PlugSettings) {
+fun PlugsSettingsHost(system: PlugSystem, actions: PlugActions, settings: PlugSettings) {
     val prefs by remember(settings) { settings.prefs }.collectAsStateWithLifecycle(PlugPrefs())
     var found by remember { mutableStateOf<PlugCandidates?>(null) }
     var reads by remember { mutableIntStateOf(0) }
@@ -92,9 +74,11 @@ internal fun PlugsSettingsHost(system: PlugSystem, actions: PlugActions, setting
     )
 }
 
-/** With the registry unreadable no plug can be called gone, so only the line is shown. */
+/** The system's order is kept. With the registry unreadable no plug can be called gone, so the shown ones are listed unnamed and without the gone line. */
 internal fun plugsSettingsUi(found: PlugCandidates, prefs: PlugPrefs): PlugsSettingsUi {
-    if (found is PlugCandidates.Failed) return PlugsSettingsUi(emptyList(), found.line)
+    if (found is PlugCandidates.Failed) {
+        return PlugsSettingsUi(prefs.plugs.map { PlugRowUi(it, PlugsWords.A_PLUG, true, it in prefs.needsPin, null) }, found.line)
+    }
     val available = (found as PlugCandidates.Found).all
     val known = available.mapTo(HashSet()) { it.entityId }
     val rows = available.map { PlugRowUi(it.entityId, it.name, it.entityId in prefs.plugs, it.entityId in prefs.needsPin, null) } +

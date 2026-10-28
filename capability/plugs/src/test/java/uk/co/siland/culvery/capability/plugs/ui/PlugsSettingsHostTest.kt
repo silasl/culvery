@@ -21,7 +21,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
@@ -49,11 +48,10 @@ private val FAN_CANDIDATE = PlugCandidate(FAN, "Fan")
 /** 12 §4.2: Settings › Other integrations › Plugs: which plugs show on the tab and which need a PIN to switch. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-class PlugsSettingsSectionTest {
+class PlugsSettingsHostTest {
     @get:Rule val compose = createComposeRule()
     private val rig = PlugsRig()
     private val actions = PlugActions(TestAccess(Role.ADMIN), rig.settings, rig.system, RecordingToaster(), CoroutineScope(Job()))
-    private val section = PlugsSettingsSection(setOf(rig.system), actions, rig.settings)
 
     private fun show(found: PlugCandidates, shown: List<String> = emptyList(), needsPin: Set<String> = emptySet()) {
         rig.system.found = found
@@ -62,7 +60,7 @@ class PlugsSettingsSectionTest {
         }
         compose.setContent {
             CulveryTheme(dark = true) {
-                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 48.dp)) { section.Content() }
+                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 48.dp)) { PlugsSettingsHost(rig.system, actions, rig.settings) }
             }
         }
         compose.waitFor { compose.onAllNodesWithTag("plugs_settings").fetchSemanticsNodes().isNotEmpty() }
@@ -71,6 +69,15 @@ class PlugsSettingsSectionTest {
     private fun found(vararg plugs: PlugCandidate) = PlugCandidates.Found(plugs.toList())
 
     private fun count(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().size
+
+    /** The provider sorts by name (its own test); the page keeps the order it is given. */
+    @Test
+    fun keepsTheOrderTheSystemGave() {
+        show(found(LAMP_CANDIDATE, FAN_CANDIDATE))
+        compose.waitFor { count("plugs_show_1") == 1 }
+        compose.onNodeWithTag("plugs_name_0").assertTextEquals("LAMP")
+        compose.onNodeWithTag("plugs_name_1").assertTextEquals("FAN")
+    }
 
     @Test
     fun listsOnlyTheAvailablePlugsByName() {
@@ -128,10 +135,15 @@ class PlugsSettingsSectionTest {
     }
 
     @Test
-    fun anUnreadableRegistrySaysSo() {
+    fun anUnreadableRegistrySaysSoAndStillListsTheShownPlugs() {
         show(PlugCandidates.Failed("Can’t list the plugs. Check Home Assistant is up to date."), shown = listOf(LAMP))
         compose.waitFor { count("plugs_line") == 1 }
         compose.onNodeWithTag("plugs_line").assertTextEquals("Can’t list the plugs. Check Home Assistant is up to date.")
+        compose.onNodeWithTag("plugs_name_0").assertTextEquals("A PLUG")
+        compose.onAllNodesWithTag("plugs_gone_0").assertCountEquals(0)
+        compose.onNodeWithTag("plugs_pin_0").assertIsEnabled()
+        compose.onNodeWithTag("plugs_show_0").assertIsOn().performClick()
+        compose.waitFor { runBlocking { rig.prefs().plugs }.isEmpty() }
         compose.assertClickablesHaveRoleAndLabel()
     }
 
@@ -143,7 +155,6 @@ class PlugsSettingsSectionTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Lamp, show on the Plugs tab")))
         compose.onNodeWithTag("plugs_pin_0")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Lamp, needs a PIN to switch")))
-        assertThat(section.order).isEqualTo(10)
         compose.assertClickablesHaveRoleAndLabel()
     }
 }

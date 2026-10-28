@@ -62,7 +62,7 @@ fun HhSwitchRow(
             .listRowCard(c, minHeight)
             .testTag(tag)
             .hhToggleable(checked, enabled, onValueChange = onChange)
-            .then(if (spokenName != null) Modifier.semantics { contentDescription = spokenName } else Modifier)
+            .semantics { spokenName?.let { contentDescription = it } }
             .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd, top = ListRowTokens.paddingV, bottom = ListRowTokens.paddingV),
     ) {
         Column(Modifier.weight(1f)) {
