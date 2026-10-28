@@ -18,7 +18,7 @@ internal object HaCapture {
     @Volatile
     var keep: Set<String> = emptySet()
         set(value) {
-            if (field != value) blanked.clear()
+            blanked.retainAll(value)
             field = value
         }
 

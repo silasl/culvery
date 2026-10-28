@@ -41,9 +41,9 @@ class HaCaptureTest {
         listOf("hoover", "Hall", "alex", "latitude", "192.168").forEach { assertThat(text).doesNotContain(it) }
     }
 
-    /** Fails if a power reading blanked in one message shows in the next, or a new keep set doesn't forget it. */
+    /** Fails if a kept power id stops being blanked when keep changes, or a dropped id is not forgotten. */
     @Test
-    fun blankedReadingsAreForgottenWhenKeepChanges() {
+    fun blankedReadingsStayBlankedWhileKeptAndAreForgottenWhenDropped() {
         ShadowLog.clear()
         ShadowLog.setLoggable("HaCapture", Log.DEBUG)
         val power = "sensor.lamp_current_consumption"
@@ -54,6 +54,10 @@ class HaCaptureTest {
         HaCapture.log(HaCall.SOCKET, changed)
         assertThat(ShadowLog.getLogsForTag("HaCapture").last().msg).contains("\"s\":0")
         HaCapture.keep = setOf(power, "sensor.other")
+        HaCapture.log(HaCall.SOCKET, changed)
+        assertThat(ShadowLog.getLogsForTag("HaCapture").last().msg).contains("\"s\":0")
+        HaCapture.keep = setOf("sensor.other")
+        HaCapture.keep = setOf(power)
         HaCapture.log(HaCall.SOCKET, changed)
         assertThat(ShadowLog.getLogsForTag("HaCapture").last().msg).contains("\"s\":\"200\"")
     }
