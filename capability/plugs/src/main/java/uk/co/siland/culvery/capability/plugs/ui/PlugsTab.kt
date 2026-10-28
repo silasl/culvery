@@ -176,7 +176,7 @@ internal fun PlugsTabHost(system: PlugSystem, actions: PlugActions, settings: Pl
 
 @Composable
 private fun AddPlugSheetHost(system: PlugSystem, actions: PlugActions, settings: PlugSettings, scope: CoroutineScope, onClose: () -> Unit) {
-    val candidates by produceState<PlugCandidates?>(null, system) { value = system.candidates() }
+    val candidates by produceState<PlugCandidates?>(null, system) { value = system.available() }
     val prefs by settings.prefs.collectAsStateWithLifecycle(PlugPrefs())
     AddPlugSheet(candidates, prefs.plugs, onPick = { scope.launch { actions.add(it.entityId) } }, onClose = onClose)
 }

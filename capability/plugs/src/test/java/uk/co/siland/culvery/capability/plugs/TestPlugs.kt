@@ -83,7 +83,7 @@ internal class FakePlugSystem(initial: List<PlugState> = emptyList()) : PlugSyst
         return { watching.decrementAndGet() }
     }
 
-    override suspend fun candidates() = found
+    override suspend fun available() = found
 
     override suspend fun read(entityId: String): PlugState {
         reads += entityId

@@ -7,6 +7,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -16,22 +17,27 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
+import android.util.Log
 import uk.co.siland.culvery.capability.plugs.PlugCandidates
 import uk.co.siland.culvery.capability.plugs.PlugPower
 import uk.co.siland.culvery.capability.plugs.PlugPrefs
 import uk.co.siland.culvery.capability.plugs.PlugResult
+import uk.co.siland.culvery.capability.plugs.isOn
 import uk.co.siland.culvery.capability.plugs.PlugsWords
 import uk.co.siland.culvery.core.homeassistant.EntityState
 import uk.co.siland.culvery.core.homeassistant.HaProblem
 import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantLink
+import uk.co.siland.culvery.core.homeassistant.RegistryEntry
 import uk.co.siland.culvery.core.homeassistant.NOT_LINKED
 import uk.co.siland.culvery.core.homeassistant.problemLine
 import uk.co.siland.culvery.core.homeassistant.test.FakeHomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.test.TEST_LINK
 import uk.co.siland.culvery.core.homeassistant.test.entityState
 import uk.co.siland.culvery.core.homeassistant.test.testHomeAssistant
+import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.plugin.retryDelayMillis
 
 /** 12 §4.1, §6: the plugs' states, their watts by name, and a switch with its 30-second check. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -42,11 +48,13 @@ class HaPlugSystemTest {
     private val prefs = MutableStateFlow(PlugPrefs(plugs = listOf("switch.lamp", "switch.fan", "switch.fairy_lights")))
     private val inFront = MutableStateFlow(true)
     private val unreachable = "Can’t reach Home Assistant. Check the NAS is on."
+    private var now = 0L
+    private val clock = WallClock { now }
 
     private fun TestScope.ha(over: HomeAssistantApi = api): HomeAssistant =
-        testHomeAssistant(over, link, inFront, backgroundScope).also { runCurrent() }
+        testHomeAssistant(over, link, inFront, backgroundScope, clock).also { runCurrent() }
 
-    private fun TestScope.system(ha: HomeAssistant = ha()) = HaPlugSystem(ha, prefs)
+    private fun TestScope.system(ha: HomeAssistant = ha()) = HaPlugSystem(ha, prefs, clock, backgroundScope)
 
     private suspend fun TestScope.after(ms: Long) {
         advanceTimeBy(ms)
@@ -60,21 +68,42 @@ class HaPlugSystemTest {
     private fun lampWatts(state: String = "182") =
         entityState("sensor.lamp_current_consumption", state, mapOf("unit_of_measurement" to "W", "device_class" to "power"))
 
+    private fun entry(id: String, platform: String = "tplink", device: String? = null, category: String? = null, key: String? = null) =
+        RegistryEntry(id, platform, device, category, key)
+
+    /** The shape of a real list: a lamp with its LED, auto-off and watts, a fan, a fairy-lights plug, and a Sonos switch. */
+    private fun fixtureRegistry() = listOf(
+        entry("switch.lamp", device = "dev_lamp"),
+        entry("switch.lamp_led", device = "dev_lamp", category = "config"),
+        entry("switch.lamp_auto_off", device = "dev_lamp", category = "config"),
+        entry("sensor.lamp_current_consumption", device = "dev_lamp", key = "current_consumption"),
+        entry("switch.fan", device = "dev_fan"),
+        entry("switch.fairy_lights", device = "dev_fairy"),
+        entry("switch.kitchen_crossfade", platform = "sonos"),
+    )
+
     private fun seed(vararg states: EntityState) = states.forEach { api.states[it.entityId] = it }
 
-    private fun seedAll() = seed(lamp(), fan(), fairy(), lampLed(), lampWatts())
+    private fun seedAll() {
+        seed(lamp(), fan(), fairy(), lampLed(), lampWatts())
+        api.registry = fixtureRegistry()
+    }
 
-    /** The system watches and the socket brings every seeded state; later reads of them come from the cache. */
+    /** The system watches and the socket brings every seeded state; later reads of them come from the cache. The registry then widens the follow, so the socket reopens and reports again. */
     private suspend fun TestScope.live(system: HaPlugSystem): () -> Unit {
         val stop = system.watch()
         runCurrent()
-        api.socket.emit(api.states.toMap())
-        runCurrent()
+        repeat(2) {
+            api.socket.emit(api.states.toMap())
+            runCurrent()
+        }
         return stop
     }
 
-    private fun plugOf(entities: Map<String, EntityState?>, id: String = "switch.lamp") =
-        stateOf(id, entities, null)
+    private val lampRegistry = PlugRegistry(setOf("switch.lamp"), mapOf("switch.lamp" to "sensor.lamp_current_consumption"))
+
+    private fun plugOf(entities: Map<String, EntityState?>, id: String = "switch.lamp", steady: Boolean = true) =
+        stateOf(id, entities, null, lampRegistry, steady)
 
     /** Fails if a home with no link has a tab, or one with a link and no plugs has anything but an empty list. */
     @Test
@@ -111,20 +140,6 @@ class HaPlugSystemTest {
         assertThat(watts("182", switch = "off")).isNull()
     }
 
-    /** Fails if a plug Home Assistant dropped isn't gone, or loses its name to "A plug" wrongly. */
-    @Test
-    fun aDeletedPlugIsGone() = runTest {
-        seed(lamp())
-        val ha = ha()
-        ha.read("switch.lamp")
-        api.states.clear()
-        val system = system(ha)
-        system.candidates()
-        val plug = system.plugs.first()!!.first()
-        assertThat(plug.power).isEqualTo(PlugPower.GONE)
-        assertThat(plug.name).isEqualTo(PlugsWords.A_PLUG)
-    }
-
     /** Fails if a rename in Home Assistant doesn't reach the next list. */
     @Test
     fun aRenameShowsAtOnce() = runTest {
@@ -142,33 +157,181 @@ class HaPlugSystemTest {
     fun oddStatesAreUnknown() {
         assertThat(plugOf(mapOf("switch.lamp" to lamp("unknown"))).power).isEqualTo(PlugPower.UNKNOWN)
         assertThat(plugOf(mapOf("switch.lamp" to lamp("jammed"))).power).isEqualTo(PlugPower.UNKNOWN)
-        assertThat(plugOf(emptyMap()).power).isEqualTo(PlugPower.UNKNOWN)
+        assertThat(plugOf(emptyMap(), steady = false).power).isEqualTo(PlugPower.UNKNOWN)
     }
 
-    /** Fails if a refused token leaves any plug with a state, or the problem isn't the token's line. */
+    /** Fails if a link problem leaves any plug with a state, or the problem isn't the token's line. */
     @Test
-    fun aLinkProblemMakesEveryPlugUnknown() = runTest {
+    fun aLinkProblemIsNoLink() = runTest {
         seedAll()
         val ha = ha()
         ha.read("switch.lamp")
         val system = system(ha)
         api.failNext = HaProblem.TOKEN_REFUSED
         assertThat(system.read("switch.fan").power).isEqualTo(PlugPower.UNREACHABLE)
-        assertThat(system.plugs.first()!!.map { it.power }).containsExactly(PlugPower.UNKNOWN, PlugPower.UNKNOWN, PlugPower.UNKNOWN)
+        assertThat(system.plugs.first()!!.map { it.power }).containsExactly(PlugPower.NO_LINK, PlugPower.NO_LINK, PlugPower.NO_LINK)
+        assertThat(system.plugs.first()!!.map { it.isOn }).containsExactly(null, null, null)
         assertThat(system.problem.first()).isEqualTo(problemLine(HaProblem.TOKEN_REFUSED))
     }
 
-    /** Fails if a switch nobody added is a plug, or the candidates aren't every switch and nothing else. */
+    /** Fails if the Home Assistant down line is anything but NO_LINK for every plug. */
     @Test
-    fun nonPlugSwitchesAreOnlyCandidates() = runTest {
+    fun unreachableIsNoLinkForEveryPlug() = runTest {
         seedAll()
         val system = system()
         live(system)
+        api.dropSocket(HaProblem.UNREACHABLE)
+        runCurrent()
+        assertThat(system.plugs.first()!!.map { it.power }).containsExactly(PlugPower.NO_LINK, PlugPower.NO_LINK, PlugPower.NO_LINK)
+    }
+
+    /** Fails if a LED, auto-off or Sonos switch is offered, or the plugs aren't sorted by name. */
+    @Test
+    fun onlyTpLinkMainSwitchesArePlugs() = runTest {
+        seedAll()
+        seed(entityState("switch.kitchen_crossfade", "on", mapOf("friendly_name" to "Crossfade")))
+        val system = system()
+        live(system)
         assertThat(system.plugs.first()!!.map { it.entityId }).doesNotContain("switch.lamp_led")
-        val found = system.candidates() as PlugCandidates.Found
-        assertThat(found.all.map { it.entityId })
-            .containsExactly("switch.lamp", "switch.fan", "switch.fairy_lights", "switch.lamp_led")
-        assertThat(found.all.map { it.name }).containsExactly("Lamp", "Fan", "Fairy lights", "Lamp LED")
+        val found = system.available() as PlugCandidates.Found
+        assertThat(found.all.map { it.name }).containsExactly("Fairy lights", "Fan", "Lamp").inOrder()
+        assertThat(found.all.map { it.entityId }).containsExactly("switch.fairy_lights", "switch.fan", "switch.lamp").inOrder()
+    }
+
+    /** Fails if the watts come from the device's own sensor wrongly: a plug without one shows none, the lamp's shows. */
+    @Test
+    fun wattsComeFromTheSameDevice() = runTest {
+        seedAll()
+        seed(fan("on"))
+        val system = system()
+        live(system)
+        val plugs = system.plugs.first()!!
+        assertThat(plugs.first { it.entityId == "switch.lamp" }.watts).isEqualTo(182)
+        assertThat(plugs.first { it.entityId == "switch.fan" }.watts).isNull()
+    }
+
+    /** Fails if the plugs and the watts sensor aren't told apart by platform, domain, category and translation key. */
+    @Test
+    fun theRegistryRuleIsExact() {
+        val read = plugRegistry(
+            fixtureRegistry() + listOf(
+                entry("sensor.fan_today", device = "dev_fan", key = "today_energy"),
+                entry("sensor.other_current_consumption", platform = "sonos", device = "dev_fan", key = "current_consumption"),
+                entry("light.lamp_strip", device = "dev_lamp"),
+            ),
+        )
+        assertThat(read.plugs).containsExactly("switch.lamp", "switch.fan", "switch.fairy_lights")
+        assertThat(read.watts).containsExactly("switch.lamp", "sensor.lamp_current_consumption")
+    }
+
+    /** Fails if a socket that was live 3 minutes doesn't call a missing plug gone, or a reopened one does before 2 steady minutes. */
+    @Test
+    fun aRestartIsNotGone() = runTest {
+        seed(lamp(), lampWatts())
+        api.registry = fixtureRegistry()
+        prefs.value = PlugPrefs(plugs = listOf("switch.lamp"))
+        val system = system()
+        live(system)
+        now = 180_000
+        api.socket.emit(mapOf("switch.lamp" to null))
+        runCurrent()
+        assertThat(system.plugs.first()!!.single().power).isEqualTo(PlugPower.GONE)
+
+        api.dropSocket(HaProblem.UNREACHABLE)
+        runCurrent()
+        now = 200_000
+        after(retryDelayMillis(0))
+        api.socket.emit(mapOf("switch.lamp" to null))
+        runCurrent()
+        assertThat(system.plugs.first()!!.single().power).isEqualTo(PlugPower.UNKNOWN)
+        now = 200_000 + GONE_AFTER_MS - 1
+        assertThat(system.plugs.first()!!.single().power).isEqualTo(PlugPower.UNKNOWN)
+        now = 200_000 + GONE_AFTER_MS
+        assertThat(system.plugs.first()!!.single().power).isEqualTo(PlugPower.GONE)
+
+        api.socket.emit(mapOf("switch.lamp" to lamp()))
+        runCurrent()
+        assertThat(system.plugs.first()!!.single().power).isEqualTo(PlugPower.ON)
+    }
+
+    /** Fails if a collecting screen isn't told when the 2 minutes pass. */
+    @Test
+    fun theRowTurnsGoneWhenTheTwoMinutesPassUnwatched() = runTest {
+        seed(fan())
+        api.registry = fixtureRegistry()
+        prefs.value = PlugPrefs(plugs = listOf("switch.lamp"))
+        val system = system()
+        val seen = mutableListOf<PlugPower>()
+        backgroundScope.launch { system.plugs.collect { seen += it!!.single().power } }
+        live(system)
+        api.socket.emit(mapOf("switch.lamp" to null))
+        runCurrent()
+        assertThat(seen.last()).isEqualTo(PlugPower.UNKNOWN)
+        now = GONE_AFTER_MS
+        after(GONE_AFTER_MS)
+        assertThat(seen.last()).isEqualTo(PlugPower.GONE)
+    }
+
+    /** Fails if a plug in the states but no longer a plug in the registry isn't gone once steady. */
+    @Test
+    fun aShownPlugLeftTheIntegrationIsGone() = runTest {
+        seed(lamp(), lampWatts())
+        api.registry = fixtureRegistry().filterNot { it.entityId.startsWith("switch.lamp") }
+        prefs.value = PlugPrefs(plugs = listOf("switch.lamp"))
+        val system = system()
+        live(system)
+        assertThat(system.plugs.first()!!.single().power).isEqualTo(PlugPower.UNKNOWN)
+        now = GONE_AFTER_MS
+        assertThat(system.plugs.first()!!.single().power).isEqualTo(PlugPower.GONE)
+    }
+
+    /** Fails if a registry that fails on a reconnect loses the plugs or their watts. */
+    @Test
+    fun aFailedRegistryKeepsTheLast() = runTest {
+        seed(lamp(), lampWatts())
+        api.registry = fixtureRegistry()
+        prefs.value = PlugPrefs(plugs = listOf("switch.lamp"))
+        val system = system()
+        live(system)
+        api.registryProblem = HaProblem.UNREACHABLE
+        api.dropSocket(HaProblem.UNREACHABLE)
+        runCurrent()
+        now = 10_000
+        after(retryDelayMillis(0))
+        api.socket.emit(mapOf("switch.lamp" to lamp(), "sensor.lamp_current_consumption" to lampWatts("90")))
+        runCurrent()
+        assertThat(api.calls.count { it == "registry" }).isAtLeast(2)
+        now = 10_000 + GONE_AFTER_MS
+        val plug = system.plugs.first()!!.single()
+        assertThat(plug.power).isEqualTo(PlugPower.ON)
+        assertThat(plug.watts).isEqualTo(90)
+        assertThat(api.follows.last()).contains("sensor.lamp_current_consumption")
+    }
+
+    /** Fails if the debug line carries more than counts, or shows when HaCapture isn't switched on. */
+    @Test
+    fun theRegistryCountsAreLoggedAtDebugOnly() = runTest {
+        seedAll()
+        ShadowLog.clear()
+        ShadowLog.setLoggable("HaCapture", Log.DEBUG)
+        val system = system()
+        live(system)
+        assertThat(ShadowLog.getLogsForTag("HaCapture").map { it.msg }).contains("registry: 3 plugs, 1 with watts, 7 entries")
+        ShadowLog.clear()
+        ShadowLog.setLoggable("HaCapture", Log.INFO)
+        system.available()
+        assertThat(ShadowLog.getLogsForTag("HaCapture")).isEmpty()
+    }
+
+    /** Fails if the registry failing or Home Assistant being old says anything but why. */
+    @Test
+    fun availableFailuresSayWhy() = runTest {
+        val system = system()
+        api.registryProblem = HaProblem.REFUSED
+        assertThat(system.available()).isEqualTo(PlugCandidates.Failed("Can’t list the plugs. Check Home Assistant is up to date."))
+        api.registryProblem = null
+        api.failNext = HaProblem.UNREACHABLE
+        assertThat(system.available()).isEqualTo(PlugCandidates.Failed(unreachable))
     }
 
     /** Fails if the candidates with Home Assistant down say anything but why. */
@@ -176,7 +339,7 @@ class HaPlugSystemTest {
     fun candidatesWithHomeAssistantDownSayWhy() = runTest {
         val system = system()
         api.failAll = HaProblem.UNREACHABLE
-        assertThat(system.candidates()).isEqualTo(PlugCandidates.Failed(unreachable))
+        assertThat(system.available()).isEqualTo(PlugCandidates.Failed(unreachable))
     }
 
     /** Fails if the right service isn't sent, or Done comes before the plug shows the change. */
@@ -343,16 +506,15 @@ class HaPlugSystemTest {
         assertThat(system(ha(timing)).read("switch.lamp").power).isEqualTo(PlugPower.UNREACHABLE)
     }
 
-    /** Fails if the socket doesn't follow every added switch and its watts sensor, and no more. */
+    /** Fails if the socket doesn't follow every added switch and the watts sensor the registry names, and no more. */
     @Test
     fun watchFollowsThePlugsAndTheirWatts() = runTest {
+        seedAll()
         prefs.value = PlugPrefs(plugs = listOf("switch.lamp", "switch.fan"))
         val system = system()
-        system.watch()
-        runCurrent()
-        assertThat(api.follows.last()).containsExactly(
-            "switch.lamp", "sensor.lamp_current_consumption", "switch.fan", "sensor.fan_current_consumption",
-        )
+        live(system)
+        assertThat(api.follows.first()).containsExactly("switch.lamp", "switch.fan")
+        assertThat(api.follows.last()).containsExactly("switch.lamp", "sensor.lamp_current_consumption", "switch.fan")
     }
 
     /** Fails if a log line carries an entity id, a name or a watt figure. */
@@ -370,7 +532,7 @@ class HaPlugSystemTest {
         after(30_000)
         unchanged.await()
         api.failAll = HaProblem.UNREACHABLE
-        system.candidates()
+        system.available()
         val ours = ShadowLog.getLogs().filter { it.tag == "HaPlugSystem" }
         assertThat(ours).isNotEmpty()
         ShadowLog.getLogs().forEach { line ->

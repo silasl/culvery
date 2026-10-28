@@ -13,6 +13,7 @@ object PlugsWords {
     const val SWITCHING = "Switching…"
     const val SWITCH_ON = "Switch on"
     const val SWITCH_OFF = "Switch off"
+    const val CANT_REACH_HOME_ASSISTANT = "Can’t reach Home Assistant."
     const val CANT_REACH_THIS_PLUG = "Can’t reach this plug."
     const val GONE_PLUG = "Home Assistant has no plug called that any more. Remove it or add it again."
     const val NEEDS_A_PIN = "Needs a PIN to switch"
@@ -33,6 +34,7 @@ object PlugsWords {
         PlugPower.UNREACHABLE -> CANT_REACH_THIS_PLUG
         PlugPower.GONE -> GONE_PLUG
         PlugPower.UNKNOWN -> CHECKING
+        PlugPower.NO_LINK -> CANT_REACH_HOME_ASSISTANT
     }
 
     /** What TalkBack reads for a card. */
@@ -44,6 +46,7 @@ object PlugsWords {
             PlugPower.UNREACHABLE -> "Plug $name, can’t reach this plug."
             PlugPower.GONE -> "Plug $name. $GONE_PLUG"
             PlugPower.UNKNOWN -> "Plug $name, checking."
+            PlugPower.NO_LINK -> "Plug $name, can’t reach Home Assistant."
         }
     }
 

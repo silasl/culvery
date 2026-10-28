@@ -2,7 +2,7 @@ package uk.co.siland.culvery.capability.plugs
 
 import kotlinx.coroutines.flow.Flow
 
-enum class PlugPower { ON, OFF, UNREACHABLE, GONE, UNKNOWN }
+enum class PlugPower { ON, OFF, UNREACHABLE, GONE, UNKNOWN, NO_LINK }
 
 /** [watts] is null with no power sensor, or while the plug isn't on. [toString] leaves out everything but [power]. */
 data class PlugState(val entityId: String, val name: String, val power: PlugPower, val watts: Int?) {
@@ -45,7 +45,8 @@ interface PlugSystem {
     /** The Plugs tab is showing; call the result when it goes. */
     fun watch(): () -> Unit
 
-    suspend fun candidates(): PlugCandidates
+    /** The plugs Home Assistant has, by name; reads its registry afresh. */
+    suspend fun available(): PlugCandidates
 
     /** One plug as it is now, read from Home Assistant when the socket isn't following it; never throws. */
     suspend fun read(entityId: String): PlugState

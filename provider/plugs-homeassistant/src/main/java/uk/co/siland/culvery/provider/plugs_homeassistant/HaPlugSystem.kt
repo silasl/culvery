@@ -4,13 +4,20 @@ import android.util.Log
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import uk.co.siland.culvery.capability.plugs.PlugCandidate
 import uk.co.siland.culvery.capability.plugs.PlugCandidates
 import uk.co.siland.culvery.capability.plugs.PlugPower
@@ -26,12 +33,35 @@ import uk.co.siland.culvery.core.homeassistant.HaProblem
 import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantException
 import uk.co.siland.culvery.core.homeassistant.NOT_LINKED
+import uk.co.siland.culvery.core.homeassistant.RegistryEntry
+import uk.co.siland.culvery.core.homeassistant.domain
 import uk.co.siland.culvery.core.homeassistant.problemLine
+import uk.co.siland.culvery.core.plugin.ApplicationScope
+import uk.co.siland.culvery.core.plugin.WallClock
 
 private const val TAG = "HaPlugSystem"
 
-/** The power sensor is found by name, with no registry read (12 §4.1). */
-internal fun wattsIdOf(switchId: String): String = "sensor." + switchId.substringAfter('.') + "_current_consumption"
+/** How long the socket must have been steady before a plug missing from it is called gone (12 §6). */
+const val GONE_AFTER_MS = 120_000L
+
+private const val CAPTURE_TAG = "HaCapture"
+private const val CANT_LIST = "Can’t list the plugs. Check Home Assistant is up to date."
+
+/** The plugs, and for each the id of its watts sensor (12 §4.1). */
+internal data class PlugRegistry(val plugs: Set<String>, val watts: Map<String, String>)
+
+/** A plug is a TP-Link switch with no entity category; its watts are the same device's `current_consumption` sensor. */
+internal fun plugRegistry(entries: List<RegistryEntry>): PlugRegistry {
+    val tpLink = entries.filter { it.platform == "tplink" }
+    val plugs = tpLink.filter { it.domain == "switch" && it.category == null }
+    val sensors = tpLink
+        .filter { it.domain == "sensor" && it.translationKey == "current_consumption" && it.deviceId != null }
+        .associateBy { it.deviceId }
+    return PlugRegistry(
+        plugs = plugs.map { it.entityId }.toSet(),
+        watts = plugs.mapNotNull { plug -> sensors[plug.deviceId]?.let { plug.entityId to it.entityId } }.toMap(),
+    )
+}
 
 internal fun powerOf(state: String): PlugPower = when (state) {
     "on" -> PlugPower.ON
@@ -43,20 +73,24 @@ internal fun powerOf(state: String): PlugPower = when (state) {
 private fun wattsOf(sensor: EntityState?): Int? =
     sensor?.state?.toDoubleOrNull()?.takeIf { it in 0.0..100_000.0 }?.roundToInt()
 
-/** One plug. [switch] is what was read for it, and [answered] that Home Assistant has answered for it: no answer is Unknown, a null one Gone. */
+/**
+ * One plug. [switch] is what was read for it. A plug is gone only once the socket is [steady]; before that, missing is
+ * unknown, so a Home Assistant restart never shows it.
+ */
 internal fun stateOf(
     id: String,
     entities: Map<String, EntityState?>,
     problem: HaProblem?,
+    registry: PlugRegistry?,
+    steady: Boolean,
     switch: EntityState? = entities[id],
-    answered: Boolean = id in entities,
 ): PlugState {
     val power = when {
-        problem != null -> PlugPower.UNKNOWN
-        answered && switch == null -> PlugPower.GONE
-        else -> switch?.let { powerOf(it.state) } ?: PlugPower.UNKNOWN
+        problem != null -> PlugPower.NO_LINK
+        switch == null || (registry != null && id !in registry.plugs) -> if (steady) PlugPower.GONE else PlugPower.UNKNOWN
+        else -> powerOf(switch.state)
     }
-    val watts = if (power == PlugPower.ON) wattsOf(entities[wattsIdOf(id)]) else null
+    val watts = if (power == PlugPower.ON) wattsOf(registry?.watts?.get(id)?.let(entities::get)) else null
     return PlugState(id, switch?.friendlyName ?: PlugsWords.A_PLUG, power, watts)
 }
 
@@ -66,43 +100,91 @@ internal fun plugStates(
     linked: Boolean,
     entities: Map<String, EntityState?>,
     problem: HaProblem?,
-): List<PlugState>? = if (linked) ids.map { stateOf(it, entities, problem) } else null
+    registry: PlugRegistry?,
+    steady: Boolean,
+): List<PlugState>? = if (linked) ids.map { stateOf(it, entities, problem, registry, steady) } else null
 
 /** The plugs through Home Assistant (12 §4.1, §6). */
 @Singleton
 class HaPlugSystem internal constructor(
     private val ha: HomeAssistant,
     private val prefs: Flow<PlugPrefs>,
+    private val clock: WallClock,
+    scope: CoroutineScope,
 ) : PlugSystem {
     @Inject
-    constructor(ha: HomeAssistant, settings: PlugSettings) : this(ha, settings.prefs)
+    constructor(ha: HomeAssistant, settings: PlugSettings, clock: WallClock, @ApplicationScope scope: CoroutineScope) :
+        this(ha, settings.prefs, clock, scope)
 
     private val switching = mutableSetOf<String>()
 
     /** A mode's or a PIN setting's write leaves it alone. */
     private val plugIds = prefs.map { it.plugs }.distinctUntilChanged()
 
+    /** The last registry read; a failed read leaves it. */
+    private val registry = MutableStateFlow<PlugRegistry?>(null)
+
+    init {
+        scope.launch {
+            ha.liveSince.filterNotNull().collect {
+                try {
+                    readRegistry()
+                } catch (e: HomeAssistantException) {
+                    Log.w(TAG, "registry failed (${e::class.simpleName})")
+                }
+            }
+        }
+    }
+
+    private suspend fun readRegistry(): PlugRegistry {
+        val entries = ha.registry()
+        val read = plugRegistry(entries)
+        registry.value = read
+        if (Log.isLoggable(CAPTURE_TAG, Log.DEBUG)) {
+            Log.d(CAPTURE_TAG, "registry: ${read.plugs.size} plugs, ${read.watts.size} with watts, ${entries.size} entries")
+        }
+        return read
+    }
+
+    /** True once the open socket has been live for [GONE_AFTER_MS]. */
+    private val steady: Flow<Boolean> = ha.liveSince.flatMapLatest { since ->
+        flow {
+            val wait = since?.let { it + GONE_AFTER_MS - clock.nowMillis() }
+            emit(wait != null && wait <= 0)
+            if (wait != null && wait > 0) {
+                delay(wait)
+                emit(true)
+            }
+        }
+    }.distinctUntilChanged()
+
+    private class Sources(val entities: Map<String, EntityState?>, val problem: HaProblem?, val registry: PlugRegistry?, val steady: Boolean)
+
     override val plugs: Flow<List<PlugState>?> =
-        combine(plugIds, ha.link, ha.entities, ha.problem) { ids, link, entities, problem -> plugStates(ids, link != null, entities, problem) }
-            .distinctUntilChanged()
+        combine(plugIds, ha.link, combine(ha.entities, ha.problem, registry, steady, ::Sources)) { ids, link, s ->
+            plugStates(ids, link != null, s.entities, s.problem, s.registry, s.steady)
+        }.distinctUntilChanged()
 
     override val problem: Flow<String?> = ha.problem.map { it?.let(::problemLine) }.distinctUntilChanged()
 
-    override fun watch(): () -> Unit = ha.watch(plugIds.map { ids -> ids.flatMap { listOf(it, wattsIdOf(it)) }.toSet() })
+    override fun watch(): () -> Unit = ha.watch(
+        combine(plugIds, registry) { ids, registry -> ids.flatMap { listOfNotNull(it, registry?.watts?.get(it)) }.toSet() },
+    )
 
-    override suspend fun candidates(): PlugCandidates = try {
+    override suspend fun available(): PlugCandidates = try {
+        val plugs = readRegistry().plugs
         PlugCandidates.Found(
-            ha.states().filter { it.domain == "switch" }.map { PlugCandidate(it.entityId, it.friendlyName ?: it.entityId) },
+            ha.states().filter { it.entityId in plugs }.map { PlugCandidate(it.entityId, it.friendlyName ?: it.entityId) }.sortedBy { it.name },
         )
     } catch (e: HomeAssistantException) {
-        Log.w(TAG, "candidates failed (${e::class.simpleName})")
-        PlugCandidates.Failed(problemLine(e.problem))
+        Log.w(TAG, "available failed (${e::class.simpleName})")
+        PlugCandidates.Failed(if (e.problem == HaProblem.REFUSED) CANT_LIST else problemLine(e.problem))
     }
 
     override suspend fun read(entityId: String): PlugState {
         val unreachable = PlugState(entityId, ha.entities.value[entityId]?.friendlyName ?: PlugsWords.A_PLUG, PlugPower.UNREACHABLE, null)
         return try {
-            stateOf(entityId, ha.entities.value, null, switch = ha.current(entityId), answered = true)
+            stateOf(entityId, ha.entities.value, null, registry.value, steady = true, switch = ha.current(entityId))
         } catch (_: HomeAssistantException) {
             unreachable
         } catch (e: TimeoutCancellationException) {
