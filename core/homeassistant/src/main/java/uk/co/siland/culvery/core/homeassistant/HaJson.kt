@@ -195,13 +195,15 @@ internal object HaJson {
         return Redactor(keep, blanked).value(element, key = null, domain = null, id = null)?.toString() ?: EMPTY
     }
 
+    private fun entityIdOf(element: JsonObject): String? = (element["entity_id"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+
     private val BLANKED_CLASSES = setOf("power", "energy")
 
     /** Adds to [blanked] every entity under [element] that says it is a power or energy sensor. */
     private fun learn(element: JsonElement, id: String?, blanked: MutableSet<String>) {
         when (element) {
             is JsonObject -> {
-                val own = (element["entity_id"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: id
+                val own = entityIdOf(element) ?: id
                 val reading = (element["device_class"] as? JsonPrimitive)?.takeIf { it.isString }?.content in BLANKED_CLASSES
                 if (reading && own != null) blanked += own
                 element.forEach { (name, child) -> learn(child, if ('.' in name) name else own, blanked) }
@@ -233,7 +235,7 @@ internal object HaJson {
         }
 
         private fun obj(element: JsonObject, domain: String?, id: String?): JsonElement? {
-            val own = (element["entity_id"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+            val own = entityIdOf(element)
             if (own != null && own !in alias) return null
             val here = own?.substringBefore('.') ?: domain
             val entity = own ?: id

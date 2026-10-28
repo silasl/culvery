@@ -56,7 +56,7 @@ class PlugRowTest {
     ) = compose.setContent {
         CulveryTheme(dark = true) {
             Box(Modifier.width(width.dp)) {
-                PlugRow(plug, needsPin, switching, modes, choices, editing, onSwitch = { calls += "switch" }, onChoose = { m, c -> calls += "$m $c" })
+                PlugRow(plug, needsPin, switching, modes, { choices[it] ?: ModeChoice.IGNORE }, editing, onSwitch = { calls += "switch" }, onChoose = { m, c -> calls += "$m $c" })
             }
         }
     }
@@ -98,6 +98,7 @@ class PlugRowTest {
         show(LAMP_ON)
         button().performClick()
         assertThat(calls).containsExactly("switch")
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if any of these shows a button or a lock, or reads or says anything but the spec's words. */
@@ -113,7 +114,7 @@ class PlugRowTest {
             ),
         )
         var shown by mutableStateOf(PlugState(FAN, "Fan", PlugPower.UNKNOWN, null))
-        compose.setContent { CulveryTheme(dark = true) { PlugRow(shown, true, false, emptyList(), emptyMap(), false, {}, { _, _ -> }) } }
+        compose.setContent { CulveryTheme(dark = true) { PlugRow(shown, true, false, emptyList(), { ModeChoice.IGNORE }, false, {}, { _, _ -> }) } }
         for ((power, line, spoken) in cases) {
             shown = PlugState(FAN, "Fan", power, null)
             compose.waitForIdle()
@@ -122,6 +123,7 @@ class PlugRowTest {
             compose.onAllNodesWithTag("plug_${FAN}_switch").assertCountEquals(0)
             compose.onAllNodesWithTag("plug_${FAN}_lock", useUnmergedTree = true).assertCountEquals(0)
         }
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if a name that needs two lines is cut to one, ellipsised, or shortened. */
@@ -133,6 +135,7 @@ class PlugRowTest {
         val layout = textLayout()
         assertThat(layout.lineCount).isEqualTo(2)
         assertThat(layout.isLineEllipsized(1)).isFalse()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if a short name is ellipsised or takes two lines. */
@@ -142,6 +145,7 @@ class PlugRowTest {
         val layout = textLayout()
         assertThat(layout.lineCount).isEqualTo(1)
         assertThat(layout.isLineEllipsized(0)).isFalse()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     private fun textLayout(): TextLayoutResult {
@@ -157,6 +161,7 @@ class PlugRowTest {
         compose.onNodeWithTag("plug_${LAMP}_lock", useUnmergedTree = true).assertIsDisplayed()
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ContentDescription))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Text))
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if the lock shows for a plug with no PIN setting. */
@@ -164,6 +169,7 @@ class PlugRowTest {
     fun noPinNoPadlock() {
         show(LAMP_ON)
         compose.onAllNodesWithTag("plug_${LAMP}_lock", useUnmergedTree = true).assertCountEquals(0)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if "Switching…" doesn't show while the switch is out, or a tap during it reaches the switch. */
@@ -172,6 +178,7 @@ class PlugRowTest {
         show(LAMP_ON, switching = true)
         button().assertContentDescriptionEquals("Switching…").performClick()
         assertThat(calls).isEmpty()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if a cell at rest has anything to tap, or doesn't show and speak the plug's word for the mode. */
@@ -183,6 +190,7 @@ class PlugRowTest {
         compose.onAllNodesWithTag("mode_${HOLIDAY}_$LAMP", useUnmergedTree = true).fetchSemanticsNodes().single().let {
             assertThat(it.config.contains(SemanticsActions.OnClick)).isFalse()
         }
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if a mode with no choice yet doesn't read Ignore. */
@@ -190,6 +198,7 @@ class PlugRowTest {
     fun noChoiceReadsIgnore() {
         show(LAMP_OFF)
         compose.onNodeWithTag("mode_${HOLIDAY}_$LAMP", useUnmergedTree = true).assertTextEquals("Ignore").assertContentDescriptionEquals("Holiday mode, ignore")
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if Edit doesn't offer three radio chips with the chosen one selected, spoken as the row, or a tap doesn't report the choice. */

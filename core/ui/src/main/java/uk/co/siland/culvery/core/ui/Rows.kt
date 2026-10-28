@@ -61,11 +61,10 @@ fun HhSwitchRow(
             .fillMaxWidth()
             .listRowCard(c, minHeight)
             .testTag(tag)
-            .hhToggleable(checked, enabled, onValueChange = onChange)
-            .semantics { spokenName?.let { contentDescription = it } }
+            .hhToggleable(checked, enabled, spoken = spokenName, onValueChange = onChange)
             .padding(start = ListRowTokens.paddingStart, end = ListRowTokens.paddingEnd, top = ListRowTokens.paddingV, bottom = ListRowTokens.paddingV),
     ) {
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).then(if (spokenName != null) Modifier.shownNotSpoken() else Modifier)) {
             Text(title, style = ListRowTokens.titleStyle, color = c.ink)
             if (line != null) Text(line, style = HhType.secondary, color = c.mute)
         }

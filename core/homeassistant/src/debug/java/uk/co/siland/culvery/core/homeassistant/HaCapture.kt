@@ -11,13 +11,14 @@ internal object HaCapture {
     private const val TAG = "HaCapture"
     private const val PIECE = 3_000
 
-    /** The power and energy sensors seen so far, whose readings stay blank; forgotten when [keep] changes (12 §6). */
+    /** The power and energy sensors seen so far, whose readings stay blank; forgotten when dropped from [keep] (12 §6). */
     private val blanked: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     /** The entity ids the capture may show, set to the ones currently watched. */
     @Volatile
     var keep: Set<String> = emptySet()
         set(value) {
+            if (value == field) return
             blanked.retainAll(value)
             field = value
         }

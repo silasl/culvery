@@ -6,7 +6,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,18 +57,17 @@ fun PlugsSettings(ui: PlugsSettingsUi, onShow: (String, Boolean) -> Unit, onNeed
     }
 }
 
-/** Settings' Plugs block over [system]; reads Home Assistant's plugs as the section appears and after each Show change; the page lists them against the stored choices. */
+/** Settings' Plugs block over [system]; reads Home Assistant's plugs as the section appears; the page lists them against the stored choices. */
 @Composable
 fun PlugsSettingsHost(system: PlugSystem, actions: PlugActions, settings: PlugSettings) {
     val prefs by remember(settings) { settings.prefs }.collectAsStateWithLifecycle(PlugPrefs())
     var found by remember { mutableStateOf<PlugCandidates?>(null) }
-    var reads by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(system, reads) { found = system.available() }
+    LaunchedEffect(system) { found = system.available() }
 
     PlugsSettings(
         found?.let { plugsSettingsUi(it, prefs) } ?: PlugsSettingsUi(emptyList(), null),
-        onShow = { id, on -> scope.launch { actions.show(id, on); reads++ } },
+        onShow = { id, on -> scope.launch { actions.show(id, on) } },
         onNeedsPin = { id, on -> scope.launch { actions.setNeedsPin(id, on) } },
     )
 }

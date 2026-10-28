@@ -38,18 +38,22 @@ fun Modifier.hhClickable(
         },
     )
 
-/** A toggle that, disabled, keeps its role and state but offers TalkBack no action (a disabled [toggleable] still does). */
+/** A toggle that, disabled, keeps its role and state but offers TalkBack no action (a disabled [toggleable] still does). [spoken] is as for [hhClickable]. */
 fun Modifier.hhToggleable(
     value: Boolean,
     enabled: Boolean = true,
     role: Role = Role.Switch,
+    spoken: String? = null,
     onValueChange: (Boolean) -> Unit,
-): Modifier = if (enabled) {
-    toggleable(value = value, role = role, onValueChange = onValueChange)
-} else {
-    semantics(mergeDescendants = true) {
-        this.role = role
-        toggleableState = ToggleableState(value)
-        disabled()
-    }
-}
+): Modifier = then(if (spoken != null) Modifier.semantics { contentDescription = spoken } else Modifier)
+    .then(
+        if (enabled) {
+            Modifier.toggleable(value = value, role = role, onValueChange = onValueChange)
+        } else {
+            Modifier.semantics(mergeDescendants = true) {
+                this.role = role
+                toggleableState = ToggleableState(value)
+                disabled()
+            }
+        },
+    )

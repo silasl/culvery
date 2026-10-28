@@ -32,9 +32,9 @@ object PlugsWords {
         return if (known.isEmpty()) HOME_ASSISTANT else "${known.count { it.power == PlugPower.ON }} of ${known.size} on · $HOME_ASSISTANT"
     }
 
-    fun showSpoken(name: String) = "$name, show on the Plugs tab"
+    fun showSpoken(name: String) = "$name, ${SHOW_ON_TAB.replaceFirstChar(Char::lowercase)}"
 
-    fun needsPinSpoken(name: String) = "$name, needs a PIN to switch"
+    fun needsPinSpoken(name: String) = "$name, ${NEEDS_A_PIN.replaceFirstChar(Char::lowercase)}"
 
     fun plugStatus(state: PlugState) = when (state.power) {
         PlugPower.ON -> state.watts?.let { "$ON · $it W" } ?: ON
@@ -64,15 +64,15 @@ object PlugsWords {
         return if (needsPin) "$action, needs a PIN" else action
     }
 
-    private fun spokenWord(choice: ModeChoice) = when (choice) {
-        ModeChoice.IGNORE -> "ignore"
-        ModeChoice.ON -> "on"
-        ModeChoice.OFF -> "off"
+    fun word(choice: ModeChoice) = when (choice) {
+        ModeChoice.IGNORE -> IGNORE
+        ModeChoice.ON -> ON
+        ModeChoice.OFF -> OFF
     }
 
-    fun modeRowSpoken(mode: String, name: String, choice: ModeChoice) = "$mode, $name, ${spokenWord(choice)}"
+    fun modeRowSpoken(mode: String, name: String, choice: ModeChoice) = "$mode, $name, ${word(choice).lowercase()}"
 
-    fun modeCellSpoken(mode: String, choice: ModeChoice) = "$mode, ${spokenWord(choice)}"
+    fun modeCellSpoken(mode: String, choice: ModeChoice) = "$mode, ${word(choice).lowercase()}"
 
     fun cantReach(name: String) = "Can’t reach $name. Check it’s plugged in and the Tapo app can see it."
 

@@ -91,6 +91,7 @@ class PlugsTabTest {
         show(plugs = listOf(FAIRY_LOST, PlugState(DESK, "Desk", PlugPower.UNKNOWN, null)))
         compose.onNodeWithText("Home Assistant").assertIsDisplayed()
         compose.onAllNodesWithText("of", substring = true).assertCountEquals(0)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if a link problem doesn't show under the header. */
@@ -100,6 +101,7 @@ class PlugsTabTest {
         compose.onNodeWithTag("plugs_line").assertTextEquals("Home Assistant can’t be reached.")
         assertThat(compose.onNodeWithTag("plugs_line").fetchSemanticsNode().boundsInRoot.top)
             .isAtLeast(compose.onNodeWithText("Plugs").fetchSemanticsNode().boundsInRoot.bottom)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if no problem still draws a line. */
@@ -107,6 +109,7 @@ class PlugsTabTest {
     fun noProblemNoLine() {
         show()
         compose.onAllNodesWithTag("plugs_line").assertCountEquals(0)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if the rows aren't in the order given, each mode has no column heading, or a heading isn't over its cells. */
@@ -125,6 +128,7 @@ class PlugsTabTest {
         }
         assertThat(compose.onNodeWithTag("mode_heading_holiday").fetchSemanticsNode().boundsInRoot.left)
             .isLessThan(compose.onNodeWithTag("mode_heading_party").fetchSemanticsNode().boundsInRoot.left)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if a tab with no plug at all draws an empty state, an Add button or a mode heading. */
@@ -142,6 +146,7 @@ class PlugsTabTest {
         show()
         compose.onNodeWithTag("plug_${FAN}_switch").performClick()
         assertThat(switched).containsExactly("Fan")
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** What [PlugsTabHost] takes, over a fake system holding [states]. */
@@ -199,6 +204,7 @@ class PlugsTabTest {
         gate.complete(Unit)
         compose.waitFor { switchButton().fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() != "Switching…" }
         assertThat(host.rig.system.switches).containsExactly(FAN to true)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if a Child's PIN switches a plug that needs one. */
@@ -212,6 +218,7 @@ class PlugsTabTest {
         host.idle()
         assertThat(host.rig.system.switches).isEmpty()
         switchButton().assertContentDescriptionEquals("Switch on, needs a PIN")
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if Edit shows its chips without the manage grant being asked for, or a Child gets them. */
@@ -234,6 +241,7 @@ class PlugsTabTest {
         assertThat(host.access.asked).containsExactly(listOf("plugs.manage"))
         assertThat(host.chips()).isFalse()
         compose.onNodeWithTag("plugs_edit").assertTextEquals("Edit")
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if a chip tap doesn't save that mode's choice for that plug. */
@@ -243,6 +251,7 @@ class PlugsTabTest {
         host.edit()
         compose.onNodeWithTag("mode_holiday_${LAMP}_off").performClick()
         compose.waitFor { host.prefs().choice("holiday", LAMP) == ModeChoice.OFF }
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Edit's timer starts when the chips show: one tick before 2 minutes they stay, at 2 minutes they go. */
@@ -264,6 +273,7 @@ class PlugsTabTest {
         assertThat(host.chips()).isTrue()
         host.edit()
         assertThat(host.chips()).isFalse()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if a change doesn't start the 2 minutes again. */
@@ -281,6 +291,7 @@ class PlugsTabTest {
         compose.mainClock.advanceTimeByFrame()
         assertThat(host.chips()).isFalse()
         compose.mainClock.autoAdvance = true
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if Edit is still on when the tab is shown again. */
@@ -294,6 +305,7 @@ class PlugsTabTest {
         host.tabShown = true
         host.idle()
         assertThat(host.chips()).isFalse()
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if the system is watched while the tab isn't composed, or not while it is. */
@@ -305,6 +317,7 @@ class PlugsTabTest {
         host.tabShown = false
         host.idle()
         assertThat(host.rig.system.watchers).isEqualTo(0)
+        compose.assertClickablesHaveRoleAndLabel()
     }
 
     /** Fails if the system's own problem line isn't shown under the header. */
@@ -314,5 +327,6 @@ class PlugsTabTest {
         host.rig.system.problem.value = "Home Assistant can’t be reached."
         compose.waitFor { count("plugs_line") > 0 }
         compose.onNodeWithTag("plugs_line").assertTextEquals("Home Assistant can’t be reached.")
+        compose.assertClickablesHaveRoleAndLabel()
     }
 }

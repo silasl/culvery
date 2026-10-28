@@ -1,5 +1,6 @@
 package uk.co.siland.culvery.provider.plugs_homeassistant
 
+import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,20 +18,19 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLog
-import android.util.Log
 import uk.co.siland.culvery.capability.plugs.PlugCandidates
 import uk.co.siland.culvery.capability.plugs.PlugPower
 import uk.co.siland.culvery.capability.plugs.PlugPrefs
 import uk.co.siland.culvery.capability.plugs.PlugResult
-import uk.co.siland.culvery.capability.plugs.isOn
 import uk.co.siland.culvery.capability.plugs.PlugsWords
+import uk.co.siland.culvery.capability.plugs.isOn
 import uk.co.siland.culvery.core.homeassistant.EntityState
 import uk.co.siland.culvery.core.homeassistant.HaProblem
 import uk.co.siland.culvery.core.homeassistant.HomeAssistant
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.HomeAssistantLink
-import uk.co.siland.culvery.core.homeassistant.RegistryEntry
 import uk.co.siland.culvery.core.homeassistant.NOT_LINKED
+import uk.co.siland.culvery.core.homeassistant.RegistryEntry
 import uk.co.siland.culvery.core.homeassistant.problemLine
 import uk.co.siland.culvery.core.homeassistant.test.FakeHomeAssistantApi
 import uk.co.siland.culvery.core.homeassistant.test.TEST_LINK
@@ -256,7 +256,7 @@ class HaPlugSystemTest {
 
     /** Fails if a collecting screen isn't told when the 2 minutes pass. */
     @Test
-    fun theRowTurnsGoneWhenTheTwoMinutesPassUnwatched() = runTest {
+    fun theRowTurnsGoneWhenTheTwoMinutesPassQuietly() = runTest {
         seed(fan())
         api.registry = fixtureRegistry()
         prefs.value = PlugPrefs(plugs = listOf("switch.lamp"))
@@ -328,7 +328,7 @@ class HaPlugSystemTest {
     fun availableFailuresSayWhy() = runTest {
         val system = system()
         api.registryProblem = HaProblem.REFUSED
-        assertThat(system.available()).isEqualTo(PlugCandidates.Failed("Can’t list the plugs. Check Home Assistant is up to date."))
+        assertThat(system.available()).isEqualTo(PlugCandidates.Failed(PlugsWords.CANT_LIST_PLUGS))
         api.registryProblem = null
         api.failNext = HaProblem.UNREACHABLE
         assertThat(system.available()).isEqualTo(PlugCandidates.Failed(unreachable))

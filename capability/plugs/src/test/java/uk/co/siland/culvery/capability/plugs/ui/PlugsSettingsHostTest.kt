@@ -153,6 +153,7 @@ class PlugsSettingsHostTest {
         compose.waitFor { count("plugs_show_0") == 1 }
         compose.onNodeWithTag("plugs_show_0")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Lamp, show on the Plugs tab")))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Text))
         compose.onNodeWithTag("plugs_pin_0")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Lamp, needs a PIN to switch")))
         compose.assertClickablesHaveRoleAndLabel()

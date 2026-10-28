@@ -38,16 +38,10 @@ import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
-private fun word(choice: ModeChoice) = when (choice) {
-    ModeChoice.IGNORE -> PlugsWords.IGNORE
-    ModeChoice.ON -> PlugsWords.ON
-    ModeChoice.OFF -> PlugsWords.OFF
-}
-
 /**
  * One plug (12 §4.3): its name over its state, the lock when it needs a PIN and the button that switches it (only for
  * a plug that is On or Off; it reads "Switching…" while a switch is out, when taps are ignored), then a cell per mode in
- * [modes] holding that mode's word from [choices] (Ignore when missing), which Edit turns into Ignore, On and Off chips.
+ * [modes] holding that mode's word from [choiceFor], which Edit turns into Ignore, On and Off chips.
  * An on plug's row has the accent fill.
  */
 @Composable
@@ -56,7 +50,7 @@ internal fun PlugRow(
     needsPin: Boolean,
     switching: Boolean,
     modes: List<HouseModeInfo>,
-    choices: Map<String, ModeChoice>,
+    choiceFor: (modeId: String) -> ModeChoice,
     editing: Boolean,
     onSwitch: () -> Unit,
     onChoose: (modeId: String, ModeChoice) -> Unit,
@@ -103,7 +97,7 @@ internal fun PlugRow(
                 }
             }
             modes.forEach { mode ->
-                key(mode.id) { ModeCell(mode, state, choices[mode.id] ?: ModeChoice.IGNORE, editing, "mode_${mode.id}_${state.entityId}", onChoose) }
+                key(mode.id) { ModeCell(mode, state.name, choiceFor(mode.id), editing, "mode_${mode.id}_${state.entityId}", onChoose) }
             }
         }
     }
@@ -113,7 +107,7 @@ internal fun PlugRow(
 @Composable
 private fun ModeCell(
     mode: HouseModeInfo,
-    state: PlugState,
+    plugName: String,
     chosen: ModeChoice,
     editing: Boolean,
     tag: String,
@@ -125,15 +119,15 @@ private fun ModeCell(
             Row(horizontalArrangement = Arrangement.spacedBy(PlugsDimens.chipGap), modifier = Modifier.selectableGroup()) {
                 ModeChoice.entries.forEach { choice ->
                     HhChoiceChip(
-                        word(choice), selected = choice == chosen, tag = "${tag}_${choice.name.lowercase()}",
+                        PlugsWords.word(choice), selected = choice == chosen, tag = "${tag}_${choice.name.lowercase()}",
                         onClick = { onChoose(mode.id, choice) }, role = Role.RadioButton,
-                        spokenName = PlugsWords.modeRowSpoken(mode.name, state.name, choice), unselectedFill = c.surf2,
+                        spokenName = PlugsWords.modeRowSpoken(mode.name, plugName, choice), unselectedFill = c.surf2,
                     )
                 }
             }
         } else {
             Text(
-                word(chosen), style = HhType.body, color = c.mute, maxLines = 1, textAlign = TextAlign.Center,
+                PlugsWords.word(chosen), style = HhType.body, color = c.mute, maxLines = 1, textAlign = TextAlign.Center,
                 modifier = Modifier.testTag(tag).semantics { contentDescription = PlugsWords.modeCellSpoken(mode.name, chosen) },
             )
         }

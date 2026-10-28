@@ -6,6 +6,8 @@ import javax.inject.Singleton
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -45,7 +48,6 @@ private const val TAG = "HaPlugSystem"
 const val GONE_AFTER_MS = 120_000L
 
 private const val CAPTURE_TAG = "HaCapture"
-private const val CANT_LIST = "Can’t list the plugs. Check Home Assistant is up to date."
 
 /** The plugs, and for each the id of its watts sensor (12 §4.1). */
 internal data class PlugRegistry(val plugs: Set<String>, val watts: Map<String, String>)
@@ -148,11 +150,15 @@ class HaPlugSystem internal constructor(
 
     /** True once the open socket has been live for [GONE_AFTER_MS]. */
     private val steady: Flow<Boolean> = ha.liveSince.flatMapLatest { since ->
-        flow {
-            val wait = since?.let { it + GONE_AFTER_MS - clock.nowMillis() }
-            emit(wait != null && wait <= 0)
-            if (wait != null && wait > 0) {
-                delay(wait)
+        if (since == null) {
+            flowOf(false)
+        } else {
+            flow {
+                val wait = since + GONE_AFTER_MS - clock.nowMillis()
+                if (wait > 0) {
+                    emit(false)
+                    delay(wait)
+                }
                 emit(true)
             }
         }
@@ -172,13 +178,17 @@ class HaPlugSystem internal constructor(
     )
 
     override suspend fun available(): PlugCandidates = try {
-        val plugs = readRegistry().plugs
-        PlugCandidates.Found(
-            ha.states().filter { it.entityId in plugs }.map { PlugCandidate(it.entityId, it.friendlyName ?: it.entityId) }.sortedBy { it.name },
-        )
+        coroutineScope {
+            val registry = async { readRegistry().plugs }
+            val states = async { ha.states() }
+            val plugs = registry.await()
+            PlugCandidates.Found(
+                states.await().filter { it.entityId in plugs }.map { PlugCandidate(it.entityId, it.friendlyName ?: it.entityId) }.sortedBy { it.name },
+            )
+        }
     } catch (e: HomeAssistantException) {
         Log.w(TAG, "available failed (${e::class.simpleName})")
-        PlugCandidates.Failed(if (e.problem == HaProblem.REFUSED) CANT_LIST else problemLine(e.problem))
+        PlugCandidates.Failed(if (e.problem == HaProblem.REFUSED) PlugsWords.CANT_LIST_PLUGS else problemLine(e.problem))
     }
 
     override suspend fun read(entityId: String): PlugState {
