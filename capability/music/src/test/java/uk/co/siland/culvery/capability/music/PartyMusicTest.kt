@@ -21,16 +21,16 @@ class PartyMusicTest {
         assertThat(partyCoordinator(layout, setOf("Gone-id"))).isNull()
     }
 
-    /** Fails if a changed room count or leader, or an absent group, still counts as Party's. */
+    /** Fails if a changed room count or leader, or another group, still counts as Party's. */
     @Test
     fun stillPartyNeedsTheSameRoomsAndLeader() {
         val made = PartyGroup("Kitchen-id", all)
         val same = group("Kitchen-id", "Kitchen", "Lounge", "Dining")
-        assertThat(stillParty(listOf(same), made)).isTrue()
-        assertThat(stillParty(listOf(group("Kitchen-id", "Kitchen", "Lounge")), made)).isFalse()
-        assertThat(stillParty(listOf(group("Kitchen-id", "Kitchen", "Lounge", "Dining", "Study")), made)).isFalse()
-        assertThat(stillParty(listOf(group("Lounge-id", "Lounge", "Kitchen", "Dining")), made)).isFalse()
-        assertThat(stillParty(listOf(kitchen, lounge), made)).isFalse()
-        assertThat(stillParty(emptyList(), made)).isFalse()
+        assertThat(stillParty(same, made)).isTrue()
+        assertThat(stillParty(group("Kitchen-id", "Kitchen", "Lounge"), made)).isFalse()
+        assertThat(stillParty(group("Kitchen-id", "Kitchen", "Lounge", "Dining", "Study"), made)).isFalse()
+        assertThat(stillParty(group("Lounge-id", "Lounge", "Kitchen", "Dining"), made)).isFalse()
+        assertThat(stillParty(kitchen, made)).isFalse()
+        assertThat(stillParty(lounge, made)).isFalse()
     }
 }

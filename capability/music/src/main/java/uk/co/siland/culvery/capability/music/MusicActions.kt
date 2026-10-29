@@ -55,7 +55,7 @@ class MusicActions internal constructor(private val system: () -> MusicSystem?, 
         val s = system() ?: return FavouritesLoad.Failed(CANT_REACH_SONOS)
         return attempt({ FavouritesLoad.Ready(s.favourites(), s.playlists()) }) { e ->
             logFailure(MusicCommand.FAVOURITES, e)
-            FavouritesLoad.Failed(sheetLine(e, SONOS_REFUSED))
+            FavouritesLoad.Failed(failureLine(e, SONOS_REFUSED))
         }
     }
 
@@ -67,7 +67,7 @@ class MusicActions internal constructor(private val system: () -> MusicSystem?, 
             null
         }) { e ->
             logFailure(MusicCommand.FAVOURITE, e)
-            sheetLine(e, CANT_PLAY_HERE)
+            failureLine(e, CANT_PLAY_HERE)
         }
     }
 
@@ -86,12 +86,6 @@ class MusicActions internal constructor(private val system: () -> MusicSystem?, 
         is MusicRefusedException -> SONOS_REFUSED
         is NoLibraryException -> NO_LIBRARY
         else -> null
-    }
-
-    private fun sheetLine(e: Exception, refused: String): String = when (e) {
-        is MusicUnreachableException -> problemLine(e.problem)
-        is MusicRefusedException -> refused
-        else -> CANT_REACH_SONOS
     }
 
     private fun logFailure(command: MusicCommand, e: Exception) {

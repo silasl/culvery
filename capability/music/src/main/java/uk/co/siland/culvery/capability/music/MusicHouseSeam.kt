@@ -38,15 +38,13 @@ class MusicHouseSeam internal constructor(
             MusicOptions(picks, rooms, null)
         }) { e ->
             logFailure(Step.OPTIONS, e)
-            MusicOptions(emptyList(), emptyList(), optionsLine(e))
+            MusicOptions(emptyList(), emptyList(), failureLine(e, SONOS_REFUSED))
         }
     }
 
     override suspend fun before(): List<GroupBefore> {
         val s = system() ?: throw MusicUnreachableException(MusicProblem.UNREACHABLE)
-        try {
-            s.checkLayout()
-        } catch (e: Exception) {
+        attempt({ s.checkLayout() }) { e ->
             logFailure(Step.BEFORE, e)
             throw e
         }
@@ -59,16 +57,8 @@ class MusicHouseSeam internal constructor(
             logFailure(Step.GROUP, e)
             null
         } ?: return failedStart()
-        val made = attempt({ s.group(prepared.coordinator, prepared.chosen) }) { e ->
-            logFailure(Step.GROUP, e)
-            regroup(s, before)
-            return failedStart()
-        }
-        attempt({ s.playFavourite(made, prepared.pick) }) { e ->
-            logFailure(Step.PLAY, e)
-            regroup(s, before)
-            return failedStart()
-        }
+        val made = attempt({ s.group(prepared.coordinator, prepared.chosen) }) { e -> return giveUp(s, Step.GROUP, e, before) }
+        attempt({ s.playFavourite(made, prepared.pick) }) { e -> return giveUp(s, Step.PLAY, e, before) }
         val joined = made.rooms.map { it.id }.toSet()
         val step = if (joined == prepared.chosen) HouseStep.Done else HouseStep.Failed(HouseLines.MUSIC_DIDNT_START)
         return MusicStart(PartyGroup(made.coordinatorId, joined), step)
@@ -83,7 +73,7 @@ class MusicHouseSeam internal constructor(
             logFailure(Step.CHECK, e)
             return HouseStep.Failed(HouseLines.MUSIC_DIDNT_STOP)
         }
-        val ours = playing.firstOrNull { stillParty(listOf(it), made) }
+        val ours = playing.firstOrNull { stillParty(it, made) }
         if (ours == null) {
             Log.i(TAG, "Party music: left as changed by hand")
             return HouseStep.Done
@@ -123,10 +113,11 @@ class MusicHouseSeam internal constructor(
 
     private fun failedStart() = MusicStart(null, HouseStep.Failed(HouseLines.MUSIC_DIDNT_START))
 
-    private fun optionsLine(e: Exception): String = when (e) {
-        is MusicUnreachableException -> problemLine(e.problem)
-        is MusicRefusedException -> SONOS_REFUSED
-        else -> CANT_REACH_SONOS
+    /** A grouping or play that failed puts [before] back, and the music didn't start. */
+    private suspend fun giveUp(s: MusicSystem, step: Step, e: Exception, before: List<GroupBefore>): MusicStart {
+        logFailure(step, e)
+        regroup(s, before)
+        return failedStart()
     }
 
     private fun logFailure(step: Step, e: Exception) {

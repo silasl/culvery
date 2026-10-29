@@ -18,6 +18,13 @@ fun problemLine(problem: MusicProblem): String = when (problem) {
     MusicProblem.OTHER_HOUSEHOLD -> OTHER_SONOS
 }
 
+/** The line for a sheet or Settings read that failed with [e]; [refused] when Sonos refused it. */
+internal fun failureLine(e: Exception, refused: String): String = when (e) {
+    is MusicUnreachableException -> problemLine(e.problem)
+    is MusicRefusedException -> refused
+    else -> CANT_REACH_SONOS
+}
+
 /** The tab's subtitle: "4 rooms · 1 group · Sonos", "1 room · Sonos"; groups of one room aren't counted (9 §4.5). */
 fun musicSummary(groups: List<SpeakerGroup>): String {
     val rooms = groups.sumOf { it.rooms.size }

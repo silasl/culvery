@@ -12,6 +12,6 @@ internal fun partyCoordinator(groups: List<SpeakerGroup>, chosen: Set<String>): 
         ?.coordinatorId
         ?: groups.flatMap { it.rooms }.firstOrNull { it.id in chosen }?.id
 
-/** [made] is among [playing] with the same leader and rooms; what it plays doesn't matter (13 §2.11). */
-internal fun stillParty(playing: List<SpeakerGroup>, made: PartyGroup): Boolean =
-    playing.any { g -> g.coordinatorId == made.coordinatorId && g.rooms.map { it.id }.toSet() == made.roomIds }
+/** [group] is [made], with the same leader and rooms; what it plays doesn't matter (13 §2.11). */
+internal fun stillParty(group: SpeakerGroup, made: PartyGroup): Boolean =
+    group.coordinatorId == made.coordinatorId && group.rooms.map { it.id }.toSet() == made.roomIds

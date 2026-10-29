@@ -22,22 +22,14 @@ class LightsParty internal constructor(private val system: () -> LightsSystem?) 
 
     suspend fun options(): LightOptions {
         val s = system() ?: return LightOptions(emptyList(), problemLine(LightsProblem.UNREACHABLE))
-        return attempt({
-            s.readAll()
-            LightOptions(s.rooms.value.map { r -> LightRoomOption(r.id, r.name, r.scenes.map { HouseScene(it.id, it.name) }) }, null)
-        }) { e ->
-            logFailure(Step.OPTIONS, e)
-            LightOptions(emptyList(), failureLine(e))
-        }
+        readAll(s, Step.OPTIONS)?.let { return LightOptions(emptyList(), failureLine(it)) }
+        return LightOptions(s.rooms.value.map { r -> LightRoomOption(r.id, r.name, r.scenes.map { HouseScene(it.id, it.name) }) }, null)
     }
 
     /** Throws when the bridge can't be read. */
     suspend fun before(choices: List<SceneChoice>): List<RoomBefore> {
         val s = system() ?: throw LightsUnreachableException(LightsProblem.UNREACHABLE)
-        attempt({ s.readAll() }) { e ->
-            logFailure(Step.BEFORE, e)
-            throw e
-        }
+        readAll(s, Step.BEFORE)?.let { throw it }
         val rooms = s.rooms.value
         return choices.mapNotNull { c ->
             val room = rooms.firstOrNull { it.id == c.roomId } ?: return@mapNotNull null
@@ -49,15 +41,11 @@ class LightsParty internal constructor(private val system: () -> LightsSystem?) 
     suspend fun on(rooms: List<RoomBefore>): List<String> {
         val s = system() ?: return rooms.map { it.name }
         return rooms.filterNot { before ->
+            val room = s.rooms.value.firstOrNull { it.id == before.roomId } ?: return@filterNot false
+            val scene = room.scenes.firstOrNull { it.id == before.sceneId } ?: return@filterNot false
             attempt({
-                val room = s.rooms.value.firstOrNull { it.id == before.roomId }
-                val scene = room?.scenes?.firstOrNull { it.id == before.sceneId }
-                if (room == null || scene == null) {
-                    false
-                } else {
-                    s.recallScene(room, scene)
-                    true
-                }
+                s.recallScene(room, scene)
+                true
             }) { e ->
                 logFailure(Step.RECALL, e)
                 false
@@ -65,33 +53,38 @@ class LightsParty internal constructor(private val system: () -> LightsSystem?) 
         }.map { it.name }
     }
 
+    /** The rooms whose active scene is still Party's but which didn't go back. */
     suspend fun back(rooms: List<RoomBefore>): List<String> {
         val s = system() ?: return rooms.map { it.name }
-        attempt({ s.readAll() }) { e ->
-            logFailure(Step.BACK, e)
-            return rooms.map { it.name }
-        }
+        readAll(s, Step.BACK)?.let { return rooms.map { it.name } }
         val now = s.rooms.value
         return rooms.filter { before ->
-            val room = now.firstOrNull { it.id == before.roomId }
-            room != null && room.activeSceneId == before.sceneId &&
-                attempt({
-                    putBack(s, room, before)
-                    false
-                }) { e ->
-                    logFailure(Step.BACK, e)
-                    true
-                }
+            val room = now.firstOrNull { it.id == before.roomId && it.activeSceneId == before.sceneId } ?: return@filter false
+            !putBack(s, room, before)
         }.map { it.name }
     }
 
-    private suspend fun putBack(s: LightsSystem, room: LightRoom, before: RoomBefore) {
+    /** Whether [room] went back as [before] had it. */
+    private suspend fun putBack(s: LightsSystem, room: LightRoom, before: RoomBefore): Boolean = attempt({
         val remembered = room.scenes.firstOrNull { it.id == before.activeSceneId }
         when {
             remembered != null -> s.recallScene(room, remembered)
             !before.on -> s.setOn(room, false)
             else -> s.setBrightness(room, max(before.brightness, 1))
         }
+        true
+    }) { e ->
+        logFailure(Step.BACK, e)
+        false
+    }
+
+    /** Reads the bridge afresh: null, or the failure, logged. */
+    private suspend fun readAll(s: LightsSystem, step: Step): Exception? = attempt({
+        s.readAll()
+        null
+    }) { e ->
+        logFailure(step, e)
+        e
     }
 
     private fun failureLine(e: Exception) = if (e is LightsUnreachableException) problemLine(e.problem) else HUE_REFUSED
