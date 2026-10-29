@@ -757,6 +757,12 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
   - the put-back after a restart can't be seen on the samples, which live in memory and reset on a force-stop; unit-tested.
 - **Side effect:** switching the samples on and off clears Lights' main room, left-out rooms and Holiday lights in the emulator's debug data.
 
+## Plan 13 (Party mode): on the tablet (2026-10-29)
+- **Installed:** the release from dd73cc2a (branch plan-13-party-mode) with `-r` (mapping `culvery-notes/mappings/mapping-dd73cc2.txt`). Culvery was opened from the launcher and pinned itself; Android's "App is pinned" notice was dismissed with OK.
+- **Seen:** the One-tap tray shows Holiday mode, then Party mode ("Off"), then the hoover.
+- **Not done yet:** Settings › Party mode against the household's real speakers, rooms and scenes (read-only, with the user); a real party run (only on the user's go), which also checks the speakers' regroup timing and a coordinator that already leads others.
+- **The log scan:** no crash or ANR; the Party, Holiday, music and lights tags wrote nothing (a release logs only warnings and errors).
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
