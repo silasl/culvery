@@ -161,6 +161,9 @@ interface HouseMusic {
 
     /** Pauses [made] and puts [before] back when [made] is still Party's (13 §2.11), else sends nothing. Never throws. */
     suspend fun stop(made: PartyGroup, before: List<GroupBefore>): HouseStep
+
+    /** Puts [before] back without pausing anything, for a restart that finds the snapshot but no group Party made. Never throws. */
+    suspend fun putBack(before: List<GroupBefore>): HouseStep
 }
 
 /** A Hue scene. [toString] leaves out the id and name. */

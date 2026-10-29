@@ -83,6 +83,7 @@ class ModuleBoundariesTest {
     @Test
     fun theMusicModulesFollowTheRules() {
         allowed(":capability:music", ":core:plugin", "api")
+        allowed(":capability:music", ":core:house", "api")
         allowed(":capability:music", ":core:ui")
         allowed(":provider:music-sonos", ":capability:music")
         allowed(":app", ":provider:music-sonos")
