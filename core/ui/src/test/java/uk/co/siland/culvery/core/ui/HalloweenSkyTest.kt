@@ -4,12 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.AccessibilityAction
@@ -33,10 +36,10 @@ import uk.co.siland.culvery.core.ui.test.windowBitmap
 class HalloweenSkyTest {
     @get:Rule val compose = createComposeRule()
 
-    private val size = Size(1000f, 600f)
+    private val band = Rect(100f, 0f, 1100f, 130f)
     private val density = Density(1f)
     private val span = 26f
-    private val cycle = size.width + span
+    private val cycle = band.width + span
 
     /** The write reaches the composition at the next frame, not by itself while the clock is held. */
     private fun set(change: () -> Unit) = compose.runOnIdle {
@@ -44,10 +47,10 @@ class HalloweenSkyTest {
         Snapshot.sendApplyNotifications()
     }
 
-    private fun bats(at: Long) = batPositions(at, size, headerBottomPx = 100f, density = density)
+    private fun bats(at: Long) = batPositions(at, band, density)
 
     @Test
-    fun batsDriftAScreenWidthEveryLap() {
+    fun batsDriftABandWidthEveryLap() {
         val start = bats(0)
         val half = bats(BAT_LAP_MS / 2)
         assertThat(start).hasSize(4)
@@ -59,19 +62,26 @@ class HalloweenSkyTest {
         assertThat(bats(BAT_LAP_MS)).isEqualTo(start)
     }
 
-    /** The first bat reaches the right edge at 78 750 ms; there it comes back in at the left, a bat's width off screen. */
+    /** The first bat reaches the band's right edge at 39 375 ms; there it comes back in at the left, a bat's width outside. */
     @Test
     fun aBatWrapsExactlyAtTheEdge() {
-        assertThat(bats(0)[0].x).isWithin(0.01f).of(0.125f * cycle - span)
-        assertThat(bats(78_749)[0].x).isWithin(0.05f).of(size.width)
-        assertThat(bats(78_750)[0].x).isWithin(0.01f).of(-span)
-        // One pixel of travel takes BAT_LAP_MS / cycle = 87.7 ms.
-        assertThat(bats(78_750 + 88)[0].x).isWithin(0.1f).of(-span + 1f)
+        assertThat(bats(0)[0].x).isWithin(0.01f).of(band.left - span + 0.125f * cycle)
+        assertThat(bats(39_374)[0].x).isWithin(0.05f).of(band.right)
+        assertThat(bats(39_375)[0].x).isWithin(0.01f).of(band.left - span)
+        // One pixel of travel takes BAT_LAP_MS / cycle = 43.9 ms.
+        assertThat(bats(39_375 + 44)[0].x).isWithin(0.1f).of(band.left - span + 1f)
     }
 
     @Test
-    fun theLanesAreTheTopOfHomeAndBelowTheHeader() {
-        assertThat(bats(0).map { it.y }).containsExactly(20f, 140f, 260f, 380f).inOrder()
+    fun theBatsShareTwoLanesInsideTheBand() {
+        assertThat(bats(0).map { it.y }).containsExactly(14f, 84f, 14f, 84f).inOrder()
+    }
+
+    @Test
+    fun aShortBandKeepsTheBatsInside() {
+        val short = Rect(0f, 0f, 500f, 60f)
+        assertThat(batPositions(0, short, density).map { it.y + span / 2 }).isNotEmpty()
+        batPositions(0, short, density).forEach { assertThat(it.y + span / 2).isAtMost(60f) }
     }
 
     @Test
@@ -125,43 +135,61 @@ class HalloweenSkyTest {
         assertThat(elapsed.longValue).isEqualTo(stood)
     }
 
-    @Test
-    fun aStillSkyStillDrawsTheBats() {
-        compose.setContent {
+    private fun showStill(measured: HomeSkyBand?) = compose.setContent {
+        CompositionLocalProvider(LocalHomeSkyBand provides measured) {
             CulveryTheme(dark = true, seasonal = SeasonalTheme.HALLOWEEN) {
                 Box(Modifier.size(300.dp, 300.dp).background(HalloweenNight.bg)) {
                     HalloweenSky(drifting = false, modifier = Modifier.fillMaxSize())
                 }
             }
         }
+    }
+
+    @Test
+    fun aStillSkyStillDrawsTheBatsAndTheMoon() {
+        showStill(null)
         val node = compose.onNodeWithTag("halloween_sky")
         val bounds = node.fetchSemanticsNode().boundsInWindow
         val image = windowBitmap(node)
         val density = Density(compose.density.density)
-        val bat = batPositions(0, Size(bounds.width, bounds.height), 0f, density).first()
+        val all = Rect(Offset.Zero, Size(bounds.width, bounds.height))
+        val bat = batPositions(0, all, density).first()
         val half = SeasonalDimens.batSpan.value * density.density / 2
         val body = image.getPixel((bounds.left + bat.x + half).toInt(), (bounds.top + bat.y + half / 2).toInt())
         assertThat(body).isEqualTo(HalloweenInks.bat(HalloweenNight).toArgb())
+        val moon = moonIn(all, density).centre
+        assertThat(image.getPixel((bounds.left + moon.x).toInt(), (bounds.top + moon.y).toInt()))
+            .isEqualTo(HalloweenInks.moon(HalloweenNight).toArgb())
     }
 
-    /** The weather's top edge is 52 dp down, so a 60 dp moon 4 dp from the top would touch it; nothing is drawn there. */
+    /** With a measured header the moon is drawn, and only inside the open band between the clock and the header items. */
     @Test
-    fun theMoonStaysOutOfTheWeatherBand() {
-        compose.setContent {
-            CulveryTheme(dark = true, seasonal = SeasonalTheme.HALLOWEEN) {
-                Box(Modifier.size(300.dp, 300.dp).background(HalloweenNight.bg)) {
-                    HalloweenSky(drifting = false, modifier = Modifier.fillMaxSize())
-                }
-            }
-        }
-        val node = compose.onNodeWithTag("halloween_sky")
-        val bounds = node.fetchSemanticsNode().boundsInWindow
-        val image = windowBitmap(node)
+    fun theMoonIsDrawnWhollyInsideTheBand() {
         val d = compose.density.density
-        val band = (bounds.top + 4 * d).toInt() until (bounds.top + 64 * d).toInt()
-        val corner = (bounds.right - 114 * d).toInt() until (bounds.right - 54 * d).toInt()
-        val painted = band.filter { y -> corner.any { x -> image.getPixel(x, y) != HalloweenNight.bg.toArgb() } }
-        assertThat(painted).isEmpty()
+        val measured = HomeSkyBand().apply {
+            headerWidth = (300 * d).toInt()
+            headerHeight = (130 * d).toInt()
+            clockWidth = (40 * d).toInt()
+            dateWidth = (60 * d).toInt()
+            itemsWidth = (80 * d).toInt()
+        }
+        showStill(measured)
+        val node = compose.onNodeWithTag("halloween_sky")
+        val origin = node.fetchSemanticsNode().boundsInWindow
+        val image = windowBitmap(node)
+        val drawn = skyBand(measured, Size(origin.width, origin.height), Density(d))
+        val ink = HalloweenInks.moon(HalloweenNight).toArgb()
+        val moon = (0 until image.height).flatMap { y -> (0 until image.width).filter { x -> image.getPixel(x, y) == ink }.map { x -> x to y } }
+        assertThat(moon).isNotEmpty()
+        assertThat(moon.minOf { it.first } - origin.left).isAtLeast(drawn.left - 1f)
+        assertThat(moon.maxOf { it.first } - origin.left).isAtMost(drawn.right + 1f)
+        assertThat(moon.minOf { it.second } - origin.top).isAtLeast(drawn.top - 1f)
+        assertThat(moon.maxOf { it.second } - origin.top).isAtMost(drawn.bottom + 1f)
+        // Left edge: the date's 60 plus the 24 gap; right: 300 - 80 - 24.
+        assertThat(drawn.left).isEqualTo((60 + 24) * d)
+        assertThat(drawn.right).isEqualTo((300 - 80 - 24) * d)
+        val radius = moonIn(drawn, Density(d)).radius
+        assertThat(radius).isEqualTo(30 * d)
     }
 
     @Test

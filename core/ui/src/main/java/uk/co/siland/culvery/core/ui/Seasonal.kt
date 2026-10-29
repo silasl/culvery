@@ -73,20 +73,31 @@ object SeasonalDimens {
     /** A bat's width, wing tip to wing tip; its height is half. */
     val batSpan = 26.dp
 
-    /** The top of the bat that crosses the clock, and the tops of the three below the header, each from the header's bottom. */
-    val batTopLane = 20.dp
-    val batLanesBelowHeader = listOf(40.dp, 160.dp, 280.dp)
+    /** The sky's room is Home's header, from this far right of the clock and date to this far left of the header items. */
+    val skyGap = 24.dp
+
+    /** The moon's size, and how far its edge sits inside the sky's top and right edges. */
+    val moonRadius = 30.dp
+    val moonEnd = 12.dp
+    val moonTop = 8.dp
+
+    /** The tops of the two lanes the bats fly in, from the sky's top. */
+    val batLanes = listOf(14.dp, 84.dp)
 }
 
-/** How long a bat takes to cross Home once. */
-const val BAT_LAP_MS = 90_000L
+/** How long a bat takes to cross the sky and come back in at the left. */
+const val BAT_LAP_MS = 45_000L
 
 /** The sky moves at most this often, about 15 frames a second. */
 const val SKY_FRAME_MS = 66L
 
-/** Where Home's header ends, in pixels from Home's top; Home sets it and the sky reads it when it draws. */
-class HomeHeaderBottom {
-    var px by mutableIntStateOf(0)
+/** What Home's header measures, in pixels; Home sets it and the sky reads it when it draws, so a change redraws only the sky. */
+class HomeSkyBand {
+    var headerWidth by mutableIntStateOf(0)
+    var headerHeight by mutableIntStateOf(0)
+    var clockWidth by mutableIntStateOf(0)
+    var dateWidth by mutableIntStateOf(0)
+    var itemsWidth by mutableIntStateOf(0)
 }
 
-val LocalHomeHeaderBottom = staticCompositionLocalOf<HomeHeaderBottom?> { null }
+val LocalHomeSkyBand = staticCompositionLocalOf<HomeSkyBand?> { null }

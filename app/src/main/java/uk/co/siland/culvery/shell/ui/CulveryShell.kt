@@ -12,8 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import java.time.LocalDateTime
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HomeHeaderBottom
-import uk.co.siland.culvery.core.ui.LocalHomeHeaderBottom
+import uk.co.siland.culvery.core.ui.HomeSkyBand
+import uk.co.siland.culvery.core.ui.LocalHomeSkyBand
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.ShellUiState
 
@@ -42,8 +42,8 @@ internal fun CulveryShell(
             StatusBar(state.dark, state.previewing, state.session, onSignOut, onToggleThemePreview, watching, pillSpot)
             Box(Modifier.weight(1f)) {
                 if (state.selectedTabId == HOME_TAB_ID) {
-                    val headerBottom = remember { HomeHeaderBottom() }
-                    CompositionLocalProvider(LocalHomeHeaderBottom provides headerBottom) {
+                    val band = remember { HomeSkyBand() }
+                    CompositionLocalProvider(LocalHomeSkyBand provides band) {
                         Culvery.look?.sky?.invoke(skyDrifts, Modifier.matchParentSize())
                         HomeScreen(now, state.homeCards, state.headerItems)
                     }

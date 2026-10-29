@@ -28,7 +28,8 @@ import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeLayout
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhType
-import uk.co.siland.culvery.core.ui.LocalHomeHeaderBottom
+import uk.co.siland.culvery.core.ui.HomeSkyBand
+import uk.co.siland.culvery.core.ui.LocalHomeSkyBand
 import uk.co.siland.culvery.core.ui.SlotClock
 import uk.co.siland.culvery.core.ui.lineBox
 import uk.co.siland.culvery.core.ui.readAsOne
@@ -45,9 +46,7 @@ private val HEADER_ITEMS_BOTTOM = 4.dp
 @Composable
 fun HomeScreen(now: () -> LocalDateTime, layout: HomeLayout, headerItems: List<HeaderItem>) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxSize()) {
-        val headerBottom = LocalHomeHeaderBottom.current
-        val measured = if (headerBottom == null) Modifier else Modifier.onSizeChanged { headerBottom.px = it.height }
-        HomeHeader(now, headerItems, Modifier.fillMaxWidth().then(measured))
+        HomeHeader(now, headerItems, Modifier.fillMaxWidth())
         HomeGrid(layout, Modifier.fillMaxWidth().weight(1f))
     }
 }
@@ -57,23 +56,29 @@ fun HomeScreen(now: () -> LocalDateTime, layout: HomeLayout, headerItems: List<H
  * capabilities' items at the right, in the width the clock and date leave less [HEADER_ITEM_GAP], their bottom
  * [HEADER_ITEMS_BOTTOM] above the date's (4b design §4.1, 4d-1 §6.2).
  */
+/** Tells the sky how big a part of the header is, where the theme has a sky to place (14 §4.3). */
+private fun Modifier.measuring(band: HomeSkyBand?, set: HomeSkyBand.(Int, Int) -> Unit): Modifier =
+    if (band == null) this else onSizeChanged { band.set(it.width, it.height) }
+
 @Composable
 fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modifier = Modifier) {
     val c = Culvery.colors
+    val band = LocalHomeSkyBand.current
     // Read clock, date, then the items: the items sit level with the clock, so by position they'd come between.
     Layout(
-        modifier = modifier.readAsOne(),
+        modifier = modifier.readAsOne().measuring(band) { w, h -> headerWidth = w; headerHeight = h },
         content = {
             val time = now().format(CLOCK)
             val clockModifier = Modifier.testTag("home_clock").lineBox(HhType.clock.lineHeight).semantics { traversalIndex = 0f }
+                .measuring(band) { w, _ -> clockWidth = w }
             val face = Culvery.look?.clockFace
             if (face != null) {
                 SlotClock(time, face, c.accent, clockModifier)
             } else {
                 Text(time, style = HhType.clock, color = c.ink, modifier = clockModifier)
             }
-            Text(now().format(DATE), style = HhType.date, color = c.mute, modifier = Modifier.testTag("home_date").semantics { traversalIndex = 1f })
-            HeaderItems(items)
+            Text(now().format(DATE), style = HhType.date, color = c.mute, modifier = Modifier.testTag("home_date").semantics { traversalIndex = 1f }.measuring(band) { w, _ -> dateWidth = w })
+            HeaderItems(items, Modifier.measuring(band) { w, _ -> itemsWidth = w })
         },
     ) { measurables, constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
@@ -94,13 +99,13 @@ fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modi
 }
 
 @Composable
-private fun HeaderItems(items: List<HeaderItem>) {
+private fun HeaderItems(items: List<HeaderItem>, measuring: Modifier) {
     val c = Culvery.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(HEADER_ITEM_GAP),
         // A group, or its index wouldn't reach the items inside it.
-        modifier = Modifier.testTag("home_header_items").readAsOne().semantics { traversalIndex = 2f },
+        modifier = measuring.testTag("home_header_items").readAsOne().semantics { traversalIndex = 2f },
     ) {
         items.forEachIndexed { i, item ->
             key(item.id) {

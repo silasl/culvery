@@ -7,6 +7,9 @@ import org.junit.Test
 /** A quiet fill carries no WCAG ratio (the label names the button) but must not vanish into its surface (4d-1 Decision 9). */
 private const val QUIET_FILL_MIN = 1.1
 
+/** The moon and bats carry no information; they only have to be seen. */
+private const val SKY_MIN = 1.2
+
 private const val TEXT = 4.5
 
 /** A disabled control is exempt from WCAG contrast; its `mute` label must still read as text on the surface it sits on. */
@@ -190,14 +193,12 @@ class ContrastTest {
         }
     }
 
-    /** The clock and the date are drawn over the bats (14 §4.3). */
+    /** No text is drawn over the sky (it sits in the header's open band), so the moon and bats only need to stand off the background (14 §4.3). */
     @Test
-    fun textReadsOverTheSky() {
+    fun theMoonAndBatsStandOffTheBackground() {
         halloween.forEach { (name, t) ->
-            val bat = HalloweenInks.bat(t)
-            check("$name accent over a bat", t.accent, bat, NON_TEXT)
-            check("$name ink over a bat", t.ink, bat, TEXT)
-            check("$name mute over a bat", t.mute, bat, TEXT)
+            check("$name moon on bg", HalloweenInks.moon(t), t.bg, SKY_MIN)
+            check("$name bat on bg", HalloweenInks.bat(t), t.bg, SKY_MIN)
         }
     }
 

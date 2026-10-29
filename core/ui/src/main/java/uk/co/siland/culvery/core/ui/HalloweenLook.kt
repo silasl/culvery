@@ -55,12 +55,14 @@ val HalloweenLook = SeasonalLook(
 
 /** The drawings' colours, here so ContrastTest checks what can sit over them (14 §4.3). */
 object HalloweenInks {
-    /** `surf2` is lighter than the day `bg` and would vanish. */
+    /** The day `bg` is lighter than `surf2`, which would vanish. */
     val DAY_BAT = Color(0xFFDDD0C0)
+    val DAY_MOON = Color(0xFFE2C79A)
+    val NIGHT_MOON = Color(0xFF5C4F3A)
     val PUMPKIN_STEM = Color(0xFF5E8C31)
     val PUMPKIN_FACE = Color(0xFF1A0C02)
 
-    fun moon(c: HhColors): Color = c.accentSoft
-    fun bat(c: HhColors): Color = if (c.isLight) DAY_BAT else c.surf2
+    fun moon(c: HhColors): Color = if (c.isLight) DAY_MOON else NIGHT_MOON
+    fun bat(c: HhColors): Color = if (c.isLight) DAY_BAT else c.surf3
     fun web(c: HhColors): Color = c.surf3
 }
