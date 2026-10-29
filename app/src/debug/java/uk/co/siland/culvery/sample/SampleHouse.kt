@@ -1,6 +1,7 @@
 package uk.co.siland.culvery.sample
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -48,6 +49,7 @@ import uk.co.siland.culvery.capability.music.SpeakerRoom
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.Feature
 import uk.co.siland.culvery.core.plugin.ProviderDescriptor
+import uk.co.siland.culvery.core.plugin.attempt
 import uk.co.siland.culvery.core.plugin.settingsDataStore
 import uk.co.siland.culvery.core.ui.Icons
 
@@ -61,6 +63,7 @@ private const val SAMPLE_KEY = "sample-key"
 /** A reserved documentation address (RFC 5737): nothing answers there, and the samples never ask. */
 private const val SAMPLE_ADDRESS = "192.0.2.1"
 
+private const val TAG = "SampleHouse"
 private const val FILE = "debug_sample_house"
 private val KEPT_MUSIC_PROVIDER = stringPreferencesKey("music_provider")
 private val KEPT_MUSIC_HOUSEHOLD = stringPreferencesKey("music_household")
@@ -338,11 +341,11 @@ class SampleHouse(
 
     private val lock = Mutex()
 
-    /** [then] runs when the change has finished, however it ended. */
+    /** [then] runs when the change has finished, however it ended; one that throws is logged, so a walk-through carries on. */
     fun useSoon(sample: Boolean, then: () -> Unit) {
         scope.launch {
             try {
-                use(sample)
+                attempt({ use(sample) }) { e -> Log.w(TAG, "The sample house didn't change (${e::class.simpleName})") }
             } finally {
                 then()
             }
@@ -380,6 +383,7 @@ class SampleHouse(
                 saved[KEPT_LIGHTS_PROVIDER] = lightsProvider
                 saved[KEPT_LIGHTS_BRIDGE] = lightsLink.bridgeId
                 saved[KEPT_LIGHTS_ADDRESS] = lightsLink.address
+                // The household's Hue key, kept under files/datastore/ as LightsSettings keeps it, which backup and transfer leave alone.
                 saved[KEPT_LIGHTS_KEY] = lightsLink.key
             }
         }
