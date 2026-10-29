@@ -430,6 +430,42 @@ class PartyHouseTest {
         assertThat(rig.music.putBacks).hasSize(1)
     }
 
+    /** Fails if a start that left no group keeps the snapshot, so a later restart regroups the speakers over hand changes. */
+    @Test
+    fun aStartThatLeftNoGroupDoesntKeepTheSnapshot() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = false
+        rig.choose(PartyPrefs(music = PARTY_MIX))
+        rig.music.started = MusicStart(null, HouseStep.Failed(MUSIC_START_LINE))
+        rig.house().turnOn(by())
+
+        assertThat(rig.saved().musicBefore).isNull()
+        assertThat(rig.saved().on).isTrue()
+        rig.restarted().tick()
+
+        assertThat(rig.music.putBacks).isEmpty()
+    }
+
+    /** Fails if a restart whose music system hasn't opened clears the snapshot, or the put-back isn't made once when it has. */
+    @Test
+    fun theSpeakersArePutBackOnceTheMusicSystemIsReady() = runTest {
+        val rig = rig()
+        rig.plugs.readyNow.value = false
+        rig.settings.save(PartyRecord(on = true, since = 1, musicBefore = GROUPS_BEFORE))
+        rig.music.readyNow.value = false
+        val house = rig.restarted()
+
+        house.tick()
+        assertThat(rig.music.putBacks).isEmpty()
+        assertThat(rig.saved().musicBefore).isEqualTo(GROUPS_BEFORE)
+        rig.music.readyNow.value = true
+        house.tick()
+        house.tick()
+
+        assertThat(rig.music.putBacks).containsExactly(GROUPS_BEFORE)
+        assertThat(rig.saved().musicBefore).isNull()
+    }
+
     /** Fails if a regroup that the speakers refuse isn't said on the tile. */
     @Test
     fun aRestartPutBackThatFailsShowsItsLine() = runTest {

@@ -74,6 +74,9 @@ class PartyHouse internal constructor(
     // The rest is in memory and changed under the mutex: a restart forgets the lines and the last try.
     private var plugsPending = false
     private var lastTry: Long? = null
+
+    // True while a restart's saved speaker groups wait for the music system to open.
+    private var groupsToPutBack = false
     private var musicLine: String? = null
     private var plugsLine: String? = null
     private var lightsLine: String? = null
@@ -151,6 +154,7 @@ class PartyHouse internal constructor(
                 orphansChecked = true
                 if (!record.on && plugs != null) answer(PartyStep.PLUGS) { plugs.leave(HouseModes.PARTY) }
             }
+            putGroupsBack()
             if (unsaved) persist()
             if (current.value?.on == true) {
                 if (plugsPending && plugs != null && !within(lastTry, RETRY_MS)) enterPlugs()
@@ -183,13 +187,18 @@ class PartyHouse internal constructor(
 
     private suspend fun resume(record: PartyRecord) {
         plugsPending = plugs != null && ready(plugs.ready(HouseModes.PARTY))
-        val before = record.musicBefore
-        if (record.made != null || before == null) return
-        if (music != null) {
-            val left = answer(PartyStep.MUSIC) { music.putBack(before) }
-            musicLine = (left as? HouseStep.Failed)?.line ?: HouseLines.SPEAKERS_NOT_BACK.takeIf { left == null }
-        }
-        set(record.copy(musicBefore = null))
+        groupsToPutBack = record.made == null && record.musicBefore != null
+        putGroupsBack()
+    }
+
+    /** Waits for the music system to open: a put-back sent before then would fail and lose the snapshot. */
+    private suspend fun putGroupsBack() {
+        val before = current.value?.musicBefore
+        if (!groupsToPutBack || before == null || music == null || !ready(music.ready)) return
+        groupsToPutBack = false
+        val left = answer(PartyStep.MUSIC) { music.putBack(before) }
+        musicLine = (left as? HouseStep.Failed)?.line ?: HouseLines.SPEAKERS_NOT_BACK.takeIf { left == null }
+        set(current.value!!.copy(musicBefore = null))
     }
 
     private suspend fun startMusic(prefs: PartyPrefs) {
@@ -208,7 +217,8 @@ class PartyHouse internal constructor(
         }
         set(current.value!!.copy(musicBefore = before))
         val started = answer(PartyStep.MUSIC) { music.start(choice.pickId, rooms?.map { it.id }?.toSet(), before) }
-        started?.made?.let { made -> set(current.value!!.copy(made = made)) }
+        // With no group left standing there is nothing to put back, and a restart must not undo hand changes.
+        set(current.value!!.copy(made = started?.made, musicBefore = before.takeIf { started?.made != null }))
         musicLine = when (val step = started?.step) {
             is HouseStep.Failed -> step.line
             else -> HouseLines.MUSIC_DIDNT_START.takeIf { started == null }
@@ -298,6 +308,7 @@ class PartyHouse internal constructor(
 
     private fun resetRun() {
         plugsPending = false
+        groupsToPutBack = false
         lastTry = null
         musicLine = null
         plugsLine = null
