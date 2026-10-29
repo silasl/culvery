@@ -3,11 +3,8 @@ package uk.co.siland.culvery.capability.holiday.ui
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,7 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import java.time.LocalDate
 import java.time.YearMonth
@@ -34,16 +30,16 @@ import uk.co.siland.culvery.capability.holiday.backDateWindow
 import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.plugin.attempt
-import uk.co.siland.culvery.core.ui.ButtonSize
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.ButtonTone
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhDateGrid
-import uk.co.siland.culvery.core.ui.HhFooterButton
-import uk.co.siland.culvery.core.ui.HhSheet
 import uk.co.siland.culvery.core.ui.HhType
-import uk.co.siland.culvery.core.ui.ShellTokens
+import uk.co.siland.culvery.core.ui.HouseModeDimens
+import uk.co.siland.culvery.core.ui.HouseModeLines
+import uk.co.siland.culvery.core.ui.HouseModeSheet
+import uk.co.siland.culvery.core.ui.HouseModeWords
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
@@ -69,63 +65,53 @@ internal fun HolidaySheet(
 ) {
     val c = Culvery.colors
     var month by remember { mutableStateOf(YearMonth.from(back)) }
-    HhSheet(
-        padding = PaddingValues(horizontal = HolidayDimens.sheetPaddingH, vertical = HolidayDimens.sheetPaddingV),
-        modifier = Modifier.testTag("holiday_sheet").semantics { paneTitle = HolidayWords.WHEN_BACK },
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HolidayDimens.buttonGap)) {
-            Column(
-                Modifier.weight(1f).testTag("holiday_back").semantics(mergeDescendants = true) { contentDescription = HolidayWords.sheetSpoken(back) },
-            ) {
-                Column(Modifier.shownNotSpoken()) {
-                    Text(HolidayWords.WHEN_BACK, style = HhType.sectionTitle, color = c.mute)
-                    Text(HolidayWords.backSpoken(back), style = HolidayDimens.dateStyle, color = c.ink)
+    HouseModeSheet(
+        tag = "holiday_sheet",
+        title = HolidayWords.WHEN_BACK,
+        confirm = if (turning) HouseModeWords.TURNING_ON else HolidayWords.TURN_ON_BUTTON,
+        confirmTag = "holiday_turn_on",
+        cancelTag = "holiday_cancel",
+        onConfirm = onTurnOn,
+        onCancel = onCancel,
+        enabled = !turning,
+        header = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HouseModeDimens.buttonGap)) {
+                Column(
+                    Modifier.weight(1f).testTag("holiday_back").semantics(mergeDescendants = true) { contentDescription = HolidayWords.sheetSpoken(back) },
+                ) {
+                    Column(Modifier.shownNotSpoken()) {
+                        Text(HolidayWords.WHEN_BACK, style = HhType.sectionTitle, color = c.mute)
+                        Text(HolidayWords.backSpoken(back), style = HolidayDimens.dateStyle, color = c.ink)
+                    }
                 }
-            }
-            HhButton(
-                HolidayWords.CHANGE_DATE, onChangeDate, Modifier.testTag("holiday_change_date"),
-                tone = ButtonTone.Quiet, enabled = !turning && !choosing, on = ButtonSurface.Bg,
-            )
-        }
-        Column(
-            verticalArrangement = Arrangement.spacedBy(ShellTokens.sheetGap),
-            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-        ) {
-            // A calendar event the date no longer matches is not the reason for it.
-            if (pick == null || pick.back == back) {
-                Text(HolidayWords.fromCalendar(pick, today), style = HhType.body, color = c.mute, modifier = Modifier.testTag("holiday_from_calendar"))
-            }
-            if (choosing) {
-                val chosen = remember(back) { setOf(back) }
-                val allowed = remember(today) { { day: LocalDate -> day in backDateWindow(today) } }
-                HhDateGrid(
-                    month = month,
-                    onMonth = { month = it },
-                    today = today,
-                    chosen = chosen,
-                    band = null,
-                    allowed = allowed,
-                    dots = emptyMap(),
-                    spoken = { "" },
-                    onPick = onPickDate,
-                    modifier = Modifier.fillMaxWidth(),
+                HhButton(
+                    HolidayWords.CHANGE_DATE, onChangeDate, Modifier.testTag("holiday_change_date"),
+                    tone = ButtonTone.Quiet, enabled = !turning && !choosing, on = ButtonSurface.Bg,
                 )
-            } else {
-                Text(HolidayWords.WILL, style = HhType.label, color = c.mute)
-                Column(verticalArrangement = Arrangement.spacedBy(HolidayDimens.stepGap), modifier = Modifier.testTag("holiday_steps")) {
-                    HolidayWords.willLines(steps, back, plugs).forEach { Text(it, style = HhType.body, color = c.ink) }
-                }
             }
+        },
+    ) {
+        // A calendar event the date no longer matches is not the reason for it.
+        if (pick == null || pick.back == back) {
+            Text(HolidayWords.fromCalendar(pick, today), style = HhType.body, color = c.mute, modifier = Modifier.testTag("holiday_from_calendar"))
         }
-        Column(verticalArrangement = Arrangement.spacedBy(HolidayDimens.buttonGap)) {
-            HhFooterButton(
-                if (turning) HolidayWords.TURNING_ON else HolidayWords.TURN_ON_BUTTON,
-                onTurnOn, "holiday_turn_on", enabled = !turning,
+        if (choosing) {
+            val chosen = remember(back) { setOf(back) }
+            val allowed = remember(today) { { day: LocalDate -> day in backDateWindow(today) } }
+            HhDateGrid(
+                month = month,
+                onMonth = { month = it },
+                today = today,
+                chosen = chosen,
+                band = null,
+                allowed = allowed,
+                dots = emptyMap(),
+                spoken = { "" },
+                onPick = onPickDate,
+                modifier = Modifier.fillMaxWidth(),
             )
-            HhButton(
-                HolidayWords.CANCEL, onCancel, Modifier.fillMaxWidth().testTag("holiday_cancel"),
-                tone = ButtonTone.Quiet, size = ButtonSize.Large, enabled = !turning, on = ButtonSurface.Bg,
-            )
+        } else {
+            HouseModeLines(HolidayWords.WILL, HolidayWords.willLines(steps, back, plugs), "holiday_steps")
         }
     }
 }

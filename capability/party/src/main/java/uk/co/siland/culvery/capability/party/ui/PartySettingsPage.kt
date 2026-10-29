@@ -42,6 +42,7 @@ import uk.co.siland.culvery.core.house.SceneChoice
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.attempt
+import uk.co.siland.culvery.core.ui.HouseModeDimens
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhCloseButton
 import uk.co.siland.culvery.core.ui.HhListRow
@@ -192,7 +193,7 @@ internal fun PartySceneSheet(room: LightRoomOption, chosenId: String?, onPick: (
 @Composable
 private fun ChoiceSheet(title: String, tag: String, rowTag: String, names: List<String>, chosen: Int, onPick: (Int) -> Unit, onClose: () -> Unit) {
     HhSheet(
-        padding = PaddingValues(horizontal = PartyDimens.sheetPaddingH, vertical = PartyDimens.sheetPaddingV),
+        padding = PaddingValues(horizontal = HouseModeDimens.sheetPaddingH, vertical = HouseModeDimens.sheetPaddingV),
         modifier = Modifier.testTag(tag).semantics { paneTitle = title },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -1,33 +1,18 @@
 package uk.co.siland.culvery.capability.party.ui
 
 import android.util.Log
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.testTag
 import uk.co.siland.culvery.capability.party.PartyActions
 import uk.co.siland.culvery.capability.party.PartyHouse
 import uk.co.siland.culvery.capability.party.PartyRun
 import uk.co.siland.culvery.capability.party.PartyWords
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
-import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.HouseModeTile
+import uk.co.siland.culvery.core.ui.HouseModeWords
 import uk.co.siland.culvery.core.ui.Icons
-import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.rememberSingleAction
-import uk.co.siland.culvery.core.ui.shownNotSpoken
 
 private const val TAG = "PartyTile"
 
@@ -37,53 +22,23 @@ private const val TAG = "PartyTile"
  */
 @Composable
 internal fun PartyTile(on: Boolean, line: String?, running: PartyRun?, onTap: () -> Unit) {
-    val colors = Culvery.colors
-    val ink = if (on) colors.accentInk else colors.ink
     val state = when (running) {
-        PartyRun.TURNING_ON -> PartyWords.TURNING_ON
-        PartyRun.TURNING_OFF -> PartyWords.TURNING_OFF
+        PartyRun.TURNING_ON -> HouseModeWords.TURNING_ON
+        PartyRun.TURNING_OFF -> HouseModeWords.TURNING_OFF
         null -> if (on) PartyWords.ON else PartyWords.OFF
     }
-    Column(Modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(PartyDimens.gap),
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("party_tile")
-                .clip(RoundedCornerShape(PartyDimens.radius))
-                .background(if (on) colors.accent else colors.surf2)
-                .hhClickable(
-                    onTap,
-                    label = if (on) PartyWords.CLICK_OFF else PartyWords.CLICK_ON,
-                    enabled = running == null,
-                    spoken = if (running != null) PartyWords.runningSpoken(running) else PartyWords.tileSpoken(on),
-                )
-                .padding(horizontal = PartyDimens.paddingH, vertical = PartyDimens.paddingV),
-        ) {
-            HhIcon(Icons.CELEBRATION, size = PartyDimens.icon, filled = true, tint = if (on) ink else colors.accent)
-            Column(Modifier.weight(1f).shownNotSpoken()) {
-                Text(PartyWords.LABEL, style = HhType.buttonLabel, color = ink, maxLines = 1)
-                Text(
-                    state,
-                    style = PartyDimens.secondStyle,
-                    color = if (on) ink else colors.mute,
-                    maxLines = 1,
-                    modifier = Modifier.testTag("party_tile_state"),
-                )
-            }
-        }
-        if (line != null) {
-            Text(
-                line,
-                style = PartyDimens.secondStyle,
-                color = colors.danger,
-                modifier = Modifier
-                    .padding(start = PartyDimens.paddingH, end = PartyDimens.paddingH, top = PartyDimens.lineGap)
-                    .testTag("party_tile_line"),
-            )
-        }
-    }
+    HouseModeTile(
+        tag = "party_tile",
+        icon = Icons.CELEBRATION,
+        label = PartyWords.LABEL,
+        on = on,
+        second = state,
+        secondTag = "party_tile_state",
+        line = line,
+        spoken = if (running != null) PartyWords.runningSpoken(running) else PartyWords.tileSpoken(on),
+        enabled = running == null,
+        onTap = onTap,
+    )
 }
 
 /**

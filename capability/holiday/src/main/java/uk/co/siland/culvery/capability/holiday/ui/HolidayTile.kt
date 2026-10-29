@@ -2,11 +2,7 @@ package uk.co.siland.culvery.capability.holiday.ui
 
 import android.util.Log
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,7 +12,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import java.time.LocalDate
 import uk.co.siland.culvery.capability.holiday.HolidayActions
@@ -25,10 +20,9 @@ import uk.co.siland.culvery.capability.holiday.HolidayRun
 import uk.co.siland.culvery.capability.holiday.HolidayWords
 import uk.co.siland.culvery.core.plugin.LocalOverlayHost
 import uk.co.siland.culvery.core.ui.Culvery
-import uk.co.siland.culvery.core.ui.HhIcon
-import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.HouseModeTile
+import uk.co.siland.culvery.core.ui.HouseModeWords
 import uk.co.siland.culvery.core.ui.Icons
-import uk.co.siland.culvery.core.ui.hhClickable
 import uk.co.siland.culvery.core.ui.rememberSingleAction
 import uk.co.siland.culvery.core.ui.shownNotSpoken
 
@@ -40,58 +34,24 @@ private const val TAG = "HolidayTile"
  */
 @Composable
 internal fun HolidayTile(on: Boolean, back: LocalDate?, line: String?, running: HolidayRun?, onTap: () -> Unit) {
-    val colors = Culvery.colors
-    val ink = if (on) colors.accentInk else colors.ink
-    val shape = RoundedCornerShape(HolidayDimens.radius)
     val second = when (running) {
-        HolidayRun.TURNING_ON -> HolidayWords.TURNING_ON
-        HolidayRun.TURNING_OFF -> HolidayWords.TURNING_OFF
+        HolidayRun.TURNING_ON -> HouseModeWords.TURNING_ON
+        HolidayRun.TURNING_OFF -> HouseModeWords.TURNING_OFF
         null -> if (on && back != null) HolidayWords.backShort(back) else null
     }
-    val secondTag = if (running != null) "holiday_tile_state" else "holiday_tile_back"
-    val spoken = if (running != null) HolidayWords.runningSpoken(running) else HolidayWords.tileSpoken(on, back)
-    Column(Modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(HolidayDimens.gap),
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("holiday_tile")
-                .clip(shape)
-                .background(if (on) colors.accent else colors.surf2)
-                .hhClickable(
-                    onTap,
-                    label = if (on) HolidayWords.CLICK_OFF else HolidayWords.CLICK_ON,
-                    enabled = running == null,
-                    spoken = spoken,
-                )
-                .padding(horizontal = HolidayDimens.paddingH, vertical = HolidayDimens.paddingV),
-        ) {
-            HhIcon(Icons.BEACH_ACCESS, size = HolidayDimens.icon, filled = true, tint = if (on) ink else colors.accent)
-            Column(Modifier.weight(1f).shownNotSpoken()) {
-                Text(HolidayWords.LABEL, style = HhType.buttonLabel, color = ink, maxLines = 1)
-                if (second != null) {
-                    Text(
-                        second,
-                        style = HolidayDimens.secondStyle,
-                        color = if (on) ink else colors.mute,
-                        maxLines = 1,
-                        modifier = Modifier.testTag(secondTag),
-                    )
-                }
-            }
-            if (on) OnPill()
-        }
-        if (line != null) {
-            Text(
-                line,
-                style = HolidayDimens.secondStyle,
-                color = colors.danger,
-                modifier = Modifier
-                    .padding(start = HolidayDimens.paddingH, end = HolidayDimens.paddingH, top = HolidayDimens.lineGap)
-                    .testTag("holiday_tile_line"),
-            )
-        }
+    HouseModeTile(
+        tag = "holiday_tile",
+        icon = Icons.BEACH_ACCESS,
+        label = HolidayWords.LABEL,
+        on = on,
+        second = second,
+        secondTag = if (running != null) "holiday_tile_state" else "holiday_tile_back",
+        line = line,
+        spoken = if (running != null) HolidayWords.runningSpoken(running) else HolidayWords.tileSpoken(on, back),
+        enabled = running == null,
+        onTap = onTap,
+    ) {
+        if (on) OnPill()
     }
 }
 
