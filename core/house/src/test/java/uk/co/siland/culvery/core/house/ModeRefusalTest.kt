@@ -14,6 +14,8 @@ import org.junit.runner.RunWith
 class ModeRefusalTest {
     private class Switch(override val modeId: String, override val modeName: String, val on: MutableStateFlow<Boolean?>) : HouseModeSwitch {
         override val isOn: StateFlow<Boolean?> = on
+
+        override suspend fun tick() = Unit
     }
 
     private val party = Switch(HouseModes.PARTY, "Party mode", MutableStateFlow(false))

@@ -22,6 +22,7 @@ import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseStep
+import uk.co.siland.culvery.core.house.HouseTimings
 import uk.co.siland.culvery.core.house.MusicStart
 import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -225,17 +226,17 @@ class PartyHouseTest {
         val turnedOn = rig.wall
         assertThat(house.line.value).isEqualTo(LAMP_LINE)
 
-        rig.wall = turnedOn + PartyHouse.RETRY_MS - 60_000
+        rig.wall = turnedOn + HouseTimings.RETRY_MS - 60_000
         house.tick()
         assertThat(rig.enters()).isEqualTo(1)
-        rig.wall = turnedOn + PartyHouse.RETRY_MS
+        rig.wall = turnedOn + HouseTimings.RETRY_MS
         house.tick()
 
         assertThat(rig.enters()).isEqualTo(2)
         assertThat(house.line.value).isNull()
         assertThat(rig.calls.count { it.startsWith("music.start") }).isEqualTo(1)
         assertThat(rig.calls.count { it == "lights.partyOn" }).isEqualTo(1)
-        rig.wall = turnedOn + 3 * PartyHouse.RETRY_MS
+        rig.wall = turnedOn + 3 * HouseTimings.RETRY_MS
         house.tick()
         assertThat(rig.enters()).isEqualTo(2)
     }
@@ -252,10 +253,10 @@ class PartyHouseTest {
         assertThat(house.line.value).isEqualTo("The plugs didn’t switch. They’ll keep trying.")
 
         rig.trace.throws -= "plugs.enter"
-        rig.wall = turnedOn + PartyHouse.RETRY_MS - 60_000
+        rig.wall = turnedOn + HouseTimings.RETRY_MS - 60_000
         house.tick()
         assertThat(rig.enters()).isEqualTo(1)
-        rig.wall = turnedOn + PartyHouse.RETRY_MS
+        rig.wall = turnedOn + HouseTimings.RETRY_MS
         house.tick()
 
         assertThat(rig.enters()).isEqualTo(2)
@@ -273,7 +274,7 @@ class PartyHouseTest {
 
         assertThat(rig.saved().on).isTrue()
         assertThat(house.line.value).isEqualTo("The plugs didn’t switch. Switch them on the Plugs tab.")
-        rig.wall = turnedOn + 2 * PartyHouse.RETRY_MS
+        rig.wall = turnedOn + 2 * HouseTimings.RETRY_MS
         house.tick()
 
         assertThat(rig.enters()).isEqualTo(1)
@@ -315,10 +316,10 @@ class PartyHouseTest {
         val off = rig.wall
 
         assertThat(house.line.value).isEqualTo(expected)
-        rig.wall = off + PartyHouse.OFF_LINE_MS - 60_000
+        rig.wall = off + HouseTimings.OFF_LINE_MS - 60_000
         house.tick()
         assertThat(house.line.value).isEqualTo(expected)
-        rig.wall = off + PartyHouse.OFF_LINE_MS
+        rig.wall = off + HouseTimings.OFF_LINE_MS
         house.tick()
         assertThat(house.line.value).isNull()
 

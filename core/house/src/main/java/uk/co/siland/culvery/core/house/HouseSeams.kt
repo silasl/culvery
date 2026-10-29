@@ -3,6 +3,7 @@ package uk.co.siland.culvery.core.house
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import uk.co.siland.culvery.core.access.Authorised
@@ -51,6 +52,15 @@ object HouseLines {
 
 /** Whether a seam's device is chosen: false with no system, else true while its state is known. */
 fun Flow<*>?.chosen(): Flow<Boolean> = this?.map { it != null } ?: flowOf(false)
+
+/** A seam's [HouseLights.ready] and the like as it is now; false with no seam. */
+suspend fun Flow<Boolean>?.isReady(): Boolean = this?.first() == true
+
+/** The modes' wall-clock spans: a failed step is tried again after [RETRY_MS], and the off line shows for [OFF_LINE_MS]. */
+object HouseTimings {
+    const val RETRY_MS = 300_000L
+    const val OFF_LINE_MS = 600_000L
+}
 
 /** What Holiday mode reaches in the house; each is optional, and one that isn't [ready] is no step (11 §5.1). */
 interface HouseLights {
@@ -103,6 +113,9 @@ interface HouseModeSwitch {
 
     /** Null until it has been read. */
     val isOn: StateFlow<Boolean?>
+
+    /** Runs what is due, at start and each minute; a tick that finds a change running leaves it to the next. */
+    suspend fun tick()
 }
 
 /** The first mode other than [modeId] that is on. */

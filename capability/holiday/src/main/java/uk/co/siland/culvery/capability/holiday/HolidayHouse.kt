@@ -6,7 +6,6 @@ import java.time.LocalDateTime
 import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,17 +22,20 @@ import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.house.HouseLights
-import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseStep
+import uk.co.siland.culvery.core.house.HouseTimings
+import uk.co.siland.culvery.core.house.ModePlugs
+import uk.co.siland.culvery.core.house.isReady
 import uk.co.siland.culvery.core.house.PlugChange
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.attempt
+import uk.co.siland.culvery.core.plugin.within
 
 private const val TAG = "HolidayHouse"
 
@@ -50,7 +52,7 @@ class HolidayHouse internal constructor(
     private val lights: HouseLights?,
     private val heating: HouseHeating?,
     private val hoover: HouseHoover?,
-    private val plugs: HousePlugs?,
+    plugs: HousePlugs?,
     private val wall: WallClock,
     private val now: () -> LocalDateTime?,
 ) : HouseMode, HouseModeSwitch {
@@ -81,6 +83,7 @@ class HolidayHouse internal constructor(
     /** The tile's line: what didn't happen. */
     val line: StateFlow<String?> = shown.asStateFlow()
 
+    private val plugs = plugs?.let { ModePlugs(it, HouseModes.HOLIDAY) }
     private val mutex = Mutex()
 
     // The rest is in memory and changed under the mutex: a restart forgets the grant, the failures and the last tries.
@@ -95,20 +98,20 @@ class HolidayHouse internal constructor(
 
     /** The steps turning on now would take, for the sheet. */
     suspend fun plan(back: LocalDate): List<HolidayStep> {
-        val eco = ready(heating?.ready)
-        val plugsReady = ready(plugs?.ready(HouseModes.HOLIDAY))
+        val eco = heating?.ready.isReady()
+        val plugsReady = plugs?.ready() == true
         val hooverInTime = now()?.let { it < hooverFrom(back) } == true
         return buildList {
-            if (ready(lights?.ready)) add(LIGHTS_ON)
+            if (lights?.ready.isReady()) add(LIGHTS_ON)
             if (eco) add(ECO_ON)
             if (plugsReady) add(PLUGS_ON)
-            if (hooverInTime && ready(hoover?.ready)) add(HOOVER)
+            if (hooverInTime && hoover?.ready.isReady()) add(HOOVER)
             if (eco) add(ECO_OFF)
         }
     }
 
     /** What the plugs step would switch, for the sheet. */
-    suspend fun plugChanges(): List<PlugChange> = plugs?.preview(HouseModes.HOLIDAY).orEmpty()
+    suspend fun plugChanges(): List<PlugChange> = plugs?.preview().orEmpty()
 
     suspend fun turnOn(back: LocalDate, by: Authorised) {
         require(HousePermissions.HOLIDAY_MODE in by.granted) { "Turning Holiday mode on needs its own grant" }
@@ -118,11 +121,7 @@ class HolidayHouse internal constructor(
             grant = by
             resetRun()
             offLine = null
-            if (plugs != null && PLUGS_ON in steps) {
-                attempt<Unit>({ plugs.begin(HouseModes.HOLIDAY, by) }) { e ->
-                    Log.w(TAG, "The plugs didn't begin for Holiday mode (${e::class.simpleName})")
-                }
-            }
+            if (PLUGS_ON in steps) plugs?.begin(by)
             set(HolidayRecord(on = true, back = back, since = wall.nowMillis(), steps = steps.associateWith { StepState.PENDING }))
             runDue()
         }
@@ -139,7 +138,7 @@ class HolidayHouse internal constructor(
             // Eco already off at 00:01 is left as it is (11 §5.7).
             val ecoLeft = heating != null && record.steps[ECO_OFF] == StepState.PENDING && answer { heating.setEco(false) } !is HouseStep.Done
             if (ecoLeft) Log.w(TAG, "The heating didn't come off Eco with Holiday mode")
-            val plugsLine = plugs?.let { puttingBack(it) }
+            val plugsLine = plugs?.leave()
             grant = null
             resetRun()
             // Heating, then plugs, then lights, one per line (12 §5.5).
@@ -153,24 +152,13 @@ class HolidayHouse internal constructor(
         }
     }
 
-    /** The line for plugs that didn't all go back, or null when they did. */
-    private suspend fun puttingBack(plugs: HousePlugs): String? {
-        val line = when (val left = answer { plugs.leave(HouseModes.HOLIDAY) }) {
-            is HouseStep.Done -> null
-            is HouseStep.Failed -> left.line
-            null -> HouseLines.PLUGS_LEAVE_THREW
-        }
-        if (line != null) Log.w(TAG, "The plugs didn't all go back with Holiday mode")
-        return line
-    }
-
     /** Runs what is due; a tick that finds another change running leaves it to the next minute. */
-    suspend fun tick() {
+    override suspend fun tick() {
         if (!mutex.tryLock()) return
         try {
             val away = load().on
             if (unsaved) persist()
-            if (away) runDue() else if (offLine != null && !within(offAt, OFF_LINE_MS)) {
+            if (away) runDue() else if (offLine != null && !wall.within(offAt, HouseTimings.OFF_LINE_MS)) {
                 offLine = null
                 showLine()
             }
@@ -191,7 +179,7 @@ class HolidayHouse internal constructor(
     /** The first read that finds Holiday mode off puts back plugs a cut-short turn-on left begun (12 §5.2). */
     private suspend fun load(): HolidayRecord = current.value ?: settings.read.filterNotNull().first().also {
         publish(it)
-        if (!it.on && plugs != null) answer { plugs.leave(HouseModes.HOLIDAY) }
+        if (!it.on) plugs?.leaveQuietly()
     }
 
     private suspend fun runDue() {
@@ -206,7 +194,7 @@ class HolidayHouse internal constructor(
                 Window.OPEN -> when {
                     // The grant lives only in memory, so after a restart the lights step can't be run (11 §5.3).
                     step == LIGHTS_ON && grant == null -> mark(step, StepState.MISSED)
-                    !within(lastTry[step], RETRY_MS) -> runStep(step)
+                    !wall.within(lastTry[step], HouseTimings.RETRY_MS) -> runStep(step)
                 }
             }
         }
@@ -220,17 +208,13 @@ class HolidayHouse internal constructor(
 
     /** No snapshot means the begin never landed, so there is nothing to retry (12 §5.2); a throw is retried. */
     private suspend fun runPlugs() {
-        val result = attempt<HouseStep?>({
-            plugs?.enter(HouseModes.HOLIDAY) ?: run {
-                failed.remove(PLUGS_ON)
-                mark(PLUGS_ON, StepState.MISSED)
-                return
-            }
-        }) { e ->
-            Log.w(TAG, "Holiday mode's plugs step threw ${e::class.simpleName}")
-            null
+        val result = plugs?.enter()
+        if (result == null) {
+            failed.remove(PLUGS_ON)
+            mark(PLUGS_ON, StepState.MISSED)
+        } else {
+            settle(PLUGS_ON, result)
         }
-        settle(PLUGS_ON, result)
     }
 
     private suspend fun settle(step: HolidayStep, result: HouseStep?) {
@@ -310,11 +294,6 @@ class HolidayHouse internal constructor(
         }
     }
 
-    /** Whether less than [span] has passed on the wall since [since]; a wall that went back counts as passed. */
-    private fun within(since: Long?, span: Long): Boolean = since != null && wall.nowMillis() - since in 0 until span
-
-    private suspend fun ready(flag: Flow<Boolean>?): Boolean = flag?.first() == true
-
     private enum class Window { NOT_YET, OPEN, PASSED }
 
     private fun window(step: HolidayStep, back: LocalDate, time: LocalDateTime): Window = when (step) {
@@ -334,10 +313,8 @@ class HolidayHouse internal constructor(
 
     private fun ecoOff(back: LocalDate) = back.atTime(0, 1)
 
-    companion object {
-        const val RETRY_MS = 300_000L
-        const val OFF_LINE_MS = 600_000L
-        private const val HOOVER_FROM_HOUR = 10
-        private const val HOOVER_UNTIL_HOUR = 22
+    private companion object {
+        const val HOOVER_FROM_HOUR = 10
+        const val HOOVER_UNTIL_HOUR = 22
     }
 }

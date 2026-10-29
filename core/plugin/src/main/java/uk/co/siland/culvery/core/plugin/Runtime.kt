@@ -12,6 +12,9 @@ fun interface WallClock {
     fun nowMillis(): Long
 }
 
+/** Whether less than [span] has passed since [since]; a wall that went back counts as passed. */
+fun WallClock.within(since: Long?, span: Long): Boolean = since != null && nowMillis() - since in 0 until span
+
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class ApplicationScope

@@ -45,6 +45,7 @@ class LogHygieneTest {
         assertThat(sources.map { it.name }).contains("HolidaySheet.kt")
         assertThat(sources.map { it.name }).contains("PartyActions.kt")
         assertThat(sources.map { it.name }).contains("ModeRefusal.kt")
+        assertThat(sources.map { it.name }).contains("ModePlugs.kt")
         assertThat(sources.map { it.name }).contains("PartyTile.kt")
         assertThat(sources.map { it.name }).contains("PartySheet.kt")
         assertThat(sources.map { it.name }).contains("PartySettingsPage.kt")
@@ -121,14 +122,14 @@ internal object LogHygiene {
      *
      * `step.name` is a Holiday mode step's name (`HolidayStep`: LIGHTS_ON, ECO_ON, PLUGS_ON, HOOVER, ECO_OFF), never a date (11 §6).
      *
-     * `own.modeName` is a mode's fixed name, "Holiday mode" or "Party mode" (`ModeRefusal`).
+     * `own.modeName` is a mode's fixed name, "Holiday mode" or "Party mode" (`ModeRefusal`); `this.modeId` its id, "holiday" or "party" (`ModePlugs`).
      */
     val ALLOWED = setOf(
         "cap.id", "conn.id", "connection.id", "connection.providerId", "change.connectionId", "change.kind", "it.descriptor.id",
         "step.id", "stored.connection.id", "this.id", "this.kind", "kind.name", "this.failedDrains", "this.reason",
         "answer.reason", "what.label", "service.displayName", "this.logName", "request.method", "pathTemplate(request.url)", "grant.scopes.size", "CALENDAR_SCOPES.size",
         "post.captureLine", "reading.outcome", "command.name", "heat.status", "heat.batteryTenths", "heat.batteryPercent",
-        "step.name", "own.modeName",
+        "step.name", "own.modeName", "this.modeId",
     )
 
     private val CALL = Regex("""\bLog\.(w|e|wtf|println)\(""")

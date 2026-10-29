@@ -4,7 +4,6 @@ import android.util.Log
 import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,15 +21,19 @@ import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseStep
+import uk.co.siland.culvery.core.house.HouseTimings
+import uk.co.siland.culvery.core.house.ModePlugs
 import uk.co.siland.culvery.core.house.PartyGroup
 import uk.co.siland.culvery.core.house.RoomBefore
+import uk.co.siland.culvery.core.house.isReady
 import uk.co.siland.culvery.core.house.line
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.attempt
+import uk.co.siland.culvery.core.plugin.within
 
 private const val TAG = "PartyHouse"
 
-private enum class PartyStep { PLUGS, MUSIC, LIGHTS }
+private enum class PartyStep { MUSIC, LIGHTS }
 
 /**
  * The house's Party mode (13 §2.2–§2.9, §4): turning on and off, and the plugs retry run by [tick]. Each step runs
@@ -40,7 +43,7 @@ private enum class PartyStep { PLUGS, MUSIC, LIGHTS }
 @Singleton
 class PartyHouse internal constructor(
     private val settings: PartySettings,
-    private val plugs: HousePlugs?,
+    plugs: HousePlugs?,
     private val music: HouseMusic?,
     private val lights: HouseLights?,
     private val wall: WallClock,
@@ -70,6 +73,7 @@ class PartyHouse internal constructor(
     override val modeId = HouseModes.PARTY
     override val modeName = PartyWords.LABEL
 
+    private val plugs = plugs?.let { ModePlugs(it, HouseModes.PARTY) }
     private val mutex = Mutex()
 
     // The rest is in memory and changed under the mutex: a restart forgets the lines and the last try.
@@ -91,11 +95,11 @@ class PartyHouse internal constructor(
     /** What turning on would do, for the sheet. Speaker rooms saved as an empty list count as no speaker chosen. */
     suspend fun plan(): PartyPlan {
         val prefs = settings.prefs.first()
-        val musicReady = ready(music?.ready) && prefs.rooms?.isEmpty() != true
+        val musicReady = music?.ready.isReady() && prefs.rooms?.isEmpty() != true
         return PartyPlan(
-            plugs = readyPlugs()?.preview(HouseModes.PARTY).orEmpty(),
+            plugs = readyPlugs()?.preview().orEmpty(),
             music = prefs.music.takeIf { musicReady },
-            scenes = if (ready(lights?.ready)) prefs.scenes else emptyList(),
+            scenes = if (lights?.ready.isReady()) prefs.scenes else emptyList(),
             rooms = prefs.rooms,
         )
     }
@@ -116,9 +120,7 @@ class PartyHouse internal constructor(
             set(PartyRecord(on = true, since = wall.nowMillis()))
             if (plugs != null) {
                 plugsPending = true
-                attempt<Unit>({ plugs.begin(HouseModes.PARTY, by) }) { e ->
-                    Log.w(TAG, "Party mode's PLUGS step didn't begin (${e::class.simpleName})")
-                }
+                plugs.begin(by)
                 enterPlugs()
             }
             startMusic(prefs)
@@ -136,7 +138,7 @@ class PartyHouse internal constructor(
             if (!record.on) return@exclusive
             val musicLine = record.made?.let { stopMusic(it, record.musicBefore.orEmpty()) }
             val lightsLine = record.lights?.takeIf { it.isNotEmpty() }?.let { putLightsBack(it) }
-            val plugsLine = plugs?.let { puttingBack(it) }
+            val plugsLine = plugs?.leave()
             resetRun()
             offLine = Lines(musicLine, plugsLine, lightsLine).joined()
             offAt = wall.nowMillis()
@@ -145,19 +147,19 @@ class PartyHouse internal constructor(
     }
 
     /** Runs the plugs retry; a tick that finds another change running leaves it to the next minute. */
-    suspend fun tick() {
+    override suspend fun tick() {
         if (!mutex.tryLock()) return
         try {
             val record = load()
             if (!orphansChecked) {
                 orphansChecked = true
-                if (!record.on && plugs != null) answer(PartyStep.PLUGS) { plugs.leave(HouseModes.PARTY) }
+                if (!record.on) plugs?.leaveQuietly()
             }
             putGroupsBack()
             if (unsaved) persist()
             if (current.value?.on == true) {
-                if (plugsPending && plugs != null && !within(lastTry, RETRY_MS)) enterPlugs()
-            } else if (offLine != null && !within(offAt, OFF_LINE_MS)) {
+                if (plugsPending && !wall.within(lastTry, HouseTimings.RETRY_MS)) enterPlugs()
+            } else if (offLine != null && !wall.within(offAt, HouseTimings.OFF_LINE_MS)) {
                 offLine = null
                 showLine()
             }
@@ -193,7 +195,7 @@ class PartyHouse internal constructor(
     /** Waits for the music system to open: a put-back sent before then would fail and lose the snapshot. */
     private suspend fun putGroupsBack() {
         val before = current.value?.musicBefore
-        if (!groupsToPutBack || before == null || music == null || !ready(music.ready)) return
+        if (!groupsToPutBack || before == null || music == null || !music.ready.isReady()) return
         groupsToPutBack = false
         lines.music = answer(PartyStep.MUSIC) { music.putBack(before) }.line(threw = HouseLines.SPEAKERS_NOT_BACK)
         set(current.value!!.copy(musicBefore = null))
@@ -201,7 +203,7 @@ class PartyHouse internal constructor(
 
     private suspend fun startMusic(prefs: PartyPrefs) {
         val choice = prefs.music ?: return
-        if (music == null || !ready(music.ready)) return
+        if (music == null || !music.ready.isReady()) return
         val rooms = prefs.rooms
         if (rooms?.isEmpty() == true) {
             Log.w(TAG, "Party mode's MUSIC step has no speaker chosen")
@@ -223,7 +225,7 @@ class PartyHouse internal constructor(
 
     private suspend fun startLights(prefs: PartyPrefs) {
         val choices = prefs.scenes
-        if (choices.isEmpty() || lights == null || !ready(lights.ready)) return
+        if (choices.isEmpty() || lights == null || !lights.ready.isReady()) return
         val rooms = answer(PartyStep.LIGHTS) { lights.partyBefore(choices) }
         if (rooms == null) {
             lines.lights = HouseLines.lightsDidntChange(choices.map { it.roomName })
@@ -240,26 +242,19 @@ class PartyHouse internal constructor(
     private suspend fun enterPlugs() {
         val plugs = plugs ?: return
         lastTry = wall.nowMillis()
-        var threw = false
-        val result = attempt<HouseStep?>({ plugs.enter(HouseModes.PARTY) }) { e ->
-            Log.w(TAG, "Party mode's PLUGS step threw ${e::class.simpleName}")
-            threw = true
-            null
-        }
-        when {
-            threw -> lines.plugs = HouseLines.PLUGS_THREW
-            result == null -> {
+        when (val step = plugs.enter()) {
+            null -> {
                 Log.w(TAG, "Party mode's PLUGS step was missed")
                 plugsPending = false
                 lines.plugs = HouseLines.PLUGS_MISSED
             }
-            result is HouseStep.Done -> {
+            HouseStep.Done -> {
                 plugsPending = false
                 lines.plugs = null
             }
-            result is HouseStep.Failed -> {
+            is HouseStep.Failed -> {
                 Log.w(TAG, "Party mode's PLUGS step didn't work; trying again in five minutes")
-                lines.plugs = result.line
+                lines.plugs = step.line
             }
         }
         showLine()
@@ -277,13 +272,6 @@ class PartyHouse internal constructor(
         if (left.isEmpty()) return null
         Log.w(TAG, "Party mode's LIGHTS step didn't put every room back")
         return HouseLines.lightsDidntGoBack(left)
-    }
-
-    /** The line for plugs that didn't all go back, or null when they did. */
-    private suspend fun puttingBack(plugs: HousePlugs): String? {
-        val line = answer(PartyStep.PLUGS) { plugs.leave(HouseModes.PARTY) }.line(threw = HouseLines.PLUGS_LEAVE_THREW)
-        if (line != null) Log.w(TAG, "Party mode's PLUGS step didn't all go back")
-        return line
     }
 
     /** [block]'s answer, or null when it threw, which is logged by step and exception type only. */
@@ -330,21 +318,11 @@ class PartyHouse internal constructor(
         }
     }
 
-    /** Whether less than [span] has passed on the wall since [since]; a wall that went back counts as passed. */
-    private fun within(since: Long?, span: Long): Boolean = since != null && wall.nowMillis() - since in 0 until span
-
-    private suspend fun ready(flag: Flow<Boolean>?): Boolean = flag?.first() == true
-
     /** The plugs, while Party's list switches any. */
-    private suspend fun readyPlugs(): HousePlugs? = plugs?.takeIf { ready(it.ready(HouseModes.PARTY)) }
+    private suspend fun readyPlugs(): ModePlugs? = plugs?.takeIf { it.ready() }
 
     /** What didn't happen, one line per step, in the order the tile shows them. */
     private class Lines(var music: String? = null, var plugs: String? = null, var lights: String? = null) {
         fun joined() = listOfNotNull(music, plugs, lights).joinToString("\n").ifEmpty { null }
-    }
-
-    companion object {
-        const val RETRY_MS = 300_000L
-        const val OFF_LINE_MS = 600_000L
     }
 }

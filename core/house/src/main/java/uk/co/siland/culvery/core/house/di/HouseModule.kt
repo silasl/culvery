@@ -1,18 +1,22 @@
 package uk.co.siland.culvery.core.house.di
 
+import dagger.Binds
 import dagger.BindsOptionalOf
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
 import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseModeInfo
+import uk.co.siland.culvery.core.house.HouseModeScheduler
 import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.MultiDayEvents
+import uk.co.siland.culvery.core.plugin.Startable
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -42,4 +46,8 @@ abstract class HouseModule {
     // With no mode bound nothing blocks a mode (13 §2.6).
     @Multibinds
     abstract fun modeSwitches(): Set<HouseModeSwitch>
+
+    @Binds
+    @IntoSet
+    abstract fun scheduler(impl: HouseModeScheduler): Startable
 }

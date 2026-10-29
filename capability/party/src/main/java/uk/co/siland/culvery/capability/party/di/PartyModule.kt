@@ -9,7 +9,6 @@ import dagger.multibindings.IntoSet
 import uk.co.siland.culvery.capability.party.PartyCapability
 import uk.co.siland.culvery.capability.party.PartyHouse
 import uk.co.siland.culvery.capability.party.PartyPermissionSource
-import uk.co.siland.culvery.capability.party.PartyScheduler
 import uk.co.siland.culvery.capability.party.PartyWords
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.house.HouseModeInfo
@@ -17,7 +16,6 @@ import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.plugin.Capability
-import uk.co.siland.culvery.core.plugin.Startable
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -25,10 +23,6 @@ abstract class PartyModule {
     @Binds
     @IntoSet
     abstract fun permissions(impl: PartyPermissionSource): PermissionSource
-
-    @Binds
-    @IntoSet
-    abstract fun scheduler(impl: PartyScheduler): Startable
 
     @Binds
     @IntoSet

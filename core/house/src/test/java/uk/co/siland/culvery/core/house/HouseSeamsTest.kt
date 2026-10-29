@@ -9,6 +9,8 @@ class HouseSeamsTest {
     private class Switch(override val modeId: String, on: Boolean?) : HouseModeSwitch {
         override val modeName = "$modeId mode"
         override val isOn: StateFlow<Boolean?> = MutableStateFlow(on)
+
+        override suspend fun tick() = Unit
     }
 
     /** 12 §6: fails if a plug's name can be read out of a log line. */

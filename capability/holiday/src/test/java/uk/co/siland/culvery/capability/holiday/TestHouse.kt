@@ -98,4 +98,6 @@ internal class TestSwitch(
     override val modeId: String,
     override val modeName: String,
     override val isOn: MutableStateFlow<Boolean?>,
-) : HouseModeSwitch
+) : HouseModeSwitch {
+    override suspend fun tick() = Unit
+}

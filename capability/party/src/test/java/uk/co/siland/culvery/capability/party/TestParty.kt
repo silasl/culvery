@@ -266,7 +266,9 @@ internal class TestSwitch(
     override val modeId: String,
     override val modeName: String,
     override val isOn: MutableStateFlow<Boolean?>,
-) : HouseModeSwitch
+) : HouseModeSwitch {
+    override suspend fun tick() = Unit
+}
 
 /** A real [PartyHouse] over an in-memory store and the fake seams. */
 internal class HouseRig(scope: CoroutineScope) {

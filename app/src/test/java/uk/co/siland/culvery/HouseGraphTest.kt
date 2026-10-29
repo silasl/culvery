@@ -11,8 +11,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
-import uk.co.siland.culvery.capability.holiday.HolidayScheduler
-import uk.co.siland.culvery.capability.party.PartyScheduler
+import uk.co.siland.culvery.core.house.HouseModeScheduler
 import uk.co.siland.culvery.di.HouseGraphProbe
 import uk.co.siland.culvery.provider.lights_hue.HUE_PROVIDER_ID
 import uk.co.siland.culvery.provider.music_sonos.SONOS_PROVIDER_ID
@@ -47,7 +46,7 @@ class HouseGraphTest {
 
     @Test
     fun theAppStartsTheScheduler() = runBlocking {
-        assertThat(probe.startables().filterIsInstance<HolidayScheduler>()).hasSize(1)
+        assertThat(probe.startables().filterIsInstance<HouseModeScheduler>()).hasSize(1)
         // Nothing else reads the record: only the scheduler's own start, from CulveryApp.onCreate, makes it known.
         assertThat(withTimeout(10_000) { probe.houseMode().holiday.first { it != null } }).isFalse()
     }
@@ -59,8 +58,6 @@ class HouseGraphTest {
         assertThat(party.order).isEqualTo(20)
         assertThat(probe.switches().map { it.modeId }).containsExactly("holiday", "party")
         assertThat(probe.music().isPresent).isTrue()
-        assertThat(probe.partyHouse().isOn).isNotNull()
-        assertThat(probe.startables().filterIsInstance<PartyScheduler>()).hasSize(1)
     }
 
     @Test

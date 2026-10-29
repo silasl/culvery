@@ -33,6 +33,7 @@ import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseStep
+import uk.co.siland.culvery.core.house.HouseTimings
 import uk.co.siland.culvery.core.household.Role
 import uk.co.siland.culvery.core.plugin.WallClock
 
@@ -147,12 +148,12 @@ class HolidayHouseTest {
 
             val turnedOn = rig.wall
             rig.now = THU_0900.plusMinutes(4)
-            rig.wall = turnedOn + HolidayHouse.RETRY_MS - 60_000
+            rig.wall = turnedOn + HouseTimings.RETRY_MS - 60_000
             house.tick()
             assertThat(rig.heating.calls).hasSize(1)
 
             rig.now = THU_0900.plusMinutes(5)
-            rig.wall = turnedOn + HolidayHouse.RETRY_MS
+            rig.wall = turnedOn + HouseTimings.RETRY_MS
             house.tick()
             assertThat(rig.heating.calls).containsExactly(true, true)
             assertThat(house.record.value!!.steps[ECO_ON]).isEqualTo(DONE)
@@ -178,10 +179,10 @@ class HolidayHouseTest {
         assertThat(house.record.value).isEqualTo(HolidayRecord())
         assertThat(rig.settings.prefs.first()).isEqualTo(HolidayRecord())
         assertThat(house.line.value).isEqualTo(STILL_ON_ECO)
-        rig.wall = off + HolidayHouse.OFF_LINE_MS - 60_000
+        rig.wall = off + HouseTimings.OFF_LINE_MS - 60_000
         house.tick()
         assertThat(house.line.value).isEqualTo(STILL_ON_ECO)
-        rig.wall = off + HolidayHouse.OFF_LINE_MS
+        rig.wall = off + HouseTimings.OFF_LINE_MS
         house.tick()
         assertThat(house.line.value).isNull()
     }
@@ -473,11 +474,11 @@ class HolidayHouseTest {
 
         // The second 01:02 and 01:03, after the clocks went back at 02:00.
         rig.now = LocalDateTime.of(2026, 10, 25, 1, 2)
-        rig.wall = turnedOn + HolidayHouse.RETRY_MS - 60_000
+        rig.wall = turnedOn + HouseTimings.RETRY_MS - 60_000
         house.tick()
         assertThat(rig.heating.calls).hasSize(1)
         rig.now = LocalDateTime.of(2026, 10, 25, 1, 3)
-        rig.wall = turnedOn + HolidayHouse.RETRY_MS
+        rig.wall = turnedOn + HouseTimings.RETRY_MS
         house.tick()
 
         assertThat(rig.heating.calls).hasSize(2)
@@ -553,12 +554,12 @@ class HolidayHouseTest {
 
             val turnedOn = rig.wall
             rig.now = THU_0900.plusMinutes(4)
-            rig.wall = turnedOn + HolidayHouse.RETRY_MS - 60_000
+            rig.wall = turnedOn + HouseTimings.RETRY_MS - 60_000
             house.tick()
             assertThat(rig.plugs.enterCount()).isEqualTo(1)
 
             rig.now = THU_0900.plusMinutes(5)
-            rig.wall = turnedOn + HolidayHouse.RETRY_MS
+            rig.wall = turnedOn + HouseTimings.RETRY_MS
             house.tick()
             assertThat(rig.plugs.enterCount()).isEqualTo(2)
             assertThat(house.record.value!!.steps[PLUGS_ON]).isEqualTo(DONE)
@@ -580,10 +581,10 @@ class HolidayHouseTest {
 
         rig.plugs.throwOnEnter = false
         val turnedOn = rig.wall
-        rig.wall = turnedOn + HolidayHouse.RETRY_MS - 60_000
+        rig.wall = turnedOn + HouseTimings.RETRY_MS - 60_000
         house.tick()
         assertThat(rig.plugs.enterCount()).isEqualTo(1)
-        rig.wall = turnedOn + HolidayHouse.RETRY_MS
+        rig.wall = turnedOn + HouseTimings.RETRY_MS
         house.tick()
 
         assertThat(rig.plugs.enterCount()).isEqualTo(2)
@@ -698,10 +699,10 @@ class HolidayHouseTest {
         assertThat(house.holiday.value).isFalse()
         assertThat(rig.settings.prefs.first()).isEqualTo(HolidayRecord())
         assertThat(house.line.value).isEqualTo(LAMP_BACK_LINE)
-        rig.wall = off + HolidayHouse.OFF_LINE_MS - 60_000
+        rig.wall = off + HouseTimings.OFF_LINE_MS - 60_000
         house.tick()
         assertThat(house.line.value).isEqualTo(LAMP_BACK_LINE)
-        rig.wall = off + HolidayHouse.OFF_LINE_MS
+        rig.wall = off + HouseTimings.OFF_LINE_MS
         house.tick()
         assertThat(house.line.value).isNull()
 
@@ -729,7 +730,7 @@ class HolidayHouseTest {
         house.turnOff(adult())
 
         assertThat(house.line.value).isEqualTo("$STILL_ON_ECO\n$LAMP_BACK_LINE\n${HolidayWords.LIGHTS_STILL_ON}")
-        rig.wall = off + HolidayHouse.OFF_LINE_MS
+        rig.wall = off + HouseTimings.OFF_LINE_MS
         house.tick()
         assertThat(house.line.value).isNull()
     }
