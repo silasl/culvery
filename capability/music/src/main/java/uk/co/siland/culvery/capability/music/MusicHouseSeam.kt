@@ -57,8 +57,9 @@ class MusicHouseSeam internal constructor(
             logFailure(Step.GROUP, e)
             null
         } ?: return failedStart()
-        val made = attempt({ s.group(prepared.coordinator, prepared.chosen) }) { e -> return giveUp(s, Step.GROUP, e, before) }
-        attempt({ s.playFavourite(made, prepared.pick) }) { e -> return giveUp(s, Step.PLAY, e, before) }
+        val touched = touching(before, prepared.chosen)
+        val made = attempt({ s.group(prepared.coordinator, prepared.chosen) }) { e -> return giveUp(s, Step.GROUP, e, touched) }
+        attempt({ s.playFavourite(made, prepared.pick) }) { e -> return giveUp(s, Step.PLAY, e, touched) }
         val joined = made.rooms.map { it.id }.toSet()
         val step = if (joined == prepared.chosen) HouseStep.Done else HouseStep.Failed(HouseLines.MUSIC_DIDNT_START)
         return MusicStart(PartyGroup(made.coordinatorId, joined), step)
@@ -82,7 +83,7 @@ class MusicHouseSeam internal constructor(
             logFailure(Step.PAUSE, e)
             return HouseStep.Failed(HouseLines.MUSIC_DIDNT_STOP)
         }
-        return regroup(s, before)
+        return regroup(s, touching(before, made.roomIds))
     }
 
     override suspend fun putBack(before: List<GroupBefore>): HouseStep {
@@ -102,6 +103,9 @@ class MusicHouseSeam internal constructor(
         val coordinator = partyCoordinator(layout, chosen)
         return if (pick == null || coordinator == null) null else Prepared(chosen, coordinator, pick)
     }
+
+    /** The groups Party broke up: any holding a party room, so the leader's old group too. The rest keep any hand change (13 decision 5). */
+    private fun touching(before: List<GroupBefore>, roomIds: Set<String>) = before.filter { g -> g.roomIds.any { it in roomIds } }
 
     private suspend fun regroup(s: MusicSystem, before: List<GroupBefore>): HouseStep = attempt({
         s.regroup(before.map { RoomGroup(it.coordinatorId, it.roomIds) })

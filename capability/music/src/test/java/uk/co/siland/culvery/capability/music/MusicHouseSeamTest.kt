@@ -125,7 +125,15 @@ class MusicHouseSeamTest {
     }
 
     @Test
-    fun theSpeakersDownFailTheStartWithoutThrowing() = runTest {
+    fun aFailedStartPutsBackOnlyTheChosenRoomsGroups() = runTest {
+        val before = seam.before()
+        system.failures["group Kitchen-id Kitchen-id,Lounge-id"] = MusicRefusedException()
+        assertThat(seam.start("FV:2/3", setOf("Kitchen-id", "Lounge-id"), before)).isEqualTo(MusicStart(null, startLine))
+        assertThat(system.calls.last()).isEqualTo("regroup Kitchen-id:Kitchen-id,Lounge-id:Lounge-id")
+    }
+
+    @Test
+    fun theSpeakersDownFailTheStartWithoutThrowing()= runTest {
         val before = seam.before()
         system.failures["checkLayout"] = MusicUnreachableException(MusicProblem.UNREACHABLE)
         assertThat(seam.start("FV:2/3", null, before)).isEqualTo(MusicStart(null, startLine))
@@ -137,6 +145,18 @@ class MusicHouseSeamTest {
         partyIsUp()
         assertThat(seam.stop(party, before)).isEqualTo(HouseStep.Done)
         assertThat(system.calls).containsExactly("checkLayout", "playingNow", "pause Kitchen-id", regroupLine).inOrder()
+    }
+
+    /** 13 decision 5: only the groups Party broke up go back; a group outside the chosen rooms keeps its hand change. */
+    @Test
+    fun aGroupOutsideThePartyIsLeftAsChangedByHand() = runTest {
+        val before = seam.before()
+        val playing = group("Kitchen-id", "Kitchen", "Lounge", state = PlayState.PLAYING, nowPlaying = SONG)
+        partyIsUp(listOf(playing))
+        system.groups.value = listOf(playing, group("Dining-id", "Dining"))
+        val chosen = PartyGroup("Kitchen-id", setOf("Kitchen-id", "Lounge-id"))
+        assertThat(seam.stop(chosen, before)).isEqualTo(HouseStep.Done)
+        assertThat(system.calls.last()).isEqualTo("regroup Kitchen-id:Kitchen-id,Lounge-id:Lounge-id")
     }
 
     /** 13 §2.11: a new song in the same group is still Party's. */
