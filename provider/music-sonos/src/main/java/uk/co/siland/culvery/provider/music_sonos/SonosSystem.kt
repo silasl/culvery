@@ -9,6 +9,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +34,10 @@ import uk.co.siland.culvery.core.plugin.WallClock
 
 /** While the speakers stay unreachable, the automatic scan runs at most this often (6 §4.1). */
 internal const val RESCAN_GAP_MS = 30_000L
+
+/** After a regrouping the layout is read up to this many times, this far apart, until it shows the rooms where they were sent (13 §4.1). */
+internal const val SETTLE_READS = 3
+internal const val SETTLE_GAP_MS = 500L
 
 /** A group, or its leader, isn't in the layout: regrouped in the Sonos app. I/O, so the layout is read again first. */
 internal class GoneFromLayout : IOException("The group isn't in the layout")
@@ -228,9 +233,13 @@ internal class SonosSystem(
                 client.standAlone(coordinator.address)
                 listOf(coordinatorId)
             }
-            led.filter { it != coordinatorId && it !in roomIds }.forEach { id -> tryRoom { client.standAlone(rooms.getValue(id).address) } }
-            roomIds.filter { it != coordinatorId && it !in led }.forEach { id -> rooms[id]?.let { room -> tryRoom { client.join(room.address, coordinatorId) } } }
-            freshLayout()
+            val left = mutableSetOf<String>()
+            val joined = mutableSetOf<String>()
+            led.filter { it != coordinatorId && it !in roomIds }.forEach { id -> if (tryRoom { client.standAlone(rooms.getValue(id).address) } == null) left += id }
+            roomIds.filter { it != coordinatorId && it !in led }.forEach { id ->
+                rooms[id]?.let { room -> if (tryRoom { client.join(room.address, coordinatorId) } == null) joined += id }
+            }
+            settle { layout.firstOrNull { it.coordinator == coordinatorId }?.members?.map { it.uuid }.orEmpty().let { now -> now.containsAll(joined) && now.none { it in left } } }
         }
         return _groups.value.firstOrNull { it.coordinatorId == coordinatorId } ?: throw MusicRefusedException()
     }
@@ -239,6 +248,7 @@ internal class SonosSystem(
     override suspend fun regroup(groups: List<RoomGroup>) {
         var failed: MusicRefusedException? = null
         toRooms(resend = false) {
+            failed = null
             freshLayout()
             val rooms = layout.flatMap { it.members }.associateBy { it.uuid }
             val leading = layout.associate { it.coordinator to it.members.map { m -> m.uuid }.toSet() }
@@ -247,11 +257,30 @@ internal class SonosSystem(
             val joins = remembered.flatMap { g ->
                 g.roomIds.filter { it != g.coordinatorId && it in rooms && it !in leading[g.coordinatorId].orEmpty() }.map { it to g.coordinatorId }
             }
-            apart.forEach { id -> tryRoom { client.standAlone(rooms.getValue(id).address) }?.let { failed = failed ?: it } }
-            joins.forEach { (id, coordinator) -> tryRoom { client.join(rooms.getValue(id).address, coordinator) }?.let { failed = failed ?: it } }
-            if (apart.isNotEmpty() || joins.isNotEmpty()) freshLayout()
+            val alone = mutableSetOf<String>()
+            val under = mutableSetOf<Pair<String, String>>()
+            apart.forEach { id -> tryRoom { client.standAlone(rooms.getValue(id).address) }?.let { failed = failed ?: it } ?: run { alone += id } }
+            joins.forEach { (id, coordinator) -> tryRoom { client.join(rooms.getValue(id).address, coordinator) }?.let { failed = failed ?: it } ?: run { under += id to coordinator } }
+            if (alone.isNotEmpty() || under.isNotEmpty()) {
+                settle {
+                    val led = layout.associate { it.coordinator to it.members.map { m -> m.uuid }.toSet() }
+                    alone.all { it in led } && under.all { (id, coordinator) -> id in led[coordinator].orEmpty() }
+                }
+            }
         }
         failed?.let { throw it }
+    }
+
+    /**
+     * Reads the layout until [settled] holds of it: Sonos shows an acknowledged join in the topology a moment later. At
+     * most [SETTLE_READS] reads, [SETTLE_GAP_MS] apart; the last read stands when it never does.
+     */
+    private suspend fun settle(settled: () -> Boolean) {
+        repeat(SETTLE_READS) { read ->
+            if (read > 0) delay(SETTLE_GAP_MS)
+            freshLayout()
+            if (settled()) return
+        }
     }
 
     /** The layout afresh; another household answering is [MusicUnreachableException], as everywhere. */

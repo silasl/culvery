@@ -73,6 +73,33 @@ class SonosGroupingTest {
         assertThat(made.rooms.map { it.id }).containsExactly(KITCHEN, LOUNGE, DINING)
     }
 
+    /** Sonos shows an acknowledged join in the topology a moment later: the read straight after the joins may still lag. */
+    @Test
+    fun aLayoutThatLagsBehindTheJoinsIsReadAgain() = runTest {
+        kitchen.answerInOrder("GetZoneGroupState", apart(), apart(), kitchenAndLounge(), underKitchen())
+        val made = system.group(KITCHEN, setOf(KITCHEN, LOUNGE, DINING))
+        assertThat(made.rooms.map { it.id }).containsExactly(KITCHEN, LOUNGE, DINING)
+        assertThat(lounge.joins()).hasSize(1)
+        assertThat(dining.joins()).hasSize(1)
+    }
+
+    @Test
+    fun aRegroupWhoseLayoutLagsIsReadAgainAndSendsNothingTwice() = runTest {
+        kitchen.answerInOrder("GetZoneGroupState", underKitchen(), underKitchen(), loungeLeadsDining())
+        system.regroup(listOf(RoomGroup(KITCHEN, listOf(KITCHEN)), RoomGroup(LOUNGE, listOf(LOUNGE, DINING))))
+        assertThat(kitchen.received.count { it.action == "GetZoneGroupState" }).isEqualTo(3)
+        assertThat(lounge.leaves()).hasSize(1)
+        assertThat(dining.joins()).hasSize(1)
+    }
+
+    @Test
+    fun aLayoutThatNeverShowsTheJoinsReturnsWhatTheLastReadShows() = runTest {
+        kitchen.answerInOrder("GetZoneGroupState", apart())
+        val made = system.group(KITCHEN, setOf(KITCHEN, LOUNGE))
+        assertThat(made.rooms.map { it.id }).containsExactly(KITCHEN)
+        assertThat(kitchen.received.count { it.action == "GetZoneGroupState" }).isEqualTo(1 + SETTLE_READS)
+    }
+
     @Test
     fun aRoomAlreadyInTheGroupIsNotSentAJoin() = runTest {
         layouts(kitchenAndLounge(), underKitchen())

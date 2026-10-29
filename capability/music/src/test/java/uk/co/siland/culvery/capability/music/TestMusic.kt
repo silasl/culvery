@@ -173,7 +173,7 @@ internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : Music
                 else -> listOf(alone(left.first()).copy(rooms = left))
             }
         }
-        val leads = (led ?: layout.first { g -> g.rooms.any { it.id == coordinatorId } }.copy(id = coordinatorId, state = PlayState.STOPPED, nowPlaying = null))
+        val leads = (led ?: (layout.firstOrNull { g -> g.rooms.any { it.id == coordinatorId } } ?: throw MusicRefusedException()).copy(id = coordinatorId, state = PlayState.STOPPED, nowPlaying = null))
             .copy(rooms = ids.sorted().sortedBy { it != coordinatorId }.mapNotNull { rooms[it] }, coordinatorId = coordinatorId)
         return listOf(leads) + stay
     }
