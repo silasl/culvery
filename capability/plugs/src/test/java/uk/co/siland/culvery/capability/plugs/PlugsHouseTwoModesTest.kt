@@ -156,7 +156,7 @@ class PlugsHouseTwoModesTest {
         assertThat(rig.lampIsOn()).isFalse()
     }
 
-    /** 12 §5.4: fails if a mode that can't put a plug back drops the note of the mode still holding it. */
+    /** 12 §5.4: fails if the newest mode that can't put a plug back drops the note of the older mode still holding it. */
     @Test
     fun unreachableAtLeaveWithAnotherHolderKeepsTheNote() = runTest {
         val rig = rig(ON, OFF)
@@ -165,9 +165,42 @@ class PlugsHouseTwoModesTest {
         house.start(PARTY)
         rig.power(LAMP, UNREACHABLE)
 
-        assertThat(house.leave(HOLIDAY)).isInstanceOf(HouseStep.Failed::class.java)
+        assertThat(house.leave(PARTY)).isInstanceOf(HouseStep.Failed::class.java)
+
+        assertThat(rig.note()).isEqualTo(PlugNote(false, listOf(Holder(HOLIDAY, true))))
+    }
+
+    /** 12 §5.4: fails if an older mode leaving reports a plug the newer mode still controls as not put back. */
+    @Test
+    fun unreachableAtLeaveOfAnOlderHolderIsNotAFailure() = runTest {
+        val rig = rig(ON, OFF)
+        val house = rig.house()
+        house.start(HOLIDAY)
+        house.start(PARTY)
+        rig.power(LAMP, UNREACHABLE)
+
+        assertThat(house.leave(HOLIDAY)).isEqualTo(HouseStep.Done)
 
         assertThat(rig.note()).isEqualTo(PlugNote(false, listOf(Holder(PARTY, false))))
+        assertThat(rig.system.switches).hasSize(2)
+    }
+
+    /** 12 §2.7: fails if a mode's own unconfirmed switch lets leave override a hand change. */
+    @Test
+    fun aHandChangeIsKeptWhenOnlyTheLeavingModeIsPending() = runTest {
+        val rig = rig(ON, ON)
+        rig.configure {
+            it.copy(
+                runs = mapOf(HOLIDAY to ModeRun(1, emptyMap()), PARTY to ModeRun(2, mapOf(LAMP to true))),
+                notes = mapOf(LAMP to PlugNote(false, listOf(Holder(HOLIDAY, true), Holder(PARTY, true)))),
+                next = 3,
+            )
+        }
+
+        assertThat(rig.house().leave(PARTY)).isEqualTo(HouseStep.Done)
+
+        assertThat(rig.system.switches).isEmpty()
+        assertThat(rig.note()).isNull()
     }
 
     /** 12 §2.7: fails if a hand change made while one mode holds the plug is kept as that mode's note for the next. */
