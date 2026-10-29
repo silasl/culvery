@@ -21,6 +21,7 @@ import uk.co.siland.culvery.core.plugin.RailBadge
 import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Toaster
 import uk.co.siland.culvery.core.ui.Icons
+import uk.co.siland.culvery.core.ui.ShowingTheme
 
 const val DOOR_ID = "door"
 
@@ -35,6 +36,7 @@ class DoorCapability @Inject constructor(
     private val health: DoorHealth,
     private val chime: Chime,
     private val toaster: Toaster,
+    private val showing: ShowingTheme,
 ) : Capability {
     override val id = DOOR_ID
     override val label = "Door"
@@ -55,7 +57,7 @@ class DoorCapability @Inject constructor(
         .distinctUntilChanged()
 
     private val pages: List<SettingsPage> = listOfNotNull(
-        provider?.let { p -> DoorPage { DoorSettingsHost(settings, health, p, chime, clock, zone.zone, toaster) } },
+        provider?.let { p -> DoorPage { DoorSettingsHost(settings, health, p, chime, clock, zone.zone, toaster, showing.showing) } },
     )
 
     override fun settingsPages(): List<SettingsPage> = pages

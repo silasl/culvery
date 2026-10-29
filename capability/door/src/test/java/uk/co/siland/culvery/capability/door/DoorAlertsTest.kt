@@ -14,6 +14,7 @@ import org.junit.Test
 import uk.co.siland.culvery.capability.door.ui.DoorCardUi
 import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 
 /** 5 §4.6–4.7: card and chime for a new ring in front; record only otherwise; 60 seconds, Got it, quiet hours, 10 seconds. */
 class DoorAlertsTest {
@@ -28,9 +29,10 @@ class DoorAlertsTest {
 
     private var night = false
     private var holiday: Boolean? = null
+    private var theme: SeasonalTheme? = null
 
     private fun TestScope.alerts() =
-        DoorAlerts(host, { seen += it }, { prefs }, chime, { london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { night }, { holiday })
+        DoorAlerts(host, { seen += it }, { prefs }, chime, { london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { night }, { holiday }, { theme })
 
     private fun TestScope.rung(id: Long, isNew: Boolean = true, device: String = "Front Door", unrecognised: Boolean = false, snapshot: File? = null) =
         Recorded(DoorEvent(id, start + testScheduler.currentTime, DoorKind.RING, device, unrecognised, snapshot, seen = false), isNew)
@@ -127,7 +129,7 @@ class DoorAlertsTest {
     @Test
     fun aRingHoldingTheLockAsTheSixtySecondsEndKeepsItsCard() = runTest {
         var gate: CompletableDeferred<Unit>? = null
-        val alerts = DoorAlerts(host, { seen += it }, { prefs }, chime, { gate?.await(); london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { false }, { null })
+        val alerts = DoorAlerts(host, { seen += it }, { prefs }, chime, { gate?.await(); london }, WallClock { start + testScheduler.currentTime }, backgroundScope, NightHours { false }, { null }, { null })
         alerts.onRecorded(rung(1))
         advanceTimeBy(CARD_MS - 1_000)
         gate = CompletableDeferred()
@@ -192,6 +194,36 @@ class DoorAlertsTest {
         alerts.onRecorded(rung(1))
         assertThat(host.shown).isEqualTo(1)
         assertThat(chime.volumes).isEmpty()
+    }
+
+    /** 14 §4.6: Follow the theme rings the organ while Halloween shows, once. */
+    @Test
+    fun aRingDuringHalloweenPlaysTheOrgan() = runTest {
+        prefs = DoorPrefs(volume = 0.6f)
+        theme = SeasonalTheme.HALLOWEEN
+        alerts().onRecorded(rung(1))
+        assertThat(chime.plays).containsExactly(DoorSound.ORGAN to 0.6f)
+    }
+
+    /** The theme is read at the ring, so a preview that ended between two rings changes the second. */
+    @Test
+    fun aRingPlaysTheThemesSoundAsItIsNow() = runTest {
+        val alerts = alerts()
+        theme = SeasonalTheme.HALLOWEEN
+        alerts.onRecorded(rung(1))
+        advanceTimeBy(CHIME_GAP_MS + 1_000)
+        theme = null
+        alerts.onRecorded(rung(2))
+        assertThat(chime.plays.map { it.first }).containsExactly(DoorSound.ORGAN, DoorSound.CLASSIC).inOrder()
+    }
+
+    /** **pin** (14 §4.6): the organ is a chime, so quiet hours silence it as they do the classic one. 22:00 BST. */
+    @Test
+    fun quietHoursStillSilenceTheOrgan() = runTest {
+        start = NOW + 8 * 60 * 60_000L - 2 * 60_000L
+        prefs = DoorPrefs(doorbell = DoorbellChoice.ORGAN)
+        alerts().onRecorded(rung(1))
+        assertThat(chime.plays).isEmpty()
     }
 
     /** 5 §2.7: stored while Culvery is behind another app; coming back raises nothing. */

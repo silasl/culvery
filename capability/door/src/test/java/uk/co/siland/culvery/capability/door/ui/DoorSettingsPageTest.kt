@@ -6,12 +6,17 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -36,6 +41,8 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import uk.co.siland.culvery.capability.door.CAPTURE_MS
 import uk.co.siland.culvery.capability.door.DoorHealth
+import uk.co.siland.culvery.capability.door.DoorSound
+import uk.co.siland.culvery.capability.door.DoorbellChoice
 import uk.co.siland.culvery.capability.door.DoorPrefs
 import uk.co.siland.culvery.capability.door.FakeChime
 import uk.co.siland.culvery.capability.door.FakeDoorProvider
@@ -48,6 +55,7 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.WallClock
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.SETTINGS_HOLD_MS
 import uk.co.siland.culvery.core.ui.test.assertAccessible
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
@@ -79,12 +87,12 @@ class DoorSettingsPageTest {
 
     private fun prefs(): DoorPrefs = runBlocking { settings.prefs.first() }
 
-    private fun showHost() {
+    private fun showHost(showing: SeasonalTheme? = null) {
         val health = DoorHealth(provider, settings, MutableStateFlow(true), MutableStateFlow(true), io)
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides navigator) {
                 CulveryTheme(dark = true) {
-                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, clock, flowOf(london), toaster) }
+                    InSettingsPane { DoorSettingsHost(settings, health, provider, chime, clock, flowOf(london), toaster, MutableStateFlow(showing)) }
                 }
             }
         }
@@ -112,7 +120,7 @@ class DoorSettingsPageTest {
     @Test
     fun allowNotificationAccessAsksForAndroidsScreen() {
         showHost()
-        compose.onNodeWithTag("door_step_access").performClick()
+        compose.onNodeWithTag("door_step_access").performScrollTo().performClick()
         assertThat(navigator.systemScreens).containsExactly(
             listOf("android.settings.NOTIFICATION_LISTENER_DETAIL_SETTINGS", "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS") to NOTIFICATION_ACCESS_MISSING,
         )
@@ -126,6 +134,42 @@ class DoorSettingsPageTest {
         waitFor { compose.onAllNodesWithTag("door_volume").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("door_play_chime").performClick()
         assertThat(chime.volumes).containsExactly(0.4f)
+    }
+
+    /** 14 §4.6: the first section, before Chime; Follow the theme is chosen until another is. */
+    @Test
+    fun theDoorbellSoundRows() {
+        showHost()
+        val sound = compose.onNodeWithContentDescription("Doorbell sound").getBoundsInRoot()
+        val chimeSection = compose.onNodeWithContentDescription("Chime").getBoundsInRoot()
+        assertThat(sound.top).isLessThan(chimeSection.top)
+        compose.onNodeWithTag("door_doorbell_follow").assertIsSelected().assertTextContains("Follow the theme")
+        compose.onNodeWithTag("door_doorbell_follow_note", useUnmergedTree = true)
+            .assertTextEquals("The haunted organ while Halloween shows, the classic chime otherwise.")
+        compose.onNodeWithTag("door_doorbell_classic").assertIsNotSelected().assertTextContains("Classic chime")
+        compose.onNodeWithTag("door_doorbell_organ").assertIsNotSelected().assertTextContains("Haunted organ")
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    @Test
+    fun choosingASoundSavesIt() {
+        showHost()
+        compose.onNodeWithTag("door_doorbell_organ").performClick()
+        waitFor { prefs().doorbell == DoorbellChoice.ORGAN }
+        waitFor { runCatching { compose.onNodeWithTag("door_doorbell_organ").assertIsSelected() }.isSuccess }
+    }
+
+    /** The preview button plays what a ring would: the showing theme's sound under Follow the theme, else the choice. */
+    @Test
+    fun playChimePlaysWhatARingWould() {
+        showHost(SeasonalTheme.HALLOWEEN)
+        compose.onNodeWithTag("door_play_chime").performClick()
+        assertThat(chime.plays).containsExactly(DoorSound.ORGAN to 1.0f)
+        compose.onNodeWithTag("door_doorbell_classic").performClick()
+        waitFor { prefs().doorbell == DoorbellChoice.CLASSIC }
+        waitFor { runCatching { compose.onNodeWithTag("door_doorbell_classic").assertIsSelected() }.isSuccess }
+        compose.onNodeWithTag("door_play_chime").performClick()
+        assertThat(chime.plays.last()).isEqualTo(DoorSound.CLASSIC to 1.0f)
     }
 
     private fun spokenVolume(): String {
@@ -142,8 +186,8 @@ class DoorSettingsPageTest {
             CulveryTheme(dark = true) {
                 InSettingsPane {
                     DoorSettingsScreen(
-                        DoorSettingsUi("Ring", null, stored, false, LocalTime.of(21, 0), LocalTime.of(7, 0), null, "", true, true, false),
-                        DoorSettingsActions(onVolume, {}, { _, _, _ -> }, {}, {}),
+                        DoorSettingsUi("Ring", null, stored, DoorbellChoice.FOLLOW_THEME, false, LocalTime.of(21, 0), LocalTime.of(7, 0), null, "", true, true, false),
+                        DoorSettingsActions(onVolume, {}, {}, { _, _, _ -> }, {}, {}),
                     )
                 }
             }

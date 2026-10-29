@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.door.ui
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -17,19 +18,25 @@ import java.time.LocalTime
 import java.time.ZoneId
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import uk.co.siland.culvery.capability.door.ACCESS_STEP
 import uk.co.siland.culvery.capability.door.ACCESS_STEP_LINE
 import uk.co.siland.culvery.capability.door.CAPTURE_LINE
 import uk.co.siland.culvery.capability.door.CAPTURE_MS
 import uk.co.siland.culvery.capability.door.CHIME
 import uk.co.siland.culvery.capability.door.CHIME_VOLUME
+import uk.co.siland.culvery.capability.door.CLASSIC_CHIME
 import uk.co.siland.culvery.capability.door.Chime
-import uk.co.siland.culvery.capability.door.DoorSound
 import uk.co.siland.culvery.capability.door.DONE
 import uk.co.siland.culvery.capability.door.DOOR
 import uk.co.siland.culvery.capability.door.DoorHealth
 import uk.co.siland.culvery.capability.door.DoorProvider
+import uk.co.siland.culvery.capability.door.DOORBELL_SOUND
 import uk.co.siland.culvery.capability.door.DoorSettings
+import uk.co.siland.culvery.capability.door.DoorbellChoice
+import uk.co.siland.culvery.capability.door.FOLLOW_THE_THEME
+import uk.co.siland.culvery.capability.door.FOLLOW_THE_THEME_LINE
+import uk.co.siland.culvery.capability.door.HAUNTED_ORGAN
 import uk.co.siland.culvery.capability.door.NOTIFICATION_ACCESS_MISSING
 import uk.co.siland.culvery.capability.door.NOT_DONE_YET
 import uk.co.siland.culvery.capability.door.OPEN_NOTIFICATION_ACCESS
@@ -39,6 +46,7 @@ import uk.co.siland.culvery.capability.door.appStep
 import uk.co.siland.culvery.capability.door.checkNotifications
 import uk.co.siland.culvery.capability.door.lastHeard
 import uk.co.siland.culvery.capability.door.quietHoursLine
+import uk.co.siland.culvery.capability.door.soundFor
 import uk.co.siland.culvery.core.plugin.HouseholdClock
 import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.SettingsPage
@@ -52,6 +60,7 @@ import uk.co.siland.culvery.core.ui.HhButton
 import uk.co.siland.culvery.core.ui.HhIcon
 import uk.co.siland.culvery.core.ui.HhListRow
 import uk.co.siland.culvery.core.ui.HhPageTitle
+import uk.co.siland.culvery.core.ui.HhRadioRow
 import uk.co.siland.culvery.core.ui.HhSectionLabel
 import uk.co.siland.culvery.core.ui.HhSliderRow
 import uk.co.siland.culvery.core.ui.HhSwitchRow
@@ -59,6 +68,8 @@ import uk.co.siland.culvery.core.ui.HhTimeStepperRow
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
 import uk.co.siland.culvery.core.ui.ListRowTokens
+import uk.co.siland.culvery.core.ui.RadioRowTokens
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.UNTIL
 
 private const val TAG = "DoorSettings"
@@ -79,6 +90,7 @@ data class DoorSettingsUi(
     val service: String,
     val hint: String?,
     val volume: Float,
+    val doorbell: DoorbellChoice,
     val quietOn: Boolean,
     val quietFrom: LocalTime,
     val quietUntil: LocalTime,
@@ -91,6 +103,7 @@ data class DoorSettingsUi(
 
 class DoorSettingsActions(
     val onVolume: (Float) -> Unit,
+    val onDoorbell: (DoorbellChoice) -> Unit,
     val onPlayChime: () -> Unit,
     val onQuietHours: (on: Boolean, from: LocalTime, until: LocalTime) -> Unit,
     val onAllowAccess: () -> Unit,
@@ -105,6 +118,12 @@ fun DoorSettingsScreen(ui: DoorSettingsUi, actions: DoorSettingsActions) {
         modifier = Modifier.testTag("settings_door"),
     ) {
         HhPageTitle(DOOR)
+        HhSectionLabel(DOORBELL_SOUND)
+        Column(verticalArrangement = Arrangement.spacedBy(RadioRowTokens.gap), modifier = Modifier.selectableGroup()) {
+            HhRadioRow(FOLLOW_THE_THEME, FOLLOW_THE_THEME_LINE, ui.doorbell == DoorbellChoice.FOLLOW_THEME, "door_doorbell_follow") { actions.onDoorbell(DoorbellChoice.FOLLOW_THEME) }
+            HhRadioRow(CLASSIC_CHIME, null, ui.doorbell == DoorbellChoice.CLASSIC, "door_doorbell_classic") { actions.onDoorbell(DoorbellChoice.CLASSIC) }
+            HhRadioRow(HAUNTED_ORGAN, null, ui.doorbell == DoorbellChoice.ORGAN, "door_doorbell_organ") { actions.onDoorbell(DoorbellChoice.ORGAN) }
+        }
         HhSectionLabel(CHIME)
         HhSliderRow(
             CHIME_VOLUME, (ui.volume * 100).roundToInt(), "door_volume",
@@ -155,6 +174,7 @@ internal fun DoorSettingsHost(
     clock: HouseholdClock,
     zone: Flow<ZoneId>,
     toaster: Toaster,
+    showing: StateFlow<SeasonalTheme?>,
 ) {
     val prefs by settings.prefs.collectAsStateWithLifecycle(null)
     val checks by health.checks.collectAsStateWithLifecycle()
@@ -173,6 +193,7 @@ internal fun DoorSettingsHost(
             service = service,
             hint = provider.descriptor.connectHint,
             volume = p.volume,
+            doorbell = p.doorbell,
             quietOn = p.quietOn,
             quietFrom = p.quietFrom,
             quietUntil = p.quietUntil,
@@ -184,7 +205,8 @@ internal fun DoorSettingsHost(
         ),
         DoorSettingsActions(
             onVolume = { v -> change { settings.setVolume(v) } },
-            onPlayChime = { chime.play(DoorSound.CLASSIC, p.volume) },
+            onDoorbell = { choice -> change { settings.setDoorbell(choice) } },
+            onPlayChime = { chime.play(p.doorbell.soundFor(showing.value), p.volume) },
             onQuietHours = { on, from, until -> change { settings.setQuietHours(on, from, until) } },
             onAllowAccess = { navigator.openSystemScreen(provider.accessScreens(), NOTIFICATION_ACCESS_MISSING) },
             onCapture = { on -> change { settings.setCapture(if (on) clock.nowMillis() + CAPTURE_MS else 0L) } },

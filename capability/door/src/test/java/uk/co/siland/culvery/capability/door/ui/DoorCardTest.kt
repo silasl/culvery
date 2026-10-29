@@ -149,7 +149,7 @@ class DoorCardTest {
         val host = FakeAlertHost()
         val seen = mutableListOf<Long>()
         val alerts = DoorAlerts(
-            host, { seen += it }, { DoorPrefs() }, FakeChime(), { ZoneId.of("Europe/London") }, WallClock { NOW }, scope.backgroundScope, NightHours { false }, { null },
+            host, { seen += it }, { DoorPrefs() }, FakeChime(), { ZoneId.of("Europe/London") }, WallClock { NOW }, scope.backgroundScope, NightHours { false }, { null }, { null },
         )
         scope.launch { alerts.onRecorded(Recorded(DoorEvent(1, NOW, DoorKind.RING, "Front Door", false, null, seen = false), isNew = true)) }
         scope.runCurrent()

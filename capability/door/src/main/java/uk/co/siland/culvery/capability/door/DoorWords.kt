@@ -74,6 +74,11 @@ fun doorSubtitle(events: List<DoorEvent>, newCount: Int): String? {
 }
 
 internal const val DOOR = "Door"
+internal const val DOORBELL_SOUND = "Doorbell sound"
+internal const val FOLLOW_THE_THEME = "Follow the theme"
+internal const val FOLLOW_THE_THEME_LINE = "The haunted organ while Halloween shows, the classic chime otherwise."
+internal const val CLASSIC_CHIME = "Classic chime"
+internal const val HAUNTED_ORGAN = "Haunted organ"
 internal const val CHIME = "Chime"
 internal const val CHIME_VOLUME = "Chime volume"
 internal const val PLAY_CHIME = "Play chime"

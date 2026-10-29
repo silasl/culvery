@@ -43,7 +43,7 @@ class DoorCapabilityTest {
 
     private fun capability(providers: Set<DoorProvider>) = DoorCapability(
         store, settings, providers, clock, householdZone(),
-        DoorHealth(providers.firstOrNull(), settings, MutableStateFlow(true), MutableStateFlow(true), scope), FakeChime(), RecordingToaster(),
+        DoorHealth(providers.firstOrNull(), settings, MutableStateFlow(true), MutableStateFlow(true), scope), FakeChime(), RecordingToaster(), FakeShowing(),
     )
 
     @After

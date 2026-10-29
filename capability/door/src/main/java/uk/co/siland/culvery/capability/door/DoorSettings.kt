@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
@@ -27,6 +28,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.settingsDataStore
+import uk.co.siland.culvery.core.ui.SeasonalSound
+import uk.co.siland.culvery.core.ui.SeasonalTheme
+import uk.co.siland.culvery.core.ui.look
 
 private const val FILE = "door_settings"
 private const val TAG = "DoorSettings"
@@ -35,11 +39,24 @@ private const val SECONDS_PER_MINUTE = 60
 /** Check Ring's notifications runs this long at most (5 §5.4). */
 const val CAPTURE_MS = 30 * 60 * 1_000L
 
+/** What Settings › Door lets the family pick; Follow the theme plays whatever the showing theme's look names (14 §4.6). */
+enum class DoorbellChoice { FOLLOW_THEME, CLASSIC, ORGAN }
+
+fun DoorbellChoice.soundFor(showing: SeasonalTheme?): DoorSound = when (this) {
+    DoorbellChoice.FOLLOW_THEME -> when (showing?.look?.sound) {
+        SeasonalSound.HAUNTED_ORGAN -> DoorSound.ORGAN
+        null -> DoorSound.CLASSIC
+    }
+    DoorbellChoice.CLASSIC -> DoorSound.CLASSIC
+    DoorbellChoice.ORGAN -> DoorSound.ORGAN
+}
+
 /** The door's settings. Defaults: 5 §2.6, §4.1, §5.4. */
 data class DoorPrefs(
     /** Both connect steps were done: the Door tab shows (5 §5.5). */
     val connected: Boolean = false,
     val volume: Float = 1.0f,
+    val doorbell: DoorbellChoice = DoorbellChoice.FOLLOW_THEME,
     val quietOn: Boolean = true,
     val quietFrom: LocalTime = LocalTime.of(21, 0),
     val quietUntil: LocalTime = LocalTime.of(7, 0),
@@ -79,6 +96,8 @@ class DoorSettings(private val store: DataStore<Preferences>, scope: CoroutineSc
 
     suspend fun setVolume(volume: Float) = edit { it[VOLUME] = volume.coerceIn(0f, 1f) }
 
+    suspend fun setDoorbell(choice: DoorbellChoice) = edit { it[DOORBELL] = choice.name }
+
     suspend fun setQuietHours(on: Boolean, from: LocalTime, until: LocalTime) = edit {
         it[QUIET_ON] = on
         it[QUIET_FROM] = from.toSecondOfDay() / SECONDS_PER_MINUTE
@@ -102,6 +121,7 @@ class DoorSettings(private val store: DataStore<Preferences>, scope: CoroutineSc
         return DoorPrefs(
             connected = this[CONNECTED] ?: defaults.connected,
             volume = this[VOLUME] ?: defaults.volume,
+            doorbell = this[DOORBELL]?.let { name -> DoorbellChoice.entries.firstOrNull { it.name == name } } ?: defaults.doorbell,
             quietOn = this[QUIET_ON] ?: defaults.quietOn,
             quietFrom = this[QUIET_FROM]?.let { LocalTime.ofSecondOfDay(it * SECONDS_PER_MINUTE.toLong()) } ?: defaults.quietFrom,
             quietUntil = this[QUIET_UNTIL]?.let { LocalTime.ofSecondOfDay(it * SECONDS_PER_MINUTE.toLong()) } ?: defaults.quietUntil,
@@ -114,6 +134,7 @@ class DoorSettings(private val store: DataStore<Preferences>, scope: CoroutineSc
     private companion object {
         val CONNECTED = booleanPreferencesKey("connected")
         val VOLUME = floatPreferencesKey("chime_volume")
+        val DOORBELL = stringPreferencesKey("doorbell_sound")
         val QUIET_ON = booleanPreferencesKey("quiet_on")
         val QUIET_FROM = intPreferencesKey("quiet_from_minute")
         val QUIET_UNTIL = intPreferencesKey("quiet_until_minute")

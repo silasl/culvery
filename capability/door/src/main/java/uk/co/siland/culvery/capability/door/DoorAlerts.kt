@@ -20,6 +20,8 @@ import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.ApplicationScope
 import uk.co.siland.culvery.core.plugin.NightHours
 import uk.co.siland.culvery.core.plugin.WallClock
+import uk.co.siland.culvery.core.ui.SeasonalTheme
+import uk.co.siland.culvery.core.ui.ShowingTheme
 
 /** A card closes by itself after this long: 60 seconds (9 §2.4). */
 const val CARD_MS = 60_000L
@@ -47,6 +49,7 @@ class DoorAlerts internal constructor(
     private val scope: CoroutineScope,
     private val night: NightHours,
     private val holiday: () -> Boolean?,
+    private val theme: () -> SeasonalTheme?,
 ) {
     @Inject
     constructor(
@@ -59,7 +62,8 @@ class DoorAlerts internal constructor(
         @ApplicationScope scope: CoroutineScope,
         night: NightHours,
         house: HouseMode,
-    ) : this(host, store::markSeen, { settings.current.value }, chime, zone::current, clock, scope, night, { house.holiday.value })
+        showing: ShowingTheme,
+    ) : this(host, store::markSeen, { settings.current.value }, chime, zone::current, clock, scope, night, { house.holiday.value }, { showing.showing.value })
 
     private val lock = Mutex()
     private val _showing = MutableStateFlow<ShowingRing?>(null)
@@ -94,7 +98,7 @@ class DoorAlerts internal constructor(
         if (quietAt(now, z, p) || chimedRecently) return@withLock
         // Music and the like go quieter first, for half a second at most (6 §3.3).
         host.quieted()
-        if (chime.play(DoorSound.CLASSIC, p.volume)) lastChimeMillis = now
+        if (chime.play(p.doorbell.soundFor(theme()), p.volume)) lastChimeMillis = now
     }
 
     /** Got it on [eventId]'s card: that ring counts as seen, and the card goes if it still shows that ring (5 §4.7). */

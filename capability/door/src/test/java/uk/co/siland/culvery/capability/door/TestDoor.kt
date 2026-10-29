@@ -15,6 +15,8 @@ import uk.co.siland.culvery.core.household.HouseholdZone
 import uk.co.siland.culvery.core.household.db.HouseholdDatabase
 import uk.co.siland.culvery.core.plugin.AlertHost
 import uk.co.siland.culvery.core.plugin.settingsDataStore
+import uk.co.siland.culvery.core.ui.SeasonalTheme
+import uk.co.siland.culvery.core.ui.ShowingTheme
 
 internal fun doorDb(): DoorDatabase =
     Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), DoorDatabase::class.java)
@@ -96,4 +98,8 @@ internal class FakeChime : Chime {
         plays += sound to volume
         return starts
     }
+}
+
+internal class FakeShowing(theme: SeasonalTheme? = null) : ShowingTheme {
+    override val showing = MutableStateFlow(theme)
 }
