@@ -31,6 +31,7 @@ import uk.co.siland.culvery.core.ui.HhSliderRow
 import uk.co.siland.culvery.core.ui.HhSwitchRow
 import uk.co.siland.culvery.core.ui.HhTimeStepperRow
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.UNTIL
 import uk.co.siland.culvery.display.ALLOW_THE_CAMERA
 import uk.co.siland.culvery.display.BRIGHTNESS
@@ -53,15 +54,19 @@ import uk.co.siland.culvery.display.NIGHT_START
 import uk.co.siland.culvery.display.NO_FRONT_CAMERA
 import uk.co.siland.culvery.display.NO_SUN_TIMES
 import uk.co.siland.culvery.display.OPEN_ANDROIDS_SETTINGS
+import uk.co.siland.culvery.display.SEASONAL_THEMES
 import uk.co.siland.culvery.display.SLEEP
 import uk.co.siland.culvery.display.SLEEP_CHOICES
 import uk.co.siland.culvery.display.SLEEP_WHEN_ALONE
+import uk.co.siland.culvery.display.SeasonalThemes
 import uk.co.siland.culvery.display.WAKE_BY_CAMERA
 import uk.co.siland.culvery.display.WAKE_BY_CAMERA_DEFAULT
 import uk.co.siland.culvery.display.WAKE_BY_CAMERA_LINE
 import uk.co.siland.culvery.display.appDetailsIntents
 import uk.co.siland.culvery.display.minutes
 import uk.co.siland.culvery.display.nightClockLine
+import uk.co.siland.culvery.display.previewLine
+import uk.co.siland.culvery.display.previewTitle
 import uk.co.siland.culvery.display.sleepAfter
 import uk.co.siland.culvery.shell.SunToday
 
@@ -75,6 +80,7 @@ class DisplayPage @Inject constructor(
     private val access: CameraAccess,
     private val sunToday: SunToday,
     private val toaster: Toaster,
+    private val themes: SeasonalThemes,
 ) : SettingsPage {
     override val id = DISPLAY_PAGE_ID
     override val title = DISPLAY
@@ -82,11 +88,11 @@ class DisplayPage @Inject constructor(
 
     @Composable
     override fun Content() {
-        DisplaySettingsHost(settings, access, sunToday, toaster, LocalShellNavigator.current)
+        DisplaySettingsHost(settings, access, sunToday, toaster, LocalShellNavigator.current, themes)
     }
 }
 
-data class DisplaySettingsUi(val prefs: DisplayPrefs, val camera: CameraState, val sunKnown: Boolean)
+data class DisplaySettingsUi(val prefs: DisplayPrefs, val camera: CameraState, val sunKnown: Boolean, val previewing: SeasonalTheme? = null)
 
 class DisplaySettingsActions(
     val onNight: (LocalTime, LocalTime) -> Unit,
@@ -96,6 +102,7 @@ class DisplaySettingsActions(
     val onWakeByCamera: (Boolean) -> Unit,
     val onAllowCamera: () -> Unit,
     val onOpenAndroidSettings: () -> Unit,
+    val onPreview: (SeasonalTheme, Boolean) -> Unit = { _, _ -> },
 )
 
 @Composable
@@ -122,6 +129,11 @@ fun DisplaySettingsScreen(ui: DisplaySettingsUi, actions: DisplaySettingsActions
             }
         }
         CameraRow(ui, actions)
+        HhSectionLabel(SEASONAL_THEMES)
+        SeasonalTheme.entries.forEach { theme ->
+            val on = ui.previewing == theme
+            HhSwitchRow(previewTitle(theme.label), previewLine(theme.label, on), on, "display_preview_${theme.name.lowercase()}", { actions.onPreview(theme, it) })
+        }
     }
 }
 
@@ -158,16 +170,18 @@ internal fun DisplaySettingsHost(
     sunToday: SunToday,
     toaster: Toaster,
     navigator: ShellNavigator,
+    themes: SeasonalThemes,
 ) {
     val prefs by settings.read.collectAsStateWithLifecycle()
     val camera by access.state.collectAsStateWithLifecycle()
     val sun by sunToday.times.collectAsStateWithLifecycle()
+    val previewing by themes.previewing.collectAsStateWithLifecycle()
     val packageName = LocalContext.current.packageName
     val scope = rememberCoroutineScope()
     val p = prefs ?: return
     val change = scope.saving(toaster) { Log.w(TAG, "Couldn't save a display setting (${it::class.simpleName})") }
     DisplaySettingsScreen(
-        DisplaySettingsUi(p, camera, sunKnown = sun != null),
+        DisplaySettingsUi(p, camera, sunKnown = sun != null, previewing = previewing),
         DisplaySettingsActions(
             onNight = { from, until -> change { settings.setNight(from, until) } },
             onDay = { v -> change { settings.setDayPercent(v) } },
@@ -176,6 +190,7 @@ internal fun DisplaySettingsHost(
             onWakeByCamera = { on -> change { settings.setWakeByCamera(on) } },
             onAllowCamera = access::ask,
             onOpenAndroidSettings = { navigator.openSystemScreen(appDetailsIntents(packageName), CANT_OPEN_ANDROIDS_SETTINGS) },
+            onPreview = themes::preview,
         ),
     )
 }

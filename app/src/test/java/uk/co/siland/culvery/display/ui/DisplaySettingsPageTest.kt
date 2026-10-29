@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -18,12 +19,15 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import java.time.LocalDateTime
 import java.time.LocalTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Rule
@@ -34,10 +38,13 @@ import uk.co.siland.culvery.core.plugin.LocalShellNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.plugin.test.RecordingToaster
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SeasonalTheme
+import uk.co.siland.culvery.core.ui.defaultSeasonDates
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.display.CameraAccess
 import uk.co.siland.culvery.display.CameraState
 import uk.co.siland.culvery.display.DisplayPrefs
+import uk.co.siland.culvery.display.SeasonalThemes
 import uk.co.siland.culvery.display.appDetailsIntents
 import uk.co.siland.culvery.display.displaySettings
 import uk.co.siland.culvery.shell.SunToday
@@ -56,6 +63,7 @@ class DisplaySettingsPageTest {
     private val wakes = mutableListOf<Boolean>()
     private var allows = 0
     private var opens = 0
+    private val previews = mutableListOf<Pair<SeasonalTheme, Boolean>>()
     private val actions = DisplaySettingsActions(
         onNight = { from, until -> nights += from to until },
         onDay = { days += it },
@@ -64,16 +72,24 @@ class DisplaySettingsPageTest {
         onWakeByCamera = { wakes += it },
         onAllowCamera = { allows++ },
         onOpenAndroidSettings = { opens++ },
+        onPreview = { theme, on -> previews += theme to on },
     )
 
     @After
     fun tearDown() = io.cancel()
 
-    private fun show(camera: CameraState = CameraState.ALLOWED, prefs: DisplayPrefs = DisplayPrefs(), sunKnown: Boolean = true) {
+    private fun show(
+        camera: CameraState = CameraState.ALLOWED,
+        prefs: DisplayPrefs = DisplayPrefs(),
+        sunKnown: Boolean = true,
+        previewing: SeasonalTheme? = null,
+    ) {
         compose.setContent {
-            CulveryTheme(dark = true) { InSettingsPane { DisplaySettingsScreen(DisplaySettingsUi(prefs, camera, sunKnown), actions) } }
+            CulveryTheme(dark = true) { InSettingsPane { DisplaySettingsScreen(DisplaySettingsUi(prefs, camera, sunKnown, previewing), actions) } }
         }
     }
+
+    private fun themes(now: MutableStateFlow<LocalDateTime?>) = SeasonalThemes(now, flowOf(defaultSeasonDates()), io)
 
     private fun shows(tag: String) = compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
@@ -87,7 +103,7 @@ class DisplaySettingsPageTest {
     /** Fails if the page's id, name or place in Settings' list changes. */
     @Test
     fun itSitsBeforeMusic() {
-        val page = DisplayPage(displaySettings(folder.root, io), access(), SunToday(null, io), RecordingToaster())
+        val page = DisplayPage(displaySettings(folder.root, io), access(), SunToday(null, io), RecordingToaster(), themes(MutableStateFlow(null)))
         assertThat(page.id).isEqualTo("display")
         assertThat(page.id).isEqualTo(DISPLAY_PAGE_ID)
         assertThat(page.title).isEqualTo("Display")
@@ -230,7 +246,7 @@ class DisplaySettingsPageTest {
         val navigator = RecordingNavigator()
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides navigator) {
-                CulveryTheme(dark = true) { InSettingsPane { DisplayPage(settings, access, SunToday(null, io), RecordingToaster()).Content() } }
+                CulveryTheme(dark = true) { InSettingsPane { DisplayPage(settings, access, SunToday(null, io), RecordingToaster(), themes(MutableStateFlow(null))).Content() } }
             }
         }
         compose.waitUntil(5_000) {
@@ -249,5 +265,92 @@ class DisplaySettingsPageTest {
             listOf("android.settings.APPLICATION_DETAILS_SETTINGS") to
                 "Culvery can’t open Android’s settings for Culvery. Allow the camera in Android’s Settings › Apps › Culvery › Permissions.",
         )
+    }
+
+    /** Fails if a theme has no preview switch, it starts on, or its line or section name differs. */
+    @Test
+    fun eachThemeHasAPreview() {
+        show()
+        compose.onNodeWithContentDescription("Seasonal themes").performScrollTo().assertExists()
+        SeasonalTheme.entries.forEach { theme ->
+            val tag = "display_preview_${theme.name.lowercase()}"
+            compose.onNodeWithTag(tag).performScrollTo().assertIsOff()
+            compose.onNodeWithText("Preview ${theme.label}").assertExists()
+            compose.onNodeWithText("Shows ${theme.label} on the wall and plays its doorbell until midnight.").assertExists()
+        }
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if a running preview doesn't say when it ends. */
+    @Test
+    fun turningThePreviewOnSaysWhenItEnds() {
+        show(previewing = SeasonalTheme.HALLOWEEN)
+        compose.onNodeWithTag("display_preview_halloween").performScrollTo().assertIsOn()
+        compose.onNodeWithText("Showing now. It ends at midnight.").assertExists()
+        compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if the switch hands on anything but the opposite of what it shows. */
+    @Test
+    fun theSwitchPreviews() {
+        show()
+        compose.onNodeWithTag("display_preview_halloween").performScrollTo().performClick()
+        assertThat(previews).containsExactly(SeasonalTheme.HALLOWEEN to true)
+    }
+
+    /** Fails if an on switch turns the preview on again instead of off. */
+    @Test
+    fun anOnSwitchPreviewsOff() {
+        show(previewing = SeasonalTheme.HALLOWEEN)
+        compose.onNodeWithTag("display_preview_halloween").performScrollTo().performClick()
+        assertThat(previews).containsExactly(SeasonalTheme.HALLOWEEN to false)
+    }
+
+    private fun showHost(now: MutableStateFlow<LocalDateTime?>): SeasonalThemes {
+        val settings = displaySettings(folder.root, io)
+        val themes = themes(now)
+        compose.setContent {
+            CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator()) {
+                CulveryTheme(dark = true) {
+                    InSettingsPane { DisplayPage(settings, CameraAccess({ true }, { false }, settings, io), SunToday(null, io), RecordingToaster(), themes).Content() }
+                }
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.waitForIdle()
+            shows("display_preview_halloween")
+        }
+        return themes
+    }
+
+    private fun waitUntilShowing(expected: SeasonalTheme?, themes: SeasonalThemes) = compose.waitUntil(5_000) {
+        compose.waitForIdle()
+        themes.showing.value == expected
+    }
+
+    /** Fails if the host doesn't send the switch to SeasonalThemes, or the switch doesn't follow it. */
+    @Test
+    fun theHostPreviewsThroughSeasonalThemes() {
+        val themes = showHost(MutableStateFlow(LocalDateTime.of(2026, 11, 5, 10, 0)))
+        assertThat(themes.showing.value).isNull()
+        compose.onNodeWithTag("display_preview_halloween").performScrollTo().performClick()
+        waitUntilShowing(SeasonalTheme.HALLOWEEN, themes)
+        compose.onNodeWithTag("display_preview_halloween").assertIsOn()
+        compose.onNodeWithTag("display_preview_halloween").performClick()
+        waitUntilShowing(null, themes)
+        compose.onNodeWithTag("display_preview_halloween").assertIsOff()
+    }
+
+    /** Fails if the switch stays on after the household's clock passes midnight. */
+    @Test
+    fun aPreviewEndingAtMidnightTurnsTheSwitchOff() {
+        val now = MutableStateFlow<LocalDateTime?>(LocalDateTime.of(2026, 11, 5, 23, 59))
+        val themes = showHost(now)
+        compose.onNodeWithTag("display_preview_halloween").performScrollTo().performClick()
+        waitUntilShowing(SeasonalTheme.HALLOWEEN, themes)
+        compose.onNodeWithTag("display_preview_halloween").assertIsOn()
+        now.value = LocalDateTime.of(2026, 11, 6, 0, 0)
+        waitUntilShowing(null, themes)
+        compose.onNodeWithTag("display_preview_halloween").assertIsOff()
     }
 }

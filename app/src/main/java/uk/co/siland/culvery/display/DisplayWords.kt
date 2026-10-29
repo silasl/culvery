@@ -38,6 +38,13 @@ internal const val OPEN_ANDROIDS_SETTINGS = "Open Android’s settings for Culve
 internal const val CANT_OPEN_ANDROIDS_SETTINGS = "Culvery can’t open Android’s settings for Culvery. Allow the camera in Android’s Settings › Apps › Culvery › Permissions."
 internal const val NO_FRONT_CAMERA = "This tablet has no front camera, so a tap wakes the screen."
 
+internal const val SEASONAL_THEMES = "Seasonal themes"
+
+internal fun previewTitle(label: String): String = "Preview $label"
+
+internal fun previewLine(label: String, on: Boolean): String =
+    if (on) "Showing now. It ends at midnight." else "Shows $label on the wall and plays its doorbell until midnight."
+
 /** Android's details screen for this app, where its permissions are; the first intent the tablet has opens. */
 fun appDetailsIntents(packageName: String): List<Intent> =
     listOf(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))

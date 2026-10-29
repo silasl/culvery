@@ -16,6 +16,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.display.CameraState
 import uk.co.siland.culvery.display.DisplayPrefs
 
@@ -28,11 +29,11 @@ class DisplaySettingsScreenshotTest {
 
     private val actions = DisplaySettingsActions({ _, _ -> }, {}, {}, {}, {}, {}, {})
 
-    private fun snap(name: String, dark: Boolean, camera: CameraState) {
+    private fun snap(name: String, dark: Boolean, camera: CameraState, previewing: SeasonalTheme? = null) {
         compose.setContent {
-            CulveryTheme(dark = dark) {
+            CulveryTheme(dark = dark, seasonal = previewing) {
                 Box(Modifier.size(960.dp, 1000.dp).background(Culvery.colors.bg)) {
-                    InSettingsPane { DisplaySettingsScreen(DisplaySettingsUi(DisplayPrefs(), camera, sunKnown = true), actions) }
+                    InSettingsPane { DisplaySettingsScreen(DisplaySettingsUi(DisplayPrefs(), camera, sunKnown = true, previewing = previewing), actions) }
                 }
             }
         }
@@ -44,6 +45,10 @@ class DisplaySettingsScreenshotTest {
     @Test fun allowedLight() = snap("settings_display_allowed_light", false, CameraState.ALLOWED)
 
     @Test fun notAskedDark() = snap("settings_display_not_asked_dark", true, CameraState.NOT_ASKED)
+
+    @Test fun previewDark() = snap("settings_display_preview_dark", true, CameraState.ALLOWED, SeasonalTheme.HALLOWEEN)
+
+    @Test fun previewLight() = snap("settings_display_preview_light", false, CameraState.ALLOWED, SeasonalTheme.HALLOWEEN)
 
     @Test fun refusedDark() = snap("settings_display_refused_dark", true, CameraState.REFUSED)
 }
