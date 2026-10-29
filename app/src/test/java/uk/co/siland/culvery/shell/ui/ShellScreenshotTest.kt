@@ -115,6 +115,7 @@ import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.plugin.test.RecordingNavigator
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.HhCard
 import uk.co.siland.culvery.core.ui.HhType
 import uk.co.siland.culvery.core.ui.Icons
@@ -361,6 +362,7 @@ class ShellScreenshotTest {
         state: ShellUiState = ShellUiState(dark = dark),
         fontScale: Float = 1f,
         watching: Boolean = false,
+        seasonal: SeasonalTheme? = null,
         ready: () -> Unit = {},
         tabContent: @Composable (String) -> Unit = {},
         overlay: @Composable () -> Unit = {},
@@ -368,7 +370,7 @@ class ShellScreenshotTest {
         val grey = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GRAY) }.asImageBitmap()
         compose.setContent {
             CompositionLocalProvider(LocalShellNavigator provides RecordingNavigator(), LocalArtSource provides ArtSource { grey }) {
-                CulveryTheme(dark = dark) {
+                CulveryTheme(dark = dark, seasonal = seasonal) {
                     WithFontScale(fontScale) {
                         Box(Modifier.fillMaxSize()) {
                             CulveryShell(
@@ -503,6 +505,12 @@ class ShellScreenshotTest {
 
     @Test
     fun homeFullLight() = snap("home_full_light", dark = false, state = fullHome(dark = false))
+
+    @Test
+    fun homeHalloweenDark() = snap("home_halloween_dark", dark = true, state = fullHome(dark = true), seasonal = SeasonalTheme.HALLOWEEN)
+
+    @Test
+    fun homeHalloweenLight() = snap("home_halloween_light", dark = false, state = fullHome(dark = false), seasonal = SeasonalTheme.HALLOWEEN)
 
     @Test
     fun doorCardOverHomeDark() = snap("home_door_card_dark", dark = true, state = fullHome(dark = true)) {

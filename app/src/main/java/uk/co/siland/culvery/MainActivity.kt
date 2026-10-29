@@ -65,6 +65,7 @@ import uk.co.siland.culvery.display.CameraPrompt
 import uk.co.siland.culvery.display.DisplayState
 import uk.co.siland.culvery.display.Screen
 import uk.co.siland.culvery.display.ScreenBrightness
+import uk.co.siland.culvery.display.SeasonalThemes
 import uk.co.siland.culvery.display.applyBrightness
 import uk.co.siland.culvery.display.camera.Presence
 import uk.co.siland.culvery.display.ui.SleepLayer
@@ -95,6 +96,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var firstDraw: FirstDraw
     @Inject lateinit var homeApp: AndroidHomeApp
     @Inject lateinit var display: DisplayState
+    @Inject lateinit var seasonal: SeasonalThemes
     @Inject lateinit var brightness: ScreenBrightness
     @Inject lateinit var camera: CameraAccess
     @Inject internal lateinit var presence: Presence
@@ -192,6 +194,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val state by shell.uiState.collectAsStateWithLifecycle()
+            val showing by seasonal.showing.collectAsStateWithLifecycle()
             // Read inside the clocks only: a minute's tick recomposes them, not the shell (4c §4.2).
             val now = shell.now.collectAsStateWithLifecycle()
             val toast by toasts.current.collectAsStateWithLifecycle()
@@ -212,7 +215,7 @@ class MainActivity : ComponentActivity() {
                 LocalAlertHost provides alerts,
                 LocalUserActivity provides userActivity,
             ) {
-                CulveryTheme(dark = state.dark) {
+                CulveryTheme(dark = state.dark, seasonal = showing) {
                     // Zero while the bars are hidden (the pinned kiosk); after Use other apps the content clears them (K1).
                     Box(Modifier.fillMaxSize().background(Culvery.colors.bg).windowInsetsPadding(WindowInsets.systemBars)) {
                         val counting = countsTouches(complete, state.settingsOpen)

@@ -37,6 +37,7 @@ import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.Startable
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.core.ui.ShowingTheme
 import uk.co.siland.culvery.display.camera.CAMERA_RETRY_MS
 import uk.co.siland.culvery.display.camera.Camera2Frames
 import uk.co.siland.culvery.display.camera.CameraModule
@@ -270,6 +271,7 @@ class DisplayWiringTest {
         assertThat(bindings(DisplayModule::class.java)).containsExactly(
             "nightHours" to Binding(DisplayState::class.java, NightHours::class.java, intoSet = false),
             "tabletHeat" to Binding(AndroidTabletHeat::class.java, TabletHeat::class.java, intoSet = false),
+            "showingTheme" to Binding(SeasonalThemes::class.java, ShowingTheme::class.java, intoSet = false),
             "heatLog" to Binding(HeatLog::class.java, Startable::class.java, intoSet = true),
             "displayPage" to Binding(DisplayPage::class.java, SettingsPage::class.java, intoSet = true),
         )

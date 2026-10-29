@@ -74,4 +74,9 @@ class HouseGraphTest {
         assertThat(probe.bridges().providers.map { it.descriptor.id }).contains("sample.lights")
         assertThat(probe.bridges().connectable?.descriptor?.id).isEqualTo(HUE_PROVIDER_ID)
     }
+
+    @Test
+    fun theShowingThemeIsSeasonalThemes() {
+        assertThat(probe.showingTheme()).isSameInstanceAs(probe.seasonalThemes())
+    }
 }

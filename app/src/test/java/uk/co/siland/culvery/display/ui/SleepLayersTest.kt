@@ -37,10 +37,14 @@ import java.time.LocalDateTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.GraphicsMode
 import uk.co.siland.culvery.core.plugin.test.FakeUserActivity
 import uk.co.siland.culvery.core.ui.ButtonSurface
 import uk.co.siland.culvery.core.ui.CulveryTheme
 import uk.co.siland.culvery.core.ui.HhButton
+import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.SeasonalTheme
+import uk.co.siland.culvery.core.ui.test.pixelAt
 import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.display.Screen
 import uk.co.siland.culvery.overlayCameraMark
@@ -64,6 +68,8 @@ class SleepLayersTest {
     private var settingsOpen by mutableStateOf(false)
     private var glyphAt by mutableStateOf<Offset?>(null)
     private var insets by mutableStateOf(0.dp)
+    private var dark by mutableStateOf(true)
+    private var seasonal by mutableStateOf<SeasonalTheme?>(null)
     private var presses = 0
     private var touches = 0
     private var alertPresses = 0
@@ -74,7 +80,7 @@ class SleepLayersTest {
         screen = start
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            CulveryTheme(dark = true) {
+            CulveryTheme(dark = dark, seasonal = seasonal) {
                 Box(Modifier.padding(top = insets, start = insets)) {
                     ShellLayers(
                         overlay = OverlayState(),
@@ -157,6 +163,25 @@ class SleepLayersTest {
         assertThat(style.fontFeatureSettings).isEqualTo("tnum")
         assertThat(style.color).isEqualTo(Color(0xFF5A5A5A))
         compose.assertClickablesHaveRoleAndLabel()
+    }
+
+    /** Fails if a theme changes the night clock's face, size, spacing, figures or grey, or lights the screen around it (14 ง2.5). */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun theNightClockIsTheSameInEveryTheme() {
+        seasonal = SeasonalTheme.HALLOWEEN
+        show(Screen.NIGHT_CLOCK)
+        for (isDark in listOf(true, false)) {
+            dark = isDark
+            settle()
+            val style = compose.onNodeWithText("23:41", useUnmergedTree = true).textLayout().layoutInput.style
+            assertThat(style.fontFamily).isEqualTo(HhType.clock.fontFamily)
+            assertThat(style.fontSize).isEqualTo(200.sp)
+            assertThat(style.letterSpacing).isEqualTo((-8).sp)
+            assertThat(style.fontFeatureSettings).isEqualTo("tnum")
+            assertThat(style.color).isEqualTo(Color(0xFF5A5A5A))
+            assertThat(Color(pixelAt(compose.onRoot(), 0.dp, 0.dp))).isEqualTo(Color.Black)
+        }
     }
 
     /** Fails if the glyph is missing, off the Watching pill's spot, clickable or in the clock's name, or shows without the camera (9 ยง6.7). */

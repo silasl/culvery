@@ -18,6 +18,8 @@ import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.MultiDayEvents
 import uk.co.siland.culvery.core.plugin.Startable
+import uk.co.siland.culvery.core.ui.ShowingTheme
+import uk.co.siland.culvery.display.SeasonalThemes
 
 /** Debug builds only: lets the unit test read what the real graph gives Holiday mode and Party mode (11 §4.2, 13 §6a). */
 @EntryPoint
@@ -37,4 +39,6 @@ interface HouseGraphProbe {
     fun bridges(): Bridges
     fun multiDayEvents(): Optional<MultiDayEvents>
     fun startables(): Set<@JvmSuppressWildcards Startable>
+    fun showingTheme(): ShowingTheme
+    fun seasonalThemes(): SeasonalThemes
 }
