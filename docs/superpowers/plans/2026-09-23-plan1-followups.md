@@ -724,6 +724,7 @@ Fault found:
 - **Seen:** the user showed the plug in Settings › Other integrations; the Plugs tab appeared on the rail; one plug, off, matching the Tapo app (its evening schedule); header "0 of 1 on · Home Assistant"; Holiday on Ignore; no padlock.
 - **Not checked (the user's ruling):** the watts against the Tapo app (the plug was off, and switching it wasn't wanted); switching from the tablet; the router plug (not discoverable yet). Holiday mode with plugs waits for its first real use (spec §8.3).
 - **The log scan:** no crash or ANR since the install; the plug, Holiday and capture tags wrote nothing (a release logs only warnings and errors); Culvery's lines hold no plug id, name, address or token. The logs are kept in `culvery-notes/plan12-tablet-log.txt` and `plan12-tablet-pid-log.txt`.
+- **From main (2026-10-29):** the release from the merged main at 136d5080 installed with `-r` (mapping `culvery-notes/mappings/mapping-136d508.txt`); Culvery opened again from the home screen, still not pinned. The Plugs tab: one plug, on (its morning schedule), "1 of 1 on · Home Assistant", Holiday on Ignore. No crash or ANR.
 
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
