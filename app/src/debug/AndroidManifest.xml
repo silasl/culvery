@@ -21,5 +21,14 @@
                 <action android:name="uk.co.siland.culvery.debug.CLOCK" />
             </intent-filter>
         </receiver>
+        <!-- Debug walkthrough only: adb connects the sample speakers and lights, changes them by hand, or takes them down. -->
+        <receiver
+            android:name=".DebugSampleHouseReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="uk.co.siland.culvery.debug.SAMPLE_HOUSE" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

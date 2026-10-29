@@ -26,8 +26,10 @@ class Bridges @Inject constructor(
     private val settings: LightsSettings,
     @ApplicationScope scope: CoroutineScope,
 ) {
-    /** Find Hue Bridge and a typed address use the first (Hue, the only one bound). */
     val providers: List<LightsProvider> = providers.toList()
+
+    /** What Find Hue Bridge and a typed address ask: the first a household may connect to, so a debug sample never answers them. */
+    val connectable: LightsProvider? = this.providers.firstOrNull { it.descriptor.userConnectable }
 
     private data class Opening(val providerId: String, val link: LightsLink) {
         fun sameBridge(other: Opening) =

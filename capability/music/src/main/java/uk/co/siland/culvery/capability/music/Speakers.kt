@@ -26,8 +26,10 @@ class Speakers @Inject constructor(
     private val settings: MusicSettings,
     @ApplicationScope scope: CoroutineScope,
 ) {
-    /** Find Sonos and a typed address use the first (Sonos, the only one bound, 6 §3.4). */
     val providers: List<MusicProvider> = providers.toList()
+
+    /** What Find Sonos and a typed address ask: the first a household may connect to, so a debug sample never answers them (6 §3.4). */
+    val connectable: MusicProvider? = this.providers.firstOrNull { it.descriptor.userConnectable }
 
     private data class Opening(val providerId: String, val link: MusicLink) {
         fun sameHousehold(other: Opening) = providerId == other.providerId && link.householdId == other.link.householdId

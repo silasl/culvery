@@ -196,8 +196,8 @@ internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : Music
 }
 
 /** A provider whose answers a test sets; it opens a [TestMusicSystem] and keeps each. */
-internal class TestMusicProvider(id: String = "music.sonos") : MusicProvider {
-    override val descriptor = ProviderDescriptor(id, "Sonos", Icons.SPEAKER, setOf(Feature.READ, Feature.WRITE))
+internal class TestMusicProvider(id: String = "music.sonos", connectable: Boolean = true) : MusicProvider {
+    override val descriptor = ProviderDescriptor(id, "Sonos", Icons.SPEAKER, setOf(Feature.READ, Feature.WRITE), userConnectable = connectable)
     var found: MusicLink? = null
 
     /** What check(address) answers, by address. */

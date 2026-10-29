@@ -64,4 +64,16 @@ class BridgesTest {
         bridges.opensAnother(than = null)
         assertThat(hue.opened).containsExactly(link())
     }
+
+    /** 13 §8: a debug sample bound ahead of Hue is never what Find Hue Bridge or a typed address asks. */
+    @Test
+    fun aSampleListedFirstIsNotWhatFindAsks() = runTest {
+        val sample = TestLightsProvider("sample.lights", connectable = false)
+        val found = BridgeFound("001788fffe00a1b2", "192.168.1.30")
+        hue.found = found
+        val bridges = Bridges(linkedSetOf(sample, hue), settings, scope)
+        assertThat(LightsConnect(bridges, settings).find()).isEqualTo(FindOutcome.Found(found))
+        assertThat(sample.asked).isEmpty()
+        assertThat(hue.asked).containsExactly("find")
+    }
 }

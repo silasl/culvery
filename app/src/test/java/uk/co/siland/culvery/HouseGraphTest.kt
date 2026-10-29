@@ -12,7 +12,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import uk.co.siland.culvery.capability.holiday.HolidayScheduler
+import uk.co.siland.culvery.capability.party.PartyScheduler
 import uk.co.siland.culvery.di.HouseGraphProbe
+import uk.co.siland.culvery.provider.lights_hue.HUE_PROVIDER_ID
+import uk.co.siland.culvery.provider.music_sonos.SONOS_PROVIDER_ID
 
 /** The real Hilt graph, built by the real application, gives Holiday mode what it needs (11 §4.2); reads it through the debug source set's [HouseGraphProbe]. */
 @RunWith(AndroidJUnit4::class)
@@ -47,5 +50,31 @@ class HouseGraphTest {
         assertThat(probe.startables().filterIsInstance<HolidayScheduler>()).hasSize(1)
         // Nothing else reads the record: only the scheduler's own start, from CulveryApp.onCreate, makes it known.
         assertThat(withTimeout(10_000) { probe.houseMode().holiday.first { it != null } }).isFalse()
+    }
+
+    @Test
+    fun partyIsInTheHouse() {
+        val party = probe.modes().single { it.id == "party" }
+        assertThat(party.permission).isEqualTo("party.mode")
+        assertThat(party.order).isEqualTo(20)
+        assertThat(probe.switches().map { it.modeId }).containsExactly("holiday", "party")
+        assertThat(probe.music().isPresent).isTrue()
+        assertThat(probe.partyHouse().isOn).isNotNull()
+        assertThat(probe.startables().filterIsInstance<PartyScheduler>()).hasSize(1)
+    }
+
+    @Test
+    fun theAppStartsPartysSchedulerAndItLoadsTheRecord() = runBlocking {
+        // Nothing else reads the record: only the scheduler's own start, from CulveryApp.onCreate, makes it known (13 §4.3).
+        assertThat(withTimeout(10_000) { probe.partyHouse().isOn.first { it != null } }).isFalse()
+    }
+
+    /** 13 §8: the debug samples are bound, yet Find and a typed address ask the real providers. */
+    @Test
+    fun theSamplesAreNeverWhatFindAsks() {
+        assertThat(probe.speakers().providers.map { it.descriptor.id }).contains("sample.music")
+        assertThat(probe.speakers().connectable?.descriptor?.id).isEqualTo(SONOS_PROVIDER_ID)
+        assertThat(probe.bridges().providers.map { it.descriptor.id }).contains("sample.lights")
+        assertThat(probe.bridges().connectable?.descriptor?.id).isEqualTo(HUE_PROVIDER_ID)
     }
 }

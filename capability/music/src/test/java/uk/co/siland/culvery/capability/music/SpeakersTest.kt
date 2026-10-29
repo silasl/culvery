@@ -68,4 +68,15 @@ class SpeakersTest {
         speakers.opensAnother(than = null)
         assertThat(sonos.opened).containsExactly(home)
     }
+
+    /** 13 §8: a debug sample bound ahead of Sonos is never what Find Sonos or a typed address asks. */
+    @Test
+    fun aSampleListedFirstIsNotWhatFindAsks() = runTest {
+        val sample = TestMusicProvider("sample.music", connectable = false)
+        sonos.found = home
+        val speakers = Speakers(linkedSetOf(sample, sonos), settings, scope)
+        assertThat(MusicConnect(speakers, settings).find()).isEqualTo(ConnectOutcome.Connected)
+        assertThat(sample.asked).isEmpty()
+        assertThat(sonos.asked).containsExactly("find")
+    }
 }

@@ -159,8 +159,8 @@ internal class TestLightsSystem(rooms: List<LightRoom> = emptyList()) : LightsSy
 }
 
 /** A provider whose answers a test sets; it opens a [TestLightsSystem] and keeps each. */
-internal class TestLightsProvider(id: String = "lights.hue") : LightsProvider {
-    override val descriptor = ProviderDescriptor(id, "Hue", Icons.LIGHTBULB, setOf(Feature.READ, Feature.WRITE))
+internal class TestLightsProvider(id: String = "lights.hue", connectable: Boolean = true) : LightsProvider {
+    override val descriptor = ProviderDescriptor(id, "Hue", Icons.LIGHTBULB, setOf(Feature.READ, Feature.WRITE), userConnectable = connectable)
     var found: BridgeFound? = null
 
     /** What check(address) answers, by address. */

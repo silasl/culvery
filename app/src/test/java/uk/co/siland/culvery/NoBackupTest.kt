@@ -66,6 +66,14 @@ class NoBackupTest {
         assertThat(settings).contains("private const val FILE = \"plug_settings\"")
     }
 
+    /** Pin (13 §4.3): Party mode's record, with the speakers' groups and the rooms' scenes to put back, is a datastore file, so the same rule keeps it off backups. */
+    @Test
+    fun partyModesRecordIsKeptWhereTheRulesExclude() {
+        val settings = File("../capability/party/src/main/java/uk/co/siland/culvery/capability/party/PartySettings.kt").readText()
+        assertThat(settings).contains("context.preferencesDataStoreFile(FILE)")
+        assertThat(settings).contains("private const val FILE = \"party_settings\"")
+    }
+
     private companion object {
         const val ANDROID = "http://schemas.android.com/apk/res/android"
         val DOMAINS = listOf(

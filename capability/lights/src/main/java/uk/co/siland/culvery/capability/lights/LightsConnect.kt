@@ -36,7 +36,7 @@ data class ConnectFailed(val line: String) : FindOutcome, PairOutcome
 @Singleton
 class LightsConnect internal constructor(private val provider: LightsProvider?, private val save: suspend (String, LightsLink) -> Unit) {
     @Inject
-    constructor(bridges: Bridges, settings: LightsSettings) : this(bridges.providers.firstOrNull(), settings::connect)
+    constructor(bridges: Bridges, settings: LightsSettings) : this(bridges.connectable, settings::connect)
 
     suspend fun find(): FindOutcome = look(NO_BRIDGE_ANSWERED) { it.find() }
 

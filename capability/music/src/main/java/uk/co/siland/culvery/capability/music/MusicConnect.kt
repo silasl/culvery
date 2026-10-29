@@ -23,7 +23,7 @@ sealed interface ConnectOutcome {
 @Singleton
 class MusicConnect internal constructor(private val provider: MusicProvider?, private val save: suspend (String, MusicLink) -> Unit) {
     @Inject
-    constructor(speakers: Speakers, settings: MusicSettings) : this(speakers.providers.firstOrNull(), settings::connect)
+    constructor(speakers: Speakers, settings: MusicSettings) : this(speakers.connectable, settings::connect)
 
     suspend fun find(): ConnectOutcome = connect { it.find() } ?: ConnectOutcome.Failed(NOTHING_ANSWERED)
 
