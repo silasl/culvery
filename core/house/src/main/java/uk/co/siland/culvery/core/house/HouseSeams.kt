@@ -15,6 +15,13 @@ sealed interface HouseStep {
     data class Failed(val line: String) : HouseStep
 }
 
+/** The line to show for a step's answer: none when it was done, its own when it failed, [threw] when there was none. */
+fun HouseStep?.line(threw: String): String? = when (this) {
+    HouseStep.Done -> null
+    is HouseStep.Failed -> line
+    null -> threw
+}
+
 /** The failure lines the seams and Holiday mode's tile both show (11 §6). */
 object HouseLines {
     const val ECO_ON_FAILED = "The heating didn’t go to Eco. Check the Nest app."
