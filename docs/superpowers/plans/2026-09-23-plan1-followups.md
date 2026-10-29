@@ -736,6 +736,27 @@ Newer Tapo firmware uses TP-Link's TPAP sign-in, which Home Assistant's TP-Link 
 - **Not used:** HACS Tapo integrations (the main one fails on TPAP too, and Culvery only lists plugs from the built-in TP-Link integration).
 - **For the next plug bought:** a Matter "M" model or a Kasa plug avoids TPAP; Matter would need Culvery to list plugs from the Matter integration.
 
+## Plan 13 (Party mode): emulator walk-through (2026-10-29)
+- **Set-up:** the debug build of c9c71c2c on the emulator. It had real Sonos and Hue connections saved, so the walk-through ran on the debug sample house only. Step 12 ran in airplane mode, so the real plug (Off in Holiday's column) and the Nest weren't touched; the hoover stayed docked.
+- **Worked:**
+  - Settings › Party mode: music pick, a speaker switched off and on again, a scene for one room, the plugs line;
+  - the Plugs tab's "Party mode" column, with Edit offering Ignore / On / Off; real plugs left on Ignore;
+  - the tile: a Child's PIN refused; the sheet lists the music and the scene; Cancel changes nothing;
+  - on: the sample speakers grouped and played; the scene came on; the tile read "On";
+  - off: the group broke back up and stopped; the room went back; no line;
+  - hand changes: a regroup left the music alone at turn-off; a changed scene left the room alone;
+  - the samples down: the music and lights lines on turn-on; the off lines on turn-off, gone after 10 minutes;
+  - nothing chosen: the "nothing to do yet" line; it turns on and off;
+  - a force-stop mid-party: the tile still reads "On" after reopening;
+  - each mode refuses while the other is on, with its line and no PIN pad.
+- **Faults, fixed in a639e6cd and re-checked on the emulator:**
+  - the hoover's tile sat between Holiday's and Party's; Party's now comes straight after Holiday's;
+  - "Turn Party mode off first." came back under Holiday's tile each time Party turned on again, with no tap; a refusal is now forgotten once the other mode is off.
+- **Not faults:**
+  - no off lines when the turn-on changed nothing;
+  - the put-back after a restart can't be seen on the samples, which live in memory and reset on a force-stop; unit-tested.
+- **Side effect:** switching the samples on and off clears Lights' main room, left-out rooms and Holiday lights in the emulator's debug data.
+
 ## To check when the tablet is next plugged in
 - **Lost taps (Plan 11a walk-through, 2026-10-26):** on the emulator, a tap on Shopping's "Stop using the sample list" and one on Settings' Close seemed to do nothing the first time. The emulator was slow; check whether it happens on the tablet before treating it as a fault.
 - **Doorbell missed (2026-10-21, about 13:10):** the Ring doorbell was pressed but the tablet showed no ring and no motion. Pull logcat for Culvery's Ring listener around that time (notification received? card shown? chime?), check the Ring app's notification settings and the Plan 5 notification shapes, and whether the parental restrictions on the tablet were active then (they already cut Hue and the calendar in the evenings). A later ring the same day (about 16:20) came through fine, so it is intermittent, not a broken listener; compare the two in logcat. A third, unexplained ring event at about 18:03 the same day: read it in logcat too (what notification arrived, and what the tablet did with it).
@@ -784,3 +805,4 @@ The open faults after the redesign phase. Details are in the plan sections above
 - **Plugs in Holiday lights (the user, 2026-10-27, from the Plan 12 brainstorm):** maybe let Holiday lights (mimic presence) switch chosen plugs too, such as a lamp on a plug.
 - **Recipes into the shopping list (the user, 2026-10-27):** extend Shopping with a curated list of recipes; tapping one has Culvery read the recipe page for its ingredients and add them to the shopping list.
 - **A status tab (the user, 2026-10-28, from the Plan 12 walk-through):** "maybe we need some sort of status tab that's where extended detail like this lives": one place for the fuller story behind the short lines on tiles and rows, such as every Holiday step that failed or was missed, which plugs did not go back, and the Home Assistant link's state. Tiles keep one short line and point there. Its own spec; no detail yet. Would also give the rail redesign a case to weigh.
+- **A Modes settings tab with custom modes (the user, 2026-10-29, from the Plan 13 walk-through):** one Settings page for Holiday and Party mode, where the family can also add their own modes (each with its own plug, music and lights choices and a tile in the One-tap tray). Its own spec; no detail yet. Would fold the Party mode settings page and the Plugs tab's per-mode columns into one place.
