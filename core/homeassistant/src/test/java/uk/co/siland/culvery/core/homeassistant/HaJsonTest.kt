@@ -181,6 +181,16 @@ class HaJsonTest {
         assertThat(entries.getValue("switch.kitchen_crossfade").deviceId).isNull()
     }
 
+    /** Fails if an `ec` that the message's categories don't list reads as a main switch. */
+    @Test
+    fun anUnlistedCategoryIsNotAMainSwitch() {
+        val entity = """{"ei":"switch.lamp_led","pl":"tplink","ec":2}"""
+        listOf("", ""","entity_categories":{"1":"config"}""").forEach { categories ->
+            val text = """{"type":"result","success":true,"result":{"entities":[$entity]$categories}}"""
+            assertThat(HaJson.registry(text).single().category).isNotNull()
+        }
+    }
+
     /** Fails if a registry entry's toString names the entity, the device or the category. */
     @Test
     fun aRegistryEntryNamesOnlyItsPlatform() {

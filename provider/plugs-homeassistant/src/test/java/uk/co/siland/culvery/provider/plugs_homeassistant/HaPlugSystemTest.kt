@@ -218,6 +218,7 @@ class HaPlugSystemTest {
                 entry("sensor.fan_today", device = "dev_fan", key = "today_energy"),
                 entry("sensor.other_current_consumption", platform = "sonos", device = "dev_fan", key = "current_consumption"),
                 entry("light.lamp_strip", device = "dev_lamp"),
+                entry("switch.fan_mystery", device = "dev_fan", category = "unknown"),
             ),
         )
         assertThat(read.plugs).containsExactly("switch.lamp", "switch.fan", "switch.fairy_lights")

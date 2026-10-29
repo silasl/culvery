@@ -107,7 +107,7 @@ internal object HaJson {
 
     fun state(text: String): EntityState = read { entity(Json.parseToJsonElement(text).jsonObject) }
 
-    /** The `entities` of a `config/entity_registry/list_for_display` result, each `ec` mapped through the message's own categories. */
+    /** The `entities` of a `config/entity_registry/list_for_display` result, each `ec` mapped through the message's own categories; an `ec` they don't list is "unknown", so only a missing one is a main switch. */
     fun registry(text: String): List<RegistryEntry> = read {
         val result = Json.parseToJsonElement(text).jsonObject.getValue("result").jsonObject
         val categories = result["entity_categories"]?.jsonObject.orEmpty().mapValues { it.value.jsonPrimitive.content }
@@ -116,7 +116,7 @@ internal object HaJson {
                 entityId = body.getValue("ei").jsonPrimitive.content,
                 platform = body.getValue("pl").jsonPrimitive.content,
                 deviceId = body["di"]?.jsonPrimitive?.contentOrNull,
-                category = body["ec"]?.jsonPrimitive?.intOrNull?.let { categories[it.toString()] },
+                category = body["ec"]?.jsonPrimitive?.intOrNull?.let { categories[it.toString()] ?: "unknown" },
                 translationKey = body["tk"]?.jsonPrimitive?.contentOrNull,
             )
         }
