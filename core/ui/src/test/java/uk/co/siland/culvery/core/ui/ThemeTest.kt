@@ -68,6 +68,9 @@ class ThemeTest {
         // The subset of the glyphs Icons names (4c §3.5): about 160 KB; the full font is 15 MB.
         assertThat(symbols).isGreaterThan(50_000)
         assertThat(symbols).isLessThan(1_000_000)
+        val creepster = res.openRawResource(R.font.creepster).use { it.readBytes().size }
+        assertThat(creepster).isGreaterThan(10_000)
+        assertThat(creepster).isLessThan(500_000)
     }
 
     @Test

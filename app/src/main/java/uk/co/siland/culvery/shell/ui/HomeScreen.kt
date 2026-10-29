@@ -27,6 +27,7 @@ import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeLayout
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.SlotClock
 import uk.co.siland.culvery.core.ui.lineBox
 import uk.co.siland.culvery.core.ui.readAsOne
 
@@ -59,10 +60,14 @@ fun HomeHeader(now: () -> LocalDateTime, items: List<HeaderItem>, modifier: Modi
     Layout(
         modifier = modifier.readAsOne(),
         content = {
-            Text(
-                now().format(CLOCK), style = HhType.clock, color = c.ink,
-                modifier = Modifier.testTag("home_clock").lineBox(HhType.clock.lineHeight).semantics { traversalIndex = 0f },
-            )
+            val time = now().format(CLOCK)
+            val clockModifier = Modifier.testTag("home_clock").lineBox(HhType.clock.lineHeight).semantics { traversalIndex = 0f }
+            val face = Culvery.look?.clockFace
+            if (face != null) {
+                SlotClock(time, face, c.accent, clockModifier)
+            } else {
+                Text(time, style = HhType.clock, color = c.ink, modifier = clockModifier)
+            }
             Text(now().format(DATE), style = HhType.date, color = c.mute, modifier = Modifier.testTag("home_date").semantics { traversalIndex = 1f })
             HeaderItems(items)
         },

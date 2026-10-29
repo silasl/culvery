@@ -211,4 +211,4 @@ Google Calendar is asked only for the fields the tablet shows, compressed, about
 
 ## Licences
 
-DM Sans: SIL Open Font License (`core/ui/licenses/OFL-DMSans.txt`). Material Symbols: Apache 2.0 (`core/ui/licenses/Apache-MaterialSymbols.txt`), subset to the glyphs Culvery uses (`tools/fonts/README.md`). The app icon is the project's own artwork (`tools/icon/`). The generated `.dc.html` files and `support.js` in `docs/design/house_hub_handoff/` are kept locally, not in the repository.
+DM Sans: SIL Open Font License (`core/ui/licenses/OFL-DMSans.txt`). Creepster: SIL Open Font License (`core/ui/licenses/OFL-Creepster.txt`), for the Halloween clock; from google/fonts at commit 6157dfaa640ca5738b4d1a7070fe389c3036d7fc, `Creepster-Regular.ttf` sha256 402aeb734586c74aecd3dbdc454589b1fb12e2e1c71f782fd019ae68066d9f44. Material Symbols: Apache 2.0 (`core/ui/licenses/Apache-MaterialSymbols.txt`), subset to the glyphs Culvery uses (`tools/fonts/README.md`). The app icon is the project's own artwork (`tools/icon/`). The generated `.dc.html` files and `support.js` in `docs/design/house_hub_handoff/` are kept locally, not in the repository.
