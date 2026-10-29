@@ -63,10 +63,24 @@ class ChimeTest {
     }
 
     @Test
-    fun theOrganIsLoudEnough() {
+    fun theOrganIsAboutAsLoudAsTheChime() {
         val organ = wav(DoorSound.ORGAN)
-        assertThat(organ.peak()).isAtLeast((0.9 * 32_767).toInt())
-        assertThat(organ.rms(0.0, 3.5)).isAtLeast(0.8 * wav(DoorSound.CLASSIC).rms(0.0, 3.0))
+        val ratio = organ.rms(0.0, 3.5) / wav(DoorSound.CLASSIC).rms(0.0, 3.0)
+        assertThat(ratio).isAtLeast(1.0)
+        assertThat(ratio).isAtMost(1.5)
+        assertThat(organ.peak()).isAtMost((0.95 * 32_767).toInt() + 1)
+    }
+
+    @Test
+    fun theOrganDoesNotSwellAsItFades() {
+        val organ = wav(DoorSound.ORGAN)
+        fun peak(from: Double, to: Double) = organ.samples.copyOfRange((from * organ.rate).toInt(), (to * organ.rate).toInt()).maxOf { abs(it.toInt()) }
+        val before = peak(3.0, 3.5)
+        val window = organ.rate / 100
+        for (start in (3.5 * organ.rate).toInt() until organ.samples.size - window step window) {
+            val windowPeak = organ.samples.copyOfRange(start, start + window).maxOf { abs(it.toInt()) }
+            assertThat(windowPeak).isAtMost((before * 1.05).toInt())
+        }
     }
 
     @Test

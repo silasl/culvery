@@ -25,6 +25,9 @@ NOTES = [
     (783.99, 1.30, 0.14), (698.46, 1.44, 0.14), (659.25, 1.58, 0.14), (587.33, 1.72, 0.30), (554.37, 2.02, 0.40), (587.33, 2.42, 1.20),
 ]
 HEADROOM = 0.95
+# Level the door chime reaches over its first 3 s (RMS, 16-bit units) times 1.25: the organ is as loud as the chime, not louder.
+TARGET_RMS = 6970.0
+RMS_SECONDS = 3.5
 OUT = pathlib.Path(__file__).resolve().parents[2] / "capability" / "door" / "src" / "main" / "res" / "raw" / "door_organ.wav"
 
 
@@ -33,7 +36,7 @@ def envelope(u, length, last):
     attack = min(1.0, u / ATTACK)
     if last:
         into = u + NOTES[-1][1] - (LENGTH - FADE)
-        return attack * (0.5 * (1 + math.cos(math.pi * min(1.0, into / FADE))) ** 2 if into > 0 else 1.0)
+        return attack * ((0.5 * (1 + math.cos(math.pi * min(1.0, into / FADE)))) ** 2 if into > 0 else 1.0)
     return attack * max(0.0, min(1.0, 1.0 - (u - length) / RELEASE))
 
 
@@ -54,12 +57,14 @@ def sample(t):
 def main():
     frames = [sample(i / RATE) for i in range(int(LENGTH * RATE))]
     peak = max(abs(f) for f in frames)
+    held = frames[:int(RMS_SECONDS * RATE)]
+    gain = min(TARGET_RMS / math.sqrt(sum(f * f for f in held) / len(held)), HEADROOM * 32767 / peak)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(OUT), "wb") as out:
         out.setnchannels(1)
         out.setsampwidth(2)
         out.setframerate(RATE)
-        out.writeframes(b"".join(struct.pack("<h", int(f / peak * HEADROOM * 32767)) for f in frames))
+        out.writeframes(b"".join(struct.pack("<h", int(f * gain)) for f in frames))
 
 
 if __name__ == "__main__":
