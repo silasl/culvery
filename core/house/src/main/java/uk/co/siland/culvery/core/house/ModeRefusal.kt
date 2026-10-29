@@ -10,8 +10,8 @@ private const val TAG = "ModeRefusal"
 
 /**
  * The line [own]'s tile shows when another mode being on kept it from turning on (13 §2.6): "Turn {mode} off first."
- * from a refusal until the next refusal or a turn-off, and only while that mode is still on, so it goes once the mode
- * is turned off. It is read from [switches] as they change, so no scope is needed to keep it current.
+ * from a refusal until the next refusal or a turn-off, and only while that mode is still on: it goes, and is forgotten,
+ * once the mode is turned off. It is read from [switches] as they change, so no scope is needed to keep it current.
  */
 class ModeRefusal(private val own: HouseModeSwitch, private val switches: Set<HouseModeSwitch>) {
     private val refusedBy = MutableStateFlow<HouseModeSwitch?>(null)
@@ -19,7 +19,15 @@ class ModeRefusal(private val own: HouseModeSwitch, private val switches: Set<Ho
     /** The line as it changes, starting with [current]. */
     val line: Flow<String?> = combine(switches.map { it.isOn } + refusedBy) { current() }.distinctUntilChanged()
 
-    fun current(): String? = refusedBy.value?.takeIf { it.isOn.value == true }?.let { HouseLines.turnOffFirst(it.modeName) }
+    fun current(): String? {
+        val other = refusedBy.value ?: return null
+        if (other.isOn.value != true) {
+            // Forgotten once that mode is off, so its next turn-on doesn't bring the line back without a tap.
+            refusedBy.compareAndSet(other, null)
+            return null
+        }
+        return HouseLines.turnOffFirst(other.modeName)
+    }
 
     /** Whether a tap is refused: turning off never is, and clears the line; turning on is while another mode is on. */
     fun refusesTap(turningOn: Boolean): Boolean {

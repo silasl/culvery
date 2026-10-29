@@ -31,7 +31,7 @@ class PartyCapabilityTest {
         assertThat(listOf(capability.id, capability.label, capability.icon, capability.order))
             .containsExactly("party", "Party mode", "celebration", 76).inOrder()
         assertThat(capability.icon).isEqualTo(Icons.CELEBRATION)
-        assertThat(capability.trayButtons().first().map { it.id to it.order }).containsExactly("party.mode" to 20)
+        assertThat(capability.trayButtons().first().map { it.id to it.order }).containsExactly("party.mode" to 15)
     }
 
     /** 13 §3: Settings › Party mode sits between Lights (470) and Other integrations (480). Fails if the page is missing, repeated or placed elsewhere. */

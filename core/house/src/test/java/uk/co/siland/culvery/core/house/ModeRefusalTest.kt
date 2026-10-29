@@ -61,4 +61,20 @@ class ModeRefusalTest {
             assertThat(awaitItem()).isNull()
         }
     }
+
+    /** Fails if the line comes back when Holiday mode goes on again with no new tap (the Plan 13 walk-through). */
+    @Test
+    fun theLineStaysGoneWhenTheOtherModeGoesOnAgain() = runTest {
+        refusal.line.test {
+            assertThat(awaitItem()).isNull()
+            holiday.on.value = true
+            refusal.refusesTap(turningOn = true)
+            assertThat(awaitItem()).isEqualTo("Turn Holiday mode off first.")
+            holiday.on.value = false
+            assertThat(awaitItem()).isNull()
+            holiday.on.value = true
+            expectNoEvents()
+        }
+        assertThat(refusal.current()).isNull()
+    }
 }

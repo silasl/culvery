@@ -40,7 +40,7 @@ class PartyCapability @Inject constructor(
     override fun TabContent() = Unit
 
     // Always there: what it can do depends on which seams are set up, which the sheet reads when it opens.
-    override fun trayButtons(): Flow<List<TrayButton>> = flowOf(listOf(TrayButton("party.mode", 20) { PartyTileHost(actions, house) }))
+    override fun trayButtons(): Flow<List<TrayButton>> = flowOf(listOf(TrayButton("party.mode", 15) { PartyTileHost(actions, house) }))
 
     override fun settingsPages(): List<SettingsPage> = listOf(PartyPage { PartySettingsHost(settings, music.orElse(null), lights.orElse(null)) })
 }
