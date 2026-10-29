@@ -7,15 +7,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import java.time.LocalDateTime
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.core.ui.HomeHeaderBottom
+import uk.co.siland.culvery.core.ui.LocalHomeHeaderBottom
 import uk.co.siland.culvery.shell.HOME_TAB_ID
 import uk.co.siland.culvery.shell.ShellUiState
 
 /**
  * The frame around every tab (9 §4.1): the rail at full height with the mark at its top, and beside it the top bar over the
- * page. [watching] shows the top bar's pill; [pillSpot] is told where its icon is.
+ * page. [watching] shows the top bar's pill; [pillSpot] is told where its icon is. [skyDrifts] lets a theme's sky behind Home move.
  */
 @Composable
 internal fun CulveryShell(
@@ -26,6 +30,7 @@ internal fun CulveryShell(
     onSignOut: () -> Unit,
     onToggleThemePreview: () -> Unit,
     watching: Boolean = false,
+    skyDrifts: Boolean = false,
     pillSpot: CameraMarkSpot? = null,
     tabContent: @Composable (String) -> Unit,
 ) {
@@ -37,7 +42,11 @@ internal fun CulveryShell(
             StatusBar(state.dark, state.previewing, state.session, onSignOut, onToggleThemePreview, watching, pillSpot)
             Box(Modifier.weight(1f)) {
                 if (state.selectedTabId == HOME_TAB_ID) {
-                    HomeScreen(now, state.homeCards, state.headerItems)
+                    val headerBottom = remember { HomeHeaderBottom() }
+                    CompositionLocalProvider(LocalHomeHeaderBottom provides headerBottom) {
+                        Culvery.look?.sky?.invoke(skyDrifts, Modifier.matchParentSize())
+                        HomeScreen(now, state.homeCards, state.headerItems)
+                    }
                 } else {
                     tabContent(state.selectedTabId)
                 }

@@ -1,6 +1,9 @@
 package uk.co.siland.culvery.core.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -66,4 +69,24 @@ object SeasonalDimens {
     /** How far the Today card's cobweb reaches from the card's top-right corner. */
     val webSpan = 88.dp
     val webStroke = 1.dp
+
+    /** A bat's width, wing tip to wing tip; its height is half. */
+    val batSpan = 26.dp
+
+    /** The top of the bat that crosses the clock, and the tops of the three below the header, each from the header's bottom. */
+    val batTopLane = 20.dp
+    val batLanesBelowHeader = listOf(40.dp, 160.dp, 280.dp)
 }
+
+/** How long a bat takes to cross Home once. */
+const val BAT_LAP_MS = 90_000L
+
+/** The sky moves at most this often, about 15 frames a second. */
+const val SKY_FRAME_MS = 66L
+
+/** Where Home's header ends, in pixels from Home's top; Home sets it and the sky reads it when it draws. */
+class HomeHeaderBottom {
+    var px by mutableIntStateOf(0)
+}
+
+val LocalHomeHeaderBottom = staticCompositionLocalOf<HomeHeaderBottom?> { null }

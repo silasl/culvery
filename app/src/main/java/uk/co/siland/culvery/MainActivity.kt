@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -60,6 +62,7 @@ import uk.co.siland.culvery.core.setup.SetupState
 import uk.co.siland.culvery.core.setup.SetupWizard
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.CulveryTheme
+import uk.co.siland.culvery.display.AnimatorsOn
 import uk.co.siland.culvery.display.CameraAccess
 import uk.co.siland.culvery.display.CameraPrompt
 import uk.co.siland.culvery.display.DisplayState
@@ -97,6 +100,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var homeApp: AndroidHomeApp
     @Inject lateinit var display: DisplayState
     @Inject lateinit var seasonal: SeasonalThemes
+    @Inject lateinit var animators: AnimatorsOn
     @Inject lateinit var brightness: ScreenBrightness
     @Inject lateinit var camera: CameraAccess
     @Inject internal lateinit var presence: Presence
@@ -115,6 +119,9 @@ class MainActivity : ComponentActivity() {
             override fun returnToPinning() = kiosk.returnToPinning()
         }
     }
+
+    // Android's "Remove animations", read at creation and on each return to the app.
+    private var animatorsOn by mutableStateOf(true)
 
     // SetupState read once for the activity, so the pin and the screen never disagree (4a design D10); null until read.
     private lateinit var setupComplete: StateFlow<Boolean?>
@@ -192,6 +199,7 @@ class MainActivity : ComponentActivity() {
                 previous = complete
             }
         }
+        animatorsOn = animators.now()
         setContent {
             val state by shell.uiState.collectAsStateWithLifecycle()
             val showing by seasonal.showing.collectAsStateWithLifecycle()
@@ -251,6 +259,7 @@ class MainActivity : ComponentActivity() {
                                         onOpenSettings = shell::openSettings,
                                         onSignOut = shell::signOut,
                                         onToggleThemePreview = shell::toggleThemePreview,
+                                        skyDrifts = skyDrifts(screen, held, animatorsOn),
                                         watching = watchingPill(
                                             running, screen != Screen.AWAKE, complete, state.settingsOpen, overlay.isShowing, pinRequest != null, alert != null,
                                         ),
@@ -270,6 +279,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        animatorsOn = animators.now()
         homeApp.refresh()
         camera.refresh(shouldShowRequestPermissionRationale(Manifest.permission.CAMERA))
     }

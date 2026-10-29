@@ -14,6 +14,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.traversalIndex
@@ -27,6 +28,7 @@ import uk.co.siland.culvery.core.plugin.HeaderItem
 import uk.co.siland.culvery.core.plugin.HomeLayout
 import uk.co.siland.culvery.core.ui.Culvery
 import uk.co.siland.culvery.core.ui.HhType
+import uk.co.siland.culvery.core.ui.LocalHomeHeaderBottom
 import uk.co.siland.culvery.core.ui.SlotClock
 import uk.co.siland.culvery.core.ui.lineBox
 import uk.co.siland.culvery.core.ui.readAsOne
@@ -43,7 +45,9 @@ private val HEADER_ITEMS_BOTTOM = 4.dp
 @Composable
 fun HomeScreen(now: () -> LocalDateTime, layout: HomeLayout, headerItems: List<HeaderItem>) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxSize()) {
-        HomeHeader(now, headerItems, Modifier.fillMaxWidth())
+        val headerBottom = LocalHomeHeaderBottom.current
+        val measured = if (headerBottom == null) Modifier else Modifier.onSizeChanged { headerBottom.px = it.height }
+        HomeHeader(now, headerItems, Modifier.fillMaxWidth().then(measured))
         HomeGrid(layout, Modifier.fillMaxWidth().weight(1f))
     }
 }

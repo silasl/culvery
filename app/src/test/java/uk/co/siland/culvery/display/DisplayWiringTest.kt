@@ -271,6 +271,7 @@ class DisplayWiringTest {
         assertThat(bindings(DisplayModule::class.java)).containsExactly(
             "nightHours" to Binding(DisplayState::class.java, NightHours::class.java, intoSet = false),
             "tabletHeat" to Binding(AndroidTabletHeat::class.java, TabletHeat::class.java, intoSet = false),
+            "animatorsOn" to Binding(AndroidAnimatorsOn::class.java, AnimatorsOn::class.java, intoSet = false),
             "showingTheme" to Binding(SeasonalThemes::class.java, ShowingTheme::class.java, intoSet = false),
             "heatLog" to Binding(HeatLog::class.java, Startable::class.java, intoSet = true),
             "displayPage" to Binding(DisplayPage::class.java, SettingsPage::class.java, intoSet = true),

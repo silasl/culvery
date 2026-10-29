@@ -22,6 +22,7 @@ import uk.co.siland.culvery.core.plugin.SettingsPage
 import uk.co.siland.culvery.core.plugin.SetupStep
 import uk.co.siland.culvery.core.plugin.UserActivity
 import uk.co.siland.culvery.core.ui.Culvery
+import uk.co.siland.culvery.display.Screen
 
 /** The wizard's steps: the core ones and each capability's, by order (4a design D7). */
 internal fun wizardSteps(core: Set<SetupStep>, capabilities: Set<Capability>): List<SetupStep> =
@@ -40,6 +41,9 @@ internal fun shouldPin(setupComplete: Boolean, kioskExited: Boolean): Boolean = 
  */
 internal fun pinOnSetupRead(previous: Boolean?, now: Boolean, resumed: Boolean, kioskExited: Boolean): Boolean =
     previous != true && resumed && shouldPin(now, kioskExited)
+
+/** The bats behind Home move only while the screen is awake, nothing is held over Home and Android's animations are on (14 §4.3). */
+internal fun skyDrifts(screen: Screen, held: Boolean, animatorsOn: Boolean): Boolean = screen == Screen.AWAKE && !held && animatorsOn
 
 /** The splash's longest stay (4c design §4.1). */
 internal const val SPLASH_MAX_MS = 2_000L
