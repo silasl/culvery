@@ -92,6 +92,15 @@ class LightsPartyTest {
         assertThat(system.calls).containsExactly("readAll", "setBrightness Kitchen-id 40", "setOn Lounge-id false").inOrder()
     }
 
+    /** Fails if a room that was off is lit again because the bridge still reported its old scene as active. */
+    @Test
+    fun aRoomOffBeforeGoesBackOffEvenWithASceneRemembered() = runTest {
+        system.rooms.value = listOf(kitchen(active = BRIGHT.id), lounge())
+        val off = kitchenBefore.copy(on = false, brightness = 0)
+        assertThat(party.back(listOf(off))).isEmpty()
+        assertThat(system.calls).containsExactly("readAll", "setOn Kitchen-id false").inOrder()
+    }
+
     /** Fails if a room whose scene someone changed during the party is touched or named (13 §2.12). */
     @Test
     fun aSceneChangedByHandIsLeft() = runTest {

@@ -68,8 +68,9 @@ class LightsParty internal constructor(private val system: () -> LightsSystem?) 
     private suspend fun putBack(s: LightsSystem, room: LightRoom, before: RoomBefore): Boolean = attempt({
         val remembered = room.scenes.firstOrNull { it.id == before.activeSceneId }
         when {
-            remembered != null -> s.recallScene(room, remembered)
+            // Checked first: a group-off can leave the bridge reporting the old scene as active.
             !before.on -> s.setOn(room, false)
+            remembered != null -> s.recallScene(room, remembered)
             else -> s.setBrightness(room, max(before.brightness, 1))
         }
         true
