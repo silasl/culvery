@@ -53,6 +53,13 @@ class IconFontTest {
     }
 
     @Test
+    fun thePartyIconIsInTheFont() {
+        assertThat(Icons.CELEBRATION).isEqualTo("celebration")
+        assertThat(font.has("celebration")).isTrue()
+        assertThat(font.hasFilledForm("celebration")).isTrue()
+    }
+
+    @Test
     fun thePlugsIconIsInTheFont() {
         assertThat(Icons.POWER).isEqualTo("power")
         assertThat(font.has("power")).isTrue()

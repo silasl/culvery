@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +24,7 @@ import uk.co.siland.culvery.core.access.PinReason
 import uk.co.siland.culvery.core.access.Refusal
 import uk.co.siland.culvery.core.house.GroupBefore
 import uk.co.siland.culvery.core.house.HouseLights
+import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseRoom
@@ -37,6 +39,7 @@ import uk.co.siland.culvery.core.house.SceneChoice
 import uk.co.siland.culvery.core.household.Person
 import uk.co.siland.culvery.core.household.PersonId
 import uk.co.siland.culvery.core.household.Role
+import uk.co.siland.culvery.core.plugin.WallClock
 
 /**
  * A settings store in memory; null holds [data] back, as a file not yet read. The write numbered [failOnWrite], counting
@@ -237,4 +240,31 @@ internal class FakeLights(private val trace: Trace = Trace()) : HouseLights {
         backs += rooms
         return notBack
     }
+}
+
+/** Another mode's switch, turned on and off by the test. */
+internal class TestSwitch(
+    override val modeId: String,
+    override val modeName: String,
+    override val isOn: MutableStateFlow<Boolean?>,
+) : HouseModeSwitch
+
+/** A real [PartyHouse] over an in-memory store and the fake seams. */
+internal class HouseRig(scope: CoroutineScope) {
+    val trace = Trace()
+    val plugs = FakePlugs(trace)
+    val music = FakeMusic(trace)
+    val lights = FakeLights(trace)
+    val settings = PartySettings(MemoryStore(), scope)
+    val house = PartyHouse(settings, plugs, music, lights, WallClock { 1_000_000L })
+
+    /** Reads the stored record, as the scheduler's first tick does; the plugs put back on that first read are not counted. */
+    suspend fun loaded(): PartyHouse = house.also {
+        it.tick()
+        trace.calls.clear()
+    }
+
+    /** Party mix on every speaker, Bright in Kitchen and Relax in Lounge. */
+    suspend fun choose(prefs: PartyPrefs = PartyPrefs(music = PARTY_MIX, scenes = listOf(KITCHEN_BRIGHT, LOUNGE_RELAX))) =
+        settings.update { prefs }
 }

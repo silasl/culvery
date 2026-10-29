@@ -18,6 +18,7 @@ object Icons {
     const val BRIGHTNESS_LOW = "brightness_low"
     const val CALENDAR_ADD_ON = "calendar_add_on"
     const val CALENDAR_MONTH = "calendar_month"
+    const val CELEBRATION = "celebration"
     const val CHECK = "check"
     const val CHECK_CIRCLE = "check_circle"
     const val CHEVRON_LEFT = "chevron_left"

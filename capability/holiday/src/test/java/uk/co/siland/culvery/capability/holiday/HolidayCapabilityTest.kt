@@ -14,7 +14,7 @@ import uk.co.siland.culvery.core.ui.Icons
 class HolidayCapabilityTest {
     private fun capability(scope: CoroutineScope): HolidayCapability {
         val house = HouseRig(scope).house
-        return HolidayCapability(HolidayActions(TestAccess(Role.ADULT), house, null, { HouseRig.TODAY }), house)
+        return HolidayCapability(HolidayActions(TestAccess(Role.ADULT), house, null, emptySet(), { HouseRig.TODAY }), house)
     }
 
     /** 11 §5.2: Holiday mode is a tray tile, not a tab. Fails if it has a tab or a Home card, or its id, label, icon or order differ. */

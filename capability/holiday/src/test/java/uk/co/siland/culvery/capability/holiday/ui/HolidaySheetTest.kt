@@ -77,7 +77,7 @@ class HolidaySheetTest {
     private fun shows(text: String) = compose.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
 
     private fun open() {
-        val actions = HolidayActions(access, rig.house, events, { today })
+        val actions = HolidayActions(access, rig.house, events, emptySet(), { today })
         compose.setContent {
             CulveryTheme(dark = true) {
                 CompositionLocalProvider(LocalOverlayHost provides overlay) {

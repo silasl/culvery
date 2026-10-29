@@ -132,7 +132,7 @@ internal fun HolidaySheet(
 
 /**
  * Reads the calendar's pick and the steps' and plugs' readiness as it opens (11 §5.2). Turn on turns Holiday mode on, which carries on
- * if the sheet closes meanwhile, then closes the sheet.
+ * if the sheet closes meanwhile, then closes the sheet; with Party mode on by then it turns nothing on and the tile says why.
  */
 @Composable
 internal fun HolidaySheetHost(by: Authorised, actions: HolidayActions, house: HolidayHouse, onClose: () -> Unit) {
@@ -171,7 +171,7 @@ internal fun HolidaySheetHost(by: Authorised, actions: HolidayActions, house: Ho
         },
         onTurnOn = {
             action.run {
-                withContext(NonCancellable) { house.turnOn(back, by) }
+                withContext(NonCancellable) { actions.turnOn(back, by) }
                 onClose()
             }
         },

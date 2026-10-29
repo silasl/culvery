@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import uk.co.siland.culvery.core.access.Authorised
+import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HousePlugs
 import uk.co.siland.culvery.core.house.HouseStep
 import uk.co.siland.culvery.core.house.MultiDayEvent
@@ -91,3 +92,10 @@ internal class FakePlugs : HousePlugs {
         onCall(call)
     }
 }
+
+/** Another mode's switch, turned on and off by the test. */
+internal class TestSwitch(
+    override val modeId: String,
+    override val modeName: String,
+    override val isOn: MutableStateFlow<Boolean?>,
+) : HouseModeSwitch

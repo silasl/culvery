@@ -90,6 +90,10 @@ class HolidayScreenshotTest {
     @Test
     fun tileLineLight() = tile("holiday_tile_line_light", false, on = true, line = LINE)
 
+    @Test fun tileRefusedDark() = tile("holiday_tile_refused_dark", true, on = false, line = REFUSED)
+
+    @Test fun tileRefusedLight() = tile("holiday_tile_refused_light", false, on = false, line = REFUSED)
+
     @Test
     fun tileThreeLinesDark() = tile("holiday_tile_three_lines_dark", true, on = false, line = THREE_LINES)
 
@@ -114,6 +118,7 @@ class HolidayScreenshotTest {
 
     private companion object {
         val PLUGS = listOf(PlugChange("Lamp", false), PlugChange("Fan", false), PlugChange("Desk", true))
+        const val REFUSED = "Turn Party mode off first."
         const val LINE = "The heating didn’t come off Eco. Turn it off in the Nest app."
         val THREE_LINES = listOf(
             "The heating is still on Eco. Turn it off in the Nest app.",

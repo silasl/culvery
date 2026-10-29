@@ -24,6 +24,7 @@ import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.house.HouseLights
 import uk.co.siland.culvery.core.house.HouseMode
+import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.house.HousePlugs
@@ -51,7 +52,7 @@ class HolidayHouse internal constructor(
     private val plugs: HousePlugs?,
     private val wall: WallClock,
     private val now: () -> LocalDateTime?,
-) : HouseMode {
+) : HouseMode, HouseModeSwitch {
     @Inject
     constructor(
         settings: HolidaySettings,
@@ -71,6 +72,9 @@ class HolidayHouse internal constructor(
     /** Null until the store has answered. */
     val record: StateFlow<HolidayRecord?> = current.asStateFlow()
     override val holiday: StateFlow<Boolean?> = on.asStateFlow()
+    override val isOn: StateFlow<Boolean?> = holiday
+    override val modeId = HouseModes.HOLIDAY
+    override val modeName = HolidayWords.LABEL
     val running: StateFlow<HolidayRun?> = run.asStateFlow()
 
     /** The tile's line: what didn't happen. */

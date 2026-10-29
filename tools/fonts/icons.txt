@@ -13,6 +13,7 @@ brightness_high
 brightness_low
 calendar_add_on
 calendar_month
+celebration
 check
 check_circle
 chevron_left

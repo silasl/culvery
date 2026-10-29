@@ -110,15 +110,19 @@ private fun OnPill() {
     }
 }
 
-/** The tile on Home: a tap asks for a PIN, then opens the "When are you back?" sheet, or turns Holiday mode off. */
+/**
+ * The tile on Home: a tap asks for a PIN, then opens the "When are you back?" sheet, or turns Holiday mode off. While
+ * Party mode is on it asks nothing and says to turn that off first.
+ */
 @Composable
 fun HolidayTileHost(actions: HolidayActions, house: HolidayHouse) {
     val record by house.record.collectAsState()
-    val line by house.line.collectAsState()
+    val houseLine by house.line.collectAsState()
+    val refusal by actions.refusal.collectAsState()
     val running by house.running.collectAsState()
     val overlay = LocalOverlayHost.current
     val action = rememberSingleAction(house) { e -> Log.w(TAG, "Holiday mode tile action failed: ${e::class.simpleName}") }
-    HolidayTile(record?.on == true, record?.back, line, running) {
+    HolidayTile(record?.on == true, record?.back, refusal ?: houseLine, running) {
         action.run { actions.toggle { by -> overlay.show { HolidaySheetHost(by, actions, house, overlay::dismiss) } } }
     }
 }

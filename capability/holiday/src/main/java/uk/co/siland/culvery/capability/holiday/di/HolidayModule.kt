@@ -14,6 +14,7 @@ import uk.co.siland.culvery.capability.holiday.HolidayWords
 import uk.co.siland.culvery.core.access.PermissionSource
 import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.house.HouseModeInfo
+import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseModes
 import uk.co.siland.culvery.core.house.HousePermissions
 import uk.co.siland.culvery.core.plugin.Capability
@@ -24,6 +25,10 @@ import uk.co.siland.culvery.core.plugin.Startable
 abstract class HolidayModule {
     @Binds
     abstract fun mode(impl: HolidayHouse): HouseMode
+
+    @Binds
+    @IntoSet
+    abstract fun switch(impl: HolidayHouse): HouseModeSwitch
 
     @Binds
     @IntoSet
