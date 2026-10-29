@@ -227,49 +227,77 @@ internal class SonosSystem(
         toRooms(resend = false) {
             freshLayout()
             val own = layout.firstOrNull { g -> g.members.any { it.uuid == coordinatorId } } ?: throw GoneFromLayout()
-            val rooms = layout.flatMap { it.members }.associateBy { it.uuid }
-            val coordinator = rooms.getValue(coordinatorId)
-            val led = if (own.coordinator == coordinatorId) own.members.map { it.uuid } else {
-                client.standAlone(coordinator.address)
-                listOf(coordinatorId)
-            }
-            val left = mutableSetOf<String>()
-            val joined = mutableSetOf<String>()
-            led.filter { it != coordinatorId && it !in roomIds }.forEach { id -> if (tryRoom { client.standAlone(rooms.getValue(id).address) } == null) left += id }
-            roomIds.filter { it != coordinatorId && it !in led }.forEach { id ->
-                rooms[id]?.let { room -> if (tryRoom { client.join(room.address, coordinatorId) } == null) joined += id }
-            }
-            settle { layout.firstOrNull { it.coordinator == coordinatorId }?.members?.map { it.uuid }.orEmpty().let { now -> now.containsAll(joined) && now.none { it in left } } }
+            val leads = own.coordinator == coordinatorId
+            if (!leads) client.standAlone(own.members.first { it.uuid == coordinatorId }.address)
+            val led = if (leads) own.members.map { it.uuid } else listOf(coordinatorId)
+            val target = listOf(RoomGroup(coordinatorId, listOf(coordinatorId) + (roomIds - coordinatorId))) +
+                led.filter { it != coordinatorId && it !in roomIds }.map { RoomGroup(it, listOf(it)) }
+            val sent = send(target, leading() + (coordinatorId to led.toSet()))
+            settle { sent.inPlace() }
         }
         return _groups.value.firstOrNull { it.coordinatorId == coordinatorId } ?: throw MusicRefusedException()
     }
 
     /** 13 §4.2: every room is tried; one that refused or didn't answer throws once the rest are done. */
     override suspend fun regroup(groups: List<RoomGroup>) {
-        var failed: MusicRefusedException? = null
-        toRooms(resend = false) {
-            failed = null
+        val sent = toRooms(resend = false) {
             freshLayout()
-            val rooms = layout.flatMap { it.members }.associateBy { it.uuid }
-            val leading = layout.associate { it.coordinator to it.members.map { m -> m.uuid }.toSet() }
-            val remembered = groups.filter { it.coordinatorId in rooms }
-            val apart = remembered.map { it.coordinatorId }.filter { it !in leading }
-            val joins = remembered.flatMap { g ->
-                g.roomIds.filter { it != g.coordinatorId && it in rooms && it !in leading[g.coordinatorId].orEmpty() }.map { it to g.coordinatorId }
+            send(groups, leading()).also { if (it.any) settle { it.inPlace() } }
+        }
+        sent.failed?.let { throw it }
+    }
+
+    /** What a regrouping sent that went through, and the first room that refused or didn't answer. */
+    private inner class Sent {
+        val alone = mutableSetOf<String>()
+        val under = mutableSetOf<Pair<String, String>>()
+        var failed: MusicRefusedException? = null
+        val any get() = alone.isNotEmpty() || under.isNotEmpty()
+
+        /** Whether each room sent is where it was sent, in the layout as last read. */
+        fun inPlace(): Boolean {
+            val led = leading()
+            return alone.all { it in led } && under.all { (id, coordinator) -> id in led[coordinator].orEmpty() }
+        }
+
+        /** Whether [block] went through; a room that refuses or doesn't answer is kept as [failed] when it is the first. */
+        suspend fun tryRoom(block: suspend () -> Unit): Boolean {
+            val refusal = try {
+                block()
+                return true
+            } catch (e: SonosFault) {
+                MusicRefusedException(e.code)
+            } catch (e: SonosXmlException) {
+                MusicRefusedException()
+            } catch (e: IOException) {
+                MusicRefusedException()
             }
-            val alone = mutableSetOf<String>()
-            val under = mutableSetOf<Pair<String, String>>()
-            apart.forEach { id -> tryRoom { client.standAlone(rooms.getValue(id).address) }?.let { failed = failed ?: it } ?: run { alone += id } }
-            joins.forEach { (id, coordinator) -> tryRoom { client.join(rooms.getValue(id).address, coordinator) }?.let { failed = failed ?: it } ?: run { under += id to coordinator } }
-            if (alone.isNotEmpty() || under.isNotEmpty()) {
-                settle {
-                    val led = layout.associate { it.coordinator to it.members.map { m -> m.uuid }.toSet() }
-                    alone.all { it in led } && under.all { (id, coordinator) -> id in led[coordinator].orEmpty() }
-                }
+            failed = failed ?: refusal
+            return false
+        }
+    }
+
+    /**
+     * Sends [target]'s leaders that aren't in [leading] to stand alone, then its rooms not already under their leader to
+     * join it, each once; a group whose leader isn't in the household, and a room that isn't, are skipped. The layout must be fresh.
+     */
+    private suspend fun send(target: List<RoomGroup>, leading: Map<String, Set<String>>): Sent {
+        val rooms = layout.flatMap { it.members }.associateBy { it.uuid }
+        val known = target.filter { it.coordinatorId in rooms }
+        val sent = Sent()
+        for (id in known.map { it.coordinatorId }.filter { it !in leading }) {
+            if (sent.tryRoom { client.standAlone(rooms.getValue(id).address) }) sent.alone += id
+        }
+        for (g in known) {
+            for (id in g.roomIds.filter { it != g.coordinatorId && it in rooms && it !in leading[g.coordinatorId].orEmpty() }) {
+                if (sent.tryRoom { client.join(rooms.getValue(id).address, g.coordinatorId) }) sent.under += id to g.coordinatorId
             }
         }
-        failed?.let { throw it }
+        return sent
     }
+
+    /** Each leader in the layout as last read, and the rooms it leads. */
+    private fun leading() = layout.associate { it.coordinator to it.members.map { m -> m.uuid }.toSet() }
 
     /**
      * Reads the layout until [settled] holds of it: Sonos shows an acknowledged join in the topology a moment later. At
@@ -286,18 +314,6 @@ internal class SonosSystem(
     /** The layout afresh; another household answering is [MusicUnreachableException], as everywhere. */
     private suspend fun freshLayout() {
         if (!readLayout(link.address)) throw MusicUnreachableException(MusicProblem.OTHER_HOUSEHOLD)
-    }
-
-    /** [block]'s refusal, or null when it went through; a room that doesn't answer is a refusal here. */
-    private suspend fun tryRoom(block: suspend () -> Unit): MusicRefusedException? = try {
-        block()
-        null
-    } catch (e: SonosFault) {
-        MusicRefusedException(e.code)
-    } catch (e: SonosXmlException) {
-        MusicRefusedException()
-    } catch (e: IOException) {
-        MusicRefusedException()
     }
 
     /** Only a speaker's own /getaa art on the home network, or a stream's https art (6 §4.2, §6). */
