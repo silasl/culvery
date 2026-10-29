@@ -1,11 +1,12 @@
 package uk.co.siland.culvery.capability.lights
 
+import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.plugin.TABLET_OFFLINE
 import uk.co.siland.culvery.core.ui.plural
 
 internal const val LIGHTS = "Lights"
 internal const val LIGHTS_BUSY = "The lights are busy. Culvery will try again in a few minutes."
-internal const val HUE_REFUSED = "Hue didn’t do that. Try again."
+internal const val HUE_REFUSED = HouseLines.HUE_REFUSED
 internal const val ALL_LIGHTS_OFF = "All lights off"
 internal const val HOLIDAY_LIGHTS = "Holiday lights"
 internal const val ONE_TAP = "One-tap"

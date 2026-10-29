@@ -1,12 +1,13 @@
 package uk.co.siland.culvery.capability.music
 
+import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.plugin.TABLET_OFFLINE
 import uk.co.siland.culvery.core.ui.plural
 
 internal const val MUSIC = "Music"
-internal const val CANT_REACH_SONOS = "Culvery can’t reach Sonos. Check the speakers are on and the tablet is on the home Wi-Fi."
+internal const val CANT_REACH_SONOS = HouseLines.CANT_REACH_SONOS
 internal const val OTHER_SONOS = "Culvery found a different Sonos system. Find Sonos again in Settings › Music."
-internal const val SONOS_REFUSED = "Sonos didn’t do that. Try again."
+internal const val SONOS_REFUSED = HouseLines.SONOS_REFUSED
 internal const val CANT_PLAY_HERE = "Sonos couldn’t play this here."
 internal const val NO_LIBRARY = "Sonos has no music library. Add it in the Sonos app."
 

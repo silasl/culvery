@@ -27,6 +27,9 @@ object HouseLines {
     const val PLUGS_MISSED = "The plugs didn’t switch. Switch them on the Plugs tab."
     const val PLUGS_LEAVE_THREW = "Some plugs may not have gone back. Check them on the Plugs tab."
     const val PLUGS_BACK = "Plugs go back as they were when you turn it off."
+    const val CANT_REACH_SONOS = "Culvery can’t reach Sonos. Check the speakers are on and the tablet is on the home Wi-Fi."
+    const val SONOS_REFUSED = "Sonos didn’t do that. Try again."
+    const val HUE_REFUSED = "Hue didn’t do that. Try again."
 
     /** "Kitchen", "Kitchen and Lounge", "Kitchen, Lounge and Dining". */
     fun roomList(names: List<String>): String =

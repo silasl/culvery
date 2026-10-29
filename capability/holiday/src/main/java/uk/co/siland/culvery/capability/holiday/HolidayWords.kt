@@ -25,11 +25,7 @@ object HolidayWords {
     const val NO_PICK = "Pick the day you’re back."
     const val STILL_ON_ECO = "The heating is still on Eco. Turn it off in the Nest app."
     const val LIGHTS_STILL_ON = "Holiday lights are still on. Turn them off in the Lights tab."
-    const val PLUGS_LEAVE_THREW = HouseLines.PLUGS_LEAVE_THREW
     private const val LIGHTS_MISSED = "Holiday lights didn’t switch on. Turn them on in the Lights tab."
-    private const val PLUGS_MISSED = HouseLines.PLUGS_MISSED
-    private const val PLUGS_THREW = HouseLines.PLUGS_THREW
-    private const val PLUGS_BACK = HouseLines.PLUGS_BACK
 
     private const val WEEKDAY_ALONE_DAYS = 6L
     private val SHORT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
@@ -50,7 +46,7 @@ object HolidayWords {
             stepLine(step, back)?.let(::add)
             if (step == HolidayStep.PLUGS_ON && plugs.isNotEmpty()) {
                 plugs.forEach { add("Switch ${it.name} ${if (it.on) "on" else "off"}.") }
-                add(PLUGS_BACK)
+                add(HouseLines.PLUGS_BACK)
             }
         }
         add(DOOR)
@@ -61,7 +57,7 @@ object HolidayWords {
     fun missedLine(step: HolidayStep): String? = when (step) {
         HolidayStep.LIGHTS_ON -> LIGHTS_MISSED
         HolidayStep.HOOVER -> HouseLines.HOOVER_DIDNT_RUN
-        HolidayStep.PLUGS_ON -> PLUGS_MISSED
+        HolidayStep.PLUGS_ON -> HouseLines.PLUGS_MISSED
         HolidayStep.ECO_ON, HolidayStep.ECO_OFF -> null
     }
 
@@ -69,7 +65,7 @@ object HolidayWords {
     fun failedLine(step: HolidayStep): String = when (step) {
         HolidayStep.LIGHTS_ON -> LIGHTS_MISSED
         HolidayStep.ECO_ON -> HouseLines.ECO_ON_FAILED
-        HolidayStep.PLUGS_ON -> PLUGS_THREW
+        HolidayStep.PLUGS_ON -> HouseLines.PLUGS_THREW
         HolidayStep.HOOVER -> HouseLines.HOOVER_DIDNT_RUN
         HolidayStep.ECO_OFF -> HouseLines.ECO_OFF_FAILED
     }

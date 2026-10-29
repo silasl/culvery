@@ -23,6 +23,7 @@ import uk.co.siland.culvery.core.access.Authorised
 import uk.co.siland.culvery.core.house.HouseHeating
 import uk.co.siland.culvery.core.house.HouseHoover
 import uk.co.siland.culvery.core.house.HouseLights
+import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.house.HouseMode
 import uk.co.siland.culvery.core.house.HouseModeSwitch
 import uk.co.siland.culvery.core.house.HouseModes
@@ -157,7 +158,7 @@ class HolidayHouse internal constructor(
         val line = when (val left = answer { plugs.leave(HouseModes.HOLIDAY) }) {
             is HouseStep.Done -> null
             is HouseStep.Failed -> left.line
-            null -> HolidayWords.PLUGS_LEAVE_THREW
+            null -> HouseLines.PLUGS_LEAVE_THREW
         }
         if (line != null) Log.w(TAG, "The plugs didn't all go back with Holiday mode")
         return line

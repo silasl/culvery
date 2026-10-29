@@ -30,6 +30,7 @@ import uk.co.siland.culvery.capability.party.PartyPrefs
 import uk.co.siland.culvery.capability.party.PartySettings
 import uk.co.siland.culvery.capability.party.PartyWords
 import uk.co.siland.culvery.core.house.HouseLights
+import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.house.HouseMusic
 import uk.co.siland.culvery.core.house.HouseRoom
 import uk.co.siland.culvery.core.house.HouseScene
@@ -219,7 +220,7 @@ fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: House
         } else {
             attempt({ music.options() }) { e ->
                 Log.w(TAG, "Couldn't read what the speakers offer (${e::class.simpleName})")
-                MusicOptions(emptyList(), emptyList(), PartyWords.CANT_REACH_SONOS)
+                MusicOptions(emptyList(), emptyList(), HouseLines.CANT_REACH_SONOS)
             }
         }
     }
@@ -229,7 +230,7 @@ fun PartySettingsHost(settings: PartySettings, music: HouseMusic?, lights: House
         } else {
             attempt({ lights.partyOptions() }) { e ->
                 Log.w(TAG, "Couldn't read what the lights offer (${e::class.simpleName})")
-                LightOptions(emptyList(), PartyWords.HUE_REFUSED)
+                LightOptions(emptyList(), HouseLines.HUE_REFUSED)
             }
         }
     }

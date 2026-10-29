@@ -3,6 +3,7 @@ package uk.co.siland.culvery.capability.holiday
 import com.google.common.truth.Truth.assertThat
 import java.time.LocalDate
 import org.junit.Test
+import uk.co.siland.culvery.core.house.HouseLines
 import uk.co.siland.culvery.core.house.PlugChange
 
 class HolidayWordsTest {
@@ -81,6 +82,6 @@ class HolidayWordsTest {
         assertThat(HolidayWords.stepLine(HolidayStep.PLUGS_ON, back)).isNull()
         assertThat(HolidayWords.missedLine(HolidayStep.PLUGS_ON)).isEqualTo("The plugs didn’t switch. Switch them on the Plugs tab.")
         assertThat(HolidayWords.failedLine(HolidayStep.PLUGS_ON)).isEqualTo("The plugs didn’t switch. They’ll keep trying.")
-        assertThat(HolidayWords.PLUGS_LEAVE_THREW).isEqualTo("Some plugs may not have gone back. Check them on the Plugs tab.")
+        assertThat(HouseLines.PLUGS_LEAVE_THREW).isEqualTo("Some plugs may not have gone back. Check them on the Plugs tab.")
     }
 }
