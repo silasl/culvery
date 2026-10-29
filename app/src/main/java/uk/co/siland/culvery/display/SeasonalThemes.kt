@@ -21,10 +21,10 @@ import uk.co.siland.culvery.core.ui.SeasonalTheme
 import uk.co.siland.culvery.core.ui.ShowingTheme
 import uk.co.siland.culvery.core.ui.defaultSeasonDates
 
-/** A theme shown by hand for [day] only (14 ง3); it counts as off on any other day. */
+/** A theme shown by hand for [day] only (14 ยง3); it counts as off on any other day. */
 data class ThemePreview(val theme: SeasonalTheme, val day: LocalDate)
 
-/** The preview's theme when it is for [date], else the first theme whose dates hold [date] (14 ง4.1). */
+/** The preview's theme when it is for [date], else the first theme whose dates hold [date] (14 ยง4.1). */
 internal fun showingOn(date: LocalDate, dates: Map<SeasonalTheme, SeasonDates>, preview: ThemePreview?): SeasonalTheme? =
     preview?.takeIf { it.day == date }?.theme
         ?: SeasonalTheme.entries.firstOrNull { (dates[it] ?: it.defaultDates).contains(date) }

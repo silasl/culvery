@@ -80,7 +80,7 @@ class SleepLayersScreenshotTest {
     @Test
     fun nightClock() = snap("night_clock", dark = true, screen = Screen.NIGHT_CLOCK)
 
-    /** The night clock is the same in every theme (14 ง2.5): this image is byte-identical to `night_clock`. */
+    /** The night clock is the same in every theme (14 ยง2.5): this image is byte-identical to `night_clock`. */
     @Test
     fun nightClockHalloween() = snap("night_clock_halloween", dark = true, screen = Screen.NIGHT_CLOCK, seasonal = SeasonalTheme.HALLOWEEN)
 

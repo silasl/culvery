@@ -20,6 +20,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -49,7 +51,9 @@ import uk.co.siland.culvery.core.ui.test.assertClickablesHaveRoleAndLabel
 import uk.co.siland.culvery.display.Screen
 import uk.co.siland.culvery.overlayCameraMark
 import uk.co.siland.culvery.shell.OverlayState
+import uk.co.siland.culvery.shell.ShellUiState
 import uk.co.siland.culvery.shell.ToastMessage
+import uk.co.siland.culvery.shell.ui.CulveryShell
 import uk.co.siland.culvery.shell.ui.ShellLayers
 import uk.co.siland.culvery.shell.ui.textLayout
 
@@ -76,7 +80,11 @@ class SleepLayersTest {
     private var keyPresses = 0
 
     /** The button, the alert's button and the PIN pad's key all sit on the screen's centre, so one spot reaches each. */
-    private fun show(start: Screen) {
+    private fun show(start: Screen, content: @Composable () -> Unit = {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            HhButton("Add event", { presses++ }, Modifier.testTag("button"), on = ButtonSurface.Bg)
+        }
+    }) {
         screen = start
         compose.mainClock.autoAdvance = false
         compose.setContent {
@@ -102,11 +110,7 @@ class SleepLayersTest {
                             running, sleeping = screen != Screen.AWAKE, complete = true, settingsOpen = settingsOpen,
                             sheetShowing = false, pinShowing = pinShowing, alertShowing = alert != null,
                         ),
-                    ) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            HhButton("Add event", { presses++ }, Modifier.testTag("button"), on = ButtonSurface.Bg)
-                        }
-                    }
+                    ) { content() }
                 }
             }
         }
@@ -165,16 +169,28 @@ class SleepLayersTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
-    /** Fails if a theme changes the night clock's face, size, spacing, figures or grey, or lights the screen around it (14 ง2.5). */
+    /** Fails if a theme changes the night clock's face, size, spacing, figures or grey, or lights the screen around it (14 ยง2.5). */
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun theNightClockIsTheSameInEveryTheme() {
         seasonal = SeasonalTheme.HALLOWEEN
-        show(Screen.NIGHT_CLOCK)
+        show(Screen.NIGHT_CLOCK) {
+            CulveryShell(
+                state = ShellUiState(dark = dark),
+                now = { at },
+                onSelectTab = {},
+                onOpenSettings = {},
+                onSignOut = {},
+                onToggleThemePreview = {},
+                watching = false,
+                tabContent = {},
+            )
+        }
         for (isDark in listOf(true, false)) {
             dark = isDark
             settle()
-            val style = compose.onNodeWithText("23:41", useUnmergedTree = true).textLayout().layoutInput.style
+            val clock = compose.onNode(hasText("23:41") and !hasTestTag("home_clock"), useUnmergedTree = true)
+            val style = clock.textLayout().layoutInput.style
             assertThat(style.fontFamily).isEqualTo(HhType.clock.fontFamily)
             assertThat(style.fontSize).isEqualTo(200.sp)
             assertThat(style.letterSpacing).isEqualTo((-8).sp)
