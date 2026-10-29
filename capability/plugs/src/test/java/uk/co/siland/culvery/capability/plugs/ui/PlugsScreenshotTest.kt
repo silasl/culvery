@@ -18,6 +18,7 @@ import uk.co.siland.culvery.capability.plugs.ModeChoice
 import uk.co.siland.culvery.capability.plugs.PlugPower
 import uk.co.siland.culvery.capability.plugs.PlugPrefs
 import uk.co.siland.culvery.capability.plugs.PlugState
+import uk.co.siland.culvery.core.house.HouseModeInfo
 import uk.co.siland.culvery.core.ui.test.snap
 
 /** The Plugs tab in the shell's content area (12 §4.3). */
@@ -28,7 +29,7 @@ class PlugsScreenshotTest {
 
     private val four = listOf(LAMP_ON, FAN_OFF, FAIRY_LOST, PlugState(DESK, "Desk", PlugPower.UNKNOWN, null))
     private val long = listOf(
-        PlugState(LAMP, "Fairy lights above the bookcase and the window in the long living room", PlugPower.ON, 12),
+        PlugState(LAMP, "Fairy lights above the bookcase and the window in the long living room at the back of the house, behind the old upright piano", PlugPower.ON, 12),
         PlugState(FAN, "Fan", PlugPower.OFF, null),
     )
     private val prefs = PlugPrefs()
@@ -37,11 +38,11 @@ class PlugsScreenshotTest {
         .with(HOLIDAY, LAMP, ModeChoice.OFF)
         .with(HOLIDAY, FAN, ModeChoice.ON)
 
-    private fun tab(name: String, dark: Boolean, plugs: List<PlugState>, editing: Boolean = false) =
+    private fun tab(name: String, dark: Boolean, plugs: List<PlugState>, editing: Boolean = false, modes: List<HouseModeInfo> = listOf(HOLIDAY_MODE)) =
         compose.snap(name, dark, Modifier.size(1116.dp, 690.dp)) {
             Box(Modifier.size(1116.dp, 690.dp)) {
                 PlugsTab(
-                    plugs, prefs.needsPin, emptySet(), null, listOf(HOLIDAY_MODE), prefs, editing,
+                    plugs, prefs.needsPin, emptySet(), null, modes, prefs, editing,
                     onSwitch = {}, onEdit = {}, onDone = {}, onChoice = { _, _, _ -> },
                 )
             }
@@ -54,6 +55,10 @@ class PlugsScreenshotTest {
     @Test fun longNameDark() = tab("plugs_tab_long_name_dark", true, long)
 
     @Test fun longNameLight() = tab("plugs_tab_long_name_light", false, long)
+
+    @Test fun longNameEditDark() = tab("plugs_tab_long_name_edit_dark", true, long, editing = true, modes = listOf(HOLIDAY_MODE, PARTY_MODE))
+
+    @Test fun longNameEditLight() = tab("plugs_tab_long_name_edit_light", false, long, editing = true, modes = listOf(HOLIDAY_MODE, PARTY_MODE))
 
     @Test fun editDark() = tab("plugs_tab_edit_dark", true, four, editing = true)
 

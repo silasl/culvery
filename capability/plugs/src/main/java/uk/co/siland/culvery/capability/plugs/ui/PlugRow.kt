@@ -74,7 +74,7 @@ internal fun PlugRow(
             Column(Modifier.weight(1f).shownNotSpoken(), verticalArrangement = Arrangement.spacedBy(PlugsDimens.textGap)) {
                 Text(
                     state.name, style = HhType.cardTitle.copy(fontSize = PlugsDimens.nameSize), color = c.ink,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("${tag}_name"),
+                    modifier = Modifier.testTag("${tag}_name"),
                 )
                 Text(
                     PlugsWords.plugStatus(state), style = HhType.body.copy(fontSize = PlugsDimens.statusSize),

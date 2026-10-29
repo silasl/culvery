@@ -138,6 +138,17 @@ class PlugRowTest {
         compose.assertClickablesHaveRoleAndLabel()
     }
 
+    /** Fails if a name that needs more than two lines, with two mode columns in Edit, is ellipsised. */
+    @Test
+    fun aVeryLongNameIsNeverCutShort() {
+        val name = "Living room standard lamp by the window next to the long bookcase and the old piano"
+        show(PlugState(LAMP, name, PlugPower.OFF, null), modes = listOf(HOLIDAY_MODE, PARTY_MODE), editing = true, width = 760)
+        compose.onNodeWithTag("plug_${LAMP}_name", useUnmergedTree = true).assertTextEquals(name)
+        val layout = textLayout()
+        assertThat(layout.lineCount).isGreaterThan(2)
+        assertThat((0 until layout.lineCount).any { layout.isLineEllipsized(it) }).isFalse()
+    }
+
     /** Fails if a short name is ellipsised or takes two lines. */
     @Test
     fun aShortNameStaysOnOneLine() {
