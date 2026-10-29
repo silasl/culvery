@@ -194,6 +194,38 @@ class SonosClientTest {
         assertThat(speaker.actions()).containsExactly("Next")
     }
 
+    /** Joining a group is a SetAVTransportURI naming the coordinator by its x-rincon URI, with no metadata. */
+    @Test
+    fun joinSendsTheCoordinatorsRinconUri() = runTest {
+        speaker.acceptCommands()
+        client.join(speaker.address, KITCHEN)
+        val join = sent("SetAVTransportURI")
+        assertThat(join.path).isEqualTo("/MediaRenderer/AVTransport/Control")
+        assertThat(join.soapAction).isEqualTo("\"$AV#SetAVTransportURI\"")
+        assertThat(join.body).contains("<InstanceID>0</InstanceID><CurrentURI>x-rincon:$KITCHEN</CurrentURI><CurrentURIMetaData></CurrentURIMetaData>")
+    }
+
+    @Test
+    fun standAloneSendsBecomeCoordinatorOfStandaloneGroup() = runTest {
+        speaker.acceptCommands()
+        client.standAlone(speaker.address)
+        val leave = sent("BecomeCoordinatorOfStandaloneGroup")
+        assertThat(leave.path).isEqualTo("/MediaRenderer/AVTransport/Control")
+        assertThat(leave.soapAction).isEqualTo("\"$AV#BecomeCoordinatorOfStandaloneGroup\"")
+        assertThat(leave.body).contains("<u:BecomeCoordinatorOfStandaloneGroup xmlns:u=\"$AV\"><InstanceID>0</InstanceID></u:BecomeCoordinatorOfStandaloneGroup>")
+    }
+
+    /** A join or a leave that took effect but whose answer was lost must not be sent again: it would move the room twice. */
+    @Test
+    fun joinAndStandAloneAreNotSentTwice() = runTest {
+        speaker.acceptCommands()
+        speaker.dropNext("SetAVTransportURI")
+        throws<IOException> { client.join(speaker.address, KITCHEN) }
+        speaker.dropNext("BecomeCoordinatorOfStandaloneGroup")
+        throws<IOException> { client.standAlone(speaker.address) }
+        assertThat(speaker.actions()).containsExactly("SetAVTransportURI", "BecomeCoordinatorOfStandaloneGroup").inOrder()
+    }
+
     /** A read that times out isn't asked again, so a dead speaker still fails within the 3 s. */
     @Test
     fun aReadThatTimesOutIsNotAskedAgain() = runTest {

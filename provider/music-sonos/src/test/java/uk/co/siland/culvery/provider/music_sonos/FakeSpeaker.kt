@@ -5,6 +5,8 @@ import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -28,11 +30,14 @@ internal fun testHttp(): OkHttpClient = OkHttpClient.Builder().callTimeout(Durat
 
 /** One Sonos speaker on localhost: answers by SOAP action, records each request; an action it wasn't given is fault 401. */
 internal class FakeSpeaker : AutoCloseable {
-    class Received(val path: String, val soapAction: String, val action: String, val body: String)
+    /** [order] counts requests across every speaker, so a test can say which of two speakers heard its request first. */
+    class Received(val path: String, val soapAction: String, val action: String, val body: String, val order: Long = ORDER.incrementAndGet())
 
     private val server = MockWebServer()
     private val answers = ConcurrentHashMap<String, MockResponse>()
     private val browses = ConcurrentHashMap<String, MockResponse>()
+    private val sequences = ConcurrentHashMap<String, List<String>>()
+    private val asked = ConcurrentHashMap<String, AtomicInteger>()
     private val dropOnce = ConcurrentHashMap.newKeySet<String>()
     val received = CopyOnWriteArrayList<Received>()
 
@@ -49,6 +54,7 @@ internal class FakeSpeaker : AutoCloseable {
                 if (silent) return MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
                 if (dropOnce.remove(action)) return MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)
                 if (action == "Browse") browses[objectId(body)]?.let { return it }
+                sequences[action]?.let { bodies -> return MockResponse().setBody(bodies[minOf(asked.getValue(action).getAndIncrement(), bodies.lastIndex)]) }
                 return answers[action] ?: MockResponse().setResponseCode(500).setBody(SonosFixtures.fault(401))
             }
         }
@@ -59,6 +65,12 @@ internal class FakeSpeaker : AutoCloseable {
     val host: String = LOOPBACK_HOST
     val port: Int = server.port
     val address: String = "$host:$port"
+
+    /** Answers [action] with each of [bodies] in turn, then the last again: a layout that changes under the commands. */
+    fun answerInOrder(action: String, vararg bodies: String) {
+        asked[action] = AtomicInteger()
+        sequences[action] = bodies.toList()
+    }
 
     fun answer(action: String, body: String) {
         answers[action] = MockResponse().setBody(body)
@@ -106,6 +118,7 @@ internal class FakeSpeaker : AutoCloseable {
             "Play", "Pause", "Next", "RemoveAllTracksFromQueue", "AddURIToQueue", "SetPlayMode", "SetAVTransportURI",
             "SnapshotGroupVolume", "SetGroupVolume", "SetVolume",
         ).forEach { answer(it, SonosFixtures.soap(it)) }
+        answer("BecomeCoordinatorOfStandaloneGroup", SonosFixtures.standAlone())
     }
 
     fun actions(): List<String> = received.map { it.action }
@@ -113,4 +126,8 @@ internal class FakeSpeaker : AutoCloseable {
     fun bodyOf(action: String): String = received.last { it.action == action }.body
 
     override fun close() = server.shutdown()
+
+    private companion object {
+        val ORDER = AtomicLong()
+    }
 }

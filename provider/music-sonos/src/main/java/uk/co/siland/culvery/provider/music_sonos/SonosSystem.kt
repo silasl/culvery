@@ -26,6 +26,7 @@ import uk.co.siland.culvery.capability.music.MusicUnreachableException
 import uk.co.siland.culvery.capability.music.NoLibraryException
 import uk.co.siland.culvery.capability.music.NowPlaying
 import uk.co.siland.culvery.capability.music.PlayState
+import uk.co.siland.culvery.capability.music.RoomGroup
 import uk.co.siland.culvery.capability.music.SpeakerGroup
 import uk.co.siland.culvery.capability.music.SpeakerRoom
 import uk.co.siland.culvery.core.plugin.WallClock
@@ -214,6 +215,60 @@ internal class SonosSystem(
             }
             client.play(leader.address)
         }
+    }
+
+    /** 13 §4.1: one room after another, so a join never meets a coordinator still in another group; never re-sent after a recovery. */
+    override suspend fun group(coordinatorId: String, roomIds: Set<String>): SpeakerGroup {
+        toRooms(resend = false) {
+            freshLayout()
+            val own = layout.firstOrNull { g -> g.members.any { it.uuid == coordinatorId } } ?: throw GoneFromLayout()
+            val rooms = layout.flatMap { it.members }.associateBy { it.uuid }
+            val coordinator = rooms.getValue(coordinatorId)
+            val led = if (own.coordinator == coordinatorId) own.members.map { it.uuid } else {
+                client.standAlone(coordinator.address)
+                listOf(coordinatorId)
+            }
+            led.filter { it != coordinatorId && it !in roomIds }.forEach { id -> tryRoom { client.standAlone(rooms.getValue(id).address) } }
+            roomIds.filter { it != coordinatorId && it !in led }.forEach { id -> rooms[id]?.let { room -> tryRoom { client.join(room.address, coordinatorId) } } }
+            freshLayout()
+        }
+        return _groups.value.firstOrNull { it.coordinatorId == coordinatorId } ?: throw MusicRefusedException()
+    }
+
+    /** 13 §4.2: every room is tried; one that refused or didn't answer throws once the rest are done. */
+    override suspend fun regroup(groups: List<RoomGroup>) {
+        var failed: MusicRefusedException? = null
+        toRooms(resend = false) {
+            freshLayout()
+            val rooms = layout.flatMap { it.members }.associateBy { it.uuid }
+            val leading = layout.associate { it.coordinator to it.members.map { m -> m.uuid }.toSet() }
+            val remembered = groups.filter { it.coordinatorId in rooms }
+            val apart = remembered.map { it.coordinatorId }.filter { it !in leading }
+            val joins = remembered.flatMap { g ->
+                g.roomIds.filter { it != g.coordinatorId && it in rooms && it !in leading[g.coordinatorId].orEmpty() }.map { it to g.coordinatorId }
+            }
+            apart.forEach { id -> tryRoom { client.standAlone(rooms.getValue(id).address) }?.let { failed = failed ?: it } }
+            joins.forEach { (id, coordinator) -> tryRoom { client.join(rooms.getValue(id).address, coordinator) }?.let { failed = failed ?: it } }
+            if (apart.isNotEmpty() || joins.isNotEmpty()) freshLayout()
+        }
+        failed?.let { throw it }
+    }
+
+    /** The layout afresh; another household answering is [MusicUnreachableException], as everywhere. */
+    private suspend fun freshLayout() {
+        if (!readLayout(link.address)) throw MusicUnreachableException(MusicProblem.OTHER_HOUSEHOLD)
+    }
+
+    /** [block]'s refusal, or null when it went through; a room that doesn't answer is a refusal here. */
+    private suspend fun tryRoom(block: suspend () -> Unit): MusicRefusedException? = try {
+        block()
+        null
+    } catch (e: SonosFault) {
+        MusicRefusedException(e.code)
+    } catch (e: SonosXmlException) {
+        MusicRefusedException()
+    } catch (e: IOException) {
+        MusicRefusedException()
     }
 
     /** Only a speaker's own /getaa art on the home network, or a stream's https art (6 §4.2, §6). */

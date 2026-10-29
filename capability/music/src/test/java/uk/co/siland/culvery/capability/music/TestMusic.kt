@@ -95,6 +95,9 @@ internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : Music
     var favouriteList: List<Favourite> = emptyList()
     var playlistList: List<Favourite> = emptyList()
 
+    /** Rooms a group() leaves out of the group it returns and out of the layout, as a speaker refusing the join would. */
+    var groupLeavesOut: Set<String> = emptySet()
+
     private suspend fun record(call: String) {
         calls += call
         gates[call]?.await()
@@ -138,6 +141,41 @@ internal class TestMusicSystem(groups: List<SpeakerGroup> = emptyList()) : Music
     override suspend fun playlists(): List<Favourite> {
         record("playlists")
         return playlistList
+    }
+
+    /** Records "group {coordinatorId} {roomIds sorted, comma-joined}", then the coordinator leads exactly those rooms. */
+    override suspend fun group(coordinatorId: String, roomIds: Set<String>): SpeakerGroup {
+        record("group $coordinatorId ${roomIds.sorted().joinToString(",")}")
+        groups.value = lead(groups.value, coordinatorId, (roomIds - groupLeavesOut) + coordinatorId)
+        return groups.value.first { it.coordinatorId == coordinatorId }
+    }
+
+    /** Records "regroup {coordinatorId}:{ids joined by +},..." in the order given, then each coordinator leads its rooms; rooms not in the layout are skipped. */
+    override suspend fun regroup(groups: List<RoomGroup>) {
+        record("regroup " + groups.joinToString(",") { "${it.coordinatorId}:${it.roomIds.joinToString("+")}" })
+        val known = this.groups.value.flatMap { g -> g.rooms.map { it.id } }.toSet()
+        this.groups.value = groups.filter { it.coordinatorId in known }.fold(this.groups.value) { layout, g ->
+            lead(layout, g.coordinatorId, g.roomIds.filter { it in known }.toSet() + g.coordinatorId)
+        }
+    }
+
+    /** [layout] with [coordinatorId] leading exactly [ids]: the rooms taken from a group leave it, and a room left behind stands alone, stopped. */
+    private fun lead(layout: List<SpeakerGroup>, coordinatorId: String, ids: Set<String>): List<SpeakerGroup> {
+        val rooms = layout.flatMap { it.rooms }.associateBy { it.id }
+        val led = layout.firstOrNull { it.coordinatorId == coordinatorId }
+        val stay = layout.flatMap { g ->
+            val left = g.rooms.filter { it.id !in ids }
+            val alone = { room: SpeakerRoom -> g.copy(id = room.id, rooms = listOf(room), coordinatorId = room.id, state = PlayState.STOPPED, nowPlaying = null) }
+            when {
+                left.isEmpty() -> emptyList()
+                g.coordinatorId !in ids -> listOf(g.copy(rooms = left))
+                g.coordinatorId == coordinatorId -> left.map(alone)
+                else -> listOf(alone(left.first()).copy(rooms = left))
+            }
+        }
+        val leads = (led ?: layout.first { g -> g.rooms.any { it.id == coordinatorId } }.copy(id = coordinatorId, state = PlayState.STOPPED, nowPlaying = null))
+            .copy(rooms = ids.sorted().sortedBy { it != coordinatorId }.mapNotNull { rooms[it] }, coordinatorId = coordinatorId)
+        return listOf(leads) + stay
     }
 
     override suspend fun playFavourite(group: SpeakerGroup, favourite: Favourite) = record("playFavourite ${group.id} ${favourite.id}")

@@ -69,6 +69,11 @@ class MusicUnreachableException(val problem: MusicProblem) : Exception("The spea
 /** The library has no tracks: Shuffle everything stops before touching the queue (6 §4.4). */
 class NoLibraryException : Exception("The music library is empty")
 
+/** A group as it was: [coordinatorId] leads [roomIds]. Names no room in [toString], as the ids are the household's. */
+data class RoomGroup(val coordinatorId: String, val roomIds: List<String>) {
+    override fun toString() = "RoomGroup(rooms=${roomIds.size})"
+}
+
 /** A saved household and the speaker address that last answered for it (6 §3.2). Neither is a secret. */
 data class MusicLink(val householdId: String, val address: String)
 
@@ -114,6 +119,19 @@ interface MusicSystem {
 
     /** The picture at [url], or null when it can't be had. */
     suspend fun art(url: String): ByteArray?
+
+    /**
+     * Makes [coordinatorId] lead exactly [roomIds] (13 §4.1), one room after another: the coordinator leaves any other group,
+     * rooms not chosen leave its group, chosen rooms join it. A room that refuses or doesn't answer is left out of the group
+     * returned, not thrown; the coordinator not answering throws as any command does. Nothing is sent twice.
+     */
+    suspend fun group(coordinatorId: String, roomIds: Set<String>): SpeakerGroup
+
+    /**
+     * Puts each of [groups] back as remembered (13 §4.2): one already so is left, a room no longer in the household is skipped.
+     * Every room is tried; [MusicRefusedException] at the end when any refused.
+     */
+    suspend fun regroup(groups: List<RoomGroup>)
 
     /** Reads and commands go to the speaker at [address] from now on: one typed for this household (6 §4.1). */
     fun useAddress(address: String)

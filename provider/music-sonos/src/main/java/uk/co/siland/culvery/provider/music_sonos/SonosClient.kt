@@ -32,6 +32,7 @@ internal const val PLAYLISTS = "SQ:"
 internal const val FAVOURITES_PAGE = 100
 internal const val SHUFFLE_NOREPEAT = "SHUFFLE_NOREPEAT"
 internal const val QUEUE_PREFIX = "x-rincon-queue:"
+internal const val RINCON_PREFIX = "x-rincon:"
 internal const val LIBRARY_PREFIX = "x-rincon-playlist:"
 
 /** Line-in has this scheme; Bluetooth is an x-sonos-vli URI, so inputs are told by their UPnP class (MediaInfo.isInput). */
@@ -131,6 +132,12 @@ internal class SonosClient(
 
     suspend fun setTransportUri(address: String, uri: String, metadata: String) =
         av(address, "SetAVTransportURI", "CurrentURI" to uri, "CurrentURIMetaData" to metadata)
+
+    /** Makes the speaker at [address] join the group [coordinatorUuid] leads (13 §4.1). */
+    suspend fun join(address: String, coordinatorUuid: String) = setTransportUri(address, "$RINCON_PREFIX$coordinatorUuid", "")
+
+    /** Takes the speaker at [address] out of its group, to lead itself alone (13 §4.1). */
+    suspend fun standAlone(address: String) = av(address, "BecomeCoordinatorOfStandaloneGroup")
 
     suspend fun groupVolume(address: String): Int =
         call(address, SonosService.GROUP_RENDERING, "GetGroupVolume", INSTANCE to "0", parse = SonosXml::volume)

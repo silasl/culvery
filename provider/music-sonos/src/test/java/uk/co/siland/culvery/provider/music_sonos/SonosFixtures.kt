@@ -58,6 +58,30 @@ internal object SonosFixtures {
             """<ZoneGroup Coordinator="$DINING" ID="$DINING:56">""" + member(DINING, dining, "Dining room") + "</ZoneGroup>",
     )
 
+    /** Every room in the Kitchen's group, which leads it. */
+    fun groupedUnderKitchen(kitchen: String, lounge: String, dining: String) = zoneGroupState(
+        """<ZoneGroup Coordinator="$KITCHEN" ID="$KITCHEN:12">""" + member(KITCHEN, kitchen, "Kitchen") + member(LOUNGE, lounge, "Lounge") +
+            member(DINING, dining, "Dining room") + "</ZoneGroup>",
+    )
+
+    /** The Lounge leading the Dining room, the Kitchen alone. */
+    fun loungeLeadsDining(kitchen: String, lounge: String, dining: String) = zoneGroupState(
+        """<ZoneGroup Coordinator="$KITCHEN" ID="$KITCHEN:12">""" + member(KITCHEN, kitchen, "Kitchen") + "</ZoneGroup>" +
+            """<ZoneGroup Coordinator="$LOUNGE" ID="$LOUNGE:34">""" + member(LOUNGE, lounge, "Lounge") + member(DINING, dining, "Dining room") + "</ZoneGroup>",
+    )
+
+    /** The Kitchen and the Lounge together under the Kitchen, the Dining room alone. */
+    fun kitchenAndLounge(kitchen: String, lounge: String, dining: String) = zoneGroupState(
+        """<ZoneGroup Coordinator="$KITCHEN" ID="$KITCHEN:12">""" + member(KITCHEN, kitchen, "Kitchen") + member(LOUNGE, lounge, "Lounge") + "</ZoneGroup>" +
+            """<ZoneGroup Coordinator="$DINING" ID="$DINING:56">""" + member(DINING, dining, "Dining room") + "</ZoneGroup>",
+    )
+
+    /** What a speaker answers when it leaves its group. Shape from Sonos's UPnP documentation (6 §7). */
+    fun standAlone() = soap("BecomeCoordinatorOfStandaloneGroup", "DelegatedGroupCoordinatorID" to "", "NewGroupID" to "")
+
+    /** What a speaker answers to SetAVTransportURI. */
+    fun transportUriSet() = soap("SetAVTransportURI")
+
     /**
      * GetZoneGroupAttributes as ZoneGroupTopology documents it: the group the asked speaker is in, and every player in it
      * (hidden ones too), comma-separated.
